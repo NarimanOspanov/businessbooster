@@ -19,6 +19,7 @@
     --radius: 16px;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
+  [hidden] { display: none !important; }
   html { scroll-behavior: smooth; }
   body {
     background: var(--bg);
@@ -949,10 +950,11 @@
         </div>
         <div class="score-t">
           <h4>Индекс AI-видимости</h4>
-          <p>ИИ-ассистенты почти не видят ваш бизнес. В большинстве ответов они порекомендуют конкурентов.</p>
+          <p id="score-verdict">ИИ-ассистенты почти не видят ваш бизнес. В большинстве ответов они порекомендуют конкурентов.</p>
         </div>
       </div>
       <button class="btn btn-primary btn-next" id="btn-build" hidden>Исправить — создать AI-витрину →</button>
+      <button class="btn btn-ghost btn-next" id="btn-retry" hidden>← Попробовать другую ссылку</button>
     </div>
 
     <div class="wstep" id="wstep3" hidden>
@@ -1000,6 +1002,7 @@
       document.getElementById('audit-list').innerHTML = '';
       document.getElementById('score-wrap').hidden = true;
       document.getElementById('btn-build').hidden = true;
+      document.getElementById('btn-retry').hidden = true;
       document.getElementById('build-log').innerHTML = '';
       document.getElementById('build-fill').style.width = '0%';
       document.getElementById('ring-arc').style.strokeDashoffset = 264;
@@ -1022,44 +1025,66 @@
       const ig = host.match(/instagram\.com\/([\w.\-]+)/i);
       slug = (ig ? ig[1] : host.split('/')[0].split('.')[0])
         .replace(/[^a-z0-9-]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'yourshop';
-      let h = 0; for (const ch of host) h = (h * 31 + ch.charCodeAt(0)) % 997;
-      score = 18 + (h % 21); // детерминированно 18–38 для каждого URL
       document.getElementById('audit-host').textContent = host;
       show(1);
-      runAudit(host);
+      runAudit(raw);
     });
 
-    function runAudit(host) {
-      const checks = [
-        ['Загружаем ' + host, 'ok', 'доступен'],
-        ['Структурированные данные (Schema.org)', 'bad', 'нет'],
-        ['llms.txt для ИИ-краулеров', 'bad', 'не найден'],
-        ['Цены и услуги машиночитаемы', 'warn', 'частично'],
-        ['Присутствие в ответах ИИ', 'bad', 'не цитируется'],
-      ];
-      const list = document.getElementById('audit-list');
-      checks.forEach((c, i) => {
-        later(() => {
-          const li = document.createElement('li');
-          const label = document.createElement('span'); label.textContent = c[0];
-          const st = document.createElement('span'); st.className = 'st wait'; st.innerHTML = '<span class="spinner"></span>';
-          li.append(label, st); list.appendChild(li);
-          later(() => {
-            st.className = 'st ' + c[1];
-            st.textContent = (c[1] === 'ok' ? '✓ ' : c[1] === 'warn' ? '⚠ ' : '✗ ') + c[2];
-          }, 650);
-        }, i * 800);
-      });
-      later(() => {
-        document.getElementById('score-wrap').hidden = false;
-        requestAnimationFrame(() =>
-          requestAnimationFrame(() => { document.getElementById('ring-arc').style.strokeDashoffset = 264 - 264 * score / 100; }));
-        let n = 0;
-        const iv = setInterval(() => { n++; document.getElementById('score-val').textContent = n; if (n >= score) clearInterval(iv); }, 1000 / score);
-        timers.push(iv);
-        document.getElementById('btn-build').hidden = false;
-      }, checks.length * 800 + 400);
+    const ERR_MSG = 'Не удалось открыть этот адрес. Проверьте ссылку и попробуйте ещё раз.';
+
+    function auditRow(list, label) {
+      const li = document.createElement('li');
+      const lb = document.createElement('span'); lb.textContent = label;
+      const st = document.createElement('span'); st.className = 'st wait'; st.innerHTML = '<span class="spinner"></span>';
+      li.append(lb, st); list.appendChild(li);
+      return st;
     }
+
+    function auditFail(msg) {
+      const list = document.getElementById('audit-list');
+      list.innerHTML = '';
+      const st = auditRow(list, msg);
+      st.className = 'st bad'; st.textContent = '✗';
+      document.getElementById('btn-retry').hidden = false;
+    }
+
+    function runAudit(raw) {
+      const list = document.getElementById('audit-list');
+      list.innerHTML = '';
+      auditRow(list, 'Проводим живой аудит…');
+
+      fetch('/api/audit?url=' + encodeURIComponent(raw) + '&lang=ru')
+        .then(r => r.json())
+        .then(d => {
+          if (!d || d.error || !d.items) { auditFail((d && d.error) || ERR_MSG); return; }
+          list.innerHTML = '';
+          score = d.score;
+          d.items.forEach((c, i) => {
+            later(() => {
+              const st = auditRow(list, c.label);
+              later(() => {
+                st.className = 'st ' + c.status;
+                st.textContent = (c.status === 'ok' ? '✓ ' : c.status === 'warn' ? '⚠ ' : '✗ ') + c.note;
+              }, 500);
+            }, i * 650);
+          });
+          later(() => {
+            document.getElementById('score-verdict').textContent = d.verdict;
+            const arc = document.getElementById('ring-arc');
+            arc.style.stroke = score < 40 ? '#f87171' : score < 70 ? '#fbbf24' : '#34d399';
+            document.getElementById('score-wrap').hidden = false;
+            requestAnimationFrame(() =>
+              requestAnimationFrame(() => { arc.style.strokeDashoffset = 264 - 264 * score / 100; }));
+            let n = 0;
+            const iv = setInterval(() => { n++; document.getElementById('score-val').textContent = n; if (n >= score) clearInterval(iv); }, 1000 / Math.max(score, 10));
+            timers.push(iv);
+            document.getElementById('btn-build').hidden = false;
+          }, d.items.length * 650 + 400);
+        })
+        .catch(() => auditFail(ERR_MSG));
+    }
+
+    document.getElementById('btn-retry').addEventListener('click', () => { show(0); document.getElementById('wiz-url').focus(); });
 
     document.getElementById('btn-build').addEventListener('click', () => { show(2); runBuild(); });
 
