@@ -147,7 +147,7 @@ async function fetchSafe(url, ms = 10000) {
       signal: ctrl.signal,
       redirect: "follow",
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; BusinessBoosterAudit/0.1)",
+        "User-Agent": "Mozilla/5.0 (compatible; SaudagoAudit/0.1)",
         Accept: "text/html,application/xhtml+xml,*/*",
         "Accept-Language": "en,ru;q=0.8",
       },
@@ -569,7 +569,7 @@ ${cards}
 </main>
 <footer>
   <div class="wrap">
-    AI-читаемая витрина, сгенерированная <a href="/">Business Booster</a> из каталога продавца на Kaspi.kz · данные обновлены ${esc(fetchedDate)} · цены и наличие подтверждаются на Kaspi
+    AI-читаемая витрина, сгенерированная <a href="/">Saudago</a> из каталога продавца на Kaspi.kz · данные обновлены ${esc(fetchedDate)} · цены и наличие подтверждаются на Kaspi
   </div>
 </footer>
 </body>
@@ -651,4 +651,4 @@ http
       res.writeHead(200, { "Content-Type": type }).end(data);
     });
   })
-  .listen(PORT, () => console.log(`Business Booster running on port ${PORT}`));
+  .listen(PORT, () => console.log(`Saudago running on port ${PORT}`));
