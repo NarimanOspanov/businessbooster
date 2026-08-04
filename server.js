@@ -334,6 +334,123 @@ async function runAudit(rawUrl, lang) {
 }
 
 // ---------------------------------------------------------------------------
+// Live Kaspi ingest (/api/ingest?url=kaspi.kz/shop/<brand>)
+// ---------------------------------------------------------------------------
+
+const MEM_MERCHANTS = new Map(); // slug -> profile (fallback when the disk is read-only)
+const KASPI_SHOP_RE = /kaspi\.kz\/shop\/([\w.\-]+)\/?(?:$|[?#])/i;
+
+const KASPI_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+  Accept: "application/json, text/*",
+  "Accept-Language": "ru",
+  "X-KS-City": "750000000",
+};
+
+function normBrand(s) {
+  return String(s).toLowerCase().replace(/[^a-z0-9а-яё]+/gi, "");
+}
+
+async function kaspiSearch(query, page) {
+  const url =
+    "https://kaspi.kz/yml/product-view/pl/results?page=" + page +
+    "&text=" + encodeURIComponent(query) +
+    "&sort=relevance&qs=&ui=d&i=-1&c=750000000";
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 12000);
+  try {
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      headers: Object.assign({ Referer: "https://kaspi.kz/shop/search/?text=" + encodeURIComponent(query) }, KASPI_HEADERS),
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return res.json();
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+function loadProfile(slug) {
+  if (MEM_MERCHANTS.has(slug)) return MEM_MERCHANTS.get(slug);
+  const file = path.join(ROOT, "data", "merchants", slug + ".json");
+  if (!fs.existsSync(file)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function profileSummary(p) {
+  return { slug: p.slug, name: p.name, productCount: p.productCount, storeUrl: "/store/" + p.slug };
+}
+
+async function handleIngest(rawUrl) {
+  const m = String(rawUrl || "").match(KASPI_SHOP_RE);
+  if (!m) return { error: "live ingest supports kaspi.kz/shop/<brand> links for now" };
+  const token = decodeURIComponent(m[1]);
+  const slug = token.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  if (!slug) return { error: "could not read the shop name from the link" };
+
+  // Fresh cache (memory or disk) within 24h
+  const cached = loadProfile(slug);
+  if (cached && cached.fetchedAt && Date.now() - Date.parse(cached.fetchedAt) < 24 * 3600 * 1000) {
+    return profileSummary(cached);
+  }
+
+  const wanted = normBrand(token);
+  const byId = new Map();
+  for (let p = 0; p < 3 && byId.size < 40; p++) {
+    let json;
+    try {
+      json = await kaspiSearch(token.replace(/[-_.]+/g, " "), p);
+    } catch {
+      break;
+    }
+    const items = (json && json.data) || [];
+    if (!items.length) break;
+    for (const it of items) {
+      if (normBrand(it.brand || "") !== wanted) continue;
+      const img = it.previewImages && it.previewImages[0] ? (it.previewImages[0].large || it.previewImages[0].medium) : null;
+      byId.set(String(it.id), {
+        id: String(it.id),
+        title: it.title,
+        price: it.unitPrice,
+        oldPrice: it.unitPriceBeforeDiscount || null,
+        discount: it.discount || 0,
+        priceFormatted: it.priceFormatted,
+        image: img,
+        kaspiUrl: "https://kaspi.kz/shop" + it.shopLink,
+        rating: it.rating || null,
+        reviews: it.reviewsQuantity || null,
+      });
+    }
+  }
+
+  if (!byId.size) return { error: "no products found for this brand on Kaspi" };
+
+  const profile = {
+    slug,
+    name: token.replace(/[-_.]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+    source: "kaspi.kz",
+    sourceQuery: token,
+    fetchedAt: new Date().toISOString(),
+    productCount: byId.size,
+    products: Array.from(byId.values()),
+  };
+
+  MEM_MERCHANTS.set(slug, profile);
+  try {
+    const outDir = path.join(ROOT, "data", "merchants");
+    fs.mkdirSync(outDir, { recursive: true });
+    fs.writeFileSync(path.join(outDir, slug + ".json"), JSON.stringify(profile, null, 2), "utf8");
+  } catch {
+    // read-only filesystem (e.g. run-from-package) — memory cache still serves the store
+  }
+  return profileSummary(profile);
+}
+
+// ---------------------------------------------------------------------------
 // SSR brand storefronts (/store/<slug>) generated from ingested catalogs
 // ---------------------------------------------------------------------------
 
@@ -342,14 +459,8 @@ function esc(s) {
 }
 
 function renderStore(slug) {
-  const file = path.join(ROOT, "data", "merchants", slug + ".json");
-  if (!fs.existsSync(file)) return null;
-  let m;
-  try {
-    m = JSON.parse(fs.readFileSync(file, "utf8"));
-  } catch {
-    return null;
-  }
+  const m = loadProfile(slug);
+  if (!m || !m.products || !m.products.length) return null;
 
   const prices = m.products.map((p) => p.price).filter(Boolean);
   const minP = Math.min(...prices);
@@ -473,6 +584,20 @@ http
   .createServer((req, res) => {
     const parsed = new URL(req.url, "http://localhost");
     const urlPath = decodeURIComponent(parsed.pathname);
+
+    if (urlPath === "/api/ingest") {
+      const target = parsed.searchParams.get("url") || "";
+      handleIngest(target)
+        .then((result) => {
+          res.writeHead(result.error ? 422 : 200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+          res.end(JSON.stringify(result));
+        })
+        .catch(() => {
+          res.writeHead(500, { "Content-Type": MIME[".json"] });
+          res.end(JSON.stringify({ error: "ingest failed" }));
+        });
+      return;
+    }
 
     if (urlPath === "/api/audit") {
       const target = parsed.searchParams.get("url") || "";

@@ -431,7 +431,8 @@
     background: var(--bg-soft); border: 1px solid rgba(52, 211, 153, 0.35); border-radius: 14px;
     padding: 16px 18px; margin: 18px 0;
   }
-  .done-url { font-family: "Cascadia Code", Consolas, monospace; color: var(--accent-2); font-weight: 700; font-size: 15px; word-break: break-all; }
+  .done-url { display: block; font-family: "Cascadia Code", Consolas, monospace; color: var(--accent-2); font-weight: 700; font-size: 15px; word-break: break-all; }
+  a.done-url[href]:hover { text-decoration: underline; }
   .done-sub { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
   .score-jump { display: flex; align-items: baseline; gap: 12px; justify-content: center; font-weight: 800; font-size: 26px; margin: 20px 0 4px; }
   .score-jump .old { color: #f87171; }
@@ -1003,7 +1004,7 @@
         </div>
       </form>
       <div class="wiz-examples">
-        <span class="chip" data-fill="kaspi.kz/shop/CvetochnyRai">🛍 Магазин Kaspi</span>
+        <span class="chip" data-fill="kaspi.kz/shop/Rozarium">🛍 Магазин Kaspi</span>
         <span class="chip" data-fill="wildberries.ru/seller/cvetochny-rai">🛍 Wildberries</span>
         <span class="chip" data-fill="ozon.ru/seller/cvetochny-rai">🛍 Ozon</span>
         <span class="chip" data-fill="instagram.com/cvetochny.rai">📷 Instagram</span>
@@ -1055,8 +1056,8 @@
       <div class="wiz-eyebrow">Готово 🎉</div>
       <h3>Ваша AI-витрина запущена</h3>
       <div class="done-card">
-        <div class="done-url" id="done-url">https://yourshop.businessbooster.com</div>
-        <div class="done-sub">Schema.org · серверный рендеринг · профили Google и Bing · демо-адрес — запуск на вашем собственном домене</div>
+        <a class="done-url" id="done-url" target="_blank" rel="noopener">https://yourshop.businessbooster.com</a>
+        <div class="done-sub" id="done-sub">Schema.org · серверный рендеринг · профили Google и Bing · демо-адрес — запуск на вашем собственном домене</div>
       </div>
       <div class="score-jump"><span class="old" id="score-old">27</span> → <span class="new">94</span> <span class="lbl">Индекс AI-видимости</span></div>
       <a class="btn btn-primary btn-next" id="dash-link" href="/dashboard/">Открыть дашборд →</a>
@@ -1098,11 +1099,13 @@
     let timers = [];
     const later = (fn, ms) => timers.push(setTimeout(fn, ms));
     let slug = 'yourshop', score = 27;
+    let ingestPromise = null, isKaspi = false;
     const G_BTN_HTML = document.getElementById('g-btn').innerHTML;
 
     function show(i) { steps.forEach((s, j) => { s.hidden = j !== i; }); }
     function reset() {
       timers.forEach(clearTimeout); timers = [];
+      ingestPromise = null; isKaspi = false;
       show(0);
       document.getElementById('wiz-form').reset();
       document.getElementById('audit-list').innerHTML = '';
@@ -1135,6 +1138,11 @@
       const m = host.match(/(?:instagram\.com|kaspi\.kz\/shop|ozon\.[a-z]{2,3}\/seller|wildberries\.[a-z]{2,3}\/seller|wb\.ru\/seller)\/([\w.\-]+)/i);
       slug = (m ? m[1] : host.split('/')[0].split('.')[0])
         .replace(/[^a-z0-9-]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'yourshop';
+      // Живой ингест для ссылок на магазины Kaspi — стартует параллельно с аудитом
+      isKaspi = /kaspi\.kz\/shop\//i.test(host);
+      ingestPromise = isKaspi
+        ? fetch('/api/ingest?url=' + encodeURIComponent(raw)).then(r => r.json()).catch(() => null)
+        : Promise.resolve(null);
       document.getElementById('audit-host').textContent = host;
       show(1);
       runAudit(raw);
@@ -1229,10 +1237,30 @@
         }, i * 1100);
       });
       later(() => {
-        document.getElementById('done-url').textContent = 'https://' + slug + '.businessbooster.com';
         document.getElementById('score-old').textContent = score;
         document.getElementById('dash-link').href = '/dashboard/?site=' + encodeURIComponent(slug);
-        show(3);
+        const u = document.getElementById('done-url');
+        let waitLine = null;
+        if (isKaspi) {
+          waitLine = document.createElement('div');
+          waitLine.className = 'doing';
+          waitLine.textContent = 'Забираем ваш живой каталог с Kaspi…';
+          log.appendChild(waitLine);
+        }
+        (ingestPromise || Promise.resolve(null)).then(ing => {
+          if (ing && ing.storeUrl) {
+            if (waitLine) { waitLine.className = 'done'; waitLine.textContent = 'Витрина опубликована: ' + ing.storeUrl + ' · товаров: ' + ing.productCount; }
+            u.textContent = location.origin + ing.storeUrl;
+            u.setAttribute('href', ing.storeUrl);
+            document.getElementById('done-sub').textContent = 'Собрана из вашего живого каталога Kaspi · Schema.org · серверный рендеринг · переедет на ваш собственный домен';
+            later(() => show(3), 900);
+          } else {
+            if (waitLine) waitLine.remove();
+            u.textContent = 'https://' + slug + '.businessbooster.com';
+            u.removeAttribute('href');
+            show(3);
+          }
+        });
       }, tasks.length * 1100 + 500);
     }
   })();
