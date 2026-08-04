@@ -334,6 +334,138 @@ async function runAudit(rawUrl, lang) {
 }
 
 // ---------------------------------------------------------------------------
+// SSR brand storefronts (/store/<slug>) generated from ingested catalogs
+// ---------------------------------------------------------------------------
+
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function renderStore(slug) {
+  const file = path.join(ROOT, "data", "merchants", slug + ".json");
+  if (!fs.existsSync(file)) return null;
+  let m;
+  try {
+    m = JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch {
+    return null;
+  }
+
+  const prices = m.products.map((p) => p.price).filter(Boolean);
+  const minP = Math.min(...prices);
+  const rated = m.products.filter((p) => p.rating && p.reviews);
+  const topRating = rated.length ? Math.max(...rated.map((p) => p.rating)) : null;
+
+  const ld = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Store",
+        name: m.name,
+        description: m.name + " — фирменный каталог: " + m.productCount + " товаров, цены от " + minP + " ₸. Заказ онлайн через Kaspi.",
+      },
+      {
+        "@type": "ItemList",
+        itemListElement: m.products.map((p, i) => ({
+          "@type": "ListItem",
+          position: i + 1,
+          item: Object.assign(
+            {
+              "@type": "Product",
+              name: p.title,
+              brand: { "@type": "Brand", name: m.name },
+              offers: {
+                "@type": "Offer",
+                price: p.price,
+                priceCurrency: "KZT",
+                availability: "https://schema.org/InStock",
+                url: p.kaspiUrl,
+              },
+            },
+            p.image ? { image: p.image } : {},
+            p.rating && p.reviews
+              ? { aggregateRating: { "@type": "AggregateRating", ratingValue: p.rating, reviewCount: p.reviews } }
+              : {}
+          ),
+        })),
+      },
+    ],
+  };
+
+  const cards = m.products
+    .map((p) => {
+      const old = p.oldPrice && p.oldPrice > p.price ? '<s>' + p.oldPrice.toLocaleString("ru-RU") + " ₸</s>" : "";
+      const disc = p.discount ? '<span class="disc">−' + p.discount + "%</span>" : "";
+      const rating = p.rating && p.reviews ? '<div class="rate">★ ' + p.rating + ' <span>(' + p.reviews + ")</span></div>" : '<div class="rate"></div>';
+      return (
+        '<article class="card">' +
+        (p.image ? '<img src="' + esc(p.image) + '" alt="' + esc(p.title) + '" loading="lazy">' : "") +
+        "<h3>" + esc(p.title) + "</h3>" +
+        rating +
+        '<div class="price">' + esc(p.priceFormatted || p.price + " ₸") + " " + old + " " + disc + "</div>" +
+        '<a class="buy" href="' + esc(p.kaspiUrl) + '" rel="nofollow">Купить на Kaspi</a>' +
+        "</article>"
+      );
+    })
+    .join("\n");
+
+  const fetchedDate = (m.fetchedAt || "").slice(0, 10);
+  return `<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${esc(m.name)} — официальный каталог и цены</title>
+<meta name="description" content="${esc(m.name)}: ${m.productCount} товаров с ценами от ${minP.toLocaleString("ru-RU")} ₸${topRating ? ", рейтинг до " + topRating + "★" : ""}. Букеты и композиции с заказом онлайн через Kaspi.">
+<script type="application/ld+json">${JSON.stringify(ld)}</script>
+<style>
+  :root { --ink: #1c1c28; --muted: #6f6f80; --line: #e8e8ef; --brand: #7c5cff; --kaspi: #f14635; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: "Inter", "Segoe UI", system-ui, sans-serif; color: var(--ink); background: #fafafc; line-height: 1.5; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+  header { background: #fff; border-bottom: 1px solid var(--line); padding: 28px 0; }
+  h1 { font-size: 28px; letter-spacing: -0.02em; }
+  .sub { color: var(--muted); font-size: 14.5px; margin-top: 4px; }
+  main { padding: 28px 0 40px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; }
+  .card img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; background: #f0f0f5; }
+  .card h3 { font-size: 14px; font-weight: 600; margin: 10px 0 4px; flex-grow: 1; }
+  .rate { font-size: 12.5px; color: #e8a33d; min-height: 19px; }
+  .rate span { color: var(--muted); }
+  .price { font-size: 16px; font-weight: 800; margin: 6px 0 10px; }
+  .price s { color: var(--muted); font-weight: 400; font-size: 13px; }
+  .disc { background: #ffe9e6; color: var(--kaspi); font-size: 12px; font-weight: 700; border-radius: 6px; padding: 1px 6px; }
+  .buy { display: block; text-align: center; background: var(--kaspi); color: #fff; text-decoration: none; font-weight: 700; font-size: 14px; padding: 10px; border-radius: 10px; }
+  .buy:hover { filter: brightness(1.05); }
+  footer { border-top: 1px solid var(--line); padding: 20px 0 32px; color: var(--muted); font-size: 12.5px; }
+  footer a { color: var(--brand); text-decoration: none; font-weight: 600; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>${esc(m.name)}</h1>
+    <p class="sub">Официальная витрина бренда · ${m.productCount} товаров · цены от ${minP.toLocaleString("ru-RU")} ₸ · заказ через Kaspi</p>
+  </div>
+</header>
+<main>
+  <div class="wrap">
+    <div class="grid">
+${cards}
+    </div>
+  </div>
+</main>
+<footer>
+  <div class="wrap">
+    AI-читаемая витрина, сгенерированная <a href="/">Business Booster</a> из каталога продавца на Kaspi.kz · данные обновлены ${esc(fetchedDate)} · цены и наличие подтверждаются на Kaspi
+  </div>
+</footer>
+</body>
+</html>`;
+}
+
+// ---------------------------------------------------------------------------
 // HTTP server: /api/audit + static files
 // ---------------------------------------------------------------------------
 
@@ -355,6 +487,15 @@ http
           res.end(JSON.stringify({ error: (S[lang] || S.en).err_fetch }));
         });
       return;
+    }
+
+    const storeMatch = urlPath.match(/^\/store\/([a-z0-9-]+)\/?$/);
+    if (storeMatch) {
+      const html = renderStore(storeMatch[1]);
+      if (html) {
+        res.writeHead(200, { "Content-Type": MIME[".html"], "Cache-Control": "public, max-age=300" }).end(html);
+        return;
+      }
     }
 
     let filePath = path.normalize(path.join(ROOT, urlPath));
