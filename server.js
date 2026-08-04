@@ -50,6 +50,16 @@ const S = {
     content_partial: "thin content",
     content_missing: "requires JS",
     social_note: "closed platform — AI crawlers can't read it",
+    mp_page: "marketplace page",
+    mp_store: "Own brand storefront",
+    mp_store_note: "none — only a marketplace listing",
+    mp_brand: "Your brand in AI answers",
+    mp_brand_note: "AI cites the marketplace, not you",
+    mp_feed: "Product feed in ChatGPT / Perplexity",
+    mp_feed_note: "not submitted",
+    mp_fee: "Marketplace commission",
+    mp_fee_note: "15–30% per order",
+    mp_verdict: "Your sales live on rented land: the marketplace owns the customer, the data and the commission. An own AI channel fixes that.",
     verdict_low: "AI assistants can barely see your business. In most answers they'll recommend competitors instead.",
     verdict_mid: "AI can partially read your business, but key signals are missing — better-optimized competitors win the answer.",
     verdict_high: "Solid baseline! A bridge site still adds transactions, always-fresh data and AI-mention monitoring.",
@@ -80,6 +90,16 @@ const S = {
     content_partial: "мало текста",
     content_missing: "нужен JS",
     social_note: "закрытая платформа — ИИ-краулеры её не читают",
+    mp_page: "страница маркетплейса",
+    mp_store: "Собственная витрина бренда",
+    mp_store_note: "нет — только карточка на маркетплейсе",
+    mp_brand: "Ваш бренд в ответах ИИ",
+    mp_brand_note: "ИИ цитирует маркетплейс, а не вас",
+    mp_feed: "Товарный фид в ChatGPT / Perplexity",
+    mp_feed_note: "не подан",
+    mp_fee: "Комиссия маркетплейса",
+    mp_fee_note: "15–30% с заказа",
+    mp_verdict: "Ваши продажи живут на арендованной земле: клиент, данные и комиссия принадлежат маркетплейсу. Собственный AI-канал это исправляет.",
     verdict_low: "ИИ-ассистенты почти не видят ваш бизнес. В большинстве ответов они порекомендуют конкурентов.",
     verdict_mid: "ИИ читает ваш бизнес частично, но ключевых сигналов нет — ответ выигрывают более оптимизированные конкуренты.",
     verdict_high: "Хорошая база! Сайт-мост всё равно добавит транзакции, всегда свежие данные и мониторинг упоминаний в ИИ.",
@@ -90,6 +110,7 @@ const S = {
 
 const AI_BOTS = ["gptbot", "claudebot", "anthropic-ai", "perplexitybot", "google-extended", "oai-searchbot"];
 const CLOSED_PLATFORMS = ["instagram.com", "facebook.com", "m.facebook.com", "tiktok.com", "vk.com"];
+const MARKETPLACES = ["kaspi.kz", "wildberries.ru", "wildberries.kz", "wb.ru", "ozon.ru", "ozon.kz"];
 
 function isPrivateIp(ip) {
   if (net.isIPv6(ip)) {
@@ -188,6 +209,21 @@ async function runAudit(rawUrl, lang) {
     return { error: t.err_url };
   }
   const host = u.hostname.replace(/^www\./, "");
+
+  // Marketplace store pages (Kaspi, Wildberries, Ozon): the seller has no AI presence of their own
+  if (MARKETPLACES.some((p) => host === p || host.endsWith("." + p))) {
+    return {
+      score: 18,
+      verdict: t.mp_verdict,
+      items: [
+        { label: t.fetch(host + u.pathname), status: "warn", note: t.mp_page },
+        { label: t.mp_store, status: "bad", note: t.mp_store_note },
+        { label: t.mp_brand, status: "bad", note: t.mp_brand_note },
+        { label: t.mp_feed, status: "bad", note: t.mp_feed_note },
+        { label: t.mp_fee, status: "warn", note: t.mp_fee_note },
+      ],
+    };
+  }
 
   // Closed platforms (Instagram etc.): truthful canned result — bots can't read them
   if (CLOSED_PLATFORMS.some((p) => host === p || host.endsWith("." + p))) {
