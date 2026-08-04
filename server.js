@@ -411,7 +411,7 @@ async function handleIngest(rawUrl) {
     if (!items.length) break;
     for (const it of items) {
       if (normBrand(it.brand || "") !== wanted) continue;
-      const img = it.previewImages && it.previewImages[0] ? (it.previewImages[0].large || it.previewImages[0].medium) : null;
+      const images = (it.previewImages || []).map((p) => p.large || p.medium).filter(Boolean).slice(0, 4);
       byId.set(String(it.id), {
         id: String(it.id),
         title: it.title,
@@ -419,7 +419,8 @@ async function handleIngest(rawUrl) {
         oldPrice: it.unitPriceBeforeDiscount || null,
         discount: it.discount || 0,
         priceFormatted: it.priceFormatted,
-        image: img,
+        image: images[0] || null,
+        images,
         kaspiUrl: "https://kaspi.kz/shop" + it.shopLink,
         rating: it.rating || null,
         reviews: it.reviewsQuantity || null,
@@ -508,9 +509,14 @@ function renderStore(slug) {
       const old = p.oldPrice && p.oldPrice > p.price ? '<s>' + p.oldPrice.toLocaleString("ru-RU") + " ₸</s>" : "";
       const disc = p.discount ? '<span class="disc">−' + p.discount + "%</span>" : "";
       const rating = p.rating && p.reviews ? '<div class="rate">★ ' + p.rating + ' <span>(' + p.reviews + ")</span></div>" : '<div class="rate"></div>';
+      const imgs = p.images && p.images.length ? p.images : p.image ? [p.image] : [];
+      const main = imgs.length ? '<img class="main" src="' + esc(imgs[0]) + '" alt="' + esc(p.title) + '" loading="lazy">' : "";
+      const thumbs = imgs.length > 1
+        ? '<div class="thumbs">' + imgs.map((u, i) => '<img src="' + esc(u) + '"' + (i === 0 ? ' class="on"' : "") + ' alt="" loading="lazy">').join("") + "</div>"
+        : "";
       return (
         '<article class="card">' +
-        (p.image ? '<img src="' + esc(p.image) + '" alt="' + esc(p.title) + '" loading="lazy">' : "") +
+        main + thumbs +
         "<h3>" + esc(p.title) + "</h3>" +
         rating +
         '<div class="price">' + esc(p.priceFormatted || p.price + " ₸") + " " + old + " " + disc + "</div>" +
@@ -540,7 +546,13 @@ function renderStore(slug) {
   main { padding: 28px 0 40px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
   .card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; }
-  .card img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; background: #f0f0f5; }
+  .card img.main { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; background: #f0f0f5; }
+  .thumbs { display: flex; gap: 6px; margin-top: 8px; }
+  .thumbs img {
+    width: 44px; height: 44px; object-fit: cover; border-radius: 8px;
+    border: 2px solid transparent; cursor: pointer; background: #f0f0f5;
+  }
+  .thumbs img.on { border-color: var(--brand); }
   .card h3 { font-size: 14px; font-weight: 600; margin: 10px 0 4px; flex-grow: 1; }
   .rate { font-size: 12.5px; color: #e8a33d; min-height: 19px; }
   .rate span { color: var(--muted); }
@@ -572,6 +584,16 @@ ${cards}
     AI-читаемая витрина, сгенерированная <a href="/">Saudaget</a> из каталога продавца на Kaspi.kz · данные обновлены ${esc(fetchedDate)} · цены и наличие подтверждаются на Kaspi
   </div>
 </footer>
+<script>
+  document.querySelectorAll(".thumbs img").forEach(function (t) {
+    t.addEventListener("click", function () {
+      var card = t.closest(".card");
+      card.querySelector("img.main").src = t.src;
+      card.querySelectorAll(".thumbs img").forEach(function (x) { x.classList.remove("on"); });
+      t.classList.add("on");
+    });
+  });
+</script>
 </body>
 </html>`;
 }

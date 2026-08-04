@@ -42,7 +42,7 @@ async function fetchPage(page) {
     for (const it of items) {
       const brandMatch = (it.brand || "").toLowerCase() === query.toLowerCase();
       if (!brandMatch) continue;
-      const img = it.previewImages && it.previewImages[0] ? (it.previewImages[0].large || it.previewImages[0].medium) : null;
+      const images = (it.previewImages || []).map((p) => p.large || p.medium).filter(Boolean).slice(0, 4);
       byId.set(String(it.id), {
         id: String(it.id),
         title: it.title,
@@ -50,7 +50,8 @@ async function fetchPage(page) {
         oldPrice: it.unitPriceBeforeDiscount || null,
         discount: it.discount || 0,
         priceFormatted: it.priceFormatted,
-        image: img,
+        image: images[0] || null,
+        images,
         kaspiUrl: "https://kaspi.kz/shop" + it.shopLink,
         rating: it.rating || null,
         reviews: it.reviewsQuantity || null,
