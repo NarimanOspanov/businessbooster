@@ -242,13 +242,14 @@ async function runAudit(rawUrl, lang) {
     const llms = await fetchSafe(u.origin + "/llms.txt", 6000);
     const looksText = llms.status === 200 && llms.text.trim() && !/^\s*</.test(llms.text);
     if (looksText) {
+      // llms.txt: nice-to-have only — research shows no major AI system consumes it yet
       items.push({ label: t.llms, status: "ok", note: t.llms_ok });
-      score += 15;
+      score += 5;
     } else {
-      items.push({ label: t.llms, status: "bad", note: t.llms_missing });
+      items.push({ label: t.llms, status: "warn", note: t.llms_missing });
     }
   } catch {
-    items.push({ label: t.llms, status: "bad", note: t.llms_missing });
+    items.push({ label: t.llms, status: "warn", note: t.llms_missing });
   }
 
   // Schema.org
@@ -281,8 +282,9 @@ async function runAudit(rawUrl, lang) {
   // Content without JS
   const textLen = stripHtml(page.text).length;
   if (textLen > 600) {
+    // Highest-weight check: AI crawlers don't execute JS, so server-rendered text is decisive
     items.push({ label: t.content, status: "ok", note: t.content_ok });
-    score += 20;
+    score += 25;
   } else if (textLen > 200) {
     items.push({ label: t.content, status: "warn", note: t.content_partial });
     score += 10;
