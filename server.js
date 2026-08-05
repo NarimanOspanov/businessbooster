@@ -502,6 +502,190 @@ function buildFeed(slug, origin) {
 }
 
 // ---------------------------------------------------------------------------
+// Google Merchant feed (/store/<slug>/feed-google.xml) — RSS 2.0 with the
+// g: namespace. Google's Shopping Graph feeds Gemini shopping answers and
+// AI Overviews; Merchant Center can fetch this URL on a schedule.
+// ---------------------------------------------------------------------------
+
+function xmlEsc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function buildGoogleFeed(slug, origin) {
+  const m = loadProfile(slug);
+  if (!m || !m.products || !m.products.length) return null;
+  const storeUrl = origin + "/store/" + m.slug;
+  const items = m.products
+    .map((p) => {
+      const images = p.images && p.images.length ? p.images : p.image ? [p.image] : [];
+      return (
+        "<item>" +
+        "<g:id>" + xmlEsc(p.id) + "</g:id>" +
+        "<g:title>" + xmlEsc(p.title) + "</g:title>" +
+        "<g:description>" + xmlEsc(p.title + " — " + m.name) + "</g:description>" +
+        "<g:link>" + xmlEsc(p.kaspiUrl) + "</g:link>" +
+        (images[0] ? "<g:image_link>" + xmlEsc(images[0]) + "</g:image_link>" : "") +
+        images.slice(1).map((u) => "<g:additional_image_link>" + xmlEsc(u) + "</g:additional_image_link>").join("") +
+        "<g:price>" + xmlEsc(p.price + " KZT") + "</g:price>" +
+        "<g:availability>in stock</g:availability>" +
+        "<g:brand>" + xmlEsc(m.name) + "</g:brand>" +
+        "<g:condition>new</g:condition>" +
+        "</item>"
+      );
+    })
+    .join("\n");
+  return (
+    '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">\n<channel>\n' +
+    "<title>" + xmlEsc(m.name) + "</title>\n" +
+    "<link>" + xmlEsc(storeUrl) + "</link>\n" +
+    "<description>" + xmlEsc(m.name + " — каталог бренда, сгенерирован Saudaget") + "</description>\n" +
+    items +
+    "\n</channel>\n</rss>\n"
+  );
+}
+
+// ---------------------------------------------------------------------------
+// MCP server per storefront (/store/<slug>/mcp) — the Anthropic-native door:
+// Claude (or any MCP client) connects and queries the catalog with tools.
+// Model Context Protocol over Streamable HTTP, stateless JSON responses.
+// ---------------------------------------------------------------------------
+
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let data = "";
+    req.on("data", (c) => {
+      data += c;
+      if (data.length > 1e6) {
+        reject(new Error("body too large"));
+        req.destroy();
+      }
+    });
+    req.on("end", () => resolve(data));
+    req.on("error", reject);
+  });
+}
+
+const MCP_TOOLS = [
+  {
+    name: "get_store_info",
+    description: "Store overview: brand name, product count, price range, data freshness.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "search_products",
+    description: "Search the catalog by product title. Returns price, rating and a buy link.",
+    inputSchema: {
+      type: "object",
+      properties: { query: { type: "string", description: "Search text, e.g. 'букет роза'" } },
+      required: ["query"],
+    },
+  },
+  {
+    name: "get_product",
+    description: "Full details for one product by its id.",
+    inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
+  },
+];
+
+function mcpToolCall(m, name, args) {
+  const brief = (p) => ({
+    id: p.id,
+    title: p.title,
+    price_kzt: p.price,
+    rating: p.rating,
+    reviews: p.reviews,
+    buy_url: p.kaspiUrl,
+  });
+  if (name === "get_store_info") {
+    const prices = m.products.map((p) => p.price).filter(Boolean);
+    return {
+      name: m.name,
+      source: m.source,
+      product_count: m.productCount,
+      min_price_kzt: prices.length ? Math.min(...prices) : null,
+      max_price_kzt: prices.length ? Math.max(...prices) : null,
+      updated_at: m.fetchedAt,
+      note: "Availability and prices are confirmed at order time on Kaspi.",
+    };
+  }
+  if (name === "search_products") {
+    const q = String((args && args.query) || "").toLowerCase();
+    const results = m.products.filter((p) => p.title.toLowerCase().includes(q)).slice(0, 10).map(brief);
+    return { query: q, result_count: results.length, results };
+  }
+  if (name === "get_product") {
+    const p = m.products.find((x) => x.id === String(args && args.id));
+    if (!p) throw new Error("product not found: " + (args && args.id));
+    return Object.assign(brief(p), {
+      images: p.images || (p.image ? [p.image] : []),
+      old_price_kzt: p.oldPrice,
+      discount_percent: p.discount,
+      price_formatted: p.priceFormatted,
+    });
+  }
+  throw new Error("unknown tool: " + name);
+}
+
+async function handleMcp(req, res, slug) {
+  const m = loadProfile(slug);
+  if (!m || !m.products || !m.products.length) {
+    res.writeHead(404, { "Content-Type": MIME[".json"] }).end(JSON.stringify({ error: "unknown store" }));
+    return;
+  }
+  if (req.method !== "POST") {
+    res.writeHead(405, { Allow: "POST", "Content-Type": MIME[".json"] })
+      .end(JSON.stringify({ error: "MCP endpoint: send JSON-RPC 2.0 messages via POST (Streamable HTTP)" }));
+    return;
+  }
+  let msg;
+  try {
+    msg = JSON.parse(await readBody(req));
+  } catch {
+    res.writeHead(400).end();
+    return;
+  }
+  if (Array.isArray(msg)) msg = msg[0]; // minimal batch support
+  const id = msg && msg.id;
+  const method = msg && msg.method;
+  const params = (msg && msg.params) || {};
+  if (id === undefined || id === null) {
+    res.writeHead(202).end(); // notification (e.g. notifications/initialized)
+    return;
+  }
+  const reply = (result) =>
+    res.writeHead(200, { "Content-Type": MIME[".json"] }).end(JSON.stringify({ jsonrpc: "2.0", id, result }));
+  const fail = (code, message) =>
+    res.writeHead(200, { "Content-Type": MIME[".json"] }).end(JSON.stringify({ jsonrpc: "2.0", id, error: { code, message } }));
+
+  switch (method) {
+    case "initialize":
+      reply({
+        protocolVersion: params.protocolVersion || "2025-06-18",
+        capabilities: { tools: {} },
+        serverInfo: { name: "saudaget-store-" + slug, version: "0.1.0" },
+      });
+      break;
+    case "ping":
+      reply({});
+      break;
+    case "tools/list":
+      reply({ tools: MCP_TOOLS });
+      break;
+    case "tools/call":
+      try {
+        const out = mcpToolCall(m, params.name, params.arguments);
+        reply({ content: [{ type: "text", text: JSON.stringify(out, null, 2) }] });
+      } catch (e) {
+        reply({ content: [{ type: "text", text: "Error: " + e.message }], isError: true });
+      }
+      break;
+    default:
+      fail(-32601, "Method not found: " + method);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // SSR brand storefronts (/store/<slug>) generated from ingested catalogs
 // ---------------------------------------------------------------------------
 
@@ -631,7 +815,8 @@ ${cards}
 </main>
 <footer>
   <div class="wrap">
-    AI-читаемая витрина, сгенерированная <a href="/">Saudaget</a> из каталога продавца на Kaspi.kz · данные обновлены ${esc(fetchedDate)} · цены и наличие подтверждаются на Kaspi · <a href="/store/${esc(m.slug)}/feed.json">фид для ИИ-шопинга</a>
+    AI-читаемая витрина, сгенерированная <a href="/">Saudaget</a> из каталога продавца на Kaspi.kz · данные обновлены ${esc(fetchedDate)} · цены и наличие подтверждаются на Kaspi<br>
+    Машинные интерфейсы: <a href="/store/${esc(m.slug)}/feed.json">фид OpenAI</a> · <a href="/store/${esc(m.slug)}/feed-google.xml">фид Google</a> · <a href="/store/${esc(m.slug)}/mcp" title="Model Context Protocol — подключается к Claude как коннектор">MCP для Claude</a>
   </div>
 </footer>
 <script>
@@ -684,6 +869,25 @@ http
           res.end(JSON.stringify({ error: (S[lang] || S.en).err_fetch }));
         });
       return;
+    }
+
+    const mcpMatch = urlPath.match(/^\/store\/([a-z0-9-]+)\/mcp$/);
+    if (mcpMatch) {
+      handleMcp(req, res, mcpMatch[1]).catch(() => {
+        if (!res.headersSent) res.writeHead(500);
+        res.end();
+      });
+      return;
+    }
+
+    const gfeedMatch = urlPath.match(/^\/store\/([a-z0-9-]+)\/feed-google\.xml$/);
+    if (gfeedMatch) {
+      const xml = buildGoogleFeed(gfeedMatch[1], "https://" + (req.headers.host || "localhost"));
+      if (xml) {
+        res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8", "Cache-Control": "public, max-age=300" });
+        res.end(xml);
+        return;
+      }
     }
 
     const feedMatch = urlPath.match(/^\/store\/([a-z0-9-]+)\/feed\.json$/);
