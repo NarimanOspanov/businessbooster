@@ -452,6 +452,52 @@ async function handleIngest(rawUrl) {
 }
 
 // ---------------------------------------------------------------------------
+// OpenAI-style product feed (/store/<slug>/feed.json)
+// Field set follows the ChatGPT Shopping / Agentic Commerce product feed spec:
+// id, title, description, link, image_link, price (value + ISO 4217),
+// availability, brand, condition, enable_search / enable_checkout.
+// inventory_quantity is intentionally omitted until the seller connects a
+// merchant-cabinet source of truth — we never fabricate stock numbers.
+// ---------------------------------------------------------------------------
+
+function buildFeed(slug, origin) {
+  const m = loadProfile(slug);
+  if (!m || !m.products || !m.products.length) return null;
+  const storeUrl = origin + "/store/" + m.slug;
+  return {
+    feed_format: "openai-product-feed/draft",
+    generated_by: "Saudaget",
+    seller_name: m.name,
+    seller_url: storeUrl,
+    source: m.source,
+    updated_at: m.fetchedAt,
+    item_count: m.products.length,
+    items: m.products.map((p) => {
+      const images = p.images && p.images.length ? p.images : p.image ? [p.image] : [];
+      return Object.assign(
+        {
+          id: p.id,
+          title: p.title,
+          description: p.title + " — " + m.name + ". Заказ онлайн, наличие и цена подтверждаются при заказе.",
+          link: p.kaspiUrl,
+          price: p.price + " KZT",
+          availability: "in_stock",
+          brand: m.name,
+          condition: "new",
+          enable_search: true,
+          enable_checkout: false,
+        },
+        images[0] ? { image_link: images[0] } : {},
+        images.length > 1 ? { additional_image_link: images.slice(1) } : {},
+        p.rating && p.reviews
+          ? { product_review_rating: p.rating, product_review_count: p.reviews }
+          : {}
+      );
+    }),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // SSR brand storefronts (/store/<slug>) generated from ingested catalogs
 // ---------------------------------------------------------------------------
 
@@ -581,7 +627,7 @@ ${cards}
 </main>
 <footer>
   <div class="wrap">
-    AI-читаемая витрина, сгенерированная <a href="/">Saudaget</a> из каталога продавца на Kaspi.kz · данные обновлены ${esc(fetchedDate)} · цены и наличие подтверждаются на Kaspi
+    AI-читаемая витрина, сгенерированная <a href="/">Saudaget</a> из каталога продавца на Kaspi.kz · данные обновлены ${esc(fetchedDate)} · цены и наличие подтверждаются на Kaspi · <a href="/store/${esc(m.slug)}/feed.json">фид для ИИ-шопинга</a>
   </div>
 </footer>
 <script>
@@ -634,6 +680,16 @@ http
           res.end(JSON.stringify({ error: (S[lang] || S.en).err_fetch }));
         });
       return;
+    }
+
+    const feedMatch = urlPath.match(/^\/store\/([a-z0-9-]+)\/feed\.json$/);
+    if (feedMatch) {
+      const feed = buildFeed(feedMatch[1], "https://" + (req.headers.host || "localhost"));
+      if (feed) {
+        res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "public, max-age=300" });
+        res.end(JSON.stringify(feed, null, 2));
+        return;
+      }
     }
 
     const storeMatch = urlPath.match(/^\/store\/([a-z0-9-]+)\/?$/);
