@@ -532,7 +532,7 @@ function listMerchantSlugs() {
 function buildSitemap(origin) {
   const urls = [
     { loc: origin + "/", priority: "1.0" },
-    { loc: origin + "/ru/", priority: "0.9" },
+    { loc: origin + "/en/", priority: "0.9" },
   ];
   for (const slug of listMerchantSlugs()) {
     const p = loadProfile(slug);
