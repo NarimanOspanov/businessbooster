@@ -449,8 +449,8 @@ async function handleIngest(rawUrl, host) {
     // read-only filesystem (e.g. run-from-package) — memory cache still serves the store
   }
   if (host && !/localhost|127\.0\.0\.1/.test(host)) {
-    const base = "https://" + host + "/store/" + slug;
-    pingIndexNow(host, [base, base + "/feed.json", base + "/feed-google.xml"]);
+    const base = CANONICAL + "/store/" + slug;
+    pingIndexNow(CANONICAL_HOST, [base, base + "/feed.json", base + "/feed-google.xml"]);
   }
   return profileSummary(profile);
 }
@@ -512,6 +512,10 @@ function buildFeed(slug, origin) {
 // ---------------------------------------------------------------------------
 
 const INDEXNOW_KEY = "8c2f1e4b9a374d5f8b6a1c0d2e3f4a5b";
+// Canonical host: the Azure default hostname serves the same content, so all
+// canonical URLs, sitemaps and feeds point search engines at the real domain.
+const CANONICAL_HOST = "saudaget.com";
+const CANONICAL = "https://" + CANONICAL_HOST;
 
 function listMerchantSlugs() {
   const slugs = new Set(MEM_MERCHANTS.keys());
@@ -834,6 +838,7 @@ function renderStore(slug) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${esc(m.name)} — официальный каталог и цены</title>
 <meta name="description" content="${esc(m.name)}: ${m.productCount} товаров с ценами от ${minP.toLocaleString("ru-RU")} ₸${topRating ? ", рейтинг до " + topRating + "★" : ""}. Букеты и композиции с заказом онлайн через Kaspi.">
+<link rel="canonical" href="${CANONICAL}/store/${esc(m.slug)}">
 <script type="application/ld+json">${JSON.stringify(ld)}</script>
 <style>
   :root { --ink: #1c1c28; --muted: #6f6f80; --line: #e8e8ef; --brand: #7c5cff; --kaspi: #f14635; }
@@ -938,15 +943,14 @@ http
     }
 
     if (urlPath === "/robots.txt") {
-      const host = req.headers.host || "localhost";
       res.writeHead(200, { "Content-Type": MIME[".txt"], "Cache-Control": "public, max-age=3600" });
-      res.end("User-agent: *\nAllow: /\n\nSitemap: https://" + host + "/sitemap.xml\n");
+      res.end("User-agent: *\nAllow: /\n\nSitemap: " + CANONICAL + "/sitemap.xml\n");
       return;
     }
 
     if (urlPath === "/sitemap.xml") {
       res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8", "Cache-Control": "public, max-age=600" });
-      res.end(buildSitemap("https://" + (req.headers.host || "localhost")));
+      res.end(buildSitemap(CANONICAL));
       return;
     }
 
@@ -967,7 +971,7 @@ http
 
     const gfeedMatch = urlPath.match(/^\/store\/([a-z0-9-]+)\/feed-google\.xml$/);
     if (gfeedMatch) {
-      const xml = buildGoogleFeed(gfeedMatch[1], "https://" + (req.headers.host || "localhost"));
+      const xml = buildGoogleFeed(gfeedMatch[1], CANONICAL);
       if (xml) {
         res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8", "Cache-Control": "public, max-age=300" });
         res.end(xml);
@@ -977,7 +981,7 @@ http
 
     const feedMatch = urlPath.match(/^\/store\/([a-z0-9-]+)\/feed\.json$/);
     if (feedMatch) {
-      const feed = buildFeed(feedMatch[1], "https://" + (req.headers.host || "localhost"));
+      const feed = buildFeed(feedMatch[1], CANONICAL);
       if (feed) {
         res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "public, max-age=300" });
         res.end(JSON.stringify(feed, null, 2));
