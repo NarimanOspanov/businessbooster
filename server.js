@@ -385,7 +385,7 @@ function profileSummary(p) {
   return { slug: p.slug, name: p.name, productCount: p.productCount, storeUrl: "/store/" + p.slug };
 }
 
-async function handleIngest(rawUrl) {
+async function handleIngest(rawUrl, host) {
   const m = String(rawUrl || "").match(KASPI_SHOP_RE);
   if (!m) return { error: "live ingest supports kaspi.kz/shop/<brand> links for now" };
   const token = decodeURIComponent(m[1]);
@@ -448,6 +448,10 @@ async function handleIngest(rawUrl) {
   } catch {
     // read-only filesystem (e.g. run-from-package) — memory cache still serves the store
   }
+  if (host && !/localhost|127\.0\.0\.1/.test(host)) {
+    const base = "https://" + host + "/store/" + slug;
+    pingIndexNow(host, [base, base + "/feed.json", base + "/feed-google.xml"]);
+  }
   return profileSummary(profile);
 }
 
@@ -499,6 +503,68 @@ function buildFeed(slug, origin) {
       );
     }),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Discoverability: robots.txt, sitemap.xml and IndexNow
+// IndexNow instantly notifies Bing (the index behind ChatGPT Search) about
+// new/updated storefront URLs. The key file must be served from this host.
+// ---------------------------------------------------------------------------
+
+const INDEXNOW_KEY = "8c2f1e4b9a374d5f8b6a1c0d2e3f4a5b";
+
+function listMerchantSlugs() {
+  const slugs = new Set(MEM_MERCHANTS.keys());
+  try {
+    for (const f of fs.readdirSync(path.join(ROOT, "data", "merchants"))) {
+      if (f.endsWith(".json")) slugs.add(f.slice(0, -5));
+    }
+  } catch {
+    // no data dir — memory only
+  }
+  return Array.from(slugs);
+}
+
+function buildSitemap(origin) {
+  const urls = [
+    { loc: origin + "/", priority: "1.0" },
+    { loc: origin + "/ru/", priority: "0.9" },
+  ];
+  for (const slug of listMerchantSlugs()) {
+    const p = loadProfile(slug);
+    urls.push({
+      loc: origin + "/store/" + slug,
+      lastmod: p && p.fetchedAt ? p.fetchedAt.slice(0, 10) : undefined,
+      priority: "0.8",
+    });
+  }
+  return (
+    '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+    urls
+      .map(
+        (u) =>
+          "<url><loc>" + xmlEsc(u.loc) + "</loc>" +
+          (u.lastmod ? "<lastmod>" + u.lastmod + "</lastmod>" : "") +
+          "<priority>" + u.priority + "</priority></url>"
+      )
+      .join("\n") +
+    "\n</urlset>\n"
+  );
+}
+
+function pingIndexNow(host, urls) {
+  // Fire-and-forget: tell Bing about new/updated URLs
+  return fetch("https://api.indexnow.org/indexnow", {
+    method: "POST",
+    headers: { "Content-Type": "application/json; charset=utf-8" },
+    body: JSON.stringify({
+      host,
+      key: INDEXNOW_KEY,
+      keyLocation: "https://" + host + "/" + INDEXNOW_KEY + ".txt",
+      urlList: urls,
+    }),
+  }).catch(() => {});
 }
 
 // ---------------------------------------------------------------------------
@@ -844,7 +910,7 @@ http
 
     if (urlPath === "/api/ingest") {
       const target = parsed.searchParams.get("url") || "";
-      handleIngest(target)
+      handleIngest(target, req.headers.host)
         .then((result) => {
           res.writeHead(result.error ? 422 : 200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
           res.end(JSON.stringify(result));
@@ -868,6 +934,25 @@ http
           res.writeHead(500, { "Content-Type": MIME[".json"] });
           res.end(JSON.stringify({ error: (S[lang] || S.en).err_fetch }));
         });
+      return;
+    }
+
+    if (urlPath === "/robots.txt") {
+      const host = req.headers.host || "localhost";
+      res.writeHead(200, { "Content-Type": MIME[".txt"], "Cache-Control": "public, max-age=3600" });
+      res.end("User-agent: *\nAllow: /\n\nSitemap: https://" + host + "/sitemap.xml\n");
+      return;
+    }
+
+    if (urlPath === "/sitemap.xml") {
+      res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8", "Cache-Control": "public, max-age=600" });
+      res.end(buildSitemap("https://" + (req.headers.host || "localhost")));
+      return;
+    }
+
+    if (urlPath === "/" + INDEXNOW_KEY + ".txt") {
+      res.writeHead(200, { "Content-Type": MIME[".txt"] });
+      res.end(INDEXNOW_KEY);
       return;
     }
 
