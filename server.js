@@ -841,7 +841,7 @@ function renderStore(slug) {
 <link rel="canonical" href="${CANONICAL}/store/${esc(m.slug)}">
 <script type="application/ld+json">${JSON.stringify(ld)}</script>
 <style>
-  :root { --ink: #1c1c28; --muted: #6f6f80; --line: #e8e8ef; --brand: #7c5cff; --kaspi: #f14635; }
+  :root { --ink: #1c1c28; --muted: #6f6f80; --line: #e8e8ef; --brand: #f14635; --kaspi: #f14635; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: "Inter", "Segoe UI", system-ui, sans-serif; color: var(--ink); background: #fafafc; line-height: 1.5; }
   .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
