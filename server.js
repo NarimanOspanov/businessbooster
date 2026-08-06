@@ -147,7 +147,7 @@ async function fetchSafe(url, ms = 10000) {
       signal: ctrl.signal,
       redirect: "follow",
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; SaudagetAudit/0.1)",
+        "User-Agent": "Mozilla/5.0 (compatible; SaudagerAudit/0.1)",
         Accept: "text/html,application/xhtml+xml,*/*",
         "Accept-Language": "en,ru;q=0.8",
       },
@@ -470,7 +470,7 @@ function buildFeed(slug, origin) {
   const storeUrl = origin + "/store/" + m.slug;
   return {
     feed_format: "openai-product-feed/draft",
-    generated_by: "Saudaget",
+    generated_by: "Saudager",
     seller_name: m.name,
     seller_url: storeUrl,
     target_country: "KZ",
@@ -514,7 +514,7 @@ function buildFeed(slug, origin) {
 const INDEXNOW_KEY = "8c2f1e4b9a374d5f8b6a1c0d2e3f4a5b";
 // Canonical host: the Azure default hostname serves the same content, so all
 // canonical URLs, sitemaps and feeds point search engines at the real domain.
-const CANONICAL_HOST = "saudaget.com";
+const CANONICAL_HOST = "saudager.ai";
 const CANONICAL = "https://" + CANONICAL_HOST;
 
 function listMerchantSlugs() {
@@ -609,7 +609,7 @@ function buildGoogleFeed(slug, origin) {
     '<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">\n<channel>\n' +
     "<title>" + xmlEsc(m.name) + "</title>\n" +
     "<link>" + xmlEsc(storeUrl) + "</link>\n" +
-    "<description>" + xmlEsc(m.name + " — каталог бренда, сгенерирован Saudaget") + "</description>\n" +
+    "<description>" + xmlEsc(m.name + " — каталог бренда, сгенерирован Saudager") + "</description>\n" +
     items +
     "\n</channel>\n</rss>\n"
   );
@@ -733,7 +733,7 @@ async function handleMcp(req, res, slug) {
       reply({
         protocolVersion: params.protocolVersion || "2025-06-18",
         capabilities: { tools: {} },
-        serverInfo: { name: "saudaget-store-" + slug, version: "0.1.0" },
+        serverInfo: { name: "Saudager-store-" + slug, version: "0.1.0" },
       });
       break;
     case "ping":
@@ -886,7 +886,7 @@ ${cards}
 </main>
 <footer>
   <div class="wrap">
-    AI-читаемая витрина, сгенерированная <a href="/">Saudaget</a> из каталога продавца на Kaspi.kz · данные обновлены ${esc(fetchedDate)} · цены и наличие подтверждаются на Kaspi<br>
+    AI-читаемая витрина, сгенерированная <a href="/">Saudager</a> из каталога продавца на Kaspi.kz · данные обновлены ${esc(fetchedDate)} · цены и наличие подтверждаются на Kaspi<br>
     Машинные интерфейсы: <a href="/store/${esc(m.slug)}/feed.json">фид OpenAI</a> · <a href="/store/${esc(m.slug)}/feed-google.xml">фид Google</a> · <a href="/store/${esc(m.slug)}/mcp" title="Model Context Protocol — подключается к Claude как коннектор">MCP для Claude</a>
   </div>
 </footer>
@@ -1026,4 +1026,4 @@ http
       res.writeHead(200, { "Content-Type": type }).end(data);
     });
   })
-  .listen(PORT, () => console.log(`Saudaget running on port ${PORT}`));
+  .listen(PORT, () => console.log(`Saudager running on port ${PORT}`));
