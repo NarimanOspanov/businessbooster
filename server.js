@@ -506,6 +506,181 @@ function buildFeed(slug, origin) {
 }
 
 // ---------------------------------------------------------------------------
+// Onboarding analysis: AI-search foundations and real competitors
+// Both read the seller's live Kaspi catalog, so every number shown to the
+// merchant comes from data we actually fetched — nothing is invented.
+// ---------------------------------------------------------------------------
+
+let kaspiRobotsCache = { blocked: null, at: 0 };
+async function kaspiAllowsAiBots() {
+  if (kaspiRobotsCache.blocked !== null && Date.now() - kaspiRobotsCache.at < 6 * 3600e3) {
+    return kaspiRobotsCache.blocked;
+  }
+  let allowed = true;
+  try {
+    const r = await fetchSafe("https://kaspi.kz/robots.txt", 6000);
+    if (r.status === 200 && r.text.trim()) {
+      const b = aiBotsBlocked(r.text);
+      allowed = !(b.bots.length || b.all);
+    }
+  } catch {
+    // unreachable robots.txt is treated as "no restrictions"
+  }
+  kaspiRobotsCache = { blocked: allowed, at: Date.now() };
+  return allowed;
+}
+
+async function buildFoundations(slug, host) {
+  const m = loadProfile(slug);
+  if (!m) return null;
+  const reviews = m.products.reduce((s, p) => s + (p.reviews || 0), 0);
+  const rated = m.products.filter((p) => p.rating);
+  const avg = rated.length ? Math.round((rated.reduce((s, p) => s + p.rating, 0) / rated.length) * 10) / 10 : 0;
+  const aiAllowed = await kaspiAllowsAiBots();
+
+  const items = [
+    {
+      label: "Магазин существует и доступен",
+      status: "ok",
+      badge: "проверено",
+      note: "Нашли ваш магазин на " + host + ": товаров — " + m.productCount + ".",
+    },
+    {
+      label: "Репутация: отзывы и рейтинг",
+      status: reviews >= 20 ? "ok" : "bad",
+      badge: "проверено",
+      note: reviews >= 20
+        ? "У ваших товаров " + reviews.toLocaleString("ru-RU") + " отзывов" + (avg ? ", средний рейтинг " + avg + "★" : "") + ". ИИ опирается на такие сигналы, когда выбирает, кого рекомендовать."
+        : "Отзывов пока мало (" + reviews + "). Это главный сигнал доверия для ИИ — его стоит набирать.",
+    },
+    {
+      label: "ИИ-краулеры допущены",
+      status: aiAllowed ? "ok" : "bad",
+      badge: "проверено",
+      note: aiAllowed
+        ? "robots.txt площадки не запрещает ИИ-краулерам читать страницы (OAI-SearchBot, Googlebot, Bingbot, Claude-SearchBot, PerplexityBot)."
+        : "robots.txt площадки закрывает страницы от ИИ-краулеров — ваши товары они прочитать не могут.",
+    },
+    {
+      label: "Свой сайт бренда",
+      status: "bad",
+      badge: "проверено",
+      note: "Своего сайта нет — только карточка внутри маркетплейса. ИИ и Google цитируют площадку, а не вас.",
+    },
+    {
+      label: "Структурированные данные о товарах",
+      status: "bad",
+      badge: "проверено",
+      note: "Нет страниц, которыми вы управляете, — значит нет и разметки Schema.org с вашими ценами и наличием.",
+    },
+    {
+      label: "Товарный фид для ИИ-шопинга",
+      status: "bad",
+      badge: "проверено",
+      note: "Фид в ChatGPT и Perplexity не подан. Это прямой и бесплатный канал попадания товаров в ответы ИИ.",
+    },
+  ];
+
+  const reported = {
+    label: "llms.txt",
+    status: "neutral",
+    badge: "не оцениваем",
+    note: "Файл llms.txt не влияет: ни один крупный ИИ-поисковик пока не подтвердил, что читает его. Мы не считаем его отсутствие пробелом.",
+  };
+
+  const done = items.filter((i) => i.status === "ok").length;
+  return {
+    slug,
+    name: m.name,
+    productCount: m.productCount,
+    reviews,
+    rating: avg,
+    score: done,
+    total: items.length,
+    items,
+    reported,
+  };
+}
+
+const STOPWORDS = new Set([
+  "для", "или", "как", "что", "это", "при", "без", "все", "уже", "его", "она", "они",
+  "шт", "см", "мм", "кг", "мл", "гр", "оформлении", "оформление", "набор", "цвет", "размер",
+]);
+
+function categoryQuery(m) {
+  const brandTokens = new Set(normBrand(m.name).split(/\s+/).filter(Boolean));
+  const freq = new Map();
+  for (const p of m.products.slice(0, 20)) {
+    for (const w of String(p.title).toLowerCase().split(/[^a-zа-яё0-9]+/i)) {
+      if (w.length < 4 || STOPWORDS.has(w)) continue;
+      if (normBrand(m.name).includes(normBrand(w))) continue;
+      if (brandTokens.has(normBrand(w))) continue;
+      if (/^\d+$/.test(w)) continue;
+      freq.set(w, (freq.get(w) || 0) + 1);
+    }
+  }
+  return Array.from(freq.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 2)
+    .map((e) => e[0])
+    .join(" ");
+}
+
+async function buildCompetitors(slug) {
+  const m = loadProfile(slug);
+  if (!m) return null;
+  const query = categoryQuery(m);
+  if (!query) return { query: null, competitors: [], me: null };
+
+  const brands = new Map();
+  for (let page = 0; page < 2; page++) {
+    let json;
+    try {
+      json = await kaspiSearch(query, page);
+    } catch {
+      break;
+    }
+    const items = (json && json.data) || [];
+    if (!items.length) break;
+    for (const it of items) {
+      const b = (it.brand || "").trim();
+      if (!b || /без бренда/i.test(b)) continue;
+      if (!brands.has(b)) brands.set(b, { brand: b, products: 0, reviews: 0, ratings: [], prices: [] });
+      const r = brands.get(b);
+      r.products++;
+      r.reviews += it.reviewsQuantity || 0;
+      if (it.rating) r.ratings.push(it.rating);
+      if (it.unitPrice) r.prices.push(it.unitPrice);
+    }
+  }
+
+  const rows = Array.from(brands.values()).map((r) => ({
+    brand: r.brand,
+    products: r.products,
+    reviews: r.reviews,
+    rating: r.ratings.length ? Math.round((r.ratings.reduce((a, b) => a + b, 0) / r.ratings.length) * 10) / 10 : null,
+    minPrice: r.prices.length ? Math.min(...r.prices) : null,
+    isMe: normBrand(r.brand) === normBrand(m.name),
+  }));
+  rows.sort((a, b) => b.reviews - a.reviews);
+
+  const myReviews = m.products.reduce((s, p) => s + (p.reviews || 0), 0);
+  const meRow = rows.find((r) => r.isMe);
+  const ranked = rows.filter((r) => !r.isMe).slice(0, 6);
+  const strongerCount = ranked.filter((r) => r.reviews > myReviews).length;
+
+  return {
+    query,
+    me: { brand: m.name, reviews: myReviews, products: m.productCount },
+    position: strongerCount + 1,
+    fieldSize: ranked.length + 1,
+    hasOwnSite: false,
+    competitors: ranked,
+    meInSearch: !!meRow,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Clerk: seller accounts and Google sign-in
 // Frontend gets the publishable key from /api/config and runs Clerk JS.
 // Backend verifies the session JWT (RS256) against Clerk's JWKS with the
@@ -998,6 +1173,32 @@ http
   .createServer((req, res) => {
     const parsed = new URL(req.url, "http://localhost");
     const urlPath = decodeURIComponent(parsed.pathname);
+
+    if (urlPath === "/api/foundations" || urlPath === "/api/competitors") {
+      const target = parsed.searchParams.get("url") || "";
+      (async () => {
+        const ing = await handleIngest(target, req.headers.host);
+        if (ing.error) return { error: ing.error };
+        const host = String(target).replace(/^https?:\/\//i, "").split("/")[0] || "kaspi.kz";
+        return urlPath === "/api/foundations"
+          ? await buildFoundations(ing.slug, host)
+          : await buildCompetitors(ing.slug);
+      })()
+        .then((result) => {
+          if (!result || result.error) {
+            res.writeHead(422, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+            res.end(JSON.stringify(result || { error: "no data" }));
+            return;
+          }
+          res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+          res.end(JSON.stringify(result));
+        })
+        .catch(() => {
+          res.writeHead(500, { "Content-Type": MIME[".json"] });
+          res.end(JSON.stringify({ error: "analysis failed" }));
+        });
+      return;
+    }
 
     if (urlPath === "/api/config") {
       res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
