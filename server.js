@@ -506,6 +506,92 @@ function buildFeed(slug, origin) {
 }
 
 // ---------------------------------------------------------------------------
+// Clerk: seller accounts and Google sign-in
+// Frontend gets the publishable key from /api/config and runs Clerk JS.
+// Backend verifies the session JWT (RS256) against Clerk's JWKS with the
+// built-in crypto module — no dependencies — then reads the user's email
+// through the Clerk Backend API and records the lead.
+// ---------------------------------------------------------------------------
+
+const crypto = require("crypto");
+const CLERK_PK = process.env.CLERK_PUBLISHABLE_KEY || "";
+const CLERK_SK = process.env.CLERK_SECRET_KEY || "";
+
+// The publishable key encodes the instance's frontend API host in base64.
+function clerkFrontendHost() {
+  const raw = CLERK_PK.replace(/^pk_(test|live)_/, "");
+  if (!raw) return null;
+  try {
+    return Buffer.from(raw, "base64").toString("utf8").replace(/\$+$/, "") || null;
+  } catch {
+    return null;
+  }
+}
+
+let jwksCache = { keys: null, at: 0 };
+async function clerkJwks() {
+  if (jwksCache.keys && Date.now() - jwksCache.at < 3600e3) return jwksCache.keys;
+  const host = clerkFrontendHost();
+  if (!host) throw new Error("no clerk publishable key");
+  const res = await fetch("https://" + host + "/.well-known/jwks.json");
+  if (!res.ok) throw new Error("jwks http " + res.status);
+  const json = await res.json();
+  jwksCache = { keys: json.keys || [], at: Date.now() };
+  return jwksCache.keys;
+}
+
+function b64urlToBuf(s) {
+  return Buffer.from(s.replace(/-/g, "+").replace(/_/g, "/"), "base64");
+}
+
+// Returns the token payload when the signature and lifetime check out.
+async function verifyClerkToken(token) {
+  const parts = String(token || "").split(".");
+  if (parts.length !== 3) throw new Error("malformed token");
+  const [h, p, s] = parts;
+  const header = JSON.parse(b64urlToBuf(h).toString("utf8"));
+  const payload = JSON.parse(b64urlToBuf(p).toString("utf8"));
+  if (header.alg !== "RS256") throw new Error("unexpected alg " + header.alg);
+
+  const keys = await clerkJwks();
+  const jwk = keys.find((k) => k.kid === header.kid);
+  if (!jwk) throw new Error("unknown kid");
+  const pub = crypto.createPublicKey({ key: jwk, format: "jwk" });
+  const ok = crypto.verify("RSA-SHA256", Buffer.from(h + "." + p), pub, b64urlToBuf(s));
+  if (!ok) throw new Error("bad signature");
+
+  const now = Math.floor(Date.now() / 1000);
+  if (payload.exp && payload.exp < now - 5) throw new Error("token expired");
+  if (payload.nbf && payload.nbf > now + 5) throw new Error("token not yet valid");
+  return payload;
+}
+
+async function clerkUserEmail(userId) {
+  if (!CLERK_SK) return null;
+  const res = await fetch("https://api.clerk.com/v1/users/" + encodeURIComponent(userId), {
+    headers: { Authorization: "Bearer " + CLERK_SK },
+  });
+  if (!res.ok) return null;
+  const u = await res.json();
+  const primary = (u.email_addresses || []).find((e) => e.id === u.primary_email_address_id);
+  return {
+    email: (primary || (u.email_addresses || [])[0] || {}).email_address || null,
+    name: [u.first_name, u.last_name].filter(Boolean).join(" ") || null,
+  };
+}
+
+function recordLead(lead) {
+  const line = JSON.stringify(lead);
+  console.log("[lead] " + line); // always visible in the Azure log stream
+  try {
+    fs.mkdirSync(path.join(ROOT, "data"), { recursive: true });
+    fs.appendFileSync(path.join(ROOT, "data", "leads.jsonl"), line + "\n", "utf8");
+  } catch {
+    // read-only filesystem — the console line above is the durable record
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Discoverability: robots.txt, sitemap.xml and IndexNow
 // IndexNow instantly notifies Bing (the index behind ChatGPT Search) about
 // new/updated storefront URLs. The key file must be served from this host.
@@ -912,6 +998,47 @@ http
   .createServer((req, res) => {
     const parsed = new URL(req.url, "http://localhost");
     const urlPath = decodeURIComponent(parsed.pathname);
+
+    if (urlPath === "/api/config") {
+      res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+      res.end(JSON.stringify({ clerkPublishableKey: CLERK_PK || null }));
+      return;
+    }
+
+    if (urlPath === "/api/lead") {
+      if (req.method !== "POST") {
+        res.writeHead(405, { Allow: "POST" }).end();
+        return;
+      }
+      (async () => {
+        const auth = req.headers.authorization || "";
+        const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+        const claims = await verifyClerkToken(token);
+        let body = {};
+        try {
+          body = JSON.parse(await readBody(req)) || {};
+        } catch {
+          body = {};
+        }
+        const who = (await clerkUserEmail(claims.sub)) || {};
+        recordLead({
+          at: new Date().toISOString(),
+          userId: claims.sub,
+          email: who.email || null,
+          name: who.name || null,
+          shopUrl: String(body.shopUrl || "").slice(0, 300),
+          slug: String(body.slug || "").slice(0, 100),
+          score: Number(body.score) || null,
+          lang: body.lang === "en" ? "en" : "ru",
+        });
+        res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+        res.end(JSON.stringify({ ok: true, email: who.email || null }));
+      })().catch((e) => {
+        res.writeHead(401, { "Content-Type": MIME[".json"] });
+        res.end(JSON.stringify({ error: "unauthorized: " + e.message }));
+      });
+      return;
+    }
 
     if (urlPath === "/api/ingest") {
       const target = parsed.searchParams.get("url") || "";

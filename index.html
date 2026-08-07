@@ -926,6 +926,7 @@
         <div class="done-sub" id="done-sub">Schema.org · серверный рендеринг · профили Google и Bing · демо-адрес — запуск на вашем собственном домене</div>
       </div>
       <div class="score-jump"><span class="old" id="score-old">27</span> → <span class="new">94</span> <span class="lbl">оценка магазина</span></div>
+      <p id="signed-as" style="font-size:12.5px; color:var(--muted); text-align:center; margin-top:6px;"></p>
       <a class="btn btn-primary btn-next" id="dash-link" href="/dashboard/">Открыть кабинет продавца →</a>
       <p class="wiz-note">Демо-режим — цифры для примера. Ваши реальные заказы и переходы появятся в кабинете после запуска.</p>
     </div>
@@ -980,6 +981,7 @@
     const later = (fn, ms) => timers.push(setTimeout(fn, ms));
     let slug = 'yourshop', score = 27;
     let ingestPromise = null, isKaspi = false;
+    let lastAudit = { raw: '', host: '', data: null };
     const G_BTN_HTML = document.getElementById('g-btn').innerHTML;
 
     function show(i) { steps.forEach((s, j) => { s.hidden = j !== i; }); }
@@ -1023,6 +1025,7 @@
       ingestPromise = isKaspi
         ? fetch('/api/ingest?url=' + encodeURIComponent(raw)).then(r => r.json()).catch(() => null)
         : Promise.resolve(null);
+      lastAudit = { raw: raw, host: host, data: null };
       document.getElementById('audit-host').textContent = host;
       show(1);
       runAudit(raw);
@@ -1057,6 +1060,7 @@
           if (!d || d.error || !d.items) { auditFail((d && d.error) || ERR_MSG); return; }
           list.innerHTML = '';
           score = d.score;
+          lastAudit.data = d;
           d.items.forEach((c, i) => {
             later(() => {
               const st = auditRow(list, c.label);
@@ -1082,19 +1086,110 @@
 
     document.getElementById('btn-retry').addEventListener('click', () => { show(0); document.getElementById('wiz-url').focus(); });
 
+    // ===== Вход через Google (Clerk) =====
+    // С ключом Clerk — настоящий OAuth; без ключа — демо-разблокировка.
+    const WIZ_KEY = 'sg_wiz_pending';
+    let clerk = null;
+
+    function unlockReport() {
+      document.getElementById('lock-overlay').hidden = true;
+      document.getElementById('score-wrap').classList.remove('locked');
+      let n = 0;
+      const iv = setInterval(() => { n++; document.getElementById('score-val').textContent = n; if (n >= score) clearInterval(iv); }, 1000 / Math.max(score, 10));
+      timers.push(iv);
+      document.getElementById('btn-build').hidden = false;
+    }
+
+    function sendLead(state) {
+      if (!clerk || !clerk.session) return;
+      clerk.session.getToken().then(t => {
+        if (!t) return;
+        fetch('/api/lead', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + t },
+          body: JSON.stringify({ shopUrl: state.raw, slug: state.slug, score: state.score, lang: 'ru' }),
+        }).then(r => r.json()).then(d => {
+          const who = document.getElementById('signed-as');
+          if (who && d && d.email) who.textContent = 'Вы вошли как ' + d.email;
+        }).catch(() => {});
+      }).catch(() => {});
+    }
+
+    // Показать отчёт заново после возврата с Google
+    function restorePending() {
+      let st;
+      try { st = JSON.parse(sessionStorage.getItem(WIZ_KEY) || 'null'); } catch { st = null; }
+      if (!st || !st.data) return false;
+      sessionStorage.removeItem(WIZ_KEY);
+      reset();
+      overlay.hidden = false;
+      document.body.style.overflow = 'hidden';
+      slug = st.slug; score = st.score;
+      isKaspi = st.isKaspi;
+      ingestPromise = st.isKaspi
+        ? fetch('/api/ingest?url=' + encodeURIComponent(st.raw)).then(r => r.json()).catch(() => null)
+        : Promise.resolve(null);
+      document.getElementById('audit-host').textContent = st.host;
+      show(1);
+      const list = document.getElementById('audit-list');
+      list.innerHTML = '';
+      st.data.items.forEach(c => {
+        const stEl = auditRow(list, c.label);
+        stEl.className = 'st ' + c.status;
+        stEl.textContent = (c.status === 'ok' ? '✓ ' : c.status === 'warn' ? '⚠ ' : '✗ ') + c.note;
+      });
+      document.getElementById('score-verdict').textContent = st.data.verdict;
+      const arc = document.getElementById('ring-arc');
+      arc.style.stroke = score < 40 ? '#f87171' : score < 70 ? '#fbbf24' : '#34d399';
+      document.getElementById('score-gate').hidden = false;
+      requestAnimationFrame(() => requestAnimationFrame(() => { arc.style.strokeDashoffset = 264 - 264 * score / 100; }));
+      unlockReport();
+      sendLead(st);
+      return true;
+    }
+
+    fetch('/api/config').then(r => r.json()).then(cfg => {
+      if (!cfg || !cfg.clerkPublishableKey) return; // демо-режим
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js';
+      s.crossOrigin = 'anonymous';
+      s.onload = () => {
+        const c = new window.Clerk(cfg.clerkPublishableKey);
+        c.load({}).then(() => {
+          clerk = c; // включаем реальный вход только после успешной загрузки
+          document.querySelectorAll('.lk-demo').forEach(el => { el.textContent = 'Вход через Google · аккаунт продавца'; });
+          if (c.user) restorePending();
+        }).catch(() => {}); // Clerk недоступен — остаётся демо-разблокировка
+      };
+      document.head.appendChild(s);
+    }).catch(() => {});
+
     document.getElementById('g-btn').addEventListener('click', () => {
       const gb = document.getElementById('g-btn');
       gb.disabled = true;
       gb.innerHTML = '<span class="spinner"></span>&nbsp;Подключаемся к Google…';
-      // TODO: заменить демо-разблокировку на настоящий Google Identity Services (нужен OAuth client_id)
-      later(() => {
-        document.getElementById('lock-overlay').hidden = true;
-        document.getElementById('score-wrap').classList.remove('locked');
-        let n = 0;
-        const iv = setInterval(() => { n++; document.getElementById('score-val').textContent = n; if (n >= score) clearInterval(iv); }, 1000 / Math.max(score, 10));
-        timers.push(iv);
-        document.getElementById('btn-build').hidden = false;
-      }, 1400);
+
+      if (clerk) {
+        // Сохраняем отчёт, чтобы вернуть пользователя ровно сюда после Google
+        try {
+          sessionStorage.setItem(WIZ_KEY, JSON.stringify({
+            raw: lastAudit.raw, host: lastAudit.host, slug, score, isKaspi, data: lastAudit.data,
+          }));
+        } catch {}
+        const back = location.origin + location.pathname;
+        if (clerk.user) { restorePending(); return; }
+        clerk.client.signIn.authenticateWithRedirect({
+          strategy: 'oauth_google',
+          redirectUrl: back,
+          redirectUrlComplete: back,
+        }).catch(() => {
+          gb.disabled = false; gb.innerHTML = G_BTN_HTML;
+          clerk.openSignIn({ afterSignInUrl: back, afterSignUpUrl: back });
+        });
+        return;
+      }
+
+      later(unlockReport, 1400); // демо без ключа Clerk
     });
 
     document.getElementById('btn-build').addEventListener('click', () => { show(2); runBuild(); });
