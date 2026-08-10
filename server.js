@@ -1438,6 +1438,42 @@ http
       return;
     }
 
+    // Reachability probe for marketplace endpoints, from the server's own IP.
+    // Fixed host allowlist and status-only output — not a general proxy.
+    if (urlPath === "/api/probe") {
+      const allowHosts = ["kaspi.kz", "search.wb.ru", "card.wb.ru", "catalog.wb.ru", "www.wildberries.ru", "www.wildberries.kz", "api-seller.ozon.ru", "www.ozon.ru"];
+      const target = parsed.searchParams.get("url") || "";
+      (async () => {
+        const u = new URL(/^https?:\/\//i.test(target) ? target : "https://" + target);
+        if (!allowHosts.includes(u.hostname)) throw new Error("host not in allowlist");
+        const r = await fetch(u, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+            Accept: "application/json, text/plain, */*",
+            "Accept-Language": "ru-RU,ru;q=0.9",
+          },
+        });
+        const text = await r.text();
+        let items = null;
+        try {
+          const j = JSON.parse(text);
+          items = (j.data && j.data.products && j.data.products.length) || (j.products && j.products.length) || null;
+        } catch {
+          items = null;
+        }
+        return { host: u.hostname, status: r.status, bytes: text.length, items, head: text.slice(0, 100).replace(/\s+/g, " ") };
+      })()
+        .then((out) => {
+          res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+          res.end(JSON.stringify(out));
+        })
+        .catch((e) => {
+          res.writeHead(400, { "Content-Type": MIME[".json"] });
+          res.end(JSON.stringify({ error: e.message }));
+        });
+      return;
+    }
+
     if (urlPath === "/api/health") {
       res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
       res.end(JSON.stringify({
