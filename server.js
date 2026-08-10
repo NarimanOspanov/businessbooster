@@ -596,6 +596,33 @@ function sourceFromReferrer(ref) {
   return "other";
 }
 
+// Telegram alerts for the operator: a click means we just handed a merchant a
+// buyer, which is the one event worth interrupting someone's day for.
+const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
+const TG_CHAT = process.env.TELEGRAM_CHAT_ID || "";
+let tgWindowStart = Date.now();
+let tgSent = 0;
+
+function notifyTelegram(text) {
+  if (!TG_TOKEN || !TG_CHAT) return;
+  if (Date.now() - tgWindowStart > 3600e3) {
+    tgWindowStart = Date.now();
+    tgSent = 0;
+  }
+  if (tgSent >= 40) return; // never flood the chat, even on a traffic spike
+  tgSent++;
+  fetch("https://api.telegram.org/bot" + TG_TOKEN + "/sendMessage", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: TG_CHAT, text, parse_mode: "HTML", disable_web_page_preview: true }),
+  }).catch(() => {});
+}
+
+const SOURCE_LABEL = {
+  chatgpt: "ChatGPT", perplexity: "Perplexity", claude: "Claude", google: "Google",
+  bing: "Bing / Copilot", yandex: "Яндекс", direct: "прямой заход", internal: "с сайта", other: "другое",
+};
+
 function bucket(slug) {
   if (!STATS[slug]) {
     STATS[slug] = { visits: 0, sources: {}, bots: {}, clicks: 0, firstSeen: new Date().toISOString(), lastSeen: null };
@@ -620,6 +647,17 @@ function track(slug, req, kind) {
   b.visits++;
   const src = sourceFromReferrer(req.headers.referer || req.headers.referrer);
   b.sources[src] = (b.sources[src] || 0) + 1;
+
+  // A human arriving from an AI assistant is the signal we launched this for
+  if (["chatgpt", "perplexity", "claude"].includes(src)) {
+    const prof = loadProfile(slug);
+    notifyTelegram(
+      "🤖 <b>Посетитель из " + (SOURCE_LABEL[src] || src) + "</b>\n" +
+        "Магазин: <b>" + (prof ? prof.name : slug) + "</b>\n" +
+        "Визитов всего: " + b.visits + " · переходов: " + b.clicks + "\n" +
+        CANONICAL + "/store/" + slug
+    );
+  }
 }
 
 function statsSummary() {
@@ -1296,6 +1334,28 @@ ${cards}
   </div>
 </footer>
 <script>
+  // Tag buy links with where this visitor came from, so the click report says
+  // "from ChatGPT" instead of just "from our storefront".
+  (function () {
+    var r = document.referrer || "";
+    var s = "direct";
+    if (r) {
+      var h = "";
+      try { h = new URL(r).hostname.replace(/^www\\./, ""); } catch (e) {}
+      if (/chatgpt\\.com|openai\\.com/.test(h)) s = "chatgpt";
+      else if (/perplexity\\.ai/.test(h)) s = "perplexity";
+      else if (/claude\\.ai|anthropic\\.com/.test(h)) s = "claude";
+      else if (/google\\./.test(h)) s = "google";
+      else if (/bing\\.com|copilot\\.microsoft/.test(h)) s = "bing";
+      else if (/yandex\\./.test(h)) s = "yandex";
+      else if (h && h !== location.hostname) s = "other";
+      else if (h === location.hostname) s = "internal";
+    }
+    document.querySelectorAll("a.buy").forEach(function (a) {
+      a.href += (a.href.indexOf("?") > -1 ? "&" : "?") + "s=" + encodeURIComponent(s);
+    });
+  })();
+
   document.querySelectorAll(".thumbs img").forEach(function (t) {
     t.addEventListener("click", function () {
       var card = t.closest(".card");
@@ -1344,6 +1404,19 @@ http
       return;
     }
 
+    // One-shot check that the bot really reaches the operator's chat
+    if (urlPath === "/api/telegram-test") {
+      if (!TG_TOKEN || !TG_CHAT) {
+        res.writeHead(400, { "Content-Type": MIME[".json"] });
+        res.end(JSON.stringify({ error: "нужны переменные TELEGRAM_BOT_TOKEN и TELEGRAM_CHAT_ID" }));
+        return;
+      }
+      notifyTelegram("✅ <b>Saudager подключён</b>\nУведомления о переходах покупателей будут приходить сюда.");
+      res.writeHead(200, { "Content-Type": MIME[".json"] });
+      res.end(JSON.stringify({ ok: true, sent: true }));
+      return;
+    }
+
     if (urlPath === "/api/health") {
       res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
       res.end(JSON.stringify({
@@ -1351,6 +1424,7 @@ http
         node: process.version,
         persistentDir: PERSIST_DATA,
         persistent: PERSIST_OK,
+        telegram: TG_TOKEN ? (TG_CHAT ? "настроен" : "нет TELEGRAM_CHAT_ID") : "нет TELEGRAM_BOT_TOKEN",
         stores: listMerchantSlugs().length,
         trackedStores: Object.keys(STATS).length,
       }));
@@ -1501,6 +1575,17 @@ http
       const prod = prof && prof.products.find((p) => String(p.id) === goMatch[2]);
       if (prod) {
         track(goMatch[1], req, "click");
+        const src = parsed.searchParams.get("s") || "unknown";
+        const b = STATS[goMatch[1]] || { clicks: 0 };
+        notifyTelegram(
+          "🛒 <b>Переход к продавцу</b>\n" +
+            "Магазин: <b>" + prof.name + "</b>\n" +
+            prod.title + "\n" +
+            (prod.priceFormatted || prod.price + " ₸") + "\n" +
+            "Источник: " + (SOURCE_LABEL[src] || src) + "\n" +
+            "Всего переходов у этого магазина: " + b.clicks + "\n" +
+            CANONICAL + "/store/" + goMatch[1]
+        );
         res.writeHead(302, { Location: prod.kaspiUrl, "Cache-Control": "no-store" }).end();
         return;
       }
