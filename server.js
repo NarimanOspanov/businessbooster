@@ -609,13 +609,15 @@ function notifyTelegram(text) {
     tgWindowStart = Date.now();
     tgSent = 0;
   }
-  if (tgSent >= 40) return; // never flood the chat, even on a traffic spike
+  if (tgSent >= 40) return Promise.resolve({ ok: false, description: "rate limit reached" }); // never flood the chat
   tgSent++;
-  fetch("https://api.telegram.org/bot" + TG_TOKEN + "/sendMessage", {
+  return fetch("https://api.telegram.org/bot" + TG_TOKEN + "/sendMessage", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ chat_id: TG_CHAT, text, parse_mode: "HTML", disable_web_page_preview: true }),
-  }).catch(() => {});
+  })
+    .then((r) => r.json())
+    .catch((e) => ({ ok: false, description: e.message }));
 }
 
 const SOURCE_LABEL = {
@@ -1411,9 +1413,16 @@ http
         res.end(JSON.stringify({ error: "нужны переменные TELEGRAM_BOT_TOKEN и TELEGRAM_CHAT_ID" }));
         return;
       }
-      notifyTelegram("✅ <b>Saudager подключён</b>\nУведомления о переходах покупателей будут приходить сюда.");
-      res.writeHead(200, { "Content-Type": MIME[".json"] });
-      res.end(JSON.stringify({ ok: true, sent: true }));
+      // Report what Telegram actually said — a test that cannot fail is useless
+      Promise.resolve(notifyTelegram("✅ <b>Saudager подключён</b>\nУведомления о переходах покупателей будут приходить сюда."))
+        .then((tg) => {
+          const delivered = !!(tg && tg.ok);
+          res.writeHead(delivered ? 200 : 502, { "Content-Type": MIME[".json"] });
+          res.end(JSON.stringify({
+            delivered,
+            telegram: tg && tg.ok ? { chat: tg.result && tg.result.chat && tg.result.chat.id, messageId: tg.result && tg.result.message_id } : tg,
+          }));
+        });
       return;
     }
 
