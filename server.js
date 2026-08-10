@@ -632,6 +632,8 @@ function bucket(slug) {
   return STATS[slug];
 }
 
+// Returns true when the hit came from a human — the caller uses this to decide
+// whether the event is worth a Telegram alert.
 function track(slug, req, kind) {
   const ua = req.headers["user-agent"] || "";
   const b = bucket(slug);
@@ -640,11 +642,20 @@ function track(slug, req, kind) {
   const botHit = AI_BOT_UA.find(([, re]) => re.test(ua));
   if (botHit) {
     b.bots[botHit[0]] = (b.bots[botHit[0]] || 0) + 1;
-    return;
+    if (kind === "click") b.botClicks = (b.botClicks || 0) + 1;
+    // Keep a few raw agents for the unclassified ones so we can see who crawls us
+    if (botHit[0] === "other-bot") {
+      b.otherBotAgents = b.otherBotAgents || {};
+      const key = ua.slice(0, 120);
+      if (Object.keys(b.otherBotAgents).length < 8 || b.otherBotAgents[key]) {
+        b.otherBotAgents[key] = (b.otherBotAgents[key] || 0) + 1;
+      }
+    }
+    return false;
   }
   if (kind === "click") {
     b.clicks++;
-    return;
+    return true;
   }
   b.visits++;
   const src = sourceFromReferrer(req.headers.referer || req.headers.referrer);
@@ -660,6 +671,7 @@ function track(slug, req, kind) {
         CANONICAL + "/store/" + slug
     );
   }
+  return true;
 }
 
 function statsSummary() {
@@ -1532,7 +1544,8 @@ http
 
     if (urlPath === "/robots.txt") {
       res.writeHead(200, { "Content-Type": MIME[".txt"], "Cache-Control": "public, max-age=3600" });
-      res.end("User-agent: *\nAllow: /\n\nSitemap: " + CANONICAL + "/sitemap.xml\n");
+      // /go/ are outbound buy redirects — no reason for crawlers to follow them
+      res.end("User-agent: *\nAllow: /\nDisallow: /go/\nDisallow: /api/\n\nSitemap: " + CANONICAL + "/sitemap.xml\n");
       return;
     }
 
@@ -1583,10 +1596,11 @@ http
       const prof = loadProfile(goMatch[1]);
       const prod = prof && prof.products.find((p) => String(p.id) === goMatch[2]);
       if (prod) {
-        track(goMatch[1], req, "click");
+        const isHuman = track(goMatch[1], req, "click");
         const src = parsed.searchParams.get("s") || "unknown";
         const b = STATS[goMatch[1]] || { clicks: 0 };
-        notifyTelegram(
+        // Crawlers follow buy links too — only a human hand-off is worth an alert
+        if (isHuman) notifyTelegram(
           "🛒 <b>Переход к продавцу</b>\n" +
             "Магазин: <b>" + prof.name + "</b>\n" +
             prod.title + "\n" +
