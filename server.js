@@ -445,7 +445,7 @@ async function handleIngest(rawUrl, host) {
 
   MEM_MERCHANTS.set(slug, profile);
   try {
-    const outDir = path.join(PERSIST_OK ? PERSIST_DATA : REPO_DATA, "merchants");
+    const outDir = path.join(PERSIST_DATA || REPO_DATA, "merchants");
     fs.mkdirSync(outDir, { recursive: true });
     fs.writeFileSync(path.join(outDir, slug + ".json"), JSON.stringify(profile, null, 2), "utf8");
   } catch {
@@ -514,24 +514,39 @@ function buildFeed(slug, origin) {
 // ---------------------------------------------------------------------------
 
 const REPO_DATA = path.join(ROOT, "data");
-const PERSIST_DATA = process.env.HOME && process.env.HOME !== ROOT ? path.join(process.env.HOME, "data") : REPO_DATA;
 
-function ensurePersist() {
-  try {
-    fs.mkdirSync(path.join(PERSIST_DATA, "merchants"), { recursive: true });
-    return true;
-  } catch {
-    return false;
+// Pick the first writable directory that survives a redeploy. On Azure Linux
+// the /home mount persists while /home/site/wwwroot is replaced on every
+// deploy, so anything written under ROOT is temporary by definition.
+function pickPersistDir() {
+  const candidates = [
+    process.env.PERSIST_DIR,
+    process.env.HOME && !ROOT.startsWith(path.join(process.env.HOME, "site")) ? null : "/home/data",
+    process.env.HOME ? path.join(process.env.HOME, "data") : null,
+  ].filter(Boolean);
+  for (const dir of candidates) {
+    if (path.resolve(dir).startsWith(path.resolve(ROOT))) continue; // inside wwwroot — wiped on deploy
+    try {
+      fs.mkdirSync(path.join(dir, "merchants"), { recursive: true });
+      fs.accessSync(dir, fs.constants.W_OK);
+      return dir;
+    } catch {
+      // not writable — try the next candidate
+    }
   }
+  return null;
 }
-const PERSIST_OK = ensurePersist();
-const DATA_DIRS = PERSIST_OK && PERSIST_DATA !== REPO_DATA ? [PERSIST_DATA, REPO_DATA] : [REPO_DATA];
+
+const PERSIST_DATA = pickPersistDir();
+const PERSIST_OK = !!PERSIST_DATA;
+const DATA_DIRS = PERSIST_OK ? [PERSIST_DATA, REPO_DATA] : [REPO_DATA];
+console.log("[storage] persistent=" + (PERSIST_DATA || "none") + " repo=" + REPO_DATA);
 
 // ---------------------------------------------------------------------------
 // Traffic measurement: who reaches a storefront and who clicks through to Kaspi
 // ---------------------------------------------------------------------------
 
-const STATS_FILE = path.join(PERSIST_OK ? PERSIST_DATA : REPO_DATA, "stats.json");
+const STATS_FILE = path.join(PERSIST_DATA || REPO_DATA, "stats.json");
 let STATS = {};
 try {
   STATS = JSON.parse(fs.readFileSync(STATS_FILE, "utf8"));
@@ -1325,6 +1340,19 @@ http
           res.writeHead(500, { "Content-Type": MIME[".json"] });
           res.end(JSON.stringify({ error: "analysis failed" }));
         });
+      return;
+    }
+
+    if (urlPath === "/api/health") {
+      res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+      res.end(JSON.stringify({
+        ok: true,
+        node: process.version,
+        persistentDir: PERSIST_DATA,
+        persistent: PERSIST_OK,
+        stores: listMerchantSlugs().length,
+        trackedStores: Object.keys(STATS).length,
+      }));
       return;
     }
 
