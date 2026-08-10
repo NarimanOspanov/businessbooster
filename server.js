@@ -519,10 +519,11 @@ const REPO_DATA = path.join(ROOT, "data");
 // the /home mount persists while /home/site/wwwroot is replaced on every
 // deploy, so anything written under ROOT is temporary by definition.
 function pickPersistDir() {
+  // /home is the Azure App Service persistent share (marked by /home/site);
+  // HOME may point at /root, which is container-local and lost on restart.
   const candidates = [
     process.env.PERSIST_DIR,
-    process.env.HOME && !ROOT.startsWith(path.join(process.env.HOME, "site")) ? null : "/home/data",
-    process.env.HOME ? path.join(process.env.HOME, "data") : null,
+    process.platform === "linux" && fs.existsSync("/home/site") ? "/home/data" : null,
   ].filter(Boolean);
   for (const dir of candidates) {
     if (path.resolve(dir).startsWith(path.resolve(ROOT))) continue; // inside wwwroot — wiped on deploy
