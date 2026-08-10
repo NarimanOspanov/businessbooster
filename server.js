@@ -372,13 +372,16 @@ async function kaspiSearch(query, page) {
 
 function loadProfile(slug) {
   if (MEM_MERCHANTS.has(slug)) return MEM_MERCHANTS.get(slug);
-  const file = path.join(ROOT, "data", "merchants", slug + ".json");
-  if (!fs.existsSync(file)) return null;
-  try {
-    return JSON.parse(fs.readFileSync(file, "utf8"));
-  } catch {
-    return null;
+  for (const dir of DATA_DIRS) {
+    const file = path.join(dir, "merchants", slug + ".json");
+    if (!fs.existsSync(file)) continue;
+    try {
+      return JSON.parse(fs.readFileSync(file, "utf8"));
+    } catch {
+      // corrupt file — fall through to the next directory
+    }
   }
+  return null;
 }
 
 function profileSummary(p) {
@@ -442,11 +445,11 @@ async function handleIngest(rawUrl, host) {
 
   MEM_MERCHANTS.set(slug, profile);
   try {
-    const outDir = path.join(ROOT, "data", "merchants");
+    const outDir = path.join(PERSIST_OK ? PERSIST_DATA : REPO_DATA, "merchants");
     fs.mkdirSync(outDir, { recursive: true });
     fs.writeFileSync(path.join(outDir, slug + ".json"), JSON.stringify(profile, null, 2), "utf8");
   } catch {
-    // read-only filesystem (e.g. run-from-package) — memory cache still serves the store
+    // read-only filesystem — memory cache still serves the store
   }
   if (host && !/localhost|127\.0\.0\.1/.test(host)) {
     const base = CANONICAL + "/store/" + slug;
@@ -503,6 +506,129 @@ function buildFeed(slug, origin) {
       );
     }),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Storage: Azure keeps /home across restarts and deploys, so generated
+// catalogs and traffic counters live there; the repo copy stays read-only.
+// ---------------------------------------------------------------------------
+
+const REPO_DATA = path.join(ROOT, "data");
+const PERSIST_DATA = process.env.HOME && process.env.HOME !== ROOT ? path.join(process.env.HOME, "data") : REPO_DATA;
+
+function ensurePersist() {
+  try {
+    fs.mkdirSync(path.join(PERSIST_DATA, "merchants"), { recursive: true });
+    return true;
+  } catch {
+    return false;
+  }
+}
+const PERSIST_OK = ensurePersist();
+const DATA_DIRS = PERSIST_OK && PERSIST_DATA !== REPO_DATA ? [PERSIST_DATA, REPO_DATA] : [REPO_DATA];
+
+// ---------------------------------------------------------------------------
+// Traffic measurement: who reaches a storefront and who clicks through to Kaspi
+// ---------------------------------------------------------------------------
+
+const STATS_FILE = path.join(PERSIST_OK ? PERSIST_DATA : REPO_DATA, "stats.json");
+let STATS = {};
+try {
+  STATS = JSON.parse(fs.readFileSync(STATS_FILE, "utf8"));
+} catch {
+  STATS = {};
+}
+let statsDirty = false;
+setInterval(() => {
+  if (!statsDirty) return;
+  statsDirty = false;
+  try {
+    fs.writeFileSync(STATS_FILE, JSON.stringify(STATS), "utf8");
+  } catch {
+    // non-writable disk — counters stay in memory for this process
+  }
+}, 20000).unref();
+
+const AI_BOT_UA = [
+  ["gptbot", /GPTBot/i],
+  ["oai-searchbot", /OAI-SearchBot/i],
+  ["chatgpt-user", /ChatGPT-User/i],
+  ["claudebot", /ClaudeBot|Claude-SearchBot|Claude-User/i],
+  ["perplexitybot", /PerplexityBot|Perplexity-User/i],
+  ["googlebot", /Googlebot/i],
+  ["bingbot", /bingbot/i],
+  ["other-bot", /bot|crawler|spider/i],
+];
+
+function sourceFromReferrer(ref) {
+  if (!ref) return "direct";
+  const h = (() => {
+    try {
+      return new URL(ref).hostname.replace(/^www\./, "");
+    } catch {
+      return "";
+    }
+  })();
+  if (!h) return "direct";
+  if (/chatgpt\.com|openai\.com/.test(h)) return "chatgpt";
+  if (/perplexity\.ai/.test(h)) return "perplexity";
+  if (/claude\.ai|anthropic\.com/.test(h)) return "claude";
+  if (/google\./.test(h)) return "google";
+  if (/bing\.com|copilot\.microsoft/.test(h)) return "bing";
+  if (/yandex\./.test(h)) return "yandex";
+  if (/saudager\.ai|azurewebsites\.net|localhost/.test(h)) return "internal";
+  return "other";
+}
+
+function bucket(slug) {
+  if (!STATS[slug]) {
+    STATS[slug] = { visits: 0, sources: {}, bots: {}, clicks: 0, firstSeen: new Date().toISOString(), lastSeen: null };
+  }
+  return STATS[slug];
+}
+
+function track(slug, req, kind) {
+  const ua = req.headers["user-agent"] || "";
+  const b = bucket(slug);
+  b.lastSeen = new Date().toISOString();
+  statsDirty = true;
+  const botHit = AI_BOT_UA.find(([, re]) => re.test(ua));
+  if (botHit) {
+    b.bots[botHit[0]] = (b.bots[botHit[0]] || 0) + 1;
+    return;
+  }
+  if (kind === "click") {
+    b.clicks++;
+    return;
+  }
+  b.visits++;
+  const src = sourceFromReferrer(req.headers.referer || req.headers.referrer);
+  b.sources[src] = (b.sources[src] || 0) + 1;
+}
+
+function statsSummary() {
+  const rows = Object.entries(STATS).map(([slug, s]) => ({
+    slug,
+    visits: s.visits,
+    clicks: s.clicks,
+    botHits: Object.values(s.bots).reduce((a, b) => a + b, 0),
+    sources: s.sources,
+    bots: s.bots,
+    lastSeen: s.lastSeen,
+  }));
+  rows.sort((a, b) => b.clicks - a.clicks || b.visits - a.visits);
+  const totals = rows.reduce(
+    (acc, r) => {
+      acc.visits += r.visits;
+      acc.clicks += r.clicks;
+      acc.botHits += r.botHits;
+      for (const [k, v] of Object.entries(r.sources)) acc.sources[k] = (acc.sources[k] || 0) + v;
+      for (const [k, v] of Object.entries(r.bots)) acc.bots[k] = (acc.bots[k] || 0) + v;
+      return acc;
+    },
+    { visits: 0, clicks: 0, botHits: 0, sources: {}, bots: {} }
+  );
+  return { storeCount: rows.length, totals, stores: rows };
 }
 
 // ---------------------------------------------------------------------------
@@ -780,12 +906,14 @@ const CANONICAL = "https://" + CANONICAL_HOST;
 
 function listMerchantSlugs() {
   const slugs = new Set(MEM_MERCHANTS.keys());
-  try {
-    for (const f of fs.readdirSync(path.join(ROOT, "data", "merchants"))) {
-      if (f.endsWith(".json")) slugs.add(f.slice(0, -5));
+  for (const dir of DATA_DIRS) {
+    try {
+      for (const f of fs.readdirSync(path.join(dir, "merchants"))) {
+        if (f.endsWith(".json")) slugs.add(f.slice(0, -5));
+      }
+    } catch {
+      // directory missing — skip
     }
-  } catch {
-    // no data dir — memory only
   }
   return Array.from(slugs);
 }
@@ -1085,7 +1213,7 @@ function renderStore(slug) {
         "<h3>" + esc(p.title) + "</h3>" +
         rating +
         '<div class="price">' + esc(p.priceFormatted || p.price + " ₸") + " " + old + " " + disc + "</div>" +
-        '<a class="buy" href="' + esc(p.kaspiUrl) + '" rel="nofollow">Купить на Kaspi</a>' +
+        '<a class="buy" href="/go/' + esc(m.slug) + '/' + esc(p.id) + '" rel="nofollow">Купить на Kaspi</a>' +
         "</article>"
       );
     })
@@ -1197,6 +1325,26 @@ http
           res.writeHead(500, { "Content-Type": MIME[".json"] });
           res.end(JSON.stringify({ error: "analysis failed" }));
         });
+      return;
+    }
+
+    if (urlPath === "/api/stats") {
+      const token = parsed.searchParams.get("token") || "";
+      const slug = parsed.searchParams.get("slug");
+      const admin = process.env.STATS_TOKEN && token === process.env.STATS_TOKEN;
+      if (slug) {
+        const s = STATS[slug];
+        res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+        res.end(JSON.stringify(s ? { slug, ...s } : { slug, visits: 0, clicks: 0, sources: {}, bots: {} }));
+        return;
+      }
+      if (!admin) {
+        res.writeHead(401, { "Content-Type": MIME[".json"] });
+        res.end(JSON.stringify({ error: "token required for the aggregate view" }));
+        return;
+      }
+      res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+      res.end(JSON.stringify(statsSummary(), null, 2));
       return;
     }
 
@@ -1317,10 +1465,23 @@ http
       }
     }
 
+    // Buy-button redirect: the click we can prove we sent to the merchant
+    const goMatch = urlPath.match(/^\/go\/([a-z0-9-]+)\/([\w-]+)$/);
+    if (goMatch) {
+      const prof = loadProfile(goMatch[1]);
+      const prod = prof && prof.products.find((p) => String(p.id) === goMatch[2]);
+      if (prod) {
+        track(goMatch[1], req, "click");
+        res.writeHead(302, { Location: prod.kaspiUrl, "Cache-Control": "no-store" }).end();
+        return;
+      }
+    }
+
     const storeMatch = urlPath.match(/^\/store\/([a-z0-9-]+)\/?$/);
     if (storeMatch) {
       const html = renderStore(storeMatch[1]);
       if (html) {
+        track(storeMatch[1], req, "visit");
         res.writeHead(200, { "Content-Type": MIME[".html"], "Cache-Control": "public, max-age=300" }).end(html);
         return;
       }
