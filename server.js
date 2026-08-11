@@ -759,7 +759,8 @@ async function runKrishaWatch() {
   const K = require("./scripts/krisha-lib.js");
   const started = Date.now();
   try {
-    const { cards, total } = await K.fetchSearch(40, K.CRITERIA);
+    const { cards, total, skipped } = await K.fetchSearch(40, K.CRITERIA);
+    let okReads = 0, failReads = 0;
     const near = cards.filter((c) => (c.loc = K.locationScore(c.addr)).score > 0);
 
     // Price moves on listings we already know about
@@ -786,10 +787,11 @@ async function runKrishaWatch() {
         // A failed read must not enter the corpus: the listing would be marked
         // seen, never retried, and sit there for ever without any features.
         KW.failed[c.id] = (KW.failed[c.id] || 0) + 1;
+        failReads++;
         await K.sleep(KRISHA_PACE_MS);
         continue;
       }
-      if (!c.year) { KW.failed[c.id] = (KW.failed[c.id] || 0) + 1; await K.sleep(KRISHA_PACE_MS); continue; }
+      okReads++;
       delete KW.failed[c.id];
       KW.corpus[c.id] = {
         id: c.id, price: c.price, ppm: c.ppm, area: c.area, rooms: c.rooms, addr: c.addr,
@@ -849,7 +851,8 @@ async function runKrishaWatch() {
     KW.lastError = null;
     KW.lastSummary = {
       total, near: near.length, corpus: corpus.length,
-      newDetails: fresh.length, alerts: KW.bootstrapped ? worth.length : 0, drops: drops.length,
+      tried: fresh.length, read: okReads, failed: failReads, searchPagesSkipped: skipped || 0,
+      alerts: KW.bootstrapped ? worth.length : 0, drops: drops.length,
       seconds: Math.round((Date.now() - started) / 1000),
     };
     saveKrisha();

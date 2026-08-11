@@ -147,13 +147,20 @@ function flagsFor(c) {
 
 async function fetchSearch(maxPages, crit, onPage) {
   const found = new Map();
-  let total = null;
+  let total = null, skipped = 0;
   for (let page = 1; page <= maxPages; page++) {
-    const res = await fetch(searchUrl(page, crit), { headers: H });
-    const html = await res.text();
+    let html;
+    try {
+      html = await fetchText(searchUrl(page, crit));
+    } catch {
+      // One unreachable page must not abort the sweep — note it and move on.
+      skipped++;
+      await sleep(1300);
+      continue;
+    }
     if (total === null) {
       const m = html.match(/"srchtype":"filter","offset":\d+,"count":(\d+)/);
-      total = m ? +m[1] : null;
+      if (m) total = +m[1];
     }
     const cards = parseCards(html);
     if (!cards.length) break;
@@ -161,23 +168,21 @@ async function fetchSearch(maxPages, crit, onPage) {
     if (onPage) onPage(page, found.size, total);
     await sleep(1300);
   }
-  return { cards: [...found.values()], total };
+  return { cards: [...found.values()], total, skipped };
 }
 
-// Listing pages come back fine from a datacenter IP but detail pages drop the
-// connection outright about a third of the time, so every read gets a deadline
-// and two retries with growing backoff before it counts as a failure.
-async function fetchDetail(id, attempts = 3) {
+// From a datacenter IP Krisha drops connections intermittently — on detail pages
+// most often, but search pages too. Every read therefore gets a deadline and two
+// backoff retries; without this a single blip killed an entire run.
+async function fetchText(url, attempts = 3, timeoutMs = 20000) {
   let last;
   for (let i = 0; i < attempts; i++) {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 20000);
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
-      const r = await fetch("https://krisha.kz/a/show/" + id, { headers: H, signal: ctrl.signal });
+      const r = await fetch(url, { headers: H, signal: ctrl.signal });
       if (!r.ok) throw new Error("HTTP " + r.status);
-      const d = parseDetail(await r.text());
-      if (!d.year) throw new Error("no build year in page");
-      return d;
+      return await r.text();
     } catch (e) {
       last = e;
       if (i < attempts - 1) await sleep(2500 * (i + 1));
@@ -188,8 +193,14 @@ async function fetchDetail(id, attempts = 3) {
   throw last;
 }
 
+async function fetchDetail(id) {
+  const d = parseDetail(await fetchText("https://krisha.kz/a/show/" + id));
+  if (!d.year) throw new Error("no build year in page");
+  return d;
+}
+
 module.exports = {
   H, CRITERIA, NEAR_DISTRICTS, sleep, num, clean, money,
   searchUrl, parseCards, parseDetail, locationScore, dedupeKey,
-  ageBand, groupKey, median, buildModel, flagsFor, fetchSearch, fetchDetail,
+  ageBand, groupKey, median, buildModel, flagsFor, fetchText, fetchSearch, fetchDetail,
 };
