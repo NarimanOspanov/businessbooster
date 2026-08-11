@@ -706,7 +706,10 @@ function statsSummary() {
 // dozen requests, not a few hundred.
 // ---------------------------------------------------------------------------
 
-const KRISHA_ON = process.env.KRISHA_WATCH === "1";
+// On by default; KRISHA_WATCH=0 turns it off. Gated on Telegram being wired up:
+// alerts have nowhere to go otherwise, and there is no reason to walk someone
+// else's site for output nobody receives — which also keeps local dev quiet.
+const KRISHA_ON = process.env.KRISHA_WATCH !== "0" && !!(TG_TOKEN && TG_CHAT);
 const KRISHA_EVERY_H = Number(process.env.KRISHA_INTERVAL_H || 4);
 const KRISHA_MIN_DISCOUNT = Number(process.env.KRISHA_MIN_DISCOUNT || 12);
 const KRISHA_DETAILS_PER_RUN = 120; // bound one run's work; the corpus warms up over several
@@ -1647,7 +1650,11 @@ http
       if (parsed.searchParams.get("run") === "1") {
         if (!KRISHA_ON) {
           res.writeHead(409, { "Content-Type": MIME[".json"] });
-          res.end(JSON.stringify({ error: "нужна переменная KRISHA_WATCH=1" }));
+          res.end(JSON.stringify({
+            error: TG_TOKEN && TG_CHAT
+              ? "выключено переменной KRISHA_WATCH=0"
+              : "нужны TELEGRAM_BOT_TOKEN и TELEGRAM_CHAT_ID — слать уведомления некуда",
+          }));
           return;
         }
         krishaTick();
