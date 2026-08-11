@@ -9,13 +9,16 @@ const H = {
 };
 
 // --- the brief -------------------------------------------------------------
+// City-wide and owner-only: 16 629 listings, against 624 under the narrow
+// personal brief. Building type and build year are no longer filtered — the
+// model bands by both, so restricting them only starved the comparables.
 const CRITERIA = {
   city: "almaty",
-  rooms: [1, 2],
-  priceFrom: 30000000,
-  priceTo: 40000000,
-  yearFrom: 1980,
-  buildings: [1, 2], // кирпичный, панельный
+  rooms: [1, 2, 3],
+  priceFrom: 15000000,
+  priceTo: 80000000,
+  yearFrom: null,
+  buildings: null,
   ownerOnly: true,
 };
 
@@ -40,13 +43,12 @@ const money = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " ")
 
 function searchUrl(page, crit) {
   const c = crit || CRITERIA;
-  const p = [
-    "das[price][from]=" + c.priceFrom,
-    "das[price][to]=" + c.priceTo,
-    "das[house.year][from]=" + c.yearFrom,
-  ];
-  c.rooms.forEach((r) => p.push("das[live.rooms][]=" + r));
-  c.buildings.forEach((b) => p.push("das[flat.building][]=" + b));
+  const p = [];
+  if (c.priceFrom) p.push("das[price][from]=" + c.priceFrom);
+  if (c.priceTo) p.push("das[price][to]=" + c.priceTo);
+  if (c.yearFrom) p.push("das[house.year][from]=" + c.yearFrom);
+  (c.rooms || []).forEach((r) => p.push("das[live.rooms][]=" + r));
+  (c.buildings || []).forEach((b) => p.push("das[flat.building][]=" + b));
   if (c.ownerOnly) p.push("das[who]=1");
   p.push("page=" + page);
   return "https://krisha.kz/prodazha/kvartiry/" + c.city + "/?" + p.join("&");
@@ -105,10 +107,12 @@ function parseDetail(html) {
 
 // Without the district guard a long street like Момышулы matches at its far end
 // in Зердели, 15 km away, and Наурызбай matches the district's own name.
+// The Abay corridor guess was a stand-in for coordinates we did not have. Now
+// that listings are geocoded and an area can be drawn on the map, it no longer
+// filters anything out — it only nudges ranking when no box is set.
 function locationScore(addr) {
   const a = String(addr || "").toLowerCase();
-  const inCorridor = NEAR_DISTRICTS.some((s) => a.includes(s));
-  if (!inCorridor) return { score: 0, why: "район в стороне от Абая" };
+  if (!NEAR_DISTRICTS.some((s) => a.includes(s))) return { score: 1, why: "Алматы" };
   if (ON_ABAY.test(a)) return { score: 3, why: "адрес на Абая" };
   const hit = CROSSES.find((s) => a.includes(s));
   if (hit) return { score: 2, why: "пересечение с Абая: " + hit };
@@ -121,7 +125,9 @@ function locationScore(addr) {
 const dedupeKey = (c) =>
   [c.district, Math.round(c.area * 10), c.rooms || "?", c.floor || "?", c.floors || "?"].join("|");
 
-const ageBand = (y) => (y >= 2010 ? "2010+" : y >= 2000 ? "2000-09" : y >= 1990 ? "1990-99" : "1980-89");
+const ageBand = (y) =>
+  y >= 2020 ? "2020+" : y >= 2010 ? "2010-19" : y >= 2000 ? "2000-09"
+  : y >= 1990 ? "1990-99" : y >= 1980 ? "1980-89" : y >= 1960 ? "1960-79" : "до 1960";
 // Price per m² falls as flats get bigger, so without an area band a whole
 // new-build complex of 74-87 m² reads as a 40% bargain against small old stock.
 const areaBand = (a) => (a < 40 ? "<40" : a < 55 ? "40-55" : a < 70 ? "55-70" : a < 90 ? "70-90" : "90+");

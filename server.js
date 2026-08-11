@@ -727,7 +727,7 @@ const KRISHA_EVERY_H = Number(process.env.KRISHA_INTERVAL_H || 4);
 const KRISHA_MIN_DISCOUNT = Number(process.env.KRISHA_MIN_DISCOUNT || 12);
 // 80 was a hedge against the read failures; with retries in place a run reads
 // every listing it tries, so the warm-up can finish in a couple of cycles.
-const KRISHA_DETAILS_PER_RUN = Number(process.env.KRISHA_DETAILS_PER_RUN || 150);
+const KRISHA_DETAILS_PER_RUN = Number(process.env.KRISHA_DETAILS_PER_RUN || 400);
 const KRISHA_PACE_MS = Number(process.env.KRISHA_PACE_MS || 2500); // gentler than local: the datacenter IP gets dropped more
 const KRISHA_FILE = path.join(PERSIST_DATA || REPO_DATA, "krisha-watch.json");
 
@@ -782,7 +782,10 @@ function krishaPost(c, kind) {
 // channel that only ever posted from it would be pointless.
 function krishaLoc(c, ignoreArea) {
   const K = require("./scripts/krisha-lib.js");
-  if (ignoreArea || !KW.area) return K.locationScore(c.addr);
+  // City-wide: proximity to one avenue is not a ranking criterion for a public
+  // channel, so ordering falls through to how underpriced the flat is.
+  if (ignoreArea) return { score: 1, why: c.district || "Алматы" };
+  if (!KW.area) return K.locationScore(c.addr);
   if (c.lat == null) return { score: 0, why: "координаты ещё не определены" };
   return K.inBox(c, KW.area)
     ? { score: 3, why: "внутри выбранной области" }
@@ -952,8 +955,11 @@ async function runKrishaWatch() {
 
     // Only unseen listings cost a detail request
     KW.failed = KW.failed || {};
+    // Newest first: ids grow over time, and a channel lives on fresh listings —
+    // the backlog can fill in behind it over the following runs.
     const fresh = near
       .filter((c) => !KW.corpus[c.id] && (KW.failed[c.id] || 0) < 3)
+      .sort((a, b) => Number(b.id) - Number(a.id))
       .slice(0, KRISHA_DETAILS_PER_RUN);
     const added = [];
     for (const c of fresh) {
@@ -986,10 +992,17 @@ async function runKrishaWatch() {
     }
     saveKrisha();
 
-    // Resolve coordinates for anything still missing them, paced for Nominatim's
-    // one-request-per-second policy. Costs Krisha nothing — we already hold the
-    // addresses.
-    const needGeo = Object.values(KW.corpus).filter((c) => c.lat == null && !c.geoTried);
+    // Coordinates are only needed for the map and the drawn area, so geocode
+    // what a person might actually look at rather than the whole city — sending
+    // 16 000 addresses to a free community service would be an abuse of it.
+    const geoModel = K.buildModel(Object.values(KW.corpus).filter((c) => c.year));
+    const needGeo = Object.values(KW.corpus)
+      .filter((c) => c.lat == null && !c.geoTried && c.year)
+      .filter((c) => {
+        const p = geoModel(c);
+        return p.solid && (1 - c.ppm / p.expected) * 100 >= 5;
+      })
+      .sort((a, b) => Number(b.id) - Number(a.id));
     for (const c of needGeo.slice(0, KRISHA_GEO_PER_RUN)) {
       const g = await K.geocode(c.addr);
       if (g) { Object.assign(c, g); geocoded++; } else { c.geoTried = true; }
