@@ -228,6 +228,38 @@ async function fetchText(url, attempts = 3, timeoutMs = 20000) {
   throw last;
 }
 
+// Krisha publishes its own price comparison — I was wrong earlier to say it does
+// not. It is rendered client-side from this fragment, which is why it was
+// invisible in the listing HTML. Not disallowed in robots.txt.
+//
+// Their stated method: build year, room count, district and building type —
+// area is not among them, which is exactly why their percentage and ours differ.
+async function fetchPriceAnalysis(id) {
+  const html = await fetchText("https://krisha.kz/analytics/aPriceAnalysis/?id=" + id);
+  const money = (re) => {
+    const m = html.match(re);
+    return m ? num(m[1]) : null;
+  };
+  const pct = clean(html).match(/На\s+([\d.,]+)%\s+(дешевле|дороже)/i);
+  const series = html.match(/chartColumnsData\s*=\s*(\{[\s\S]{0,4000}?\});/);
+  let city = null, micro = null;
+  if (series) {
+    try {
+      const j = JSON.parse(series[1]);
+      city = j.city || null;
+      micro = j.microdistrict || null;
+    } catch { /* chart is a bonus, not a requirement */ }
+  }
+  return {
+    kzPpm: money(/class="green-price">([\d\s&nbsp;]+)/),
+    kzSimilarLocal: money(/class="blue-price">([\d\s&nbsp;]+)/),
+    kzSimilarCity: money(/class="white-blue-price">([\d\s&nbsp;]+)/),
+    kzDiscount: pct ? (pct[2].toLowerCase() === "дешевле" ? 1 : -1) * Number(pct[1].replace(",", ".")) : null,
+    kzCompareUrl: (html.match(/href="(\/prodazha\/kvartiry\/[^"]+)"/) || [])[1] || null,
+    trendCity: city, trendMicro: micro,
+  };
+}
+
 async function fetchDetail(id) {
   const d = parseDetail(await fetchText("https://krisha.kz/a/show/" + id));
   if (!d.year) throw new Error("no build year in page");
@@ -297,5 +329,6 @@ module.exports = {
   addressQueries, geocode, inBox,
   H, CRITERIA, NEAR_DISTRICTS, sleep, num, clean, money,
   searchUrl, parseCards, parseDetail, locationScore, dedupeKey,
-  ageBand, groupKey, median, buildModel, flagsFor, fetchText, fetchSearch, fetchDetail,
+  ageBand, areaBand, groupKey, median, buildModel, flagsFor,
+  fetchText, fetchSearch, fetchDetail, fetchPriceAnalysis,
 };

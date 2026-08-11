@@ -878,7 +878,15 @@ function krishaChannelPost(c, rubric) {
   lines.push("🏠 <b>" + (rubric || "Находка дня") +
     (c.solid ? " · дешевле похожих на " + c.discount + "%" : "") + "</b>", "");
   lines.push("<b>" + K.money(c.price) + "</b> · " + c.ppm.toLocaleString("ru") + " ₸/м²");
-  if (c.solid) lines.push("У похожих домов в районе — " + c.expected.toLocaleString("ru") + " ₸/м²");
+  if (c.solid) lines.push("По нашей выборке у похожих — " + c.expected.toLocaleString("ru") + " ₸/м²");
+  // Krisha publishes its own comparison on every listing. Quoting it defuses the
+  // obvious objection — a reader who opens the ad sees a different percentage —
+  // and the gap is honest: their method uses year, rooms, district and building
+  // type, ours adds floor area.
+  if (c.kzSimilarLocal) {
+    lines.push("По оценке Крыши у похожих — " + c.kzSimilarLocal.toLocaleString("ru") + " ₸/м²" +
+      (c.kzDiscount != null ? " (" + (c.kzDiscount >= 0 ? "−" : "+") + Math.abs(c.kzDiscount) + "%)" : ""));
+  }
   lines.push("");
   lines.push(c.rooms + "-комн · " + c.area + " м²" + (c.floor ? " · " + c.floor + "/" + c.floors + " этаж" : ""));
   lines.push([c.building, c.year ? c.year + " г." : null, c.renovation].filter(Boolean).join(", "));
@@ -920,6 +928,8 @@ async function krishaPublish(rows, rubric) {
   KW.published = KW.published || {};
   const out = [];
   for (const c of rows) {
+    // One extra request, only for what actually gets published
+    try { Object.assign(c, await K.fetchPriceAnalysis(c.id)); } catch { /* post without it */ }
     const tg = await sendTelegram(KW.channel, krishaChannelPost(c, rubric));
     const ok = !!(tg && tg.ok);
     if (ok) KW.published[K.dedupeKey(c)] = { id: c.id, at: new Date().toISOString(), price: c.price };
