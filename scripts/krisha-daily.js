@@ -23,8 +23,14 @@ const day = (d) => d.toISOString().slice(0, 10);
 const today = new Date();
 const windowStart = new Date(today.getTime() - (DAYS - 1) * 864e5);
 
+const OWNER = argv.includes("--owner");
+
 function searchUrl(page) {
-  return "https://krisha.kz/prodazha/kvartiry/" + DISTRICT + "/?das[live.rooms][]=" + ROOMS + "&page=" + page;
+  const p = [];
+  if (ROOMS && ROOMS !== "all") String(ROOMS).split(",").forEach((r) => p.push("das[live.rooms][]=" + r));
+  if (OWNER) p.push("das[who]=1");
+  p.push("page=" + page);
+  return "https://krisha.kz/prodazha/kvartiry/" + DISTRICT + "/?" + p.join("&");
 }
 
 (async () => {
@@ -33,7 +39,7 @@ function searchUrl(page) {
   // 1. every id under the filter
   const byId = new Map();
   let total = null;
-  for (let page = 1; page <= 200; page++) {
+  for (let page = 1; page <= Number(flag("pages", 900)); page++) {
     let html;
     try { html = await K.fetchText(searchUrl(page)); } catch { break; }
     if (total === null) {

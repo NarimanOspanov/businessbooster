@@ -976,7 +976,10 @@ async function runKrishaWatch() {
   const K = require("./scripts/krisha-lib.js");
   const started = Date.now();
   try {
-    const { cards, total, skipped } = await K.fetchSearch(40, K.CRITERIA);
+    // 40 pages covered the old narrow brief entirely; against 16 649 listings it
+    // saw 5% — and the wrong 5%, since default order is driven by paid bumps, so
+    // genuinely new listings were never reached.
+    const { cards, total, skipped } = await K.fetchSearch(KRISHA_MAX_PAGES, K.CRITERIA);
     let okReads = 0, failReads = 0, geocoded = 0;
     // With a drawn area we cannot know what is inside it before the listing has
     // been read and geocoded, so every result becomes a candidate. Without one,
@@ -1171,6 +1174,7 @@ const KRISHA_POST_HOUR = Number(process.env.KRISHA_POST_HOUR || 19); // Asia/Alm
 const KRISHA_WEEKLY_HOUR = Number(process.env.KRISHA_WEEKLY_HOUR || 12); // Sundays
 const KRISHA_WEEKLY_LIMIT = Number(process.env.KRISHA_WEEKLY_LIMIT || 7);
 const KRISHA_MAX_GAP = Number(process.env.KRISHA_MAX_GAP || 15); // percentage points vs Krisha's own estimate
+const KRISHA_MAX_PAGES = Number(process.env.KRISHA_MAX_PAGES || 900); // 16 649 listings ≈ 833 pages
 
 if (KRISHA_ON) {
   setTimeout(krishaTick, 45000).unref();                       // let the app finish booting
