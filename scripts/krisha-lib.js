@@ -164,10 +164,28 @@ async function fetchSearch(maxPages, crit, onPage) {
   return { cards: [...found.values()], total };
 }
 
-async function fetchDetail(id) {
-  const r = await fetch("https://krisha.kz/a/show/" + id, { headers: H });
-  if (!r.ok) throw new Error("HTTP " + r.status);
-  return parseDetail(await r.text());
+// Listing pages come back fine from a datacenter IP but detail pages drop the
+// connection outright about a third of the time, so every read gets a deadline
+// and two retries with growing backoff before it counts as a failure.
+async function fetchDetail(id, attempts = 3) {
+  let last;
+  for (let i = 0; i < attempts; i++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 20000);
+    try {
+      const r = await fetch("https://krisha.kz/a/show/" + id, { headers: H, signal: ctrl.signal });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const d = parseDetail(await r.text());
+      if (!d.year) throw new Error("no build year in page");
+      return d;
+    } catch (e) {
+      last = e;
+      if (i < attempts - 1) await sleep(2500 * (i + 1));
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw last;
 }
 
 module.exports = {

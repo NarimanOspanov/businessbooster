@@ -712,7 +712,8 @@ function statsSummary() {
 const KRISHA_ON = process.env.KRISHA_WATCH !== "0" && !!(TG_TOKEN && TG_CHAT);
 const KRISHA_EVERY_H = Number(process.env.KRISHA_INTERVAL_H || 4);
 const KRISHA_MIN_DISCOUNT = Number(process.env.KRISHA_MIN_DISCOUNT || 12);
-const KRISHA_DETAILS_PER_RUN = 120; // bound one run's work; the corpus warms up over several
+const KRISHA_DETAILS_PER_RUN = Number(process.env.KRISHA_DETAILS_PER_RUN || 80);
+const KRISHA_PACE_MS = Number(process.env.KRISHA_PACE_MS || 2500); // gentler than local: the datacenter IP gets dropped more
 const KRISHA_FILE = path.join(PERSIST_DATA || REPO_DATA, "krisha-watch.json");
 
 let KW = { corpus: {}, seenKeys: [], bootstrapped: false, lastRun: null, lastError: null, runs: 0 };
@@ -785,10 +786,10 @@ async function runKrishaWatch() {
         // A failed read must not enter the corpus: the listing would be marked
         // seen, never retried, and sit there for ever without any features.
         KW.failed[c.id] = (KW.failed[c.id] || 0) + 1;
-        await K.sleep(1200);
+        await K.sleep(KRISHA_PACE_MS);
         continue;
       }
-      if (!c.year) { KW.failed[c.id] = (KW.failed[c.id] || 0) + 1; await K.sleep(1200); continue; }
+      if (!c.year) { KW.failed[c.id] = (KW.failed[c.id] || 0) + 1; await K.sleep(KRISHA_PACE_MS); continue; }
       delete KW.failed[c.id];
       KW.corpus[c.id] = {
         id: c.id, price: c.price, ppm: c.ppm, area: c.area, rooms: c.rooms, addr: c.addr,
@@ -797,8 +798,12 @@ async function runKrishaWatch() {
         firstSeen: new Date().toISOString(), seenAt: new Date().toISOString(),
       };
       added.push(KW.corpus[c.id]);
-      await K.sleep(1200);
+      // Persist as we go: a restart mid-run used to throw away everything the
+      // run had read, and a full warm-up is several hundred requests.
+      if (added.length % 20 === 0) saveKrisha();
+      await K.sleep(KRISHA_PACE_MS);
     }
+    saveKrisha();
 
     // Score against everything we have ever seen, not just this page of results
     const corpus = Object.values(KW.corpus).filter((c) => c.year);
@@ -1665,6 +1670,8 @@ http
         running: krishaRunning,
         everyHours: KRISHA_EVERY_H,
         minDiscount: KRISHA_MIN_DISCOUNT,
+        paceMs: KRISHA_PACE_MS,
+        detailsPerRun: KRISHA_DETAILS_PER_RUN,
         bootstrapped: KW.bootstrapped,
         corpus: Object.keys(KW.corpus || {}).length,
         retrying: Object.keys(KW.failed || {}).length,
