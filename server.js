@@ -757,6 +757,55 @@ function krishaPost(c, kind) {
   return notifyTelegram(lines.filter((l) => l !== null && l !== undefined).join("\n"));
 }
 
+// The shortlist the watch is holding right now, scored against everything it
+// has ever read. Shared by the endpoint and the scheduled digest.
+function krishaShortlist(opts) {
+  const K = require("./scripts/krisha-lib.js");
+  const o = opts || {};
+  const min = o.min == null ? KRISHA_MIN_DISCOUNT : Number(o.min);
+  const corpus = Object.values(KW.corpus || {}).filter((c) => c.year);
+  const price = K.buildModel(corpus);
+  const seen = new Set();
+  const rows = corpus
+    .map((c) => {
+      const p = price(c);
+      return Object.assign({}, c, p, {
+        discount: Math.round((1 - c.ppm / p.expected) * 100),
+        flags: K.flagsFor(c),
+        loc: K.locationScore(c.addr),
+        url: "https://krisha.kz/a/show/" + c.id,
+      });
+    })
+    .filter((c) => c.solid && c.discount >= min)
+    .filter((c) => !(o.clean && c.flags.length))
+    .filter((c) => { const k = K.dedupeKey(c); if (seen.has(k)) return false; seen.add(k); return true; })
+    .sort((a, b) => b.loc.score - a.loc.score || b.discount - a.discount)
+    .slice(0, Number(o.limit || 20));
+  return { corpus: corpus.length, rows };
+}
+
+async function krishaDigest(opts) {
+  const K = require("./scripts/krisha-lib.js");
+  const { corpus, rows } = krishaShortlist(opts);
+  if (!rows.length) return { delivered: false, sentItems: 0, reason: "под критерии сейчас ничего не подходит" };
+  const when = new Date().toLocaleString("ru-RU", {
+    timeZone: "Asia/Almaty", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+  });
+  const body = rows.map((c, i) =>
+    (i + 1) + ". <b>−" + c.discount + "%</b> · " + K.money(c.price) + " · " + c.area + " м²" +
+    (c.floor ? " · " + c.floor + "/" + c.floors : "") + " · " +
+    [c.building, c.year ? c.year + " г." : null].filter(Boolean).join(" ") +
+    (c.flags.length ? " · ⚠ " + c.flags.join(", ") : "") + "\n" +
+    c.addr + "\n" + c.url
+  ).join("\n\n");
+  const text =
+    "🏠 <b>Подборка квартир · " + when + "</b>\n" +
+    "30–40 млн · 1–2 комнаты · дом от 1980 · кирпич/панель · от хозяев · вдоль Абая\n" +
+    "в базе " + corpus + " · подошло " + rows.length + "\n\n" + body;
+  const tg = await notifyTelegram(text);
+  return { delivered: !!(tg && tg.ok), sentItems: rows.length, telegram: tg && tg.ok ? undefined : tg };
+}
+
 async function runKrishaWatch() {
   const K = require("./scripts/krisha-lib.js");
   const started = Date.now();
@@ -877,10 +926,25 @@ async function krishaTick() {
   krishaRunning = true;
   try { await runKrishaWatch(); } finally { krishaRunning = false; }
 }
+// The per-listing alerts only fire on arrivals, so without a periodic digest the
+// backlog stays invisible in Telegram — the whole point is not having to open a
+// dashboard to see what is on the market.
+const KRISHA_DIGEST_H = Number(process.env.KRISHA_DIGEST_H || 24);
+const KRISHA_DIGEST_LIMIT = Number(process.env.KRISHA_DIGEST_LIMIT || 10);
+
 if (KRISHA_ON) {
   setTimeout(krishaTick, 45000).unref();                       // let the app finish booting
   setInterval(krishaTick, KRISHA_EVERY_H * 3600e3).unref();
-  console.log("[krisha] watch on · каждые " + KRISHA_EVERY_H + " ч · порог " + KRISHA_MIN_DISCOUNT + "%");
+  if (KRISHA_DIGEST_H > 0) {
+    setInterval(() => {
+      if (!KW.bootstrapped) return;                            // nothing worth summarising yet
+      krishaDigest({ limit: KRISHA_DIGEST_LIMIT, clean: true })
+        .then((o) => console.log("[krisha] digest " + JSON.stringify(o)))
+        .catch((e) => console.log("[krisha] digest failed: " + e.message));
+    }, KRISHA_DIGEST_H * 3600e3).unref();
+  }
+  console.log("[krisha] watch on · каждые " + KRISHA_EVERY_H + " ч · порог " + KRISHA_MIN_DISCOUNT +
+    "% · дайджест каждые " + KRISHA_DIGEST_H + " ч");
 }
 
 // ---------------------------------------------------------------------------
@@ -1663,27 +1727,22 @@ http
     // listings that have been on the site for months — but the backlog is still
     // the answer to "what is on the market", so it needs a way out.
     if (urlPath === "/api/krisha/shortlist") {
-      const K = require("./scripts/krisha-lib.js");
-      const corpus = Object.values(KW.corpus || {}).filter((c) => c.year);
-      const price = K.buildModel(corpus);
-      const seen = new Set();
-      const rows = corpus
-        .map((c) => {
-          const p = price(c);
-          return Object.assign({}, c, p, {
-            discount: Math.round((1 - c.ppm / p.expected) * 100),
-            flags: K.flagsFor(c),
-            loc: K.locationScore(c.addr),
-            url: "https://krisha.kz/a/show/" + c.id,
-          });
-        })
-        .filter((c) => c.solid && c.discount >= Number(parsed.searchParams.get("min") || 12))
-        .filter((c) => !(parsed.searchParams.get("clean") === "1" && c.flags.length))
-        .filter((c) => { const k = K.dedupeKey(c); if (seen.has(k)) return false; seen.add(k); return true; })
-        .sort((a, b) => b.loc.score - a.loc.score || b.discount - a.discount)
-        .slice(0, Number(parsed.searchParams.get("limit") || 20));
+      const opts = {
+        min: parsed.searchParams.get("min"),
+        limit: parsed.searchParams.get("limit"),
+        clean: parsed.searchParams.get("clean") === "1",
+      };
+      if (parsed.searchParams.get("send") === "1") {
+        // Report what Telegram actually answered — a send that cannot fail is useless
+        krishaDigest(opts).then((out) => {
+          res.writeHead(out.delivered ? 200 : 502, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+          res.end(JSON.stringify(out, null, 2));
+        });
+        return;
+      }
+      const { corpus, rows } = krishaShortlist(opts);
       res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
-      res.end(JSON.stringify({ corpus: corpus.length, found: rows.length, items: rows }, null, 2));
+      res.end(JSON.stringify({ corpus, found: rows.length, items: rows }, null, 2));
       return;
     }
 
