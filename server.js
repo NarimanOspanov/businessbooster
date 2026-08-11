@@ -828,6 +828,7 @@ async function runKrishaWatch() {
       .sort((a, b) => b.loc.score - a.loc.score || b.discount - a.discount);
     KW.seenKeys = [...seen].slice(-4000);
 
+    let sent = 0;
     if (!KW.bootstrapped) {
       // The first pass would fire dozens of alerts for a backlog the user never
       // asked about, so it only reports that the watch is live.
@@ -841,9 +842,10 @@ async function runKrishaWatch() {
         );
       }
     } else {
-      for (const c of worth.slice(0, 5)) { await krishaPost(c, "new"); await K.sleep(1200); }
+      for (const c of worth.slice(0, 5)) { await krishaPost(c, "new"); sent++; await K.sleep(1200); }
       for (const c of drops.slice(0, 5)) {
         await krishaPost(Object.assign(score(c), { discount: c.drop }), "drop");
+        sent++;
         await K.sleep(1200);
       }
     }
@@ -854,7 +856,9 @@ async function runKrishaWatch() {
     KW.lastSummary = {
       total, near: near.length, corpus: corpus.length,
       tried: fresh.length, read: okReads, failed: failReads, searchPagesSkipped: skipped || 0,
-      alerts: KW.bootstrapped ? worth.length : 0, drops: drops.length,
+      // What was actually delivered — bootstrapped flips to true inside the
+      // branch above, so reading it here reported a send that never happened.
+      qualified: worth.length, sent, drops: drops.length,
       seconds: Math.round((Date.now() - started) / 1000),
     };
     saveKrisha();
@@ -1651,6 +1655,35 @@ http
           res.writeHead(400, { "Content-Type": MIME[".json"] });
           res.end(JSON.stringify({ error: e.message }));
         });
+      return;
+    }
+
+    // What the watch is holding right now. The warm-up deliberately suppresses
+    // the backlog so the first cycle does not fire dozens of alerts about
+    // listings that have been on the site for months — but the backlog is still
+    // the answer to "what is on the market", so it needs a way out.
+    if (urlPath === "/api/krisha/shortlist") {
+      const K = require("./scripts/krisha-lib.js");
+      const corpus = Object.values(KW.corpus || {}).filter((c) => c.year);
+      const price = K.buildModel(corpus);
+      const seen = new Set();
+      const rows = corpus
+        .map((c) => {
+          const p = price(c);
+          return Object.assign({}, c, p, {
+            discount: Math.round((1 - c.ppm / p.expected) * 100),
+            flags: K.flagsFor(c),
+            loc: K.locationScore(c.addr),
+            url: "https://krisha.kz/a/show/" + c.id,
+          });
+        })
+        .filter((c) => c.solid && c.discount >= Number(parsed.searchParams.get("min") || 12))
+        .filter((c) => !(parsed.searchParams.get("clean") === "1" && c.flags.length))
+        .filter((c) => { const k = K.dedupeKey(c); if (seen.has(k)) return false; seen.add(k); return true; })
+        .sort((a, b) => b.loc.score - a.loc.score || b.discount - a.discount)
+        .slice(0, Number(parsed.searchParams.get("limit") || 20));
+      res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+      res.end(JSON.stringify({ corpus: corpus.length, found: rows.length, items: rows }, null, 2));
       return;
     }
 
