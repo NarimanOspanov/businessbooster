@@ -18,38 +18,60 @@
     font-family:Roboto,"Segoe UI",system-ui,sans-serif; color:var(--text); background:var(--bg);
     display:flex; flex-direction:column; height:100dvh; overflow:hidden;
   }
-  header { padding:11px 16px 10px; border-bottom:1px solid var(--border); flex-shrink:0; }
+  header { padding:10px 16px 9px; border-bottom:1px solid var(--border); flex-shrink:0; }
   h1 { font-size:16.5px; font-weight:800; letter-spacing:-.02em; }
-  .hint { font-size:13px; color:var(--muted); margin-top:3px; line-height:1.4; }
+  .hint { font-size:12.5px; color:var(--muted); margin-top:2px; line-height:1.35; }
 
-  /* Actions sit directly under the header: on a phone the bottom of the page is
-     behind the browser chrome, which is where they used to be. */
-  .actions { display:flex; gap:8px; padding:10px 16px; border-bottom:1px solid var(--border); flex-shrink:0; overflow-x:auto; }
+  .actions { display:flex; gap:8px; padding:9px 16px; border-bottom:1px solid var(--border); flex-shrink:0; overflow-x:auto; }
   button {
     font:inherit; cursor:pointer; border:none; white-space:nowrap;
-    padding:11px 16px; border-radius:11px; font-weight:600; font-size:14.5px;
+    padding:10px 15px; border-radius:11px; font-weight:600; font-size:14px;
   }
   .primary { background:linear-gradient(135deg,#f14635,#e23c2b); color:#fff; }
   .primary:disabled { opacity:.4; }
   .ghost { background:#fff; border:1px solid var(--border); color:var(--text); }
   .ghost.on { background:var(--text); color:#fff; border-color:var(--text); }
 
-  #map { flex:1; min-height:0; width:100%; }
+  .split { flex:1; min-height:0; display:flex; flex-direction:column; }
+  #map { height:40dvh; flex-shrink:0; width:100%; }
   #map.drawing { touch-action:none; cursor:crosshair; }
-  #map.drawing .leaflet-grab { cursor:crosshair; }
 
-  .panel {
-    flex-shrink:0; border-top:1px solid var(--border);
-    padding:10px 16px calc(10px + env(safe-area-inset-bottom));
-    display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  .listwrap { flex:1; min-height:0; display:flex; flex-direction:column; border-top:1px solid var(--border); }
+  .filters {
+    padding:9px 16px; display:flex; gap:14px; align-items:center; flex-wrap:wrap;
+    border-bottom:1px solid var(--border); flex-shrink:0; background:var(--bg-soft);
   }
-  .stat b { font-size:16px; font-weight:800; }
-  .stat span { color:var(--muted); font-size:11.5px; display:block; line-height:1.2; }
-  .legend { font-size:11.5px; color:var(--muted); display:flex; gap:12px; }
+  .filters label { display:flex; align-items:center; gap:7px; font-size:13.5px; cursor:pointer; }
+  .filters input[type=checkbox] { width:17px; height:17px; accent-color:var(--accent); }
+  select { font:inherit; font-size:13.5px; padding:6px 9px; border-radius:9px; border:1px solid var(--border); background:#fff; }
+  .count { font-size:13.5px; font-weight:700; }
+  .count span { font-weight:400; color:var(--muted); }
+
+  .list { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:0 0 calc(12px + env(safe-area-inset-bottom)); }
+  .row { display:block; padding:12px 16px; border-bottom:1px solid var(--border); color:inherit; text-decoration:none; }
+  .row:active { background:var(--bg-soft); }
+  .row .top { display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; }
+  .row .price { font-size:17px; font-weight:800; letter-spacing:-.02em; }
+  .badge { font-size:11.5px; font-weight:700; padding:2px 8px; border-radius:6px; }
+  .badge.down { background:#e6f6ec; color:var(--green); }
+  .badge.up { background:#fdeceb; color:#b4442f; }
+  .row .meta { font-size:13px; color:var(--muted); margin-top:3px; }
+  .row .addr { font-size:13.5px; margin-top:3px; }
+  .row .flags { font-size:12px; color:var(--amber); margin-top:3px; }
+  .row .why { font-size:12px; color:var(--muted); margin-top:3px; }
+  .empty { padding:34px 16px; text-align:center; color:var(--muted); font-size:14px; }
+
+  .stats { padding:8px 16px; font-size:12px; color:var(--muted); border-top:1px solid var(--border); flex-shrink:0; display:flex; gap:14px; flex-wrap:wrap; }
   .dot { width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:4px; }
-  .msg { font-size:13px; width:100%; }
+  .msg { font-size:12.5px; }
   .msg.ok { color:var(--green); font-weight:600; }
   .msg.err { color:var(--accent); font-weight:600; }
+
+  @media (min-width: 900px) {
+    .split { flex-direction:row; }
+    #map { height:auto; flex:1 1 58%; }
+    .listwrap { flex:1 1 42%; border-top:none; border-left:1px solid var(--border); }
+  }
   .leaflet-container { font-family:inherit; }
 </style>
 </head>
@@ -57,27 +79,41 @@
 
 <header>
   <h1>Область поиска квартир</h1>
-  <p class="hint" id="hint">Нажмите «Обвести область» и проведите пальцем по карте. Сторож будет следить только внутри.</p>
+  <p class="hint" id="hint">Нажмите «Обвести область» и проведите пальцем по карте — ниже появится список квартир внутри.</p>
 </header>
 
 <div class="actions">
   <button class="ghost" id="draw">✏️ Обвести область</button>
   <button class="ghost" id="visible">Взять видимую часть</button>
   <button class="primary" id="save" disabled>Сохранить</button>
+  <button class="ghost" id="tg">В Telegram</button>
   <button class="ghost" id="clear">Сбросить</button>
 </div>
 
-<div id="map"></div>
+<div class="split">
+  <div id="map"></div>
 
-<div class="panel">
-  <div class="stat"><b id="s-geo">—</b><span>с координатами</span></div>
-  <div class="stat"><b id="s-in">—</b><span>внутри области</span></div>
-  <div class="stat"><b id="s-pend">—</b><span>ждут координат</span></div>
-  <div class="legend">
-    <span><i class="dot" style="background:#1f9d55"></i>точный адрес</span>
-    <span><i class="dot" style="background:#c47f17"></i>центр мкр</span>
+  <div class="listwrap">
+    <div class="filters">
+      <div class="count" id="count">—</div>
+      <label><input type="checkbox" id="f-cheap"> дешевле сопоставимых</label>
+      <label><input type="checkbox" id="f-clean"> без 1-го и последнего этажа</label>
+      <select id="sort">
+        <option value="discount">сначала выгодные</option>
+        <option value="price">сначала дешёвые</option>
+        <option value="ppm">по цене за м²</option>
+      </select>
+    </div>
+    <div class="list" id="list"><div class="empty">Обведите область на карте — список появится здесь</div></div>
   </div>
-  <div class="msg" id="msg"></div>
+</div>
+
+<div class="stats">
+  <span><b id="s-geo">—</b> с координатами</span>
+  <span><b id="s-pend">—</b> ждут координат</span>
+  <span><i class="dot" style="background:#1f9d55"></i>точный адрес</span>
+  <span><i class="dot" style="background:#c47f17"></i>центр мкр</span>
+  <span class="msg" id="msg"></span>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -85,6 +121,7 @@
 const $ = (id) => document.getElementById(id);
 const msg = (t, cls) => { $("msg").textContent = t || ""; $("msg").className = "msg " + (cls || ""); };
 const money = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " ₸";
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 
 const mapEl = $("map");
 const map = L.map(mapEl).setView([43.2385, 76.8890], 13);
@@ -93,8 +130,9 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 }).addTo(map);
 map.boxZoom.disable();
 
-const touch = matchMedia("(pointer: coarse)").matches;
-if (!touch) $("hint").innerHTML = "Нажмите «Обвести область» и протяните мышью — или зажмите <b>Shift</b> и тяните сразу.";
+if (!matchMedia("(pointer: coarse)").matches) {
+  $("hint").innerHTML = "Обведите область мышью (кнопка ниже или <b>Shift</b>+перетаскивание) — справа появится список квартир внутри.";
+}
 
 let rect = null, box = null, points = [];
 
@@ -109,14 +147,57 @@ function setBox(b) {
   box = b;
   paint({ lat: b.south, lng: b.west }, { lat: b.north, lng: b.east }, false);
   $("save").disabled = false;
-  countInside();
+  render();
 }
 
-function countInside() {
-  if (!box) { $("s-in").textContent = "—"; return; }
-  $("s-in").textContent = points.filter((p) =>
-    p.lat >= box.south && p.lat <= box.north && p.lon >= box.west && p.lon <= box.east).length;
+// --- the list ---------------------------------------------------------------
+function inBox(p) {
+  return box && p.lat >= box.south && p.lat <= box.north && p.lon >= box.west && p.lon <= box.east;
 }
+
+function render() {
+  const list = $("list");
+  if (!box) {
+    $("count").textContent = "—";
+    list.innerHTML = '<div class="empty">Обведите область на карте — список появится здесь</div>';
+    return;
+  }
+  const all = points.filter(inBox);
+  let rows = all.slice();
+  // "cheaper than comparable" is a choice, not a precondition
+  if ($("f-cheap").checked) rows = rows.filter((p) => p.solid && p.discount >= 12);
+  if ($("f-clean").checked) rows = rows.filter((p) => !p.flags.length);
+
+  const s = $("sort").value;
+  rows.sort((a, b) => s === "price" ? a.price - b.price : s === "ppm" ? a.ppm - b.ppm : b.discount - a.discount);
+
+  $("count").innerHTML = rows.length + " кв. <span>из " + all.length + " в области</span>";
+  if (!rows.length) {
+    list.innerHTML = '<div class="empty">Под эти условия внутри области ничего не подошло</div>';
+    return;
+  }
+  list.innerHTML = rows.map((p) => {
+    const d = p.discount;
+    const badge = p.solid
+      ? '<span class="badge ' + (d >= 0 ? "down" : "up") + '">' + (d >= 0 ? "−" : "+") + Math.abs(d) + "% к похожим</span>"
+      : "";
+    return '<a class="row" href="' + p.url + '" target="_blank" rel="noopener">' +
+      '<div class="top"><span class="price">' + money(p.price) + "</span>" + badge + "</div>" +
+      '<div class="meta">' + p.rooms + "-комн · " + p.area + " м²" +
+        (p.floor ? " · " + p.floor + "/" + p.floors + " этаж" : "") +
+        " · " + esc(p.building) + " " + p.year + " г." +
+        (p.renovation ? " · " + esc(p.renovation) : "") + "</div>" +
+      '<div class="addr">' + esc(p.addr) + "</div>" +
+      (p.flags.length ? '<div class="flags">⚠ ' + esc(p.flags.join(", ")) + "</div>" : "") +
+      '<div class="why">' + p.ppm.toLocaleString("ru") + " ₸/м²" +
+        (p.solid ? " · у похожих " + p.expected.toLocaleString("ru") : " · сравнивать не с чем") +
+        (p.exact ? "" : " · метка неточная") + "</div></a>";
+  }).join("");
+}
+
+$("f-cheap").onchange = render;
+$("f-clean").onchange = render;
+$("sort").onchange = render;
 
 // --- drawing: one code path for finger, pen and mouse -----------------------
 let drawMode = false, startLL = null;
@@ -149,7 +230,7 @@ mapEl.addEventListener("pointermove", (ev) => {
   ev.preventDefault();
 }, { passive: false });
 
-function finishDraw(ev) {
+mapEl.addEventListener("pointerup", (ev) => {
   if (!startLL) return;
   const a = startLL, b = toLatLng(ev);
   startLL = null;
@@ -165,18 +246,15 @@ function finishDraw(ev) {
     south: Math.min(a.lat, b.lat), north: Math.max(a.lat, b.lat),
     west: Math.min(a.lng, b.lng), east: Math.max(a.lng, b.lng),
   });
-  msg("Область намечена. Нажмите «Сохранить», чтобы сторож её запомнил.");
-}
-mapEl.addEventListener("pointerup", finishDraw);
+  msg("Область намечена. «Сохранить» — чтобы сторож следил только внутри.");
+});
 mapEl.addEventListener("pointercancel", () => { startLL = null; map.dragging.enable(); setDrawMode(false); });
 
 $("draw").onclick = () => setDrawMode(!drawMode);
-
-// The fastest route on a phone: pinch to the area you want, then take it whole
 $("visible").onclick = () => {
   const b = map.getBounds();
   setBox({ south: b.getSouth(), north: b.getNorth(), west: b.getWest(), east: b.getEast() });
-  msg("Взял то, что видно на экране. Нажмите «Сохранить».");
+  msg("Взял то, что видно на экране.");
 };
 
 // --- data -------------------------------------------------------------------
@@ -190,12 +268,12 @@ fetch("/api/krisha/points").then((r) => r.json()).then((d) => {
       fillColor: p.exact ? "#1f9d55" : "#c47f17", fillOpacity: 0.85,
     }).addTo(map).bindPopup(
       "<b>" + money(p.price) + "</b><br>" + p.rooms + "-комн · " + p.area + " м²" +
-      (p.year ? " · " + p.building + " " + p.year : "") + "<br>" + p.addr +
+      (p.year ? " · " + esc(p.building) + " " + p.year : "") + "<br>" + esc(p.addr) +
       (p.exact ? "" : "<br><i>метка неточная: центр микрорайона</i>") +
       '<br><a href="' + p.url + '" target="_blank" rel="noopener">Открыть на Крыше</a>'
     );
   });
-  countInside();
+  render();
 });
 
 fetch("/api/krisha/area").then((r) => r.json()).then((d) => {
@@ -203,7 +281,7 @@ fetch("/api/krisha/area").then((r) => r.json()).then((d) => {
   if (d.area) {
     setBox(d.area);
     map.fitBounds([[d.area.south, d.area.west], [d.area.north, d.area.east]]);
-    msg("Область уже задана", "ok");
+    msg("Область уже сохранена", "ok");
   }
 });
 
@@ -212,15 +290,25 @@ $("save").onclick = () => {
   const bbox = [box.south, box.west, box.north, box.east].map((x) => x.toFixed(6)).join(",");
   msg("Сохраняю…");
   fetch("/api/krisha/area?bbox=" + bbox).then((r) => r.json()).then((d) => {
-    msg(d.area ? "Сохранено · внутри области " + d.inside + " объявлений с координатами" : "Не сохранилось",
-        d.area ? "ok" : "err");
+    msg(d.area ? "Сохранено · сторож следит внутри области" : "Не сохранилось", d.area ? "ok" : "err");
   }).catch((e) => msg("Ошибка: " + e.message, "err"));
+};
+
+$("tg").onclick = () => {
+  const cheap = $("f-cheap").checked;
+  msg("Отправляю…");
+  fetch("/api/krisha/shortlist?send=1&limit=15&min=" + (cheap ? 12 : -100) +
+       "&solid=" + (cheap ? 1 : 0) + "&clean=" + ($("f-clean").checked ? 1 : 0))
+    .then((r) => r.json())
+    .then((d) => msg(d.delivered ? "Отправил в Telegram: " + d.sentItems + " шт." : "Не отправилось: " + (d.reason || ""), d.delivered ? "ok" : "err"))
+    .catch((e) => msg("Ошибка: " + e.message, "err"));
 };
 
 $("clear").onclick = () => {
   fetch("/api/krisha/area?clear=1").then((r) => r.json()).then(() => {
     if (rect) map.removeLayer(rect);
-    rect = null; box = null; $("save").disabled = true; $("s-in").textContent = "—";
+    rect = null; box = null; $("save").disabled = true;
+    render();
     msg("Ограничение снято — снова ищем вдоль Абая", "ok");
   });
 };

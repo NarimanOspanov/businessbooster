@@ -794,7 +794,9 @@ function krishaShortlist(opts) {
       });
     })
     .filter((c) => c.loc.score > 0)
-    .filter((c) => c.solid && c.discount >= min)
+    // "cheaper than comparable" is an option, not a precondition: inside a drawn
+    // zone the honest default is everything that matches the brief.
+    .filter((c) => (o.requireSolid === false || c.solid) && c.discount >= min)
     .filter((c) => !(o.clean && c.flags.length))
     .filter((c) => { const k = K.dedupeKey(c); if (seen.has(k)) return false; seen.add(k); return true; })
     .sort((a, b) => b.loc.score - a.loc.score || b.discount - a.discount)
@@ -1795,15 +1797,27 @@ http
       return;
     }
 
-    // Everything geocoded so far, for drawing on the map
+    // Everything geocoded so far, already scored. The map page filters by box
+    // and by "cheaper than comparable" locally, so drawing a zone shows its list
+    // instantly instead of waiting on another round trip.
     if (urlPath === "/api/krisha/points") {
-      const items = Object.values(KW.corpus || {})
+      const K = require("./scripts/krisha-lib.js");
+      const corpus = Object.values(KW.corpus || {}).filter((c) => c.year);
+      const price = K.buildModel(corpus);
+      const items = corpus
         .filter((c) => c.lat != null)
-        .map((c) => ({
-          id: c.id, lat: c.lat, lon: c.lon, price: c.price, ppm: c.ppm, area: c.area,
-          rooms: c.rooms, year: c.year, building: c.building, addr: c.addr,
-          exact: !!c.geoExact, url: "https://krisha.kz/a/show/" + c.id,
-        }));
+        .map((c) => {
+          const p = price(c);
+          return {
+            id: c.id, lat: c.lat, lon: c.lon, price: c.price, ppm: c.ppm, area: c.area,
+            rooms: c.rooms, year: c.year, building: c.building, renovation: c.renovation,
+            floor: c.floor, floors: c.floors, addr: c.addr, exact: !!c.geoExact,
+            expected: p.expected, basis: p.basis, solid: p.solid,
+            discount: Math.round((1 - c.ppm / p.expected) * 100),
+            flags: K.flagsFor(c),
+            url: "https://krisha.kz/a/show/" + c.id,
+          };
+        });
       res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
       res.end(JSON.stringify({ count: items.length, items }));
       return;
@@ -1814,6 +1828,7 @@ http
         min: parsed.searchParams.get("min"),
         limit: parsed.searchParams.get("limit"),
         clean: parsed.searchParams.get("clean") === "1",
+        requireSolid: parsed.searchParams.get("solid") !== "0",
       };
       if (parsed.searchParams.get("send") === "1") {
         // Report what Telegram actually answered — a send that cannot fail is useless
