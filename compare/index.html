@@ -162,6 +162,17 @@
   .tag.value { background: #e9f0fd; color: var(--blue); }
   .tag.fast { background: #fff2e2; color: var(--amber); }
   .tag.rate { background: #f3ecfd; color: #6b3fc4; }
+  .mp { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 6px; color: #fff; white-space: nowrap; }
+  .mp.own { background: #fff !important; color: var(--muted); border: 1px solid var(--border); font-weight: 600; }
+
+  /* Cheapest offer per marketplace — the one view a single marketplace cannot show */
+  .bych { display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); gap: 10px; margin: 18px 0 4px; }
+  .bych-item { border: 1px solid var(--border); border-radius: 12px; padding: 11px 13px; background: #fff; }
+  .bych-item.win { border-color: #cfe9d8; background: #f4fbf6; }
+  .bych-item .amt2 { font-size: 16.5px; font-weight: 800; letter-spacing: -.02em; margin-top: 7px; }
+  .bych-item .cnt { font-size: 12px; color: var(--muted); }
+  .bych-item .gap { font-size: 12px; color: #b4442f; font-weight: 600; }
+  .bych-item.win .gap { color: var(--green); }
   .delivery { font-size: 13.5px; color: var(--muted); }
   .delivery b { color: var(--text); font-weight: 600; display: block; font-size: 14px; }
   .price-cell { display: flex; align-items: center; justify-content: flex-end; gap: 14px; }
@@ -190,7 +201,7 @@
 </head>
 <body>
 
-<div class="demo-bar">Мокап интерфейса. Магазины, цены и остатки вымышлены — данные нужны только чтобы оценить внешний вид.</div>
+<div class="demo-bar">Мокап интерфейса. Названия сетей и площадок настоящие, но <b>все цены, остатки, сроки доставки и то, кто где торгует, — выдуманы</b> и не отражают реальный рынок.</div>
 
 <header>
   <div class="container bar">
@@ -212,20 +223,36 @@
 <main class="container" id="main"></main>
 
 <footer class="container">
-  Saudager — мокап. Все названия магазинов вымышлены, любые совпадения случайны. Цены сгенерированы для демонстрации и не отражают реальный рынок.
+  Saudager — мокап интерфейса, не работающий сервис. Названия компаний и торговых площадок принадлежат их владельцам и использованы только для оформления демонстрации. Ни одна цена, ни один срок доставки и ни одно распределение продавцов по площадкам на этой странице не соответствуют действительности.
 </footer>
 
 <script>
 // ---------------------------------------------------------------------------
-// Demo data. Shops are invented on purpose: attaching made-up prices to real
-// retailers would be a fabricated record, and for judging the UI it changes
-// nothing.
+// Demo data. Seller and marketplace names are real so the layout can be judged
+// against the actual Kazakhstani landscape; every number attached to them is
+// generated, which the banner, the footer and the disclaimer all state.
 // ---------------------------------------------------------------------------
-const SHOPS = [
-  "Техносити", "Электрон.kz", "ГаджетМаркет", "ЦифроПлюс", "Мега Техно",
-  "АйТи Ленд", "Смарт Базар", "Вольт Store", "Алма Дигитал", "НурТехника",
-  "Керемет Электроникс", "Про Гаджет", "Дала Техно", "Стрим Маркет", "Юнит Шоп",
-  "Тау Электро", "Байтерек Техно", "Орбита Диджитал", "Астана Гаджет", "Люмен Store"
+// Real Kazakhstani sales channels. Only the names are real: every price,
+// stock status, delivery time and seller-to-marketplace pairing below is
+// invented, which the banner states plainly.
+const CHANNELS = [
+  { id: "kaspi", name: "Kaspi Магазин", short: "Kaspi", kind: "mp", color: "#f14635" },
+  { id: "wb",    name: "Wildberries",   short: "WB",    kind: "mp", color: "#7b2ff7" },
+  { id: "ozon",  name: "Ozon",          short: "Ozon",  kind: "mp", color: "#005bff" },
+  { id: "halyk", name: "Halyk Market",  short: "Halyk", kind: "mp", color: "#0f9b6c" },
+  { id: "forte", name: "Forte Market",  short: "Forte", kind: "mp", color: "#1b4fa0" },
+  { id: "satu",  name: "Satu.kz",       short: "Satu",  kind: "mp", color: "#c47f17" },
+  { id: "own",   name: "Свой сайт",     short: "Свой сайт", kind: "own", color: "#6c7180" }
+];
+const CH = (id) => CHANNELS.find((c) => c.id === id);
+
+// Chains that run their own storefront and also trade inside marketplaces
+const CHAINS = ["Technodom", "Sulpak", "Белый Ветер", "Mechta", "Alser", "Evrika"];
+
+// Marketplace merchants — these names were observed live on Kaspi offer listings
+const MERCHANTS = [
+  "ITELL-KZ", "Tehno Trade", "Mobile_Shop", "TOP_DEVICE", "SENSATION",
+  "MyTehnics", "SuperPrice", "Top-Sale", "LASTTIME", "Fort", "iSpace"
 ];
 
 const CATS = [
@@ -286,15 +313,32 @@ const DELIVERY = [
 
 function buildOffers(p) {
   const r = rng(p.id * 137);
-  const n = 6 + Math.floor(r() * 12);
-  const pool = SHOPS.slice().sort(() => r() - 0.5);
+  const mps = CHANNELS.filter((c) => c.kind === "mp");
+
+  // Pairs are drawn in three passes so the mix stays true to the market: every
+  // product shows a few chain storefronts, Kaspi dominates as it does in real
+  // life, and the rest fills in. A flat shuffle buried the chains entirely.
+  const shuffle = (a) => a.slice().sort(() => r() - 0.5);
+  const ownPairs = shuffle(CHAINS.map((s) => ({ seller: s, ch: CH("own") })));
+  const kaspiPairs = shuffle(CHAINS.concat(MERCHANTS).map((s) => ({ seller: s, ch: CH("kaspi") })));
+  const rest = [];
+  CHAINS.concat(MERCHANTS).forEach((s) =>
+    mps.filter((m) => m.id !== "kaspi").forEach((m) => rest.push({ seller: s, ch: m }))
+  );
+
+  const nOwn = 2 + Math.floor(r() * 3);    // 2-4 own storefronts
+  const nKaspi = 3 + Math.floor(r() * 4);  // 3-6 Kaspi merchants
+  const pairs = ownPairs.slice(0, nOwn).concat(kaspiPairs.slice(0, nKaspi), shuffle(rest));
+
+  const n = 10 + Math.floor(r() * 8);
   const offers = [];
   for (let i = 0; i < n; i++) {
     const spread = -0.055 + r() * 0.30;        // a few below base, a long tail above
     const price = Math.round((p.base * (1 + spread)) / 10) * 10;
     const d = DELIVERY[Math.floor(r() * DELIVERY.length)];
     offers.push({
-      shop: pool[i % pool.length],
+      shop: pairs[i].seller,
+      ch: pairs[i].ch,
       price,
       rating: Math.round((3.6 + r() * 1.4) * 10) / 10,
       reviews: 12 + Math.floor(r() * 1800),
@@ -326,6 +370,16 @@ PRODUCTS.forEach((p) => {
 const money = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " ₸";
 const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 const stars = (n) => Number(n).toFixed(1);
+const plural = (n, one, few, many) => {
+  const a = Math.abs(n) % 100, b = a % 10;
+  if (a > 10 && a < 20) return many;
+  if (b > 1 && b < 5) return few;
+  return b === 1 ? one : many;
+};
+const chLabel = (c) => (c.kind === "own" ? "Свои сайты" : c.name);
+const chBadge = (c, text) =>
+  '<span class="mp' + (c.kind === "own" ? " own" : "") + '" style="background:' + c.color + '">' +
+  esc(text || chLabel(c)) + "</span>";
 
 // Value score: price dominates, but a cheap shop with 3.7 stars and a week of
 // waiting is not actually the best deal, and the UI should be able to say so.
@@ -505,7 +559,8 @@ function showList(filter) {
     '<div class="stats">' +
       '<div class="stat"><b>' + PRODUCTS.length + '</b><span>товаров<br>в каталоге</span></div>' +
       '<div class="stat"><b>' + totalOffers + '</b><span>предложений<br>от магазинов</span></div>' +
-      '<div class="stat"><b>' + SHOPS.length + '</b><span>магазинов<br>подключено</span></div>' +
+      '<div class="stat"><b>' + (CHAINS.length + MERCHANTS.length) + '</b><span>продавцов<br>и сетей</span></div>' +
+      '<div class="stat"><b>' + CHANNELS.length + '</b><span>площадок<br>и своих сайтов</span></div>' +
       '<div class="stat"><b>2×/день</b><span>обновление<br>цен</span></div>' +
     '</div>';
 
@@ -533,10 +588,14 @@ function spark(hist) {
     '<circle cx="280" cy="' + (44 - ((hist[hist.length - 1] - lo) / (hi - lo || 1)) * 40).toFixed(1) + '" r="3.5" fill="#1f9d55"/></svg>';
 }
 
-let sortMode = "price", onlyInstallment = false, onlyFast = false, onlyGood = false, currentId = null;
+let sortMode = "price", onlyInstallment = false, onlyFast = false, onlyGood = false;
+let channelFilter = null, currentId = null;
+
+function setChannel(id) { channelFilter = id; renderProduct(); }
 
 function openProduct(id) {
   currentId = id; sortMode = "price"; onlyInstallment = onlyFast = onlyGood = false;
+  channelFilter = null;
   renderProduct();
   window.scrollTo(0, 0);
 }
@@ -549,7 +608,19 @@ function renderProduct() {
   const bestRated = all.reduce((a, b) => (b.rating > a.rating ? b : a));
   const fastest = all.reduce((a, b) => (b.delivery.days < a.delivery.days ? b : a));
 
+  // Cheapest offer per channel — this is the comparison no single marketplace
+  // can render, so it gets its own strip above the list.
+  const byChannel = CHANNELS
+    .map((c) => {
+      const own = all.filter((o) => o.ch.id === c.id);
+      if (!own.length) return null;
+      return { ch: c, min: Math.min(...own.map((o) => o.price)), count: own.length };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.min - b.min);
+
   let list = all.slice();
+  if (channelFilter) list = list.filter((o) => o.ch.id === channelFilter);
   if (onlyInstallment) list = list.filter((o) => o.installment);
   if (onlyFast) list = list.filter((o) => o.delivery.days <= 1);
   if (onlyGood) list = list.filter((o) => o.rating >= 4.5);
@@ -570,7 +641,9 @@ function renderProduct() {
     const diff = o.price - cheapest.price;
     return '<div class="offer' + (o === cheapest || o === bestValue ? " top" : "") + '">' +
       '<div class="rank">' + (i + 1) + '</div>' +
-      '<div class="shop"><div class="shop-name">' + esc(o.shop) + tags.join("") + '</div>' +
+      '<div class="shop"><div class="shop-name">' + esc(o.shop) +
+        '<span class="mp' + (o.ch.kind === "own" ? " own" : "") + '" style="background:' + o.ch.color + '">' +
+        esc(o.ch.kind === "own" ? "Свой сайт" : o.ch.name) + "</span>" + tags.join("") + "</div>" +
         '<div class="shop-meta"><span class="rating">★ ' + stars(o.rating) + '</span>' +
         '<span>' + o.reviews + ' отзывов</span><span>' + o.stock + '</span>' +
         '<span>на площадке ' + o.years + " " + (o.years === 1 ? "год" : o.years < 5 ? "года" : "лет") + '</span>' +
@@ -591,7 +664,9 @@ function renderProduct() {
 
       '<div><h2 class="pname">' + esc(p.full) + '</h2>' +
       '<div class="brandline"><span class="rating">★ ' + stars(p.rating) + '</span><span>' + p.offers.length +
-        ' предложений</span><span>Бренд: ' + esc(p.brand) + '</span><span>Алматы</span></div>' +
+        " " + plural(p.offers.length, "предложение", "предложения", "предложений") + " на " + byChannel.length +
+        " " + plural(byChannel.length, "площадке", "площадках", "площадках") +
+        '</span><span>Бренд: ' + esc(p.brand) + '</span><span>Алматы</span></div>' +
       '<div class="specs">' + p.specs.map((s) => '<span class="spec">' + esc(s) + "</span>").join("") + "</div>" +
 
       '<div class="pricebox"><div class="from">Минимальная цена сейчас</div>' +
@@ -601,8 +676,22 @@ function renderProduct() {
         '<div class="sparkwrap"><div class="lbl"><span>Цена за 30 дней</span><span style="color:var(--green);font-weight:700">↓ ' +
           money(drop) + "</span></div>" + spark(p.history) + "</div></div></div></div>" +
 
-    '<div class="offers-head"><h3>Все предложения — ' + p.offers.length + "</h3>" +
+    '<h3>Минимум по площадкам</h3>' +
+    '<div class="bych">' + byChannel.map((b, i) =>
+      '<div class="bych-item' + (i === 0 ? " win" : "") + '">' + chBadge(b.ch) +
+      '<div class="amt2">' + money(b.min) + "</div>" +
+      '<div class="cnt">' + b.count + " " + plural(b.count, "предложение", "предложения", "предложений") + "</div>" +
+      '<div class="gap">' + (i === 0 ? "самая низкая" : "+" + money(b.min - byChannel[0].min)) + "</div></div>"
+    ).join("") + "</div>" +
+
+    '<div class="offers-head" style="margin-top:34px"><h3>Все предложения — ' + p.offers.length + "</h3>" +
       '<span style="font-size:13px;color:var(--muted)">Обновлено сегодня в 09:40</span></div>' +
+
+    '<div class="tabs">' +
+      '<button class="tab' + (channelFilter ? "" : " on") + '" onclick="setChannel(null)">Все площадки</button>' +
+      byChannel.map((b) => '<button class="tab' + (channelFilter === b.ch.id ? " on" : "") +
+        '" onclick="setChannel(\'' + b.ch.id + '\')">' + esc(chLabel(b.ch)) + " · " + b.count + "</button>").join("") +
+    "</div>" +
 
     '<div class="tabs">' +
       tab("price", "Сначала дешёвые") + tab("value", "Самые выгодные") +
@@ -619,7 +708,8 @@ function renderProduct() {
     '<div class="disclaimer"><b>Как считается «оптимальный выбор».</b> Цена даёт 60% оценки, рейтинг магазина — 25%, ' +
       'скорость доставки — 15%. Самое дешёвое предложение не всегда лучшее: магазин с рейтингом 3.7 и доставкой ' +
       'через неделю может стоить дешевле, и интерфейс должен об этом говорить прямо.<br><br>' +
-      'Все данные на этой странице вымышлены и приведены только для оценки интерфейса.</div>';
+      '<b>Названия сетей и площадок настоящие, все числа — нет.</b> Цены, наличие, сроки доставки, рейтинги и то, ' +
+      'какой продавец на какой площадке торгует, сгенерированы для оценки интерфейса.</div>';
 }
 
 function tab(mode, label) {
