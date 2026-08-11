@@ -603,6 +603,19 @@ const TG_CHAT = process.env.TELEGRAM_CHAT_ID || "";
 let tgWindowStart = Date.now();
 let tgSent = 0;
 
+// Same sender, different destination: operator alerts go to the private chat,
+// channel posts to the channel, and both must report what Telegram answered.
+function sendTelegram(chatId, text) {
+  if (!TG_TOKEN || !chatId) return Promise.resolve({ ok: false, description: "нет токена или адресата" });
+  return fetch("https://api.telegram.org/bot" + TG_TOKEN + "/sendMessage", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: true }),
+  })
+    .then((r) => r.json())
+    .catch((e) => ({ ok: false, description: e.message }));
+}
+
 function notifyTelegram(text) {
   if (!TG_TOKEN || !TG_CHAT) return;
   if (Date.now() - tgWindowStart > 3600e3) {
@@ -826,6 +839,45 @@ async function krishaDigest(opts) {
   return { delivered: !!(tg && tg.ok), sentItems: rows.length, telegram: tg && tg.ok ? undefined : tg };
 }
 
+// One flat, formatted for the public channel. The method line is deliberate: it
+// is what separates this from a reposted feed, and it keeps the claim factual —
+// KZ advertising law wants any superlative documented, a measured comparison
+// needs no documenting.
+function krishaChannelPost(c, rubric) {
+  const K = require("./scripts/krisha-lib.js");
+  const when = new Date().toLocaleString("ru-RU", {
+    timeZone: "Asia/Almaty", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+  });
+  const lines = [];
+  lines.push("🏠 <b>" + (rubric || "Находка дня") +
+    (c.solid ? " · дешевле похожих на " + c.discount + "%" : "") + "</b>", "");
+  lines.push("<b>" + K.money(c.price) + "</b> · " + c.ppm.toLocaleString("ru") + " ₸/м²");
+  if (c.solid) lines.push("У похожих домов в районе — " + c.expected.toLocaleString("ru") + " ₸/м²");
+  lines.push("");
+  lines.push(c.rooms + "-комн · " + c.area + " м²" + (c.floor ? " · " + c.floor + "/" + c.floors + " этаж" : ""));
+  lines.push([c.building, c.year ? c.year + " г." : null, c.renovation].filter(Boolean).join(", "));
+  lines.push(c.addr);
+
+  // Age is the one thing Krisha hides: its cards show the bump date, so a
+  // year-old listing looks like today's.
+  const marks = [];
+  if (c.createdAt) {
+    const days = Math.floor((Date.now() - Date.parse(c.createdAt)) / 864e5);
+    marks.push(days <= 2 ? "🆕 новое объявление"
+      : days < 30 ? "на сайте " + days + " дн."
+      : "на сайте " + Math.round(days / 30) + " мес.");
+  }
+  if (c.isAgent === false) marks.push("от хозяина");
+  else if (c.isAgent === true) marks.push("агентство");
+  if (marks.length) lines.push("", marks.join(" · "));
+
+  if (c.flags && c.flags.length) lines.push("⚠ " + c.flags.join(", "));
+  lines.push("");
+  if (c.basis) lines.push("<i>Сравнение: " + c.basis + " · цена на " + when + "</i>");
+  lines.push("https://krisha.kz/a/show/" + c.id);
+  return lines.join("\n");
+}
+
 async function runKrishaWatch() {
   const K = require("./scripts/krisha-lib.js");
   const started = Date.now();
@@ -872,6 +924,9 @@ async function runKrishaWatch() {
         id: c.id, price: c.price, ppm: c.ppm, area: c.area, rooms: c.rooms, addr: c.addr,
         title: c.title, district: c.district, pro: c.pro, year: c.year, building: c.building,
         renovation: c.renovation, floor: c.floor, floors: c.floors,
+        // createdAt is the real posting date; the card shows addedAt, the last
+        // bump, which is why every listing on a page looks like it appeared today
+        createdAt: c.createdAt, addedAt: c.addedAt, isAgent: c.isAgent,
         firstSeen: new Date().toISOString(), seenAt: new Date().toISOString(),
       };
       added.push(KW.corpus[c.id]);
@@ -1764,6 +1819,52 @@ http
     // the backlog so the first cycle does not fire dozens of alerts about
     // listings that have been on the site for months — but the backlog is still
     // the answer to "what is on the market", so it needs a way out.
+    // Public channel target. Kept in state rather than an env var so it can be
+    // pointed at a test channel and back without a redeploy.
+    if (urlPath === "/api/krisha/channel") {
+      const id = parsed.searchParams.get("id");
+      if (parsed.searchParams.get("clear") === "1") { KW.channel = null; saveKrisha(); }
+      else if (id) { KW.channel = id; saveKrisha(); }
+      res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+      res.end(JSON.stringify({ channel: KW.channel || null, botConfigured: !!TG_TOKEN }, null, 2));
+      return;
+    }
+
+    // Publish the current best find to the channel, one post, in the rubric
+    // format. Reports what Telegram answered rather than assuming success.
+    if (urlPath === "/api/krisha/publish") {
+      if (!KW.channel) {
+        res.writeHead(409, { "Content-Type": MIME[".json"] });
+        res.end(JSON.stringify({ error: "канал не задан: /api/krisha/channel?id=@имя" }));
+        return;
+      }
+      const n = Math.max(1, Math.min(5, Number(parsed.searchParams.get("n") || 1)));
+      const { rows } = krishaShortlist({
+        min: parsed.searchParams.get("min"),
+        limit: n,
+        clean: parsed.searchParams.get("clean") !== "0",
+      });
+      if (!rows.length) {
+        res.writeHead(200, { "Content-Type": MIME[".json"] });
+        res.end(JSON.stringify({ published: 0, reason: "под критерии сейчас ничего не подходит" }));
+        return;
+      }
+      (async () => {
+        const out = [];
+        for (const c of rows) {
+          const tg = await sendTelegram(KW.channel, krishaChannelPost(c, parsed.searchParams.get("rubric")));
+          out.push({ id: c.id, ok: !!(tg && tg.ok), error: tg && tg.ok ? undefined : tg.description });
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+        return out;
+      })().then((out) => {
+        const ok = out.filter((x) => x.ok).length;
+        res.writeHead(ok ? 200 : 502, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+        res.end(JSON.stringify({ channel: KW.channel, published: ok, results: out }, null, 2));
+      });
+      return;
+    }
+
     // The box drawn on /area/. Reading is free; setting replaces the address
     // heuristic for every later run.
     if (urlPath === "/api/krisha/area") {

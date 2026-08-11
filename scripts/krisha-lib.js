@@ -84,7 +84,15 @@ function parseDetail(html) {
     d[m[1]] = clean(m[2]);
   }
   const fl = (d["flat.floor"] || "").match(/(\d+)\s*из\s*(\d+)/);
+  // The card shows addedAt — the last bump — which is why every listing on a
+  // page reads "today". createdAt is the real one. isAgent is Krisha's own
+  // verdict, unlike the das[who]=1 filter which the seller ticks themselves.
+  const createdAt = (html.match(/"createdAt"\s*:\s*"(\d{4}-\d{2}-\d{2})"/) || [])[1] || null;
+  const addedAt = (html.match(/"addedAt"\s*:\s*"(\d{4}-\d{2}-\d{2})"/) || [])[1] || null;
+  const agentM = html.match(/"isAgent"\s*:\s*(true|false)/);
   return {
+    createdAt, addedAt,
+    isAgent: agentM ? agentM[1] === "true" : null,
     year: num(d["house.year"]) || null,
     building: d["flat.building"] || null,
     renovation: d["flat.renovation"] || null,
@@ -141,7 +149,11 @@ function flagsFor(c) {
   if (/требует ремонта|черновая/i.test(c.renovation || "")) f.push("требует ремонта");
   if (c.floor === 1) f.push("первый этаж");
   if (c.floor && c.floors && c.floor === c.floors) f.push("последний этаж");
-  if (c.pro) f.push("похоже на агентство");
+  // Krisha's own isAgent from the listing page beats the card badge: measured on
+  // 70 listings they disagree on 22, and the badge over-flags badly — it was
+  // disqualifying almost every candidate.
+  if (c.isAgent === true) f.push("агентство");
+  else if (c.isAgent == null && c.pro) f.push("похоже на агентство");
   return f;
 }
 
