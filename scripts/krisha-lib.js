@@ -115,32 +115,49 @@ function locationScore(addr) {
   return { score: 1, why: "район вдоль Абая" };
 }
 
-// Two ads for one flat are common — same address, size, floor and price
+// Identity of a flat, price deliberately excluded: one flat was found posted
+// thirteen times in a day, and a re-post with a nudged price must not read as a
+// new find. Price changes are handled separately, as their own event.
 const dedupeKey = (c) =>
-  [c.district, Math.round(c.area), c.floor || "?", c.floors || "?", Math.round(c.price / 1e5)].join("|");
+  [c.district, Math.round(c.area * 10), c.rooms || "?", c.floor || "?", c.floors || "?"].join("|");
 
 const ageBand = (y) => (y >= 2010 ? "2010+" : y >= 2000 ? "2000-09" : y >= 1990 ? "1990-99" : "1980-89");
-const groupKey = (c) => c.district + "|" + (c.building || "?") + "|" + ageBand(c.year);
+// Price per m² falls as flats get bigger, so without an area band a whole
+// new-build complex of 74-87 m² reads as a 40% bargain against small old stock.
+const areaBand = (a) => (a < 40 ? "<40" : a < 55 ? "40-55" : a < 70 ? "55-70" : a < 90 ? "70-90" : "90+");
+const groupKey = (c) => c.district + "|" + (c.building || "?") + "|" + ageBand(c.year) + "|" + areaBand(c.area);
 const median = (a) => {
   const s = a.map((x) => x.ppm).filter(Boolean).sort((x, y) => x - y);
   return s.length ? s[Math.floor(s.length / 2)] : 0;
 };
 
-// Comparables: same district AND building type AND age band. Anything looser is
-// reported as such, because a discount to a mixed bag is not evidence.
+// Comparables, tried from tightest to loosest. Only a match that controls for
+// area counts as solid — that is the one a claim can rest on. Everything looser
+// is returned but flagged, because a discount to a mixed bag is not evidence.
 function buildModel(corpus) {
-  const groups = {}, byDistrict = {};
-  corpus.filter((c) => c.year && c.ppm).forEach((c) => {
-    (groups[groupKey(c)] = groups[groupKey(c)] || []).push(c);
-    (byDistrict[c.district] = byDistrict[c.district] || []).push(c);
+  const usable = corpus.filter((c) => c.year && c.ppm && c.area);
+  const idx = { full: {}, noArea: {}, distArea: {}, dist: {} };
+  const put = (bag, k, c) => ((bag[k] = bag[k] || []).push(c));
+  usable.forEach((c) => {
+    put(idx.full, groupKey(c), c);
+    put(idx.noArea, c.district + "|" + (c.building || "?") + "|" + ageBand(c.year), c);
+    put(idx.distArea, c.district + "|" + areaBand(c.area), c);
+    put(idx.dist, c.district, c);
   });
-  const all = median(corpus.filter((c) => c.ppm));
+  const all = median(usable);
+
   return function price(c) {
-    const g = groups[groupKey(c)];
-    if (g && g.length >= 5) return { expected: median(g), basis: "дом того же типа и возраста в районе (" + g.length + ")", solid: true };
-    const d = byDistrict[c.district];
-    if (d && d.length >= 5) return { expected: median(d), basis: "район целиком (" + d.length + ")", solid: false };
-    return { expected: all, basis: "вся выборка (" + corpus.length + ")", solid: false };
+    const ladder = [
+      [idx.full[groupKey(c)], (n) => "тот же тип, возраст и площадь в районе (" + n + ")", true],
+      [idx.distArea[c.district + "|" + areaBand(c.area)], (n) => "та же площадь в районе (" + n + ")", true],
+      [idx.noArea[c.district + "|" + (c.building || "?") + "|" + ageBand(c.year)],
+        (n) => "тот же тип и возраст в районе, площадь любая (" + n + ")", false],
+      [idx.dist[c.district], (n) => "район целиком (" + n + ")", false],
+    ];
+    for (const [g, label, solid] of ladder) {
+      if (g && g.length >= 5) return { expected: median(g), basis: label(g.length), solid };
+    }
+    return { expected: all, basis: "вся выборка (" + usable.length + ")", solid: false };
   };
 }
 

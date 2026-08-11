@@ -789,11 +789,32 @@ function krishaLoc(c) {
 
 // The shortlist the watch is holding right now, scored against everything it
 // has ever read. Shared by the endpoint and the scheduled digest.
+// One flat, one entry. Re-posting is rampant — thirteen ads for a single flat in
+// one day — so the same home must not occupy thirteen slots in a shortlist. The
+// cheapest live ad wins, and the earliest creation date is kept because that is
+// how long the flat has really been for sale.
+function krishaCollapse(list) {
+  const K = require("./scripts/krisha-lib.js");
+  const best = new Map();
+  for (const c of list) {
+    const k = K.dedupeKey(c);
+    const prev = best.get(k);
+    if (!prev) { best.set(k, Object.assign({ reposts: 1 }, c)); continue; }
+    prev.reposts++;
+    if (c.createdAt && (!prev.createdAt || c.createdAt < prev.createdAt)) prev.createdAt = c.createdAt;
+    if (c.price < prev.price) {
+      const reposts = prev.reposts, createdAt = prev.createdAt;
+      best.set(k, Object.assign({}, c, { reposts, createdAt }));
+    }
+  }
+  return [...best.values()];
+}
+
 function krishaShortlist(opts) {
   const K = require("./scripts/krisha-lib.js");
   const o = opts || {};
   const min = o.min == null ? KRISHA_MIN_DISCOUNT : Number(o.min);
-  const corpus = Object.values(KW.corpus || {}).filter((c) => c.year);
+  const corpus = krishaCollapse(Object.values(KW.corpus || {}).filter((c) => c.year));
   const price = K.buildModel(corpus);
   const seen = new Set();
   const rows = corpus
@@ -876,6 +897,32 @@ function krishaChannelPost(c, rubric) {
   if (c.basis) lines.push("<i>Сравнение: " + c.basis + " · цена на " + when + "</i>");
   lines.push("https://krisha.kz/a/show/" + c.id);
   return lines.join("\n");
+}
+
+// Picks what to post, skipping flats already published. A re-post of the same
+// home under a new id must never come round again as a fresh find.
+function krishaPickForChannel(n, opts) {
+  const K = require("./scripts/krisha-lib.js");
+  const o = opts || {};
+  const { rows } = krishaShortlist({ min: o.min, limit: 200, clean: o.clean !== false });
+  const done = KW.published || {};
+  const fresh = o.again ? rows : rows.filter((c) => !done[K.dedupeKey(c)]);
+  return { rows: fresh.slice(0, n), available: fresh.length, total: rows.length };
+}
+
+async function krishaPublish(rows, rubric) {
+  const K = require("./scripts/krisha-lib.js");
+  KW.published = KW.published || {};
+  const out = [];
+  for (const c of rows) {
+    const tg = await sendTelegram(KW.channel, krishaChannelPost(c, rubric));
+    const ok = !!(tg && tg.ok);
+    if (ok) KW.published[K.dedupeKey(c)] = { id: c.id, at: new Date().toISOString(), price: c.price };
+    out.push({ id: c.id, ok, error: ok ? undefined : tg && tg.description });
+    await new Promise((r) => setTimeout(r, 1500));
+  }
+  saveKrisha();
+  return out;
 }
 
 async function runKrishaWatch() {
@@ -1024,6 +1071,7 @@ async function krishaTick() {
 // dashboard to see what is on the market.
 const KRISHA_DIGEST_H = Number(process.env.KRISHA_DIGEST_H || 24);
 const KRISHA_DIGEST_LIMIT = Number(process.env.KRISHA_DIGEST_LIMIT || 10);
+const KRISHA_POST_HOUR = Number(process.env.KRISHA_POST_HOUR || 19); // Asia/Almaty
 
 if (KRISHA_ON) {
   setTimeout(krishaTick, 45000).unref();                       // let the app finish booting
@@ -1036,8 +1084,27 @@ if (KRISHA_ON) {
         .catch((e) => console.log("[krisha] digest failed: " + e.message));
     }, KRISHA_DIGEST_H * 3600e3).unref();
   }
+  // "Находка дня": one post at a fixed hour. A daily rubric only builds a habit
+  // if it turns up at the same time whether or not the find is spectacular.
+  setInterval(() => {
+    if (!KW.channel || !KW.bootstrapped) return;
+    const now = new Date().toLocaleString("en-CA", {
+      timeZone: "Asia/Almaty", hour12: false,
+      year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit",
+    });
+    const [date, hour] = now.split(", ");
+    if (Number(hour) !== KRISHA_POST_HOUR || KW.lastDailyPost === date) return;
+    KW.lastDailyPost = date;
+    saveKrisha();
+    const { rows, available } = krishaPickForChannel(1, { clean: true });
+    if (!rows.length) { console.log("[krisha] дневной пост пропущен: нечего публиковать"); return; }
+    krishaPublish(rows, "Находка дня")
+      .then((o) => console.log("[krisha] дневной пост " + JSON.stringify(o) + " · в запасе " + available))
+      .catch((e) => console.log("[krisha] дневной пост не ушёл: " + e.message));
+  }, 15 * 60e3).unref();
+
   console.log("[krisha] watch on · каждые " + KRISHA_EVERY_H + " ч · порог " + KRISHA_MIN_DISCOUNT +
-    "% · дайджест каждые " + KRISHA_DIGEST_H + " ч");
+    "% · дайджест каждые " + KRISHA_DIGEST_H + " ч · находка дня в " + KRISHA_POST_HOUR + ":00");
 }
 
 // ---------------------------------------------------------------------------
@@ -1839,25 +1906,17 @@ http
         return;
       }
       const n = Math.max(1, Math.min(5, Number(parsed.searchParams.get("n") || 1)));
-      const { rows } = krishaShortlist({
+      const { rows } = krishaPickForChannel(n, {
         min: parsed.searchParams.get("min"),
-        limit: n,
         clean: parsed.searchParams.get("clean") !== "0",
+        again: parsed.searchParams.get("again") === "1",
       });
       if (!rows.length) {
         res.writeHead(200, { "Content-Type": MIME[".json"] });
         res.end(JSON.stringify({ published: 0, reason: "под критерии сейчас ничего не подходит" }));
         return;
       }
-      (async () => {
-        const out = [];
-        for (const c of rows) {
-          const tg = await sendTelegram(KW.channel, krishaChannelPost(c, parsed.searchParams.get("rubric")));
-          out.push({ id: c.id, ok: !!(tg && tg.ok), error: tg && tg.ok ? undefined : tg.description });
-          await new Promise((r) => setTimeout(r, 1500));
-        }
-        return out;
-      })().then((out) => {
+      krishaPublish(rows, parsed.searchParams.get("rubric")).then((out) => {
         const ok = out.filter((x) => x.ok).length;
         res.writeHead(ok ? 200 : 502, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
         res.end(JSON.stringify({ channel: KW.channel, published: ok, results: out }, null, 2));
