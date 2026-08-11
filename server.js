@@ -718,7 +718,9 @@ const KRISHA_DETAILS_PER_RUN = Number(process.env.KRISHA_DETAILS_PER_RUN || 150)
 const KRISHA_PACE_MS = Number(process.env.KRISHA_PACE_MS || 2500); // gentler than local: the datacenter IP gets dropped more
 const KRISHA_FILE = path.join(PERSIST_DATA || REPO_DATA, "krisha-watch.json");
 
-const KRISHA_GEO_PER_RUN = Number(process.env.KRISHA_GEO_PER_RUN || 60);
+// ~2.2s per address including the fallback query, so 150 is about six minutes —
+// well under Nominatim's one-per-second ceiling, and the backlog is one-time.
+const KRISHA_GEO_PER_RUN = Number(process.env.KRISHA_GEO_PER_RUN || 150);
 
 // KW.area is a box drawn on the map at /area/. When it is set it replaces the
 // Abay text heuristic entirely: the corridor guess exists only because Krisha
