@@ -700,6 +700,173 @@ function statsSummary() {
 }
 
 // ---------------------------------------------------------------------------
+// Apartment watch: scans Krisha on a schedule and alerts on listings that are
+// underpriced against comparable flats — same district, building type and age.
+// Details are fetched once per listing and kept, so a routine run costs a few
+// dozen requests, not a few hundred.
+// ---------------------------------------------------------------------------
+
+const KRISHA_ON = process.env.KRISHA_WATCH === "1";
+const KRISHA_EVERY_H = Number(process.env.KRISHA_INTERVAL_H || 4);
+const KRISHA_MIN_DISCOUNT = Number(process.env.KRISHA_MIN_DISCOUNT || 12);
+const KRISHA_DETAILS_PER_RUN = 120; // bound one run's work; the corpus warms up over several
+const KRISHA_FILE = path.join(PERSIST_DATA || REPO_DATA, "krisha-watch.json");
+
+let KW = { corpus: {}, seenKeys: [], bootstrapped: false, lastRun: null, lastError: null, runs: 0 };
+try {
+  KW = Object.assign(KW, JSON.parse(fs.readFileSync(KRISHA_FILE, "utf8").replace(/^﻿/, "")));
+} catch {
+  // first boot, or a file we cannot read — a fresh corpus is rebuilt below
+}
+// Self-heal: an entry without a build year came from a failed read and is
+// useless for comparables. Drop it so the next run fetches it again.
+for (const [id, c] of Object.entries(KW.corpus || {})) if (!c || !c.year) delete KW.corpus[id];
+function saveKrisha() {
+  try {
+    fs.mkdirSync(path.dirname(KRISHA_FILE), { recursive: true });
+    fs.writeFileSync(KRISHA_FILE, JSON.stringify(KW), "utf8");
+  } catch {
+    // read-only disk: the corpus lives in memory for this process
+  }
+}
+
+function krishaPost(c, kind) {
+  const K = require("./scripts/krisha-lib.js");
+  const head = kind === "drop"
+    ? "📉 <b>Снизили цену</b>"
+    : "🏠 <b>Новый вариант — дешевле похожих на " + c.discount + "%</b>";
+  const lines = [
+    head, "",
+    "<b>" + K.money(c.price) + "</b> · " + c.ppm.toLocaleString("ru") + " ₸/м²" +
+      (c.expected ? " (у сопоставимых " + c.expected.toLocaleString("ru") + ")" : ""),
+    c.title,
+    c.addr,
+    [c.building, c.year ? c.year + " г." : null, c.renovation].filter(Boolean).join(" · "),
+    "",
+    c.loc ? c.loc.why : "",
+    c.basis ? "сравнение: " + c.basis : "",
+  ];
+  if (c.flags && c.flags.length) lines.push("⚠ " + c.flags.join(", "));
+  lines.push("", "https://krisha.kz/a/show/" + c.id);
+  return notifyTelegram(lines.filter((l) => l !== null && l !== undefined).join("\n"));
+}
+
+async function runKrishaWatch() {
+  const K = require("./scripts/krisha-lib.js");
+  const started = Date.now();
+  try {
+    const { cards, total } = await K.fetchSearch(40, K.CRITERIA);
+    const near = cards.filter((c) => (c.loc = K.locationScore(c.addr)).score > 0);
+
+    // Price moves on listings we already know about
+    const drops = [];
+    for (const c of near) {
+      const old = KW.corpus[c.id];
+      if (old && old.price > c.price) {
+        const pct = Math.round((1 - c.price / old.price) * 100);
+        if (pct >= 3) drops.push(Object.assign({}, old, c, { drop: pct }));
+      }
+      if (old) Object.assign(old, { price: c.price, ppm: c.ppm, seenAt: new Date().toISOString() });
+    }
+
+    // Only unseen listings cost a detail request
+    KW.failed = KW.failed || {};
+    const fresh = near
+      .filter((c) => !KW.corpus[c.id] && (KW.failed[c.id] || 0) < 3)
+      .slice(0, KRISHA_DETAILS_PER_RUN);
+    const added = [];
+    for (const c of fresh) {
+      try {
+        Object.assign(c, await K.fetchDetail(c.id));
+      } catch {
+        // A failed read must not enter the corpus: the listing would be marked
+        // seen, never retried, and sit there for ever without any features.
+        KW.failed[c.id] = (KW.failed[c.id] || 0) + 1;
+        await K.sleep(1200);
+        continue;
+      }
+      if (!c.year) { KW.failed[c.id] = (KW.failed[c.id] || 0) + 1; await K.sleep(1200); continue; }
+      delete KW.failed[c.id];
+      KW.corpus[c.id] = {
+        id: c.id, price: c.price, ppm: c.ppm, area: c.area, rooms: c.rooms, addr: c.addr,
+        title: c.title, district: c.district, pro: c.pro, year: c.year, building: c.building,
+        renovation: c.renovation, floor: c.floor, floors: c.floors,
+        firstSeen: new Date().toISOString(), seenAt: new Date().toISOString(),
+      };
+      added.push(KW.corpus[c.id]);
+      await K.sleep(1200);
+    }
+
+    // Score against everything we have ever seen, not just this page of results
+    const corpus = Object.values(KW.corpus).filter((c) => c.year);
+    const price = K.buildModel(corpus);
+    const score = (c) => {
+      const p = price(c);
+      return Object.assign({}, c, p, {
+        discount: Math.round((1 - c.ppm / p.expected) * 100),
+        flags: K.flagsFor(c),
+        loc: K.locationScore(c.addr),
+      });
+    };
+
+    const seen = new Set(KW.seenKeys || []);
+    const worth = added.map(score)
+      .filter((c) => c.solid && c.discount >= KRISHA_MIN_DISCOUNT)
+      .filter((c) => { const k = K.dedupeKey(c); if (seen.has(k)) return false; seen.add(k); return true; })
+      .sort((a, b) => b.loc.score - a.loc.score || b.discount - a.discount);
+    KW.seenKeys = [...seen].slice(-4000);
+
+    if (!KW.bootstrapped) {
+      // The first pass would fire dozens of alerts for a backlog the user never
+      // asked about, so it only reports that the watch is live.
+      if (fresh.length < KRISHA_DETAILS_PER_RUN) {
+        KW.bootstrapped = true;
+        await notifyTelegram(
+          "🏠 <b>Слежу за квартирами на Крыше</b>\n\n" +
+          "Критерии: 30–40 млн · 1–2 комнаты · дом от 1980 · кирпич/панель · от хозяев · вдоль Абая\n" +
+          "Всего по фильтру: " + (total || "?") + " · в базе: " + corpus.length + "\n\n" +
+          "Дальше буду присылать только новое, что дешевле сопоставимых на " + KRISHA_MIN_DISCOUNT + "%+ , и снижения цен."
+        );
+      }
+    } else {
+      for (const c of worth.slice(0, 5)) { await krishaPost(c, "new"); await K.sleep(1200); }
+      for (const c of drops.slice(0, 5)) {
+        await krishaPost(Object.assign(score(c), { discount: c.drop }), "drop");
+        await K.sleep(1200);
+      }
+    }
+
+    KW.runs = (KW.runs || 0) + 1;
+    KW.lastRun = new Date().toISOString();
+    KW.lastError = null;
+    KW.lastSummary = {
+      total, near: near.length, corpus: corpus.length,
+      newDetails: fresh.length, alerts: KW.bootstrapped ? worth.length : 0, drops: drops.length,
+      seconds: Math.round((Date.now() - started) / 1000),
+    };
+    saveKrisha();
+    console.log("[krisha] " + JSON.stringify(KW.lastSummary));
+  } catch (e) {
+    KW.lastError = String(e && e.message ? e.message : e);
+    KW.lastRun = new Date().toISOString();
+    saveKrisha();
+    console.log("[krisha] failed: " + KW.lastError);
+  }
+}
+
+let krishaRunning = false;
+async function krishaTick() {
+  if (krishaRunning) return;
+  krishaRunning = true;
+  try { await runKrishaWatch(); } finally { krishaRunning = false; }
+}
+if (KRISHA_ON) {
+  setTimeout(krishaTick, 45000).unref();                       // let the app finish booting
+  setInterval(krishaTick, KRISHA_EVERY_H * 3600e3).unref();
+  console.log("[krisha] watch on · каждые " + KRISHA_EVERY_H + " ч · порог " + KRISHA_MIN_DISCOUNT + "%");
+}
+
+// ---------------------------------------------------------------------------
 // Onboarding analysis: AI-search foundations and real competitors
 // Both read the seller's live Kaspi catalog, so every number shown to the
 // merchant comes from data we actually fetched — nothing is invented.
@@ -1441,7 +1608,7 @@ http
     // Reachability probe for marketplace endpoints, from the server's own IP.
     // Fixed host allowlist and status-only output — not a general proxy.
     if (urlPath === "/api/probe") {
-      const allowHosts = ["kaspi.kz", "search.wb.ru", "card.wb.ru", "catalog.wb.ru", "www.wildberries.ru", "www.wildberries.kz", "api-seller.ozon.ru", "www.ozon.ru"];
+      const allowHosts = ["kaspi.kz", "search.wb.ru", "card.wb.ru", "catalog.wb.ru", "www.wildberries.ru", "www.wildberries.kz", "api-seller.ozon.ru", "www.ozon.ru", "krisha.kz"];
       const target = parsed.searchParams.get("url") || "";
       (async () => {
         const u = new URL(/^https?:\/\//i.test(target) ? target : "https://" + target);
@@ -1471,6 +1638,35 @@ http
           res.writeHead(400, { "Content-Type": MIME[".json"] });
           res.end(JSON.stringify({ error: e.message }));
         });
+      return;
+    }
+
+    // Apartment watch status, and a manual kick so it can be verified without
+    // waiting out the interval. Writes nothing that a run would not write anyway.
+    if (urlPath === "/api/krisha") {
+      if (parsed.searchParams.get("run") === "1") {
+        if (!KRISHA_ON) {
+          res.writeHead(409, { "Content-Type": MIME[".json"] });
+          res.end(JSON.stringify({ error: "нужна переменная KRISHA_WATCH=1" }));
+          return;
+        }
+        krishaTick();
+      }
+      res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+      res.end(JSON.stringify({
+        enabled: KRISHA_ON,
+        running: krishaRunning,
+        everyHours: KRISHA_EVERY_H,
+        minDiscount: KRISHA_MIN_DISCOUNT,
+        bootstrapped: KW.bootstrapped,
+        corpus: Object.keys(KW.corpus || {}).length,
+        retrying: Object.keys(KW.failed || {}).length,
+        runs: KW.runs || 0,
+        lastRun: KW.lastRun,
+        lastError: KW.lastError,
+        lastSummary: KW.lastSummary || null,
+        telegram: TG_TOKEN && TG_CHAT ? "настроен" : "не настроен",
+      }, null, 2));
       return;
     }
 
