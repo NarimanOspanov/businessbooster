@@ -940,6 +940,29 @@ async function krishaPublish(rows, rubric) {
   return out;
 }
 
+// Sunday roundup for the channel. Unlike the daily find it deliberately repeats
+// flats already posted — the point is a cross-section for people who muted
+// notifications, not a queue of unseen items.
+async function krishaWeekly(limit) {
+  const K = require("./scripts/krisha-lib.js");
+  const n = Number(limit || KRISHA_WEEKLY_LIMIT);
+  const { rows } = krishaShortlist({ limit: n, clean: true, ignoreArea: true });
+  if (!rows.length) return { delivered: false, items: 0, reason: "нечего показывать" };
+  const when = new Date().toLocaleDateString("ru-RU", { timeZone: "Asia/Almaty", day: "2-digit", month: "long" });
+  const body = rows.map((c, i) =>
+    (i + 1) + ". <b>−" + c.discount + "%</b> · " + K.money(c.price) + " · " + c.rooms + "-комн · " + c.area + " м²" +
+    (c.floor ? " · " + c.floor + "/" + c.floors : "") + "\n" +
+    [c.building, c.year ? c.year + " г." : null].filter(Boolean).join(" ") + " · " + c.addr + "\n" +
+    "https://krisha.kz/a/show/" + c.id
+  ).join("\n\n");
+  const text =
+    "📋 <b>Подборка недели · " + when + "</b>\n" +
+    "Квартиры от хозяев в Алматы, дешевле сопоставимых по типу дома, году, площади и району\n\n" +
+    body + "\n\n<i>Сравнение по нашей выборке. Цены на момент публикации.</i>";
+  const tg = await sendTelegram(KW.channel, text);
+  return { delivered: !!(tg && tg.ok), items: rows.length, telegram: tg && tg.ok ? undefined : tg };
+}
+
 async function runKrishaWatch() {
   const K = require("./scripts/krisha-lib.js");
   const started = Date.now();
@@ -1097,6 +1120,8 @@ async function krishaTick() {
 const KRISHA_DIGEST_H = Number(process.env.KRISHA_DIGEST_H || 24);
 const KRISHA_DIGEST_LIMIT = Number(process.env.KRISHA_DIGEST_LIMIT || 10);
 const KRISHA_POST_HOUR = Number(process.env.KRISHA_POST_HOUR || 19); // Asia/Almaty
+const KRISHA_WEEKLY_HOUR = Number(process.env.KRISHA_WEEKLY_HOUR || 12); // Sundays
+const KRISHA_WEEKLY_LIMIT = Number(process.env.KRISHA_WEEKLY_LIMIT || 7);
 
 if (KRISHA_ON) {
   setTimeout(krishaTick, 45000).unref();                       // let the app finish booting
@@ -1126,6 +1151,25 @@ if (KRISHA_ON) {
     krishaPublish(rows, "Находка дня")
       .then((o) => console.log("[krisha] дневной пост " + JSON.stringify(o) + " · в запасе " + available))
       .catch((e) => console.log("[krisha] дневной пост не ушёл: " + e.message));
+  }, 15 * 60e3).unref();
+
+  // Sunday roundup, on its own schedule so a quiet week still gets one post
+  setInterval(() => {
+    if (!KW.channel || !KW.bootstrapped) return;
+    const parts = new Date().toLocaleString("en-CA", {
+      timeZone: "Asia/Almaty", hour12: false, weekday: "short",
+      year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit",
+    });
+    // "Sun, 2026-08-16, 12" — anchor the hour to the end, or the year's first
+    // two digits get read as the hour.
+    const date = (parts.match(/\d{4}-\d{2}-\d{2}/) || [])[0];
+    const hour = Number((parts.match(/,\s*(\d{1,2})\s*$/) || [])[1]);
+    if (!/^Sun/i.test(parts) || hour !== KRISHA_WEEKLY_HOUR || KW.lastWeeklyPost === date) return;
+    KW.lastWeeklyPost = date;
+    saveKrisha();
+    krishaWeekly()
+      .then((o) => console.log("[krisha] подборка недели " + JSON.stringify(o)))
+      .catch((e) => console.log("[krisha] подборка недели не ушла: " + e.message));
   }, 15 * 60e3).unref();
 
   console.log("[krisha] watch on · каждые " + KRISHA_EVERY_H + " ч · порог " + KRISHA_MIN_DISCOUNT +
@@ -1919,6 +1963,20 @@ http
       else if (id) { KW.channel = id; saveKrisha(); }
       res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
       res.end(JSON.stringify({ channel: KW.channel || null, botConfigured: !!TG_TOKEN }, null, 2));
+      return;
+    }
+
+    // Sunday roundup, also triggerable by hand for a look before it goes out
+    if (urlPath === "/api/krisha/weekly") {
+      if (!KW.channel) {
+        res.writeHead(409, { "Content-Type": MIME[".json"] });
+        res.end(JSON.stringify({ error: "канал не задан: /api/krisha/channel?id=@имя" }));
+        return;
+      }
+      krishaWeekly(parsed.searchParams.get("limit")).then((o) => {
+        res.writeHead(o.delivered ? 200 : 502, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+        res.end(JSON.stringify(o, null, 2));
+      });
       return;
     }
 
