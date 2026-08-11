@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Область поиска квартир — Saudager</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -10,27 +10,46 @@
 <style>
   :root {
     --bg:#fff; --bg-soft:#f4f5f7; --border:#e6e7eb; --text:#1f2028;
-    --muted:#6c7180; --accent:#f14635; --green:#1f9d55;
+    --muted:#6c7180; --accent:#f14635; --green:#1f9d55; --amber:#c47f17;
   }
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:Roboto,"Segoe UI",system-ui,sans-serif; color:var(--text); background:var(--bg); }
-  header { padding:14px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
-  h1 { font-size:18px; font-weight:800; letter-spacing:-.02em; }
-  .hint { font-size:13.5px; color:var(--muted); }
-  #map { height:calc(100vh - 190px); min-height:340px; width:100%; }
-  .panel { padding:14px 20px; border-top:1px solid var(--border); display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
-  .stat { font-size:14px; }
-  .stat b { font-size:17px; font-weight:800; }
-  .stat span { color:var(--muted); font-size:12.5px; display:block; line-height:1.2; }
-  button { font:inherit; cursor:pointer; border:none; padding:11px 20px; border-radius:11px; font-weight:600; font-size:14.5px; }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; }
+  body {
+    font-family:Roboto,"Segoe UI",system-ui,sans-serif; color:var(--text); background:var(--bg);
+    display:flex; flex-direction:column; height:100dvh; overflow:hidden;
+  }
+  header { padding:11px 16px 10px; border-bottom:1px solid var(--border); flex-shrink:0; }
+  h1 { font-size:16.5px; font-weight:800; letter-spacing:-.02em; }
+  .hint { font-size:13px; color:var(--muted); margin-top:3px; line-height:1.4; }
+
+  /* Actions sit directly under the header: on a phone the bottom of the page is
+     behind the browser chrome, which is where they used to be. */
+  .actions { display:flex; gap:8px; padding:10px 16px; border-bottom:1px solid var(--border); flex-shrink:0; overflow-x:auto; }
+  button {
+    font:inherit; cursor:pointer; border:none; white-space:nowrap;
+    padding:11px 16px; border-radius:11px; font-weight:600; font-size:14.5px;
+  }
   .primary { background:linear-gradient(135deg,#f14635,#e23c2b); color:#fff; }
-  .primary:disabled { opacity:.45; cursor:default; }
-  .ghost { background:#fff; border:1px solid var(--border); }
-  .msg { font-size:13.5px; margin-left:auto; }
+  .primary:disabled { opacity:.4; }
+  .ghost { background:#fff; border:1px solid var(--border); color:var(--text); }
+  .ghost.on { background:var(--text); color:#fff; border-color:var(--text); }
+
+  #map { flex:1; min-height:0; width:100%; }
+  #map.drawing { touch-action:none; cursor:crosshair; }
+  #map.drawing .leaflet-grab { cursor:crosshair; }
+
+  .panel {
+    flex-shrink:0; border-top:1px solid var(--border);
+    padding:10px 16px calc(10px + env(safe-area-inset-bottom));
+    display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  }
+  .stat b { font-size:16px; font-weight:800; }
+  .stat span { color:var(--muted); font-size:11.5px; display:block; line-height:1.2; }
+  .legend { font-size:11.5px; color:var(--muted); display:flex; gap:12px; }
+  .dot { width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:4px; }
+  .msg { font-size:13px; width:100%; }
   .msg.ok { color:var(--green); font-weight:600; }
   .msg.err { color:var(--accent); font-weight:600; }
-  .legend { font-size:12.5px; color:var(--muted); display:flex; gap:14px; align-items:center; }
-  .dot { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:5px; }
   .leaflet-container { font-family:inherit; }
 </style>
 </head>
@@ -38,79 +57,129 @@
 
 <header>
   <h1>Область поиска квартир</h1>
-  <span class="hint">Зажмите <b>Shift</b> и протяните мышью, чтобы обвести район. Сторож будет следить только внутри него.</span>
+  <p class="hint" id="hint">Нажмите «Обвести область» и проведите пальцем по карте. Сторож будет следить только внутри.</p>
 </header>
+
+<div class="actions">
+  <button class="ghost" id="draw">✏️ Обвести область</button>
+  <button class="ghost" id="visible">Взять видимую часть</button>
+  <button class="primary" id="save" disabled>Сохранить</button>
+  <button class="ghost" id="clear">Сбросить</button>
+</div>
 
 <div id="map"></div>
 
 <div class="panel">
   <div class="stat"><b id="s-geo">—</b><span>с координатами</span></div>
   <div class="stat"><b id="s-in">—</b><span>внутри области</span></div>
-  <div class="stat"><b id="s-pend">—</b><span>ждут геокодирования</span></div>
+  <div class="stat"><b id="s-pend">—</b><span>ждут координат</span></div>
   <div class="legend">
     <span><i class="dot" style="background:#1f9d55"></i>точный адрес</span>
-    <span><i class="dot" style="background:#c47f17"></i>центр микрорайона</span>
+    <span><i class="dot" style="background:#c47f17"></i>центр мкр</span>
   </div>
-  <button class="primary" id="save" disabled>Сохранить область</button>
-  <button class="ghost" id="clear">Убрать ограничение</button>
-  <span class="msg" id="msg"></span>
+  <div class="msg" id="msg"></div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-const map = L.map("map").setView([43.2385, 76.8890], 13);
+const $ = (id) => document.getElementById(id);
+const msg = (t, cls) => { $("msg").textContent = t || ""; $("msg").className = "msg " + (cls || ""); };
+const money = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " ₸";
+
+const mapEl = $("map");
+const map = L.map(mapEl).setView([43.2385, 76.8890], 13);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 19, attribution: "&copy; OpenStreetMap",
 }).addTo(map);
+map.boxZoom.disable();
 
-let rect = null, box = null;
-const $ = (id) => document.getElementById(id);
-const msg = (t, cls) => { $("msg").textContent = t; $("msg").className = "msg " + (cls || ""); };
+const touch = matchMedia("(pointer: coarse)").matches;
+if (!touch) $("hint").innerHTML = "Нажмите «Обвести область» и протяните мышью — или зажмите <b>Shift</b> и тяните сразу.";
+
+let rect = null, box = null, points = [];
+
+function paint(a, b, dashed) {
+  if (rect) map.removeLayer(rect);
+  rect = L.rectangle([[a.lat, a.lng], [b.lat, b.lng]], {
+    color: "#f14635", weight: 2, fillOpacity: 0.07, dashArray: dashed ? "5 5" : null,
+  }).addTo(map);
+}
 
 function setBox(b) {
   box = b;
-  if (rect) map.removeLayer(rect);
-  rect = L.rectangle([[b.south, b.west], [b.north, b.east]], {
-    color: "#f14635", weight: 2, fillOpacity: 0.07,
-  }).addTo(map);
+  paint({ lat: b.south, lng: b.west }, { lat: b.north, lng: b.east }, false);
   $("save").disabled = false;
   countInside();
 }
 
-// Shift-drag draws the box. Leaflet's box-zoom fires this event with the bounds.
-map.boxZoom.disable();
-let dragStart = null;
-map.on("mousedown", (e) => { if (e.originalEvent.shiftKey) { dragStart = e.latlng; map.dragging.disable(); } });
-map.on("mousemove", (e) => {
-  if (!dragStart) return;
-  if (rect) map.removeLayer(rect);
-  rect = L.rectangle([[dragStart.lat, dragStart.lng], [e.latlng.lat, e.latlng.lng]], {
-    color: "#f14635", weight: 2, dashArray: "5 5", fillOpacity: 0.07,
-  }).addTo(map);
-});
-map.on("mouseup", (e) => {
-  if (!dragStart) return;
-  const a = dragStart, b = e.latlng;
-  dragStart = null;
+function countInside() {
+  if (!box) { $("s-in").textContent = "—"; return; }
+  $("s-in").textContent = points.filter((p) =>
+    p.lat >= box.south && p.lat <= box.north && p.lon >= box.west && p.lon <= box.east).length;
+}
+
+// --- drawing: one code path for finger, pen and mouse -----------------------
+let drawMode = false, startLL = null;
+
+function setDrawMode(on) {
+  drawMode = on;
+  $("draw").classList.toggle("on", on);
+  $("draw").textContent = on ? "✏️ Проведите по карте" : "✏️ Обвести область";
+  mapEl.classList.toggle("drawing", on);
+  if (on) { map.dragging.disable(); msg("Проведите по карте, чтобы задать прямоугольник"); }
+  else { map.dragging.enable(); }
+}
+
+const toLatLng = (ev) => {
+  const r = mapEl.getBoundingClientRect();
+  return map.containerPointToLatLng([ev.clientX - r.left, ev.clientY - r.top]);
+};
+
+mapEl.addEventListener("pointerdown", (ev) => {
+  if (!drawMode && !ev.shiftKey) return;
+  startLL = toLatLng(ev);
+  map.dragging.disable();
+  try { mapEl.setPointerCapture(ev.pointerId); } catch (e) {}
+  ev.preventDefault();
+}, { passive: false });
+
+mapEl.addEventListener("pointermove", (ev) => {
+  if (!startLL) return;
+  paint(startLL, toLatLng(ev), true);
+  ev.preventDefault();
+}, { passive: false });
+
+function finishDraw(ev) {
+  if (!startLL) return;
+  const a = startLL, b = toLatLng(ev);
+  startLL = null;
   map.dragging.enable();
-  if (Math.abs(a.lat - b.lat) < 1e-4 || Math.abs(a.lng - b.lng) < 1e-4) { msg("Слишком маленькая область", "err"); return; }
+  setDrawMode(false);
+  if (Math.abs(a.lat - b.lat) < 2e-4 || Math.abs(a.lng - b.lng) < 2e-4) {
+    if (rect) { map.removeLayer(rect); rect = null; }
+    if (box) setBox(box);
+    msg("Область получилась слишком маленькой — попробуйте ещё раз", "err");
+    return;
+  }
   setBox({
     south: Math.min(a.lat, b.lat), north: Math.max(a.lat, b.lat),
     west: Math.min(a.lng, b.lng), east: Math.max(a.lng, b.lng),
   });
-  msg("");
-});
-
-let points = [];
-function countInside() {
-  if (!box) { $("s-in").textContent = "—"; return; }
-  const n = points.filter((p) =>
-    p.lat >= box.south && p.lat <= box.north && p.lon >= box.west && p.lon <= box.east).length;
-  $("s-in").textContent = n;
+  msg("Область намечена. Нажмите «Сохранить», чтобы сторож её запомнил.");
 }
+mapEl.addEventListener("pointerup", finishDraw);
+mapEl.addEventListener("pointercancel", () => { startLL = null; map.dragging.enable(); setDrawMode(false); });
 
-const money = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " ₸";
+$("draw").onclick = () => setDrawMode(!drawMode);
 
+// The fastest route on a phone: pinch to the area you want, then take it whole
+$("visible").onclick = () => {
+  const b = map.getBounds();
+  setBox({ south: b.getSouth(), north: b.getNorth(), west: b.getWest(), east: b.getEast() });
+  msg("Взял то, что видно на экране. Нажмите «Сохранить».");
+};
+
+// --- data -------------------------------------------------------------------
 fetch("/api/krisha/points").then((r) => r.json()).then((d) => {
   points = d.items || [];
   $("s-geo").textContent = points.length;
@@ -131,22 +200,27 @@ fetch("/api/krisha/points").then((r) => r.json()).then((d) => {
 
 fetch("/api/krisha/area").then((r) => r.json()).then((d) => {
   $("s-pend").textContent = d.pending;
-  if (d.area) { setBox(d.area); map.fitBounds([[d.area.south, d.area.west], [d.area.north, d.area.east]]); msg("Область уже задана", "ok"); }
+  if (d.area) {
+    setBox(d.area);
+    map.fitBounds([[d.area.south, d.area.west], [d.area.north, d.area.east]]);
+    msg("Область уже задана", "ok");
+  }
 });
 
 $("save").onclick = () => {
   if (!box) return;
   const bbox = [box.south, box.west, box.north, box.east].map((x) => x.toFixed(6)).join(",");
+  msg("Сохраняю…");
   fetch("/api/krisha/area?bbox=" + bbox).then((r) => r.json()).then((d) => {
-    msg(d.area ? "Сохранено · внутри " + d.inside + " объявлений" : "Не сохранилось", d.area ? "ok" : "err");
+    msg(d.area ? "Сохранено · внутри области " + d.inside + " объявлений с координатами" : "Не сохранилось",
+        d.area ? "ok" : "err");
   }).catch((e) => msg("Ошибка: " + e.message, "err"));
 };
 
 $("clear").onclick = () => {
   fetch("/api/krisha/area?clear=1").then((r) => r.json()).then(() => {
     if (rect) map.removeLayer(rect);
-    rect = null; box = null; $("save").disabled = true;
-    $("s-in").textContent = "—";
+    rect = null; box = null; $("save").disabled = true; $("s-in").textContent = "—";
     msg("Ограничение снято — снова ищем вдоль Абая", "ok");
   });
 };
