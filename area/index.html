@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Область поиска квартир — Saudager</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#fff; --bg-soft:#f4f5f7; --border:#e6e7eb; --text:#1f2028;
+    --muted:#6c7180; --accent:#f14635; --green:#1f9d55;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:Roboto,"Segoe UI",system-ui,sans-serif; color:var(--text); background:var(--bg); }
+  header { padding:14px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+  h1 { font-size:18px; font-weight:800; letter-spacing:-.02em; }
+  .hint { font-size:13.5px; color:var(--muted); }
+  #map { height:calc(100vh - 190px); min-height:340px; width:100%; }
+  .panel { padding:14px 20px; border-top:1px solid var(--border); display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .stat { font-size:14px; }
+  .stat b { font-size:17px; font-weight:800; }
+  .stat span { color:var(--muted); font-size:12.5px; display:block; line-height:1.2; }
+  button { font:inherit; cursor:pointer; border:none; padding:11px 20px; border-radius:11px; font-weight:600; font-size:14.5px; }
+  .primary { background:linear-gradient(135deg,#f14635,#e23c2b); color:#fff; }
+  .primary:disabled { opacity:.45; cursor:default; }
+  .ghost { background:#fff; border:1px solid var(--border); }
+  .msg { font-size:13.5px; margin-left:auto; }
+  .msg.ok { color:var(--green); font-weight:600; }
+  .msg.err { color:var(--accent); font-weight:600; }
+  .legend { font-size:12.5px; color:var(--muted); display:flex; gap:14px; align-items:center; }
+  .dot { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:5px; }
+  .leaflet-container { font-family:inherit; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Область поиска квартир</h1>
+  <span class="hint">Зажмите <b>Shift</b> и протяните мышью, чтобы обвести район. Сторож будет следить только внутри него.</span>
+</header>
+
+<div id="map"></div>
+
+<div class="panel">
+  <div class="stat"><b id="s-geo">—</b><span>с координатами</span></div>
+  <div class="stat"><b id="s-in">—</b><span>внутри области</span></div>
+  <div class="stat"><b id="s-pend">—</b><span>ждут геокодирования</span></div>
+  <div class="legend">
+    <span><i class="dot" style="background:#1f9d55"></i>точный адрес</span>
+    <span><i class="dot" style="background:#c47f17"></i>центр микрорайона</span>
+  </div>
+  <button class="primary" id="save" disabled>Сохранить область</button>
+  <button class="ghost" id="clear">Убрать ограничение</button>
+  <span class="msg" id="msg"></span>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const map = L.map("map").setView([43.2385, 76.8890], 13);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19, attribution: "&copy; OpenStreetMap",
+}).addTo(map);
+
+let rect = null, box = null;
+const $ = (id) => document.getElementById(id);
+const msg = (t, cls) => { $("msg").textContent = t; $("msg").className = "msg " + (cls || ""); };
+
+function setBox(b) {
+  box = b;
+  if (rect) map.removeLayer(rect);
+  rect = L.rectangle([[b.south, b.west], [b.north, b.east]], {
+    color: "#f14635", weight: 2, fillOpacity: 0.07,
+  }).addTo(map);
+  $("save").disabled = false;
+  countInside();
+}
+
+// Shift-drag draws the box. Leaflet's box-zoom fires this event with the bounds.
+map.boxZoom.disable();
+let dragStart = null;
+map.on("mousedown", (e) => { if (e.originalEvent.shiftKey) { dragStart = e.latlng; map.dragging.disable(); } });
+map.on("mousemove", (e) => {
+  if (!dragStart) return;
+  if (rect) map.removeLayer(rect);
+  rect = L.rectangle([[dragStart.lat, dragStart.lng], [e.latlng.lat, e.latlng.lng]], {
+    color: "#f14635", weight: 2, dashArray: "5 5", fillOpacity: 0.07,
+  }).addTo(map);
+});
+map.on("mouseup", (e) => {
+  if (!dragStart) return;
+  const a = dragStart, b = e.latlng;
+  dragStart = null;
+  map.dragging.enable();
+  if (Math.abs(a.lat - b.lat) < 1e-4 || Math.abs(a.lng - b.lng) < 1e-4) { msg("Слишком маленькая область", "err"); return; }
+  setBox({
+    south: Math.min(a.lat, b.lat), north: Math.max(a.lat, b.lat),
+    west: Math.min(a.lng, b.lng), east: Math.max(a.lng, b.lng),
+  });
+  msg("");
+});
+
+let points = [];
+function countInside() {
+  if (!box) { $("s-in").textContent = "—"; return; }
+  const n = points.filter((p) =>
+    p.lat >= box.south && p.lat <= box.north && p.lon >= box.west && p.lon <= box.east).length;
+  $("s-in").textContent = n;
+}
+
+const money = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " ₸";
+
+fetch("/api/krisha/points").then((r) => r.json()).then((d) => {
+  points = d.items || [];
+  $("s-geo").textContent = points.length;
+  points.forEach((p) => {
+    L.circleMarker([p.lat, p.lon], {
+      radius: 5, weight: 1, color: "#fff",
+      // An inexact pin sits at the centre of a microdistrict, not on the building
+      fillColor: p.exact ? "#1f9d55" : "#c47f17", fillOpacity: 0.85,
+    }).addTo(map).bindPopup(
+      "<b>" + money(p.price) + "</b><br>" + p.rooms + "-комн · " + p.area + " м²" +
+      (p.year ? " · " + p.building + " " + p.year : "") + "<br>" + p.addr +
+      (p.exact ? "" : "<br><i>метка неточная: центр микрорайона</i>") +
+      '<br><a href="' + p.url + '" target="_blank" rel="noopener">Открыть на Крыше</a>'
+    );
+  });
+  countInside();
+});
+
+fetch("/api/krisha/area").then((r) => r.json()).then((d) => {
+  $("s-pend").textContent = d.pending;
+  if (d.area) { setBox(d.area); map.fitBounds([[d.area.south, d.area.west], [d.area.north, d.area.east]]); msg("Область уже задана", "ok"); }
+});
+
+$("save").onclick = () => {
+  if (!box) return;
+  const bbox = [box.south, box.west, box.north, box.east].map((x) => x.toFixed(6)).join(",");
+  fetch("/api/krisha/area?bbox=" + bbox).then((r) => r.json()).then((d) => {
+    msg(d.area ? "Сохранено · внутри " + d.inside + " объявлений" : "Не сохранилось", d.area ? "ok" : "err");
+  }).catch((e) => msg("Ошибка: " + e.message, "err"));
+};
+
+$("clear").onclick = () => {
+  fetch("/api/krisha/area?clear=1").then((r) => r.json()).then(() => {
+    if (rect) map.removeLayer(rect);
+    rect = null; box = null; $("save").disabled = true;
+    $("s-in").textContent = "—";
+    msg("Ограничение снято — снова ищем вдоль Абая", "ok");
+  });
+};
+</script>
+</body>
+</html>

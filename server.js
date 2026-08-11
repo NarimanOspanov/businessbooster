@@ -718,7 +718,12 @@ const KRISHA_DETAILS_PER_RUN = Number(process.env.KRISHA_DETAILS_PER_RUN || 150)
 const KRISHA_PACE_MS = Number(process.env.KRISHA_PACE_MS || 2500); // gentler than local: the datacenter IP gets dropped more
 const KRISHA_FILE = path.join(PERSIST_DATA || REPO_DATA, "krisha-watch.json");
 
-let KW = { corpus: {}, seenKeys: [], bootstrapped: false, lastRun: null, lastError: null, runs: 0 };
+const KRISHA_GEO_PER_RUN = Number(process.env.KRISHA_GEO_PER_RUN || 60);
+
+// KW.area is a box drawn on the map at /area/. When it is set it replaces the
+// Abay text heuristic entirely: the corridor guess exists only because Krisha
+// gives no coordinates, and a real box is strictly better.
+let KW = { corpus: {}, seenKeys: [], bootstrapped: false, lastRun: null, lastError: null, runs: 0, area: null };
 try {
   KW = Object.assign(KW, JSON.parse(fs.readFileSync(KRISHA_FILE, "utf8").replace(/^﻿/, "")));
 } catch {
@@ -757,6 +762,16 @@ function krishaPost(c, kind) {
   return notifyTelegram(lines.filter((l) => l !== null && l !== undefined).join("\n"));
 }
 
+// A drawn box beats the address heuristic outright, so it replaces it when set.
+function krishaLoc(c) {
+  const K = require("./scripts/krisha-lib.js");
+  if (!KW.area) return K.locationScore(c.addr);
+  if (c.lat == null) return { score: 0, why: "координаты ещё не определены" };
+  return K.inBox(c, KW.area)
+    ? { score: 3, why: "внутри выбранной области" }
+    : { score: 0, why: "вне выбранной области" };
+}
+
 // The shortlist the watch is holding right now, scored against everything it
 // has ever read. Shared by the endpoint and the scheduled digest.
 function krishaShortlist(opts) {
@@ -772,10 +787,11 @@ function krishaShortlist(opts) {
       return Object.assign({}, c, p, {
         discount: Math.round((1 - c.ppm / p.expected) * 100),
         flags: K.flagsFor(c),
-        loc: K.locationScore(c.addr),
+        loc: krishaLoc(c),
         url: "https://krisha.kz/a/show/" + c.id,
       });
     })
+    .filter((c) => c.loc.score > 0)
     .filter((c) => c.solid && c.discount >= min)
     .filter((c) => !(o.clean && c.flags.length))
     .filter((c) => { const k = K.dedupeKey(c); if (seen.has(k)) return false; seen.add(k); return true; })
@@ -811,8 +827,12 @@ async function runKrishaWatch() {
   const started = Date.now();
   try {
     const { cards, total, skipped } = await K.fetchSearch(40, K.CRITERIA);
-    let okReads = 0, failReads = 0;
-    const near = cards.filter((c) => (c.loc = K.locationScore(c.addr)).score > 0);
+    let okReads = 0, failReads = 0, geocoded = 0;
+    // With a drawn area we cannot know what is inside it before the listing has
+    // been read and geocoded, so every result becomes a candidate. Without one,
+    // the address heuristic keeps the sweep small.
+    cards.forEach((c) => (c.loc = K.locationScore(c.addr)));
+    const near = KW.area ? cards.slice() : cards.filter((c) => c.loc.score > 0);
 
     // Price moves on listings we already know about
     const drops = [];
@@ -858,6 +878,18 @@ async function runKrishaWatch() {
     }
     saveKrisha();
 
+    // Resolve coordinates for anything still missing them, paced for Nominatim's
+    // one-request-per-second policy. Costs Krisha nothing — we already hold the
+    // addresses.
+    const needGeo = Object.values(KW.corpus).filter((c) => c.lat == null && !c.geoTried);
+    for (const c of needGeo.slice(0, KRISHA_GEO_PER_RUN)) {
+      const g = await K.geocode(c.addr);
+      if (g) { Object.assign(c, g); geocoded++; } else { c.geoTried = true; }
+      if (geocoded % 20 === 0) saveKrisha();
+      await K.sleep(1100);
+    }
+    if (geocoded) saveKrisha();
+
     // Score against everything we have ever seen, not just this page of results
     const corpus = Object.values(KW.corpus).filter((c) => c.year);
     const price = K.buildModel(corpus);
@@ -866,12 +898,13 @@ async function runKrishaWatch() {
       return Object.assign({}, c, p, {
         discount: Math.round((1 - c.ppm / p.expected) * 100),
         flags: K.flagsFor(c),
-        loc: K.locationScore(c.addr),
+        loc: krishaLoc(c),
       });
     };
 
     const seen = new Set(KW.seenKeys || []);
     const worth = added.map(score)
+      .filter((c) => c.loc.score > 0)
       .filter((c) => c.solid && c.discount >= KRISHA_MIN_DISCOUNT)
       .filter((c) => { const k = K.dedupeKey(c); if (seen.has(k)) return false; seen.add(k); return true; })
       .sort((a, b) => b.loc.score - a.loc.score || b.discount - a.discount);
@@ -904,7 +937,8 @@ async function runKrishaWatch() {
     KW.lastError = null;
     KW.lastSummary = {
       total, near: near.length, corpus: corpus.length,
-      tried: fresh.length, read: okReads, failed: failReads, searchPagesSkipped: skipped || 0,
+      tried: fresh.length, read: okReads, failed: failReads, geocoded,
+      searchPagesSkipped: skipped || 0,
       // What was actually delivered — bootstrapped flips to true inside the
       // branch above, so reading it here reported a send that never happened.
       qualified: worth.length, sent, drops: drops.length,
@@ -1726,6 +1760,53 @@ http
     // the backlog so the first cycle does not fire dozens of alerts about
     // listings that have been on the site for months — but the backlog is still
     // the answer to "what is on the market", so it needs a way out.
+    // The box drawn on /area/. Reading is free; setting replaces the address
+    // heuristic for every later run.
+    if (urlPath === "/api/krisha/area") {
+      const bbox = parsed.searchParams.get("bbox");
+      if (parsed.searchParams.get("clear") === "1") {
+        KW.area = null;
+        saveKrisha();
+      } else if (bbox) {
+        const n = bbox.split(",").map(Number);
+        if (n.length !== 4 || n.some((x) => !isFinite(x))) {
+          res.writeHead(400, { "Content-Type": MIME[".json"] });
+          res.end(JSON.stringify({ error: "bbox=south,west,north,east" }));
+          return;
+        }
+        KW.area = {
+          south: Math.min(n[0], n[2]), north: Math.max(n[0], n[2]),
+          west: Math.min(n[1], n[3]), east: Math.max(n[1], n[3]),
+          setAt: new Date().toISOString(),
+        };
+        saveKrisha();
+      }
+      const K = require("./scripts/krisha-lib.js");
+      const pts = Object.values(KW.corpus || {}).filter((c) => c.lat != null);
+      res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+      res.end(JSON.stringify({
+        area: KW.area,
+        geocoded: pts.length,
+        pending: Object.values(KW.corpus || {}).filter((c) => c.lat == null && !c.geoTried).length,
+        inside: KW.area ? pts.filter((c) => K.inBox(c, KW.area)).length : null,
+      }, null, 2));
+      return;
+    }
+
+    // Everything geocoded so far, for drawing on the map
+    if (urlPath === "/api/krisha/points") {
+      const items = Object.values(KW.corpus || {})
+        .filter((c) => c.lat != null)
+        .map((c) => ({
+          id: c.id, lat: c.lat, lon: c.lon, price: c.price, ppm: c.ppm, area: c.area,
+          rooms: c.rooms, year: c.year, building: c.building, addr: c.addr,
+          exact: !!c.geoExact, url: "https://krisha.kz/a/show/" + c.id,
+        }));
+      res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+      res.end(JSON.stringify({ count: items.length, items }));
+      return;
+    }
+
     if (urlPath === "/api/krisha/shortlist") {
       const opts = {
         min: parsed.searchParams.get("min"),
@@ -1771,6 +1852,8 @@ http
         detailsPerRun: KRISHA_DETAILS_PER_RUN,
         bootstrapped: KW.bootstrapped,
         corpus: Object.keys(KW.corpus || {}).length,
+        geocoded: Object.values(KW.corpus || {}).filter((c) => c.lat != null).length,
+        area: KW.area,
         retrying: Object.keys(KW.failed || {}).length,
         runs: KW.runs || 0,
         lastRun: KW.lastRun,

@@ -199,7 +199,67 @@ async function fetchDetail(id) {
   return d;
 }
 
+// --- geocoding ---------------------------------------------------------------
+// Krisha exposes no coordinates and closed its map (/a/show-map/ is disallowed
+// in robots.txt), so a "draw a box on the map" filter has to run on coordinates
+// we derive ourselves from addresses we already hold. That also means zero extra
+// load on Krisha.
+//
+// Nominatim's usage policy: identify yourself and stay under one request per
+// second. Callers must pace; this only does one request per attempt.
+const NOMINATIM_UA = process.env.GEOCODER_UA ||
+  "saudager-apartment-watch/0.1 (https://saudager.ai)";
+
+// Address strings look like "Ауэзовский р-н, мкр Аксай-3 7 — Момышулы Толеби".
+// The part before "—" is the actual location; the rest is a cross-street hint.
+function addressQueries(addr) {
+  const raw = String(addr || "").split("—")[0].replace(/^[^,]*р-н,\s*/, "").trim();
+  if (!raw) return [];
+  const out = [];
+  const mkr = raw.match(/мкр\.?\s*([^,]+?)(?:\s+(\d+[а-яa-z]?))?$/i);
+  if (mkr) {
+    const name = mkr[1].trim(), house = mkr[2];
+    if (house) out.push("микрорайон " + name + " " + house + ", Алматы");
+    out.push("микрорайон " + name + ", Алматы");
+    out.push(name + ", Алматы");
+  } else {
+    out.push(raw + ", Алматы");
+    const noHouse = raw.replace(/\s+\d+[а-яa-z]?(\/\d+)?$/i, "").trim();
+    if (noHouse && noHouse !== raw) out.push(noHouse + ", Алматы");
+  }
+  return [...new Set(out)];
+}
+
+async function geocode(addr) {
+  for (const q of addressQueries(addr)) {
+    const url = "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=kz&q=" +
+      encodeURIComponent(q);
+    try {
+      const r = await fetch(url, {
+        headers: { "User-Agent": NOMINATIM_UA, "Accept-Language": "ru" },
+        signal: AbortSignal.timeout(20000),
+      });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const j = await r.json();
+      if (j && j[0]) {
+        // A microdistrict resolves to its centre, not the building — worth
+        // recording so the UI can say how much to trust the pin.
+        const exact = /house|building|apartments|address/i.test(j[0].type || "") || /^\d/.test(q);
+        return { lat: +j[0].lat, lon: +j[0].lon, geoQuery: q, geoExact: exact };
+      }
+    } catch {
+      // try the next, looser formulation
+    }
+    await sleep(1100);
+  }
+  return null;
+}
+
+const inBox = (c, b) =>
+  c && b && c.lat >= b.south && c.lat <= b.north && c.lon >= b.west && c.lon <= b.east;
+
 module.exports = {
+  addressQueries, geocode, inBox,
   H, CRITERIA, NEAR_DISTRICTS, sleep, num, clean, money,
   searchUrl, parseCards, parseDetail, locationScore, dedupeKey,
   ageBand, groupKey, median, buildModel, flagsFor, fetchText, fetchSearch, fetchDetail,
