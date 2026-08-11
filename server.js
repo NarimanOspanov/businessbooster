@@ -984,6 +984,31 @@ async function runKrishaWatch() {
     cards.forEach((c) => (c.loc = K.locationScore(c.addr)));
     const near = KW.area ? cards.slice() : cards.filter((c) => c.loc.score > 0);
 
+    // Listings that vanished from the sweep have been sold or withdrawn. A miss
+    // is only counted when the sweep was complete — a skipped page would
+    // otherwise read as half the market disappearing — and is confirmed twice
+    // before anything is claimed.
+    const goneNow = [];
+    if (!skipped) {
+      const seen = new Set(cards.map((c) => c.id));
+      KW.published = KW.published || {};
+      for (const c of Object.values(KW.corpus)) {
+        if (c.goneAt) continue;
+        if (seen.has(c.id)) { c.misses = 0; continue; }
+        c.misses = (c.misses || 0) + 1;
+        if (c.misses < 2) continue;
+        // Confirm against the listing itself: gone from a filtered search can
+        // also mean the seller edited it out of our price or room range.
+        let alive = true;
+        try { await K.fetchDetail(c.id); } catch { alive = false; }
+        await K.sleep(1200);
+        if (alive) { c.misses = 0; continue; }
+        c.goneAt = new Date().toISOString();
+        const pub = KW.published[K.dedupeKey(c)];
+        if (pub && pub.at && !pub.skipped) goneNow.push({ c, pub });
+      }
+    }
+
     // Price moves on listings we already know about
     const drops = [];
     for (const c of near) {
@@ -1087,6 +1112,18 @@ async function runKrishaWatch() {
         );
       }
     } else {
+      // The one rubric that proves the channel is pointing at real deals rather
+      // than merely cheap flats: a find that left the market, and how fast.
+      for (const g of goneNow.slice(0, 3)) {
+        const days = Math.max(1, Math.round((Date.now() - Date.parse(g.pub.at)) / 864e5));
+        await sendTelegram(KW.channel,
+          "✅ <b>Ушла с рынка</b>\n\n" +
+          "Квартира из нашего поста " + (days === 1 ? "вчера" : days + " дн. назад") + " снята с продажи.\n\n" +
+          K.money(g.c.price) + " · " + g.c.rooms + "-комн · " + g.c.area + " м²\n" +
+          g.c.addr + "\n\n" +
+          "<i>Объявление больше не открывается — продана или снята хозяином.</i>");
+        await K.sleep(1500);
+      }
       for (const c of worth.slice(0, 5)) { await krishaPost(c, "new"); sent++; await K.sleep(1200); }
       for (const c of drops.slice(0, 5)) {
         await krishaPost(Object.assign(score(c), { discount: c.drop }), "drop");
@@ -1102,6 +1139,8 @@ async function runKrishaWatch() {
       total, near: near.length, corpus: corpus.length,
       tried: fresh.length, read: okReads, failed: failReads, geocoded,
       searchPagesSkipped: skipped || 0,
+      gone: goneNow.length,
+      goneTotal: Object.values(KW.corpus).filter((c) => c.goneAt).length,
       // What was actually delivered — bootstrapped flips to true inside the
       // branch above, so reading it here reported a send that never happened.
       qualified: worth.length, sent, drops: drops.length,
