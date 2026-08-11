@@ -712,7 +712,9 @@ function statsSummary() {
 const KRISHA_ON = process.env.KRISHA_WATCH !== "0" && !!(TG_TOKEN && TG_CHAT);
 const KRISHA_EVERY_H = Number(process.env.KRISHA_INTERVAL_H || 4);
 const KRISHA_MIN_DISCOUNT = Number(process.env.KRISHA_MIN_DISCOUNT || 12);
-const KRISHA_DETAILS_PER_RUN = Number(process.env.KRISHA_DETAILS_PER_RUN || 80);
+// 80 was a hedge against the read failures; with retries in place a run reads
+// every listing it tries, so the warm-up can finish in a couple of cycles.
+const KRISHA_DETAILS_PER_RUN = Number(process.env.KRISHA_DETAILS_PER_RUN || 150);
 const KRISHA_PACE_MS = Number(process.env.KRISHA_PACE_MS || 2500); // gentler than local: the datacenter IP gets dropped more
 const KRISHA_FILE = path.join(PERSIST_DATA || REPO_DATA, "krisha-watch.json");
 
