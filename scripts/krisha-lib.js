@@ -155,7 +155,11 @@ function buildModel(corpus) {
   return function price(c) {
     const ladder = [
       [idx.full[groupKey(c)], (n) => "тот же тип, возраст и площадь в районе (" + n + ")", true],
-      [idx.distArea[c.district + "|" + areaBand(c.area)], (n) => "та же площадь в районе (" + n + ")", true],
+      // District alone is far too coarse a geography — Медеуский runs from the
+      // centre to the mountains — so an area-only match inside it is a hint, not
+      // evidence. It produced a 1965 panel in a remote micro-district priced
+      // against central stock and called it 49% below market.
+      [idx.distArea[c.district + "|" + areaBand(c.area)], (n) => "та же площадь в районе (" + n + ")", false],
       [idx.noArea[c.district + "|" + (c.building || "?") + "|" + ageBand(c.year)],
         (n) => "тот же тип и возраст в районе, площадь любая (" + n + ")", false],
       [idx.dist[c.district], (n) => "район целиком (" + n + ")", false],

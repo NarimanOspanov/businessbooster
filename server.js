@@ -930,6 +930,15 @@ async function krishaPublish(rows, rubric) {
   for (const c of rows) {
     // One extra request, only for what actually gets published
     try { Object.assign(c, await K.fetchPriceAnalysis(c.id)); } catch { /* post without it */ }
+    // Krisha's own estimate is an independent check. When it disagrees sharply,
+    // our comparable set is the thing that is wrong — publishing a "−49%" that
+    // the listing page calls −15% would cost more credibility than the post is
+    // worth. Such a flat is parked, not retried.
+    if (c.kzDiscount != null && Math.abs(c.discount - c.kzDiscount) > KRISHA_MAX_GAP) {
+      KW.published[K.dedupeKey(c)] = { id: c.id, at: new Date().toISOString(), skipped: "расхождение с оценкой Крыши" };
+      out.push({ id: c.id, ok: false, error: "наша оценка −" + c.discount + "%, у Крыши −" + c.kzDiscount + "% — пропущено" });
+      continue;
+    }
     const tg = await sendTelegram(KW.channel, krishaChannelPost(c, rubric));
     const ok = !!(tg && tg.ok);
     if (ok) KW.published[K.dedupeKey(c)] = { id: c.id, at: new Date().toISOString(), price: c.price };
@@ -1122,6 +1131,7 @@ const KRISHA_DIGEST_LIMIT = Number(process.env.KRISHA_DIGEST_LIMIT || 10);
 const KRISHA_POST_HOUR = Number(process.env.KRISHA_POST_HOUR || 19); // Asia/Almaty
 const KRISHA_WEEKLY_HOUR = Number(process.env.KRISHA_WEEKLY_HOUR || 12); // Sundays
 const KRISHA_WEEKLY_LIMIT = Number(process.env.KRISHA_WEEKLY_LIMIT || 7);
+const KRISHA_MAX_GAP = Number(process.env.KRISHA_MAX_GAP || 15); // percentage points vs Krisha's own estimate
 
 if (KRISHA_ON) {
   setTimeout(krishaTick, 45000).unref();                       // let the app finish booting
