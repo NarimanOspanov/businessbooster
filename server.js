@@ -778,9 +778,11 @@ function krishaPost(c, kind) {
 }
 
 // A drawn box beats the address heuristic outright, so it replaces it when set.
-function krishaLoc(c) {
+// The channel passes ignoreArea: the box is one person's search, and a public
+// channel that only ever posted from it would be pointless.
+function krishaLoc(c, ignoreArea) {
   const K = require("./scripts/krisha-lib.js");
-  if (!KW.area) return K.locationScore(c.addr);
+  if (ignoreArea || !KW.area) return K.locationScore(c.addr);
   if (c.lat == null) return { score: 0, why: "координаты ещё не определены" };
   return K.inBox(c, KW.area)
     ? { score: 3, why: "внутри выбранной области" }
@@ -823,7 +825,7 @@ function krishaShortlist(opts) {
       return Object.assign({}, c, p, {
         discount: Math.round((1 - c.ppm / p.expected) * 100),
         flags: K.flagsFor(c),
-        loc: krishaLoc(c),
+        loc: krishaLoc(c, o.ignoreArea),
         url: "https://krisha.kz/a/show/" + c.id,
       });
     })
@@ -904,7 +906,7 @@ function krishaChannelPost(c, rubric) {
 function krishaPickForChannel(n, opts) {
   const K = require("./scripts/krisha-lib.js");
   const o = opts || {};
-  const { rows } = krishaShortlist({ min: o.min, limit: 200, clean: o.clean !== false });
+  const { rows } = krishaShortlist({ min: o.min, limit: 200, clean: o.clean !== false, ignoreArea: true });
   const done = KW.published || {};
   const fresh = o.again ? rows : rows.filter((c) => !done[K.dedupeKey(c)]);
   return { rows: fresh.slice(0, n), available: fresh.length, total: rows.length };
