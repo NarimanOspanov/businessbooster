@@ -1908,20 +1908,28 @@ http
         return;
       }
       const n = Math.max(1, Math.min(5, Number(parsed.searchParams.get("n") || 1)));
-      const { rows } = krishaPickForChannel(n, {
+      const pick = krishaPickForChannel(n, {
         min: parsed.searchParams.get("min"),
         clean: parsed.searchParams.get("clean") !== "0",
         again: parsed.searchParams.get("again") === "1",
       });
-      if (!rows.length) {
+      if (!pick.rows.length) {
         res.writeHead(200, { "Content-Type": MIME[".json"] });
-        res.end(JSON.stringify({ published: 0, reason: "под критерии сейчас ничего не подходит" }));
+        res.end(JSON.stringify({
+          published: 0, queue: 0, matching: pick.total,
+          reason: pick.total ? "всё подходящее уже опубликовано" : "под критерии сейчас ничего не подходит",
+        }, null, 2));
         return;
       }
-      krishaPublish(rows, parsed.searchParams.get("rubric")).then((out) => {
+      krishaPublish(pick.rows, parsed.searchParams.get("rubric")).then((out) => {
         const ok = out.filter((x) => x.ok).length;
         res.writeHead(ok ? 200 : 502, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
-        res.end(JSON.stringify({ channel: KW.channel, published: ok, results: out }, null, 2));
+        res.end(JSON.stringify({
+          channel: KW.channel, published: ok,
+          // How many days of daily posts are left in stock — the number that
+          // decides whether a daily rubric can actually run
+          queue: pick.available - ok, matching: pick.total, results: out,
+        }, null, 2));
       });
       return;
     }
