@@ -647,7 +647,7 @@ function bucket(slug) {
 
 // Returns true when the hit came from a human — the caller uses this to decide
 // whether the event is worth a Telegram alert.
-function track(slug, req, kind) {
+function track(slug, req, kind, tag) {
   const ua = req.headers["user-agent"] || "";
   const b = bucket(slug);
   b.lastSeen = new Date().toISOString();
@@ -667,8 +667,26 @@ function track(slug, req, kind) {
     return false;
   }
   if (kind === "click") {
+    // The buy button gets its ?s= marker appended by JavaScript on the
+    // storefront, so a click carrying one came from a rendered page. Crawlers
+    // read the href straight out of the markup and arrive without it — which is
+    // how 27 "purchases" appeared against 3 page views.
+    const tagged = !!tag && tag !== "unknown";
     b.clicks++;
-    return true;
+    if (tagged) {
+      b.clicksTagged = (b.clicksTagged || 0) + 1;
+      b.clickSources = b.clickSources || {};
+      b.clickSources[tag] = (b.clickSources[tag] || 0) + 1;
+    } else {
+      b.clicksUntagged = (b.clicksUntagged || 0) + 1;
+      // Keep the agents behind untagged clicks: that is the evidence we lacked
+      b.clickAgents = b.clickAgents || {};
+      const key = (ua || "нет user-agent").slice(0, 120);
+      if (Object.keys(b.clickAgents).length < 8 || b.clickAgents[key]) {
+        b.clickAgents[key] = (b.clickAgents[key] || 0) + 1;
+      }
+    }
+    return tagged;
   }
   b.visits++;
   const src = sourceFromReferrer(req.headers.referer || req.headers.referrer);
@@ -692,6 +710,10 @@ function statsSummary() {
     slug,
     visits: s.visits,
     clicks: s.clicks,
+    // Split out, because the headline click count was inflated by crawlers
+    clicksTagged: s.clicksTagged || 0,
+    clicksUntagged: s.clicksUntagged || 0,
+    clickSources: s.clickSources || {},
     botHits: Object.values(s.bots).reduce((a, b) => a + b, 0),
     sources: s.sources,
     bots: s.bots,
@@ -2343,17 +2365,18 @@ http
       const prof = loadProfile(goMatch[1]);
       const prod = prof && prof.products.find((p) => String(p.id) === goMatch[2]);
       if (prod) {
-        const isHuman = track(goMatch[1], req, "click");
         const src = parsed.searchParams.get("s") || "unknown";
-        const b = STATS[goMatch[1]] || { clicks: 0 };
-        // Crawlers follow buy links too — only a human hand-off is worth an alert
+        const isHuman = track(goMatch[1], req, "click", src);
+        const b = STATS[goMatch[1]] || { clicks: 0, clicksTagged: 0 };
+        // Crawlers follow buy links too, and some pose as browsers — the missing
+        // JS-added marker is what separates them, so it gates the alert.
         if (isHuman) notifyTelegram(
           "🛒 <b>Переход к продавцу</b>\n" +
             "Магазин: <b>" + prof.name + "</b>\n" +
             prod.title + "\n" +
             (prod.priceFormatted || prod.price + " ₸") + "\n" +
             "Источник: " + (SOURCE_LABEL[src] || src) + "\n" +
-            "Всего переходов у этого магазина: " + b.clicks + "\n" +
+            "Живых переходов у этого магазина: " + (b.clicksTagged || 0) + "\n" +
             CANONICAL + "/store/" + goMatch[1]
         );
         res.writeHead(302, { Location: prod.kaspiUrl, "Cache-Control": "no-store" }).end();
