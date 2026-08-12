@@ -1008,6 +1008,10 @@ async function krishaWeekly(limit) {
 async function runKrishaWatch() {
   const K = require("./scripts/krisha-lib.js");
   const started = Date.now();
+  // Krisha stopped answering this server entirely after we pulled 833 pages
+  // every four hours. Hammering a host that is refusing us is both useless and
+  // rude, so a sweep that collects nothing trips a breaker instead of retrying.
+  if (KW.pausedUntil && Date.now() < Date.parse(KW.pausedUntil)) return;
   try {
     // 40 pages covered the old narrow brief entirely; against 16 649 listings it
     // saw 5% — and the wrong 5%, since default order is driven by paid bumps, so
@@ -1162,6 +1166,23 @@ async function runKrishaWatch() {
         sent++;
         await K.sleep(1200);
       }
+    }
+
+    // A sweep that returned nothing at all means the host is refusing us, not
+    // that the market emptied. Two in a row and we stand down for a day.
+    if (total === null && !cards.length) {
+      KW.deadSweeps = (KW.deadSweeps || 0) + 1;
+      if (KW.deadSweeps >= 2 && !KW.pausedUntil) {
+        KW.pausedUntil = new Date(Date.now() + 24 * 3600e3).toISOString();
+        await notifyTelegram(
+          "⛔️ <b>Крыша перестала отвечать этому серверу</b>\n\n" +
+          "Два обхода подряд вернули ноль страниц — похоже, наш IP заблокирован после слишком частых обходов.\n" +
+          "Слежение остановлено на сутки, чтобы не долбиться в закрытую дверь.\n\n" +
+          "Снять паузу: " + CANONICAL + "/api/krisha?resume=1"
+        );
+      }
+    } else {
+      KW.deadSweeps = 0;
     }
 
     KW.runs = (KW.runs || 0) + 1;
@@ -2182,6 +2203,11 @@ http
     // Apartment watch status, and a manual kick so it can be verified without
     // waiting out the interval. Writes nothing that a run would not write anyway.
     if (urlPath === "/api/krisha") {
+      if (parsed.searchParams.get("resume") === "1") {
+        KW.pausedUntil = null;
+        KW.deadSweeps = 0;
+        saveKrisha();
+      }
       if (parsed.searchParams.get("run") === "1") {
         if (!KRISHA_ON) {
           res.writeHead(409, { "Content-Type": MIME[".json"] });
@@ -2202,6 +2228,8 @@ http
         minDiscount: KRISHA_MIN_DISCOUNT,
         paceMs: KRISHA_PACE_MS,
         detailsPerRun: KRISHA_DETAILS_PER_RUN,
+        pausedUntil: KW.pausedUntil || null,
+        deadSweeps: KW.deadSweeps || 0,
         bootstrapped: KW.bootstrapped,
         corpus: Object.keys(KW.corpus || {}).length,
         geocoded: Object.values(KW.corpus || {}).filter((c) => c.lat != null).length,
