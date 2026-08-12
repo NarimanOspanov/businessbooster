@@ -977,7 +977,18 @@ async function krishaPublish(rows, rubric) {
 async function krishaWeekly(limit) {
   const K = require("./scripts/krisha-lib.js");
   const n = Number(limit || KRISHA_WEEKLY_LIMIT);
-  const { rows } = krishaShortlist({ limit: n, clean: true, ignoreArea: true });
+  // The weekly list bypassed the sanity gate and filled up with new-build
+  // artifacts at −45%, so it now checks each candidate against Krisha's own
+  // estimate exactly as the daily post does.
+  const { rows: pool } = krishaShortlist({ limit: n * 4, clean: true, ignoreArea: true });
+  const rows = [];
+  for (const c of pool) {
+    if (rows.length >= n) break;
+    try { Object.assign(c, await K.fetchPriceAnalysis(c.id)); } catch { /* keep it, unverified */ }
+    if (c.kzDiscount != null && Math.abs(c.discount - c.kzDiscount) > KRISHA_MAX_GAP) continue;
+    rows.push(c);
+    await K.sleep(1200);
+  }
   if (!rows.length) return { delivered: false, items: 0, reason: "нечего показывать" };
   const when = new Date().toLocaleDateString("ru-RU", { timeZone: "Asia/Almaty", day: "2-digit", month: "long" });
   const body = rows.map((c, i) =>
@@ -1001,7 +1012,10 @@ async function runKrishaWatch() {
     // 40 pages covered the old narrow brief entirely; against 16 649 listings it
     // saw 5% — and the wrong 5%, since default order is driven by paid bumps, so
     // genuinely new listings were never reached.
-    const { cards, total, skipped } = await K.fetchSearch(KRISHA_MAX_PAGES, K.CRITERIA);
+    const { cards, total, skipped } = await K.fetchSearch(KRISHA_MAX_PAGES, K.CRITERIA, null, {
+      pace: KRISHA_PAGE_PACE_MS,
+      budgetMs: KRISHA_SWEEP_BUDGET_MIN * 60e3,
+    });
     let okReads = 0, failReads = 0, geocoded = 0;
     // With a drawn area we cannot know what is inside it before the listing has
     // been read and geocoded, so every result becomes a candidate. Without one,
@@ -1028,9 +1042,14 @@ async function runKrishaWatch() {
         try { await K.fetchDetail(c.id); } catch { alive = false; }
         await K.sleep(1200);
         if (alive) { c.misses = 0; continue; }
+        // Kept as a measurement, not a rubric: whether our finds actually sell,
+        // and how fast, is the only check on whether the selection is any good.
         c.goneAt = new Date().toISOString();
         const pub = KW.published[K.dedupeKey(c)];
-        if (pub && pub.at && !pub.skipped) goneNow.push({ c, pub });
+        if (pub && pub.at && !pub.skipped) {
+          pub.goneAfterDays = Math.max(1, Math.round((Date.now() - Date.parse(pub.at)) / 864e5));
+          goneNow.push({ c, pub });
+        }
       }
     }
 
@@ -1137,18 +1156,6 @@ async function runKrishaWatch() {
         );
       }
     } else {
-      // The one rubric that proves the channel is pointing at real deals rather
-      // than merely cheap flats: a find that left the market, and how fast.
-      for (const g of goneNow.slice(0, 3)) {
-        const days = Math.max(1, Math.round((Date.now() - Date.parse(g.pub.at)) / 864e5));
-        await sendTelegram(KW.channel,
-          "✅ <b>Ушла с рынка</b>\n\n" +
-          "Квартира из нашего поста " + (days === 1 ? "вчера" : days + " дн. назад") + " снята с продажи.\n\n" +
-          K.money(g.c.price) + " · " + g.c.rooms + "-комн · " + g.c.area + " м²\n" +
-          g.c.addr + "\n\n" +
-          "<i>Объявление больше не открывается — продана или снята хозяином.</i>");
-        await K.sleep(1500);
-      }
       for (const c of worth.slice(0, 5)) { await krishaPost(c, "new"); sent++; await K.sleep(1200); }
       for (const c of drops.slice(0, 5)) {
         await krishaPost(Object.assign(score(c), { discount: c.drop }), "drop");
@@ -1197,6 +1204,8 @@ const KRISHA_WEEKLY_HOUR = Number(process.env.KRISHA_WEEKLY_HOUR || 12); // Sund
 const KRISHA_WEEKLY_LIMIT = Number(process.env.KRISHA_WEEKLY_LIMIT || 7);
 const KRISHA_MAX_GAP = Number(process.env.KRISHA_MAX_GAP || 15); // percentage points vs Krisha's own estimate
 const KRISHA_MAX_PAGES = Number(process.env.KRISHA_MAX_PAGES || 900); // 16 649 listings ≈ 833 pages
+const KRISHA_PAGE_PACE_MS = Number(process.env.KRISHA_PAGE_PACE_MS || 2000);
+const KRISHA_SWEEP_BUDGET_MIN = Number(process.env.KRISHA_SWEEP_BUDGET_MIN || 35);
 
 if (KRISHA_ON) {
   setTimeout(krishaTick, 45000).unref();                       // let the app finish booting

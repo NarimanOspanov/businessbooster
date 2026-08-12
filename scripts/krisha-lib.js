@@ -184,17 +184,24 @@ function flagsFor(c) {
   return f;
 }
 
-async function fetchSearch(maxPages, crit, onPage) {
+async function fetchSearch(maxPages, crit, onPage, opts) {
+  const o = opts || {};
+  const pace = o.pace || 1300;
+  const deadline = o.budgetMs ? Date.now() + o.budgetMs : null;
   const found = new Map();
   let total = null, skipped = 0;
   for (let page = 1; page <= maxPages; page++) {
+    // A run that spent 8.6 hours retrying 726 unreachable pages is worse than a
+    // partial sweep: search pages get one short attempt, and the whole sweep
+    // gets a wall-clock budget.
+    if (deadline && Date.now() > deadline) { skipped += maxPages - page + 1; break; }
     let html;
     try {
-      html = await fetchText(searchUrl(page, crit));
+      html = await fetchText(searchUrl(page, crit), 1, 8000);
     } catch {
       // One unreachable page must not abort the sweep — note it and move on.
       skipped++;
-      await sleep(1300);
+      await sleep(pace);
       continue;
     }
     if (total === null) {
@@ -205,7 +212,7 @@ async function fetchSearch(maxPages, crit, onPage) {
     if (!cards.length) break;
     cards.forEach((c) => found.set(c.id, c));
     if (onPage) onPage(page, found.size, total);
-    await sleep(1300);
+    await sleep(pace);
   }
   return { cards: [...found.values()], total, skipped };
 }
