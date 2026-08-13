@@ -2208,6 +2208,12 @@ http
         KW.deadSweeps = 0;
         saveKrisha();
       }
+      // Park it without a redeploy: ?pause=30 stands down for 30 days
+      const pauseDays = Number(parsed.searchParams.get("pause") || 0);
+      if (pauseDays > 0) {
+        KW.pausedUntil = new Date(Date.now() + pauseDays * 24 * 3600e3).toISOString();
+        saveKrisha();
+      }
       if (parsed.searchParams.get("run") === "1") {
         if (!KRISHA_ON) {
           res.writeHead(409, { "Content-Type": MIME[".json"] });
