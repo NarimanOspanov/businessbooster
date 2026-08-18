@@ -1600,8 +1600,13 @@ function buildSitemap(origin) {
   );
 }
 
+let lastIndexNow = { at: null, status: null, urls: 0, body: "" };
+
+// Report what IndexNow answered. This used to swallow every outcome, so eight days
+// of zero Bing traffic could not be told apart from submissions that were never
+// accepted — 403 (key not readable) and 422 (host mismatch) look identical to
+// success when nothing is logged.
 function pingIndexNow(host, urls) {
-  // Fire-and-forget: tell Bing about new/updated URLs
   return fetch("https://api.indexnow.org/indexnow", {
     method: "POST",
     headers: { "Content-Type": "application/json; charset=utf-8" },
@@ -1611,7 +1616,37 @@ function pingIndexNow(host, urls) {
       keyLocation: "https://" + host + "/" + INDEXNOW_KEY + ".txt",
       urlList: urls,
     }),
-  }).catch(() => {});
+  })
+    .then(async (r) => {
+      const body = (await r.text().catch(() => "")).slice(0, 200);
+      lastIndexNow = { at: new Date().toISOString(), status: r.status, urls: urls.length, body };
+      console.log("[indexnow] " + r.status + " for " + urls.length + " urls" + (body ? " · " + body : ""));
+      return lastIndexNow;
+    })
+    .catch((e) => {
+      lastIndexNow = { at: new Date().toISOString(), status: 0, urls: urls.length, body: String(e.message).slice(0, 120) };
+      console.log("[indexnow] failed: " + lastIndexNow.body);
+      return lastIndexNow;
+    });
+}
+
+// Announce EVERY storefront. The 145 built by scripts/bulk-ingest.js never went
+// through handleIngest, so they were never submitted at all — which is the most
+// likely reason Bing has not crawled a single one.
+let indexNowAllAt = 0;
+async function pingIndexNowAll() {
+  if (Date.now() - indexNowAllAt < 3600e3) return { skipped: "cooldown", lastIndexNow };
+  indexNowAllAt = Date.now();
+  const slugs = listMerchantSlugs();
+  const urls = [CANONICAL + "/", CANONICAL + "/en/"];
+  for (const s of slugs) {
+    urls.push(CANONICAL + "/store/" + s);
+    urls.push(CANONICAL + "/store/" + s + "/feed-google.xml");
+  }
+  // IndexNow caps a submission at 10 000 URLs; batch well under it either way.
+  const out = [];
+  for (let i = 0; i < urls.length; i += 500) out.push(await pingIndexNow(CANONICAL_HOST, urls.slice(i, i + 500)));
+  return { stores: slugs.length, urls: urls.length, batches: out.length, results: out };
 }
 
 // ---------------------------------------------------------------------------
@@ -2251,6 +2286,22 @@ http
         lastSummary: KW.lastSummary || null,
         telegram: TG_TOKEN && TG_CHAT ? "настроен" : "не настроен",
       }, null, 2));
+      return;
+    }
+
+    // Submit every storefront to IndexNow and report what it answered. Safe to expose:
+    // it can only ever submit this host own URLs, and it is on a one-hour cooldown.
+    if (urlPath === "/api/indexnow") {
+      const go = parsed.searchParams.get("submit") === "1";
+      if (!go) {
+        res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+        res.end(JSON.stringify({ lastIndexNow, hint: "add ?submit=1 to announce all storefronts" }, null, 2));
+        return;
+      }
+      pingIndexNowAll().then((out) => {
+        res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+        res.end(JSON.stringify(out, null, 2));
+      });
       return;
     }
 
