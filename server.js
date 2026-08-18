@@ -656,10 +656,14 @@ function track(slug, req, kind, tag) {
   if (botHit) {
     b.bots[botHit[0]] = (b.bots[botHit[0]] || 0) + 1;
     if (kind === "click") b.botClicks = (b.botClicks || 0) + 1;
-    // Keep a few raw agents for the unclassified ones so we can see who crawls us
+    // Keep a few raw agents for the unclassified ones so we can see who crawls us.
+    // Crawlers hide their name AFTER a browser-shaped prefix, so the first 120 characters are the
+    // least informative part of the string: 6 958 hits were sampled as plain "Chrome/145" and told us
+    // nothing. Lead the key with the token that actually matched.
     if (botHit[0] === "other-bot") {
       b.otherBotAgents = b.otherBotAgents || {};
-      const key = ua.slice(0, 120);
+      const tok = (ua.match(/[w.-]*(?:bot|crawler|spider)[w./-]*/i) || [""])[0];
+      const key = (tok ? tok + " · " : "") + ua.slice(0, 110);
       if (Object.keys(b.otherBotAgents).length < 8 || b.otherBotAgents[key]) {
         b.otherBotAgents[key] = (b.otherBotAgents[key] || 0) + 1;
       }
