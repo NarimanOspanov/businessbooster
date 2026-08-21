@@ -1576,6 +1576,8 @@ function buildSitemap(origin) {
   const urls = [
     { loc: origin + "/", priority: "1.0" },
     { loc: origin + "/en/", priority: "0.9" },
+    { loc: origin + "/phone/", priority: "0.9" },
+    { loc: origin + "/phone/kk/", priority: "0.9" },
   ];
   for (const slug of listMerchantSlugs()) {
     const p = loadProfile(slug);
@@ -2342,6 +2344,39 @@ http
     if (urlPath === "/api/config") {
       res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
       res.end(JSON.stringify({ clerkPublishableKey: CLERK_PK || null }));
+      return;
+    }
+
+    // Callback request from the phone-assistant landing. No auth on purpose: this is a
+    // validation page, and a login wall in front of "leave your number" measures the wall.
+    if (urlPath === "/api/callback") {
+      if (req.method !== "POST") { res.writeHead(405, { Allow: "POST" }).end(); return; }
+      (async () => {
+        let body = {};
+        try { body = JSON.parse(await readBody(req)) || {}; } catch { body = {}; }
+        const phone = String(body.phone || "").slice(0, 40).trim();
+        const name = String(body.name || "").slice(0, 80).trim();
+        const kind = String(body.kind || "").slice(0, 60).trim();
+        const lang = body.lang === "kk" ? "kk" : "ru";
+        if (phone.replace(/[^0-9]/g, "").length < 10) {
+          res.writeHead(400, { "Content-Type": MIME[".json"] });
+          res.end(JSON.stringify({ error: "phone_required" }));
+          return;
+        }
+        recordLead({ at: new Date().toISOString(), product: "jauap", name, phone, kind, lang });
+        await notifyTelegram(
+          "📞 <b>Заявка на ИИ-секретаря</b>\n\n" +
+          (name ? "Имя: " + name + "\n" : "") +
+          "Телефон: " + phone + "\n" +
+          (kind ? "Бизнес: " + kind + "\n" : "") +
+          "Язык страницы: " + lang
+        );
+        res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+        res.end(JSON.stringify({ ok: true }));
+      })().catch((e) => {
+        res.writeHead(500, { "Content-Type": MIME[".json"] });
+        res.end(JSON.stringify({ error: String(e.message).slice(0, 120) }));
+      });
       return;
     }
 
