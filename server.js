@@ -1575,9 +1575,9 @@ function listMerchantSlugs() {
 function buildSitemap(origin) {
   const urls = [
     { loc: origin + "/", priority: "1.0" },
+    { loc: origin + "/kk/", priority: "0.9" },
+    { loc: origin + "/kaspi/", priority: "0.9" },
     { loc: origin + "/en/", priority: "0.9" },
-    { loc: origin + "/phone/", priority: "0.9" },
-    { loc: origin + "/phone/kk/", priority: "0.9" },
   ];
   for (const slug of listMerchantSlugs()) {
     const p = loadProfile(slug);
@@ -1640,7 +1640,7 @@ async function pingIndexNowAll() {
   if (Date.now() - indexNowAllAt < 3600e3) return { skipped: "cooldown", lastIndexNow };
   indexNowAllAt = Date.now();
   const slugs = listMerchantSlugs();
-  const urls = [CANONICAL + "/", CANONICAL + "/en/"];
+  const urls = [CANONICAL + "/", CANONICAL + "/kk/", CANONICAL + "/kaspi/", CANONICAL + "/en/"];
   for (const s of slugs) {
     urls.push(CANONICAL + "/store/" + s);
     urls.push(CANONICAL + "/store/" + s + "/feed-google.xml");
@@ -1966,7 +1966,7 @@ ${cards}
 </main>
 <footer>
   <div class="wrap">
-    AI-читаемая витрина, сгенерированная <a href="/">Saudager</a> из каталога продавца на Kaspi.kz · данные обновлены ${esc(fetchedDate)} · цены и наличие подтверждаются на Kaspi<br>
+    AI-читаемая витрина, сгенерированная <a href="/kaspi/">Saudager</a> из каталога продавца на Kaspi.kz · данные обновлены ${esc(fetchedDate)} · цены и наличие подтверждаются на Kaspi<br>
     Машинные интерфейсы: <a href="/store/${esc(m.slug)}/feed.json">фид OpenAI</a> · <a href="/store/${esc(m.slug)}/feed-google.xml">фид Google</a> · <a href="/store/${esc(m.slug)}/mcp" title="Model Context Protocol — подключается к Claude как коннектор">MCP для Claude</a>
   </div>
 </footer>
@@ -2441,6 +2441,13 @@ http
           res.writeHead(500, { "Content-Type": MIME[".json"] });
           res.end(JSON.stringify({ error: (S[lang] || S.en).err_fetch }));
         });
+      return;
+    }
+
+    // /phone/ was where this landing first lived and is already submitted to
+    // IndexNow, so it keeps working — permanently, pointing at the new place.
+    if (urlPath === "/phone" || urlPath === "/phone/" || urlPath === "/phone/kk" || urlPath === "/phone/kk/") {
+      res.writeHead(301, { Location: urlPath.indexOf("/kk") > 0 ? "/kk/" : "/" }).end();
       return;
     }
 
