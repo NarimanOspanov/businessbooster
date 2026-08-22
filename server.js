@@ -2363,9 +2363,9 @@ http
           res.end(JSON.stringify({ error: "phone_required" }));
           return;
         }
-        recordLead({ at: new Date().toISOString(), product: "jauap", name, phone, kind, lang });
+        recordLead({ at: new Date().toISOString(), product: "otvet", name, phone, kind, lang });
         await notifyTelegram(
-          "📞 <b>Заявка на ИИ-секретаря</b>\n\n" +
+          "📞 <b>Заявка — Ответ</b>\n\n" +
           (name ? "Имя: " + name + "\n" : "") +
           "Телефон: " + phone + "\n" +
           (kind ? "Бизнес: " + kind + "\n" : "") +
