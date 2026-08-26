@@ -4,19 +4,38 @@
 //   node scripts/elevenlabs-agent.js get     — показать текущую конфигурацию
 //   node scripts/elevenlabs-agent.js apply   — записать конфигурацию ниже
 //
-// Ключ берётся только из переменной среды ELEVENLABS_API_KEY и нигде не
-// печатается. В репозиторий он не попадает и в переписке не участвует.
+// Ключ нигде не печатается, в репозиторий не попадает и в переписке не
+// участвует. Берётся из переменной среды, а если её нет — из файла в домашней
+// папке: переменная, заданная в одном окне терминала, в другой шелл не
+// переходит, а файл виден всем.
+
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 
 const AGENT_ID =
   process.env.ELEVENLABS_AGENT_ID || "agent_2501m0ywtypefffaq1hf5edfadf5";
-const KEY = process.env.ELEVENLABS_API_KEY;
+const KEY_FILE =
+  process.env.ELEVENLABS_KEY_FILE ||
+  path.join(os.homedir(), ".elevenlabs-key");
+
+const KEY = (() => {
+  if (process.env.ELEVENLABS_API_KEY) return process.env.ELEVENLABS_API_KEY.trim();
+  try {
+    return fs.readFileSync(KEY_FILE, "utf8").trim();
+  } catch {
+    return null;
+  }
+})();
+
 const BASE = "https://api.elevenlabs.io/v1/convai/agents/" + AGENT_ID;
 
 if (!KEY) {
   console.error(
-    "Нет ELEVENLABS_API_KEY.\n" +
-      "PowerShell:  $env:ELEVENLABS_API_KEY = \"ваш-ключ\"\n" +
-      "bash:        export ELEVENLABS_API_KEY=ваш-ключ"
+    "Ключ не найден.\n" +
+      "Положите его одной строкой в файл:\n  " + KEY_FILE + "\n\n" +
+      "PowerShell:\n" +
+      '  Set-Content -NoNewline -Path "' + KEY_FILE + '" -Value "ваш-ключ"'
   );
   process.exit(1);
 }
