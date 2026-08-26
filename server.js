@@ -1588,8 +1588,15 @@ async function placeDemoCall(toNumber) {
     }),
   });
   const text = await res.text();
-  if (!res.ok) return { ok: false, reason: "provider", status: res.status, body: text.slice(0, 300) };
-  return { ok: true, body: text.slice(0, 300) };
+  if (!res.ok) return { ok: false, reason: "provider", status: res.status, body: text.slice(0, 400) };
+  // ElevenLabs отвечает 200 и на неудавшийся звонок — правду говорит только
+  // поле success в теле. Без этой проверки форма радостно врёт «звоню».
+  let parsed = null;
+  try { parsed = JSON.parse(text); } catch {}
+  if (!parsed || parsed.success !== true) {
+    return { ok: false, reason: "call_failed", body: text.slice(0, 400) };
+  }
+  return { ok: true, body: text.slice(0, 400) };
 }
 
 // ---------------------------------------------------------------------------
