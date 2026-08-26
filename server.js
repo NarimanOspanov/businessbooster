@@ -1547,6 +1547,52 @@ function recordLead(lead) {
 }
 
 // ---------------------------------------------------------------------------
+// Демо-звонок: посетитель вводит СВОЙ номер, агент перезванивает.
+//
+// Форма «позвоним на любой номер» — это готовый инструмент травли и способ
+// слить чужой телефонный счёт, поэтому здесь три ограничителя: согласие,
+// лимит на номер и общий дневной потолок.
+
+const DEMO_CALL_LOG = []; // { at, phone, ip }
+const DEMO_MAX_PER_DAY = Number(process.env.DEMO_CALL_MAX_PER_DAY || 40);
+const DEMO_MAX_PER_NUMBER = 2; // за сутки
+const DEMO_MAX_PER_IP = 5; // за сутки
+
+function demoCallsSince(hours) {
+  const since = Date.now() - hours * 3600e3;
+  return DEMO_CALL_LOG.filter((c) => c.at >= since);
+}
+
+// +7 7XX XXX XX XX — казахстанские мобильные. Иначе демо звонит куда попало.
+function normalizeKzMobile(raw) {
+  const d = String(raw || "").replace(/[^0-9]/g, "");
+  if (d.length === 11 && (d[0] === "7" || d[0] === "8") && d[1] === "7") return "+7" + d.slice(1);
+  if (d.length === 10 && d[0] === "7") return "+7" + d;
+  return null;
+}
+
+async function placeDemoCall(toNumber) {
+  const key = process.env.ELEVENLABS_API_KEY;
+  const agentId = process.env.ELEVENLABS_AGENT_ID;
+  const phoneId = process.env.ELEVENLABS_PHONE_NUMBER_ID;
+  if (!key || !agentId || !phoneId) {
+    return { ok: false, reason: "not_configured" };
+  }
+  const res = await fetch("https://api.elevenlabs.io/v1/convai/twilio/outbound-call", {
+    method: "POST",
+    headers: { "xi-api-key": key, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      agent_id: agentId,
+      agent_phone_number_id: phoneId,
+      to_number: toNumber,
+    }),
+  });
+  const text = await res.text();
+  if (!res.ok) return { ok: false, reason: "provider", status: res.status, body: text.slice(0, 300) };
+  return { ok: true, body: text.slice(0, 300) };
+}
+
+// ---------------------------------------------------------------------------
 // Discoverability: robots.txt, sitemap.xml and IndexNow
 // IndexNow instantly notifies Bing (the index behind ChatGPT Search) about
 // new/updated storefront URLs. The key file must be served from this host.
@@ -2349,6 +2395,50 @@ http
 
     // Callback request from the phone-assistant landing. No auth on purpose: this is a
     // validation page, and a login wall in front of "leave your number" measures the wall.
+    if (urlPath === "/api/demo-call") {
+      if (req.method !== "POST") { res.writeHead(405, { Allow: "POST" }).end(); return; }
+      (async () => {
+        const send = (code, obj) => {
+          res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+          res.end(JSON.stringify(obj));
+        };
+        let body = {};
+        try { body = JSON.parse(await readBody(req)) || {}; } catch { body = {}; }
+
+        // Без явного согласия не звоним: иначе сюда впишут чужой номер.
+        if (body.consent !== true) return send(400, { error: "consent_required" });
+
+        const phone = normalizeKzMobile(body.phone);
+        if (!phone) return send(400, { error: "bad_number" });
+
+        const ip = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() ||
+                   req.socket.remoteAddress || "";
+        const day = demoCallsSince(24);
+        if (day.length >= DEMO_MAX_PER_DAY) return send(429, { error: "daily_limit" });
+        if (day.filter((c) => c.phone === phone).length >= DEMO_MAX_PER_NUMBER) {
+          return send(429, { error: "number_limit" });
+        }
+        if (ip && day.filter((c) => c.ip === ip).length >= DEMO_MAX_PER_IP) {
+          return send(429, { error: "ip_limit" });
+        }
+
+        const r = await placeDemoCall(phone);
+        if (!r.ok) {
+          console.log("[demo-call] отказ " + phone + " — " + JSON.stringify(r).slice(0, 200));
+          return send(r.reason === "not_configured" ? 503 : 502, { error: r.reason });
+        }
+
+        DEMO_CALL_LOG.push({ at: Date.now(), phone, ip });
+        console.log("[demo-call] звоним " + phone);
+        await notifyTelegram("☎️ <b>Демо-звонок</b>\n\nНомер: " + phone);
+        send(200, { ok: true });
+      })().catch((e) => {
+        res.writeHead(500, { "Content-Type": MIME[".json"] });
+        res.end(JSON.stringify({ error: String(e.message).slice(0, 120) }));
+      });
+      return;
+    }
+
     if (urlPath === "/api/callback") {
       if (req.method !== "POST") { res.writeHead(405, { Allow: "POST" }).end(); return; }
       (async () => {

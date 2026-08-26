@@ -32,7 +32,10 @@
   h1 span { background:var(--grad); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
   .tagline { margin-top:14px; font-size:15.5px; font-weight:600; color:var(--accent); }
   .hero p { color:var(--muted); font-size:17.5px; max-width:680px; margin:14px auto 26px; }
-  .demo-hint { max-width:420px; margin:26px auto 0; padding:16px 20px; text-align:center; font-weight:600; font-size:15px; color:var(--accent); background:#fff; border:1px dashed var(--accent); border-radius:14px; }
+  .callform { max-width:400px; margin:26px auto 0; display:flex; flex-direction:column; gap:11px; }
+  .consent { display:flex; gap:9px; align-items:flex-start; font-size:14px; color:var(--muted); text-align:left; cursor:pointer; }
+  .consent input { width:17px; height:17px; margin-top:1px; flex:none; accent-color:var(--accent); }
+  .demo-or { max-width:400px; margin:16px auto 0; text-align:center; font-size:13.5px; color:var(--muted); }
   elevenlabs-convai { z-index:60; }
   .hero-note { font-size:13px; color:var(--muted); margin-top:12px; }
   h2 { font-size:clamp(22px,3.4vw,31px); font-weight:800; letter-spacing:-.02em; text-align:center; }
@@ -86,9 +89,15 @@
 </div>
 
 <section id="demo"><div class="wrap">
-  <h2>Онымен қазір сөйлесіп көріңіз</h2>
-  <p class="sub">Клиентіңіз сияқты кез келген сұрақты хатшыға дауыспен қойыңыз. Браузер микрофонға рұқсат сұрайды. Дауыстық хатшы әзірге тек орысша сөйлейді.</p>
-  <div class="demo-hint">Кнопка ассистента — в правом нижнем углу экрана</div>
+  <h2>Ол сізге қоңырау шалсын</h2>
+  <p class="sub">Нөміріңізді енгізіңіз — хатшы бірнеше секундта қоңырау шалады, сіз клиентіңіз еститін нәрсені естисіз. Дауыстық хатшы әзірге тек орысша сөйлейді.</p>
+  <form class="callform" id="cf">
+    <input id="cf-phone" type="tel" autocomplete="tel" placeholder="Нөміріңіз — +7 ___ ___ __ __" required>
+    <label class="consent"><input type="checkbox" id="cf-consent"><span>Бұл менің нөмірім, қоңырау шалуға болады</span></label>
+    <button class="btn btn-primary" type="submit" id="cf-send">Маған қоңырау шалыңыз</button>
+    <div class="status" id="cf-status"></div>
+  </form>
+  <p class="demo-or">немесе бұрыштағы хатшы түймесін басып, браузерде сөйлесіңіз</p>
 </div></section>
 
 <section id="when" class="soft"><div class="wrap">
@@ -169,7 +178,34 @@
 <elevenlabs-convai agent-id="agent_2501m0ywtypefffaq1hf5edfadf5" dismissible="true"></elevenlabs-convai>
 <script src="https://unpkg.com/@elevenlabs/convai-widget-embed" async type="text/javascript"></script>
 <script>
-  var L = {"sending":"Жіберілуде…","ok":"Рахмет. Күн ішінде хабарласамыз.","errPhone":"Телефон нөмірін енгізіңіз","err":"Жіберілмеді. Қайталап көріңіз.","send":"Жіберу","lang":"kk"};
+  var L = {"sending":"Жіберілуде…","ok":"Рахмет. Күн ішінде хабарласамыз.","errPhone":"Телефон нөмірін енгізіңіз","err":"Жіберілмеді. Қайталап көріңіз.","send":"Жіберу","lang":"kk","callBtn":"Маған қоңырау шалыңыз","callGoing":"Теріп жатырмын…","callOk":"Қоңырау шалып жатырмын. Телефонды алыңыз.","callErrConsent":"Нөмір өзіңіздікі екенін белгілеңіз","callErrNumber":"Қазақстандық мобильді нөмір керек, +7 7XX...","callErrLimit":"Қоңырау тым көп. Кейінірек көріңіз.","callErrOff":"Демо-қоңыраулар әзірге өшірулі. Төменде өтінім қалдырыңыз.","callErr":"Қоңырау шалу мүмкін болмады. Қайталап көріңіз."};
+
+  document.getElementById('cf').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var st = document.getElementById('cf-status');
+    var btn = document.getElementById('cf-send');
+    var phone = document.getElementById('cf-phone').value.trim();
+    var consent = document.getElementById('cf-consent').checked;
+    var fail = function (m) { st.className = 'status bad'; st.textContent = m; };
+    if (!consent) { fail(L.callErrConsent); return; }
+    if (phone.replace(/[^0-9]/g, '').length < 10) { fail(L.callErrNumber); return; }
+    btn.disabled = true; st.className = 'status'; st.textContent = L.callGoing;
+    fetch('/api/demo-call', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: phone, consent: true, lang: L.lang })
+    }).then(function (r) { return r.json().then(function (d) { return { s: r.status, d: d }; }); })
+      .then(function (res) {
+        if (res.s === 200 && res.d.ok) { st.className = 'status ok'; st.textContent = L.callOk; return; }
+        if (res.d.error === 'bad_number') return fail(L.callErrNumber);
+        if (res.d.error === 'consent_required') return fail(L.callErrConsent);
+        if (res.s === 429) return fail(L.callErrLimit);
+        if (res.s === 503) return fail(L.callErrOff);
+        fail(L.callErr);
+      })
+      .catch(function () { fail(L.callErr); })
+      .finally(function () { btn.disabled = false; btn.textContent = L.callBtn; });
+  });
+
   document.getElementById('cb').addEventListener('submit', function (e) {
     e.preventDefault();
     var st = document.getElementById('f-status');
