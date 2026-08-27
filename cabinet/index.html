@@ -55,6 +55,22 @@
   .turn .r { font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; }
   .turn.agent .r { color:var(--accent); }
   audio { width:100%; margin-bottom:16px; }
+  .tabs { display:flex; gap:8px; margin-bottom:16px; }
+  .tab { border:1px solid #e2e5ea; background:#fff; border-radius:9px; padding:8px 16px;
+         font:inherit; font-weight:600; cursor:pointer; color:#5a6270; }
+  .tab-on { background:#111; border-color:#111; color:#fff; }
+  .card-pad { padding:22px; }
+  .fld { margin-bottom:16px; }
+  .fld label { display:block; font-weight:600; font-size:14px; margin-bottom:5px; }
+  .fld .hint { font-size:12.5px; color:#7a828e; margin-bottom:6px; }
+  .fld input, .fld textarea {
+    width:100%; box-sizing:border-box; border:1px solid #d9dde3; border-radius:9px;
+    padding:10px 12px; font:inherit; font-size:14.5px; background:#fff; }
+  .fld textarea { min-height:96px; resize:vertical; line-height:1.5; }
+  .fld input:focus, .fld textarea:focus { outline:2px solid #111; border-color:#111; }
+  .actions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:4px; }
+  pre.prompt { white-space:pre-wrap; background:#f6f7f9; border-radius:10px; padding:16px;
+               font-size:13px; line-height:1.55; margin:0; }
   @media (max-width:720px) { .hide-sm { display:none; } }
 </style>
 </head>
@@ -77,6 +93,29 @@
 
   <div id="app" hidden>
     <div class="clinics" id="clinics"></div>
+
+    <div class="tabs">
+      <button class="tab tab-on" id="tab-calls">Звонки</button>
+      <button class="tab" id="tab-agent">Ассистент</button>
+    </div>
+
+    <div id="view-agent" hidden>
+      <div class="card card-pad">
+        <p class="muted" style="margin:0 0 18px">
+          Ассистент отвечает пациентам по тому, что здесь написано. Чего здесь
+          нет — он не назовёт и честно скажет, что не знает.
+        </p>
+        <div id="form"></div>
+        <div class="actions">
+          <button class="btn btn-primary" id="save">Сохранить</button>
+          <button class="btn" id="publish">Обновить ассистента</button>
+          <button class="btn" id="preview">Показать инструкцию</button>
+          <span class="muted" id="form-note"></span>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-calls">
     <div class="stats" id="stats"></div>
     <div class="card">
       <table>
@@ -87,6 +126,7 @@
         <tbody id="rows"></tbody>
       </table>
       <div class="empty" id="empty" hidden>Звонков пока нет.</div>
+    </div>
     </div>
   </div>
 </main>
@@ -170,6 +210,52 @@
     Array.prototype.forEach.call(document.querySelectorAll("#rows tr"), function (tr) {
       tr.addEventListener("click", function () { openCall(tr.getAttribute("data-id")); });
     });
+  }
+
+  // --- анкета клиники ------------------------------------------------------
+
+  async function post(path, body) {
+    var t = await clerk.session.getToken();
+    var r = await fetch(path, {
+      method: "POST",
+      headers: { Authorization: "Bearer " + t, "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+    });
+    var j = await r.json().catch(function () { return {}; });
+    if (!r.ok) throw new Error(j.error || String(r.status));
+    return j;
+  }
+
+  function note(text) { document.getElementById("form-note").textContent = text || ""; }
+
+  var formFields = [];
+  async function loadForm() {
+    var d = await api("/api/cabinet/profile");
+    formFields = d.fields || [];
+    document.getElementById("form").innerHTML = formFields.map(function (f) {
+      var v = esc((d.profile || {})[f.key] || "");
+      var input = f.multiline
+        ? '<textarea id="f-' + f.key + '">' + v + "</textarea>"
+        : '<input id="f-' + f.key + '" value="' + v.replace(/"/g, "&quot;") + '">';
+      return '<div class="fld"><label>' + esc(f.label) +
+        (f.required ? ' <span style="color:#e5484d">*</span>' : "") + "</label>" +
+        (f.hint ? '<div class="hint">' + esc(f.hint) + "</div>" : "") + input + "</div>";
+    }).join("");
+
+    // Клиника должна видеть, что правки ещё не у пациентов.
+    if (!d.saved_at) note("Анкета ещё не заполнена.");
+    else if (!d.built_at || new Date(d.built_at) < new Date(d.saved_at))
+      note("Анкета сохранена, но ассистент ещё работает по-старому.");
+    else note("Ассистент работает по этой анкете.");
+  }
+
+  function readForm() {
+    var out = {};
+    formFields.forEach(function (f) {
+      var el = document.getElementById("f-" + f.key);
+      out[f.key] = el ? el.value : "";
+    });
+    return out;
   }
 
   var audioUrl = null;
@@ -294,6 +380,55 @@
     });
     document.getElementById("out").addEventListener("click", function () {
       clerk.signOut().then(function () { location.reload(); });
+    });
+
+    var tabs = { calls: document.getElementById("tab-calls"), agent: document.getElementById("tab-agent") };
+    function openTab(which) {
+      document.getElementById("view-calls").hidden = which !== "calls";
+      document.getElementById("view-agent").hidden = which !== "agent";
+      tabs.calls.className = "tab" + (which === "calls" ? " tab-on" : "");
+      tabs.agent.className = "tab" + (which === "agent" ? " tab-on" : "");
+      if (which === "agent" && !formFields.length) {
+        loadForm().catch(function (e) { note("Не удалось загрузить анкету: " + e.message); });
+      }
+    }
+    tabs.calls.addEventListener("click", function () { openTab("calls"); });
+    tabs.agent.addEventListener("click", function () { openTab("agent"); });
+
+    document.getElementById("save").addEventListener("click", function () {
+      note("Сохраняю…");
+      post("/api/cabinet/profile", { profile: readForm() })
+        .then(function () { note("Сохранено. Нажмите «Обновить ассистента», чтобы он заговорил по-новому."); })
+        .catch(function (e) {
+          note(e.message === "name_required" ? "Название клиники обязательно." : "Не сохранилось: " + e.message);
+        });
+    });
+
+    document.getElementById("publish").addEventListener("click", function () {
+      note("Обновляю ассистента…");
+      // Сначала сохраняем: иначе клиника нажмёт «обновить», не нажав «сохранить»,
+      // и получит старого ассистента при новых полях на экране.
+      post("/api/cabinet/profile", { profile: readForm() })
+        .then(function () { return post("/api/cabinet/publish", {}); })
+        .then(function () { note("Готово. Ассистент отвечает по этой анкете."); })
+        .catch(function (e) {
+          note(e.message === "profile_empty" ? "Сначала заполните анкету." : "Не вышло: " + e.message);
+        });
+    });
+
+    document.getElementById("preview").addEventListener("click", function () {
+      api("/api/cabinet/preview").then(function (d) {
+        document.getElementById("d-title").textContent = "Инструкция ассистента";
+        document.getElementById("d-sub").textContent = "Так он понимает вашу клинику";
+        document.getElementById("d-audio").hidden = true;
+        document.getElementById("d-fields").innerHTML = "";
+        document.getElementById("d-summary").textContent = "";
+        document.getElementById("d-transcript").innerHTML =
+          "<p><b>Первая фраза</b></p><pre class=\"prompt\">" + esc(d.first_message) +
+          "</pre><p style=\"margin-top:18px\"><b>Инструкция</b></p><pre class=\"prompt\">" +
+          esc(d.prompt) + "</pre>";
+        document.getElementById("dlg").showModal();
+      }).catch(function (e) { note("Не показалось: " + e.message); });
     });
 
     if (!clerk.user) { showGate(); return; }

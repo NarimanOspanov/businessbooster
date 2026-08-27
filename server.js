@@ -1470,6 +1470,7 @@ async function buildCompetitors(slug) {
 
 const crypto = require("crypto");
 const db = require("./scripts/db");
+const agentTemplate = require("./scripts/agent-template");
 const CLERK_PK = process.env.CLERK_PUBLISHABLE_KEY || "";
 const CLERK_SK = process.env.CLERK_SECRET_KEY || "";
 
@@ -2531,6 +2532,86 @@ http
 
         // Ни один запрос ниже не принимает идентификатор клиники снаружи.
         if (!ctx.clinicIds.length) return send(200, { calls: [] });
+
+        // Анкета клиники. Работаем с первой клиникой пользователя: сейчас она
+        // у всех одна, а когда станет несколько, выбор придёт из кабинета и
+        // будет сверен с ctx.clinicIds, а не принят на веру.
+        const myClinic = ctx.clinicIds[0];
+
+        if (urlPath === "/api/cabinet/profile" && req.method === "GET") {
+          const c = await db.clinicById(myClinic);
+          let profile = {};
+          try { profile = JSON.parse(c.profile_json || "{}"); } catch {}
+          return send(200, {
+            fields: agentTemplate.FIELDS,
+            profile: agentTemplate.clean(profile),
+            saved_at: c.profile_saved_at,
+            built_at: c.agent_built_at,
+            has_agent: !!c.agent_id,
+          });
+        }
+
+        if (urlPath === "/api/cabinet/profile" && req.method === "POST") {
+          let body = {};
+          try { body = JSON.parse(await readBody(req)) || {}; } catch {}
+          // clean() режет длину и выбрасывает всё, чего нет в анкете: иначе в
+          // промпт попадёт то, что прислали помимо формы.
+          const profile = agentTemplate.clean(body.profile || {});
+          if (!profile.name) return send(400, { error: "name_required" });
+          await db.saveClinicProfile(myClinic, profile);
+          return send(200, { ok: true, profile });
+        }
+
+        // Сборка агента. Отделена от сохранения нарочно: анкету правят по
+        // частям и подолгу, а перестраивать агента на каждое нажатие клавиши
+        // значит менять то, что прямо сейчас разговаривает с пациентом.
+        if (urlPath === "/api/cabinet/publish" && req.method === "POST") {
+          const c = await db.clinicById(myClinic);
+          let profile = {};
+          try { profile = JSON.parse(c.profile_json || "{}"); } catch {}
+          if (!profile.name) return send(400, { error: "profile_empty" });
+
+          let agentId = c.agent_id;
+          // Базового агента не трогаем: он общий и обслуживает демо на сайте.
+          if (!agentId || agentId === agentTemplate.BASE_AGENT) {
+            agentId = await agentTemplate.createAgent(profile);
+          } else {
+            await agentTemplate.updateAgent(agentId, profile);
+          }
+          await db.setClinicAgent(myClinic, agentId);
+
+          // Номер клиники должен звонить именно этому агенту.
+          if (c.phone_number_id && process.env.ELEVENLABS_API_KEY) {
+            try {
+              await fetch(
+                "https://api.elevenlabs.io/v1/convai/phone-numbers/" + c.phone_number_id,
+                {
+                  method: "PATCH",
+                  headers: {
+                    "xi-api-key": process.env.ELEVENLABS_API_KEY,
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({ agent_id: agentId }),
+                }
+              );
+            } catch (e) {
+              console.log("[cabinet] номер к агенту не привязался: " + String(e.message).slice(0, 120));
+            }
+          }
+          return send(200, { ok: true, agent_id: agentId });
+        }
+
+        // Даём клинике увидеть промпт целиком. Это её слова, и она вправе
+        // знать, что именно услышит пациент.
+        if (urlPath === "/api/cabinet/preview" && req.method === "GET") {
+          const c = await db.clinicById(myClinic);
+          let profile = {};
+          try { profile = JSON.parse(c.profile_json || "{}"); } catch {}
+          return send(200, {
+            first_message: agentTemplate.buildFirstMessage(profile),
+            prompt: agentTemplate.buildPrompt(profile),
+          });
+        }
 
         if (urlPath === "/api/cabinet/calls") {
           const calls = await db.callsForClinics(ctx.clinicIds, {

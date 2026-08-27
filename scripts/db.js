@@ -103,6 +103,18 @@ IF COL_LENGTH('dbo.calls', 'agent_number') IS NULL
 IF COL_LENGTH('dbo.calls', 'direction') IS NULL
   ALTER TABLE dbo.calls ADD direction NVARCHAR(16) NULL;
 
+-- Анкета клиники: из неё собирается промпт агента. Держим целиком в JSON —
+-- набор полей ещё будет меняться после первых клиник, и каждое изменение не
+-- должно быть миграцией таблицы.
+IF COL_LENGTH('dbo.clinics', 'profile_json') IS NULL
+  ALTER TABLE dbo.clinics ADD profile_json NVARCHAR(MAX) NULL;
+-- Когда анкету последний раз переносили в агента. Если пусто или старее
+-- правки анкеты — клиника видит, что изменения ещё не в работе.
+IF COL_LENGTH('dbo.clinics', 'profile_saved_at') IS NULL
+  ALTER TABLE dbo.clinics ADD profile_saved_at DATETIME2(0) NULL;
+IF COL_LENGTH('dbo.clinics', 'agent_built_at') IS NULL
+  ALTER TABLE dbo.clinics ADD agent_built_at DATETIME2(0) NULL;
+
 -- Пул номеров. Номер у Zadarma активируется до двух рабочих дней, поэтому
 -- купить его в момент онбординга нельзя: клиника нажала «выбрать», а номер
 -- двое суток отвечает автоответчиком. Держим запас заранее и выдаём готовые.
@@ -304,6 +316,45 @@ async function callForClinics(conversationId, clinicIds) {
 }
 
 // ---------------------------------------------------------------------------
+// Анкета клиники и её агент.
+
+async function clinicById(clinicId) {
+  const pool = await getPool();
+  const r = await pool
+    .request()
+    .input("id", sql.Int, clinicId)
+    .query(
+      "SELECT TOP 1 id, org_id, name, public_number, phone_number_id, agent_id, " +
+      "profile_json, profile_saved_at, agent_built_at FROM dbo.clinics WHERE id = @id"
+    );
+  return r.recordset[0] || null;
+}
+
+async function saveClinicProfile(clinicId, profile) {
+  const pool = await getPool();
+  await pool
+    .request()
+    .input("id", sql.Int, clinicId)
+    .input("json", sql.NVarChar(sql.MAX), JSON.stringify(profile))
+    // Название клиники живёт и в анкете, и в колонке: колонку видно в кабинете
+    // и в отчётах, и расходиться они не должны.
+    .input("name", sql.NVarChar(200), String(profile.name || "").slice(0, 200) || null)
+    .query(
+      "UPDATE dbo.clinics SET profile_json = @json, profile_saved_at = SYSUTCDATETIME(), " +
+      "name = COALESCE(@name, name) WHERE id = @id"
+    );
+}
+
+async function setClinicAgent(clinicId, agentId) {
+  const pool = await getPool();
+  await pool
+    .request()
+    .input("id", sql.Int, clinicId)
+    .input("agent", sql.NVarChar(64), agentId)
+    .query("UPDATE dbo.clinics SET agent_id = @agent, agent_built_at = SYSUTCDATETIME() WHERE id = @id");
+}
+
+// ---------------------------------------------------------------------------
 // Пул номеров.
 
 async function numbersByStatus(status) {
@@ -392,7 +443,7 @@ async function releaseNumber(number) {
   return r.recordset.length ? r.recordset[0].number : null;
 }
 
-module.exports = { getPool, migrate, saveCall, connectionString, clinicIdForCall, upsertClinic, clinicsByOrgIds, callsForClinics, callForClinics, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
+module.exports = { getPool, migrate, saveCall, connectionString, clinicIdForCall, upsertClinic, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 
 if (require.main === module) {
   const cmd = process.argv[2];
