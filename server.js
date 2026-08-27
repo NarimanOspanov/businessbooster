@@ -1547,6 +1547,40 @@ function recordLead(lead) {
 }
 
 // ---------------------------------------------------------------------------
+// Записи со звонков: ElevenLabs присылает разговор, мы достаём из него поля.
+
+function recordBooking(b) {
+  const line = JSON.stringify(b);
+  console.log("[booking] " + line);
+  try {
+    fs.mkdirSync(path.join(ROOT, "data"), { recursive: true });
+    fs.appendFileSync(path.join(ROOT, "data", "bookings.jsonl"), line + "\n", "utf8");
+  } catch {
+    // файловая система только на чтение — строка выше остаётся единственной записью
+  }
+}
+
+// ElevenLabs подписывает тело: t=<время>,v0=<hmac>. Без проверки эндпоинт
+// открыт для подделки, а записи попадут клинике как настоящие.
+function verifyElevenSignature(raw, header, secret) {
+  if (!secret) return { ok: false, reason: "no_secret" };
+  if (!header) return { ok: false, reason: "no_signature" };
+  const parts = String(header).split(",");
+  const t = (parts.find((p) => p.startsWith("t=")) || "").slice(2);
+  const v0 = (parts.find((p) => p.startsWith("v0=")) || "").slice(3);
+  if (!t || !v0) return { ok: false, reason: "malformed" };
+  const age = Math.abs(Date.now() / 1000 - Number(t));
+  if (!Number.isFinite(age) || age > 1800) return { ok: false, reason: "stale" };
+  const mac = crypto.createHmac("sha256", secret).update(t + "." + raw).digest("hex");
+  const a = Buffer.from(mac);
+  const b = Buffer.from(v0);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return { ok: false, reason: "bad_signature" };
+  }
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
 // Демо-звонок: посетитель вводит СВОЙ номер, агент перезванивает.
 //
 // Форма «позвоним на любой номер» — это готовый инструмент травли и способ
@@ -2402,6 +2436,73 @@ http
 
     // Callback request from the phone-assistant landing. No auth on purpose: this is a
     // validation page, and a login wall in front of "leave your number" measures the wall.
+    if (urlPath === "/api/elevenlabs/post-call") {
+      if (req.method !== "POST") { res.writeHead(405, { Allow: "POST" }).end(); return; }
+      (async () => {
+        const raw = await readBody(req);
+        const check = verifyElevenSignature(
+          raw,
+          req.headers["elevenlabs-signature"],
+          process.env.ELEVENLABS_WEBHOOK_SECRET
+        );
+        if (!check.ok) {
+          console.log("[post-call] отклонён: " + check.reason);
+          res.writeHead(401, { "Content-Type": MIME[".json"] });
+          res.end(JSON.stringify({ error: check.reason }));
+          return;
+        }
+
+        let body = {};
+        try { body = JSON.parse(raw) || {}; } catch { body = {}; }
+        const d = body.data || {};
+        const an = d.analysis || {};
+        const got = an.data_collection_results || {};
+        const val = (k) => {
+          const v = got[k];
+          if (v === undefined || v === null) return "";
+          return typeof v === "object" ? (v.value ?? "") : v;
+        };
+
+        const booking = {
+          at: new Date().toISOString(),
+          conversation: d.conversation_id || "",
+          seconds: (d.metadata && d.metadata.call_duration_secs) || 0,
+          phone: String(val("client_phone") || "").slice(0, 40),
+          name: String(val("client_name") || "").slice(0, 80),
+          service: String(val("service") || "").slice(0, 120),
+          when: String(val("desired_time") || "").slice(0, 80),
+          booked: val("is_booked") === true || val("is_booked") === "true",
+          urgent: val("is_urgent") === true || val("is_urgent") === "true",
+          summary: String(an.transcript_summary || "").slice(0, 600),
+        };
+        recordBooking(booking);
+
+        // Неотложка идёт отдельным сообщением: её нельзя пролистать в общем списке.
+        const head = booking.urgent
+          ? "🚨 <b>Срочный звонок</b>"
+          : booking.booked
+          ? "✅ <b>Новая запись</b>"
+          : "📋 <b>Звонок без записи</b>";
+        await notifyTelegram(
+          head + "\n\n" +
+          (booking.name ? "Имя: " + booking.name + "\n" : "") +
+          (booking.phone ? "Телефон: " + booking.phone + "\n" : "") +
+          (booking.service ? "Услуга: " + booking.service + "\n" : "") +
+          (booking.when ? "Когда: " + booking.when + "\n" : "") +
+          "Длительность: " + booking.seconds + " с" +
+          (booking.summary ? "\n\n" + booking.summary : "")
+        );
+
+        res.writeHead(200, { "Content-Type": MIME[".json"] });
+        res.end(JSON.stringify({ ok: true }));
+      })().catch((e) => {
+        console.log("[post-call] ошибка: " + String(e.message).slice(0, 200));
+        res.writeHead(500, { "Content-Type": MIME[".json"] });
+        res.end(JSON.stringify({ error: "internal" }));
+      });
+      return;
+    }
+
     if (urlPath === "/api/demo-call") {
       if (req.method !== "POST") { res.writeHead(405, { Allow: "POST" }).end(); return; }
       (async () => {
