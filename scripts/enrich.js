@@ -68,6 +68,11 @@ function htmlToText(html) {
     .replace(/&hellip;/g, "…").replace(/&middot;/g, "·")
     .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(Number(d)))
     .replace(/[ \t ]+/g, " ")
+    // 2GIS и подобные SPA оставляют после разметки длинные ряды точек и
+    // пустых строк. Модели они ничего не говорят, а место в запросе занимают:
+    // карточка клиники худеет с 3 700 символов до 2 400.
+    .replace(/[.·•]{4,}/g, " ")
+    .replace(/\n[ \t ​]*(?=\n)/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }

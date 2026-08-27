@@ -66,8 +66,9 @@ const FIELDS = [
 // Откуда мы читаем про клинику на онбординге. В промпт эти ссылки не идут —
 // из них извлекаются факты, а сами ссылки ассистенту не нужны.
 const SOURCES = [
+  { key: "src_2gis", label: "Страница в 2GIS", max: 400, placeholder: "https://2gis.kz/almaty/firm/…",
+    hint: "Начните с неё: там обычно уже есть адрес, часы, телефон и ссылка на сайт" },
   { key: "src_site", label: "Сайт клиники", max: 300, placeholder: "https://…" },
-  { key: "src_2gis", label: "Страница в 2GIS", max: 400, placeholder: "https://2gis.kz/almaty/firm/…" },
   { key: "src_instagram", label: "Instagram", max: 300, placeholder: "https://instagram.com/…" },
 ];
 

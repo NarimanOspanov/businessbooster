@@ -113,6 +113,10 @@
   .more { border-top:1px solid #e6e7eb; margin-top:18px; padding-top:14px; }
   .more summary { cursor:pointer; font-weight:600; font-size:14.5px; }
   .sixty { font-size:13.5px; color:#7a828e; margin:0 0 14px; }
+  .got { font-size:11.5px; font-weight:700; color:#1f9d55; background:rgba(31,157,85,.1);
+         border-radius:5px; padding:1px 7px; margin-left:8px; vertical-align:1px; }
+  .fld.need label { color:#96590a; }
+  .fld.need input, .fld.need textarea { border-color:#e0c08a; background:#fffdf8; }
   @media (max-width:720px) { .hide-sm { display:none; } }
 </style>
 </head>
@@ -418,6 +422,28 @@
     goStep(d.saved_at ? 2 : 1);
   }
 
+  // Что уже нашли — не переспрашиваем: помечаем заполненное и называем вслух
+  // только то, чего не хватает. Возвращает список недостающих полей.
+  function markFilled() {
+    var missing = [];
+    formFields.forEach(function (f) {
+      var el = document.getElementById("f-" + f.key);
+      if (!el) return;
+      var box = el.closest(".fld");
+      if (el.value.trim()) {
+        if (box && !box.querySelector(".got")) {
+          var tag = document.createElement("span");
+          tag.className = "got"; tag.textContent = "нашли";
+          box.querySelector("label").appendChild(tag);
+        }
+      } else {
+        if (box) box.classList.add("need");
+        missing.push(f.label.toLowerCase());
+      }
+    });
+    return missing.join(", ");
+  }
+
   function readFields(list) {
     var out = {};
     list.forEach(function (f) {
@@ -587,7 +613,10 @@
             if (el && !el.value && d.profile[f.key]) el.value = d.profile[f.key];
           });
           sn.textContent = "";
-          showFound("Прочитано страниц: " + read + ". Анкета заполнена — проверьте её.", bad);
+          var left = markFilled();
+          showFound(left
+            ? "Заполнили по вашим страницам. Осталось дописать: " + left + "."
+            : "Заполнили по вашим страницам. Проверьте и идите дальше.", bad);
           goStep(2);
         } else if (d.error === "no_model_key") {
           sn.textContent = "";

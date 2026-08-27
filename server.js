@@ -1658,12 +1658,59 @@ const DEMO_MAX_PER_DAY = Number(process.env.DEMO_CALL_MAX_PER_DAY || 40);
 const DEMO_MAX_PER_NUMBER = 2; // за сутки
 const DEMO_MAX_PER_IP = 5; // за сутки
 
+// Чтение чужих страниц открыто без входа, значит им можно злоупотребить:
+// нашим сервером будут ходить по чужим сайтам. Счётчик в памяти — этого
+// достаточно, пока сервер один.
+const hits = new Map();
+function tooOften(key, limit, windowMs) {
+  const now = Date.now();
+  const list = (hits.get(key) || []).filter((t) => now - t < windowMs);
+  if (list.length >= limit) { hits.set(key, list); return true; }
+  list.push(now);
+  hits.set(key, list);
+  // Карта не должна расти вечно: раз в сотню обращений выбрасываем протухшее.
+  if (hits.size > 500) {
+    for (const [k, v] of hits) {
+      if (!v.some((t) => now - t < windowMs)) hits.delete(k);
+    }
+  }
+  return false;
+}
+
+function clientIp(req) {
+  return String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() ||
+         req.socket.remoteAddress || "";
+}
+
 function demoCallsSince(hours) {
   const since = Date.now() - hours * 3600e3;
   return DEMO_CALL_LOG.filter((c) => c.at >= since);
 }
 
 // +7 7XX XXX XX XX — казахстанские мобильные. Иначе демо звонит куда попало.
+// Витрина кабинета открыта без входа, а звонили в неё живые люди. Показываем,
+// как выглядит работа, но не сдаём тех, кто звонил: от номера оставляем код
+// оператора и две последние цифры, от имени — только имя.
+function maskPhone(raw) {
+  const d = String(raw || "").replace(/[^0-9]/g, "");
+  if (d.length < 8) return raw ? "•••" : null;
+  return "+" + d.slice(0, 1) + " " + d.slice(1, 4) + " ••• •• " + d.slice(-2);
+}
+
+function maskDigits(text) {
+  // Пять и больше цифр подряд (с пробелами и дефисами внутри) — это номер.
+  return String(text || "").replace(/(?:\d[\s-]?){5,}\d/g, "•••");
+}
+
+function maskCall(c) {
+  const out = Object.assign({}, c);
+  delete out.raw;
+  out.caller_number = maskPhone(c.caller_number);
+  out.client_phone = maskPhone(c.client_phone);
+  out.client_name = String(c.client_name || "").trim().split(/\s+/)[0] || null;
+  return out;
+}
+
 function normalizeKzMobile(raw) {
   const d = String(raw || "").replace(/[^0-9]/g, "");
   if (d.length === 11 && (d[0] === "7" || d[0] === "8") && d[1] === "7") return "+7" + d.slice(1);
@@ -2714,6 +2761,165 @@ http
         send(404, { error: "unknown_endpoint" });
       })().catch((e) => {
         console.log("[cabinet] " + String(e.message).slice(0, 200));
+        res.writeHead(500, { "Content-Type": MIME[".json"] });
+        res.end(JSON.stringify({ error: "internal" }));
+      });
+      return;
+    }
+
+    // Онбординг до входа. Клиника заполняет анкету, видит, что вышло, и только
+    // потом регистрируется — регистрация нужна, чтобы привязать номер, а не
+    // чтобы посмотреть.
+    if (urlPath.startsWith("/api/onboard/")) {
+      (async () => {
+        const send = (code, obj) => {
+          res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+          res.end(JSON.stringify(obj));
+        };
+        if (req.method !== "POST" && urlPath !== "/api/onboard/fields") {
+          return send(405, { error: "method" });
+        }
+
+        if (urlPath === "/api/onboard/fields") {
+          return send(200, {
+            fields: agentTemplate.FIELDS,
+            sources: agentTemplate.SOURCES,
+            integration: agentTemplate.INTEGRATION,
+            enrich_available: enrich.available(),
+          });
+        }
+
+        if (urlPath === "/api/onboard/enrich") {
+          if (tooOften("enrich:" + clientIp(req), 20, 3600e3)) {
+            return send(429, { error: "too_often" });
+          }
+          let body = {};
+          try { body = JSON.parse(await readBody(req)) || {}; } catch {}
+          const urls = (Array.isArray(body.urls) ? body.urls : [])
+            .map((u) => String(u || "").trim()).filter(Boolean).slice(0, 4);
+          if (!urls.length) return send(400, { error: "no_urls" });
+
+          const pages = [], failed = [];
+          for (const u of urls) {
+            try { pages.push(await enrich.fetchSource(u)); }
+            catch (e) { failed.push({ url: u, error: String(e.message).slice(0, 40) }); }
+          }
+          if (!pages.length) return send(200, { pages: [], failed, profile: null });
+          if (!enrich.available()) {
+            return send(200, {
+              pages: pages.map((p) => ({ url: p.url, chars: p.chars })),
+              failed, profile: null, error: "no_model_key",
+            });
+          }
+          try {
+            const draft = await enrich.extractProfile(pages);
+            return send(200, {
+              pages: pages.map((p) => ({ url: p.url, chars: p.chars })),
+              failed, profile: agentTemplate.clean(draft),
+            });
+          } catch (e) {
+            return send(200, {
+              pages: pages.map((p) => ({ url: p.url, chars: p.chars })),
+              failed, profile: null, error: String(e.message).slice(0, 80),
+            });
+          }
+        }
+
+        // Здесь вход уже нужен: за анкетой закрепляется организация и номер.
+        if (urlPath === "/api/onboard/claim") {
+          if (!CLERK_PK || !CLERK_SK) return send(503, { error: "clerk_not_configured" });
+          let ctx;
+          try { ctx = await cabinetContext(req); }
+          catch (e) { return send(401, { error: String(e.message).slice(0, 40) }); }
+
+          let body = {};
+          try { body = JSON.parse(await readBody(req)) || {}; } catch {}
+          const profile = agentTemplate.cleanAll(body.profile || {});
+          if (!profile.name) return send(400, { error: "name_required" });
+
+          // Уже есть клиника — обновляем её, а не заводим вторую.
+          let clinicId = ctx.clinicIds[0] || null;
+          let orgId = ctx.orgIds[0] || null;
+
+          if (!clinicId) {
+            if (!orgId) {
+              const r = await fetch("https://api.clerk.com/v1/organizations", {
+                method: "POST",
+                headers: { Authorization: "Bearer " + CLERK_SK, "Content-Type": "application/json" },
+                body: JSON.stringify({ name: profile.name.slice(0, 100), created_by: ctx.userId }),
+              });
+              const j = await r.json();
+              if (!r.ok) {
+                console.log("[onboard] организация не создалась: " + JSON.stringify(j).slice(0, 200));
+                return send(502, { error: "org_failed" });
+              }
+              orgId = j.id;
+            }
+            clinicId = await db.upsertClinic({ org_id: orgId, name: profile.name });
+          }
+
+          await db.saveClinicProfile(clinicId, profile);
+          const clinic = await db.clinicById(clinicId);
+          let agentId = clinic.agent_id;
+          if (!agentId || agentId === agentTemplate.BASE_AGENT) {
+            agentId = await agentTemplate.createAgent(profile);
+          } else {
+            await agentTemplate.updateAgent(agentId, profile);
+          }
+          await db.setClinicAgent(clinicId, agentId);
+          return send(200, { ok: true, clinic_id: clinicId, org_id: orgId });
+        }
+
+        send(404, { error: "unknown_endpoint" });
+      })().catch((e) => {
+        console.log("[onboard] " + String(e.message).slice(0, 200));
+        res.writeHead(500, { "Content-Type": MIME[".json"] });
+        res.end(JSON.stringify({ error: "internal" }));
+      });
+      return;
+    }
+
+    // Витрина кабинета: показать, как он выглядит, не требуя входа. Звонки
+    // берём у демо-клиники — той, чей номер стоит на лендинге.
+    if (urlPath === "/api/demo/calls") {
+      (async () => {
+        const send = (code, obj) => {
+          res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+          res.end(JSON.stringify(obj));
+        };
+        const clinicId = Number(process.env.DEMO_CLINIC_ID || 1);
+        try {
+          const calls = await db.callsForClinics([clinicId], { limit: 25 });
+          send(200, { calls: calls.map(maskCall) });
+        } catch (e) {
+          console.log("[demo] " + String(e.message).slice(0, 120));
+          send(200, { calls: [] });
+        }
+      })();
+      return;
+    }
+
+    if (urlPath === "/api/demo/call") {
+      (async () => {
+        const send = (code, obj) => {
+          res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+          res.end(JSON.stringify(obj));
+        };
+        const clinicId = Number(process.env.DEMO_CLINIC_ID || 1);
+        const id = parsed.searchParams.get("id") || "";
+        const call = await db.callForClinics(id, [clinicId]);
+        if (!call) return send(404, { error: "not_found" });
+        const safe = maskCall(call);
+        // Расшифровку отдаём, потому что ради неё витрину и открывают, но
+        // цифры в ней прячем: номер, названный вслух, — тот же номер.
+        let turns = [];
+        try { turns = JSON.parse(call.transcript || "[]"); } catch {}
+        safe.transcript = JSON.stringify(turns.map((t) => ({
+          role: t.role, message: maskDigits(String(t.message || "")),
+        })));
+        safe.summary = maskDigits(safe.summary || "");
+        send(200, { call: safe });
+      })().catch(() => {
         res.writeHead(500, { "Content-Type": MIME[".json"] });
         res.end(JSON.stringify({ error: "internal" }));
       });
