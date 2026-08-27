@@ -2519,13 +2519,23 @@ http
           : booking.booked
           ? "✅ <b>Новая запись</b>"
           : "📋 <b>Звонок без записи</b>";
+
+        // Время по Алматы: клиника читает отчёт утром и должна сразу понимать,
+        // во сколько человек звонил, а не пересчитывать из UTC.
+        const almaty = new Date(Date.now() + 5 * 3600e3)
+          .toISOString().slice(0, 16).replace("T", " ");
+
+        // Пустые поля показываем явно. Пропуск строки читается как «всё есть»,
+        // а клинике важно видеть, что телефон не назвали и перезвонить некуда.
+        const row = (label, v) => label + ": " + (v ? v : "<i>не назвал</i>") + "\n";
+
         await notifyTelegram(
-          head + "\n\n" +
-          (booking.name ? "Имя: " + booking.name + "\n" : "") +
-          (booking.phone ? "Телефон: " + booking.phone + "\n" : "") +
-          (booking.service ? "Услуга: " + booking.service + "\n" : "") +
-          (booking.when ? "Когда: " + booking.when + "\n" : "") +
-          "Длительность: " + booking.seconds + " с" +
+          head + "\n" + almaty + " (Алматы)\n\n" +
+          row("Имя", booking.name) +
+          row("Телефон", booking.phone) +
+          row("Услуга", booking.service) +
+          row("Когда хочет", booking.when) +
+          "\nРазговор: " + booking.seconds + " с" +
           (booking.summary ? "\n\n" + booking.summary : "")
         );
 
