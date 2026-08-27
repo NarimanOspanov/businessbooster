@@ -1471,6 +1471,7 @@ async function buildCompetitors(slug) {
 const crypto = require("crypto");
 const db = require("./scripts/db");
 const agentTemplate = require("./scripts/agent-template");
+const enrich = require("./scripts/enrich");
 const CLERK_PK = process.env.CLERK_PUBLISHABLE_KEY || "";
 const CLERK_SK = process.env.CLERK_SECRET_KEY || "";
 
@@ -1670,9 +1671,11 @@ function normalizeKzMobile(raw) {
   return null;
 }
 
-async function placeDemoCall(toNumber) {
+// agentOverride — чтобы клиника из кабинета услышала СВОЕГО ассистента, а не
+// общего демонстрационного.
+async function placeDemoCall(toNumber, agentOverride) {
   const key = process.env.ELEVENLABS_API_KEY;
-  const agentId = process.env.ELEVENLABS_AGENT_ID;
+  const agentId = agentOverride || process.env.ELEVENLABS_AGENT_ID;
   const phoneId = process.env.ELEVENLABS_PHONE_NUMBER_ID;
   if (!key || !agentId || !phoneId) {
     return { ok: false, reason: "not_configured" };
@@ -2544,22 +2547,80 @@ http
           try { profile = JSON.parse(c.profile_json || "{}"); } catch {}
           return send(200, {
             fields: agentTemplate.FIELDS,
-            profile: agentTemplate.clean(profile),
+            sources: agentTemplate.SOURCES,
+            integration: agentTemplate.INTEGRATION,
+            profile: agentTemplate.cleanAll(profile),
             saved_at: c.profile_saved_at,
             built_at: c.agent_built_at,
             has_agent: !!c.agent_id,
+            number: c.public_number,
+            enrich_available: enrich.available(),
           });
         }
 
         if (urlPath === "/api/cabinet/profile" && req.method === "POST") {
           let body = {};
           try { body = JSON.parse(await readBody(req)) || {}; } catch {}
-          // clean() режет длину и выбрасывает всё, чего нет в анкете: иначе в
-          // промпт попадёт то, что прислали помимо формы.
-          const profile = agentTemplate.clean(body.profile || {});
+          // cleanAll режет длину и выбрасывает всё, чего нет в анкете: иначе в
+          // хранилище попадёт то, что прислали помимо формы.
+          const profile = agentTemplate.cleanAll(body.profile || {});
           if (!profile.name) return send(400, { error: "name_required" });
           await db.saveClinicProfile(myClinic, profile);
           return send(200, { ok: true, profile });
+        }
+
+        // Читает страницы клиники и предлагает заполненную анкету. Ничего не
+        // сохраняет: предложение показывается клинике, и правит его она.
+        if (urlPath === "/api/cabinet/enrich" && req.method === "POST") {
+          let body = {};
+          try { body = JSON.parse(await readBody(req)) || {}; } catch {}
+          const urls = (Array.isArray(body.urls) ? body.urls : [])
+            .map((u) => String(u || "").trim()).filter(Boolean).slice(0, 4);
+          if (!urls.length) return send(400, { error: "no_urls" });
+
+          const pages = [];
+          const failed = [];
+          for (const u of urls) {
+            try { pages.push(await enrich.fetchSource(u)); }
+            catch (e) { failed.push({ url: u, error: String(e.message).slice(0, 40) }); }
+          }
+          if (!pages.length) return send(200, { pages: [], failed, profile: null });
+
+          if (!enrich.available()) {
+            // Страницы прочитаны, разбирать нечем. Отдаём текст: даже так
+            // заполнять анкету быстрее, чем ходить по сайту вручную.
+            return send(200, {
+              pages: pages.map((p) => ({ url: p.url, chars: p.chars, text: p.text.slice(0, 6000) })),
+              failed, profile: null, error: "no_model_key",
+            });
+          }
+          try {
+            const draft = await enrich.extractProfile(pages);
+            return send(200, {
+              pages: pages.map((p) => ({ url: p.url, chars: p.chars })),
+              failed,
+              profile: agentTemplate.clean(draft),
+            });
+          } catch (e) {
+            return send(200, {
+              pages: pages.map((p) => ({ url: p.url, chars: p.chars })),
+              failed, profile: null, error: String(e.message).slice(0, 80),
+            });
+          }
+        }
+
+        // Звонок самой клинике, чтобы она услышала своего ассистента. Номер
+        // берём из запроса, но звоним ЕЁ агентом: услышать чужого нельзя.
+        if (urlPath === "/api/cabinet/test-call" && req.method === "POST") {
+          let body = {};
+          try { body = JSON.parse(await readBody(req)) || {}; } catch {}
+          const to = normalizeKzMobile(body.phone);
+          if (!to) return send(400, { error: "bad_number" });
+          const c = await db.clinicById(myClinic);
+          if (!c.agent_id) return send(400, { error: "no_agent" });
+          const r = await placeDemoCall(to, c.agent_id);
+          if (!r.ok) return send(502, { error: r.reason || "call_failed" });
+          return send(200, { ok: true });
         }
 
         // Сборка агента. Отделена от сохранения нарочно: анкету правят по

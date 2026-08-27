@@ -71,6 +71,48 @@
   .actions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:4px; }
   pre.prompt { white-space:pre-wrap; background:#f6f7f9; border-radius:10px; padding:16px;
                font-size:13px; line-height:1.55; margin:0; }
+  .steps { display:flex; gap:8px; list-style:none; margin:0 0 16px; padding:0;
+           flex-wrap:wrap; counter-reset:s; }
+  .steps li { counter-increment:s; font-size:13.5px; color:#7a828e; display:flex;
+              align-items:center; gap:7px; padding:6px 12px 6px 8px; border-radius:20px;
+              background:#fff; border:1px solid #e2e5ea; }
+  .steps li::before { content:counter(s); width:20px; height:20px; border-radius:50%;
+              background:#eef0f3; color:#5a6270; font-size:11.5px; font-weight:700;
+              display:grid; place-items:center; }
+  .steps li.on { color:#111; border-color:#111; font-weight:600; }
+  .steps li.on::before { background:#111; color:#fff; }
+  .steps li.done::before { content:"✓"; background:#0f6f45; color:#fff; }
+  .opt { font-size:12px; font-weight:600; color:#7a828e; background:#f1f3f6;
+         border-radius:5px; padding:2px 7px; margin-left:6px; vertical-align:2px; }
+  .wizard-nav { display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; }
+  .callrow { display:flex; gap:10px; flex-wrap:wrap; }
+  .callrow input { flex:1; min-width:200px; border:1px solid #d9dde3; border-radius:9px;
+                   padding:10px 12px; font:inherit; font-size:15px; }
+  .found { background:#e8f4ee; border-radius:9px; padding:12px 14px; font-size:14px;
+           margin-bottom:16px; }
+  .found b { display:block; margin-bottom:4px; }
+  .found .bad { color:#96590a; }
+  .way { border:1px solid #e2e5ea; border-radius:12px; padding:16px 18px; margin-bottom:12px; }
+  .way-pick { border-color:#111; }
+  .way-head { display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+  .way-head b { font-size:16px; }
+  .badge { font-size:12px; font-weight:700; background:#111; color:#fff;
+           border-radius:20px; padding:3px 10px; }
+  .badge.grey { background:#eef0f3; color:#5a6270; }
+  .way p { font-size:14.5px; color:#4a5260; margin-bottom:8px; }
+  .way p.do { font-weight:600; color:#1f2028; margin-top:12px; margin-bottom:6px; }
+  .cmd { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+  .cmd code { background:#111; color:#fff; border-radius:8px; padding:9px 13px;
+              font-size:15px; font-family:ui-monospace,Menlo,Consolas,monospace; }
+  .pm { list-style:none; padding:0; margin:0; font-size:14px; }
+  .pm li { padding-left:22px; position:relative; margin-bottom:5px; color:#4a5260; }
+  .pm li::before { position:absolute; left:0; font-weight:700; }
+  .pm li.p::before { content:"+"; color:#1f9d55; }
+  .pm li.m::before { content:"–"; color:#b8860b; }
+  .pm code { background:#f1f3f6; border-radius:5px; padding:1px 6px; font-size:13px; }
+  .more { border-top:1px solid #e6e7eb; margin-top:18px; padding-top:14px; }
+  .more summary { cursor:pointer; font-weight:600; font-size:14.5px; }
+  .sixty { font-size:13.5px; color:#7a828e; margin:0 0 14px; }
   @media (max-width:720px) { .hide-sm { display:none; } }
 </style>
 </head>
@@ -100,18 +142,110 @@
     </div>
 
     <div id="view-agent" hidden>
-      <div class="card card-pad">
-        <p class="muted" style="margin:0 0 18px">
-          Ассистент отвечает пациентам по тому, что здесь написано. Чего здесь
-          нет — он не назовёт и честно скажет, что не знает.
+      <ol class="steps" id="steps">
+        <li data-step="1">Откуда взять данные</li>
+        <li data-step="2">Проверить и дополнить</li>
+        <li data-step="3">Как подключить</li>
+        <li data-step="4">Позвонить и проверить</li>
+      </ol>
+      <p class="sixty">Ссылка на 2GIS → проверить, что вышло → одна команда на телефоне. Около минуты.</p>
+
+      <!-- 1. источники -->
+      <div class="card card-pad step" data-pane="1">
+        <h3>Расскажите, где о вас уже написано</h3>
+        <p class="muted" style="margin:6px 0 18px">
+          Мы прочитаем эти страницы и заполним анкету за вас. Всё, что получится,
+          вы увидите и сможете поправить — ничего не уйдёт пациентам без вашей проверки.
+        </p>
+        <div id="src-form"></div>
+        <div class="actions">
+          <button class="btn btn-primary" id="fetch">Прочитать страницы</button>
+          <button class="btn" id="skip-fetch">Заполню сам</button>
+          <span class="muted" id="src-note"></span>
+        </div>
+      </div>
+
+      <!-- 2. анкета -->
+      <div class="card card-pad step" data-pane="2" hidden>
+        <h3>Проверьте, что получилось</h3>
+        <p class="muted" style="margin:6px 0 18px">
+          Ассистент отвечает пациентам строго по этим полям. Чего здесь нет —
+          он не назовёт и честно скажет, что не знает. Пустое поле безопаснее
+          неточного.
         </p>
         <div id="form"></div>
         <div class="actions">
           <button class="btn btn-primary" id="save">Сохранить</button>
-          <button class="btn" id="publish">Обновить ассистента</button>
           <button class="btn" id="preview">Показать инструкцию</button>
           <span class="muted" id="form-note"></span>
         </div>
+      </div>
+
+      <!-- 3. подключение -->
+      <div class="card card-pad step" data-pane="3" hidden>
+        <h3>Как звонки попадут к ассистенту</h3>
+        <p class="muted" style="margin:6px 0 18px">Два способа. Первый быстрее и
+        почти всем подходит.</p>
+
+        <div class="way way-pick">
+          <div class="way-head"><b>Оставить свой номер</b><span class="badge">за минуту</span></div>
+          <p>Пациенты продолжают звонить на ваш номер. Если за 20 секунд никто
+          не взял трубку, оператор передаёт звонок нам.</p>
+          <p class="do">Наберите на телефоне клиники и нажмите вызов:</p>
+          <div class="cmd"><code id="ussd">**61*НОМЕР**20#</code>
+            <button class="btn" id="copy-ussd">Скопировать</button></div>
+          <ul class="pm">
+            <li class="p">Визитки, сайт и 2GIS не трогаете</li>
+            <li class="p">Выключается одной командой <code>##61#</code></li>
+            <li class="m">Переадресованная минута идёт по вашему тарифу</li>
+          </ul>
+        </div>
+
+        <div class="way">
+          <div class="way-head"><b>Взять отдельный номер</b><span class="badge grey">до 2 дней</span></div>
+          <p>Мы выдаём вам городской номер, и вы ставите его туда, куда хотите.</p>
+          <ul class="pm">
+            <li class="p">Не зависит от вашего оператора и его тарифа</li>
+            <li class="p">Можно поставить только в рекламу и считать, сколько звонков она принесла</li>
+            <li class="m">Номер нужно где-то опубликовать — сам он звонки не соберёт</li>
+            <li class="m">Активация занимает до двух рабочих дней</li>
+          </ul>
+        </div>
+
+        <details class="more">
+          <summary>У нас своя программа записи <span class="opt">необязательно</span></summary>
+          <p class="muted" style="margin:10px 0 14px">
+            Дайте два адреса — и ассистент будет спрашивать свободное время
+            и записывать прямо в вашу программу. Не заполняйте — заявки будут
+            приходить как обычно, а переносить их будет администратор.
+          </p>
+          <div id="int-form"></div>
+          <div class="actions">
+            <button class="btn btn-primary" id="save-int">Сохранить</button>
+            <span class="muted" id="int-note"></span>
+          </div>
+        </details>
+      </div>
+
+      <!-- 4. проверка -->
+      <div class="card card-pad step" data-pane="4" hidden>
+        <h3>Позвоните себе и послушайте</h3>
+        <p class="muted" style="margin:6px 0 18px">
+          Ассистент перезвонит вам и будет отвечать по анкете, которую вы только что
+          заполнили. Спросите цену, спросите то, чего в анкете нет, скажите,
+          что болит — так вы услышите его ровно таким, каким его услышит пациент.
+        </p>
+        <div class="callrow">
+          <input id="test-phone" placeholder="+7 707 000 00 00" inputmode="tel">
+          <button class="btn btn-primary" id="test-call">Позвонить мне</button>
+        </div>
+        <p class="muted" id="call-note" style="margin-top:12px"></p>
+      </div>
+
+      <div class="wizard-nav">
+        <button class="btn" id="back" hidden>Назад</button>
+        <button class="btn" id="next">Дальше</button>
+        <button class="btn btn-primary" id="publish">Обновить ассистента</button>
       </div>
     </div>
 
@@ -228,34 +362,91 @@
 
   function note(text) { document.getElementById("form-note").textContent = text || ""; }
 
-  var formFields = [];
-  async function loadForm() {
-    var d = await api("/api/cabinet/profile");
-    formFields = d.fields || [];
-    document.getElementById("form").innerHTML = formFields.map(function (f) {
-      var v = esc((d.profile || {})[f.key] || "");
+  // Итог чтения страниц показываем над анкетой: клиника должна понимать,
+  // откуда взялись слова, которые она сейчас проверяет.
+  function showFound(text, failedUrls) {
+    var box = document.getElementById("found");
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "found"; box.className = "found";
+      var form = document.getElementById("form");
+      form.parentNode.insertBefore(box, form);
+    }
+    var bad = (failedUrls || []).length
+      ? '<span class="bad">Не открылось: ' + esc(failedUrls.join(", ")) + "</span>"
+      : "";
+    box.innerHTML = "<b>" + esc(text) + "</b>" + bad;
+  }
+
+  var formFields = [], srcFields = [], intFields = [], loaded = null;
+
+  function renderFields(list, into, values) {
+    document.getElementById(into).innerHTML = list.map(function (f) {
+      var v = esc((values || {})[f.key] || "");
+      var attrs = ' id="f-' + f.key + '"' +
+        (f.placeholder ? ' placeholder="' + esc(f.placeholder) + '"' : "") +
+        (f.secret ? ' type="password" autocomplete="off"' : "");
       var input = f.multiline
-        ? '<textarea id="f-' + f.key + '">' + v + "</textarea>"
-        : '<input id="f-' + f.key + '" value="' + v.replace(/"/g, "&quot;") + '">';
+        ? "<textarea" + attrs + ">" + v + "</textarea>"
+        : "<input" + attrs + ' value="' + v.replace(/"/g, "&quot;") + '">';
       return '<div class="fld"><label>' + esc(f.label) +
         (f.required ? ' <span style="color:#e5484d">*</span>' : "") + "</label>" +
         (f.hint ? '<div class="hint">' + esc(f.hint) + "</div>" : "") + input + "</div>";
     }).join("");
+  }
+
+  async function loadForm() {
+    var d = await api("/api/cabinet/profile");
+    loaded = d;
+    formFields = d.fields || []; srcFields = d.sources || []; intFields = d.integration || [];
+    renderFields(srcFields, "src-form", d.profile);
+    renderFields(formFields, "form", d.profile);
+    renderFields(intFields, "int-form", d.profile);
+    // В команде должен стоять номер именно этой клиники, иначе она отправит
+    // своих пациентов к чужому ассистенту.
+    if (d.number) {
+      document.getElementById("ussd").textContent = "**61*" + d.number + "**20#";
+    }
 
     // Клиника должна видеть, что правки ещё не у пациентов.
     if (!d.saved_at) note("Анкета ещё не заполнена.");
     else if (!d.built_at || new Date(d.built_at) < new Date(d.saved_at))
       note("Анкета сохранена, но ассистент ещё работает по-старому.");
     else note("Ассистент работает по этой анкете.");
+
+    // Заполненную анкету незачем начинать с чтения сайта.
+    goStep(d.saved_at ? 2 : 1);
   }
 
-  function readForm() {
+  function readFields(list) {
     var out = {};
-    formFields.forEach(function (f) {
+    list.forEach(function (f) {
       var el = document.getElementById("f-" + f.key);
-      out[f.key] = el ? el.value : "";
+      if (el) out[f.key] = el.value;
     });
     return out;
+  }
+
+  // Сохраняем всё разом: поля лежат в одной анкете, и отправка только части
+  // затёрла бы остальное.
+  function readForm() {
+    var out = readFields(srcFields);
+    Object.assign(out, readFields(formFields), readFields(intFields));
+    return out;
+  }
+
+  var step = 1;
+  function goStep(n) {
+    step = n;
+    [].forEach.call(document.querySelectorAll(".step"), function (el) {
+      el.hidden = Number(el.getAttribute("data-pane")) !== n;
+    });
+    [].forEach.call(document.querySelectorAll("#steps li"), function (el) {
+      var i = Number(el.getAttribute("data-step"));
+      el.className = i === n ? "on" : (i < n ? "done" : "");
+    });
+    document.getElementById("back").hidden = n === 1;
+    document.getElementById("next").hidden = n === 4;
   }
 
   var audioUrl = null;
@@ -357,7 +548,140 @@
     if (text) document.getElementById("gate-text").textContent = text;
   }
 
+  // Кнопки навешиваем до входа, а не после. Раньше это делалось внутри
+  // инициализации Clerk, и любая её заминка оставляла живые на вид кнопки
+  // без обработчиков — ошибку такого рода видно только по жалобе.
+  function wireUi() {
+  var tabs = { calls: document.getElementById("tab-calls"), agent: document.getElementById("tab-agent") };
+  function openTab(which) {
+    document.getElementById("view-calls").hidden = which !== "calls";
+    document.getElementById("view-agent").hidden = which !== "agent";
+    tabs.calls.className = "tab" + (which === "calls" ? " tab-on" : "");
+    tabs.agent.className = "tab" + (which === "agent" ? " tab-on" : "");
+    if (which === "agent" && !formFields.length) {
+      loadForm().catch(function (e) { note("Не удалось загрузить анкету: " + e.message); });
+    }
+  }
+  tabs.calls.addEventListener("click", function () { openTab("calls"); });
+  tabs.agent.addEventListener("click", function () { openTab("agent"); });
+
+  document.getElementById("next").addEventListener("click", function () { goStep(Math.min(4, step + 1)); });
+  document.getElementById("back").addEventListener("click", function () { goStep(Math.max(1, step - 1)); });
+  document.getElementById("skip-fetch").addEventListener("click", function () { goStep(2); });
+
+  document.getElementById("fetch").addEventListener("click", function () {
+    var src = readFields(srcFields);
+    var urls = Object.keys(src).map(function (k) { return src[k]; }).filter(Boolean);
+    var sn = document.getElementById("src-note");
+    if (!urls.length) { sn.textContent = "Укажите хотя бы одну ссылку."; return; }
+    sn.textContent = "Читаю страницы, это занимает до минуты…";
+    post("/api/cabinet/enrich", { urls: urls })
+      .then(function (d) {
+        var read = (d.pages || []).length;
+        var bad = (d.failed || []).map(function (f) { return f.url; });
+        if (d.profile) {
+          // Не затираем то, что клиника уже написала руками: предложение
+          // модели ложится только в пустые поля.
+          formFields.forEach(function (f) {
+            var el = document.getElementById("f-" + f.key);
+            if (el && !el.value && d.profile[f.key]) el.value = d.profile[f.key];
+          });
+          sn.textContent = "";
+          showFound("Прочитано страниц: " + read + ". Анкета заполнена — проверьте её.", bad);
+          goStep(2);
+        } else if (d.error === "no_model_key") {
+          sn.textContent = "";
+          showFound("Прочитано страниц: " + read + ", но разбор текста пока не подключён. " +
+                    "Заполните анкету сами — данные со страниц под рукой.", bad);
+          goStep(2);
+        } else if (!read) {
+          sn.textContent = "Ни одну страницу открыть не удалось.";
+        } else {
+          sn.textContent = "Страницы прочитаны, но разобрать их не вышло: " + (d.error || "");
+        }
+      })
+      .catch(function (e) { sn.textContent = "Не вышло: " + e.message; });
+  });
+
+  document.getElementById("copy-ussd").addEventListener("click", function () {
+    var btn = document.getElementById("copy-ussd");
+    var el = document.getElementById("ussd");
+    var done = function () {
+      btn.textContent = "Скопировано";
+      setTimeout(function () { btn.textContent = "Скопировать"; }, 1800);
+    };
+    // Буфер обмена доступен не везде: тогда выделяем команду, чтобы её можно
+    // было скопировать руками, а не оставляем кнопку, которая молчит.
+    var select = function () {
+      var r = document.createRange(); r.selectNodeContents(el);
+      var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      btn.textContent = "Выделено — скопируйте";
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(el.textContent).then(done, select);
+    } else select();
+  });
+
+  document.getElementById("save-int").addEventListener("click", function () {
+    var n = document.getElementById("int-note");
+    n.textContent = "Сохраняю…";
+    post("/api/cabinet/profile", { profile: readForm() })
+      .then(function () { n.textContent = "Сохранено."; })
+      .catch(function (e) { n.textContent = "Не сохранилось: " + e.message; });
+  });
+
+  document.getElementById("test-call").addEventListener("click", function () {
+    var n = document.getElementById("call-note");
+    var phone = document.getElementById("test-phone").value;
+    n.textContent = "Звоню…";
+    post("/api/cabinet/test-call", { phone: phone })
+      .then(function () { n.textContent = "Звоню — возьмите трубку."; })
+      .catch(function (e) {
+        n.textContent = e.message === "bad_number" ? "Проверьте номер: нужен казахстанский мобильный."
+          : e.message === "no_agent" ? "Сначала соберите ассистента кнопкой «Обновить ассистента»."
+          : "Не дозвонились: " + e.message;
+      });
+  });
+
+  document.getElementById("save").addEventListener("click", function () {
+    note("Сохраняю…");
+    post("/api/cabinet/profile", { profile: readForm() })
+      .then(function () { note("Сохранено. Нажмите «Обновить ассистента», чтобы он заговорил по-новому."); })
+      .catch(function (e) {
+        note(e.message === "name_required" ? "Название клиники обязательно." : "Не сохранилось: " + e.message);
+      });
+  });
+
+  document.getElementById("publish").addEventListener("click", function () {
+    note("Обновляю ассистента…");
+    // Сначала сохраняем: иначе клиника нажмёт «обновить», не нажав «сохранить»,
+    // и получит старого ассистента при новых полях на экране.
+    post("/api/cabinet/profile", { profile: readForm() })
+      .then(function () { return post("/api/cabinet/publish", {}); })
+      .then(function () { note("Готово. Ассистент отвечает по этой анкете."); })
+      .catch(function (e) {
+        note(e.message === "profile_empty" ? "Сначала заполните анкету." : "Не вышло: " + e.message);
+      });
+  });
+
+  document.getElementById("preview").addEventListener("click", function () {
+    api("/api/cabinet/preview").then(function (d) {
+      document.getElementById("d-title").textContent = "Инструкция ассистента";
+      document.getElementById("d-sub").textContent = "Так он понимает вашу клинику";
+      document.getElementById("d-audio").hidden = true;
+      document.getElementById("d-fields").innerHTML = "";
+      document.getElementById("d-summary").textContent = "";
+      document.getElementById("d-transcript").innerHTML =
+        "<p><b>Первая фраза</b></p><pre class=\"prompt\">" + esc(d.first_message) +
+        "</pre><p style=\"margin-top:18px\"><b>Инструкция</b></p><pre class=\"prompt\">" +
+        esc(d.prompt) + "</pre>";
+      document.getElementById("dlg").showModal();
+    }).catch(function (e) { note("Не показалось: " + e.message); });
+  });
+  }
+
   (async function () {
+    wireUi();
     var cfg = await fetch("/api/config").then(function (r) { return r.json(); }).catch(function () { return {}; });
     if (!cfg.clerkPublishableKey) {
       showGate("Вход пока не настроен: на сервере нет ключей Clerk.");
@@ -380,55 +704,6 @@
     });
     document.getElementById("out").addEventListener("click", function () {
       clerk.signOut().then(function () { location.reload(); });
-    });
-
-    var tabs = { calls: document.getElementById("tab-calls"), agent: document.getElementById("tab-agent") };
-    function openTab(which) {
-      document.getElementById("view-calls").hidden = which !== "calls";
-      document.getElementById("view-agent").hidden = which !== "agent";
-      tabs.calls.className = "tab" + (which === "calls" ? " tab-on" : "");
-      tabs.agent.className = "tab" + (which === "agent" ? " tab-on" : "");
-      if (which === "agent" && !formFields.length) {
-        loadForm().catch(function (e) { note("Не удалось загрузить анкету: " + e.message); });
-      }
-    }
-    tabs.calls.addEventListener("click", function () { openTab("calls"); });
-    tabs.agent.addEventListener("click", function () { openTab("agent"); });
-
-    document.getElementById("save").addEventListener("click", function () {
-      note("Сохраняю…");
-      post("/api/cabinet/profile", { profile: readForm() })
-        .then(function () { note("Сохранено. Нажмите «Обновить ассистента», чтобы он заговорил по-новому."); })
-        .catch(function (e) {
-          note(e.message === "name_required" ? "Название клиники обязательно." : "Не сохранилось: " + e.message);
-        });
-    });
-
-    document.getElementById("publish").addEventListener("click", function () {
-      note("Обновляю ассистента…");
-      // Сначала сохраняем: иначе клиника нажмёт «обновить», не нажав «сохранить»,
-      // и получит старого ассистента при новых полях на экране.
-      post("/api/cabinet/profile", { profile: readForm() })
-        .then(function () { return post("/api/cabinet/publish", {}); })
-        .then(function () { note("Готово. Ассистент отвечает по этой анкете."); })
-        .catch(function (e) {
-          note(e.message === "profile_empty" ? "Сначала заполните анкету." : "Не вышло: " + e.message);
-        });
-    });
-
-    document.getElementById("preview").addEventListener("click", function () {
-      api("/api/cabinet/preview").then(function (d) {
-        document.getElementById("d-title").textContent = "Инструкция ассистента";
-        document.getElementById("d-sub").textContent = "Так он понимает вашу клинику";
-        document.getElementById("d-audio").hidden = true;
-        document.getElementById("d-fields").innerHTML = "";
-        document.getElementById("d-summary").textContent = "";
-        document.getElementById("d-transcript").innerHTML =
-          "<p><b>Первая фраза</b></p><pre class=\"prompt\">" + esc(d.first_message) +
-          "</pre><p style=\"margin-top:18px\"><b>Инструкция</b></p><pre class=\"prompt\">" +
-          esc(d.prompt) + "</pre>";
-        document.getElementById("dlg").showModal();
-      }).catch(function (e) { note("Не показалось: " + e.message); });
     });
 
     if (!clerk.user) { showGate(); return; }

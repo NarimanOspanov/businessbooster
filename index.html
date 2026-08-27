@@ -35,6 +35,14 @@
   .callform { max-width:400px; margin:26px auto 0; display:flex; flex-direction:column; gap:11px; }
   .consent { display:flex; gap:9px; align-items:flex-start; font-size:14px; color:var(--muted); text-align:left; cursor:pointer; }
   .consent input { width:17px; height:17px; margin-top:1px; flex:none; accent-color:var(--accent); }
+  .phonewrap { display:flex; align-items:center; border:1px solid var(--border); border-radius:12px;
+    background:#fff; overflow:hidden; }
+  .phonewrap:focus-within { border-color:var(--accent); }
+  .phonewrap .cc { padding:0 4px 0 15px; font-size:15.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .phonewrap input { border:none; border-radius:0; padding-left:6px; letter-spacing:.02em;
+    font-variant-numeric:tabular-nums; }
+  .phonewrap input:focus { outline:none; }
+  .btn-primary:disabled { opacity:.45; cursor:not-allowed; }
   .hero-note { font-size:13px; color:var(--muted); margin-top:12px; }
   h2 { font-size:clamp(22px,3.4vw,31px); font-weight:800; letter-spacing:-.02em; text-align:center; }
   section { padding:56px 0; }
@@ -73,7 +81,7 @@
 <header><div class="wrap"><nav>
   <a class="logo" href="#"><span class="mark">О</span>Ответ</a>
   <div class="navlinks">
-    <a href="#demo">Демо</a><a href="#when">Когда отвечаем</a><a href="#price">Стоимость</a><a href="#form">Оставить заявку</a>
+    <a href="#when">Когда отвечаем</a><a href="#price">Стоимость</a><a href="#form">Оставить заявку</a>
   </div>
   <a class="lang" href="/kk/">Қазақша</a>
 </nav></div></header>
@@ -81,21 +89,22 @@
 <div class="wrap hero">
   <h1>ИИ-секретарь, который не пропустит <span>ни одного звонка</span></h1>
   <div class="tagline">Приём звонков и сообщений для вашего бизнеса 24/7</div>
-  <p>Ваш телефон отвечает всегда. Мы берём трубку и отвечаем в мессенджерах в те часы, когда у вас этого сделать некому: после закрытия, в выходные, в праздники и в обед. Отвечаем на вопросы клиента, записываем на свободное время и присылаем вам список. По-казахски, по-русски и по-английски.</p>
-  <a class="btn btn-primary" href="#form">Получить 10 лидов бесплатно</a>
-  <div class="hero-note">Первые 10 лидов — бесплатно. Без предоплаты, без договора и без интеграций.</div>
-</div>
+  <p>Введите свой номер — ассистент перезвонит через несколько секунд, и вы услышите
+  то же, что услышит ваш клиент.</p>
 
-<section id="demo"><div class="wrap">
-  <h2>Пусть он позвонит вам</h2>
-  <p class="sub">Введите свой номер — ассистент перезвонит через несколько секунд, и вы услышите то же, что услышит ваш клиент.</p>
   <form class="callform" id="cf">
-    <input id="cf-phone" type="tel" autocomplete="tel" placeholder="Ваш номер — +7 ___ ___ __ __" required>
+    <div class="phonewrap">
+      <span class="cc">+7</span>
+      <input id="cf-phone" type="tel" inputmode="numeric" autocomplete="tel"
+             placeholder="707 000 00 00" maxlength="13" required>
+    </div>
+    <button class="btn btn-primary" type="submit" id="cf-send" disabled>Позвоните мне</button>
     <label class="consent"><input type="checkbox" id="cf-consent"><span>Это мой номер, мне можно позвонить</span></label>
-    <button class="btn btn-primary" type="submit" id="cf-send">Позвоните мне</button>
     <div class="status" id="cf-status"></div>
   </form>
-</div></section>
+
+  <div class="hero-note">Без предоплаты, без договора и без интеграций.</div>
+</div>
 
 <section id="when" class="soft"><div class="wrap">
   <h2>Когда мы отвечаем</h2>
@@ -175,15 +184,53 @@
 <script>
   var L = {"sending":"Отправляю…","ok":"Спасибо. Перезвоним в течение дня.","errPhone":"Введите номер телефона","err":"Не отправилось. Попробуйте ещё раз.","send":"Отправить","lang":"ru","callBtn":"Позвоните мне","callGoing":"Набираю…","callOk":"Звоню. Возьмите трубку.","callErrConsent":"Отметьте, что номер ваш","callErrNumber":"Нужен казахстанский мобильный, +7 7XX...","callErrLimit":"Слишком много звонков. Попробуйте позже.","callErrOff":"Демо-звонки сейчас выключены. Оставьте заявку ниже.","callErrFailed":"Не удалось дозвониться на этот номер. Оставьте заявку ниже — перезвоним сами.","callErr":"Не получилось позвонить. Попробуйте ещё раз."};
 
+
+  // Номер вводится цифрами, а формат ставим сами. Свободный текст здесь стоит
+  // дорого: на том конце его набирает не человек, а телефония, и «8 (707)»
+  // или номер с буквой уходит в неудавшийся звонок.
+  (function () {
+    var input = document.getElementById('cf-phone');
+    var btn = document.getElementById('cf-send');
+    var consent = document.getElementById('cf-consent');
+
+    function digits(v) {
+      var d = String(v).replace(/[^0-9]/g, '');
+      // Человек привычно начинает с 8 или 7 — это код страны, а не номер.
+      if (d.length && (d[0] === '8' || d[0] === '7') && d.length > 10) d = d.slice(1);
+      return d.slice(0, 10);
+    }
+    function pretty(d) {
+      var out = d.slice(0, 3);
+      if (d.length > 3) out += ' ' + d.slice(3, 6);
+      if (d.length > 6) out += ' ' + d.slice(6, 8);
+      if (d.length > 8) out += ' ' + d.slice(8, 10);
+      return out;
+    }
+    // Мобильные Казахстана: 700-708, 747, 750, 751, 760, 761, 762, 763, 764,
+    // 771-778. Городские сюда не годятся — ассистент звонит на мобильный.
+    function valid(d) { return d.length === 10 && d[0] === '7'; }
+
+    function sync() {
+      var d = digits(input.value);
+      input.value = pretty(d);
+      btn.disabled = !(valid(d) && consent.checked);
+      return d;
+    }
+    input.addEventListener('input', sync);
+    consent.addEventListener('change', sync);
+    input.addEventListener('paste', function () { setTimeout(sync, 0); });
+    window.phoneDigits = function () { return digits(input.value); };
+  })();
+
   document.getElementById('cf').addEventListener('submit', function (e) {
     e.preventDefault();
     var st = document.getElementById('cf-status');
     var btn = document.getElementById('cf-send');
-    var phone = document.getElementById('cf-phone').value.trim();
+    var phone = '+7' + window.phoneDigits();
     var consent = document.getElementById('cf-consent').checked;
     var fail = function (m) { st.className = 'status bad'; st.textContent = m; };
     if (!consent) { fail(L.callErrConsent); return; }
-    if (phone.replace(/[^0-9]/g, '').length < 10) { fail(L.callErrNumber); return; }
+    if (window.phoneDigits().length !== 10) { fail(L.callErrNumber); return; }
     btn.disabled = true; st.className = 'status'; st.textContent = L.callGoing;
     fetch('/api/demo-call', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },

@@ -63,14 +63,40 @@ const FIELDS = [
     hint: "Парковка, оплата, детский приём, языки персонала" },
 ];
 
-function clean(profile) {
+// Откуда мы читаем про клинику на онбординге. В промпт эти ссылки не идут —
+// из них извлекаются факты, а сами ссылки ассистенту не нужны.
+const SOURCES = [
+  { key: "src_site", label: "Сайт клиники", max: 300, placeholder: "https://…" },
+  { key: "src_2gis", label: "Страница в 2GIS", max: 400, placeholder: "https://2gis.kz/almaty/firm/…" },
+  { key: "src_instagram", label: "Instagram", max: 300, placeholder: "https://instagram.com/…" },
+];
+
+// Необязательная связка с программой записи клиники. Тоже не в промпт:
+// это адреса, по которым ассистент будет ходить во время разговора.
+const INTEGRATION = [
+  { key: "book_read_url", label: "Адрес для чтения расписания", max: 500,
+    placeholder: "https://…/slots", hint: "Отдаёт свободное время. Ассистент спросит его, прежде чем предлагать час" },
+  { key: "book_write_url", label: "Адрес для записи", max: 500,
+    placeholder: "https://…/appointments", hint: "Принимает подтверждённую запись" },
+  { key: "book_token", label: "Ключ доступа", max: 200, secret: true,
+    hint: "Отправим в заголовке Authorization. Виден только вам" },
+];
+
+const ALL_FIELDS = FIELDS.concat(SOURCES, INTEGRATION);
+
+function cleanBy(list, profile) {
   const out = {};
-  for (const f of FIELDS) {
+  for (const f of list) {
     const v = profile && profile[f.key];
     out[f.key] = String(v == null ? "" : v).trim().slice(0, f.max);
   }
   return out;
 }
+
+// clean() — только факты для промпта. Ссылки и адреса интеграции сюда не
+// попадают нарочно: иначе ассистент однажды продиктует пациенту наш токен.
+function clean(profile) { return cleanBy(FIELDS, profile); }
+function cleanAll(profile) { return cleanBy(ALL_FIELDS, profile); }
 
 // --- промпт ---------------------------------------------------------------
 
@@ -235,6 +261,6 @@ async function deleteAgent(agentId) {
 }
 
 module.exports = {
-  FIELDS, clean, buildPrompt, buildFirstMessage,
+  FIELDS, SOURCES, INTEGRATION, ALL_FIELDS, clean, cleanAll, buildPrompt, buildFirstMessage,
   createAgent, updateAgent, deleteAgent, checkAgent, BASE_AGENT,
 };
