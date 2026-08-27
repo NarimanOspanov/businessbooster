@@ -102,6 +102,33 @@ IF COL_LENGTH('dbo.calls', 'agent_number') IS NULL
   ALTER TABLE dbo.calls ADD agent_number NVARCHAR(32) NULL;
 IF COL_LENGTH('dbo.calls', 'direction') IS NULL
   ALTER TABLE dbo.calls ADD direction NVARCHAR(16) NULL;
+
+-- Пул номеров. Номер у Zadarma активируется до двух рабочих дней, поэтому
+-- купить его в момент онбординга нельзя: клиника нажала «выбрать», а номер
+-- двое суток отвечает автоответчиком. Держим запас заранее и выдаём готовые.
+IF OBJECT_ID('dbo.numbers', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.numbers (
+    id              INT IDENTITY(1,1) PRIMARY KEY,
+    number          NVARCHAR(32)  NOT NULL,
+    provider        NVARCHAR(32)  NOT NULL CONSTRAINT DF_numbers_provider DEFAULT 'zadarma',
+    -- preparing: куплен, но ещё не проведён через настройку или не активирован
+    -- free: готов к выдаче | assigned: за клиникой | retired: отключён
+    status          NVARCHAR(16)  NOT NULL CONSTRAINT DF_numbers_status DEFAULT 'preparing',
+    phone_number_id NVARCHAR(64)  NULL,
+    pbx_extension   NVARCHAR(32)  NULL,
+    clinic_id       INT           NULL,
+    note            NVARCHAR(200) NULL,
+    created_at      DATETIME2(0)  NOT NULL CONSTRAINT DF_numbers_created DEFAULT SYSUTCDATETIME(),
+    assigned_at     DATETIME2(0)  NULL
+  );
+  CREATE UNIQUE INDEX UX_numbers_number ON dbo.numbers (number);
+  -- Тот же запрет, что и у клиник: один номер в ElevenLabs не может стоять за
+  -- двумя строками, иначе звонок достанется не той клинике.
+  CREATE UNIQUE INDEX UX_numbers_phone_id ON dbo.numbers (phone_number_id)
+    WHERE phone_number_id IS NOT NULL;
+  CREATE INDEX IX_numbers_status ON dbo.numbers (status);
+END
 `;
 
 // Выборки в кабинете всегда «звонки моей клиники за период», поэтому индекс
@@ -276,7 +303,96 @@ async function callForClinics(conversationId, clinicIds) {
   return r.recordset[0] || null;
 }
 
-module.exports = { getPool, migrate, saveCall, connectionString, clinicIdForCall, upsertClinic, clinicsByOrgIds, callsForClinics, callForClinics };
+// ---------------------------------------------------------------------------
+// Пул номеров.
+
+async function numbersByStatus(status) {
+  const pool = await getPool();
+  const req = pool.request();
+  let where = "";
+  if (status) { req.input("s", sql.NVarChar(16), status); where = "WHERE status = @s"; }
+  const r = await req.query(
+    "SELECT id, number, provider, status, phone_number_id, pbx_extension, " +
+    "clinic_id, note, created_at, assigned_at FROM dbo.numbers " + where +
+    " ORDER BY status, number"
+  );
+  return r.recordset;
+}
+
+// Заводит номер в пул или обновляет то, что о нём известно. Статус трогаем
+// только если он передан: провизионер вызывает функцию дважды, и второй вызов
+// не должен вернуть выданный номер обратно в свободные.
+async function upsertNumber(n) {
+  const pool = await getPool();
+  const r = await pool
+    .request()
+    .input("number", sql.NVarChar(32), n.number)
+    .input("provider", sql.NVarChar(32), n.provider || "zadarma")
+    .input("status", sql.NVarChar(16), n.status || null)
+    .input("phone_number_id", sql.NVarChar(64), n.phone_number_id || null)
+    .input("pbx_extension", sql.NVarChar(32), n.pbx_extension || null)
+    .input("note", sql.NVarChar(200), n.note || null)
+    .query(`
+      MERGE dbo.numbers AS t
+      USING (SELECT @number AS number) AS s ON t.number = s.number
+      WHEN MATCHED THEN UPDATE SET
+        provider = @provider,
+        status = COALESCE(@status, t.status),
+        phone_number_id = COALESCE(@phone_number_id, t.phone_number_id),
+        pbx_extension = COALESCE(@pbx_extension, t.pbx_extension),
+        note = COALESCE(@note, t.note)
+      WHEN NOT MATCHED THEN INSERT
+        (number, provider, status, phone_number_id, pbx_extension, note)
+        VALUES (@number, @provider, COALESCE(@status, 'preparing'),
+                @phone_number_id, @pbx_extension, @note)
+      OUTPUT inserted.id;
+    `);
+  return r.recordset[0].id;
+}
+
+// Выдаёт номер клинике. Условие status = 'free' стоит внутри UPDATE нарочно:
+// проверка отдельным SELECT оставила бы зазор, в котором две клиники,
+// нажавшие «выбрать» одновременно, получили бы один номер.
+async function assignNumber(number, clinicId) {
+  const pool = await getPool();
+  const r = await pool
+    .request()
+    .input("number", sql.NVarChar(32), number)
+    .input("clinic", sql.Int, clinicId)
+    .query(
+      "UPDATE dbo.numbers SET status = 'assigned', clinic_id = @clinic, " +
+      "assigned_at = SYSUTCDATETIME() " +
+      "OUTPUT inserted.id, inserted.number, inserted.phone_number_id, inserted.pbx_extension " +
+      "WHERE number = @number AND status = 'free'"
+    );
+  if (!r.recordset.length) return null; // уже занят или ещё не готов
+  const taken = r.recordset[0];
+
+  // Клиника ищет свои звонки по phone_number_id, поэтому переставляем и его.
+  await pool
+    .request()
+    .input("pid", sql.NVarChar(64), taken.phone_number_id)
+    .input("num", sql.NVarChar(32), taken.number)
+    .input("clinic", sql.Int, clinicId)
+    .query("UPDATE dbo.clinics SET phone_number_id = @pid, public_number = @num WHERE id = @clinic");
+  return taken;
+}
+
+async function releaseNumber(number) {
+  const pool = await getPool();
+  const r = await pool
+    .request()
+    .input("number", sql.NVarChar(32), number)
+    .query(
+      "UPDATE dbo.clinics SET phone_number_id = NULL, public_number = NULL " +
+      "WHERE phone_number_id = (SELECT phone_number_id FROM dbo.numbers WHERE number = @number);" +
+      "UPDATE dbo.numbers SET status = 'free', clinic_id = NULL, assigned_at = NULL " +
+      "OUTPUT inserted.number WHERE number = @number"
+    );
+  return r.recordset.length ? r.recordset[0].number : null;
+}
+
+module.exports = { getPool, migrate, saveCall, connectionString, clinicIdForCall, upsertClinic, clinicsByOrgIds, callsForClinics, callForClinics, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 
 if (require.main === module) {
   const cmd = process.argv[2];
