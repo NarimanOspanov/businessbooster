@@ -105,7 +105,6 @@
   </div>
 </dialog>
 
-<script src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js"></script>
 <script>
   var clerk = null;
 
@@ -208,6 +207,31 @@
     document.getElementById("dlg").showModal();
   }
 
+  // Бандл Clerk забирает ключ из data-атрибута своего же тега и создаёт
+  // window.Clerk сам. Хост берём из ключа: так версия скрипта всегда совпадает
+  // с инстансом.
+  function loadClerk(pk) {
+    var host;
+    try {
+      host = atob(pk.replace(/^pk_(test|live)_/, "")).replace(/$+$/, "");
+    } catch (e) {
+      return Promise.reject(new Error("bad_key"));
+    }
+    return new Promise(function (resolve, reject) {
+      var s = document.createElement("script");
+      s.async = true;
+      s.crossOrigin = "anonymous";
+      s.setAttribute("data-clerk-publishable-key", pk);
+      s.src = "https://" + host + "/npm/@clerk/clerk-js@5/dist/clerk.browser.js";
+      s.onerror = function () { reject(new Error("script_failed")); };
+      s.onload = function () {
+        if (!window.Clerk) return reject(new Error("no_clerk"));
+        window.Clerk.load().then(function () { resolve(window.Clerk); }, reject);
+      };
+      document.head.appendChild(s);
+    });
+  }
+
   function showGate(text) {
     document.getElementById("gate").hidden = false;
     document.getElementById("app").hidden = true;
@@ -221,8 +245,13 @@
       document.getElementById("in").hidden = true;
       return;
     }
-    clerk = new window.Clerk(cfg.clerkPublishableKey);
-    await clerk.load();
+    try {
+      clerk = await loadClerk(cfg.clerkPublishableKey);
+    } catch (e) {
+      showGate("Не удалось загрузить форму входа. Обновите страницу.");
+      document.getElementById("in").hidden = true;
+      return;
+    }
 
     document.getElementById("in").addEventListener("click", function () {
       clerk.openSignIn({ afterSignInUrl: "/cabinet/", afterSignUpUrl: "/cabinet/" });
