@@ -1548,6 +1548,40 @@ function recordLead(lead) {
 }
 
 // ---------------------------------------------------------------------------
+// Кабинет клиники.
+//
+// Правило, из которого всё остальное: список клиник берётся ТОЛЬКО из
+// организаций Clerk, в которых состоит владелец проверенного токена. Ни один
+// идентификатор из запроса в выборку не попадает — иначе кабинет открывается
+// подбором чужого номера.
+
+async function clerkUserOrgIds(userId) {
+  if (!CLERK_SK) return [];
+  const res = await fetch(
+    "https://api.clerk.com/v1/users/" + encodeURIComponent(userId) +
+    "/organization_memberships?limit=50",
+    { headers: { Authorization: "Bearer " + CLERK_SK } }
+  );
+  if (!res.ok) return [];
+  const j = await res.json();
+  return (j.data || [])
+    .map((m) => m.organization && m.organization.id)
+    .filter(Boolean);
+}
+
+// Достаёт пользователя из заголовка и отдаёт его клиники. Бросает — значит
+// доступа нет, и вызывающий отвечает 401.
+async function cabinetContext(req) {
+  const auth = String(req.headers.authorization || "");
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  if (!token) throw new Error("no_token");
+  const claims = await verifyClerkToken(token);
+  const orgIds = await clerkUserOrgIds(claims.sub);
+  const clinics = await db.clinicsByOrgIds(orgIds);
+  return { userId: claims.sub, orgIds, clinics, clinicIds: clinics.map((c) => c.id) };
+}
+
+// ---------------------------------------------------------------------------
 // Записи со звонков: ElevenLabs присылает разговор, мы достаём из него поля.
 
 // Пишем и в базу, и в файл. База — основное хранилище, файл — страховка:
@@ -2466,6 +2500,84 @@ http
 
     // Callback request from the phone-assistant landing. No auth on purpose: this is a
     // validation page, and a login wall in front of "leave your number" measures the wall.
+    if (urlPath.startsWith("/api/cabinet/")) {
+      (async () => {
+        const send = (code, obj) => {
+          res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+          res.end(JSON.stringify(obj));
+        };
+        if (!CLERK_PK || !CLERK_SK) return send(503, { error: "clerk_not_configured" });
+
+        let ctx;
+        try {
+          ctx = await cabinetContext(req);
+        } catch (e) {
+          // Наружу — только факт отказа. Подробности разбора токена помогают
+          // подбирать, а нам самим они видны в логе.
+          console.log("[cabinet] отказ: " + String(e.message).slice(0, 120));
+          return send(401, { error: e.message === "no_token" ? "no_token" : "bad_token" });
+        }
+
+        if (urlPath === "/api/cabinet/me") {
+          const who = (await clerkUserEmail(ctx.userId)) || {};
+          return send(200, {
+            email: who.email || null,
+            name: who.name || null,
+            clinics: ctx.clinics.map((c) => ({
+              name: c.name, number: c.public_number, org_id: c.org_id,
+            })),
+          });
+        }
+
+        // Ни один запрос ниже не принимает идентификатор клиники снаружи.
+        if (!ctx.clinicIds.length) return send(200, { calls: [] });
+
+        if (urlPath === "/api/cabinet/calls") {
+          const calls = await db.callsForClinics(ctx.clinicIds, {
+            limit: parsed.searchParams.get("limit"),
+            offset: parsed.searchParams.get("offset"),
+          });
+          return send(200, { calls });
+        }
+
+        if (urlPath === "/api/cabinet/call") {
+          const id = parsed.searchParams.get("id") || "";
+          const call = await db.callForClinics(id, ctx.clinicIds);
+          if (!call) return send(404, { error: "not_found" });
+          return send(200, { call });
+        }
+
+        // Запись разговора лежит у ElevenLabs. Проксируем, а не даём ссылку:
+        // прямая ссылка требует нашего ключа и открыла бы чужие разговоры.
+        if (urlPath === "/api/cabinet/audio") {
+          const id = parsed.searchParams.get("id") || "";
+          const call = await db.callForClinics(id, ctx.clinicIds);
+          if (!call) return send(404, { error: "not_found" });
+          const key = process.env.ELEVENLABS_API_KEY;
+          if (!key) return send(503, { error: "not_configured" });
+          const r = await fetch(
+            "https://api.elevenlabs.io/v1/convai/conversations/" +
+            encodeURIComponent(id) + "/audio",
+            { headers: { "xi-api-key": key } }
+          );
+          if (!r.ok) return send(502, { error: "audio_unavailable" });
+          res.writeHead(200, {
+            "Content-Type": r.headers.get("content-type") || "audio/mpeg",
+            "Cache-Control": "private, max-age=300",
+          });
+          res.end(Buffer.from(await r.arrayBuffer()));
+          return;
+        }
+
+        send(404, { error: "unknown_endpoint" });
+      })().catch((e) => {
+        console.log("[cabinet] " + String(e.message).slice(0, 200));
+        res.writeHead(500, { "Content-Type": MIME[".json"] });
+        res.end(JSON.stringify({ error: "internal" }));
+      });
+      return;
+    }
+
     if (urlPath === "/api/elevenlabs/post-call") {
       if (req.method !== "POST") { res.writeHead(405, { Allow: "POST" }).end(); return; }
       (async () => {

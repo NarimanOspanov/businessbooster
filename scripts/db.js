@@ -217,7 +217,66 @@ async function saveCall(c) {
     `);
 }
 
-module.exports = { getPool, migrate, saveCall, connectionString, clinicIdForCall, upsertClinic };
+
+// Клиники, доступные пользователю: только те, чьи организации Clerk он состоит.
+// Список идентификаторов приходит с сервера после проверки токена — из запроса
+// его брать нельзя, иначе кабинет открывается по подобранному номеру.
+async function clinicsByOrgIds(orgIds) {
+  if (!orgIds || !orgIds.length) return [];
+  const pool = await getPool();
+  const req = pool.request();
+  const names = orgIds.map((id, i) => {
+    req.input("o" + i, sql.NVarChar(64), id);
+    return "@o" + i;
+  });
+  const r = await req.query(
+    "SELECT id, org_id, name, public_number FROM dbo.clinics " +
+    "WHERE is_active = 1 AND org_id IN (" + names.join(",") + ")"
+  );
+  return r.recordset;
+}
+
+async function callsForClinics(clinicIds, { limit = 50, offset = 0 } = {}) {
+  if (!clinicIds || !clinicIds.length) return [];
+  const pool = await getPool();
+  const req = pool.request();
+  const names = clinicIds.map((id, i) => {
+    req.input("c" + i, sql.Int, id);
+    return "@c" + i;
+  });
+  req.input("lim", sql.Int, Math.min(Number(limit) || 50, 200));
+  req.input("off", sql.Int, Math.max(Number(offset) || 0, 0));
+  const r = await req.query(
+    "SELECT id, conversation_id, received_at, duration_secs, direction, " +
+    "caller_number, client_name, client_phone, service, desired_time, " +
+    "is_booked, is_urgent, summary, clinic_id " +
+    "FROM dbo.calls WHERE clinic_id IN (" + names.join(",") + ") " +
+    "ORDER BY received_at DESC OFFSET @off ROWS FETCH NEXT @lim ROWS ONLY"
+  );
+  return r.recordset;
+}
+
+// Один звонок с расшифровкой — но только если он принадлежит клинике этого
+// пользователя. Проверку владения делаем в самом запросе, а не после.
+async function callForClinics(conversationId, clinicIds) {
+  if (!clinicIds || !clinicIds.length) return null;
+  const pool = await getPool();
+  const req = pool.request();
+  const names = clinicIds.map((id, i) => {
+    req.input("c" + i, sql.Int, id);
+    return "@c" + i;
+  });
+  req.input("conv", sql.NVarChar(64), conversationId);
+  const r = await req.query(
+    "SELECT TOP 1 conversation_id, received_at, duration_secs, direction, " +
+    "caller_number, client_name, client_phone, service, desired_time, " +
+    "is_booked, is_urgent, summary, transcript, clinic_id " +
+    "FROM dbo.calls WHERE conversation_id = @conv AND clinic_id IN (" + names.join(",") + ")"
+  );
+  return r.recordset[0] || null;
+}
+
+module.exports = { getPool, migrate, saveCall, connectionString, clinicIdForCall, upsertClinic, clinicsByOrgIds, callsForClinics, callForClinics };
 
 if (require.main === module) {
   const cmd = process.argv[2];
