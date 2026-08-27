@@ -2489,6 +2489,11 @@ http
           return typeof v === "object" ? (v.value ?? "") : v;
         };
 
+        // Номер, с которого звонили, известен всегда. Если из разговора
+        // телефон не извлёкся — берём его, иначе клинике некому перезвонить.
+        const callerNumber = (d.metadata && d.metadata.phone_call &&
+          (d.metadata.phone_call.external_number || d.metadata.phone_call.to_number)) || "";
+
         const booking = {
           at: new Date().toISOString(),
           conversation: d.conversation_id || "",
@@ -2496,7 +2501,8 @@ http
           // Модель слышит «восемь семьсот два» и пишет 8..., получается
           // +87029410625 — такой номер не наберётся и не откроется в WhatsApp.
           phone: normalizeKzMobile(val("client_phone")) ||
-                 String(val("client_phone") || "").slice(0, 40),
+                 String(val("client_phone") || "").slice(0, 40) ||
+                 normalizeKzMobile(callerNumber) || callerNumber,
           name: String(val("client_name") || "").slice(0, 80),
           service: String(val("service") || "").slice(0, 120),
           when: String(val("desired_time") || "").slice(0, 80),
@@ -2506,9 +2512,7 @@ http
         };
         await recordBooking(booking, {
           agent_id: d.agent_id || "",
-          caller_number:
-            (d.metadata && d.metadata.phone_call &&
-             (d.metadata.phone_call.external_number || d.metadata.phone_call.to_number)) || "",
+          caller_number: callerNumber,
           transcript: d.transcript ? JSON.stringify(d.transcript) : null,
           raw: raw.slice(0, 200000),
         });
