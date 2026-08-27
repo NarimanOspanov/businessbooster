@@ -172,6 +172,26 @@
     });
   }
 
+  var audioUrl = null;
+  async function loadAudio(id) {
+    var a = document.getElementById("d-audio");
+    a.removeAttribute("src");
+    if (audioUrl) { URL.revokeObjectURL(audioUrl); audioUrl = null; }
+    try {
+      var t = await clerk.session.getToken();
+      var r = await fetch("/api/cabinet/audio?id=" + encodeURIComponent(id), {
+        headers: { Authorization: "Bearer " + t },
+      });
+      if (!r.ok) throw new Error(String(r.status));
+      audioUrl = URL.createObjectURL(await r.blob());
+      a.src = audioUrl;
+    } catch (e) {
+      a.hidden = true;
+      return;
+    }
+    a.hidden = false;
+  }
+
   async function openCall(id) {
     var d = await api("/api/cabinet/call?id=" + encodeURIComponent(id));
     var c = d.call;
@@ -180,8 +200,9 @@
       fmtDate(c.received_at) + " · " + (c.duration_secs || 0) + " с · " +
       (c.direction === "outbound" ? "исходящий" : "входящий");
 
-    var a = document.getElementById("d-audio");
-    a.src = "/api/cabinet/audio?id=" + encodeURIComponent(id);
+    // Плеер грузит src сам, без заголовка авторизации, и получал 401. Забираем
+    // запись с токеном и отдаём ему готовый blob.
+    loadAudio(id);
 
     var f = [
       ["Телефон", c.client_phone || c.caller_number],

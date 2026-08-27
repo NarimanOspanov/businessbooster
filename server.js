@@ -2629,9 +2629,13 @@ http
           seconds: (d.metadata && d.metadata.call_duration_secs) || 0,
           // Модель слышит «восемь семьсот два» и пишет 8..., получается
           // +87029410625 — такой номер не наберётся и не откроется в WhatsApp.
+          // А иногда она ошибается так, что чинить нечего (+72772940625).
+          // Тогда берём определившийся номер звонящего: он от оператора, а не
+          // с слуха. Нераспознанное показываем последним — лучше правдивый
+          // номер линии, чем набор цифр, по которому не перезвонить.
           phone: normalizeKzMobile(val("client_phone")) ||
-                 String(val("client_phone") || "").slice(0, 40) ||
-                 normalizeKzMobile(callerNumber) || callerNumber,
+                 normalizeKzMobile(callerNumber) || callerNumber ||
+                 String(val("client_phone") || "").slice(0, 40),
           name: String(val("client_name") || "").slice(0, 80),
           service: String(val("service") || "").slice(0, 120),
           when: String(val("desired_time") || "").slice(0, 80),
