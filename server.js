@@ -1469,6 +1469,7 @@ async function buildCompetitors(slug) {
 // ---------------------------------------------------------------------------
 
 const crypto = require("crypto");
+const db = require("./scripts/db");
 const CLERK_PK = process.env.CLERK_PUBLISHABLE_KEY || "";
 const CLERK_SK = process.env.CLERK_SECRET_KEY || "";
 
@@ -1549,7 +1550,9 @@ function recordLead(lead) {
 // ---------------------------------------------------------------------------
 // Записи со звонков: ElevenLabs присылает разговор, мы достаём из него поля.
 
-function recordBooking(b) {
+// Пишем и в базу, и в файл. База — основное хранилище, файл — страховка:
+// если Azure SQL недоступен, запись клиники не должна пропасть вместе с ним.
+async function recordBooking(b, extra) {
   const line = JSON.stringify(b);
   console.log("[booking] " + line);
   try {
@@ -1557,6 +1560,29 @@ function recordBooking(b) {
     fs.appendFileSync(path.join(ROOT, "data", "bookings.jsonl"), line + "\n", "utf8");
   } catch {
     // файловая система только на чтение — строка выше остаётся единственной записью
+  }
+  try {
+    await db.saveCall({
+      conversation_id: b.conversation,
+      agent_id: (extra && extra.agent_id) || null,
+      caller_number: (extra && extra.caller_number) || null,
+      duration_secs: b.seconds,
+      client_name: b.name,
+      client_phone: b.phone,
+      service: b.service,
+      desired_time: b.when,
+      is_booked: b.booked,
+      is_urgent: b.urgent,
+      summary: b.summary,
+      transcript: (extra && extra.transcript) || null,
+      raw: (extra && extra.raw) || null,
+    });
+    console.log("[booking] в базу записано: " + b.conversation);
+  } catch (e) {
+    console.log(
+      "[booking] БАЗА НЕДОСТУПНА (" + String(e.message).slice(0, 120) +
+      ") — запись осталась только в файле: " + b.conversation
+    );
   }
 }
 
@@ -2475,7 +2501,14 @@ http
           urgent: val("is_urgent") === true || val("is_urgent") === "true",
           summary: String(an.transcript_summary || "").slice(0, 600),
         };
-        recordBooking(booking);
+        await recordBooking(booking, {
+          agent_id: d.agent_id || "",
+          caller_number:
+            (d.metadata && d.metadata.phone_call &&
+             (d.metadata.phone_call.external_number || d.metadata.phone_call.to_number)) || "",
+          transcript: d.transcript ? JSON.stringify(d.transcript) : null,
+          raw: raw.slice(0, 200000),
+        });
 
         // Неотложка идёт отдельным сообщением: её нельзя пролистать в общем списке.
         const head = booking.urgent
