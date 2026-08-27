@@ -170,6 +170,37 @@ function applyProfile(conversationConfig, profile) {
   return cc;
 }
 
+// Что переносим из настроек площадки. Список короткий, но каждый пункт тут по
+// делу, и один из них уже был забыт:
+//   workspace_overrides — здесь лежит post_call_webhook_id. Вебхук привязан к
+//     АГЕНТУ, а не к аккаунту. Без него звонок проходит хорошо, но до нас не
+//     доезжает: ни в базе, ни в кабинете, ни в телеграме его не будет, и
+//     заметить это можно только хватившись пропавшего разговора.
+//   data_collection — поля, которые мы разбираем из разговора.
+//   summary_language — иначе сводка приходит по-английски.
+function platformSettings(ps) {
+  const out = {
+    data_collection: ps.data_collection || {},
+    summary_language: ps.summary_language || "ru",
+  };
+  if (ps.workspace_overrides) out.workspace_overrides = ps.workspace_overrides;
+  return out;
+}
+
+// Проверка после сборки: агент без вебхука выглядит рабочим и молча теряет
+// звонки, поэтому спрашиваем платформу, а не полагаемся на то, что послали.
+async function checkAgent(agentId) {
+  const a = await eleven("/v1/convai/agents/" + agentId);
+  const ps = a.platform_settings || {};
+  const hook = ((ps.workspace_overrides || {}).webhooks || {}).post_call_webhook_id || null;
+  return {
+    agent_id: agentId,
+    webhook: hook,
+    fields: Object.keys(ps.data_collection || {}),
+    summary_language: ps.summary_language || null,
+  };
+}
+
 async function createAgent(profile) {
   const base = await baseConfig();
   const ps = base.platform_settings || {};
@@ -178,13 +209,7 @@ async function createAgent(profile) {
     body: JSON.stringify({
       name: "Ответ — " + (clean(profile).name || "клиника"),
       conversation_config: applyProfile(base.conversation_config, profile),
-      // Переносим только то, от чего зависит наш разбор звонка: поля сбора
-      // данных и язык сводки. Остальные настройки площадки — рабочие,
-      // аккаунтные, и копировать их в каждого агента незачем.
-      platform_settings: {
-        data_collection: ps.data_collection || {},
-        summary_language: ps.summary_language || "ru",
-      },
+      platform_settings: platformSettings(ps),
     }),
   });
   return made.agent_id;
@@ -197,6 +222,9 @@ async function updateAgent(agentId, profile) {
     body: JSON.stringify({
       name: "Ответ — " + (clean(profile).name || "клиника"),
       conversation_config: applyProfile(base.conversation_config, profile),
+      // И при обновлении тоже: агент мог быть создан до того, как мы научились
+      // переносить вебхук.
+      platform_settings: platformSettings(base.platform_settings || {}),
     }),
   });
   return agentId;
@@ -208,5 +236,5 @@ async function deleteAgent(agentId) {
 
 module.exports = {
   FIELDS, clean, buildPrompt, buildFirstMessage,
-  createAgent, updateAgent, deleteAgent, BASE_AGENT,
+  createAgent, updateAgent, deleteAgent, checkAgent, BASE_AGENT,
 };
