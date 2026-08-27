@@ -1574,6 +1574,10 @@ async function recordBooking(b, extra) {
       is_booked: b.booked,
       is_urgent: b.urgent,
       summary: b.summary,
+      clinic_id: (extra && extra.clinic_id) || null,
+      phone_number_id: (extra && extra.phone_number_id) || null,
+      agent_number: (extra && extra.agent_number) || null,
+      direction: (extra && extra.direction) || null,
       transcript: (extra && extra.transcript) || null,
       raw: (extra && extra.raw) || null,
     });
@@ -2491,8 +2495,21 @@ http
 
         // Номер, с которого звонили, известен всегда. Если из разговора
         // телефон не извлёкся — берём его, иначе клинике некому перезвонить.
-        const callerNumber = (d.metadata && d.metadata.phone_call &&
-          (d.metadata.phone_call.external_number || d.metadata.phone_call.to_number)) || "";
+        const pc = (d.metadata && d.metadata.phone_call) || {};
+        const callerNumber = pc.external_number || pc.to_number || "";
+
+        // Чья это клиника — определяем по номеру, на который позвонили.
+        // Не нашли — строка останется без клиники и попадёт в общий список,
+        // но не в чужой кабинет.
+        let clinicId = null;
+        try {
+          clinicId = await db.clinicIdForCall({
+            phone_number_id: pc.phone_number_id,
+            agent_id: d.agent_id,
+          });
+        } catch (e) {
+          console.log("[post-call] клинику определить не вышло: " + String(e.message).slice(0, 100));
+        }
 
         const booking = {
           at: new Date().toISOString(),
@@ -2513,6 +2530,10 @@ http
         await recordBooking(booking, {
           agent_id: d.agent_id || "",
           caller_number: callerNumber,
+          clinic_id: clinicId,
+          phone_number_id: pc.phone_number_id || "",
+          agent_number: pc.agent_number || "",
+          direction: pc.direction || "",
           transcript: d.transcript ? JSON.stringify(d.transcript) : null,
           raw: raw.slice(0, 200000),
         });
