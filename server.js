@@ -2517,11 +2517,21 @@ http
           raw: raw.slice(0, 200000),
         });
 
+        // Разговор мог не состояться: связь, спешка, случайное нажатие. Тогда
+        // от звонка остаётся только номер — перезванивать придётся вслепую,
+        // и администратор должен видеть это сразу, а не выяснять из пустых полей.
+        // Судим по тому, что узнали, а не по секундам: за двенадцать секунд
+        // можно успеть сказать «зуб болит», и это уже не пустой звонок.
+        const barelyTalked =
+          !booking.name && !booking.service && !booking.when && !booking.summary;
+
         // Неотложка идёт отдельным сообщением: её нельзя пролистать в общем списке.
         const head = booking.urgent
           ? "🚨 <b>Срочный звонок</b>"
           : booking.booked
           ? "✅ <b>Новая запись</b>"
+          : barelyTalked
+          ? "📵 <b>Только номер — поговорить не успели</b>"
           : "📋 <b>Звонок без записи</b>";
 
         // Время по Алматы: клиника читает отчёт утром и должна сразу понимать,
@@ -2535,12 +2545,16 @@ http
 
         await notifyTelegram(
           head + "\n" + almaty + " (Алматы)\n\n" +
-          row("Имя", booking.name) +
-          row("Телефон", booking.phone) +
-          row("Услуга", booking.service) +
-          row("Когда хочет", booking.when) +
-          "\nРазговор: " + booking.seconds + " с" +
-          (booking.summary ? "\n\n" + booking.summary : "")
+          (barelyTalked
+            ? "Телефон: " + (booking.phone || "<i>скрыт</i>") + "\n" +
+              "\nЗвонок длился " + booking.seconds + " с — человек не назвал " +
+              "ни имени, ни причины.\nПерезвоните: зачем звонил, мы не знаем."
+            : row("Имя", booking.name) +
+              row("Телефон", booking.phone) +
+              row("Услуга", booking.service) +
+              row("Когда хочет", booking.when) +
+              "\nРазговор: " + booking.seconds + " с" +
+              (booking.summary ? "\n\n" + booking.summary : ""))
         );
 
         res.writeHead(200, { "Content-Type": MIME[".json"] });
