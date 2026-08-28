@@ -154,17 +154,34 @@ function provider() {
 
 function available() { return !!provider(); }
 
+const PROFILE_KEYS = ["name", "city", "address", "hours", "services", "doctors", "extra"];
+
 // Модель иногда оборачивает JSON в ```json — вырезаем сами, а не просим её
 // переделать: лишний заход стоит времени на глазах у клиники.
 function parseJson(out) {
   const m = String(out).match(/\{[\s\S]*\}/);
   if (!m) throw new Error("model_gave_no_json");
-  return JSON.parse(m[0]);
+  const raw = JSON.parse(m[0]);
+  // Схема требует строк, но подстраховываемся: список, пришедший массивом,
+  // склеиваем переносами, а не запятыми — иначе цены встанут в одну строку.
+  const out2 = {};
+  for (const k of PROFILE_KEYS) {
+    const v = raw[k];
+    out2[k] = Array.isArray(v) ? v.filter(Boolean).join("\n") : String(v == null ? "" : v);
+  }
+  return out2;
 }
 
-async function askGemini(body) {
+// Закреплённая версия однажды закрывается для новых аккаунтов — мы это уже
+// поймали на gemini-2.5-flash, и поймали только потому, что проверяли руками.
+// В проде такое всплыло бы при первой же клинике, поэтому на 404 переходим
+// на плавающий алиас: он живёт всегда.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.7-flash";
+const GEMINI_FALLBACK = "gemini-flash-latest";
+
+async function askGemini(body, model) {
   const key = keyFrom("GEMINI_API_KEY", ".gemini-key");
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  model = model || GEMINI_MODEL;
   const res = await fetch(
     "https://generativelanguage.googleapis.com/v1beta/models/" +
     encodeURIComponent(model) + ":generateContent",
@@ -176,15 +193,28 @@ async function askGemini(body) {
         contents: [{ role: "user", parts: [{ text: body }] }],
         generationConfig: {
           temperature: 0,
-          maxOutputTokens: 2000,
+          maxOutputTokens: 4000,
           // Просим сразу JSON: так реже приходится выковыривать его из текста.
           responseMimeType: "application/json",
+          // Схема, а не уговоры в промпте. Без неё одна модель отдаёт услуги
+          // строкой, другая — массивом, и цены слипаются через запятую.
+          responseSchema: {
+            type: "OBJECT",
+            properties: Object.fromEntries(
+              PROFILE_KEYS.map((k) => [k, { type: "STRING" }])
+            ),
+            required: PROFILE_KEYS,
+          },
         },
       }),
       signal: AbortSignal.timeout(90000),
     }
   );
   const text = await res.text();
+  if (res.status === 404 && model !== GEMINI_FALLBACK) {
+    console.log("[enrich] модель " + model + " недоступна, беру " + GEMINI_FALLBACK);
+    return askGemini(body, GEMINI_FALLBACK);
+  }
   if (!res.ok) throw new Error("model_" + res.status + ": " + text.slice(0, 200));
   const j = JSON.parse(text);
   const parts = ((j.candidates || [])[0] || {}).content || {};

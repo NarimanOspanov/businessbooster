@@ -43,7 +43,7 @@ async function listGeminiModels(key) {
 
   if (who === "gemini") {
     const key = geminiKey();
-    const want = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+    const want = process.env.GEMINI_MODEL || "gemini-3.7-flash";
     try {
       const models = await listGeminiModels(key);
       console.log("доступно моделей:", models.length);
