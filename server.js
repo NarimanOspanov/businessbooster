@@ -2899,6 +2899,38 @@ http
       return;
     }
 
+    // Запись с витрины. Отдаём только помеченные звонки: голос обезличить
+    // нельзя, а на демо-номер звонят посторонние.
+    if (urlPath === "/api/demo/audio") {
+      (async () => {
+        const clinicId = Number(process.env.DEMO_CLINIC_ID || 1);
+        const id = parsed.searchParams.get("id") || "";
+        const call = await db.callForClinics(id, [clinicId]);
+        const deny = (code, err) => {
+          res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+          res.end(JSON.stringify({ error: err }));
+        };
+        if (!call || !call.demo_public) return deny(404, "not_found");
+        const key = process.env.ELEVENLABS_API_KEY;
+        if (!key) return deny(503, "not_configured");
+        const r = await fetch(
+          "https://api.elevenlabs.io/v1/convai/conversations/" +
+          encodeURIComponent(id) + "/audio",
+          { headers: { "xi-api-key": key } }
+        );
+        if (!r.ok) return deny(502, "audio_unavailable");
+        res.writeHead(200, {
+          "Content-Type": r.headers.get("content-type") || "audio/mpeg",
+          "Cache-Control": "public, max-age=3600",
+        });
+        res.end(Buffer.from(await r.arrayBuffer()));
+      })().catch(() => {
+        res.writeHead(500, { "Content-Type": MIME[".json"] });
+        res.end(JSON.stringify({ error: "internal" }));
+      });
+      return;
+    }
+
     if (urlPath === "/api/demo/call") {
       (async () => {
         const send = (code, obj) => {

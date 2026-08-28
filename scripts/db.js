@@ -115,6 +115,13 @@ IF COL_LENGTH('dbo.clinics', 'profile_saved_at') IS NULL
 IF COL_LENGTH('dbo.clinics', 'agent_built_at') IS NULL
   ALTER TABLE dbo.clinics ADD agent_built_at DATETIME2(0) NULL;
 
+-- Какие звонки можно показывать на витрине со звуком. По умолчанию НИ ОДИН:
+-- демо-номер публичный, на него звонят посторонние, и их голос обезличить
+-- нельзя — в отличие от номера и имени. Отметку ставим руками, для своих
+-- проверочных звонков.
+IF COL_LENGTH('dbo.calls', 'demo_public') IS NULL
+  ALTER TABLE dbo.calls ADD demo_public BIT NOT NULL CONSTRAINT DF_calls_demo_public DEFAULT 0;
+
 -- Пул номеров. Номер у Zadarma активируется до двух рабочих дней, поэтому
 -- купить его в момент онбординга нельзя: клиника нажала «выбрать», а номер
 -- двое суток отвечает автоответчиком. Держим запас заранее и выдаём готовые.
@@ -309,7 +316,7 @@ async function callForClinics(conversationId, clinicIds) {
   const r = await req.query(
     "SELECT TOP 1 conversation_id, received_at, duration_secs, direction, " +
     "caller_number, client_name, client_phone, service, desired_time, " +
-    "is_booked, is_urgent, summary, transcript, clinic_id " +
+    "is_booked, is_urgent, summary, transcript, clinic_id, demo_public " +
     "FROM dbo.calls WHERE conversation_id = @conv AND clinic_id IN (" + names.join(",") + ")"
   );
   return r.recordset[0] || null;
