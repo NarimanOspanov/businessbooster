@@ -118,6 +118,10 @@ async function fetchSource(url) {
 const EXTRACT_PROMPT = `Ты помогаешь заполнить анкету стоматологической клиники по тексту с её
 страниц. Возвращай ТОЛЬКО JSON, без пояснений и без markdown.
 
+Страниц может быть несколько, но все они принадлежат ОДНОЙ клинике. Верни
+ОДИН объект, собрав сведения со всех страниц вместе. Не возвращай массив и не
+делай отдельный объект на каждую страницу.
+
 Поля:
   name      — название клиники
   city      — город
@@ -155,13 +159,51 @@ function provider() {
 function available() { return !!provider(); }
 
 const PROFILE_KEYS = ["name", "city", "address", "hours", "services", "doctors", "extra"];
+// Одиночные сведения не складываются: два адреса подряд — это не адрес.
+const LIST_KEYS = new Set(["services", "doctors", "extra"]);
+
+function asText(v) {
+  return Array.isArray(v) ? v.filter(Boolean).join("\n") : String(v == null ? "" : v).trim();
+}
+
+function mergeProfiles(items) {
+  const out = {};
+  for (const k of PROFILE_KEYS) {
+    const values = items
+      .filter((x) => x && typeof x === "object")
+      .map((x) => asText(x[k]))
+      .filter(Boolean);
+    if (!values.length) { out[k] = ""; continue; }
+    if (!LIST_KEYS.has(k)) { out[k] = values[0]; continue; }
+    const seen = new Set();
+    const lines = [];
+    for (const line of values.join("\n").split("\n")) {
+      const t = line.trim();
+      if (t && !seen.has(t)) { seen.add(t); lines.push(t); }
+    }
+    out[k] = lines.join("\n");
+  }
+  return out;
+}
 
 // Модель иногда оборачивает JSON в ```json — вырезаем сами, а не просим её
 // переделать: лишний заход стоит времени на глазах у клиники.
 function parseJson(out) {
-  const m = String(out).match(/\{[\s\S]*\}/);
-  if (!m) throw new Error("model_gave_no_json");
-  const raw = JSON.parse(m[0]);
+  const text = String(out).trim();
+  let parsed = null;
+  try {
+    parsed = JSON.parse(text); // responseMimeType обычно даёт чистый JSON
+  } catch {
+    const m = text.match(/[\{\[][\s\S]*[\}\]]/);
+    if (!m) throw new Error("model_gave_no_json");
+    parsed = JSON.parse(m[0]);
+  }
+
+  // Получив несколько страниц, модель отвечает массивом — по объекту на
+  // страницу, — даже когда схема просит один объект и промпт просит того же.
+  // Страницы принадлежат одной клинике, поэтому объекты сливаем: адрес берём
+  // первый найденный, а списки складываем, отбрасывая повторы.
+  const raw = Array.isArray(parsed) ? mergeProfiles(parsed) : parsed;
   // Схема требует строк, но подстраховываемся: список, пришедший массивом,
   // склеиваем переносами, а не запятыми — иначе цены встанут в одну строку.
   const out2 = {};
@@ -193,7 +235,12 @@ async function askGemini(body, model) {
         contents: [{ role: "user", parts: [{ text: body }] }],
         generationConfig: {
           temperature: 0,
-          maxOutputTokens: 4000,
+          // Прайс клиники — это десятки строк, и на 4000 ответ обрывался на
+          // полуслове: JSON приходил недописанным. Плюс на «размышления»
+          // уходило до 1400 токенов, хотя выписывать факты из текста думать
+          // не надо — отключаем и отдаём весь бюджет ответу.
+          maxOutputTokens: 12000,
+          thinkingConfig: { thinkingBudget: 0 },
           // Просим сразу JSON: так реже приходится выковыривать его из текста.
           responseMimeType: "application/json",
           // Схема, а не уговоры в промпте. Без неё одна модель отдаёт услуги
@@ -217,8 +264,12 @@ async function askGemini(body, model) {
   }
   if (!res.ok) throw new Error("model_" + res.status + ": " + text.slice(0, 200));
   const j = JSON.parse(text);
-  const parts = ((j.candidates || [])[0] || {}).content || {};
-  return parseJson((parts.parts || []).map((x) => x.text || "").join(""));
+  const cand = (j.candidates || [])[0] || {};
+  // Обрыв по лимиту даёт недописанный JSON. Без отдельной проверки это
+  // выглядит как «модель не вернула JSON», и чинишь совсем не то.
+  if (cand.finishReason === "MAX_TOKENS") throw new Error("model_answer_cut_off");
+  const parts = (cand.content || {}).parts || [];
+  return parseJson(parts.map((x) => x.text || "").join(""));
 }
 
 async function askAnthropic(body) {
