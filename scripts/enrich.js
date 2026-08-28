@@ -6,6 +6,9 @@
 // ответ. Разрешаем только http(s) на публичные адреса.
 const dns = require("dns").promises;
 const net = require("net");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 
 const MAX_BYTES = 700 * 1024;
 const TIMEOUT_MS = 15000;
@@ -130,20 +133,66 @@ const EXTRACT_PROMPT = `Ты помогаешь заполнить анкету 
   по этой анкете ассистент будет называть пациентам цены.
 - Цены переписывай как есть, вместе с "от" и валютой.`;
 
-function anthropicKey() {
-  return process.env.ANTHROPIC_API_KEY || null;
+// Разбором может заниматься любая модель — задача простая: вытащить факты из
+// текста. Берём ту, чей ключ нашёлся, чтобы смена поставщика была настройкой,
+// а не правкой кода. Ключ читаем из переменной окружения, а локально — из
+// файла в домашней папке, как остальные ключи проекта.
+function keyFrom(envName, fileName) {
+  if (process.env[envName]) return process.env[envName].trim();
+  try {
+    return fs.readFileSync(path.join(os.homedir(), fileName), "utf8").trim() || null;
+  } catch {
+    return null;
+  }
 }
 
-function available() { return !!anthropicKey(); }
+function provider() {
+  if (keyFrom("GEMINI_API_KEY", ".gemini-key")) return "gemini";
+  if (keyFrom("ANTHROPIC_API_KEY", ".anthropic-key")) return "anthropic";
+  return null;
+}
 
-async function extractProfile(sources) {
-  const key = anthropicKey();
-  if (!key) throw new Error("no_model_key");
+function available() { return !!provider(); }
 
-  const body = sources
-    .map((s) => "СТРАНИЦА: " + s.url + "\n\n" + s.text.slice(0, 24000))
-    .join("\n\n---\n\n");
+// Модель иногда оборачивает JSON в ```json — вырезаем сами, а не просим её
+// переделать: лишний заход стоит времени на глазах у клиники.
+function parseJson(out) {
+  const m = String(out).match(/\{[\s\S]*\}/);
+  if (!m) throw new Error("model_gave_no_json");
+  return JSON.parse(m[0]);
+}
 
+async function askGemini(body) {
+  const key = keyFrom("GEMINI_API_KEY", ".gemini-key");
+  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  const res = await fetch(
+    "https://generativelanguage.googleapis.com/v1beta/models/" +
+    encodeURIComponent(model) + ":generateContent",
+    {
+      method: "POST",
+      headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: EXTRACT_PROMPT }] },
+        contents: [{ role: "user", parts: [{ text: body }] }],
+        generationConfig: {
+          temperature: 0,
+          maxOutputTokens: 2000,
+          // Просим сразу JSON: так реже приходится выковыривать его из текста.
+          responseMimeType: "application/json",
+        },
+      }),
+      signal: AbortSignal.timeout(90000),
+    }
+  );
+  const text = await res.text();
+  if (!res.ok) throw new Error("model_" + res.status + ": " + text.slice(0, 200));
+  const j = JSON.parse(text);
+  const parts = ((j.candidates || [])[0] || {}).content || {};
+  return parseJson((parts.parts || []).map((x) => x.text || "").join(""));
+}
+
+async function askAnthropic(body) {
+  const key = keyFrom("ANTHROPIC_API_KEY", ".anthropic-key");
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -152,23 +201,27 @@ async function extractProfile(sources) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-5",
+      model: process.env.ANTHROPIC_MODEL || "claude-sonnet-5",
       max_tokens: 2000,
       system: EXTRACT_PROMPT,
-      messages: [{ role: "user", content: body.slice(0, 90000) }],
+      messages: [{ role: "user", content: body }],
     }),
     signal: AbortSignal.timeout(90000),
   });
   const text = await res.text();
   if (!res.ok) throw new Error("model_" + res.status + ": " + text.slice(0, 200));
-
   const j = JSON.parse(text);
-  const out = (j.content || []).map((c) => c.text || "").join("");
-  // Модель иногда оборачивает JSON в ```json — вырезаем сами, а не просим её
-  // ещё раз: лишний заход стоит времени на глазах у клиники.
-  const m = out.match(/\{[\s\S]*\}/);
-  if (!m) throw new Error("model_gave_no_json");
-  return JSON.parse(m[0]);
+  return parseJson((j.content || []).map((c) => c.text || "").join(""));
 }
 
-module.exports = { fetchSource, extractProfile, available, htmlToText, assertPublicUrl, isPrivateIp };
+async function extractProfile(sources) {
+  const who = provider();
+  if (!who) throw new Error("no_model_key");
+  const body = sources
+    .map((s) => "СТРАНИЦА: " + s.url + "\n\n" + s.text.slice(0, 24000))
+    .join("\n\n---\n\n")
+    .slice(0, 90000);
+  return who === "gemini" ? askGemini(body) : askAnthropic(body);
+}
+
+module.exports = { fetchSource, extractProfile, available, provider, htmlToText, assertPublicUrl, isPrivateIp };
