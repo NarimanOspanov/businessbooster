@@ -1688,6 +1688,21 @@ function demoCallsSince(hours) {
 }
 
 // +7 7XX XXX XX XX — казахстанские мобильные. Иначе демо звонит куда попало.
+// Модель речи размечает свои реплики тегами подачи — [Friendly], [Efficient],
+// [Professional]. Вслух они не звучат, но в расшифровку попадают как текст, и
+// клиника видит их вперемешку со словами. Убираем только латинские теги в
+// начале реплики: русский текст в скобках может быть настоящей речью.
+function stripAudioTags(text) {
+  return String(text || "")
+    .replace(/^(?:\s*\[[A-Za-z][A-Za-z \-]{0,24}\])+\s*/, "")
+    .trim();
+}
+
+function cleanTranscript(turns) {
+  if (!Array.isArray(turns)) return turns;
+  return turns.map((t) => Object.assign({}, t, { message: stripAudioTags(t.message) }));
+}
+
 // Витрина кабинета открыта без входа, а звонили в неё живые люди. Показываем,
 // как выглядит работа, но не сдаём тех, кто звонил: от номера оставляем код
 // оператора и две последние цифры, от имени — только имя.
@@ -3030,7 +3045,7 @@ http
           phone_number_id: pc.phone_number_id || "",
           agent_number: pc.agent_number || "",
           direction: pc.direction || "",
-          transcript: d.transcript ? JSON.stringify(d.transcript) : null,
+          transcript: d.transcript ? JSON.stringify(cleanTranscript(d.transcript)) : null,
           raw: raw.slice(0, 200000),
         });
 
