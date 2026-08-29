@@ -3342,6 +3342,15 @@ http
 
     fs.readFile(filePath, (err, data) => {
       if (err) {
+        // Подстановка главной уместна для адресов страниц, но не для файлов.
+        // Картинка, которую не нашли, возвращалась как HTML с кодом 200 —
+        // браузер показывал битый значок, а причину приходилось искать в
+        // трёх местах. Отсутствующий файл должен отвечать 404.
+        const ext = path.extname(urlPath).toLowerCase();
+        if (ext && ext !== ".html" && ext !== ".htm") {
+          res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }).end("Not found");
+          return;
+        }
         // SPA-стиль: на неизвестные пути отдаём главную
         fs.readFile(path.join(ROOT, "index.html"), (err2, home) => {
           if (err2) {
