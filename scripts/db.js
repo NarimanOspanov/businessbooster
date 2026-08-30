@@ -122,6 +122,12 @@ IF COL_LENGTH('dbo.clinics', 'agent_built_at') IS NULL
 IF COL_LENGTH('dbo.calls', 'demo_public') IS NULL
   ALTER TABLE dbo.calls ADD demo_public BIT NOT NULL CONSTRAINT DF_calls_demo_public DEFAULT 0;
 
+-- Ключ, по которому ассистент клиники обращается к нашему посреднику за её
+-- расписанием. Лежит в конфигурации агента, а не на странице: по нему мы
+-- узнаём клинику, не принимая её идентификатор из запроса.
+IF COL_LENGTH('dbo.clinics', 'tool_key') IS NULL
+  ALTER TABLE dbo.clinics ADD tool_key NVARCHAR(64) NULL;
+
 -- Пул номеров. Номер у Zadarma активируется до двух рабочих дней, поэтому
 -- купить его в момент онбординга нельзя: клиника нажала «выбрать», а номер
 -- двое суток отвечает автоответчиком. Держим запас заранее и выдаём готовые.
@@ -155,6 +161,8 @@ END
 const SCHEMA_INDEXES = `
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_calls_clinic' AND object_id = OBJECT_ID('dbo.calls'))
   CREATE INDEX IX_calls_clinic ON dbo.calls (clinic_id, received_at DESC);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UX_clinics_tool_key')
+  CREATE UNIQUE INDEX UX_clinics_tool_key ON dbo.clinics (tool_key) WHERE tool_key IS NOT NULL;
 `;
 
 async function migrate() {
@@ -361,6 +369,34 @@ async function setClinicAgent(clinicId, agentId) {
     .query("UPDATE dbo.clinics SET agent_id = @agent, agent_built_at = SYSUTCDATETIME() WHERE id = @id");
 }
 
+// Клиника по ключу инструмента. Ключ приходит от ElevenLabs вместе с вызовом
+// инструмента — это единственное, чем звонок себя называет.
+async function clinicByToolKey(k) {
+  if (!k) return null;
+  const pool = await getPool();
+  const r = await pool
+    .request()
+    .input("k", sql.NVarChar(64), String(k))
+    .query(
+      "SELECT TOP 1 id, name, profile_json FROM dbo.clinics " +
+      "WHERE tool_key = @k AND is_active = 1"
+    );
+  return r.recordset[0] || null;
+}
+
+// Ключ выдаём один раз и больше не меняем: он зашит в конфигурацию агента.
+async function ensureToolKey(clinicId) {
+  const pool = await getPool();
+  const cur = await pool.request().input("id", sql.Int, clinicId)
+    .query("SELECT tool_key FROM dbo.clinics WHERE id = @id");
+  const have = cur.recordset[0] && cur.recordset[0].tool_key;
+  if (have) return have;
+  const key = require("crypto").randomBytes(24).toString("base64url");
+  await pool.request().input("id", sql.Int, clinicId).input("k", sql.NVarChar(64), key)
+    .query("UPDATE dbo.clinics SET tool_key = @k WHERE id = @id");
+  return key;
+}
+
 // ---------------------------------------------------------------------------
 // Пул номеров.
 
@@ -450,7 +486,7 @@ async function releaseNumber(number) {
   return r.recordset.length ? r.recordset[0].number : null;
 }
 
-module.exports = { getPool, migrate, saveCall, connectionString, clinicIdForCall, upsertClinic, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
+module.exports = { getPool, migrate, saveCall, connectionString, clinicIdForCall, upsertClinic, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 
 if (require.main === module) {
   const cmd = process.argv[2];

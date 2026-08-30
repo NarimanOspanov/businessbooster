@@ -1471,6 +1471,11 @@ async function buildCompetitors(slug) {
 const crypto = require("crypto");
 const db = require("./scripts/db");
 const agentTemplate = require("./scripts/agent-template");
+// Инструменты агента ведут на наш сервер. Адрес берём из настройки, а не из
+// заголовка Host: заголовок присылает клиент, и подменив его, он подменил бы
+// и адрес, по которому ассистент пойдёт за расписанием.
+const PUBLIC_URL = (process.env.PUBLIC_URL || "https://otvet.mobi").replace(/\/+$/, "");
+
 const enrich = require("./scripts/enrich");
 const CLERK_PK = process.env.CLERK_PUBLISHABLE_KEY || "";
 const CLERK_SK = process.env.CLERK_SECRET_KEY || "";
@@ -2694,12 +2699,16 @@ http
           try { profile = JSON.parse(c.profile_json || "{}"); } catch {}
           if (!profile.name) return send(400, { error: "profile_empty" });
 
+          // Ключ выдаётся один раз: он зашит в адреса инструментов агента.
+          const toolKey = await db.ensureToolKey(myClinic);
+          const opts = { toolKey: toolKey, baseUrl: PUBLIC_URL };
+
           let agentId = c.agent_id;
           // Базового агента не трогаем: он общий и обслуживает демо на сайте.
           if (!agentId || agentId === agentTemplate.BASE_AGENT) {
-            agentId = await agentTemplate.createAgent(profile);
+            agentId = await agentTemplate.createAgent(profile, opts);
           } else {
-            await agentTemplate.updateAgent(agentId, profile);
+            await agentTemplate.updateAgent(agentId, profile, opts);
           }
           await db.setClinicAgent(myClinic, agentId);
 
@@ -2778,6 +2787,93 @@ http
         console.log("[cabinet] " + String(e.message).slice(0, 200));
         res.writeHead(500, { "Content-Type": MIME[".json"] });
         res.end(JSON.stringify({ error: "internal" }));
+      });
+      return;
+    }
+
+    // Инструменты ассистента: во время разговора он спрашивает у нас свободное
+    // время и записывает пациента. Мы — посредник, а не сквозной проброс:
+    //   · ключ доступа клиники остаётся у нас и не уезжает в ElevenLabs;
+    //   · адрес клиники проверяется тем же правилом, что и чтение сайтов, иначе
+    //     кабинет становится способом ходить по внутренней сети Azure;
+    //   · ответ приводим к короткому виду — модели нужен смысл, а не выгрузка.
+    if (urlPath.startsWith("/api/tools/")) {
+      (async () => {
+        const send = (code, obj) => {
+          res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+          res.end(JSON.stringify(obj));
+        };
+        const clinic = await db.clinicByToolKey(parsed.searchParams.get("k"));
+        // Ассистенту отвечаем понятным текстом, а не кодом ошибки: он это
+        // произнесёт вслух, и «404» в трубке звучит хуже, чем «не знаю».
+        const nope = (why) => send(200, { ok: false, message: why });
+        if (!clinic) return nope("Расписание недоступно.");
+
+        let profile = {};
+        try { profile = JSON.parse(clinic.profile_json || "{}"); } catch {}
+        const token = profile.book_token || "";
+        const headers = { "Content-Type": "application/json", Accept: "application/json" };
+        if (token) headers.Authorization = "Bearer " + token;
+
+        async function callClinic(rawUrl, init) {
+          let url;
+          try { url = await enrich.assertPublicUrl(rawUrl); }
+          catch { throw new Error("bad_url"); }
+          const r = await fetch(url, {
+            ...init, headers, redirect: "manual", signal: AbortSignal.timeout(8000),
+          });
+          const text = (await r.text()).slice(0, 4000);
+          if (!r.ok) throw new Error("http_" + r.status);
+          try { return JSON.parse(text); } catch { return { raw: text }; }
+        }
+
+        if (urlPath === "/api/tools/slots") {
+          if (!profile.book_read_url) {
+            return nope("Свободное время я не вижу — предложите перезвонить утром.");
+          }
+          const date = String(parsed.searchParams.get("date") || "").slice(0, 40);
+          const u = profile.book_read_url + (profile.book_read_url.includes("?") ? "&" : "?") +
+            "date=" + encodeURIComponent(date);
+          try {
+            const data = await callClinic(u, { method: "GET" });
+            const slots = Array.isArray(data) ? data : (data.slots || data.items || []);
+            return send(200, { ok: true, slots: slots.slice(0, 12) });
+          } catch (e) {
+            console.log("[tools] slots клиника " + clinic.id + ": " + e.message);
+            return nope("Расписание сейчас не отвечает — запишите контакт и перезвоните.");
+          }
+        }
+
+        if (urlPath === "/api/tools/book") {
+          if (req.method !== "POST") return send(405, { ok: false });
+          if (!profile.book_write_url) {
+            return nope("Записать в программу не могу — передайте заявку администратору.");
+          }
+          let body = {};
+          try { body = JSON.parse(await readBody(req)) || {}; } catch {}
+          const payload = {
+            name: String(body.name || "").slice(0, 120),
+            phone: normalizeKzMobile(body.phone) || String(body.phone || "").slice(0, 32),
+            service: String(body.service || "").slice(0, 200),
+            time: String(body.time || "").slice(0, 120),
+            source: "otvet.mobi",
+          };
+          try {
+            const data = await callClinic(profile.book_write_url, {
+              method: "POST", body: JSON.stringify(payload),
+            });
+            return send(200, { ok: true, booked: true, result: data });
+          } catch (e) {
+            console.log("[tools] book клиника " + clinic.id + ": " + e.message);
+            return nope("Записать не получилось — я передам заявку администратору.");
+          }
+        }
+
+        send(404, { ok: false });
+      })().catch((e) => {
+        console.log("[tools] " + String(e.message).slice(0, 200));
+        res.writeHead(200, { "Content-Type": MIME[".json"] });
+        res.end(JSON.stringify({ ok: false, message: "Не получилось проверить расписание." }));
       });
       return;
     }
@@ -2875,11 +2971,13 @@ http
 
           await db.saveClinicProfile(clinicId, profile);
           const clinic = await db.clinicById(clinicId);
+          const toolKey = await db.ensureToolKey(clinicId);
+          const opts = { toolKey: toolKey, baseUrl: PUBLIC_URL };
           let agentId = clinic.agent_id;
           if (!agentId || agentId === agentTemplate.BASE_AGENT) {
-            agentId = await agentTemplate.createAgent(profile);
+            agentId = await agentTemplate.createAgent(profile, opts);
           } else {
-            await agentTemplate.updateAgent(agentId, profile);
+            await agentTemplate.updateAgent(agentId, profile, opts);
           }
           await db.setClinicAgent(clinicId, agentId);
           return send(200, { ok: true, clinic_id: clinicId, org_id: orgId });

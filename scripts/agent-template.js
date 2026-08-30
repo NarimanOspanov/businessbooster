@@ -151,7 +151,15 @@ function block(title, value) {
   return value ? "\n\n" + title + "\n" + value : "";
 }
 
-function buildPrompt(raw) {
+const TOOLS_RULE = `РАСПИСАНИЕ КЛИНИКИ
+У тебя есть доступ к живому расписанию.
+- Прежде чем назвать пациенту час, вызови check_slots и предлагай только то,
+  что он вернул. Своё время не придумывай никогда.
+- Когда пациент подтвердил час, вызови book_slot и запиши его.
+- Если инструмент вернул ok:false — не настаивай: скажи, что уточнишь у
+  администратора и вам перезвонят, и возьми контакт.`;
+
+function buildPrompt(raw, withTools) {
   const p = clean(raw);
   const where = [p.city, p.address].filter(Boolean).join(", ");
 
@@ -165,6 +173,7 @@ function buildPrompt(raw) {
   s += block("УСЛУГИ И ЦЕНЫ", p.services);
   s += block("ВРАЧИ", p.doctors);
   s += block("КАК ЗАПИСЫВАТЬ", p.booking);
+  if (withTools) s += "\n\n" + TOOLS_RULE;
   s += "\n\nСРОЧНЫЕ СЛУЧАИ — ВАЖНЕЕ ВСЕГО ОСТАЛЬНОГО\n" + (p.urgent || URGENT_DEFAULT);
   s += block("ЧТО ЕЩЁ ВАЖНО", p.extra);
 
@@ -182,18 +191,102 @@ function buildFirstMessage(raw) {
     "удобнее говорить — қазақша, по-русски или English?";
 }
 
+
+// --- инструменты ассистента ------------------------------------------------
+//
+// Ассистент умеет во время разговора спросить свободное время и записать
+// пациента. Оба инструмента ведут на НАШ сервер, а не на адрес клиники:
+// её ключ доступа не должен оказаться в чужой конфигурации, и ответ нужно
+// привести к короткому виду, прежде чем показывать модели.
+
+function toolDefs(baseUrl, toolKey) {
+  const q = "?k=" + encodeURIComponent(toolKey);
+  return [
+    {
+      type: "webhook",
+      name: "check_slots",
+      description:
+        "Свободное время клиники. Вызывай ПЕРЕД тем, как назвать пациенту час, " +
+        "и никогда не придумывай время сам. Если вернулось ok:false — скажи, " +
+        "что уточнишь у администратора, и возьми контакт.",
+      api_schema: {
+        url: baseUrl + "/api/tools/slots" + q,
+        method: "GET",
+        query_params_schema: {
+          properties: {
+            date: {
+              type: "string",
+              description: "День, который просит пациент: 'сегодня', 'завтра' или дата.",
+            },
+          },
+          required: [],
+        },
+      },
+    },
+    {
+      type: "webhook",
+      name: "book_slot",
+      description:
+        "Записать пациента на выбранное время. Вызывай только после того, как " +
+        "пациент подтвердил час. Если вернулось ok:false — скажи, что передашь " +
+        "заявку администратору.",
+      api_schema: {
+        url: baseUrl + "/api/tools/book" + q,
+        method: "POST",
+        request_body_schema: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "Имя пациента" },
+            phone: { type: "string", description: "Телефон в формате +7XXXXXXXXXX" },
+            service: { type: "string", description: "Какая услуга нужна" },
+            time: { type: "string", description: "Согласованные день и час" },
+          },
+          required: ["name", "time"],
+        },
+      },
+    },
+  ];
+}
+
+// Инструменты живут отдельно от агента и переиспользуются по id. У каждой
+// клиники они свои — в адрес зашит её ключ.
+async function ensureTools(baseUrl, toolKey, existingIds) {
+  const ids = [];
+  for (const def of toolDefs(baseUrl, toolKey)) {
+    const made = await eleven("/v1/convai/tools", {
+      method: "POST",
+      body: JSON.stringify({ tool_config: def }),
+    });
+    ids.push(made.id);
+  }
+  // Старые удаляем после создания новых: если создание упадёт, агент
+  // останется с рабочими инструментами, а не без единого.
+  for (const old of existingIds || []) {
+    try { await eleven("/v1/convai/tools/" + old, { method: "DELETE" }); } catch {}
+  }
+  return ids;
+}
+
+async function deleteTools(ids) {
+  for (const id of ids || []) {
+    try { await eleven("/v1/convai/tools/" + id, { method: "DELETE" }); } catch {}
+  }
+}
+
 // --- создание и обновление агента ----------------------------------------
 
 async function baseConfig() {
   return eleven("/v1/convai/agents/" + BASE_AGENT);
 }
 
-function applyProfile(conversationConfig, profile) {
+function applyProfile(conversationConfig, profile, toolIds) {
   const cc = JSON.parse(JSON.stringify(conversationConfig));
   cc.agent = cc.agent || {};
   cc.agent.first_message = buildFirstMessage(profile);
   cc.agent.prompt = cc.agent.prompt || {};
-  cc.agent.prompt.prompt = buildPrompt(profile);
+  cc.agent.prompt.prompt = buildPrompt(profile, !!(toolIds && toolIds.length));
+  // Пустой список тоже осмыслен: клиника убрала адреса — инструменты уходят.
+  cc.agent.prompt.tool_ids = toolIds || [];
   return cc;
 }
 
@@ -228,27 +321,44 @@ async function checkAgent(agentId) {
   };
 }
 
-async function createAgent(profile) {
+async function createAgent(profile, opts) {
+  opts = opts || {};
   const base = await baseConfig();
+  const toolIds = await wantedTools(profile, opts, []);
   const ps = base.platform_settings || {};
   const made = await eleven("/v1/convai/agents/create", {
     method: "POST",
     body: JSON.stringify({
       name: "Ответ — " + (clean(profile).name || "клиника"),
-      conversation_config: applyProfile(base.conversation_config, profile),
+      conversation_config: applyProfile(base.conversation_config, profile, toolIds),
       platform_settings: platformSettings(ps),
     }),
   });
   return made.agent_id;
 }
 
-async function updateAgent(agentId, profile) {
+// Какие инструменты положены этой клинике: оба адреса пусты — ни одного.
+async function wantedTools(profile, opts, existingIds) {
+  const p = cleanAll(profile);
+  const need = p.book_read_url || p.book_write_url;
+  if (!need || !opts.toolKey || !opts.baseUrl) {
+    await deleteTools(existingIds);
+    return [];
+  }
+  return ensureTools(opts.baseUrl, opts.toolKey, existingIds);
+}
+
+async function updateAgent(agentId, profile, opts) {
+  opts = opts || {};
   const base = await baseConfig();
+  const cur = await eleven("/v1/convai/agents/" + agentId);
+  const had = (((cur.conversation_config || {}).agent || {}).prompt || {}).tool_ids || [];
+  const toolIds = await wantedTools(profile, opts, had);
   await eleven("/v1/convai/agents/" + agentId, {
     method: "PATCH",
     body: JSON.stringify({
       name: "Ответ — " + (clean(profile).name || "клиника"),
-      conversation_config: applyProfile(base.conversation_config, profile),
+      conversation_config: applyProfile(base.conversation_config, profile, toolIds),
       // И при обновлении тоже: агент мог быть создан до того, как мы научились
       // переносить вебхук.
       platform_settings: platformSettings(base.platform_settings || {}),
@@ -264,4 +374,5 @@ async function deleteAgent(agentId) {
 module.exports = {
   FIELDS, SOURCES, INTEGRATION, ALL_FIELDS, clean, cleanAll, buildPrompt, buildFirstMessage,
   createAgent, updateAgent, deleteAgent, checkAgent, BASE_AGENT,
+  toolDefs, ensureTools, deleteTools, wantedTools,
 };
