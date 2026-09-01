@@ -265,6 +265,8 @@
     callErrLimit:"Слишком много звонков. Попробуйте позже.",
     callErrOff:"Демо-звонки сейчас выключены.",
     callErrFailed:"Не удалось дозвониться на этот номер.",
+    callTalking:"Соединились — говорите.",
+    callBlocked:"Ваш оператор не пропустил звонок из-за рубежа. Позвоните сами на +7 727 312 28 37 — ответит тот же ассистент.",
     callErr:"Не получилось позвонить. Попробуйте ещё раз."};
 
   // Номер вводится цифрами, формат ставим сами: на том конце его набирает
@@ -289,6 +291,25 @@
     window.phoneDigits = function () { return digits(input.value); };
   })();
 
+  // Оператор может отбить звонок молча, и форма до сих пор обещала звонок,
+  // которого не будет. Спрашиваем сервер об исходе и говорим как есть.
+  function watchCall(id, st) {
+    var tries = 0;
+    (function ask() {
+      if (++tries > 12) return;
+      setTimeout(function () {
+        fetch('/api/demo-call/status?id=' + encodeURIComponent(id))
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (d.state === 'talking') { st.className = 'status ok'; st.textContent = L.callTalking; return; }
+            if (d.state === 'rejected') { st.className = 'status bad'; st.textContent = L.callBlocked; return; }
+            ask();
+          })
+          .catch(function () {});
+      }, 4000);
+    })();
+  }
+
   document.getElementById('cf').addEventListener('submit', function (e) {
     e.preventDefault();
     var st = document.getElementById('cf-status');
@@ -303,7 +324,11 @@
       body: JSON.stringify({ phone: '+7' + window.phoneDigits(), consent: true, lang: 'ru' })
     }).then(function (r) { return r.json().then(function (d) { return { s: r.status, d: d }; }); })
       .then(function (res) {
-        if (res.s === 200 && res.d.ok) { st.className = 'status ok'; st.textContent = L.callOk; return; }
+        if (res.s === 200 && res.d.ok) {
+          st.className = 'status ok'; st.textContent = L.callOk;
+          if (res.d.id) watchCall(res.d.id, st);
+          return;
+        }
         if (res.d.error === 'bad_number') return fail(L.callErrNumber);
         if (res.s === 429) return fail(L.callErrLimit);
         if (res.s === 503) return fail(L.callErrOff);

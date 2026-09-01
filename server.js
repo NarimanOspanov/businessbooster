@@ -1765,7 +1765,7 @@ async function placeDemoCall(toNumber, agentOverride) {
   if (!parsed || parsed.success !== true) {
     return { ok: false, reason: "call_failed", body: text.slice(0, 400) };
   }
-  return { ok: true, body: text.slice(0, 400) };
+  return { ok: true, id: parsed.conversation_id || null, body: text.slice(0, 400) };
 }
 
 // ---------------------------------------------------------------------------
@@ -3230,13 +3230,54 @@ http
           return send(r.reason === "not_configured" ? 503 : 502, { error: r.reason });
         }
 
-        DEMO_CALL_LOG.push({ at: Date.now(), phone, ip });
+        DEMO_CALL_LOG.push({ at: Date.now(), phone, ip, id: r.id });
         console.log("[demo-call] звоним " + phone);
         await notifyTelegram("☎️ <b>Демо-звонок</b>\n\nНомер: " + phone);
-        send(200, { ok: true });
+        send(200, { ok: true, id: r.id });
       })().catch((e) => {
         res.writeHead(500, { "Content-Type": MIME[".json"] });
         res.end(JSON.stringify({ error: String(e.message).slice(0, 120) }));
+      });
+      return;
+    }
+
+    // Казахстанские операторы отбивают часть зарубежных вызовов молча: Twilio
+    // отдаёт busy, а разговор в ElevenLabs так и остаётся initiated с нулевой
+    // длительностью. Форма спрашивает сюда, чтобы не обещать звонок, которого
+    // не будет.
+    if (urlPath === "/api/demo-call/status") {
+      (async () => {
+        const send = (code, obj) => {
+          res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+          res.end(JSON.stringify(obj));
+        };
+        const id = String(parsed.searchParams.get("id") || "");
+        // Отвечаем только про звонок, заказанный через эту же форму: иначе
+        // ручка превращается в справочник по чужим разговорам.
+        const mine = DEMO_CALL_LOG.find((c) => c.id && c.id === id);
+        if (!mine) return send(404, { error: "unknown_call" });
+
+        const key = process.env.ELEVENLABS_API_KEY;
+        if (!key) return send(503, { error: "not_configured" });
+        let conv = null;
+        try {
+          const r = await fetch("https://api.elevenlabs.io/v1/convai/conversations/" + id, {
+            headers: { "xi-api-key": key }, signal: AbortSignal.timeout(8000),
+          });
+          if (r.ok) conv = await r.json();
+        } catch { /* сеть до ElevenLabs рвётся — тогда честнее сказать «звонит» */ }
+        if (!conv) return send(200, { state: "ringing" });
+
+        const secs = (conv.metadata && conv.metadata.call_duration_secs) || 0;
+        const age = (Date.now() - mine.at) / 1000;
+        let state = "ringing";
+        if (secs > 0 || conv.status === "in-progress") state = "talking";
+        else if (conv.status === "done") state = "rejected";
+        else if (conv.status === "initiated" && age > 35) state = "rejected";
+        send(200, { state: state });
+      })().catch(() => {
+        res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+        res.end(JSON.stringify({ state: "ringing" }));
       });
       return;
     }
