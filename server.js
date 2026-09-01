@@ -1731,6 +1731,19 @@ function maskCall(c) {
   return out;
 }
 
+// Коды стран, которые предлагает форма. Список нужен не для красоты: без него
+// через демо-звонок можно набирать платные номера в любой точке мира за наш счёт.
+const DEMO_DIAL_CODES = ["996", "998", "994", "995", "971", "90", "49", "7", "1"];
+function normalizeDemoPhone(raw) {
+  const d = String(raw || "").replace(/[^0-9]/g, "");
+  if (d.length < 8 || d.length > 15) return null;
+  const code = DEMO_DIAL_CODES.find((c) => d.startsWith(c));
+  if (!code) return null;
+  const rest = d.slice(code.length);
+  if (rest.length < 6 || rest.length > 12) return null;
+  return "+" + d;
+}
+
 function normalizeKzMobile(raw) {
   const d = String(raw || "").replace(/[^0-9]/g, "");
   if (d.length === 11 && (d[0] === "7" || d[0] === "8") && d[1] === "7") return "+7" + d.slice(1);
@@ -1740,32 +1753,27 @@ function normalizeKzMobile(raw) {
 
 // agentOverride — чтобы клиника из кабинета услышала СВОЕГО ассистента, а не
 // общего демонстрационного.
-// Через какую ручку звонить, зависит от того, чей номер: у Twilio и у
-// SIP-транка они разные. Спрашиваем ElevenLabs один раз и запоминаем —
-// иначе каждый демо-звонок начинался бы с лишнего запроса.
-let DEMO_PHONE_PROVIDER = null;
-async function demoCallEndpoint(key, phoneId) {
-  if (!DEMO_PHONE_PROVIDER) {
-    try {
-      const r = await fetch("https://api.elevenlabs.io/v1/convai/phone-numbers/" + phoneId, {
-        headers: { "xi-api-key": key }, signal: AbortSignal.timeout(8000),
-      });
-      if (r.ok) DEMO_PHONE_PROVIDER = (await r.json()).provider || "twilio";
-    } catch { /* не дозвонились до API — считаем, что номер прежний, твилиевский */ }
-  }
-  return DEMO_PHONE_PROVIDER === "sip_trunk"
-    ? "https://api.elevenlabs.io/v1/convai/sip-trunk/outbound-call"
-    : "https://api.elevenlabs.io/v1/convai/twilio/outbound-call";
-}
+// Казахстанский номер Zadarma. Часть операторов Казахстана отбивает вызовы с
+// зарубежного определителя — проверено: один и тот же абонент отказал пяти
+// звонкам с номера Twilio и снял трубку на первом же с алматинского. Поэтому
+// внутрь страны звоним отсюда, а за границу — по-прежнему через Twilio,
+// потому что с казахстанского номера Zadarma наружу звонить не разрешает.
+const KZ_PHONE_ID = process.env.ELEVENLABS_PHONE_NUMBER_ID_KZ ||
+  "phnum_9801m11yd9nyfv7986sgzd40rdjd";
+const isKzMobile = (e164) => /^\+77\d{9}$/.test(String(e164 || ""));
 
 async function placeDemoCall(toNumber, agentOverride) {
   const key = process.env.ELEVENLABS_API_KEY;
   const agentId = agentOverride || process.env.ELEVENLABS_AGENT_ID;
-  const phoneId = process.env.ELEVENLABS_PHONE_NUMBER_ID;
+  const viaKz = isKzMobile(toNumber) && KZ_PHONE_ID;
+  const phoneId = viaKz ? KZ_PHONE_ID : process.env.ELEVENLABS_PHONE_NUMBER_ID;
   if (!key || !agentId || !phoneId) {
     return { ok: false, reason: "not_configured" };
   }
-  const res = await fetch(await demoCallEndpoint(key, phoneId), {
+  const endpoint = viaKz
+    ? "https://api.elevenlabs.io/v1/convai/sip-trunk/outbound-call"
+    : "https://api.elevenlabs.io/v1/convai/twilio/outbound-call";
+  const res = await fetch(endpoint, {
     method: "POST",
     headers: { "xi-api-key": key, "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -3228,7 +3236,7 @@ http
         // Без явного согласия не звоним: иначе сюда впишут чужой номер.
         if (body.consent !== true) return send(400, { error: "consent_required" });
 
-        const phone = normalizeKzMobile(body.phone);
+        const phone = normalizeDemoPhone(body.phone);
         if (!phone) return send(400, { error: "bad_number" });
 
         const ip = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() ||

@@ -38,9 +38,10 @@
 
         <form class="callform" id="cf">
           <div class="phonewrap">
-            <span class="cc">+7</span>
+            <button type="button" class="cc" id="cf-cc" aria-haspopup="listbox" aria-expanded="false"></button>
+            <ul class="cclist" id="cf-cclist" role="listbox" hidden></ul>
             <input id="cf-phone" type="tel" inputmode="numeric" autocomplete="tel"
-                   placeholder="707 000 00 00" maxlength="13" required aria-label="Телефон нөміріңіз">
+                   placeholder="707 000 00 00" maxlength="16" required aria-label="Телефон нөміріңіз">
           </div>
           <button class="btn btn-accent" type="submit" id="cf-send">Қоңырау шалыңыз</button>
         </form>
@@ -259,6 +260,7 @@
   </div>
 </div></footer>
 
+<script src="/assets/phone.js" defer></script>
 <script>
   var L = {callBtn:"Қоңырау шалыңыз",callGoing:"Теріп жатырмыз…",callOk:"Ассистент қоңырау шалып жатыр. Тұтқаны алыңыз.",
     callErrNumber:"Қазақстандық ұялы нөмір керек, +7 7XX…",
@@ -269,27 +271,7 @@
     callBlocked:"Қоңырау шалу мүмкін болмады: нөмір жауап бермеді немесе оператор өткізбеді. Өзіңіз +7 727 312 28 37 нөміріне қоңырау шалыңыз — сол ассистент жауап береді.",
     callErr:"Қоңырау шалу шықпады. Тағы көріңіз."};
 
-  // Номер вводится цифрами, формат ставим сами: на том конце его набирает
-  // телефония, и «8 (707)» уходит в неудавшийся звонок.
-  (function () {
-    var input = document.getElementById('cf-phone');
-    function digits(v) {
-      var d = String(v).replace(/[^0-9]/g, '');
-      if (d.length && (d[0] === '8' || d[0] === '7') && d.length > 10) d = d.slice(1);
-      return d.slice(0, 10);
-    }
-    function pretty(d) {
-      var out = d.slice(0, 3);
-      if (d.length > 3) out += ' ' + d.slice(3, 6);
-      if (d.length > 6) out += ' ' + d.slice(6, 8);
-      if (d.length > 8) out += ' ' + d.slice(8, 10);
-      return out;
-    }
-    function sync() { input.value = pretty(digits(input.value)); }
-    input.addEventListener('input', sync);
-    input.addEventListener('paste', function () { setTimeout(sync, 0); });
-    window.phoneDigits = function () { return digits(input.value); };
-  })();
+  window.COUNTRY_NAMES = {kz:"Қазақстан",ru:"Ресей",kg:"Қырғызстан",uz:"Өзбекстан",az:"Әзірбайжан",ge:"Грузия",tr:"Түркия",ae:"БАӘ",de:"Германия",us:"АҚШ"};
 
   // Оператор қоңырауды үнсіз қайтаруы мүмкін — сервердің жауабын сұрап,
   // болған-болмағанын шын күйінде айтамыз.
@@ -315,13 +297,12 @@
     var st = document.getElementById('cf-status');
     var btn = document.getElementById('cf-send');
     var fail = function (m) { st.className = 'status bad'; st.textContent = m; };
-    if (window.phoneDigits().length !== 10) {
-      fail(L.callErrNumber); document.getElementById('cf-phone').focus(); return;
-    }
+    var to = window.phoneE164 && window.phoneE164();
+    if (!to) { fail(L.callErrNumber); document.getElementById('cf-phone').focus(); return; }
     btn.disabled = true; st.className = 'status'; st.textContent = L.callGoing;
     fetch('/api/demo-call', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone: '+7' + window.phoneDigits(), consent: true, lang: 'kk' })
+      body: JSON.stringify({ phone: to, consent: true, lang: 'kk' })
     }).then(function (r) { return r.json().then(function (d) { return { s: r.status, d: d }; }); })
       .then(function (res) {
         if (res.s === 200 && res.d.ok) {
