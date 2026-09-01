@@ -1763,8 +1763,11 @@ function normalizeKzMobile(raw) {
 // звонкам с номера Twilio и снял трубку на первом же с алматинского. Поэтому
 // внутрь страны звоним отсюда, а за границу — по-прежнему через Twilio,
 // потому что с казахстанского номера Zadarma наружу звонить не разрешает.
-const KZ_PHONE_ID = process.env.ELEVENLABS_PHONE_NUMBER_ID_KZ ||
-  "phnum_9801m11yd9nyfv7986sgzd40rdjd";
+// Пока пусто: транк Zadarma принимает вызов и сам же кладёт трубку через
+// четыре секунды, до абонента звонок не доходит. Как только исходящий маршрут
+// в АТС заработает, номер вписывается в ELEVENLABS_PHONE_NUMBER_ID_KZ — и
+// казахстанские звонки пойдут через Алматы без выкладки кода.
+const KZ_PHONE_ID = process.env.ELEVENLABS_PHONE_NUMBER_ID_KZ || "";
 const isKzMobile = (e164) => /^\+77\d{9}$/.test(String(e164 || ""));
 
 async function placeDemoCall(toNumber, agentOverride) {
