@@ -29,7 +29,7 @@ DIM = colors.HexColor("#4a6b72")
 # город: (население тыс., всего медорганизаций, стоматологий)
 # None — справочник такой страницы не отдаёт
 CITIES = [
-    ("Алматы",            2230, None, 693),
+    ("Алматы",            2230, "≈1900–3600", 693),
     ("Астана",            1500,  973, None),
     ("Шымкент",           1250,  563, None),
     ("Актобе",             560,  222, None),
@@ -60,16 +60,25 @@ styles = {
 }
 
 def per100k(count, pop):
-    return None if count is None else round(count / (pop / 100.0), 1)
+    # оценка приходит строкой — плотность по ней не считаем, чтобы диапазон
+    # не превращался в одно ложно-точное число
+    if count is None or isinstance(count, str):
+        return None
+    return round(count / (pop / 100.0), 1)
 
 def bar_table(rows, value_key, title, unit, color):
     """Горизонтальные полосы прямо в таблице: без графической библиотеки,
     зато печатается одинаково везде."""
-    vals = [r[value_key] for r in rows if r[value_key] is not None]
+    vals = [r[value_key] for r in rows
+            if r[value_key] is not None and not isinstance(r[value_key], str)]
     top = max(vals) if vals else 1
     data = [[Paragraph("Город", styles["cellh"]), Paragraph(unit, styles["cellh"]), ""]]
     for r in rows:
         v = r[value_key]
+        if isinstance(v, str):
+            data.append([Paragraph(r["city"], styles["cell"]),
+                         Paragraph(v, styles["small"]), ""])
+            continue
         if v is None:
             data.append([Paragraph(r["city"], styles["cell"]),
                          Paragraph("нет данных", styles["small"]), ""])
@@ -119,7 +128,11 @@ head = ["Город", "Население,<br/>тыс.", "Всего<br/>мед�
 data = [[Paragraph(h, styles["cellh"]) for h in head]]
 for r in rows:
     def f(v):
-        return "—" if v is None else ("%g" % v).replace(".", ",")
+        if v is None:
+            return "—"
+        if isinstance(v, str):
+            return v
+        return ("%g" % v).replace(".", ",")
     data.append([
         Paragraph(r["city"], styles["cellb"]),
         Paragraph(f(r["pop"]), styles["cell"]),
@@ -143,11 +156,15 @@ t.setStyle(TableStyle([
 S.append(t)
 S.append(Spacer(1, 4 * mm))
 S.append(Paragraph("Прочерк — справочник не отдаёт такую страницу по этому городу, "
-                   "а не «ноль клиник».", styles["small"]))
+                   "а не «ноль клиник». По Алматы общей страницы нет, поэтому «всего» — "
+                   "оценка: стоматологии в других городах занимают от 19% до 36% всех "
+                   "медорганизаций, и 693 алматинские стоматологии дают этот диапазон.",
+                   styles["small"]))
 
 S.append(PageBreak())
 
-S.append(bar_table(sorted([r for r in rows], key=lambda r: -(r["med"] or 0)),
+S.append(bar_table(sorted([r for r in rows],
+                          key=lambda r: -(r["med"] if isinstance(r["med"], int) else 0)),
                    "med", "Медорганизаций в городе", "штук", TEAL))
 S.append(Spacer(1, 6 * mm))
 S.append(bar_table(sorted([r for r in rows], key=lambda r: -(r["med100"] or 0)),
@@ -183,6 +200,21 @@ S.append(Paragraph("<b>Где начинать.</b> Города-миллион�
                    "месяц. Города на 200–400 тысяч — Костанай, Петропавловск, Кызылорда, "
                    "Актау, Уральск — позволяют пройти рынок целиком, получить первые "
                    "отзывы и уже с ними идти в Алматы и Астану.", styles["p"]))
+
+S.append(Paragraph("Алматы отдельно", styles["h2"]))
+S.append(Paragraph("Здесь у справочника нет общей страницы по городу, есть только "
+                   "стоматологическая — 693 клиники. Это больше, чем весь список Астаны "
+                   "по всем специальностям, и вдвое больше, чем в Шымкенте с миллионом "
+                   "с четвертью жителей. По плотности стоматологий Алматы тоже первый: "
+                   "31,1 на сто тысяч против 22,6 в Уральске и 18,4 в Актау.", styles["p"]))
+S.append(Paragraph("Оценка по всем медорганизациям — от 1 900 до 3 600. Разброс большой "
+                   "потому, что доля стоматологий по городам гуляет от 19% до 36%; "
+                   "сузить его можно только пересчётом вручную. Но даже нижняя граница "
+                   "делает Алматы вдвое крупнее Астаны, а верхняя — вчетверо.", styles["p"]))
+S.append(Paragraph("Практический вывод от этого не меняется: Алматы — самый большой "
+                   "рынок и самый шумный. Тысячи клиник получают десятки предложений в "
+                   "месяц, и заходить туда без отзывов первых клиник дороже, чем взять "
+                   "город на четверть миллиона и пройти его целиком.", styles["p"]))
 
 S.append(Paragraph("Чего эти цифры не говорят", styles["h2"]))
 S.append(Paragraph("Это счётчик одного справочника, а не перепись. По Костанаю мы "
