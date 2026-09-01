@@ -53,6 +53,10 @@ styles = {
     "small": ParagraphStyle("small", fontName="Body", fontSize=9, leading=13, textColor=DIM, spaceAfter=5),
     "cell": ParagraphStyle("cell", fontName="Body", fontSize=9.5, leading=12.5, textColor=INK),
     "cellb": ParagraphStyle("cellb", fontName="Semi", fontSize=9.5, leading=12.5, textColor=INK),
+    # Абзац несёт свой цвет, и TEXTCOLOR таблицы его не перебивает: без
+    # отдельного стиля шапка получалась тёмной по тёмному.
+    "cellh": ParagraphStyle("cellh", fontName="Semi", fontSize=9.5, leading=12.5,
+                            textColor=colors.white),
 }
 
 def per100k(count, pop):
@@ -63,7 +67,7 @@ def bar_table(rows, value_key, title, unit, color):
     зато печатается одинаково везде."""
     vals = [r[value_key] for r in rows if r[value_key] is not None]
     top = max(vals) if vals else 1
-    data = [[Paragraph("Город", styles["cellb"]), Paragraph(unit, styles["cellb"]), ""]]
+    data = [[Paragraph("Город", styles["cellh"]), Paragraph(unit, styles["cellh"]), ""]]
     for r in rows:
         v = r[value_key]
         if v is None:
@@ -110,9 +114,9 @@ S.append(Paragraph("Сколько медицинских организаций
                    "получается рынок для ИИ-ресепшена. Собрано 1 сентября 2026.", styles["sub"]))
 
 # --- сводная таблица ---
-head = ["Город", "Население,<br/>тыс.", "Медорганизаций", "Стоматологий",
+head = ["Город", "Население,<br/>тыс.", "Всего<br/>медорганизаций", "В том числе<br/>стоматологий",
         "Медорг.<br/>на 100 тыс.", "Стомат.<br/>на 100 тыс."]
-data = [[Paragraph(h, styles["cellb"]) for h in head]]
+data = [[Paragraph(h, styles["cellh"]) for h in head]]
 for r in rows:
     def f(v):
         return "—" if v is None else ("%g" % v).replace(".", ",")
@@ -124,7 +128,7 @@ for r in rows:
         Paragraph(f(r["med100"]), styles["cell"]),
         Paragraph(f(r["dent100"]), styles["cell"]),
     ])
-t = Table(data, colWidths=[36 * mm, 22 * mm, 28 * mm, 26 * mm, 26 * mm, 26 * mm], repeatRows=1)
+t = Table(data, colWidths=[34 * mm, 22 * mm, 32 * mm, 30 * mm, 28 * mm, 28 * mm], repeatRows=1)
 t.setStyle(TableStyle([
     ("BACKGROUND", (0, 0), (-1, 0), INK),
     ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
