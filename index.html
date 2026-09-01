@@ -281,8 +281,10 @@
     callErrLimit:"Слишком много звонков. Попробуйте позже.",
     callErrOff:"Демо-звонки сейчас выключены.",
     callErrFailed:"Не удалось дозвониться на этот номер.",
+    callNumber:"+7 727 312 28 37",
+    callSelf:"Позвоните нам сами:",
     callTalking:"Соединились — говорите.",
-    callBlocked:"Дозвониться не удалось: номер не ответил или оператор не пропустил звонок. Наберите нас сами — +7 727 312 28 37, ответит тот же ассистент.",
+    callBlocked:"Дозвониться не удалось: номер не ответил или оператор не пропустил звонок.",
     callErr:"Не получилось позвонить. Попробуйте ещё раз."};
 
 
@@ -297,7 +299,15 @@
           .then(function (r) { return r.json(); })
           .then(function (d) {
             if (d.state === 'talking') { st.className = 'status ok'; st.textContent = L.callTalking; return; }
-            if (d.state === 'rejected') { st.className = 'status bad'; st.textContent = L.callBlocked; return; }
+            if (d.state === 'rejected') {
+              st.className = 'status bad';
+              st.textContent = L.callBlocked + ' ' + L.callSelf + ' ';
+              var a = document.createElement('a');
+              a.href = 'tel:' + L.callNumber.replace(/[^+0-9]/g, '');
+              a.textContent = L.callNumber;
+              st.appendChild(a);
+              return;
+            }
             ask();
           })
           .catch(function () {});
@@ -309,9 +319,21 @@
     e.preventDefault();
     var st = document.getElementById('cf-status');
     var btn = document.getElementById('cf-send');
-    var fail = function (m) { st.className = 'status bad'; st.textContent = m; };
+    var fail = function (m, withPhone) {
+      st.className = 'status bad';
+      st.textContent = m;
+      // Звонок не дошёл — значит человек должен уйти со страницы не ни с чем,
+      // а с номером, по которому его точно услышат.
+      if (withPhone !== false) {
+        st.appendChild(document.createTextNode(' ' + L.callSelf + ' '));
+        var a = document.createElement('a');
+        a.href = 'tel:' + L.callNumber.replace(/[^+0-9]/g, '');
+        a.textContent = L.callNumber;
+        st.appendChild(a);
+      }
+    };
     var to = window.phoneE164 && window.phoneE164();
-    if (!to) { fail(L.callErrNumber); document.getElementById('cf-phone').focus(); return; }
+    if (!to) { fail(L.callErrNumber, false); document.getElementById('cf-phone').focus(); return; }
     btn.disabled = true; st.className = 'status'; st.textContent = L.callGoing;
     fetch('/api/demo-call', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },

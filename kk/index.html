@@ -282,8 +282,10 @@
     callErrLimit:"Тым көп қоңырау. Кейінірек көріңіз.",
     callErrOff:"Демо-қоңыраулар қазір өшірулі.",
     callErrFailed:"Бұл нөмірге қоңырау шалу мүмкін болмады.",
+    callNumber:"+7 727 312 28 37",
+    callSelf:"Өзіңіз қоңырау шалыңыз:",
     callTalking:"Қосылдық — сөйлей беріңіз.",
-    callBlocked:"Қоңырау шалу мүмкін болмады: нөмір жауап бермеді немесе оператор өткізбеді. Өзіңіз +7 727 312 28 37 нөміріне қоңырау шалыңыз — сол ассистент жауап береді.",
+    callBlocked:"Қоңырау шалу мүмкін болмады: нөмір жауап бермеді немесе оператор өткізбеді.",
     callErr:"Қоңырау шалу шықпады. Тағы көріңіз."};
 
   window.COUNTRY_NAMES = {us:"АҚШ",ca:"Канада",kz:"Қазақстан",ru:"Ресей",gr:"Грекия",nl:"Нидерланды",be:"Бельгия",fr:"Франция",es:"Испания",hu:"Венгрия",it:"Италия",ro:"Румыния",ch:"Швейцария",at:"Австрия",gb:"Ұлыбритания",dk:"Дания",se:"Швеция",no:"Норвегия",pl:"Польша",de:"Германия",tr:"Түркия",pt:"Португалия",fi:"Финляндия",by:"Беларусь",ua:"Украина",cz:"Чехия",ae:"БАӘ",tj:"Тәжікстан",tm:"Түрікменстан",az:"Әзірбайжан",ge:"Грузия",kg:"Қырғызстан",uz:"Өзбекстан"};
@@ -301,7 +303,15 @@
           .then(function (r) { return r.json(); })
           .then(function (d) {
             if (d.state === 'talking') { st.className = 'status ok'; st.textContent = L.callTalking; return; }
-            if (d.state === 'rejected') { st.className = 'status bad'; st.textContent = L.callBlocked; return; }
+            if (d.state === 'rejected') {
+              st.className = 'status bad';
+              st.textContent = L.callBlocked + ' ' + L.callSelf + ' ';
+              var a = document.createElement('a');
+              a.href = 'tel:' + L.callNumber.replace(/[^+0-9]/g, '');
+              a.textContent = L.callNumber;
+              st.appendChild(a);
+              return;
+            }
             ask();
           })
           .catch(function () {});
@@ -313,9 +323,21 @@
     e.preventDefault();
     var st = document.getElementById('cf-status');
     var btn = document.getElementById('cf-send');
-    var fail = function (m) { st.className = 'status bad'; st.textContent = m; };
+    var fail = function (m, withPhone) {
+      st.className = 'status bad';
+      st.textContent = m;
+      // Звонок не дошёл — значит человек должен уйти со страницы не ни с чем,
+      // а с номером, по которому его точно услышат.
+      if (withPhone !== false) {
+        st.appendChild(document.createTextNode(' ' + L.callSelf + ' '));
+        var a = document.createElement('a');
+        a.href = 'tel:' + L.callNumber.replace(/[^+0-9]/g, '');
+        a.textContent = L.callNumber;
+        st.appendChild(a);
+      }
+    };
     var to = window.phoneE164 && window.phoneE164();
-    if (!to) { fail(L.callErrNumber); document.getElementById('cf-phone').focus(); return; }
+    if (!to) { fail(L.callErrNumber, false); document.getElementById('cf-phone').focus(); return; }
     btn.disabled = true; st.className = 'status'; st.textContent = L.callGoing;
     fetch('/api/demo-call', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
