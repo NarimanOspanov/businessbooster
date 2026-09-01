@@ -1740,6 +1740,24 @@ function normalizeKzMobile(raw) {
 
 // agentOverride — чтобы клиника из кабинета услышала СВОЕГО ассистента, а не
 // общего демонстрационного.
+// Через какую ручку звонить, зависит от того, чей номер: у Twilio и у
+// SIP-транка они разные. Спрашиваем ElevenLabs один раз и запоминаем —
+// иначе каждый демо-звонок начинался бы с лишнего запроса.
+let DEMO_PHONE_PROVIDER = null;
+async function demoCallEndpoint(key, phoneId) {
+  if (!DEMO_PHONE_PROVIDER) {
+    try {
+      const r = await fetch("https://api.elevenlabs.io/v1/convai/phone-numbers/" + phoneId, {
+        headers: { "xi-api-key": key }, signal: AbortSignal.timeout(8000),
+      });
+      if (r.ok) DEMO_PHONE_PROVIDER = (await r.json()).provider || "twilio";
+    } catch { /* не дозвонились до API — считаем, что номер прежний, твилиевский */ }
+  }
+  return DEMO_PHONE_PROVIDER === "sip_trunk"
+    ? "https://api.elevenlabs.io/v1/convai/sip-trunk/outbound-call"
+    : "https://api.elevenlabs.io/v1/convai/twilio/outbound-call";
+}
+
 async function placeDemoCall(toNumber, agentOverride) {
   const key = process.env.ELEVENLABS_API_KEY;
   const agentId = agentOverride || process.env.ELEVENLABS_AGENT_ID;
@@ -1747,7 +1765,7 @@ async function placeDemoCall(toNumber, agentOverride) {
   if (!key || !agentId || !phoneId) {
     return { ok: false, reason: "not_configured" };
   }
-  const res = await fetch("https://api.elevenlabs.io/v1/convai/twilio/outbound-call", {
+  const res = await fetch(await demoCallEndpoint(key, phoneId), {
     method: "POST",
     headers: { "xi-api-key": key, "Content-Type": "application/json" },
     body: JSON.stringify({
