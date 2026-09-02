@@ -58,7 +58,7 @@ def tbl(head, rows, widths, right=()):
 
 doc = SimpleDocTemplate(OUT, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm,
                         topMargin=18 * mm, bottomMargin=16 * mm,
-                        title="TAM, SAM и SOM по четырём странам", author="Reception365 · otvet.mobi")
+                        title="TAM, SAM и SOM по четырём странам", author="Reception365 · reception365.online")
 S = []
 S.append(Paragraph("Сколько здесь денег", st["h1"]))
 S.append(Paragraph("Ёмкость рынка ИИ-ресепшена в Казахстане, Узбекистане, России и "
@@ -167,7 +167,7 @@ S.append(Paragraph("<b>Цены за пределами Казахстана —
 
 def footer(c, d):
     c.saveState(); c.setFont("Body", 8); c.setFillColor(DIM)
-    c.drawString(18 * mm, 10 * mm, "Reception365 · otvet.mobi · расчёт от 1 сентября 2026")
+    c.drawString(18 * mm, 10 * mm, "Reception365 · reception365.online · расчёт от 1 сентября 2026")
     c.drawRightString(A4[0] - 18 * mm, 10 * mm, "%d" % d.page)
     c.restoreState()
 

@@ -8,8 +8,8 @@ from reportlab.pdfgen import canvas as rl_canvas
 from reportlab.lib.utils import ImageReader
 
 ROOT = "C:/Users/nariman_ospanov/Downloads/bbooster/"
-PNG = ROOT + "docs/otvet-one-pager.png"
-PDF = ROOT + "docs/otvet-one-pager.pdf"
+PNG = ROOT + "docs/reception365-one-pager.png"
+PDF = ROOT + "docs/reception365-one-pager.pdf"
 FONTS = "C:/Windows/Fonts/"
 
 W, H = 1080, 2400            # холст с запасом, внизу обрежем по содержимому
@@ -62,10 +62,10 @@ CW = W - 2 * M              # рабочая ширина
 d.rounded_rectangle([M, 60, M + 64, 124], radius=18, fill=TEAL)
 d.text((M + 24, 72), "R", font=bold(36), fill=WHITE)
 d.text((M + 84, 76), "Reception365", font=bold(38), fill=INK)
-site = "otvet.mobi"
+site = "reception365.online"
 sw = d.textlength(site, font=semi(30))
 d.text((W - M - sw, 84), site, font=semi(30), fill=DIM)
-link(W - M - sw - 8, 76, W - M + 8, 124, "https://otvet.mobi")
+link(W - M - sw - 8, 76, W - M + 8, 124, "https://reception365.online")
 
 # --- плашка «для кого» ---
 tag = "ИИ-РЕСЕПШЕН ДЛЯ СТОМАТОЛОГИЙ И МЕДЦЕНТРОВ"
@@ -147,9 +147,9 @@ y += cta_h + 46
 # --- подвал ---
 d.line([M, y, W - M, y], fill=(219, 234, 236), width=2)
 y += 26
-d.text((M, y), "otvet.mobi", font=semi(30), fill=INK)
-link(M - 6, y - 6, M + d.textlength("otvet.mobi", font=semi(30)) + 6, y + 44,
-     "https://otvet.mobi")
+d.text((M, y), "reception365.online", font=semi(30), fill=INK)
+link(M - 6, y - 6, M + d.textlength("reception365.online", font=semi(30)) + 6, y + 44,
+     "https://reception365.online")
 right = "+7 702 941 06 25 · Алматы"
 rw = d.textlength(right, font=body(30))
 d.text((W - M - rw, y), right, font=body(30), fill=DIM)

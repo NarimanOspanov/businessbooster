@@ -114,7 +114,7 @@ doc = SimpleDocTemplate(OUT, pagesize=A4,
                         leftMargin=18 * mm, rightMargin=18 * mm,
                         topMargin=18 * mm, bottomMargin=16 * mm,
                         title="Рынок клиник Казахстана по городам",
-                        author="Reception365 · otvet.mobi")
+                        author="Reception365 · reception365.online")
 S = []
 
 S.append(Paragraph("Рынок клиник Казахстана", styles["h1"]))
@@ -247,7 +247,7 @@ def footer(canvas, doc_):
     canvas.saveState()
     canvas.setFont("Body", 8)
     canvas.setFillColor(DIM)
-    canvas.drawString(18 * mm, 10 * mm, "Reception365 · otvet.mobi · данные medelement, 1 сентября 2026")
+    canvas.drawString(18 * mm, 10 * mm, "Reception365 · reception365.online · данные medelement, 1 сентября 2026")
     canvas.drawRightString(A4[0] - 18 * mm, 10 * mm, "%d" % doc_.page)
     canvas.restoreState()
 

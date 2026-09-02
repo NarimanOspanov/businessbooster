@@ -1475,7 +1475,7 @@ const agentTemplate = require("./scripts/agent-template");
 // Инструменты агента ведут на наш сервер. Адрес берём из настройки, а не из
 // заголовка Host: заголовок присылает клиент, и подменив его, он подменил бы
 // и адрес, по которому ассистент пойдёт за расписанием.
-const PUBLIC_URL = (process.env.PUBLIC_URL || "https://otvet.mobi").replace(/\/+$/, "");
+const PUBLIC_URL = (process.env.PUBLIC_URL || "https://reception365.online").replace(/\/+$/, "");
 
 const enrich = require("./scripts/enrich");
 const CLERK_PK = process.env.CLERK_PUBLISHABLE_KEY || "";

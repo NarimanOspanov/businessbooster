@@ -91,7 +91,7 @@ async function fetchSource(url) {
       redirect: "manual",
       headers: {
         // Без внятного user-agent половина сайтов отдаёт заглушку.
-        "User-Agent": "Mozilla/5.0 (compatible; OtvetBot/1.0; +https://otvet.mobi)",
+        "User-Agent": "Mozilla/5.0 (compatible; OtvetBot/1.0; +https://reception365.online)",
         "Accept-Language": "ru,kk;q=0.9,en;q=0.8",
       },
       signal: AbortSignal.timeout(TIMEOUT_MS),
