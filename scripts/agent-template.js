@@ -329,7 +329,7 @@ async function createAgent(profile, opts) {
   const made = await eleven("/v1/convai/agents/create", {
     method: "POST",
     body: JSON.stringify({
-      name: "Ответ — " + (clean(profile).name || "клиника"),
+      name: "Welcome365 — " + (clean(profile).name || "клиника"),
       conversation_config: applyProfile(base.conversation_config, profile, toolIds),
       platform_settings: platformSettings(ps),
     }),
@@ -357,7 +357,7 @@ async function updateAgent(agentId, profile, opts) {
   await eleven("/v1/convai/agents/" + agentId, {
     method: "PATCH",
     body: JSON.stringify({
-      name: "Ответ — " + (clean(profile).name || "клиника"),
+      name: "Welcome365 — " + (clean(profile).name || "клиника"),
       conversation_config: applyProfile(base.conversation_config, profile, toolIds),
       // И при обновлении тоже: агент мог быть создан до того, как мы научились
       // переносить вебхук.

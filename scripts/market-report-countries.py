@@ -80,7 +80,7 @@ def bars(rows, title, unit, color):
 doc = SimpleDocTemplate(OUT, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm,
                         topMargin=18 * mm, bottomMargin=16 * mm,
                         title="Казахстан, Узбекистан, Кыргызстан, Россия: рынки клиник",
-                        author="Ответ · otvet.mobi")
+                        author="Welcome365 · otvet.mobi")
 S = []
 S.append(Paragraph("Четыре рынка рядом", st["h1"]))
 S.append(Paragraph("Казахстан, Узбекистан, Кыргызстан и Россия: сколько частных клиник, "
@@ -169,7 +169,7 @@ S.append(Paragraph("Население — оценки 2025 года. Данн�
 
 def footer(c, d):
     c.saveState(); c.setFont("Body", 8); c.setFillColor(DIM)
-    c.drawString(18 * mm, 10 * mm, "Ответ · otvet.mobi · открытые источники, 1 сентября 2026")
+    c.drawString(18 * mm, 10 * mm, "Welcome365 · otvet.mobi · открытые источники, 1 сентября 2026")
     c.drawRightString(A4[0] - 18 * mm, 10 * mm, "%d" % d.page)
     c.restoreState()
 
