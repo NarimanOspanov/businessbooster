@@ -144,13 +144,22 @@ d.text((M + 44, y + 174), "Ответит тот же ассистент, что
        font=body(26), fill=(190, 230, 234))
 y += cta_h + 46
 
+# --- место для промокода ---
+# Листовку раздают агенты, и каждый вписывает сюда свой код от руки: по нему
+# потом видно, чья это заявка. Печатать код нельзя — он у всех разный.
+promo = "Промокод на скидку:"
+d.text((M, y), promo, font=semi(28), fill=INK)
+pw = d.textlength(promo, font=semi(28))
+d.line([M + pw + 18, y + 34, W - M, y + 34], fill=(150, 180, 186), width=2)
+y += 62
+
 # --- подвал ---
 d.line([M, y, W - M, y], fill=(219, 234, 236), width=2)
 y += 26
 d.text((M, y), "reception365.online", font=semi(30), fill=INK)
 link(M - 6, y - 6, M + d.textlength("reception365.online", font=semi(30)) + 6, y + 44,
      "https://reception365.online")
-right = "+7 702 941 06 25 · Алматы"
+right = "+7 702 941 06 25"
 rw = d.textlength(right, font=body(30))
 d.text((W - M - rw, y), right, font=body(30), fill=DIM)
 phone_w = d.textlength("+7 702 941 06 25", font=body(30))
