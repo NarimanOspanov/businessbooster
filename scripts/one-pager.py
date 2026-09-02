@@ -2,10 +2,13 @@
 # Одностраничник для рассылки. Картинкой, а не PDF: в мессенджере она
 # открывается сразу, без скачивания. Из неё же собирается PDF — для тех,
 # кому удобнее файл.
-import os
+import os, sys
 from PIL import Image, ImageDraw, ImageFont
 from reportlab.pdfgen import canvas as rl_canvas
 from reportlab.lib.utils import ImageReader
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import leaflet_text as T          # тексты общие с печатной листовкой
 
 ROOT = "C:/Users/nariman_ospanov/Downloads/bbooster/"
 PNG = ROOT + "docs/reception365-one-pager.png"
@@ -61,14 +64,14 @@ CW = W - 2 * M              # рабочая ширина
 # --- шапка ---
 d.rounded_rectangle([M, 60, M + 64, 124], radius=18, fill=TEAL)
 d.text((M + 24, 72), "R", font=bold(36), fill=WHITE)
-d.text((M + 84, 76), "Reception365", font=bold(38), fill=INK)
-site = "https://reception365.online"
+d.text((M + 84, 76), T.BRAND, font=bold(38), fill=INK)
+site = T.SITE
 sw = d.textlength(site, font=semi(30))
 d.text((W - M - sw, 84), site, font=semi(30), fill=DIM)
-link(W - M - sw - 8, 76, W - M + 8, 124, "https://reception365.online")
+link(W - M - sw - 8, 76, W - M + 8, 124, T.SITE)
 
 # --- плашка «для кого» ---
-tag = "ИИ-РЕСЕПШЕН ДЛЯ СТОМАТОЛОГИЙ И МЕДЦЕНТРОВ"
+tag = T.TAG
 tw = d.textlength(tag, font=semi(24))
 d.rounded_rectangle([M, 176, M + tw + 56, 232], radius=28, fill=MIST)
 d.ellipse([M + 26, 198, M + 40, 212], fill=TEAL)
@@ -76,31 +79,15 @@ d.text((M + 52, 191), tag, font=semi(24), fill=TEAL_D)
 
 # --- заголовок ---
 y = 276
-y = draw_block("ИИ принимает звонки, записывает на приём и сам звонит пациентам",
-               bold(66), M, y, CW, INK, 82)
+y = draw_block(T.H1, bold(66), M, y, CW, INK, 82)
 
 # --- подзаголовок ---
 y += 18
-y = draw_block("Отвечает, когда ответить некому. Напоминает о приёме накануне "
-               "и возвращает тех, кто давно не был.",
-               body(32), M, y, CW, DIM, 46)
+y = draw_block(T.SUB, body(32), M, y, CW, DIM, 46)
 
 # --- четыре пункта ---
 y += 34
-POINTS = [
-    ("Круглосуточно, без выходных",
-     "Пациент с болью в одиннадцать вечера дозванивается, а не слушает гудки"),
-    ("Отвечает как обученный консультант",
-     "По вашему прайсу и расписанию, на любом языке"),
-    ("Записывает на приём",
-     "Смотрит свободное время в вашей CRM через API. Подключаем быстро — и с интеграцией, и без неё"),
-    ("Вы слышите каждый разговор",
-     "Запись и расшифровка по репликам в личном кабинете"),
-    ("Напоминает о приёме накануне",
-     "Звонит за день и уточняет, в силе ли визит. Не придёт — успеете отдать время другому"),
-    ("Возвращает тех, кто давно не был",
-     "Обзванивает базу: плановый осмотр, гигиена, акция. Кто согласился — записан"),
-]
+POINTS = T.POINTS
 for title, sub in POINTS:
     d.ellipse([M + 4, y + 14, M + 20, y + 30], fill=TEAL)
     d.text((M + 44, y), title, font=semi(34), fill=INK)
@@ -111,8 +98,7 @@ for title, sub in POINTS:
 # Исходящие звонки пока подключаются отдельно — говорим это на самой странице,
 # чтобы продавец не обещал того, что включается не сразу.
 y += 4
-d.text((M + 44, y), "Два последних пункта — исходящие звонки, подключаем по запросу",
-       font=body(26), fill=TEAL_D)
+d.text((M + 44, y), T.OUTBOUND_NOTE, font=body(26), fill=TEAL_D)
 y += 46
 
 # --- цена ---
@@ -121,35 +107,34 @@ box_h = 196
 d.rounded_rectangle([M, y, W - M, y + box_h], radius=28, fill=MIST)
 # Две половины цены разведены к краям: между ними плюс, и видно, что это
 # сумма постоянной части и переменной, а не одна цифра рядом с другой.
-d.text((M + 48, y + 34), "9 000 ₸", font=bold(58), fill=INK)
-d.text((M + 48, y + 104), "в месяц — аренда номера,", font=body(28), fill=DIM)
-d.text((M + 48, y + 140), "кабинет и поддержка", font=body(28), fill=DIM)
+d.text((M + 48, y + 34), T.PRICE_FIX, font=bold(58), fill=INK)
+d.text((M + 48, y + 104), T.PRICE_FIX_SUB[0], font=body(28), fill=DIM)
+d.text((M + 48, y + 140), T.PRICE_FIX_SUB[1], font=body(28), fill=DIM)
 
 plus_x = M + 400
 d.text((plus_x, y + 44), "+", font=bold(52), fill=TEAL)
 
 right_x = M + 486
-d.text((right_x, y + 34), "150 ₸", font=bold(58), fill=INK)
-d.text((right_x, y + 104), "за минуту разговора", font=body(28), fill=DIM)
+d.text((right_x, y + 34), T.PRICE_VAR, font=bold(58), fill=INK)
+d.text((right_x, y + 104), T.PRICE_VAR_SUB, font=body(28), fill=DIM)
 y += box_h + 14
-d.text((M + 48, y), "Подключение за один день", font=semi(28), fill=TEAL_D)
+d.text((M + 48, y), T.SPEED, font=semi(28), fill=TEAL_D)
 y += 52
 
 # --- призыв: послушать вживую ---
 cta_h = 232
 d.rounded_rectangle([M, y, W - M, y + cta_h], radius=28, fill=TEAL_D)
-d.text((M + 44, y + 32), "Позвоните и послушайте сами", font=semi(34), fill=WHITE)
-d.text((M + 44, y + 88), "+7 727 312 28 37", font=bold(58), fill=WHITE)
-link(M + 36, y + 80, M + 44 + d.textlength("+7 727 312 28 37", font=bold(58)) + 10,
-     y + 160, "tel:+77273122837")
-d.text((M + 44, y + 174), "Ответит тот же ассистент, что будет отвечать вашим пациентам",
-       font=body(26), fill=(190, 230, 234))
+d.text((M + 44, y + 32), T.CTA_TITLE, font=semi(34), fill=WHITE)
+d.text((M + 44, y + 88), T.DEMO_PHONE, font=bold(58), fill=WHITE)
+link(M + 36, y + 80, M + 44 + d.textlength(T.DEMO_PHONE, font=bold(58)) + 10,
+     y + 160, T.DEMO_TEL)
+d.text((M + 44, y + 174), T.CTA_SUB, font=body(26), fill=(190, 230, 234))
 y += cta_h + 46
 
 # --- место для промокода ---
 # Листовку раздают агенты, и каждый вписывает сюда свой код от руки: по нему
 # потом видно, чья это заявка. Печатать код нельзя — он у всех разный.
-promo = "Промокод на скидку:"
+promo = T.PROMO
 d.text((M, y), promo, font=semi(28), fill=INK)
 pw = d.textlength(promo, font=semi(28))
 d.line([M + pw + 18, y + 34, W - M, y + 34], fill=(150, 180, 186), width=2)
@@ -158,14 +143,13 @@ y += 62
 # --- подвал ---
 d.line([M, y, W - M, y], fill=(219, 234, 236), width=2)
 y += 26
-d.text((M, y), "https://reception365.online", font=semi(30), fill=INK)
-link(M - 6, y - 6, M + d.textlength("https://reception365.online", font=semi(30)) + 6, y + 44,
-     "https://reception365.online")
-right = "+7 702 941 06 25"
+d.text((M, y), T.SITE, font=semi(30), fill=INK)
+link(M - 6, y - 6, M + d.textlength(T.SITE, font=semi(30)) + 6, y + 44, T.SITE)
+right = T.SALES_PHONE
 rw = d.textlength(right, font=body(30))
 d.text((W - M - rw, y), right, font=body(30), fill=DIM)
-phone_w = d.textlength("+7 702 941 06 25", font=body(30))
-link(W - M - rw - 6, y - 6, W - M - rw + phone_w + 6, y + 44, "tel:+77029410625")
+phone_w = d.textlength(T.SALES_PHONE, font=body(30))
+link(W - M - rw - 6, y - 6, W - M - rw + phone_w + 6, y + 44, T.SALES_TEL)
 
 # Обрезаем по последней нарисованной строке: так одностраничник всегда
 # заканчивается там, где кончается текст, а не там, где кончился холст.
