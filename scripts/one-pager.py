@@ -62,7 +62,7 @@ CW = W - 2 * M              # рабочая ширина
 d.rounded_rectangle([M, 60, M + 64, 124], radius=18, fill=TEAL)
 d.text((M + 24, 72), "R", font=bold(36), fill=WHITE)
 d.text((M + 84, 76), "Reception365", font=bold(38), fill=INK)
-site = "reception365.online"
+site = "https://reception365.online"
 sw = d.textlength(site, font=semi(30))
 d.text((W - M - sw, 84), site, font=semi(30), fill=DIM)
 link(W - M - sw - 8, 76, W - M + 8, 124, "https://reception365.online")
@@ -131,7 +131,9 @@ d.text((plus_x, y + 44), "+", font=bold(52), fill=TEAL)
 right_x = M + 486
 d.text((right_x, y + 34), "150 ₸", font=bold(58), fill=INK)
 d.text((right_x, y + 104), "за минуту разговора", font=body(28), fill=DIM)
-y += box_h + 40
+y += box_h + 14
+d.text((M + 48, y), "Подключение за один день", font=semi(28), fill=TEAL_D)
+y += 52
 
 # --- призыв: послушать вживую ---
 cta_h = 232
@@ -156,8 +158,8 @@ y += 62
 # --- подвал ---
 d.line([M, y, W - M, y], fill=(219, 234, 236), width=2)
 y += 26
-d.text((M, y), "reception365.online", font=semi(30), fill=INK)
-link(M - 6, y - 6, M + d.textlength("reception365.online", font=semi(30)) + 6, y + 44,
+d.text((M, y), "https://reception365.online", font=semi(30), fill=INK)
+link(M - 6, y - 6, M + d.textlength("https://reception365.online", font=semi(30)) + 6, y + 44,
      "https://reception365.online")
 right = "+7 702 941 06 25"
 rw = d.textlength(right, font=body(30))
