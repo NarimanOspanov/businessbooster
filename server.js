@@ -3396,17 +3396,24 @@ http
         const phone = String(body.phone || "").slice(0, 40).trim();
         const name = String(body.name || "").slice(0, 80).trim();
         const kind = String(body.kind || "").slice(0, 60).trim();
+        const city = String(body.city || "").slice(0, 80).trim();
+        const clinic = String(body.clinic || "").slice(0, 120).trim();
+        const promo = String(body.promo || "").slice(0, 40).trim();
         const lang = body.lang === "kk" ? "kk" : "ru";
         if (phone.replace(/[^0-9]/g, "").length < 10) {
           res.writeHead(400, { "Content-Type": MIME[".json"] });
           res.end(JSON.stringify({ error: "phone_required" }));
           return;
         }
-        recordLead({ at: new Date().toISOString(), product: "otvet", name, phone, kind, lang });
+        recordLead({ at: new Date().toISOString(), product: "reception365",
+                     name, phone, city, clinic, promo, kind, lang });
         await notifyTelegram(
           "📞 <b>Заявка — Reception365</b>\n\n" +
           (name ? "Имя: " + name + "\n" : "") +
           "Телефон: " + phone + "\n" +
+          (city ? "Город: " + city + "\n" : "") +
+          (clinic ? "Клиника: " + clinic + "\n" : "") +
+          (promo ? "Промокод: " + promo + "\n" : "") +
           (kind ? "Бизнес: " + kind + "\n" : "") +
           "Язык страницы: " + lang
         );

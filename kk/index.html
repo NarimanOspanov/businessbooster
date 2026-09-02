@@ -23,7 +23,7 @@
   <div class="nav-right">
     <button class="themer" id="themer" type="button" aria-label="Тақырыпты ауыстыру"><svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2.6 12h2.2M19.2 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6"/></svg><svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.2A8.2 8.2 0 0 1 9.8 4a8.4 8.4 0 1 0 10.2 10.2Z"/></svg></button>
     <a class="lang" href="/">Русский</a>
-    <a class="btn btn-accent btn-sm" href="#cf">Маған қоңырау шалыңыз</a>
+    <a class="btn btn-accent btn-sm" href="#lead">Қосу</a>
   </div>
   <button class="burger" id="burger" aria-label="Мәзір" aria-expanded="false" aria-controls="menu"><span></span><span></span><span></span></button>
 </nav></div></header>
@@ -166,7 +166,7 @@
     <b>Бұдан былай бірде-бір қоңырау жіберілмейді</b>
     <span>Қосылу бір минут алады. Алғашқы 10 өтінім — тегін.</span>
   </div>
-  <a class="btn btn-dark" href="#cf">Маған қоңырау шалыңыз</a>
+  <a class="btn btn-dark" href="#lead">Қосу</a>
 </div></div>
 
 <section id="price" class="s-mist">
@@ -260,15 +260,27 @@
   </div>
 </section>
 
-<section class="s-accent">
+<section class="s-accent" id="lead">
   <div class="wrap center">
-    <h2>Қоңырау шалып тыңдаңыз</h2>
-    <p class="lead" style="margin-top:14px">Нөміріңізді енгізіңіз — ассистент қоңырау шалып,
-    кешкі он бірде клиникаңызға телефон соққан адаммен қалай сөйлессе, солай сөйлеседі.</p>
-    <div style="margin-top:28px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-      <a class="btn" style="background:#fff;color:#1b0d13" href="#cf">Маған қоңырау шалыңыз</a>
-      <a class="btn btn-ghost" style="border-color:rgba(255,255,255,.35);color:#fff" href="/start/">Өзім баптаймын</a>
-    </div>
+    <h2>Клиниканы қосу</h2>
+    <p class="lead" style="margin-top:14px">Өтінім қалдырыңыз — қоңырау шалып, кабинетті
+    көрсетеміз және ассистентті прайсыңызға баптаймыз. Әдетте бір әңгіме жеткілікті.</p>
+
+    <form class="leadform" id="lf">
+      <div class="lf-row">
+        <input id="lf-name" name="name" type="text" autocomplete="name" placeholder="Сізге қалай жүгінейік" required>
+        <input id="lf-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+7 707 000 00 00" required>
+      </div>
+      <div class="lf-row">
+        <input id="lf-city" name="city" type="text" placeholder="Қала" required>
+        <input id="lf-clinic" name="clinic" type="text" placeholder="Клиника атауы" required>
+      </div>
+      <div class="lf-row">
+        <input id="lf-promo" name="promo" type="text" placeholder="Промокод, болса">
+        <button class="btn" style="background:#fff;color:#0c2b31" type="submit" id="lf-send">Өтінім қалдыру</button>
+      </div>
+      <div class="status" id="lf-status"></div>
+    </form>
   </div>
 </section>
 
@@ -472,6 +484,36 @@
       if (light) document.documentElement.removeAttribute('data-theme');
       else document.documentElement.setAttribute('data-theme', 'light');
       try { localStorage.setItem('otvet-theme', light ? 'dark' : 'light'); } catch (e) {}
+    });
+  })();
+
+  // Заявка на подключение. Телефон проверяем мягко: сюда пишет владелец
+  // клиники, и придираться к формату его номера — терять заявку.
+  (function () {
+    var f = document.getElementById('lf');
+    if (!f) return;
+    var st = document.getElementById('lf-status'), btn = document.getElementById('lf-send');
+    f.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var val = function (id) { return (document.getElementById(id).value || '').trim(); };
+      if (val('lf-phone').replace(/[^0-9]/g, '').length < 10) {
+        st.className = 'status bad'; st.textContent = 'Қоңырау шалатын нөміріңізді қалдырыңыз';
+        document.getElementById('lf-phone').focus(); return;
+      }
+      btn.disabled = true; st.className = 'status'; st.textContent = 'Жіберіліп жатыр…';
+      fetch('/api/callback', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: val('lf-name'), phone: val('lf-phone'), city: val('lf-city'),
+          clinic: val('lf-clinic'), promo: val('lf-promo'), lang: 'kk',
+        }),
+      }).then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d && d.ok) { st.className = 'status ok'; st.textContent = 'Өтінім бізде. Жұмыс уақытында қоңырау шаламыз.'; f.reset(); }
+          else { st.className = 'status bad'; st.textContent = 'Жіберілмеді. Бізге қоңырау шалыңыз: +7 702 941 06 25'; }
+        })
+        .catch(function () { st.className = 'status bad'; st.textContent = 'Жіберілмеді. Бізге қоңырау шалыңыз: +7 702 941 06 25'; })
+        .finally(function () { btn.disabled = false; });
     });
   })();
 
