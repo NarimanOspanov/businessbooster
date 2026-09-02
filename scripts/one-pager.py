@@ -60,8 +60,8 @@ CW = W - 2 * M              # рабочая ширина
 
 # --- шапка ---
 d.rounded_rectangle([M, 60, M + 64, 124], radius=18, fill=TEAL)
-d.text((M + 22, 72), "W", font=bold(36), fill=WHITE)
-d.text((M + 84, 76), "Welcome365", font=bold(38), fill=INK)
+d.text((M + 24, 72), "R", font=bold(36), fill=WHITE)
+d.text((M + 84, 76), "Reception365", font=bold(38), fill=INK)
 site = "otvet.mobi"
 sw = d.textlength(site, font=semi(30))
 d.text((W - M - sw, 84), site, font=semi(30), fill=DIM)
@@ -167,7 +167,7 @@ img.save(PNG, "PNG", optimize=True)
 K = 0.5                                   # пиксель картинки -> пункт PDF
 PW, PH = W * K, img.height * K
 c = rl_canvas.Canvas(PDF, pagesize=(PW, PH))
-c.setTitle("Welcome365 — ИИ-ресепшен для стоматологий и медцентров")
+c.setTitle("Reception365 — ИИ-ресепшен для стоматологий и медцентров")
 c.drawImage(ImageReader(img), 0, 0, width=PW, height=PH)
 for x0, y0, x1, y1, url in LINKS:
     rect = (x0 * K, PH - y1 * K, x1 * K, PH - y0 * K)   # у PDF ось Y снизу

@@ -86,7 +86,7 @@ async function importToEleven(number) {
     body: JSON.stringify({
       provider: "sip_trunk",
       phone_number: number,
-      label: "Welcome365 — " + number,
+      label: "Reception365 — " + number,
     }),
   });
   console.log("  импортирован:", made.phone_number_id);

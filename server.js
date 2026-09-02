@@ -3333,7 +3333,7 @@ http
         }
         recordLead({ at: new Date().toISOString(), product: "otvet", name, phone, kind, lang });
         await notifyTelegram(
-          "📞 <b>Заявка — Welcome365</b>\n\n" +
+          "📞 <b>Заявка — Reception365</b>\n\n" +
           (name ? "Имя: " + name + "\n" : "") +
           "Телефон: " + phone + "\n" +
           (kind ? "Бизнес: " + kind + "\n" : "") +

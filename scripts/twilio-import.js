@@ -127,7 +127,7 @@ const cmd = process.argv[2];
 
     const created = await elevenlabs("POST", "/phone-numbers", {
       phone_number: chosen.phone_number,
-      label: "Welcome365 — демо",
+      label: "Reception365 — демо",
       provider: "twilio",
       sid: TW_SID,
       token: TW_TOKEN,

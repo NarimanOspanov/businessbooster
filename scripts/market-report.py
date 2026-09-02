@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Отчёт по городам: сколько медорганизаций и стоматологий, сколько на сто тысяч
-# жителей и что из этого следует для Welcome365. Данные — справочник medelement,
+# жителей и что из этого следует для Reception365. Данные — справочник medelement,
 # 1 сентября 2026; население — оценки 2024-2025 годов.
 import os
 from reportlab.lib import colors
@@ -114,7 +114,7 @@ doc = SimpleDocTemplate(OUT, pagesize=A4,
                         leftMargin=18 * mm, rightMargin=18 * mm,
                         topMargin=18 * mm, bottomMargin=16 * mm,
                         title="Рынок клиник Казахстана по городам",
-                        author="Welcome365 · otvet.mobi")
+                        author="Reception365 · otvet.mobi")
 S = []
 
 S.append(Paragraph("Рынок клиник Казахстана", styles["h1"]))
@@ -247,7 +247,7 @@ def footer(canvas, doc_):
     canvas.saveState()
     canvas.setFont("Body", 8)
     canvas.setFillColor(DIM)
-    canvas.drawString(18 * mm, 10 * mm, "Welcome365 · otvet.mobi · данные medelement, 1 сентября 2026")
+    canvas.drawString(18 * mm, 10 * mm, "Reception365 · otvet.mobi · данные medelement, 1 сентября 2026")
     canvas.drawRightString(A4[0] - 18 * mm, 10 * mm, "%d" % doc_.page)
     canvas.restoreState()
 
