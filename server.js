@@ -1771,7 +1771,73 @@ function normalizeKzMobile(raw) {
 const KZ_PHONE_ID = process.env.ELEVENLABS_PHONE_NUMBER_ID_KZ || "";
 const isKzMobile = (e164) => /^\+77\d{9}$/.test(String(e164 || ""));
 
-async function placeDemoCall(toNumber, agentOverride) {
+// Сценарии демо-звонка. «Приём» — агент как настроен, ничего не подменяем.
+// Два исходящих играются подменой первой фразы и промпта: так посетитель
+// слышит ровно ту работу, которую выбрал, а не рассказ о ней.
+const DEMO_SCENARIOS = {
+  reminder: {
+    ru: {
+      first: "Здравствуйте! Это клиника Нариман Дент. Напоминаю: вы записаны " +
+             "завтра в три часа дня на чистку. Подскажите, всё в силе?",
+      prompt: "Ты администратор стоматологии «Нариман Дент». Звонишь накануне " +
+              "приёма, чтобы подтвердить визит. Цель — получить ответ: придёт " +
+              "человек или нет. Если придёт — поблагодари и попрощайся. Если не " +
+              "может — предложи перенести и спроси, какой день и время удобны, " +
+              "затем подтверди перенос. Говори коротко, тремя-четырьмя фразами, " +
+              "на языке собеседника. Если спросят, честно скажи, что это " +
+              "демонстрационный звонок сервиса Reception365.",
+    },
+    kk: {
+      first: "Сәлеметсіз бе! Бұл «Нариман Дент» клиникасы. Еске саламын: сіз " +
+             "ертең сағат үште тазалауға жазылғансыз. Күшінде ме?",
+      prompt: "Сен «Нариман Дент» стоматологиясының әкімшісісің. Қабылдау " +
+              "алдында визитті растау үшін қоңырау шаласың. Мақсат — адам " +
+              "келе ме, жоқ па, соны білу. Келсе — алғыс айтып қоштас. Келе " +
+              "алмаса — басқа күнге ауыстыруды ұсын, ыңғайлы күн мен уақытты " +
+              "сұра. Қысқа сөйле. Сұраса, бұл Reception365 сервисінің " +
+              "демонстрациялық қоңырауы екенін шыншылдықпен айт.",
+    },
+  },
+  upsell: {
+    ru: {
+      first: "Здравствуйте! Это клиника Нариман Дент. Вы были у нас чуть больше " +
+             "полугода назад. Сейчас идёт профилактический осмотр и чистка со " +
+             "скидкой — подобрать вам удобное время?",
+      prompt: "Ты администратор стоматологии «Нариман Дент». Звонишь пациенту, " +
+              "который давно не приходил, и предлагаешь плановый осмотр с " +
+              "гигиенической чисткой. Цель — записать на приём. Если человек " +
+              "согласен, предложи два конкретных времени на выбор и подтверди " +
+              "запись. Если отказывается — не уговаривай, вежливо попрощайся. " +
+              "Говори коротко, тремя-четырьмя фразами, на языке собеседника. " +
+              "Если спросят, честно скажи, что это демонстрационный звонок " +
+              "сервиса Reception365.",
+    },
+    kk: {
+      first: "Сәлеметсіз бе! Бұл «Нариман Дент» клиникасы. Сіз бізде жарты " +
+             "жылдан астам уақыт бұрын болғансыз. Қазір жоспарлы тексеру мен " +
+             "тазалауға жеңілдік бар — ыңғайлы уақыт таңдайық па?",
+      prompt: "Сен «Нариман Дент» стоматологиясының әкімшісісің. Ұзақ уақыт " +
+              "келмеген пациентке қоңырау шалып, жоспарлы тексеру мен " +
+              "гигиеналық тазалауды ұсынасың. Мақсат — қабылдауға жазу. " +
+              "Келіссе, екі нақты уақыт ұсынып, жазуды растa. Бас тартса — " +
+              "көндірме, сыпайы қоштас. Қысқа сөйле. Сұраса, бұл Reception365 " +
+              "сервисінің демонстрациялық қоңырауы екенін айт.",
+    },
+  },
+};
+
+function demoOverride(scenario, lang) {
+  const s = DEMO_SCENARIOS[scenario];
+  if (!s) return null;
+  const t = s[lang === "kk" ? "kk" : "ru"];
+  return {
+    conversation_config_override: {
+      agent: { first_message: t.first, prompt: { prompt: t.prompt } },
+    },
+  };
+}
+
+async function placeDemoCall(toNumber, agentOverride, scenario, lang) {
   const key = process.env.ELEVENLABS_API_KEY;
   const agentId = agentOverride || process.env.ELEVENLABS_AGENT_ID;
   const viaKz = isKzMobile(toNumber) && KZ_PHONE_ID;
@@ -1789,6 +1855,8 @@ async function placeDemoCall(toNumber, agentOverride) {
       agent_id: agentId,
       agent_phone_number_id: phoneId,
       to_number: toNumber,
+      ...(agentOverride ? {} : (demoOverride(scenario, lang)
+        ? { conversation_initiation_client_data: demoOverride(scenario, lang) } : {})),
     }),
   });
   const text = await res.text();
@@ -3259,15 +3327,18 @@ http
           return send(429, { error: "ip_limit" });
         }
 
-        const r = await placeDemoCall(phone);
+        const scenario = ["reminder", "upsell"].includes(String(body.scenario))
+          ? String(body.scenario) : "inbound";
+        const r = await placeDemoCall(phone, null, scenario, body.lang === "kk" ? "kk" : "ru");
         if (!r.ok) {
           console.log("[demo-call] отказ " + phone + " — " + JSON.stringify(r).slice(0, 200));
           return send(r.reason === "not_configured" ? 503 : 502, { error: r.reason });
         }
 
         DEMO_CALL_LOG.push({ at: Date.now(), phone, ip, id: r.id });
-        console.log("[demo-call] звоним " + phone);
-        await notifyTelegram("☎️ <b>Демо-звонок</b>\n\nНомер: " + phone);
+        console.log("[demo-call] звоним " + phone + " (" + scenario + ")");
+        await notifyTelegram("☎️ <b>Демо-звонок</b>\n\nНомер: " + phone +
+                             "\nСценарий: " + scenario);
         send(200, { ok: true, id: r.id });
       })().catch((e) => {
         res.writeHead(500, { "Content-Type": MIME[".json"] });
