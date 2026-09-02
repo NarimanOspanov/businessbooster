@@ -4,6 +4,8 @@
 # кому удобнее файл.
 import os
 from PIL import Image, ImageDraw, ImageFont
+from reportlab.pdfgen import canvas as rl_canvas
+from reportlab.lib.utils import ImageReader
 
 ROOT = "C:/Users/nariman_ospanov/Downloads/bbooster/"
 PNG = ROOT + "docs/otvet-one-pager.png"
@@ -27,6 +29,11 @@ body = lambda s: f("segoeui.ttf", s)
 
 img = Image.new("RGB", (W, H), WHITE)
 d = ImageDraw.Draw(img)
+
+# Кликабельные области PDF: координаты в пикселях картинки, потом пересчитаем.
+LINKS = []
+def link(x0, y0, x1, y1, url):
+    LINKS.append((x0, y0, x1, y1, url))
 
 def wrap(text, font, width):
     words, lines, cur = text.split(), [], ""
@@ -56,7 +63,9 @@ d.rounded_rectangle([M, 60, M + 64, 124], radius=18, fill=TEAL)
 d.text((M + 20, 72), "О", font=bold(38), fill=WHITE)
 d.text((M + 84, 76), "Ответ", font=bold(38), fill=INK)
 site = "otvet.mobi"
-d.text((W - M - d.textlength(site, font=semi(30)), 84), site, font=semi(30), fill=DIM)
+sw = d.textlength(site, font=semi(30))
+d.text((W - M - sw, 84), site, font=semi(30), fill=DIM)
+link(W - M - sw - 8, 76, W - M + 8, 124, "https://otvet.mobi")
 
 # --- плашка «для кого» ---
 tag = "ИИ-АВТООТВЕТЧИК ДЛЯ СТОМАТОЛОГИЙ И МЕДЦЕНТРОВ"
@@ -119,6 +128,8 @@ cta_h = 232
 d.rounded_rectangle([M, y, W - M, y + cta_h], radius=28, fill=TEAL_D)
 d.text((M + 44, y + 32), "Позвоните и послушайте сами", font=semi(34), fill=WHITE)
 d.text((M + 44, y + 88), "+7 727 312 28 37", font=bold(58), fill=WHITE)
+link(M + 36, y + 80, M + 44 + d.textlength("+7 727 312 28 37", font=bold(58)) + 10,
+     y + 160, "tel:+77273122837")
 d.text((M + 44, y + 174), "Ответит тот же ассистент, что будет отвечать вашим пациентам",
        font=body(26), fill=(190, 230, 234))
 y += cta_h + 46
@@ -127,13 +138,31 @@ y += cta_h + 46
 d.line([M, y, W - M, y], fill=(219, 234, 236), width=2)
 y += 26
 d.text((M, y), "otvet.mobi", font=semi(30), fill=INK)
+link(M - 6, y - 6, M + d.textlength("otvet.mobi", font=semi(30)) + 6, y + 44,
+     "https://otvet.mobi")
 right = "+7 702 941 06 25 · Алматы"
-d.text((W - M - d.textlength(right, font=body(30)), y), right, font=body(30), fill=DIM)
+rw = d.textlength(right, font=body(30))
+d.text((W - M - rw, y), right, font=body(30), fill=DIM)
+phone_w = d.textlength("+7 702 941 06 25", font=body(30))
+link(W - M - rw - 6, y - 6, W - M - rw + phone_w + 6, y + 44, "tel:+77029410625")
 
 # Обрезаем по последней нарисованной строке: так одностраничник всегда
 # заканчивается там, где кончается текст, а не там, где кончился холст.
 img = img.crop((0, 0, W, y + 78))
+img = img  # холст уже обрезан
 img.save(PNG, "PNG", optimize=True)
-img.convert("RGB").save(PDF, "PDF", resolution=150.0)
-print("высота:", img.height)
+
+# PDF рисуем поверх той же картинки и накрываем ссылки прозрачными областями:
+# в мессенджере по ним открывается сайт и набирается номер.
+K = 0.5                                   # пиксель картинки -> пункт PDF
+PW, PH = W * K, img.height * K
+c = rl_canvas.Canvas(PDF, pagesize=(PW, PH))
+c.setTitle("Ответ — ИИ-автоответчик для стоматологий и медцентров")
+c.drawImage(ImageReader(img), 0, 0, width=PW, height=PH)
+for x0, y0, x1, y1, url in LINKS:
+    rect = (x0 * K, PH - y1 * K, x1 * K, PH - y0 * K)   # у PDF ось Y снизу
+    c.linkURL(url, rect, relative=0, thickness=0)
+c.showPage()
+c.save()
+print("высота:", img.height, "| ссылок в PDF:", len(LINKS))
 print("готово:", PNG, os.path.getsize(PNG), "байт;", PDF, os.path.getsize(PDF), "байт")
