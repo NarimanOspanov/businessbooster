@@ -38,11 +38,6 @@
         <p class="lead">Отвечает, когда ответить некому. Напоминает о приёме накануне
         и возвращает тех, кто давно не был.</p>
 
-        <div class="scen" id="cf-scen" role="radiogroup" aria-label="Что показать в звонке">
-          <button type="button" class="scen-b on" data-scen="inbound" role="radio" aria-checked="true">Принимает звонок</button>
-          <button type="button" class="scen-b" data-scen="reminder" role="radio" aria-checked="false">Напоминает о приёме</button>
-          <button type="button" class="scen-b" data-scen="upsell" role="radio" aria-checked="false">Возвращает пациента</button>
-        </div>
         <form class="callform" id="cf">
           <div class="phonewrap">
             <button type="button" class="cc" id="cf-cc" aria-haspopup="listbox" aria-expanded="false"></button>
@@ -308,6 +303,23 @@
   </div>
 </div></footer>
 
+<!-- Выбор сценария демо-звонка. Появляется после нажатия кнопки: до этого
+     три варианта делили внимание с полем номера. -->
+<div class="modal" id="scen-modal" hidden role="dialog" aria-modal="true" aria-labelledby="scen-title">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3 id="scen-title">Какой звонок показать?</h3>
+      <button type="button" class="modal-x" aria-label="Закрыть">&times;</button>
+    </div>
+    <p class="modal-sub" id="scen-sub" data-tpl="Позвоним на {n}. Выберите сценарий — и ассистент наберёт."></p>
+    <div class="scens">
+      <button type="button" class="scen-o" data-scen="inbound"><b>Принимает звонок</b><span>Отвечает как администратор: спросите цену или запишитесь на приём</span></button>
+      <button type="button" class="scen-o" data-scen="reminder"><b>Напоминает о приёме</b><span>Звонит накануне визита и уточняет, придёте ли вы</span></button>
+      <button type="button" class="scen-o" data-scen="upsell"><b>Возвращает пациента</b><span>Предлагает осмотр тому, кто давно не был</span></button>
+    </div>
+  </div>
+</div>
+
 <script src="/assets/phone.js" defer></script>
 <script>
   var L = {callBtn:"Позвоните мне",callGoing:"Набираем…",callOk:"Ассистент звонит. Возьмите трубку.",
@@ -349,29 +361,18 @@
     })();
   }
 
-  // Выбор сценария: посетитель слушает ту работу, которая ему интересна,
-  // а не ту, которую мы решили показать.
-  var scenario = 'inbound';
+  // Сценарий спрашиваем после нажатия кнопки: в герое остаётся одно
+  // действие, а выбор всплывает тогда, когда номер уже введён и человек
+  // действительно готов слушать.
   (function () {
-    var box = document.getElementById('cf-scen');
-    if (!box) return;
-    box.addEventListener('click', function (e) {
-      var b = e.target.closest('.scen-b');
-      if (!b) return;
-      scenario = b.getAttribute('data-scen');
-      box.querySelectorAll('.scen-b').forEach(function (x) {
-        var on = x === b;
-        x.classList.toggle('on', on);
-        x.setAttribute('aria-checked', on ? 'true' : 'false');
-      });
-    });
-  })();
-
-  document.getElementById('cf').addEventListener('submit', function (e) {
-    e.preventDefault();
+    var form = document.getElementById('cf');
     var st = document.getElementById('cf-status');
     var btn = document.getElementById('cf-send');
-    var fail = function (m, withPhone) {
+    var modal = document.getElementById('scen-modal');
+    var sub = document.getElementById('scen-sub');
+    var back = null;
+
+    function fail(m, withPhone) {
       st.className = 'status bad';
       st.textContent = m;
       // Звонок не дошёл — значит человек должен уйти со страницы не ни с чем,
@@ -383,29 +384,69 @@
         a.textContent = L.callNumber;
         st.appendChild(a);
       }
-    };
-    var to = window.phoneE164 && window.phoneE164();
-    if (!to) { fail(L.callErrNumber, false); document.getElementById('cf-phone').focus(); return; }
-    btn.disabled = true; st.className = 'status'; st.textContent = L.callGoing;
-    fetch('/api/demo-call', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone: to, consent: true, lang: 'ru', scenario: scenario })
-    }).then(function (r) { return r.json().then(function (d) { return { s: r.status, d: d }; }); })
-      .then(function (res) {
-        if (res.s === 200 && res.d.ok) {
-          st.className = 'status ok'; st.textContent = L.callOk;
-          if (res.d.id) watchCall(res.d.id, st);
-          return;
-        }
-        if (res.d.error === 'bad_number') return fail(L.callErrNumber);
-        if (res.s === 429) return fail(L.callErrLimit);
-        if (res.s === 503) return fail(L.callErrOff);
-        if (res.d.error === 'call_failed') return fail(L.callErrFailed);
-        fail(L.callErr);
-      })
-      .catch(function () { fail(L.callErr); })
-      .finally(function () { btn.disabled = false; });
-  });
+    }
+
+    function shut() {
+      modal.hidden = true;
+      document.body.classList.remove('noscroll');
+      if (back) back.focus();
+    }
+
+    function show(to) {
+      var shown = (window.phoneShown && window.phoneShown()) || to;
+      sub.textContent = sub.getAttribute('data-tpl').replace('{n}', shown);
+      back = document.activeElement;
+      modal.hidden = false;
+      document.body.classList.add('noscroll');
+      var first = modal.querySelector('.scen-o');
+      if (first) first.focus();
+    }
+
+    function send(to, scenario) {
+      btn.disabled = true; st.className = 'status'; st.textContent = L.callGoing;
+      fetch('/api/demo-call', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: to, consent: true, lang: 'ru', scenario: scenario })
+      }).then(function (r) { return r.json().then(function (d) { return { s: r.status, d: d }; }); })
+        .then(function (res) {
+          if (res.s === 200 && res.d.ok) {
+            st.className = 'status ok'; st.textContent = L.callOk;
+            if (res.d.id) watchCall(res.d.id, st);
+            return;
+          }
+          if (res.d.error === 'bad_number') return fail(L.callErrNumber);
+          if (res.s === 429) return fail(L.callErrLimit);
+          if (res.s === 503) return fail(L.callErrOff);
+          if (res.d.error === 'call_failed') return fail(L.callErrFailed);
+          fail(L.callErr);
+        })
+        .catch(function () { fail(L.callErr); })
+        .finally(function () { btn.disabled = false; });
+    }
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var to = window.phoneE164 && window.phoneE164();
+      if (!to) { fail(L.callErrNumber, false); document.getElementById('cf-phone').focus(); return; }
+      st.className = 'status'; st.textContent = '';
+      show(to);
+    });
+
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal || e.target.closest('.modal-x')) return shut();
+      var o = e.target.closest('.scen-o');
+      if (!o) return;
+      // Номер читаем заново: пока окно открыто, поле никуда не делось.
+      var to = window.phoneE164 && window.phoneE164();
+      shut();
+      if (!to) return fail(L.callErrNumber, false);
+      send(to, o.getAttribute('data-scen'));
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !modal.hidden) shut();
+    });
+  })();
 
   // Считаем скупо: один из пяти. Завышенная цифра стоит доверия ко всей странице.
   (function () {

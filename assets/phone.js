@@ -236,4 +236,10 @@
     if (current.len ? d.length !== current.len : (d.length < 6 || d.length > 12)) return null;
     return "+" + current.code + d;
   };
+
+  // Тот же номер, но в том виде, в каком человек его видит в поле: его же
+  // мы показываем в окне выбора сценария, чтобы он узнал свой номер.
+  window.phoneShown = function () {
+    return ("+" + current.code + " " + input.value).replace(/\s+/g, " ").trim();
+  };
 })();
