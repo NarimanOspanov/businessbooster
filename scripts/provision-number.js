@@ -46,12 +46,29 @@ async function eleven(pathname, init = {}, tries = 4) {
   }
 }
 
-async function ensureExtension(wanted) {
+// У каждого номера должен быть свой внутренний: переадресация настраивается
+// на внутреннем и ведёт на конкретный номер в ElevenLabs. Если посадить два
+// номера на один внутренний, звонки второй клиники уедут первой — поэтому
+// занятые внутренние обходим стороной, а не берём первый попавшийся.
+async function ensureExtension(wanted, number) {
   const list = await zadarma.call("/v1/pbx/internal/");
-  const numbers = list.numbers || [];
+  const numbers = (list.numbers || []).map(String);
   console.log("  внутренние номера АТС:", numbers.join(", ") || "нет");
-  if (wanted && numbers.map(String).includes(String(wanted))) return String(wanted);
-  if (!wanted && numbers.length) return String(numbers[0]);
+  if (wanted && numbers.includes(String(wanted))) return String(wanted);
+  if (wanted) {
+    console.log("  внутреннего " + wanted + " в АТС нет — создам новый");
+  }
+
+  const taken = new Set();
+  for (const n of await db.numbersByStatus()) {
+    if (n.pbx_extension && n.number !== number) taken.add(String(n.pbx_extension));
+  }
+  if (taken.size) console.log("  уже заняты другими номерами:", [...taken].join(", "));
+
+  if (!wanted) {
+    const free = numbers.find((n) => !taken.has(n));
+    if (free) return free;
+  }
 
   const made = await zadarma.call("/v1/pbx/internal/create/", {}, "POST");
   const created = made.internal_number || (made.numbers || [])[0];
@@ -106,7 +123,7 @@ async function importToEleven(number) {
     console.log("\n[1-2] Zadarma пропущена по флагу");
   } else {
     console.log("\n[1] внутренний номер АТС");
-    extension = await ensureExtension(extension);
+    extension = await ensureExtension(extension, number);
     console.log("\n[2] переадресация на ElevenLabs");
     console.log("  адрес:", await setRedirection(extension, number));
   }
