@@ -130,11 +130,19 @@ async function importToEleven(number) {
 
   console.log("\n[3] импорт в ElevenLabs");
   const phoneNumberId = await importToEleven(number);
+  // Импорт заводит номер с supports_inbound = false: платформа отказывается
+  // принимать звонок, пока у транка нет входящей конфигурации. Досылаем её
+  // всегда — иначе первый же звонок пациента упрётся в тишину.
   await eleven("/v1/convai/phone-numbers/" + phoneNumberId, {
     method: "PATCH",
-    body: JSON.stringify({ agent_id: AGENT }),
+    body: JSON.stringify({
+      agent_id: AGENT,
+      inbound_trunk_config: { media_encryption: "disabled" },
+    }),
   });
+  const now = await eleven("/v1/convai/phone-numbers/" + phoneNumberId);
   console.log("  агент привязан:", AGENT);
+  console.log("  входящие:", now.supports_inbound ? "принимает" : "НЕ ПРИНИМАЕТ — разбирайтесь");
 
   console.log("\n[4] запись в пул");
   // 'free' ставим только по флагу: номер бывает куплен, но ещё не активирован
