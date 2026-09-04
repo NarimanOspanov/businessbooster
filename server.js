@@ -1589,6 +1589,78 @@ async function cabinetContext(req) {
   return { userId: claims.sub, orgIds, clinics, clinicIds: clinics.map((c) => c.id) };
 }
 
+// Кабинет агента. Агент ведёт чужие клиники: заводит организацию, выдаёт
+// номер из пула, заполняет анкету — и только потом передаёт кабинет владельцу.
+// Доступ по списку идентификаторов Clerk, а не по общему паролю: пароль на
+// всех не отзывается и не показывает, кто именно что сделал.
+const ADMIN_IDS = (process.env.ADMIN_USER_IDS || "").split(/[^\w-]+/).filter(Boolean);
+
+async function adminContext(req) {
+  const auth = String(req.headers.authorization || "");
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  if (!token) throw new Error("no_token");
+  const claims = await verifyClerkToken(token);
+  // Свой идентификатор возвращаем даже при отказе: первый агент иначе не
+  // знает, что вписывать в ADMIN_USER_IDS, и войти не может никогда.
+  if (!ADMIN_IDS.length) {
+    const e = new Error("admin_not_configured"); e.userId = claims.sub; throw e;
+  }
+  if (!ADMIN_IDS.includes(claims.sub)) {
+    const e = new Error("not_admin"); e.userId = claims.sub; throw e;
+  }
+  return { userId: claims.sub };
+}
+
+// Номер должен звонить агенту своей клиники. Пока этого не сделано, он
+// отвечает базовым демо-агентом — то есть чужим голосом и чужим прайсом.
+async function bindNumberToAgent(phoneNumberId, agentId) {
+  if (!phoneNumberId || !agentId || !process.env.ELEVENLABS_API_KEY) return false;
+  try {
+    const r = await fetch(
+      "https://api.elevenlabs.io/v1/convai/phone-numbers/" + phoneNumberId,
+      {
+        method: "PATCH",
+        headers: {
+          "xi-api-key": process.env.ELEVENLABS_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ agent_id: agentId }),
+      }
+    );
+    if (!r.ok) throw new Error("ElevenLabs " + r.status);
+    return true;
+  } catch (e) {
+    console.log("[номер] не привязался к агенту: " + String(e.message).slice(0, 120));
+    return false;
+  }
+}
+
+// Переносит анкету в агента и ставит агента на номер. Один и тот же путь для
+// кабинета клиники и для кабинета агента: разойдись они — у одной из сторон
+// «Включить» однажды перестало бы включать.
+async function publishClinic(clinicId) {
+  const c = await db.clinicById(clinicId);
+  if (!c) throw new Error("no_clinic");
+  let profile = {};
+  try { profile = JSON.parse(c.profile_json || "{}"); } catch {}
+  if (!profile.name) throw new Error("profile_empty");
+
+  // Ключ выдаётся один раз: он зашит в адреса инструментов агента.
+  const toolKey = await db.ensureToolKey(clinicId);
+  const opts = { toolKey: toolKey, baseUrl: PUBLIC_URL };
+
+  let agentId = c.agent_id;
+  // Базового агента не трогаем: он общий и обслуживает демо на сайте.
+  if (!agentId || agentId === agentTemplate.BASE_AGENT) {
+    agentId = await agentTemplate.createAgent(profile, opts);
+  } else {
+    await agentTemplate.updateAgent(agentId, profile, opts);
+  }
+  await db.setClinicAgent(clinicId, agentId);
+  await bindNumberToAgent(c.phone_number_id, agentId);
+  return agentId;
+}
+
 // ---------------------------------------------------------------------------
 // Записи со звонков: ElevenLabs присылает разговор, мы достаём из него поля.
 
@@ -2797,43 +2869,12 @@ http
         // частям и подолгу, а перестраивать агента на каждое нажатие клавиши
         // значит менять то, что прямо сейчас разговаривает с пациентом.
         if (urlPath === "/api/cabinet/publish" && req.method === "POST") {
-          const c = await db.clinicById(myClinic);
-          let profile = {};
-          try { profile = JSON.parse(c.profile_json || "{}"); } catch {}
-          if (!profile.name) return send(400, { error: "profile_empty" });
-
-          // Ключ выдаётся один раз: он зашит в адреса инструментов агента.
-          const toolKey = await db.ensureToolKey(myClinic);
-          const opts = { toolKey: toolKey, baseUrl: PUBLIC_URL };
-
-          let agentId = c.agent_id;
-          // Базового агента не трогаем: он общий и обслуживает демо на сайте.
-          if (!agentId || agentId === agentTemplate.BASE_AGENT) {
-            agentId = await agentTemplate.createAgent(profile, opts);
-          } else {
-            await agentTemplate.updateAgent(agentId, profile, opts);
+          try {
+            return send(200, { ok: true, agent_id: await publishClinic(myClinic) });
+          } catch (e) {
+            if (e.message === "profile_empty") return send(400, { error: "profile_empty" });
+            throw e;
           }
-          await db.setClinicAgent(myClinic, agentId);
-
-          // Номер клиники должен звонить именно этому агенту.
-          if (c.phone_number_id && process.env.ELEVENLABS_API_KEY) {
-            try {
-              await fetch(
-                "https://api.elevenlabs.io/v1/convai/phone-numbers/" + c.phone_number_id,
-                {
-                  method: "PATCH",
-                  headers: {
-                    "xi-api-key": process.env.ELEVENLABS_API_KEY,
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({ agent_id: agentId }),
-                }
-              );
-            } catch (e) {
-              console.log("[cabinet] номер к агенту не привязался: " + String(e.message).slice(0, 120));
-            }
-          }
-          return send(200, { ok: true, agent_id: agentId });
         }
 
         // Даём клинике увидеть промпт целиком. Это её слова, и она вправе
@@ -2984,6 +3025,163 @@ http
     // Онбординг до входа. Клиника заполняет анкету, видит, что вышло, и только
     // потом регистрируется — регистрация нужна, чтобы привязать номер, а не
     // чтобы посмотреть.
+    // Кабинет агента. Всё, что здесь делается, делается за клинику, которая
+    // ещё не завела себе вход: организация, номер, анкета. Поэтому проверка
+    // не «состоит ли в организации», как в кабинете клиники, а «в списке ли
+    // агентов» — и список задаётся снаружи, в настройках сервера.
+    if (urlPath.startsWith("/api/admin/")) {
+      (async () => {
+        const send = (code, obj) => {
+          res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+          res.end(JSON.stringify(obj));
+        };
+        if (!CLERK_PK || !CLERK_SK) return send(503, { error: "clerk_not_configured" });
+
+        let ctx;
+        try {
+          ctx = await adminContext(req);
+        } catch (e) {
+          console.log("[admin] отказ: " + String(e.message).slice(0, 120));
+          const denied = e.message === "not_admin" || e.message === "admin_not_configured";
+          return send(denied ? 403 : 401, { error: e.message, user_id: e.userId || null });
+        }
+        const body = async () => {
+          try { return JSON.parse(await readBody(req)) || {}; } catch { return {}; }
+        };
+
+        if (urlPath === "/api/admin/state") {
+          const [clinics, numbers] = await Promise.all([db.listClinics(), db.numbersByStatus()]);
+          return send(200, {
+            clinics, numbers,
+            fields: agentTemplate.FIELDS,
+            sources: agentTemplate.SOURCES,
+            integration: agentTemplate.INTEGRATION,
+            enrich_available: enrich.available(),
+          });
+        }
+
+        if (urlPath === "/api/admin/clinic" && req.method === "GET") {
+          const c = await db.clinicById(Number(parsed.searchParams.get("id")));
+          if (!c) return send(404, { error: "no_clinic" });
+          let profile = {};
+          try { profile = JSON.parse(c.profile_json || "{}"); } catch {}
+          return send(200, {
+            clinic: {
+              id: c.id, name: c.name, org_id: c.org_id, agent_id: c.agent_id,
+              public_number: c.public_number, phone_number_id: c.phone_number_id,
+            },
+            profile: agentTemplate.cleanAll(profile),
+          });
+        }
+
+        // Новая клиника. Организация в Clerk заводится сразу: без неё клинике
+        // некуда будет войти, а переселить её потом — значит переписать
+        // владельца у уже накопленных звонков.
+        if (urlPath === "/api/admin/clinic" && req.method === "POST") {
+          const b = await body();
+          const name = String(b.name || "").trim().slice(0, 120);
+          if (!name) return send(400, { error: "name_required" });
+          const r = await fetch("https://api.clerk.com/v1/organizations", {
+            method: "POST",
+            headers: { Authorization: "Bearer " + CLERK_SK, "Content-Type": "application/json" },
+            body: JSON.stringify({ name: name, created_by: ctx.userId }),
+          });
+          const j = await r.json();
+          if (!r.ok) {
+            console.log("[admin] организация не создалась: " + JSON.stringify(j).slice(0, 200));
+            return send(502, { error: "org_failed" });
+          }
+          const clinicId = await db.upsertClinic({ org_id: j.id, name: name });
+          await db.saveClinicProfile(clinicId, agentTemplate.cleanAll({ name: name }));
+          return send(200, { ok: true, clinic_id: clinicId, org_id: j.id });
+        }
+
+        if (urlPath === "/api/admin/profile" && req.method === "POST") {
+          const b = await body();
+          const c = await db.clinicById(Number(b.clinic_id));
+          if (!c) return send(404, { error: "no_clinic" });
+          const profile = agentTemplate.cleanAll(b.profile || {});
+          if (!profile.name) return send(400, { error: "name_required" });
+          await db.saveClinicProfile(c.id, profile);
+          return send(200, { ok: true });
+        }
+
+        if (urlPath === "/api/admin/publish" && req.method === "POST") {
+          const b = await body();
+          try {
+            return send(200, { ok: true, agent_id: await publishClinic(Number(b.clinic_id)) });
+          } catch (e) {
+            if (e.message === "profile_empty" || e.message === "no_clinic") {
+              return send(400, { error: e.message });
+            }
+            throw e;
+          }
+        }
+
+        // Выдать номер. Агента может ещё не быть — тогда номер закрепится за
+        // клиникой, а на её агента встанет позже, при «Включить».
+        if (urlPath === "/api/admin/assign" && req.method === "POST") {
+          const b = await body();
+          const number = String(b.number || "").trim();
+          const c = await db.clinicById(Number(b.clinic_id));
+          if (!c) return send(404, { error: "no_clinic" });
+          const taken = await db.assignNumber(number, c.id);
+          if (!taken) return send(409, { error: "not_free" });
+          const bound = c.agent_id ? await bindNumberToAgent(taken.phone_number_id, c.agent_id) : false;
+          return send(200, { ok: true, number: taken.number, bound: bound });
+        }
+
+        if (urlPath === "/api/admin/release" && req.method === "POST") {
+          const b = await body();
+          const number = String(b.number || "").trim();
+          const row = (await db.numbersByStatus()).find((n) => n.number === number);
+          const freed = await db.releaseNumber(number);
+          if (!freed) return send(404, { error: "no_number" });
+          // Освобождённый номер не должен продолжать отвечать голосом клиники,
+          // от которой его забрали.
+          if (row && row.phone_number_id) {
+            await bindNumberToAgent(row.phone_number_id, agentTemplate.BASE_AGENT);
+          }
+          return send(200, { ok: true });
+        }
+
+        // Передача кабинета владельцу: приглашение в организацию клиники.
+        if (urlPath === "/api/admin/invite" && req.method === "POST") {
+          const b = await body();
+          const c = await db.clinicById(Number(b.clinic_id));
+          const email = String(b.email || "").trim().slice(0, 200);
+          if (!c) return send(404, { error: "no_clinic" });
+          if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return send(400, { error: "bad_email" });
+          const r = await fetch(
+            "https://api.clerk.com/v1/organizations/" + encodeURIComponent(c.org_id) + "/invitations",
+            {
+              method: "POST",
+              headers: { Authorization: "Bearer " + CLERK_SK, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                email_address: email,
+                role: "org:admin",
+                inviter_user_id: ctx.userId,
+                redirect_url: PUBLIC_URL + "/cabinet/",
+              }),
+            }
+          );
+          const j = await r.json();
+          if (!r.ok) {
+            console.log("[admin] приглашение не ушло: " + JSON.stringify(j).slice(0, 200));
+            return send(502, { error: "invite_failed" });
+          }
+          return send(200, { ok: true });
+        }
+
+        send(404, { error: "unknown_endpoint" });
+      })().catch((e) => {
+        console.log("[admin] " + String(e.message).slice(0, 200));
+        res.writeHead(500, { "Content-Type": MIME[".json"] });
+        res.end(JSON.stringify({ error: "internal" }));
+      });
+      return;
+    }
+
     if (urlPath.startsWith("/api/onboard/")) {
       (async () => {
         const send = (code, obj) => {

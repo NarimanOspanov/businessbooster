@@ -199,6 +199,18 @@ async function clinicIdForCall({ phone_number_id, agent_id }) {
   return null;
 }
 
+// Весь список — для кабинета агента, который ведёт чужие клиники. Кабинет
+// самой клиники этим не пользуется: там выборка идёт строго по организациям.
+async function listClinics() {
+  const pool = await getPool();
+  const r = await pool.request().query(
+    "SELECT id, org_id, name, agent_id, phone_number_id, public_number, is_active, created_at, " +
+    "  CASE WHEN profile_json IS NULL OR profile_json = '' THEN 0 ELSE 1 END AS has_profile " +
+    "FROM dbo.clinics ORDER BY id DESC"
+  );
+  return r.recordset;
+}
+
 // Клиника заводится один раз на организацию Clerk и потом только обновляется.
 async function upsertClinic(c) {
   const pool = await getPool();
@@ -486,7 +498,7 @@ async function releaseNumber(number) {
   return r.recordset.length ? r.recordset[0].number : null;
 }
 
-module.exports = { getPool, migrate, saveCall, connectionString, clinicIdForCall, upsertClinic, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
+module.exports = { getPool, migrate, saveCall, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 
 if (require.main === module) {
   const cmd = process.argv[2];
