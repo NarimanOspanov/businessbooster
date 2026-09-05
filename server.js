@@ -3538,6 +3538,10 @@ http
             raw: raw.slice(0, 2000),
           };
           ZADARMA_EVENTS.unshift(event);
+          // И в базу: память переживёт не каждый перезапуск, а разбираться с
+          // этими полями мы будем не в ту же минуту.
+          db.saveZadarmaEvent(fields.event || "", fields).catch((e) =>
+            console.log("[zadarma] в базу не записалось: " + String(e.message).slice(0, 120)));
           if (ZADARMA_EVENTS.length > 40) ZADARMA_EVENTS.length = 40;
           console.log("[zadarma] " + (fields.event || "?") + " " + JSON.stringify(fields).slice(0, 400));
 

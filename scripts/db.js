@@ -154,6 +154,20 @@ BEGIN
     WHERE phone_number_id IS NOT NULL;
   CREATE INDEX IX_numbers_status ON dbo.numbers (status);
 END
+
+-- Сырые события от АТС Zadarma. Нужны, чтобы понять, приходит ли номер, с
+-- которого сделана переадресация: по SIP до нас доезжает только звонящий.
+-- Поля храним целиком в JSON — мы как раз ищем поле, названия которого не знаем.
+IF OBJECT_ID('dbo.zadarma_events', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.zadarma_events (
+    id          INT IDENTITY(1,1) PRIMARY KEY,
+    received_at DATETIME2(0)  NOT NULL CONSTRAINT DF_zde_at DEFAULT SYSUTCDATETIME(),
+    event       NVARCHAR(64)  NULL,
+    fields      NVARCHAR(MAX) NULL
+  );
+  CREATE INDEX IX_zde_at ON dbo.zadarma_events (received_at DESC);
+END
 `;
 
 // Выборки в кабинете всегда «звонки моей клиники за период», поэтому индекс
@@ -498,7 +512,25 @@ async function releaseNumber(number) {
   return r.recordset.length ? r.recordset[0].number : null;
 }
 
-module.exports = { getPool, migrate, saveCall, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
+async function saveZadarmaEvent(event, fields) {
+  const pool = await getPool();
+  await pool
+    .request()
+    .input("event", sql.NVarChar(64), String(event || "").slice(0, 64))
+    .input("fields", sql.NVarChar(sql.MAX), JSON.stringify(fields || {}))
+    .query("INSERT INTO dbo.zadarma_events (event, fields) VALUES (@event, @fields)");
+}
+
+async function lastZadarmaEvents(limit) {
+  const pool = await getPool();
+  const r = await pool
+    .request()
+    .input("n", sql.Int, Math.min(Number(limit) || 20, 100))
+    .query("SELECT TOP (@n) id, received_at, event, fields FROM dbo.zadarma_events ORDER BY id DESC");
+  return r.recordset;
+}
+
+module.exports = { getPool, migrate, saveCall, saveZadarmaEvent, lastZadarmaEvents, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 
 if (require.main === module) {
   const cmd = process.argv[2];
