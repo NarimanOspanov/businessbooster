@@ -68,6 +68,9 @@
   .steps { counter-reset:s; display:grid; gap:2px; margin-bottom:16px; }
   .steps div { font-size:13px; color:var(--muted); }
   .empty { color:var(--muted); font-size:14px; }
+  .zd { font-size:12px; line-height:1.45; white-space:pre-wrap; word-break:break-word;
+    max-height:340px; overflow:auto; margin-top:10px; color:var(--text); background:var(--soft);
+    border-radius:10px; padding:12px; }
   @media (max-width:860px) { .cols { grid-template-columns:1fr; } }
 </style>
 </head>
@@ -104,6 +107,15 @@
         <div class="note">Новый номер заводится командой
           <code>node scripts/provision-number.js</code> — она настраивает АТС
           и ElevenLabs.</div>
+      </div>
+
+      <div class="card">
+        <h2>События Zadarma</h2>
+        <div class="row">
+          <button class="btn" id="zd-go">Обновить</button>
+          <span class="note" style="margin:0">Что АТС знает о звонке</span>
+        </div>
+        <pre class="zd" id="zd" hidden></pre>
       </div>
     </div>
 
@@ -369,6 +381,26 @@
   document.getElementById("clinics").addEventListener("click", function (e) {
     var b = e.target.closest(".item");
     if (b) openClinic(Number(b.getAttribute("data-id")));
+  });
+
+  // Диагностика переадресации: смотрим сырые поля вебхука АТС. Нас интересует,
+  // приедет ли когда-нибудь номер, С КОТОРОГО переадресовали.
+  document.getElementById("zd-go").addEventListener("click", function () {
+    var box = document.getElementById("zd");
+    var btn = this;
+    btn.disabled = true;
+    api("/api/admin/zadarma-events")
+      .then(function (d) {
+        box.hidden = false;
+        if (!d.events.length) { box.textContent = "Событий пока нет."; return; }
+        var NL = String.fromCharCode(10);
+        box.textContent = d.events.map(function (e) {
+          return e.at.slice(11, 19) + "  " + (e.event || "?") + "  (подпись: " + e.signature + ")" + NL +
+            Object.keys(e.fields).map(function (k) { return "   " + k + " = " + e.fields[k]; }).join(NL);
+        }).join(NL + NL);
+      })
+      .catch(function (er) { box.hidden = false; box.textContent = "Не вышло: " + er.message; })
+      .finally(function () { btn.disabled = false; });
   });
 
   document.getElementById("new-go").addEventListener("click", function () {

@@ -1593,6 +1593,10 @@ async function cabinetContext(req) {
 // номер из пула, заполняет анкету — и только потом передаёт кабинет владельцу.
 // Доступ по списку идентификаторов Clerk, а не по общему паролю: пароль на
 // всех не отзывается и не показывает, кто именно что сделал.
+// Последние события от АТС Zadarma. Держим в памяти: это диагностика, а не
+// данные клиник — переживать перезапуск им незачем.
+const ZADARMA_EVENTS = [];
+
 const ADMIN_IDS = (process.env.ADMIN_USER_IDS || "").split(/[^\w-]+/).filter(Boolean);
 
 async function adminContext(req) {
@@ -3060,6 +3064,10 @@ http
           });
         }
 
+        if (urlPath === "/api/admin/zadarma-events") {
+          return send(200, { events: ZADARMA_EVENTS });
+        }
+
         if (urlPath === "/api/admin/clinic" && req.method === "GET") {
           const c = await db.clinicById(Number(parsed.searchParams.get("id")));
           if (!c) return send(404, { error: "no_clinic" });
@@ -3495,6 +3503,61 @@ http
         res.writeHead(500, { "Content-Type": MIME[".json"] });
         res.end(JSON.stringify({ error: "internal" }));
       });
+      return;
+    }
+
+    // Вебхук Zadarma. Ставим его, чтобы увидеть, что АТС знает о звонке:
+    // по SIP до нас доезжает только номер звонящего, а номер, С КОТОРОГО
+    // сделана переадресация, теряется — а именно он позволил бы держать одну
+    // линию на нескольких клиентов вместо номера на каждого.
+    if (urlPath === "/api/zadarma/webhook") {
+      // Сохранение адреса в панели Zadarma: они дёргают GET со случайной
+      // строкой в zd_echo и ждут её же в теле ответа.
+      if (req.method === "GET") {
+        const echo = parsed.searchParams.get("zd_echo");
+        res.writeHead(200, { "Content-Type": "text/plain", "Cache-Control": "no-store" });
+        return res.end(echo == null ? "ok" : String(echo));
+      }
+      if (req.method !== "POST") {
+        res.writeHead(405, { "Content-Type": MIME[".json"] });
+        return res.end(JSON.stringify({ error: "method" }));
+      }
+      readBody(req)
+        .then((raw) => {
+          // Тело приходит формой; сохраняем ВСЕ поля, а не разбираем знакомые:
+          // смысл затеи как раз в том, чтобы увидеть незнакомые.
+          const fields = {};
+          try {
+            for (const [k, v] of new URLSearchParams(raw)) fields[k] = v;
+          } catch {}
+          const event = {
+            at: new Date().toISOString(),
+            event: fields.event || "",
+            signature: String(req.headers.signature || "") ? "есть" : "нет",
+            fields,
+            raw: raw.slice(0, 2000),
+          };
+          ZADARMA_EVENTS.unshift(event);
+          if (ZADARMA_EVENTS.length > 40) ZADARMA_EVENTS.length = 40;
+          console.log("[zadarma] " + (fields.event || "?") + " " + JSON.stringify(fields).slice(0, 400));
+
+          // В телеграм — только поля, похожие на номера: по ним сразу видно,
+          // приехал ли номер переадресации, не открывая кабинет.
+          const nums = Object.keys(fields)
+            .filter((k) => /num|caller|did|dest|forward|divert|redirect|internal/i.test(k))
+            .map((k) => k + ": " + fields[k]);
+          notifyTelegram(
+            "\u260e\ufe0f <b>Zadarma: " + (fields.event || "событие") + "</b>\n" +
+            (nums.length ? nums.join("\n") : "полей с номерами нет") +
+            "\n\nвсего полей: " + Object.keys(fields).length
+          );
+          res.writeHead(200, { "Content-Type": "text/plain" });
+          res.end("ok");
+        })
+        .catch(() => {
+          res.writeHead(200, { "Content-Type": "text/plain" });
+          res.end("ok");
+        });
       return;
     }
 
