@@ -3808,25 +3808,28 @@ http
         ok();
 
         const msg = waParse(payload);
-        if (msg.event && !/message/i.test(msg.event)) return;  // статусы сессии
-        if (msg.fromMe || msg.isGroup) return;
-        if (!waAllowed(msg.chatId)) {
-          console.log("[whatsapp] пропускаю " + msg.chatId + ": не в списке проверки");
-          return;
-        }
-        if (!msg.chatId || !msg.text) {
-          console.log("[whatsapp] не разобрал: " + JSON.stringify(payload).slice(0, 300));
-          return;
-        }
+        // Пишем в базу каждый шаг: логи Azure видны не всегда, а «ассистент
+        // молчит» без записи выглядит одинаково при десяти разных причинах.
+        const note = (why, extra) => db.saveZadarmaEvent("wa:" + why, {
+          clinic: String(clinic.id), chat: msg.chatId || "", text: (msg.text || "").slice(0, 200),
+          allow_list: WA_ONLY_FROM.join(",") || "(пусто)", ...(extra || {}),
+        }).catch(() => {});
 
+        if (msg.event && !/message/i.test(msg.event)) return;  // статусы сессии
+        if (msg.fromMe || msg.isGroup) return void note("skip-own-or-group");
+        if (!waAllowed(msg.chatId)) return void note("skip-not-in-list");
+        if (!msg.chatId || !msg.text) return void note("skip-empty");
+        note("in");
         try {
           const reply = await waReply(clinic, msg.text.slice(0, 1500), WA_CHATS.get(msg.chatId));
           waRemember(msg.chatId, "human", msg.text);
           waRemember(msg.chatId, "clinic", reply);
           await waSend(msg.chatId, reply, clinic.wa_session);
+          note("out", { reply: reply.slice(0, 300) });
           console.log("[whatsapp] " + clinic.name + " " + msg.chatId + ": " +
             msg.text.slice(0, 40) + " -> " + reply.slice(0, 40));
         } catch (e) {
+          note("fail", { error: String(e.message).slice(0, 300) });
           console.log("[whatsapp] не ответили: " + String(e.message).slice(0, 160));
         }
       })().catch((e) => {
