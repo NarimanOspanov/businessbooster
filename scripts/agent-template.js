@@ -340,7 +340,9 @@ function applyProfile(conversationConfig, profile, toolIds) {
   cc.agent = cc.agent || {};
   cc.agent.first_message = buildFirstMessage(profile);
   cc.agent.prompt = cc.agent.prompt || {};
-  cc.agent.prompt.prompt = buildPrompt(profile, !!(toolIds && toolIds.length));
+  // По вертикали: телефон и переписка должны говорить одно и то же, а для
+  // аренды стоматологический шаблон не годится ни одним абзацем.
+  cc.agent.prompt.prompt = buildPromptFor(profile, !!(toolIds && toolIds.length));
   // Пустой список тоже осмыслен: клиника убрала адреса — инструменты уходят.
   cc.agent.prompt.tool_ids = toolIds || [];
   return cc;
