@@ -313,7 +313,9 @@ async function askText(system, user) {
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
           contents: [{ role: "user", parts: [{ text: user }] }],
-          generationConfig: { temperature: 0.3, maxOutputTokens: 600 },
+          // У моделей с рассуждением бюджет один на размышления и на ответ: при 600
+          // реплика обрывалась на полуслове, хотя сама она в три строки.
+          generationConfig: { temperature: 0.3, maxOutputTokens: 2000 },
         }),
         signal: AbortSignal.timeout(30000),
       }
