@@ -1678,6 +1678,19 @@ async function waConnect(clinic, phoneDigits) {
   // Вебхук ставим сразу: подключение без него — это сессия, которая молчит.
   const toolKey = await db.ensureToolKey(clinic.id);
   try {
+    // Сначала убираем свои прежние: «Подключить» нажимают не по одному разу,
+    // а каждый лишний вебхук — это ещё одна доставка того же сообщения и ещё
+    // один ответ гостю. Плюс старый мог остаться без нынешнего фильтра.
+    const had = await waApi("/api/sessions/" + encodeURIComponent(session) + "/webhooks");
+    for (const h of (Array.isArray(had) ? had : had.data || [])) {
+      if (!String(h.url || "").startsWith(PUBLIC_URL + "/api/whatsapp/inbound")) continue;
+      await waApi("/api/sessions/" + encodeURIComponent(session) + "/webhooks/" + h.id,
+        { method: "DELETE" });
+    }
+  } catch (e) {
+    console.log("[whatsapp] старые вебхуки не убрались: " + String(e.message).slice(0, 120));
+  }
+  try {
     await waApi("/api/sessions/" + encodeURIComponent(session) + "/webhooks", {
       method: "POST",
       body: JSON.stringify({
