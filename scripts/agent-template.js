@@ -475,7 +475,10 @@ async function wantedTools(profile, opts, existingIds) {
     await deleteTools(existingIds);
     return [];
   }
-  return ensureTools(opts.baseUrl, opts.toolKey, existingIds, p.vertical);
+  // Вертикаль берём из сырой анкеты: cleanAll оставляет только известные поля,
+  // а vertical в их списке нет — через него ехала пустота, и аренда получала
+  // стоматологический набор инструментов.
+  return ensureTools(opts.baseUrl, opts.toolKey, existingIds, profile && profile.vertical);
 }
 
 async function updateAgent(agentId, profile, opts) {
