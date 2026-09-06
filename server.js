@@ -1593,6 +1593,87 @@ async function cabinetContext(req) {
 // номер из пула, заполняет анкету — и только потом передаёт кабинет владельцу.
 // Доступ по списку идентификаторов Clerk, а не по общему паролю: пароль на
 // всех не отзывается и не показывает, кто именно что сделал.
+// Шлюз WhatsApp: адрес и ключ — настройки сервера, сессии — по клинике.
+function waGateway() {
+  const url = String(process.env.WA_API_URL || "").replace(/\/+$/, "");
+  const key = process.env.WA_API_KEY || "";
+  if (!url || !key) throw new Error("gateway_not_configured");
+  return { url: url, key: key };
+}
+
+async function waApi(pathname, init) {
+  const g = waGateway();
+  const r = await fetch(g.url + pathname, {
+    ...(init || {}),
+    headers: { "Content-Type": "application/json", "X-API-Key": g.key, ...((init || {}).headers || {}) },
+    signal: AbortSignal.timeout(20000),
+  });
+  const text = await r.text();
+  if (!r.ok) throw new Error("gateway_" + r.status + ": " + text.slice(0, 200));
+  try { return text ? JSON.parse(text) : {}; } catch { return {}; }
+}
+
+// Подключение номера клиники к переписке. Возвращает код из восьми символов,
+// который человек вводит у себя в WhatsApp: «Связанные устройства» ->
+// «Связать по номеру телефона». QR не годится — его нужно чем-то сканировать,
+// а у клиента часто есть только тот самый телефон.
+async function waConnect(clinic, phoneDigits) {
+  let session = clinic.wa_session || "";
+
+  if (!session) {
+    const made = await waApi("/api/sessions", {
+      method: "POST",
+      body: JSON.stringify({ name: "clinic-" + clinic.id }),
+    });
+    session = made.id || made.sessionId || made.session || "";
+    if (!session) throw new Error("сессия не создалась");
+    await db.setClinicWaSession(clinic.id, session);
+  }
+
+  // Старт повторный не вредит: если сессия уже поднята, шлюз ответит отказом,
+  // и это не повод прерывать подключение.
+  try { await waApi("/api/sessions/" + encodeURIComponent(session) + "/start", { method: "POST" }); }
+  catch (e) { console.log("[whatsapp] старт сессии: " + String(e.message).slice(0, 100)); }
+
+  // Кода до готовности движка не будет: до qr_ready шлюз отвечает 409.
+  let status = "";
+  for (let i = 0; i < 15; i++) {
+    const st = await waApi("/api/sessions/" + encodeURIComponent(session));
+    status = st.status || st.state || "";
+    if (/qr_ready|connected|authenticated/i.test(status)) break;
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  if (/connected|authenticated/i.test(status)) {
+    return { already: true, session: session, status: status };
+  }
+
+  const code = await waApi("/api/sessions/" + encodeURIComponent(session) + "/pairing-code", {
+    method: "POST",
+    body: JSON.stringify({ phoneNumber: phoneDigits }),
+  });
+
+  // Вебхук ставим сразу: подключение без него — это сессия, которая молчит.
+  const toolKey = await db.ensureToolKey(clinic.id);
+  try {
+    await waApi("/api/sessions/" + encodeURIComponent(session) + "/webhooks", {
+      method: "POST",
+      body: JSON.stringify({
+        url: PUBLIC_URL + "/api/whatsapp/inbound?k=" + encodeURIComponent(toolKey),
+        events: ["message.received"],
+      }),
+    });
+  } catch (e) {
+    console.log("[whatsapp] вебхук не встал: " + String(e.message).slice(0, 140));
+  }
+
+  return {
+    already: false,
+    session: session,
+    status: status,
+    code: code.pairingCode || code.code || "",
+  };
+}
+
 // Переписка в WhatsApp. Хранение историй — в памяти: чтобы ответ был связным,
 // хватает последних реплик, а держать чужую переписку дольше незачем.
 const WA_CHATS = new Map(); // chatId -> [{from, text}]
@@ -3154,6 +3235,51 @@ http
             integration: agentTemplate.INTEGRATION,
             enrich_available: enrich.available(),
           });
+        }
+
+        // Подключение WhatsApp клиники: код вместо QR.
+        if (urlPath === "/api/admin/wa/connect" && req.method === "POST") {
+          const b = await body();
+          const clinic = await db.clinicById(Number(b.clinic_id));
+          if (!clinic) return send(404, { error: "no_clinic" });
+          const phone = String(b.phone || "").replace(/\D/g, "");
+          if (phone.length < 10 || phone.length > 15) return send(400, { error: "bad_phone" });
+          try {
+            const r = await waConnect(clinic, phone);
+            if (r.code) {
+              // Код живёт минуты: пока агент диктует его клиенту, полезно
+              // иметь его и в телефоне, а не только на экране кабинета.
+              notifyTelegram("\u{1F4AC} <b>Код для WhatsApp</b>\n" + clinic.name +
+                ", номер +" + phone + "\n<code>" + r.code + "</code>\n" +
+                "Ввести: WhatsApp -> Связанные устройства -> Связать устройство -> " +
+                "Связать по номеру телефона");
+            }
+            return send(200, { ok: true, ...r });
+          } catch (e) {
+            const m = String(e.message);
+            if (m === "gateway_not_configured") return send(503, { error: "gateway_not_configured" });
+            console.log("[admin] whatsapp: " + m.slice(0, 200));
+            return send(502, { error: "gateway_failed", detail: m.slice(0, 160) });
+          }
+        }
+
+        if (urlPath === "/api/admin/wa/status") {
+          const clinic = await db.clinicById(Number(parsed.searchParams.get("clinic_id")));
+          if (!clinic) return send(404, { error: "no_clinic" });
+          if (!clinic.wa_session) return send(200, { ok: true, connected: false, status: "нет сессии" });
+          try {
+            const st = await waApi("/api/sessions/" + encodeURIComponent(clinic.wa_session));
+            const status = st.status || st.state || "";
+            return send(200, {
+              ok: true, session: clinic.wa_session, status: status,
+              connected: /connected|authenticated|working/i.test(status),
+            });
+          } catch (e) {
+            if (String(e.message) === "gateway_not_configured") {
+              return send(503, { error: "gateway_not_configured" });
+            }
+            return send(502, { error: "gateway_failed" });
+          }
         }
 
         if (urlPath === "/api/admin/zadarma-events") {

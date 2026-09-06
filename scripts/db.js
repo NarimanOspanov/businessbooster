@@ -155,6 +155,12 @@ BEGIN
   CREATE INDEX IX_numbers_status ON dbo.numbers (status);
 END
 
+-- Сессия шлюза WhatsApp у этой клиники. Отдельной колонкой, а не в анкете:
+-- анкета чистится по списку известных полей, и сессия пропала бы при первом
+-- же сохранении формы.
+IF COL_LENGTH('dbo.clinics', 'wa_session') IS NULL
+  ALTER TABLE dbo.clinics ADD wa_session NVARCHAR(64) NULL;
+
 -- Сырые события от АТС Zadarma. Нужны, чтобы понять, приходит ли номер, с
 -- которого сделана переадресация: по SIP до нас доезжает только звонящий.
 -- Поля храним целиком в JSON — мы как раз ищем поле, названия которого не знаем.
@@ -366,7 +372,7 @@ async function clinicById(clinicId) {
     .input("id", sql.Int, clinicId)
     .query(
       "SELECT TOP 1 id, org_id, name, public_number, phone_number_id, agent_id, " +
-      "profile_json, profile_saved_at, agent_built_at FROM dbo.clinics WHERE id = @id"
+      "wa_session, profile_json, profile_saved_at, agent_built_at FROM dbo.clinics WHERE id = @id"
     );
   return r.recordset[0] || null;
 }
@@ -512,6 +518,15 @@ async function releaseNumber(number) {
   return r.recordset.length ? r.recordset[0].number : null;
 }
 
+async function setClinicWaSession(clinicId, session) {
+  const pool = await getPool();
+  await pool
+    .request()
+    .input("id", sql.Int, clinicId)
+    .input("s", sql.NVarChar(64), session || null)
+    .query("UPDATE dbo.clinics SET wa_session = @s WHERE id = @id");
+}
+
 async function saveZadarmaEvent(event, fields) {
   const pool = await getPool();
   await pool
@@ -530,7 +545,7 @@ async function lastZadarmaEvents(limit) {
   return r.recordset;
 }
 
-module.exports = { getPool, migrate, saveCall, saveZadarmaEvent, lastZadarmaEvents, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
+module.exports = { getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 
 if (require.main === module) {
   const cmd = process.argv[2];

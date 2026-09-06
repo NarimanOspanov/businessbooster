@@ -68,6 +68,9 @@
   .steps { counter-reset:s; display:grid; gap:2px; margin-bottom:16px; }
   .steps div { font-size:13px; color:var(--muted); }
   .empty { color:var(--muted); font-size:14px; }
+  .code { font-size:30px; font-weight:800; letter-spacing:.16em; text-align:center;
+    padding:16px; border-radius:12px; background:var(--soft); margin-top:12px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
   .zd { font-size:12px; line-height:1.45; white-space:pre-wrap; word-break:break-word;
     max-height:340px; overflow:auto; margin-top:10px; color:var(--text); background:var(--soft);
     border-radius:10px; padding:12px; }
@@ -259,6 +262,17 @@
       "</div>" +
 
       '<div class="card">' +
+        "<h2>WhatsApp</h2>" +
+        '<div class="row"><input id="wa-phone" class="grow" placeholder="номер клиента, +7 707 000 00 00">' +
+        '<button class="btn btn-primary" id="wa-go">Подключить</button>' +
+        '<button class="btn" id="wa-st">Проверить</button></div>' +
+        '<div class="note">Клиент вводит код у себя: WhatsApp → Связанные устройства →' +
+        ' Связать устройство → Связать по номеру телефона. Код живёт несколько минут.</div>' +
+        '<div id="wa-code" hidden class="code"></div>' +
+        '<div class="msg" id="wa-msg"></div>' +
+      "</div>" +
+
+      '<div class="card">' +
         "<h2>Передать кабинет клинике</h2>" +
         '<div class="row"><input id="inv" class="grow" placeholder="почта владельца клиники">' +
         '<button class="btn" id="invite">Пригласить</button></div>' +
@@ -349,6 +363,46 @@
         })
         .catch(function (e) {
           say("save-msg", e.message === "profile_empty" ? "Заполните хотя бы название." : "Не вышло: " + e.message, true);
+        })
+        .finally(function () { btn.disabled = false; });
+    });
+
+    // Код показываем на экране и дублируем в телеграм: агент обычно диктует
+    // его клиенту по телефону, и смотреть в кабинет в этот момент неудобно.
+    document.getElementById("wa-go").addEventListener("click", function () {
+      var phone = (document.getElementById("wa-phone").value || "").trim();
+      if (!phone) return say("wa-msg", "Укажите номер клиента.", true);
+      var btn = this, box = document.getElementById("wa-code");
+      btn.disabled = true;
+      box.hidden = true;
+      say("wa-msg", "Поднимаем сессию, это до полуминуты…");
+      api("/api/admin/wa/connect", { method: "POST", body: { clinic_id: c.id, phone: phone } })
+        .then(function (d) {
+          if (d.already) return say("wa-msg", "Этот номер уже подключён.");
+          if (!d.code) return say("wa-msg", "Шлюз не дал код. Статус сессии: " + (d.status || "неизвестен"), true);
+          box.hidden = false;
+          box.textContent = d.code;
+          say("wa-msg", "Продиктуйте код клиенту. Он же ушёл вам в телеграм.");
+        })
+        .catch(function (e) {
+          say("wa-msg", e.message === "gateway_not_configured"
+            ? "Шлюз ещё не подключён: нет WA_API_URL и WA_API_KEY в настройках сервера."
+            : "Не вышло: " + (e.data && e.data.detail ? e.data.detail : e.message), true);
+        })
+        .finally(function () { btn.disabled = false; });
+    });
+
+    document.getElementById("wa-st").addEventListener("click", function () {
+      var btn = this;
+      btn.disabled = true;
+      api("/api/admin/wa/status?clinic_id=" + c.id)
+        .then(function (d) {
+          say("wa-msg", d.connected ? "Подключено, переписка идёт." :
+            "Пока не подключено. Статус: " + (d.status || "нет сессии"), !d.connected);
+        })
+        .catch(function (e) {
+          say("wa-msg", e.message === "gateway_not_configured"
+            ? "Шлюз ещё не подключён." : "Не вышло: " + e.message, true);
         })
         .finally(function () { btn.disabled = false; });
     });
