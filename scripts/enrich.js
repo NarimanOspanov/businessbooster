@@ -295,6 +295,54 @@ async function askAnthropic(body) {
   return parseJson((j.content || []).map((c) => c.text || "").join(""));
 }
 
+// Свободный текстовый ответ той же моделью, что вытаскивает анкеты. Нужен
+// второму каналу — переписке в WhatsApp: там от модели требуется не JSON, а
+// реплика администратора.
+async function askText(system, user) {
+  const who = provider();
+  if (!who) throw new Error("no_model_key");
+  if (who === "gemini") {
+    const key = keyFrom("GEMINI_API_KEY", ".gemini-key");
+    const model = process.env.GEMINI_MODEL || GEMINI_MODEL;
+    const res = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/" +
+        encodeURIComponent(model) + ":generateContent",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: system }] },
+          contents: [{ role: "user", parts: [{ text: user }] }],
+          generationConfig: { temperature: 0.3, maxOutputTokens: 600 },
+        }),
+        signal: AbortSignal.timeout(30000),
+      }
+    );
+    const text = await res.text();
+    if (!res.ok) throw new Error("model_" + res.status + ": " + text.slice(0, 200));
+    const j = JSON.parse(text);
+    const cand = (j.candidates || [])[0] || {};
+    return (((cand.content || {}).parts) || []).map((x) => x.text || "").join("").trim();
+  }
+  const key = keyFrom("ANTHROPIC_API_KEY", ".anthropic-key");
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": key, "anthropic-version": "2023-06-01", "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: process.env.ANTHROPIC_MODEL || "claude-sonnet-5",
+      max_tokens: 600,
+      system: system,
+      messages: [{ role: "user", content: user }],
+    }),
+    signal: AbortSignal.timeout(30000),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error("model_" + res.status + ": " + text.slice(0, 200));
+  return (JSON.parse(text).content || []).map((c) => c.text || "").join("").trim();
+}
+
 async function extractProfile(sources) {
   const who = provider();
   if (!who) throw new Error("no_model_key");
@@ -305,4 +353,4 @@ async function extractProfile(sources) {
   return who === "gemini" ? askGemini(body) : askAnthropic(body);
 }
 
-module.exports = { fetchSource, extractProfile, available, provider, htmlToText, assertPublicUrl, isPrivateIp };
+module.exports = { fetchSource, extractProfile, askText, available, provider, htmlToText, assertPublicUrl, isPrivateIp };

@@ -3514,6 +3514,68 @@ http
     // аренды: ассистент ходит сюда за занятостью, как ходил бы в реальную
     // систему арендодателя. Данные выдуманные и намеренно постоянные —
     // проверяем разговор, а не базу.
+    // Ответ для переписки в WhatsApp. Отвечаем текстом на текст: сам шлюз
+    // (OpenWA) живёт у агента на машине и ходит сюда за репликой — так его
+    // не нужно открывать наружу, а знания о клинике остаются в одном месте.
+    // Узнаём клинику по её ключу инструментов: он уже есть, он секретный, и
+    // ничей идентификатор из запроса мы на веру не принимаем.
+    if (urlPath === "/api/whatsapp/reply") {
+      (async () => {
+        const send = (code, obj) => {
+          res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+          res.end(JSON.stringify(obj));
+        };
+        if (req.method !== "POST") return send(405, { error: "method" });
+
+        let body = {};
+        try { body = JSON.parse(await readBody(req)) || {}; } catch {}
+        const clinic = await db.clinicByToolKey(String(body.key || ""));
+        if (!clinic) return send(403, { error: "bad_key" });
+
+        const text = String(body.text || "").trim().slice(0, 1500);
+        if (!text) return send(400, { error: "no_text" });
+        if (!enrich.available()) return send(503, { error: "no_model_key" });
+
+        let profile = {};
+        try { profile = JSON.parse(clinic.profile_json || "{}"); } catch {}
+
+        // Переписка — не телефон: здороваться в каждом сообщении не нужно,
+        // а длинная реплика в чате читается хуже короткой.
+        const system = agentTemplate.buildPrompt(profile) + "\n\n" +
+          "КАНАЛ: ПЕРЕПИСКА В WHATSAPP\n" +
+          "Пиши коротко — две-три строки, как живой администратор в чате.\n" +
+          "Здоровайся только в первом сообщении переписки.\n" +
+          "Не пиши «разговор записывается» — это не звонок.\n" +
+          "Не выдумывай цены и свободное время: чего нет выше — того не знаешь.\n" +
+          "Если человек готов записаться, спроси имя и удобное время и скажи, " +
+          "что администратор подтвердит.\n" +
+          "Отвечай на языке собеседника.";
+
+        const history = (Array.isArray(body.history) ? body.history : [])
+          .slice(-8)
+          .map((m) => (m && m.from === "clinic" ? "Клиника: " : "Человек: ") +
+            String((m && m.text) || "").slice(0, 500))
+          .join("\n");
+        const user = (history ? "Переписка до этого:\n" + history + "\n\n" : "") +
+          "Новое сообщение: " + text;
+
+        try {
+          const reply = await enrich.askText(system, user);
+          console.log("[whatsapp] клиника " + clinic.id + ": " + text.slice(0, 60) +
+            " -> " + reply.slice(0, 60));
+          return send(200, { ok: true, reply: reply.slice(0, 1500), clinic: clinic.name });
+        } catch (e) {
+          console.log("[whatsapp] модель не ответила: " + String(e.message).slice(0, 140));
+          return send(200, { ok: false, error: "model_failed" });
+        }
+      })().catch((e) => {
+        console.log("[whatsapp] " + String(e.message).slice(0, 200));
+        res.writeHead(500, { "Content-Type": MIME[".json"] });
+        res.end(JSON.stringify({ error: "internal" }));
+      });
+      return;
+    }
+
     if (urlPath === "/api/demo/rental-slots") {
       const date = String(parsed.searchParams.get("date") || "").slice(0, 40);
       res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
