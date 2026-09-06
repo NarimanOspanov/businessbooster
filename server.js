@@ -1478,6 +1478,7 @@ const agentTemplate = require("./scripts/agent-template");
 const PUBLIC_URL = (process.env.PUBLIC_URL || "https://reception365.online").replace(/\/+$/, "");
 
 const enrich = require("./scripts/enrich");
+const ical = require("./scripts/ical");
 const CLERK_PK = process.env.CLERK_PUBLISHABLE_KEY || "";
 const CLERK_SK = process.env.CLERK_SECRET_KEY || "";
 
@@ -1767,7 +1768,15 @@ async function waReply(clinic, text, history) {
   // переписки в том, свободно или нет, и лазить за этим в календарь руками —
   // ровно та работа, которую мы забираем.
   let live = "";
-  if (profile.book_read_url) {
+  if (profile.ical) {
+    try {
+      const data = await ical.availability(profile.ical, "сегодня");
+      live = "\n\nЗАНЯТОСТЬ ИЗ КАЛЕНДАРЯ КЛИЕНТА (свободных ночей подряд от сегодня):\n" +
+        JSON.stringify(data).slice(0, 1500);
+    } catch (e) {
+      console.log("[ical] переписка: " + String(e.message).slice(0, 80));
+    }
+  } else if (profile.book_read_url) {
     try {
       const u = await enrich.assertPublicUrl(profile.book_read_url);
       const r = await fetch(u, { signal: AbortSignal.timeout(6000) });
@@ -3336,6 +3345,18 @@ http
         }
 
         if (urlPath === "/api/tools/slots") {
+          // Если клиент дал ссылки на календари — занятость берём оттуда. Это
+          // его настоящие брони со всех площадок, а не наша выдумка.
+          if (profile.ical) {
+            const when = String(parsed.searchParams.get("date") || "").slice(0, 40);
+            try {
+              const data = await ical.availability(profile.ical, when);
+              return send(200, { ok: true, ...data });
+            } catch (e) {
+              console.log("[ical] клиника " + clinic.id + ": " + String(e.message).slice(0, 120));
+              return nope("Календарь сейчас не отвечает — возьмите контакт и перезвоните.");
+            }
+          }
           if (!profile.book_read_url) {
             return nope("Свободное время я не вижу — предложите перезвонить утром.");
           }
