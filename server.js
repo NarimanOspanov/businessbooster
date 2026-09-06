@@ -1621,9 +1621,16 @@ async function waConnect(clinic, phoneDigits) {
   let session = clinic.wa_session || "";
 
   if (!session) {
+    // Прокси, если задан: WhatsApp смотрит, откуда пришло устройство, и адрес
+    // дата-центра в чужой стране — сам по себе повод ограничить аккаунт.
+    // Residential-адрес в стране номера этот сигнал снимает.
+    const proxy = process.env.WA_PROXY_URL || "";
     const made = await waApi("/api/sessions", {
       method: "POST",
-      body: JSON.stringify({ name: "clinic-" + clinic.id }),
+      body: JSON.stringify({
+        name: "clinic-" + clinic.id,
+        ...(proxy ? { proxyUrl: proxy, proxyType: process.env.WA_PROXY_TYPE || "http" } : {}),
+      }),
     });
     session = made.id || made.sessionId || made.session || "";
     if (!session) throw new Error("сессия не создалась");
