@@ -184,6 +184,51 @@ function buildPrompt(raw, withTools) {
   return s;
 }
 
+// Вторая вертикаль — посуточная аренда. Шаблон стоматологии здесь не годится
+// ни одним абзацем: вместо услуг и врачей даты, гости, депозит и заселение.
+// Выбор идёт по полю vertical в анкете; чего нет — то по-прежнему стоматология.
+function buildRentalPrompt(raw) {
+  const p = cleanAll(raw);
+  const where = [p.city, p.address].filter(Boolean).join(", ");
+  let s = "Ты — администратор службы посуточной аренды квартир";
+  if (p.name) s += " «" + p.name + "»";
+  if (where) s += " в городе " + where;
+  s += ".\nТвоя работа: подобрать свободную квартиру на нужные даты и забронировать её.\n\n";
+
+  s += "ЧТО ДЕЛАЕШЬ\n" +
+    "1. Узнаёшь даты заезда и выезда и число гостей. Без дат подбирать нельзя.\n" +
+    "2. Предлагаешь только те квартиры, которые свободны на эти даты и вмещают\n" +
+    "   столько гостей. Ничего не добавляешь от себя.\n" +
+    "3. Называешь цену за сутки и считаешь сумму за весь срок.\n" +
+    "4. Если человек согласен — записываешь имя и даты и говоришь, что хозяин\n" +
+    "   подтвердит бронь.\n\n";
+
+  s += "ЧЕГО НЕ ДЕЛАЕШЬ НИКОГДА\n" +
+    "- Не придумываешь квартиры, цены и свободные даты. Чего нет в данных ниже —\n" +
+    "  того ты не знаешь: так и говори и предложи уточнить у хозяина.\n" +
+    "- Не обещаешь скидку и не торгуешься.\n" +
+    "- Не обещаешь прислать фотографии: сказать «сейчас пришлю фото» ты не\n" +
+    "  можешь, отправлять их тебе нечем. Говори, что фото пришлёт хозяин.\n" +
+    "- Точный адрес и код от подъезда — только после подтверждённой брони,\n" +
+    "  до этого район и ориентир.\n\n";
+
+  if (p.services) s += block("КВАРТИРЫ И ЦЕНЫ", p.services);
+  if (p.hours) s += block("КОГДА ОТВЕЧАЕМ", p.hours);
+  if (p.booking) s += block("КАК БРОНИРОВАТЬ", p.booking);
+  if (p.extra) s += block("ПРАВИЛА И ЧТО ЕЩЁ ВАЖНО", p.extra);
+  s += "\nЕсли свободных нет — спроси про соседние даты и возьми контакт, чтобы\n" +
+    "хозяин написал при отмене.\n" +
+    "Если спросят, человек ты или программа — отвечай честно, что ты ассистент.";
+  return s;
+}
+
+// Один вход для обоих каналов: и голос, и переписка спрашивают одно и то же —
+// «как этому арендатору разговаривать с клиентом».
+function buildPromptFor(raw, withTools) {
+  const v = String((raw && raw.vertical) || "").toLowerCase();
+  return v === "rental" ? buildRentalPrompt(raw) : buildPrompt(raw, withTools);
+}
+
 function buildFirstMessage(raw) {
   const p = clean(raw);
   return "Здравствуйте, сәлеметсіз бе! Вас приветствует клиника " +
@@ -372,7 +417,7 @@ async function deleteAgent(agentId) {
 }
 
 module.exports = {
-  FIELDS, SOURCES, INTEGRATION, ALL_FIELDS, clean, cleanAll, buildPrompt, buildFirstMessage,
+  FIELDS, SOURCES, INTEGRATION, ALL_FIELDS, clean, cleanAll, buildPrompt, buildPromptFor, buildRentalPrompt, buildFirstMessage,
   createAgent, updateAgent, deleteAgent, checkAgent, BASE_AGENT,
   toolDefs, ensureTools, deleteTools, wantedTools,
 };

@@ -3541,7 +3541,24 @@ http
 
         // Переписка — не телефон: здороваться в каждом сообщении не нужно,
         // а длинная реплика в чате читается хуже короткой.
-        const system = agentTemplate.buildPrompt(profile) + "\n\n" +
+        // Занятость подтягиваем прямо в подсказку: у посуточной аренды весь
+        // смысл переписки в том, свободно или нет, и лазить за этим в календарь
+        // руками — ровно та работа, которую мы забираем.
+        let live = "";
+        if (profile.book_read_url) {
+          try {
+            const u = await enrich.assertPublicUrl(profile.book_read_url);
+            const r = await fetch(u, { signal: AbortSignal.timeout(6000) });
+            if (r.ok) {
+              live = "\n\nСВОБОДНО СЕЙЧАС (из системы бронирования):\n" +
+                (await r.text()).slice(0, 1500);
+            }
+          } catch (e) {
+            console.log("[whatsapp] календарь не ответил: " + String(e.message).slice(0, 80));
+          }
+        }
+
+        const system = agentTemplate.buildPromptFor(profile) + live + "\n\n" +
           "КАНАЛ: ПЕРЕПИСКА В WHATSAPP\n" +
           "Пиши коротко — две-три строки, как живой администратор в чате.\n" +
           "Здоровайся только в первом сообщении переписки.\n" +
