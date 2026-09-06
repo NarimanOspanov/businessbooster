@@ -1,0 +1,44 @@
+# Шлюз WhatsApp (OpenWA) — отдельный сервис на Render, изолированный от нашего
+# приложения. Общего с ним у него только один адрес вебхука.
+#
+# Как применить: на render.com → New → Blueprint → указать этот репозиторий и
+# путь deploy/openwa/render.yaml. Либо создать сервис руками: New → Web Service
+# → Existing image → ghcr.io/rmyndharis/openwa:latest, и повторить настройки ниже.
+#
+# Почему отдельно, а не рядом с сайтом: шлюз держит живую сессию WhatsApp и
+# тянет за собой Chromium. Падение или перезапуск шлюза не должны трогать сайт,
+# а деплой сайта — ронять сессию, после которой нужно заново сканировать QR.
+services:
+  - type: web
+    name: openwa
+    runtime: image
+    image:
+      url: ghcr.io/rmyndharis/openwa:latest
+    region: frankfurt          # ближе к Казахстану, чем Орегон
+    plan: standard             # 2 ГБ: движку whatsapp-web.js нужен Chromium
+    healthCheckPath: /health
+
+    # Сессия WhatsApp — это файлы авторизации. Без постоянного диска после
+    # каждого перезапуска придётся заново сканировать QR-код телефоном.
+    disk:
+      name: openwa-data
+      mountPath: /app/data
+      sizeGB: 1
+
+    envVars:
+      - key: PORT
+        value: 2785
+      - key: NODE_ENV
+        value: production
+      # Ключ первого администратора панели. Задать в интерфейсе Render, в код
+      # не пишем.
+      - key: ADMIN_API_KEY
+        sync: false
+      # База: по умолчанию SQLite на том же диске, отдельная не нужна.
+      - key: DATABASE_URL
+        value: file:/app/data/openwa.db
+      # Ограничитель отправки — защита от бана: пара сообщений в минуту.
+      - key: RATE_LIMIT_MAX
+        value: 2
+      - key: RATE_LIMIT_WINDOW_MS
+        value: 60000

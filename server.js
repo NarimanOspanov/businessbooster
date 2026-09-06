@@ -1593,6 +1593,98 @@ async function cabinetContext(req) {
 // номер из пула, заполняет анкету — и только потом передаёт кабинет владельцу.
 // Доступ по списку идентификаторов Clerk, а не по общему паролю: пароль на
 // всех не отзывается и не показывает, кто именно что сделал.
+// Переписка в WhatsApp. Хранение историй — в памяти: чтобы ответ был связным,
+// хватает последних реплик, а держать чужую переписку дольше незачем.
+const WA_CHATS = new Map(); // chatId -> [{from, text}]
+
+function waRemember(chatId, from, text) {
+  const list = WA_CHATS.get(chatId) || [];
+  list.push({ from, text });
+  if (list.length > 10) list.splice(0, list.length - 10);
+  WA_CHATS.set(chatId, list);
+  // Переписки живут не вечно: раз в сутки самые старые уходят.
+  if (WA_CHATS.size > 500) WA_CHATS.delete(WA_CHATS.keys().next().value);
+}
+
+// У разных движков шлюза поля называются по-разному, поэтому достаём по
+// нескольким именам: неверная догадка выглядела бы как молчание, а не ошибка.
+function waPick(obj, names) {
+  for (const n of names) {
+    let v = obj;
+    for (const part of n.split(".")) v = v && typeof v === "object" ? v[part] : undefined;
+    if (typeof v === "string" && v) return v;
+  }
+  return "";
+}
+
+function waParse(payload) {
+  const d = payload && payload.data ? payload.data : payload || {};
+  const m = d.message && typeof d.message === "object" ? d.message
+    : d.msg && typeof d.msg === "object" ? d.msg : d;
+  const chatId = waPick(m, ["chatId", "from", "chat.id", "key.remoteJid", "chat_id"]);
+  return {
+    event: waPick(payload || {}, ["event", "type"]),
+    chatId: chatId,
+    text: waPick(m, ["body", "text", "message", "content", "caption"]),
+    fromMe: !!(m.fromMe || m.from_me || (m.key && m.key.fromMe)),
+    isGroup: /\ng\.us$/.test(chatId),
+  };
+}
+
+// Ответ строим по анкете арендатора: та же анкета, что отвечает по телефону.
+async function waReply(clinic, text, history) {
+  let profile = {};
+  try { profile = JSON.parse(clinic.profile_json || "{}"); } catch {}
+
+  // Занятость подтягиваем прямо в подсказку: у посуточной аренды весь смысл
+  // переписки в том, свободно или нет, и лазить за этим в календарь руками —
+  // ровно та работа, которую мы забираем.
+  let live = "";
+  if (profile.book_read_url) {
+    try {
+      const u = await enrich.assertPublicUrl(profile.book_read_url);
+      const r = await fetch(u, { signal: AbortSignal.timeout(6000) });
+      if (r.ok) live = "\n\nСВОБОДНО СЕЙЧАС (из системы бронирования):\n" + (await r.text()).slice(0, 1500);
+    } catch (e) {
+      console.log("[whatsapp] календарь не ответил: " + String(e.message).slice(0, 80));
+    }
+  }
+
+  const system = agentTemplate.buildPromptFor(profile) + live + "\n\n" +
+    "КАНАЛ: ПЕРЕПИСКА В WHATSAPP\n" +
+    "Пиши коротко — две-три строки, как живой администратор в чате.\n" +
+    "Здоровайся только в первом сообщении переписки.\n" +
+    "Не пиши «разговор записывается» — это не звонок.\n" +
+    "Не выдумывай цены и свободное время: чего нет выше — того не знаешь.\n" +
+    "Если человек готов записаться, спроси имя и удобное время и скажи, " +
+    "что подтвердим.\n" +
+    "Отвечай на языке собеседника.";
+
+  const past = (Array.isArray(history) ? history : [])
+    .slice(-8)
+    .map((m) => (m && m.from === "clinic" ? "Мы: " : "Человек: ") +
+      String((m && m.text) || "").slice(0, 500))
+    .join("\n");
+  const user = (past ? "Переписка до этого:\n" + past + "\n\n" : "") + "Новое сообщение: " + text;
+  return (await enrich.askText(system, user)).slice(0, 1500);
+}
+
+// Отправка обратно через шлюз. Его адрес и ключ — настройки сервера, а не
+// клиники: шлюз один на всех, а арендатора мы узнаём по ключу в адресе вебхука.
+async function waSend(chatId, text) {
+  const url = String(process.env.WA_API_URL || "").replace(/\/+$/, "");
+  const key = process.env.WA_API_KEY || "";
+  const session = process.env.WA_SESSION || "";
+  if (!url || !key || !session) throw new Error("шлюз не настроен");
+  const r = await fetch(url + "/api/sessions/" + encodeURIComponent(session) + "/messages/send-text", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-API-Key": key },
+    body: JSON.stringify({ chatId: chatId, text: text }),
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!r.ok) throw new Error("шлюз " + r.status + ": " + (await r.text()).slice(0, 200));
+}
+
 // Последние события от АТС Zadarma. Держим в памяти: это диагностика, а не
 // данные клиник — переживать перезапуск им незачем.
 const ZADARMA_EVENTS = [];
@@ -3519,6 +3611,57 @@ http
     // не нужно открывать наружу, а знания о клинике остаются в одном месте.
     // Узнаём клинику по её ключу инструментов: он уже есть, он секретный, и
     // ничей идентификатор из запроса мы на веру не принимаем.
+    // Входящее сообщение от шлюза. Арендатора узнаём по ключу в адресе — тому
+    // же, что у инструментов: он секретный, уже выдан и не приходит из тела
+    // запроса, где его мог бы подставить кто угодно.
+    if (urlPath === "/api/whatsapp/inbound") {
+      (async () => {
+        const ok = () => {
+          // Шлюзу отвечаем сразу и всегда: он ждёт подтверждения доставки, а
+          // не результата нашей работы, и на ошибку начнёт повторять.
+          res.writeHead(200, { "Content-Type": MIME[".json"] });
+          res.end('{"ok":true}');
+        };
+        const clinic = await db.clinicByToolKey(parsed.searchParams.get("k"));
+        if (!clinic) {
+          res.writeHead(403, { "Content-Type": MIME[".json"] });
+          return res.end('{"error":"bad_key"}');
+        }
+        let payload = {};
+        try { payload = JSON.parse(await readBody(req)) || {}; } catch {}
+        ok();
+
+        const msg = waParse(payload);
+        if (msg.event && !/message/i.test(msg.event)) return;  // статусы сессии
+        if (msg.fromMe || msg.isGroup) return;
+        if (!msg.chatId || !msg.text) {
+          console.log("[whatsapp] не разобрал: " + JSON.stringify(payload).slice(0, 300));
+          return;
+        }
+
+        try {
+          const reply = await waReply(clinic, msg.text.slice(0, 1500), WA_CHATS.get(msg.chatId));
+          waRemember(msg.chatId, "human", msg.text);
+          waRemember(msg.chatId, "clinic", reply);
+          await waSend(msg.chatId, reply);
+          console.log("[whatsapp] " + clinic.name + " " + msg.chatId + ": " +
+            msg.text.slice(0, 40) + " -> " + reply.slice(0, 40));
+        } catch (e) {
+          console.log("[whatsapp] не ответили: " + String(e.message).slice(0, 160));
+        }
+      })().catch((e) => {
+        console.log("[whatsapp] " + String(e.message).slice(0, 200));
+        try {
+          res.writeHead(500, { "Content-Type": MIME[".json"] });
+          res.end('{"error":"internal"}');
+        } catch {}
+      });
+      return;
+    }
+
+    // Тот же ответ, но по запросу снаружи: для случая, когда шлюз WhatsApp
+    // живёт у агента на машине и не может принять звонок от нас — тогда он
+    // спрашивает реплику сам. Логика одна, чтобы каналы не разъехались.
     if (urlPath === "/api/whatsapp/reply") {
       (async () => {
         const send = (code, obj) => {
@@ -3536,51 +3679,11 @@ http
         if (!text) return send(400, { error: "no_text" });
         if (!enrich.available()) return send(503, { error: "no_model_key" });
 
-        let profile = {};
-        try { profile = JSON.parse(clinic.profile_json || "{}"); } catch {}
-
-        // Переписка — не телефон: здороваться в каждом сообщении не нужно,
-        // а длинная реплика в чате читается хуже короткой.
-        // Занятость подтягиваем прямо в подсказку: у посуточной аренды весь
-        // смысл переписки в том, свободно или нет, и лазить за этим в календарь
-        // руками — ровно та работа, которую мы забираем.
-        let live = "";
-        if (profile.book_read_url) {
-          try {
-            const u = await enrich.assertPublicUrl(profile.book_read_url);
-            const r = await fetch(u, { signal: AbortSignal.timeout(6000) });
-            if (r.ok) {
-              live = "\n\nСВОБОДНО СЕЙЧАС (из системы бронирования):\n" +
-                (await r.text()).slice(0, 1500);
-            }
-          } catch (e) {
-            console.log("[whatsapp] календарь не ответил: " + String(e.message).slice(0, 80));
-          }
-        }
-
-        const system = agentTemplate.buildPromptFor(profile) + live + "\n\n" +
-          "КАНАЛ: ПЕРЕПИСКА В WHATSAPP\n" +
-          "Пиши коротко — две-три строки, как живой администратор в чате.\n" +
-          "Здоровайся только в первом сообщении переписки.\n" +
-          "Не пиши «разговор записывается» — это не звонок.\n" +
-          "Не выдумывай цены и свободное время: чего нет выше — того не знаешь.\n" +
-          "Если человек готов записаться, спроси имя и удобное время и скажи, " +
-          "что администратор подтвердит.\n" +
-          "Отвечай на языке собеседника.";
-
-        const history = (Array.isArray(body.history) ? body.history : [])
-          .slice(-8)
-          .map((m) => (m && m.from === "clinic" ? "Клиника: " : "Человек: ") +
-            String((m && m.text) || "").slice(0, 500))
-          .join("\n");
-        const user = (history ? "Переписка до этого:\n" + history + "\n\n" : "") +
-          "Новое сообщение: " + text;
-
         try {
-          const reply = await enrich.askText(system, user);
-          console.log("[whatsapp] клиника " + clinic.id + ": " + text.slice(0, 60) +
-            " -> " + reply.slice(0, 60));
-          return send(200, { ok: true, reply: reply.slice(0, 1500), clinic: clinic.name });
+          const reply = await waReply(clinic, text, body.history);
+          console.log("[whatsapp] " + clinic.name + ": " + text.slice(0, 50) +
+            " -> " + reply.slice(0, 50));
+          return send(200, { ok: true, reply: reply, clinic: clinic.name });
         } catch (e) {
           console.log("[whatsapp] модель не ответила: " + String(e.message).slice(0, 140));
           return send(200, { ok: false, error: "model_failed" });
