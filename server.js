@@ -1752,10 +1752,13 @@ async function waReply(clinic, text, history) {
 
 // Отправка обратно через шлюз. Его адрес и ключ — настройки сервера, а не
 // клиники: шлюз один на всех, а арендатора мы узнаём по ключу в адресе вебхука.
-async function waSend(chatId, text) {
+// Сессия у каждой клиники своя: одна на всех означала бы, что ответ уходит
+// из чужого WhatsApp. Настройка WA_SESSION остаётся запасной — для первого
+// номера, подключённого руками, пока клиник ещё нет.
+async function waSend(chatId, text, session) {
   const url = String(process.env.WA_API_URL || "").replace(/\/+$/, "");
   const key = process.env.WA_API_KEY || "";
-  const session = process.env.WA_SESSION || "";
+  session = session || process.env.WA_SESSION || "";
   if (!url || !key || !session) throw new Error("шлюз не настроен");
   const r = await fetch(url + "/api/sessions/" + encodeURIComponent(session) + "/messages/send-text", {
     method: "POST",
@@ -3769,7 +3772,7 @@ http
           const reply = await waReply(clinic, msg.text.slice(0, 1500), WA_CHATS.get(msg.chatId));
           waRemember(msg.chatId, "human", msg.text);
           waRemember(msg.chatId, "clinic", reply);
-          await waSend(msg.chatId, reply);
+          await waSend(msg.chatId, reply, clinic.wa_session);
           console.log("[whatsapp] " + clinic.name + " " + msg.chatId + ": " +
             msg.text.slice(0, 40) + " -> " + reply.slice(0, 40));
         } catch (e) {
