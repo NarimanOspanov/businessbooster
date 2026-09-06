@@ -247,6 +247,17 @@ function buildFirstMessage(raw) {
     "удобнее говорить — қазақша, по-русски или English?";
 }
 
+// У аренды и приветствие своё: «вас приветствует клиника Квартиры посуточно»
+// звучит ровно так, как звучит — будто робота забыли переодеть.
+function buildFirstMessageFor(raw) {
+  const v = String((raw && raw.vertical) || "").toLowerCase();
+  if (v !== "rental") return buildFirstMessage(raw);
+  const p = cleanAll(raw);
+  return "Здравствуйте, сәлеметсіз бе! " + (p.name || "Квартиры посуточно") +
+    (p.city ? ", " + p.city : "") + ". Подскажите, на каком языке вам удобнее " +
+    "говорить — қазақша, по-русски или English?";
+}
+
 
 // --- инструменты ассистента ------------------------------------------------
 //
@@ -338,7 +349,7 @@ async function baseConfig() {
 function applyProfile(conversationConfig, profile, toolIds) {
   const cc = JSON.parse(JSON.stringify(conversationConfig));
   cc.agent = cc.agent || {};
-  cc.agent.first_message = buildFirstMessage(profile);
+  cc.agent.first_message = buildFirstMessageFor(profile);
   cc.agent.prompt = cc.agent.prompt || {};
   // По вертикали: телефон и переписка должны говорить одно и то же, а для
   // аренды стоматологический шаблон не годится ни одним абзацем.
@@ -430,7 +441,7 @@ async function deleteAgent(agentId) {
 }
 
 module.exports = {
-  FIELDS, SOURCES, INTEGRATION, ALL_FIELDS, clean, cleanAll, buildPrompt, buildPromptFor, buildRentalPrompt, buildFirstMessage,
+  FIELDS, SOURCES, INTEGRATION, ALL_FIELDS, clean, cleanAll, buildPrompt, buildPromptFor, buildRentalPrompt, buildFirstMessage, buildFirstMessageFor,
   createAgent, updateAgent, deleteAgent, checkAgent, BASE_AGENT,
   toolDefs, ensureTools, deleteTools, wantedTools,
 };
