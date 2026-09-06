@@ -446,6 +446,19 @@ async function baseConfig() {
 function applyProfile(conversationConfig, profile, toolIds) {
   const cc = JSON.parse(JSON.stringify(conversationConfig));
   cc.agent = cc.agent || {};
+  // Умение класть трубку. Без него ассистент прощается, пока собеседник не
+  // нажмёт отбой — а это минуты в счёте и семь минут «до свидания» в логе.
+  cc.agent.prompt.built_in_tools = cc.agent.prompt.built_in_tools || {};
+  cc.agent.prompt.built_in_tools.end_call = {
+    type: "system",
+    name: "end_call",
+    description:
+      "Положить трубку. Вызывай, когда разговор закончен: попрощались, вопросов " +
+      "больше нет или собеседник просит завершить звонок. Не жди, пока он " +
+      "нажмёт отбой.",
+    params: { system_tool_type: "end_call" },
+  };
+
   cc.agent.first_message = buildFirstMessageFor(profile);
   cc.agent.prompt = cc.agent.prompt || {};
   // По вертикали: телефон и переписка должны говорить одно и то же, а для

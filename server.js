@@ -3266,7 +3266,9 @@ http
         if (urlPath === "/api/tools/send-payment") {
           let ask = {};
           try { ask = JSON.parse(await readBody(req)) || {}; } catch {}
-          let phone = String(ask.phone || "").replace(/[^0-9]/g, "");
+          // На исходящем звонке ассистент не знает номер собеседника. Запасной
+          // берём из анкеты — иначе он начнёт просить продиктовать номер вслух.
+          let phone = String(ask.phone || profile.default_phone || "").replace(/[^0-9]/g, "");
           for (const pair of String(profile.test_redirect || "").split(",")) {
             const [from, to] = pair.split(">").map((x) => String(x).replace(/[^0-9]/g, ""));
             if (from && to && phone === from) phone = to;
@@ -3291,7 +3293,9 @@ http
         if (urlPath === "/api/tools/send-photos") {
           let ask = {};
           try { ask = JSON.parse(await readBody(req)) || {}; } catch {}
-          let phone = String(ask.phone || "").replace(/[^0-9]/g, "");
+          // На исходящем звонке ассистент не знает номер собеседника. Запасной
+          // берём из анкеты — иначе он начнёт просить продиктовать номер вслух.
+          let phone = String(ask.phone || profile.default_phone || "").replace(/[^0-9]/g, "");
           // Проверочная подмена: у пилота номер оператора и номер «гостя» —
           // это один и тот же телефон, сам себе в WhatsApp не напишешь.
           // Формат в анкете: "77029410625>19406025427", через запятую.
