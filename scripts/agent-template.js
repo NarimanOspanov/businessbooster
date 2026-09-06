@@ -187,7 +187,7 @@ function buildPrompt(raw, withTools) {
 // Вторая вертикаль — посуточная аренда. Шаблон стоматологии здесь не годится
 // ни одним абзацем: вместо услуг и врачей даты, гости, депозит и заселение.
 // Выбор идёт по полю vertical в анкете; чего нет — то по-прежнему стоматология.
-function buildRentalPrompt(raw) {
+function buildRentalPrompt(raw, withTools) {
   const p = cleanAll(raw);
   const where = [p.city, p.address].filter(Boolean).join(", ");
   let s = "Ты — администратор службы посуточной аренды квартир";
@@ -223,6 +223,19 @@ function buildRentalPrompt(raw) {
     "Реквизиты бери только из данных ниже. Своих не выдумывай: перевод не " +
     "туда — это чужие деньги.\n\n";
 
+  // Про инструменты надо сказать прямо: иначе агент, у которого календарь
+  // подключён, отвечает «не могу проверить» — так и случилось на первом же
+  // звонке.
+  if (withTools) {
+    s += "КАЛЕНДАРЬ\n" +
+      "Свободные квартиры смотри инструментом check_slots — всегда перед тем, " +
+      "как назвать вариант или сказать, что мест нет. Сам не придумывай.\n" +
+      "Бронь оформляй инструментом book_slot и только после того, как гость " +
+      "подтвердил квартиру и даты.\n" +
+      "Если инструмент вернул ok:false — скажи, что уточнишь у хозяина, и " +
+      "возьми имя с номером.\n\n";
+  }
+
   if (p.services) s += block("КВАРТИРЫ И ЦЕНЫ", p.services);
   if (p.hours) s += block("КОГДА ОТВЕЧАЕМ", p.hours);
   if (p.booking) s += block("КАК БРОНИРОВАТЬ", p.booking);
@@ -237,7 +250,7 @@ function buildRentalPrompt(raw) {
 // «как этому арендатору разговаривать с клиентом».
 function buildPromptFor(raw, withTools) {
   const v = String((raw && raw.vertical) || "").toLowerCase();
-  return v === "rental" ? buildRentalPrompt(raw) : buildPrompt(raw, withTools);
+  return v === "rental" ? buildRentalPrompt(raw, withTools) : buildPrompt(raw, withTools);
 }
 
 function buildFirstMessage(raw) {
