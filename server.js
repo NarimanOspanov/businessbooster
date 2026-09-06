@@ -1593,6 +1593,22 @@ async function cabinetContext(req) {
 // номер из пула, заполняет анкету — и только потом передаёт кабинет владельцу.
 // Доступ по списку идентификаторов Clerk, а не по общему паролю: пароль на
 // всех не отзывается и не показывает, кто именно что сделал.
+// На время проверки ассистент отвечает только этим номерам. Пусто — отвечает
+// всем, как в бою. Нужно затем, что подключаем живой номер человека: без
+// фильтра ассистент про квартиры ответит и жене, и коллеге.
+// Номера разделяются запятой: пробелы внутри одного номера — обычное дело,
+// и по ним делить нельзя, иначе «+7 705 123 45 67» распадётся на обрывки.
+const WA_ONLY_FROM = String(process.env.WA_ONLY_FROM || "")
+  .split(/[,;]+/)
+  .map((x) => x.replace(/\D/g, ""))
+  .filter((x) => x.length >= 8);
+
+function waAllowed(chatId) {
+  if (!WA_ONLY_FROM.length) return true;
+  const digits = String(chatId || "").replace(/\D/g, "");
+  return WA_ONLY_FROM.some((n) => digits.endsWith(n.slice(-10)));
+}
+
 // Шлюз WhatsApp: адрес и ключ — настройки сервера, сессии — по клинике.
 function waGateway() {
   const url = String(process.env.WA_API_URL || "").replace(/\/+$/, "");
@@ -1667,6 +1683,16 @@ async function waConnect(clinic, phoneDigits) {
       body: JSON.stringify({
         url: PUBLIC_URL + "/api/whatsapp/inbound?k=" + encodeURIComponent(toolKey),
         events: ["message.received"],
+        // Фильтр ставим и здесь: тогда чужие сообщения не покидают шлюз и до
+        // нашего сервера не доходят вовсе — это и надёжнее, и честнее.
+        ...(WA_ONLY_FROM.length ? {
+          filters: {
+            conditions: [{
+              field: "sender", operator: "is",
+              value: WA_ONLY_FROM.map((n) => n + "@c.us"),
+            }],
+          },
+        } : {}),
       }),
     });
   } catch (e) {
@@ -3771,6 +3797,10 @@ http
         const msg = waParse(payload);
         if (msg.event && !/message/i.test(msg.event)) return;  // статусы сессии
         if (msg.fromMe || msg.isGroup) return;
+        if (!waAllowed(msg.chatId)) {
+          console.log("[whatsapp] пропускаю " + msg.chatId + ": не в списке проверки");
+          return;
+        }
         if (!msg.chatId || !msg.text) {
           console.log("[whatsapp] не разобрал: " + JSON.stringify(payload).slice(0, 300));
           return;
