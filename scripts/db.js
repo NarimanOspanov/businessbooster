@@ -410,7 +410,9 @@ async function clinicByToolKey(k) {
     .request()
     .input("k", sql.NVarChar(64), String(k))
     .query(
-      "SELECT TOP 1 id, name, profile_json FROM dbo.clinics " +
+      // Сессия шлюза здесь же: по этому ключу приходит переписка, и отвечать
+      // придётся из сессии этой клиники — без неё ответ уходить некуда.
+      "SELECT TOP 1 id, name, profile_json, wa_session FROM dbo.clinics " +
       "WHERE tool_key = @k AND is_active = 1"
     );
   return r.recordset[0] || null;
