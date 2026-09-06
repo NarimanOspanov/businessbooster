@@ -3275,7 +3275,8 @@ http
             const status = st.status || st.state || "";
             return send(200, {
               ok: true, session: clinic.wa_session, status: status,
-              connected: /connected|authenticated|working/i.test(status),
+              // «ready» у шлюза и есть «на связи»: движок поднят, номер привязан.
+              connected: /connected|authenticated|working|ready/i.test(status),
             });
           } catch (e) {
             if (String(e.message) === "gateway_not_configured") {
