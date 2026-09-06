@@ -1777,7 +1777,23 @@ async function waReply(clinic, text, history) {
     }
   }
 
-  const system = agentTemplate.buildPromptFor(profile) + live + "\n\n" +
+  // Без сегодняшней даты «завтра» и «на выходные» превращаются в переспрос,
+  // а это половина сообщений в посуточной аренде. Время алматинское: клиент,
+  // квартиры и гости живут в нём, а сервер — в UTC.
+  const now = new Date(Date.now() + 5 * 3600e3);
+  const DAYS = ["воскресенье", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота"];
+  const MONTHS = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля",
+    "августа", "сентября", "октября", "ноября", "декабря"];
+  const NL2 = String.fromCharCode(10);
+  const today = NL2 + NL2 + "СЕГОДНЯ: " + DAYS[now.getUTCDay()] + ", " + now.getUTCDate() + " " +
+    MONTHS[now.getUTCMonth()] + " " + now.getUTCFullYear() + ", " +
+    String(now.getUTCHours()).padStart(2, "0") + ":" + String(now.getUTCMinutes()).padStart(2, "0") +
+    " по Алматы." + NL2 +
+    "Считай от неё «сегодня», «завтра», «на выходные», «через неделю» " +
+    "и не переспрашивай про них — человек ждёт, что ты знаешь число. " +
+    "Если гость назвал срок в сутках, посчитай даты заезда и выезда сам и назови их.";
+
+  const system = agentTemplate.buildPromptFor(profile) + live + today + "\n\n" +
     "КАНАЛ: ПЕРЕПИСКА В WHATSAPP\n" +
     "Ты переписываешься с телефона, как обычный человек. Не как служба " +
     "поддержки и не как бот.\n\n" +
