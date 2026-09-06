@@ -3267,7 +3267,17 @@ http
         if (urlPath === "/api/tools/send-photos") {
           let ask = {};
           try { ask = JSON.parse(await readBody(req)) || {}; } catch {}
-          const phone = String(ask.phone || "").replace(/[^0-9]/g, "");
+          let phone = String(ask.phone || "").replace(/[^0-9]/g, "");
+          // Проверочная подмена: у пилота номер оператора и номер «гостя» —
+          // это один и тот же телефон, сам себе в WhatsApp не напишешь.
+          // Формат в анкете: "77029410625>19406025427", через запятую.
+          for (const pair of String(profile.test_redirect || "").split(",")) {
+            const [from, to] = pair.split(">").map((x) => String(x).replace(/[^0-9]/g, ""));
+            if (from && to && phone === from) {
+              console.log("[фото] проверочная подмена " + from + " -> " + to);
+              phone = to;
+            }
+          }
           if (phone.length < 10) return nope("Не понял, на какой номер отправить.");
           if (!clinic.wa_session) return nope("WhatsApp у клиники не подключён.");
 
