@@ -3261,6 +3261,30 @@ http
           try { return JSON.parse(text); } catch { return { raw: text }; }
         }
 
+        // Реквизиты предоплаты — тоже сообщением, а не голосом: номер счёта
+        // на слух записывают с ошибкой, и перевод уходит чужому человеку.
+        if (urlPath === "/api/tools/send-payment") {
+          let ask = {};
+          try { ask = JSON.parse(await readBody(req)) || {}; } catch {}
+          let phone = String(ask.phone || "").replace(/[^0-9]/g, "");
+          for (const pair of String(profile.test_redirect || "").split(",")) {
+            const [from, to] = pair.split(">").map((x) => String(x).replace(/[^0-9]/g, ""));
+            if (from && to && phone === from) phone = to;
+          }
+          if (phone.length < 10) return nope("Не понял, на какой номер отправить.");
+          if (!clinic.wa_session) return nope("WhatsApp у клиники не подключён.");
+          const text = String(profile.payment || "").trim();
+          if (!text) return nope("Реквизитов нет в анкете.");
+          try {
+            await waSend(phone + "@c.us", text, clinic.wa_session);
+            console.log("[реквизиты] " + clinic.name + " -> " + phone);
+            return send(200, { ok: true, message: "Отправил реквизиты в WhatsApp." });
+          } catch (e) {
+            console.log("[реквизиты] не ушло: " + String(e.message).slice(0, 120));
+            return nope("Не получилось отправить реквизиты.");
+          }
+        }
+
         // Фото квартиры в WhatsApp прямо во время звонка. Гость просит их почти
         // всегда, и «хозяин пришлёт» — это потерянная бронь: пока хозяин
         // доберётся, гость уже смотрит другую квартиру.
