@@ -3261,6 +3261,36 @@ http
           try { return JSON.parse(text); } catch { return { raw: text }; }
         }
 
+        // Фото квартиры в WhatsApp прямо во время звонка. Гость просит их почти
+        // всегда, и «хозяин пришлёт» — это потерянная бронь: пока хозяин
+        // доберётся, гость уже смотрит другую квартиру.
+        if (urlPath === "/api/tools/send-photos") {
+          let ask = {};
+          try { ask = JSON.parse(await readBody(req)) || {}; } catch {}
+          const phone = String(ask.phone || "").replace(/[^0-9]/g, "");
+          if (phone.length < 10) return nope("Не понял, на какой номер отправить.");
+          if (!clinic.wa_session) return nope("WhatsApp у клиники не подключён.");
+
+          // Ссылки лежат в анкете строками «Название — ссылка». Ищем строку
+          // про названную квартиру; не нашли — отправляем всё, что есть.
+          const lines = String(profile.photos || "").split("\n")
+            .map((x) => x.trim()).filter(Boolean);
+          if (!lines.length) return nope("Фотографий пока нет.");
+          const words = String(ask.apartment || "").toLowerCase()
+            .split(/[^a-zа-яё0-9]+/i).filter((w) => w.length > 3);
+          const hit = lines.find((l) => words.some((w) => l.toLowerCase().includes(w)));
+          const text = hit || lines.join("\n");
+
+          try {
+            await waSend(phone + "@c.us", text, clinic.wa_session);
+            console.log("[фото] " + clinic.name + " -> " + phone);
+            return send(200, { ok: true, message: "Отправил фото в WhatsApp." });
+          } catch (e) {
+            console.log("[фото] не ушло: " + String(e.message).slice(0, 140));
+            return nope("Не получилось отправить, фото пришлёт хозяин.");
+          }
+        }
+
         if (urlPath === "/api/tools/slots") {
           if (!profile.book_read_url) {
             return nope("Свободное время я не вижу — предложите перезвонить утром.");

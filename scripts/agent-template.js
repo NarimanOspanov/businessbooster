@@ -330,9 +330,51 @@ function toolDefs(baseUrl, toolKey) {
 
 // Инструменты живут отдельно от агента и переиспользуются по id. У каждой
 // клиники они свои — в адрес зашит её ключ.
-async function ensureTools(baseUrl, toolKey, existingIds) {
+// Аренде нужен третий инструмент: гость почти всегда просит фото, и обещать
+// их «хозяин пришлёт» — значит терять бронь на ровном месте. Отправляем сами,
+// в тот же WhatsApp, с которого клиника уже переписывается.
+function rentalToolDefs(baseUrl, toolKey) {
+  const q = "?k=" + encodeURIComponent(toolKey);
+  const base = toolDefs(baseUrl, toolKey);
+  base.push({
+    type: "webhook",
+    name: "send_photos",
+    description:
+      "Отправить гостю фотографии квартиры в WhatsApp. Вызывай, когда гость " +
+      "попросил фото или когда сам предложил их прислать и он согласился. " +
+      "Сначала спроси, на этот ли номер отправлять. Если вернулось ok:false — " +
+      "скажи, что фото пришлёт хозяин.",
+    api_schema: {
+      url: baseUrl + "/api/tools/send-photos" + q,
+      method: "POST",
+      request_body_schema: {
+        type: "object",
+        properties: {
+          apartment: {
+            type: "string",
+            description: "Какая квартира: название или адрес из списка.",
+          },
+          phone: {
+            type: "string",
+            description: "Номер в международном формате, куда слать. Обычно номер звонящего.",
+          },
+        },
+        required: ["apartment"],
+      },
+    },
+  });
+  return base;
+}
+
+function toolDefsFor(baseUrl, toolKey, vertical) {
+  return String(vertical || "").toLowerCase() === "rental"
+    ? rentalToolDefs(baseUrl, toolKey)
+    : toolDefs(baseUrl, toolKey);
+}
+
+async function ensureTools(baseUrl, toolKey, existingIds, vertical) {
   const ids = [];
-  for (const def of toolDefs(baseUrl, toolKey)) {
+  for (const def of toolDefsFor(baseUrl, toolKey, vertical)) {
     const made = await eleven("/v1/convai/tools", {
       method: "POST",
       body: JSON.stringify({ tool_config: def }),
@@ -427,7 +469,7 @@ async function wantedTools(profile, opts, existingIds) {
     await deleteTools(existingIds);
     return [];
   }
-  return ensureTools(opts.baseUrl, opts.toolKey, existingIds);
+  return ensureTools(opts.baseUrl, opts.toolKey, existingIds, p.vertical);
 }
 
 async function updateAgent(agentId, profile, opts) {
