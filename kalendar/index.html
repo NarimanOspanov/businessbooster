@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<script>(function(){try{var t=localStorage.getItem("otvet-theme")||"light";if(t==="light")document.documentElement.setAttribute("data-theme","light");}catch(e){document.documentElement.setAttribute("data-theme","light");}})();</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Шахматка — Reception365</title>
+<meta name="description" content="Макет календаря занятости для посуточной аренды: занятость квартир приходит по ссылкам iCal, ассистент смотрит в неё до того, как назвать гостю свободную квартиру.">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/site.css">
+<style>
+  /* Своё только то, чего нет в общем листе. */
+  .hero{padding:62px 0 66px}
+  .hero h1{max-width:900px}
+  .hero p.lead{margin:16px 0 0;color:var(--on-dark-dim);max-width:640px}
+  .tag{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:700;
+    letter-spacing:.07em;text-transform:uppercase;color:var(--on-dark-dim);
+    border:1px solid var(--line-dark);border-radius:999px;padding:5px 13px;margin-bottom:18px}
+
+  .board{background:var(--paper);border:1px solid var(--line);border-radius:20px;overflow:hidden}
+  .board-top{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;
+    padding:18px 20px;border-bottom:1px solid var(--line)}
+  .board-top b{font-size:17px;font-weight:700}
+  .board-top span{color:var(--text-dim);font-size:14px;font-variant-numeric:tabular-nums}
+  .scroll{overflow-x:auto}
+  .sheet{min-width:760px}
+  .days,.row{display:grid;grid-template-columns:200px repeat(14,1fr)}
+  .days{border-bottom:1px solid var(--line);background:var(--mist)}
+  .days div{padding:10px 0 9px;text-align:center;font-size:12.5px;color:var(--text-dim);
+    font-variant-numeric:tabular-nums}
+  .days div:first-child{text-align:left;padding-left:20px;font-size:11px;font-weight:700;
+    letter-spacing:.07em;text-transform:uppercase}
+  .days .wd{display:block;font-size:10px}
+  .days .now{color:var(--accent);font-weight:700}
+
+  .row{border-top:1px solid var(--line)}
+  .flat{padding:14px 14px 14px 20px;border-right:1px solid var(--line)}
+  .flat b{display:block;font-size:14.5px;font-weight:600}
+  .flat i{display:block;font-style:normal;font-size:13px;color:var(--text-dim);
+    font-variant-numeric:tabular-nums;margin-top:2px}
+  .src{display:inline-block;margin-top:8px;font-size:10px;font-weight:700;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--text-dim);border:1px solid var(--line);
+    border-radius:999px;padding:2px 9px}
+
+  /* Полдня — одна колонка: заезд и выезд приходятся на середину суток. */
+  .lane{grid-column:2/-1;position:relative;display:grid;grid-template-columns:repeat(28,1fr);
+    align-items:center;background-image:repeating-linear-gradient(to right,
+      var(--line) 0 1px,transparent 1px calc(100%/14))}
+  .bar{height:32px;border-radius:8px;background:var(--accent);color:#fff;display:flex;
+    align-items:center;padding:0 11px;font-size:12.5px;font-weight:600;
+    white-space:nowrap;overflow:hidden}
+
+  .legend{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center;padding:14px 20px;
+    border-top:1px solid var(--line);color:var(--text-dim);font-size:13.5px}
+  .legend i{display:inline-block;width:22px;height:12px;border-radius:4px;
+    vertical-align:-1px;margin-right:8px}
+
+  .two{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));
+    gap:18px;margin-top:24px}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:20px;padding:22px 24px}
+  .card h3{font-size:17px;font-weight:700}
+  .card .note{color:var(--text-dim);font-size:14px;margin:6px 0 14px}
+  .ans{display:flex;justify-content:space-between;gap:14px;font-size:14.5px;
+    padding:10px 0;border-top:1px solid var(--line)}
+  .ans:first-of-type{border-top:none}
+  .ans span{color:var(--text-dim)}
+  .ans .yes{color:#1f9d55;font-weight:600}
+  .msg{background:var(--mist);border-radius:14px;padding:14px 16px;font-size:14.5px}
+  .msg p+p{margin-top:10px}
+  .after{color:var(--text-dim);font-size:13.5px;margin-top:12px}
+
+  .sub{color:var(--text-dim);font-size:16.5px;max-width:700px;margin-bottom:22px}
+  ol.steps{counter-reset:s;list-style:none;display:grid;gap:14px}
+  ol.steps li{counter-increment:s;background:var(--paper);border:1px solid var(--line);
+    border-radius:18px;padding:20px 24px 20px 62px;position:relative}
+  ol.steps li::before{content:counter(s);position:absolute;left:22px;top:20px;width:26px;height:26px;
+    border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;
+    font-weight:800;font-size:13px}
+  ol.steps h3{font-size:16.5px;font-weight:700}
+  ol.steps p{color:var(--text-dim);font-size:14.5px;margin-top:5px}
+  .cta{text-align:center}
+  .cta p{color:var(--text-dim);font-size:16.5px;max-width:600px;margin:12px auto 22px}
+</style>
+</head>
+<body>
+
+<header><div class="wrap"><nav>
+  <a class="logo" href="/"><span class="mark">R</span>Reception365</a>
+  <div class="navlinks" id="menu">
+    <a href="#board">Шахматка</a><a href="#call">Во время звонка</a><a href="#how">Как подключается</a>
+  </div>
+  <div class="nav-right">
+    <button class="themer" id="themer" type="button" aria-label="Сменить тему"><svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2.6 12h2.2M19.2 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6"/></svg><svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.2A8.2 8.2 0 0 1 9.8 4a8.4 8.4 0 1 0 10.2 10.2Z"/></svg></button>
+    <a class="btn btn-accent btn-sm" href="/#lead">Подключить</a>
+  </div>
+  <button class="burger" id="burger" aria-label="Меню" aria-expanded="false" aria-controls="menu"><span></span><span></span><span></span></button>
+</nav></div></header>
+
+<div class="hero"><div class="wrap">
+  <span class="tag">Макет · посуточная аренда</span>
+  <h1>Ассистент смотрит в вашу занятость <span class="pill-accent pill">до того</span>, как назвать гостю квартиру</h1>
+  <p class="lead">Занятость приходит по ссылкам из тех систем, где вы уже ведёте брони.
+  Никаких «сейчас уточню у хозяина»: ассистент отвечает на звонок в шесть утра
+  и называет только то, что действительно свободно.</p>
+</div></div>
+
+<section id="board"><div class="wrap">
+  <div class="board">
+    <div class="board-top">
+      <b>Кубик в кубе</b>
+      <span>9 — 22 сентября</span>
+    </div>
+
+    <div class="scroll"><div class="sheet">
+      <div class="days">
+        <div>Квартира</div>
+        <div class="now">9<span class="wd">ср</span></div>
+        <div>10<span class="wd">чт</span></div>
+        <div>11<span class="wd">пт</span></div>
+        <div>12<span class="wd">сб</span></div>
+        <div>13<span class="wd">вс</span></div>
+        <div>14<span class="wd">пн</span></div>
+        <div>15<span class="wd">вт</span></div>
+        <div>16<span class="wd">ср</span></div>
+        <div>17<span class="wd">чт</span></div>
+        <div>18<span class="wd">пт</span></div>
+        <div>19<span class="wd">сб</span></div>
+        <div>20<span class="wd">вс</span></div>
+        <div>21<span class="wd">пн</span></div>
+        <div>22<span class="wd">вт</span></div>
+      </div>
+
+      <div class="row">
+        <div class="flat"><b>Студия, Абая 143</b><i>12 000 ₸ · 2 гостя</i><span class="src">Airbnb</span></div>
+        <div class="lane">
+          <div class="bar" style="grid-column:2/6">Reserved</div>
+          <div class="bar" style="grid-column:18/24">Reserved</div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="flat"><b>Однокомнатная, Достык 89</b><i>16 000 ₸ · 3 гостя</i><span class="src">RealtyCalendar</span></div>
+        <div class="lane">
+          <div class="bar" style="grid-column:2/10">Айгерим, 3 гостя</div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="flat"><b>Двухкомнатная, Сатпаева 30</b><i>24 000 ₸ · 5 гостей</i><span class="src">Google Календарь</span></div>
+        <div class="lane">
+          <div class="bar" style="grid-column:22/26">Семья, 4 гостя</div>
+        </div>
+      </div>
+    </div></div>
+
+    <div class="legend">
+      <span><i style="background:var(--accent)"></i>занято</span>
+      <span><i style="background:var(--paper);border:1px solid var(--line)"></i>свободно</span>
+      <span>Полоса начинается в середине дня заезда и кончается в середине дня выезда: гость съезжает до 12:00, следующий заселяется с 14:00 — эта ночь продаётся.</span>
+    </div>
+  </div>
+</div></section>
+
+<section id="call" class="s-mist"><div class="wrap">
+  <h2>Что из этой сетки происходит на звонке</h2>
+  <p class="sub">Гость звонит 9 сентября и говорит: «завтра, двое, на три ночи».
+  Слева — что ассистент вычитал из календарей, справа — что услышал гость.</p>
+
+  <div class="two">
+    <div class="card">
+      <h3>Что он видит</h3>
+      <p class="note">Три календаря, одна дата, ответ за полторы секунды.</p>
+      <div class="ans"><b>Студия, Абая</b><span>занята до 11-го</span></div>
+      <div class="ans"><b>Однокомнатная, Достык</b><span>занята до 13-го</span></div>
+      <div class="ans"><b>Двухкомнатная, Сатпаева</b><span class="yes">свободна, 9 ночей</span></div>
+    </div>
+
+    <div class="card">
+      <h3>Что он отвечает</h3>
+      <p class="note">Тот же расчёт, но словами гостя.</p>
+      <div class="msg">
+        <p>Здравствуйте! На 10–13 сентября для двоих свободна двухкомнатная на Сатпаева —
+        24 000 ₸ за сутки, 72 000 ₸ за три ночи.</p>
+        <p>Студия и однокомнатная заняты до 13-го. Скинуть фото Сатпаева в WhatsApp?</p>
+      </div>
+      <p class="after">Дальше по тому же звонку: фото уходят в WhatsApp, следом реквизиты
+      на предоплату, и гость присылает чек — не дожидаясь, пока хозяин освободится.</p>
+    </div>
+  </div>
+</div></section>
+
+<section id="how"><div class="wrap">
+  <h2>Как это подключается</h2>
+  <p class="sub">Ничего не нужно переносить и никуда не нужно переезжать.
+  Вы продолжаете вести брони там, где вели.</p>
+  <ol class="steps">
+    <li>
+      <h3>Вы копируете ссылку на календарь</h3>
+      <p>Airbnb, Booking, Суточно, RealtyCalendar, Bnovo, Google Календарь — экспорт
+      в iCal есть у всех. Одна ссылка на квартиру.</p>
+    </li>
+    <li>
+      <h3>Мы добавляем квартиры в анкету</h3>
+      <p>Название, адрес, цена за сутки, сколько гостей помещается, фотографии
+      и реквизиты для предоплаты.</p>
+    </li>
+    <li>
+      <h3>Ассистент начинает отвечать</h3>
+      <p>Занятость он перечитывает на каждом звонке, поэтому бронь, которую вы
+      завели минуту назад, он уже видит.</p>
+    </li>
+  </ol>
+</div></section>
+
+<section class="s-mist"><div class="wrap cta">
+  <h2>Посмотреть на своих квартирах</h2>
+  <p>Пришлите ссылки на календари — соберём эту же сетку по вашим объектам
+  и дадим позвонить ассистенту самому.</p>
+  <a class="btn btn-primary" href="/#lead">Оставить номер</a>
+</div></section>
+
+<footer><div class="wrap">Reception365 · reception365.online · приём звонков и сообщений для малого бизнеса · Казахстан</div></footer>
+
+<script>
+  // Шапка и переключатель темы — те же, что на остальных страницах.
+  (function () {
+    var b = document.getElementById('burger'), m = document.getElementById('menu');
+    if (b && m) {
+      var set = function (open) {
+        b.setAttribute('aria-expanded', open ? 'true' : 'false');
+        m.classList.toggle('open', open);
+      };
+      b.addEventListener('click', function (e) { e.stopPropagation(); set(b.getAttribute('aria-expanded') !== 'true'); });
+      m.addEventListener('click', function (e) { if (e.target.tagName === 'A') set(false); });
+      document.addEventListener('click', function (e) { if (!m.contains(e.target)) set(false); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') set(false); });
+    }
+    var t = document.getElementById('themer');
+    if (t) t.addEventListener('click', function () {
+      var light = document.documentElement.getAttribute('data-theme') === 'light';
+      if (light) document.documentElement.removeAttribute('data-theme');
+      else document.documentElement.setAttribute('data-theme', 'light');
+      try { localStorage.setItem('otvet-theme', light ? 'dark' : 'light'); } catch (e) {}
+    });
+  })();
+</script>
+</body>
+</html>
