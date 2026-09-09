@@ -103,6 +103,12 @@ async function fetchPhones(id, cookie) {
   let j = null;
   try { j = JSON.parse(text); } catch { return null; }
   if (j && j.error) return { error: String(j.error).slice(0, 120) };
+  // Сессии мало: на живом аккаунте ручка отвечает 200, отдаёт пустой список и
+  // конфиг reCAPTCHA — номер показывают только после решённой капчи. Капчи мы
+  // не решаем, поэтому честно сообщаем, что номера не будет.
+  if (j && j.gRecaptcha && !(j.phones || []).length) {
+    return { error: "Крыша просит пройти капчу — номер отдаём ссылкой на объявление" };
+  }
   const phones = [];
   const dig = (v) => {
     if (typeof v === "string" && /\+?\d[\d\s()-]{9,}/.test(v)) phones.push(v.trim());
