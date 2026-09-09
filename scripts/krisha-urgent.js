@@ -11,14 +11,30 @@
 // (createdAt) знает только карточка объявления, поэтому её читаем — но лишь у
 // верхушки отранжированного списка, десяток запросов вместо полутора сотен.
 //
-// Запуск руками: node scripts/krisha-urgent.js --n 8
+// Запуск руками: node scripts/krisha-urgent.js --city astana --n 8
 
 const K = require("./krisha-lib.js");
 
+// Город — часть адреса на Крыше, поэтому в него нельзя пускать что угодно:
+// принимаем только слаг вида «almaty», «ust-kamenogorsk».
 const CITY = "almaty";
-const BASE = "https://krisha.kz/prodazha/kvartiry/" + CITY +
-  "/?das[_sys.hasphoto]=1&das[who]=1";
-const pageUrl = (p) => (p > 1 ? BASE + "&page=" + p : BASE);
+const cleanCity = (c) => {
+  const s = String(c || "").toLowerCase().trim();
+  return /^[a-z][a-z-]{1,39}$/.test(s) ? s : CITY;
+};
+const NAMES = {
+  almaty: "Алматы", astana: "Астана", shymkent: "Шымкент", karaganda: "Караганда",
+  aktobe: "Актобе", atyrau: "Атырау", taraz: "Тараз", pavlodar: "Павлодар",
+  "ust-kamenogorsk": "Усть-Каменогорск", semey: "Семей", kostanay: "Костанай",
+  kyzylorda: "Кызылорда", aktau: "Актау", uralsk: "Уральск", kokshetau: "Кокшетау",
+  petropavlovsk: "Петропавловск", temirtau: "Темиртау", turkestan: "Туркестан",
+  taldykorgan: "Талдыкорган", ekibastuz: "Экибастуз",
+};
+const cityName = (c) => NAMES[c] || c;
+const pageUrl = (city, p) => {
+  const base = "https://krisha.kz/prodazha/kvartiry/" + city + "/?das[_sys.hasphoto]=1&das[who]=1";
+  return p > 1 ? base + "&page=" + p : base;
+};
 
 const MONTHS = [/^янв/, /^февр?/, /^март?/, /^апр/, /^ма[йя]/, /^июн/,
   /^июл/, /^авг/, /^сент?/, /^окт/, /^нояб?/, /^дек/];
@@ -56,6 +72,7 @@ async function collect(opts) {
   const minComparables = o.minComparables || 8;
   const log = o.log || (() => {});
   const today = almatyToday();
+  const city = cleanCity(o.city);
 
   // 1. Все объявления, поднятые сегодня. Сортировка на Крыше — по поднятию,
   //    поэтому первая полностью вчерашняя страница обрывает обход.
@@ -63,7 +80,7 @@ async function collect(opts) {
   let pages = 0, emptyRun = 0;
   for (let p = 1; p <= maxPages; p++) {
     let html;
-    try { html = await K.fetchText(pageUrl(p), 2, 12000); } catch { break; }
+    try { html = await K.fetchText(pageUrl(city, p), 2, 12000); } catch { break; }
     const cards = K.parseCards(html);
     if (!cards.length) break;
     pages = p;
@@ -80,7 +97,9 @@ async function collect(opts) {
   const corpus = [...seen.values()];
 
   // 2. Цена похожих считается по обычным объявлениям: если сравнивать срочные
-  //    со срочными, метка растворяется в базе сравнения.
+  //    со срочными, метка растворяется в базе сравнения. В городах без деления
+  //    на районы все объявления попадают в «без района» — сравнение тогда идёт
+  //    по городу целиком и метражу, что для города поменьше и правильно.
   const groups = {};
   corpus.filter((c) => !c.urgent).forEach((c) => {
     (groups[groupKey(c)] = groups[groupKey(c)] || []).push(c.ppm);
@@ -122,7 +141,7 @@ async function collect(opts) {
 
   rows.sort((a, b) => b.discount - a.discount);
   return {
-    today: today.iso, pages, corpus: corpus.length,
+    today: today.iso, city, cityName: cityName(city), pages, corpus: corpus.length,
     urgentTotal: corpus.filter((c) => c.urgent).length,
     urgentScored: urgent.length, read, freshToday, rows,
   };
@@ -160,11 +179,11 @@ async function verify(rows, maxGap, pace) {
   return out;
 }
 
-function post(rows, dateIso) {
+function post(rows, dateIso, city) {
   const when = new Date(dateIso + "T00:00:00Z")
     .toLocaleDateString("ru-RU", { timeZone: "UTC", day: "numeric", month: "long" });
   const lines = [
-    "🔥 <b>Срочно, торг · " + when + "</b>",
+    "🔥 <b>Срочно, торг · " + cityName(cleanCity(city)) + " · " + when + "</b>",
     "",
     "Квартиры от хозяев, где продавец сам поставил метку «Срочно, торг». " +
     "Процент — к цене метра у похожих квартир того же района и метража.",
@@ -192,13 +211,14 @@ function post(rows, dateIso) {
   return lines.join("\n");
 }
 
-module.exports = { collect, pick, verify, post, bumpedToday, almatyToday };
+module.exports = { collect, pick, verify, post, bumpedToday, almatyToday, cleanCity, cityName };
 
 if (require.main === module) {
   const argv = process.argv.slice(2);
   const flag = (n, d) => { const i = argv.indexOf("--" + n); return i === -1 ? d : argv[i + 1]; };
   (async () => {
     const r = await collect({
+      city: flag("city", CITY),
       pages: Number(flag("pages", 220)),
       shortlist: Number(flag("shortlist", 30)),
       log: (m) => process.stdout.write("\r" + m + "          "),
@@ -218,6 +238,6 @@ if (require.main === module) {
     if (!top.length) return console.log("\nпод порог ничего не прошло");
     const ok = await verify(top, Number(flag("gap", 20)));
     console.log("\n--- пост ---\n");
-    console.log(post(ok, r.today));
+    console.log(post(ok, r.today, r.city));
   })();
 }

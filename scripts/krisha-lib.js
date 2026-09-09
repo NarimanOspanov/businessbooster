@@ -56,6 +56,12 @@ function searchUrl(page, crit) {
 
 // The card container writes data-id before class, across several lines, so we
 // chunk on that opening tag rather than on the class attribute.
+function districtOf(addr) {
+  const a = String(addr || "");
+  const m = a.match(/([А-Яа-яЁё-]+)\s+р-н/) || a.match(/р-н\s+([А-Яа-яЁё-]+)/);
+  return m ? m[1] + " р-н" : "без района";
+}
+
 function parseCards(html) {
   const re = /<div\s+data-id="(\d+)"\s+data-uuid="[^"]*"\s+class="(a-card[^"]*)"/g;
   const marks = [];
@@ -83,7 +89,10 @@ function parseCards(html) {
       rooms: num((title.match(/(\d+)-комнатная/) || [])[1]),
       ppm: Math.round(price / area),
       pro: /user-label-identified-specialist|user-title-pro/.test(c),
-      district: (addr.match(/([А-Яа-яЁё-]+ский р-н)/) || [])[1] || "без района",
+      // В Алматы районы «-ский», в Астане это «Нура р-н» и «р-н Байконур» —
+      // под старое правило они не подходили, и весь город уезжал в «без района»,
+      // то есть сравнивался сам с собой целиком.
+      district: districtOf(addr),
     });
   }
   return out;
@@ -348,7 +357,7 @@ const inBox = (c, b) =>
 module.exports = {
   addressQueries, geocode, inBox,
   H, CRITERIA, NEAR_DISTRICTS, sleep, num, clean, money,
-  searchUrl, parseCards, parseDetail, locationScore, dedupeKey,
+  searchUrl, parseCards, parseDetail, districtOf, locationScore, dedupeKey,
   ageBand, areaBand, groupKey, median, buildModel, flagsFor,
   fetchText, fetchSearch, fetchDetail, fetchPriceAnalysis,
 };

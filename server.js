@@ -1015,16 +1015,18 @@ async function krishaWeekly(limit) {
 // сегодня и продавец сам пометил его «срочно». Обход занимает минуты, дольше
 // чем живёт HTTP-запрос, поэтому запуск асинхронный, а результат забирают
 // повторным GET.
-let KU = { running: false, startedAt: null, progress: null, lastRun: null, result: null };
+let KU = { running: false, startedAt: null, city: null, progress: null, lastRun: null, result: null };
 
 async function runKrishaUrgent(opts) {
   const U = require("./scripts/krisha-urgent.js");
   const o = opts || {};
   KU.running = true;
   KU.startedAt = new Date().toISOString();
+  KU.city = require("./scripts/krisha-urgent.js").cleanCity(o.city);
   KU.progress = "обход поиска";
   try {
     const r = await U.collect({
+      city: o.city,
       pages: o.pages || 220,
       shortlist: o.shortlist || 30,
       pace: KRISHA_PACE_MS,
@@ -1034,9 +1036,11 @@ async function runKrishaUrgent(opts) {
     KU.progress = "сверка с оценкой Крыши";
     const rows = top.length ? await U.verify(top, o.gap == null ? 20 : o.gap, KRISHA_PACE_MS) : [];
     let telegram = null;
-    if (o.send && rows.length && KW.channel) telegram = await sendTelegram(KW.channel, U.post(rows, r.today));
+    if (o.send && rows.length && KW.channel) telegram = await sendTelegram(KW.channel, U.post(rows, r.today, r.city));
     KU.result = {
       date: r.today,
+      city: r.city,
+      cityName: r.cityName,
       pages: r.pages,
       bumpedToday: r.corpus,
       urgentSeen: r.urgentSeen,
@@ -2869,6 +2873,7 @@ http
       const q = parsed.searchParams;
       if (q.get("run") === "1" && !KU.running) {
         runKrishaUrgent({
+          city: q.get("city"),
           send: q.get("send") === "1",
           n: Number(q.get("n") || 8),
           min: q.get("min") == null ? 8 : Number(q.get("min")),
@@ -2880,7 +2885,7 @@ http
       }
       res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
       res.end(JSON.stringify({
-        running: KU.running, startedAt: KU.startedAt, progress: KU.progress,
+        running: KU.running, startedAt: KU.startedAt, city: KU.city, progress: KU.progress,
         lastRun: KU.lastRun, channel: KW.channel || null, result: KU.result,
       }, null, 2));
       return;
