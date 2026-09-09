@@ -350,8 +350,8 @@ function postFresh(rows, dateIso, city, base) {
     lines.push((i + 1) + ". <b>" + K.money(c.price) + "</b> · " +
       (c.rooms ? c.rooms + "-комн · " : "") + c.area + " м²");
     lines.push(c.addr);
-    // Ссылка живёт внутри строки со скидкой: голый адрес объявления рядом с
-    // ней — это вторая ссылка на то же место и лишняя строка в каждом пункте.
+    // Ссылка названа делом, а не процентом: процент уже стоит в заголовке
+    // подборки, а читателю в этой строке нужно понять, что его ждёт по нажатию.
     //
     // Ведёт она на нашу страницу, а не на Крышу: в Телеграме она открывается
     // тут же, фотографиями и описанием, а не переходом на чужой сайт. Снимка
@@ -359,9 +359,7 @@ function postFresh(rows, dateIso, city, base) {
     const url = base && c.hasCard
       ? base + "/kv/" + c.id
       : "https://krisha.kz/a/show/" + c.id;
-    lines.push(c.kzDiscount != null
-      ? '↓ <a href="' + url + '">на ' + Math.round(c.kzDiscount) + "% ниже рынка</a>"
-      : url);
+    lines.push('<a href="' + url + '">Смотреть фото и контакты →</a>');
     lines.push("");
   });
   return lines.join("\n").trimEnd();
