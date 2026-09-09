@@ -756,7 +756,14 @@ const KRISHA_MIN_DISCOUNT = Number(process.env.KRISHA_MIN_DISCOUNT || 12);
 // every listing it tries, so the warm-up can finish in a couple of cycles.
 const KRISHA_DETAILS_PER_RUN = Number(process.env.KRISHA_DETAILS_PER_RUN || 400);
 const KRISHA_PACE_MS = Number(process.env.KRISHA_PACE_MS || 2500); // gentler than local: the datacenter IP gets dropped more
+// Готовая сессия Крыши, которую кладёт владелец аккаунта: без неё телефон
+// продавца недоступен, потому что своего входа у сервиса нет — логин живёт на
+// id.kolesa.kz за проверкой «подтвердите, что вы человек».
+const KRISHA_COOKIE = process.env.KRISHA_COOKIE || "";
 const KRISHA_FILE = path.join(PERSIST_DATA || REPO_DATA, "krisha-watch.json");
+// Снимки объявлений для страниц /kv/<id>: их открывают из поста в Телеграме, а
+// объявление к тому времени могут снять.
+const KRISHA_CARDS_FILE = path.join(PERSIST_DATA || REPO_DATA, "krisha-cards.json");
 
 // ~2.2s per address including the fallback query, so 150 is about six minutes —
 // well under Nominatim's one-per-second ceiling, and the backlog is one-time.
@@ -774,6 +781,18 @@ try {
 // Self-heal: an entry without a build year came from a failed read and is
 // useless for comparables. Drop it so the next run fetches it again.
 for (const [id, c] of Object.entries(KW.corpus || {})) if (!c || !c.year) delete KW.corpus[id];
+let KC = {};
+try { KC = JSON.parse(fs.readFileSync(KRISHA_CARDS_FILE, "utf8")); } catch { /* первый запуск */ }
+function saveCards() {
+  try {
+    fs.mkdirSync(path.dirname(KRISHA_CARDS_FILE), { recursive: true });
+    // За месяц набирается пара сотен снимков; дальше самые старые не нужны.
+    const ids = Object.keys(KC).sort((a, b) => String(KC[b].takenAt || "").localeCompare(String(KC[a].takenAt || "")));
+    for (const id of ids.slice(600)) delete KC[id];
+    fs.writeFileSync(KRISHA_CARDS_FILE, JSON.stringify(KC), "utf8");
+  } catch { /* диск только на чтение */ }
+}
+
 function saveKrisha() {
   try {
     fs.mkdirSync(path.dirname(KRISHA_FILE), { recursive: true });
@@ -1046,8 +1065,34 @@ async function runKrishaUrgent(opts) {
         ? await U.cheaper(f.rows, { min: min, pace: KRISHA_PACE_MS, log: (m) => { KU.progress = m; } })
         : [];
       const rows = good.slice(0, o.n || 12);
+
+      // Снимок каждой опубликованной квартиры: фотографии, описание хозяина,
+      // характеристики. Телефон — только если владелец аккаунта положил свою
+      // сессию в KRISHA_COOKIE.
+      const Card = require("./scripts/krisha-card.js");
+      for (let i = 0; i < rows.length; i++) {
+        const c = rows[i];
+        KU.progress = "снимок карточки " + (i + 1) + " из " + rows.length;
+        try {
+          const card = await Card.fetchCard(c.id);
+          card.addr = card.addr || c.addr;
+          card.kzDiscount = c.kzDiscount == null ? null : c.kzDiscount;
+          if (KRISHA_COOKIE) {
+            try {
+              const ph = await Card.fetchPhones(c.id, KRISHA_COOKIE);
+              if (ph && ph.phones && ph.phones.length) card.phones = ph.phones;
+              else if (ph && ph.error) card.phoneError = ph.error;
+            } catch { /* без телефона страница всё равно полезна */ }
+          }
+          KC[c.id] = card;
+          c.hasCard = true;
+        } catch { /* не сняли — ссылка уйдёт прямо на Крышу */ }
+        await new Promise((r) => setTimeout(r, KRISHA_PACE_MS));
+      }
+      saveCards();
+
       let tg = null;
-      if (o.send && rows.length && KW.channel) tg = await sendTelegram(KW.channel, U.postFresh(rows, f.today, f.city));
+      if (o.send && rows.length && KW.channel) tg = await sendTelegram(KW.channel, U.postFresh(rows, f.today, f.city, CANONICAL));
       KU.result = {
         mode: "fresh",
         date: f.today, city: f.city, cityName: f.cityName,
@@ -4461,6 +4506,21 @@ http
     // IndexNow, so it keeps working — permanently, pointing at the new place.
     if (urlPath === "/phone" || urlPath === "/phone/" || urlPath === "/phone/kk" || urlPath === "/phone/kk/") {
       res.writeHead(301, { Location: urlPath.indexOf("/kk") > 0 ? "/kk/" : "/" }).end();
+      return;
+    }
+
+    // Квартира из подборки: ссылку открывают прямо в Телеграме, поэтому
+    // показываем свой снимок с фотографиями и контактами, а не отправляем
+    // человека на чужой сайт, где объявления может уже не быть.
+    const kvMatch = urlPath.match(/^\/kv\/(\d+)\/?$/);
+    if (kvMatch) {
+      const page = require("./scripts/krisha-page.js");
+      const card = KC[kvMatch[1]];
+      res.writeHead(card ? 200 : 404, {
+        "Content-Type": MIME[".html"],
+        "Cache-Control": card ? "public, max-age=300" : "no-store",
+      });
+      res.end(card ? page.render(card) : page.notFound(kvMatch[1]));
       return;
     }
 

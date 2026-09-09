@@ -339,7 +339,7 @@ async function cheaper(rows, opts) {
 
 // Рубрика «что появилось за сутки». Здесь не заявляется никакой выгоды —
 // только факт: объявление новое и продавец сам пометил его «срочно».
-function postFresh(rows, dateIso, city) {
+function postFresh(rows, dateIso, city, base) {
   const when = new Date(dateIso + "T00:00:00Z")
     .toLocaleDateString("ru-RU", { timeZone: "UTC", day: "numeric", month: "long" });
   const lines = [
@@ -353,7 +353,13 @@ function postFresh(rows, dateIso, city) {
     lines.push(c.addr);
     // Ссылка живёт внутри строки со скидкой: голый адрес объявления рядом с
     // ней — это вторая ссылка на то же место и лишняя строка в каждом пункте.
-    const url = "https://krisha.kz/a/show/" + c.id;
+    //
+    // Ведёт она на нашу страницу, а не на Крышу: в Телеграме она открывается
+    // тут же, фотографиями и описанием, а не переходом на чужой сайт. Снимка
+    // может не быть — тогда честнее отправить на первоисточник.
+    const url = base && c.hasCard
+      ? base + "/kv/" + c.id
+      : "https://krisha.kz/a/show/" + c.id;
     lines.push(c.kzDiscount != null
       ? '↓ <a href="' + url + '">на ' + Math.round(c.kzDiscount) + "% ниже рынка</a>"
       : url);
