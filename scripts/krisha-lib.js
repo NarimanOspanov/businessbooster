@@ -265,9 +265,17 @@ async function fetchText(url, attempts = 3, timeoutMs = 20000) {
 // area is not among them, which is exactly why their percentage and ours differ.
 async function fetchPriceAnalysis(id) {
   const html = await fetchText("https://krisha.kz/analytics/aPriceAnalysis/?id=" + id);
+  // Крыша округляет крупные суммы до «1 млн», и старый разбор читал из этого
+  // единицу — в подборке стояло «у похожих 1 ₸/м²». Такие значения помечаем
+  // приблизительными, а ноль означает, что похожих рядом не нашлось.
   const money = (re) => {
     const m = html.match(re);
-    return m ? num(m[1]) : null;
+    if (!m) return null;
+    const raw = clean(m[1]);
+    const mm = raw.match(/^([\d.,]+)\s*млн/i);
+    if (mm) return Math.round(Number(mm[1].replace(",", ".")) * 1e6);
+    const v = num(raw);
+    return v || null;
   };
   const pct = clean(html).match(/На\s+([\d.,]+)%\s+(дешевле|дороже)/i);
   const series = html.match(/chartColumnsData\s*=\s*(\{[\s\S]{0,4000}?\});/);
@@ -280,9 +288,10 @@ async function fetchPriceAnalysis(id) {
     } catch { /* chart is a bonus, not a requirement */ }
   }
   return {
-    kzPpm: money(/class="green-price">([\d\s&nbsp;]+)/),
-    kzSimilarLocal: money(/class="blue-price">([\d\s&nbsp;]+)/),
-    kzSimilarCity: money(/class="white-blue-price">([\d\s&nbsp;]+)/),
+    kzPpm: money(/class="green-price">([^<]+)/),
+    kzApprox: /class="green-price">[^<]*млн/i.test(html),
+    kzSimilarLocal: money(/class="blue-price">([^<]+)/),
+    kzSimilarCity: money(/class="white-blue-price">([^<]+)/),
     kzDiscount: pct ? (pct[2].toLowerCase() === "дешевле" ? 1 : -1) * Number(pct[1].replace(",", ".")) : null,
     kzCompareUrl: (html.match(/href="(\/prodazha\/kvartiry\/[^"]+)"/) || [])[1] || null,
     trendCity: city, trendMicro: micro,

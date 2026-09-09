@@ -1036,7 +1036,14 @@ async function runKrishaUrgent(opts) {
         pace: KRISHA_PACE_MS,
         log: (m) => { KU.progress = m; },
       });
-      const rows = f.rows.slice(0, o.n || 12);
+      // Последний фильтр — цена, по оценке самой Крыши: один запрос на
+      // квартиру, а квартир после отбора десятка два.
+      KU.progress = "оценка цены";
+      const min = o.min == null ? 5 : o.min;
+      const good = f.rows.length
+        ? await U.cheaper(f.rows, { min: min, pace: KRISHA_PACE_MS, log: (m) => { KU.progress = m; } })
+        : [];
+      const rows = good.slice(0, o.n || 12);
       let tg = null;
       if (o.send && rows.length && KW.channel) tg = await sendTelegram(KW.channel, U.postFresh(rows, f.today, f.city));
       KU.result = {
@@ -1045,12 +1052,17 @@ async function runKrishaUrgent(opts) {
         pages: f.pages, bumpedToday: f.corpus, urgentToday: f.urgentTotal,
         boundaryId: f.boundaryId, boundaryReads: f.boundaryReads,
         newToday: f.rows.length,
+        cheaperThanSimilar: good.length,
+        minDiscount: min,
         published: rows.length,
         sent: !!(tg && tg.ok),
         telegram: tg && tg.ok ? undefined : tg,
         items: rows.map((c) => ({
           id: c.id, price: c.price, ppm: c.ppm, area: c.area, rooms: c.rooms,
-          addr: c.addr, url: "https://krisha.kz/a/show/" + c.id,
+          addr: c.addr,
+          kzDiscount: c.kzDiscount == null ? null : c.kzDiscount,
+          kzSimilarLocal: c.kzSimilarLocal || null,
+          url: "https://krisha.kz/a/show/" + c.id,
         })),
       };
       KU.running = false;

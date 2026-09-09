@@ -282,6 +282,27 @@ function post(rows, dateIso, city) {
   return lines.join("\n");
 }
 
+// Последний фильтр: из новых со «срочно» оставить те, что дешевле похожих.
+//
+// Оценку берём у самой Крыши, а не свою: она считает по году дома, району,
+// типу и числу комнат, показана на странице объявления — и читатель проверяет
+// её одним кликом, вместо того чтобы верить нашей выборке на слово. Один
+// запрос на квартиру, а квартир после отбора полтора десятка.
+async function cheaper(rows, opts) {
+  const o = opts || {};
+  const min = o.min == null ? 5 : o.min;
+  const log = o.log || (() => {});
+  const out = [];
+  let i = 0;
+  for (const c of rows) {
+    try { Object.assign(c, await K.fetchPriceAnalysis(c.id)); } catch { c.kzDiscount = null; }
+    if (c.kzDiscount != null && c.kzDiscount >= min) out.push(c);
+    log("оценка цены: " + (++i) + " из " + rows.length);
+    await K.sleep(o.pace || 1200);
+  }
+  return out.sort((a, b) => b.kzDiscount - a.kzDiscount);
+}
+
 // Рубрика «что появилось за сутки». Здесь не заявляется никакой выгоды —
 // только факт: объявление новое и продавец сам пометил его «срочно».
 function postFresh(rows, dateIso, city) {
@@ -290,8 +311,8 @@ function postFresh(rows, dateIso, city) {
   const lines = [
     "🔥 <b>Срочно, торг · " + cityName(cleanCity(city)) + " · " + when + "</b>",
     "",
-    "Что появилось за сутки: квартиры от хозяев, где продавец сам поставил " +
-    "метку «Срочно, торг».",
+    "Появились за сутки, продавец сам поставил метку «Срочно, торг», " +
+    "и по оценке самой Крыши стоят дешевле похожих квартир рядом.",
     "",
   ];
   rows.forEach((c, i) => {
@@ -299,16 +320,21 @@ function postFresh(rows, dateIso, city) {
       (c.rooms ? c.rooms + "-комн · " : "") + c.area + " м² · " +
       c.ppm.toLocaleString("ru") + " ₸/м²");
     lines.push(c.addr);
+    if (c.kzDiscount != null) {
+      lines.push("↓ на " + Math.round(c.kzDiscount) + "% дешевле похожих" +
+        (c.kzSimilarLocal ? " — у них " + c.kzSimilarLocal.toLocaleString("ru") + " ₸/м²" : "") +
+        " (оценка Крыши)");
+    }
     lines.push("https://krisha.kz/a/show/" + c.id);
     lines.push("");
   });
-  lines.push("<i>Метку ставит продавец, торг обещает тоже он. Цену с рынком " +
-    "не сравниваем — смотрите сами.</i>");
+  lines.push("<i>Метку ставит продавец, торг обещает тоже он. Процент — оценка " +
+    "Крыши по году дома, району и числу комнат, её видно на странице объявления.</i>");
   return lines.join("\n");
 }
 
 module.exports = {
-  sweep, collect, fresh, pick, verify, post, postFresh, boundary, createdAt,
+  sweep, collect, fresh, pick, cheaper, verify, post, postFresh, boundary, createdAt,
   bumpedToday, almatyToday, cleanCity, cityName,
 };
 
@@ -328,7 +354,10 @@ if (require.main === module) {
       console.log("новых за сутки со «срочно»: " + r.rows.length + "\n");
       r.rows.forEach((c) => console.log("  " + (c.rooms || "?") + "к " + c.area + " м²  " +
         (c.price / 1e6).toFixed(1) + " млн  " + c.addr.slice(0, 44) + "  /a/show/" + c.id));
-      if (r.rows.length) console.log("\n--- пост ---\n\n" + postFresh(r.rows, r.today, r.city));
+      const min = Number(flag("min", 5));
+      const good = r.rows.length ? await cheaper(r.rows, { min: min, log: (m) => process.stdout.write("\r" + m + "     ") }) : [];
+      console.log("\nдешевле похожих (от " + min + "%): " + good.length);
+      if (good.length) console.log("\n--- пост ---\n\n" + postFresh(good, r.today, r.city));
       return;
     }
     const r = await collect({
