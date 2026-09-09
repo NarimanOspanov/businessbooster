@@ -9,7 +9,7 @@
 const K = require("./krisha-lib.js");
 
 const clean = (s) =>
-  String(s || "").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "")
+  String(s || "").replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n").replace(/<[^>]+>/g, "")
     .replace(/&nbsp;/g, " ").replace(/&quot;/g, '"').replace(/&#039;|&apos;/g, "'")
     .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
     .replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
@@ -54,6 +54,21 @@ function params(html) {
   return out;
 }
 
+// Текст хозяина. В одном шаблоне у блока класс js-description, в другом просто
+// a-text — поэтому надёжнее всего идти от подписи «Описание».
+function description(html) {
+  const tries = [
+    /class="js-description[^"]*"[^>]*>([\s\S]*?)<\/div>/,
+    /offer__bio-title">\s*Описание\s*<\/div>\s*<div class="text">\s*<div[^>]*>([\s\S]*?)<\/div>/,
+    /class="a-text a-text-white-spaces"[^>]*>([\s\S]*?)<\/div>/,
+  ];
+  for (const re of tries) {
+    const t = clean((html.match(re) || [])[1]);
+    if (t) return t;
+  }
+  return "";
+}
+
 function parse(html, id) {
   const short = (html.match(/class="offer__short-description"[\s\S]*?(?=<div class="offer__description")/) || [])[0] || "";
   const shortItems = [];
@@ -66,10 +81,14 @@ function parse(html, id) {
   }
   return {
     id: String(id),
-    title: clean((html.match(/class="offer__advert-title-text"[\s\S]*?<h1>([\s\S]*?)<\/h1>/) || [])[1]),
+    // У Крыши два шаблона страницы: в одном заголовок обёрнут в
+    // offer__advert-title-text, в другом h1 лежит прямо в offer__advert-title.
+    // Первый разбор знал только про первый, и у двух объявлений из трёх не
+    // было ни заголовка, ни описания.
+    title: clean((html.match(/class="offer__advert-title[^"]*"[\s\S]{0,300}?<h1[^>]*>([\s\S]*?)<\/h1>/) || [])[1]),
     price: K.num((html.match(/class="offer__price"[^>]*>([\s\S]*?)<\/div>/) || [])[1]),
     addr: clean((html.match(/class="offer__location[^"]*"[\s\S]*?<div>([\s\S]*?)<\/div>/) || [])[1]),
-    description: clean((html.match(/class="js-description[^"]*"[^>]*>([\s\S]*?)<\/div>/) || [])[1]),
+    description: description(html),
     short: shortItems,
     params: params(html),
     photos: photos(html),
