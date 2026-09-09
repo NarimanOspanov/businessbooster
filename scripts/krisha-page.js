@@ -12,6 +12,9 @@ const esc = (s) => String(s == null ? "" : s)
 
 const money = (n) => String(Math.round(n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " ₸";
 
+// Тот же номер, что на сайте и в вакансии — публичный рабочий, не чей-то чужой.
+const FALLBACK_PHONE = process.env.CONTACT_PHONE || "+7 702 941 06 25";
+
 function render(card, opts) {
   const o = opts || {};
   const photos = card.photos || [];
@@ -41,11 +44,18 @@ function render(card, opts) {
   const params = (card.params || []).map((p) =>
     '<div class="f"><span>' + esc(p.label) + "</span><b>" + esc(p.value) + "</b></div>").join("");
 
+  // Номера хозяина у нас нет: Крыша отдаёт его только после капчи. Пока вместо
+  // него стоит наш собственный номер — и подписан как наш. Выдуманный ставить
+  // нельзя: любой правдоподобный казахстанский номер принадлежит живому
+  // человеку, и звонить по квартире стали бы ему.
+  const ours = o.phone || FALLBACK_PHONE;
   const contacts = phones.length
     ? '<div class="tel">' + phones.map((p) =>
         '<a href="tel:' + esc(String(p).replace(/[^\d+]/g, "")) + '">' + esc(p) + "</a>").join("") + "</div>"
-    : '<div class="tel tel-off"><span>' + esc(card.phonePreview || "+7 ") + "… </span>" +
-      '<a class="btn" href="' + krisha + '" target="_blank" rel="noopener">Показать на Крыше</a></div>';
+    : '<div class="tel"><a href="tel:' + esc(ours.replace(/[^\d+]/g, "")) + '">' + esc(ours) + "</a>" +
+      '<div class="stub">Это наш номер. Телефон хозяина — ' +
+      '<a href="' + krisha + '" target="_blank" rel="noopener">на странице объявления</a>' +
+      (card.phonePreview ? ", начинается на " + esc(card.phonePreview.trim()) : "") + ".</div></div>";
 
   const discount = card.kzDiscount != null && card.kzDiscount > 0
     ? '<div class="tag">↓ на ' + Math.round(card.kzDiscount) + "% ниже рынка</div>"
@@ -89,11 +99,15 @@ ${photos.length ? '<meta property="og:image" content="' + esc(photos[0].big) + '
   .f b{font-weight:500;text-align:right}
   .desc{white-space:pre-wrap;background:var(--card);border-radius:14px;padding:14px 16px;font-size:15px}
   .tel{display:flex;flex-direction:column;gap:8px;margin-top:10px}
-  .tel a{display:block;background:var(--accent);color:#fff;text-align:center;text-decoration:none;
+  /* Только прямая ссылка-номер выглядит кнопкой: ссылка внутри подписи под ней
+     тоже подхватывала эти стили, и кнопок становилось две. */
+  .tel > a{display:block;background:var(--accent);color:#fff;text-align:center;text-decoration:none;
     font-size:17px;font-weight:600;border-radius:12px;padding:14px}
   .tel-off{flex-direction:row;align-items:center;gap:12px;background:var(--card);border-radius:12px;padding:12px 14px}
   .tel-off span{font-size:17px;font-weight:600;color:var(--dim)}
   .tel-off .btn{flex:1;font-size:15px;padding:10px}
+  .stub{font-size:13px;color:var(--dim);text-align:center;line-height:1.45}
+  .stub a{color:var(--dim);text-decoration:underline}
   .src{margin-top:22px;font-size:13px;color:var(--dim);text-align:center}
   .src a{color:var(--dim)}
 </style>
@@ -106,7 +120,7 @@ ${gallery}
   <h1>${esc(card.title)}</h1>
   ${card.addr ? '<div style="color:var(--dim);font-size:15px">' + esc(card.addr) + "</div>" : ""}
 
-  <h2>Контакты хозяина</h2>
+  <h2>${phones.length ? "Контакты хозяина" : "Контакты"}</h2>
   ${contacts}
 
   ${card.description ? "<h2>Описание</h2><div class=\"desc\">" + esc(card.description) + "</div>" : ""}
