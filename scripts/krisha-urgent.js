@@ -65,17 +65,18 @@ const median = (xs) => {
 };
 const groupKey = (c) => c.district + "|" + K.areaBand(c.area);
 
-async function collect(opts) {
+// Обход выдачи: всё, что сегодня показано с сегодняшней датой. Дальше этот
+// список используют оба режима — и «новые за сутки», и подборка по цене.
+async function sweep(opts) {
   const o = opts || {};
   const pace = o.pace || 1200;
   const maxPages = o.pages || 160;
-  const minComparables = o.minComparables || 8;
   const log = o.log || (() => {});
   const today = almatyToday();
   const city = cleanCity(o.city);
 
-  // 1. Все объявления, поднятые сегодня. Сортировка на Крыше — по поднятию,
-  //    поэтому первая полностью вчерашняя страница обрывает обход.
+  // Все объявления, поднятые сегодня. Сортировка на Крыше — по поднятию,
+  // поэтому первая полностью вчерашняя страница обрывает обход.
   const seen = new Map();
   let pages = 0, emptyRun = 0;
   for (let p = 1; p <= maxPages; p++) {
@@ -94,7 +95,21 @@ async function collect(opts) {
     if (emptyRun >= 3) break;
     await K.sleep(pace);
   }
-  const corpus = [...seen.values()];
+  return {
+    today: today.iso, city, cityName: cityName(city), pages,
+    cards: [...seen.values()],
+  };
+}
+
+// Подборка по цене: что дешевле похожих. Тяжёлый режим — читает карточки.
+async function collect(opts) {
+  const o = opts || {};
+  const pace = o.pace || 1200;
+  const minComparables = o.minComparables || 8;
+  const log = o.log || (() => {});
+  const swept = await sweep(o);
+  const corpus = swept.cards;
+  const today = { iso: swept.today };
 
   // 2. Цена похожих считается по обычным объявлениям: если сравнивать срочные
   //    со срочными, метка растворяется в базе сравнения. В городах без деления
@@ -140,11 +155,67 @@ async function collect(opts) {
   }
 
   rows.sort((a, b) => b.discount - a.discount);
-  return {
-    today: today.iso, city, cityName: cityName(city), pages, corpus: corpus.length,
+  return Object.assign({}, swept, {
+    cards: undefined,
+    corpus: corpus.length,
     urgentTotal: corpus.filter((c) => c.urgent).length,
     urgentScored: urgent.length, read, freshToday, rows,
-  };
+  });
+}
+
+// Новые за сутки: то же самое, но без оценки цены. Метка «срочно» плюс дата
+// публикации — всё, что нужно рубрике «что появилось сегодня».
+async function fresh(opts) {
+  const o = opts || {};
+  const log = o.log || (() => {});
+  const swept = await sweep(o);
+  const urgent = swept.cards.filter((c) => c.urgent);
+  const b = await boundary(swept.cards, o.since || swept.today, { pace: o.pace, log: log });
+  const rows = (b.id == null ? [] : urgent.filter((c) => Number(c.id) >= Number(b.id)))
+    .sort((a, b2) => Number(b2.id) - Number(a.id));
+  return Object.assign({}, swept, {
+    cards: undefined,
+    corpus: swept.cards.length,
+    urgentTotal: urgent.length,
+    boundaryId: b.id,
+    boundaryReads: b.reads,
+    rows,
+  });
+}
+
+// Дата публикации: id вместо чтения каждой карточки.
+//
+// Проверено на живых объявлениях: id при продлении не меняется, а растёт со
+// временем строго. Объявление с id 683317840 создано в марте 2023-го и сегодня
+// поднято заново — id прежний. Значит достаточно найти границу: наименьший id,
+// у которого createdAt уже сегодняшний. Всё, что выше, опубликовано за сутки.
+//
+// Двоичный поиск по отсортированному списку — это десяток запросов вместо
+// нескольких сотен, и никакого хранимого состояния: граница пересчитывается
+// на каждом прогоне заново.
+async function createdAt(id) {
+  const html = await K.fetchText("https://krisha.kz/a/show/" + id, 2, 12000);
+  return (html.match(/"createdAt"\s*:\s*"(\d{4}-\d{2}-\d{2})"/) || [])[1] || null;
+}
+
+async function boundary(cards, sinceIso, opts) {
+  const o = opts || {};
+  const pace = o.pace || 1200;
+  const log = o.log || (() => {});
+  const sorted = cards.slice().sort((a, b) => Number(a.id) - Number(b.id));
+  let lo = 0, hi = sorted.length - 1, found = null, reads = 0;
+  while (lo <= hi && reads < (o.maxReads || 14)) {
+    const mid = (lo + hi) >> 1;
+    let d = null;
+    try { d = await createdAt(sorted[mid].id); } catch { /* объявление могли снять */ }
+    reads++;
+    log("поиск границы: " + reads + " запрос(ов)");
+    if (d == null) { lo = mid + 1; }
+    else if (d >= sinceIso) { found = sorted[mid].id; hi = mid - 1; }
+    else { lo = mid + 1; }
+    await K.sleep(pace);
+  }
+  return { id: found, reads };
 }
 
 // Что из этого годится в канал. Две отсечки, обе выяснились на первом же
@@ -211,12 +282,55 @@ function post(rows, dateIso, city) {
   return lines.join("\n");
 }
 
-module.exports = { collect, pick, verify, post, bumpedToday, almatyToday, cleanCity, cityName };
+// Рубрика «что появилось за сутки». Здесь не заявляется никакой выгоды —
+// только факт: объявление новое и продавец сам пометил его «срочно».
+function postFresh(rows, dateIso, city) {
+  const when = new Date(dateIso + "T00:00:00Z")
+    .toLocaleDateString("ru-RU", { timeZone: "UTC", day: "numeric", month: "long" });
+  const lines = [
+    "🔥 <b>Срочно, торг · " + cityName(cleanCity(city)) + " · " + when + "</b>",
+    "",
+    "Что появилось за сутки: квартиры от хозяев, где продавец сам поставил " +
+    "метку «Срочно, торг».",
+    "",
+  ];
+  rows.forEach((c, i) => {
+    lines.push((i + 1) + ". <b>" + K.money(c.price) + "</b> · " +
+      (c.rooms ? c.rooms + "-комн · " : "") + c.area + " м² · " +
+      c.ppm.toLocaleString("ru") + " ₸/м²");
+    lines.push(c.addr);
+    lines.push("https://krisha.kz/a/show/" + c.id);
+    lines.push("");
+  });
+  lines.push("<i>Метку ставит продавец, торг обещает тоже он. Цену с рынком " +
+    "не сравниваем — смотрите сами.</i>");
+  return lines.join("\n");
+}
+
+module.exports = {
+  sweep, collect, fresh, pick, verify, post, postFresh, boundary, createdAt,
+  bumpedToday, almatyToday, cleanCity, cityName,
+};
 
 if (require.main === module) {
   const argv = process.argv.slice(2);
   const flag = (n, d) => { const i = argv.indexOf("--" + n); return i === -1 ? d : argv[i + 1]; };
   (async () => {
+    if (flag("mode", "deal") === "fresh") {
+      const r = await fresh({
+        city: flag("city", CITY),
+        pages: Number(flag("pages", 220)),
+        log: (m) => process.stdout.write("\r" + m + "          "),
+      });
+      console.log("\n\n" + r.cityName + " · страниц: " + r.pages + " · поднято сегодня: " +
+        r.corpus + " · из них со «срочно»: " + r.urgentTotal);
+      console.log("граница по id: " + r.boundaryId + " (" + r.boundaryReads + " запросов)");
+      console.log("новых за сутки со «срочно»: " + r.rows.length + "\n");
+      r.rows.forEach((c) => console.log("  " + (c.rooms || "?") + "к " + c.area + " м²  " +
+        (c.price / 1e6).toFixed(1) + " млн  " + c.addr.slice(0, 44) + "  /a/show/" + c.id));
+      if (r.rows.length) console.log("\n--- пост ---\n\n" + postFresh(r.rows, r.today, r.city));
+      return;
+    }
     const r = await collect({
       city: flag("city", CITY),
       pages: Number(flag("pages", 220)),

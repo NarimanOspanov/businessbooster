@@ -1025,6 +1025,39 @@ async function runKrishaUrgent(opts) {
   KU.city = require("./scripts/krisha-urgent.js").cleanCity(o.city);
   KU.progress = "обход поиска";
   try {
+    // Рубрика «что появилось за сутки»: метка плюс дата публикации, без оценки
+    // цены. Дату берём не из карточек, а по границе id — одиннадцать запросов
+    // вместо трёхсот, потому что id при продлении не меняется и растёт со
+    // временем.
+    if (o.mode === "fresh") {
+      const f = await U.fresh({
+        city: o.city,
+        pages: o.pages || 220,
+        pace: KRISHA_PACE_MS,
+        log: (m) => { KU.progress = m; },
+      });
+      const rows = f.rows.slice(0, o.n || 12);
+      let tg = null;
+      if (o.send && rows.length && KW.channel) tg = await sendTelegram(KW.channel, U.postFresh(rows, f.today, f.city));
+      KU.result = {
+        mode: "fresh",
+        date: f.today, city: f.city, cityName: f.cityName,
+        pages: f.pages, bumpedToday: f.corpus, urgentToday: f.urgentTotal,
+        boundaryId: f.boundaryId, boundaryReads: f.boundaryReads,
+        newToday: f.rows.length,
+        published: rows.length,
+        sent: !!(tg && tg.ok),
+        telegram: tg && tg.ok ? undefined : tg,
+        items: rows.map((c) => ({
+          id: c.id, price: c.price, ppm: c.ppm, area: c.area, rooms: c.rooms,
+          addr: c.addr, url: "https://krisha.kz/a/show/" + c.id,
+        })),
+      };
+      KU.running = false;
+      KU.progress = null;
+      KU.lastRun = new Date().toISOString();
+      return KU.result;
+    }
     const r = await U.collect({
       city: o.city,
       pages: o.pages || 220,
@@ -2869,11 +2902,14 @@ http
 
     // Сегодняшние «Срочно, торг». run=1 запускает обход, send=1 отправляет
     // готовую подборку в канал; без параметров — что получилось в прошлый раз.
+    // mode=fresh — что появилось за сутки, mode=deal (по умолчанию) — что
+    // дешевле похожих.
     if (urlPath === "/api/krisha/urgent") {
       const q = parsed.searchParams;
       if (q.get("run") === "1" && !KU.running) {
         runKrishaUrgent({
           city: q.get("city"),
+          mode: q.get("mode") === "fresh" ? "fresh" : "deal",
           send: q.get("send") === "1",
           n: Number(q.get("n") || 8),
           min: q.get("min") == null ? 8 : Number(q.get("min")),
