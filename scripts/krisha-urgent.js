@@ -348,8 +348,7 @@ function postFresh(rows, dateIso, city, base) {
   ];
   rows.forEach((c, i) => {
     lines.push((i + 1) + ". <b>" + K.money(c.price) + "</b> · " +
-      (c.rooms ? c.rooms + "-комн · " : "") + c.area + " м² · " +
-      c.ppm.toLocaleString("ru") + " ₸/м²");
+      (c.rooms ? c.rooms + "-комн · " : "") + c.area + " м²");
     lines.push(c.addr);
     // Ссылка живёт внутри строки со скидкой: голый адрес объявления рядом с
     // ней — это вторая ссылка на то же место и лишняя строка в каждом пункте.
