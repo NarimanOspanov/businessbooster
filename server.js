@@ -1010,6 +1010,61 @@ async function krishaWeekly(limit) {
   return { delivered: !!(tg && tg.ok), items: rows.length, telegram: tg && tg.ok ? undefined : tg };
 }
 
+// Подборка «Срочно, торг» за сегодня. Отдельная от сторожа задача: у сторожа
+// свой корпус и свои критерии, а здесь важна одна вещь — объявление появилось
+// сегодня и продавец сам пометил его «срочно». Обход занимает минуты, дольше
+// чем живёт HTTP-запрос, поэтому запуск асинхронный, а результат забирают
+// повторным GET.
+let KU = { running: false, startedAt: null, progress: null, lastRun: null, result: null };
+
+async function runKrishaUrgent(opts) {
+  const U = require("./scripts/krisha-urgent.js");
+  const o = opts || {};
+  KU.running = true;
+  KU.startedAt = new Date().toISOString();
+  KU.progress = "обход поиска";
+  try {
+    const r = await U.collect({
+      pages: o.pages || 220,
+      shortlist: o.shortlist || 30,
+      pace: KRISHA_PACE_MS,
+      log: (m) => { KU.progress = m; },
+    });
+    const top = U.pick(r.rows, { n: o.n || 8, min: o.min, max: o.max, maxAge: o.maxAge });
+    KU.progress = "сверка с оценкой Крыши";
+    const rows = top.length ? await U.verify(top, o.gap == null ? 20 : o.gap, KRISHA_PACE_MS) : [];
+    let telegram = null;
+    if (o.send && rows.length && KW.channel) telegram = await sendTelegram(KW.channel, U.post(rows, r.today));
+    KU.result = {
+      date: r.today,
+      pages: r.pages,
+      bumpedToday: r.corpus,
+      urgentSeen: r.urgentSeen,
+      detailsRead: r.read,
+      urgentToday: r.urgentTotal,
+      scored: r.urgentScored,
+      createdToday: r.freshToday,
+      published: rows.length,
+      sent: !!(telegram && telegram.ok),
+      telegram: telegram && telegram.ok ? undefined : telegram,
+      items: rows.map((c) => ({
+        id: c.id, price: c.price, ppm: c.ppm, area: c.area, rooms: c.rooms,
+        addr: c.addr, discount: c.discount, expected: c.expected || null,
+        ageDays: c.ageDays == null ? null : c.ageDays,
+        kzDiscount: c.kzDiscount == null ? null : c.kzDiscount,
+        url: "https://krisha.kz/a/show/" + c.id,
+      })),
+      skipped: r.rows.filter((c) => c.skipped).map((c) => ({ id: c.id, why: c.skipped })),
+    };
+  } catch (e) {
+    KU.result = { error: String(e && e.message).slice(0, 200) };
+  }
+  KU.running = false;
+  KU.progress = null;
+  KU.lastRun = new Date().toISOString();
+  return KU.result;
+}
+
 async function runKrishaWatch() {
   const K = require("./scripts/krisha-lib.js");
   const started = Date.now();
@@ -2805,6 +2860,29 @@ http
       else if (id) { KW.channel = id; saveKrisha(); }
       res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
       res.end(JSON.stringify({ channel: KW.channel || null, botConfigured: !!TG_TOKEN }, null, 2));
+      return;
+    }
+
+    // Сегодняшние «Срочно, торг». run=1 запускает обход, send=1 отправляет
+    // готовую подборку в канал; без параметров — что получилось в прошлый раз.
+    if (urlPath === "/api/krisha/urgent") {
+      const q = parsed.searchParams;
+      if (q.get("run") === "1" && !KU.running) {
+        runKrishaUrgent({
+          send: q.get("send") === "1",
+          n: Number(q.get("n") || 8),
+          min: q.get("min") == null ? 8 : Number(q.get("min")),
+          max: q.get("max") == null ? 35 : Number(q.get("max")),
+          maxAge: q.get("age") == null ? 30 : Number(q.get("age")),
+          pages: Number(q.get("pages") || 220),
+          gap: q.get("gap") == null ? 20 : Number(q.get("gap")),
+        }).catch(() => {});
+      }
+      res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+      res.end(JSON.stringify({
+        running: KU.running, startedAt: KU.startedAt, progress: KU.progress,
+        lastRun: KU.lastRun, channel: KW.channel || null, result: KU.result,
+      }, null, 2));
       return;
     }
 

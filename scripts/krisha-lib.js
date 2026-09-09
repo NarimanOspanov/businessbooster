@@ -57,10 +57,10 @@ function searchUrl(page, crit) {
 // The card container writes data-id before class, across several lines, so we
 // chunk on that opening tag rather than on the class attribute.
 function parseCards(html) {
-  const re = /<div\s+data-id="(\d+)"\s+data-uuid="[^"]*"\s+class="a-card[\s"]/g;
+  const re = /<div\s+data-id="(\d+)"\s+data-uuid="[^"]*"\s+class="(a-card[^"]*)"/g;
   const marks = [];
   let m;
-  while ((m = re.exec(html))) marks.push({ id: m[1], at: m.index });
+  while ((m = re.exec(html))) marks.push({ id: m[1], cls: m[2], at: m.index });
   const out = [];
   for (let i = 0; i < marks.length; i++) {
     const c = html.slice(marks[i].at, marks[i + 1] ? marks[i + 1].at : marks[i].at + 9000);
@@ -69,8 +69,17 @@ function parseCards(html) {
     const addr = clean((c.match(/class="a-card__subtitle[^"]*"[^>]*>([^<]+)</) || [])[1]);
     const area = Number(((title.match(/([\d.,]+)\s*м²/) || [])[1] || "").replace(",", "."));
     if (!price || !area || !title) continue;
+    // «Срочно, торг» — платная метка, которую ставит сам продавец. Фильтра по
+    // ней в форме поиска нет, но она приезжает в классе карточки, так что
+    // отбирать можно на нашей стороне.
+    const stats = [...c.matchAll(/class="a-card__stats-item"[^>]*>([\s\S]{0,300}?)<\/div>/g)]
+      .map((x) => clean(x[1]));
     out.push({
       id: marks[i].id, price, area, addr, title,
+      urgent: /(^| )is-urgent( |$)/.test(marks[i].cls || ""),
+      label: clean((c.match(/class="a-card__label"[^>]*>([^<]+)</) || [])[1]) || null,
+      // дата на карточке — это последнее поднятие, а не публикация
+      bumped: stats.find((x) => /^(сегодня|вчера|\d{1,2}\s+[а-яё]+\.?)$/i.test(x)) || null,
       rooms: num((title.match(/(\d+)-комнатная/) || [])[1]),
       ppm: Math.round(price / area),
       pro: /user-label-identified-specialist|user-title-pro/.test(c),
