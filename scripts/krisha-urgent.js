@@ -324,7 +324,7 @@ function postFresh(rows, dateIso, city) {
     // ней — это вторая ссылка на то же место и лишняя строка в каждом пункте.
     const url = "https://krisha.kz/a/show/" + c.id;
     lines.push(c.kzDiscount != null
-      ? '↓ <a href="' + url + '">на ' + Math.round(c.kzDiscount) + "% дешевле похожих</a>"
+      ? '↓ <a href="' + url + '">на ' + Math.round(c.kzDiscount) + "% ниже рынка</a>"
       : url);
     lines.push("");
   });
