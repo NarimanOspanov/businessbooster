@@ -171,14 +171,17 @@ async function fresh(opts) {
   const swept = await sweep(o);
   const urgent = swept.cards.filter((c) => c.urgent);
   const b = await boundary(swept.cards, o.since || swept.today, { pace: o.pace, log: log });
-  const rows = (b.id == null ? [] : urgent.filter((c) => Number(c.id) >= Number(b.id)))
-    .sort((a, b2) => Number(b2.id) - Number(a.id));
+  const isNew = (c) => b.id != null && Number(c.id) >= Number(b.id);
+  const rows = urgent.filter(isNew).sort((a, b2) => Number(b2.id) - Number(a.id));
   return Object.assign({}, swept, {
     cards: undefined,
     corpus: swept.cards.length,
     urgentTotal: urgent.length,
     boundaryId: b.id,
     boundaryReads: b.reads,
+    // сколько из поднятых сегодня сегодня же и опубликованы — остальные просто
+    // подняты заново, и разница между этими числами обычно стократная
+    createdToday: swept.cards.filter(isNew).length,
     rows,
   });
 }
@@ -351,7 +354,8 @@ if (require.main === module) {
       console.log("\n\n" + r.cityName + " · страниц: " + r.pages + " · поднято сегодня: " +
         r.corpus + " · из них со «срочно»: " + r.urgentTotal);
       console.log("граница по id: " + r.boundaryId + " (" + r.boundaryReads + " запросов)");
-      console.log("новых за сутки со «срочно»: " + r.rows.length + "\n");
+      console.log("опубликованы сегодня: " + r.createdToday +
+        " · из них со «срочно»: " + r.rows.length + "\n");
       r.rows.forEach((c) => console.log("  " + (c.rooms || "?") + "к " + c.area + " м²  " +
         (c.price / 1e6).toFixed(1) + " млн  " + c.addr.slice(0, 44) + "  /a/show/" + c.id));
       const min = Number(flag("min", 8));

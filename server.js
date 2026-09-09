@@ -1051,6 +1051,7 @@ async function runKrishaUrgent(opts) {
         date: f.today, city: f.city, cityName: f.cityName,
         pages: f.pages, bumpedToday: f.corpus, urgentToday: f.urgentTotal,
         boundaryId: f.boundaryId, boundaryReads: f.boundaryReads,
+        createdToday: f.createdToday,
         newToday: f.rows.length,
         cheaperThanSimilar: good.length,
         minDiscount: min,
