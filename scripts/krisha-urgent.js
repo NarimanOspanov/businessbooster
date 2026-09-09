@@ -290,7 +290,7 @@ function post(rows, dateIso, city) {
 // запрос на квартиру, а квартир после отбора полтора десятка.
 async function cheaper(rows, opts) {
   const o = opts || {};
-  const min = o.min == null ? 5 : o.min;
+  const min = o.min == null ? 8 : o.min;
   const log = o.log || (() => {});
   const out = [];
   let i = 0;
@@ -354,7 +354,7 @@ if (require.main === module) {
       console.log("новых за сутки со «срочно»: " + r.rows.length + "\n");
       r.rows.forEach((c) => console.log("  " + (c.rooms || "?") + "к " + c.area + " м²  " +
         (c.price / 1e6).toFixed(1) + " млн  " + c.addr.slice(0, 44) + "  /a/show/" + c.id));
-      const min = Number(flag("min", 5));
+      const min = Number(flag("min", 8));
       const good = r.rows.length ? await cheaper(r.rows, { min: min, log: (m) => process.stdout.write("\r" + m + "     ") }) : [];
       console.log("\nдешевле похожих (от " + min + "%): " + good.length);
       if (good.length) console.log("\n--- пост ---\n\n" + postFresh(good, r.today, r.city));
