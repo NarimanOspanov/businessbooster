@@ -322,17 +322,19 @@ function post(rows, dateIso, city) {
 // запрос на квартиру, а квартир после отбора полтора десятка.
 async function cheaper(rows, opts) {
   const o = opts || {};
-  const min = o.min == null ? 8 : o.min;
+  // min: null — не отсекать, только подписать процентом. Тогда порядок остаётся
+  // как был, от свежего к старому; с отсечкой — от самой большой скидки.
+  const min = o.min === null ? null : (o.min == null ? 8 : o.min);
   const log = o.log || (() => {});
   const out = [];
   let i = 0;
   for (const c of rows) {
     try { Object.assign(c, await K.fetchPriceAnalysis(c.id)); } catch { c.kzDiscount = null; }
-    if (c.kzDiscount != null && c.kzDiscount >= min) out.push(c);
+    if (min === null || (c.kzDiscount != null && c.kzDiscount >= min)) out.push(c);
     log("оценка цены: " + (++i) + " из " + rows.length);
     await K.sleep(o.pace || 1200);
   }
-  return out.sort((a, b) => b.kzDiscount - a.kzDiscount);
+  return min === null ? out : out.sort((a, b) => b.kzDiscount - a.kzDiscount);
 }
 
 // Рубрика «что появилось за сутки». Здесь не заявляется никакой выгоды —
@@ -382,9 +384,10 @@ if (require.main === module) {
         " · из них со «срочно»: " + r.rows.length + "\n");
       r.rows.forEach((c) => console.log("  " + (c.rooms || "?") + "к " + c.area + " м²  " +
         (c.price / 1e6).toFixed(1) + " млн  " + c.addr.slice(0, 44) + "  /a/show/" + c.id));
-      const min = Number(flag("min", 8));
+      const minRaw = flag("min", "8");
+      const min = String(minRaw) === "off" ? null : Number(minRaw);
       const good = r.rows.length ? await cheaper(r.rows, { min: min, log: (m) => process.stdout.write("\r" + m + "     ") }) : [];
-      console.log("\nдешевле похожих (от " + min + "%): " + good.length);
+      console.log("\n" + (min === null ? "без отсечки по цене: " : "ниже рынка от " + min + "%: ") + good.length);
       if (good.length) console.log("\n--- пост ---\n\n" + postFresh(good, r.today, r.city));
       return;
     }

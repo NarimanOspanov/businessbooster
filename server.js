@@ -1039,7 +1039,9 @@ async function runKrishaUrgent(opts) {
       // Последний фильтр — цена, по оценке самой Крыши: один запрос на
       // квартиру, а квартир после отбора десятка два.
       KU.progress = "оценка цены";
-      const min = o.min == null ? 5 : o.min;
+      // min=off — публиковать всё сегодняшнее со «срочно», процент только
+      // подписывать. Число — отсекать по нему.
+      const min = o.min === null ? null : (o.min == null ? 8 : o.min);
       const good = f.rows.length
         ? await U.cheaper(f.rows, { min: min, pace: KRISHA_PACE_MS, log: (m) => { KU.progress = m; } })
         : [];
@@ -2925,7 +2927,7 @@ http
           mode: q.get("mode") === "fresh" ? "fresh" : "deal",
           send: q.get("send") === "1",
           n: Number(q.get("n") || 8),
-          min: q.get("min") == null ? 8 : Number(q.get("min")),
+          min: q.get("min") === "off" ? null : (q.get("min") == null ? 8 : Number(q.get("min"))),
           max: q.get("max") == null ? 35 : Number(q.get("max")),
           maxAge: q.get("age") == null ? 30 : Number(q.get("age")),
           pages: Number(q.get("pages") || 220),
