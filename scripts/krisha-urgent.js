@@ -312,10 +312,7 @@ function postFresh(rows, dateIso, city) {
   const when = new Date(dateIso + "T00:00:00Z")
     .toLocaleDateString("ru-RU", { timeZone: "UTC", day: "numeric", month: "long" });
   const lines = [
-    "🔥 <b>Срочно, торг · " + cityName(cleanCity(city)) + " · " + when + "</b>",
-    "",
-    "Появились за сутки, продавец сам поставил метку «Срочно, торг», " +
-    "и по оценке самой Крыши стоят дешевле похожих квартир рядом.",
+    "🔥 <b>Квартиры ниже рынка · " + cityName(cleanCity(city)) + " · " + when + "</b>",
     "",
   ];
   rows.forEach((c, i) => {
@@ -331,9 +328,7 @@ function postFresh(rows, dateIso, city) {
       : url);
     lines.push("");
   });
-  lines.push("<i>Метку ставит продавец, торг обещает тоже он. Процент — оценка " +
-    "Крыши по году дома, району и числу комнат, её видно на странице объявления.</i>");
-  return lines.join("\n");
+  return lines.join("\n").trimEnd();
 }
 
 module.exports = {
