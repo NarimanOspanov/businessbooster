@@ -1052,6 +1052,8 @@ async function runKrishaUrgent(opts) {
       const f = await U.fresh({
         city: o.city,
         pages: o.pages || 220,
+        urgentOnly: o.urgentOnly !== false,
+        shortlist: o.shortlist || 30,
         pace: KRISHA_PACE_MS,
         log: (m) => { KU.progress = m; },
       });
@@ -1097,6 +1099,7 @@ async function runKrishaUrgent(opts) {
         mode: "fresh",
         date: f.today, city: f.city, cityName: f.cityName,
         pages: f.pages, bumpedToday: f.corpus, urgentToday: f.urgentTotal,
+        urgentOnly: f.urgentOnly,
         boundaryId: f.boundaryId, boundaryReads: f.boundaryReads,
         createdToday: f.createdToday,
         newToday: f.rows.length,
@@ -2970,6 +2973,9 @@ http
         runKrishaUrgent({
           city: q.get("city"),
           mode: q.get("mode") === "fresh" ? "fresh" : "deal",
+          // urgent=0 — брать всё, что хозяева опубликовали за сутки, а не
+          // только помеченное «Срочно, торг».
+          urgentOnly: q.get("urgent") !== "0",
           send: q.get("send") === "1",
           n: Number(q.get("n") || 8),
           min: q.get("min") === "off" ? null : (q.get("min") == null ? 8 : Number(q.get("min"))),

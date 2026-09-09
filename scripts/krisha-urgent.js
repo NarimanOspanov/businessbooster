@@ -168,20 +168,47 @@ async function collect(opts) {
 async function fresh(opts) {
   const o = opts || {};
   const log = o.log || (() => {});
+  const urgentOnly = o.urgentOnly !== false;
   const swept = await sweep(o);
   const urgent = swept.cards.filter((c) => c.urgent);
   const b = await boundary(swept.cards, o.since || swept.today, { pace: o.pace, log: log });
   const isNew = (c) => b.id != null && Number(c.id) >= Number(b.id);
-  const rows = urgent.filter(isNew).sort((a, b2) => Number(b2.id) - Number(a.id));
+  const fresh24 = swept.cards.filter(isNew);
+
+  let rows;
+  if (urgentOnly) {
+    rows = urgent.filter(isNew).sort((a, b2) => Number(b2.id) - Number(a.id));
+  } else {
+    // Без метки за сутки набирается под две сотни квартир, а оценку Крыши мы
+    // спрашиваем по одному запросу на квартиру. Поэтому сначала прикидываем
+    // сами — по медиане цены метра в связке район плюс диапазон площади, это
+    // бесплатно, — и на проверку отправляем только верхушку.
+    const groups = {};
+    swept.cards.forEach((c) => ((groups[groupKey(c)] = groups[groupKey(c)] || []).push(c.ppm)));
+    rows = fresh24.map((c) => {
+      const g = groups[groupKey(c)] || [];
+      if (g.length >= (o.minComparables || 8)) {
+        c.expected = median(g);
+        c.discount = Math.round((100 * (c.expected - c.ppm)) / c.expected);
+        c.comparables = g.length;
+      }
+      return c;
+    })
+      .filter((c) => c.discount != null)
+      .sort((a, b2) => b2.discount - a.discount)
+      .slice(0, o.shortlist || 30);
+  }
+
   return Object.assign({}, swept, {
     cards: undefined,
     corpus: swept.cards.length,
     urgentTotal: urgent.length,
+    urgentOnly: urgentOnly,
     boundaryId: b.id,
     boundaryReads: b.reads,
     // сколько из поднятых сегодня сегодня же и опубликованы — остальные просто
     // подняты заново, и разница между этими числами обычно стократная
-    createdToday: swept.cards.filter(isNew).length,
+    createdToday: fresh24.length,
     rows,
   });
 }
@@ -377,11 +404,14 @@ if (require.main === module) {
     if (flag("mode", "deal") === "fresh") {
       const r = await fresh({
         city: flag("city", CITY),
+        urgentOnly: flag("urgent", "1") !== "0",
+        shortlist: Number(flag("shortlist", 30)),
         pages: Number(flag("pages", 220)),
         log: (m) => process.stdout.write("\r" + m + "          "),
       });
       console.log("\n\n" + r.cityName + " · страниц: " + r.pages + " · поднято сегодня: " +
-        r.corpus + " · из них со «срочно»: " + r.urgentTotal);
+        r.corpus + " · из них со «срочно»: " + r.urgentTotal +
+        (r.urgentOnly ? "" : " (метка не требуется)"));
       console.log("граница по id: " + r.boundaryId + " (" + r.boundaryReads + " запросов)");
       console.log("опубликованы сегодня: " + r.createdToday +
         " · из них со «срочно»: " + r.rows.length + "\n");
