@@ -323,12 +323,12 @@ function postFresh(rows, dateIso, city) {
       (c.rooms ? c.rooms + "-комн · " : "") + c.area + " м² · " +
       c.ppm.toLocaleString("ru") + " ₸/м²");
     lines.push(c.addr);
-    if (c.kzDiscount != null) {
-      lines.push("↓ на " + Math.round(c.kzDiscount) + "% дешевле похожих" +
-        (c.kzSimilarLocal ? " — у них " + c.kzSimilarLocal.toLocaleString("ru") + " ₸/м²" : "") +
-        " (оценка Крыши)");
-    }
-    lines.push("https://krisha.kz/a/show/" + c.id);
+    // Ссылка живёт внутри строки со скидкой: голый адрес объявления рядом с
+    // ней — это вторая ссылка на то же место и лишняя строка в каждом пункте.
+    const url = "https://krisha.kz/a/show/" + c.id;
+    lines.push(c.kzDiscount != null
+      ? '↓ <a href="' + url + '">на ' + Math.round(c.kzDiscount) + "% дешевле похожих</a>"
+      : url);
     lines.push("");
   });
   lines.push("<i>Метку ставит продавец, торг обещает тоже он. Процент — оценка " +
