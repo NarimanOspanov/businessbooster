@@ -206,17 +206,46 @@ async function boundary(cards, sinceIso, opts) {
   const pace = o.pace || 1200;
   const log = o.log || (() => {});
   const sorted = cards.slice().sort((a, b) => Number(a.id) - Number(b.id));
-  let lo = 0, hi = sorted.length - 1, found = null, reads = 0;
-  while (lo <= hi && reads < (o.maxReads || 14)) {
-    const mid = (lo + hi) >> 1;
-    let d = null;
-    try { d = await createdAt(sorted[mid].id); } catch { /* объявление могли снять */ }
-    reads++;
-    log("поиск границы: " + reads + " запрос(ов)");
-    if (d == null) { lo = mid + 1; }
-    else if (d >= sinceIso) { found = sorted[mid].id; hi = mid - 1; }
-    else { lo = mid + 1; }
-    await K.sleep(pace);
+  let reads = 0;
+
+  // Снятое объявление страницы не отдаёт. Раньше такой ответ засчитывался как
+  // «старое», и поиск отбрасывал нижнюю половину вместе с сегодняшними — на
+  // замере граница уезжала вверх на две тысячи id, и полтора десятка квартир
+  // молча выпадали из подборки. Теперь при неудаче берём соседа, а не половину.
+  const read = async (i) => {
+    for (let k = 0; k < 6 && i + k < sorted.length; k++) {
+      let d = null;
+      try { d = await createdAt(sorted[i + k].id); } catch { /* снято */ }
+      reads++;
+      log("поиск границы: " + reads + " запрос(ов)");
+      await K.sleep(pace);
+      if (d) return { at: i + k, date: d };
+    }
+    return null;
+  };
+
+  let lo = 0, hi = sorted.length - 1, found = null, foundAt = null;
+  while (lo <= hi && reads < (o.maxReads || 30)) {
+    const r = await read((lo + hi) >> 1);
+    if (!r) break;
+    if (r.date >= sinceIso) { found = sorted[r.at].id; foundAt = r.at; hi = r.at - 1; }
+    else { lo = r.at + 1; }
+  }
+
+  // Страховка от той же неровности: id и дата публикации совпадают по порядку
+  // не идеально — черновик заводят вечером, а публикуют ночью. Поэтому шагаем
+  // от найденной границы вниз, пока не встретим подряд несколько несегодняшних.
+  if (foundAt != null) {
+    let miss = 0;
+    for (let i = foundAt - 1; i >= 0 && miss < (o.confirm || 8) && reads < (o.maxReads || 30) + 12; i--) {
+      let d = null;
+      try { d = await createdAt(sorted[i].id); } catch { /* снято */ }
+      reads++;
+      log("проверка границы: " + reads + " запрос(ов)");
+      await K.sleep(pace);
+      if (d && d >= sinceIso) { found = sorted[i].id; miss = 0; }
+      else if (d) miss++;
+    }
   }
   return { id: found, reads };
 }
