@@ -4591,6 +4591,32 @@ http
 
       (async () => {
         if (urlPath === "/api/krisha/base") {
+          // Разовый перенос того, что собрано до переезда в SQL: файлы лежат на
+          // диске App Service, руками до них не дотянуться.
+          if (parsed.searchParams.get("import") === "1") {
+            const dir = PERSIST_DATA || REPO_DATA;
+            const readJson = (p) => { try { return JSON.parse(fs.readFileSync(p, "utf8")); } catch { return null; } };
+            let flats = 0, cards = 0, phones = 0;
+            const baseDir = path.join(dir, "krisha-base");
+            let files = [];
+            try { files = fs.readdirSync(baseDir).filter((x) => /^\d{4}-\d{2}-\d{2}\.json$/.test(x)); } catch { /* нет базы */ }
+            for (const f of files) {
+              const day = readJson(path.join(baseDir, f)) || {};
+              flats += await db.saveFlats(Object.values(day));
+            }
+            const kc = readJson(path.join(dir, "krisha-cards.json")) || {};
+            for (const id of Object.keys(kc)) {
+              const c = kc[id];
+              try {
+                await db.saveCard(id, c);
+                cards++;
+                if ((c.phones || []).length) { await db.saveFlatPhones(id, c.phones, "manual"); phones++; }
+              } catch { /* одна битая карточка не должна рвать перенос */ }
+            }
+            return send(200, Object.assign(
+              { ok: true, imported: { flats: flats, cards: cards, withPhone: phones } },
+              await db.krishaStats()));
+          }
           return send(200, Object.assign({ ok: true }, await db.krishaStats()));
         }
         const url = parsed.searchParams.get("url");
