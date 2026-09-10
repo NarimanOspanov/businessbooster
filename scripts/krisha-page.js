@@ -2,10 +2,14 @@
 // Крыше: человек приходит по ссылке из поста и видит привычную карточку, а не
 // чужую вёрстку.
 //
-// Размеры и цвета взяты из их собственного main-common.css, а не подобраны на
-// глаз: текст #1c1819, синий #2a81dd, рамки rgba(28,24,25,.1), Open Sans,
-// заголовок 24/36, цена 22/32, подзаголовки разделов 18/28, характеристики
-// 13px серым и 14px чёрным. Тёмной темы у Крыши нет — нет и у нас.
+// Размеры взяты из их собственного main-common.css, а не подобраны на глаз:
+// Open Sans, заголовок 24/36, цена 22/32, подзаголовки разделов 18/28,
+// характеристики 13px подписью и 14/24 значением, колонка значений 184px.
+//
+// Тема одна и тёмная. У Крыши тёмной темы нет, но её страницу открывают в
+// браузере, а нашу — внутри Телеграма, где у большинства всё чёрное, и белый
+// лист там бьёт по глазам. Светлого варианта нет совсем: раз тема одна, всё
+// красится явно, и от настроек читателя ничего не зависит.
 //
 // Чего мы не повторяем: их шапку, логотип и название. Страница показывает
 // чужое объявление и говорит об этом внизу; выдавать её за krisha.kz нельзя.
@@ -20,8 +24,9 @@ const money = (n) => String(Math.round(n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g,
 const FALLBACK_PHONE = process.env.CONTACT_PHONE || "+7 702 941 06 25";
 
 const CSS = `
-  :root{--ink:#1c1819;--dim:#888b94;--line:rgba(28,24,25,.1);--blue:#2a81dd;
-    --blue-hi:#34a2e9;--green:#64bd38;--bg:#fff}
+  :root{--ink:#f2f3f5;--dim:#8b8f98;--line:rgba(255,255,255,.11);--blue:#2a81dd;
+    --blue-hi:#3b98ea;--link:#6fb2f0;--green:#64bd38;--bg:#16171a;--card:#1e2024}
+  html{color-scheme:dark}
   *{margin:0;padding:0;box-sizing:border-box}
   body{background:var(--bg);color:var(--ink);font-family:"Open Sans",Helvetica,Arial,sans-serif;
     font-size:14px;line-height:1.43;-webkit-font-smoothing:antialiased;padding-bottom:32px}
@@ -55,11 +60,11 @@ const CSS = `
     text-align:center;text-decoration:none;box-shadow:0 2px 4px rgba(28,24,25,.1)}
   .btn:active{background:var(--blue-hi)}
   .note{margin-top:8px;color:var(--dim);font-size:13px;line-height:20px}
-  .note a{color:var(--blue);text-decoration:none}
+  .note a{color:var(--link);text-decoration:none}
 
   .src{margin-top:28px;padding-top:16px;border-top:1px solid var(--line);
     color:var(--dim);font-size:13px}
-  .src a{color:var(--blue);text-decoration:none}
+  .src a{color:var(--link);text-decoration:none}
 `;
 
 function render(card, opts) {
@@ -150,8 +155,9 @@ function notFound(id) {
   return `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Объявление не найдено</title>
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
-<style>body{font-family:"Open Sans",Helvetica,Arial,sans-serif;font-size:14px;color:#1c1819;
-padding:48px 20px;text-align:center}a{color:#2a81dd;text-decoration:none}</style></head><body>
+<style>html{color-scheme:dark}body{font-family:"Open Sans",Helvetica,Arial,sans-serif;font-size:14px;
+color:#f2f3f5;background:#16171a;padding:48px 20px;text-align:center}
+a{color:#6fb2f0;text-decoration:none}</style></head><body>
 <p>Мы не сохраняли это объявление.</p>
 <p style="margin-top:12px"><a href="https://krisha.kz/a/show/${esc(id)}">Открыть на Крыше</a></p>
 </body></html>`;
