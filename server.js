@@ -4630,8 +4630,12 @@ http
             floors: parsed.searchParams.get("floors"),
             year: parsed.searchParams.get("year"),
             district: parsed.searchParams.get("district"),
+            priceFrom: parsed.searchParams.get("priceFrom"),
+            priceTo: parsed.searchParams.get("priceTo"),
           };
-          if (!q.area) return send(400, { ok: false, error: "нужна ссылка или хотя бы площадь" });
+          if (!q.area && !q.district && !q.rooms && !q.priceFrom && !q.priceTo) {
+            return send(400, { ok: false, error: "нужна ссылка или хоть один признак" });
+          }
         }
         const hits = await db.findFlats(q, 8);
         const items = [];
@@ -4643,6 +4647,7 @@ http
           items.push({
             id: id, score: h.score,
             title: h.title, price: h.price, addr: h.addr, district: h.district,
+            photo: h.photo1 || null, photos: h.photos || 0,
             area: h.area == null ? null : Number(h.area),
             rooms: h.rooms, floor: h.floor, floors: h.floors, year: h.build_year,
             posted: h.posted_on ? String(h.posted_on).slice(0, 10) : null,

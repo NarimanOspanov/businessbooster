@@ -743,7 +743,29 @@ async function card(flatId) {
 async function findFlats(q, limit) {
   const pool = await getPool();
   const area = Number(String(q.area || "").replace(",", "."));
-  if (!area) return [];
+  // Без площади ищем по тому, что назвали: район, комнаты, вилка цены. Это уже
+  // не «узнать квартиру», а «посмотреть, что подходит», поэтому сортировка по
+  // свежести, а не по совпадению.
+  if (!area) {
+    if (!q.district && !q.rooms && !q.priceFrom && !q.priceTo) return [];
+    const r0 = await pool.request()
+      .input("rooms", sql.Int, q.rooms ? Number(q.rooms) : null)
+      .input("district", sql.NVarChar(100), q.district || null)
+      .input("floor", sql.Int, q.floor ? Number(q.floor) : null)
+      .input("from", sql.BigInt, q.priceFrom ? Number(q.priceFrom) : null)
+      .input("to", sql.BigInt, q.priceTo ? Number(q.priceTo) : null)
+      .input("n", sql.Int, Number(limit) || 20)
+      .query(`
+        SELECT TOP (@n) f.*, 0 AS score
+        FROM dbo.krisha_flats f
+        WHERE (@rooms IS NULL OR f.rooms = @rooms)
+          AND (@floor IS NULL OR f.floor = @floor)
+          AND (@district IS NULL OR f.district LIKE '%' + @district + '%')
+          AND (@from IS NULL OR f.price >= @from)
+          AND (@to IS NULL OR f.price <= @to)
+        ORDER BY f.posted_on DESC, f.id DESC`);
+    return r0.recordset;
+  }
   const tol = String(q.area).indexOf(".") === -1 ? 0.9 : 0.35;
   const r = await pool.request()
     .input("lo", sql.Decimal(7, 2), area - tol)

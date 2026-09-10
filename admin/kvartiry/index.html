@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Найти хозяина — Reception365</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#16171a;--card:#1e2024;--ink:#f2f3f5;--dim:#8b8f98;--line:rgba(255,255,255,.11);
+    --blue:#2a81dd;--green:#64bd38;--amber:#ffa000}
+  html{color-scheme:dark}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font:15px/1.5 Inter,system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;padding:28px 20px 60px}
+  .wrap{max-width:880px;margin:0 auto}
+  h1{font-size:24px;font-weight:600;letter-spacing:-.01em}
+  .sub{color:var(--dim);font-size:14px;margin-top:6px}
+  .stat{color:var(--dim);font-size:13px;margin-top:4px}
+
+  .box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-top:20px}
+  .box h2{font-size:15px;font-weight:600;margin-bottom:4px}
+  .box .hint{color:var(--dim);font-size:13px;margin-bottom:12px}
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  input{flex:1;min-width:180px;background:#141518;color:var(--ink);border:1px solid var(--line);
+    border-radius:9px;padding:11px 13px;font:inherit;font-size:14px}
+  input:focus{outline:0;border-color:var(--blue)}
+  input.s{flex:0 0 118px;min-width:0}
+  button{background:var(--blue);color:#fff;border:0;border-radius:9px;padding:11px 20px;
+    font:inherit;font-weight:600;font-size:14px;cursor:pointer}
+  button:hover{background:#3b98ea}
+  button.ghost{background:transparent;border:1px solid var(--line);color:var(--dim);font-weight:400}
+
+  .msg{margin-top:14px;color:var(--dim);font-size:14px}
+  .msg.bad{color:#ff8a80}
+
+  .hit{display:flex;gap:14px;background:var(--card);border:1px solid var(--line);
+    border-radius:14px;padding:14px;margin-top:12px}
+  .hit.best{border-color:var(--amber)}
+  .hit img{flex:0 0 132px;width:132px;height:99px;object-fit:cover;border-radius:9px;background:#000}
+  .hit .body{flex:1;min-width:0}
+  .hit .t{font-weight:500}
+  .hit .m{color:var(--dim);font-size:13px;margin-top:3px}
+  .hit .p{font-size:18px;font-weight:600;margin-top:6px}
+  .tel{display:inline-block;margin-top:8px;background:var(--green);color:#fff;border-radius:7px;
+    padding:5px 11px;font-weight:600;font-size:15px;text-decoration:none}
+  .tel.no{background:transparent;border:1px solid var(--line);color:var(--dim);font-weight:400}
+  .links{margin-top:8px;font-size:13px;display:flex;gap:14px;flex-wrap:wrap}
+  .links a{color:var(--blue);text-decoration:none}
+  .why{margin-top:6px;font-size:12px;color:var(--dim)}
+  .score{float:right;color:var(--amber);font-size:13px;font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Найти хозяина</h1>
+  <p class="sub">Покупатель прислал объявление агента — находим то же самое, но от хозяина, и его телефон.</p>
+  <p class="stat" id="stat">…</p>
+
+  <div class="box">
+    <h2>По ссылке</h2>
+    <p class="hint">Вставьте адрес объявления на Крыше. Разберём и поищем по площади, этажу, году и району.</p>
+    <div class="row">
+      <input id="url" placeholder="https://krisha.kz/a/show/1015591221" autocomplete="off">
+      <button id="go">Найти</button>
+    </div>
+  </div>
+
+  <div class="box">
+    <h2>По приметам</h2>
+    <p class="hint">Если ссылки нет, а есть скриншот или рассказ. Площадь с десятыми сужает до одной квартиры; без неё ищем по району и комнатам, свежие сверху.</p>
+    <div class="row">
+      <input class="s" id="area" placeholder="площадь" autocomplete="off">
+      <input class="s" id="rooms" placeholder="комнат" autocomplete="off">
+      <input class="s" id="floor" placeholder="этаж" autocomplete="off">
+      <input class="s" id="floors" placeholder="из скольки" autocomplete="off">
+      <input id="district" placeholder="район, например Бостандыкский" autocomplete="off">
+    </div>
+    <div class="row" style="margin-top:8px">
+      <input class="s" id="priceFrom" placeholder="цена от, млн" autocomplete="off">
+      <input class="s" id="priceTo" placeholder="до, млн" autocomplete="off">
+      <button id="go2">Искать</button>
+      <button class="ghost" id="clr">Очистить</button>
+    </div>
+  </div>
+
+  <div id="msg" class="msg"></div>
+  <div id="out"></div>
+</div>
+
+<script>
+(function () {
+  var API = "";
+  var key = localStorage.getItem("r365key");
+  function need() {
+    if (key) return key;
+    var k = prompt("Ключ Reception365:", "");
+    if (k && k.trim()) { key = k.trim(); localStorage.setItem("r365key", key); }
+    return key;
+  }
+
+  var msg = document.getElementById("msg"), out = document.getElementById("out");
+  function say(t, bad) { msg.textContent = t || ""; msg.className = "msg" + (bad ? " bad" : ""); }
+  function money(n) { return n ? String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " ₸" : "—"; }
+
+  function draw(j) {
+    out.innerHTML = "";
+    if (!j.items || !j.items.length) { say("Ничего не нашли. Возможно, эту квартиру мы ещё не снимали."); return; }
+    var top = j.items[0].score;
+    j.items.forEach(function (x) {
+      var d = document.createElement("div");
+      d.className = "hit" + (x.score && x.score === top && top >= 8 ? " best" : "");
+      var tel = x.phones && x.phones.length
+        ? '<a class="tel" href="tel:+' + x.phones[0] + '">+' + x.phones[0] + "</a>"
+        : '<a class="tel no" href="' + x.krisha + '" target="_blank" rel="noopener">Телефона нет — пройти капчу</a>';
+      d.innerHTML =
+        (x.photo ? '<img src="' + x.photo + '" alt="">' : '<img alt="">') +
+        '<div class="body">' +
+          (x.score ? '<span class="score">' + x.score + "</span>" : "") +
+          '<div class="t">' + (x.title || "без названия") + "</div>" +
+          '<div class="m">' + [x.district, x.posted ? "опубликовано " + x.posted : "", x.photos ? x.photos + " фото" : ""]
+            .filter(Boolean).join(" · ") + "</div>" +
+          '<div class="p">' + money(x.price) + "</div>" +
+          tel +
+          '<div class="links"><a href="' + x.krisha + '" target="_blank" rel="noopener">оригинал на Крыше</a>' +
+            '<a href="' + x.card + '" target="_blank" rel="noopener">наша карточка</a></div>' +
+          (x.why ? '<div class="why">' + x.why + "</div>" : "") +
+        "</div>";
+      out.appendChild(d);
+    });
+    say("Нашли " + j.items.length + ". Сверху — самое похожее.");
+  }
+
+  function ask(qs) {
+    if (!need()) return;
+    say("Ищем…");
+    out.innerHTML = "";
+    fetch(API + "/api/krisha/find?key=" + encodeURIComponent(key) + "&" + qs)
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j.ok) {
+          if (j.error === "bad_key") { localStorage.removeItem("r365key"); key = null; }
+          return say(j.error || "не получилось", true);
+        }
+        draw(j);
+      })
+      .catch(function () { say("Сеть не отвечает", true); });
+  }
+
+  document.getElementById("go").addEventListener("click", function () {
+    var u = document.getElementById("url").value.trim();
+    if (!u) return say("Вставьте ссылку", true);
+    ask("url=" + encodeURIComponent(u));
+  });
+  document.getElementById("url").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") document.getElementById("go").click();
+  });
+
+  var fields = ["area", "rooms", "floor", "floors", "district", "priceFrom", "priceTo"];
+  document.getElementById("go2").addEventListener("click", function () {
+    var parts = [];
+    fields.forEach(function (f) {
+      var v = document.getElementById(f).value.trim();
+      if (!v) return;
+      // Цену удобнее вводить в миллионах, а хранится она в тенге.
+      if (f === "priceFrom" || f === "priceTo") v = Math.round(parseFloat(v.replace(",", ".")) * 1e6);
+      parts.push(f + "=" + encodeURIComponent(v));
+    });
+    if (!parts.length) return say("Заполните хотя бы одно поле", true);
+    ask(parts.join("&"));
+  });
+  document.getElementById("clr").addEventListener("click", function () {
+    fields.forEach(function (f) { document.getElementById(f).value = ""; });
+    out.innerHTML = ""; say("");
+  });
+  fields.forEach(function (f) {
+    document.getElementById(f).addEventListener("keydown", function (e) {
+      if (e.key === "Enter") document.getElementById("go2").click();
+    });
+  });
+
+  if (need()) {
+    fetch(API + "/api/krisha/base?key=" + encodeURIComponent(key))
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j.ok) return;
+        var cities = Object.keys(j.cities || {}).map(function (c) { return c + " " + j.cities[c]; }).join(", ");
+        document.getElementById("stat").textContent =
+          "В базе " + j.flats + " квартир (" + cities + "), с телефоном " + j.with_phone +
+          (j.from ? ", с " + String(j.from).slice(0, 10) : "");
+      })
+      .catch(function () {});
+  }
+})();
+</script>
+</body>
+</html>
