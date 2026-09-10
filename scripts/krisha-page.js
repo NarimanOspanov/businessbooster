@@ -32,17 +32,24 @@ const CSS = `
     font-size:14px;line-height:1.43;-webkit-font-smoothing:antialiased;padding-bottom:32px}
   .wrap{max-width:640px;margin:0 auto;padding:0 16px}
 
-  /* Галерея живёт в той же колонке, что и текст. Без этого на широком экране
-     фотография растягивалась во весь монитор над узким столбцом описания.
-     Вертикальные снимки к тому же надо ограничивать по высоте, иначе на
-     десктопе первый кадр занимает целый экран и цены не видно. */
-  .gal-wrap{max-width:640px;margin:0 auto;background:#000}
-  .gal{display:flex;gap:4px;overflow-x:auto;scroll-snap-type:x mandatory;
-    -webkit-overflow-scrolling:touch;scrollbar-width:none}
-  .gal::-webkit-scrollbar{display:none}
-  .gal a{flex:0 0 100%;scroll-snap-align:center;display:block}
-  .gal img{display:block;width:100%;height:auto;aspect-ratio:var(--ratio,4/3);
-    max-height:min(70vh,520px);object-fit:cover}
+  /* Галерея как на Крыше: большой кадр и сетка миниатюр под ним. Ленту с
+     горизонтальной прокруткой пришлось убрать — мышью её листать нечем, на
+     десктопе оставались только стрелки.
+     Живёт в той же колонке, что и текст: иначе на широком экране фотография
+     растягивалась во весь монитор над узким столбцом описания. Высоту кадра
+     тоже ограничиваем — хозяева снимают вертикально, и без потолка первый
+     снимок занимал целый экран. */
+  .gal-wrap{max-width:640px;margin:0 auto}
+  .gal-main{display:block;background:#000}
+  .gal-main img{display:block;width:100%;height:auto;aspect-ratio:var(--ratio,4/3);
+    max-height:min(70vh,520px);object-fit:contain}
+  .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));
+    gap:4px;margin-top:4px}
+  .th{padding:0;border:2px solid transparent;border-radius:4px;background:#000;
+    overflow:hidden;cursor:pointer;line-height:0}
+  .th img{width:100%;height:100%;aspect-ratio:4/3;object-fit:cover;opacity:.65;transition:opacity .15s}
+  .th.is-active{border-color:#ffa000}
+  .th.is-active img,.th:hover img{opacity:1}
   .gal-n{padding:8px 16px 0;color:var(--dim);font-size:13px}
 
   .price{margin-top:12px;color:var(--ink);font-weight:600;font-size:22px;line-height:32px}
@@ -80,13 +87,22 @@ function render(card, opts) {
   const krisha = "https://krisha.kz/a/show/" + card.id;
   const portrait = photos.filter((p) => p.portrait).length > photos.length / 2;
 
+  const first = photos[0];
   const gallery = photos.length
-    ? '<div class="gal-wrap"><div class="gal">' + photos.map((p, i) =>
-        '<a href="' + esc(p.full || p.big) + '" target="_blank" rel="noopener">' +
-        '<img src="' + esc(p.big) + '" alt="Фото ' + (i + 1) + '"' +
-        (i < 2 ? "" : ' loading="lazy"') +
-        (p.full ? ' onerror="this.onerror=null;this.src=\'' + esc(p.full) + "'\"" : "") +
-        "></a>").join("") + "</div></div>" +
+    ? '<div class="gal-wrap">' +
+      '<a class="gal-main" id="g-link" href="' + esc(first.full || first.big) + '" target="_blank" rel="noopener">' +
+      '<img id="g-main" src="' + esc(first.big) + '" alt="Фото 1"' +
+      (first.full ? ' onerror="this.onerror=null;this.src=\'' + esc(first.full) + "'\"" : "") +
+      "></a>" +
+      (photos.length > 1
+        ? '<div class="thumbs">' + photos.map((p, i) =>
+            '<button type="button" class="th' + (i ? "" : " is-active") + '"' +
+            ' data-big="' + esc(p.big) + '" data-full="' + esc(p.full || p.big) + '"' +
+            ' aria-label="Фото ' + (i + 1) + '">' +
+            '<img src="' + esc(p.small) + '" alt=""' + (i < 6 ? "" : ' loading="lazy"') + "></button>"
+          ).join("") + "</div>"
+        : "") +
+      "</div>" +
       '<div class="wrap"><div class="gal-n">' + photos.length + " фото</div></div>"
     : "";
 
@@ -152,6 +168,39 @@ ${gallery}
 </div>
 <script>
   try { if (window.Telegram && Telegram.WebApp) { Telegram.WebApp.ready(); Telegram.WebApp.expand(); } } catch (e) {}
+
+  // Миниатюра переключает главный кадр; стрелки — для клавиатуры, свайп — для
+  // телефона. Свайп гасит переход по ссылке, иначе смахивание открывало бы
+  // оригинал вместо листания.
+  (function () {
+    var main = document.getElementById("g-main"), link = document.getElementById("g-link");
+    if (!main) return;
+    var th = Array.prototype.slice.call(document.querySelectorAll(".th"));
+    var at = 0, swiped = false;
+    function show(n) {
+      if (!th.length) return;
+      at = (n + th.length) % th.length;
+      var b = th[at];
+      main.src = b.getAttribute("data-big");
+      link.href = b.getAttribute("data-full");
+      th.forEach(function (x) { x.classList.remove("is-active"); });
+      b.classList.add("is-active");
+    }
+    th.forEach(function (b, n) { b.addEventListener("click", function () { show(n); }); });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowRight") show(at + 1);
+      else if (e.key === "ArrowLeft") show(at - 1);
+    });
+    var x0 = null;
+    main.addEventListener("touchstart", function (e) { x0 = e.touches[0].clientX; }, { passive: true });
+    main.addEventListener("touchend", function (e) {
+      if (x0 === null) return;
+      var dx = e.changedTouches[0].clientX - x0;
+      x0 = null;
+      if (Math.abs(dx) > 40) { swiped = true; show(dx < 0 ? at + 1 : at - 1); }
+    }, { passive: true });
+    link.addEventListener("click", function (e) { if (swiped) { e.preventDefault(); swiped = false; } });
+  })();
 </script>
 </body>
 </html>`;
