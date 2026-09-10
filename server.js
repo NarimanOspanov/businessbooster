@@ -1149,11 +1149,24 @@ async function runKrishaUrgent(opts) {
       // характеристики. Телефон — только если владелец аккаунта положил свою
       // сессию в KRISHA_COOKIE.
       const Card = require("./scripts/krisha-card.js");
+      const KL = require("./scripts/krisha-lib.js");
+      const BaseRec = require("./scripts/krisha-base.js");
       for (let i = 0; i < rows.length; i++) {
         const c = rows[i];
         KU.progress = "снимок карточки " + (i + 1) + " из " + rows.length;
         try {
-          const card = await Card.fetchCard(c.id);
+          const html = await KL.fetchText("https://krisha.kz/a/show/" + c.id, 3, 15000);
+          const card = Card.parse(html, c.id);
+          // Опубликованная квартира должна и в базе быть: иначе телефон,
+          // который вы по ней пройдёте, повиснет без объявления — не найдётся
+          // ни поиском, ни очередью на досъёмку.
+          try {
+            await db.saveFlat(BaseRec.record(c, KL.parseDetail(html), {
+              city: f.city, title: card.title, short: card.short,
+              photos: (card.photos || []).length,
+              ph1: card.photos && card.photos[0] ? card.photos[0].full : null,
+            }));
+          } catch { /* база подождёт, снимок важнее */ }
           card.addr = card.addr || c.addr;
           card.kzDiscount = c.kzDiscount == null ? null : c.kzDiscount;
           if (KRISHA_COOKIE) {
