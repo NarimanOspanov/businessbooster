@@ -32,11 +32,17 @@ const CSS = `
     font-size:14px;line-height:1.43;-webkit-font-smoothing:antialiased;padding-bottom:32px}
   .wrap{max-width:640px;margin:0 auto;padding:0 16px}
 
+  /* Галерея живёт в той же колонке, что и текст. Без этого на широком экране
+     фотография растягивалась во весь монитор над узким столбцом описания.
+     Вертикальные снимки к тому же надо ограничивать по высоте, иначе на
+     десктопе первый кадр занимает целый экран и цены не видно. */
+  .gal-wrap{max-width:640px;margin:0 auto;background:#000}
   .gal{display:flex;gap:4px;overflow-x:auto;scroll-snap-type:x mandatory;
-    -webkit-overflow-scrolling:touch;scrollbar-width:none;background:#000}
+    -webkit-overflow-scrolling:touch;scrollbar-width:none}
   .gal::-webkit-scrollbar{display:none}
   .gal a{flex:0 0 100%;scroll-snap-align:center;display:block}
-  .gal img{display:block;width:100%;height:auto;aspect-ratio:var(--ratio,4/3);object-fit:cover}
+  .gal img{display:block;width:100%;height:auto;aspect-ratio:var(--ratio,4/3);
+    max-height:min(70vh,520px);object-fit:cover}
   .gal-n{padding:8px 16px 0;color:var(--dim);font-size:13px}
 
   .price{margin-top:12px;color:var(--ink);font-weight:600;font-size:22px;line-height:32px}
@@ -75,12 +81,12 @@ function render(card, opts) {
   const portrait = photos.filter((p) => p.portrait).length > photos.length / 2;
 
   const gallery = photos.length
-    ? '<div class="gal">' + photos.map((p, i) =>
+    ? '<div class="gal-wrap"><div class="gal">' + photos.map((p, i) =>
         '<a href="' + esc(p.full || p.big) + '" target="_blank" rel="noopener">' +
         '<img src="' + esc(p.big) + '" alt="Фото ' + (i + 1) + '"' +
         (i < 2 ? "" : ' loading="lazy"') +
         (p.full ? ' onerror="this.onerror=null;this.src=\'' + esc(p.full) + "'\"" : "") +
-        "></a>").join("") + "</div>" +
+        "></a>").join("") + "</div></div>" +
       '<div class="wrap"><div class="gal-n">' + photos.length + " фото</div></div>"
     : "";
 
