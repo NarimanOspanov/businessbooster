@@ -764,6 +764,9 @@ const KRISHA_COOKIE = process.env.KRISHA_COOKIE || "";
 // закрыта совсем: открытый адрес, куда любой подставит чужой номер на нашей
 // же странице, хуже, чем отсутствие телефонов.
 const KRISHA_PHONE_KEY = process.env.KRISHA_PHONE_KEY || "";
+// Отдельный ключ для внешнего планировщика. Не задан — принимаем тот же, что у
+// скрипта: заводить вторую переменную ради одного джоба необязательно.
+const KRISHA_JOB_KEY = process.env.KRISHA_JOB_KEY || "";
 const KRISHA_FILE = path.join(PERSIST_DATA || REPO_DATA, "krisha-watch.json");
 
 // ~2.2s per address including the fallback query, so 150 is about six minutes —
@@ -1220,6 +1223,51 @@ async function runKrishaUrgent(opts) {
   KU.progress = null;
   KU.lastRun = new Date().toISOString();
   return KU.result;
+}
+
+// Ежесуточный сбор: пройти города по очереди и сложить новые объявления от
+// хозяев в базу. Телефоны здесь не собираются — их отдают только после капчи,
+// которую проходит человек.
+//
+// Своего планировщика тут нет и не нужно: джоб живёт в отдельном приложении на
+// Hangfire и дёргает /api/krisha/collect. Отсюда и устройство ручки — она
+// отвечает сразу, а работает в фоне: обход двух городов идёт около сорока
+// минут, столько ни один вызов по HTTP не проживёт.
+const KRISHA_CITIES = String(process.env.KRISHA_CITIES || "almaty,astana")
+  .split(/[^a-z-]+/i).filter(Boolean);
+let baseRunning = false;
+
+async function runKrishaDaily(cities) {
+  if (baseRunning) return { skipped: "уже идёт" };
+  baseRunning = true;
+  const list = (cities && cities.length ? cities : KRISHA_CITIES);
+  const done = [];
+  try {
+    for (const city of list) {
+      const r = await runKrishaUrgent({ mode: "fresh", base: true, send: false, city: city, urgentOnly: false });
+      done.push(r || {});
+      // Пауза между городами: два обхода подряд — это шестьсот запросов в час.
+      await new Promise((r2) => setTimeout(r2, 60000));
+    }
+  } finally {
+    baseRunning = false;
+  }
+
+  const stats = await db.krishaStats().catch(() => null);
+  const lines = ["🏘 <b>Крыша: сбор за сутки</b>", ""];
+  let added = 0;
+  for (const r of done) {
+    if (!r || r.error) { lines.push("• " + (r && r.error ? r.error : "прогон сорвался")); continue; }
+    added += r.inBase || 0;
+    lines.push("• <b>" + (r.cityName || r.city) + "</b>: опубликовано за сутки " + (r.createdToday || 0) +
+      ", в базу " + (r.inBase || 0) + (r.missedBase ? ", не отдали " + r.missedBase : ""));
+  }
+  if (stats) {
+    lines.push("", "Всего в базе " + stats.flats + ", с телефоном " + stats.with_phone +
+      (stats.pending ? ", в очереди на досъёмку " + stats.pending : ""));
+  }
+  await notifyTelegram(lines.join("\n"));
+  return { cities: list, added: added, runs: done.length };
 }
 
 async function runKrishaWatch() {
@@ -4573,6 +4621,29 @@ http
     if (urlPath === "/phone" || urlPath === "/phone/" || urlPath === "/phone/kk" || urlPath === "/phone/kk/") {
       res.writeHead(301, { Location: urlPath.indexOf("/kk") > 0 ? "/kk/" : "/" }).end();
       return;
+    }
+
+    // Суточный сбор для внешнего планировщика: обойти города и сложить новые
+    // объявления от хозяев в базу. Город необязателен — без него берутся все из
+    // KRISHA_CITIES. Отвечаем сразу: работа идёт в фоне минут сорок, итог
+    // приходит в Телеграм.
+    if (urlPath === "/api/krisha/collect") {
+      const send = (code, obj) => {
+        res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+        res.end(JSON.stringify(obj, null, 2));
+      };
+      const want = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
+      if (!want || parsed.searchParams.get("key") !== want) return send(403, { ok: false, error: "bad_key" });
+      if (baseRunning || KU.running) {
+        return send(409, { ok: false, running: true, progress: KU.progress || null, error: "уже идёт" });
+      }
+      const only = String(parsed.searchParams.get("cities") || parsed.searchParams.get("city") || "")
+        .split(/[^a-z-]+/i).filter(Boolean);
+      const cities = only.length ? only : KRISHA_CITIES;
+      runKrishaDaily(cities)
+        .then((o) => console.log("[krisha] сбор базы " + JSON.stringify(o)))
+        .catch((e) => console.log("[krisha] сбор базы сорвался: " + e.message));
+      return send(202, { ok: true, started: true, cities: cities, note: "итог придёт в Телеграм" });
     }
 
     // Узнать свою квартиру в объявлении агента. Покупатель присылает ссылку —
