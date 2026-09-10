@@ -50,6 +50,19 @@ const CSS = `
   .th img{width:100%;height:100%;aspect-ratio:4/3;object-fit:cover;opacity:.65;transition:opacity .15s}
   .th.is-active{border-color:#ffa000}
   .th.is-active img,.th:hover img{opacity:1}
+
+  /* Просмотрщик: снимок открывается поверх страницы, как на Крыше, а не
+     уводит на файл в новой вкладке. */
+  .lb{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.92);
+    display:flex;align-items:center;justify-content:center;padding:16px}
+  .lb[hidden]{display:none}
+  .lb img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+  .lb-x{position:absolute;top:10px;right:10px;width:40px;height:40px;padding:0;border:0;
+    border-radius:50%;background:rgba(255,255,255,.14);color:#fff;font:300 26px/40px
+    "Open Sans",Helvetica,Arial,sans-serif;cursor:pointer}
+  .lb-n{position:absolute;left:0;right:0;bottom:14px;text-align:center;
+    color:rgba(255,255,255,.75);font-size:13px}
+  body.lb-open{overflow:hidden}
   .gal-n{padding:8px 16px 0;color:var(--dim);font-size:13px}
 
   .price{margin-top:12px;color:var(--ink);font-weight:600;font-size:22px;line-height:32px}
@@ -166,6 +179,7 @@ ${gallery}
   <div class="src">Объявление с <a href="${krisha}" target="_blank" rel="noopener">krisha.kz</a>${
     card.takenAt ? ", данные на " + esc(card.takenAt.slice(0, 10)) : ""}</div>
 </div>
+${photos.length ? '<div class="lb" id="lb" hidden><button class="lb-x" id="lb-x" type="button" aria-label="Закрыть">×</button><img id="lb-img" src="" alt=""><div class="lb-n" id="lb-n"></div></div>' : ""}
 <script>
   try { if (window.Telegram && Telegram.WebApp) { Telegram.WebApp.ready(); Telegram.WebApp.expand(); } } catch (e) {}
 
@@ -187,19 +201,56 @@ ${gallery}
       b.classList.add("is-active");
     }
     th.forEach(function (b, n) { b.addEventListener("click", function () { show(n); }); });
+
+    // Просмотрщик. Ссылка на оригинал остаётся настоящей ссылкой: если скрипт
+    // не отработал, снимок всё равно откроется — просто файлом.
+    var lb = document.getElementById("lb"), lbImg = document.getElementById("lb-img"),
+        lbN = document.getElementById("lb-n");
+    function paint() {
+      if (!lb || lb.hidden) return;
+      lbImg.src = th.length ? th[at].getAttribute("data-full") : link.href;
+      lbN.textContent = (at + 1) + " из " + (th.length || 1);
+    }
+    function open(e) {
+      if (!lb) return;
+      if (e) e.preventDefault();
+      if (swiped) { swiped = false; return; }
+      lb.hidden = false;
+      document.body.classList.add("lb-open");
+      paint();
+    }
+    function close() {
+      if (!lb) return;
+      lb.hidden = true;
+      lbImg.src = "";
+      document.body.classList.remove("lb-open");
+    }
+    link.addEventListener("click", open);
+    if (lb) {
+      document.getElementById("lb-x").addEventListener("click", close);
+      // Клик мимо снимка закрывает; по самому снимку — нет, иначе не разглядеть.
+      lb.addEventListener("click", function (e) { if (e.target === lb) close(); });
+    }
+
     document.addEventListener("keydown", function (e) {
-      if (e.key === "ArrowRight") show(at + 1);
-      else if (e.key === "ArrowLeft") show(at - 1);
+      if (lb && !lb.hidden && e.key === "Escape") return close();
+      if (e.key === "ArrowRight") { show(at + 1); paint(); }
+      else if (e.key === "ArrowLeft") { show(at - 1); paint(); }
     });
-    var x0 = null;
-    main.addEventListener("touchstart", function (e) { x0 = e.touches[0].clientX; }, { passive: true });
-    main.addEventListener("touchend", function (e) {
-      if (x0 === null) return;
-      var dx = e.changedTouches[0].clientX - x0;
-      x0 = null;
-      if (Math.abs(dx) > 40) { swiped = true; show(dx < 0 ? at + 1 : at - 1); }
-    }, { passive: true });
-    link.addEventListener("click", function (e) { if (swiped) { e.preventDefault(); swiped = false; } });
+
+    // Свайп листает и на странице, и внутри просмотрщика.
+    function swipe(el) {
+      var x0 = null;
+      el.addEventListener("touchstart", function (e) { x0 = e.touches[0].clientX; }, { passive: true });
+      el.addEventListener("touchend", function (e) {
+        if (x0 === null) return;
+        var dx = e.changedTouches[0].clientX - x0;
+        x0 = null;
+        if (Math.abs(dx) > 40) { swiped = true; show(dx < 0 ? at + 1 : at - 1); paint(); }
+      }, { passive: true });
+    }
+    swipe(main);
+    if (lb) swipe(lb);
   })();
 </script>
 </body>
