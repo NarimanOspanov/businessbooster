@@ -1122,6 +1122,25 @@ async function runKrishaUrgent(opts) {
         await db.clearPending(batch.map((r) => r.id));
         if (missed.length) await db.markPending(missed, f.city);
         KU.missedBase = missed.length;
+
+        // Отчёт после каждого сбора, а не один общий в конце: города обходятся
+        // по очереди и подолгу, и знать, чем кончился каждый, полезнее, чем
+        // получить итог через сорок минут.
+        const st = await db.krishaStats().catch(() => null);
+        const when = new Date(f.today + "T00:00:00Z")
+          .toLocaleDateString("ru-RU", { timeZone: "UTC", day: "numeric", month: "long" });
+        const lines = [
+          "🏘 <b>Крыша · " + f.cityName + " · " + when + "</b>",
+          "",
+          "Поднято за сутки: " + f.corpus + ", из них опубликовано сегодня: <b>" + f.createdToday + "</b>",
+          "В базу легло: <b>" + based + "</b>" + (missed.length ? ", не отдали: " + missed.length : "") +
+            (behind.length ? " (в том числе догнали прошлые: " + behind.length + ")" : ""),
+        ];
+        if (st) {
+          lines.push("", "Всего в базе <b>" + st.flats + "</b>, с телефоном " + st.with_phone +
+            (st.pending ? ", ждут досъёмки " + st.pending : ""));
+        }
+        await notifyTelegram(lines.join("\n"));
       }
 
       const rows = good.slice(0, o.n || 12);
@@ -1253,21 +1272,16 @@ async function runKrishaDaily(cities) {
     baseRunning = false;
   }
 
-  const stats = await db.krishaStats().catch(() => null);
-  const lines = ["🏘 <b>Крыша: сбор за сутки</b>", ""];
+  // Общего письма в конце нет: каждый город отчитался сам, сразу как закончил.
+  // Сообщаем только о сорвавшихся — их иначе было бы не заметить.
   let added = 0;
+  const failed = [];
   for (const r of done) {
-    if (!r || r.error) { lines.push("• " + (r && r.error ? r.error : "прогон сорвался")); continue; }
+    if (!r || r.error) { failed.push((r && r.error) || "прогон сорвался"); continue; }
     added += r.inBase || 0;
-    lines.push("• <b>" + (r.cityName || r.city) + "</b>: опубликовано за сутки " + (r.createdToday || 0) +
-      ", в базу " + (r.inBase || 0) + (r.missedBase ? ", не отдали " + r.missedBase : ""));
   }
-  if (stats) {
-    lines.push("", "Всего в базе " + stats.flats + ", с телефоном " + stats.with_phone +
-      (stats.pending ? ", в очереди на досъёмку " + stats.pending : ""));
-  }
-  await notifyTelegram(lines.join("\n"));
-  return { cities: list, added: added, runs: done.length };
+  if (failed.length) await notifyTelegram("⚠️ <b>Крыша: сбор сорвался</b>\n" + failed.join("\n"));
+  return { cities: list, added: added, runs: done.length, failed: failed.length };
 }
 
 async function runKrishaWatch() {
