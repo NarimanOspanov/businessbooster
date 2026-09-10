@@ -1080,23 +1080,42 @@ async function runKrishaUrgent(opts) {
         const Card = require("./scripts/krisha-card.js");
         Base.dir(path.join(PERSIST_DATA || REPO_DATA, "krisha-base"));
         const batch = [];
-        const list = f.fresh24 || [];
+        const missed = [];
+        // Сначала догоняем то, что не отдалось в прошлые прогоны: в
+        // «сегодняшних» эти квартиры больше не появятся, они уже вчерашние.
+        const behind = Base.pendingFor(f.city, 60).map((id) => ({ id: id, catchUp: true }));
+        const list = behind.concat(f.fresh24 || []);
         for (let i = 0; i < list.length; i++) {
           const c = list[i];
-          KU.progress = "база: " + (i + 1) + " из " + list.length;
+          KU.progress = "база: " + (i + 1) + " из " + list.length +
+            (behind.length ? " (догоняем " + behind.length + ")" : "");
           try {
-            const html = await K.fetchText("https://krisha.kz/a/show/" + c.id, 2, 12000);
+            const html = await K.fetchText("https://krisha.kz/a/show/" + c.id, 4, 12000);
             const detail = K.parseDetail(html);
             const card = Card.parse(html, c.id);
-            batch.push(Base.record(c, detail, {
+            // У догоняемых нет карточки из выдачи, поэтому комнаты и площадь
+            // достаём из заголовка объявления.
+            const t = card.title || "";
+            const base = c.catchUp ? {
+              id: c.id,
+              rooms: Number((t.match(/(\d+)-комнатная/) || [])[1]) || null,
+              area: Number(String((t.match(/([\d.,]+)\s*м²/) || [])[1] || "").replace(",", ".")) || null,
+              district: K.districtOf(Base.fromShort(card.short, "Город") || t),
+              price: card.price || null,
+              addr: null,
+            } : c;
+            batch.push(Base.record(base, detail, {
               city: f.city, title: card.title, short: card.short,
               photos: (card.photos || []).length,
               ph1: card.photos && card.photos[0] ? card.photos[0].full : null,
             }));
-          } catch { /* не прочли — попадёт в базу в другой раз */ }
+          } catch { missed.push(c.id); }
           await new Promise((r) => setTimeout(r, KRISHA_PACE_MS));
         }
         based = Base.saveDay(f.today, batch);
+        Base.clearPending(batch.map((r) => r.id));
+        if (missed.length) Base.markPending(missed, f.city);
+        KU.missedBase = missed.length;
       }
 
       const rows = good.slice(0, o.n || 12);
@@ -1135,6 +1154,7 @@ async function runKrishaUrgent(opts) {
         urgentOnly: f.urgentOnly,
         boundaryId: f.boundaryId, boundaryReads: f.boundaryReads,
         inBase: based || undefined,
+        missedBase: KU.missedBase || undefined,
         createdToday: f.createdToday,
         newToday: f.rows.length,
         cheaperThanSimilar: good.length,

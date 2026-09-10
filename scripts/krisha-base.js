@@ -73,6 +73,46 @@ function saveDay(day, records) {
   }
 }
 
+// Крыша отдаёт карточки не всегда: на замере четверть запросов вернула защиту
+// от ботов. Для базы это дыра в покрытии, а второй раз те же квартиры в
+// «сегодняшних» уже не окажутся — они станут вчерашними. Поэтому промахи
+// складываем отдельно и досняем на следующих прогонах.
+const PEND = () => path.join(DIR, "pending.json");
+
+function readPending() {
+  try { return JSON.parse(fs.readFileSync(PEND(), "utf8")); } catch { return {}; }
+}
+
+function markPending(ids, city) {
+  const p = readPending();
+  for (const id of ids) {
+    const e = p[String(id)] || { city: city, tries: 0 };
+    e.tries += 1;
+    e.city = e.city || city;
+    e.at = new Date().toISOString();
+    // Пять неудач подряд — объявление, скорее всего, снято, а не заблокировано.
+    if (e.tries > 5) delete p[String(id)]; else p[String(id)] = e;
+  }
+  try { fs.mkdirSync(DIR, { recursive: true }); fs.writeFileSync(PEND(), JSON.stringify(p), "utf8"); } catch { /* только чтение */ }
+}
+
+function clearPending(ids) {
+  const p = readPending();
+  let touched = false;
+  for (const id of ids) if (p[String(id)]) { delete p[String(id)]; touched = true; }
+  if (touched) { try { fs.writeFileSync(PEND(), JSON.stringify(p), "utf8"); } catch { /* только чтение */ } }
+}
+
+// Что доснять в этом прогоне: чужие города не берём, чтобы не путать выборку.
+function pendingFor(city, limit) {
+  const p = readPending();
+  const have = new Set(all(0).map((r) => r.id));
+  return Object.keys(p)
+    .filter((id) => !have.has(id) && (!p[id].city || p[id].city === city))
+    .sort((a, b) => p[a].tries - p[b].tries)
+    .slice(0, limit || 60);
+}
+
 // Всё, что накопили, одним индексом в памяти. Записи короткие, шесть тысяч
 // занимают пару мегабайт, поэтому проще держать целиком, чем ходить на диск.
 let cache = { at: 0, rows: [] };
@@ -166,4 +206,7 @@ async function queryFromUrl(url) {
   };
 }
 
-module.exports = { dir, record, saveDay, all, stats, search, queryFromUrl, fromShort };
+module.exports = {
+  dir, record, saveDay, all, stats, search, queryFromUrl, fromShort,
+  markPending, clearPending, pendingFor, readPending,
+};
