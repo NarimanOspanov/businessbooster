@@ -177,6 +177,79 @@ END
 `;
 
 // Выборки в кабинете всегда «звонки моей клиники за период», поэтому индекс
+// --- Крыша --------------------------------------------------------------
+//
+// Ежедневный слепок квартир, которые хозяева выставили на продажу. Смысл в
+// покрытии: спросят про квартиру, которой в базе нет, и ответить будет нечем.
+//
+// Три таблицы вместо одной, потому что у данных разный срок жизни. Параметры
+// квартиры живут вечно и нужны для поиска. Телефон хозяина — персональные
+// данные: его удаляют по требованию человека, отдельно от всего остального.
+// Снимок карточки тяжёлый и нужен только тем квартирам, что мы показываем.
+const SCHEMA_KRISHA = `
+IF OBJECT_ID('dbo.krisha_flats', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.krisha_flats (
+    id          BIGINT        NOT NULL PRIMARY KEY,   -- номер объявления на Крыше
+    city        NVARCHAR(40)  NULL,
+    rooms       INT           NULL,
+    -- Площадь с сотыми: «52.13 м², 6 из 9, Жетысуский» на весь город одна.
+    -- Это и есть ключ, по которому квартира узнаётся в объявлении агента.
+    area        DECIMAL(7,2)  NULL,
+    floor       INT           NULL,
+    floors      INT           NULL,
+    build_year  INT           NULL,
+    house       NVARCHAR(60)  NULL,
+    complex     NVARCHAR(160) NULL,
+    cond        NVARCHAR(80)  NULL,
+    district    NVARCHAR(100) NULL,
+    price       BIGINT        NULL,
+    addr        NVARCHAR(300) NULL,
+    title       NVARCHAR(300) NULL,
+    photos      INT           NULL,
+    photo1      NVARCHAR(300) NULL,
+    posted_on   DATE          NULL,                   -- дата публикации на Крыше
+    first_seen  DATETIME2(0)  NOT NULL CONSTRAINT DF_kflats_first DEFAULT SYSUTCDATETIME(),
+    last_seen   DATETIME2(0)  NOT NULL CONSTRAINT DF_kflats_last  DEFAULT SYSUTCDATETIME()
+  );
+  -- Поиск всегда начинается с площади, остальное сужает.
+  CREATE INDEX IX_kflats_area ON dbo.krisha_flats (area, rooms, floor);
+  CREATE INDEX IX_kflats_posted ON dbo.krisha_flats (posted_on DESC);
+END
+
+IF OBJECT_ID('dbo.krisha_phones', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.krisha_phones (
+    flat_id  BIGINT       NOT NULL,
+    phone    NVARCHAR(20) NOT NULL,                   -- только цифры, 7XXXXXXXXXX
+    got_at   DATETIME2(0) NOT NULL CONSTRAINT DF_kphones_got DEFAULT SYSUTCDATETIME(),
+    source   NVARCHAR(20) NULL,                       -- script | manual
+    CONSTRAINT PK_krisha_phones PRIMARY KEY (flat_id, phone)
+  );
+END
+
+IF OBJECT_ID('dbo.krisha_cards', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.krisha_cards (
+    flat_id   BIGINT        NOT NULL PRIMARY KEY,
+    card_json NVARCHAR(MAX) NOT NULL,                 -- фото, описание, характеристики
+    taken_at  DATETIME2(0)  NOT NULL CONSTRAINT DF_kcards_taken DEFAULT SYSUTCDATETIME()
+  );
+END
+
+-- Объявления, которые Крыша не отдала: в «сегодняшних» они больше не всплывут,
+-- поэтому досниаются в начале следующих прогонов.
+IF OBJECT_ID('dbo.krisha_pending', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.krisha_pending (
+    flat_id  BIGINT       NOT NULL PRIMARY KEY,
+    city     NVARCHAR(40) NULL,
+    tries    INT          NOT NULL CONSTRAINT DF_kpend_tries DEFAULT 1,
+    last_try DATETIME2(0) NOT NULL CONSTRAINT DF_kpend_last  DEFAULT SYSUTCDATETIME()
+  );
+END
+`;
+
 // составной: по одному clinic_id база всё равно пошла бы сортировать.
 const SCHEMA_INDEXES = `
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_calls_clinic' AND object_id = OBJECT_ID('dbo.calls'))
@@ -188,6 +261,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UX_clinics_tool_key')
 async function migrate() {
   const pool = await getPool();
   await pool.request().batch(SCHEMA);
+  await pool.request().batch(SCHEMA_KRISHA);
   await pool.request().batch(SCHEMA_INDEXES); // после ALTER: колонки должны уже быть
   const r = await pool.request().query(
     "SELECT (SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID('dbo.calls')) AS calls_cols," +
@@ -547,7 +621,219 @@ async function lastZadarmaEvents(limit) {
   return r.recordset;
 }
 
-module.exports = { getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
+// --- Крыша: запись ---------------------------------------------------------
+
+// Объявление могло попасться нам вчера и снова сегодня: тогда обновляем цену и
+// отметку «видели», а дату публикации и первую встречу не трогаем.
+async function saveFlat(f) {
+  const pool = await getPool();
+  await pool.request()
+    .input("id", sql.BigInt, Number(f.id))
+    .input("city", sql.NVarChar(40), f.city || null)
+    .input("rooms", sql.Int, f.rooms || null)
+    .input("area", sql.Decimal(7, 2), f.area || null)
+    .input("floor", sql.Int, f.floor || null)
+    .input("floors", sql.Int, f.floors || null)
+    .input("year", sql.Int, f.year || null)
+    .input("house", sql.NVarChar(60), f.house || null)
+    .input("complex", sql.NVarChar(160), f.complex || null)
+    .input("cond", sql.NVarChar(80), f.cond || null)
+    .input("district", sql.NVarChar(100), f.district || null)
+    .input("price", sql.BigInt, f.price || null)
+    .input("addr", sql.NVarChar(300), f.addr || null)
+    .input("title", sql.NVarChar(300), f.title || null)
+    .input("photos", sql.Int, f.photos || null)
+    .input("photo1", sql.NVarChar(300), f.ph1 || null)
+    .input("posted", sql.Date, f.created || null)
+    .query(`
+      MERGE dbo.krisha_flats AS t
+      USING (SELECT @id AS id) AS s ON t.id = s.id
+      WHEN MATCHED THEN UPDATE SET
+        price = COALESCE(@price, t.price), title = COALESCE(@title, t.title),
+        photos = COALESCE(@photos, t.photos), last_seen = SYSUTCDATETIME()
+      WHEN NOT MATCHED THEN INSERT
+        (id, city, rooms, area, floor, floors, build_year, house, complex, cond,
+         district, price, addr, title, photos, photo1, posted_on)
+      VALUES
+        (@id, @city, @rooms, @area, @floor, @floors, @year, @house, @complex, @cond,
+         @district, @price, @addr, @title, @photos, @photo1, @posted);`);
+}
+
+async function saveFlats(list) {
+  let ok = 0;
+  for (const f of list || []) {
+    try { await saveFlat(f); ok++; } catch (e) { console.log("[крыша] не записал " + f.id + ": " + e.message); }
+  }
+  return ok;
+}
+
+// «8 705…» и «+7 705…» — один и тот же номер, и лечь он должен одной строкой.
+// Приводим здесь, а не у вызывающего: иначе однажды кто-нибудь передаст сырое
+// значение, и в базе появится двойник, которого потом не свести.
+function normPhone(raw) {
+  const d = String(raw == null ? "" : raw).replace(/\D/g, "");
+  if (d.length === 11 && /^[78]/.test(d)) return "7" + d.slice(1);
+  if (d.length === 10) return "7" + d;
+  return null;
+}
+
+async function saveFlatPhones(flatId, phones, source) {
+  const pool = await getPool();
+  const seen = new Set();
+  for (const raw of phones || []) {
+    const digits = normPhone(raw);
+    if (!digits || seen.has(digits)) continue;
+    seen.add(digits);
+    await pool.request()
+      .input("id", sql.BigInt, Number(flatId))
+      .input("p", sql.NVarChar(20), digits)
+      .input("src", sql.NVarChar(20), source || "script")
+      .query(`
+        MERGE dbo.krisha_phones AS t
+        USING (SELECT @id AS flat_id, @p AS phone) AS s
+          ON t.flat_id = s.flat_id AND t.phone = s.phone
+        WHEN NOT MATCHED THEN INSERT (flat_id, phone, source) VALUES (@id, @p, @src);`);
+  }
+}
+
+async function flatPhones(flatId) {
+  const pool = await getPool();
+  const r = await pool.request().input("id", sql.BigInt, Number(flatId))
+    .query("SELECT phone FROM dbo.krisha_phones WHERE flat_id = @id ORDER BY got_at");
+  return r.recordset.map((x) => x.phone);
+}
+
+// Что ещё без телефона: очередь для скрипта, который их собирает.
+async function flatsWithoutPhone(limit) {
+  const pool = await getPool();
+  const r = await pool.request().input("n", sql.Int, Number(limit) || 30).query(`
+    SELECT TOP (@n) f.id, f.title
+    FROM dbo.krisha_flats f
+    LEFT JOIN dbo.krisha_phones p ON p.flat_id = f.id
+    WHERE p.flat_id IS NULL
+    ORDER BY f.first_seen DESC`);
+  return r.recordset;
+}
+
+async function saveCard(flatId, card) {
+  const pool = await getPool();
+  await pool.request()
+    .input("id", sql.BigInt, Number(flatId))
+    .input("j", sql.NVarChar(sql.MAX), JSON.stringify(card))
+    .query(`
+      MERGE dbo.krisha_cards AS t
+      USING (SELECT @id AS flat_id) AS s ON t.flat_id = s.flat_id
+      WHEN MATCHED THEN UPDATE SET card_json = @j, taken_at = SYSUTCDATETIME()
+      WHEN NOT MATCHED THEN INSERT (flat_id, card_json) VALUES (@id, @j);`);
+}
+
+async function card(flatId) {
+  const pool = await getPool();
+  const r = await pool.request().input("id", sql.BigInt, Number(flatId))
+    .query("SELECT card_json FROM dbo.krisha_cards WHERE flat_id = @id");
+  if (!r.recordset.length) return null;
+  try { return JSON.parse(r.recordset[0].card_json); } catch { return null; }
+}
+
+// --- Крыша: поиск ----------------------------------------------------------
+
+// Жёсткое условие одно — площадь: она приезжает из оригинала и агент её не
+// трогает. Комнаты и этаж отсекают, если известны; район и год только
+// добавляют уверенности, потому что агент иногда пишет свой район.
+async function findFlats(q, limit) {
+  const pool = await getPool();
+  const area = Number(String(q.area || "").replace(",", "."));
+  if (!area) return [];
+  const tol = String(q.area).indexOf(".") === -1 ? 0.9 : 0.35;
+  const r = await pool.request()
+    .input("lo", sql.Decimal(7, 2), area - tol)
+    .input("hi", sql.Decimal(7, 2), area + tol)
+    .input("rooms", sql.Int, q.rooms ? Number(q.rooms) : null)
+    .input("floor", sql.Int, q.floor ? Number(q.floor) : null)
+    .input("floors", sql.Int, q.floors ? Number(q.floors) : null)
+    .input("year", sql.Int, q.year ? Number(q.year) : null)
+    .input("district", sql.NVarChar(100), q.district || null)
+    .input("complex", sql.NVarChar(160), q.complex || null)
+    .input("n", sql.Int, Number(limit) || 8)
+    .query(`
+      SELECT TOP (@n) f.*,
+        3 + IIF(@rooms IS NOT NULL AND f.rooms = @rooms, 2, 0)
+          + IIF(@floor IS NOT NULL AND f.floor = @floor, 2, 0)
+          + IIF(@floors IS NOT NULL AND f.floors = @floors, 1, 0)
+          + IIF(@year IS NOT NULL AND f.build_year = @year, 1, 0)
+          + IIF(@district IS NOT NULL AND f.district = @district, 1, 0)
+          + IIF(@complex IS NOT NULL AND f.complex = @complex, 1, 0) AS score
+      FROM dbo.krisha_flats f
+      WHERE f.area BETWEEN @lo AND @hi
+        AND (@rooms IS NULL OR f.rooms IS NULL OR f.rooms = @rooms)
+        AND (@floor IS NULL OR f.floor IS NULL OR f.floor = @floor)
+        AND (@floors IS NULL OR f.floors IS NULL OR f.floors = @floors)
+      ORDER BY score DESC, f.id DESC`);
+  return r.recordset;
+}
+
+async function krishaStats() {
+  const pool = await getPool();
+  const r = await pool.request().query(`
+    SELECT
+      (SELECT COUNT(*) FROM dbo.krisha_flats) AS flats,
+      (SELECT COUNT(DISTINCT flat_id) FROM dbo.krisha_phones) AS with_phone,
+      (SELECT COUNT(*) FROM dbo.krisha_cards) AS cards,
+      (SELECT COUNT(*) FROM dbo.krisha_pending) AS pending,
+      (SELECT MIN(posted_on) FROM dbo.krisha_flats) AS from_day,
+      (SELECT MAX(posted_on) FROM dbo.krisha_flats) AS to_day`);
+  const byCity = await pool.request().query(
+    "SELECT city, COUNT(*) AS n FROM dbo.krisha_flats GROUP BY city ORDER BY n DESC");
+  const s = r.recordset[0];
+  s.cities = {};
+  byCity.recordset.forEach((x) => { s.cities[x.city || "?"] = x.n; });
+  return s;
+}
+
+// --- Крыша: очередь на досъёмку -------------------------------------------
+
+async function markPending(ids, city) {
+  const pool = await getPool();
+  for (const id of ids || []) {
+    await pool.request()
+      .input("id", sql.BigInt, Number(id))
+      .input("city", sql.NVarChar(40), city || null)
+      .query(`
+        MERGE dbo.krisha_pending AS t
+        USING (SELECT @id AS flat_id) AS s ON t.flat_id = s.flat_id
+        WHEN MATCHED THEN UPDATE SET tries = t.tries + 1, last_try = SYSUTCDATETIME()
+        WHEN NOT MATCHED THEN INSERT (flat_id, city) VALUES (@id, @city);`);
+  }
+  // Пять неудач подряд — объявление, скорее всего, снято, а не заблокировано.
+  await pool.request().query("DELETE FROM dbo.krisha_pending WHERE tries > 5");
+}
+
+async function clearPending(ids) {
+  if (!ids || !ids.length) return;
+  const pool = await getPool();
+  for (const id of ids) {
+    await pool.request().input("id", sql.BigInt, Number(id))
+      .query("DELETE FROM dbo.krisha_pending WHERE flat_id = @id");
+  }
+}
+
+async function pendingFlats(city, limit) {
+  const pool = await getPool();
+  const r = await pool.request()
+    .input("city", sql.NVarChar(40), city || null)
+    .input("n", sql.Int, Number(limit) || 60)
+    .query(`
+      SELECT TOP (@n) p.flat_id
+      FROM dbo.krisha_pending p
+      LEFT JOIN dbo.krisha_flats f ON f.id = p.flat_id
+      WHERE f.id IS NULL AND (@city IS NULL OR p.city IS NULL OR p.city = @city)
+      ORDER BY p.tries, p.last_try`);
+  return r.recordset.map((x) => String(x.flat_id));
+}
+
+module.exports = { saveFlat, saveFlats, saveFlatPhones, normPhone, flatPhones, flatsWithoutPhone,
+  saveCard, card, findFlats, krishaStats, markPending, clearPending, pendingFlats,
+  getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 
 if (require.main === module) {
   const cmd = process.argv[2];

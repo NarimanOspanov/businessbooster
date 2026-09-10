@@ -765,9 +765,6 @@ const KRISHA_COOKIE = process.env.KRISHA_COOKIE || "";
 // же странице, хуже, чем отсутствие телефонов.
 const KRISHA_PHONE_KEY = process.env.KRISHA_PHONE_KEY || "";
 const KRISHA_FILE = path.join(PERSIST_DATA || REPO_DATA, "krisha-watch.json");
-// Снимки объявлений для страниц /kv/<id>: их открывают из поста в Телеграме, а
-// объявление к тому времени могут снять.
-const KRISHA_CARDS_FILE = path.join(PERSIST_DATA || REPO_DATA, "krisha-cards.json");
 
 // ~2.2s per address including the fallback query, so 150 is about six minutes —
 // well under Nominatim's one-per-second ceiling, and the backlog is one-time.
@@ -785,16 +782,23 @@ try {
 // Self-heal: an entry without a build year came from a failed read and is
 // useless for comparables. Drop it so the next run fetches it again.
 for (const [id, c] of Object.entries(KW.corpus || {})) if (!c || !c.year) delete KW.corpus[id];
-let KC = {};
-try { KC = JSON.parse(fs.readFileSync(KRISHA_CARDS_FILE, "utf8")); } catch { /* первый запуск */ }
-function saveCards() {
-  try {
-    fs.mkdirSync(path.dirname(KRISHA_CARDS_FILE), { recursive: true });
-    // За месяц набирается пара сотен снимков; дальше самые старые не нужны.
-    const ids = Object.keys(KC).sort((a, b) => String(KC[b].takenAt || "").localeCompare(String(KC[a].takenAt || "")));
-    for (const id of ids.slice(600)) delete KC[id];
-    fs.writeFileSync(KRISHA_CARDS_FILE, JSON.stringify(KC), "utf8");
-  } catch { /* диск только на чтение */ }
+// Снимки карточек, база квартир и телефоны хозяев переехали в SQL: файл на
+// диске App Service не имеет резервных копий, а телефон хозяина — персональные
+// данные, которые придётся уметь удалять по требованию.
+//
+// Небольшой кеш карточек в памяти: страницу /kv/ открывают из поста, и ходить
+// в базу на каждый просмотр незачем.
+const cardCache = new Map();
+async function loadCard(id) {
+  if (cardCache.has(id)) return cardCache.get(id);
+  let c = null;
+  try { c = await db.card(id); } catch { /* база недоступна — покажем «не найдено» */ }
+  if (c) {
+    try { c.phones = await db.flatPhones(id); } catch { /* без телефона страница всё равно полезна */ }
+    if (cardCache.size > 300) cardCache.clear();
+    cardCache.set(id, c);
+  }
+  return c;
 }
 
 function saveKrisha() {
@@ -1078,12 +1082,11 @@ async function runKrishaUrgent(opts) {
         const K = require("./scripts/krisha-lib.js");
         const Base = require("./scripts/krisha-base.js");
         const Card = require("./scripts/krisha-card.js");
-        Base.dir(path.join(PERSIST_DATA || REPO_DATA, "krisha-base"));
         const batch = [];
         const missed = [];
         // Сначала догоняем то, что не отдалось в прошлые прогоны: в
         // «сегодняшних» эти квартиры больше не появятся, они уже вчерашние.
-        const behind = Base.pendingFor(f.city, 60).map((id) => ({ id: id, catchUp: true }));
+        const behind = (await db.pendingFlats(f.city, 60)).map((id) => ({ id: id, catchUp: true }));
         const list = behind.concat(f.fresh24 || []);
         for (let i = 0; i < list.length; i++) {
           const c = list[i];
@@ -1112,9 +1115,9 @@ async function runKrishaUrgent(opts) {
           } catch { missed.push(c.id); }
           await new Promise((r) => setTimeout(r, KRISHA_PACE_MS));
         }
-        based = Base.saveDay(f.today, batch);
-        Base.clearPending(batch.map((r) => r.id));
-        if (missed.length) Base.markPending(missed, f.city);
+        based = await db.saveFlats(batch);
+        await db.clearPending(batch.map((r) => r.id));
+        if (missed.length) await db.markPending(missed, f.city);
         KU.missedBase = missed.length;
       }
 
@@ -1134,16 +1137,16 @@ async function runKrishaUrgent(opts) {
           if (KRISHA_COOKIE) {
             try {
               const ph = await Card.fetchPhones(c.id, KRISHA_COOKIE);
-              if (ph && ph.phones && ph.phones.length) card.phones = ph.phones;
+              if (ph && ph.phones && ph.phones.length) await db.saveFlatPhones(c.id, ph.phones, "cookie");
               else if (ph && ph.error) card.phoneError = ph.error;
             } catch { /* без телефона страница всё равно полезна */ }
           }
-          KC[c.id] = card;
+          await db.saveCard(c.id, card);
+          cardCache.delete(String(c.id));
           c.hasCard = true;
         } catch { /* не сняли — ссылка уйдёт прямо на Крышу */ }
         await new Promise((r) => setTimeout(r, KRISHA_PACE_MS));
       }
-      saveCards();
 
       let tg = null;
       if (o.send && rows.length && KW.channel) tg = await sendTelegram(KW.channel, U.postFresh(rows, f.today, f.city, CANONICAL));
@@ -4585,11 +4588,11 @@ http
         return send(403, { ok: false, error: "bad_key" });
       }
       const Base = require("./scripts/krisha-base.js");
-      Base.dir(path.join(PERSIST_DATA || REPO_DATA, "krisha-base"));
-
-      if (urlPath === "/api/krisha/base") return send(200, Object.assign({ ok: true }, Base.stats()));
 
       (async () => {
+        if (urlPath === "/api/krisha/base") {
+          return send(200, Object.assign({ ok: true }, await db.krishaStats()));
+        }
         const url = parsed.searchParams.get("url");
         let q;
         if (url) q = await Base.queryFromUrl(url);
@@ -4604,26 +4607,25 @@ http
           };
           if (!q.area) return send(400, { ok: false, error: "нужна ссылка или хотя бы площадь" });
         }
-        const hits = Base.search(q, { limit: 8 });
-        return send(200, {
-          ok: true,
-          query: q,
-          found: hits.length,
-          items: hits.map((h) => ({
-            id: h.row.id,
-            score: h.score,
-            why: h.why.join(", "),
-            title: h.row.title,
-            price: h.row.price,
-            addr: h.row.addr,
-            created: h.row.created,
-            seen: h.row.seen,
-            // Телефон, если вы его уже проходили; иначе — ссылка, где пройти.
-            phones: (KC[h.row.id] && KC[h.row.id].phones) || null,
-            krisha: "https://krisha.kz/a/show/" + h.row.id,
-            card: KC[h.row.id] ? CANONICAL + "/kv/" + h.row.id : null,
-          })),
-        });
+        const hits = await db.findFlats(q, 8);
+        const items = [];
+        for (const h of hits) {
+          const id = String(h.id);
+          // Телефон, если вы его уже проходили; иначе — ссылка, где пройти.
+          let phones = [];
+          try { phones = await db.flatPhones(id); } catch { /* необязательно */ }
+          items.push({
+            id: id, score: h.score,
+            title: h.title, price: h.price, addr: h.addr, district: h.district,
+            area: h.area == null ? null : Number(h.area),
+            rooms: h.rooms, floor: h.floor, floors: h.floors, year: h.build_year,
+            posted: h.posted_on ? String(h.posted_on).slice(0, 10) : null,
+            phones: phones.length ? phones : null,
+            krisha: "https://krisha.kz/a/show/" + id,
+            card: CANONICAL + "/kv/" + id,
+          });
+        }
+        return send(200, { ok: true, query: q, found: items.length, items: items });
       })().catch((e) => send(400, { ok: false, error: String(e.message).slice(0, 160) }));
       return;
     }
@@ -4646,22 +4648,22 @@ http
       const key = parsed.searchParams.get("key") || "";
       if (!KRISHA_PHONE_KEY || key !== KRISHA_PHONE_KEY) return send(403, { ok: false, error: "bad_key" });
 
-      // Очередь: что из последней подборки ещё без телефона, свежее — раньше.
-      if (urlPath === "/api/krisha/queue") {
-        const rows = Object.values(KC)
-          .filter((c) => !(c.phones || []).length)
-          .sort((a, b) => String(b.takenAt || "").localeCompare(String(a.takenAt || "")))
-          .slice(0, Number(parsed.searchParams.get("limit") || 30))
-          .map((c) => ({ id: c.id, title: c.title, url: "https://krisha.kz/a/show/" + c.id }));
-        return send(200, { ok: true, count: rows.length, items: rows });
-      }
-
       (async () => {
+        // Очередь: квартиры из базы, у которых телефона ещё нет, свежие раньше.
+        if (urlPath === "/api/krisha/queue") {
+          const rows = await db.flatsWithoutPhone(Number(parsed.searchParams.get("limit") || 30));
+          return send(200, {
+            ok: true, count: rows.length,
+            items: rows.map((r) => ({
+              id: String(r.id), title: r.title, url: "https://krisha.kz/a/show/" + r.id,
+            })),
+          });
+        }
+
         let body = {};
         try { body = JSON.parse(await readBody(req)) || {}; } catch { /* пусто */ }
         const id = String(body.id || "").replace(/\D/g, "");
-        const card = KC[id];
-        if (!card) return send(404, { ok: false, error: "нет такой карточки" });
+        if (!id) return send(400, { ok: false, error: "нет номера объявления" });
 
         // Казахстанский номер: 11 цифр с 7 в начале либо 10 без кода страны.
         const phones = [];
@@ -4673,13 +4675,13 @@ http
         }
         if (!phones.length) return send(400, { ok: false, error: "номер не разобрал" });
 
-        card.phones = phones.map((n) =>
+        await db.saveFlatPhones(id, phones, "script");
+        cardCache.delete(id);
+        const pretty = phones.map((n) =>
           "+" + n[0] + " " + n.slice(1, 4) + " " + n.slice(4, 7) + " " + n.slice(7, 9) + " " + n.slice(9));
-        card.phonesAt = new Date().toISOString();
-        saveCards();
-        console.log("[телефон] " + id + ": " + card.phones.length + " шт.");
-        return send(200, { ok: true, id: id, phones: card.phones });
-      })().catch(() => send(500, { ok: false, error: "internal" }));
+        console.log("[телефон] " + id + ": " + pretty.length + " шт.");
+        return send(200, { ok: true, id: id, phones: pretty });
+      })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
       return;
     }
 
@@ -4689,12 +4691,13 @@ http
     const kvMatch = urlPath.match(/^\/kv\/(\d+)\/?$/);
     if (kvMatch) {
       const page = require("./scripts/krisha-page.js");
-      const card = KC[kvMatch[1]];
-      res.writeHead(card ? 200 : 404, {
-        "Content-Type": MIME[".html"],
-        "Cache-Control": card ? "public, max-age=300" : "no-store",
+      loadCard(kvMatch[1]).then((card) => {
+        res.writeHead(card ? 200 : 404, {
+          "Content-Type": MIME[".html"],
+          "Cache-Control": card ? "public, max-age=300" : "no-store",
+        });
+        res.end(card ? page.render(card) : page.notFound(kvMatch[1]));
       });
-      res.end(card ? page.render(card) : page.notFound(kvMatch[1]));
       return;
     }
 
