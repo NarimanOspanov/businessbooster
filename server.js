@@ -1070,6 +1070,35 @@ async function runKrishaUrgent(opts) {
       const good = f.rows.length
         ? await U.cheaper(f.rows, { min: min, pace: KRISHA_PACE_MS, log: (m) => { KU.progress = m; } })
         : [];
+      // База: короткая запись по каждой сегодняшней квартире от хозяина, а не
+      // только по опубликованным. Ценность базы — покрытие: спросят про
+      // квартиру, которой в ней нет, и отвечать будет нечем.
+      let based = 0;
+      if (o.base) {
+        const K = require("./scripts/krisha-lib.js");
+        const Base = require("./scripts/krisha-base.js");
+        const Card = require("./scripts/krisha-card.js");
+        Base.dir(path.join(PERSIST_DATA || REPO_DATA, "krisha-base"));
+        const batch = [];
+        const list = f.fresh24 || [];
+        for (let i = 0; i < list.length; i++) {
+          const c = list[i];
+          KU.progress = "база: " + (i + 1) + " из " + list.length;
+          try {
+            const html = await K.fetchText("https://krisha.kz/a/show/" + c.id, 2, 12000);
+            const detail = K.parseDetail(html);
+            const card = Card.parse(html, c.id);
+            batch.push(Base.record(c, detail, {
+              city: f.city, title: card.title, short: card.short,
+              photos: (card.photos || []).length,
+              ph1: card.photos && card.photos[0] ? card.photos[0].full : null,
+            }));
+          } catch { /* не прочли — попадёт в базу в другой раз */ }
+          await new Promise((r) => setTimeout(r, KRISHA_PACE_MS));
+        }
+        based = Base.saveDay(f.today, batch);
+      }
+
       const rows = good.slice(0, o.n || 12);
 
       // Снимок каждой опубликованной квартиры: фотографии, описание хозяина,
@@ -1105,6 +1134,7 @@ async function runKrishaUrgent(opts) {
         pages: f.pages, bumpedToday: f.corpus, urgentToday: f.urgentTotal,
         urgentOnly: f.urgentOnly,
         boundaryId: f.boundaryId, boundaryReads: f.boundaryReads,
+        inBase: based || undefined,
         createdToday: f.createdToday,
         newToday: f.rows.length,
         cheaperThanSimilar: good.length,
@@ -2980,6 +3010,9 @@ http
           // urgent=0 — брать всё, что хозяева опубликовали за сутки, а не
           // только помеченное «Срочно, торг».
           urgentOnly: q.get("urgent") !== "0",
+          // base=1 — снять короткую запись по каждой сегодняшней квартире от
+          // хозяина, а не только по тем, что идут в пост.
+          base: q.get("base") === "1",
           send: q.get("send") === "1",
           n: Number(q.get("n") || 8),
           min: q.get("min") === "off" ? null : (q.get("min") == null ? 8 : Number(q.get("min"))),
@@ -4516,6 +4549,62 @@ http
     // IndexNow, so it keeps working — permanently, pointing at the new place.
     if (urlPath === "/phone" || urlPath === "/phone/" || urlPath === "/phone/kk" || urlPath === "/phone/kk/") {
       res.writeHead(301, { Location: urlPath.indexOf("/kk") > 0 ? "/kk/" : "/" }).end();
+      return;
+    }
+
+    // Узнать свою квартиру в объявлении агента. Покупатель присылает ссылку —
+    // разбираем её тем же кодом, которым снимаем свои, и ищем по параметрам.
+    // Без ссылки принимаем площадь с этажом руками: со скриншота их вбить
+    // быстрее, чем искать глазами.
+    if (urlPath === "/api/krisha/find" || urlPath === "/api/krisha/base") {
+      const send = (code, obj) => {
+        res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+        res.end(JSON.stringify(obj, null, 2));
+      };
+      if (!KRISHA_PHONE_KEY || parsed.searchParams.get("key") !== KRISHA_PHONE_KEY) {
+        return send(403, { ok: false, error: "bad_key" });
+      }
+      const Base = require("./scripts/krisha-base.js");
+      Base.dir(path.join(PERSIST_DATA || REPO_DATA, "krisha-base"));
+
+      if (urlPath === "/api/krisha/base") return send(200, Object.assign({ ok: true }, Base.stats()));
+
+      (async () => {
+        const url = parsed.searchParams.get("url");
+        let q;
+        if (url) q = await Base.queryFromUrl(url);
+        else {
+          q = {
+            rooms: parsed.searchParams.get("rooms"),
+            area: parsed.searchParams.get("area"),
+            floor: parsed.searchParams.get("floor"),
+            floors: parsed.searchParams.get("floors"),
+            year: parsed.searchParams.get("year"),
+            district: parsed.searchParams.get("district"),
+          };
+          if (!q.area) return send(400, { ok: false, error: "нужна ссылка или хотя бы площадь" });
+        }
+        const hits = Base.search(q, { limit: 8 });
+        return send(200, {
+          ok: true,
+          query: q,
+          found: hits.length,
+          items: hits.map((h) => ({
+            id: h.row.id,
+            score: h.score,
+            why: h.why.join(", "),
+            title: h.row.title,
+            price: h.row.price,
+            addr: h.row.addr,
+            created: h.row.created,
+            seen: h.row.seen,
+            // Телефон, если вы его уже проходили; иначе — ссылка, где пройти.
+            phones: (KC[h.row.id] && KC[h.row.id].phones) || null,
+            krisha: "https://krisha.kz/a/show/" + h.row.id,
+            card: KC[h.row.id] ? CANONICAL + "/kv/" + h.row.id : null,
+          })),
+        });
+      })().catch((e) => send(400, { ok: false, error: String(e.message).slice(0, 160) }));
       return;
     }
 
