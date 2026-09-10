@@ -760,6 +760,10 @@ const KRISHA_PACE_MS = Number(process.env.KRISHA_PACE_MS || 2500); // gentler th
 // продавца недоступен, потому что своего входа у сервиса нет — логин живёт на
 // id.kolesa.kz за проверкой «подтвердите, что вы человек».
 const KRISHA_COOKIE = process.env.KRISHA_COOKIE || "";
+// Ключ для скрипта, который сохраняет телефоны с Крыши. Не задан — ручка
+// закрыта совсем: открытый адрес, куда любой подставит чужой номер на нашей
+// же странице, хуже, чем отсутствие телефонов.
+const KRISHA_PHONE_KEY = process.env.KRISHA_PHONE_KEY || "";
 const KRISHA_FILE = path.join(PERSIST_DATA || REPO_DATA, "krisha-watch.json");
 // Снимки объявлений для страниц /kv/<id>: их открывают из поста в Телеграме, а
 // объявление к тому времени могут снять.
@@ -4515,6 +4519,61 @@ http
       return;
     }
 
+    // Телефон хозяина, снятый скриптом со страницы Крыши после того, как
+    // человек сам прошёл капчу. Запрос приходит с krisha.kz, то есть с чужого
+    // источника, — отсюда разрешение CORS и отдельный ключ.
+    if (urlPath === "/api/krisha/phone" || urlPath === "/api/krisha/queue") {
+      const cors = {
+        "Access-Control-Allow-Origin": "https://krisha.kz",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Max-Age": "86400",
+      };
+      if (req.method === "OPTIONS") { res.writeHead(204, cors); res.end(); return; }
+      const send = (code, obj) => {
+        res.writeHead(code, Object.assign({ "Content-Type": MIME[".json"], "Cache-Control": "no-store" }, cors));
+        res.end(JSON.stringify(obj));
+      };
+      const key = parsed.searchParams.get("key") || "";
+      if (!KRISHA_PHONE_KEY || key !== KRISHA_PHONE_KEY) return send(403, { ok: false, error: "bad_key" });
+
+      // Очередь: что из последней подборки ещё без телефона, свежее — раньше.
+      if (urlPath === "/api/krisha/queue") {
+        const rows = Object.values(KC)
+          .filter((c) => !(c.phones || []).length)
+          .sort((a, b) => String(b.takenAt || "").localeCompare(String(a.takenAt || "")))
+          .slice(0, Number(parsed.searchParams.get("limit") || 30))
+          .map((c) => ({ id: c.id, title: c.title, url: "https://krisha.kz/a/show/" + c.id }));
+        return send(200, { ok: true, count: rows.length, items: rows });
+      }
+
+      (async () => {
+        let body = {};
+        try { body = JSON.parse(await readBody(req)) || {}; } catch { /* пусто */ }
+        const id = String(body.id || "").replace(/\D/g, "");
+        const card = KC[id];
+        if (!card) return send(404, { ok: false, error: "нет такой карточки" });
+
+        // Казахстанский номер: 11 цифр с 7 в начале либо 10 без кода страны.
+        const phones = [];
+        for (const raw of [].concat(body.phones || body.phone || [])) {
+          const d = String(raw).replace(/\D/g, "");
+          const n = d.length === 11 && /^[78]/.test(d) ? "7" + d.slice(1)
+            : d.length === 10 ? "7" + d : null;
+          if (n && !phones.includes(n)) phones.push(n);
+        }
+        if (!phones.length) return send(400, { ok: false, error: "номер не разобрал" });
+
+        card.phones = phones.map((n) =>
+          "+" + n[0] + " " + n.slice(1, 4) + " " + n.slice(4, 7) + " " + n.slice(7, 9) + " " + n.slice(9));
+        card.phonesAt = new Date().toISOString();
+        saveCards();
+        console.log("[телефон] " + id + ": " + card.phones.length + " шт.");
+        return send(200, { ok: true, id: id, phones: card.phones });
+      })().catch(() => send(500, { ok: false, error: "internal" }));
+      return;
+    }
+
     // Квартира из подборки: ссылку открывают прямо в Телеграме, поэтому
     // показываем свой снимок с фотографиями и контактами, а не отправляем
     // человека на чужой сайт, где объявления может уже не быть.
@@ -4527,6 +4586,20 @@ http
         "Cache-Control": card ? "public, max-age=300" : "no-store",
       });
       res.end(card ? page.render(card) : page.notFound(kvMatch[1]));
+      return;
+    }
+
+    // Скрипт для браузера отдаём по адресу, чтобы Tampermonkey ставил его по
+    // ссылке и сам обновлял. Ключа внутри нет — его спрашивают при первом
+    // запуске и хранят в браузере.
+    if (urlPath === "/krisha-phone.user.js") {
+      fs.readFile(path.join(ROOT, "scripts", "krisha-phone.user.js"), (err, js) => {
+        if (err) { res.writeHead(404).end("Not found"); return; }
+        res.writeHead(200, {
+          "Content-Type": "application/javascript; charset=utf-8",
+          "Cache-Control": "public, max-age=300",
+        }).end(js);
+      });
       return;
     }
 

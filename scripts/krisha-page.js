@@ -135,8 +135,8 @@ function render(card, opts) {
   // человеку, и звонить по квартире стали бы ему.
   const ours = o.phone || FALLBACK_PHONE;
   const contacts = phones.length
-    ? phones.map((p) => '<a class="btn" href="tel:' + esc(String(p).replace(/[^\d+]/g, "")) +
-        '" style="margin-top:8px">' + esc(p) + "</a>").join("")
+    ? phones.map((p, i) => '<a class="btn" href="tel:' + esc(String(p).replace(/[^\d+]/g, "")) + '"' +
+        (i ? ' style="margin-top:8px"' : "") + ">" + esc(p) + "</a>").join("")
     : '<a class="btn" href="tel:' + esc(ours.replace(/[^\d+]/g, "")) + '">' + esc(ours) + "</a>" +
       '<div class="note">Это наш номер. Телефон хозяина — <a href="' + krisha +
       '" target="_blank" rel="noopener">на странице объявления</a>' +
@@ -169,7 +169,7 @@ ${gallery}
   <h1>${esc(card.title)}</h1>
   ${card.addr ? '<div class="loc">' + esc(card.addr) + "</div>" : ""}
 
-  <h2>Контакты</h2>
+  <h2>${phones.length ? "Контакты хозяина" : "Контакты"}</h2>
   ${contacts}
 
   ${short.length ? "<h2>О квартире</h2>" + rows(short) : ""}
