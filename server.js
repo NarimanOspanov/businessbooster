@@ -1269,15 +1269,37 @@ const KRISHA_CITIES = String(process.env.KRISHA_CITIES || "almaty,astana")
   .split(/[^a-z-]+/i).filter(Boolean);
 let baseRunning = false;
 
-async function runKrishaDaily(cities) {
+// Сбор идёт раз в сутки, и расписание живёт снаружи. Если внешний планировщик
+// настроят на «каждые два часа» — а это уже случилось, — двенадцать обходов в
+// сутки подведут нас к той нагрузке, после которой Крыша перестала отвечать.
+// Поэтому город, собранный недавно, пропускаем; force=1 снимает ограничение.
+const KRISHA_MIN_GAP_H = Number(process.env.KRISHA_MIN_GAP_H || 6);
+
+async function runKrishaDaily(cities, opts) {
+  const o = opts || {};
   if (baseRunning) return { skipped: "уже идёт" };
   baseRunning = true;
-  const list = (cities && cities.length ? cities : KRISHA_CITIES);
+  let list = (cities && cities.length ? cities : KRISHA_CITIES);
+  if (!o.force) {
+    KW.lastBaseRun = KW.lastBaseRun || {};
+    const fresh = [];
+    const skipped = [];
+    for (const c of list) {
+      const at = Date.parse(KW.lastBaseRun[c] || 0);
+      if (at && Date.now() - at < KRISHA_MIN_GAP_H * 3600e3) skipped.push(c); else fresh.push(c);
+    }
+    if (skipped.length) console.log("[krisha] пропускаем, собирали недавно: " + skipped.join(", "));
+    list = fresh;
+  }
+  if (!list.length) { baseRunning = false; return { skipped: "собирали меньше " + KRISHA_MIN_GAP_H + " ч назад" }; }
   const done = [];
   try {
     for (const city of list) {
       const r = await runKrishaUrgent({ mode: "fresh", base: true, send: false, city: city, urgentOnly: false });
       done.push(r || {});
+      KW.lastBaseRun = KW.lastBaseRun || {};
+      KW.lastBaseRun[city] = new Date().toISOString();
+      saveKrisha();
       // Пауза между городами: два обхода подряд — это шестьсот запросов в час.
       await new Promise((r2) => setTimeout(r2, 60000));
     }
@@ -4667,7 +4689,23 @@ http
       const only = String(parsed.searchParams.get("cities") || parsed.searchParams.get("city") || "")
         .split(/[^a-z-]+/i).filter(Boolean);
       const cities = only.length ? only : KRISHA_CITIES;
-      runKrishaDaily(cities)
+      const force = parsed.searchParams.get("force") === "1";
+      // Проверяем до запуска, чтобы планировщик получил внятный ответ, а не 202
+      // на работу, которой не будет.
+      if (!force) {
+        const last = KW.lastBaseRun || {};
+        const due = cities.filter((c) => {
+          const at = Date.parse(last[c] || 0);
+          return !at || Date.now() - at >= KRISHA_MIN_GAP_H * 3600e3;
+        });
+        if (!due.length) {
+          return send(429, {
+            ok: false, skipped: true, cities: cities, minGapHours: KRISHA_MIN_GAP_H,
+            lastRun: last, error: "собирали меньше " + KRISHA_MIN_GAP_H + " ч назад",
+          });
+        }
+      }
+      runKrishaDaily(cities, { force: force })
         .then((o) => console.log("[krisha] сбор базы " + JSON.stringify(o)))
         .catch((e) => console.log("[krisha] сбор базы сорвался: " + e.message));
       return send(202, { ok: true, started: true, cities: cities, note: "итог придёт в Телеграм" });
