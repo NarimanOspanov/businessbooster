@@ -87,6 +87,12 @@ function parseCards(html) {
       // дата на карточке — это последнее поднятие, а не публикация
       bumped: stats.find((x) => /^(сегодня|вчера|\d{1,2}\s+[а-яё]+\.?)$/i.test(x)) || null,
       rooms: num((title.match(/(\d+)-комнатная/) || [])[1]),
+      // Этаж в заголовке: «... 42 м² · 6/9 этаж, Бурундайская 91». Есть почти
+      // у всех, и этого хватает, чтобы завести квартиру в базу, не открывая
+      // самого объявления.
+      floor: num((title.match(/(\d+)\/(\d+)\s*этаж/) || [])[1]),
+      floors: num((title.match(/(\d+)\/(\d+)\s*этаж/) || [])[2]),
+      photo: (c.match(/https:\/\/krisha-photos\.kcdn\.online\/[a-z0-9\/-]+?\/\d+-400x300\.jpg/) || [])[0] || null,
       ppm: Math.round(price / area),
       pro: /user-label-identified-specialist|user-title-pro/.test(c),
       // В Алматы районы «-ский», в Астане это «Нура р-н» и «р-н Байконур» —

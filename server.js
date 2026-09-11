@@ -1345,6 +1345,71 @@ async function runKrishaDaily(cities, opts) {
   return { cities: list, added: added, runs: done.length, failed: failed.length };
 }
 
+// Разбор архива: всё, что сейчас висит на Крыше от хозяев, а не только
+// сегодняшнее. Тут нам везёт — в карточке выдачи уже есть площадь с десятыми,
+// комнаты, этаж из этажности, район, цена и фотография. То есть весь ключ, по
+// которому квартира потом узнаётся в объявлении агента, берётся из самой
+// выдачи, и открывать 37 тысяч объявлений не нужно: хватает 1 900 страниц.
+//
+// Чего в карточке нет: года постройки, типа дома и даты публикации. Их
+// дочитываем по требованию — в тот момент, когда квартира кому-то понадобилась.
+const KRISHA_BACKFILL_PACE_MS = Number(process.env.KRISHA_BACKFILL_PACE_MS || 4000);
+let backfillRunning = false;
+
+async function runKrishaBackfill(city, pages, fromPage) {
+  if (backfillRunning) return { skipped: "уже идёт" };
+  backfillRunning = true;
+  const U = require("./scripts/krisha-urgent.js");
+  const K = require("./scripts/krisha-lib.js");
+  const Base = require("./scripts/krisha-base.js");
+  const c = U.cleanCity(city);
+  const base = "https://krisha.kz/prodazha/kvartiry/" + c + "/?das[_sys.hasphoto]=1&das[who]=1";
+  const start = Math.max(1, Number(fromPage) || (KW.backfill && KW.backfill[c]) || 1);
+  const limit = Math.max(1, Math.min(Number(pages) || 300, 600));
+
+  let page = start, seen = 0, saved = 0, total = null, empty = 0;
+  try {
+    for (; page < start + limit; page++) {
+      let html;
+      try { html = await K.fetchText(page > 1 ? base + "&page=" + page : base, 3, 15000); }
+      catch { empty++; if (empty > 5) break; await K.sleep(KRISHA_BACKFILL_PACE_MS); continue; }
+      if (total === null) {
+        const m = html.match(/"srchtype":"filter","offset":\d+,"count":(\d+)/);
+        if (m) total = Number(m[1]);
+      }
+      const cards = K.parseCards(html);
+      if (!cards.length) break;                      // страницы кончились
+      empty = 0;
+      seen += cards.length;
+      const rows = cards.map((x) => Base.record(x, {
+        floor: x.floor || null, floors: x.floors || null,
+      }, { city: c, title: x.title, photos: 0, ph1: x.photo || null }));
+      saved += await db.saveFlats(rows);
+      KU.progress = "архив " + c + ": страница " + page + ", собрано " + seen;
+      await K.sleep(KRISHA_BACKFILL_PACE_MS);
+    }
+  } finally {
+    backfillRunning = false;
+  }
+
+  KW.backfill = KW.backfill || {};
+  KW.backfill[c] = page;
+  saveKrisha();
+
+  const st = await db.krishaStats().catch(() => null);
+  const done = total ? Math.min(100, Math.round((100 * (page - 1) * 20) / total)) : null;
+  await notifyTelegram([
+    "📚 <b>Крыша · архив " + c + "</b>",
+    "",
+    "Страницы " + start + "–" + (page - 1) + ", карточек " + seen + ", записано " + saved,
+    total ? "Всего по фильтру " + total.toLocaleString("ru") + (done != null ? " · пройдено ~" + done + "%" : "") : null,
+    st ? "\nВ базе " + st.flats + ", с телефоном " + st.with_phone : null,
+    "Следующий запуск продолжит со страницы " + page,
+  ].filter(Boolean).join("\n"));
+
+  return { city: c, from: start, to: page - 1, seen: seen, saved: saved, total: total, next: page };
+}
+
 async function runKrishaWatch() {
   const K = require("./scripts/krisha-lib.js");
   const started = Date.now();
@@ -4736,6 +4801,33 @@ http
         .then((o) => console.log("[krisha] сбор базы " + JSON.stringify(o)))
         .catch((e) => console.log("[krisha] сбор базы сорвался: " + e.message));
       return send(202, { ok: true, started: true, cities: cities, note: "итог придёт в Телеграм" });
+    }
+
+    // Разбор архива: то, что висит на Крыше давно. Идёт кусками по триста
+    // страниц, каждый следующий вызов продолжает с того места, где кончил
+    // предыдущий, — так весь город набирается за несколько заходов, а не одним
+    // многочасовым обходом, на который площадка обидится.
+    if (urlPath === "/api/krisha/backfill") {
+      const send = (code, obj) => {
+        res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+        res.end(JSON.stringify(obj, null, 2));
+      };
+      const want = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
+      if (!want || parsed.searchParams.get("key") !== want) return send(403, { ok: false, error: "bad_key" });
+      if (backfillRunning || KU.running) {
+        return send(409, { ok: false, running: true, progress: KU.progress || null, error: "уже идёт" });
+      }
+      const city = parsed.searchParams.get("city") || "almaty";
+      const pages = parsed.searchParams.get("pages");
+      const from = parsed.searchParams.get("from");
+      runKrishaBackfill(city, pages, from)
+        .then((o) => console.log("[krisha] архив " + JSON.stringify(o)))
+        .catch((e) => console.log("[krisha] архив сорвался: " + e.message));
+      return send(202, {
+        ok: true, started: true, city: city,
+        from: Number(from) || (KW.backfill && KW.backfill[city]) || 1,
+        note: "итог придёт в Телеграм",
+      });
     }
 
     // Узнать свою квартиру в объявлении агента. Покупатель присылает ссылку —

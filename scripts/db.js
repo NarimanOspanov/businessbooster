@@ -650,7 +650,15 @@ async function saveFlat(f) {
       USING (SELECT @id AS id) AS s ON t.id = s.id
       WHEN MATCHED THEN UPDATE SET
         price = COALESCE(@price, t.price), title = COALESCE(@title, t.title),
-        photos = COALESCE(@photos, t.photos), last_seen = SYSUTCDATETIME()
+        photos = COALESCE(@photos, t.photos), last_seen = SYSUTCDATETIME(),
+        -- Сначала квартира может попасть из выдачи, без года и даты
+        -- публикации, а потом из карточки объявления — с ними. Пустое
+        -- заполняем, заполненное не затираем.
+        floor = COALESCE(t.floor, @floor), floors = COALESCE(t.floors, @floors),
+        build_year = COALESCE(t.build_year, @year), house = COALESCE(t.house, @house),
+        complex = COALESCE(t.complex, @complex), cond = COALESCE(t.cond, @cond),
+        addr = COALESCE(t.addr, @addr), photo1 = COALESCE(t.photo1, @photo1),
+        posted_on = COALESCE(t.posted_on, @posted)
       WHEN NOT MATCHED THEN INSERT
         (id, city, rooms, area, floor, floors, build_year, house, complex, cond,
          district, price, addr, title, photos, photo1, posted_on)
