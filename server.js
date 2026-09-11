@@ -1116,10 +1116,17 @@ async function runKrishaUrgent(opts) {
               price: card.price || null,
               addr: null,
             } : c;
+            // В базу кладём одну фотографию — по ней видно, о какой квартире
+            // речь, когда сверяешь с присланным объявлением агента. Берём
+            // средний размер: полноразмерная тут ни к чему.
+            let ph1 = card.photos && card.photos[0] ? card.photos[0].big : null;
+            if (ph1 && blob.ready()) {
+              try { ph1 = await blob.copyFrom(ph1, "base/" + c.id + ".jpg"); } catch { /* останется чужая */ }
+            }
             batch.push(Base.record(base, detail, {
               city: f.city, title: card.title, short: card.short,
               photos: (card.photos || []).length,
-              ph1: card.photos && card.photos[0] ? card.photos[0].full : null,
+              ph1: ph1,
             }));
           } catch { missed.push(c.id); }
           await new Promise((r) => setTimeout(r, KRISHA_PACE_MS));
@@ -1164,6 +1171,18 @@ async function runKrishaUrgent(opts) {
         try {
           const html = await KL.fetchText("https://krisha.kz/a/show/" + c.id, 3, 15000);
           const card = Card.parse(html, c.id);
+
+          // Фотографии забираем к себе: объявление снимут через неделю, а
+          // ссылка из поста должна остаться живой. Не получилось — оставляем
+          // адрес Крыши, страница с чужими картинками лучше, чем без картинок.
+          if (blob.ready()) {
+            KU.progress = "фото " + (i + 1) + " из " + rows.length;
+            for (let n = 0; n < (card.photos || []).length; n++) {
+              const p = card.photos[n];
+              try { p.big = await blob.copyFrom(p.big, "kv/" + c.id + "/" + (n + 1) + "-560.jpg"); } catch { /* останется чужая */ }
+              try { p.full = await blob.copyFrom(p.full, "kv/" + c.id + "/" + (n + 1) + "-full.jpg"); } catch { /* останется чужая */ }
+            }
+          }
           // Опубликованная квартира должна и в базе быть: иначе телефон,
           // который вы по ней пройдёте, повиснет без объявления — не найдётся
           // ни поиском, ни очередью на досъёмку.
@@ -1787,6 +1806,7 @@ async function buildCompetitors(slug) {
 
 const crypto = require("crypto");
 const db = require("./scripts/db");
+const blob = require("./scripts/azure-blob");
 const agentTemplate = require("./scripts/agent-template");
 // Инструменты агента ведут на наш сервер. Адрес берём из настройки, а не из
 // заголовка Host: заголовок присылает клиент, и подменив его, он подменил бы
