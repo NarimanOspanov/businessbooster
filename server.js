@@ -1090,7 +1090,13 @@ async function runKrishaUrgent(opts) {
         // Сначала догоняем то, что не отдалось в прошлые прогоны: в
         // «сегодняшних» эти квартиры больше не появятся, они уже вчерашние.
         const behind = (await db.pendingFlats(f.city, 60)).map((id) => ({ id: id, catchUp: true }));
-        const list = behind.concat(f.fresh24 || []);
+        // То, что уже в базе, не перечитываем: за сутки прогон может пройти
+        // дважды, и второй раз это те же полторы сотни карточек впустую.
+        const todays = f.fresh24 || [];
+        const have = await db.knownIds(todays.map((c) => c.id)).catch(() => new Set());
+        const news = todays.filter((c) => !have.has(String(c.id)));
+        if (have.size) console.log("[krisha] уже в базе: " + have.size + ", читаем " + news.length);
+        const list = behind.concat(news);
         for (let i = 0; i < list.length; i++) {
           const c = list[i];
           KU.progress = "база: " + (i + 1) + " из " + list.length +
@@ -1135,12 +1141,13 @@ async function runKrishaUrgent(opts) {
           "Поднято за сутки: " + f.corpus + ", из них опубликовано сегодня: <b>" + f.createdToday + "</b>",
           "В базу легло: <b>" + based + "</b>" + (missed.length ? ", не отдали: " + missed.length : "") +
             (behind.length ? " (в том числе догнали прошлые: " + behind.length + ")" : ""),
+          have.size ? "Уже были в базе: " + have.size + ", их не перечитывали" : null,
         ];
         if (st) {
           lines.push("", "Всего в базе <b>" + st.flats + "</b>, с телефоном " + st.with_phone +
             (st.pending ? ", ждут досъёмки " + st.pending : ""));
         }
-        await notifyTelegram(lines.join("\n"));
+        await notifyTelegram(lines.filter(Boolean).join("\n"));
       }
 
       const rows = good.slice(0, o.n || 12);

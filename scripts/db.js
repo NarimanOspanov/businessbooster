@@ -659,6 +659,24 @@ async function saveFlat(f) {
          @district, @price, @addr, @title, @photos, @photo1, @posted);`);
 }
 
+// Какие из этих объявлений у нас уже есть. Нужно перед снятием карточек: за
+// сутки прогон может пройти дважды, и второй раз читать то же самое незачем.
+async function knownIds(ids) {
+  const list = (ids || []).map((x) => Number(x)).filter(Boolean);
+  if (!list.length) return new Set();
+  const pool = await getPool();
+  const have = new Set();
+  // Пачками: список параметров в запросе не бесконечный.
+  for (let i = 0; i < list.length; i += 200) {
+    const chunk = list.slice(i, i + 200);
+    const req = pool.request();
+    const names = chunk.map((id, n) => { req.input("i" + n, sql.BigInt, id); return "@i" + n; });
+    const r = await req.query("SELECT id FROM dbo.krisha_flats WHERE id IN (" + names.join(",") + ")");
+    r.recordset.forEach((x) => have.add(String(x.id)));
+  }
+  return have;
+}
+
 async function saveFlats(list) {
   let ok = 0;
   for (const f of list || []) {
@@ -853,7 +871,7 @@ async function pendingFlats(city, limit) {
   return r.recordset.map((x) => String(x.flat_id));
 }
 
-module.exports = { saveFlat, saveFlats, saveFlatPhones, normPhone, flatPhones, flatsWithoutPhone,
+module.exports = { saveFlat, saveFlats, knownIds, saveFlatPhones, normPhone, flatPhones, flatsWithoutPhone,
   saveCard, card, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 
