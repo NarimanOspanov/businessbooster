@@ -122,4 +122,9 @@ async function copyFrom(url, name) {
   return put(name, buf, r.headers.get("content-type") || "image/jpeg");
 }
 
-module.exports = { ready, config, put, head, copyFrom, publicUrl, openContainer };
+async function del(name) {
+  const r = await call("DELETE", "/" + String(name).replace(/^\/+/, ""), null, null);
+  return r.ok || r.status === 404;
+}
+
+module.exports = { ready, config, put, head, del, copyFrom, publicUrl, openContainer };

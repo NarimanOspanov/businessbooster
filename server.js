@@ -1367,7 +1367,7 @@ async function runKrishaBackfill(city, pages, fromPage) {
   const start = Math.max(1, Number(fromPage) || (KW.backfill && KW.backfill[c]) || 1);
   const limit = Math.max(1, Math.min(Number(pages) || 300, 600));
 
-  let page = start, seen = 0, saved = 0, total = null, empty = 0;
+  let page = start, seen = 0, saved = 0, total = null, empty = 0, copied = 0;
   try {
     for (; page < start + limit; page++) {
       let html;
@@ -1381,11 +1381,33 @@ async function runKrishaBackfill(city, pages, fromPage) {
       if (!cards.length) break;                      // страницы кончились
       empty = 0;
       seen += cards.length;
+
+      // Фотографии забираем здесь же, не открывая объявлений. Лежат они на
+      // отдельном хосте — krisha-photos.kcdn.online, — и наша пауза в четыре
+      // секунды нужна выдаче, а не картинкам. Поэтому качаем их пачкой прямо
+      // внутрь этой паузы: двадцать снимков успевают до следующей страницы.
+      if (blob.ready()) {
+        await Promise.all(cards.map(async (x) => {
+          if (!x.photo) return;
+          try { x.photo = await blob.copyFrom(x.photo, "base/" + x.id + ".jpg"); }
+          catch { /* останется адрес Крыши */ }
+        }));
+        copied += cards.filter((x) => /blob\.core\.windows\.net/.test(String(x.photo))).length;
+      }
+
       const rows = cards.map((x) => Base.record(x, {
         floor: x.floor || null, floors: x.floors || null,
       }, { city: c, title: x.title, photos: 0, ph1: x.photo || null }));
       saved += await db.saveFlats(rows);
       KU.progress = "архив " + c + ": страница " + page + ", собрано " + seen;
+
+      // Отметку о пройденном сохраняем по ходу, а не в конце: прогон могут
+      // оборвать выкатом, и терять из-за этого триста страниц незачем.
+      if (page % 25 === 0) {
+        KW.backfill = KW.backfill || {};
+        KW.backfill[c] = page + 1;
+        saveKrisha();
+      }
       await K.sleep(KRISHA_BACKFILL_PACE_MS);
     }
   } finally {
@@ -1402,12 +1424,13 @@ async function runKrishaBackfill(city, pages, fromPage) {
     "📚 <b>Крыша · архив " + c + "</b>",
     "",
     "Страницы " + start + "–" + (page - 1) + ", карточек " + seen + ", записано " + saved,
+    copied ? "Фотографий сохранено: " + copied : null,
     total ? "Всего по фильтру " + total.toLocaleString("ru") + (done != null ? " · пройдено ~" + done + "%" : "") : null,
     st ? "\nВ базе " + st.flats + ", с телефоном " + st.with_phone : null,
     "Следующий запуск продолжит со страницы " + page,
   ].filter(Boolean).join("\n"));
 
-  return { city: c, from: start, to: page - 1, seen: seen, saved: saved, total: total, next: page };
+  return { city: c, from: start, to: page - 1, seen: seen, saved: saved, copied: copied, total: total, next: page };
 }
 
 async function runKrishaWatch() {
