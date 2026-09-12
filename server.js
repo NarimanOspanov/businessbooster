@@ -4835,7 +4835,7 @@ http
       };
       const want = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
       if (!want || parsed.searchParams.get("key") !== want) return send(403, { ok: false, error: "bad_key" });
-      if (baseRunning || KU.running) {
+      if (baseRunning || KU.running || deepenRunning || backfillRunning) {
         return send(409, { ok: false, running: true, progress: KU.progress || null, error: "уже идёт" });
       }
       const only = String(parsed.searchParams.get("cities") || parsed.searchParams.get("city") || "")
@@ -5016,7 +5016,7 @@ http
       };
       const want = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
       if (!want || parsed.searchParams.get("key") !== want) return send(403, { ok: false, error: "bad_key" });
-      if (backfillRunning || KU.running) {
+      if (backfillRunning || KU.running || deepenRunning || baseRunning) {
         return send(409, { ok: false, running: true, progress: KU.progress || null, error: "уже идёт" });
       }
       // Без города берём первый непройденный из KRISHA_CITIES — так один джоб
