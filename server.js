@@ -1372,6 +1372,10 @@ async function runKrishaDaily(cities, opts) {
 // Чего в карточке нет: года постройки, типа дома и даты публикации. Их
 // дочитываем по требованию — в тот момент, когда квартира кому-то понадобилась.
 const KRISHA_BACKFILL_PACE_MS = Number(process.env.KRISHA_BACKFILL_PACE_MS || 4000);
+// Сколько страниц объявлений дочитывание берёт за сутки. Вместе с суточным
+// сбором это держит нас в трёх тысячах запросов — вдвое ниже того, на чём нас
+// однажды отрезали.
+const KRISHA_DEEPEN_DAILY = Number(process.env.KRISHA_DEEPEN_DAILY || 2500);
 let backfillRunning = false;
 let photosRunning = false;
 let deepenRunning = false;
@@ -4873,7 +4877,21 @@ http
       if (deepenRunning || KU.running || backfillRunning) {
         return send(409, { ok: false, running: true, progress: KU.progress || null, error: "уже идёт" });
       }
-      const limit = Math.max(1, Math.min(Number(parsed.searchParams.get("limit") || 300), 1000));
+      // Суточный бюджет на страницы объявлений. 28 тысяч за день не прочитать
+      // никакой паузой: в августе Крыша перестала отвечать этому серверу на
+      // пяти тысячах в сутки. Поэтому предел — в коде, а не в расписании: так
+      // его нельзя случайно превысить, поставив джоб почаще.
+      const today = new Date(Date.now() + 5 * 3600e3).toISOString().slice(0, 10);
+      KW.deepen = KW.deepen || {};
+      if (KW.deepen.day !== today) KW.deepen = { day: today, read: 0 };
+      const budget = Math.max(0, KRISHA_DEEPEN_DAILY - KW.deepen.read);
+      if (!budget) {
+        return send(429, {
+          ok: false, skipped: true, readToday: KW.deepen.read, dailyLimit: KRISHA_DEEPEN_DAILY,
+          error: "суточный бюджет израсходован",
+        });
+      }
+      const limit = Math.max(1, Math.min(Number(parsed.searchParams.get("limit") || 500), 2000, budget));
       deepenRunning = true;
       (async () => {
         const Card = require("./scripts/krisha-card.js");
@@ -4908,6 +4926,8 @@ http
               ));
               done++;
             } catch { failed++; }
+            KW.deepen.read = (KW.deepen.read || 0) + 1;
+            if (i % 50 === 0) saveKrisha();
             await KL.sleep(KRISHA_PACE_MS);
           }
         } finally {
