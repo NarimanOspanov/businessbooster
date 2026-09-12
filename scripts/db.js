@@ -886,12 +886,16 @@ async function facets() {
       SUM(CASE WHEN toilet IS NOT NULL THEN 1 ELSE 0 END) AS toilet,
       SUM(CASE WHEN cond IS NOT NULL THEN 1 ELSE 0 END) AS cond,
       SUM(CASE WHEN floor IS NOT NULL THEN 1 ELSE 0 END) AS floor,
-      SUM(CASE WHEN kitchen IS NOT NULL THEN 1 ELSE 0 END) AS kitchen
+      SUM(CASE WHEN kitchen IS NOT NULL THEN 1 ELSE 0 END) AS kitchen,
+      SUM(CASE WHEN posted_on IS NOT NULL THEN 1 ELSE 0 END) AS posted_on
     FROM dbo.krisha_flats`);
   out.known = k.recordset[0];
   const y = await pool.request().query(
     "SELECT MIN(build_year) AS lo, MAX(build_year) AS hi FROM dbo.krisha_flats WHERE build_year IS NOT NULL");
   out.years = y.recordset[0];
+  const d = await pool.request().query(
+    "SELECT MIN(posted_on) AS lo, MAX(posted_on) AS hi FROM dbo.krisha_flats WHERE posted_on IS NOT NULL");
+  out.posted = d.recordset[0];
   return out;
 }
 
@@ -984,7 +988,8 @@ async function findFlats(q, limit) {
   // свежести, а не по совпадению.
   if (!area) {
     const any = q.district || q.rooms || q.priceFrom || q.priceTo || q.mkr || q.city || q.addr ||
-      q.yearFrom || q.yearTo || q.house || q.toilet || q.cond || q.notFirst || q.notLast;
+      q.yearFrom || q.yearTo || q.house || q.toilet || q.cond || q.notFirst || q.notLast ||
+      q.postedFrom || q.postedTo;
     if (!any) return [];
     const r0 = await pool.request()
       .input("rooms", sql.Int, q.rooms ? Number(q.rooms) : null)
@@ -998,6 +1003,8 @@ async function findFlats(q, limit) {
       .input("cond", sql.NVarChar(80), q.cond || null)
       .input("nf", sql.Bit, q.notFirst ? 1 : 0)
       .input("nl", sql.Bit, q.notLast ? 1 : 0)
+      .input("pf", sql.Date, q.postedFrom || null)
+      .input("pt", sql.Date, q.postedTo || null)
       .input("district", sql.NVarChar(100), q.district || null)
       .input("floor", sql.Int, q.floor ? Number(q.floor) : null)
       .input("from", sql.BigInt, q.priceFrom ? Number(q.priceFrom) : null)
@@ -1026,6 +1033,8 @@ async function findFlats(q, limit) {
           -- первый этаж и последний сбивают цену и отсеиваются первым делом.
           AND (@nf = 0 OR f.floor IS NULL OR f.floor > 1)
           AND (@nl = 0 OR f.floor IS NULL OR f.floors IS NULL OR f.floor < f.floors)
+          AND (@pf IS NULL OR f.posted_on >= @pf)
+          AND (@pt IS NULL OR f.posted_on <= @pt)
         ORDER BY f.posted_on DESC, f.id DESC`);
     return r0.recordset;
   }
