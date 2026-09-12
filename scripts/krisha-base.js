@@ -29,6 +29,13 @@ function fromShort(short, label) {
   return line ? line.slice(line.indexOf(":") + 1).trim() : null;
 }
 
+// «https://krisha-photos.kcdn.online/webp/1e/1e0e145a-…/3-560x350.jpg»
+// -> «webp/1e/1e0e145a-…»
+function photoDirOf(url) {
+  const m = String(url || "").match(/(webp\/[0-9a-f]{2}\/[0-9a-f-]{36})\//);
+  return m ? m[1] : null;
+}
+
 // card — карточка из выдачи (комнаты, площадь, район, цена), detail — разбор
 // страницы объявления (год, тип дома, этаж), photos — только счёт и первая.
 function record(card, detail, extra) {
@@ -50,9 +57,11 @@ function record(card, detail, extra) {
     addr: card.addr || null,
     title: e.title || card.title || null,
     photos: e.photos || 0,
-    // Первая фотография: по её размеру в байтах потом видно ленивое
-    // перевыкладывание — агент залил тот же файл.
     ph1: e.ph1 || null,
+    // Папка снимков на CDN: у объявления она одна на все фотографии, а имена
+    // файлов — номера. Зная папку, галерею можно собрать перебором, не
+    // открывая объявление.
+    photoDir: e.photoDir || photoDirOf(e.ph1) || photoDirOf(e.photoSrc) || null,
     created: (detail && detail.createdAt) || null,
     seen: new Date().toISOString().slice(0, 10),
   };
@@ -207,6 +216,6 @@ async function queryFromUrl(url) {
 }
 
 module.exports = {
-  dir, record, saveDay, all, stats, search, queryFromUrl, fromShort,
+  dir, record, saveDay, photoDirOf, all, stats, search, queryFromUrl, fromShort,
   markPending, clearPending, pendingFor, readPending,
 };

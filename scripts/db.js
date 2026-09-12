@@ -237,6 +237,14 @@ BEGIN
   );
 END
 
+-- Папка снимков на CDN Крыши: у объявления она одна и постоянная, а имена
+-- файлов — просто номера. Зная папку, всю галерею можно собрать перебором, не
+-- открывая объявление. Номера при этом не вечные: если хозяин перезаливает
+-- фотографии, старые умирают, а новые продолжают нумерацию дальше — проверено
+-- на объявлении, у которого снимки 2–8 за сутки стали 9–15.
+IF COL_LENGTH('dbo.krisha_flats', 'photo_dir') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD photo_dir NVARCHAR(120) NULL;
+
 -- Объявления, которые Крыша не отдала: в «сегодняшних» они больше не всплывут,
 -- поэтому досниаются в начале следующих прогонов.
 IF OBJECT_ID('dbo.krisha_pending', 'U') IS NULL
@@ -644,6 +652,7 @@ async function saveFlat(f) {
     .input("title", sql.NVarChar(300), f.title || null)
     .input("photos", sql.Int, f.photos || null)
     .input("photo1", sql.NVarChar(300), f.ph1 || null)
+    .input("dir", sql.NVarChar(120), f.photoDir || null)
     .input("posted", sql.Date, f.created || null)
     .query(`
       MERGE dbo.krisha_flats AS t
@@ -658,13 +667,14 @@ async function saveFlat(f) {
         build_year = COALESCE(t.build_year, @year), house = COALESCE(t.house, @house),
         complex = COALESCE(t.complex, @complex), cond = COALESCE(t.cond, @cond),
         addr = COALESCE(t.addr, @addr), photo1 = COALESCE(t.photo1, @photo1),
+        photo_dir = COALESCE(t.photo_dir, @dir),
         posted_on = COALESCE(t.posted_on, @posted)
       WHEN NOT MATCHED THEN INSERT
         (id, city, rooms, area, floor, floors, build_year, house, complex, cond,
-         district, price, addr, title, photos, photo1, posted_on)
+         district, price, addr, title, photos, photo1, photo_dir, posted_on)
       VALUES
         (@id, @city, @rooms, @area, @floor, @floors, @year, @house, @complex, @cond,
-         @district, @price, @addr, @title, @photos, @photo1, @posted);`);
+         @district, @price, @addr, @title, @photos, @photo1, @dir, @posted);`);
 }
 
 // Какие из этих объявлений у нас уже есть. Нужно перед снятием карточек: за
@@ -701,6 +711,40 @@ function normPhone(raw) {
   if (d.length === 11 && /^[78]/.test(d)) return "7" + d.slice(1);
   if (d.length === 10) return "7" + d;
   return null;
+}
+
+// Квартиры, чья фотография всё ещё лежит на Крыше. Их снимки догоняем отдельным
+// проходом: качать 24 тысячи картинок во время обхода выдачи незачем, а CDN на
+// параллельные запросы не жалуется — там нет ни капчи, ни ограничения темпа.
+async function flatsNeedingPhoto(limit) {
+  const pool = await getPool();
+  const r = await pool.request().input("n", sql.Int, Number(limit) || 400).query(`
+    SELECT TOP (@n) id, photo1 FROM dbo.krisha_flats
+    WHERE photo1 IS NOT NULL AND photo1 NOT LIKE '%blob.core.windows.net%'
+    ORDER BY id DESC`);
+  return r.recordset;
+}
+
+async function setFlatPhoto(id, url, dir) {
+  const pool = await getPool();
+  await pool.request()
+    .input("id", sql.BigInt, Number(id))
+    .input("u", sql.NVarChar(300), url || null)
+    .input("d", sql.NVarChar(120), dir || null)
+    .query(`UPDATE dbo.krisha_flats
+            SET photo1 = COALESCE(@u, photo1), photo_dir = COALESCE(@d, photo_dir)
+            WHERE id = @id`);
+}
+
+async function photoStats() {
+  const pool = await getPool();
+  const r = await pool.request().query(`
+    SELECT COUNT(*) AS total,
+      SUM(CASE WHEN photo1 LIKE '%blob.core.windows.net%' THEN 1 ELSE 0 END) AS ours,
+      SUM(CASE WHEN photo1 IS NULL THEN 1 ELSE 0 END) AS none,
+      SUM(CASE WHEN photo_dir IS NOT NULL THEN 1 ELSE 0 END) AS with_dir
+    FROM dbo.krisha_flats`);
+  return r.recordset[0];
 }
 
 async function saveFlatPhones(flatId, phones, source) {
@@ -879,7 +923,7 @@ async function pendingFlats(city, limit) {
   return r.recordset.map((x) => String(x.flat_id));
 }
 
-module.exports = { saveFlat, saveFlats, knownIds, saveFlatPhones, normPhone, flatPhones, flatsWithoutPhone,
+module.exports = { saveFlat, saveFlats, knownIds, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, normPhone, flatPhones, flatsWithoutPhone,
   saveCard, card, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 

@@ -1355,6 +1355,7 @@ async function runKrishaDaily(cities, opts) {
 // дочитываем по требованию — в тот момент, когда квартира кому-то понадобилась.
 const KRISHA_BACKFILL_PACE_MS = Number(process.env.KRISHA_BACKFILL_PACE_MS || 4000);
 let backfillRunning = false;
+let photosRunning = false;
 
 async function runKrishaBackfill(city, pages, fromPage) {
   if (backfillRunning) return { skipped: "уже идёт" };
@@ -1386,6 +1387,9 @@ async function runKrishaBackfill(city, pages, fromPage) {
       // отдельном хосте — krisha-photos.kcdn.online, — и наша пауза в четыре
       // секунды нужна выдаче, а не картинкам. Поэтому качаем их пачкой прямо
       // внутрь этой паузы: двадцать снимков успевают до следующей страницы.
+      // Исходный адрес запоминаем до копирования: из него берётся папка на CDN,
+      // а после подмены на наш адрес её уже не восстановить.
+      cards.forEach((x) => { x.photoSrc = x.photo; });
       if (blob.ready()) {
         await Promise.all(cards.map(async (x) => {
           if (!x.photo) return;
@@ -1397,7 +1401,7 @@ async function runKrishaBackfill(city, pages, fromPage) {
 
       const rows = cards.map((x) => Base.record(x, {
         floor: x.floor || null, floors: x.floors || null,
-      }, { city: c, title: x.title, photos: 0, ph1: x.photo || null }));
+      }, { city: c, title: x.title, photos: 0, ph1: x.photo || null, photoSrc: x.photoSrc }));
       saved += await db.saveFlats(rows);
       KU.progress = "архив " + c + ": страница " + page + ", собрано " + seen;
 
@@ -4824,6 +4828,62 @@ http
         .then((o) => console.log("[krisha] сбор базы " + JSON.stringify(o)))
         .catch((e) => console.log("[krisha] сбор базы сорвался: " + e.message));
       return send(202, { ok: true, started: true, cities: cities, note: "итог придёт в Телеграм" });
+    }
+
+    // Догон фотографий по тем квартирам, что уже в базе со ссылкой на Крышу.
+    // Ходим только на CDN — там нет ни капчи, ни ограничения темпа, поэтому
+    // качаем по двадцать за раз. Заодно запоминаем папку снимков.
+    if (urlPath === "/api/krisha/photos") {
+      const send = (code, obj) => {
+        res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+        res.end(JSON.stringify(obj, null, 2));
+      };
+      const want = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
+      if (!want || parsed.searchParams.get("key") !== want) return send(403, { ok: false, error: "bad_key" });
+      if (photosRunning) return send(409, { ok: false, running: true, progress: KU.progress || null });
+      if (!blob.ready()) return send(409, { ok: false, error: "хранилище не настроено" });
+
+      const limit = Math.max(1, Math.min(Number(parsed.searchParams.get("limit") || 600), 3000));
+      photosRunning = true;
+      (async () => {
+        const Base = require("./scripts/krisha-base.js");
+        let done = 0, failed = 0;
+        try {
+          for (;;) {
+            const rows = await db.flatsNeedingPhoto(Math.min(20, limit - done - failed));
+            if (!rows.length || done + failed >= limit) break;
+            await Promise.all(rows.map(async (r) => {
+              const dir = Base.photoDirOf(r.photo1);
+              try {
+                const url = await blob.copyFrom(r.photo1, "base/" + r.id + ".jpg");
+                await db.setFlatPhoto(r.id, url, dir);
+                done++;
+              } catch {
+                // Снимка уже нет — папку всё равно запомним, по ней галерею
+                // можно будет собрать перебором.
+                try { await db.setFlatPhoto(r.id, null, dir); } catch { /* не судьба */ }
+                failed++;
+              }
+            }));
+            KU.progress = "фото из базы: перенесено " + done + ", не вышло " + failed;
+          }
+        } finally {
+          photosRunning = false;
+          KU.progress = null;
+        }
+        const st = await db.photoStats().catch(() => null);
+        await notifyTelegram([
+          "🖼 <b>Крыша: фотографии</b>",
+          "",
+          "Перенесено: <b>" + done + "</b>" + (failed ? ", не вышло: " + failed : ""),
+          st ? "У нас в хранилище " + st.ours + " из " + st.total + ", папка известна у " + st.with_dir : null,
+        ].filter(Boolean).join("\n"));
+        return { done: done, failed: failed };
+      })()
+        .then((o) => console.log("[krisha] фото " + JSON.stringify(o)))
+        .catch((e) => { photosRunning = false; console.log("[krisha] фото сорвалось: " + e.message); });
+
+      return send(202, { ok: true, started: true, limit: limit, note: "итог придёт в Телеграм" });
     }
 
     // Разбор архива: то, что висит на Крыше давно. Идёт кусками по триста
