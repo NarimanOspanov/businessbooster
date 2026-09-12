@@ -924,11 +924,12 @@ async function findFlats(q, limit) {
   // не «узнать квартиру», а «посмотреть, что подходит», поэтому сортировка по
   // свежести, а не по совпадению.
   if (!area) {
-    if (!q.district && !q.rooms && !q.priceFrom && !q.priceTo && !q.mkr && !q.city) return [];
+    if (!q.district && !q.rooms && !q.priceFrom && !q.priceTo && !q.mkr && !q.city && !q.addr) return [];
     const r0 = await pool.request()
       .input("rooms", sql.Int, q.rooms ? Number(q.rooms) : null)
       .input("city", sql.NVarChar(40), q.city || null)
       .input("mkr", sql.NVarChar(80), q.mkr || null)
+      .input("addr", sql.NVarChar(200), q.addr || null)
       .input("district", sql.NVarChar(100), q.district || null)
       .input("floor", sql.Int, q.floor ? Number(q.floor) : null)
       .input("from", sql.BigInt, q.priceFrom ? Number(q.priceFrom) : null)
@@ -941,6 +942,9 @@ async function findFlats(q, limit) {
           AND (@floor IS NULL OR f.floor = @floor)
           AND (@city IS NULL OR f.city = @city)
           AND (@mkr IS NULL OR f.mkr LIKE '%' + @mkr + '%')
+          -- Улица с домом попадает то в адрес, то в заголовок, поэтому ищем в
+          -- обоих: «Бурундайская 91» встречается только в заголовке.
+          AND (@addr IS NULL OR f.addr LIKE '%' + @addr + '%' OR f.title LIKE '%' + @addr + '%')
           AND (@district IS NULL OR f.district LIKE '%' + @district + '%')
           AND (@from IS NULL OR f.price >= @from)
           AND (@to IS NULL OR f.price <= @to)
@@ -957,6 +961,7 @@ async function findFlats(q, limit) {
     .input("year", sql.Int, q.year ? Number(q.year) : null)
     .input("district", sql.NVarChar(100), q.district || null)
     .input("complex", sql.NVarChar(160), q.complex || null)
+    .input("addr2", sql.NVarChar(200), q.addr || null)
     .input("n", sql.Int, Number(limit) || 8)
     .query(`
       SELECT TOP (@n) f.*,
@@ -965,7 +970,8 @@ async function findFlats(q, limit) {
           + IIF(@floors IS NOT NULL AND f.floors = @floors, 1, 0)
           + IIF(@year IS NOT NULL AND f.build_year = @year, 1, 0)
           + IIF(@district IS NOT NULL AND f.district = @district, 1, 0)
-          + IIF(@complex IS NOT NULL AND f.complex = @complex, 1, 0) AS score
+          + IIF(@complex IS NOT NULL AND f.complex = @complex, 1, 0)
+          + IIF(@addr2 IS NOT NULL AND (f.addr LIKE '%' + @addr2 + '%' OR f.title LIKE '%' + @addr2 + '%'), 2, 0) AS score
       FROM dbo.krisha_flats f
       WHERE f.area BETWEEN @lo AND @hi
         AND (@rooms IS NULL OR f.rooms IS NULL OR f.rooms = @rooms)

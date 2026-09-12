@@ -5085,10 +5085,11 @@ http
             district: parsed.searchParams.get("district"),
             city: parsed.searchParams.get("city"),
             mkr: parsed.searchParams.get("mkr"),
+            addr: parsed.searchParams.get("addr"),
             priceFrom: parsed.searchParams.get("priceFrom"),
             priceTo: parsed.searchParams.get("priceTo"),
           };
-          if (!q.area && !q.district && !q.rooms && !q.priceFrom && !q.priceTo && !q.mkr && !q.city) {
+          if (!q.area && !q.district && !q.rooms && !q.priceFrom && !q.priceTo && !q.mkr && !q.city && !q.addr) {
             return send(400, { ok: false, error: "нужна ссылка или хоть один признак" });
           }
         }
