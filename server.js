@@ -1420,6 +1420,13 @@ async function runKrishaBackfill(city, pages, fromPage) {
 
   KW.backfill = KW.backfill || {};
   KW.backfill[c] = page;
+  // Город пройден, если обход упёрся в конец, а не в предел по страницам:
+  // тогда следующие запуски без города возьмутся за другой город, а не будут
+  // раз за разом уходить за последнюю страницу этого.
+  if (page < start + limit) {
+    KW.backfillDone = KW.backfillDone || {};
+    KW.backfillDone[c] = true;
+  }
   saveKrisha();
 
   const st = await db.krishaStats().catch(() => null);
@@ -4900,7 +4907,16 @@ http
       if (backfillRunning || KU.running) {
         return send(409, { ok: false, running: true, progress: KU.progress || null, error: "уже идёт" });
       }
-      const city = parsed.searchParams.get("city") || "almaty";
+      // Без города берём первый непройденный из KRISHA_CITIES — так один джоб
+      // без параметров доводит до конца сначала один город, потом следующий.
+      // Раньше по умолчанию брался Алматы, и после его окончания каждый запуск
+      // уходил за последнюю страницу и не делал ничего.
+      const done = KW.backfillDone || {};
+      const city = parsed.searchParams.get("city") ||
+        KRISHA_CITIES.find((x) => !done[x]) || null;
+      if (!city) {
+        return send(200, { ok: true, started: false, doneCities: Object.keys(done), note: "все города пройдены" });
+      }
       const pages = parsed.searchParams.get("pages");
       const from = parsed.searchParams.get("from");
       runKrishaBackfill(city, pages, from)
@@ -4955,7 +4971,9 @@ http
               { ok: true, imported: { flats: flats, cards: cards, withPhone: phones } },
               await db.krishaStats()));
           }
-          return send(200, Object.assign({ ok: true }, await db.krishaStats()));
+          return send(200, Object.assign({ ok: true }, await db.krishaStats(), {
+            backfill: KW.backfill || {}, backfillDone: KW.backfillDone || {},
+          }));
         }
         const url = parsed.searchParams.get("url");
         let q;
