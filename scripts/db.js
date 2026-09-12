@@ -725,6 +725,11 @@ async function flatsNeedingPhoto(limit) {
   return r.recordset;
 }
 
+// url = null означает «показать нечего»: снимок не скачался и адрес на Крыше
+// мёртвый. Тогда поле именно обнуляем, а не оставляем как было, — иначе эта
+// квартира будет попадать в очередь на перенос при каждом прогоне и вечно
+// откусывать бюджет. Папка при этом сохраняется: по ней галерею всё равно
+// можно собрать перебором.
 async function setFlatPhoto(id, url, dir) {
   const pool = await getPool();
   await pool.request()
@@ -732,7 +737,7 @@ async function setFlatPhoto(id, url, dir) {
     .input("u", sql.NVarChar(300), url || null)
     .input("d", sql.NVarChar(120), dir || null)
     .query(`UPDATE dbo.krisha_flats
-            SET photo1 = COALESCE(@u, photo1), photo_dir = COALESCE(@d, photo_dir)
+            SET photo1 = @u, photo_dir = COALESCE(@d, photo_dir)
             WHERE id = @id`);
 }
 
