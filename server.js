@@ -1116,17 +1116,26 @@ async function runKrishaUrgent(opts) {
               price: card.price || null,
               addr: null,
             } : c;
-            // В базу кладём одну фотографию — по ней видно, о какой квартире
-            // речь, когда сверяешь с присланным объявлением агента. Берём
-            // средний размер: полноразмерная тут ни к чему.
-            let ph1 = card.photos && card.photos[0] ? card.photos[0].big : null;
-            if (ph1 && blob.ready()) {
-              try { ph1 = await blob.copyFrom(ph1, "base/" + c.id + ".jpg"); } catch { /* останется чужая */ }
+            // Страница объявления уже прочитана, значит полный список снимков
+            // у нас на руках — забираем все, а не только первый. Объявление
+            // однажды снимут, и показать квартиру покупателю будет нечем.
+            // Размер берём средний: полноразмерные нужны только там, где их
+            // разглядывают, то есть у опубликованных квартир.
+            const shots = card.photos || [];
+            let ph1 = shots[0] ? shots[0].big : null;
+            if (shots.length && blob.ready()) {
+              await Promise.all(shots.map(async (p, n) => {
+                try {
+                  const u = await blob.copyFrom(p.big, "flat/" + c.id + "/" + (n + 1) + ".jpg");
+                  if (n === 0) ph1 = u;
+                } catch { /* останется адрес Крыши */ }
+              }));
             }
             batch.push(Base.record(base, detail, {
               city: f.city, title: card.title, short: card.short,
-              photos: (card.photos || []).length,
+              photos: shots.length,
               ph1: ph1,
+              photoSrc: shots[0] ? shots[0].big : null,
             }));
           } catch { missed.push(c.id); }
           await new Promise((r) => setTimeout(r, KRISHA_PACE_MS));
