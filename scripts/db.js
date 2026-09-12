@@ -275,8 +275,14 @@ IF COL_LENGTH('dbo.krisha_flats', 'parking') IS NULL
   ALTER TABLE dbo.krisha_flats ADD parking NVARCHAR(60) NULL;
 IF COL_LENGTH('dbo.krisha_flats', 'dorm') IS NULL
   ALTER TABLE dbo.krisha_flats ADD dorm BIT NULL;
+-- «Квартира меблирована» отвечает не «да/нет», а «полностью», «частично»,
+-- «без мебели». Булевой колонкой это не описать, а «частично» — как раз то,
+-- что покупателю важно знать. Меняем тип: значений в ней всё равно не было.
 IF COL_LENGTH('dbo.krisha_flats', 'furnished') IS NULL
-  ALTER TABLE dbo.krisha_flats ADD furnished BIT NULL;
+  ALTER TABLE dbo.krisha_flats ADD furnished NVARCHAR(40) NULL;
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.krisha_flats')
+           AND name = 'furnished' AND system_type_id = TYPE_ID('bit'))
+  ALTER TABLE dbo.krisha_flats ALTER COLUMN furnished NVARCHAR(40) NULL;
 IF COL_LENGTH('dbo.krisha_flats', 'is_agent') IS NULL
   ALTER TABLE dbo.krisha_flats ADD is_agent BIT NULL;
 
@@ -696,7 +702,7 @@ async function saveFlat(f) {
     .input("balcony", sql.NVarChar(60), f.balcony || null)
     .input("parking", sql.NVarChar(60), f.parking || null)
     .input("dorm", sql.Bit, f.dorm == null ? null : f.dorm)
-    .input("furnished", sql.Bit, f.furnished == null ? null : f.furnished)
+    .input("furnished", sql.NVarChar(40), f.furnished || null)
     .input("agent", sql.Bit, f.isAgent == null ? null : f.isAgent)
     .input("posted", sql.Date, f.created || null)
     .query(`
@@ -873,7 +879,7 @@ async function places() {
 async function facets() {
   const pool = await getPool();
   const out = {};
-  for (const col of ["house", "toilet", "cond", "balcony", "parking"]) {
+  for (const col of ["house", "toilet", "cond", "balcony", "parking", "furnished"]) {
     const r = await pool.request().query(
       "SELECT " + col + " AS v, COUNT(*) AS n FROM dbo.krisha_flats" +
       " WHERE " + col + " IS NOT NULL GROUP BY " + col + " ORDER BY n DESC");
@@ -989,7 +995,7 @@ async function findFlats(q, limit) {
   if (!area) {
     const any = q.district || q.rooms || q.priceFrom || q.priceTo || q.mkr || q.city || q.addr ||
       q.yearFrom || q.yearTo || q.house || q.toilet || q.cond || q.notFirst || q.notLast ||
-      q.postedFrom || q.postedTo;
+      q.postedFrom || q.postedTo || q.furnished;
     if (!any) return [];
     const r0 = await pool.request()
       .input("rooms", sql.Int, q.rooms ? Number(q.rooms) : null)
@@ -1001,6 +1007,7 @@ async function findFlats(q, limit) {
       .input("house", sql.NVarChar(60), q.house || null)
       .input("toilet", sql.NVarChar(40), q.toilet || null)
       .input("cond", sql.NVarChar(80), q.cond || null)
+      .input("furn", sql.NVarChar(40), q.furnished || null)
       .input("nf", sql.Bit, q.notFirst ? 1 : 0)
       .input("nl", sql.Bit, q.notLast ? 1 : 0)
       .input("pf", sql.Date, q.postedFrom || null)
@@ -1029,6 +1036,7 @@ async function findFlats(q, limit) {
           AND (@house IS NULL OR f.house = @house)
           AND (@toilet IS NULL OR f.toilet = @toilet)
           AND (@cond IS NULL OR f.cond LIKE '%' + @cond + '%')
+          AND (@furn IS NULL OR f.furnished = @furn)
           -- «не первый» и «не последний» — то, с чего начинают почти все:
           -- первый этаж и последний сбивают цену и отсеиваются первым делом.
           AND (@nf = 0 OR f.floor IS NULL OR f.floor > 1)

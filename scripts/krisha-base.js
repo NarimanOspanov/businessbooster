@@ -121,7 +121,8 @@ function record(card, detail, extra) {
     toilet: (detail && detail.toilet) || fromShort(e.short, "Санузел") || fromParams(e.params, "Санузел"),
     balcony: fromShort(e.short, "Балкон") || fromParams(e.params, "Балкон"),
     dorm: yesNo(fromParams(e.params, "Бывшее общежитие") || fromShort(e.short, "Бывшее общежитие")),
-    furnished: yesNo(fromParams(e.params, "Квартира меблирована")),
+    // «полностью», «частично», «без мебели» — храним как сказано, а не как да/нет.
+    furnished: fromParams(e.params, "Квартира меблирована"),
     parking: fromShort(e.short, "Парковка") || fromParams(e.params, "Парковка"),
     isAgent: detail && detail.isAgent == null ? null : !!(detail && detail.isAgent),
     created: (detail && detail.createdAt) || null,

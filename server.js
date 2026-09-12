@@ -5111,6 +5111,7 @@ http
             house: parsed.searchParams.get("house"),
             toilet: parsed.searchParams.get("toilet"),
             cond: parsed.searchParams.get("cond"),
+            furnished: parsed.searchParams.get("furnished"),
             postedFrom: parsed.searchParams.get("postedFrom"),
             postedTo: parsed.searchParams.get("postedTo"),
             notFirst: parsed.searchParams.get("notFirst") === "1",
@@ -5120,7 +5121,7 @@ http
           };
           const anything = q.area || q.district || q.rooms || q.priceFrom || q.priceTo ||
             q.mkr || q.city || q.addr || q.yearFrom || q.yearTo || q.house || q.toilet ||
-            q.cond || q.notFirst || q.notLast || q.postedFrom || q.postedTo;
+            q.cond || q.notFirst || q.notLast || q.postedFrom || q.postedTo || q.furnished;
           if (!anything) {
             return send(400, { ok: false, error: "нужна ссылка или хоть один признак" });
           }
