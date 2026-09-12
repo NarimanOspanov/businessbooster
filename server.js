@@ -5025,7 +5025,8 @@ http
     // разбираем её тем же кодом, которым снимаем свои, и ищем по параметрам.
     // Без ссылки принимаем площадь с этажом руками: со скриншота их вбить
     // быстрее, чем искать глазами.
-    if (urlPath === "/api/krisha/find" || urlPath === "/api/krisha/base") {
+    if (urlPath === "/api/krisha/find" || urlPath === "/api/krisha/base" ||
+        urlPath === "/api/krisha/places") {
       const send = (code, obj) => {
         res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
         res.end(JSON.stringify(obj, null, 2));
@@ -5036,6 +5037,10 @@ http
       const Base = require("./scripts/krisha-base.js");
 
       (async () => {
+        // Дерево «город — район — микрорайон» для выбора места в кабинете.
+        if (urlPath === "/api/krisha/places") {
+          return send(200, { ok: true, tree: await db.places() });
+        }
         if (urlPath === "/api/krisha/base") {
           // Разовый перенос того, что собрано до переезда в SQL: файлы лежат на
           // диске App Service, руками до них не дотянуться.
@@ -5078,10 +5083,12 @@ http
             floors: parsed.searchParams.get("floors"),
             year: parsed.searchParams.get("year"),
             district: parsed.searchParams.get("district"),
+            city: parsed.searchParams.get("city"),
+            mkr: parsed.searchParams.get("mkr"),
             priceFrom: parsed.searchParams.get("priceFrom"),
             priceTo: parsed.searchParams.get("priceTo"),
           };
-          if (!q.area && !q.district && !q.rooms && !q.priceFrom && !q.priceTo) {
+          if (!q.area && !q.district && !q.rooms && !q.priceFrom && !q.priceTo && !q.mkr && !q.city) {
             return send(400, { ok: false, error: "нужна ссылка или хоть один признак" });
           }
         }
@@ -5097,6 +5104,8 @@ http
             title: h.title, price: h.price, addr: h.addr, district: h.district,
             photo: h.photo1 || null, photos: h.photos || 0,
             area: h.area == null ? null : Number(h.area),
+            kitchen: h.kitchen == null ? null : Number(h.kitchen),
+            mkr: h.mkr || null, isAgent: h.is_agent,
             rooms: h.rooms, floor: h.floor, floors: h.floors, year: h.build_year,
             posted: h.posted_on ? String(h.posted_on).slice(0, 10) : null,
             phones: phones.length ? phones : null,

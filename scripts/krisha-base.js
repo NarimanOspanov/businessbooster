@@ -36,6 +36,38 @@ function photoDirOf(url) {
   return m ? m[1] : null;
 }
 
+// «Наурызбайский р-н, мкр Шугыла 342/1» -> «Шугыла». Микрорайон указан у
+// трети адресов, а в Алматы и Астане это привычнее улицы: спрашивают «что есть
+// в Коктеме», а не «что есть на Розыбакиева».
+function mkrOf(addr) {
+  const m = String(addr || "").match(/мкр\.?\s+([^,—]+)/i);
+  if (!m) return null;
+  // Отрезаем номер дома в конце: «Шугыла 342/1», «Нуркент 9к35», «Мамыр 10».
+  const s = m[1].trim().replace(/\s+\d+\S*$/, "").trim();
+  return s || null;
+}
+
+// Значение из блока «Дополнительно»: там пары «подпись — значение».
+function fromParams(params, label) {
+  const p = (params || []).find((x) =>
+    String(x.label || "").toLowerCase().indexOf(String(label).toLowerCase()) === 0);
+  return p ? String(p.value || "").trim() || null : null;
+}
+
+// «да» / «нет» в человеческом написании -> true / false / null.
+function yesNo(v) {
+  const s = String(v == null ? "" : v).toLowerCase().trim();
+  if (!s) return null;
+  if (/^(да|есть|yes)/.test(s)) return true;
+  if (/^(нет|no)/.test(s)) return false;
+  return null;
+}
+
+const numOf = (s) => {
+  const m = String(s == null ? "" : s).replace(",", ".").match(/\d+(\.\d+)?/);
+  return m ? Number(m[0]) : null;
+};
+
 // card — карточка из выдачи (комнаты, площадь, район, цена), detail — разбор
 // страницы объявления (год, тип дома, этаж), photos — только счёт и первая.
 function record(card, detail, extra) {
@@ -62,6 +94,22 @@ function record(card, detail, extra) {
     // файлов — номера. Зная папку, галерею можно собрать перебором, не
     // открывая объявление.
     photoDir: e.photoDir || photoDirOf(e.ph1) || photoDirOf(e.photoSrc) || null,
+    mkr: mkrOf(card.addr) || mkrOf(e.title) || null,
+
+    // Подробности со страницы объявления. Площадь кухни и высота потолков —
+    // сильные различители: агент, перевыкладывая, их не переписывает. «Бывшее
+    // общежитие» резко меняет цену, поэтому без него сравнение врёт.
+    // isAgent — оценка самой Крыши, и она расходится с галочкой «от хозяина»,
+    // которую ставит продавец: звонок агенту вместо хозяина — потраченное зря
+    // время.
+    kitchen: numOf((fromShort(e.short, "Площадь") || "").split(/кухни/i)[1]),
+    ceiling: numOf(fromParams(e.params, "Высота потолков") || fromShort(e.short, "Высота потолков")),
+    toilet: (detail && detail.toilet) || fromShort(e.short, "Санузел") || fromParams(e.params, "Санузел"),
+    balcony: fromShort(e.short, "Балкон") || fromParams(e.params, "Балкон"),
+    dorm: yesNo(fromParams(e.params, "Бывшее общежитие") || fromShort(e.short, "Бывшее общежитие")),
+    furnished: yesNo(fromParams(e.params, "Квартира меблирована")),
+    parking: fromShort(e.short, "Парковка") || fromParams(e.params, "Парковка"),
+    isAgent: detail && detail.isAgent == null ? null : !!(detail && detail.isAgent),
     created: (detail && detail.createdAt) || null,
     seen: new Date().toISOString().slice(0, 10),
   };
@@ -216,6 +264,6 @@ async function queryFromUrl(url) {
 }
 
 module.exports = {
-  dir, record, saveDay, photoDirOf, all, stats, search, queryFromUrl, fromShort,
+  dir, record, saveDay, photoDirOf, mkrOf, fromParams, all, stats, search, queryFromUrl, fromShort,
   markPending, clearPending, pendingFor, readPending,
 };

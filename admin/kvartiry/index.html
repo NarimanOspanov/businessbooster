@@ -49,6 +49,19 @@
   .links{margin-top:8px;font-size:13px;display:flex;gap:14px;flex-wrap:wrap}
   .links a{color:var(--blue);text-decoration:none}
   .why{margin-top:6px;font-size:12px;color:var(--dim)}
+
+  /* Выбор места тремя столбцами, как на Крыше. */
+  .cols{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .col{list-style:none;height:210px;overflow-y:auto;background:#141518;
+    border:1px solid var(--line);border-radius:9px;padding:4px}
+  .col li{padding:6px 9px;border-radius:6px;cursor:pointer;font-size:14px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .col li:hover{background:rgba(255,255,255,.06)}
+  .col li.on{background:var(--blue);color:#fff}
+  .col li b{font-weight:400;color:var(--dim);font-size:12.5px}
+  .col li.on b{color:rgba(255,255,255,.75)}
+  .chosen{margin-top:10px;color:var(--dim);font-size:13.5px}
+  @media (max-width:620px){ .cols{grid-template-columns:1fr} .col{height:150px} }
   .score{float:right;color:var(--amber);font-size:13px;font-weight:600}
 </style>
 </head>
@@ -68,14 +81,26 @@
   </div>
 
   <div class="box">
+    <h2>Место</h2>
+    <p class="hint">Как на Крыше: город, район, микрорайон. Списки собраны из самой базы, в скобках — сколько там квартир.</p>
+    <input id="pq" placeholder="Поиск по городу, району, микрорайону" autocomplete="off" style="margin-bottom:8px">
+    <div class="cols">
+      <ul class="col" id="cities"></ul>
+      <ul class="col" id="districts"></ul>
+      <ul class="col" id="mkrs"></ul>
+    </div>
+    <div class="chosen" id="chosen">Место не выбрано</div>
+  </div>
+
+  <div class="box">
     <h2>По приметам</h2>
-    <p class="hint">Если ссылки нет, а есть скриншот или рассказ. Площадь с десятыми сужает до одной квартиры; без неё ищем по району и комнатам, свежие сверху.</p>
+    <p class="hint">Площадь с десятыми сужает до одной квартиры; без неё ищем по выбранному месту, комнатам и цене — свежие сверху.</p>
     <div class="row">
       <input class="s" id="area" placeholder="площадь" autocomplete="off">
       <input class="s" id="rooms" placeholder="комнат" autocomplete="off">
       <input class="s" id="floor" placeholder="этаж" autocomplete="off">
       <input class="s" id="floors" placeholder="из скольки" autocomplete="off">
-      <input id="district" placeholder="район, например Бостандыкский" autocomplete="off">
+      <input id="district" placeholder="район, если не выбран выше" autocomplete="off">
     </div>
     <div class="row" style="margin-top:8px">
       <input class="s" id="priceFrom" placeholder="цена от, млн" autocomplete="off">
@@ -119,8 +144,13 @@
         '<div class="body">' +
           (x.score ? '<span class="score">' + x.score + "</span>" : "") +
           '<div class="t">' + (x.title || "без названия") + "</div>" +
-          '<div class="m">' + [x.district, x.posted ? "опубликовано " + x.posted : "", x.photos ? x.photos + " фото" : ""]
-            .filter(Boolean).join(" · ") + "</div>" +
+          '<div class="m">' + [
+            x.district, x.mkr ? "мкр " + x.mkr : "",
+            x.kitchen ? "кухня " + x.kitchen + " м²" : "",
+            x.posted ? "опубликовано " + x.posted : "",
+            x.photos ? x.photos + " фото" : "",
+            x.isAgent === true ? "⚠ Крыша считает продавца агентом" : "",
+          ].filter(Boolean).join(" · ") + "</div>" +
           '<div class="p">' + money(x.price) + "</div>" +
           tel +
           '<div class="links"><a href="' + x.krisha + '" target="_blank" rel="noopener">оригинал на Крыше</a>' +
@@ -157,10 +187,92 @@
     if (e.key === "Enter") document.getElementById("go").click();
   });
 
+  // --- выбор места: три столбца, как на Крыше ---------------------------
+  var tree = null, place = { city: null, district: null, mkr: null };
+  var NAMES = { almaty: "Алматы", astana: "Астана", shymkent: "Шымкент",
+    karaganda: "Караганда", aktobe: "Актобе", shymkent2: "" };
+  var elCities = document.getElementById("cities"),
+      elDistricts = document.getElementById("districts"),
+      elMkrs = document.getElementById("mkrs"),
+      elChosen = document.getElementById("chosen"),
+      elPq = document.getElementById("pq");
+
+  function li(text, count, on, onclick) {
+    var el = document.createElement("li");
+    el.innerHTML = text + (count != null ? ' <b>(' + count + ")</b>" : "");
+    if (on) el.className = "on";
+    el.addEventListener("click", onclick);
+    return el;
+  }
+
+  function fits(name) {
+    var q = (elPq.value || "").trim().toLowerCase();
+    return !q || String(name).toLowerCase().indexOf(q) >= 0;
+  }
+
+  function drawPlace() {
+    if (!tree) return;
+    elCities.innerHTML = ""; elDistricts.innerHTML = ""; elMkrs.innerHTML = "";
+
+    elCities.appendChild(li("Все города", null, !place.city, function () {
+      place = { city: null, district: null, mkr: null }; drawPlace();
+    }));
+    Object.keys(tree).sort().forEach(function (c) {
+      if (!fits(NAMES[c] || c)) return;
+      elCities.appendChild(li(NAMES[c] || c, tree[c].n, place.city === c, function () {
+        place = { city: c, district: null, mkr: null }; drawPlace();
+      }));
+    });
+
+    if (place.city) {
+      var ds = tree[place.city].districts;
+      elDistricts.appendChild(li("Все районы", null, !place.district, function () {
+        place.district = null; place.mkr = null; drawPlace();
+      }));
+      Object.keys(ds).sort(function (a, b) { return ds[b].n - ds[a].n; }).forEach(function (d) {
+        if (!fits(d)) return;
+        elDistricts.appendChild(li(d, ds[d].n, place.district === d, function () {
+          place.district = d; place.mkr = null; drawPlace();
+        }));
+      });
+    }
+
+    if (place.city && place.district) {
+      var ms = tree[place.city].districts[place.district].mkrs || {};
+      var keys = Object.keys(ms);
+      elMkrs.appendChild(li("Все микрорайоны", null, !place.mkr, function () {
+        place.mkr = null; drawPlace();
+      }));
+      if (!keys.length) {
+        var none = document.createElement("li");
+        none.innerHTML = "<b>микрорайонов нет</b>";
+        elMkrs.appendChild(none);
+      }
+      keys.sort(function (a, b) { return ms[b] - ms[a]; }).forEach(function (m) {
+        if (!fits(m)) return;
+        elMkrs.appendChild(li(m, ms[m], place.mkr === m, function () {
+          place.mkr = m; drawPlace();
+        }));
+      });
+    }
+
+    elChosen.textContent = place.city
+      ? [NAMES[place.city] || place.city, place.district, place.mkr ? "мкр " + place.mkr : null]
+          .filter(Boolean).join(" · ")
+      : "Место не выбрано";
+  }
+
+  elPq.addEventListener("input", drawPlace);
+
   var fields = ["area", "rooms", "floor", "floors", "district", "priceFrom", "priceTo"];
   document.getElementById("go2").addEventListener("click", function () {
     var parts = [];
+    if (place.city) parts.push("city=" + encodeURIComponent(place.city));
+    if (place.district) parts.push("district=" + encodeURIComponent(place.district));
+    if (place.mkr) parts.push("mkr=" + encodeURIComponent(place.mkr));
     fields.forEach(function (f) {
+      // район из формы не нужен, если он уже выбран в столбцах
+      if (f === "district" && place.district) return;
       var v = document.getElementById(f).value.trim();
       if (!v) return;
       // Цену удобнее вводить в миллионах, а хранится она в тенге.
@@ -185,6 +297,10 @@
   if (!key) {
     document.getElementById("stat").textContent = "Ключ спросим при первом поиске.";
   } else {
+    fetch(API + "/api/krisha/places?key=" + encodeURIComponent(key))
+      .then(function (r) { return r.json(); })
+      .then(function (j) { if (j.ok) { tree = j.tree; drawPlace(); } })
+      .catch(function () {});
     fetch(API + "/api/krisha/base?key=" + encodeURIComponent(key))
       .then(function (r) { return r.json(); })
       .then(function (j) {

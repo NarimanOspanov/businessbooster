@@ -245,6 +245,35 @@ END
 IF COL_LENGTH('dbo.krisha_flats', 'photo_dir') IS NULL
   ALTER TABLE dbo.krisha_flats ADD photo_dir NVARCHAR(120) NULL;
 
+-- Микрорайон: в Алматы и Астане это привычнее улицы, спрашивают «что есть в
+-- Коктеме». Указан у трети адресов, поэтому отдельной колонкой, а не разбором
+-- строки на каждый запрос.
+IF COL_LENGTH('dbo.krisha_flats', 'mkr') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD mkr NVARCHAR(80) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_kflats_place' AND object_id = OBJECT_ID('dbo.krisha_flats'))
+  CREATE INDEX IX_kflats_place ON dbo.krisha_flats (city, district, mkr);
+
+-- Подробности со страницы объявления. Площадь кухни и высота потолков — сильные
+-- различители: агент, перевыкладывая, их не переписывает. «Бывшее общежитие»
+-- резко меняет цену. is_agent — оценка самой Крыши, и она расходится с
+-- галочкой «от хозяина», которую ставит продавец.
+IF COL_LENGTH('dbo.krisha_flats', 'kitchen') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD kitchen DECIMAL(6,2) NULL;
+IF COL_LENGTH('dbo.krisha_flats', 'ceiling') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD ceiling DECIMAL(4,2) NULL;
+IF COL_LENGTH('dbo.krisha_flats', 'toilet') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD toilet NVARCHAR(40) NULL;
+IF COL_LENGTH('dbo.krisha_flats', 'balcony') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD balcony NVARCHAR(60) NULL;
+IF COL_LENGTH('dbo.krisha_flats', 'parking') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD parking NVARCHAR(60) NULL;
+IF COL_LENGTH('dbo.krisha_flats', 'dorm') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD dorm BIT NULL;
+IF COL_LENGTH('dbo.krisha_flats', 'furnished') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD furnished BIT NULL;
+IF COL_LENGTH('dbo.krisha_flats', 'is_agent') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD is_agent BIT NULL;
+
 -- Объявления, которые Крыша не отдала: в «сегодняшних» они больше не всплывут,
 -- поэтому досниаются в начале следующих прогонов.
 IF OBJECT_ID('dbo.krisha_pending', 'U') IS NULL
@@ -653,6 +682,15 @@ async function saveFlat(f) {
     .input("photos", sql.Int, f.photos || null)
     .input("photo1", sql.NVarChar(300), f.ph1 || null)
     .input("dir", sql.NVarChar(120), f.photoDir || null)
+    .input("mkr", sql.NVarChar(80), f.mkr || null)
+    .input("kitchen", sql.Decimal(6, 2), f.kitchen == null ? null : f.kitchen)
+    .input("ceiling", sql.Decimal(4, 2), f.ceiling == null ? null : f.ceiling)
+    .input("toilet", sql.NVarChar(40), f.toilet || null)
+    .input("balcony", sql.NVarChar(60), f.balcony || null)
+    .input("parking", sql.NVarChar(60), f.parking || null)
+    .input("dorm", sql.Bit, f.dorm == null ? null : f.dorm)
+    .input("furnished", sql.Bit, f.furnished == null ? null : f.furnished)
+    .input("agent", sql.Bit, f.isAgent == null ? null : f.isAgent)
     .input("posted", sql.Date, f.created || null)
     .query(`
       MERGE dbo.krisha_flats AS t
@@ -667,14 +705,20 @@ async function saveFlat(f) {
         build_year = COALESCE(t.build_year, @year), house = COALESCE(t.house, @house),
         complex = COALESCE(t.complex, @complex), cond = COALESCE(t.cond, @cond),
         addr = COALESCE(t.addr, @addr), photo1 = COALESCE(t.photo1, @photo1),
-        photo_dir = COALESCE(t.photo_dir, @dir),
+        photo_dir = COALESCE(t.photo_dir, @dir), mkr = COALESCE(t.mkr, @mkr),
+        kitchen = COALESCE(t.kitchen, @kitchen), ceiling = COALESCE(t.ceiling, @ceiling),
+        toilet = COALESCE(t.toilet, @toilet), balcony = COALESCE(t.balcony, @balcony),
+        parking = COALESCE(t.parking, @parking), dorm = COALESCE(t.dorm, @dorm),
+        furnished = COALESCE(t.furnished, @furnished), is_agent = COALESCE(t.is_agent, @agent),
         posted_on = COALESCE(t.posted_on, @posted)
       WHEN NOT MATCHED THEN INSERT
         (id, city, rooms, area, floor, floors, build_year, house, complex, cond,
-         district, price, addr, title, photos, photo1, photo_dir, posted_on)
+         district, price, addr, title, photos, photo1, photo_dir, mkr, posted_on,
+         kitchen, ceiling, toilet, balcony, parking, dorm, furnished, is_agent)
       VALUES
         (@id, @city, @rooms, @area, @floor, @floors, @year, @house, @complex, @cond,
-         @district, @price, @addr, @title, @photos, @photo1, @dir, @posted);`);
+         @district, @price, @addr, @title, @photos, @photo1, @dir, @mkr, @posted,
+         @kitchen, @ceiling, @toilet, @balcony, @parking, @dorm, @furnished, @agent);`);
 }
 
 // Какие из этих объявлений у нас уже есть. Нужно перед снятием карточек: за
@@ -793,6 +837,50 @@ async function flatsWithoutPhone(limit) {
 // Квартиры, у которых есть запись в базе, но нет снятой карточки: описание,
 // характеристики и галерею им ещё не читали. Архивный обход страниц объявлений
 // не открывает, поэтому дочитываем их отдельным неспешным проходом.
+// Дерево «город — район — микрорайон» строится из самих данных, а не забивается
+// списком: города и районы меняются, а выдумывать справочник, который разойдётся
+// с базой, — худшее из решений.
+async function places() {
+  const pool = await getPool();
+  const r = await pool.request().query(`
+    SELECT city, district, mkr, COUNT(*) AS n
+    FROM dbo.krisha_flats
+    GROUP BY city, district, mkr`);
+  const tree = {};
+  for (const x of r.recordset) {
+    const city = x.city || "?";
+    const d = x.district || "без района";
+    tree[city] = tree[city] || { n: 0, districts: {} };
+    tree[city].n += x.n;
+    tree[city].districts[d] = tree[city].districts[d] || { n: 0, mkrs: {} };
+    tree[city].districts[d].n += x.n;
+    if (x.mkr) tree[city].districts[d].mkrs[x.mkr] = x.n;
+  }
+  return tree;
+}
+
+// Заполнение микрорайона у того, что уже собрано: адрес есть, разбора не было.
+async function backfillMkr(rows) {
+  const pool = await getPool();
+  let n = 0;
+  for (const r of rows) {
+    await pool.request()
+      .input("id", sql.BigInt, Number(r.id))
+      .input("m", sql.NVarChar(80), r.mkr)
+      .query("UPDATE dbo.krisha_flats SET mkr = @m WHERE id = @id AND mkr IS NULL");
+    n++;
+  }
+  return n;
+}
+
+async function flatsWithoutMkr(limit) {
+  const pool = await getPool();
+  const r = await pool.request().input("n", sql.Int, Number(limit) || 2000).query(`
+    SELECT TOP (@n) id, addr FROM dbo.krisha_flats
+    WHERE mkr IS NULL AND addr LIKE N'%мкр%'`);
+  return r.recordset;
+}
+
 async function flatsWithoutCard(limit) {
   const pool = await getPool();
   const r = await pool.request().input("n", sql.Int, Number(limit) || 200).query(`
@@ -836,9 +924,11 @@ async function findFlats(q, limit) {
   // не «узнать квартиру», а «посмотреть, что подходит», поэтому сортировка по
   // свежести, а не по совпадению.
   if (!area) {
-    if (!q.district && !q.rooms && !q.priceFrom && !q.priceTo) return [];
+    if (!q.district && !q.rooms && !q.priceFrom && !q.priceTo && !q.mkr && !q.city) return [];
     const r0 = await pool.request()
       .input("rooms", sql.Int, q.rooms ? Number(q.rooms) : null)
+      .input("city", sql.NVarChar(40), q.city || null)
+      .input("mkr", sql.NVarChar(80), q.mkr || null)
       .input("district", sql.NVarChar(100), q.district || null)
       .input("floor", sql.Int, q.floor ? Number(q.floor) : null)
       .input("from", sql.BigInt, q.priceFrom ? Number(q.priceFrom) : null)
@@ -849,6 +939,8 @@ async function findFlats(q, limit) {
         FROM dbo.krisha_flats f
         WHERE (@rooms IS NULL OR f.rooms = @rooms)
           AND (@floor IS NULL OR f.floor = @floor)
+          AND (@city IS NULL OR f.city = @city)
+          AND (@mkr IS NULL OR f.mkr LIKE '%' + @mkr + '%')
           AND (@district IS NULL OR f.district LIKE '%' + @district + '%')
           AND (@from IS NULL OR f.price >= @from)
           AND (@to IS NULL OR f.price <= @to)
@@ -942,7 +1034,7 @@ async function pendingFlats(city, limit) {
   return r.recordset.map((x) => String(x.flat_id));
 }
 
-module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, normPhone, flatPhones, flatsWithoutPhone,
+module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, places, backfillMkr, flatsWithoutMkr, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, normPhone, flatPhones, flatsWithoutPhone,
   saveCard, card, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 
