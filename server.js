@@ -1087,6 +1087,7 @@ async function runKrishaUrgent(opts) {
         const Card = require("./scripts/krisha-card.js");
         const batch = [];
         const missed = [];
+        parsedNow.clear();
         // Сначала догоняем то, что не отдалось в прошлые прогоны: в
         // «сегодняшних» эти квартиры больше не появятся, они уже вчерашние.
         const behind = (await db.pendingFlats(f.city, 60)).map((id) => ({ id: id, catchUp: true }));
@@ -1105,6 +1106,9 @@ async function runKrishaUrgent(opts) {
             const html = await K.fetchText("https://krisha.kz/a/show/" + c.id, 4, 12000);
             const detail = K.parseDetail(html);
             const card = Card.parse(html, c.id);
+            // Разобранное придержим: часть этих же квартир через несколько
+            // минут уйдёт в канал, и читать их страницы второй раз незачем.
+            parsedNow.set(String(c.id), { card: card, detail: detail });
             // У догоняемых нет карточки из выдачи, поэтому комнаты и площадь
             // достаём из заголовка объявления.
             const t = card.title || "";
@@ -1178,28 +1182,33 @@ async function runKrishaUrgent(opts) {
         const c = rows[i];
         KU.progress = "снимок карточки " + (i + 1) + " из " + rows.length;
         try {
-          const html = await KL.fetchText("https://krisha.kz/a/show/" + c.id, 3, 15000);
-          const card = Card.parse(html, c.id);
+          // Эту страницу почти наверняка уже читал проход по базе — берём
+          // разобранное из памяти, чтобы не ходить к Крыше второй раз.
+          let got = parsedNow.get(String(c.id));
+          if (!got) {
+            const html = await KL.fetchText("https://krisha.kz/a/show/" + c.id, 3, 15000);
+            got = { card: Card.parse(html, c.id), detail: KL.parseDetail(html) };
+          }
+          const card = got.card;
 
-          // Фотографии забираем к себе: объявление снимут через неделю, а
-          // ссылка из поста должна остаться живой. Не получилось — оставляем
-          // адрес Крыши, страница с чужими картинками лучше, чем без картинок.
+          // Средние снимки проход по базе уже сложил в flat/<id>/<n>.jpg —
+          // второй копии под другим именем не нужно. Здесь добираем только
+          // полноразмерные: их разглядывают в просмотрщике.
           if (blob.ready()) {
             KU.progress = "фото " + (i + 1) + " из " + rows.length;
-            for (let n = 0; n < (card.photos || []).length; n++) {
-              const p = card.photos[n];
-              try { p.big = await blob.copyFrom(p.big, "kv/" + c.id + "/" + (n + 1) + "-560.jpg"); } catch { /* останется чужая */ }
+            await Promise.all((card.photos || []).map(async (p, n) => {
+              try { p.big = await blob.copyFrom(p.big, "flat/" + c.id + "/" + (n + 1) + ".jpg"); } catch { /* останется чужая */ }
               try { p.full = await blob.copyFrom(p.full, "kv/" + c.id + "/" + (n + 1) + "-full.jpg"); } catch { /* останется чужая */ }
-            }
+            }));
           }
           // Опубликованная квартира должна и в базе быть: иначе телефон,
           // который вы по ней пройдёте, повиснет без объявления — не найдётся
           // ни поиском, ни очередью на досъёмку.
           try {
-            await db.saveFlat(BaseRec.record(c, KL.parseDetail(html), {
+            await db.saveFlat(BaseRec.record(c, got.detail, {
               city: f.city, title: card.title, short: card.short,
               photos: (card.photos || []).length,
-              ph1: card.photos && card.photos[0] ? card.photos[0].full : null,
+              ph1: card.photos && card.photos[0] ? card.photos[0].big : null,
             }));
           } catch { /* база подождёт, снимок важнее */ }
           card.addr = card.addr || c.addr;
@@ -1365,6 +1374,9 @@ async function runKrishaDaily(cities, opts) {
 const KRISHA_BACKFILL_PACE_MS = Number(process.env.KRISHA_BACKFILL_PACE_MS || 4000);
 let backfillRunning = false;
 let photosRunning = false;
+// Разобранные страницы текущего прогона: тот же объект нужен и проходу по базе,
+// и сборке страниц для канала, а страница у Крыши одна.
+const parsedNow = new Map();
 
 async function runKrishaBackfill(city, pages, fromPage) {
   if (backfillRunning) return { skipped: "уже идёт" };
