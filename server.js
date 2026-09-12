@@ -1136,7 +1136,7 @@ async function runKrishaUrgent(opts) {
               }));
             }
             batch.push(Base.record(base, detail, {
-              city: f.city, title: card.title, short: card.short,
+              city: f.city, title: card.title, short: card.short, params: card.params,
               photos: shots.length,
               ph1: ph1,
               photoSrc: shots[0] ? shots[0].big : null,
@@ -1206,7 +1206,7 @@ async function runKrishaUrgent(opts) {
           // ни поиском, ни очередью на досъёмку.
           try {
             await db.saveFlat(BaseRec.record(c, got.detail, {
-              city: f.city, title: card.title, short: card.short,
+              city: f.city, title: card.title, short: card.short, params: card.params,
               photos: (card.photos || []).length,
               ph1: card.photos && card.photos[0] ? card.photos[0].big : null,
             }));
@@ -4920,7 +4920,7 @@ http
               await db.saveFlat(Base.record(
                 { id: r.id, rooms: r.rooms, area: r.area == null ? null : Number(r.area), district: r.district, price: r.price, addr: r.addr },
                 detail,
-                { city: r.city, title: card.title, short: card.short,
+                { city: r.city, title: card.title, short: card.short, params: card.params,
                   photos: (card.photos || []).length,
                   ph1: card.photos && card.photos[0] ? card.photos[0].big : null }
               ));
