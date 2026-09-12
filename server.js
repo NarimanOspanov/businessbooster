@@ -5039,7 +5039,7 @@ http
       (async () => {
         // Дерево «город — район — микрорайон» для выбора места в кабинете.
         if (urlPath === "/api/krisha/places") {
-          return send(200, { ok: true, tree: await db.places() });
+          return send(200, { ok: true, tree: await db.places(), facets: await db.facets() });
         }
         if (urlPath === "/api/krisha/base") {
           // Разовый перенос того, что собрано до переезда в SQL: файлы лежат на
@@ -5086,10 +5086,20 @@ http
             city: parsed.searchParams.get("city"),
             mkr: parsed.searchParams.get("mkr"),
             addr: parsed.searchParams.get("addr"),
+            yearFrom: parsed.searchParams.get("yearFrom"),
+            yearTo: parsed.searchParams.get("yearTo"),
+            house: parsed.searchParams.get("house"),
+            toilet: parsed.searchParams.get("toilet"),
+            cond: parsed.searchParams.get("cond"),
+            notFirst: parsed.searchParams.get("notFirst") === "1",
+            notLast: parsed.searchParams.get("notLast") === "1",
             priceFrom: parsed.searchParams.get("priceFrom"),
             priceTo: parsed.searchParams.get("priceTo"),
           };
-          if (!q.area && !q.district && !q.rooms && !q.priceFrom && !q.priceTo && !q.mkr && !q.city && !q.addr) {
+          const anything = q.area || q.district || q.rooms || q.priceFrom || q.priceTo ||
+            q.mkr || q.city || q.addr || q.yearFrom || q.yearTo || q.house || q.toilet ||
+            q.cond || q.notFirst || q.notLast;
+          if (!anything) {
             return send(400, { ok: false, error: "нужна ссылка или хоть один признак" });
           }
         }
@@ -5108,6 +5118,7 @@ http
             kitchen: h.kitchen == null ? null : Number(h.kitchen),
             mkr: h.mkr || null, street: h.street || null, isAgent: h.is_agent,
             rooms: h.rooms, floor: h.floor, floors: h.floors, year: h.build_year,
+            house: h.house || null, toilet: h.toilet || null, cond: h.cond || null,
             posted: h.posted_on ? String(h.posted_on).slice(0, 10) : null,
             phones: phones.length ? phones : null,
             krisha: "https://krisha.kz/a/show/" + id,

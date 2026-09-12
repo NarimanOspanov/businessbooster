@@ -61,6 +61,13 @@
   .col li b{font-weight:400;color:var(--dim);font-size:12.5px}
   .col li.on b{color:rgba(255,255,255,.75)}
   .chosen{margin-top:10px;color:var(--dim);font-size:13.5px}
+  select{flex:1;min-width:150px;background:#141518;color:var(--ink);border:1px solid var(--line);
+    border-radius:9px;padding:11px 13px;font:inherit;font-size:14px}
+  select:focus{outline:0;border-color:var(--blue)}
+  .chk{display:flex;align-items:center;gap:7px;color:var(--dim);font-size:14px;
+    padding:0 6px;cursor:pointer;white-space:nowrap}
+  .chk input{flex:0 0 auto;min-width:0;width:16px;height:16px;accent-color:var(--blue)}
+  .known{color:var(--dim);font-size:12.5px;margin-top:10px;line-height:1.5}
   @media (max-width:620px){ .cols{grid-template-columns:1fr} .col{height:150px} }
   .score{float:right;color:var(--amber);font-size:13px;font-weight:600}
 </style>
@@ -106,11 +113,23 @@
       <input id="addr" placeholder="адрес: улица, дом, перекрёсток — «Абая 155» или «Абая — Розыбакиева»" autocomplete="off">
     </div>
     <div class="row" style="margin-top:8px">
+      <input class="s" id="yearFrom" placeholder="год от" autocomplete="off">
+      <input class="s" id="yearTo" placeholder="год до" autocomplete="off">
+      <select id="house"><option value="">тип дома — любой</option></select>
+      <select id="toilet"><option value="">санузел — любой</option></select>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <select id="cond"><option value="">состояние — любое</option></select>
+      <label class="chk"><input type="checkbox" id="notFirst"> не первый этаж</label>
+      <label class="chk"><input type="checkbox" id="notLast"> не последний</label>
+    </div>
+    <div class="row" style="margin-top:8px">
       <input class="s" id="priceFrom" placeholder="цена от, млн" autocomplete="off">
       <input class="s" id="priceTo" placeholder="до, млн" autocomplete="off">
       <button id="go2">Искать</button>
       <button class="ghost" id="clr">Очистить</button>
     </div>
+    <div class="known" id="known"></div>
   </div>
 
   <div id="msg" class="msg"></div>
@@ -267,7 +286,9 @@
 
   elPq.addEventListener("input", drawPlace);
 
-  var fields = ["area", "rooms", "floor", "floors", "district", "addr", "priceFrom", "priceTo"];
+  var fields = ["area", "rooms", "floor", "floors", "district", "addr",
+    "yearFrom", "yearTo", "house", "toilet", "cond", "priceFrom", "priceTo"];
+  var flags = ["notFirst", "notLast"];
   document.getElementById("go2").addEventListener("click", function () {
     var parts = [];
     if (place.city) parts.push("city=" + encodeURIComponent(place.city));
@@ -282,11 +303,15 @@
       if (f === "priceFrom" || f === "priceTo") v = Math.round(parseFloat(v.replace(",", ".")) * 1e6);
       parts.push(f + "=" + encodeURIComponent(v));
     });
+    flags.forEach(function (f) {
+      if (document.getElementById(f).checked) parts.push(f + "=1");
+    });
     if (!parts.length) return say("Заполните хотя бы одно поле", true);
     ask(parts.join("&"));
   });
   document.getElementById("clr").addEventListener("click", function () {
     fields.forEach(function (f) { document.getElementById(f).value = ""; });
+    flags.forEach(function (f) { document.getElementById(f).checked = false; });
     out.innerHTML = ""; say("");
   });
   fields.forEach(function (f) {
@@ -302,7 +327,28 @@
   } else {
     fetch(API + "/api/krisha/places?key=" + encodeURIComponent(key))
       .then(function (r) { return r.json(); })
-      .then(function (j) { if (j.ok) { tree = j.tree; drawPlace(); } })
+      .then(function (j) {
+        if (!j.ok) return;
+        tree = j.tree; drawPlace();
+        var f = j.facets || {};
+        [["house", "тип дома"], ["toilet", "санузел"], ["cond", "состояние"]].forEach(function (pair) {
+          var el = document.getElementById(pair[0]);
+          (f[pair[0]] || []).forEach(function (x) {
+            var o = document.createElement("option");
+            o.value = x.v; o.textContent = x.v + " (" + x.n + ")";
+            el.appendChild(o);
+          });
+        });
+        var k = f.known || {};
+        // Охват показываем прямо: фильтр по полю, известному у трёх процентов,
+        // вернёт почти пустой список, и это не поломка, а нехватка данных.
+        document.getElementById("known").innerHTML =
+          "Известно из " + k.total + " квартир: этаж " + k.floor +
+          " · год " + k.build_year + " · тип дома " + k.house +
+          " · санузел " + k.toilet + " · состояние " + k.cond +
+          " · площадь кухни " + k.kitchen +
+          "<br>Год, тип дома и санузел есть только на странице объявления — их дочитывает отдельный проход, поэтому пока их немного.";
+      })
       .catch(function () {});
     fetch(API + "/api/krisha/base?key=" + encodeURIComponent(key))
       .then(function (r) { return r.json(); })

@@ -867,6 +867,34 @@ async function places() {
   return tree;
 }
 
+// Что вообще встречается в базе и у скольких квартир поле известно. Нужно и
+// для выпадающих списков, и чтобы человек видел охват: фильтр по году, который
+// известен у трёх процентов, обманчив, и это должно быть написано прямо.
+async function facets() {
+  const pool = await getPool();
+  const out = {};
+  for (const col of ["house", "toilet", "cond", "balcony", "parking"]) {
+    const r = await pool.request().query(
+      "SELECT " + col + " AS v, COUNT(*) AS n FROM dbo.krisha_flats" +
+      " WHERE " + col + " IS NOT NULL GROUP BY " + col + " ORDER BY n DESC");
+    out[col] = r.recordset.map((x) => ({ v: x.v, n: x.n }));
+  }
+  const k = await pool.request().query(`
+    SELECT COUNT(*) AS total,
+      SUM(CASE WHEN build_year IS NOT NULL THEN 1 ELSE 0 END) AS build_year,
+      SUM(CASE WHEN house IS NOT NULL THEN 1 ELSE 0 END) AS house,
+      SUM(CASE WHEN toilet IS NOT NULL THEN 1 ELSE 0 END) AS toilet,
+      SUM(CASE WHEN cond IS NOT NULL THEN 1 ELSE 0 END) AS cond,
+      SUM(CASE WHEN floor IS NOT NULL THEN 1 ELSE 0 END) AS floor,
+      SUM(CASE WHEN kitchen IS NOT NULL THEN 1 ELSE 0 END) AS kitchen
+    FROM dbo.krisha_flats`);
+  out.known = k.recordset[0];
+  const y = await pool.request().query(
+    "SELECT MIN(build_year) AS lo, MAX(build_year) AS hi FROM dbo.krisha_flats WHERE build_year IS NOT NULL");
+  out.years = y.recordset[0];
+  return out;
+}
+
 // Заполнение микрорайона у того, что уже собрано: адрес есть, разбора не было.
 async function backfillMkr(rows) {
   const pool = await getPool();
@@ -955,12 +983,21 @@ async function findFlats(q, limit) {
   // не «узнать квартиру», а «посмотреть, что подходит», поэтому сортировка по
   // свежести, а не по совпадению.
   if (!area) {
-    if (!q.district && !q.rooms && !q.priceFrom && !q.priceTo && !q.mkr && !q.city && !q.addr) return [];
+    const any = q.district || q.rooms || q.priceFrom || q.priceTo || q.mkr || q.city || q.addr ||
+      q.yearFrom || q.yearTo || q.house || q.toilet || q.cond || q.notFirst || q.notLast;
+    if (!any) return [];
     const r0 = await pool.request()
       .input("rooms", sql.Int, q.rooms ? Number(q.rooms) : null)
       .input("city", sql.NVarChar(40), q.city || null)
       .input("mkr", sql.NVarChar(80), q.mkr || null)
       .input("addr", sql.NVarChar(200), q.addr || null)
+      .input("yf", sql.Int, q.yearFrom ? Number(q.yearFrom) : null)
+      .input("yt", sql.Int, q.yearTo ? Number(q.yearTo) : null)
+      .input("house", sql.NVarChar(60), q.house || null)
+      .input("toilet", sql.NVarChar(40), q.toilet || null)
+      .input("cond", sql.NVarChar(80), q.cond || null)
+      .input("nf", sql.Bit, q.notFirst ? 1 : 0)
+      .input("nl", sql.Bit, q.notLast ? 1 : 0)
       .input("district", sql.NVarChar(100), q.district || null)
       .input("floor", sql.Int, q.floor ? Number(q.floor) : null)
       .input("from", sql.BigInt, q.priceFrom ? Number(q.priceFrom) : null)
@@ -980,6 +1017,15 @@ async function findFlats(q, limit) {
           AND (@district IS NULL OR f.district LIKE '%' + @district + '%')
           AND (@from IS NULL OR f.price >= @from)
           AND (@to IS NULL OR f.price <= @to)
+          AND (@yf IS NULL OR f.build_year >= @yf)
+          AND (@yt IS NULL OR f.build_year <= @yt)
+          AND (@house IS NULL OR f.house = @house)
+          AND (@toilet IS NULL OR f.toilet = @toilet)
+          AND (@cond IS NULL OR f.cond LIKE '%' + @cond + '%')
+          -- «не первый» и «не последний» — то, с чего начинают почти все:
+          -- первый этаж и последний сбивают цену и отсеиваются первым делом.
+          AND (@nf = 0 OR f.floor IS NULL OR f.floor > 1)
+          AND (@nl = 0 OR f.floor IS NULL OR f.floors IS NULL OR f.floor < f.floors)
         ORDER BY f.posted_on DESC, f.id DESC`);
     return r0.recordset;
   }
@@ -1073,7 +1119,7 @@ async function pendingFlats(city, limit) {
   return r.recordset.map((x) => String(x.flat_id));
 }
 
-module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, places, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, normPhone, flatPhones, flatsWithoutPhone,
+module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, normPhone, flatPhones, flatsWithoutPhone,
   saveCard, card, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 
