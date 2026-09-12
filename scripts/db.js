@@ -790,6 +790,20 @@ async function flatsWithoutPhone(limit) {
   return r.recordset;
 }
 
+// Квартиры, у которых есть запись в базе, но нет снятой карточки: описание,
+// характеристики и галерею им ещё не читали. Архивный обход страниц объявлений
+// не открывает, поэтому дочитываем их отдельным неспешным проходом.
+async function flatsWithoutCard(limit) {
+  const pool = await getPool();
+  const r = await pool.request().input("n", sql.Int, Number(limit) || 200).query(`
+    SELECT TOP (@n) f.id, f.city, f.rooms, f.area, f.district, f.price, f.addr
+    FROM dbo.krisha_flats f
+    LEFT JOIN dbo.krisha_cards c ON c.flat_id = f.id
+    WHERE c.flat_id IS NULL
+    ORDER BY f.id DESC`);
+  return r.recordset;
+}
+
 async function saveCard(flatId, card) {
   const pool = await getPool();
   await pool.request()
@@ -928,7 +942,7 @@ async function pendingFlats(city, limit) {
   return r.recordset.map((x) => String(x.flat_id));
 }
 
-module.exports = { saveFlat, saveFlats, knownIds, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, normPhone, flatPhones, flatsWithoutPhone,
+module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, normPhone, flatPhones, flatsWithoutPhone,
   saveCard, card, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 

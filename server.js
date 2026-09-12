@@ -1374,6 +1374,7 @@ async function runKrishaDaily(cities, opts) {
 const KRISHA_BACKFILL_PACE_MS = Number(process.env.KRISHA_BACKFILL_PACE_MS || 4000);
 let backfillRunning = false;
 let photosRunning = false;
+let deepenRunning = false;
 // Разобранные страницы текущего прогона: тот же объект нужен и проходу по базе,
 // и сборке страниц для канала, а страница у Крыши одна.
 const parsedNow = new Map();
@@ -4856,6 +4857,76 @@ http
         .then((o) => console.log("[krisha] сбор базы " + JSON.stringify(o)))
         .catch((e) => console.log("[krisha] сбор базы сорвался: " + e.message));
       return send(202, { ok: true, started: true, cities: cities, note: "итог придёт в Телеграм" });
+    }
+
+    // Дочитывание архива: описание хозяина, характеристики и полная галерея у
+    // квартир, которые попали в базу из выдачи. Идёт медленно и порциями, и это
+    // не осторожность ради осторожности: страниц объявлений 28 тысяч, и разом
+    // это 31 час обхода того самого хоста, который нас однажды уже отрезал.
+    if (urlPath === "/api/krisha/deepen") {
+      const send = (code, obj) => {
+        res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+        res.end(JSON.stringify(obj, null, 2));
+      };
+      const want = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
+      if (!want || parsed.searchParams.get("key") !== want) return send(403, { ok: false, error: "bad_key" });
+      if (deepenRunning || KU.running || backfillRunning) {
+        return send(409, { ok: false, running: true, progress: KU.progress || null, error: "уже идёт" });
+      }
+      const limit = Math.max(1, Math.min(Number(parsed.searchParams.get("limit") || 300), 1000));
+      deepenRunning = true;
+      (async () => {
+        const Card = require("./scripts/krisha-card.js");
+        const KL = require("./scripts/krisha-lib.js");
+        const Base = require("./scripts/krisha-base.js");
+        let done = 0, failed = 0;
+        try {
+          const rows = await db.flatsWithoutCard(limit);
+          for (let i = 0; i < rows.length; i++) {
+            const r = rows[i];
+            KU.progress = "дочитываю архив: " + (i + 1) + " из " + rows.length;
+            try {
+              const html = await KL.fetchText("https://krisha.kz/a/show/" + r.id, 3, 15000);
+              const card = Card.parse(html, r.id);
+              const detail = KL.parseDetail(html);
+              if (blob.ready()) {
+                await Promise.all((card.photos || []).map(async (p, n) => {
+                  try { p.big = await blob.copyFrom(p.big, "flat/" + r.id + "/" + (n + 1) + ".jpg"); } catch { /* останется чужая */ }
+                  try { p.full = await blob.copyFrom(p.full, "kv/" + r.id + "/" + (n + 1) + "-full.jpg"); } catch { /* останется чужая */ }
+                }));
+              }
+              card.addr = card.addr || r.addr;
+              await db.saveCard(r.id, card);
+              // Тут же дописываем то, чего архивной записи не хватало: год
+              // постройки, тип дома и дату публикации.
+              await db.saveFlat(Base.record(
+                { id: r.id, rooms: r.rooms, area: r.area == null ? null : Number(r.area), district: r.district, price: r.price, addr: r.addr },
+                detail,
+                { city: r.city, title: card.title, short: card.short,
+                  photos: (card.photos || []).length,
+                  ph1: card.photos && card.photos[0] ? card.photos[0].big : null }
+              ));
+              done++;
+            } catch { failed++; }
+            await KL.sleep(KRISHA_PACE_MS);
+          }
+        } finally {
+          deepenRunning = false;
+          KU.progress = null;
+        }
+        const st = await db.krishaStats().catch(() => null);
+        await notifyTelegram([
+          "📖 <b>Крыша: дочитывание архива</b>",
+          "",
+          "Прочитано: <b>" + done + "</b>" + (failed ? ", не отдали: " + failed : ""),
+          st ? "Карточек всего " + st.cards + " из " + st.flats + " квартир" : null,
+        ].filter(Boolean).join("\n"));
+        return { done: done, failed: failed };
+      })()
+        .then((o) => console.log("[krisha] дочитывание " + JSON.stringify(o)))
+        .catch((e) => { deepenRunning = false; console.log("[krisha] дочитывание сорвалось: " + e.message); });
+
+      return send(202, { ok: true, started: true, limit: limit, note: "итог придёт в Телеграм" });
     }
 
     // Догон фотографий по тем квартирам, что уже в базе со ссылкой на Крышу.
