@@ -5106,7 +5106,7 @@ http
             photo: h.photo1 || null, photos: h.photos || 0,
             area: h.area == null ? null : Number(h.area),
             kitchen: h.kitchen == null ? null : Number(h.kitchen),
-            mkr: h.mkr || null, isAgent: h.is_agent,
+            mkr: h.mkr || null, street: h.street || null, isAgent: h.is_agent,
             rooms: h.rooms, floor: h.floor, floors: h.floors, year: h.build_year,
             posted: h.posted_on ? String(h.posted_on).slice(0, 10) : null,
             phones: phones.length ? phones : null,

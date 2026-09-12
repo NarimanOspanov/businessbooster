@@ -68,6 +68,19 @@ const numOf = (s) => {
   return m ? Number(m[0]) : null;
 };
 
+// Хвост заголовка — это место: «… 11/12 этаж, Абая 155 — Розыбакиева» либо
+// просто перекрёсток без дома, «Абая — Абая Розыбакиева». Хранится отдельно от
+// адреса, потому что в адресе улицы может не быть вовсе, а тут она есть, и
+// искать по ней люди хотят так же, как по району.
+function streetOf(title) {
+  const t = String(title || "").trim();
+  let m = t.match(/этаж,\s*(.+)$/i);
+  if (!m) m = t.match(/м²\s*,\s*(.+)$/i);
+  if (!m) return null;
+  const s = m[1].trim().replace(/\s+/g, " ");
+  return s.length > 1 ? s.slice(0, 160) : null;
+}
+
 // card — карточка из выдачи (комнаты, площадь, район, цена), detail — разбор
 // страницы объявления (год, тип дома, этаж), photos — только счёт и первая.
 function record(card, detail, extra) {
@@ -95,6 +108,7 @@ function record(card, detail, extra) {
     // открывая объявление.
     photoDir: e.photoDir || photoDirOf(e.ph1) || photoDirOf(e.photoSrc) || null,
     mkr: mkrOf(card.addr) || mkrOf(e.title) || null,
+    street: streetOf(e.title || card.title),
 
     // Подробности со страницы объявления. Площадь кухни и высота потолков —
     // сильные различители: агент, перевыкладывая, их не переписывает. «Бывшее
@@ -264,6 +278,6 @@ async function queryFromUrl(url) {
 }
 
 module.exports = {
-  dir, record, saveDay, photoDirOf, mkrOf, fromParams, all, stats, search, queryFromUrl, fromShort,
+  dir, record, saveDay, photoDirOf, mkrOf, streetOf, fromParams, all, stats, search, queryFromUrl, fromShort,
   markPending, clearPending, pendingFor, readPending,
 };

@@ -250,6 +250,12 @@ IF COL_LENGTH('dbo.krisha_flats', 'photo_dir') IS NULL
 -- строки на каждый запрос.
 IF COL_LENGTH('dbo.krisha_flats', 'mkr') IS NULL
   ALTER TABLE dbo.krisha_flats ADD mkr NVARCHAR(80) NULL;
+
+-- Место из заголовка: «Абая 155 — Розыбакиева» или один перекрёсток без дома,
+-- «Абая — Абая Розыбакиева». В поле addr улицы может не быть вовсе, а тут она
+-- есть, и искать по ней хотят так же, как по району.
+IF COL_LENGTH('dbo.krisha_flats', 'street') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD street NVARCHAR(160) NULL;
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_kflats_place' AND object_id = OBJECT_ID('dbo.krisha_flats'))
   CREATE INDEX IX_kflats_place ON dbo.krisha_flats (city, district, mkr);
 
@@ -683,6 +689,7 @@ async function saveFlat(f) {
     .input("photo1", sql.NVarChar(300), f.ph1 || null)
     .input("dir", sql.NVarChar(120), f.photoDir || null)
     .input("mkr", sql.NVarChar(80), f.mkr || null)
+    .input("street", sql.NVarChar(160), f.street || null)
     .input("kitchen", sql.Decimal(6, 2), f.kitchen == null ? null : f.kitchen)
     .input("ceiling", sql.Decimal(4, 2), f.ceiling == null ? null : f.ceiling)
     .input("toilet", sql.NVarChar(40), f.toilet || null)
@@ -706,6 +713,7 @@ async function saveFlat(f) {
         complex = COALESCE(t.complex, @complex), cond = COALESCE(t.cond, @cond),
         addr = COALESCE(t.addr, @addr), photo1 = COALESCE(t.photo1, @photo1),
         photo_dir = COALESCE(t.photo_dir, @dir), mkr = COALESCE(t.mkr, @mkr),
+        street = COALESCE(t.street, @street),
         kitchen = COALESCE(t.kitchen, @kitchen), ceiling = COALESCE(t.ceiling, @ceiling),
         toilet = COALESCE(t.toilet, @toilet), balcony = COALESCE(t.balcony, @balcony),
         parking = COALESCE(t.parking, @parking), dorm = COALESCE(t.dorm, @dorm),
@@ -713,11 +721,11 @@ async function saveFlat(f) {
         posted_on = COALESCE(t.posted_on, @posted)
       WHEN NOT MATCHED THEN INSERT
         (id, city, rooms, area, floor, floors, build_year, house, complex, cond,
-         district, price, addr, title, photos, photo1, photo_dir, mkr, posted_on,
+         district, price, addr, title, photos, photo1, photo_dir, mkr, street, posted_on,
          kitchen, ceiling, toilet, balcony, parking, dorm, furnished, is_agent)
       VALUES
         (@id, @city, @rooms, @area, @floor, @floors, @year, @house, @complex, @cond,
-         @district, @price, @addr, @title, @photos, @photo1, @dir, @mkr, @posted,
+         @district, @price, @addr, @title, @photos, @photo1, @dir, @mkr, @street, @posted,
          @kitchen, @ceiling, @toilet, @balcony, @parking, @dorm, @furnished, @agent);`);
 }
 
@@ -873,6 +881,29 @@ async function backfillMkr(rows) {
   return n;
 }
 
+// Заполнение места из заголовка у того, что уже собрано: заголовки в базе есть,
+// разбора не было. Сеть не нужна.
+async function flatsWithoutStreet(limit) {
+  const pool = await getPool();
+  const r = await pool.request().input("n", sql.Int, Number(limit) || 3000).query(`
+    SELECT TOP (@n) id, title FROM dbo.krisha_flats
+    WHERE street IS NULL AND title IS NOT NULL`);
+  return r.recordset;
+}
+
+async function backfillStreet(rows) {
+  const pool = await getPool();
+  let n = 0;
+  for (const r of rows) {
+    await pool.request()
+      .input("id", sql.BigInt, Number(r.id))
+      .input("s", sql.NVarChar(160), r.street)
+      .query("UPDATE dbo.krisha_flats SET street = @s WHERE id = @id AND street IS NULL");
+    n++;
+  }
+  return n;
+}
+
 async function flatsWithoutMkr(limit) {
   const pool = await getPool();
   const r = await pool.request().input("n", sql.Int, Number(limit) || 2000).query(`
@@ -944,7 +975,8 @@ async function findFlats(q, limit) {
           AND (@mkr IS NULL OR f.mkr LIKE '%' + @mkr + '%')
           -- Улица с домом попадает то в адрес, то в заголовок, поэтому ищем в
           -- обоих: «Бурундайская 91» встречается только в заголовке.
-          AND (@addr IS NULL OR f.addr LIKE '%' + @addr + '%' OR f.title LIKE '%' + @addr + '%')
+          AND (@addr IS NULL OR f.addr LIKE '%' + @addr + '%'
+               OR f.street LIKE '%' + @addr + '%' OR f.title LIKE '%' + @addr + '%')
           AND (@district IS NULL OR f.district LIKE '%' + @district + '%')
           AND (@from IS NULL OR f.price >= @from)
           AND (@to IS NULL OR f.price <= @to)
@@ -971,7 +1003,8 @@ async function findFlats(q, limit) {
           + IIF(@year IS NOT NULL AND f.build_year = @year, 1, 0)
           + IIF(@district IS NOT NULL AND f.district = @district, 1, 0)
           + IIF(@complex IS NOT NULL AND f.complex = @complex, 1, 0)
-          + IIF(@addr2 IS NOT NULL AND (f.addr LIKE '%' + @addr2 + '%' OR f.title LIKE '%' + @addr2 + '%'), 2, 0) AS score
+          + IIF(@addr2 IS NOT NULL AND (f.addr LIKE '%' + @addr2 + '%'
+               OR f.street LIKE '%' + @addr2 + '%' OR f.title LIKE '%' + @addr2 + '%'), 2, 0) AS score
       FROM dbo.krisha_flats f
       WHERE f.area BETWEEN @lo AND @hi
         AND (@rooms IS NULL OR f.rooms IS NULL OR f.rooms = @rooms)
@@ -1040,7 +1073,7 @@ async function pendingFlats(city, limit) {
   return r.recordset.map((x) => String(x.flat_id));
 }
 
-module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, places, backfillMkr, flatsWithoutMkr, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, normPhone, flatPhones, flatsWithoutPhone,
+module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, places, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, normPhone, flatPhones, flatsWithoutPhone,
   saveCard, card, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 
