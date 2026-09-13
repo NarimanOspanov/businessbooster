@@ -39,6 +39,28 @@ function photoDirOf(url) {
 // «Наурызбайский р-н, мкр Шугыла 342/1» -> «Шугыла». Микрорайон указан у
 // трети адресов, а в Алматы и Астане это привычнее улицы: спрашивают «что есть
 // в Коктеме», а не «что есть на Розыбакиева».
+// Город в базе хранится слагом, а на странице объявления стоит по-русски:
+// «Город: Алматы, Бостандыкский р-н». Без обратного перевода поиск по ссылке
+// сравнивал квартиры разных городов между собой.
+const CITY_SLUG = {
+  "алматы": "almaty", "астана": "astana", "нур-султан": "astana", "шымкент": "shymkent",
+  "караганда": "karaganda", "актобе": "aktobe", "атырау": "atyrau", "тараз": "taraz",
+  "павлодар": "pavlodar", "усть-каменогорск": "ust-kamenogorsk", "семей": "semey",
+  "костанай": "kostanay", "кызылорда": "kyzylorda", "актау": "aktau", "уральск": "uralsk",
+  "кокшетау": "kokshetau", "петропавловск": "petropavlovsk", "темиртау": "temirtau",
+  "туркестан": "turkestan", "талдыкорган": "taldykorgan", "экибастуз": "ekibastuz",
+};
+const cityNameOf = (slug) => {
+  const s = String(slug || "");
+  const found = Object.keys(CITY_SLUG).find((k) => CITY_SLUG[k] === s);
+  return found ? found[0].toUpperCase() + found.slice(1) : null;
+};
+function citySlugOf(text) {
+  const t = String(text || "").toLowerCase();
+  for (const name of Object.keys(CITY_SLUG)) if (t.includes(name)) return CITY_SLUG[name];
+  return null;
+}
+
 function mkrOf(addr) {
   const m = String(addr || "").match(/мкр\.?\s+([^,—]+)/i);
   if (!m) return null;
@@ -83,14 +105,21 @@ function streetOf(title) {
 
 // card — карточка из выдачи (комнаты, площадь, район, цена), detail — разбор
 // страницы объявления (год, тип дома, этаж), photos — только счёт и первая.
+// Площадь и комнаты Крыша держит в самом заголовке, и площадь — главный ключ
+// опознания квартиры. Хозяева правят объявления, а заголовок со страницы
+// свежее площади из карточки поиска, снятой раньше: берём то, что согласуется
+// с тем заголовком, который и запишем.
+const areaOf = (title) => num((String(title || "").match(/([\d.,]+)\s*м²/) || [])[1]);
+
 function record(card, detail, extra) {
   const e = extra || {};
   const floors = detail && detail.floors ? detail.floors : num(fromShort(e.short, "Этаж") || "");
+  const title = e.title || card.title || null;
   return {
     id: String(card.id),
     city: e.city || null,
     rooms: card.rooms || null,
-    area: card.area || null,
+    area: areaOf(title) || card.area || null,
     floor: (detail && detail.floor) || null,
     floors: floors || null,
     year: (detail && detail.year) || null,
@@ -100,7 +129,7 @@ function record(card, detail, extra) {
     district: card.district || null,
     price: card.price || null,
     addr: card.addr || null,
-    title: e.title || card.title || null,
+    title: title,
     photos: e.photos || 0,
     ph1: e.ph1 || null,
     // Папка снимков на CDN: у объявления она одна на все фотографии, а имена
@@ -270,6 +299,7 @@ async function queryFromUrl(url) {
     year: d.year || null,
     // На странице объявления адреса как отдельного поля нет, зато район стоит
     // в строке «Город: Алматы, Бостандыкский р-н».
+    city: citySlugOf(fromShort(c.short, "Город") || c.addr || t),
     district: K.districtOf(fromShort(c.short, "Город") || c.addr || t),
     complex: fromShort(c.short, "Жилой комплекс"),
     photos: (c.photos || []).length,
@@ -279,6 +309,6 @@ async function queryFromUrl(url) {
 }
 
 module.exports = {
-  dir, record, saveDay, photoDirOf, mkrOf, streetOf, fromParams, all, stats, search, queryFromUrl, fromShort,
+  dir, record, saveDay, photoDirOf, mkrOf, streetOf, citySlugOf, cityNameOf, areaOf, fromParams, all, stats, search, queryFromUrl, fromShort,
   markPending, clearPending, pendingFor, readPending,
 };

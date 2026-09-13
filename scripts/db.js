@@ -1095,7 +1095,13 @@ async function findFlats(q, limit) {
         ORDER BY f.posted_on DESC, f.id DESC`);
     return r0.recordset;
   }
+  // Здесь мы не подбираем похожее, а узнаём ту же самую квартиру в чужом
+  // объявлении. Значит всё, что у квартиры физически неизменно — город, район,
+  // год дома, этажность, — должно совпасть, а не добавить очков: иначе на
+  // алматинскую сталинку 1986 года в ответ приходят астанинские новостройки той
+  // же площади. Сравниваем только то, что известно обеим сторонам.
   const tol = String(q.area).indexOf(".") === -1 ? 0.9 : 0.35;
+  const price = Number(q.price) || null;
   const r = await pool.request()
     .input("lo", sql.Decimal(7, 2), area - tol)
     .input("hi", sql.Decimal(7, 2), area + tol)
@@ -1103,9 +1109,15 @@ async function findFlats(q, limit) {
     .input("floor", sql.Int, q.floor ? Number(q.floor) : null)
     .input("floors", sql.Int, q.floors ? Number(q.floors) : null)
     .input("year", sql.Int, q.year ? Number(q.year) : null)
+    .input("city", sql.NVarChar(40), q.city || null)
     .input("district", sql.NVarChar(100), q.district || null)
+    .input("mkr", sql.NVarChar(80), q.mkr || null)
     .input("complex", sql.NVarChar(160), q.complex || null)
     .input("addr2", sql.NVarChar(200), q.addr || null)
+    // Посредник ставит свою цену, но не втрое: вилка отсекает совпадения,
+    // которые физически подошли, а по деньгам — другая квартира.
+    .input("plo", sql.BigInt, price ? Math.round(price * 0.6) : null)
+    .input("phi", sql.BigInt, price ? Math.round(price * 1.5) : null)
     .input("n", sql.Int, Number(limit) || 8)
     .query(`
       SELECT TOP (@n) f.*,
@@ -1114,16 +1126,33 @@ async function findFlats(q, limit) {
           + IIF(@floors IS NOT NULL AND f.floors = @floors, 1, 0)
           + IIF(@year IS NOT NULL AND f.build_year = @year, 1, 0)
           + IIF(@district IS NOT NULL AND f.district = @district, 1, 0)
+          + IIF(@mkr IS NOT NULL AND f.mkr = @mkr, 2, 0)
           + IIF(@complex IS NOT NULL AND f.complex = @complex, 1, 0)
           + IIF(@addr2 IS NOT NULL AND (f.addr LIKE '%' + @addr2 + '%'
                OR f.street LIKE '%' + @addr2 + '%' OR f.title LIKE '%' + @addr2 + '%'), 2, 0) AS score
       FROM dbo.krisha_flats f
       WHERE f.area BETWEEN @lo AND @hi
+        AND (@city IS NULL OR f.city = @city)
         AND (@rooms IS NULL OR f.rooms IS NULL OR f.rooms = @rooms)
         AND (@floor IS NULL OR f.floor IS NULL OR f.floor = @floor)
         AND (@floors IS NULL OR f.floors IS NULL OR f.floors = @floors)
+        AND (@district IS NULL OR f.district IS NULL OR f.district = @district)
+        -- Год постройки на Крыше иногда расходится на год: сдача дома и
+        -- заселение приходятся на разные годы, и владельцы пишут по-разному.
+        AND (@year IS NULL OR f.build_year IS NULL OR ABS(f.build_year - @year) <= 1)
+        AND (@plo IS NULL OR f.price IS NULL OR f.price BETWEEN @plo AND @phi)
       ORDER BY score DESC, f.id DESC`);
   return r.recordset;
+}
+
+// Одна квартира по номеру. Нужна для случая, когда покупатель присылает ссылку,
+// которая уже есть у нас: значит это объявление и так от хозяина, и искать
+// похожие незачем — надо отдать контакты именно по нему.
+async function flat(id) {
+  const pool = await getPool();
+  const r = await pool.request().input("id", sql.BigInt, Number(id))
+    .query("SELECT * FROM dbo.krisha_flats WHERE id = @id");
+  return r.recordset[0] || null;
 }
 
 async function krishaStats() {
@@ -1295,7 +1324,7 @@ async function botStats(days) {
 }
 
 module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, normPhone, flatPhones, flatsWithoutPhone,
-  saveCard, card, findFlats, krishaStats, markPending, clearPending, pendingFlats,
+  saveCard, card, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   upsertUser, logBotRequest, botStats,
   getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 

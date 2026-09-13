@@ -39,7 +39,11 @@ function idFromText(text) {
 }
 
 function askedLine(q) {
+  const Base = require("./krisha-base.js");
+  // Город показываем первым: по нему сразу видно, что мы поняли объявление
+  // правильно, а не ищем алматинскую квартиру в Астане.
   const bits = [
+    Base.cityNameOf(q.city),
     q.rooms ? q.rooms + "-комн" : null,
     q.area ? q.area + " м²" : null,
     q.floor && q.floors ? q.floor + "/" + q.floors + " этаж" : null,

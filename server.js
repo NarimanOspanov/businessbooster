@@ -1542,6 +1542,23 @@ async function handleTelegramUpdate(u) {
   }
 
   await say(chat, "Смотрю объявление…");
+
+  // Сначала проверяем себя: база собрана по фильтру «от хозяев», поэтому если
+  // присланный номер в ней есть, искать похожие незачем — это объявление и так
+  // без посредника, и контакты нужны именно по нему.
+  let mine = null;
+  try { mine = await db.flat(id); } catch { /* спросим Крышу как обычно */ }
+  if (mine) {
+    const f = flatForBot(mine);
+    const cap = "✅ <b>Это объявление уже от хозяина</b>, без посредника.\n\n" + bot.caption(f, CANONICAL);
+    db.logBotRequest({ userId: uid, kind: "search", krishaId: id, found: true, matches: 1,
+      note: "сама ссылка от хозяина" }).catch(() => {});
+    await sendFlat(chat, mine, cap);
+    notifyTelegram("🔍 <b>Прислали ссылку хозяина</b>\n" + bot.esc(who) +
+      "\n" + CANONICAL + "/kv/" + id);
+    return;
+  }
+
   let q;
   try {
     q = await Base.queryFromUrl("https://krisha.kz/a/show/" + id);
@@ -1572,27 +1589,37 @@ async function handleTelegramUpdate(u) {
   await say(chat, "Вы прислали: <b>" + bot.esc(asked) + "</b>\n" +
     "Нашли " + hits.length + (hits.length === 1 ? " похожую квартиру от хозяина." : " похожих квартиры от хозяина."));
 
-  for (const h of hits) {
-    const f = {
-      id: String(h.id), price: h.price, rooms: h.rooms,
-      area: h.area == null ? null : Number(h.area),
-      kitchen: h.kitchen == null ? null : Number(h.kitchen),
-      floor: h.floor, floors: h.floors, year: h.build_year,
-      house: h.house, cond: h.cond, furnished: h.furnished, toilet: h.toilet,
-      street: h.street, mkr: h.mkr, district: h.district,
-      posted: h.posted_on, photos: h.photos,
-    };
-    const cap = bot.caption(f, CANONICAL);
-    const markup = bot.contactsButton(f.id);
-    let sent = { ok: false };
-    if (h.photo1) {
-      sent = await bot.api(TG_TOKEN, "sendPhoto", {
-        chat_id: chat, photo: h.photo1, caption: cap,
-        parse_mode: "HTML", reply_markup: markup,
-      });
-    }
-    // Фотография могла не загрузиться у Телеграма — текст всё равно уходит.
-    if (!sent.ok) await say(chat, cap, { reply_markup: markup });
+  for (const h of hits) await sendFlat(chat, h);
+}
+
+// Строка базы — в то, что понимает подпись бота.
+function flatForBot(h) {
+  return {
+    id: String(h.id), price: h.price, rooms: h.rooms,
+    area: h.area == null ? null : Number(h.area),
+    kitchen: h.kitchen == null ? null : Number(h.kitchen),
+    floor: h.floor, floors: h.floors, year: h.build_year,
+    house: h.house, cond: h.cond, furnished: h.furnished, toilet: h.toilet,
+    street: h.street, mkr: h.mkr, district: h.district,
+    posted: h.posted_on, photos: h.photos,
+  };
+}
+
+async function sendFlat(chat, h, caption) {
+  const bot = require("./scripts/krisha-bot.js");
+  const cap = caption || bot.caption(flatForBot(h), CANONICAL);
+  const markup = bot.contactsButton(String(h.id));
+  let sent = { ok: false };
+  if (h.photo1) {
+    sent = await bot.api(TG_TOKEN, "sendPhoto", {
+      chat_id: chat, photo: h.photo1, caption: cap,
+      parse_mode: "HTML", reply_markup: markup,
+    });
+  }
+  // Фотография могла не загрузиться у Телеграма — текст всё равно уходит.
+  if (!sent.ok) {
+    await bot.api(TG_TOKEN, "sendMessage", { chat_id: chat, text: cap, parse_mode: "HTML",
+      disable_web_page_preview: true, reply_markup: markup });
   }
 }
 
@@ -5177,6 +5204,10 @@ http
           KU.progress = null;
         }
         const st = await db.photoStats().catch(() => null);
+        // Хранилище догнало базу, и каждые десять минут приходил отчёт ни о чём.
+        // Молчим, когда переносить было нечего: отчёт нужен про работу, а не
+        // про её отсутствие.
+        if (!done && !failed) return { done: 0, failed: 0, quiet: true };
         await notifyTelegram([
           "🖼 <b>Крыша: фотографии</b>",
           "",
