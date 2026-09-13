@@ -179,10 +179,10 @@ async function dispatcher() {
   const key = urls.join("\n");
   if (agentKey !== key) {
     // Реальный параллелизм упирается в этот предел раньше, чем в сам
-    // concurrency: при 5 входах и 8 соединений на каждый, 100 одновременных
-    // задач всё равно бегут по 40 через сеть, а остальные просто стоят в
-    // очереди у undici. 25×5=125 — с запасом над проверяемой сотней.
-    agents = urls.map((uri) => new ProxyAgent({ uri: uri, connections: 25 }));
+    // concurrency: при 5 входах и N соединений на каждый, больше N×5 задач
+    // всё равно бегут по очереди у undici, сколько бы их ни запустили разом.
+    // 50×5=250 — с запасом над проверяемыми двумястами.
+    agents = urls.map((uri) => new ProxyAgent({ uri: uri, connections: 50 }));
     agentKey = key;
     rr = 0;
   }
