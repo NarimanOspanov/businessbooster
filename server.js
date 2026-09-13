@@ -5474,10 +5474,13 @@ http
             const phones = await db.flatPhones(id);
             return send(200, { ok: true, id: id, phones: phones.map(pretty), raw: phones });
           }
-          const rows = await db.flatsWithoutPhone(Number(parsed.searchParams.get("limit") || 30));
+          const q = await db.flatsWithoutPhone(Number(parsed.searchParams.get("limit") || 30));
+          // count — сколько в этой пачке, total — сколько в очереди целиком.
+          // Их путали: limit=30 всегда возвращал 30, и это выглядело как
+          // застрявший прогресс, хотя очередь на деле двигалась.
           return send(200, {
-            ok: true, count: rows.length,
-            items: rows.map((r) => ({
+            ok: true, count: q.rows.length, total: q.total,
+            items: q.rows.map((r) => ({
               id: String(r.id), title: r.title, url: "https://krisha.kz/a/show/" + r.id,
             })),
           });

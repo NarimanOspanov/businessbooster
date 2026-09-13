@@ -1055,6 +1055,9 @@ async function replaceFlatPhones(flatId, phones, source) {
 }
 
 // Что ещё без телефона: очередь для скрипта, который их собирает.
+// total — сколько всего в очереди, а не в этой странице. Без него счётчик в
+// userscript показывал бы размер запрошенной пачки (постоянные «осталось 30»
+// при limit=30) вместо настоящего прогресса.
 async function flatsWithoutPhone(limit) {
   const pool = await getPool();
   const r = await pool.request().input("n", sql.Int, Number(limit) || 30).query(`
@@ -1063,7 +1066,11 @@ async function flatsWithoutPhone(limit) {
     LEFT JOIN dbo.krisha_phones p ON p.flat_id = f.id
     WHERE p.flat_id IS NULL
     ORDER BY f.first_seen DESC`);
-  return r.recordset;
+  const t = await pool.request().query(`
+    SELECT COUNT(*) AS n FROM dbo.krisha_flats f
+    LEFT JOIN dbo.krisha_phones p ON p.flat_id = f.id
+    WHERE p.flat_id IS NULL`);
+  return { rows: r.recordset, total: t.recordset[0].n };
 }
 
 // Квартиры, у которых есть запись в базе, но нет снятой карточки: описание,

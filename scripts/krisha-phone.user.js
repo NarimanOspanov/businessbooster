@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reception365 · телефоны с Крыши
 // @namespace    https://saudager.ai/
-// @version      1.1
+// @version      1.2
 // @description  Сама жмёт «показать телефон», сохраняет номер и ведёт к следующей квартире из очереди
 // @match        https://krisha.kz/a/show/*
 // @run-at       document-idle
@@ -88,7 +88,11 @@
       .then(function (j) {
         var left = (j.items || []).filter(function (x) { return x.id !== ID; });
         if (!left.length) { say(box.innerHTML + "<br>Очередь пуста."); return; }
-        say(box.innerHTML + "<br>Осталось " + left.length +
+        // total — очередь целиком, а не размер этой пачки. С limit=30 count
+        // почти всегда был ровно 30 и не двигался, сколько ни сохраняй — на
+        // самом деле счётчик тогда мерил не прогресс, а лимит запроса.
+        var n = typeof j.total === "number" ? j.total : left.length;
+        say(box.innerHTML + "<br>Осталось " + n +
           '. <a href="' + left[0].url + '" style="color:#6fb2f0">следующая →</a>');
       })
       .catch(function () { /* очередь не обязательна */ });
