@@ -15,51 +15,19 @@ const H = {
 
 // Прокси для страниц объявлений. Azure-адрес Крыша уже однажды закрыла.
 //
-// KRISHA_PROXY — либо готовый вход http://login:pass@host:port, либо кабинет
-// Asocks (https://my.asocks.com/). Сайт кабинета прокси не является: живой
-// порт берём через API по ASOCKS_API_KEY. URL с паролем в лог не пишем.
-let proxyAgent = null;
-let resolvedProxy = null;
+// KRISHA_PROXY — один или несколько входов http://login:pass@host:port через
+// запятую (или с новой строки в ~/.krisha-proxy). Кабинет Asocks прокси не
+// является: живой порт тогда берём через API по ASOCKS_API_KEY. URL с паролем
+// в лог не пишем. Несколько входов раздаём по кругу — у Крыши это разные IP.
+let agents = [];
+let agentKey = "";
+let rr = 0;
 
 function env(name) {
   return String(process.env[name] || "").trim();
 }
 
 const PROXY_FILE = path.join(os.homedir(), ".krisha-proxy");
-
-function fromFile() {
-  let text = "";
-  try { text = fs.readFileSync(PROXY_FILE, "utf8"); } catch { return ""; }
-  for (const line of text.split(/\r?\n/)) {
-    const s = line.trim();
-    if (!s || s.startsWith("#")) continue;
-    const val = /^KRISHA_PROXY=/i.test(s) ? s.slice(s.indexOf("=") + 1).trim() : s;
-    if (looksLikeProxyUrl(val)) return val;
-  }
-  const login = (text.match(/^LOGIN=(.*)$/m) || [])[1];
-  const pass = (text.match(/^PASSWORD=(.*)$/m) || [])[1];
-  const ip = (text.match(/^(?:IP|HOST)=(.*)$/m) || [])[1];
-  const port = (text.match(/^PORT=(.*)$/m) || [])[1];
-  if (login && pass && ip && port) {
-    return "http://" + String(login).trim() + ":" + String(pass).trim() + "@" +
-      String(ip).trim() + ":" + String(port).trim();
-  }
-  return "";
-}
-
-function proxySetting() {
-  const fromEnv = env("KRISHA_PROXY");
-  if (fromEnv) return fromEnv;
-  return fromFile();
-}
-
-function asocksKey() {
-  const dedicated = env("ASOCKS_API_KEY");
-  if (dedicated) return dedicated;
-  const raw = proxySetting();
-  if (raw && !/:\/\//.test(raw) && !raw.includes(".")) return raw;
-  return "";
-}
 
 function looksLikeDashboard(raw) {
   try {
@@ -80,23 +48,66 @@ function looksLikeProxyUrl(raw) {
   }
 }
 
-function viaProxy() {
-  const raw = proxySetting();
-  return looksLikeProxyUrl(raw) || !!asocksKey();
-}
-
-function proxyHint() {
-  const raw = proxySetting();
-  if (looksLikeDashboard(raw) && !asocksKey()) {
-    return "https://my.asocks.com/ — кабинет Asocks, не прокси. Положите ASOCKS_API_KEY из кабинета (API) или KRISHA_PROXY=http://login:pass@ip:port";
-  }
-  return "KRISHA_PROXY не задан — дочитывание с адреса Azure Крыша не отдаёт";
-}
-
 function toHttpProxy(raw) {
   const withScheme = raw.includes("://") ? raw : "http://" + raw;
   // CONNECT идёт по HTTP; схема https:// у прокси здесь только путает undici.
   return withScheme.replace(/^https:\/\//i, "http://");
+}
+
+function splitProxies(text) {
+  const out = [];
+  const seen = new Set();
+  for (const part of String(text || "").split(/[\s,]+/)) {
+    const val = part.replace(/^KRISHA_PROXY=/i, "").replace(/,$/, "").trim();
+    if (!val || val.startsWith("#") || /^KEY=/i.test(val)) continue;
+    if (!looksLikeProxyUrl(val)) continue;
+    const url = toHttpProxy(val);
+    if (seen.has(url)) continue;
+    seen.add(url);
+    out.push(url);
+  }
+  return out;
+}
+
+function fromFileText() {
+  try { return fs.readFileSync(PROXY_FILE, "utf8"); } catch { return ""; }
+}
+
+function proxyUrlsFromConfig() {
+  const fromEnv = splitProxies(env("KRISHA_PROXY"));
+  if (fromEnv.length) return fromEnv;
+  const text = fromFileText();
+  const listed = splitProxies(text);
+  if (listed.length) return listed;
+  const login = (text.match(/^LOGIN=(.*)$/m) || [])[1];
+  const pass = (text.match(/^PASSWORD=(.*)$/m) || [])[1];
+  const ip = (text.match(/^(?:IP|HOST)=(.*)$/m) || [])[1];
+  const port = (text.match(/^PORT=(.*)$/m) || [])[1];
+  if (login && pass && ip && port) {
+    return ["http://" + String(login).trim() + ":" + String(pass).trim() + "@" +
+      String(ip).trim() + ":" + String(port).trim()];
+  }
+  return [];
+}
+
+function asocksKey() {
+  return env("ASOCKS_API_KEY");
+}
+
+function viaProxy() {
+  return proxyUrlsFromConfig().length > 0 || !!asocksKey();
+}
+
+function proxyCount() {
+  return proxyUrlsFromConfig().length;
+}
+
+function proxyHint() {
+  const raw = env("KRISHA_PROXY") || fromFileText();
+  if (looksLikeDashboard(raw.trim().split(/[\s,]+/)[0]) && !asocksKey()) {
+    return "https://my.asocks.com/ — кабинет Asocks, не прокси. Положите ASOCKS_API_KEY из кабинета (API) или KRISHA_PROXY=http://login:pass@ip:port";
+  }
+  return "KRISHA_PROXY не задан — дочитывание с адреса Azure Крыша не отдаёт";
 }
 
 function portList(j) {
@@ -154,22 +165,26 @@ async function asocksProxyUrl(key) {
   return formatAsocksPort(p);
 }
 
-async function resolveProxyUrl() {
-  const raw = proxySetting();
-  if (looksLikeProxyUrl(raw)) return toHttpProxy(raw);
+async function resolveProxyUrls() {
+  const listed = proxyUrlsFromConfig();
+  if (listed.length) return listed;
   const key = asocksKey();
   if (!key) throw new Error(proxyHint());
-  return asocksProxyUrl(key);
+  return [await asocksProxyUrl(key)];
 }
 
 async function dispatcher() {
-  const url = await resolveProxyUrl();
-  if (!url) return undefined;
-  if (!proxyAgent || resolvedProxy !== url) {
-    proxyAgent = new ProxyAgent({ uri: url, connections: 32 });
-    resolvedProxy = url;
+  const urls = await resolveProxyUrls();
+  if (!urls.length) return undefined;
+  const key = urls.join("\n");
+  if (agentKey !== key) {
+    agents = urls.map((uri) => new ProxyAgent({ uri: uri, connections: 8 }));
+    agentKey = key;
+    rr = 0;
   }
-  return proxyAgent;
+  const agent = agents[rr % agents.length];
+  rr++;
+  return agent;
 }
 
 // --- the brief -------------------------------------------------------------
@@ -551,5 +566,5 @@ module.exports = {
   searchUrl, parseCards, parseDetail, districtOf, locationScore, dedupeKey,
   ageBand, areaBand, groupKey, median, buildModel, flagsFor,
   fetchText, fetchSearch, fetchDetail, fetchPriceAnalysis,
-  viaProxy, proxyHint, PROXY_FILE,
+  viaProxy, proxyHint, proxyCount, PROXY_FILE,
 };

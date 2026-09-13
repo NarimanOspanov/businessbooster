@@ -5213,7 +5213,11 @@ http
         .then((o) => console.log("[krisha] дочитывание " + JSON.stringify(o)))
         .catch((e) => { deepenRunning = false; console.log("[krisha] дочитывание сорвалось: " + e.message); });
 
-      return send(202, { ok: true, started: true, limit: limit, concurrency: concurrency, viaProxy: true, note: "итог придёт в Телеграм" });
+      return send(202, {
+        ok: true, started: true, limit: limit, concurrency: concurrency,
+        viaProxy: true, proxies: require("./scripts/krisha-lib.js").proxyCount(),
+        note: "итог придёт в Телеграм",
+      });
     }
 
     // Догон фотографий по тем квартирам, что уже в базе со ссылкой на Крышу.
