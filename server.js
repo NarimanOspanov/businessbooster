@@ -1146,6 +1146,13 @@ async function runKrishaUrgent(opts) {
               ph1: ph1,
               photoSrc: shots[0] ? shots[0].big : null,
             }));
+            // Страница уже прочитана — сохраняем и карточку. Раньше её здесь
+            // выбрасывали, и дочитывание потом открывало ту же страницу второй
+            // раз просто чтобы записать то, что у нас в руках уже было.
+            try {
+              card.addr = card.addr || c.addr;
+              await db.saveCard(c.id, card);
+            } catch { /* запись в базу подождёт, обход важнее */ }
           } catch { missed.push(c.id); }
           await new Promise((r) => setTimeout(r, KRISHA_PACE_MS));
         }
@@ -1210,7 +1217,7 @@ async function runKrishaUrgent(opts) {
           // который вы по ней пройдёте, повиснет без объявления — не найдётся
           // ни поиском, ни очередью на досъёмку.
           try {
-            await db.saveFlat(BaseRec.record(c, got.detail, {
+            await db.saveFlat(BaseRec.record(Object.assign({}, card, c), got.detail, {
               city: f.city, title: card.title, short: card.short, params: card.params,
               photos: (card.photos || []).length,
               ph1: card.photos && card.photos[0] ? card.photos[0].big : null,
@@ -1380,7 +1387,13 @@ const KRISHA_BACKFILL_PACE_MS = Number(process.env.KRISHA_BACKFILL_PACE_MS || 40
 // Сколько страниц объявлений дочитывание берёт за сутки. Вместе с суточным
 // сбором это держит нас в трёх тысячах запросов — вдвое ниже того, на чём нас
 // однажды отрезали.
-const KRISHA_DEEPEN_DAILY = Number(process.env.KRISHA_DEEPEN_DAILY || 3000);
+// Суточный предел на дочитывание. Частота обращений задана отдельно —
+// KRISHA_PACE_MS, — и её мы не трогаем: 2,5 секунды между страницами. Предел
+// говорит лишь, сколько часов в сутки этот ровный ручеёк течёт. При 3000 он
+// выдыхался за два часа, и архив из 29 тысяч страниц набирался бы десять дней;
+// при 12 000 это восемь часов в сутки той же частоты и два с половиной дня.
+// Быстрее — только чаще, а чаще нам уже отвечали отказом на всё подряд.
+const KRISHA_DEEPEN_DAILY = Number(process.env.KRISHA_DEEPEN_DAILY || 12000);
 let backfillRunning = false;
 let photosRunning = false;
 let deepenRunning = false;
@@ -5124,7 +5137,10 @@ http
               const html = await KL.fetchText("https://krisha.kz/a/show/" + r.id, 3, 15000);
               const card = Card.parse(html, r.id);
               const detail = KL.parseDetail(html);
-              if (blob.ready()) {
+              // Перечитка идёт ради JSON, а не ради снимков: у этих объявлений
+              // галерея в хранилище уже лежит, и перекачивать её заново — сто
+              // тысяч обращений к CDN впустую.
+              if (blob.ready() && !r.reread) {
                 await Promise.all((card.photos || []).map(async (p, n) => {
                   try { p.big = await blob.copyFrom(p.big, "flat/" + r.id + "/" + (n + 1) + ".jpg"); } catch { /* останется чужая */ }
                   try { p.full = await blob.copyFrom(p.full, "kv/" + r.id + "/" + (n + 1) + "-full.jpg"); } catch { /* останется чужая */ }
@@ -5147,7 +5163,14 @@ http
                   ph1: card.photos && card.photos[0] ? card.photos[0].big : null }
               ));
               done++;
-            } catch { failed++; }
+            } catch {
+              failed++;
+              // По коду ответа снятое от придержанного не отличить: одно и то
+              // же объявление отдаёт то 404, то 468, и заведомо живое тоже
+              // отвечает 468. Поэтому ничего не объявляем снятым — только
+              // считаем попытки, а очередь ставит неудачников в конец.
+              await db.markCardMiss(r.id).catch(() => {});
+            }
             KW.deepen.read = (KW.deepen.read || 0) + 1;
             if (i % 50 === 0) saveKrisha();
             await KL.sleep(KRISHA_PACE_MS);
@@ -5157,12 +5180,18 @@ http
           KU.progress = null;
         }
         const st = await db.krishaStats().catch(() => null);
+        const left = await db.deepenLeft().catch(() => null);
         await notifyTelegram([
           "📖 <b>Крыша: дочитывание архива</b>",
           "",
           "Прочитано: <b>" + done + "</b>" +
-            (failed ? ", не отдали: " + failed + " (" + Math.round((100 * failed) / (done + failed)) + "%)" : ""),
+            (failed ? ", не отдали: " + failed + " (" + Math.round((100 * failed) / (done + failed)) + "%)" : "") +
+
           st ? "Карточек всего " + st.cards + " из " + st.flats + " квартир" : null,
+          // Видно конец работы, а не только сегодняшний шаг.
+          left ? "Осталось дочитать: <b>" + (left.no_card + left.old_parse) + "</b>" +
+            " · с координатами " + left.with_geo +
+            (left.given_up ? " · отложено " + left.given_up : "") : null,
         ].filter(Boolean).join("\n"));
         return { done: done, failed: failed };
       })()

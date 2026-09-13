@@ -338,6 +338,18 @@ IF COL_LENGTH('dbo.krisha_flats', 'bumped_on') IS NULL
 IF COL_LENGTH('dbo.krisha_cards', 'advert_json') IS NULL
   ALTER TABLE dbo.krisha_cards ADD advert_json NVARCHAR(MAX) NULL;
 
+-- Сколько раз страница объявления не отдалась. Нужно, чтобы очередь на
+-- дочитывание двигалась: без счётчика те же неудачники попадали бы в начало
+-- каждый раз и вытесняли непрочитанные — так уже было с фотографиями, копии
+-- которых умерли.
+--
+-- Отдельной отметки «снято» нет намеренно. По коду ответа снятое от
+-- придержанного не отличить: проверка показала, что одно и то же объявление
+-- отдаёт то 404, то 468, а заведомо живое тоже отвечает 468. Объявить такое
+-- снятым — значит похоронить живую квартиру.
+IF COL_LENGTH('dbo.krisha_flats', 'card_tries') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD card_tries SMALLINT NULL;
+
 -- Объявления, которые Крыша не отдала: в «сегодняшних» они больше не всплывут,
 -- поэтому досниаются в начале следующих прогонов.
 IF OBJECT_ID('dbo.krisha_pending', 'U') IS NULL
@@ -1080,34 +1092,78 @@ async function flatsWithoutMkr(limit) {
 }
 
 // Что дочитать со страниц объявлений. Сначала те, у которых страницы не было
-// вовсе, а когда они кончатся — прочитанные до того, как мы стали забирать
-// координаты: у них страница есть, а дома на карте нет, и в опознании
-// квартиры это самый сильный признак.
+// вовсе, а когда они кончатся — прочитанные старым разбором, который не знал
+// про JSON самой Крыши: у них нет ни координат, ни её слагов адреса.
+//
+// Признак перечитки — пустой advert_json, а не пустые координаты. Разница
+// принципиальная: у объявления без карты координат не будет и после перечитки,
+// и по «lat IS NULL» оно возвращалось бы в очередь вечно, вытесняя остальные.
+// Сохранённый advert_json означает «эту страницу мы новым разбором уже видели»
+// — независимо от того, что в ней нашлось, — поэтому очередь заканчивается.
 async function flatsWithoutCard(limit) {
   const pool = await getPool();
-  const r = await pool.request().input("n", sql.Int, Number(limit) || 200).query(`
+  const n = Number(limit) || 200;
+  // Восемь неудач подряд — предел: дальше объявление, скорее всего, снято, но
+  // утверждать этого мы не можем, поэтому просто перестаём его пробовать.
+  const alive = "ISNULL(f.card_tries, 0) < 8";
+  const r = await pool.request().input("n", sql.Int, n).query(`
     SELECT TOP (@n) f.id, f.city, f.rooms, f.area, f.district, f.price, f.addr, 0 AS reread
     FROM dbo.krisha_flats f
     LEFT JOIN dbo.krisha_cards c ON c.flat_id = f.id
-    WHERE c.flat_id IS NULL
-    ORDER BY f.id DESC`);
+    WHERE c.flat_id IS NULL AND ${alive}
+    ORDER BY ISNULL(f.card_tries, 0), f.id DESC`);
   const rows = r.recordset;
-  const left = (Number(limit) || 200) - rows.length;
+  const left = n - rows.length;
   if (left <= 0) return rows;
   const r2 = await pool.request().input("n", sql.Int, left).query(`
     SELECT TOP (@n) f.id, f.city, f.rooms, f.area, f.district, f.price, f.addr, 1 AS reread
     FROM dbo.krisha_flats f
     JOIN dbo.krisha_cards c ON c.flat_id = f.id
-    WHERE f.lat IS NULL
-    ORDER BY f.id DESC`);
+    WHERE c.advert_json IS NULL AND ${alive}
+    ORDER BY ISNULL(f.card_tries, 0), f.id DESC`);
   return rows.concat(r2.recordset);
+}
+
+// Страница не отдалась — считаем попытку. Очередь сортируется по этому счёту,
+// поэтому неудачник уходит в конец и вернётся, когда придержка снимется, а не
+// на следующем же заходе.
+async function markCardMiss(id) {
+  const pool = await getPool();
+  await pool.request().input("id", sql.BigInt, Number(id)).query(`
+    UPDATE dbo.krisha_flats SET card_tries = ISNULL(card_tries, 0) + 1 WHERE id = @id`);
+}
+
+// Сколько ещё дочитывать: по обеим очередям сразу, чтобы видеть конец работы.
+async function deepenLeft() {
+  const pool = await getPool();
+  // Считаем только то, что ещё имеет смысл читать: снятые объявления и те, что
+  // не отдались пять раз, из остатка исключены — иначе число никогда не дойдёт
+  // до нуля и перестанет что-либо значить.
+  // Восемь неудач подряд — предел: дальше объявление, скорее всего, снято, но
+  // утверждать этого мы не можем, поэтому просто перестаём его пробовать.
+  const alive = "ISNULL(f.card_tries, 0) < 8";
+  const r = await pool.request().query(`
+    SELECT
+      (SELECT COUNT(*) FROM dbo.krisha_flats f
+        LEFT JOIN dbo.krisha_cards c ON c.flat_id = f.id
+        WHERE c.flat_id IS NULL AND ${alive}) AS no_card,
+      (SELECT COUNT(*) FROM dbo.krisha_flats f
+        JOIN dbo.krisha_cards c ON c.flat_id = f.id
+        WHERE c.advert_json IS NULL AND ${alive}) AS old_parse,
+      (SELECT COUNT(*) FROM dbo.krisha_flats WHERE lat IS NOT NULL) AS with_geo,
+      (SELECT COUNT(*) FROM dbo.krisha_flats WHERE ISNULL(card_tries, 0) >= 8) AS given_up,
+      (SELECT COUNT(*) FROM dbo.krisha_flats) AS total`);
+  return r.recordset[0];
 }
 
 async function saveCard(flatId, card) {
   const pool = await getPool();
   // Сырой объект от Крыши держим отдельной колонкой, а из разобранной карточки
   // убираем — иначе одно и то же лежало бы дважды.
-  const raw = card && card.advertRaw ? JSON.stringify(card.advertRaw) : null;
+  // Пустой объект, а не NULL, когда на странице JSON не нашлось: колонка
+  // служит отметкой «эту страницу новый разбор уже видел», и без неё
+  // объявление возвращалось бы в очередь на перечитку бесконечно.
+  const raw = card && card.advertRaw ? JSON.stringify(card.advertRaw) : "{}";
   const parsed = Object.assign({}, card);
   delete parsed.advertRaw;
   await pool.request()
@@ -1457,7 +1513,7 @@ async function botStats(days) {
   return s;
 }
 
-module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, normPhone, flatPhones, flatsWithoutPhone,
+module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, normPhone, flatPhones, flatsWithoutPhone,
   saveCard, card, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   upsertUser, logBotRequest, botStats,
   getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
