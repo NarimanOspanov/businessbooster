@@ -2,11 +2,175 @@
 // model. Used by both the CLI agent (scripts/krisha-agent.js) and the scheduled
 // watcher inside server.js, so the two can never drift apart.
 
+const { ProxyAgent, fetch: undiciFetch } = require("undici");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+
 const H = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
   Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
   "Accept-Language": "ru-RU,ru;q=0.9",
 };
+
+// Прокси для страниц объявлений. Azure-адрес Крыша уже однажды закрыла.
+//
+// KRISHA_PROXY — либо готовый вход http://login:pass@host:port, либо кабинет
+// Asocks (https://my.asocks.com/). Сайт кабинета прокси не является: живой
+// порт берём через API по ASOCKS_API_KEY. URL с паролем в лог не пишем.
+let proxyAgent = null;
+let resolvedProxy = null;
+
+function env(name) {
+  return String(process.env[name] || "").trim();
+}
+
+const PROXY_FILE = path.join(os.homedir(), ".krisha-proxy");
+
+function fromFile() {
+  let text = "";
+  try { text = fs.readFileSync(PROXY_FILE, "utf8"); } catch { return ""; }
+  for (const line of text.split(/\r?\n/)) {
+    const s = line.trim();
+    if (!s || s.startsWith("#")) continue;
+    const val = /^KRISHA_PROXY=/i.test(s) ? s.slice(s.indexOf("=") + 1).trim() : s;
+    if (looksLikeProxyUrl(val)) return val;
+  }
+  const login = (text.match(/^LOGIN=(.*)$/m) || [])[1];
+  const pass = (text.match(/^PASSWORD=(.*)$/m) || [])[1];
+  const ip = (text.match(/^(?:IP|HOST)=(.*)$/m) || [])[1];
+  const port = (text.match(/^PORT=(.*)$/m) || [])[1];
+  if (login && pass && ip && port) {
+    return "http://" + String(login).trim() + ":" + String(pass).trim() + "@" +
+      String(ip).trim() + ":" + String(port).trim();
+  }
+  return "";
+}
+
+function proxySetting() {
+  const fromEnv = env("KRISHA_PROXY");
+  if (fromEnv) return fromEnv;
+  return fromFile();
+}
+
+function asocksKey() {
+  const dedicated = env("ASOCKS_API_KEY");
+  if (dedicated) return dedicated;
+  const raw = proxySetting();
+  if (raw && !/:\/\//.test(raw) && !raw.includes(".")) return raw;
+  return "";
+}
+
+function looksLikeDashboard(raw) {
+  try {
+    const host = new URL(raw).hostname.toLowerCase();
+    return host === "asocks.com" || host.endsWith(".asocks.com");
+  } catch {
+    return false;
+  }
+}
+
+function looksLikeProxyUrl(raw) {
+  if (!raw || looksLikeDashboard(raw)) return false;
+  try {
+    const u = new URL(raw.includes("://") ? raw : "http://" + raw);
+    return !!(u.hostname && u.port);
+  } catch {
+    return false;
+  }
+}
+
+function viaProxy() {
+  const raw = proxySetting();
+  return looksLikeProxyUrl(raw) || !!asocksKey();
+}
+
+function proxyHint() {
+  const raw = proxySetting();
+  if (looksLikeDashboard(raw) && !asocksKey()) {
+    return "https://my.asocks.com/ — кабинет Asocks, не прокси. Положите ASOCKS_API_KEY из кабинета (API) или KRISHA_PROXY=http://login:pass@ip:port";
+  }
+  return "KRISHA_PROXY не задан — дочитывание с адреса Azure Крыша не отдаёт";
+}
+
+function toHttpProxy(raw) {
+  const withScheme = raw.includes("://") ? raw : "http://" + raw;
+  // CONNECT идёт по HTTP; схема https:// у прокси здесь только путает undici.
+  return withScheme.replace(/^https:\/\//i, "http://");
+}
+
+function portList(j) {
+  if (!j || typeof j !== "object") return [];
+  if (Array.isArray(j.data)) return j.data;
+  if (Array.isArray(j.message)) return j.message;
+  if (Array.isArray(j.ports)) return j.ports;
+  if (Array.isArray(j)) return j;
+  return [];
+}
+
+function portHostPort(p) {
+  if (!p || typeof p !== "object") return "";
+  if (typeof p.proxy === "string" && p.proxy.includes(":")) return p.proxy.trim();
+  const host = p.ip || p.host || p.server;
+  const port = p.port || p.server_port;
+  return host && port ? host + ":" + port : "";
+}
+
+function portAuth(p) {
+  const login = p.login || p.user || p.username || p.login_name;
+  const pass = p.password || p.pass;
+  return { login, pass };
+}
+
+function pickPort(list) {
+  const kz = list.filter((p) => {
+    const c = String(p.countryName || p.country_code || p.country || "").toLowerCase();
+    return c === "kz" || c.includes("kazakh");
+  });
+  return kz[0] || list[0] || null;
+}
+
+function formatAsocksPort(p) {
+  const hostport = portHostPort(p);
+  if (!hostport) throw new Error("Asocks не отдал адрес порта");
+  const { login, pass } = portAuth(p);
+  if (login && pass) {
+    return "http://" + encodeURIComponent(String(login)) + ":" + encodeURIComponent(String(pass)) + "@" + hostport;
+  }
+  return "http://" + hostport;
+}
+
+async function asocksProxyUrl(key) {
+  const r = await fetch("https://api.asocks.com/v2/proxy/ports?apiKey=" + encodeURIComponent(key) + "&per_page=50", {
+    headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(15000),
+  });
+  const j = await r.json().catch(() => null);
+  if (!r.ok || (j && j.success === false)) {
+    throw new Error("Asocks API не отдал порты");
+  }
+  const p = pickPort(portList(j));
+  if (!p) throw new Error("в кабинете Asocks нет порта — создайте HTTP-порт (KZ) и повторите");
+  return formatAsocksPort(p);
+}
+
+async function resolveProxyUrl() {
+  const raw = proxySetting();
+  if (looksLikeProxyUrl(raw)) return toHttpProxy(raw);
+  const key = asocksKey();
+  if (!key) throw new Error(proxyHint());
+  return asocksProxyUrl(key);
+}
+
+async function dispatcher() {
+  const url = await resolveProxyUrl();
+  if (!url) return undefined;
+  if (!proxyAgent || resolvedProxy !== url) {
+    proxyAgent = new ProxyAgent({ uri: url, connections: 32 });
+    resolvedProxy = url;
+  }
+  return proxyAgent;
+}
 
 // --- the brief -------------------------------------------------------------
 // City-wide and owner-only: 16 629 listings, against 624 under the narrow
@@ -249,13 +413,20 @@ async function fetchSearch(maxPages, crit, onPage, opts) {
 // From a datacenter IP Krisha drops connections intermittently — on detail pages
 // most often, but search pages too. Every read therefore gets a deadline and two
 // backoff retries; without this a single blip killed an entire run.
-async function fetchText(url, attempts = 3, timeoutMs = 20000) {
+async function fetchText(url, attempts = 3, timeoutMs = 20000, opts) {
+  const useProxy = !!(opts && opts.proxy);
+  const agent = useProxy ? await dispatcher() : undefined;
+  if (useProxy && !agent) throw new Error(proxyHint());
   let last;
   for (let i = 0; i < attempts; i++) {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
-      const r = await fetch(url, { headers: H, signal: ctrl.signal });
+      const r = await (agent ? undiciFetch : fetch)(url, {
+        headers: H,
+        signal: ctrl.signal,
+        ...(agent ? { dispatcher: agent } : {}),
+      });
       if (!r.ok) throw new Error("HTTP " + r.status);
       return await r.text();
     } catch (e) {
@@ -380,4 +551,5 @@ module.exports = {
   searchUrl, parseCards, parseDetail, districtOf, locationScore, dedupeKey,
   ageBand, areaBand, groupKey, median, buildModel, flagsFor,
   fetchText, fetchSearch, fetchDetail, fetchPriceAnalysis,
+  viaProxy, proxyHint, PROXY_FILE,
 };

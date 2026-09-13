@@ -1400,6 +1400,10 @@ const KRISHA_DEEPEN_DAILY = Number(process.env.KRISHA_DEEPEN_DAILY || 3000);
 // Сколько часов не трогать Крышу после прогона, который почти ничего не
 // принёс. Стучать в закрытую дверь бесполезно, а отказы, похоже, копятся.
 const KRISHA_DEEPEN_PAUSE_H = Number(process.env.KRISHA_DEEPEN_PAUSE_H || 6);
+// Сколько страниц объявлений читать сразу. С прокси пауза между запросами
+// больше не держит Azure-адрес, а очередь из 28 тысяч иначе снова растянется
+// на сутки. Потолок 50 — чтобы один прогон не открыл сотню CONNECT разом.
+const KRISHA_DEEPEN_CONCURRENCY = Math.max(1, Math.min(50, Number(process.env.KRISHA_DEEPEN_CONCURRENCY || 20)));
 let backfillRunning = false;
 let photosRunning = false;
 let deepenRunning = false;
@@ -5100,9 +5104,8 @@ http
     }
 
     // Дочитывание архива: описание хозяина, характеристики и полная галерея у
-    // квартир, которые попали в базу из выдачи. Идёт медленно и порциями, и это
-    // не осторожность ради осторожности: страниц объявлений 28 тысяч, и разом
-    // это 31 час обхода того самого хоста, который нас однажды уже отрезал.
+    // квартир, которые попали в базу из выдачи. Страницы объявлений идут через
+    // KRISHA_PROXY — с адреса Azure Крыша эти запросы уже не отдаёт.
     if (urlPath === "/api/krisha/deepen") {
       const send = (code, obj) => {
         res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
@@ -5135,19 +5138,25 @@ http
         });
       }
       const limit = Math.max(1, Math.min(Number(parsed.searchParams.get("limit") || 500), 2000, budget));
+      const concurrency = Math.max(1, Math.min(50,
+        Number(parsed.searchParams.get("concurrency") || KRISHA_DEEPEN_CONCURRENCY) || KRISHA_DEEPEN_CONCURRENCY));
+      {
+        const KL0 = require("./scripts/krisha-lib.js");
+        if (!KL0.viaProxy()) return send(409, { ok: false, error: KL0.proxyHint() });
+      }
       deepenRunning = true;
       (async () => {
         const Card = require("./scripts/krisha-card.js");
         const KL = require("./scripts/krisha-lib.js");
         const Base = require("./scripts/krisha-base.js");
-        let done = 0, failed = 0;
+        let done = 0, failed = 0, seen = 0;
         try {
           const rows = await db.flatsWithoutCard(limit);
-          for (let i = 0; i < rows.length; i++) {
-            const r = rows[i];
-            KU.progress = "дочитываю архив: " + (i + 1) + " из " + rows.length;
+          const n = Math.min(concurrency, Math.max(1, rows.length));
+          let next = 0;
+          async function deepenOne(r) {
             try {
-              const html = await KL.fetchText("https://krisha.kz/a/show/" + r.id, 3, 15000);
+              const html = await KL.fetchText("https://krisha.kz/a/show/" + r.id, 3, 15000, { proxy: true });
               const card = Card.parse(html, r.id);
               const detail = KL.parseDetail(html);
               // Перечитка идёт ради JSON, а не ради снимков: у этих объявлений
@@ -5184,10 +5193,19 @@ http
               // считаем попытки, а очередь ставит неудачников в конец.
               await db.markCardMiss(r.id).catch(() => {});
             }
+            seen++;
             KW.deepen.read = (KW.deepen.read || 0) + 1;
-            if (i % 50 === 0) saveKrisha();
-            await KL.sleep(KRISHA_PACE_MS);
+            KU.progress = "дочитываю архив: " + seen + " из " + rows.length + " ×" + n;
+            if (seen % 50 === 0) saveKrisha();
           }
+          await Promise.all(Array.from({ length: n }, async (_, w) => {
+            if (w) await KL.sleep(w * 40);
+            while (true) {
+              const i = next++;
+              if (i >= rows.length) return;
+              await deepenOne(rows[i]);
+            }
+          }));
         } finally {
           deepenRunning = false;
           KU.progress = null;
@@ -5220,7 +5238,7 @@ http
         .then((o) => console.log("[krisha] дочитывание " + JSON.stringify(o)))
         .catch((e) => { deepenRunning = false; console.log("[krisha] дочитывание сорвалось: " + e.message); });
 
-      return send(202, { ok: true, started: true, limit: limit, note: "итог придёт в Телеграм" });
+      return send(202, { ok: true, started: true, limit: limit, concurrency: concurrency, viaProxy: true, note: "итог придёт в Телеграм" });
     }
 
     // Догон фотографий по тем квартирам, что уже в базе со ссылкой на Крышу.
