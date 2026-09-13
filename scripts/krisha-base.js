@@ -36,6 +36,14 @@ function photoDirOf(url) {
   return m ? m[1] : null;
 }
 
+// Тот же путь, но из uuid, который карточка выдачи называет своим атрибутом:
+// первые два знака — подпапка. Выводить из ссылки на снимок больше не нужно,
+// а если снимка в карточке не оказалось, папка всё равно известна.
+function dirFromUuid(uuid) {
+  const u = String(uuid || "").toLowerCase();
+  return /^[0-9a-f]{8}-[0-9a-f-]{27}$/.test(u) ? "webp/" + u.slice(0, 2) + "/" + u : null;
+}
+
 // «Наурызбайский р-н, мкр Шугыла 342/1» -> «Шугыла». Микрорайон указан у
 // трети адресов, а в Алматы и Астане это привычнее улицы: спрашивают «что есть
 // в Коктеме», а не «что есть на Розыбакиева».
@@ -157,12 +165,15 @@ function record(card, detail, extra) {
     price: card.price || null,
     addr: card.addr || null,
     title: title,
-    photos: e.photos || 0,
+    // Карточка выдачи называет общее число снимков в data-nb, поэтому архивным
+    // записям больше не нужно писать ноль: страницу за этим открывать не надо.
+    photos: e.photos || card.photosNb || 0,
     ph1: e.ph1 || null,
     // Папка снимков на CDN: у объявления она одна на все фотографии, а имена
     // файлов — номера. Зная папку, галерею можно собрать перебором, не
     // открывая объявление.
-    photoDir: e.photoDir || photoDirOf(e.ph1) || photoDirOf(e.photoSrc) || null,
+    photoDir: e.photoDir || photoDirOf(e.ph1) || photoDirOf(e.photoSrc) ||
+      dirFromUuid(card.uuid) || null,
     mkr: mkrOf(card.addr) || mkrOf(e.title) || null,
     street: streetOf(e.title || card.title),
     streetKey: streetKey(card.addressTitle || card.addr || e.title || card.title),

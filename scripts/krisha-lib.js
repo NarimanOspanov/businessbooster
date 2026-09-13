@@ -63,10 +63,10 @@ function districtOf(addr) {
 }
 
 function parseCards(html) {
-  const re = /<div\s+data-id="(\d+)"\s+data-uuid="[^"]*"\s+class="(a-card[^"]*)"/g;
+  const re = /<div\s+data-id="(\d+)"\s+data-uuid="([^"]*)"\s+class="(a-card[^"]*)"/g;
   const marks = [];
   let m;
-  while ((m = re.exec(html))) marks.push({ id: m[1], cls: m[2], at: m.index });
+  while ((m = re.exec(html))) marks.push({ id: m[1], uuid: m[2], cls: m[3], at: m.index });
   const out = [];
   for (let i = 0; i < marks.length; i++) {
     const c = html.slice(marks[i].at, marks[i + 1] ? marks[i + 1].at : marks[i].at + 9000);
@@ -93,6 +93,11 @@ function parseCards(html) {
       floor: num((title.match(/(\d+)\/(\d+)\s*этаж/) || [])[1]),
       floors: num((title.match(/(\d+)\/(\d+)\s*этаж/) || [])[2]),
       photo: (c.match(/https:\/\/krisha-photos\.kcdn\.online\/[a-z0-9\/-]+?\/\d+-400x300\.jpg/) || [])[0] || null,
+      // Папку снимков на CDN и их общее число карточка называет прямо: uuid в
+      // своём атрибуте, число — в data-nb у ссылки. Значит всю галерею можно
+      // собрать перебором «папка/1..N», ни разу не открыв объявление.
+      uuid: marks[i].uuid || null,
+      photosNb: num((c.match(/data-nb="(\d+)"/) || [])[1]) || 0,
       ppm: Math.round(price / area),
       pro: /user-label-identified-specialist|user-title-pro/.test(c),
       // В Алматы районы «-ский», в Астане это «Нура р-н» и «р-н Байконур» —
