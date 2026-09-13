@@ -5440,7 +5440,7 @@ http
     if (urlPath === "/api/krisha/phone" || urlPath === "/api/krisha/queue") {
       const cors = {
         "Access-Control-Allow-Origin": "https://krisha.kz",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type",
         "Access-Control-Max-Age": "86400",
       };
@@ -5452,9 +5452,28 @@ http
       const key = parsed.searchParams.get("key") || "";
       if (!KRISHA_PHONE_KEY || key !== KRISHA_PHONE_KEY) return send(403, { ok: false, error: "bad_key" });
 
+      const pretty = (n) =>
+        "+" + n[0] + " " + n.slice(1, 4) + " " + n.slice(4, 7) + " " + n.slice(7, 9) + " " + n.slice(9);
+      // Казахстанский номер: 11 цифр с 7/8 в начале либо 10 без кода страны.
+      const parsePhones = (list) => {
+        const out = [];
+        for (const raw of [].concat(list || [])) {
+          const n = db.normPhone(raw);
+          if (n && !out.includes(n)) out.push(n);
+        }
+        return out;
+      };
+
       (async () => {
-        // Очередь: квартиры из базы, у которых телефона ещё нет, свежие раньше.
-        if (urlPath === "/api/krisha/queue") {
+        // GET: без id — очередь квартир без единого номера (свежие раньше);
+        // с id — то, что по этой квартире уже сохранено. Второе нужно перед
+        // правкой: не перезаписывать номера вслепую, не видя, что там сейчас.
+        if (req.method === "GET" || req.method === "HEAD") {
+          const id = String(parsed.searchParams.get("id") || "").replace(/\D/g, "");
+          if (id) {
+            const phones = await db.flatPhones(id);
+            return send(200, { ok: true, id: id, phones: phones.map(pretty), raw: phones });
+          }
           const rows = await db.flatsWithoutPhone(Number(parsed.searchParams.get("limit") || 30));
           return send(200, {
             ok: true, count: rows.length,
@@ -5466,25 +5485,31 @@ http
 
         let body = {};
         try { body = JSON.parse(await readBody(req)) || {}; } catch { /* пусто */ }
-        const id = String(body.id || "").replace(/\D/g, "");
+        const id = String(body.id || parsed.searchParams.get("id") || "").replace(/\D/g, "");
         if (!id) return send(400, { ok: false, error: "нет номера объявления" });
+        const phones = parsePhones(body.phones || body.phone);
 
-        // Казахстанский номер: 11 цифр с 7 в начале либо 10 без кода страны.
-        const phones = [];
-        for (const raw of [].concat(body.phones || body.phone || [])) {
-          const d = String(raw).replace(/\D/g, "");
-          const n = d.length === 11 && /^[78]/.test(d) ? "7" + d.slice(1)
-            : d.length === 10 ? "7" + d : null;
-          if (n && !phones.includes(n)) phones.push(n);
+        // PUT/PATCH: заменить номера этой квартиры целиком — для правки того,
+        // что записалось неверно. Пустой список — осознанно стереть все номера,
+        // а не молча ничего не сделать.
+        if (req.method === "PUT" || req.method === "PATCH") {
+          if (!phones.length && !("phones" in body || "phone" in body)) {
+            return send(400, { ok: false, error: "нужен список phones (может быть пустым)" });
+          }
+          const saved = await db.replaceFlatPhones(id, phones, body.source || "manual");
+          cardCache.delete(id);
+          console.log("[телефон] заменено " + id + ": " + saved.length + " шт.");
+          return send(200, { ok: true, id: id, phones: saved.map(pretty) });
         }
-        if (!phones.length) return send(400, { ok: false, error: "номер не разобрал" });
 
-        await db.saveFlatPhones(id, phones, "script");
+        // POST (по умолчанию): добавить к тому, что уже есть — для скрипта,
+        // который снимает один номер со страницы и может перезапуститься на
+        // той же квартире.
+        if (!phones.length) return send(400, { ok: false, error: "номер не разобрал" });
+        await db.saveFlatPhones(id, phones, body.source || "script");
         cardCache.delete(id);
-        const pretty = phones.map((n) =>
-          "+" + n[0] + " " + n.slice(1, 4) + " " + n.slice(4, 7) + " " + n.slice(7, 9) + " " + n.slice(9));
-        console.log("[телефон] " + id + ": " + pretty.length + " шт.");
-        return send(200, { ok: true, id: id, phones: pretty });
+        console.log("[телефон] " + id + ": " + phones.length + " шт.");
+        return send(200, { ok: true, id: id, phones: phones.map(pretty) });
       })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
       return;
     }

@@ -1024,6 +1024,36 @@ async function flatPhones(flatId) {
   return r.recordset.map((x) => x.phone);
 }
 
+// Заменить номера квартиры целиком, а не добавить к ним. saveFlatPhones
+// каждый раз ТОЛЬКО добавляет — это правильно для скрипта, который снимает
+// номер со страницы и может перезапуститься на той же квартире, но не даёт
+// способа поправить неверно записанный номер: он останется в базе рядом с
+// исправленным. Здесь — для ручного редактирования, когда именно это и нужно.
+async function replaceFlatPhones(flatId, phones, source) {
+  const pool = await getPool();
+  const seen = new Set();
+  const clean = [];
+  for (const raw of phones || []) {
+    const d = normPhone(raw);
+    if (d && !seen.has(d)) { seen.add(d); clean.push(d); }
+  }
+  const tx = new sql.Transaction(pool);
+  await tx.begin();
+  try {
+    await tx.request().input("id", sql.BigInt, Number(flatId))
+      .query("DELETE FROM dbo.krisha_phones WHERE flat_id = @id");
+    for (const p of clean) {
+      await tx.request()
+        .input("id", sql.BigInt, Number(flatId))
+        .input("p", sql.NVarChar(20), p)
+        .input("src", sql.NVarChar(20), source || "manual")
+        .query("INSERT INTO dbo.krisha_phones (flat_id, phone, source) VALUES (@id, @p, @src)");
+    }
+    await tx.commit();
+  } catch (e) { await tx.rollback(); throw e; }
+  return clean;
+}
+
 // Что ещё без телефона: очередь для скрипта, который их собирает.
 async function flatsWithoutPhone(limit) {
   const pool = await getPool();
@@ -1569,7 +1599,7 @@ async function botStats(days) {
   return s;
 }
 
-module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, normPhone, flatPhones, flatsWithoutPhone,
+module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone,
   saveCard, card, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   upsertUser, logBotRequest, botStats,
   getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
