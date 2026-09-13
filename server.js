@@ -1375,7 +1375,7 @@ const KRISHA_BACKFILL_PACE_MS = Number(process.env.KRISHA_BACKFILL_PACE_MS || 40
 // Сколько страниц объявлений дочитывание берёт за сутки. Вместе с суточным
 // сбором это держит нас в трёх тысячах запросов — вдвое ниже того, на чём нас
 // однажды отрезали.
-const KRISHA_DEEPEN_DAILY = Number(process.env.KRISHA_DEEPEN_DAILY || 2500);
+const KRISHA_DEEPEN_DAILY = Number(process.env.KRISHA_DEEPEN_DAILY || 3000);
 let backfillRunning = false;
 let photosRunning = false;
 let deepenRunning = false;
@@ -4938,7 +4938,8 @@ http
         await notifyTelegram([
           "📖 <b>Крыша: дочитывание архива</b>",
           "",
-          "Прочитано: <b>" + done + "</b>" + (failed ? ", не отдали: " + failed : ""),
+          "Прочитано: <b>" + done + "</b>" +
+            (failed ? ", не отдали: " + failed + " (" + Math.round((100 * failed) / (done + failed)) + "%)" : ""),
           st ? "Карточек всего " + st.cards + " из " + st.flats + " квартир" : null,
         ].filter(Boolean).join("\n"));
         return { done: done, failed: failed };
