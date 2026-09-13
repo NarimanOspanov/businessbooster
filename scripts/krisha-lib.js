@@ -178,7 +178,11 @@ async function dispatcher() {
   if (!urls.length) return undefined;
   const key = urls.join("\n");
   if (agentKey !== key) {
-    agents = urls.map((uri) => new ProxyAgent({ uri: uri, connections: 8 }));
+    // Реальный параллелизм упирается в этот предел раньше, чем в сам
+    // concurrency: при 5 входах и 8 соединений на каждый, 100 одновременных
+    // задач всё равно бегут по 40 через сеть, а остальные просто стоят в
+    // очереди у undici. 25×5=125 — с запасом над проверяемой сотней.
+    agents = urls.map((uri) => new ProxyAgent({ uri: uri, connections: 25 }));
     agentKey = key;
     rr = 0;
   }
