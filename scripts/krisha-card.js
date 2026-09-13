@@ -94,19 +94,47 @@ function windowData(html) {
     if (ch === '"') inStr = true;
     else if (ch === "{") depth++;
     else if (ch === "}" && !--depth) {
-      try { return JSON.parse(html.slice(start, i + 1)).advert || null; } catch { return null; }
+      try { return JSON.parse(html.slice(start, i + 1)); } catch { return null; }
     }
   }
   return null;
 }
+const windowDataAll = windowData;
 
 // Из advert берём только то, чем опознают квартиру и продавца.
 function fromWindowData(html) {
-  const a = windowData(html);
+  const d = windowDataAll(html);
+  const a = d && d.advert;
   if (!a) return {};
+  // adverts[0] — та же квартира карточкой, и в ней тридцать полей сверх: срок
+  // жизни объявления, дата публикации, сколько у продавца номеров, правил ли
+  // он объявление. Всё то, за чем мы иначе лезем в разметку или вычисляем.
+  const c = (d.adverts && d.adverts[0]) || {};
+  const own = c.owner || {};
+  const con = c.contactsInfo || {};
+  // «Активно ещё 7 дней», «Будет перенесено в архив через <b>7 дней</b>».
+  const daysLeft = (() => {
+    const t = String(c.statusBadge && c.statusBadge.text || c.expiresAtText || "");
+    const m = t.replace(/<[^>]+>/g, "").match(/(\d+)\s*дн/);
+    return m ? Number(m[1]) : null;
+  })();
   const map = a.map || {}, ad = a.address || {};
   const geo = (v) => (typeof v === "number" && v > -90 && v < 90 && v !== 0 ? v : null);
   return {
+    houseNum: ad.house_num || null,
+    // Дату, а не «осталось дней»: число дней протухает на следующие сутки, а
+    // дата остаётся верной, и «что исчезнет завтра» становится обычным запросом.
+    expiresOn: daysLeft == null ? null
+      : new Date(Date.now() + daysLeft * 864e5).toISOString().slice(0, 10),
+    daysLive: typeof c.daysInLive === "number" ? c.daysInLive : null,
+    phonesNb: typeof con.phonesNb === "number" ? con.phonesNb : null,
+    phonePreview: con.phonePreview || null,
+    isEdited: typeof c.isEdited === "boolean" ? c.isEdited : null,
+    priceM2: typeof c.priceM2 === "number" ? c.priceM2 : null,
+    ownerChecked: typeof own.isChecked === "boolean" ? own.isChecked : null,
+    isAgentJson: typeof c.isAgent === "boolean" ? c.isAgent : null,
+    uuid: c.uuid || null,
+    fullAddress: c.fullAddress || null,
     lat: geo(map.lat),
     lon: typeof map.lon === "number" && map.lon !== 0 ? map.lon : null,
     citySlug: ad.city || null,
@@ -128,7 +156,16 @@ function fromWindowData(html) {
     // Кроме массива фотографий: их 31, они занимают 10 из 11 килобайт объекта,
     // и они уже разобраны рядом. На 29 тысяч объявлений это треть гигабайта
     // дубля в базе, за которую мы платим.
-    advertRaw: Object.assign({}, a, { photos: undefined }),
+    advertRaw: Object.assign({}, a, {
+      photos: undefined,
+      // Карточку кладём рядом, без снимков, описания и прейскуранта платных
+      // услуг: описание лежит в соседней колонке, остальное весит больше, чем
+      // стоит.
+      card: Object.assign({}, c, {
+        photos: undefined, photo: undefined, description: undefined,
+        paidServices: undefined, services: undefined, titleWithPrice: undefined,
+      }),
+    }),
   };
 }
 

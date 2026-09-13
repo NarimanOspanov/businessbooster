@@ -197,6 +197,17 @@ function record(card, detail, extra) {
     label: card.label || null,
     bumped: card.bumped || null,
 
+    // Из adverts[0] той же страницы: когда объявление уберут в архив, сколько
+    // дней оно висит, сколько у продавца номеров, правил ли он его.
+    houseNum: card.houseNum || null,
+    expiresOn: card.expiresOn || null,
+    daysLive: card.daysLive == null ? null : card.daysLive,
+    phonesNb: card.phonesNb == null ? null : card.phonesNb,
+    phonePreview: card.phonePreview || null,
+    isEdited: card.isEdited == null ? null : card.isEdited,
+    priceM2: card.priceM2 == null ? null : card.priceM2,
+    ownerChecked: card.ownerChecked == null ? null : card.ownerChecked,
+
     // Подробности со страницы объявления. Площадь кухни и высота потолков —
     // сильные различители: агент, перевыкладывая, их не переписывает. «Бывшее
     // общежитие» резко меняет цену, поэтому без него сравнение врёт.

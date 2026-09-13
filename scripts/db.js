@@ -350,6 +350,36 @@ IF COL_LENGTH('dbo.krisha_cards', 'advert_json') IS NULL
 IF COL_LENGTH('dbo.krisha_flats', 'card_tries') IS NULL
   ALTER TABLE dbo.krisha_flats ADD card_tries SMALLINT NULL;
 
+-- Ещё из того же JSON, из соседней ветки adverts[0].
+--
+-- expires_on — день, когда Крыша уберёт объявление в архив. Она называет это
+-- «активно ещё 7 дней»; храним датой, а не остатком дней, потому что остаток
+-- назавтра становится неправдой, а дата остаётся верной, и «что исчезнет
+-- завтра» превращается в обычный запрос.
+--
+-- phones_nb — сколько у продавца номеров: иначе не узнать, все ли мы собрали.
+-- is_edited — хозяин правил объявление: те двенадцать расхождений по площади
+-- были именно правками. house_num — номер дома отдельным полем, а не концом
+-- строки адреса.
+IF COL_LENGTH('dbo.krisha_flats', 'house_num') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD house_num NVARCHAR(40) NULL;
+IF COL_LENGTH('dbo.krisha_flats', 'expires_on') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD expires_on DATE NULL;
+IF COL_LENGTH('dbo.krisha_flats', 'days_live') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD days_live INT NULL;
+IF COL_LENGTH('dbo.krisha_flats', 'phones_nb') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD phones_nb INT NULL;
+IF COL_LENGTH('dbo.krisha_flats', 'phone_preview') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD phone_preview NVARCHAR(32) NULL;
+IF COL_LENGTH('dbo.krisha_flats', 'is_edited') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD is_edited BIT NULL;
+IF COL_LENGTH('dbo.krisha_flats', 'price_m2') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD price_m2 INT NULL;
+IF COL_LENGTH('dbo.krisha_flats', 'owner_checked') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD owner_checked BIT NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_flats_expires')
+  CREATE INDEX IX_flats_expires ON dbo.krisha_flats (expires_on);
+
 -- Объявления, которые Крыша не отдала: в «сегодняшних» они больше не всплывут,
 -- поэтому досниаются в начале следующих прогонов.
 IF OBJECT_ID('dbo.krisha_pending', 'U') IS NULL
@@ -822,6 +852,14 @@ async function saveFlat(f) {
     .input("urg", sql.Bit, f.urgent == null ? null : (f.urgent ? 1 : 0))
     .input("label", sql.NVarChar(80), f.label || null)
     .input("bump", sql.NVarChar(40), f.bumped || null)
+    .input("hnum", sql.NVarChar(40), f.houseNum || null)
+    .input("exp", sql.Date, f.expiresOn || null)
+    .input("dlive", sql.Int, f.daysLive == null ? null : Number(f.daysLive))
+    .input("pnb", sql.Int, f.phonesNb == null ? null : Number(f.phonesNb))
+    .input("ppre", sql.NVarChar(32), f.phonePreview || null)
+    .input("edit", sql.Bit, f.isEdited == null ? null : (f.isEdited ? 1 : 0))
+    .input("pm2", sql.Int, f.priceM2 == null ? null : Number(f.priceM2))
+    .input("ochk", sql.Bit, f.ownerChecked == null ? null : (f.ownerChecked ? 1 : 0))
     .input("kitchen", sql.Decimal(6, 2), f.kitchen == null ? null : f.kitchen)
     .input("ceiling", sql.Decimal(4, 2), f.ceiling == null ? null : f.ceiling)
     .input("toilet", sql.NVarChar(40), f.toilet || null)
@@ -857,6 +895,13 @@ async function saveFlat(f) {
         -- Метка платная и снимается вместе с оплатой, поэтому не COALESCE:
         -- «была срочной месяц назад» — не то же, что «срочная сейчас».
         urgent = @urg, label = @label, bumped_on = COALESCE(@bump, t.bumped_on),
+        house_num = COALESCE(@hnum, t.house_num),
+        -- Срок жизни и число прожитых дней не COALESCE: объявление продлевают,
+        -- и вчерашний срок — уже неправда.
+        expires_on = COALESCE(@exp, t.expires_on), days_live = COALESCE(@dlive, t.days_live),
+        phones_nb = COALESCE(@pnb, t.phones_nb), phone_preview = COALESCE(@ppre, t.phone_preview),
+        is_edited = COALESCE(@edit, t.is_edited), price_m2 = COALESCE(@pm2, t.price_m2),
+        owner_checked = COALESCE(@ochk, t.owner_checked),
         kitchen = COALESCE(t.kitchen, @kitchen), ceiling = COALESCE(t.ceiling, @ceiling),
         toilet = COALESCE(t.toilet, @toilet), balcony = COALESCE(t.balcony, @balcony),
         parking = COALESCE(t.parking, @parking), dorm = COALESCE(t.dorm, @dorm),
@@ -867,12 +912,14 @@ async function saveFlat(f) {
          district, price, addr, title, photos, photo1, photo_dir, mkr, street, street_key, posted_on,
          lat, lon, street_slug, mkr_slug, user_type, owner_name, complex_id,
          uuid, is_pro, urgent, label, bumped_on,
+         house_num, expires_on, days_live, phones_nb, phone_preview, is_edited, price_m2, owner_checked,
          kitchen, ceiling, toilet, balcony, parking, dorm, furnished, is_agent)
       VALUES
         (@id, @city, @rooms, @area, @floor, @floors, @year, @house, @complex, @cond,
          @district, @price, @addr, @title, @photos, @photo1, @dir, @mkr, @street, @skey, @posted,
          @lat, @lon, @sslug, @mslug, @utype, @oname, @cxid,
          @uuid, @pro, @urg, @label, @bump,
+         @hnum, @exp, @dlive, @pnb, @ppre, @edit, @pm2, @ochk,
          @kitchen, @ceiling, @toilet, @balcony, @parking, @dorm, @furnished, @agent);`);
 }
 
@@ -1271,6 +1318,7 @@ async function findFlats(q, limit) {
     .input("mkr", sql.NVarChar(80), q.mkr || null)
     .input("skey", sql.NVarChar(120), q.streetKey || null)
     .input("sslug", sql.NVarChar(120), q.streetSlug || null)
+    .input("hnum", sql.NVarChar(40), q.houseNum || null)
     .input("lat", sql.Decimal(11, 7), q.lat == null ? null : Number(q.lat))
     .input("lon", sql.Decimal(11, 7), q.lon == null ? null : Number(q.lon))
     .input("kit", sql.Decimal(7, 2), q.kitchen == null ? null : Number(q.kitchen))
@@ -1287,6 +1335,10 @@ async function findFlats(q, limit) {
         3 + IIF(@rooms IS NOT NULL AND f.rooms = @rooms, 2, 0)
           + IIF(@skey IS NOT NULL AND f.street_key = @skey, 4, 0)
           + IIF(@sslug IS NOT NULL AND f.street_slug = @sslug, 4, 0)
+          -- Улица и номер дома вместе — это уже адрес, а не район: столько же,
+          -- сколько за совпадение по карте.
+          + IIF(@hnum IS NOT NULL AND @sslug IS NOT NULL
+               AND f.house_num = @hnum AND f.street_slug = @sslug, 6, 0)
           + IIF(@lat IS NOT NULL AND f.lat IS NOT NULL
                AND ABS(f.lat - @lat) < 0.0006 AND ABS(f.lon - @lon) < 0.0008, 6, 0)
           + IIF(@floor IS NOT NULL AND f.floor = @floor, 2, 0)
@@ -1318,6 +1370,10 @@ async function findFlats(q, limit) {
         -- Слаг улицы Крыша ставит сама, поэтому у двух объявлений одного дома
         -- он совпадает буква в букву — сверять нечего.
         AND (@sslug IS NULL OR f.street_slug IS NULL OR f.street_slug = @sslug)
+        -- Номер дома сверяем только вместе с улицей: «дом 9» сам по себе есть
+        -- на каждой улице города.
+        AND (@hnum IS NULL OR f.house_num IS NULL OR @sslug IS NULL OR f.street_slug IS NULL
+             OR f.street_slug <> @sslug OR f.house_num = @hnum)
         -- Координаты называют дом с точностью до метров. 0.0006° по широте —
         -- около 65 м, 0.0008° по долготе на нашей широте — около 65 м: это
         -- один дом с запасом на то, что геокодер ставит точку по-разному.
