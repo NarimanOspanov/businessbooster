@@ -1470,6 +1470,114 @@ async function runKrishaBackfill(city, pages, fromPage) {
   return { city: c, from: start, to: page - 1, seen: seen, saved: saved, copied: copied, total: total, next: page };
 }
 
+// Сколько совпадений показываем покупателю. Больше трёх — это уже не ответ, а
+// список, в котором он утонет: площадь с этажом обычно указывают на одну
+// квартиру, остальные идут от округлённых данных.
+const BOT_MATCHES = Number(process.env.KRISHA_BOT_MATCHES || 3);
+
+async function handleTelegramUpdate(u) {
+  const bot = require("./scripts/krisha-bot.js");
+  const Base = require("./scripts/krisha-base.js");
+  const say = (chat, text, extra) => bot.api(TG_TOKEN, "sendMessage", Object.assign(
+    { chat_id: chat, text: text, parse_mode: "HTML", disable_web_page_preview: true }, extra || {}));
+
+  // Нажали «Показать контакты».
+  if (u.callback_query) {
+    const cq = u.callback_query;
+    const chat = cq.message && cq.message.chat && cq.message.chat.id;
+    const id = String(cq.data || "").replace(/^c:/, "").replace(/\D/g, "");
+    await bot.api(TG_TOKEN, "answerCallbackQuery", { callback_query_id: cq.id });
+    if (!id || !chat) return;
+
+    let phones = [];
+    try { phones = await db.flatPhones(id); } catch { /* база ответит в другой раз */ }
+    const who = [cq.from && cq.from.first_name, cq.from && cq.from.username ? "@" + cq.from.username : null]
+      .filter(Boolean).join(" ");
+
+    if (phones.length) {
+      await say(chat, "📞 <b>Контакты хозяина</b>\n\n" +
+        phones.map((p) => "+" + p).join("\n") +
+        "\n\nСкажите, что нашли объявление на Крыше — так разговор начнётся понятнее.");
+    } else {
+      await say(chat, "Телефон этой квартиры мы ещё не открывали. Мы запросим его и вернёмся к вам.\n\n" +
+        '<a href="https://krisha.kz/a/show/' + id + '">Объявление на Крыше</a>');
+    }
+    // Заявку показываем себе всегда: даже когда телефон отдан, полезно знать,
+    // кто и что спрашивал.
+    notifyTelegram("🔔 <b>Запрос контактов</b>\n" + (who || "без имени") +
+      "\nКвартира: " + CANONICAL + "/kv/" + id +
+      "\nТелефон " + (phones.length ? "отдан: +" + phones[0] : "у нас не собран"));
+    return;
+  }
+
+  const msg = u.message || u.edited_message;
+  if (!msg || !msg.chat) return;
+  const chat = msg.chat.id;
+  const text = String(msg.text || msg.caption || "");
+
+  if (/^\/start|^\/help/.test(text)) {
+    await say(chat, "Пришлите ссылку на объявление с Крыши — найдём то же самое от хозяина, " +
+      "без посредника, и покажем его контакты.\n\nСсылка выглядит так: krisha.kz/a/show/1015591221");
+    return;
+  }
+
+  const id = bot.idFromText(text);
+  if (!id) {
+    await say(chat, "Пришлите ссылку на объявление с Крыши — например krisha.kz/a/show/1015591221.");
+    return;
+  }
+
+  await say(chat, "Смотрю объявление…");
+  let q;
+  try {
+    q = await Base.queryFromUrl("https://krisha.kz/a/show/" + id);
+  } catch {
+    await say(chat, "Не смог открыть это объявление. Возможно, его уже снял продавец.");
+    return;
+  }
+
+  let hits = [];
+  try { hits = await db.findFlats(q, BOT_MATCHES + 2); } catch { /* покажем пустой ответ */ }
+  // Само присланное объявление в ответе не нужно — покупатель его и так видел.
+  hits = hits.filter((h) => String(h.id) !== String(id)).slice(0, BOT_MATCHES);
+
+  const asked = bot.askedLine(q);
+  if (!hits.length) {
+    await say(chat, "Вы прислали: " + bot.esc(asked) +
+      "\n\nТакой квартиры от хозяина у нас пока нет. Мы обновляем базу каждый день — " +
+      "пришлите ссылку ещё раз через сутки.");
+    notifyTelegram("🔍 <b>Искали, не нашли</b>\n" + bot.esc(asked) +
+      "\nhttps://krisha.kz/a/show/" + id);
+    return;
+  }
+
+  await say(chat, "Вы прислали: <b>" + bot.esc(asked) + "</b>\n" +
+    "Нашли " + hits.length + (hits.length === 1 ? " похожую квартиру от хозяина." : " похожих квартиры от хозяина."));
+
+  for (const h of hits) {
+    const f = {
+      id: String(h.id), price: h.price, rooms: h.rooms,
+      area: h.area == null ? null : Number(h.area),
+      kitchen: h.kitchen == null ? null : Number(h.kitchen),
+      floor: h.floor, floors: h.floors, year: h.build_year,
+      house: h.house, cond: h.cond, furnished: h.furnished, toilet: h.toilet,
+      street: h.street, mkr: h.mkr, district: h.district,
+      posted: h.posted_on, photos: h.photos,
+    };
+    const cap = bot.caption(f, CANONICAL);
+    const markup = bot.contactsButton(f.id);
+    let sent = { ok: false };
+    if (h.photo1) {
+      sent = await bot.api(TG_TOKEN, "sendPhoto", {
+        chat_id: chat, photo: h.photo1, caption: cap,
+        parse_mode: "HTML", reply_markup: markup,
+      });
+    }
+    // Фотография могла не загрузиться у Телеграма — текст всё равно уходит.
+    if (!sent.ok) await say(chat, cap, { reply_markup: markup });
+  }
+}
+
 async function runKrishaWatch() {
   const K = require("./scripts/krisha-lib.js");
   const started = Date.now();
@@ -4821,6 +4929,28 @@ http
     // IndexNow, so it keeps working — permanently, pointing at the new place.
     if (urlPath === "/phone" || urlPath === "/phone/" || urlPath === "/phone/kk" || urlPath === "/phone/kk/") {
       res.writeHead(301, { Location: urlPath.indexOf("/kk") > 0 ? "/kk/" : "/" }).end();
+      return;
+    }
+
+    // Бот для покупателя. Он присылает ссылку на объявление агента — мы
+    // отвечаем оригиналами от хозяев, по сообщению на совпадение, с кнопкой
+    // «Показать контакты».
+    //
+    // Секрет вебхука выведен из токена бота, поэтому лишней переменной не
+    // нужно, а посторонний по адресу ручки ничего не отправит.
+    if (urlPath === "/api/telegram/webhook") {
+      const bot = require("./scripts/krisha-bot.js");
+      if (!TG_TOKEN) { res.writeHead(503).end(); return; }
+      if (req.headers["x-telegram-bot-api-secret-token"] !== bot.webhookSecret(TG_TOKEN)) {
+        res.writeHead(403).end();
+        return;
+      }
+      // Телеграм повторяет доставку, если не ответить быстро, поэтому
+      // подтверждаем сразу и работаем дальше в фоне.
+      res.writeHead(200, { "Content-Type": MIME[".json"] }).end("{}");
+      readBody(req)
+        .then((raw) => handleTelegramUpdate(JSON.parse(raw || "{}")))
+        .catch((e) => console.log("[бот] " + String(e.message).slice(0, 140)));
       return;
     }
 
