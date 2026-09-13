@@ -1384,18 +1384,6 @@ async function runKrishaDaily(cities, opts) {
 // Чего в карточке нет: года постройки, типа дома и даты публикации. Их
 // дочитываем по требованию — в тот момент, когда квартира кому-то понадобилась.
 const KRISHA_BACKFILL_PACE_MS = Number(process.env.KRISHA_BACKFILL_PACE_MS || 4000);
-// Сколько страниц объявлений дочитывание берёт за сутки. Вместе с суточным
-// сбором это держит нас в трёх тысячах запросов — вдвое ниже того, на чём нас
-// однажды отрезали.
-// Суточный предел на дочитывание.
-//
-// Я поднимал его до 12 000, рассчитывая пройти архив за двое суток, и был
-// неправ: в тот же час прогон дал семнадцать попыток и ни одной удачи — Крыша
-// перестала отвечать этому серверу совсем. Строчкой ниже всё это время стояло
-// предупреждение, что пять тысяч в сутки её уже однажды закрыли. Предел
-// возвращён, и быстрее его делать нельзя: 29 тысяч страниц с одного адреса за
-// пару дней Крыша не отдаёт ни при какой паузе между запросами.
-const KRISHA_DEEPEN_DAILY = Number(process.env.KRISHA_DEEPEN_DAILY || 3000);
 
 // Сколько часов не трогать Крышу после прогона, который почти ничего не
 // принёс. Стучать в закрытую дверь бесполезно, а отказы, похоже, копятся.
@@ -5116,13 +5104,7 @@ http
       if (deepenRunning || KU.running || backfillRunning) {
         return send(409, { ok: false, running: true, progress: KU.progress || null, error: "уже идёт" });
       }
-      // Суточный бюджет на страницы объявлений. 28 тысяч за день не прочитать
-      // никакой паузой: в августе Крыша перестала отвечать этому серверу на
-      // пяти тысячах в сутки. Поэтому предел — в коде, а не в расписании: так
-      // его нельзя случайно превысить, поставив джоб почаще.
-      const today = new Date(Date.now() + 5 * 3600e3).toISOString().slice(0, 10);
       KW.deepen = KW.deepen || {};
-      if (KW.deepen.day !== today) KW.deepen = { day: today, read: 0, pausedUntil: KW.deepen.pausedUntil };
       // Предохранитель: после прогона, который почти ничего не принёс, ждём.
       if (KW.deepen.pausedUntil && Date.now() < Date.parse(KW.deepen.pausedUntil)) {
         return send(429, {
@@ -5130,14 +5112,7 @@ http
           error: "Крыша отказывает — ждём до " + KW.deepen.pausedUntil,
         });
       }
-      const budget = Math.max(0, KRISHA_DEEPEN_DAILY - KW.deepen.read);
-      if (!budget) {
-        return send(429, {
-          ok: false, skipped: true, readToday: KW.deepen.read, dailyLimit: KRISHA_DEEPEN_DAILY,
-          error: "суточный бюджет израсходован",
-        });
-      }
-      const limit = Math.max(1, Math.min(Number(parsed.searchParams.get("limit") || 500), 2000, budget));
+      const limit = Math.max(1, Math.min(Number(parsed.searchParams.get("limit") || 500), 2000));
       const concurrency = Math.max(1, Math.min(50,
         Number(parsed.searchParams.get("concurrency") || KRISHA_DEEPEN_CONCURRENCY) || KRISHA_DEEPEN_CONCURRENCY));
       {
