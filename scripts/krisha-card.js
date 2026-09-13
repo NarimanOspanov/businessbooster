@@ -69,6 +69,61 @@ function description(html) {
   return "";
 }
 
+// Крыша сама отдаёт объявление структурой: на странице лежит `window.data` с
+// объектом advert, а в нём — координаты дома и её собственные слаги адреса
+// («Mkr_Koktem-1», «Bostandykskiy_r-n»). Для опознания квартиры это лучше
+// разбора русских строк: обе стороны получают одну и ту же строку, сверять
+// нечего. Скобки считаем вручную — вложенный JSON регуляркой не берут.
+//
+// В том же `window.data` рядом лежат ключи мобильного приложения. Берём только
+// advert: чужие ключи нам не нужны.
+function windowData(html) {
+  const at = html.indexOf("window.data");
+  if (at < 0) return null;
+  const start = html.indexOf("{", at);
+  if (start < 0) return null;
+  let depth = 0, inStr = false, esc = false;
+  for (let i = start; i < html.length; i++) {
+    const ch = html[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === "\\") esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') inStr = true;
+    else if (ch === "{") depth++;
+    else if (ch === "}" && !--depth) {
+      try { return JSON.parse(html.slice(start, i + 1)).advert || null; } catch { return null; }
+    }
+  }
+  return null;
+}
+
+// Из advert берём только то, чем опознают квартиру и продавца.
+function fromWindowData(html) {
+  const a = windowData(html);
+  if (!a) return {};
+  const map = a.map || {}, ad = a.address || {};
+  const geo = (v) => (typeof v === "number" && v > -90 && v < 90 && v !== 0 ? v : null);
+  return {
+    lat: geo(map.lat),
+    lon: typeof map.lon === "number" && map.lon !== 0 ? map.lon : null,
+    citySlug: ad.city || null,
+    districtSlug: ad.district || null,
+    mkrSlug: ad.microdistrict || null,
+    streetSlug: ad.street || null,
+    addressTitle: a.addressTitle || null,
+    // userType — вердикт самой Крыши, а не галочка продавца в фильтре.
+    userType: a.userType || null,
+    ownerName: a.ownerName || null,
+    complexId: a.complexId == null ? null : Number(a.complexId) || null,
+    square: typeof a.square === "number" ? a.square : null,
+    rooms: typeof a.rooms === "number" ? a.rooms : null,
+    status: a.status || null,
+  };
+}
+
 function parse(html, id) {
   const short = (html.match(/class="offer__short-description"[\s\S]*?(?=<div class="offer__description")/) || [])[0] || "";
   const shortItems = [];
@@ -79,7 +134,7 @@ function parse(html, id) {
       .replace(/:?\s*показать на карте\s*$/i, "").trim();
     if (t) shortItems.push(t);
   }
-  return {
+  return Object.assign(fromWindowData(html), {
     id: String(id),
     // У Крыши два шаблона страницы: в одном заголовок обёрнут в
     // offer__advert-title-text, в другом h1 лежит прямо в offer__advert-title.
@@ -87,7 +142,11 @@ function parse(html, id) {
     // было ни заголовка, ни описания.
     title: clean((html.match(/class="offer__advert-title[^"]*"[\s\S]{0,300}?<h1[^>]*>([\s\S]*?)<\/h1>/) || [])[1]),
     price: K.num((html.match(/class="offer__price"[^>]*>([\s\S]*?)<\/div>/) || [])[1]),
-    addr: clean((html.match(/class="offer__location[^"]*"[\s\S]*?<div>([\s\S]*?)<\/div>/) || [])[1]),
+    // Блок с адресом на странице есть не всегда, зато адрес всегда стоит в
+    // <title>: «… - №1015591221: Хусаинова, Алматы, Бостандыкский р-н — за …».
+    // Улица нужна для опознания квартиры, поэтому берём откуда достанем.
+    addr: clean((html.match(/class="offer__location[^"]*"[\s\S]*?<div>([\s\S]*?)<\/div>/) || [])[1])
+      || clean((html.match(/<title>[^<]*?№\d+:\s*([^<]+?)\s+—\s+за\s/i) || [])[1]),
     description: description(html),
     short: shortItems,
     params: params(html),
@@ -97,7 +156,7 @@ function parse(html, id) {
     phonesNb: Number((html.match(/"phonesNb":(\d+)/) || [])[1]) || 0,
     createdAt: (html.match(/"createdAt"\s*:\s*"(\d{4}-\d{2}-\d{2})"/) || [])[1] || null,
     takenAt: new Date().toISOString(),
-  };
+  });
 }
 
 async function fetchCard(id) {

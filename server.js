@@ -1112,14 +1112,19 @@ async function runKrishaUrgent(opts) {
             // У догоняемых нет карточки из выдачи, поэтому комнаты и площадь
             // достаём из заголовка объявления.
             const t = card.title || "";
-            const base = c.catchUp ? {
+            // Координаты дома, слаги адреса и вердикт Крыши о продавце лежат
+            // в разобранной странице: подмешиваем её к карточке из выдачи,
+            // иначе record() их не увидит и самый сильный признак опознания
+            // пропадёт.
+            const base = Object.assign({}, card, c.catchUp ? {
               id: c.id,
-              rooms: Number((t.match(/(\d+)-комнатная/) || [])[1]) || null,
-              area: Number(String((t.match(/([\d.,]+)\s*м²/) || [])[1] || "").replace(",", ".")) || null,
+              rooms: card.rooms || Number((t.match(/(\d+)-комнатная/) || [])[1]) || null,
+              area: card.square ||
+                Number(String((t.match(/([\d.,]+)\s*м²/) || [])[1] || "").replace(",", ".")) || null,
               district: K.districtOf(Base.fromShort(card.short, "Город") || t),
               price: card.price || null,
-              addr: null,
-            } : c;
+              addr: card.addressTitle || null,
+            } : c);
             // Страница объявления уже прочитана, значит полный список снимков
             // у нас на руках — забираем все, а не только первый. Объявление
             // однажды снимут, и показать квартиру покупателю будет нечем.
@@ -5130,7 +5135,12 @@ http
               // Тут же дописываем то, чего архивной записи не хватало: год
               // постройки, тип дома и дату публикации.
               await db.saveFlat(Base.record(
-                { id: r.id, rooms: r.rooms, area: r.area == null ? null : Number(r.area), district: r.district, price: r.price, addr: r.addr },
+                Object.assign({}, card, {
+                  id: r.id, rooms: r.rooms || card.rooms,
+                  area: r.area == null ? card.square : Number(r.area),
+                  district: r.district, price: r.price,
+                  addr: card.addressTitle || r.addr,
+                }),
                 detail,
                 { city: r.city, title: card.title, short: card.short, params: card.params,
                   photos: (card.photos || []).length,

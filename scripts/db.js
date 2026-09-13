@@ -286,6 +286,37 @@ IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.krisha_fla
 IF COL_LENGTH('dbo.krisha_flats', 'is_agent') IS NULL
   ALTER TABLE dbo.krisha_flats ADD is_agent BIT NULL;
 
+-- Название улицы или микрорайона без номера дома. Номер есть только в карточке
+-- поиска, на странице объявления его нет, поэтому сравнивать стороны можно
+-- лишь по названию — зато адрес известен почти у всей базы, и в опознании
+-- квартиры это сильнейший признак после площади.
+IF COL_LENGTH('dbo.krisha_flats', 'street_key') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD street_key NVARCHAR(120) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_flats_streetkey')
+  CREATE INDEX IX_flats_streetkey ON dbo.krisha_flats (city, street_key);
+
+-- Крыша отдаёт объявление структурой window.data: координаты дома и свои
+-- же слаги адреса. Это надёжнее разбора русских строк — обе стороны получают
+-- ровно одну и ту же строку, а координаты называют дом с точностью до метров.
+-- user_type — вердикт самой Крыши о продавце, он расходится с галочкой
+-- «от хозяина», которую ставит сам продавец.
+IF COL_LENGTH('dbo.krisha_flats', 'lat') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD lat DECIMAL(11, 7) NULL;
+IF COL_LENGTH('dbo.krisha_flats', 'lon') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD lon DECIMAL(11, 7) NULL;
+IF COL_LENGTH('dbo.krisha_flats', 'street_slug') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD street_slug NVARCHAR(120) NULL;
+IF COL_LENGTH('dbo.krisha_flats', 'mkr_slug') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD mkr_slug NVARCHAR(120) NULL;
+IF COL_LENGTH('dbo.krisha_flats', 'user_type') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD user_type NVARCHAR(40) NULL;
+IF COL_LENGTH('dbo.krisha_flats', 'owner_name') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD owner_name NVARCHAR(120) NULL;
+IF COL_LENGTH('dbo.krisha_flats', 'complex_id') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD complex_id BIGINT NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_flats_geo')
+  CREATE INDEX IX_flats_geo ON dbo.krisha_flats (city, lat, lon);
+
 -- Объявления, которые Крыша не отдала: в «сегодняшних» они больше не всплывут,
 -- поэтому досниаются в начале следующих прогонов.
 IF OBJECT_ID('dbo.krisha_pending', 'U') IS NULL
@@ -745,6 +776,14 @@ async function saveFlat(f) {
     .input("dir", sql.NVarChar(120), f.photoDir || null)
     .input("mkr", sql.NVarChar(80), f.mkr || null)
     .input("street", sql.NVarChar(160), f.street || null)
+    .input("skey", sql.NVarChar(120), f.streetKey || null)
+    .input("lat", sql.Decimal(11, 7), f.lat == null ? null : Number(f.lat))
+    .input("lon", sql.Decimal(11, 7), f.lon == null ? null : Number(f.lon))
+    .input("sslug", sql.NVarChar(120), f.streetSlug || null)
+    .input("mslug", sql.NVarChar(120), f.mkrSlug || null)
+    .input("utype", sql.NVarChar(40), f.userType || null)
+    .input("oname", sql.NVarChar(120), f.ownerName || null)
+    .input("cxid", sql.BigInt, f.complexId == null ? null : Number(f.complexId))
     .input("kitchen", sql.Decimal(6, 2), f.kitchen == null ? null : f.kitchen)
     .input("ceiling", sql.Decimal(4, 2), f.ceiling == null ? null : f.ceiling)
     .input("toilet", sql.NVarChar(40), f.toilet || null)
@@ -769,6 +808,13 @@ async function saveFlat(f) {
         addr = COALESCE(t.addr, @addr), photo1 = COALESCE(t.photo1, @photo1),
         photo_dir = COALESCE(t.photo_dir, @dir), mkr = COALESCE(t.mkr, @mkr),
         street = COALESCE(t.street, @street),
+        -- Ключ адреса пересчитываем всегда: правило разбора мы уточняем, а
+        -- сравнение двух сторон должно идти по одной и той же его версии.
+        street_key = COALESCE(@skey, t.street_key),
+        lat = COALESCE(@lat, t.lat), lon = COALESCE(@lon, t.lon),
+        street_slug = COALESCE(@sslug, t.street_slug), mkr_slug = COALESCE(@mslug, t.mkr_slug),
+        user_type = COALESCE(@utype, t.user_type), owner_name = COALESCE(@oname, t.owner_name),
+        complex_id = COALESCE(@cxid, t.complex_id),
         kitchen = COALESCE(t.kitchen, @kitchen), ceiling = COALESCE(t.ceiling, @ceiling),
         toilet = COALESCE(t.toilet, @toilet), balcony = COALESCE(t.balcony, @balcony),
         parking = COALESCE(t.parking, @parking), dorm = COALESCE(t.dorm, @dorm),
@@ -776,11 +822,13 @@ async function saveFlat(f) {
         posted_on = COALESCE(t.posted_on, @posted)
       WHEN NOT MATCHED THEN INSERT
         (id, city, rooms, area, floor, floors, build_year, house, complex, cond,
-         district, price, addr, title, photos, photo1, photo_dir, mkr, street, posted_on,
+         district, price, addr, title, photos, photo1, photo_dir, mkr, street, street_key, posted_on,
+         lat, lon, street_slug, mkr_slug, user_type, owner_name, complex_id,
          kitchen, ceiling, toilet, balcony, parking, dorm, furnished, is_agent)
       VALUES
         (@id, @city, @rooms, @area, @floor, @floors, @year, @house, @complex, @cond,
-         @district, @price, @addr, @title, @photos, @photo1, @dir, @mkr, @street, @posted,
+         @district, @price, @addr, @title, @photos, @photo1, @dir, @mkr, @street, @skey, @posted,
+         @lat, @lon, @sslug, @mslug, @utype, @oname, @cxid,
          @kitchen, @ceiling, @toilet, @balcony, @parking, @dorm, @furnished, @agent);`);
 }
 
@@ -999,15 +1047,28 @@ async function flatsWithoutMkr(limit) {
   return r.recordset;
 }
 
+// Что дочитать со страниц объявлений. Сначала те, у которых страницы не было
+// вовсе, а когда они кончатся — прочитанные до того, как мы стали забирать
+// координаты: у них страница есть, а дома на карте нет, и в опознании
+// квартиры это самый сильный признак.
 async function flatsWithoutCard(limit) {
   const pool = await getPool();
   const r = await pool.request().input("n", sql.Int, Number(limit) || 200).query(`
-    SELECT TOP (@n) f.id, f.city, f.rooms, f.area, f.district, f.price, f.addr
+    SELECT TOP (@n) f.id, f.city, f.rooms, f.area, f.district, f.price, f.addr, 0 AS reread
     FROM dbo.krisha_flats f
     LEFT JOIN dbo.krisha_cards c ON c.flat_id = f.id
     WHERE c.flat_id IS NULL
     ORDER BY f.id DESC`);
-  return r.recordset;
+  const rows = r.recordset;
+  const left = (Number(limit) || 200) - rows.length;
+  if (left <= 0) return rows;
+  const r2 = await pool.request().input("n", sql.Int, left).query(`
+    SELECT TOP (@n) f.id, f.city, f.rooms, f.area, f.district, f.price, f.addr, 1 AS reread
+    FROM dbo.krisha_flats f
+    JOIN dbo.krisha_cards c ON c.flat_id = f.id
+    WHERE f.lat IS NULL
+    ORDER BY f.id DESC`);
+  return rows.concat(r2.recordset);
 }
 
 async function saveCard(flatId, card) {
@@ -1112,6 +1173,12 @@ async function findFlats(q, limit) {
     .input("city", sql.NVarChar(40), q.city || null)
     .input("district", sql.NVarChar(100), q.district || null)
     .input("mkr", sql.NVarChar(80), q.mkr || null)
+    .input("skey", sql.NVarChar(120), q.streetKey || null)
+    .input("sslug", sql.NVarChar(120), q.streetSlug || null)
+    .input("lat", sql.Decimal(11, 7), q.lat == null ? null : Number(q.lat))
+    .input("lon", sql.Decimal(11, 7), q.lon == null ? null : Number(q.lon))
+    .input("kit", sql.Decimal(7, 2), q.kitchen == null ? null : Number(q.kitchen))
+    .input("house", sql.NVarChar(60), q.house || null)
     .input("complex", sql.NVarChar(160), q.complex || null)
     .input("addr2", sql.NVarChar(200), q.addr || null)
     // Посредник ставит свою цену, но не втрое: вилка отсекает совпадения,
@@ -1122,11 +1189,17 @@ async function findFlats(q, limit) {
     .query(`
       SELECT TOP (@n) f.*,
         3 + IIF(@rooms IS NOT NULL AND f.rooms = @rooms, 2, 0)
+          + IIF(@skey IS NOT NULL AND f.street_key = @skey, 4, 0)
+          + IIF(@sslug IS NOT NULL AND f.street_slug = @sslug, 4, 0)
+          + IIF(@lat IS NOT NULL AND f.lat IS NOT NULL
+               AND ABS(f.lat - @lat) < 0.0006 AND ABS(f.lon - @lon) < 0.0008, 6, 0)
           + IIF(@floor IS NOT NULL AND f.floor = @floor, 2, 0)
           + IIF(@floors IS NOT NULL AND f.floors = @floors, 1, 0)
           + IIF(@year IS NOT NULL AND f.build_year = @year, 1, 0)
           + IIF(@district IS NOT NULL AND f.district = @district, 1, 0)
           + IIF(@mkr IS NOT NULL AND f.mkr = @mkr, 2, 0)
+          + IIF(@kit IS NOT NULL AND f.kitchen = @kit, 2, 0)
+          + IIF(@house IS NOT NULL AND f.house = @house, 1, 0)
           + IIF(@complex IS NOT NULL AND f.complex = @complex, 1, 0)
           + IIF(@addr2 IS NOT NULL AND (f.addr LIKE '%' + @addr2 + '%'
                OR f.street LIKE '%' + @addr2 + '%' OR f.title LIKE '%' + @addr2 + '%'), 2, 0) AS score
@@ -1137,9 +1210,25 @@ async function findFlats(q, limit) {
         AND (@floor IS NULL OR f.floor IS NULL OR f.floor = @floor)
         AND (@floors IS NULL OR f.floors IS NULL OR f.floors = @floors)
         AND (@district IS NULL OR f.district IS NULL OR f.district = @district)
+        -- Улица: у нас она с номером дома, на странице объявления — без него,
+        -- поэтому сравниваем только название. Внутри района это сужает выбор
+        -- до одного-двух домов и делает главную работу после площади.
+        AND (@skey IS NULL OR f.street_key IS NULL OR f.street_key = @skey)
+        -- Слаг улицы Крыша ставит сама, поэтому у двух объявлений одного дома
+        -- он совпадает буква в букву — сверять нечего.
+        AND (@sslug IS NULL OR f.street_slug IS NULL OR f.street_slug = @sslug)
+        -- Координаты называют дом с точностью до метров. 0.0006° по широте —
+        -- около 65 м, 0.0008° по долготе на нашей широте — около 65 м: это
+        -- один дом с запасом на то, что геокодер ставит точку по-разному.
+        AND (@lat IS NULL OR f.lat IS NULL
+             OR (ABS(f.lat - @lat) < 0.0006 AND ABS(f.lon - @lon) < 0.0008))
         -- Год постройки на Крыше иногда расходится на год: сдача дома и
         -- заселение приходятся на разные годы, и владельцы пишут по-разному.
         AND (@year IS NULL OR f.build_year IS NULL OR ABS(f.build_year - @year) <= 1)
+        AND (@house IS NULL OR f.house IS NULL OR f.house = @house)
+        -- Кухню каждая сторона округляет по-своему: «9» против «9.2».
+        AND (@kit IS NULL OR f.kitchen IS NULL OR ABS(f.kitchen - @kit) <= 1)
+        AND (@complex IS NULL OR f.complex IS NULL OR f.complex = @complex)
         AND (@plo IS NULL OR f.price IS NULL OR f.price BETWEEN @plo AND @phi)
       ORDER BY score DESC, f.id DESC`);
   return r.recordset;

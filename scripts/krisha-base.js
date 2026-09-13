@@ -61,6 +61,33 @@ function citySlugOf(text) {
   return null;
 }
 
+// Ключ адреса — название улицы или микрорайона без номера дома.
+//
+// Две стороны пишут адрес по-разному: карточка поиска даёт «Хусаинова 225», а
+// заголовок страницы объявления — просто «Хусаинова». Номер дома есть только
+// у одной стороны, поэтому сравнивать по нему нельзя; зато название улицы
+// внутри района сужает выбор до одного-двух домов. Перекрёсток «Абая —
+// Розыбакиева» приводим к первой улице: вторую стороны пишут вразнобой.
+function streetKey(addr) {
+  let a = String(addr || "").trim();
+  if (!a) return null;
+  // Со страницы приходит «Хусаинова, Алматы, Бостандыкский р-н», из карточки —
+  // «Бостандыкский р-н, Хусаинова 225». Район с городом убираем с любой стороны.
+  // Заголовок страницы повторяет адрес дважды («Мкр Коктем-1, Алматы,
+  // Бостандыкский р-н, мкр Коктем-1»), поэтому берём первый уцелевший кусок, а
+  // не склеиваем остаток: улицу обе стороны ставят первой.
+  const parts = a.split(",").map((x) => x.trim())
+    .filter((x) => x && !/р-н|район/i.test(x) && !CITY_SLUG[x.toLowerCase()]);
+  if (!parts.length) return null;
+  a = parts[0].split("—")[0];                            // перекрёсток: первая улица
+  a = a.toLowerCase().replace(/[«»"'.]/g, " ").replace(/\s+/g, " ").trim();
+  a = a.replace(/[,;]+\s*$/, "").trim();
+  // Хвостовой номер дома: «225», «57д», «2/7», «10к35», «117, 55».
+  a = a.replace(/[\s,]+\d+\s*[а-яa-z]?(\s*[/к-]\s*\d+[а-яa-z]?)?$/i, "").trim();
+  a = a.replace(/[,;]+\s*$/, "").trim();
+  return a.length > 2 ? a.slice(0, 120) : null;
+}
+
 function mkrOf(addr) {
   const m = String(addr || "").match(/мкр\.?\s+([^,—]+)/i);
   if (!m) return null;
@@ -138,6 +165,18 @@ function record(card, detail, extra) {
     photoDir: e.photoDir || photoDirOf(e.ph1) || photoDirOf(e.photoSrc) || null,
     mkr: mkrOf(card.addr) || mkrOf(e.title) || null,
     street: streetOf(e.title || card.title),
+    streetKey: streetKey(card.addressTitle || card.addr || e.title || card.title),
+
+    // Прямо из window.data: координаты дома, слаги адреса и вердикт Крыши о
+    // продавце. Разбирать нечего — Крыша отдаёт их готовыми, и потому у двух
+    // объявлений одного дома они совпадают буква в букву.
+    lat: card.lat == null ? null : card.lat,
+    lon: card.lon == null ? null : card.lon,
+    streetSlug: card.streetSlug || null,
+    mkrSlug: card.mkrSlug || null,
+    userType: card.userType || null,
+    ownerName: card.ownerName || null,
+    complexId: card.complexId == null ? null : card.complexId,
 
     // Подробности со страницы объявления. Площадь кухни и высота потолков —
     // сильные различители: агент, перевыкладывая, их не переписывает. «Бывшее
@@ -282,6 +321,9 @@ function search(q, opts) {
 
 // Объявление, которое присылает покупатель, разбираем тем же кодом, которым
 // снимаем свои, — и сразу получаем всё, по чему искать.
+// Что искать по чужой ссылке. Разбираем её тем же record(), которым наполняем
+// базу: один парсер на обе стороны — единственный способ не получить снова
+// историю с городом, который на странице читался, а в запросе нет.
 async function queryFromUrl(url) {
   const id = (String(url).match(/\/a\/show\/(\d+)/) || [])[1];
   if (!id) throw new Error("это не ссылка на объявление");
@@ -290,25 +332,33 @@ async function queryFromUrl(url) {
   const c = Card.parse(html, id);
   const d = K.parseDetail(html);
   const t = c.title || "";
-  return {
+  // Страница объявления не карточка поиска: комнаты и площадь стоят в
+  // заголовке, а город с районом — в строке «Город: Алматы, Бостандыкский р-н».
+  // Собираем из них карточку, чтобы дальше сравнивать строго одинаково.
+  const place = fromShort(c.short, "Город") || c.addr || t;
+  // Всё, что Крыша отдала структурой — координаты, слаги, продавца, — кладём в
+  // карточку как есть: record() читает их оттуда, а пересобирать нечего.
+  const card = Object.assign({}, c, {
     id: id,
-    rooms: num((t.match(/(\d+)-комнатная/) || [])[1]),
-    area: num((t.match(/([\d.,]+)\s*м²/) || [])[1]),
-    floor: d.floor || null,
-    floors: d.floors || null,
-    year: d.year || null,
-    // На странице объявления адреса как отдельного поля нет, зато район стоит
-    // в строке «Город: Алматы, Бостандыкский р-н».
-    city: citySlugOf(fromShort(c.short, "Город") || c.addr || t),
-    district: K.districtOf(fromShort(c.short, "Город") || c.addr || t),
-    complex: fromShort(c.short, "Жилой комплекс"),
-    photos: (c.photos || []).length,
-    title: t,
+    rooms: c.rooms || num((t.match(/(\d+)-комнатная/) || [])[1]),
+    area: c.square || areaOf(t),
+    district: K.districtOf(place),
     price: c.price || null,
-  };
+    // addressTitle из window.data — «Хусаинова 225», с номером дома; в блоке
+    // адреса на странице номера может не быть вовсе.
+    addr: c.addressTitle || c.addr || place.replace(/^Город:\s*/i, "") || null,
+    title: t,
+  });
+  const q = record(card, d, {
+    city: citySlugOf(place), title: t, short: c.short, params: c.params,
+    photos: (c.photos || []).length,
+  });
+  q.photos = (c.photos || []).length;
+  return q;
 }
 
+
 module.exports = {
-  dir, record, saveDay, photoDirOf, mkrOf, streetOf, citySlugOf, cityNameOf, areaOf, fromParams, all, stats, search, queryFromUrl, fromShort,
+  dir, record, saveDay, photoDirOf, mkrOf, streetOf, streetKey, citySlugOf, cityNameOf, areaOf, fromParams, all, stats, search, queryFromUrl, fromShort,
   markPending, clearPending, pendingFor, readPending,
 };
