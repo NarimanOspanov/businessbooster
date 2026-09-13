@@ -4932,6 +4932,43 @@ http
       return;
     }
 
+    // Регистрация вебхука. Делается на сервере, а не снаружи: токен бота живёт
+    // только здесь, а секрет вебхука из него и выводится.
+    if (urlPath === "/api/telegram/setup") {
+      const bot = require("./scripts/krisha-bot.js");
+      const send = (code, obj) => {
+        res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+        res.end(JSON.stringify(obj, null, 2));
+      };
+      const want = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
+      if (!want || parsed.searchParams.get("key") !== want) return send(403, { ok: false, error: "bad_key" });
+      if (!TG_TOKEN) return send(503, { ok: false, error: "нет токена бота" });
+      (async () => {
+        if (parsed.searchParams.get("off") === "1") {
+          return send(200, { ok: true, deleted: await bot.api(TG_TOKEN, "deleteWebhook", {}) });
+        }
+        const set = await bot.api(TG_TOKEN, "setWebhook", {
+          url: CANONICAL + "/api/telegram/webhook",
+          secret_token: bot.webhookSecret(TG_TOKEN),
+          allowed_updates: ["message", "callback_query"],
+          drop_pending_updates: true,
+        });
+        const info = await bot.api(TG_TOKEN, "getWebhookInfo", {});
+        const me = await bot.api(TG_TOKEN, "getMe", {});
+        return send(200, {
+          ok: !!set.ok,
+          set: set.description || set.result,
+          bot: me.result ? "@" + me.result.username : null,
+          webhook: info.result ? {
+            url: info.result.url,
+            pending: info.result.pending_update_count,
+            lastError: info.result.last_error_message || null,
+          } : null,
+        });
+      })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 160) }));
+      return;
+    }
+
     // Бот для покупателя. Он присылает ссылку на объявление агента — мы
     // отвечаем оригиналами от хозяев, по сообщению на совпадение, с кнопкой
     // «Показать контакты».
