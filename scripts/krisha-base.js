@@ -189,6 +189,14 @@ function record(card, detail, extra) {
     ownerName: card.ownerName || null,
     complexId: card.complexId == null ? null : card.complexId,
 
+    // Из карточки выдачи: папка снимков, платные метки продавца и дата
+    // последнего поднятия. Раньше всё это разбиралось и выбрасывалось.
+    uuid: card.uuid || null,
+    isPro: card.pro == null ? null : !!card.pro,
+    urgent: card.urgent == null ? null : !!card.urgent,
+    label: card.label || null,
+    bumped: card.bumped || null,
+
     // Подробности со страницы объявления. Площадь кухни и высота потолков —
     // сильные различители: агент, перевыкладывая, их не переписывает. «Бывшее
     // общежитие» резко меняет цену, поэтому без него сравнение врёт.

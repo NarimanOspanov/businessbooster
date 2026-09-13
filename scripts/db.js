@@ -317,6 +317,27 @@ IF COL_LENGTH('dbo.krisha_flats', 'complex_id') IS NULL
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_flats_geo')
   CREATE INDEX IX_flats_geo ON dbo.krisha_flats (city, lat, lon);
 
+-- То, что карточка выдачи отдаёт, а мы до сих пор выбрасывали. uuid — папка
+-- снимков на CDN, она же ключ галереи. is_pro и метка «Срочно, торг» платные:
+-- их ставит сам продавец, и по ним видно, кто перед нами. bumped_on — дата
+-- последнего поднятия, она не равна дате публикации.
+IF COL_LENGTH('dbo.krisha_flats', 'uuid') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD uuid NVARCHAR(40) NULL;
+IF COL_LENGTH('dbo.krisha_flats', 'is_pro') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD is_pro BIT NULL;
+IF COL_LENGTH('dbo.krisha_flats', 'urgent') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD urgent BIT NULL;
+IF COL_LENGTH('dbo.krisha_flats', 'label') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD label NVARCHAR(80) NULL;
+IF COL_LENGTH('dbo.krisha_flats', 'bumped_on') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD bumped_on NVARCHAR(40) NULL;
+
+-- Объявление, как его отдала Крыша, без нашего разбора. Держим рядом с
+-- карточкой: когда окажется, что полезно ещё какое-то поле, его можно будет
+-- достать запросом к базе, а не двадцатью девятью тысячами обращений к Крыше.
+IF COL_LENGTH('dbo.krisha_cards', 'advert_json') IS NULL
+  ALTER TABLE dbo.krisha_cards ADD advert_json NVARCHAR(MAX) NULL;
+
 -- Объявления, которые Крыша не отдала: в «сегодняшних» они больше не всплывут,
 -- поэтому досниаются в начале следующих прогонов.
 IF OBJECT_ID('dbo.krisha_pending', 'U') IS NULL
@@ -784,6 +805,11 @@ async function saveFlat(f) {
     .input("utype", sql.NVarChar(40), f.userType || null)
     .input("oname", sql.NVarChar(120), f.ownerName || null)
     .input("cxid", sql.BigInt, f.complexId == null ? null : Number(f.complexId))
+    .input("uuid", sql.NVarChar(40), f.uuid || null)
+    .input("pro", sql.Bit, f.isPro == null ? null : (f.isPro ? 1 : 0))
+    .input("urg", sql.Bit, f.urgent == null ? null : (f.urgent ? 1 : 0))
+    .input("label", sql.NVarChar(80), f.label || null)
+    .input("bump", sql.NVarChar(40), f.bumped || null)
     .input("kitchen", sql.Decimal(6, 2), f.kitchen == null ? null : f.kitchen)
     .input("ceiling", sql.Decimal(4, 2), f.ceiling == null ? null : f.ceiling)
     .input("toilet", sql.NVarChar(40), f.toilet || null)
@@ -815,6 +841,10 @@ async function saveFlat(f) {
         street_slug = COALESCE(@sslug, t.street_slug), mkr_slug = COALESCE(@mslug, t.mkr_slug),
         user_type = COALESCE(@utype, t.user_type), owner_name = COALESCE(@oname, t.owner_name),
         complex_id = COALESCE(@cxid, t.complex_id),
+        uuid = COALESCE(@uuid, t.uuid), is_pro = COALESCE(@pro, t.is_pro),
+        -- Метка платная и снимается вместе с оплатой, поэтому не COALESCE:
+        -- «была срочной месяц назад» — не то же, что «срочная сейчас».
+        urgent = @urg, label = @label, bumped_on = COALESCE(@bump, t.bumped_on),
         kitchen = COALESCE(t.kitchen, @kitchen), ceiling = COALESCE(t.ceiling, @ceiling),
         toilet = COALESCE(t.toilet, @toilet), balcony = COALESCE(t.balcony, @balcony),
         parking = COALESCE(t.parking, @parking), dorm = COALESCE(t.dorm, @dorm),
@@ -824,11 +854,13 @@ async function saveFlat(f) {
         (id, city, rooms, area, floor, floors, build_year, house, complex, cond,
          district, price, addr, title, photos, photo1, photo_dir, mkr, street, street_key, posted_on,
          lat, lon, street_slug, mkr_slug, user_type, owner_name, complex_id,
+         uuid, is_pro, urgent, label, bumped_on,
          kitchen, ceiling, toilet, balcony, parking, dorm, furnished, is_agent)
       VALUES
         (@id, @city, @rooms, @area, @floor, @floors, @year, @house, @complex, @cond,
          @district, @price, @addr, @title, @photos, @photo1, @dir, @mkr, @street, @skey, @posted,
          @lat, @lon, @sslug, @mslug, @utype, @oname, @cxid,
+         @uuid, @pro, @urg, @label, @bump,
          @kitchen, @ceiling, @toilet, @balcony, @parking, @dorm, @furnished, @agent);`);
 }
 
@@ -1073,14 +1105,22 @@ async function flatsWithoutCard(limit) {
 
 async function saveCard(flatId, card) {
   const pool = await getPool();
+  // Сырой объект от Крыши держим отдельной колонкой, а из разобранной карточки
+  // убираем — иначе одно и то же лежало бы дважды.
+  const raw = card && card.advertRaw ? JSON.stringify(card.advertRaw) : null;
+  const parsed = Object.assign({}, card);
+  delete parsed.advertRaw;
   await pool.request()
     .input("id", sql.BigInt, Number(flatId))
-    .input("j", sql.NVarChar(sql.MAX), JSON.stringify(card))
+    .input("j", sql.NVarChar(sql.MAX), JSON.stringify(parsed))
+    .input("raw", sql.NVarChar(sql.MAX), raw)
     .query(`
       MERGE dbo.krisha_cards AS t
       USING (SELECT @id AS flat_id) AS s ON t.flat_id = s.flat_id
-      WHEN MATCHED THEN UPDATE SET card_json = @j, taken_at = SYSUTCDATETIME()
-      WHEN NOT MATCHED THEN INSERT (flat_id, card_json) VALUES (@id, @j);`);
+      WHEN MATCHED THEN UPDATE SET card_json = @j,
+        advert_json = COALESCE(@raw, t.advert_json), taken_at = SYSUTCDATETIME()
+      WHEN NOT MATCHED THEN INSERT (flat_id, card_json, advert_json)
+        VALUES (@id, @j, @raw);`);
 }
 
 async function card(flatId) {
@@ -1201,6 +1241,11 @@ async function findFlats(q, limit) {
           + IIF(@kit IS NOT NULL AND f.kitchen = @kit, 2, 0)
           + IIF(@house IS NOT NULL AND f.house = @house, 1, 0)
           + IIF(@complex IS NOT NULL AND f.complex = @complex, 1, 0)
+          -- Вся затея ради прямого контакта хозяина, поэтому при равном
+          -- совпадении выше встаёт тот, кого Крыша хозяином и считает, а
+          -- платный значок «специалист» опускает.
+          + IIF(f.user_type = 'owner', 2, 0)
+          + IIF(f.is_pro = 1, -2, 0)
           + IIF(@addr2 IS NOT NULL AND (f.addr LIKE '%' + @addr2 + '%'
                OR f.street LIKE '%' + @addr2 + '%' OR f.title LIKE '%' + @addr2 + '%'), 2, 0) AS score
       FROM dbo.krisha_flats f
