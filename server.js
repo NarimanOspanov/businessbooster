@@ -1391,7 +1391,11 @@ const KRISHA_DEEPEN_PAUSE_H = Number(process.env.KRISHA_DEEPEN_PAUSE_H || 6);
 // Сколько страниц объявлений читать сразу. С прокси пауза между запросами
 // больше не держит Azure-адрес, а очередь из 28 тысяч иначе снова растянется
 // на сутки. Потолок 50 — чтобы один прогон не открыл сотню CONNECT разом.
-const KRISHA_DEEPEN_CONCURRENCY = Math.max(1, Math.min(150, Number(process.env.KRISHA_DEEPEN_CONCURRENCY || 100)));
+// 100 намертво в коде, а не из переменной окружения: на Azure уже стоит
+// KRISHA_DEEPEN_CONCURRENCY=20 из прежнего запуска, и переменная окружения
+// перекрывала бы этот дефолт. ?concurrency=N в самом запросе по-прежнему
+// работает — это для разового теста другого числа, а не постоянная настройка.
+const KRISHA_DEEPEN_CONCURRENCY = 100;
 let backfillRunning = false;
 let photosRunning = false;
 let deepenRunning = false;
