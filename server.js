@@ -1387,13 +1387,19 @@ const KRISHA_BACKFILL_PACE_MS = Number(process.env.KRISHA_BACKFILL_PACE_MS || 40
 // Сколько страниц объявлений дочитывание берёт за сутки. Вместе с суточным
 // сбором это держит нас в трёх тысячах запросов — вдвое ниже того, на чём нас
 // однажды отрезали.
-// Суточный предел на дочитывание. Частота обращений задана отдельно —
-// KRISHA_PACE_MS, — и её мы не трогаем: 2,5 секунды между страницами. Предел
-// говорит лишь, сколько часов в сутки этот ровный ручеёк течёт. При 3000 он
-// выдыхался за два часа, и архив из 29 тысяч страниц набирался бы десять дней;
-// при 12 000 это восемь часов в сутки той же частоты и два с половиной дня.
-// Быстрее — только чаще, а чаще нам уже отвечали отказом на всё подряд.
-const KRISHA_DEEPEN_DAILY = Number(process.env.KRISHA_DEEPEN_DAILY || 12000);
+// Суточный предел на дочитывание.
+//
+// Я поднимал его до 12 000, рассчитывая пройти архив за двое суток, и был
+// неправ: в тот же час прогон дал семнадцать попыток и ни одной удачи — Крыша
+// перестала отвечать этому серверу совсем. Строчкой ниже всё это время стояло
+// предупреждение, что пять тысяч в сутки её уже однажды закрыли. Предел
+// возвращён, и быстрее его делать нельзя: 29 тысяч страниц с одного адреса за
+// пару дней Крыша не отдаёт ни при какой паузе между запросами.
+const KRISHA_DEEPEN_DAILY = Number(process.env.KRISHA_DEEPEN_DAILY || 3000);
+
+// Сколько часов не трогать Крышу после прогона, который почти ничего не
+// принёс. Стучать в закрытую дверь бесполезно, а отказы, похоже, копятся.
+const KRISHA_DEEPEN_PAUSE_H = Number(process.env.KRISHA_DEEPEN_PAUSE_H || 6);
 let backfillRunning = false;
 let photosRunning = false;
 let deepenRunning = false;
@@ -5113,7 +5119,14 @@ http
       // его нельзя случайно превысить, поставив джоб почаще.
       const today = new Date(Date.now() + 5 * 3600e3).toISOString().slice(0, 10);
       KW.deepen = KW.deepen || {};
-      if (KW.deepen.day !== today) KW.deepen = { day: today, read: 0 };
+      if (KW.deepen.day !== today) KW.deepen = { day: today, read: 0, pausedUntil: KW.deepen.pausedUntil };
+      // Предохранитель: после прогона, который почти ничего не принёс, ждём.
+      if (KW.deepen.pausedUntil && Date.now() < Date.parse(KW.deepen.pausedUntil)) {
+        return send(429, {
+          ok: false, skipped: true, pausedUntil: KW.deepen.pausedUntil,
+          error: "Крыша отказывает — ждём до " + KW.deepen.pausedUntil,
+        });
+      }
       const budget = Math.max(0, KRISHA_DEEPEN_DAILY - KW.deepen.read);
       if (!budget) {
         return send(429, {
@@ -5181,6 +5194,14 @@ http
         }
         const st = await db.krishaStats().catch(() => null);
         const left = await db.deepenLeft().catch(() => null);
+        // Прогон, из которого не вышло почти ничего, означает не «страницы
+        // плохие», а «нас не пускают». Дальше читать нечего до следующего раза.
+        let paused = null;
+        if (done + failed >= 10 && done <= (done + failed) * 0.2) {
+          paused = new Date(Date.now() + KRISHA_DEEPEN_PAUSE_H * 3600e3).toISOString();
+          KW.deepen.pausedUntil = paused;
+          saveKrisha();
+        }
         await notifyTelegram([
           "📖 <b>Крыша: дочитывание архива</b>",
           "",
@@ -5192,6 +5213,7 @@ http
           left ? "Осталось дочитать: <b>" + (left.no_card + left.old_parse) + "</b>" +
             " · с координатами " + left.with_geo +
             (left.given_up ? " · отложено " + left.given_up : "") : null,
+          paused ? "Крыша отказывает — не трогаем её до " + paused.slice(11, 16) + " UTC" : null,
         ].filter(Boolean).join("\n"));
         return { done: done, failed: failed };
       })()
