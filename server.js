@@ -1481,6 +1481,20 @@ async function handleTelegramUpdate(u) {
   const say = (chat, text, extra) => bot.api(TG_TOKEN, "sendMessage", Object.assign(
     { chat_id: chat, text: text, parse_mode: "HTML", disable_web_page_preview: true }, extra || {}));
 
+  // Кто пишет. Проверяем и заводим при каждом обращении — Телеграм не сообщает
+  // о новых подписчиках отдельно, так что первое сообщение и есть регистрация.
+  const from = (u.callback_query && u.callback_query.from) ||
+    ((u.message || u.edited_message || {}).from) || null;
+  const fromChat = (u.callback_query && u.callback_query.message && u.callback_query.message.chat
+    && u.callback_query.message.chat.id) || ((u.message || u.edited_message || {}).chat || {}).id;
+  let fresh = { isNew: false };
+  try { fresh = await db.upsertUser(from, fromChat); } catch { /* не мешаем ответу */ }
+  const uid = from && from.id ? from.id : null;
+  const who = from
+    ? [from.first_name, from.last_name, from.username ? "@" + from.username : null].filter(Boolean).join(" ")
+    : "без имени";
+  if (fresh.isNew) notifyTelegram("👤 <b>Новый пользователь</b>\n" + bot.esc(who) + "\nid " + uid);
+
   // Нажали «Показать контакты».
   if (u.callback_query) {
     const cq = u.callback_query;
@@ -1491,8 +1505,8 @@ async function handleTelegramUpdate(u) {
 
     let phones = [];
     try { phones = await db.flatPhones(id); } catch { /* база ответит в другой раз */ }
-    const who = [cq.from && cq.from.first_name, cq.from && cq.from.username ? "@" + cq.from.username : null]
-      .filter(Boolean).join(" ");
+    db.logBotRequest({ userId: uid, kind: "contact", flatId: id, found: phones.length > 0,
+      matches: phones.length }).catch(() => {});
 
     if (phones.length) {
       await say(chat, "📞 <b>Контакты хозяина</b>\n\n" +
@@ -1504,7 +1518,7 @@ async function handleTelegramUpdate(u) {
     }
     // Заявку показываем себе всегда: даже когда телефон отдан, полезно знать,
     // кто и что спрашивал.
-    notifyTelegram("🔔 <b>Запрос контактов</b>\n" + (who || "без имени") +
+    notifyTelegram("🔔 <b>Запрос контактов</b>\n" + bot.esc(who) +
       "\nКвартира: " + CANONICAL + "/kv/" + id +
       "\nТелефон " + (phones.length ? "отдан: +" + phones[0] : "у нас не собран"));
     return;
@@ -1533,6 +1547,8 @@ async function handleTelegramUpdate(u) {
     q = await Base.queryFromUrl("https://krisha.kz/a/show/" + id);
   } catch {
     await say(chat, "Не смог открыть это объявление. Возможно, его уже снял продавец.");
+    db.logBotRequest({ userId: uid, kind: "search", krishaId: id, found: false, matches: 0,
+      note: "объявление не открылось" }).catch(() => {});
     return;
   }
 
@@ -1542,11 +1558,13 @@ async function handleTelegramUpdate(u) {
   hits = hits.filter((h) => String(h.id) !== String(id)).slice(0, BOT_MATCHES);
 
   const asked = bot.askedLine(q);
+  db.logBotRequest({ userId: uid, kind: "search", krishaId: id, found: hits.length > 0,
+    matches: hits.length, note: asked }).catch(() => {});
   if (!hits.length) {
     await say(chat, "Вы прислали: " + bot.esc(asked) +
       "\n\nТакой квартиры от хозяина у нас пока нет. Мы обновляем базу каждый день — " +
       "пришлите ссылку ещё раз через сутки.");
-    notifyTelegram("🔍 <b>Искали, не нашли</b>\n" + bot.esc(asked) +
+    notifyTelegram("🔍 <b>Искали, не нашли</b>\n" + bot.esc(who) + "\n" + bot.esc(asked) +
       "\nhttps://krisha.kz/a/show/" + id);
     return;
   }
@@ -5214,7 +5232,7 @@ http
     // Без ссылки принимаем площадь с этажом руками: со скриншота их вбить
     // быстрее, чем искать глазами.
     if (urlPath === "/api/krisha/find" || urlPath === "/api/krisha/base" ||
-        urlPath === "/api/krisha/places") {
+        urlPath === "/api/krisha/places" || urlPath === "/api/krisha/dashboard") {
       const send = (code, obj) => {
         res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
         res.end(JSON.stringify(obj, null, 2));
@@ -5225,6 +5243,12 @@ http
       const Base = require("./scripts/krisha-base.js");
 
       (async () => {
+        // Сводка по боту: обращения, люди, доля находок.
+        if (urlPath === "/api/krisha/dashboard") {
+          const days = parsed.searchParams.get("days");
+          return send(200, Object.assign({ ok: true },
+            await db.botStats(days), { base: await db.krishaStats() }));
+        }
         // Дерево «город — район — микрорайон» для выбора места в кабинете.
         if (urlPath === "/api/krisha/places") {
           return send(200, { ok: true, tree: await db.places(), facets: await db.facets() });

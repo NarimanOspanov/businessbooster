@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Сводка по боту — Reception365</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#16171a;--card:#1e2024;--ink:#f2f3f5;--dim:#8b8f98;--line:rgba(255,255,255,.11);
+    --blue:#2a81dd;--green:#64bd38;--amber:#ffa000;--red:#ff8a80}
+  html{color-scheme:dark}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font:15px/1.5 Inter,system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;padding:28px 20px 60px}
+  .wrap{max-width:980px;margin:0 auto}
+  h1{font-size:24px;font-weight:600;letter-spacing:-.01em}
+  .sub{color:var(--dim);font-size:14px;margin-top:6px}
+  .sub a{color:var(--blue);text-decoration:none}
+
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:22px}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+  .tile .k{color:var(--dim);font-size:12.5px;text-transform:uppercase;letter-spacing:.04em}
+  .tile .v{font-size:30px;font-weight:600;margin-top:6px;font-variant-numeric:tabular-nums}
+  .tile .n{color:var(--dim);font-size:13px;margin-top:3px}
+  .tile.rate .v{color:var(--green)}
+  .tile.rate.low .v{color:var(--amber)}
+  .tile.rate.none .v{color:var(--dim)}
+
+  .box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-top:20px}
+  .box h2{font-size:15px;font-weight:600}
+  .box .hint{color:var(--dim);font-size:13px;margin-top:4px;margin-bottom:14px}
+
+  .tbl{width:100%;border-collapse:collapse;font-size:14px}
+  .tbl th{text-align:left;color:var(--dim);font-weight:500;font-size:12.5px;
+    text-transform:uppercase;letter-spacing:.03em;padding:0 10px 8px 0;white-space:nowrap}
+  .tbl td{padding:8px 10px 8px 0;border-top:1px solid var(--line);font-variant-numeric:tabular-nums;
+    vertical-align:top}
+  .tbl td.t{font-variant-numeric:normal}
+  .tbl a{color:var(--blue);text-decoration:none}
+  .scroll{overflow-x:auto}
+  .yes{color:var(--green)}
+  .no{color:var(--dim)}
+  .pill{display:inline-block;border:1px solid var(--line);border-radius:6px;
+    padding:1px 7px;font-size:12px;color:var(--dim);white-space:nowrap}
+  .bar{height:6px;border-radius:3px;background:rgba(255,255,255,.08);margin-top:5px;overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--green)}
+  .msg{margin-top:14px;color:var(--dim);font-size:14px}
+  .msg.bad{color:var(--red)}
+  .foot{color:var(--dim);font-size:13px;margin-top:22px}
+  button{background:transparent;border:1px solid var(--line);color:var(--dim);border-radius:9px;
+    padding:8px 15px;font:inherit;font-size:13.5px;cursor:pointer;margin-top:14px}
+  button:hover{color:var(--ink);border-color:var(--blue)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Сводка по боту</h1>
+  <div class="sub">
+    Что спрашивают покупатели и что мы им отвечаем.
+    Проверить как клиент: <a href="https://t.me/aisaudager_bot" target="_blank" rel="noopener">@aisaudager_bot</a>
+    · <a href="/admin/kvartiry/">поиск по базе</a>
+  </div>
+
+  <div id="tiles" class="tiles"></div>
+  <div id="msg" class="msg">Загружаю…</div>
+  <div id="out"></div>
+  <button id="again">Обновить</button>
+</div>
+
+<script>
+(function () {
+  var key = localStorage.getItem("r365key");
+  function need() {
+    if (key) return key;
+    var k = prompt("Ключ Reception365:", "");
+    if (k && k.trim()) { key = k.trim(); localStorage.setItem("r365key", key); }
+    return key;
+  }
+  var msg = document.getElementById("msg"), out = document.getElementById("out"),
+      tiles = document.getElementById("tiles");
+  function say(t, bad) { msg.textContent = t || ""; msg.className = "msg" + (bad ? " bad" : ""); }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function day(s) { return String(s || "").slice(0, 10); }
+  function at(s) {
+    // На сервере время в UTC, живём по Алматы.
+    var d = new Date(String(s).replace(" ", "T") + (/[Zz]|[+-]\d\d:?\d\d$/.test(String(s)) ? "" : "Z"));
+    if (isNaN(d)) return esc(s);
+    return d.toLocaleString("ru-RU", { timeZone: "Asia/Almaty", day: "2-digit", month: "2-digit",
+      hour: "2-digit", minute: "2-digit" });
+  }
+  function name(r) {
+    var n = [r.first_name, r.last_name].filter(Boolean).join(" ");
+    if (r.username) n += (n ? " " : "") + "@" + r.username;
+    return n || (r.user_id || r.id ? "id " + (r.user_id || r.id) : "—");
+  }
+  function rate(found, all) { return all ? Math.round((100 * found) / all) + "%" : "—"; }
+
+  function tile(k, v, n, cls) {
+    return '<div class="tile ' + (cls || "") + '"><div class="k">' + k + "</div>" +
+      '<div class="v">' + v + "</div>" + (n ? '<div class="n">' + n + "</div>" : "") + "</div>";
+  }
+
+  function draw(j) {
+    var fr = j.find_rate_today;
+    // Пока за сегодня ничего не спрашивали, показываем долю за всё время —
+    // иначе панель утром выглядит сломанной.
+    var shown = fr == null ? j.find_rate : fr;
+    var cls = shown == null ? "none" : (shown < 50 ? "low" : "");
+    tiles.innerHTML =
+      tile("Запросов сегодня", j.searches_today,
+        "всего " + j.searches_all) +
+      tile("Доля находок", shown == null ? "—" : shown + "%",
+        fr == null ? "за всё время · " + j.found_all + " из " + j.searches_all
+                   : "сегодня " + j.found_today + " из " + j.searches_today, "rate " + cls) +
+      tile("Новых людей", j.users_today, "всего " + j.users_all + " · за неделю " + j.users_week) +
+      tile("Просили контакты", j.contacts_today, "всего " + j.contacts_all) +
+      (j.base ? tile("Квартир в базе", (j.base.flats || 0).toLocaleString("ru-RU"),
+        "с телефоном " + (j.base.with_phone || 0)) : "");
+
+    var newBy = {};
+    (j.new_users || []).forEach(function (x) { newBy[day(x.day)] = x.n; });
+
+    var html = "";
+
+    // По дням
+    html += '<div class="box"><h2>По дням</h2>' +
+      '<div class="hint">Доля находок — сколько присланных ссылок нашлись в базе. ' +
+      'Низкая доля означает нехватку покрытия, а не поломку бота.</div><div class="scroll"><table class="tbl">' +
+      "<tr><th>День</th><th>Запросов</th><th>Нашли</th><th>Доля</th><th>Контакты</th><th>Новых людей</th></tr>";
+    var days = j.days || [];
+    if (!days.length) html += '<tr><td colspan="6" class="t no">Пока обращений не было.</td></tr>';
+    days.forEach(function (d) {
+      var p = d.searches ? Math.round((100 * d.found) / d.searches) : 0;
+      html += "<tr><td>" + day(d.day) + "</td><td>" + d.searches + "</td><td>" + d.found + "</td>" +
+        "<td>" + rate(d.found, d.searches) +
+        (d.searches ? '<div class="bar"><i style="width:' + p + '%"></i></div>' : "") + "</td>" +
+        "<td>" + d.contacts + "</td><td>" + (newBy[day(d.day)] || 0) + "</td></tr>";
+    });
+    html += "</table></div></div>";
+
+    // Последние обращения
+    html += '<div class="box"><h2>Последние обращения</h2>' +
+      '<div class="hint">Чего не хватило — видно здесь: по каждой ненайденной ссылке понятно, ' +
+      'какую квартиру искали.</div><div class="scroll"><table class="tbl">' +
+      "<tr><th>Когда</th><th>Кто</th><th>Что</th><th>Итог</th><th>Объявление</th></tr>";
+    var rec = j.recent || [];
+    if (!rec.length) html += '<tr><td colspan="5" class="t no">Пусто.</td></tr>';
+    rec.forEach(function (r) {
+      var what = r.kind === "contact"
+        ? '<span class="pill">контакты</span>'
+        : '<span class="pill">поиск</span>' + (r.note ? " " + esc(r.note) : "");
+      var res = r.kind === "contact"
+        ? (r.found ? '<span class="yes">телефон отдан</span>' : '<span class="no">телефона нет</span>')
+        : (r.found ? '<span class="yes">' + r.matches + " совп.</span>" : '<span class="no">не нашли</span>');
+      var link = r.krisha_id
+        ? '<a href="https://krisha.kz/a/show/' + r.krisha_id + '" target="_blank" rel="noopener">крыша</a>'
+        : (r.flat_id ? '<a href="/kv/' + r.flat_id + '" target="_blank">/kv/' + r.flat_id + "</a>" : "—");
+      html += "<tr><td>" + at(r.at) + '</td><td class="t">' + esc(name(r)) + '</td><td class="t">' +
+        what + "</td><td>" + res + "</td><td>" + link + "</td></tr>";
+    });
+    html += "</table></div></div>";
+
+    // Люди
+    html += '<div class="box"><h2>Люди</h2><div class="hint">Последние, кто писал боту.</div>' +
+      '<div class="scroll"><table class="tbl">' +
+      "<tr><th>Кто</th><th>Пришёл</th><th>Был</th><th>Запросов</th><th>Контактов</th></tr>";
+    var ppl = j.people || [];
+    if (!ppl.length) html += '<tr><td colspan="5" class="t no">Пока никого.</td></tr>';
+    ppl.forEach(function (p) {
+      html += '<tr><td class="t">' + esc(name(p)) + "</td><td>" + day(p.joined_at) + "</td><td>" +
+        at(p.last_seen_at) + "</td><td>" + p.searches + "</td><td>" + p.contacts + "</td></tr>";
+    });
+    html += "</table></div></div>";
+
+    out.innerHTML = html;
+    say("");
+  }
+
+  function load() {
+    if (!need()) { say("Без ключа не покажу.", true); return; }
+    say("Загружаю…");
+    fetch("/api/krisha/dashboard?key=" + encodeURIComponent(key) + "&days=14")
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j.ok) {
+          if (j.error === "bad_key") { localStorage.removeItem("r365key"); key = null; }
+          say("Не получилось: " + (j.error || "неизвестно"), true);
+          return;
+        }
+        draw(j);
+      })
+      .catch(function (e) { say("Сеть не ответила: " + e.message, true); });
+  }
+
+  document.getElementById("again").addEventListener("click", load);
+  load();
+})();
+</script>
+</body>
+</html>

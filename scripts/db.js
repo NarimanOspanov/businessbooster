@@ -299,6 +299,54 @@ BEGIN
 END
 `;
 
+// --- Пользователи бота ------------------------------------------------------
+//
+// Телеграм присылает данные о человеке в каждом сообщении, и они меняются: имя
+// правят, username берут и бросают. Поэтому храним и разобранные поля — по ним
+// считаем, — и сырой объект целиком: набор полей у Телеграма со временем
+// пополняется, и терять то, чего мы сегодня не знаем, незачем.
+const SCHEMA_USERS = `
+IF OBJECT_ID('dbo.users', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.users (
+    id           BIGINT        NOT NULL PRIMARY KEY,   -- id пользователя в Телеграме
+    chat_id      BIGINT        NULL,
+    username     NVARCHAR(64)  NULL,
+    first_name   NVARCHAR(128) NULL,
+    last_name    NVARCHAR(128) NULL,
+    lang         NVARCHAR(16)  NULL,
+    is_premium   BIT           NULL,
+    is_bot       BIT           NULL,
+    joined_at    DATETIME2(0)  NOT NULL CONSTRAINT DF_users_joined DEFAULT SYSUTCDATETIME(),
+    last_seen_at DATETIME2(0)  NOT NULL CONSTRAINT DF_users_seen   DEFAULT SYSUTCDATETIME(),
+    searches     INT           NOT NULL CONSTRAINT DF_users_searches DEFAULT 0,
+    contacts     INT           NOT NULL CONSTRAINT DF_users_contacts DEFAULT 0,
+    raw          NVARCHAR(MAX) NULL
+  );
+  CREATE INDEX IX_users_joined ON dbo.users (joined_at DESC);
+END
+
+-- Журнал обращений. Нужен ради одной цифры, которую иначе не узнать: какая
+-- доля присланных ссылок нашлась в базе. Пустой ответ — это не ошибка бота, а
+-- нехватка покрытия, и видеть её надо в числах.
+IF OBJECT_ID('dbo.bot_requests', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.bot_requests (
+    id        BIGINT IDENTITY(1,1) PRIMARY KEY,
+    at        DATETIME2(0)  NOT NULL CONSTRAINT DF_breq_at DEFAULT SYSUTCDATETIME(),
+    user_id   BIGINT        NULL,
+    kind      NVARCHAR(16)  NOT NULL,                  -- search | contact
+    krisha_id BIGINT        NULL,                      -- что присылали
+    flat_id   BIGINT        NULL,                      -- по какой квартире просили контакты
+    found     BIT           NULL,                      -- нашлось ли хоть одно совпадение
+    matches   INT           NULL,
+    note      NVARCHAR(200) NULL
+  );
+  CREATE INDEX IX_breq_at ON dbo.bot_requests (at DESC);
+  CREATE INDEX IX_breq_user ON dbo.bot_requests (user_id, at DESC);
+END
+`;
+
 // составной: по одному clinic_id база всё равно пошла бы сортировать.
 const SCHEMA_INDEXES = `
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_calls_clinic' AND object_id = OBJECT_ID('dbo.calls'))
@@ -311,6 +359,7 @@ async function migrate() {
   const pool = await getPool();
   await pool.request().batch(SCHEMA);
   await pool.request().batch(SCHEMA_KRISHA);
+  await pool.request().batch(SCHEMA_USERS);
   await pool.request().batch(SCHEMA_INDEXES); // после ALTER: колонки должны уже быть
   const r = await pool.request().query(
     "SELECT (SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID('dbo.calls')) AS calls_cols," +
@@ -1136,8 +1185,118 @@ async function pendingFlats(city, limit) {
   return r.recordset.map((x) => String(x.flat_id));
 }
 
+// --- Пользователи бота и журнал обращений -----------------------------------
+
+// Заводим человека при первом же сообщении и обновляем то, что Телеграм прислал
+// сейчас. Возвращаем признак новизны — по нему бот здоровается, а сводка
+// считает «новых за сегодня».
+async function upsertUser(from, chatId) {
+  if (!from || !from.id) return { isNew: false };
+  const pool = await getPool();
+  const r = await pool.request()
+    .input("id", sql.BigInt, Number(from.id))
+    .input("chat", sql.BigInt, chatId == null ? null : Number(chatId))
+    .input("username", sql.NVarChar(64), from.username || null)
+    .input("first", sql.NVarChar(128), from.first_name || null)
+    .input("last", sql.NVarChar(128), from.last_name || null)
+    .input("lang", sql.NVarChar(16), from.language_code || null)
+    .input("prem", sql.Bit, from.is_premium == null ? null : (from.is_premium ? 1 : 0))
+    .input("bot", sql.Bit, from.is_bot == null ? null : (from.is_bot ? 1 : 0))
+    .input("raw", sql.NVarChar(sql.MAX), JSON.stringify(from))
+    .query(`
+      MERGE dbo.users AS t
+      USING (SELECT @id AS id) AS s ON t.id = s.id
+      WHEN MATCHED THEN UPDATE SET
+        chat_id = ISNULL(@chat, t.chat_id), username = @username,
+        first_name = @first, last_name = @last, lang = ISNULL(@lang, t.lang),
+        is_premium = @prem, is_bot = ISNULL(@bot, t.is_bot),
+        last_seen_at = SYSUTCDATETIME(), raw = @raw
+      WHEN NOT MATCHED THEN INSERT (id, chat_id, username, first_name, last_name, lang, is_premium, is_bot, raw)
+        VALUES (@id, @chat, @username, @first, @last, @lang, @prem, @bot, @raw)
+      OUTPUT $action AS act;`);
+  const act = r.recordset && r.recordset[0] ? r.recordset[0].act : null;
+  return { isNew: act === "INSERT" };
+}
+
+async function logBotRequest(x) {
+  const pool = await getPool();
+  const col = x.kind === "contact" ? "contacts" : "searches";
+  await pool.request()
+    .input("user", sql.BigInt, x.userId == null ? null : Number(x.userId))
+    .input("kind", sql.NVarChar(16), x.kind || "search")
+    .input("kid", sql.BigInt, x.krishaId == null ? null : Number(x.krishaId))
+    .input("fid", sql.BigInt, x.flatId == null ? null : Number(x.flatId))
+    .input("found", sql.Bit, x.found == null ? null : (x.found ? 1 : 0))
+    .input("matches", sql.Int, x.matches == null ? null : Number(x.matches))
+    .input("note", sql.NVarChar(200), x.note ? String(x.note).slice(0, 200) : null)
+    .query(`
+      INSERT INTO dbo.bot_requests (user_id, kind, krisha_id, flat_id, found, matches, note)
+      VALUES (@user, @kind, @kid, @fid, @found, @matches, @note);
+      UPDATE dbo.users SET ${col} = ${col} + 1 WHERE id = @user;`);
+}
+
+// Сводка для панели. Сутки считаем по Алматы (UTC+5) — иначе «сегодня» на
+// панели меняется в пять утра и дневные числа не сходятся с ощущением дня.
+const ALM = "DATEADD(hour, 5, ";
+async function botStats(days) {
+  const pool = await getPool();
+  const n = Math.min(Math.max(Number(days) || 14, 2), 90);
+  const today = `CAST(${ALM}at) AS date) = CAST(${ALM}SYSUTCDATETIME()) AS date)`;
+  const r = await pool.request().input("n", sql.Int, n).query(`
+    SELECT
+      (SELECT COUNT(*) FROM dbo.bot_requests WHERE kind = 'search' AND ${today}) AS searches_today,
+      (SELECT COUNT(*) FROM dbo.bot_requests WHERE kind = 'search' AND found = 1 AND ${today}) AS found_today,
+      (SELECT COUNT(*) FROM dbo.bot_requests WHERE kind = 'contact' AND ${today}) AS contacts_today,
+      (SELECT COUNT(*) FROM dbo.bot_requests WHERE kind = 'search') AS searches_all,
+      (SELECT COUNT(*) FROM dbo.bot_requests WHERE kind = 'search' AND found = 1) AS found_all,
+      (SELECT COUNT(*) FROM dbo.bot_requests WHERE kind = 'contact') AS contacts_all,
+      (SELECT COUNT(*) FROM dbo.users) AS users_all,
+      (SELECT COUNT(*) FROM dbo.users
+        WHERE CAST(${ALM}joined_at) AS date) = CAST(${ALM}SYSUTCDATETIME()) AS date)) AS users_today,
+      (SELECT COUNT(*) FROM dbo.users
+        WHERE last_seen_at > DATEADD(day, -7, SYSUTCDATETIME())) AS users_week`);
+
+  const byDay = await pool.request().input("n", sql.Int, n).query(`
+    SELECT CAST(${ALM}at) AS date) AS day,
+      SUM(IIF(kind = 'search', 1, 0)) AS searches,
+      SUM(IIF(kind = 'search' AND found = 1, 1, 0)) AS found,
+      SUM(IIF(kind = 'contact', 1, 0)) AS contacts
+    FROM dbo.bot_requests
+    WHERE at > DATEADD(day, -@n, SYSUTCDATETIME())
+    GROUP BY CAST(${ALM}at) AS date)
+    ORDER BY day DESC`);
+
+  const usersByDay = await pool.request().input("n", sql.Int, n).query(`
+    SELECT CAST(${ALM}joined_at) AS date) AS day, COUNT(*) AS n
+    FROM dbo.users
+    WHERE joined_at > DATEADD(day, -@n, SYSUTCDATETIME())
+    GROUP BY CAST(${ALM}joined_at) AS date)
+    ORDER BY day DESC`);
+
+  const recent = await pool.request().query(`
+    SELECT TOP (40) r.at, r.kind, r.krisha_id, r.flat_id, r.found, r.matches, r.note,
+      u.id AS user_id, u.username, u.first_name, u.last_name
+    FROM dbo.bot_requests r
+    LEFT JOIN dbo.users u ON u.id = r.user_id
+    ORDER BY r.at DESC`);
+
+  const people = await pool.request().query(`
+    SELECT TOP (20) id, username, first_name, last_name, joined_at, last_seen_at, searches, contacts
+    FROM dbo.users ORDER BY last_seen_at DESC`);
+
+  const s = r.recordset[0];
+  s.find_rate_today = s.searches_today ? Math.round((100 * s.found_today) / s.searches_today) : null;
+  s.find_rate = s.searches_all ? Math.round((100 * s.found_all) / s.searches_all) : null;
+  s.days = byDay.recordset;
+  s.new_users = usersByDay.recordset;
+  s.recent = recent.recordset;
+  s.people = people.recordset;
+  return s;
+}
+
 module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, normPhone, flatPhones, flatsWithoutPhone,
   saveCard, card, findFlats, krishaStats, markPending, clearPending, pendingFlats,
+  upsertUser, logBotRequest, botStats,
   getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 
 if (require.main === module) {
