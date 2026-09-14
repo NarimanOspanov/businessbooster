@@ -5144,8 +5144,12 @@ http
         });
       }
       const limit = Math.max(1, Math.min(Number(parsed.searchParams.get("limit") || 500), 2000));
-      const concurrency = Math.max(1, Math.min(300,
+      const concurrency = Math.max(1, Math.min(500,
         Number(parsed.searchParams.get("concurrency") || KRISHA_DEEPEN_CONCURRENCY) || KRISHA_DEEPEN_CONCURRENCY));
+      // Заставить процесс подхватить весь пул прямо сейчас, а не ждать
+      // случайной серии из 8 отказов, которая до ротации может и не дойти.
+      // Разовая проверка — не завязана на конкретное число прокси.
+      const wantRotate = parsed.searchParams.get("rotateProxies") === "1";
       {
         const KL0 = require("./scripts/krisha-lib.js");
         if (!KL0.viaProxy()) return send(409, { ok: false, error: KL0.proxyHint() });
@@ -5157,6 +5161,9 @@ http
         const Base = require("./scripts/krisha-base.js");
         let done = 0, failed = 0, seen = 0, rotated = 0, streak = 0;
         try {
+          if (wantRotate) {
+            try { await KL.rotateProxies(); } catch { /* останется прежний пул */ }
+          }
           const rows = await db.flatsWithoutCard(limit);
           const n = Math.min(concurrency, Math.max(1, rows.length));
           let next = 0;
