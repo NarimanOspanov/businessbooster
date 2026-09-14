@@ -1866,7 +1866,17 @@ const KRISHA_MAX_PAGES = Number(process.env.KRISHA_MAX_PAGES || 900); // 16 649 
 const KRISHA_PAGE_PACE_MS = Number(process.env.KRISHA_PAGE_PACE_MS || 2000);
 const KRISHA_SWEEP_BUDGET_MIN = Number(process.env.KRISHA_SWEEP_BUDGET_MIN || 35);
 
-if (KRISHA_ON) {
+// Вся эта слежка — один и тот же старый механизм «сравнение с похожими» на
+// личном корпусе KW.corpus: тик со «снизили цену»/«дешевле похожих», дайджест,
+// «Находка дня» и недельная подборка — все четыре читают его через
+// krishaShortlist. Это не то же самое, что «Квартиры ниже рынка» из
+// krisha-urgent.js (тот пайплайн живёт в SQL и продолжает работать своим
+// путём). Пользователь решил, что сравнение с похожими больше не актуально —
+// расписание выключено целиком. Ручной запуск через /api/krisha?run=1 и
+// статус остаются рабочими, просто не наступают сами по будильнику.
+const KRISHA_WATCH_SCHEDULED = false;
+
+if (KRISHA_ON && KRISHA_WATCH_SCHEDULED) {
   setTimeout(krishaTick, 45000).unref();                       // let the app finish booting
   setInterval(krishaTick, KRISHA_EVERY_H * 3600e3).unref();
   if (KRISHA_DIGEST_H > 0) {
@@ -1917,6 +1927,8 @@ if (KRISHA_ON) {
 
   console.log("[krisha] watch on · каждые " + KRISHA_EVERY_H + " ч · порог " + KRISHA_MIN_DISCOUNT +
     "% · дайджест каждые " + KRISHA_DIGEST_H + " ч · находка дня в " + KRISHA_POST_HOUR + ":00");
+} else if (KRISHA_ON) {
+  console.log("[krisha] watch выключен по расписанию (KRISHA_WATCH_SCHEDULED=false) — сравнение с похожими не актуально");
 }
 
 // ---------------------------------------------------------------------------
@@ -5128,7 +5140,7 @@ http
         const Card = require("./scripts/krisha-card.js");
         const KL = require("./scripts/krisha-lib.js");
         const Base = require("./scripts/krisha-base.js");
-        let done = 0, failed = 0, seen = 0;
+        let done = 0, failed = 0, seen = 0, rotated = 0, streak = 0;
         try {
           const rows = await db.flatsWithoutCard(limit);
           const n = Math.min(concurrency, Math.max(1, rows.length));
@@ -5164,8 +5176,23 @@ http
                   ph1: card.photos && card.photos[0] ? card.photos[0].big : null }
               ));
               done++;
-            } catch {
+              streak = 0;
+            } catch (e) {
               failed++;
+              const gone = e && (e.status === 404 || e.status === 410);
+              if (!gone) streak++;
+              else streak = 0;
+              if (streak >= 8) {
+                try {
+                  await KL.rotateProxies();
+                  rotated++;
+                  streak = 0;
+                  KU.progress = "сменил прокси, пул " + KL.proxyCount();
+                  console.log("[krisha] " + KU.progress);
+                } catch (re) {
+                  console.log("[krisha] прокси не сменились: " + String(re.message).slice(0, 120));
+                }
+              }
               // По коду ответа снятое от придержанного не отличить: одно и то
               // же объявление отдаёт то 404, то 468, и заведомо живое тоже
               // отвечает 468. Поэтому ничего не объявляем снятым — только
@@ -5211,6 +5238,7 @@ http
             " · с координатами " + left.with_geo +
             (left.given_up ? " · отложено " + left.given_up : "") : null,
           paused ? "Крыша отказывает — не трогаем её до " + paused.slice(11, 16) + " UTC" : null,
+          rotated ? "Сменили прокси: " + rotated : null,
         ].filter(Boolean).join("\n"));
         return { done: done, failed: failed };
       })()
