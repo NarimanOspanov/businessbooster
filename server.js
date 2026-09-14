@@ -5129,6 +5129,13 @@ http
         return send(409, { ok: false, running: true, progress: KU.progress || null, error: "уже идёт" });
       }
       KW.deepen = KW.deepen || {};
+      // Ручной сброс паузы: ?resume=1 снимает предохранитель раньше срока,
+      // когда есть основания думать, что причина уже не действует (например,
+      // починили ротацию прокси и хотят проверить прямо сейчас).
+      if (parsed.searchParams.get("resume") === "1") {
+        KW.deepen.pausedUntil = null;
+        saveKrisha();
+      }
       // Предохранитель: после прогона, который почти ничего не принёс, ждём.
       if (KW.deepen.pausedUntil && Date.now() < Date.parse(KW.deepen.pausedUntil)) {
         return send(429, {
