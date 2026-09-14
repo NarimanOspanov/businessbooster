@@ -1599,15 +1599,21 @@ async function handleTelegramUpdate(u) {
     return;
   }
 
+  // Параметры одни находят не ту квартиру чаще, чем ту: на выборке в 200
+  // свежих агентских объявлений из 16 найденных по параметрам фото
+  // подтвердило только 2 — остальные оказались соседними квартирами того же
+  // дома с теми же метрами и этажом. Поэтому берём пул шире (параметры сами
+  // не обязаны быть точными — их дело сузить дом), а показываем покупателю
+  // только тех, кого фото подтвердило как ту же самую квартиру.
   let hits = [];
-  try { hits = await db.findFlats(q, BOT_MATCHES + 2); } catch { /* покажем пустой ответ */ }
+  try { hits = await db.findFlats(q, 12); } catch { /* покажем пустой ответ */ }
   // Само присланное объявление в ответе не нужно — покупатель его и так видел.
-  hits = hits.filter((h) => String(h.id) !== String(id)).slice(0, BOT_MATCHES);
+  hits = hits.filter((h) => String(h.id) !== String(id));
 
   const asked = bot.askedLine(q);
-  db.logBotRequest({ userId: uid, kind: "search", krishaId: id, found: hits.length > 0,
-    matches: hits.length, note: asked }).catch(() => {});
   if (!hits.length) {
+    db.logBotRequest({ userId: uid, kind: "search", krishaId: id, found: false, matches: 0,
+      note: asked }).catch(() => {});
     await say(chat, "Вы прислали: " + bot.esc(asked) +
       "\n\nТакой квартиры от хозяина у нас пока нет. Мы обновляем базу каждый день — " +
       "пришлите ссылку ещё раз через сутки.");
@@ -1616,11 +1622,9 @@ async function handleTelegramUpdate(u) {
     return;
   }
 
-  // Параметры уже отобрали кандидатов, но не отличают ту же квартиру от
-  // соседней такой же планировки — фото решает, кто из кандидатов точнее.
-  // Лучший по фото уходит первым; кандидатов, которых нечем подтвердить или
-  // не с чем сравнить, всё равно показываем — это уточнение, а не фильтр.
   const photoNotes = {};
+  let confirmed = hits;
+  let photoChecked = false;
   if (q.photoUrls && q.photoUrls.length) {
     try {
       const PhotoMatch = require("./scripts/photo-match.js");
@@ -1629,21 +1633,40 @@ async function handleTelegramUpdate(u) {
           id: String(h.id), photos: await db.candidatePhotoUrls(h.id, h.photo1),
         })));
         const scores = await PhotoMatch.scoreCandidates(q.photoUrls, candidates);
+        photoChecked = true;
         for (const h of hits) {
           const s = scores[String(h.id)];
           if (s && s.match && s.confidence >= 0.7) {
             photoNotes[h.id] = "📷 Фото совпадают — это точно та же квартира";
           }
         }
-        hits.sort((a, b) => (photoNotes[b.id] ? 1 : 0) - (photoNotes[a.id] ? 1 : 0));
+        confirmed = hits.filter((h) => photoNotes[h.id]);
+        confirmed.sort((a, b) => b.score - a.score);
       }
-    } catch { /* фото — уточнение, параметры уже нашли кандидатов */ }
+    } catch { /* сеть/модель подвела — покажем как есть, без фотоуточнения */ }
   }
 
-  await say(chat, "Вы прислали: <b>" + bot.esc(asked) + "</b>\n" +
-    "Нашли " + hits.length + (hits.length === 1 ? " похожую квартиру от хозяина." : " похожих квартиры от хозяина."));
+  // Фото сработало, но никого не подтвердило — значит совпадение по
+  // параметрам было случайным (та же площадь и этаж у другой квартиры дома).
+  // Показать его как найденное — значит отправить покупателя звонить не по
+  // адресу, поэтому в этом случае отвечаем как при пустом результате.
+  if (photoChecked && !confirmed.length) {
+    db.logBotRequest({ userId: uid, kind: "search", krishaId: id, found: false, matches: 0,
+      note: asked + " (по параметрам " + hits.length + ", фото не подтвердило ни одного)" }).catch(() => {});
+    await say(chat, "Вы прислали: " + bot.esc(asked) +
+      "\n\nТакой квартиры от хозяина у нас пока нет. Мы обновляем базу каждый день — " +
+      "пришлите ссылку ещё раз через сутки.");
+    notifyTelegram("🔍 <b>Похожие по параметрам были, фото не подтвердило</b>\n" + bot.esc(who) +
+      "\n" + bot.esc(asked) + "\nhttps://krisha.kz/a/show/" + id);
+    return;
+  }
 
-  for (const h of hits) await sendFlat(chat, h, null, photoNotes[h.id]);
+  db.logBotRequest({ userId: uid, kind: "search", krishaId: id, found: true,
+    matches: confirmed.length, note: asked }).catch(() => {});
+  await say(chat, "Вы прислали: <b>" + bot.esc(asked) + "</b>\n" +
+    "Нашли " + confirmed.length + (confirmed.length === 1 ? " похожую квартиру от хозяина." : " похожих квартиры от хозяина."));
+
+  for (const h of confirmed.slice(0, BOT_MATCHES)) await sendFlat(chat, h, null, photoNotes[h.id]);
 }
 
 // Строка базы — в то, что понимает подпись бота.
