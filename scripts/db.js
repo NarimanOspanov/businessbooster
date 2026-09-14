@@ -1436,6 +1436,10 @@ async function findFlats(q, limit) {
           OR (@lat IS NOT NULL AND f.lat IS NOT NULL
                AND ABS(f.lat - @lat) < 0.0006 AND ABS(f.lon - @lon) < 0.0008)
         )
+        -- Год постройки на Крыше иногда расходится на год у одного и того же
+        -- дома: сдача и заселение приходятся на разные годы, владельцы пишут
+        -- по-разному. Терпим ±1, а не только точное совпадение.
+        AND (@year IS NULL OR f.build_year IS NULL OR ABS(f.build_year - @year) <= 1)
         AND (@house IS NULL OR f.house IS NULL OR f.house = @house)
         AND (@toilet IS NULL OR f.toilet IS NULL OR f.toilet = @toilet)
         AND (@balcony IS NULL OR f.balcony IS NULL OR f.balcony = @balcony)
