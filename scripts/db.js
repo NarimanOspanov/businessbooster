@@ -1271,6 +1271,19 @@ async function card(flatId) {
   try { return JSON.parse(r.recordset[0].card_json); } catch { return null; }
 }
 
+// Все фото кандидата, если карточку уже сняли (deepen); иначе — только
+// photo1, который приходит прямо со страницы поиска.
+async function candidatePhotoUrls(flatId, photo1) {
+  try {
+    const c = await card(flatId);
+    if (c && Array.isArray(c.photos) && c.photos.length) {
+      const urls = c.photos.map((p) => p.big).filter(Boolean);
+      if (urls.length) return urls;
+    }
+  } catch { /* обойдёмся первой фотографией */ }
+  return photo1 ? [photo1] : [];
+}
+
 // --- Крыша: поиск ----------------------------------------------------------
 
 // Жёсткое условие одно — площадь: она приезжает из оригинала и агент её не
@@ -1631,7 +1644,7 @@ async function botStats(days) {
 }
 
 module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone,
-  saveCard, card, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
+  saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   upsertUser, logBotRequest, botStats,
   getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 

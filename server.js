@@ -5485,6 +5485,20 @@ http
             card: CANONICAL + "/kv/" + id,
           });
         }
+        // Найденный по ссылке запрос несёт свои фото (q.photoUrls) — тогда
+        // каждого кандидата можно дополнительно проскорить по снимкам, а не
+        // только по параметрам квартиры. Без ключа или без фото просто
+        // пропускаем — это уточнение, а не обязательное условие показа.
+        const PhotoMatch = require("./scripts/photo-match.js");
+        if (q.photoUrls && q.photoUrls.length && items.length && PhotoMatch.available()) {
+          try {
+            const candidates = await Promise.all(items.map(async (it) => ({
+              id: it.id, photos: await db.candidatePhotoUrls(it.id, it.photo),
+            })));
+            const scores = await PhotoMatch.scoreCandidates(q.photoUrls, candidates);
+            for (const it of items) it.photoMatch = scores[it.id] || null;
+          } catch (e) { /* фото не критично — параметры уже нашли кандидатов */ }
+        }
         return send(200, { ok: true, query: q, found: items.length, items: items });
       })().catch((e) => send(400, { ok: false, error: String(e.message).slice(0, 160) }));
       return;

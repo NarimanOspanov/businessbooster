@@ -384,6 +384,8 @@ async function queryFromUrl(url) {
     photos: (c.photos || []).length,
   });
   q.photos = (c.photos || []).length;
+  // Полные ссылки на фото — для сравнения снимков с кандидатами (photo-match.js).
+  q.photoUrls = (c.photos || []).map((p) => p.big).filter(Boolean);
   return q;
 }
 
