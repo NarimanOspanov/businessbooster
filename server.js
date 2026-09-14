@@ -1239,8 +1239,16 @@ async function runKrishaUrgent(opts) {
         await new Promise((r) => setTimeout(r, KRISHA_PACE_MS));
       }
 
+      // Рубрика «Квартиры ниже рынка» больше не нужна — сбор в базу и всё
+      // остальное (карточки, фотографии, телефоны) идёт как прежде, просто
+      // в канал больше ничего не уходит. Заголовок у postFresh один и тот же
+      // что для urgentOnly=true, что для false — второго живого варианта у
+      // этой рубрики нет, поэтому весь вызов sendTelegram здесь выключен.
+      const KRISHA_POST_BELOW_MARKET = false;
       let tg = null;
-      if (o.send && rows.length && KW.channel) tg = await sendTelegram(KW.channel, U.postFresh(rows, f.today, f.city, CANONICAL));
+      if (KRISHA_POST_BELOW_MARKET && o.send && rows.length && KW.channel) {
+        tg = await sendTelegram(KW.channel, U.postFresh(rows, f.today, f.city, CANONICAL));
+      }
       KU.result = {
         mode: "fresh",
         date: f.today, city: f.city, cityName: f.cityName,
