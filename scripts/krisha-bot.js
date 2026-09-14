@@ -54,8 +54,10 @@ function askedLine(q) {
 }
 
 // Подпись к совпадению. Сначала то, ради чего пришли — цена и параметры, —
-// потом чем подтверждается совпадение.
-function caption(f, site) {
+// потом чем подтверждается совпадение. photoNote — короткая строка от
+// сравнения снимков (photo-match.js), необязательная: без ключа или при
+// низкой уверенности её просто нет.
+function caption(f, site, photoNote) {
   const lines = [];
   lines.push("<b>" + money(f.price) + "</b>");
   lines.push([
@@ -75,6 +77,7 @@ function caption(f, site) {
   if (about.length) lines.push(esc(about.join(" · ")));
   if (f.posted) lines.push("Опубликовано " + String(f.posted).slice(0, 10));
   if (f.photos > 1) lines.push(f.photos + " фото на странице квартиры");
+  if (photoNote) lines.push(photoNote);
   lines.push("");
   lines.push('<a href="' + site + "/kv/" + f.id + '">Вся информация о квартире</a>');
   const cap = lines.join("\n");

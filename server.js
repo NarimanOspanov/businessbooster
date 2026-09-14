@@ -1616,10 +1616,34 @@ async function handleTelegramUpdate(u) {
     return;
   }
 
+  // Параметры уже отобрали кандидатов, но не отличают ту же квартиру от
+  // соседней такой же планировки — фото решает, кто из кандидатов точнее.
+  // Лучший по фото уходит первым; кандидатов, которых нечем подтвердить или
+  // не с чем сравнить, всё равно показываем — это уточнение, а не фильтр.
+  const photoNotes = {};
+  if (q.photoUrls && q.photoUrls.length) {
+    try {
+      const PhotoMatch = require("./scripts/photo-match.js");
+      if (PhotoMatch.available()) {
+        const candidates = await Promise.all(hits.map(async (h) => ({
+          id: String(h.id), photos: await db.candidatePhotoUrls(h.id, h.photo1),
+        })));
+        const scores = await PhotoMatch.scoreCandidates(q.photoUrls, candidates);
+        for (const h of hits) {
+          const s = scores[String(h.id)];
+          if (s && s.match && s.confidence >= 0.7) {
+            photoNotes[h.id] = "📷 Фото совпадают — это точно та же квартира";
+          }
+        }
+        hits.sort((a, b) => (photoNotes[b.id] ? 1 : 0) - (photoNotes[a.id] ? 1 : 0));
+      }
+    } catch { /* фото — уточнение, параметры уже нашли кандидатов */ }
+  }
+
   await say(chat, "Вы прислали: <b>" + bot.esc(asked) + "</b>\n" +
     "Нашли " + hits.length + (hits.length === 1 ? " похожую квартиру от хозяина." : " похожих квартиры от хозяина."));
 
-  for (const h of hits) await sendFlat(chat, h);
+  for (const h of hits) await sendFlat(chat, h, null, photoNotes[h.id]);
 }
 
 // Строка базы — в то, что понимает подпись бота.
@@ -1635,9 +1659,9 @@ function flatForBot(h) {
   };
 }
 
-async function sendFlat(chat, h, caption) {
+async function sendFlat(chat, h, caption, photoNote) {
   const bot = require("./scripts/krisha-bot.js");
-  const cap = caption || bot.caption(flatForBot(h), CANONICAL);
+  const cap = caption || bot.caption(flatForBot(h), CANONICAL, photoNote);
   const markup = bot.contactsButton(String(h.id));
   let sent = { ok: false };
   if (h.photo1) {
