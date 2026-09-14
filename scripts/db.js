@@ -1364,6 +1364,8 @@ async function findFlats(q, limit) {
     .input("kit", sql.Decimal(7, 2), q.kitchen == null ? null : Number(q.kitchen))
     .input("house", sql.NVarChar(60), q.house || null)
     .input("complex", sql.NVarChar(160), q.complex || null)
+    .input("toilet", sql.NVarChar(40), q.toilet || null)
+    .input("balcony", sql.NVarChar(60), q.balcony || null)
     .input("addr2", sql.NVarChar(200), q.addr || null)
     // Посредник ставит свою цену, но не втрое: вилка отсекает совпадения,
     // которые физически подошли, а по деньгам — другая квартира.
@@ -1419,25 +1421,28 @@ async function findFlats(q, limit) {
         -- один дом с запасом на то, что геокодер ставит точку по-разному.
         AND (@lat IS NULL OR f.lat IS NULL
              OR (ABS(f.lat - @lat) < 0.0006 AND ABS(f.lon - @lon) < 0.0008))
-        -- Дом должен быть подтверждён хоть чем-то специфичным для этого дома
-        -- одного, а не просто «не противоречить». Координаты, слаг улицы от
-        -- самой Крыши и точное имя улицы — три равноправных способа это
-        -- сделать: любой один надёжен сам по себе. Без ни одного из них
-        -- остаётся ЖК и год — но тогда оба обязаны быть известны с нашей
-        -- стороны и совпасть, а не просто не мешать: район и площадь сходятся
-        -- у десятков домов, и раньше именно «неизвестно — пропускаем» пускало
-        -- такие совпадения дальше как подтверждённые.
+        -- Дом должен быть подтверждён хоть чем-то, что называет именно его, а
+        -- не просто «не противоречить». Название улицы само по себе таким
+        -- подтверждением не считается: улица — не дом, на ней может стоять
+        -- десяток зданий с одинаковым названием в адресе, и этаж/тип дома,
+        -- которых мы тогда не проверяем, у них будут разными. Настоящее
+        -- подтверждение — координаты (~65 м, это уже один дом) или улица
+        -- ВМЕСТЕ с номером дома, который Крыша сама разбирает на street_slug
+        -- и house_num. Без обоих остаётся ЖК и год — и тогда они обязаны быть
+        -- известны с нашей стороны и совпасть, а не просто не мешать.
         AND (
           (@lat IS NOT NULL AND f.lat IS NOT NULL
                AND ABS(f.lat - @lat) < 0.0006 AND ABS(f.lon - @lon) < 0.0008)
-          OR (@sslug IS NOT NULL AND f.street_slug IS NOT NULL AND f.street_slug = @sslug)
-          OR (@skey IS NOT NULL AND f.street_key IS NOT NULL AND f.street_key = @skey)
+          OR (@sslug IS NOT NULL AND @hnum IS NOT NULL
+               AND f.street_slug = @sslug AND f.house_num = @hnum)
           OR (
             (@complex IS NULL OR f.complex = @complex)
             AND (@year IS NULL OR f.build_year = @year)
           )
         )
         AND (@house IS NULL OR f.house IS NULL OR f.house = @house)
+        AND (@toilet IS NULL OR f.toilet IS NULL OR f.toilet = @toilet)
+        AND (@balcony IS NULL OR f.balcony IS NULL OR f.balcony = @balcony)
         -- Кухню каждая сторона округляет по-своему: «9» против «9.2».
         AND (@kit IS NULL OR f.kitchen IS NULL OR ABS(f.kitchen - @kit) <= 1)
         AND (@plo IS NULL OR f.price IS NULL OR f.price BETWEEN @plo AND @phi)
