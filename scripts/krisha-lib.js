@@ -3,6 +3,7 @@
 // watcher inside server.js, so the two can never drift apart.
 
 const { ProxyAgent, fetch: undiciFetch } = require("undici");
+const crypto = require("crypto");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -22,6 +23,9 @@ const H = {
 let agents = [];
 let agentKey = "";
 let rr = 0;
+// Рабочий пул на время процесса: после смены портов не ждём рестарт Azure.
+let liveUrls = null;
+let rotateWait = null;
 
 function env(name) {
   return String(process.env[name] || "").trim();
@@ -94,12 +98,17 @@ function asocksKey() {
   return env("ASOCKS_API_KEY");
 }
 
+function currentUrls() {
+  if (liveUrls && liveUrls.length) return liveUrls;
+  return proxyUrlsFromConfig();
+}
+
 function viaProxy() {
-  return proxyUrlsFromConfig().length > 0 || !!asocksKey();
+  return currentUrls().length > 0 || !!asocksKey();
 }
 
 function proxyCount() {
-  return proxyUrlsFromConfig().length;
+  return currentUrls().length;
 }
 
 function proxyHint() {
@@ -114,6 +123,11 @@ function portList(j) {
   if (!j || typeof j !== "object") return [];
   if (Array.isArray(j.data)) return j.data;
   if (Array.isArray(j.message)) return j.message;
+  // Настоящая форма ответа /v2/proxy/ports: {success, message:{countProxies,
+  // pagination, proxies:[...]}} — message тут объект, а не массив, и список
+  // лежит на уровень глубже. Без этого случая portList всегда отдавал пустоту,
+  // даже когда success:true и порты реально есть в кабинете.
+  if (j.message && Array.isArray(j.message.proxies)) return j.message.proxies;
   if (Array.isArray(j.ports)) return j.ports;
   if (Array.isArray(j)) return j;
   return [];
@@ -166,11 +180,100 @@ async function asocksProxyUrl(key) {
 }
 
 async function resolveProxyUrls() {
-  const listed = proxyUrlsFromConfig();
+  const listed = currentUrls();
   if (listed.length) return listed;
   const key = asocksKey();
   if (!key) throw new Error(proxyHint());
   return [await asocksProxyUrl(key)];
+}
+
+async function asocksListPorts(key) {
+  const r = await fetch("https://api.asocks.com/v2/proxy/ports?apiKey=" + encodeURIComponent(key) + "&per_page=50", {
+    headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(20000),
+  });
+  const j = await r.json().catch(() => null);
+  if (!r.ok || (j && j.success === false)) throw new Error("Asocks не отдал порты");
+  return portList(j);
+}
+
+async function asocksRefreshPort(key, id) {
+  const r = await fetch("https://api.asocks.com/v2/proxy/refresh/" + encodeURIComponent(id) +
+    "?apiKey=" + encodeURIComponent(key), { signal: AbortSignal.timeout(20000) });
+  return r.ok;
+}
+
+async function asocksCreatePorts(key, count) {
+  // proxy_type_id/type_id обязательны — без них Asocks отвечает 422. 2/1 — то
+  // же, что у остальных наших портов (мобильный, резидентный, KZ): смотрели
+  // на уже существующий рабочий порт в кабинете и повторили его тип.
+  const r = await fetch("https://api.asocks.com/v2/proxy/create-port?apiKey=" + encodeURIComponent(key), {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({
+      country_code: "KZ", proxy_type_id: 2, type_id: 1,
+      name: "krisha-deepen", count: count,
+    }),
+    signal: AbortSignal.timeout(30000),
+  });
+  const j = await r.json().catch(() => null);
+  if (!r.ok || (j && j.success === false)) {
+    throw new Error("Asocks не создал порты" +
+      (j && j.errors ? ": " + JSON.stringify(j.errors).slice(0, 200) : ""));
+  }
+  return portList(j);
+}
+
+function urlsFromPorts(list) {
+  const out = [];
+  for (const p of list || []) {
+    try { out.push(formatAsocksPort(p)); } catch { /* битая запись */ }
+  }
+  return out;
+}
+
+function newSessionUrl(raw) {
+  try {
+    const u = new URL(raw.includes("://") ? raw : "http://" + raw);
+    const user = decodeURIComponent(u.username || "");
+    const hex = crypto.randomBytes(8).toString("hex");
+    const next = /hold-session-session-[a-zA-Z0-9]+/i.test(user)
+      ? user.replace(/hold-session-session-[a-zA-Z0-9]+/i, "hold-session-session-" + hex)
+      : /session-[a-zA-Z0-9]+/i.test(user)
+        ? user.replace(/session-[a-zA-Z0-9]+/i, "session-" + hex)
+        : user + "-session-" + hex;
+    u.username = next;
+    return toHttpProxy(u.toString());
+  } catch {
+    return raw;
+  }
+}
+
+async function doRotateProxies() {
+  const want = Math.max(currentUrls().length, 1);
+  const key = asocksKey();
+  if (key) {
+    const listed = await asocksListPorts(key);
+    for (const p of listed) {
+      const id = p.id || p.portId || p.port_id;
+      if (id) await asocksRefreshPort(key, id).catch(() => false);
+    }
+    let urls = urlsFromPorts(await asocksListPorts(key));
+    if (!urls.length && listed.length) urls = urlsFromPorts(listed);
+    if (!urls.length) urls = urlsFromPorts(await asocksCreatePorts(key, want));
+    const kz = urls.filter((u) => /country-KZ/i.test(u) || /KZ/i.test(u));
+    liveUrls = (kz.length ? kz : urls).slice(0, Math.max(want, urls.length));
+  } else {
+    liveUrls = currentUrls().map(newSessionUrl);
+  }
+  agentKey = "";
+  console.log("[proxy] пул сменили, входов " + liveUrls.length);
+  return liveUrls.length;
+}
+
+function rotateProxies() {
+  if (!rotateWait) rotateWait = doRotateProxies().finally(() => { rotateWait = null; });
+  return rotateWait;
 }
 
 async function dispatcher() {
@@ -181,7 +284,6 @@ async function dispatcher() {
     // Реальный параллелизм упирается в этот предел раньше, чем в сам
     // concurrency: при 5 входах и N соединений на каждый, больше N×5 задач
     // всё равно бегут по очереди у undici, сколько бы их ни запустили разом.
-    // 50×5=250 — с запасом над проверяемыми двумястами.
     agents = urls.map((uri) => new ProxyAgent({ uri: uri, connections: 50 }));
     agentKey = key;
     rr = 0;
@@ -434,10 +536,10 @@ async function fetchSearch(maxPages, crit, onPage, opts) {
 // backoff retries; without this a single blip killed an entire run.
 async function fetchText(url, attempts = 3, timeoutMs = 20000, opts) {
   const useProxy = !!(opts && opts.proxy);
-  const agent = useProxy ? await dispatcher() : undefined;
-  if (useProxy && !agent) throw new Error(proxyHint());
   let last;
   for (let i = 0; i < attempts; i++) {
+    const agent = useProxy ? await dispatcher() : undefined;
+    if (useProxy && !agent) throw new Error(proxyHint());
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
@@ -446,10 +548,15 @@ async function fetchText(url, attempts = 3, timeoutMs = 20000, opts) {
         signal: ctrl.signal,
         ...(agent ? { dispatcher: agent } : {}),
       });
-      if (!r.ok) throw new Error("HTTP " + r.status);
+      if (!r.ok) {
+        const e = new Error("HTTP " + r.status);
+        e.status = r.status;
+        throw e;
+      }
       return await r.text();
     } catch (e) {
       last = e;
+      if (e && (e.status === 404 || e.status === 410)) throw e;
       if (i < attempts - 1) await sleep(2500 * (i + 1));
     } finally {
       clearTimeout(timer);
@@ -570,5 +677,5 @@ module.exports = {
   searchUrl, parseCards, parseDetail, districtOf, locationScore, dedupeKey,
   ageBand, areaBand, groupKey, median, buildModel, flagsFor,
   fetchText, fetchSearch, fetchDetail, fetchPriceAnalysis,
-  viaProxy, proxyHint, proxyCount, PROXY_FILE,
+  viaProxy, proxyHint, proxyCount, rotateProxies, PROXY_FILE,
 };
