@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Reception365 · телефоны с Крыши
 // @namespace    https://saudager.ai/
-// @version      1.2
-// @description  Сама жмёт «показать телефон», сохраняет номер и ведёт к следующей квартире из очереди
+// @version      1.3
+// @description  Сама жмёт «показать телефон», сохраняет номер и сама идёт дальше по очереди — пока не покажется капча
 // @match        https://krisha.kz/a/show/*
 // @run-at       document-idle
 // @grant        none
@@ -12,8 +12,14 @@
 // человека только саму кнопку «Показать телефон» (класс show-phones), чтобы
 // не тянуться к ней на каждой странице руками, — а дальше, если Крыша
 // потребует капчу, её решает уже человек. Когда номер появился на экране,
-// скрипт забирает его из разметки и отправляет к нам. Дальше предлагает
-// открыть следующую квартиру из очереди.
+// скрипт забирает его из разметки и отправляет к нам.
+//
+// Дальше — либо едет сам, либо ждёт руки. Пока капча ни разу не показалась
+// на этой странице, номер, скорее всего, отдался без проверки — тогда скрипт
+// сам открывает следующую квартиру из очереди, без клика. А если капча всё же
+// всплыла (даже если человек её тут же решил), это знак, что Крыша
+// присматривается к темпу, — на такой странице автопереход выключается, и
+// дальше снова решает человек, кликая «следующая →» сам.
 
 (function () {
   "use strict";
@@ -49,6 +55,22 @@
     return out;
   }
 
+  // Капча — виджет reCAPTCHA, инлайном или в iframe. Селекторы — только
+  // точные токены класса/атрибута, не подстрока: на каждой странице Крыши в
+  // подвале есть <p class="g-recaptcha-policy"> — обычная приписка «сайт
+  // защищён reCAPTCHA», и широкий [class*="captcha"] цеплял бы её всегда,
+  // выключая автопереход навсегда с первой же страницы.
+  var captchaSeen = false;
+  function captchaVisible() {
+    return !!(
+      document.querySelector('iframe[src*="recaptcha" i]') ||
+      document.querySelector('iframe[title*="recaptcha" i]') ||
+      document.querySelector('iframe[src*="hcaptcha" i]') ||
+      document.querySelector(".g-recaptcha") ||
+      document.querySelector(".h-captcha")
+    );
+  }
+
   var sent = false;
   function save(phones) {
     if (sent) return;
@@ -72,7 +94,11 @@
           return;
         }
         say("✓ Сохранено: " + r.j.phones.join(", "));
-        next();
+        // Капча ни разу не показалась на этой странице — номер отдался
+        // без проверки, и Крыша, похоже, не насторожилась. Едем дальше сами.
+        // Если капча всё же мелькала (пусть человек её и решил), это знак
+        // притормозить — дальше снова руками, кликом по ссылке.
+        if (captchaSeen) next(); else autoNext();
       })
       .catch(function () {
         sent = false;
@@ -80,22 +106,44 @@
       });
   }
 
-  // Следующая квартира без телефона. Переход — по кнопке, а не сам: страницу
-  // из-под человека выдёргивать нельзя, вдруг он её ещё читает.
-  function next() {
-    fetch(API + "/api/krisha/queue?key=" + encodeURIComponent(KEY) + "&limit=30")
+  // total — очередь целиком, а не размер этой пачки. С limit=30 count почти
+  // всегда был ровно 30 и не двигался, сколько ни сохраняй — на самом деле
+  // счётчик тогда мерил не прогресс, а лимит запроса.
+  function queueLeft() {
+    return fetch(API + "/api/krisha/queue?key=" + encodeURIComponent(KEY) + "&limit=30")
       .then(function (r) { return r.json(); })
       .then(function (j) {
         var left = (j.items || []).filter(function (x) { return x.id !== ID; });
-        if (!left.length) { say(box.innerHTML + "<br>Очередь пуста."); return; }
-        // total — очередь целиком, а не размер этой пачки. С limit=30 count
-        // почти всегда был ровно 30 и не двигался, сколько ни сохраняй — на
-        // самом деле счётчик тогда мерил не прогресс, а лимит запроса.
         var n = typeof j.total === "number" ? j.total : left.length;
-        say(box.innerHTML + "<br>Осталось " + n +
-          '. <a href="' + left[0].url + '" style="color:#6fb2f0">следующая →</a>');
+        return { left: left, n: n };
+      });
+  }
+
+  // Следующая квартира без телефона. Переход — по кнопке, а не сам: страницу
+  // из-под человека выдёргивать нельзя, вдруг он её ещё читает. Используется,
+  // когда на этой странице была капча — дальше решает человек.
+  function next() {
+    queueLeft()
+      .then(function (r) {
+        if (!r.left.length) { say(box.innerHTML + "<br>Очередь пуста."); return; }
+        say(box.innerHTML + "<br>Осталось " + r.n +
+          '. <a href="' + r.left[0].url + '" style="color:#6fb2f0">следующая →</a>');
       })
       .catch(function () { /* очередь не обязательна */ });
+  }
+
+  // Капчи не было — едем сами, без клика. Небольшая пауза перед переходом:
+  // не мгновенно, чтобы сообщение успело мелькнуть на экране, а не потому что
+  // Крыше нужна задержка — по темпу запросов для неё это то же самое, что
+  // клик сразу.
+  function autoNext() {
+    queueLeft()
+      .then(function (r) {
+        if (!r.left.length) { say(box.innerHTML + "<br>Очередь пуста."); return; }
+        say(box.innerHTML + "<br>Осталось " + r.n + ". Открываю следующую…");
+        setTimeout(function () { location.href = r.left[0].url; }, 1200);
+      })
+      .catch(function () { /* очередь не обязательна — просто останемся тут */ });
   }
 
   // Кнопка «Показать телефон» рисуется React-ом после загрузки, поэтому её
@@ -125,7 +173,9 @@
     });
     wait.observe(document.body, { childList: true, subtree: true });
   }
+  if (captchaVisible()) captchaSeen = true;
   var mo = new MutationObserver(function () {
+    if (!captchaSeen && captchaVisible()) captchaSeen = true;
     var p = found();
     if (p.length) { mo.disconnect(); save(p); }
   });
