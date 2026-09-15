@@ -1697,7 +1697,8 @@ async function maxKnownId() {
   const r = await pool.request().query(
     "SELECT MAX(m) AS mx FROM (SELECT MAX(id) AS m FROM dbo.krisha_flats " +
     "UNION ALL SELECT MAX(id) AS m FROM dbo.krisha_objects) x");
-  return r.recordset[0].mx || null;
+  // mssql отдаёт BIGINT строкой — вернём число, иначе cursor + k склеит строки.
+  return r.recordset[0].mx == null ? null : Number(r.recordset[0].mx);
 }
 
 // Одно объявление из потока: разобранные поля + сам window.data (gzip).

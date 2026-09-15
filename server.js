@@ -5448,7 +5448,9 @@ http
         // Стартовый курсор: заданный вручную, сохранённый ранее, иначе самый
         // большой известный id (дальше него объявлений ещё нет).
         const override = Number(parsed.searchParams.get("cursor"));
-        let cursor = override || KW.scan.cursor || (await db.maxKnownId()) || 0;
+        // Number(): курсор из maxKnownId/сохранения может быть строкой (BIGINT),
+        // и тогда cursor + k склеил бы строки вместо арифметики.
+        let cursor = Number(override || KW.scan.cursor || (await db.maxKnownId()) || 0);
         const ids = [];
         for (let k = 1; k <= batch; k++) ids.push(cursor + k);
 
