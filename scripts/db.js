@@ -421,6 +421,17 @@ BEGIN
   CREATE INDEX IX_kobj_created ON dbo.krisha_objects (created_on DESC);
   CREATE INDEX IX_kobj_cat ON dbo.krisha_objects (deal, prop, city, user_type);
 END
+-- Поля для сопоставления «та же квартира» (добавляются к уже существующей
+-- таблице). Этаж/этажность из заголовка, ЖК/район/улица/дом из advert.address.
+IF COL_LENGTH('dbo.krisha_objects', 'floor')       IS NULL ALTER TABLE dbo.krisha_objects ADD floor INT NULL;
+IF COL_LENGTH('dbo.krisha_objects', 'floors')      IS NULL ALTER TABLE dbo.krisha_objects ADD floors INT NULL;
+IF COL_LENGTH('dbo.krisha_objects', 'complex_id')  IS NULL ALTER TABLE dbo.krisha_objects ADD complex_id BIGINT NULL;
+IF COL_LENGTH('dbo.krisha_objects', 'district')    IS NULL ALTER TABLE dbo.krisha_objects ADD district NVARCHAR(120) NULL;
+IF COL_LENGTH('dbo.krisha_objects', 'mkr')         IS NULL ALTER TABLE dbo.krisha_objects ADD mkr NVARCHAR(120) NULL;
+IF COL_LENGTH('dbo.krisha_objects', 'street_slug') IS NULL ALTER TABLE dbo.krisha_objects ADD street_slug NVARCHAR(160) NULL;
+IF COL_LENGTH('dbo.krisha_objects', 'house_num')   IS NULL ALTER TABLE dbo.krisha_objects ADD house_num NVARCHAR(40) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_kobj_match' AND object_id = OBJECT_ID('dbo.krisha_objects'))
+  CREATE INDEX IX_kobj_match ON dbo.krisha_objects (deal, prop, user_type, city, area);
 `;
 
 // --- Пользователи бота ------------------------------------------------------
@@ -1718,6 +1729,13 @@ async function saveObject(o) {
     .input("lat", sql.Decimal(11, 7), o.lat == null ? null : Number(o.lat))
     .input("lon", sql.Decimal(11, 7), o.lon == null ? null : Number(o.lon))
     .input("title", sql.NVarChar(300), o.title || null)
+    .input("floor", sql.Int, o.floor == null ? null : Number(o.floor))
+    .input("floors", sql.Int, o.floors == null ? null : Number(o.floors))
+    .input("cxid", sql.BigInt, o.complexId == null ? null : Number(o.complexId))
+    .input("district", sql.NVarChar(120), o.district || null)
+    .input("mkr", sql.NVarChar(120), o.mkr || null)
+    .input("sslug", sql.NVarChar(160), o.streetSlug || null)
+    .input("hnum", sql.NVarChar(40), o.houseNum || null)
     .input("gz", sql.VarBinary(sql.MAX), o.dataGz || null)
     .query(`
       MERGE dbo.krisha_objects AS t
@@ -1726,10 +1744,79 @@ async function saveObject(o) {
         deal = @deal, prop = @prop, user_type = @ut, city = @city,
         created_on = COALESCE(@created, t.created_on), price = @price, rooms = @rooms,
         area = @area, lat = @lat, lon = @lon, title = @title,
+        floor = @floor, floors = @floors, complex_id = @cxid, district = @district,
+        mkr = @mkr, street_slug = @sslug, house_num = @hnum,
         data_gz = COALESCE(@gz, t.data_gz), last_seen = SYSUTCDATETIME()
       WHEN NOT MATCHED THEN INSERT
-        (id, deal, prop, user_type, city, created_on, price, rooms, area, lat, lon, title, data_gz)
-        VALUES (@id, @deal, @prop, @ut, @city, @created, @price, @rooms, @area, @lat, @lon, @title, @gz);`);
+        (id, deal, prop, user_type, city, created_on, price, rooms, area, lat, lon, title,
+         floor, floors, complex_id, district, mkr, street_slug, house_num, data_gz)
+        VALUES (@id, @deal, @prop, @ut, @city, @created, @price, @rooms, @area, @lat, @lon, @title,
+         @floor, @floors, @cxid, @district, @mkr, @sslug, @hnum, @gz);`);
+}
+
+// Узнать ту же самую недвижимость в объявлении агента — но по полному потоку
+// (krisha_objects), не только по квартирам-на-продажу. Возвращаем объявления
+// ХОЗЯЕВ той же сделки и типа (аренда против аренды, дом против дома). Логика
+// та же, что в findFlats: дом опознаём по ЖК или координатам (любой из двух),
+// дальше площадь/комнаты/этаж; поле неизвестно с одной стороны — не исключаем.
+async function findObjects(q, limit) {
+  const pool = await getPool();
+  await ensureObjects(pool);
+  const area = Number(q.area);
+  if (!area) return [];
+  const tol = 5; // площадь иногда указывают неверно — тот же допуск, что в findFlats
+  const r = await pool.request()
+    .input("deal", sql.NVarChar(10), q.deal || null)
+    .input("prop", sql.NVarChar(20), q.prop || null)
+    .input("lo", sql.Decimal(9, 2), area - tol)
+    .input("hi", sql.Decimal(9, 2), area + tol)
+    .input("city", sql.NVarChar(40), q.city || null)
+    .input("rooms", sql.Int, q.rooms ? Number(q.rooms) : null)
+    .input("floor", sql.Int, q.floor ? Number(q.floor) : null)
+    .input("floors", sql.Int, q.floors ? Number(q.floors) : null)
+    .input("cxid", sql.BigInt, q.complexId ? Number(q.complexId) : null)
+    .input("district", sql.NVarChar(120), q.district || null)
+    .input("sslug", sql.NVarChar(160), q.streetSlug || null)
+    .input("hnum", sql.NVarChar(40), q.houseNum || null)
+    .input("lat", sql.Decimal(11, 7), q.lat == null ? null : Number(q.lat))
+    .input("lon", sql.Decimal(11, 7), q.lon == null ? null : Number(q.lon))
+    .input("exid", sql.BigInt, q.id ? Number(q.id) : null)
+    .input("n", sql.Int, Number(limit) || 12)
+    .query(`
+      SELECT TOP (@n) f.id, f.deal, f.prop, f.user_type, f.city, f.area, f.rooms, f.floor, f.floors,
+        f.complex_id, f.district, f.street_slug, f.house_num, f.lat, f.lon, f.price, f.title, f.created_on,
+        3 + IIF(@rooms IS NOT NULL AND f.rooms = @rooms, 2, 0)
+          + IIF(@cxid IS NOT NULL AND f.complex_id = @cxid, 4, 0)
+          + IIF(@lat IS NOT NULL AND f.lat IS NOT NULL
+                AND ABS(f.lat - @lat) < 0.0006 AND ABS(f.lon - @lon) < 0.0008, 6, 0)
+          + IIF(@sslug IS NOT NULL AND f.street_slug = @sslug, 3, 0)
+          + IIF(@hnum IS NOT NULL AND @sslug IS NOT NULL
+                AND f.house_num = @hnum AND f.street_slug = @sslug, 4, 0)
+          + IIF(@floor IS NOT NULL AND f.floor = @floor, 2, 0)
+          + IIF(@floors IS NOT NULL AND f.floors = @floors, 1, 0)
+          + IIF(@district IS NOT NULL AND f.district = @district, 1, 0) AS score
+      FROM dbo.krisha_objects f
+      WHERE f.user_type = 'owner'
+        AND (@deal IS NULL OR f.deal = @deal)
+        AND (@prop IS NULL OR f.prop = @prop)
+        AND (@exid IS NULL OR f.id <> @exid)
+        AND f.area BETWEEN @lo AND @hi
+        AND (@city IS NULL OR f.city = @city)
+        AND (@rooms IS NULL OR f.rooms IS NULL OR f.rooms = @rooms)
+        AND (@floor IS NULL OR f.floor IS NULL OR f.floor = @floor)
+        AND (@floors IS NULL OR f.floors IS NULL OR f.floors = @floors)
+        AND (@hnum IS NULL OR f.house_num IS NULL OR @sslug IS NULL OR f.street_slug IS NULL
+             OR f.street_slug <> @sslug OR f.house_num = @hnum)
+        AND (@lat IS NULL OR f.lat IS NULL
+             OR (ABS(f.lat - @lat) < 0.0006 AND ABS(f.lon - @lon) < 0.0008))
+        -- Опознание дома обязательно: ЖК или координаты, любой из двух.
+        AND (
+          (@cxid IS NOT NULL AND f.complex_id = @cxid)
+          OR (@lat IS NOT NULL AND f.lat IS NOT NULL
+              AND ABS(f.lat - @lat) < 0.0006 AND ABS(f.lon - @lon) < 0.0008)
+        )
+      ORDER BY score DESC, f.id DESC`);
+  return r.recordset;
 }
 
 // Сводка по собранному потоку — для статуса и отчётов.
@@ -1748,7 +1835,7 @@ async function objectStats() {
 
 module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
-  maxKnownId, saveObject, objectStats,
+  maxKnownId, saveObject, objectStats, findObjects,
   upsertUser, logBotRequest, botStats,
   getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 

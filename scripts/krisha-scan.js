@@ -1,7 +1,9 @@
 // Разбор страницы объявления для полного сбора потока (id-walking).
-// Достаём window.data целиком (его и храним в gzip) и размечаем то, по чему
-// потом фильтруют: сделка (продажа/аренда), тип объекта, продавец, город,
-// дата создания, базовые поля. HTML не парсим — всё берём из JSON и <title>.
+// Достаём window.data целиком (его храним в gzip) и размечаем поля, по
+// которым потом фильтруют и сопоставляют: сделка, тип объекта, продавец,
+// город, дата, цена, а также то, что нужно для поиска «та же квартира»:
+// координаты, ЖК, район, улица+дом, этаж, комнаты, площадь. HTML не парсим —
+// всё берём из JSON (window.data.advert) и заголовка.
 
 const zlib = require("zlib");
 
@@ -21,51 +23,82 @@ function windowDataRaw(html) {
   return null;
 }
 
-const S = (html, key) => (html.match(new RegExp('"' + key + '"\\s*:\\s*"([^"]*)"')) || [])[1] || null;
-const N = (html, key) => {
-  const m = html.match(new RegExp('"' + key + '"\\s*:\\s*(-?\\d+(?:\\.\\d+)?)'));
-  return m ? Number(m[1]) : null;
-};
-
-// Тип объекта и сделка — из <title>: «Продажа 2-комнатной квартиры …»,
-// «Аренда …», «Продажа дома …», «… участка», «… помещения».
-function dealAndProp(title) {
+// Сделка и тип объекта — из полей advert (надёжнее, чем разбор заголовка):
+// sectionAlias = prodazha/arenda, categoryAlias = kvartiry/doma-dachi/…
+// На случай отсутствия падаем в разбор заголовка.
+function dealAndProp(section, category, title) {
+  const s = String(section || "").toLowerCase();
+  const c = String(category || "").toLowerCase();
   const t = (title || "").toLowerCase();
-  const deal = /аренд|сдам|сдаётся|снять|посуточн/.test(t) ? "rent"
+  const deal = s === "arenda" ? "rent" : s === "prodazha" ? "sale"
+    : /аренд|сдам|сдаётся|снять|посуточн/.test(t) ? "rent"
     : /продажа|продам|продаётся/.test(t) ? "sale" : null;
-  const prop = /кварт/.test(t) ? "flat"
+  const prop = /kvartiry|komnaty/.test(c) ? (/komnaty/.test(c) ? "room" : "flat")
+    : /doma|dachi|kottedzh|taunhaus/.test(c) ? "house"
+    : /uchastk|zeml/.test(c) ? "land"
+    : /garazh|parking/.test(c) ? "garage"
+    : /kommerch|ofis|magazin|sklad|zdani/.test(c) ? "commercial"
+    : /кварт/.test(t) ? "flat"
     : /дом|коттедж|дач|таунхаус/.test(t) ? "house"
     : /участок|земл/.test(t) ? "land"
     : /гараж|парковк|паркинг/.test(t) ? "garage"
     : /офис|помещени|коммерч|магазин|склад|здание|бизнес/.test(t) ? "commercial"
-    : /комнат[уые]|комнаты\b/.test(t) ? "room"
+    : /комнат[уые]/.test(t) ? "room"
     : "other";
   return { deal, prop };
 }
 
-// Разбор одной страницы. Возвращает объект для db.saveObject или null, если
-// это не объявление (нет window.data).
+const geoLat = (v) => (typeof v === "number" && v > -90 && v < 90 && v !== 0 ? v : null);
+const geoLon = (v) => (typeof v === "number" && v !== 0 ? v : null);
+
+// Разбор одной страницы -> объект для db.saveObject, либо null, если это не
+// объявление (нет window.data).
 function parse(id, html) {
   const raw = windowDataRaw(html);
   if (!raw) return null;
-  const title = (html.match(/<title>([^<]+)<\/title>/) || [])[1] || null;
-  const { deal, prop } = dealAndProp(title);
-  const cityRaw = S(html, "city");
+  let j;
+  try { j = JSON.parse(raw); } catch { return null; }
+  const a = j.advert || {};
+  const c = (j.adverts && j.adverts[0]) || {};
+  const pageTitle = (html.match(/<title>([^<]+)<\/title>/) || [])[1] || null;
+  // advert.title — «3-комнатная квартира · 85 м² · 6/12 этаж»: в нём этаж.
+  const advTitle = a.title || null;
+  const { deal, prop } = dealAndProp(a.sectionAlias, a.categoryAlias, pageTitle || advTitle);
+  const ad = a.address || {};
+  const map = a.map || {};
+  // Этаж/этажность — из advert.title: «… · 6/12 этаж».
+  const fl = (advTitle || "").match(/(\d+)\s*\/\s*(\d+)\s*этаж/);
+  const city = (a.city || ad.city || (c.city && c.city.name) || null);
+
   return {
     id: id,
     deal: deal,
     prop: prop,
-    userType: S(html, "userType"),
-    city: cityRaw ? cityRaw.toLowerCase() : null,
-    createdOn: (html.match(/"createdAt"\s*:\s*"(\d{4}-\d{2}-\d{2})"/) || [])[1] || null,
-    price: N(html, "price"),
-    rooms: N(html, "rooms"),
-    area: N(html, "square"),
-    lat: (() => { const v = N(html, "lat"); return v && v > -90 && v < 90 && v !== 0 ? v : null; })(),
-    lon: (() => { const v = N(html, "lon"); return v && v !== 0 ? v : null; })(),
-    title: title,
+    userType: a.userType || null,
+    city: city ? String(city).toLowerCase() : null,
+    createdOn: c.createdAt || c.addedAt || null,
+    price: typeof a.price === "number" ? a.price : null,
+    rooms: typeof a.rooms === "number" ? a.rooms : null,
+    area: typeof a.square === "number" ? a.square : null,
+    lat: geoLat(map.lat),
+    lon: geoLon(map.lon),
+    // Поля для сопоставления «та же квартира»:
+    floor: fl ? Number(fl[1]) : null,
+    floors: fl ? Number(fl[2]) : null,
+    complexId: a.complexId == null ? null : (Number(a.complexId) || null),
+    district: ad.district || null,
+    mkr: ad.microdistrict || null,
+    streetSlug: ad.street || null,
+    houseNum: ad.house_num || null,
+    title: advTitle || pageTitle,
     dataGz: zlib.gzipSync(Buffer.from(raw, "utf8")),
   };
 }
 
-module.exports = { windowDataRaw, dealAndProp, parse };
+// Тот же разбор, но из уже сохранённого JSON (для backfill существующих
+// строк). Принимает распакованную строку window.data и заголовок отдельно.
+function fieldsFromJson(rawJson, title) {
+  return parse(0, "<title>" + (title || "") + "</title>window.data = " + rawJson + ";</script>");
+}
+
+module.exports = { windowDataRaw, dealAndProp, parse, fieldsFromJson };
