@@ -1409,6 +1409,7 @@ const KRISHA_DEEPEN_CONCURRENCY = 50;
 let backfillRunning = false;
 let photosRunning = false;
 let deepenRunning = false;
+let scanRunning = false;
 // Разобранные страницы текущего прогона: тот же объект нужен и проходу по базе,
 // и сборке страниц для канала, а страница у Крыши одна.
 const parsedNow = new Map();
@@ -5417,6 +5418,98 @@ http
         from: Number(from) || (KW.backfill && KW.backfill[city]) || 1,
         note: "итог придёт в Телеграм",
       });
+    }
+
+    // Полный поток недвижимости обходом по id (id-walking). Держим курсор —
+    // самый большой id, за которым уже видели живое объявление, — и на каждый
+    // вызов проверяем следующий блок id за ним. Живые сохраняем целиком
+    // (window.data в gzip + разобранные поля), 404 пропускаем, 468 отдаём на
+    // ретрай самому fetchText. Курсор двигаем только до самого большого живого
+    // id: у фронтира (дальше объявлений ещё нет) он стоит и ждёт, пока новые
+    // появятся. Задумано под частый дёрг из Hangfire (раз в 30-60 c).
+    // Отвечает синхронно — планировщик видит итог прогона, а не пустой 202.
+    if (urlPath === "/api/krisha/scan") {
+      const send = (code, obj) => {
+        res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+        res.end(JSON.stringify(obj, null, 2));
+      };
+      const want = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
+      if (!want || parsed.searchParams.get("key") !== want) return send(403, { ok: false, error: "bad_key" });
+      if (scanRunning) return send(409, { ok: false, running: true, error: "скан уже идёт" });
+      const KL = require("./scripts/krisha-lib.js");
+      if (!KL.viaProxy()) return send(409, { ok: false, error: KL.proxyHint() });
+      const batch = Math.max(1, Math.min(500, Number(parsed.searchParams.get("batch")) || 120));
+      const conc = Math.max(1, Math.min(30, Number(parsed.searchParams.get("concurrency")) || 8));
+      const retries = Math.max(1, Math.min(8, Number(parsed.searchParams.get("retries")) || 5));
+      KW.scan = KW.scan || {};
+      scanRunning = true;
+      (async () => {
+        const Scan = require("./scripts/krisha-scan.js");
+        // Стартовый курсор: заданный вручную, сохранённый ранее, иначе самый
+        // большой известный id (дальше него объявлений ещё нет).
+        const override = Number(parsed.searchParams.get("cursor"));
+        let cursor = override || KW.scan.cursor || (await db.maxKnownId()) || 0;
+        const ids = [];
+        for (let k = 1; k <= batch; k++) ids.push(cursor + k);
+
+        let saved = 0, gaps = 0, unresolved = 0, notListing = 0, maxLive = cursor;
+        const byDeal = {}, bySeller = {};
+        let next = 0;
+        await Promise.all(Array.from({ length: conc }, async () => {
+          while (true) {
+            const idx = next++;
+            if (idx >= ids.length) return;
+            const id = ids[idx];
+            try {
+              const html = await KL.fetchText("https://krisha.kz/a/show/" + id, retries, 15000, { proxy: true });
+              const obj = Scan.parse(id, html);
+              if (!obj) { notListing++; continue; }
+              await db.saveObject(obj);
+              saved++;
+              if (id > maxLive) maxLive = id;
+              byDeal[obj.deal || "?"] = (byDeal[obj.deal || "?"] || 0) + 1;
+              bySeller[obj.userType || "?"] = (bySeller[obj.userType || "?"] || 0) + 1;
+            } catch (e) {
+              if (e && (e.status === 404 || e.status === 410)) gaps++;
+              else unresolved++;
+            }
+          }
+        }));
+
+        // Двигаем курсор до самого большого живого id. Если живого не было
+        // вовсе — вероятно, стоим у фронтира: курсор не трогаем, следующий
+        // вызов перепроверит тот же блок (там уже могли появиться новые).
+        // Но если так повторяется — возможно, впереди большой мёртвый провал
+        // (пачка удалённых id); после трёх пустых заходов перепрыгиваем блок.
+        if (maxLive > cursor) {
+          KW.scan.cursor = maxLive;
+          KW.scan.emptyStreak = 0;
+        } else {
+          KW.scan.emptyStreak = (KW.scan.emptyStreak || 0) + 1;
+          if (KW.scan.emptyStreak >= 3) {
+            KW.scan.cursor = cursor + batch;
+            KW.scan.emptyStreak = 0;
+          }
+        }
+        KW.scan.savedTotal = (KW.scan.savedTotal || 0) + saved;
+        KW.scan.lastRun = new Date().toISOString();
+        saveKrisha();
+
+        scanRunning = false;
+        send(200, {
+          ok: true,
+          scanned: ids.length,
+          range: (cursor + 1) + "…" + (cursor + batch),
+          saved: saved, gaps404: gaps, unresolved468: unresolved, notListing: notListing,
+          byDeal: byDeal, bySeller: bySeller,
+          cursor: KW.scan.cursor, advanced: KW.scan.cursor - cursor,
+          savedTotal: KW.scan.savedTotal,
+        });
+      })().catch((e) => {
+        scanRunning = false;
+        send(500, { ok: false, error: String(e.message).slice(0, 200) });
+      });
+      return;
     }
 
     // Узнать свою квартиру в объявлении агента. Покупатель присылает ссылку —

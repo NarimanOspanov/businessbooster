@@ -393,6 +393,36 @@ BEGIN
 END
 `;
 
+// Полный поток недвижимости Крыши: не только квартиры хозяев на продажу, а
+// всё — продажа и аренда, любой тип объекта, любой продавец. Проблема
+// «агент вместо хозяина» есть везде, поэтому храним весь поток: разобранные
+// поля для запросов + сам window.data (gzip) целиком, чтобы не открывать
+// страницу второй раз, когда понадобится ещё какое-то поле.
+const SCHEMA_OBJECTS = `
+IF OBJECT_ID('dbo.krisha_objects', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.krisha_objects (
+    id         BIGINT         NOT NULL PRIMARY KEY,   -- номер объявления
+    deal       NVARCHAR(10)   NULL,   -- sale / rent
+    prop       NVARCHAR(20)   NULL,   -- flat/house/commercial/land/garage/other
+    user_type  NVARCHAR(20)   NULL,   -- owner/specialist/company/agent/complex
+    city       NVARCHAR(40)   NULL,
+    created_on DATE           NULL,   -- createdAt со страницы (настоящая дата)
+    price      BIGINT         NULL,
+    rooms      INT            NULL,
+    area       DECIMAL(9,2)   NULL,
+    lat        DECIMAL(11,7)  NULL,
+    lon        DECIMAL(11,7)  NULL,
+    title      NVARCHAR(300)  NULL,
+    data_gz    VARBINARY(MAX) NULL,   -- gzip(window.data JSON)
+    first_seen DATETIME2(0)   NOT NULL CONSTRAINT DF_kobj_first DEFAULT SYSUTCDATETIME(),
+    last_seen  DATETIME2(0)   NOT NULL CONSTRAINT DF_kobj_last  DEFAULT SYSUTCDATETIME()
+  );
+  CREATE INDEX IX_kobj_created ON dbo.krisha_objects (created_on DESC);
+  CREATE INDEX IX_kobj_cat ON dbo.krisha_objects (deal, prop, city, user_type);
+END
+`;
+
 // --- Пользователи бота ------------------------------------------------------
 //
 // Телеграм присылает данные о человеке в каждом сообщении, и они меняются: имя
@@ -453,6 +483,7 @@ async function migrate() {
   const pool = await getPool();
   await pool.request().batch(SCHEMA);
   await pool.request().batch(SCHEMA_KRISHA);
+  await pool.request().batch(SCHEMA_OBJECTS);
   await pool.request().batch(SCHEMA_USERS);
   await pool.request().batch(SCHEMA_INDEXES); // после ALTER: колонки должны уже быть
   const r = await pool.request().query(
@@ -1649,8 +1680,74 @@ async function botStats(days) {
   return s;
 }
 
+// --- Крыша: полный поток недвижимости (id-walking) -------------------------
+
+let objectsReady = false;
+async function ensureObjects(pool) {
+  if (objectsReady) return;
+  await pool.request().batch(SCHEMA_OBJECTS);
+  objectsReady = true;
+}
+
+// Самый большой известный id — стартовая точка курсора сканера: дальше него
+// объявлений ещё нет, оттуда и идём вперёд. Берём максимум из обеих таблиц.
+async function maxKnownId() {
+  const pool = await getPool();
+  await ensureObjects(pool);
+  const r = await pool.request().query(
+    "SELECT MAX(m) AS mx FROM (SELECT MAX(id) AS m FROM dbo.krisha_flats " +
+    "UNION ALL SELECT MAX(id) AS m FROM dbo.krisha_objects) x");
+  return r.recordset[0].mx || null;
+}
+
+// Одно объявление из потока: разобранные поля + сам window.data (gzip).
+async function saveObject(o) {
+  const pool = await getPool();
+  await ensureObjects(pool);
+  await pool.request()
+    .input("id", sql.BigInt, Number(o.id))
+    .input("deal", sql.NVarChar(10), o.deal || null)
+    .input("prop", sql.NVarChar(20), o.prop || null)
+    .input("ut", sql.NVarChar(20), o.userType || null)
+    .input("city", sql.NVarChar(40), o.city || null)
+    .input("created", sql.Date, o.createdOn || null)
+    .input("price", sql.BigInt, o.price == null ? null : Number(o.price))
+    .input("rooms", sql.Int, o.rooms == null ? null : Number(o.rooms))
+    .input("area", sql.Decimal(9, 2), o.area == null ? null : Number(o.area))
+    .input("lat", sql.Decimal(11, 7), o.lat == null ? null : Number(o.lat))
+    .input("lon", sql.Decimal(11, 7), o.lon == null ? null : Number(o.lon))
+    .input("title", sql.NVarChar(300), o.title || null)
+    .input("gz", sql.VarBinary(sql.MAX), o.dataGz || null)
+    .query(`
+      MERGE dbo.krisha_objects AS t
+      USING (SELECT @id AS id) AS s ON t.id = s.id
+      WHEN MATCHED THEN UPDATE SET
+        deal = @deal, prop = @prop, user_type = @ut, city = @city,
+        created_on = COALESCE(@created, t.created_on), price = @price, rooms = @rooms,
+        area = @area, lat = @lat, lon = @lon, title = @title,
+        data_gz = COALESCE(@gz, t.data_gz), last_seen = SYSUTCDATETIME()
+      WHEN NOT MATCHED THEN INSERT
+        (id, deal, prop, user_type, city, created_on, price, rooms, area, lat, lon, title, data_gz)
+        VALUES (@id, @deal, @prop, @ut, @city, @created, @price, @rooms, @area, @lat, @lon, @title, @gz);`);
+}
+
+// Сводка по собранному потоку — для статуса и отчётов.
+async function objectStats() {
+  const pool = await getPool();
+  await ensureObjects(pool);
+  const r = await pool.request().query(`
+    SELECT COUNT(*) AS total,
+      SUM(CASE WHEN deal = 'rent' THEN 1 ELSE 0 END) AS rent,
+      SUM(CASE WHEN deal = 'sale' THEN 1 ELSE 0 END) AS sale,
+      SUM(CASE WHEN user_type = 'owner' THEN 1 ELSE 0 END) AS owner,
+      SUM(CAST(DATALENGTH(data_gz) AS BIGINT)) AS gz_bytes
+    FROM dbo.krisha_objects`);
+  return r.recordset[0];
+}
+
 module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
+  maxKnownId, saveObject, objectStats,
   upsertUser, logBotRequest, botStats,
   getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 
