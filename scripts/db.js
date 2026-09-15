@@ -1415,6 +1415,12 @@ async function findFlats(q, limit) {
                OR f.street LIKE '%' + @addr2 + '%' OR f.title LIKE '%' + @addr2 + '%'), 2, 0) AS score
       FROM dbo.krisha_flats f
       WHERE f.area BETWEEN @lo AND @hi
+        -- Застройщик, не хозяин: у ещё не сданного дома (user_type=complex)
+        -- нет фото конкретной квартиры, только рендер планировки — он один
+        -- на все квартиры этого типа в доме, и «совпадение» по фото ничего
+        -- не доказывает. К тому же звонить там некому — не хозяину, а в
+        -- отдел продаж застройщика, а бот обещает именно хозяина.
+        AND (f.user_type IS NULL OR f.user_type <> 'complex')
         AND (@city IS NULL OR f.city = @city)
         AND (@rooms IS NULL OR f.rooms IS NULL OR f.rooms = @rooms)
         AND (@floor IS NULL OR f.floor IS NULL OR f.floor = @floor)
