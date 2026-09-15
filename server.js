@@ -5542,8 +5542,9 @@ http
         const show = (id) => "https://krisha.kz/a/show/" + id;
         const label = (x) => [x.city, x.rooms ? x.rooms + "к" : null, x.area ? x.area + "м²" : null,
           x.floor && x.floors ? x.floor + "/" + x.floors : null, x.district].filter(Boolean).join(" · ");
+        const PhotoMatch = require("./scripts/photo-match.js");
         const agents = await db.agentsToMatch(batch);
-        let searched = 0, matched = 0;
+        let searched = 0, matched = 0, photoConfirmed = 0;
         const finds = [];
         for (const a of agents) {
           const q = {
@@ -5555,17 +5556,52 @@ http
           try { hits = await db.findObjects(q, 6); } catch { /* пропустим */ }
           await db.recordSearched(a.id, hits.length, hits[0] ? hits[0].id : null).catch(() => {});
           searched++;
-          if (hits.length) { matched++; finds.push({ a: a, hits: hits }); }
+          if (!hits.length) continue;
+          matched++;
+
+          // Нашли по параметрам — сразу сверяем по фото (Gemini). Дорого только
+          // на самих находках, а они редки, так что нагрузки почти нет.
+          let scores = {};
+          if (PhotoMatch.available()) {
+            try {
+              const agentPhotos = await db.objectPhotos(a.id);
+              if (agentPhotos.length) {
+                const cands = await Promise.all(hits.map(async (h) =>
+                  ({ id: String(h.id), photos: await db.objectPhotos(h.id) })));
+                scores = await PhotoMatch.scoreCandidates(agentPhotos, cands);
+              }
+            } catch { /* фото — уточнение, находка и так записана */ }
+          }
+
+          // Каждого кандидата — в журнал (для ручной проверки и статистики).
+          const cand = [];
+          let anyPhoto = false;
+          for (const h of hits) {
+            const s = scores[String(h.id)];
+            if (s && s.match && s.confidence >= 0.7) anyPhoto = true;
+            await db.logMatchCandidate({
+              agentId: a.id, ownerId: h.id, deal: a.deal, prop: a.prop, city: a.city,
+              paramScore: h.score,
+              photoMatch: s ? s.match : null, photoConf: s ? s.confidence : null, photoWhy: s ? s.why : null,
+            }).catch(() => {});
+            cand.push({ h: h, s: s });
+          }
+          if (anyPhoto) photoConfirmed++;
+          finds.push({ a: a, cand: cand });
         }
 
-        // Находки — в мониторинг-чат, пачкой (без флуда). До 10 на сообщение.
+        // Находки — в мониторинг-чат с галочками. До 8 на сообщение, без флуда.
         if (finds.length) {
           const esc = (s) => require("./scripts/krisha-bot.js").esc(String(s == null ? "" : s));
-          const lines = ["🎯 <b>Нашли хозяев по агентским</b> (" + finds.length + " из " + searched + " проверенных)"];
-          for (const f of finds.slice(0, 10)) {
+          const lines = ["🎯 <b>Находки по агентским</b> (" + finds.length + " из " + searched +
+            ", фото подтвердило " + photoConfirmed + ")"];
+          for (const f of finds.slice(0, 8)) {
             lines.push("", "🏢 Агент: " + esc(label(f.a)) + "\n" + show(f.a.id));
-            for (const h of f.hits.slice(0, 4)) {
-              lines.push("👤 хозяин (score " + h.score + "): " + esc(label(h)) + "\n" + show(h.id));
+            for (const c of f.cand.slice(0, 4)) {
+              const ok = c.s && c.s.match && c.s.confidence >= 0.7;
+              const mark = !c.s ? "➖" : ok ? "✅" : "❌";
+              const ph = !c.s ? "фото не проверить" : ok ? ("фото совпали " + c.s.confidence) : "фото не совпали";
+              lines.push(mark + " хозяин (score " + c.h.score + " · " + ph + "): " + esc(label(c.h)) + "\n" + show(c.h.id));
             }
           }
           notifyTelegram(lines.join("\n"));
@@ -5574,8 +5610,14 @@ http
         const st = await db.matchStats().catch(() => null);
         matchRunning = false;
         send(200, {
-          ok: true, searched: searched, matched: matched,
-          finds: finds.map((f) => ({ agent: f.a.id, owners: f.hits.map((h) => ({ id: h.id, score: h.score })) })),
+          ok: true, searched: searched, matched: matched, photoConfirmed: photoConfirmed,
+          finds: finds.map((f) => ({
+            agent: f.a.id,
+            owners: f.cand.map((c) => ({
+              id: c.h.id, score: c.h.score,
+              photoMatch: c.s ? c.s.match : null, photoConf: c.s ? c.s.confidence : null,
+            })),
+          })),
           effectiveness: st && st.total ? st.total : null,
         });
       })().catch((e) => {

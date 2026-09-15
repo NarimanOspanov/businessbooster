@@ -458,6 +458,33 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_kobj_owner_complex' AN
   EXEC('CREATE INDEX IX_kobj_owner_complex ON dbo.krisha_objects (complex_id) WHERE user_type = ''owner'' AND complex_id IS NOT NULL');
 `;
 
+// Журнал находок: по каждому агентскому объявлению, где поиск дал кандидатов,
+// пишем строку на каждого кандидата-хозяина — параметрический score и вердикт
+// сравнения по фото (Gemini). human_ok оставляем под ручную проверку: человек
+// потом смотрит, реально ли это та же квартира, и ставит галочку. По этому
+// журналу видно, какая часть параметрических совпадений подтверждается фото.
+const SCHEMA_MATCHLOG = `
+IF OBJECT_ID('dbo.krisha_match_log', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.krisha_match_log (
+    id          BIGINT IDENTITY(1,1) PRIMARY KEY,
+    agent_id    BIGINT        NOT NULL,   -- искомое (агентское) объявление
+    owner_id    BIGINT        NOT NULL,   -- кандидат-хозяин
+    deal        NVARCHAR(10)  NULL,
+    prop        NVARCHAR(20)  NULL,
+    city        NVARCHAR(40)  NULL,
+    param_score INT           NULL,       -- совпадение по параметрам
+    photo_match BIT           NULL,       -- вердикт Gemini: та же квартира?
+    photo_conf  FLOAT         NULL,
+    photo_why   NVARCHAR(400) NULL,
+    human_ok    BIT           NULL,       -- ручная проверка: null=не смотрели, 1=верно, 0=нет
+    found_at    DATETIME2(0)  NOT NULL CONSTRAINT DF_kml_found DEFAULT SYSUTCDATETIME()
+  );
+  CREATE INDEX IX_kml_agent  ON dbo.krisha_match_log (agent_id);
+  CREATE INDEX IX_kml_review ON dbo.krisha_match_log (human_ok, found_at DESC);
+END
+`;
+
 // --- Пользователи бота ------------------------------------------------------
 //
 // Телеграм присылает данные о человеке в каждом сообщении, и они меняются: имя
@@ -519,6 +546,7 @@ async function migrate() {
   await pool.request().batch(SCHEMA);
   await pool.request().batch(SCHEMA_KRISHA);
   await pool.request().batch(SCHEMA_OBJECTS);
+  await pool.request().batch(SCHEMA_MATCHLOG);
   await pool.request().batch(SCHEMA_USERS);
   await pool.request().batch(SCHEMA_INDEXES); // после ALTER: колонки должны уже быть
   const r = await pool.request().query(
@@ -1721,7 +1749,41 @@ let objectsReady = false;
 async function ensureObjects(pool) {
   if (objectsReady) return;
   await pool.request().batch(SCHEMA_OBJECTS);
+  await pool.request().batch(SCHEMA_MATCHLOG);
   objectsReady = true;
+}
+
+// Ссылки на фото объекта — из сохранённого window.data (advert.photos).
+// Отдаём размер 560x350 (полноразмерные -full.jpg тяжелее для Gemini).
+async function objectPhotos(id) {
+  const pool = await getPool();
+  const r = await pool.request().input("id", sql.BigInt, Number(id))
+    .query("SELECT data_gz FROM dbo.krisha_objects WHERE id = @id");
+  if (!r.recordset.length || !r.recordset[0].data_gz) return [];
+  try {
+    const j = JSON.parse(require("zlib").gunzipSync(r.recordset[0].data_gz).toString("utf8"));
+    const photos = (j.advert && j.advert.photos) || [];
+    return photos.map((p) => String(p.src || "").replace(/-full\.jpg$/, "-560x350.jpg")).filter(Boolean);
+  } catch { return []; }
+}
+
+// Записать кандидата в журнал находок (для ручной проверки и статистики).
+async function logMatchCandidate(m) {
+  const pool = await getPool();
+  await ensureObjects(pool);
+  await pool.request()
+    .input("agent", sql.BigInt, Number(m.agentId))
+    .input("owner", sql.BigInt, Number(m.ownerId))
+    .input("deal", sql.NVarChar(10), m.deal || null)
+    .input("prop", sql.NVarChar(20), m.prop || null)
+    .input("city", sql.NVarChar(40), m.city || null)
+    .input("score", sql.Int, m.paramScore == null ? null : Number(m.paramScore))
+    .input("pm", sql.Bit, m.photoMatch == null ? null : (m.photoMatch ? 1 : 0))
+    .input("pc", sql.Float, m.photoConf == null ? null : Number(m.photoConf))
+    .input("pw", sql.NVarChar(400), m.photoWhy ? String(m.photoWhy).slice(0, 400) : null)
+    .query(`INSERT INTO dbo.krisha_match_log
+      (agent_id, owner_id, deal, prop, city, param_score, photo_match, photo_conf, photo_why)
+      VALUES (@agent, @owner, @deal, @prop, @city, @score, @pm, @pc, @pw)`);
 }
 
 // Самый большой известный id — стартовая точка курсора сканера: дальше него
@@ -1909,6 +1971,7 @@ async function objectStats() {
 module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
+  objectPhotos, logMatchCandidate,
   upsertUser, logBotRequest, botStats,
   getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 
