@@ -5454,32 +5454,45 @@ http
 
         let saved = 0, gaps = 0, unresolved = 0, notListing = 0, maxLive = cursor, scannedTo = cursor;
         const byDeal = {}, bySeller = {};
-        // Дошли до фронтира — дальше объявлений ещё нет, только 404. Как только
-        // прошли столько id выше последнего живого, останавливаемся: незачем
-        // жечь прокси на пустоту (это половина блока у фронтира). Порог заметно
-        // больше обычного разрыва в середине потока (там до ~15 подряд).
-        const FRONTIER_GAP = Math.max(30, conc * 3);
+        // Фронтир — это подряд идущие ПОДТВЕРЖДЁННЫЕ 404 (дальше объявлений ещё
+        // нет). Останавливаемся только на такой серии, чтобы не жечь прокси на
+        // пустоте. 468 — это «не смогли прочитать», а не «нет объявления»:
+        // серию не обрывает и не двигает, иначе throttle-всплеск у любого
+        // разрежённого участка застопорил бы курсор. Порог больше обычного
+        // разрыва в середине потока (там до ~15 подряд 404).
+        const FRONTIER_GAP = Math.max(40, conc * 4);
+        // Возвращает исход: 'live' | 'gap'(404) | 'unresolved'(468) | 'skip'.
         async function handle(id) {
           try {
             const html = await KL.fetchText("https://krisha.kz/a/show/" + id, retries, 15000, { proxy: true });
             const obj = Scan.parse(id, html);
-            if (!obj) { notListing++; return; }
+            if (!obj) { notListing++; return "skip"; }
             await db.saveObject(obj);
             saved++;
             if (id > maxLive) maxLive = id;
             byDeal[obj.deal || "?"] = (byDeal[obj.deal || "?"] || 0) + 1;
             bySeller[obj.userType || "?"] = (bySeller[obj.userType || "?"] || 0) + 1;
+            return "live";
           } catch (e) {
-            if (e && (e.status === 404 || e.status === 410)) gaps++;
-            else unresolved++;
+            if (e && (e.status === 404 || e.status === 410)) { gaps++; return "gap"; }
+            unresolved++;
+            return "unresolved";
           }
         }
-        // Идём вверх окнами по conc (порядок нужен, чтобы поймать фронтир).
+        // Идём вверх окнами по conc (порядок нужен для счёта серии 404).
+        let gap404Streak = 0;
+        outer:
         for (let i = 0; i < ids.length; i += conc) {
           const win = ids.slice(i, i + conc);
-          await Promise.all(win.map(handle));
-          scannedTo = win[win.length - 1];
-          if (scannedTo - maxLive >= FRONTIER_GAP) break; // прошли фронтир
+          const out = await Promise.all(win.map(handle));
+          for (let k = 0; k < win.length; k++) {
+            scannedTo = win[k];
+            if (out[k] === "gap") {
+              if (++gap404Streak >= FRONTIER_GAP) break outer; // прошли фронтир
+            } else {
+              gap404Streak = 0; // живое, 468 или не-объявление — серия прервана
+            }
+          }
         }
 
         // Курсор двигаем только до самого большого живого id — у фронтира он
