@@ -430,8 +430,32 @@ IF COL_LENGTH('dbo.krisha_objects', 'district')    IS NULL ALTER TABLE dbo.krish
 IF COL_LENGTH('dbo.krisha_objects', 'mkr')         IS NULL ALTER TABLE dbo.krisha_objects ADD mkr NVARCHAR(120) NULL;
 IF COL_LENGTH('dbo.krisha_objects', 'street_slug') IS NULL ALTER TABLE dbo.krisha_objects ADD street_slug NVARCHAR(160) NULL;
 IF COL_LENGTH('dbo.krisha_objects', 'house_num')   IS NULL ALTER TABLE dbo.krisha_objects ADD house_num NVARCHAR(40) NULL;
+-- Учёт поиска оригинала-хозяина для каждого агентского объявления: когда
+-- искали, сколько кандидатов нашли, лучший. По этим полям меряем, как растёт
+-- эффективность инструмента день ото дня.
+IF COL_LENGTH('dbo.krisha_objects', 'searched_at') IS NULL ALTER TABLE dbo.krisha_objects ADD searched_at DATETIME2(0) NULL;
+IF COL_LENGTH('dbo.krisha_objects', 'match_count') IS NULL ALTER TABLE dbo.krisha_objects ADD match_count INT NULL;
+IF COL_LENGTH('dbo.krisha_objects', 'match_top')   IS NULL ALTER TABLE dbo.krisha_objects ADD match_top BIGINT NULL;
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_kobj_match' AND object_id = OBJECT_ID('dbo.krisha_objects'))
   CREATE INDEX IX_kobj_match ON dbo.krisha_objects (deal, prop, user_type, city, area);
+-- EXEC у всех индексов ниже: они ссылаются на колонки, добавленные ALTER'ом
+-- выше в этом же батче — прямой CREATE не скомпилируется (на чистой базе
+-- колонок ещё нет на этапе разбора). EXEC откладывает компиляцию до
+-- выполнения, когда ALTER'ы уже отработали.
+-- Очередь на поиск: только неисканные.
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_kobj_tosearch' AND object_id = OBJECT_ID('dbo.krisha_objects'))
+  EXEC('CREATE INDEX IX_kobj_tosearch ON dbo.krisha_objects (searched_at) WHERE searched_at IS NULL');
+-- findObjects всегда ищет среди ХОЗЯЕВ — держим для них узкие фильтрованные
+-- индексы (хозяева — меньшинство потока, индексы получаются небольшие):
+--  по сделке/типу/городу/площади (главный фильтр),
+--  по координатам (опознание дома),
+--  по ЖК (второй путь опознания дома).
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_kobj_owner_cat' AND object_id = OBJECT_ID('dbo.krisha_objects'))
+  EXEC('CREATE INDEX IX_kobj_owner_cat ON dbo.krisha_objects (deal, prop, city, area) WHERE user_type = ''owner''');
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_kobj_owner_geo' AND object_id = OBJECT_ID('dbo.krisha_objects'))
+  EXEC('CREATE INDEX IX_kobj_owner_geo ON dbo.krisha_objects (lat, lon) WHERE user_type = ''owner'' AND lat IS NOT NULL');
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_kobj_owner_complex' AND object_id = OBJECT_ID('dbo.krisha_objects'))
+  EXEC('CREATE INDEX IX_kobj_owner_complex ON dbo.krisha_objects (complex_id) WHERE user_type = ''owner'' AND complex_id IS NOT NULL');
 `;
 
 // --- Пользователи бота ------------------------------------------------------
@@ -1819,6 +1843,55 @@ async function findObjects(q, limit) {
   return r.recordset;
 }
 
+// Свежие агентские объявления, для которых ещё не искали оригинал хозяина.
+// Только те, у кого есть по чему опознать дом (ЖК или координаты) и площадь —
+// иначе искать нечем. Застройщиков (complex) не берём: у них нет «хозяина».
+async function agentsToMatch(limit) {
+  const pool = await getPool();
+  await ensureObjects(pool);
+  const r = await pool.request().input("n", sql.Int, Number(limit) || 100).query(`
+    SELECT TOP (@n) id, deal, prop, city, area, rooms, floor, floors,
+      complex_id, district, street_slug, house_num, lat, lon, title, user_type
+    FROM dbo.krisha_objects
+    WHERE searched_at IS NULL
+      AND user_type IN ('specialist', 'company', 'agent')
+      AND area IS NOT NULL
+      AND (complex_id IS NOT NULL OR lat IS NOT NULL)
+    ORDER BY id DESC`);
+  return r.recordset;
+}
+
+// Отметить, что по агентскому объявлению искали, и записать исход.
+async function recordSearched(id, count, topId) {
+  const pool = await getPool();
+  await pool.request()
+    .input("id", sql.BigInt, Number(id))
+    .input("cnt", sql.Int, Number(count) || 0)
+    .input("top", sql.BigInt, topId ? Number(topId) : null)
+    .query(`UPDATE dbo.krisha_objects
+            SET searched_at = SYSUTCDATETIME(), match_count = @cnt, match_top = @top
+            WHERE id = @id`);
+}
+
+// Эффективность инструмента: сколько агентских проверили и у скольких нашёлся
+// хозяин — всего и по дням. По этому видно рост со временем.
+async function matchStats() {
+  const pool = await getPool();
+  await ensureObjects(pool);
+  const tot = (await pool.request().query(`
+    SELECT
+      COUNT(*) AS searched,
+      SUM(CASE WHEN match_count > 0 THEN 1 ELSE 0 END) AS matched
+    FROM dbo.krisha_objects WHERE searched_at IS NOT NULL`)).recordset[0];
+  const byDay = (await pool.request().query(`
+    SELECT CAST(searched_at AS DATE) AS day,
+      COUNT(*) AS searched,
+      SUM(CASE WHEN match_count > 0 THEN 1 ELSE 0 END) AS matched
+    FROM dbo.krisha_objects WHERE searched_at IS NOT NULL
+    GROUP BY CAST(searched_at AS DATE) ORDER BY day DESC`)).recordset;
+  return { total: tot, byDay: byDay };
+}
+
 // Сводка по собранному потоку — для статуса и отчётов.
 async function objectStats() {
   const pool = await getPool();
@@ -1835,7 +1908,7 @@ async function objectStats() {
 
 module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
-  maxKnownId, saveObject, objectStats, findObjects,
+  maxKnownId, saveObject, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
   upsertUser, logBotRequest, botStats,
   getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 

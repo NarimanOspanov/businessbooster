@@ -1410,6 +1410,7 @@ let backfillRunning = false;
 let photosRunning = false;
 let deepenRunning = false;
 let scanRunning = false;
+let matchRunning = false;
 // Разобранные страницы текущего прогона: тот же объект нужен и проходу по базе,
 // и сборке страниц для канала, а страница у Крыши одна.
 const parsedNow = new Map();
@@ -5517,6 +5518,68 @@ http
         });
       })().catch((e) => {
         scanRunning = false;
+        send(500, { ok: false, error: String(e.message).slice(0, 200) });
+      });
+      return;
+    }
+
+    // Замер эффективности: по свежим агентским объявлениям, которые ещё не
+    // искали, запускаем поиск оригинала-хозяина (findObjects), записываем
+    // исход и находки скидываем в мониторинг-чат. Со временем видно, как
+    // растёт доля агентских, у которых нашёлся хозяин. Дёргается Hangfire
+    // после скана. Только база — быстро, отвечает синхронно.
+    if (urlPath === "/api/krisha/match") {
+      const send = (code, obj) => {
+        res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+        res.end(JSON.stringify(obj, null, 2));
+      };
+      const want = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
+      if (!want || parsed.searchParams.get("key") !== want) return send(403, { ok: false, error: "bad_key" });
+      if (matchRunning) return send(409, { ok: false, running: true, error: "поиск уже идёт" });
+      const batch = Math.max(1, Math.min(1000, Number(parsed.searchParams.get("batch")) || 200));
+      matchRunning = true;
+      (async () => {
+        const show = (id) => "https://krisha.kz/a/show/" + id;
+        const label = (x) => [x.city, x.rooms ? x.rooms + "к" : null, x.area ? x.area + "м²" : null,
+          x.floor && x.floors ? x.floor + "/" + x.floors : null, x.district].filter(Boolean).join(" · ");
+        const agents = await db.agentsToMatch(batch);
+        let searched = 0, matched = 0;
+        const finds = [];
+        for (const a of agents) {
+          const q = {
+            deal: a.deal, prop: a.prop, city: a.city, area: a.area, rooms: a.rooms,
+            floor: a.floor, floors: a.floors, complexId: a.complex_id, district: a.district,
+            streetSlug: a.street_slug, houseNum: a.house_num, lat: a.lat, lon: a.lon, id: a.id,
+          };
+          let hits = [];
+          try { hits = await db.findObjects(q, 6); } catch { /* пропустим */ }
+          await db.recordSearched(a.id, hits.length, hits[0] ? hits[0].id : null).catch(() => {});
+          searched++;
+          if (hits.length) { matched++; finds.push({ a: a, hits: hits }); }
+        }
+
+        // Находки — в мониторинг-чат, пачкой (без флуда). До 10 на сообщение.
+        if (finds.length) {
+          const esc = (s) => require("./scripts/krisha-bot.js").esc(String(s == null ? "" : s));
+          const lines = ["🎯 <b>Нашли хозяев по агентским</b> (" + finds.length + " из " + searched + " проверенных)"];
+          for (const f of finds.slice(0, 10)) {
+            lines.push("", "🏢 Агент: " + esc(label(f.a)) + "\n" + show(f.a.id));
+            for (const h of f.hits.slice(0, 4)) {
+              lines.push("👤 хозяин (score " + h.score + "): " + esc(label(h)) + "\n" + show(h.id));
+            }
+          }
+          notifyTelegram(lines.join("\n"));
+        }
+
+        const st = await db.matchStats().catch(() => null);
+        matchRunning = false;
+        send(200, {
+          ok: true, searched: searched, matched: matched,
+          finds: finds.map((f) => ({ agent: f.a.id, owners: f.hits.map((h) => ({ id: h.id, score: h.score })) })),
+          effectiveness: st && st.total ? st.total : null,
+        });
+      })().catch((e) => {
+        matchRunning = false;
         send(500, { ok: false, error: String(e.message).slice(0, 200) });
       });
       return;
