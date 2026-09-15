@@ -5452,45 +5452,41 @@ http
         const ids = [];
         for (let k = 1; k <= batch; k++) ids.push(cursor + k);
 
-        let saved = 0, gaps = 0, unresolved = 0, notListing = 0, maxLive = cursor;
+        let saved = 0, gaps = 0, unresolved = 0, notListing = 0, maxLive = cursor, scannedTo = cursor;
         const byDeal = {}, bySeller = {};
-        let next = 0;
-        await Promise.all(Array.from({ length: conc }, async () => {
-          while (true) {
-            const idx = next++;
-            if (idx >= ids.length) return;
-            const id = ids[idx];
-            try {
-              const html = await KL.fetchText("https://krisha.kz/a/show/" + id, retries, 15000, { proxy: true });
-              const obj = Scan.parse(id, html);
-              if (!obj) { notListing++; continue; }
-              await db.saveObject(obj);
-              saved++;
-              if (id > maxLive) maxLive = id;
-              byDeal[obj.deal || "?"] = (byDeal[obj.deal || "?"] || 0) + 1;
-              bySeller[obj.userType || "?"] = (bySeller[obj.userType || "?"] || 0) + 1;
-            } catch (e) {
-              if (e && (e.status === 404 || e.status === 410)) gaps++;
-              else unresolved++;
-            }
-          }
-        }));
-
-        // Двигаем курсор до самого большого живого id. Если живого не было
-        // вовсе — вероятно, стоим у фронтира: курсор не трогаем, следующий
-        // вызов перепроверит тот же блок (там уже могли появиться новые).
-        // Но если так повторяется — возможно, впереди большой мёртвый провал
-        // (пачка удалённых id); после трёх пустых заходов перепрыгиваем блок.
-        if (maxLive > cursor) {
-          KW.scan.cursor = maxLive;
-          KW.scan.emptyStreak = 0;
-        } else {
-          KW.scan.emptyStreak = (KW.scan.emptyStreak || 0) + 1;
-          if (KW.scan.emptyStreak >= 3) {
-            KW.scan.cursor = cursor + batch;
-            KW.scan.emptyStreak = 0;
+        // Дошли до фронтира — дальше объявлений ещё нет, только 404. Как только
+        // прошли столько id выше последнего живого, останавливаемся: незачем
+        // жечь прокси на пустоту (это половина блока у фронтира). Порог заметно
+        // больше обычного разрыва в середине потока (там до ~15 подряд).
+        const FRONTIER_GAP = Math.max(30, conc * 3);
+        async function handle(id) {
+          try {
+            const html = await KL.fetchText("https://krisha.kz/a/show/" + id, retries, 15000, { proxy: true });
+            const obj = Scan.parse(id, html);
+            if (!obj) { notListing++; return; }
+            await db.saveObject(obj);
+            saved++;
+            if (id > maxLive) maxLive = id;
+            byDeal[obj.deal || "?"] = (byDeal[obj.deal || "?"] || 0) + 1;
+            bySeller[obj.userType || "?"] = (bySeller[obj.userType || "?"] || 0) + 1;
+          } catch (e) {
+            if (e && (e.status === 404 || e.status === 410)) gaps++;
+            else unresolved++;
           }
         }
+        // Идём вверх окнами по conc (порядок нужен, чтобы поймать фронтир).
+        for (let i = 0; i < ids.length; i += conc) {
+          const win = ids.slice(i, i + conc);
+          await Promise.all(win.map(handle));
+          scannedTo = win[win.length - 1];
+          if (scannedTo - maxLive >= FRONTIER_GAP) break; // прошли фронтир
+        }
+
+        // Курсор двигаем только до самого большого живого id — у фронтира он
+        // стоит и ждёт новых. Большой мёртвый провал (редко) виден по
+        // advanced=0 при saved=0; тогда оператор перескакивает вручную ?cursor=.
+        const advanced = maxLive > cursor;
+        if (advanced) KW.scan.cursor = maxLive;
         KW.scan.savedTotal = (KW.scan.savedTotal || 0) + saved;
         KW.scan.lastRun = new Date().toISOString();
         saveKrisha();
@@ -5498,8 +5494,7 @@ http
         scanRunning = false;
         send(200, {
           ok: true,
-          scanned: ids.length,
-          range: (cursor + 1) + "…" + (cursor + batch),
+          scannedTo: scannedTo, stoppedAtFrontier: scannedTo < cursor + batch,
           saved: saved, gaps404: gaps, unresolved468: unresolved, notListing: notListing,
           byDeal: byDeal, bySeller: bySeller,
           cursor: KW.scan.cursor, advanced: KW.scan.cursor - cursor,
