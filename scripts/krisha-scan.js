@@ -51,6 +51,19 @@ function dealAndProp(section, category, title) {
 const geoLat = (v) => (typeof v === "number" && v > -90 && v < 90 && v !== 0 ? v : null);
 const geoLon = (v) => (typeof v === "number" && v !== 0 ? v : null);
 
+// Площадь для типов, где её нет в advert.square (участок, коммерция): берём
+// из заголовка. Участок — в сотках («20 соток»), остальное — в м². Единица
+// разная, но findObjects фильтрует по типу (участок↔участок), так что сотки
+// с м² не смешиваются.
+function areaFromTitle(t) {
+  const s = String(t || "");
+  let m = s.match(/([\d.,]+)\s*соток/i);
+  if (m) return Number(m[1].replace(",", "."));
+  m = s.match(/([\d.,]+)\s*м²/);
+  if (m) return Number(m[1].replace(",", "."));
+  return null;
+}
+
 // Год постройки, тип дома, санузел — надёжного структурного поля в window.data
 // нет. Их два источника: блок характеристик в HTML (parseDetail, для новых
 // объявлений скан его качает) и свободный текст описания (запасной вариант,
@@ -119,7 +132,9 @@ function parse(id, html) {
     createdOn: c.createdAt || c.addedAt || null,
     price: typeof a.price === "number" ? a.price : null,
     rooms: typeof a.rooms === "number" ? a.rooms : null,
-    area: typeof a.square === "number" ? a.square : null,
+    // Площадь: у квартир/домов в advert.square; у участка/коммерции — из
+    // заголовка (соток/м²).
+    area: typeof a.square === "number" ? a.square : (areaFromTitle(advTitle) || areaFromTitle(pageTitle)),
     lat: geoLat(map.lat),
     lon: geoLon(map.lon),
     // Поля для сопоставления «та же квартира»:
