@@ -51,6 +51,38 @@ function dealAndProp(section, category, title) {
 const geoLat = (v) => (typeof v === "number" && v > -90 && v < 90 && v !== 0 ? v : null);
 const geoLon = (v) => (typeof v === "number" && v !== 0 ? v : null);
 
+// Год постройки, тип дома, санузел — надёжного структурного поля в window.data
+// нет. Их два источника: блок характеристик в HTML (parseDetail, для новых
+// объявлений скан его качает) и свободный текст описания (запасной вариант,
+// работает и для уже сохранённых строк при backfill).
+function yearFromText(t) {
+  const m = String(t || "").match(/(\d{4})\s*г\.?\s*п|год\s+постройки[:\s]+(\d{4})/i);
+  const y = m ? Number(m[1] || m[2]) : null;
+  return y && y >= 1900 && y <= new Date().getFullYear() + 2 ? y : null;
+}
+function houseFromText(t) {
+  const s = String(t || "").toLowerCase();
+  return /монолит/.test(s) ? "монолитный" : /кирпич/.test(s) ? "кирпичный"
+    : /панельн/.test(s) ? "панельный" : /каркас/.test(s) ? "каркасно-камышитовый"
+    : /блочн/.test(s) ? "блочный" : null;
+}
+function toiletFromText(t) {
+  const s = String(t || "").toLowerCase();
+  if (/санузел[^.]*раздельн|раздельн[^.]*санузел|2\s*с\/у|два\s+санузл/.test(s)) return "раздельный";
+  if (/санузел[^.]*совмещ|совмещ[^.]*санузел/.test(s)) return "совмещенный";
+  return null;
+}
+function normHouse(v) {
+  const s = String(v || "").toLowerCase();
+  return /монолит/.test(s) ? "монолитный" : /кирпич/.test(s) ? "кирпичный"
+    : /панельн/.test(s) ? "панельный" : /каркас/.test(s) ? "каркасно-камышитовый"
+    : /блочн/.test(s) ? "блочный" : (v || null);
+}
+function normToilet(v) {
+  const s = String(v || "").toLowerCase();
+  return /раздельн/.test(s) ? "раздельный" : /совмещ/.test(s) ? "совмещенный" : (v || null);
+}
+
 // Разбор одной страницы -> объект для db.saveObject, либо null, если это не
 // объявление (нет window.data).
 function parse(id, html) {
@@ -69,6 +101,14 @@ function parse(id, html) {
   // Этаж/этажность — из advert.title: «… · 6/12 этаж».
   const fl = (advTitle || "").match(/(\d+)\s*\/\s*(\d+)\s*этаж/);
   const city = (a.city || ad.city || (c.city && c.city.name) || null);
+  // Год/тип дома/санузел: структурный блок HTML (для новых), иначе — из текста
+  // описания (запасной, работает и на уже сохранённых строках).
+  let det = {};
+  try { det = require("./krisha-lib.js").parseDetail(html); } catch { /* нет HTML-блока */ }
+  const desc = String(c.description || a.description || "");
+  const buildYear = det.year || yearFromText(desc) || yearFromText(advTitle);
+  const house = normHouse(det.building) || houseFromText(desc);
+  const toilet = normToilet(det.toilet) || toiletFromText(desc);
 
   return {
     id: id,
@@ -90,6 +130,9 @@ function parse(id, html) {
     mkr: ad.microdistrict || null,
     streetSlug: ad.street || null,
     houseNum: ad.house_num || null,
+    buildYear: buildYear,
+    house: house,
+    toilet: toilet,
     title: advTitle || pageTitle,
     dataGz: zlib.gzipSync(Buffer.from(raw, "utf8")),
   };

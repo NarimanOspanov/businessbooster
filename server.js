@@ -5550,7 +5550,8 @@ http
           const q = {
             deal: a.deal, prop: a.prop, city: a.city, area: a.area, rooms: a.rooms,
             floor: a.floor, floors: a.floors, complexId: a.complex_id, district: a.district,
-            streetSlug: a.street_slug, houseNum: a.house_num, lat: a.lat, lon: a.lon, id: a.id,
+            streetSlug: a.street_slug, houseNum: a.house_num, lat: a.lat, lon: a.lon,
+            buildYear: a.build_year, house: a.house, toilet: a.toilet, id: a.id,
           };
           let hits = [];
           try { hits = await db.findObjects(q, 6); } catch { /* пропустим */ }

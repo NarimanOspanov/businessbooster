@@ -430,6 +430,11 @@ IF COL_LENGTH('dbo.krisha_objects', 'district')    IS NULL ALTER TABLE dbo.krish
 IF COL_LENGTH('dbo.krisha_objects', 'mkr')         IS NULL ALTER TABLE dbo.krisha_objects ADD mkr NVARCHAR(120) NULL;
 IF COL_LENGTH('dbo.krisha_objects', 'street_slug') IS NULL ALTER TABLE dbo.krisha_objects ADD street_slug NVARCHAR(160) NULL;
 IF COL_LENGTH('dbo.krisha_objects', 'house_num')   IS NULL ALTER TABLE dbo.krisha_objects ADD house_num NVARCHAR(40) NULL;
+-- Год постройки, тип дома, санузел: из блока характеристик HTML (parseDetail),
+-- иначе из текста описания. Вторичные null-tolerant поля для точности.
+IF COL_LENGTH('dbo.krisha_objects', 'build_year')  IS NULL ALTER TABLE dbo.krisha_objects ADD build_year INT NULL;
+IF COL_LENGTH('dbo.krisha_objects', 'house')       IS NULL ALTER TABLE dbo.krisha_objects ADD house NVARCHAR(60) NULL;
+IF COL_LENGTH('dbo.krisha_objects', 'toilet')      IS NULL ALTER TABLE dbo.krisha_objects ADD toilet NVARCHAR(40) NULL;
 -- Учёт поиска оригинала-хозяина для каждого агентского объявления: когда
 -- искали, сколько кандидатов нашли, лучший. По этим полям меряем, как растёт
 -- эффективность инструмента день ото дня.
@@ -1822,6 +1827,9 @@ async function saveObject(o) {
     .input("mkr", sql.NVarChar(120), o.mkr || null)
     .input("sslug", sql.NVarChar(160), o.streetSlug || null)
     .input("hnum", sql.NVarChar(40), o.houseNum || null)
+    .input("byear", sql.Int, o.buildYear == null ? null : Number(o.buildYear))
+    .input("house", sql.NVarChar(60), o.house || null)
+    .input("toilet", sql.NVarChar(40), o.toilet || null)
     .input("gz", sql.VarBinary(sql.MAX), o.dataGz || null)
     .query(`
       MERGE dbo.krisha_objects AS t
@@ -1832,12 +1840,14 @@ async function saveObject(o) {
         area = @area, lat = @lat, lon = @lon, title = @title,
         floor = @floor, floors = @floors, complex_id = @cxid, district = @district,
         mkr = @mkr, street_slug = @sslug, house_num = @hnum,
+        build_year = COALESCE(@byear, t.build_year), house = COALESCE(@house, t.house),
+        toilet = COALESCE(@toilet, t.toilet),
         data_gz = COALESCE(@gz, t.data_gz), last_seen = SYSUTCDATETIME()
       WHEN NOT MATCHED THEN INSERT
         (id, deal, prop, user_type, city, created_on, price, rooms, area, lat, lon, title,
-         floor, floors, complex_id, district, mkr, street_slug, house_num, data_gz)
+         floor, floors, complex_id, district, mkr, street_slug, house_num, build_year, house, toilet, data_gz)
         VALUES (@id, @deal, @prop, @ut, @city, @created, @price, @rooms, @area, @lat, @lon, @title,
-         @floor, @floors, @cxid, @district, @mkr, @sslug, @hnum, @gz);`);
+         @floor, @floors, @cxid, @district, @mkr, @sslug, @hnum, @byear, @house, @toilet, @gz);`);
 }
 
 // Узнать ту же самую недвижимость в объявлении агента — но по полному потоку
@@ -1866,11 +1876,15 @@ async function findObjects(q, limit) {
     .input("hnum", sql.NVarChar(40), q.houseNum || null)
     .input("lat", sql.Decimal(11, 7), q.lat == null ? null : Number(q.lat))
     .input("lon", sql.Decimal(11, 7), q.lon == null ? null : Number(q.lon))
+    .input("year", sql.Int, q.buildYear ? Number(q.buildYear) : null)
+    .input("house", sql.NVarChar(60), q.house || null)
+    .input("toilet", sql.NVarChar(40), q.toilet || null)
     .input("exid", sql.BigInt, q.id ? Number(q.id) : null)
     .input("n", sql.Int, Number(limit) || 12)
     .query(`
       SELECT TOP (@n) f.id, f.deal, f.prop, f.user_type, f.city, f.area, f.rooms, f.floor, f.floors,
         f.complex_id, f.district, f.street_slug, f.house_num, f.lat, f.lon, f.price, f.title, f.created_on,
+        f.build_year, f.house, f.toilet,
         3 + IIF(@rooms IS NOT NULL AND f.rooms = @rooms, 2, 0)
           + IIF(@cxid IS NOT NULL AND f.complex_id = @cxid, 4, 0)
           + IIF(@lat IS NOT NULL AND f.lat IS NOT NULL
@@ -1880,7 +1894,10 @@ async function findObjects(q, limit) {
                 AND f.house_num = @hnum AND f.street_slug = @sslug, 4, 0)
           + IIF(@floor IS NOT NULL AND f.floor = @floor, 2, 0)
           + IIF(@floors IS NOT NULL AND f.floors = @floors, 1, 0)
-          + IIF(@district IS NOT NULL AND f.district = @district, 1, 0) AS score
+          + IIF(@district IS NOT NULL AND f.district = @district, 1, 0)
+          + IIF(@year IS NOT NULL AND f.build_year = @year, 1, 0)
+          + IIF(@house IS NOT NULL AND f.house = @house, 1, 0)
+          + IIF(@toilet IS NOT NULL AND f.toilet = @toilet, 1, 0) AS score
       FROM dbo.krisha_objects f
       WHERE f.user_type = 'owner'
         AND (@deal IS NULL OR f.deal = @deal)
@@ -1895,6 +1912,11 @@ async function findObjects(q, limit) {
              OR f.street_slug <> @sslug OR f.house_num = @hnum)
         AND (@lat IS NULL OR f.lat IS NULL
              OR (ABS(f.lat - @lat) < 0.0006 AND ABS(f.lon - @lon) < 0.0008))
+        -- Год постройки/тип дома/санузел — null-tolerant: исключаем, только
+        -- если поле известно с обеих сторон и не совпало (год ±1 на разнобой).
+        AND (@year IS NULL OR f.build_year IS NULL OR ABS(f.build_year - @year) <= 1)
+        AND (@house IS NULL OR f.house IS NULL OR f.house = @house)
+        AND (@toilet IS NULL OR f.toilet IS NULL OR f.toilet = @toilet)
         -- Опознание дома обязательно: ЖК или координаты, любой из двух.
         AND (
           (@cxid IS NOT NULL AND f.complex_id = @cxid)
@@ -1913,7 +1935,7 @@ async function agentsToMatch(limit) {
   await ensureObjects(pool);
   const r = await pool.request().input("n", sql.Int, Number(limit) || 100).query(`
     SELECT TOP (@n) id, deal, prop, city, area, rooms, floor, floors,
-      complex_id, district, street_slug, house_num, lat, lon, title, user_type
+      complex_id, district, street_slug, house_num, lat, lon, build_year, house, toilet, title, user_type
     FROM dbo.krisha_objects
     WHERE searched_at IS NULL
       AND user_type IN ('specialist', 'company', 'agent')
