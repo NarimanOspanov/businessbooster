@@ -1976,6 +1976,35 @@ async function matchStats() {
   return { total: tot, byDay: byDay };
 }
 
+// Находки для дашборда-ревью: последние строки журнала с деталями искомого
+// (агентского) и кандидата (хозяина) рядом — для ручной проверки по фото.
+async function matchReviewRows(limit) {
+  const pool = await getPool();
+  await ensureObjects(pool);
+  const r = await pool.request().input("n", sql.Int, Number(limit) || 40).query(`
+    SELECT TOP (@n) m.id, m.agent_id, m.owner_id, m.param_score, m.photo_match, m.photo_conf,
+      m.photo_why, m.human_ok, m.found_at,
+      a.title a_title, a.city a_city, a.area a_area, a.rooms a_rooms, a.floor a_floor,
+      a.floors a_floors, a.price a_price, a.deal a_deal, a.prop a_prop,
+      a.build_year a_year, a.house a_house, a.toilet a_toilet,
+      o.title o_title, o.area o_area, o.rooms o_rooms, o.floor o_floor, o.floors o_floors,
+      o.price o_price, o.build_year o_year, o.house o_house, o.toilet o_toilet
+    FROM dbo.krisha_match_log m
+    JOIN dbo.krisha_objects a ON a.id = m.agent_id
+    JOIN dbo.krisha_objects o ON o.id = m.owner_id
+    ORDER BY m.found_at DESC`);
+  return r.recordset;
+}
+
+// Ручная отметка результата: 1 — та же квартира, 0 — нет, null — снять отметку.
+async function setHumanOk(logId, ok) {
+  const pool = await getPool();
+  await pool.request()
+    .input("id", sql.BigInt, Number(logId))
+    .input("ok", sql.Bit, ok == null ? null : (ok ? 1 : 0))
+    .query("UPDATE dbo.krisha_match_log SET human_ok = @ok WHERE id = @id");
+}
+
 // Сводка по собранному потоку — для статуса и отчётов.
 async function objectStats() {
   const pool = await getPool();
@@ -1993,7 +2022,7 @@ async function objectStats() {
 module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
-  objectPhotos, logMatchCandidate,
+  objectPhotos, logMatchCandidate, matchReviewRows, setHumanOk,
   upsertUser, logBotRequest, botStats,
   getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 

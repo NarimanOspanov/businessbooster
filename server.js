@@ -634,6 +634,100 @@ function notifyTelegram(text) {
     .catch((e) => ({ ok: false, description: e.message }));
 }
 
+// Внутренний дашборд мониторинга находок «агент → хозяин». Данные тянет с
+// /api/krisha/monitor?data=1, отметки шлёт на ?set=. Ключ берёт из своего URL.
+const KRISHA_MONITOR_HTML = `<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Крыша · мониторинг находок</title>
+<style>
+  :root{--bg:#0f1216;--card:#181d24;--line:#262d37;--fg:#e6e9ee;--mut:#8a95a5;--ok:#2fbf71;--no:#e5484d;--acc:#4c8dff}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:16px}
+  h1{font-size:18px;margin:0 0 12px}
+  .mut{color:var(--mut)}
+  table{border-collapse:collapse;width:100%;max-width:640px;margin:0 0 24px}
+  th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;font-variant-numeric:tabular-nums}
+  th{color:var(--mut);font-weight:600}
+  .find{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:0 0 14px}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:640px){.cols{grid-template-columns:1fr}}
+  .side h3{margin:0 0 6px;font-size:13px;letter-spacing:.02em;text-transform:uppercase;color:var(--mut)}
+  .photos{display:flex;gap:4px;overflow-x:auto;margin:0 0 8px}
+  .photos img{height:96px;border-radius:6px;object-fit:cover;flex:0 0 auto;background:#222}
+  .p{margin:2px 0}
+  a{color:var(--acc);text-decoration:none}
+  .verdict{margin:10px 0;padding:8px 10px;border-radius:8px;background:#12161c;border:1px solid var(--line)}
+  .btns{display:flex;gap:8px;margin-top:8px}
+  button{border:1px solid var(--line);background:#12161c;color:var(--fg);border-radius:8px;padding:8px 14px;cursor:pointer;font:inherit}
+  button.ok.on{background:var(--ok);border-color:var(--ok);color:#04140b}
+  button.no.on{background:var(--no);border-color:var(--no);color:#1a0405}
+  .tag{display:inline-block;padding:1px 7px;border-radius:99px;font-size:12px}
+  .tag.y{background:rgba(47,191,113,.15);color:var(--ok)} .tag.n{background:rgba(229,72,77,.15);color:var(--no)} .tag.q{background:rgba(138,149,165,.15);color:var(--mut)}
+</style></head><body>
+<h1>Крыша · мониторинг находок «агент → хозяин»</h1>
+<div id="stats" class="mut">загрузка…</div>
+<div id="finds"></div>
+<script>
+var KEY = new URLSearchParams(location.search).get("key") || "";
+var API = "/api/krisha/monitor?key=" + encodeURIComponent(KEY);
+function esc(s){s=(s==null?"":String(s));return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function money(n){return n?Math.round(n).toLocaleString("ru-RU")+" ₸":"";}
+function show(id){return "https://krisha.kz/a/show/"+id;}
+function par(x,pre){var b=[];
+  if(x[pre+"rooms"])b.push(x[pre+"rooms"]+"-комн");
+  if(x[pre+"area"])b.push(x[pre+"area"]+" м²");
+  if(x[pre+"floor"]&&x[pre+"floors"])b.push(x[pre+"floor"]+"/"+x[pre+"floors"]+" эт");
+  if(x[pre+"year"])b.push(x[pre+"year"]+" г");
+  if(x[pre+"house"])b.push(x[pre+"house"]);
+  if(x[pre+"toilet"])b.push("с/у "+x[pre+"toilet"]);
+  return b.join(" · ");}
+function imgs(a){if(!a||!a.length)return "<div class=mut>нет фото</div>";var h="";for(var i=0;i<a.length;i++)h+="<img loading=lazy src='"+esc(a[i])+"'>";return "<div class=photos>"+h+"</div>";}
+function side(title,id,photos,paramStr,extra){
+  return "<div class=side><h3>"+title+"</h3>"+imgs(photos)+
+    "<div class=p>"+esc(paramStr)+"</div>"+(extra||"")+
+    "<div class=p><a href='"+show(id)+"' target=_blank>krisha.kz/a/show/"+id+"</a></div></div>";}
+function render(d){
+  var s=d.stats||{}; var t=s.total||{};
+  var rows="<table><tr><th>День</th><th>Проверено</th><th>Нашли (параметры)</th></tr>";
+  (s.byDay||[]).forEach(function(x){rows+="<tr><td>"+String(x.day).slice(0,10)+"</td><td>"+x.searched+"</td><td>"+x.matched+"</td></tr>";});
+  rows+="</table>";
+  document.getElementById("stats").innerHTML="<b>Всего проверено агентских:</b> "+(t.searched||0)+
+    " · <b>нашли хозяина:</b> "+(t.matched||0)+rows;
+  var box=document.getElementById("finds"); box.innerHTML="";
+  (d.finds||[]).forEach(function(f){
+    var ph = f.photo_match===true ? "<span class='tag y'>фото: та же ("+f.photo_conf+")</span>"
+      : f.photo_match===false ? "<span class='tag n'>фото: не та ("+f.photo_conf+")</span>"
+      : "<span class='tag q'>фото не проверено</span>";
+    var el=document.createElement("div"); el.className="find";
+    el.innerHTML="<div class=cols>"+
+      side("Агент · score "+f.param_score, f.agent_id, f.a_photos, par(f,"a_")+" · "+money(f.a_price))+
+      side("Кандидат-хозяин", f.owner_id, f.o_photos, par(f,"o_")+" · "+money(f.o_price))+
+      "</div>"+
+      "<div class=verdict>"+ph+(f.photo_why?" — "+esc(f.photo_why):"")+"</div>"+
+      "<div class=btns>"+
+        "<button class='ok"+(f.human_ok===true?" on":"")+"' data-id="+f.id+" data-v=1>✅ верно</button>"+
+        "<button class='no"+(f.human_ok===false?" on":"")+"' data-id="+f.id+" data-v=0>❌ неверно</button>"+
+      "</div>";
+    box.appendChild(el);
+  });
+  box.querySelectorAll("button").forEach(function(b){
+    b.onclick=function(){
+      var id=b.getAttribute("data-id"), v=b.getAttribute("data-v");
+      var on=b.classList.contains("on");
+      fetch(API+"&set="+id+"&ok="+(on?"clear":v)).then(function(){
+        var card=b.closest(".find");
+        card.querySelectorAll("button").forEach(function(x){x.classList.remove("on");});
+        if(!on)b.classList.add("on");
+      });
+    };
+  });
+}
+fetch(API+"&data=1").then(function(r){return r.json();}).then(render).catch(function(e){
+  document.getElementById("stats").textContent="Ошибка загрузки: "+e;
+});
+</script></body></html>`;
+
 const SOURCE_LABEL = {
   chatgpt: "ChatGPT", perplexity: "Perplexity", claude: "Claude", google: "Google",
   bing: "Bing / Copilot", yandex: "Яндекс", direct: "прямой заход", internal: "с сайта", other: "другое",
@@ -5625,6 +5719,45 @@ http
         matchRunning = false;
         send(500, { ok: false, error: String(e.message).slice(0, 200) });
       });
+      return;
+    }
+
+    // Внутренний дашборд мониторинга находок: рост успешности по дням + лента
+    // находок с фото агента и хозяина рядом и кнопками ручной проверки.
+    //  ?key=..            -> HTML-страница
+    //  ?key=..&data=1     -> JSON {stats, finds+фото}
+    //  ?key=..&set=<id>&ok=<1|0|clear> -> проставить human_ok
+    if (urlPath === "/api/krisha/monitor") {
+      const q = parsed.searchParams;
+      const key = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
+      if (!key || q.get("key") !== key) { res.writeHead(403); res.end("bad key"); return; }
+
+      if (q.get("set")) {
+        const okv = q.get("ok");
+        (async () => {
+          await db.setHumanOk(Number(q.get("set")), okv === "1" ? 1 : okv === "0" ? 0 : null);
+          res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+          res.end(JSON.stringify({ ok: true }));
+        })().catch((e) => { res.writeHead(500); res.end(String(e.message)); });
+        return;
+      }
+
+      if (q.get("data")) {
+        (async () => {
+          const stats = await db.matchStats();
+          const rows = await db.matchReviewRows(40);
+          const finds = await Promise.all(rows.map(async (r) => Object.assign({}, r, {
+            a_photos: (await db.objectPhotos(r.agent_id).catch(() => [])).slice(0, 4),
+            o_photos: (await db.objectPhotos(r.owner_id).catch(() => [])).slice(0, 4),
+          })));
+          res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+          res.end(JSON.stringify({ stats: stats, finds: finds }));
+        })().catch((e) => { res.writeHead(500); res.end(String(e.message)); });
+        return;
+      }
+
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+      res.end(KRISHA_MONITOR_HTML);
       return;
     }
 
