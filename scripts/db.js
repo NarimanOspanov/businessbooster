@@ -1885,7 +1885,7 @@ async function findObjects(q, limit) {
       SELECT TOP (@n) f.id, f.deal, f.prop, f.user_type, f.city, f.area, f.rooms, f.floor, f.floors,
         f.complex_id, f.district, f.street_slug, f.house_num, f.lat, f.lon, f.price, f.title, f.created_on,
         f.build_year, f.house, f.toilet,
-        3 + IIF(@rooms IS NOT NULL AND f.rooms = @rooms, 2, 0)
+        IIF(@rooms IS NOT NULL AND f.rooms = @rooms, 2, 0)
           + IIF(@cxid IS NOT NULL AND f.complex_id = @cxid, 4, 0)
           + IIF(@lat IS NOT NULL AND f.lat IS NOT NULL
                 AND ABS(f.lat - @lat) < 0.0006 AND ABS(f.lon - @lon) < 0.0008, 6, 0)
