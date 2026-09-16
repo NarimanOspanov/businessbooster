@@ -844,7 +844,7 @@ function cardBig(v,l,sm){return "<div class='c big'><div class=n>"+v+"</div><div
 function drawChart(rows){
   var W=860,H=220,pad=28,bw;
   if(!rows.length){document.getElementById("chart").innerHTML="<p style='color:var(--mut)'>нет данных</p>";return;}
-  var max=Math.max(1,Math.apply(null,rows.map(function(r){return (r.sale||0)+(r.rent||0);})));
+  var max=Math.max(1,Math.max.apply(null,rows.map(function(r){return (r.sale||0)+(r.rent||0);})));
   bw=Math.min(60,(W-pad*2)/rows.length-6);
   var x0=pad, gap=(W-pad*2)/rows.length;
   var svg="<svg viewBox='0 0 "+W+" "+H+"'>";
