@@ -664,6 +664,8 @@ const KRISHA_MONITOR_HTML = `<!doctype html>
   button.no.on{background:var(--no);border-color:var(--no);color:#1a0405}
   .tag{display:inline-block;padding:1px 7px;border-radius:99px;font-size:12px}
   .tag.y{background:rgba(47,191,113,.15);color:var(--ok)} .tag.n{background:rgba(229,72,77,.15);color:var(--no)} .tag.q{background:rgba(138,149,165,.15);color:var(--mut)}
+  .fieldsbox{margin:10px 0;padding:8px 10px;border-radius:8px;background:#12161c;border:1px solid var(--line)}
+  .fields{display:flex;flex-wrap:wrap}
 </style></head><body>
 <h1>Крыша · мониторинг находок «агент → хозяин»</h1>
 <div id="stats" class="mut">загрузка…</div>
@@ -687,6 +689,23 @@ function side(title,id,photos,paramStr,extra){
   return "<div class=side><h3>"+title+"</h3>"+imgs(photos)+
     "<div class=p>"+esc(paramStr)+"</div>"+(extra||"")+
     "<div class=p><a href='"+show(id)+"' target=_blank>krisha.kz/a/show/"+id+"</a></div></div>";}
+function fld(label,state,note){var c=state==="y"?"y":state==="n"?"n":"q";var s=state==="y"?"✓":state==="n"?"✗":"—";
+  return "<span class='tag "+c+"' style='margin:2px 4px 2px 0'>"+label+" "+s+(note?" "+note:"")+"</span>";}
+function eq(label,a,b){if(a==null||b==null||a===""||b==="")return fld(label,"q");return fld(label,a===b?"y":"n");}
+function chips(f){var o=[];
+  if(f.a_lat!=null&&f.o_lat!=null)o.push(fld("координаты",(Math.abs(f.a_lat-f.o_lat)<0.0006&&Math.abs(f.a_lon-f.o_lon)<0.0008)?"y":"n"));
+  else o.push(fld("координаты","q"));
+  if(f.a_cx&&f.o_cx)o.push(fld("ЖК",f.a_cx===f.o_cx?"y":"n"));else o.push(fld("ЖК","q"));
+  o.push(fld("площадь",(Math.abs(f.a_area-f.o_area)<=5)?"y":"n",f.a_area+"/"+f.o_area));
+  o.push(eq("комнаты",f.a_rooms,f.o_rooms));
+  o.push(eq("этаж",f.a_floor,f.o_floor));
+  o.push(eq("этажность",f.a_floors,f.o_floors));
+  if(f.a_sslug&&f.o_sslug)o.push(fld("улица+дом",(f.a_sslug===f.o_sslug&&f.a_hnum===f.o_hnum)?"y":"n"));else o.push(fld("улица+дом","q"));
+  o.push(eq("район",f.a_district,f.o_district));
+  if(f.a_year&&f.o_year)o.push(fld("год",Math.abs(f.a_year-f.o_year)<=1?"y":"n",f.a_year+"/"+f.o_year));else o.push(fld("год","q"));
+  o.push(eq("тип дома",f.a_house,f.o_house));
+  o.push(eq("санузел",f.a_toilet,f.o_toilet));
+  return "<div class=fields>"+o.join("")+"</div>";}
 function render(d){
   var s=d.stats||{}; var t=s.total||{};
   var rows="<table><tr><th>День</th><th>Проверено</th><th>Нашли (параметры)</th></tr>";
@@ -704,6 +723,7 @@ function render(d){
       side("Агент · score "+f.param_score, f.agent_id, f.a_photos, par(f,"a_")+" · "+money(f.a_price))+
       side("Кандидат-хозяин", f.owner_id, f.o_photos, par(f,"o_")+" · "+money(f.o_price))+
       "</div>"+
+      "<div class=fieldsbox><div class=mut style='font-size:12px;margin-bottom:4px'>что совпало:</div>"+chips(f)+"</div>"+
       "<div class=verdict>"+ph+(f.photo_why?" — "+esc(f.photo_why):"")+"</div>"+
       "<div class=btns>"+
         "<button class='ok"+(f.human_ok===true?" on":"")+"' data-id="+f.id+" data-v=1>✅ верно</button>"+

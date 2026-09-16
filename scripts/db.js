@@ -1987,8 +1987,12 @@ async function matchReviewRows(limit) {
       a.title a_title, a.city a_city, a.area a_area, a.rooms a_rooms, a.floor a_floor,
       a.floors a_floors, a.price a_price, a.deal a_deal, a.prop a_prop,
       a.build_year a_year, a.house a_house, a.toilet a_toilet,
+      a.complex_id a_cx, a.lat a_lat, a.lon a_lon, a.district a_district,
+      a.street_slug a_sslug, a.house_num a_hnum,
       o.title o_title, o.area o_area, o.rooms o_rooms, o.floor o_floor, o.floors o_floors,
-      o.price o_price, o.build_year o_year, o.house o_house, o.toilet o_toilet
+      o.price o_price, o.build_year o_year, o.house o_house, o.toilet o_toilet,
+      o.complex_id o_cx, o.lat o_lat, o.lon o_lon, o.district o_district,
+      o.street_slug o_sslug, o.house_num o_hnum
     FROM dbo.krisha_match_log m
     JOIN dbo.krisha_objects a ON a.id = m.agent_id
     JOIN dbo.krisha_objects o ON o.id = m.owner_id
