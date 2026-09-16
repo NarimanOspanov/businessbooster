@@ -666,6 +666,10 @@ const KRISHA_MONITOR_HTML = `<!doctype html>
   .tag.y{background:rgba(47,191,113,.15);color:var(--ok)} .tag.n{background:rgba(229,72,77,.15);color:var(--no)} .tag.q{background:rgba(138,149,165,.15);color:var(--mut)}
   .fieldsbox{margin:10px 0;padding:8px 10px;border-radius:8px;background:#12161c;border:1px solid var(--line)}
   .fields{display:flex;flex-wrap:wrap}
+  .agenthead{border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:10px}
+  .candhead{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.03em;margin:0 0 8px}
+  .cand{border:1px solid var(--line);border-radius:10px;padding:10px;margin:0 0 10px;background:#12161c}
+  .candtitle{font-weight:600;margin:0 0 6px}
 </style></head><body>
 <h1>Крыша · мониторинг находок «агент → хозяин»</h1>
 <div id="stats" class="mut">загрузка…</div>
@@ -714,21 +718,32 @@ function render(d){
   document.getElementById("stats").innerHTML="<b>Всего проверено агентских:</b> "+(t.searched||0)+
     " · <b>нашли хозяина:</b> "+(t.matched||0)+rows;
   var box=document.getElementById("finds"); box.innerHTML="";
-  (d.finds||[]).forEach(function(f){
-    var ph = f.photo_match===true ? "<span class='tag y'>фото: та же ("+f.photo_conf+")</span>"
-      : f.photo_match===false ? "<span class='tag n'>фото: не та ("+f.photo_conf+")</span>"
-      : "<span class='tag q'>фото не проверено</span>";
+  // Группируем по агентскому объявлению: одно искомое сверху, под ним все его кандидаты.
+  var groups={},order=[];
+  (d.finds||[]).forEach(function(f){ if(!groups[f.agent_id]){groups[f.agent_id]=[];order.push(f.agent_id);} groups[f.agent_id].push(f); });
+  order.forEach(function(aid){
+    var list=groups[aid], f0=list[0];
     var el=document.createElement("div"); el.className="find";
-    el.innerHTML="<div class=cols>"+
-      side("Агент · score "+f.param_score, f.agent_id, f.a_photos, par(f,"a_")+" · "+money(f.a_price))+
-      side("Кандидат-хозяин", f.owner_id, f.o_photos, par(f,"o_")+" · "+money(f.o_price))+
-      "</div>"+
-      "<div class=fieldsbox><div class=mut style='font-size:12px;margin-bottom:4px'>что совпало:</div>"+chips(f)+"</div>"+
-      "<div class=verdict>"+ph+(f.photo_why?" — "+esc(f.photo_why):"")+"</div>"+
-      "<div class=btns>"+
-        "<button class='ok"+(f.human_ok===true?" on":"")+"' data-id="+f.id+" data-v=1>✅ верно</button>"+
-        "<button class='no"+(f.human_ok===false?" on":"")+"' data-id="+f.id+" data-v=0>❌ неверно</button>"+
-      "</div>";
+    var h="<div class=agenthead><h3>Искомое объявление (агент)</h3>"+imgs(f0.a_photos)+
+      "<div class=p>"+esc(par(f0,"a_")+" · "+money(f0.a_price))+"</div>"+
+      "<div class=p><a href='"+show(aid)+"' target=_blank>krisha.kz/a/show/"+aid+"</a></div></div>";
+    h+="<div class=candhead>Кандидаты-хозяева: "+list.length+"</div>";
+    list.forEach(function(f){
+      var ph = f.photo_match===true ? "<span class='tag y'>фото: та же ("+f.photo_conf+")</span>"
+        : f.photo_match===false ? "<span class='tag n'>фото: не та ("+f.photo_conf+")</span>"
+        : "<span class='tag q'>фото не проверено</span>";
+      h+="<div class=cand><div class=candtitle>Кандидат · score "+f.param_score+"</div>"+
+        imgs(f.o_photos)+
+        "<div class=p>"+esc(par(f,"o_")+" · "+money(f.o_price))+"</div>"+
+        "<div class=p><a href='"+show(f.owner_id)+"' target=_blank>krisha.kz/a/show/"+f.owner_id+"</a></div>"+
+        "<div class=fieldsbox><div class=mut style='font-size:12px;margin-bottom:4px'>что совпало:</div>"+chips(f)+"</div>"+
+        "<div class=verdict>"+ph+(f.photo_why?" — "+esc(f.photo_why):"")+"</div>"+
+        "<div class=btns>"+
+          "<button class='ok"+(f.human_ok===true?" on":"")+"' data-id="+f.id+" data-v=1>✅ верно</button>"+
+          "<button class='no"+(f.human_ok===false?" on":"")+"' data-id="+f.id+" data-v=0>❌ неверно</button>"+
+        "</div></div>";
+    });
+    el.innerHTML=h;
     box.appendChild(el);
   });
   box.querySelectorAll("button").forEach(function(b){
