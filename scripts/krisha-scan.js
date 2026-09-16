@@ -57,9 +57,11 @@ const geoLon = (v) => (typeof v === "number" && v !== 0 ? v : null);
 // с м² не смешиваются.
 function areaFromTitle(t) {
   const s = String(t || "");
-  let m = s.match(/([\d.,]+)\s*соток/i);
+  // «20 соток», «133 сотки», «7 сотка» — все формы.
+  let m = s.match(/([\d.,]+)\s*сот(?:ка|ки|ок|ках|\.)/i);
   if (m) return Number(m[1].replace(",", "."));
-  m = s.match(/([\d.,]+)\s*м²/);
+  // «85 м²», «57.5 кв.м», «40 м2».
+  m = s.match(/([\d.,]+)\s*(?:м²|м2|кв\.?\s*м)/i);
   if (m) return Number(m[1].replace(",", "."));
   return null;
 }
