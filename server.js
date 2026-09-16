@@ -738,9 +738,10 @@ function render(d){
         "<div class=p><a href='"+show(f.owner_id)+"' target=_blank>krisha.kz/a/show/"+f.owner_id+"</a></div>"+
         "<div class=fieldsbox><div class=mut style='font-size:12px;margin-bottom:4px'>что совпало:</div>"+chips(f)+"</div>"+
         "<div class=verdict>"+ph+(f.photo_why?" — "+esc(f.photo_why):"")+"</div>"+
+        "<div class=mut style='font-size:12px;margin:8px 0 4px'>Ваш вердикт по фото — это та же квартира?</div>"+
         "<div class=btns>"+
-          "<button class='ok"+(f.human_ok===true?" on":"")+"' data-id="+f.id+" data-v=1>✅ верно</button>"+
-          "<button class='no"+(f.human_ok===false?" on":"")+"' data-id="+f.id+" data-v=0>❌ неверно</button>"+
+          "<button class='ok"+(f.human_ok===true?" on":"")+"' data-id="+f.id+" data-v=1>✅ та же квартира</button>"+
+          "<button class='no"+(f.human_ok===false?" on":"")+"' data-id="+f.id+" data-v=0>❌ другая квартира</button>"+
         "</div></div>";
     });
     el.innerHTML=h;
