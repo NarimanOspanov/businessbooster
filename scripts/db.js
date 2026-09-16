@@ -2009,6 +2009,43 @@ async function setHumanOk(logId, ok) {
     .query("UPDATE dbo.krisha_match_log SET human_ok = @ok WHERE id = @id");
 }
 
+// Данные для дашборда собственника: сколько импортировано по дням (с
+// разбивкой на сделку и продавца) и эффективность поиска по дням. Отдаём за
+// 60 дней разом, а периоды (1/7/30/60) клиент режет сам.
+async function ownerDashboard(days) {
+  const pool = await getPool();
+  await ensureObjects(pool);
+  const d = Math.min(120, Math.max(1, Number(days) || 60));
+  const imports = (await pool.request().input("d", sql.Int, d).query(`
+    SELECT CONVERT(char(10), first_seen, 23) AS day, COUNT(*) AS total,
+      SUM(CASE WHEN deal='sale' THEN 1 ELSE 0 END) AS sale,
+      SUM(CASE WHEN deal='rent' THEN 1 ELSE 0 END) AS rent,
+      SUM(CASE WHEN user_type='owner' THEN 1 ELSE 0 END) AS owner,
+      SUM(CASE WHEN user_type='specialist' THEN 1 ELSE 0 END) AS specialist,
+      SUM(CASE WHEN user_type IN ('company','agent') THEN 1 ELSE 0 END) AS company,
+      SUM(CASE WHEN user_type='complex' THEN 1 ELSE 0 END) AS complex,
+      SUM(CASE WHEN prop='flat' THEN 1 ELSE 0 END) AS flat,
+      SUM(CASE WHEN prop='house' THEN 1 ELSE 0 END) AS house,
+      SUM(CASE WHEN prop NOT IN ('flat','house') THEN 1 ELSE 0 END) AS other
+    FROM dbo.krisha_objects
+    WHERE first_seen >= DATEADD(day, -@d, SYSUTCDATETIME())
+    GROUP BY CONVERT(char(10), first_seen, 23) ORDER BY day`)).recordset;
+  const searched = (await pool.request().input("d", sql.Int, d).query(`
+    SELECT CONVERT(char(10), searched_at, 23) AS day, COUNT(*) AS searched,
+      SUM(CASE WHEN match_count > 0 THEN 1 ELSE 0 END) AS matched
+    FROM dbo.krisha_objects
+    WHERE searched_at IS NOT NULL AND searched_at >= DATEADD(day, -@d, SYSUTCDATETIME())
+    GROUP BY CONVERT(char(10), searched_at, 23) ORDER BY day`)).recordset;
+  const photos = (await pool.request().input("d", sql.Int, d).query(`
+    SELECT CONVERT(char(10), found_at, 23) AS day,
+      COUNT(DISTINCT CASE WHEN photo_match = 1 THEN agent_id END) AS photo_ok,
+      COUNT(DISTINCT CASE WHEN human_ok = 1 THEN agent_id END) AS human_ok
+    FROM dbo.krisha_match_log
+    WHERE found_at >= DATEADD(day, -@d, SYSUTCDATETIME())
+    GROUP BY CONVERT(char(10), found_at, 23) ORDER BY day`)).recordset;
+  return { imports: imports, searched: searched, photos: photos };
+}
+
 // Сводка по собранному потоку — для статуса и отчётов.
 async function objectStats() {
   const pool = await getPool();
@@ -2026,7 +2063,7 @@ async function objectStats() {
 module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
-  objectPhotos, logMatchCandidate, matchReviewRows, setHumanOk,
+  objectPhotos, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   upsertUser, logBotRequest, botStats,
   getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 

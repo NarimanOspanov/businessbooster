@@ -764,6 +764,124 @@ fetch(API+"&data=1").then(function(r){return r.json();}).then(render).catch(func
 });
 </script></body></html>`;
 
+// Дашборд собственника: импорт по дням/периодам с разбивкой на сделку,
+// продавца и тип, плюс конверсия (успешные находки оригиналов). Данные с
+// /api/krisha/stats?data=1, всё считает и рисует клиент.
+const KRISHA_STATS_HTML = `<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Крыша · импорт и находки</title>
+<style>
+  :root{--bg:#0f1216;--card:#181d24;--line:#262d37;--fg:#e6e9ee;--mut:#8a95a5;--ok:#2fbf71;--acc:#4c8dff;--rent:#f5a524;--sale:#4c8dff}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:18px;max-width:900px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 4px} .sub{color:var(--mut);margin:0 0 16px}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px}
+  .tab{border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:8px;padding:8px 16px;cursor:pointer;font:inherit}
+  .tab.on{background:var(--acc);border-color:var(--acc);color:#04122e;font-weight:600}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:0 0 20px}
+  .c{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .c .n{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
+  .c .l{color:var(--mut);font-size:12px;margin-top:4px;text-transform:uppercase;letter-spacing:.03em}
+  .c .sm{color:var(--mut);font-size:12px;margin-top:6px}
+  .big .n{color:var(--ok)}
+  .filters{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px;align-items:center}
+  .filters .lbl{color:var(--mut);font-size:12px;margin-right:2px}
+  .f{border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:99px;padding:5px 12px;cursor:pointer;font:inherit;font-size:13px}
+  .f.on{background:var(--fg);color:#0f1216;border-color:var(--fg)}
+  .chartbox{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:0 0 20px}
+  .chartbox h3{margin:0 0 12px;font-size:14px}
+  svg{display:block;width:100%;height:auto;overflow:visible}
+  table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+  th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right}
+  th:first-child,td:first-child{text-align:left}
+  th{color:var(--mut);font-weight:600;font-size:12px}
+  .leg{display:flex;gap:14px;font-size:12px;color:var(--mut);margin-top:8px}
+  .leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:middle}
+</style></head><body>
+<h1>Крыша · импорт и находки</h1>
+<p class="sub" id="range">загрузка…</p>
+<div class="tabs" id="tabs"></div>
+<div class="cards" id="cards"></div>
+<div class="filters"><span class="lbl">Сделка:</span><span id="deals"></span></div>
+<div class="chartbox"><h3>Импорт по дням</h3><div id="chart"></div>
+  <div class="leg"><span><i style="background:var(--sale)"></i>продажа</span><span><i style="background:var(--rent)"></i>аренда</span><span><i style="background:var(--ok)"></i>найдено оригиналов</span></div>
+</div>
+<div class="chartbox"><h3>По дням — таблица</h3><div id="table"></div></div>
+<script>
+var KEY=new URLSearchParams(location.search).get("key")||"";
+var DATA=null, PERIOD=1, DEAL="all";
+var PERIODS=[{d:1,t:"Сутки"},{d:7,t:"7 дней"},{d:30,t:"30 дней"},{d:60,t:"60 дней"}];
+function n(x){return (x==null?0:x).toLocaleString("ru-RU");}
+function byDay(){ // объединяем импорт/поиск/фото по дню
+  var m={};
+  (DATA.imports||[]).forEach(function(r){m[r.day]=m[r.day]||{day:r.day};Object.assign(m[r.day],r);});
+  (DATA.searched||[]).forEach(function(r){m[r.day]=m[r.day]||{day:r.day};m[r.day].searched=r.searched;m[r.day].matched=r.matched;});
+  (DATA.photos||[]).forEach(function(r){m[r.day]=m[r.day]||{day:r.day};m[r.day].photo_ok=r.photo_ok;m[r.day].human_ok=r.human_ok;});
+  return Object.keys(m).sort().map(function(k){return m[k];});
+}
+function periodRows(){var all=byDay();return all.slice(Math.max(0,all.length-PERIOD));}
+function impVal(r){return DEAL==="sale"?(r.sale||0):DEAL==="rent"?(r.rent||0):(r.total||0);}
+function render(){
+  document.getElementById("range").textContent="за "+(PERIOD===1?"последние сутки":"последние "+PERIOD+" дней")+" · обновлено "+new Date().toLocaleString("ru-RU");
+  var rows=periodRows();
+  var sum=function(f){return rows.reduce(function(a,r){return a+(f(r)||0);},0);};
+  var imp=sum(impVal), sale=sum(function(r){return r.sale;}), rent=sum(function(r){return r.rent;});
+  var owner=sum(function(r){return r.owner;}), spec=sum(function(r){return r.specialist;}), comp=sum(function(r){return r.company;}), cx=sum(function(r){return r.complex;});
+  var searched=sum(function(r){return r.searched;}), matched=sum(function(r){return r.matched;}), photo=sum(function(r){return r.photo_ok;});
+  var conv=searched?Math.round(1000*photo/searched)/10:0;
+  document.getElementById("cards").innerHTML=
+    card(n(imp),"импортировано"+(DEAL==="all"?"":DEAL==="sale"?" (продажа)":" (аренда)"),"продажа "+n(sale)+" · аренда "+n(rent))+
+    card(n(owner),"из них от хозяев",spec?("агенты "+n(spec+comp)+" · застройщик "+n(cx)):"")+
+    card(n(searched),"проверено агентских","нашли по параметрам "+n(matched))+
+    cardBig(n(photo),"найдено оригиналов","подтверждено по фото")+
+    cardBig(conv+"%","конверсия","оригинал / проверенных");
+  drawChart(rows);
+  drawTable(rows);
+}
+function card(v,l,sm){return "<div class=c><div class=n>"+v+"</div><div class=l>"+l+"</div>"+(sm?"<div class=sm>"+sm+"</div>":"")+"</div>";}
+function cardBig(v,l,sm){return "<div class='c big'><div class=n>"+v+"</div><div class=l>"+l+"</div>"+(sm?"<div class=sm>"+sm+"</div>":"")+"</div>";}
+function drawChart(rows){
+  var W=860,H=220,pad=28,bw;
+  if(!rows.length){document.getElementById("chart").innerHTML="<p style='color:var(--mut)'>нет данных</p>";return;}
+  var max=Math.max(1,Math.apply(null,rows.map(function(r){return (r.sale||0)+(r.rent||0);})));
+  bw=Math.min(60,(W-pad*2)/rows.length-6);
+  var x0=pad, gap=(W-pad*2)/rows.length;
+  var svg="<svg viewBox='0 0 "+W+" "+H+"'>";
+  // ось
+  svg+="<line x1="+pad+" y1="+(H-pad)+" x2="+(W-pad)+" y2="+(H-pad)+" stroke='#262d37'/>";
+  rows.forEach(function(r,i){
+    var cx=x0+gap*i+gap/2, s=r.sale||0, rt=r.rent||0, tot=s+rt;
+    var hTot=(H-pad*2)*tot/max, hRent=(H-pad*2)*rt/max;
+    var y=H-pad-hTot;
+    // продажа (низ) + аренда (верх)
+    svg+="<rect x="+(cx-bw/2)+" y="+(H-pad-((H-pad*2)*s/max))+" width="+bw+" height="+((H-pad*2)*s/max)+" fill='var(--sale)' rx=2/>";
+    svg+="<rect x="+(cx-bw/2)+" y="+y+" width="+bw+" height="+hRent+" fill='var(--rent)' rx=2/>";
+    // найдено — зелёная точка над столбцом
+    var f=r.photo_ok||0; if(f){svg+="<circle cx="+cx+" cy="+(y-8)+" r=4 fill='var(--ok)'/><text x="+cx+" y="+(y-14)+" fill='var(--ok)' font-size=11 text-anchor=middle>"+f+"</text>";}
+    svg+="<text x="+cx+" y="+(H-pad+14)+" fill='#8a95a5' font-size=10 text-anchor=middle>"+r.day.slice(5)+"</text>";
+    svg+="<text x="+cx+" y="+(y-2)+" fill='#e6e9ee' font-size=10 text-anchor=middle>"+(tot||"")+"</text>";
+  });
+  svg+="</svg>";
+  document.getElementById("chart").innerHTML=svg;
+}
+function drawTable(rows){
+  var h="<table><tr><th>День</th><th>Всего</th><th>Продажа</th><th>Аренда</th><th>Хозяев</th><th>Проверено</th><th>Найдено</th></tr>";
+  rows.slice().reverse().forEach(function(r){
+    h+="<tr><td>"+r.day+"</td><td>"+n(r.total)+"</td><td>"+n(r.sale)+"</td><td>"+n(r.rent)+"</td><td>"+n(r.owner)+"</td><td>"+n(r.searched)+"</td><td style='color:var(--ok)'>"+n(r.photo_ok)+"</td></tr>";
+  });
+  h+="</table>";
+  document.getElementById("table").innerHTML=h;
+}
+function tabs(){
+  document.getElementById("tabs").innerHTML=PERIODS.map(function(p){return "<button class='tab"+(p.d===PERIOD?" on":"")+"' data-d="+p.d+">"+p.t+"</button>";}).join("");
+  document.getElementById("deals").innerHTML=[["all","все"],["sale","продажа"],["rent","аренда"]].map(function(x){return "<button class='f"+(x[0]===DEAL?" on":"")+"' data-deal="+x[0]+">"+x[1]+"</button>";}).join(" ");
+  document.querySelectorAll("[data-d]").forEach(function(b){b.onclick=function(){PERIOD=+b.getAttribute("data-d");tabs();render();};});
+  document.querySelectorAll("[data-deal]").forEach(function(b){b.onclick=function(){DEAL=b.getAttribute("data-deal");tabs();render();};});
+}
+fetch("/api/krisha/stats?data=1&key="+encodeURIComponent(KEY)).then(function(r){return r.json();}).then(function(d){DATA=d;tabs();render();}).catch(function(e){document.getElementById("range").textContent="Ошибка: "+e;});
+</script></body></html>`;
+
 const SOURCE_LABEL = {
   chatgpt: "ChatGPT", perplexity: "Perplexity", claude: "Claude", google: "Google",
   bing: "Bing / Copilot", yandex: "Яндекс", direct: "прямой заход", internal: "с сайта", other: "другое",
@@ -5794,6 +5912,24 @@ http
 
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
       res.end(KRISHA_MONITOR_HTML);
+      return;
+    }
+
+    // Дашборд собственника: импорт по дням/периодам, разбивка, конверсия.
+    if (urlPath === "/api/krisha/stats") {
+      const q = parsed.searchParams;
+      const key = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
+      if (!key || q.get("key") !== key) { res.writeHead(403); res.end("bad key"); return; }
+      if (q.get("data")) {
+        (async () => {
+          const d = await db.ownerDashboard(60);
+          res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+          res.end(JSON.stringify(d));
+        })().catch((e) => { res.writeHead(500); res.end(String(e.message)); });
+        return;
+      }
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+      res.end(KRISHA_STATS_HTML);
       return;
     }
 
