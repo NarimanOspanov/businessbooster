@@ -350,6 +350,13 @@ IF COL_LENGTH('dbo.krisha_cards', 'advert_json') IS NULL
 IF COL_LENGTH('dbo.krisha_flats', 'card_tries') IS NULL
   ALTER TABLE dbo.krisha_flats ADD card_tries SMALLINT NULL;
 
+-- Симметрично card_tries, но по другому сигналу: здесь не сервер не достучался
+-- до страницы, а человек с юзерскриптом не нашёл на ней ни кнопки «Показать
+-- телефон», ни капчи — типичный признак снятого объявления. Тот же счётчик,
+-- а не флаг «снято», и по той же причине: наверняка не определить.
+IF COL_LENGTH('dbo.krisha_flats', 'phone_tries') IS NULL
+  ALTER TABLE dbo.krisha_flats ADD phone_tries SMALLINT NULL;
+
 -- Ещё из того же JSON, из соседней ветки adverts[0].
 --
 -- expires_on — день, когда Крыша уберёт объявление в архив. Она называет это
@@ -1159,17 +1166,31 @@ async function replaceFlatPhones(flatId, phones, source) {
 // при limit=30) вместо настоящего прогресса.
 async function flatsWithoutPhone(limit) {
   const pool = await getPool();
+  // Пять промахов подряд — предел: дальше объявление, скорее всего, снято
+  // (юзерскрипт не находит на нём ни кнопки, ни капчи), но утверждать это
+  // мы не можем, поэтому просто перестаём его предлагать — как и с card_tries,
+  // без счётчика тот же мертвяк вечно занимал бы голову очереди.
+  const alive = "ISNULL(f.phone_tries, 0) < 5";
   const r = await pool.request().input("n", sql.Int, Number(limit) || 30).query(`
     SELECT TOP (@n) f.id, f.title
     FROM dbo.krisha_flats f
     LEFT JOIN dbo.krisha_phones p ON p.flat_id = f.id
-    WHERE p.flat_id IS NULL
+    WHERE p.flat_id IS NULL AND ${alive}
     ORDER BY f.first_seen DESC`);
   const t = await pool.request().query(`
     SELECT COUNT(*) AS n FROM dbo.krisha_flats f
     LEFT JOIN dbo.krisha_phones p ON p.flat_id = f.id
-    WHERE p.flat_id IS NULL`);
+    WHERE p.flat_id IS NULL AND ${alive}`);
   return { rows: r.recordset, total: t.recordset[0].n };
+}
+
+// Юзерскрипт не смог получить номер на этой странице (кнопки нет, капчи нет,
+// номер не появился) — считаем промах. Симметрично markCardMiss ниже по
+// файлу, только сигнал приходит из браузера, а не с сервера.
+async function markPhoneMiss(id) {
+  const pool = await getPool();
+  await pool.request().input("id", sql.BigInt, Number(id)).query(`
+    UPDATE dbo.krisha_flats SET phone_tries = ISNULL(phone_tries, 0) + 1 WHERE id = @id`);
 }
 
 // Квартиры, у которых есть запись в базе, но нет снятой карточки: описание,
@@ -2060,7 +2081,7 @@ async function objectStats() {
   return r.recordset[0];
 }
 
-module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone,
+module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
   objectPhotos, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,

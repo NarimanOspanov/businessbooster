@@ -6068,7 +6068,7 @@ http
     // Телефон хозяина, снятый скриптом со страницы Крыши после того, как
     // человек сам прошёл капчу. Запрос приходит с krisha.kz, то есть с чужого
     // источника, — отсюда разрешение CORS и отдельный ключ.
-    if (urlPath === "/api/krisha/phone" || urlPath === "/api/krisha/queue") {
+    if (urlPath === "/api/krisha/phone" || urlPath === "/api/krisha/queue" || urlPath === "/api/krisha/phone/miss") {
       const cors = {
         "Access-Control-Allow-Origin": "https://krisha.kz",
         "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, OPTIONS",
@@ -6082,6 +6082,24 @@ http
       };
       const key = parsed.searchParams.get("key") || "";
       if (!KRISHA_PHONE_KEY || key !== KRISHA_PHONE_KEY) return send(403, { ok: false, error: "bad_key" });
+
+      // Юзерскрипт зовёт это, когда на странице объявления не нашлось ни
+      // кнопки «Показать телефон», ни капчи, ни самого номера — похоже на
+      // снятое объявление. Отмечаем промах и уходим, не трогая остальную
+      // логику ниже: у этого пути нет GET-варианта и он не пишет номера.
+      if (urlPath === "/api/krisha/phone/miss") {
+        if (req.method !== "POST") return send(405, { ok: false, error: "only POST" });
+        (async () => {
+          let body = {};
+          try { body = JSON.parse(await readBody(req)) || {}; } catch { /* пусто */ }
+          const id = String(body.id || parsed.searchParams.get("id") || "").replace(/\D/g, "");
+          if (!id) return send(400, { ok: false, error: "нет номера объявления" });
+          await db.markPhoneMiss(id);
+          console.log("[телефон] промах " + id);
+          return send(200, { ok: true, id: id });
+        })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
+        return;
+      }
 
       const pretty = (n) =>
         "+" + n[0] + " " + n.slice(1, 4) + " " + n.slice(4, 7) + " " + n.slice(7, 9) + " " + n.slice(9);

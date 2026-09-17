@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Reception365 · телефоны с Крыши
 // @namespace    https://saudager.ai/
-// @version      1.3
-// @description  Сама жмёт «показать телефон», сохраняет номер и сама идёт дальше по очереди — пока не покажется капча
+// @version      1.4
+// @description  Сама жмёт «показать телефон», сохраняет номер и сама идёт дальше по очереди — пока не покажется капча; снятые объявления пропускает сама, не зависая
 // @match        https://krisha.kz/a/show/*
 // @run-at       document-idle
 // @grant        none
@@ -71,10 +71,28 @@
     );
   }
 
+  // Если за это время не нашлась ни кнопка с номером, ни капча — страница,
+  // скорее всего, мертва (объявление снято). Ждать тут больше нет смысла:
+  // раньше скрипт просто зависал навсегда на такой странице, и очередь
+  // упиралась в один и тот же мертвяк на каждом заходе.
+  var GIVE_UP_MS = 15000;
+  var giveUpTimer = setTimeout(giveUp, GIVE_UP_MS);
+  function giveUp() {
+    if (sent || captchaSeen) return; // капча — значит дело живое, решает человек
+    say("Похоже, объявление снято — сообщаю и еду дальше…");
+    if (!KEY && !askKey()) { say("Без ключа даже промах сообщить некуда."); return; }
+    fetch(API + "/api/krisha/phone/miss?key=" + encodeURIComponent(KEY), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: ID }),
+    }).catch(function () {}).then(function () { autoNext(); });
+  }
+
   var sent = false;
   function save(phones) {
     if (sent) return;
     sent = true;
+    clearTimeout(giveUpTimer);
     if (!KEY && !askKey()) { say("Без ключа сохранять некуда."); sent = false; return; }
     say("Сохраняю " + phones.join(", ") + " …");
     fetch(API + "/api/krisha/phone?key=" + encodeURIComponent(KEY), {
