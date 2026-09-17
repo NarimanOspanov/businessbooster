@@ -447,7 +447,7 @@ IF COL_LENGTH('dbo.krisha_objects', 'toilet')      IS NULL ALTER TABLE dbo.krish
 IF COL_LENGTH('dbo.krisha_objects', 'phones')      IS NULL ALTER TABLE dbo.krisha_objects ADD phones NVARCHAR(300) NULL;
 IF COL_LENGTH('dbo.krisha_objects', 'phones_at')   IS NULL ALTER TABLE dbo.krisha_objects ADD phones_at DATETIME2(0) NULL;
 -- Промахи плагина: phone_tries — сколько раз номер не снялся; phone_state —
--- чем кончилась последняя попытка (ok / archived / captcha / timeout /
+-- чем кончилась последняя попытка (ok / archived / not_found / captcha / timeout /
 -- no_phone / error, NULL — ещё не пробовали); phone_next_at — раньше этого
 -- времени объект в очередь не отдаём (пауза после captcha/timeout/…).
 IF COL_LENGTH('dbo.krisha_objects', 'phone_tries')   IS NULL ALTER TABLE dbo.krisha_objects ADD phone_tries SMALLINT NULL;
@@ -2090,13 +2090,16 @@ async function ownerDashboard(days) {
 // Любой промах — плюс один к phone_tries; после пяти объект выпадает
 // насовсем, какая бы ни была причина.
 const PHONE_MISS = {
-  archived: { final: true },     // объявление снято / в архиве / 404
+  archived:  { final: true },    // объявление открывается, но снято / в архиве
+  not_found: { final: true },    // страницы нет вовсе: Крыша отдаёт 404
   no_phone: { retryMin: 1440 },  // страница живая, но номера нет (только чат)
   captcha:  { retryMin: 30 },    // капча показалась и не решена
   timeout:  { retryMin: 60 },    // страница или кнопка не дождались
   error:    { retryMin: 60 },    // всё остальное
 };
 const PHONE_MISS_REASONS = Object.keys(PHONE_MISS);
+// Состояния, после которых объект в очередь не возвращается, — списком в SQL.
+const PHONE_FINAL_SQL = PHONE_MISS_REASONS.filter((k) => PHONE_MISS[k].final).map((k) => "'" + k + "'").join(", ");
 
 // Следующий объект без сохранённого номера — один, а не пачка: плагин на
 // той стороне снимает номера по одному и каждый раз спрашивает «кого дальше».
@@ -2110,7 +2113,7 @@ async function nextObjectWithoutPhone(since) {
   await ensureObjects(pool);
   const ready = `phones IS NULL AND created_on >= @since
         AND ISNULL(phone_tries, 0) < 5
-        AND (phone_state IS NULL OR phone_state <> 'archived')`;
+        AND (phone_state IS NULL OR phone_state NOT IN (${PHONE_FINAL_SQL}))`;
   const now = "(phone_next_at IS NULL OR phone_next_at <= SYSUTCDATETIME())";
   const r = await pool.request()
     .input("since", sql.Date, since)

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reception365 · телефоны с Крыши
 // @namespace    https://saudager.ai/
-// @version      2.0
+// @version      2.1
 // @description  Берёт из очереди следующий объект без номера, сама жмёт «показать телефон», сохраняет номер и идёт дальше — пока не покажется капча; снятые и зависшие страницы отмечает промахом с причиной
 // @match        https://krisha.kz/a/show/*
 // @run-at       document-idle
@@ -19,7 +19,8 @@
 //
 // Если номер не снялся, сообщаем промах с причиной — от неё зависит, что
 // сервер сделает с объектом:
-//   archived — объявление снято: из очереди насовсем;
+//   archived  — объявление открывается, но снято: из очереди насовсем;
+//   not_found — страницы нет вовсе, Крыша отдаёт 404: тоже насовсем;
 //   no_phone — страница живая, но кнопки/номера нет: пауза сутки;
 //   timeout  — кнопку нажали, а номер так и не появился: пауза час;
 //   captcha  — капча показалась и за две минуты не решена: пауза полчаса.
@@ -119,6 +120,23 @@
     return (document.body.innerText || "").indexOf("Объявление может быть неактуальным") !== -1;
   }
 
+  // Несуществующее объявление: Крыша отдаёт 404 с тем же адресом, скрипт на
+  // ней тоже запускается. Страница — <div class="error-page error-404"> с
+  // заголовком «Страница не найдена»; проверяем и класс, и текст.
+  function notFoundVisible() {
+    var t = document.querySelector(".error-content__title");
+    return !!document.querySelector(".error-page.error-404") ||
+      !!(t && (t.textContent || "").indexOf("не найдена") !== -1);
+  }
+
+  // Мёртвая страница — какая именно. null, если живая.
+  function deadReason() {
+    if (notFoundVisible()) return "not_found";
+    if (archivedVisible()) return "archived";
+    return null;
+  }
+  var DEAD_WHY = { not_found: "Страницы нет (404)", archived: "Объявление снято" };
+
   // --- промах -------------------------------------------------------------
   // Одна отправка на страницу: кто первый определил причину, тот и прав.
   var done = false;
@@ -145,7 +163,8 @@
   var GIVE_UP_MS = 15000;
   var giveUpTimer = setTimeout(function () {
     if (done || captchaSeen) return; // капча — значит дело живое, решает человек
-    if (archivedVisible()) miss("archived", "Объявление снято");
+    var dead = deadReason();
+    if (dead) miss(dead, DEAD_WHY[dead]);
     else if (clicked) miss("timeout", "Номер так и не появился");
     else miss("no_phone", "На странице нет кнопки с номером");
   }, GIVE_UP_MS);
@@ -252,8 +271,9 @@
 
   var mo = null;
   var seen = found();
+  var dead0 = deadReason();
   if (seen.length) save(seen);
-  else if (archivedVisible()) miss("archived", "Объявление снято");
+  else if (dead0) miss(dead0, DEAD_WHY[dead0]);
   else if (!clickShow()) {
     var wait = new MutationObserver(function () {
       if (clickShow()) wait.disconnect();
@@ -267,7 +287,8 @@
     mo = new MutationObserver(function () {
       if (done) return;
       if (captchaVisible()) onCaptcha();
-      if (archivedVisible()) { miss("archived", "Объявление снято"); return; }
+      var d = deadReason();
+      if (d) { miss(d, DEAD_WHY[d]); return; }
       var p = found();
       if (p.length) { mo.disconnect(); save(p); }
     });
