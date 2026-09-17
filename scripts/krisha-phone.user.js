@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reception365 · телефоны с Крыши
 // @namespace    https://saudager.ai/
-// @version      1.5
+// @version      1.6
 // @description  Сама жмёт «показать телефон», сохраняет номер и сама идёт дальше по очереди — пока не покажется капча; снятые и архивные объявления пропускает сама, не зависая
 // @match        https://krisha.kz/a/show/*
 // @run-at       document-idle
@@ -46,8 +46,12 @@
   say("Открываю телефон…");
 
   // Номера живут в блоке контактов и появляются только после капчи.
+  // offer__contacts-phones — актуальный класс блока на текущей вёрстке Крыши;
+  // .a-phones/#a-phones — старые селекторы, оставлены запасным вариантом на
+  // случай, если Крыша всё ещё отдаёт ими какие-то страницы.
   function found() {
-    var el = document.querySelector(".a-phones") || document.querySelector("#a-phones");
+    var el = document.querySelector(".offer__contacts-phones") ||
+      document.querySelector(".a-phones") || document.querySelector("#a-phones");
     if (!el) return [];
     var out = [];
     (el.innerText || "").replace(/(?:\+?7|8)[\s\-()]*\d{3}[\s\-()]*\d{3}[\s\-()]*\d{2}[\s\-()]*\d{2}/g,
@@ -163,7 +167,7 @@
       .catch(function () { /* очередь не обязательна */ });
   }
 
-  // Капчи не было — едем сами, без клика. Небольшая пауза перед переходом:
+  // Капчи не было — едем сами, без клика. Пауза перед переходом — 3 секунды:
   // не мгновенно, чтобы сообщение успело мелькнуть на экране, а не потому что
   // Крыше нужна задержка — по темпу запросов для неё это то же самое, что
   // клик сразу.
@@ -172,7 +176,7 @@
       .then(function (r) {
         if (!r.left.length) { say(box.innerHTML + "<br>Очередь пуста."); return; }
         say(box.innerHTML + "<br>Осталось " + r.n + ". Открываю следующую…");
-        setTimeout(function () { location.href = r.left[0].url; }, 1200);
+        setTimeout(function () { location.href = r.left[0].url; }, 3000);
       })
       .catch(function () { /* очередь не обязательна — просто останемся тут */ });
   }
