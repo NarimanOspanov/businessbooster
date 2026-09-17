@@ -5706,20 +5706,16 @@ http
         // Number(): курсор из maxKnownId/сохранения может быть строкой (BIGINT),
         // и тогда cursor + k склеил бы строки вместо арифметики.
         let cursor = Number(override || KW.scan.cursor || (await db.maxKnownId()) || 0);
-        // Потолок из выдачи: выше самого свежего id в выдаче объявлений нет,
-        // и щупать их через прокси незачем. Нет потолка — идём как раньше.
+        // Потолок из выдачи — подсказка, а не граница. Первая страница выдачи
+        // у Крыши отсортирована не строго по свежести (в «продаже» наверху
+        // бывают id старше курсора), поэтому потолок ниже курсора — это не
+        // «новых нет», а «выдача не показала»: тогда щупаем как раньше, а от
+        // повторов тех же 404 бережёт память ниже. Потолок выше курсора —
+        // режем пачку по нему: дальше него в выдаче никого нет.
         const ceiling = await KL.frontierFromSearch().catch(() => null);
-        const top = ceiling ? Math.min(cursor + batch, ceiling) : cursor + batch;
+        const top = ceiling && ceiling > cursor ? Math.min(cursor + batch, ceiling) : cursor + batch;
         const ids = [];
         for (let id = cursor + 1; id <= top; id++) ids.push(id);
-        if (!ids.length) {
-          KW.scan.lastRun = new Date().toISOString();
-          scanRunning = false;
-          return send(200, {
-            ok: true, idle: true, cursor: cursor, ceiling: ceiling, saved: 0, advanced: 0,
-            note: "в выдаче нет id выше курсора — новых объявлений пока нет",
-          });
-        }
 
         let saved = 0, gaps = 0, gapsCached = 0, unresolved = 0, notListing = 0, maxLive = cursor, scannedTo = cursor;
         const byDeal = {}, bySeller = {};
