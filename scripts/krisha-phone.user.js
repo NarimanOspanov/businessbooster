@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Reception365 · телефоны с Крыши
 // @namespace    https://saudager.ai/
-// @version      1.4
-// @description  Сама жмёт «показать телефон», сохраняет номер и сама идёт дальше по очереди — пока не покажется капча; снятые объявления пропускает сама, не зависая
+// @version      1.5
+// @description  Сама жмёт «показать телефон», сохраняет номер и сама идёт дальше по очереди — пока не покажется капча; снятые и архивные объявления пропускает сама, не зависая
 // @match        https://krisha.kz/a/show/*
 // @run-at       document-idle
 // @grant        none
@@ -71,14 +71,27 @@
     );
   }
 
-  // Если за это время не нашлась ни кнопка с номером, ни капча — страница,
-  // скорее всего, мертва (объявление снято). Ждать тут больше нет смысла:
-  // раньше скрипт просто зависал навсегда на такой странице, и очередь
-  // упиралась в один и тот же мертвяк на каждом заходе.
+  // Архивное объявление Крыша отдаёт тем же макетом, что и живое, только
+  // вместо кнопки «Показать телефон» — фраза «Объявление может быть
+  // неактуальным.». Ловим её целиком по всему тексту страницы, а не по
+  // классу блока (его не видели) — так же как капчу ловим по точному
+  // токену, а не по подстроке, чтобы не цепляться за что-то похожее.
+  function archivedVisible() {
+    return (document.body.innerText || "").indexOf("Объявление может быть неактуальным") !== -1;
+  }
+
+  // Если по явному признаку выше страница не мертва, но за это время всё
+  // равно не нашлась ни кнопка с номером, ни капча — тоже считаем мёртвой:
+  // мало ли Крыша сменит формулировку или разметку. Раньше скрипт в обоих
+  // случаях просто зависал навсегда, и очередь упиралась в один и тот же
+  // мертвяк на каждом заходе.
   var GIVE_UP_MS = 15000;
   var giveUpTimer = setTimeout(giveUp, GIVE_UP_MS);
+  var gaveUp = false;
   function giveUp() {
-    if (sent || captchaSeen) return; // капча — значит дело живое, решает человек
+    if (sent || captchaSeen || gaveUp) return; // капча — значит дело живое, решает человек
+    gaveUp = true;
+    clearTimeout(giveUpTimer);
     say("Похоже, объявление снято — сообщаю и еду дальше…");
     if (!KEY && !askKey()) { say("Без ключа даже промах сообщить некуда."); return; }
     fetch(API + "/api/krisha/phone/miss?key=" + encodeURIComponent(KEY), {
@@ -185,6 +198,7 @@
   // ловим и саму кнопку, если её не было в первый момент.
   var seen = found();
   if (seen.length) save(seen);
+  else if (archivedVisible()) giveUp();
   else if (!clickShow()) {
     var wait = new MutationObserver(function () {
       if (clickShow()) wait.disconnect();
@@ -194,6 +208,7 @@
   if (captchaVisible()) captchaSeen = true;
   var mo = new MutationObserver(function () {
     if (!captchaSeen && captchaVisible()) captchaSeen = true;
+    if (!gaveUp && archivedVisible()) giveUp();
     var p = found();
     if (p.length) { mo.disconnect(); save(p); }
   });
