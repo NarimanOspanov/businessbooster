@@ -6166,6 +6166,83 @@ http
       return;
     }
 
+    // То же, но для новой архитектуры (krisha_objects): телефоны хранятся
+    // колонкой в самой таблице объектов. Очередь на съём — объекты без номера,
+    // с параметрами date (дата публикации-курсор) и dir (up — свежие, down —
+    // в прошлое/архив): один джоб догоняет новые, другой заполняет архив.
+    if (urlPath === "/api/krisha/objphone" || urlPath === "/api/krisha/objqueue") {
+      const cors = {
+        "Access-Control-Allow-Origin": "https://krisha.kz",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Max-Age": "86400",
+      };
+      if (req.method === "OPTIONS") { res.writeHead(204, cors); res.end(); return; }
+      const send = (code, obj) => {
+        res.writeHead(code, Object.assign({ "Content-Type": MIME[".json"], "Cache-Control": "no-store" }, cors));
+        res.end(JSON.stringify(obj));
+      };
+      const key = parsed.searchParams.get("key") || "";
+      if (!KRISHA_PHONE_KEY || key !== KRISHA_PHONE_KEY) return send(403, { ok: false, error: "bad_key" });
+
+      const pretty = (n) =>
+        "+" + n[0] + " " + n.slice(1, 4) + " " + n.slice(4, 7) + " " + n.slice(7, 9) + " " + n.slice(9);
+      const parsePhones = (list) => {
+        const out = [];
+        for (const raw of [].concat(list || [])) {
+          const n = db.normPhone(raw);
+          if (n && !out.includes(n)) out.push(n);
+        }
+        return out;
+      };
+      const day = (v) => (v ? String(v).slice(0, 10) : null);
+
+      (async () => {
+        if (req.method === "GET" || req.method === "HEAD") {
+          const id = String(parsed.searchParams.get("id") || "").replace(/\D/g, "");
+          if (id) {
+            const phones = await db.objectPhonesGet(id);
+            return send(200, { ok: true, id: id, phones: phones.map(pretty), raw: phones });
+          }
+          const dir = String(parsed.searchParams.get("dir") || "up").toLowerCase() === "down" ? "down" : "up";
+          const date = parsed.searchParams.get("date") || null;
+          const q = await db.objectsWithoutPhone(Number(parsed.searchParams.get("limit") || 30), date, dir);
+          const days = q.rows.map((r) => day(r.created_on)).filter(Boolean);
+          return send(200, {
+            ok: true, count: q.rows.length, total: q.total, dir: dir,
+            // Границы пачки по дате — чтобы джоб сдвигал курсор (для dir=down — к oldest).
+            newest: days.length ? days[0] : null,
+            oldest: days.length ? days[days.length - 1] : null,
+            items: q.rows.map((r) => ({
+              id: String(r.id), title: r.title, deal: r.deal, prop: r.prop, city: r.city,
+              posted: day(r.created_on), url: "https://krisha.kz/a/show/" + r.id,
+            })),
+          });
+        }
+
+        let body = {};
+        try { body = JSON.parse(await readBody(req)) || {}; } catch { /* пусто */ }
+        const id = String(body.id || parsed.searchParams.get("id") || "").replace(/\D/g, "");
+        if (!id) return send(400, { ok: false, error: "нет номера объявления" });
+        const phones = parsePhones(body.phones || body.phone);
+
+        if (req.method === "PUT" || req.method === "PATCH") {
+          if (!phones.length && !("phones" in body || "phone" in body)) {
+            return send(400, { ok: false, error: "нужен список phones (может быть пустым)" });
+          }
+          const saved = await db.setObjectPhones(id, phones);
+          console.log("[objphone] заменено " + id + ": " + saved.length + " шт.");
+          return send(200, { ok: true, id: id, phones: saved.map(pretty) });
+        }
+
+        if (!phones.length) return send(400, { ok: false, error: "номер не разобрал" });
+        const merged = await db.addObjectPhones(id, phones);
+        console.log("[objphone] " + id + ": +" + phones.length + " (итого " + merged.length + ")");
+        return send(200, { ok: true, id: id, phones: merged.map(pretty) });
+      })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
+      return;
+    }
+
     // Квартира из подборки: ссылку открывают прямо в Телеграме, поэтому
     // показываем свой снимок с фотографиями и контактами, а не отправляем
     // человека на чужой сайт, где объявления может уже не быть.

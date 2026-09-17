@@ -442,6 +442,10 @@ IF COL_LENGTH('dbo.krisha_objects', 'house_num')   IS NULL ALTER TABLE dbo.krish
 IF COL_LENGTH('dbo.krisha_objects', 'build_year')  IS NULL ALTER TABLE dbo.krisha_objects ADD build_year INT NULL;
 IF COL_LENGTH('dbo.krisha_objects', 'house')       IS NULL ALTER TABLE dbo.krisha_objects ADD house NVARCHAR(60) NULL;
 IF COL_LENGTH('dbo.krisha_objects', 'toilet')      IS NULL ALTER TABLE dbo.krisha_objects ADD toilet NVARCHAR(40) NULL;
+-- Телефоны, снятые со страницы (человеком через капчу): цифрами через запятую
+-- 7XXXXXXXXXX; phones_at — когда сняли. Очередь на съём — где phones пусто.
+IF COL_LENGTH('dbo.krisha_objects', 'phones')      IS NULL ALTER TABLE dbo.krisha_objects ADD phones NVARCHAR(300) NULL;
+IF COL_LENGTH('dbo.krisha_objects', 'phones_at')   IS NULL ALTER TABLE dbo.krisha_objects ADD phones_at DATETIME2(0) NULL;
 -- Учёт поиска оригинала-хозяина для каждого агентского объявления: когда
 -- искали, сколько кандидатов нашли, лучший. По этим полям меряем, как растёт
 -- эффективность инструмента день ото дня.
@@ -457,6 +461,9 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_kobj_match' AND object
 -- Очередь на поиск: только неисканные.
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_kobj_tosearch' AND object_id = OBJECT_ID('dbo.krisha_objects'))
   EXEC('CREATE INDEX IX_kobj_tosearch ON dbo.krisha_objects (searched_at) WHERE searched_at IS NULL');
+-- Очередь на съём телефона: объекты без номера, по дате публикации.
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_kobj_nophone' AND object_id = OBJECT_ID('dbo.krisha_objects'))
+  EXEC('CREATE INDEX IX_kobj_nophone ON dbo.krisha_objects (created_on) WHERE phones IS NULL');
 -- findObjects всегда ищет среди ХОЗЯЕВ — держим для них узкие фильтрованные
 -- индексы (хозяева — меньшинство потока, индексы получаются небольшие):
 --  по сделке/типу/городу/площади (главный фильтр),
@@ -2067,6 +2074,69 @@ async function ownerDashboard(days) {
   return { imports: imports, searched: searched, photos: photos };
 }
 
+// --- Крыша objects: телефоны хозяев ----------------------------------------
+
+// Очередь объектов без сохранённого номера, по дате публикации.
+//  dir='up'   — свежие сверху: created_on >= date (date — нижняя граница),
+//               для джоба «догоняем новые».
+//  dir='down' — в прошлое: created_on <= date (date — верхняя граница),
+//               для архивного джоба; он сдвигает date вниз к oldest пачки.
+// Без date — просто самые свежие без номера. Порядок всегда новее→старее.
+async function objectsWithoutPhone(limit, date, dir) {
+  const pool = await getPool();
+  await ensureObjects(pool);
+  const up = String(dir || "up").toLowerCase() !== "down";
+  const r = await pool.request()
+    .input("n", sql.Int, Math.max(1, Math.min(200, Number(limit) || 30)))
+    .input("date", sql.Date, date || null)
+    .query(`
+      SELECT TOP (@n) id, title, deal, prop, city, created_on
+      FROM dbo.krisha_objects
+      WHERE phones IS NULL
+        AND (@date IS NULL OR created_on ${up ? ">=" : "<="} @date)
+      ORDER BY created_on DESC, id DESC`);
+  const total = (await pool.request().query(
+    "SELECT COUNT(*) AS n FROM dbo.krisha_objects WHERE phones IS NULL")).recordset[0].n;
+  return { rows: r.recordset, total: total };
+}
+
+const rawList = (s) => String(s || "").split(",").map((x) => x.trim()).filter(Boolean);
+
+// Номера по объекту (цифрами 7XXXXXXXXXX).
+async function objectPhonesGet(id) {
+  const pool = await getPool();
+  const r = await pool.request().input("id", sql.BigInt, Number(id))
+    .query("SELECT phones FROM dbo.krisha_objects WHERE id = @id");
+  return r.recordset.length ? rawList(r.recordset[0].phones) : [];
+}
+
+// Добавить номера к уже сохранённым (не затирая старые).
+async function addObjectPhones(id, phones) {
+  const pool = await getPool();
+  await ensureObjects(pool);
+  const cur = await objectPhonesGet(id);
+  const merged = cur.slice();
+  for (const p of phones || []) if (p && !merged.includes(p)) merged.push(p);
+  await pool.request()
+    .input("id", sql.BigInt, Number(id))
+    .input("ph", sql.NVarChar(300), merged.length ? merged.join(",") : null)
+    .query("UPDATE dbo.krisha_objects SET phones = @ph, phones_at = SYSUTCDATETIME() WHERE id = @id");
+  return merged;
+}
+
+// Заменить номера целиком (пустой массив — стереть).
+async function setObjectPhones(id, phones) {
+  const pool = await getPool();
+  await ensureObjects(pool);
+  const clean = [];
+  for (const p of phones || []) if (p && !clean.includes(p)) clean.push(p);
+  await pool.request()
+    .input("id", sql.BigInt, Number(id))
+    .input("ph", sql.NVarChar(300), clean.length ? clean.join(",") : null)
+    .query("UPDATE dbo.krisha_objects SET phones = @ph, phones_at = SYSUTCDATETIME() WHERE id = @id");
+  return clean;
+}
+
 // Сводка по собранному потоку — для статуса и отчётов.
 async function objectStats() {
   const pool = await getPool();
@@ -2085,6 +2155,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
   objectPhotos, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
+  objectsWithoutPhone, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,
   getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 
