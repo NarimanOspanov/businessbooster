@@ -446,9 +446,13 @@ IF COL_LENGTH('dbo.krisha_objects', 'toilet')      IS NULL ALTER TABLE dbo.krish
 -- 7XXXXXXXXXX; phones_at — когда сняли. Очередь на съём — где phones пусто.
 IF COL_LENGTH('dbo.krisha_objects', 'phones')      IS NULL ALTER TABLE dbo.krisha_objects ADD phones NVARCHAR(300) NULL;
 IF COL_LENGTH('dbo.krisha_objects', 'phones_at')   IS NULL ALTER TABLE dbo.krisha_objects ADD phones_at DATETIME2(0) NULL;
--- phone_tries — сколько раз плагин не нашёл номер на странице; после пяти
--- объект выпадает из очереди на съём (снятое объявление).
-IF COL_LENGTH('dbo.krisha_objects', 'phone_tries') IS NULL ALTER TABLE dbo.krisha_objects ADD phone_tries SMALLINT NULL;
+-- Промахи плагина: phone_tries — сколько раз номер не снялся; phone_state —
+-- чем кончилась последняя попытка (ok / archived / captcha / timeout /
+-- no_phone / error, NULL — ещё не пробовали); phone_next_at — раньше этого
+-- времени объект в очередь не отдаём (пауза после captcha/timeout/…).
+IF COL_LENGTH('dbo.krisha_objects', 'phone_tries')   IS NULL ALTER TABLE dbo.krisha_objects ADD phone_tries SMALLINT NULL;
+IF COL_LENGTH('dbo.krisha_objects', 'phone_state')   IS NULL ALTER TABLE dbo.krisha_objects ADD phone_state NVARCHAR(20) NULL;
+IF COL_LENGTH('dbo.krisha_objects', 'phone_next_at') IS NULL ALTER TABLE dbo.krisha_objects ADD phone_next_at DATETIME2(0) NULL;
 -- Учёт поиска оригинала-хозяина для каждого агентского объявления: когда
 -- искали, сколько кандидатов нашли, лучший. По этим полям меряем, как растёт
 -- эффективность инструмента день ото дня.
@@ -2079,38 +2083,79 @@ async function ownerDashboard(days) {
 
 // --- Крыша objects: телефоны хозяев ----------------------------------------
 
+// Чем может кончиться попытка снять номер, и что с объектом делать дальше.
+//  final    — объекта на Крыше больше нет, в очередь не возвращаем никогда.
+//  retryMin — пауза до следующей попытки; растёт с каждым промахом
+//             (retryMin × номер попытки), чтобы не долбить одну страницу.
+// Любой промах — плюс один к phone_tries; после пяти объект выпадает
+// насовсем, какая бы ни была причина.
+const PHONE_MISS = {
+  archived: { final: true },     // объявление снято / в архиве / 404
+  no_phone: { retryMin: 1440 },  // страница живая, но номера нет (только чат)
+  captcha:  { retryMin: 30 },    // капча показалась и не решена
+  timeout:  { retryMin: 60 },    // страница или кнопка не дождались
+  error:    { retryMin: 60 },    // всё остальное
+};
+const PHONE_MISS_REASONS = Object.keys(PHONE_MISS);
+
 // Следующий объект без сохранённого номера — один, а не пачка: плагин на
 // той стороне снимает номера по одному и каждый раз спрашивает «кого дальше».
 // since — нижняя граница по дате публикации (YYYY-MM-DD); от неё идём вверх,
 // к сегодняшнему дню: что старее в окне — то раньше. Курсор клиенту не нужен:
-// как только у объекта появился номер (или пять промахов), он сам выпадает из
-// очереди, и следующий вызов отдаёт следующий.
+// как только у объекта появился номер (или он выбыл по промахам), он сам
+// выпадает из очереди, и следующий вызов отдаёт следующий. Объекты на паузе
+// (phone_next_at в будущем) пропускаем — они вернутся, когда пауза выйдет.
 async function nextObjectWithoutPhone(since) {
   const pool = await getPool();
   await ensureObjects(pool);
-  const alive = "ISNULL(phone_tries, 0) < 5";
+  const ready = `phones IS NULL AND created_on >= @since
+        AND ISNULL(phone_tries, 0) < 5
+        AND (phone_state IS NULL OR phone_state <> 'archived')`;
+  const now = "(phone_next_at IS NULL OR phone_next_at <= SYSUTCDATETIME())";
   const r = await pool.request()
     .input("since", sql.Date, since)
     .query(`
-      SELECT TOP (1) id, title, deal, prop, city, user_type, created_on
+      SELECT TOP (1) id, title, deal, prop, city, user_type, created_on, phone_tries, phone_state
       FROM dbo.krisha_objects
-      WHERE phones IS NULL AND ${alive} AND created_on >= @since
+      WHERE ${ready} AND ${now}
       ORDER BY created_on ASC, id ASC`);
-  const left = (await pool.request()
+  const c = (await pool.request()
     .input("since", sql.Date, since)
-    .query(`SELECT COUNT(*) AS n FROM dbo.krisha_objects
-            WHERE phones IS NULL AND ${alive} AND created_on >= @since`)).recordset[0].n;
-  return { row: r.recordset[0] || null, left: left };
+    .query(`SELECT
+              SUM(CASE WHEN ${now} THEN 1 ELSE 0 END) AS ready,
+              SUM(CASE WHEN ${now} THEN 0 ELSE 1 END) AS waiting
+            FROM dbo.krisha_objects WHERE ${ready}`)).recordset[0];
+  return { row: r.recordset[0] || null, left: c.ready || 0, waiting: c.waiting || 0 };
 }
 
-// Плагин не нашёл номер на странице (объявление снято, кнопки нет) — промах.
-// После пяти промахов объект перестаём предлагать: иначе первый же мертвяк в
-// окне занял бы голову очереди навсегда. Зеркало markPhoneMiss для квартир.
-async function markObjectPhoneMiss(id) {
+// Плагин не снял номер — записываем причину и решаем, когда объект снова
+// предложить (см. PHONE_MISS). Неизвестная причина считается за error.
+async function markObjectPhoneMiss(id, reason) {
+  const key = PHONE_MISS[reason] ? reason : "error";
+  const rule = PHONE_MISS[key];
   const pool = await getPool();
   await ensureObjects(pool);
-  await pool.request().input("id", sql.BigInt, Number(id)).query(`
-    UPDATE dbo.krisha_objects SET phone_tries = ISNULL(phone_tries, 0) + 1 WHERE id = @id`);
+  const r = await pool.request()
+    .input("id", sql.BigInt, Number(id))
+    .input("st", sql.NVarChar(20), key)
+    .input("min", sql.Int, rule.retryMin || 0)
+    .query(`
+      UPDATE dbo.krisha_objects
+      SET phone_tries = ISNULL(phone_tries, 0) + 1,
+          phone_state = @st,
+          phone_next_at = CASE WHEN @min > 0
+            THEN DATEADD(minute, @min * (ISNULL(phone_tries, 0) + 1), SYSUTCDATETIME())
+            ELSE NULL END
+      OUTPUT INSERTED.phone_tries, INSERTED.phone_next_at
+      WHERE id = @id`);
+  const row = r.recordset[0] || {};
+  const tries = row.phone_tries || 0;
+  return {
+    state: key, tries: tries,
+    // Отдали объект насовсем: архив или исчерпаны попытки.
+    final: !!rule.final || tries >= 5,
+    next_at: row.phone_next_at ? new Date(row.phone_next_at).toISOString() : null,
+  };
 }
 
 const rawList = (s) => String(s || "").split(",").map((x) => x.trim()).filter(Boolean);
@@ -2133,7 +2178,11 @@ async function addObjectPhones(id, phones) {
   await pool.request()
     .input("id", sql.BigInt, Number(id))
     .input("ph", sql.NVarChar(300), merged.length ? merged.join(",") : null)
-    .query("UPDATE dbo.krisha_objects SET phones = @ph, phones_at = SYSUTCDATETIME() WHERE id = @id");
+    .query(`UPDATE dbo.krisha_objects
+            SET phones = @ph, phones_at = SYSUTCDATETIME(),
+                phone_state = CASE WHEN @ph IS NULL THEN NULL ELSE 'ok' END,
+                phone_next_at = NULL
+            WHERE id = @id`);
   return merged;
 }
 
@@ -2146,7 +2195,11 @@ async function setObjectPhones(id, phones) {
   await pool.request()
     .input("id", sql.BigInt, Number(id))
     .input("ph", sql.NVarChar(300), clean.length ? clean.join(",") : null)
-    .query("UPDATE dbo.krisha_objects SET phones = @ph, phones_at = SYSUTCDATETIME() WHERE id = @id");
+    .query(`UPDATE dbo.krisha_objects
+            SET phones = @ph, phones_at = SYSUTCDATETIME(),
+                phone_state = CASE WHEN @ph IS NULL THEN NULL ELSE 'ok' END,
+                phone_next_at = NULL
+            WHERE id = @id`);
   return clean;
 }
 
@@ -2168,7 +2221,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
   objectPhotos, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
-  nextObjectWithoutPhone, markObjectPhoneMiss, objectPhonesGet, addObjectPhones, setObjectPhones,
+  nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,
   getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 

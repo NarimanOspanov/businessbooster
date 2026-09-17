@@ -6186,9 +6186,10 @@ http
       const key = parsed.searchParams.get("key") || "";
       if (!KRISHA_PHONE_KEY || key !== KRISHA_PHONE_KEY) return send(403, { ok: false, error: "bad_key" });
 
-      // Плагин не нашёл номер на странице (объявление снято, кнопки нет) —
-      // отмечаем промах и уходим; после пяти объект выпадает из очереди.
-      // Зеркало /api/krisha/phone/miss для квартир. GET-варианта нет.
+      // Плагин не снял номер — сообщает причину (reason): archived — объекта
+      // больше нет, из очереди насовсем; captcha / timeout / no_phone / error —
+      // пауза и повтор позже, после пяти промахов тоже насовсем. Без reason
+      // считаем error. GET-варианта нет.
       if (urlPath === "/api/krisha/objphone/miss") {
         if (req.method !== "POST") return send(405, { ok: false, error: "only POST" });
         (async () => {
@@ -6196,9 +6197,13 @@ http
           try { body = JSON.parse(await readBody(req)) || {}; } catch { /* пусто */ }
           const id = String(body.id || parsed.searchParams.get("id") || "").replace(/\D/g, "");
           if (!id) return send(400, { ok: false, error: "нет номера объявления" });
-          await db.markObjectPhoneMiss(id);
-          console.log("[objphone] промах " + id);
-          return send(200, { ok: true, id: id });
+          const reason = String(body.reason || parsed.searchParams.get("reason") || "error").toLowerCase();
+          if (!db.PHONE_MISS_REASONS.includes(reason)) {
+            return send(400, { ok: false, error: "reason: один из " + db.PHONE_MISS_REASONS.join(", ") });
+          }
+          const m = await db.markObjectPhoneMiss(id, reason);
+          console.log("[objphone] промах " + id + ": " + m.state + " (попытка " + m.tries + (m.final ? ", выбыл" : "") + ")");
+          return send(200, Object.assign({ ok: true, id: id }, m));
         })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
         return;
       }
@@ -6234,10 +6239,13 @@ http
           const q = await db.nextObjectWithoutPhone(since);
           const r = q.row;
           return send(200, {
-            ok: true, since: since, left: q.left,
+            ok: true, since: since, left: q.left, waiting: q.waiting,
             item: r ? {
               id: String(r.id), title: r.title, deal: r.deal, prop: r.prop, city: r.city,
               seller: r.user_type, posted: day(r.created_on), url: "https://krisha.kz/a/show/" + r.id,
+              // Сколько раз уже пробовали и чем кончилось — плагин может,
+              // например, на повторной попытке ждать страницу дольше.
+              tries: r.phone_tries || 0, last: r.phone_state || null,
             } : null,
           });
         }
