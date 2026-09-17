@@ -12,6 +12,10 @@ const H = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
   Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
   "Accept-Language": "ru-RU,ru;q=0.9",
+  // Сами undici и fetch просят только gzip/deflate; Крыша умеет brotli, и он
+  // на десятую часть компактнее — через прокси это те же деньги. Оба пути
+  // (глобальный fetch и undici с ProxyAgent) br распаковывают, проверено.
+  "Accept-Encoding": "gzip, deflate, br",
 };
 
 // Прокси для страниц объявлений. Azure-адрес Крыша уже однажды закрыла.
@@ -276,7 +280,9 @@ function rotateProxies() {
   return rotateWait;
 }
 
-async function dispatcher() {
+// avoid — вход, через который только что ответили 468: повтор идёт через
+// другой, если входов больше одного. Тот же порт, скорее всего, ответит тем же.
+async function dispatcher(avoid) {
   const urls = await resolveProxyUrls();
   if (!urls.length) return undefined;
   const key = urls.join("\n");
@@ -288,8 +294,9 @@ async function dispatcher() {
     agentKey = key;
     rr = 0;
   }
-  const agent = agents[rr % agents.length];
+  let agent = agents[rr % agents.length];
   rr++;
+  if (avoid && agent === avoid && agents.length > 1) { agent = agents[rr % agents.length]; rr++; }
   return agent;
 }
 
@@ -537,9 +544,12 @@ async function fetchSearch(maxPages, crit, onPage, opts) {
 async function fetchText(url, attempts = 3, timeoutMs = 20000, opts) {
   const useProxy = !!(opts && opts.proxy);
   let last;
+  let lastAgent;
+  let blocked = 0; // сколько раз ответили 468
   for (let i = 0; i < attempts; i++) {
-    const agent = useProxy ? await dispatcher() : undefined;
+    const agent = useProxy ? await dispatcher(blocked ? lastAgent : undefined) : undefined;
     if (useProxy && !agent) throw new Error(proxyHint());
+    lastAgent = agent;
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
@@ -549,6 +559,11 @@ async function fetchText(url, attempts = 3, timeoutMs = 20000, opts) {
         ...(agent ? { dispatcher: agent } : {}),
       });
       if (!r.ok) {
+        // Тело нам не нужно — рвём соединение сразу, не дочитывая. Страница
+        // 468 у Крыши — 231 КБ без сжатия, 404 — ещё 14 КБ; через прокси это
+        // чистый расход трафика за ответ, из которого берём только статус.
+        try { if (r.body) r.body.cancel().catch(() => {}); } catch { /* уже закрыт */ }
+        ctrl.abort();
         const e = new Error("HTTP " + r.status);
         e.status = r.status;
         throw e;
@@ -557,12 +572,36 @@ async function fetchText(url, attempts = 3, timeoutMs = 20000, opts) {
     } catch (e) {
       last = e;
       if (e && (e.status === 404 || e.status === 410)) throw e;
+      // 468 — не больше двух попыток, и вторая через другой вход прокси:
+      // каждая попытка стоит трафика, а после двух отказов подряд третий
+      // ничего не меняет — дальше эту страницу возьмёт следующий прогон.
+      if (e && e.status === 468 && ++blocked >= 2) throw e;
       if (i < attempts - 1) await sleep(2500 * (i + 1));
     } finally {
       clearTimeout(timer);
     }
   }
   throw last;
+}
+
+// 2. Потолок id для скана — из выдачи, а не щупаньем 404 через прокси.
+// Первые страницы «вся продажа» и «вся аренда» по всему Казахстану идут от
+// свежих к старым; максимальный id на них — это и есть текущий фронтир,
+// выше него объявлений ещё нет. Два прямых запроса (выдачу Крыша с Azure
+// отдаёт, это же читает ежедневный сбор) вместо сорока страниц 404 через
+// прокси на каждый прогон. null — выдача не отдалась; тогда скан идёт
+// по-старому, до серии 404.
+async function frontierFromSearch() {
+  let top = 0;
+  for (const u of ["https://krisha.kz/prodazha/", "https://krisha.kz/arenda/"]) {
+    let html;
+    try { html = await fetchText(u, 1, 10000); } catch { continue; }
+    for (const m of html.matchAll(/\/a\/show\/(\d+)/g)) {
+      const id = Number(m[1]);
+      if (id > top) top = id;
+    }
+  }
+  return top || null;
 }
 
 // Krisha publishes its own price comparison — I was wrong earlier to say it does
@@ -676,6 +715,6 @@ module.exports = {
   H, CRITERIA, NEAR_DISTRICTS, sleep, num, clean, money,
   searchUrl, parseCards, parseDetail, districtOf, locationScore, dedupeKey,
   ageBand, areaBand, groupKey, median, buildModel, flagsFor,
-  fetchText, fetchSearch, fetchDetail, fetchPriceAnalysis,
+  fetchText, fetchSearch, fetchDetail, fetchPriceAnalysis, frontierFromSearch,
   viaProxy, proxyHint, proxyCount, rotateProxies, PROXY_FILE,
 };

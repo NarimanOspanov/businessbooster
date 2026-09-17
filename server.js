@@ -1659,6 +1659,11 @@ let photosRunning = false;
 let deepenRunning = false;
 let scanRunning = false;
 let matchRunning = false;
+// Подтверждённые 404 скана: id → когда. Пока курсор стоит у фронтира, каждый
+// прогон заново качал бы те же пустые страницы через прокси; здесь их помним
+// и в течение KRISHA_SCAN_GAP_TTL_MIN минут считаем 404 без запроса.
+const scanGap404 = new Map();
+const KRISHA_SCAN_GAP_TTL_MIN = Number(process.env.KRISHA_SCAN_GAP_TTL_MIN || 15);
 // Разобранные страницы текущего прогона: тот же объект нужен и проходу по базе,
 // и сборке страниц для канала, а страница у Крыши одна.
 const parsedNow = new Map();
@@ -5690,6 +5695,7 @@ http
       const batch = Math.max(1, Math.min(500, Number(parsed.searchParams.get("batch")) || 120));
       const conc = Math.max(1, Math.min(30, Number(parsed.searchParams.get("concurrency")) || 8));
       const retries = Math.max(1, Math.min(8, Number(parsed.searchParams.get("retries")) || 5));
+      const gapTtlMs = Math.max(0, Number(parsed.searchParams.get("gapTtlMin") || KRISHA_SCAN_GAP_TTL_MIN)) * 60e3;
       KW.scan = KW.scan || {};
       scanRunning = true;
       (async () => {
@@ -5700,10 +5706,22 @@ http
         // Number(): курсор из maxKnownId/сохранения может быть строкой (BIGINT),
         // и тогда cursor + k склеил бы строки вместо арифметики.
         let cursor = Number(override || KW.scan.cursor || (await db.maxKnownId()) || 0);
+        // Потолок из выдачи: выше самого свежего id в выдаче объявлений нет,
+        // и щупать их через прокси незачем. Нет потолка — идём как раньше.
+        const ceiling = await KL.frontierFromSearch().catch(() => null);
+        const top = ceiling ? Math.min(cursor + batch, ceiling) : cursor + batch;
         const ids = [];
-        for (let k = 1; k <= batch; k++) ids.push(cursor + k);
+        for (let id = cursor + 1; id <= top; id++) ids.push(id);
+        if (!ids.length) {
+          KW.scan.lastRun = new Date().toISOString();
+          scanRunning = false;
+          return send(200, {
+            ok: true, idle: true, cursor: cursor, ceiling: ceiling, saved: 0, advanced: 0,
+            note: "в выдаче нет id выше курсора — новых объявлений пока нет",
+          });
+        }
 
-        let saved = 0, gaps = 0, unresolved = 0, notListing = 0, maxLive = cursor, scannedTo = cursor;
+        let saved = 0, gaps = 0, gapsCached = 0, unresolved = 0, notListing = 0, maxLive = cursor, scannedTo = cursor;
         const byDeal = {}, bySeller = {};
         // Фронтир — это подряд идущие ПОДТВЕРЖДЁННЫЕ 404 (дальше объявлений ещё
         // нет). Останавливаемся только на такой серии, чтобы не жечь прокси на
@@ -5714,6 +5732,9 @@ http
         const FRONTIER_GAP = Math.max(40, conc * 4);
         // Возвращает исход: 'live' | 'gap'(404) | 'unresolved'(468) | 'skip'.
         async function handle(id) {
+          // Недавно подтверждённый 404 — не переспрашиваем.
+          const seenAt = scanGap404.get(id);
+          if (seenAt && Date.now() - seenAt < gapTtlMs) { gapsCached++; return "gap"; }
           try {
             const html = await KL.fetchText("https://krisha.kz/a/show/" + id, retries, 15000, { proxy: true });
             const obj = Scan.parse(id, html);
@@ -5725,11 +5746,13 @@ http
             bySeller[obj.userType || "?"] = (bySeller[obj.userType || "?"] || 0) + 1;
             return "live";
           } catch (e) {
-            if (e && (e.status === 404 || e.status === 410)) { gaps++; return "gap"; }
+            if (e && (e.status === 404 || e.status === 410)) { gaps++; scanGap404.set(id, Date.now()); return "gap"; }
             unresolved++;
             return "unresolved";
           }
         }
+        // Память о 404 не растёт бесконечно: всё старше срока — вон.
+        for (const [id, at] of scanGap404) if (Date.now() - at >= gapTtlMs) scanGap404.delete(id);
         // Идём вверх окнами по conc (порядок нужен для счёта серии 404).
         let gap404Streak = 0;
         outer:
@@ -5758,8 +5781,8 @@ http
         scanRunning = false;
         send(200, {
           ok: true,
-          scannedTo: scannedTo, stoppedAtFrontier: scannedTo < cursor + batch,
-          saved: saved, gaps404: gaps, unresolved468: unresolved, notListing: notListing,
+          scannedTo: scannedTo, ceiling: ceiling, stoppedAtFrontier: scannedTo < top,
+          saved: saved, gaps404: gaps, gaps404Cached: gapsCached, unresolved468: unresolved, notListing: notListing,
           byDeal: byDeal, bySeller: bySeller,
           cursor: KW.scan.cursor, advanced: KW.scan.cursor - cursor,
           savedTotal: KW.scan.savedTotal,
