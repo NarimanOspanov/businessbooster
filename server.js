@@ -5821,8 +5821,10 @@ http
       matchRunning = true;
       (async () => {
         const show = (id) => "https://krisha.kz/a/show/" + id;
+        const floorText = (x) => x.floor && x.floors ? x.floor + "/" + x.floors
+          : x.floor ? x.floor + " эт." : x.floors ? "дом " + x.floors + " эт." : null;
         const label = (x) => [x.city, x.rooms ? x.rooms + "к" : null, x.area ? x.area + "м²" : null,
-          x.floor && x.floors ? x.floor + "/" + x.floors : null, x.district].filter(Boolean).join(" · ");
+          floorText(x), x.district].filter(Boolean).join(" · ");
         const PhotoMatch = require("./scripts/photo-match.js");
         const agents = await db.agentsToMatch(batch);
         let searched = 0, matched = 0, photoConfirmed = 0;

@@ -406,7 +406,11 @@ function parseDetail(html) {
   for (const m of html.matchAll(/data-name="([^"]+)"[\s\S]{0,400}?offer__advert-short-info"[^>]*>([\s\S]{0,140}?)<\/div>/g)) {
     d[m[1]] = clean(m[2]);
   }
-  const fl = (d["flat.floor"] || "").match(/(\d+)\s*из\s*(\d+)/);
+  // «5 из 9» — этаж и этажность. Если продавец не указал этажность, Крыша
+  // показывает одно число («9») и не пишет этаж в заголовок объявления —
+  // тогда берём хотя бы этаж, а этажность остаётся неизвестной.
+  const flRaw = (d["flat.floor"] || "").trim();
+  const fl = flRaw.match(/(\d+)\s*из\s*(\d+)/) || (/^\d+$/.test(flRaw) ? [flRaw, flRaw, null] : null);
   // The card shows addedAt — the last bump — which is why every listing on a
   // page reads "today". createdAt is the real one. isAgent is Krisha's own
   // verdict, unlike the das[who]=1 filter which the seller ticks themselves.
@@ -421,7 +425,7 @@ function parseDetail(html) {
     renovation: d["flat.renovation"] || null,
     floorRaw: d["flat.floor"] || null,
     floor: fl ? +fl[1] : null,
-    floors: fl ? +fl[2] : null,
+    floors: fl && fl[2] ? +fl[2] : null,
     toilet: d["flat.toilet"] || null,
   };
 }

@@ -139,9 +139,11 @@ function parse(id, html) {
     area: typeof a.square === "number" ? a.square : (areaFromTitle(advTitle) || areaFromTitle(pageTitle)),
     lat: geoLat(map.lat),
     lon: geoLon(map.lon),
-    // Поля для сопоставления «та же квартира»:
-    floor: fl ? Number(fl[1]) : null,
-    floors: fl ? Number(fl[2]) : null,
+    // Поля для сопоставления «та же квартира». Заголовок содержит этаж
+    // только в форме «6/12 этаж»; без этажности Крыша его туда не пишет, и
+    // тогда этаж есть лишь в блоке характеристик (parseDetail).
+    floor: fl ? Number(fl[1]) : (det.floor || null),
+    floors: fl ? Number(fl[2]) : (det.floors || null),
     complexId: a.complexId == null ? null : (Number(a.complexId) || null),
     district: ad.district || null,
     mkr: ad.microdistrict || null,
