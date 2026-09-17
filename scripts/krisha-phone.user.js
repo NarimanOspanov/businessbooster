@@ -1,25 +1,33 @@
 // ==UserScript==
 // @name         Reception365 · телефоны с Крыши
 // @namespace    https://saudager.ai/
-// @version      1.6
-// @description  Сама жмёт «показать телефон», сохраняет номер и сама идёт дальше по очереди — пока не покажется капча; снятые и архивные объявления пропускает сама, не зависая
+// @version      2.0
+// @description  Берёт из очереди следующий объект без номера, сама жмёт «показать телефон», сохраняет номер и идёт дальше — пока не покажется капча; снятые и зависшие страницы отмечает промахом с причиной
 // @match        https://krisha.kz/a/show/*
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
 
+// Ходит в /api/krisha/objphone (таблица krisha_objects, весь поток
+// недвижимости). Очередь отдаёт по одному объекту от даты since и вверх;
+// курсор вести не нужно — объект с номером или с промахом сам выпадает.
+//
 // Капчу проходит человек — скрипт её не видит и не трогает. Он нажимает за
-// человека только саму кнопку «Показать телефон» (класс show-phones), чтобы
-// не тянуться к ней на каждой странице руками, — а дальше, если Крыша
-// потребует капчу, её решает уже человек. Когда номер появился на экране,
-// скрипт забирает его из разметки и отправляет к нам.
+// человека только саму кнопку «Показать телефон», чтобы не тянуться к ней на
+// каждой странице руками. Когда номер появился на экране, скрипт забирает его
+// из разметки и отправляет к нам.
+//
+// Если номер не снялся, сообщаем промах с причиной — от неё зависит, что
+// сервер сделает с объектом:
+//   archived — объявление снято: из очереди насовсем;
+//   no_phone — страница живая, но кнопки/номера нет: пауза сутки;
+//   timeout  — кнопку нажали, а номер так и не появился: пауза час;
+//   captcha  — капча показалась и за две минуты не решена: пауза полчаса.
 //
 // Дальше — либо едет сам, либо ждёт руки. Пока капча ни разу не показалась
-// на этой странице, номер, скорее всего, отдался без проверки — тогда скрипт
-// сам открывает следующую квартиру из очереди, без клика. А если капча всё же
-// всплыла (даже если человек её тут же решил), это знак, что Крыша
-// присматривается к темпу, — на такой странице автопереход выключается, и
-// дальше снова решает человек, кликая «следующая →» сам.
+// на этой странице, скрипт сам открывает следующий объект. Если капча всплыла
+// (даже решённая), это знак, что Крыша присматривается к темпу, — автопереход
+// выключается, дальше человек кликает «следующая →» сам.
 
 (function () {
   "use strict";
@@ -36,19 +44,49 @@
     return KEY;
   }
 
+  // Нижняя граница очереди по дате публикации (YYYY-MM-DD). Пусто — сервер
+  // берёт последнюю неделю. Меняется ссылкой «с даты» в углу.
+  var SINCE = localStorage.getItem("r365since") || "";
+  function askSince() {
+    var s = prompt("С какой даты публикации брать объекты (YYYY-MM-DD, пусто — последняя неделя):", SINCE);
+    if (s === null) return;
+    s = s.trim();
+    if (s && !/^\d{4}-\d{2}-\d{2}$/.test(s)) { alert("Нужна дата вида 2026-09-10"); return; }
+    SINCE = s;
+    if (s) localStorage.setItem("r365since", s); else localStorage.removeItem("r365since");
+    say(status);
+  }
+
   var box = document.createElement("div");
   box.style.cssText = "position:fixed;right:16px;bottom:16px;z-index:99999;max-width:280px;" +
     "padding:12px 14px;border-radius:10px;background:#1c1819;color:#fff;" +
     'font:14px/1.4 "Open Sans",Arial,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.35)';
   document.body.appendChild(box);
-  function say(html) { box.innerHTML = html; }
+  var status = "";
+  function say(html) {
+    status = html;
+    box.innerHTML = html +
+      '<div style="margin-top:8px;font-size:12px;color:#aaa">очередь ' +
+      (SINCE ? "с " + SINCE : "за неделю") +
+      ' · <a href="#" id="r365-since" style="color:#6fb2f0">с даты</a></div>';
+    var a = document.getElementById("r365-since");
+    if (a) a.onclick = function (e) { e.preventDefault(); askSince(); };
+  }
+  function append(html) { say(status + "<br>" + html); }
 
   say("Открываю телефон…");
 
+  function api(path, method, body) {
+    return fetch(API + path + (path.indexOf("?") > -1 ? "&" : "?") + "key=" + encodeURIComponent(KEY), {
+      method: method || "GET",
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); });
+  }
+
   // Номера живут в блоке контактов и появляются только после капчи.
   // offer__contacts-phones — актуальный класс блока на текущей вёрстке Крыши;
-  // .a-phones/#a-phones — старые селекторы, оставлены запасным вариантом на
-  // случай, если Крыша всё ещё отдаёт ими какие-то страницы.
+  // .a-phones/#a-phones — старые селекторы, оставлены запасным вариантом.
   function found() {
     var el = document.querySelector(".offer__contacts-phones") ||
       document.querySelector(".a-phones") || document.querySelector("#a-phones");
@@ -60,10 +98,9 @@
   }
 
   // Капча — виджет reCAPTCHA, инлайном или в iframe. Селекторы — только
-  // точные токены класса/атрибута, не подстрока: на каждой странице Крыши в
-  // подвале есть <p class="g-recaptcha-policy"> — обычная приписка «сайт
-  // защищён reCAPTCHA», и широкий [class*="captcha"] цеплял бы её всегда,
-  // выключая автопереход навсегда с первой же страницы.
+  // точные токены класса/атрибута, не подстрока: в подвале каждой страницы
+  // есть <p class="g-recaptcha-policy">, и широкий [class*="captcha"] цеплял
+  // бы её всегда.
   var captchaSeen = false;
   function captchaVisible() {
     return !!(
@@ -77,50 +114,68 @@
 
   // Архивное объявление Крыша отдаёт тем же макетом, что и живое, только
   // вместо кнопки «Показать телефон» — фраза «Объявление может быть
-  // неактуальным.». Ловим её целиком по всему тексту страницы, а не по
-  // классу блока (его не видели) — так же как капчу ловим по точному
-  // токену, а не по подстроке, чтобы не цепляться за что-то похожее.
+  // неактуальным.». Ловим её целиком по всему тексту страницы.
   function archivedVisible() {
     return (document.body.innerText || "").indexOf("Объявление может быть неактуальным") !== -1;
   }
 
-  // Если по явному признаку выше страница не мертва, но за это время всё
-  // равно не нашлась ни кнопка с номером, ни капча — тоже считаем мёртвой:
-  // мало ли Крыша сменит формулировку или разметку. Раньше скрипт в обоих
-  // случаях просто зависал навсегда, и очередь упиралась в один и тот же
-  // мертвяк на каждом заходе.
-  var GIVE_UP_MS = 15000;
-  var giveUpTimer = setTimeout(giveUp, GIVE_UP_MS);
-  var gaveUp = false;
-  function giveUp() {
-    if (sent || captchaSeen || gaveUp) return; // капча — значит дело живое, решает человек
-    gaveUp = true;
+  // --- промах -------------------------------------------------------------
+  // Одна отправка на страницу: кто первый определил причину, тот и прав.
+  var done = false;
+  function miss(reason, why) {
+    if (done) return;
+    done = true;
     clearTimeout(giveUpTimer);
-    say("Похоже, объявление снято — сообщаю и еду дальше…");
+    clearTimeout(captchaTimer);
+    if (mo) mo.disconnect();
+    say(why + " — сообщаю (" + reason + ")…");
     if (!KEY && !askKey()) { say("Без ключа даже промах сообщить некуда."); return; }
-    fetch(API + "/api/krisha/phone/miss?key=" + encodeURIComponent(KEY), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: ID }),
-    }).catch(function () {}).then(function () { autoNext(); });
+    api("/api/krisha/objphone/miss", "POST", { id: ID, reason: reason })
+      .then(function (r) {
+        if (!r.ok || !r.j.ok) { append("Не записалось: " + ((r.j && r.j.error) || "ошибка")); return; }
+        append(r.j.final ? "Объект выбыл из очереди." : "Вернётся в очередь позже (попытка " + r.j.tries + ").");
+      })
+      .catch(function () { append("Сеть не отвечает."); })
+      .then(function () { if (reason === "captcha" || captchaSeen) next(); else autoNext(); });
   }
 
-  var sent = false;
-  function save(phones) {
-    if (sent) return;
-    sent = true;
+  // За 15 секунд не нашлось ни номера, ни капчи, ни архивной пометки.
+  // Кнопку нажимали — значит, страница живая, но номер не пришёл: timeout.
+  // Кнопки не было вовсе — живая страница без телефона (только чат): no_phone.
+  var GIVE_UP_MS = 15000;
+  var giveUpTimer = setTimeout(function () {
+    if (done || captchaSeen) return; // капча — значит дело живое, решает человек
+    if (archivedVisible()) miss("archived", "Объявление снято");
+    else if (clicked) miss("timeout", "Номер так и не появился");
+    else miss("no_phone", "На странице нет кнопки с номером");
+  }, GIVE_UP_MS);
+
+  // Капча показалась — ждём человека две минуты. Не дождались — captcha,
+  // сервер даст объекту паузу и вернёт его позже.
+  var CAPTCHA_MS = 120000;
+  var captchaTimer = null;
+  function onCaptcha() {
+    if (captchaSeen) return;
+    captchaSeen = true;
     clearTimeout(giveUpTimer);
-    if (!KEY && !askKey()) { say("Без ключа сохранять некуда."); sent = false; return; }
+    append("Капча — решите её, номер сохранится сам.");
+    captchaTimer = setTimeout(function () {
+      if (!done) miss("captcha", "Капча не решена за две минуты");
+    }, CAPTCHA_MS);
+  }
+
+  // --- сохранение ---------------------------------------------------------
+  function save(phones) {
+    if (done) return;
+    done = true;
+    clearTimeout(giveUpTimer);
+    clearTimeout(captchaTimer);
+    if (!KEY && !askKey()) { say("Без ключа сохранять некуда."); done = false; return; }
     say("Сохраняю " + phones.join(", ") + " …");
-    fetch(API + "/api/krisha/phone?key=" + encodeURIComponent(KEY), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: ID, phones: phones }),
-    })
-      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+    api("/api/krisha/objphone", "POST", { id: ID, phones: phones })
       .then(function (r) {
         if (!r.ok || !r.j.ok) {
-          sent = false;
+          done = false;
           if (r.j && r.j.error === "bad_key") { localStorage.removeItem("r365key"); KEY = null; }
           say("Не сохранилось: " + ((r.j && r.j.error) || "ошибка") +
             '<br><a href="#" id="r365-retry" style="color:#6fb2f0">повторить</a>');
@@ -129,61 +184,59 @@
           return;
         }
         say("✓ Сохранено: " + r.j.phones.join(", "));
-        // Капча ни разу не показалась на этой странице — номер отдался
-        // без проверки, и Крыша, похоже, не насторожилась. Едем дальше сами.
-        // Если капча всё же мелькала (пусть человек её и решил), это знак
-        // притормозить — дальше снова руками, кликом по ссылке.
+        // Капча ни разу не показалась — номер отдался без проверки, едем
+        // дальше сами. Если мелькала (пусть человек её и решил), это знак
+        // притормозить — дальше руками, кликом по ссылке.
         if (captchaSeen) next(); else autoNext();
       })
       .catch(function () {
-        sent = false;
+        done = false;
         say("Сеть не отвечает. Откройте страницу заново.");
       });
   }
 
-  // total — очередь целиком, а не размер этой пачки. С limit=30 count почти
-  // всегда был ровно 30 и не двигался, сколько ни сохраняй — на самом деле
-  // счётчик тогда мерил не прогресс, а лимит запроса.
-  function queueLeft() {
-    return fetch(API + "/api/krisha/queue?key=" + encodeURIComponent(KEY) + "&limit=30")
-      .then(function (r) { return r.json(); })
-      .then(function (j) {
-        var left = (j.items || []).filter(function (x) { return x.id !== ID; });
-        var n = typeof j.total === "number" ? j.total : left.length;
-        return { left: left, n: n };
+  // --- очередь ------------------------------------------------------------
+  // Сервер отдаёт один следующий объект: item (или null), left — сколько
+  // готовых осталось, waiting — сколько на паузе после промахов.
+  function nextItem() {
+    return api("/api/krisha/objphone" + (SINCE ? "?since=" + encodeURIComponent(SINCE) : ""))
+      .then(function (r) {
+        var j = r.j || {};
+        var it = j.item && String(j.item.id) !== ID ? j.item : null;
+        return { item: it, left: j.left || 0, waiting: j.waiting || 0 };
       });
   }
+  function emptyNote(q) {
+    return "Очередь пуста" + (q.waiting ? ", на паузе " + q.waiting + "." : ".");
+  }
 
-  // Следующая квартира без телефона. Переход — по кнопке, а не сам: страницу
-  // из-под человека выдёргивать нельзя, вдруг он её ещё читает. Используется,
-  // когда на этой странице была капча — дальше решает человек.
+  // Переход по кнопке, не сам: страницу из-под человека выдёргивать нельзя.
+  // Используется, когда на этой странице была капча — дальше решает человек.
   function next() {
-    queueLeft()
-      .then(function (r) {
-        if (!r.left.length) { say(box.innerHTML + "<br>Очередь пуста."); return; }
-        say(box.innerHTML + "<br>Осталось " + r.n +
-          '. <a href="' + r.left[0].url + '" style="color:#6fb2f0">следующая →</a>');
+    nextItem()
+      .then(function (q) {
+        if (!q.item) { append(emptyNote(q)); return; }
+        append("Осталось " + q.left + '. <a href="' + q.item.url + '" style="color:#6fb2f0">следующая →</a>');
       })
       .catch(function () { /* очередь не обязательна */ });
   }
 
-  // Капчи не было — едем сами, без клика. Пауза перед переходом — 3 секунды:
-  // не мгновенно, чтобы сообщение успело мелькнуть на экране, а не потому что
-  // Крыше нужна задержка — по темпу запросов для неё это то же самое, что
-  // клик сразу.
+  // Капчи не было — едем сами. Пауза 3 секунды, чтобы сообщение успело
+  // мелькнуть на экране.
   function autoNext() {
-    queueLeft()
-      .then(function (r) {
-        if (!r.left.length) { say(box.innerHTML + "<br>Очередь пуста."); return; }
-        say(box.innerHTML + "<br>Осталось " + r.n + ". Открываю следующую…");
-        setTimeout(function () { location.href = r.left[0].url; }, 3000);
+    nextItem()
+      .then(function (q) {
+        if (!q.item) { append(emptyNote(q)); return; }
+        append("Осталось " + q.left + ". Открываю следующую…");
+        setTimeout(function () { location.href = q.item.url; }, 3000);
       })
       .catch(function () { /* очередь не обязательна — просто останемся тут */ });
   }
 
+  // --- страница -----------------------------------------------------------
   // Кнопка «Показать телефон» рисуется React-ом после загрузки, поэтому её
-  // тоже ждём, а не ищем один раз сразу. Жмём один раз: повторный клик после
-  // того, как Крыша уже показывает капчу или номер, только мешает.
+  // ждём, а не ищем один раз. Жмём один раз: повторный клик после того, как
+  // Крыша уже показывает капчу или номер, только мешает.
   var clicked = false;
   function clickShow() {
     if (clicked) return false;
@@ -197,24 +250,27 @@
     return true;
   }
 
-  // Ждём, пока номер появится: страница подставляет его после капчи, без
-  // перезагрузки, поэтому следим за изменениями разметки. Той же слежкой
-  // ловим и саму кнопку, если её не было в первый момент.
+  var mo = null;
   var seen = found();
   if (seen.length) save(seen);
-  else if (archivedVisible()) giveUp();
+  else if (archivedVisible()) miss("archived", "Объявление снято");
   else if (!clickShow()) {
     var wait = new MutationObserver(function () {
       if (clickShow()) wait.disconnect();
     });
     wait.observe(document.body, { childList: true, subtree: true });
   }
-  if (captchaVisible()) captchaSeen = true;
-  var mo = new MutationObserver(function () {
-    if (!captchaSeen && captchaVisible()) captchaSeen = true;
-    if (!gaveUp && archivedVisible()) giveUp();
-    var p = found();
-    if (p.length) { mo.disconnect(); save(p); }
-  });
-  mo.observe(document.body, { childList: true, subtree: true, characterData: true });
+  if (!done) {
+    if (captchaVisible()) onCaptcha();
+    // Ждём, пока номер появится: страница подставляет его после капчи без
+    // перезагрузки, поэтому следим за изменениями разметки.
+    mo = new MutationObserver(function () {
+      if (done) return;
+      if (captchaVisible()) onCaptcha();
+      if (archivedVisible()) { miss("archived", "Объявление снято"); return; }
+      var p = found();
+      if (p.length) { mo.disconnect(); save(p); }
+    });
+    mo.observe(document.body, { childList: true, subtree: true, characterData: true });
+  }
 })();
