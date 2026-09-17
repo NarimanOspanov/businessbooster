@@ -6195,7 +6195,7 @@ http
         }
         return out;
       };
-      const day = (v) => (v ? String(v).slice(0, 10) : null);
+      const day = (v) => { try { return v ? new Date(v).toISOString().slice(0, 10) : null; } catch { return null; } };
 
       (async () => {
         if (req.method === "GET" || req.method === "HEAD") {
