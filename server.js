@@ -6167,10 +6167,11 @@ http
     }
 
     // То же, но для новой архитектуры (krisha_objects): телефоны хранятся
-    // колонкой в самой таблице объектов. Очередь на съём — объекты без номера,
-    // с параметрами date (дата публикации-курсор) и dir (up — свежие, down —
-    // в прошлое/архив): один джоб догоняет новые, другой заполняет архив.
-    if (urlPath === "/api/krisha/objphone" || urlPath === "/api/krisha/objqueue") {
+    // колонкой в самой таблице объектов. Очередь на съём — объекты без номера
+    // от даты since и вверх; GET отдаёт по одному — под плагин на той стороне,
+    // который обрабатывает объекты по одному.
+    if (urlPath === "/api/krisha/objphone" || urlPath === "/api/krisha/objqueue" ||
+        urlPath === "/api/krisha/objphone/miss") {
       const cors = {
         "Access-Control-Allow-Origin": "https://krisha.kz",
         "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, OPTIONS",
@@ -6184,6 +6185,23 @@ http
       };
       const key = parsed.searchParams.get("key") || "";
       if (!KRISHA_PHONE_KEY || key !== KRISHA_PHONE_KEY) return send(403, { ok: false, error: "bad_key" });
+
+      // Плагин не нашёл номер на странице (объявление снято, кнопки нет) —
+      // отмечаем промах и уходим; после пяти объект выпадает из очереди.
+      // Зеркало /api/krisha/phone/miss для квартир. GET-варианта нет.
+      if (urlPath === "/api/krisha/objphone/miss") {
+        if (req.method !== "POST") return send(405, { ok: false, error: "only POST" });
+        (async () => {
+          let body = {};
+          try { body = JSON.parse(await readBody(req)) || {}; } catch { /* пусто */ }
+          const id = String(body.id || parsed.searchParams.get("id") || "").replace(/\D/g, "");
+          if (!id) return send(400, { ok: false, error: "нет номера объявления" });
+          await db.markObjectPhoneMiss(id);
+          console.log("[objphone] промах " + id);
+          return send(200, { ok: true, id: id });
+        })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
+        return;
+      }
 
       const pretty = (n) =>
         "+" + n[0] + " " + n.slice(1, 4) + " " + n.slice(4, 7) + " " + n.slice(7, 9) + " " + n.slice(9);
@@ -6204,19 +6222,23 @@ http
             const phones = await db.objectPhonesGet(id);
             return send(200, { ok: true, id: id, phones: phones.map(pretty), raw: phones });
           }
-          const dir = String(parsed.searchParams.get("dir") || "up").toLowerCase() === "down" ? "down" : "up";
-          const date = parsed.searchParams.get("date") || null;
-          const q = await db.objectsWithoutPhone(Number(parsed.searchParams.get("limit") || 30), date, dir);
-          const days = q.rows.map((r) => day(r.created_on)).filter(Boolean);
+          // Один следующий объект, не пачка. since — нижняя граница по дате
+          // публикации (YYYY-MM-DD), от неё идём вверх к сегодняшнему дню;
+          // без since — последняя неделя. Курсор клиенту вести не нужно:
+          // объект с номером (или пятью промахами) сам выпадает из очереди.
+          const sinceRaw = parsed.searchParams.get("since");
+          if (sinceRaw && (!/^\d{4}-\d{2}-\d{2}$/.test(sinceRaw) || isNaN(Date.parse(sinceRaw)))) {
+            return send(400, { ok: false, error: "since: нужна дата YYYY-MM-DD" });
+          }
+          const since = sinceRaw || day(Date.now() - 7 * 86400e3);
+          const q = await db.nextObjectWithoutPhone(since);
+          const r = q.row;
           return send(200, {
-            ok: true, count: q.rows.length, total: q.total, dir: dir,
-            // Границы пачки по дате — чтобы джоб сдвигал курсор (для dir=down — к oldest).
-            newest: days.length ? days[0] : null,
-            oldest: days.length ? days[days.length - 1] : null,
-            items: q.rows.map((r) => ({
+            ok: true, since: since, left: q.left,
+            item: r ? {
               id: String(r.id), title: r.title, deal: r.deal, prop: r.prop, city: r.city,
-              posted: day(r.created_on), url: "https://krisha.kz/a/show/" + r.id,
-            })),
+              seller: r.user_type, posted: day(r.created_on), url: "https://krisha.kz/a/show/" + r.id,
+            } : null,
           });
         }
 

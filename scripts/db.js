@@ -446,6 +446,9 @@ IF COL_LENGTH('dbo.krisha_objects', 'toilet')      IS NULL ALTER TABLE dbo.krish
 -- 7XXXXXXXXXX; phones_at — когда сняли. Очередь на съём — где phones пусто.
 IF COL_LENGTH('dbo.krisha_objects', 'phones')      IS NULL ALTER TABLE dbo.krisha_objects ADD phones NVARCHAR(300) NULL;
 IF COL_LENGTH('dbo.krisha_objects', 'phones_at')   IS NULL ALTER TABLE dbo.krisha_objects ADD phones_at DATETIME2(0) NULL;
+-- phone_tries — сколько раз плагин не нашёл номер на странице; после пяти
+-- объект выпадает из очереди на съём (снятое объявление).
+IF COL_LENGTH('dbo.krisha_objects', 'phone_tries') IS NULL ALTER TABLE dbo.krisha_objects ADD phone_tries SMALLINT NULL;
 -- Учёт поиска оригинала-хозяина для каждого агентского объявления: когда
 -- искали, сколько кандидатов нашли, лучший. По этим полям меряем, как растёт
 -- эффективность инструмента день ото дня.
@@ -2076,28 +2079,38 @@ async function ownerDashboard(days) {
 
 // --- Крыша objects: телефоны хозяев ----------------------------------------
 
-// Очередь объектов без сохранённого номера, по дате публикации.
-//  dir='up'   — свежие сверху: created_on >= date (date — нижняя граница),
-//               для джоба «догоняем новые».
-//  dir='down' — в прошлое: created_on <= date (date — верхняя граница),
-//               для архивного джоба; он сдвигает date вниз к oldest пачки.
-// Без date — просто самые свежие без номера. Порядок всегда новее→старее.
-async function objectsWithoutPhone(limit, date, dir) {
+// Следующий объект без сохранённого номера — один, а не пачка: плагин на
+// той стороне снимает номера по одному и каждый раз спрашивает «кого дальше».
+// since — нижняя граница по дате публикации (YYYY-MM-DD); от неё идём вверх,
+// к сегодняшнему дню: что старее в окне — то раньше. Курсор клиенту не нужен:
+// как только у объекта появился номер (или пять промахов), он сам выпадает из
+// очереди, и следующий вызов отдаёт следующий.
+async function nextObjectWithoutPhone(since) {
   const pool = await getPool();
   await ensureObjects(pool);
-  const up = String(dir || "up").toLowerCase() !== "down";
+  const alive = "ISNULL(phone_tries, 0) < 5";
   const r = await pool.request()
-    .input("n", sql.Int, Math.max(1, Math.min(200, Number(limit) || 30)))
-    .input("date", sql.Date, date || null)
+    .input("since", sql.Date, since)
     .query(`
-      SELECT TOP (@n) id, title, deal, prop, city, created_on
+      SELECT TOP (1) id, title, deal, prop, city, user_type, created_on
       FROM dbo.krisha_objects
-      WHERE phones IS NULL
-        AND (@date IS NULL OR created_on ${up ? ">=" : "<="} @date)
-      ORDER BY created_on DESC, id DESC`);
-  const total = (await pool.request().query(
-    "SELECT COUNT(*) AS n FROM dbo.krisha_objects WHERE phones IS NULL")).recordset[0].n;
-  return { rows: r.recordset, total: total };
+      WHERE phones IS NULL AND ${alive} AND created_on >= @since
+      ORDER BY created_on ASC, id ASC`);
+  const left = (await pool.request()
+    .input("since", sql.Date, since)
+    .query(`SELECT COUNT(*) AS n FROM dbo.krisha_objects
+            WHERE phones IS NULL AND ${alive} AND created_on >= @since`)).recordset[0].n;
+  return { row: r.recordset[0] || null, left: left };
+}
+
+// Плагин не нашёл номер на странице (объявление снято, кнопки нет) — промах.
+// После пяти промахов объект перестаём предлагать: иначе первый же мертвяк в
+// окне занял бы голову очереди навсегда. Зеркало markPhoneMiss для квартир.
+async function markObjectPhoneMiss(id) {
+  const pool = await getPool();
+  await ensureObjects(pool);
+  await pool.request().input("id", sql.BigInt, Number(id)).query(`
+    UPDATE dbo.krisha_objects SET phone_tries = ISNULL(phone_tries, 0) + 1 WHERE id = @id`);
 }
 
 const rawList = (s) => String(s || "").split(",").map((x) => x.trim()).filter(Boolean);
@@ -2155,7 +2168,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
   objectPhotos, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
-  objectsWithoutPhone, objectPhonesGet, addObjectPhones, setObjectPhones,
+  nextObjectWithoutPhone, markObjectPhoneMiss, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,
   getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 
