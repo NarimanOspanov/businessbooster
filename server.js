@@ -601,6 +601,12 @@ function sourceFromReferrer(ref) {
 // buyer, which is the one event worth interrupting someone's day for.
 const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 const TG_CHAT = process.env.TELEGRAM_CHAT_ID || "";
+// Кому уходят служебные уведомления (переходы, лиды, запросы в боте): список
+// админов через запятую в BOT_ADMIN_TELEGRAM_IDS. Без него — один чат из
+// TELEGRAM_CHAT_ID, как раньше. Каждое уведомление получает каждый из списка.
+const TG_ADMINS = [...new Set(
+  (process.env.BOT_ADMIN_TELEGRAM_IDS || TG_CHAT).split(/[^\d-]+/).filter(Boolean)
+)];
 let tgWindowStart = Date.now();
 let tgSent = 0;
 
@@ -618,20 +624,28 @@ function sendTelegram(chatId, text) {
 }
 
 function notifyTelegram(text) {
-  if (!TG_TOKEN || !TG_CHAT) return;
+  if (!TG_TOKEN || !TG_ADMINS.length) return;
   if (Date.now() - tgWindowStart > 3600e3) {
     tgWindowStart = Date.now();
     tgSent = 0;
   }
+  // Бюджет считается на уведомление, а не на адресата: сорок событий в час,
+  // сколько бы админов их ни получали.
   if (tgSent >= 40) return Promise.resolve({ ok: false, description: "rate limit reached" }); // never flood the chat
   tgSent++;
-  return fetch("https://api.telegram.org/bot" + TG_TOKEN + "/sendMessage", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: TG_CHAT, text, parse_mode: "HTML", disable_web_page_preview: true }),
-  })
-    .then((r) => r.json())
-    .catch((e) => ({ ok: false, description: e.message }));
+  // Всем админам разом. Итог — как у одиночной отправки: ok, если дошло хотя
+  // бы до одного; description — кому не дошло и почему; result — от первого
+  // удачного (на него смотрит /api/telegram-test).
+  return Promise.all(TG_ADMINS.map((chat) => sendTelegram(chat, text).then((r) => ({ chat, r })))).then((all) => {
+    const good = all.filter((x) => x.r && x.r.ok);
+    const bad = all.filter((x) => !(x.r && x.r.ok));
+    return {
+      ok: good.length > 0,
+      description: bad.length ? bad.map((x) => x.chat + ": " + ((x.r && x.r.description) || "нет ответа")).join("; ") : undefined,
+      result: good.length ? good[0].r.result : undefined,
+      delivered: good.map((x) => x.chat),
+    };
+  });
 }
 
 // Внутренний дашборд мониторинга находок «агент → хозяин». Данные тянет с
@@ -997,7 +1011,7 @@ function statsSummary() {
 // On by default; KRISHA_WATCH=0 turns it off. Gated on Telegram being wired up:
 // alerts have nowhere to go otherwise, and there is no reason to walk someone
 // else's site for output nobody receives — which also keeps local dev quiet.
-const KRISHA_ON = process.env.KRISHA_WATCH !== "0" && !!(TG_TOKEN && TG_CHAT);
+const KRISHA_ON = process.env.KRISHA_WATCH !== "0" && !!(TG_TOKEN && TG_ADMINS.length);
 const KRISHA_EVERY_H = Number(process.env.KRISHA_INTERVAL_H || 4);
 const KRISHA_MIN_DISCOUNT = Number(process.env.KRISHA_MIN_DISCOUNT || 12);
 // 80 was a hedge against the read failures; with retries in place a run reads
@@ -3697,9 +3711,9 @@ http
 
     // One-shot check that the bot really reaches the operator's chat
     if (urlPath === "/api/telegram-test") {
-      if (!TG_TOKEN || !TG_CHAT) {
+      if (!TG_TOKEN || !TG_ADMINS.length) {
         res.writeHead(400, { "Content-Type": MIME[".json"] });
-        res.end(JSON.stringify({ error: "нужны переменные TELEGRAM_BOT_TOKEN и TELEGRAM_CHAT_ID" }));
+        res.end(JSON.stringify({ error: "нужны переменные TELEGRAM_BOT_TOKEN и BOT_ADMIN_TELEGRAM_IDS (или TELEGRAM_CHAT_ID)" }));
         return;
       }
       // Report what Telegram actually said — a test that cannot fail is useless
@@ -3946,9 +3960,9 @@ http
         if (!KRISHA_ON) {
           res.writeHead(409, { "Content-Type": MIME[".json"] });
           res.end(JSON.stringify({
-            error: TG_TOKEN && TG_CHAT
+            error: TG_TOKEN && TG_ADMINS.length
               ? "выключено переменной KRISHA_WATCH=0"
-              : "нужны TELEGRAM_BOT_TOKEN и TELEGRAM_CHAT_ID — слать уведомления некуда",
+              : "нужны TELEGRAM_BOT_TOKEN и BOT_ADMIN_TELEGRAM_IDS — слать уведомления некуда",
           }));
           return;
         }
@@ -3973,7 +3987,7 @@ http
         lastRun: KW.lastRun,
         lastError: KW.lastError,
         lastSummary: KW.lastSummary || null,
-        telegram: TG_TOKEN && TG_CHAT ? "настроен" : "не настроен",
+        telegram: TG_TOKEN && TG_ADMINS.length ? "настроен, админов " + TG_ADMINS.length : "не настроен",
       }, null, 2));
       return;
     }
@@ -4001,7 +4015,7 @@ http
         node: process.version,
         persistentDir: PERSIST_DATA,
         persistent: PERSIST_OK,
-        telegram: TG_TOKEN ? (TG_CHAT ? "настроен" : "нет TELEGRAM_CHAT_ID") : "нет TELEGRAM_BOT_TOKEN",
+        telegram: TG_TOKEN ? (TG_ADMINS.length ? "настроен, админов " + TG_ADMINS.length : "нет BOT_ADMIN_TELEGRAM_IDS") : "нет TELEGRAM_BOT_TOKEN",
         stores: listMerchantSlugs().length,
         trackedStores: Object.keys(STATS).length,
       }));
@@ -5861,17 +5875,33 @@ http
         // Находки — в мониторинг-чат с галочками. До 8 на сообщение, без флуда.
         if (finds.length) {
           const esc = (s) => require("./scripts/krisha-bot.js").esc(String(s == null ? "" : s));
-          const lines = ["🎯 <b>Находки по агентским</b> (" + finds.length + " из " + searched +
-            ", фото подтвердило " + photoConfirmed + ")"];
-          for (const f of finds.slice(0, 8)) {
-            lines.push("", "🏢 Агент: " + esc(label(f.a)) + "\n" + show(f.a.id));
-            for (const c of f.cand.slice(0, 4)) {
-              const ok = c.s && c.s.match && c.s.confidence >= 0.7;
-              const mark = !c.s ? "➖" : ok ? "✅" : "❌";
-              const ph = !c.s ? "фото не проверить" : ok ? ("фото совпали " + c.s.confidence) : "фото не совпали";
-              lines.push(mark + " хозяин (score " + c.h.score + " · " + ph + "): " + esc(label(c.h)) + "\n" + show(c.h.id));
-            }
-          }
+          // Формат — как читается в чате: заголовок с оценкой лучшего кандидата,
+          // затем «от агента» и «от собственника» со ссылками. Кандидаты идут
+          // в порядке findObjects — лучший первым; у остальных оценка своя,
+          // поэтому она дописана к строке.
+          const photoOk = (c) => !!(c.s && c.s.match && c.s.confidence >= 0.7);
+          const photoText = (c) => !c.s ? "фото не проверить" : photoOk(c) ? "фото совпали " + c.s.confidence : "фото не совпали";
+          const verdict = (c) => "score " + c.h.score + " · " + photoText(c);
+          const lines = [];
+          finds.slice(0, 8).forEach((f, n) => {
+            const best = f.cand[0];
+            if (n) lines.push("");
+            lines.push("🎯 <b>Совпадение</b>" + (best ? " (" + verdict(best) + ")" : ""),
+              "",
+              "🏢 От агента: " + esc(label(f.a)) + "\n" + show(f.a.id));
+            f.cand.slice(0, 4).forEach((c, k) => {
+              const mark = !c.s ? "➖" : photoOk(c) ? "✅" : "❌";
+              lines.push(mark + " От собственника: " + esc(label(c.h)) + (k ? " (" + verdict(c) + ")" : "") +
+                "\n" + show(c.h.id));
+            });
+          });
+          // Хвост: куда смотреть дальше. Ключ — тот же, что открывает эти
+          // маршруты; в чат админов он и так уходит с каждым отчётом.
+          const dashKey = encodeURIComponent(KRISHA_JOB_KEY || KRISHA_PHONE_KEY);
+          lines.push("", "",
+            '<a href="' + CANONICAL + "/api/krisha/monitor?key=" + dashKey + '">все совпадения</a>' +
+            " · " +
+            '<a href="' + CANONICAL + "/api/krisha/stats?key=" + dashKey + '">статистика</a>');
           notifyTelegram(lines.join("\n"));
         }
 
