@@ -5844,17 +5844,24 @@ http
           }
           return false;
         };
-        // Самозащита от перегруза базы: считаем, сколько занимает запись
-        // страницы; если в среднем дольше 1.5 с — режем параллельность вдвое
-        // до конца прогона и запоминаем для следующего.
-        let storeMs = 0, storeN = 0, throttled = 0;
-        function checkDbSpeed() {
-          if (storeN < 4) return;
-          const avg = storeMs / storeN;
-          if (avg > 1500 && conc > 1) { conc = Math.max(1, Math.floor(conc / 2)); throttled++; KW.list.dbSlow = true; }
-          else if (avg < 400) KW.list.dbSlow = false;
+        // Самозащита от перегруза базы — по её собственным счётчикам, а не по
+        // времени записи: на 10 DTU MERGE пишется быстро, но съедает весь
+        // процессор, и очередь плагина с поиском не получают своей доли.
+        // Выше 85% — один поток и пауза 1.5 с; выше 70% — два потока и 0.5 с;
+        // ниже 50% — снимаем ограничение. Проверяем каждые 20 страниц.
+        let storeMs = 0, storeN = 0, throttled = 0, pageGap = pace, lastLoad = null;
+        async function checkDbSpeed(force) {
+          if (!force && storeN < 20) return;
           storeMs = 0; storeN = 0;
+          const l = await db.dbLoad().catch(() => null);
+          if (!l) return;
+          lastLoad = l;
+          const hot = Math.max(l.cpu, l.io, l.log);
+          if (hot > 85) { if (conc !== 1 || pageGap < 1500) throttled++; conc = 1; pageGap = Math.max(pace, 1500); KW.list.dbSlow = true; }
+          else if (hot > 70) { if (conc > 2) throttled++; conc = Math.min(conc, 2); pageGap = Math.max(pace, 500); KW.list.dbSlow = true; }
+          else if (hot < 50) { KW.list.dbSlow = false; }
         }
+        await checkDbSpeed(true);
         // Записать страницу одним запросом (см. saveListAdverts).
         async function store(res, section) {
           const rows = res.adverts.map((a) => L.parseAdvert(a, section, res.dates)).filter((o) => o.id);
@@ -5892,8 +5899,8 @@ http
           }
           if (ended) { if (nextSection()) break outer; continue; }
           if (errors >= 3) break;
-          checkDbSpeed();
-          if (pace) await sleep(pace);
+          await checkDbSpeed(false);
+          if (pageGap) await sleep(pageGap);
         }
         if (sweepDone) st.lastSweep = sweepDone;
         KW.list = st;
@@ -5904,7 +5911,7 @@ http
           pages: pages, adverts: adverts, added: added, priceChanged: priceChanged,
           archived: archived, back: back, bumped: bumped, cityNull: cityNull, errors: errors,
           photosMigrated: migrated, photosLeft: migrateLeft,
-          concurrency: conc, concurrencyAsked: concAsked, throttled: throttled, dbSlow: !!KW.list.dbSlow, proxy: viaProxy,
+          concurrency: conc, concurrencyAsked: concAsked, throttled: throttled, dbSlow: !!KW.list.dbSlow, dbLoad: lastLoad, proxy: viaProxy,
           cursor: { section: L.SECTIONS[st.section], page: st.page, sweepNo: st.sweepNo,
                     pagesThisSweep: st.pages, advertsThisSweep: st.adverts, startedAt: st.startedAt },
           lastSweep: st.lastSweep || null,

@@ -2320,6 +2320,18 @@ async function setListHumanOk(logId, ok) {
     .query("UPDATE dbo.krisha_list_matches SET human_ok = @ok WHERE id = @id");
 }
 
+// Последние показания нагрузки базы (Azure SQL обновляет раз в 15 секунд):
+// доля процессора, диска и журнала от лимита тарифа. null — не Azure/нет прав.
+async function dbLoad() {
+  const pool = await getPool();
+  try {
+    const r = (await pool.request().query(`
+      SELECT TOP (1) avg_cpu_percent AS cpu, avg_data_io_percent AS io, avg_log_write_percent AS log_write
+      FROM sys.dm_db_resource_stats ORDER BY end_time DESC`)).recordset[0];
+    return r ? { cpu: Number(r.cpu), io: Number(r.io), log: Number(r.log_write) } : null;
+  } catch { return null; }
+}
+
 // Размер базы: лимит и занято, и кто сколько занимает по таблицам и индексам.
 // Нужно, когда Azure SQL упирается в квоту и надо решать, что резать.
 async function dbSize() {
@@ -3012,7 +3024,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveListAdvert, listStats, listCompare,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
-  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, migrateListPhotos, saveListAdverts,
+  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,
