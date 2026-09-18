@@ -2214,17 +2214,12 @@ async function listStats() {
     GROUP BY bumped_on ORDER BY bumped_on DESC`)).recordset;
   const byDeal = (await pool.request().query(`
     SELECT deal, prop, COUNT(*) AS n FROM dbo.krisha_list GROUP BY deal, prop`)).recordset;
-  // Главная метрика гонки: у скольких хозяев номер был снят ДО того, как они
-  // спрятали объявление.
-  const race = (await pool.request().query(`
-    SELECT COUNT(*) AS owners_archived,
-      SUM(CASE WHEN l.phones_at IS NOT NULL AND l.phones_at <= e.at THEN 1 ELSE 0 END) AS phone_before_archive,
+  // Телефоны хозяев: сколько уже с номером, сколько живых ещё без него.
+  const ph=(await pool.request().query(`
+    SELECT
       (SELECT COUNT(*) FROM dbo.krisha_list WHERE user_type = 'owner' AND phones IS NOT NULL) AS owners_with_phone,
-      (SELECT COUNT(*) FROM dbo.krisha_list WHERE user_type = 'owner' AND storage = 'live' AND phones IS NULL) AS owners_live_no_phone
-    FROM dbo.krisha_list l
-    JOIN (SELECT id, MIN(at) AS at FROM dbo.krisha_list_events WHERE kind = 'archived' GROUP BY id) e ON e.id = l.id
-    WHERE l.user_type = 'owner'`)).recordset[0];
-  return { total: tot, events24h: ev, byDealProp: byDeal, bumpedByDay: bumps, phoneRace: race };
+      (SELECT COUNT(*) FROM dbo.krisha_list WHERE user_type = 'owner' AND storage = 'live' AND phones IS NULL) AS owners_live_no_phone`)).recordset[0];
+  return { total: tot, events24h: ev, byDealProp: byDeal, bumpedByDay: bumps, phones: ph };
 }
 
 // Кто быстрее и полнее: список карты или обход по id. Считаем по общему
