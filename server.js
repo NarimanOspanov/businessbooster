@@ -6982,11 +6982,14 @@ http
           let cached = objphoneCounts.get(ck);
           // Первый вызов на окно считает синхронно; дальше плагин получает
           // счётчики из кэша сразу, а пересчёт раз в минуту идёт в фоне.
+          // И первый вызов не ждёт подсчёта: пока база занята обходом, подсчёт
+          // по 200 тысячам строк может не уложиться в таймаут, а объект плагину
+          // нужен сразу. Счётчики придут со следующим вызовом.
           if (!cached) {
-            const q0 = await db.nextListOwnerWithoutPhone(since, dealF, propF, true);
-            cached = { at: Date.now(), left: q0.left, waiting: q0.waiting, busy: false };
+            cached = { at: 0, left: null, waiting: null, busy: false };
             objphoneCounts.set(ck, cached);
-          } else if (Date.now() - cached.at > 60e3 && !cached.busy) {
+          }
+          if (Date.now() - cached.at > 60e3 && !cached.busy) {
             cached.busy = true;
             db.nextListOwnerWithoutPhone(since, dealF, propF, true)
               .then((q1) => { cached.at = Date.now(); cached.left = q1.left; cached.waiting = q1.waiting; })
@@ -6995,7 +6998,7 @@ http
           const q = await db.nextListOwnerWithoutPhone(since, dealF, propF, false);
           const r = q.row;
           return send(200, {
-            ok: true, since: since, left: cached.left, waiting: cached.waiting, countsAt: new Date(cached.at).toISOString(),
+            ok: true, since: since, left: cached.left, waiting: cached.waiting, countsAt: cached.at ? new Date(cached.at).toISOString() : null,
             item: r ? {
               id: String(r.id), title: r.title, deal: r.deal, prop: r.prop, city: r.city,
               seller: r.user_type, price: r.price == null ? null : Number(r.price),
