@@ -2097,8 +2097,8 @@ async function agentsToMatchList(limit) {
 
 // Хозяева той же квартиры среди ВСЕХ наших, включая архив: хозяин по просьбе
 // агента прячет объявление, и найти его можно только у себя. Дом — по ЖК или
-// координатам; дальше комнаты, этаж, площадь (±3%, не меньше 1 м²). Бонус за
-// «снял объявление незадолго до появления агентского» — это почерк агента.
+// координатам; дальше комнаты, этаж, площадь (±3%, не меньше 1 м²). Сам факт
+// архивации признаком не считается и баллов не даёт.
 async function findListOwners(q, limit) {
   const pool = await getPool();
   await ensureList(pool);
@@ -2116,7 +2116,6 @@ async function findListOwners(q, limit) {
     .input("cxid", sql.BigInt, q.complexId ? Number(q.complexId) : null)
     .input("lat", sql.Decimal(11, 7), q.lat == null ? null : Number(q.lat))
     .input("lon", sql.Decimal(11, 7), q.lon == null ? null : Number(q.lon))
-    .input("seen", sql.DateTime2, q.agentSeen ? new Date(q.agentSeen) : new Date())
     .input("exid", sql.BigInt, q.id ? Number(q.id) : null)
     .input("n", sql.Int, Number(limit) || 6)
     .query(`
@@ -2128,8 +2127,7 @@ async function findListOwners(q, limit) {
                 AND ABS(f.lat - @lat) < 0.0006 AND ABS(f.lon - @lon) < 0.0008, 6, 0)
           + IIF(@rooms IS NOT NULL AND f.rooms = @rooms, 2, 0)
           + IIF(@floor IS NOT NULL AND f.floor = @floor, 2, 0)
-          + IIF(@floors IS NOT NULL AND f.floors = @floors, 1, 0)
-          + IIF(arch.at IS NOT NULL AND arch.at <= @seen AND arch.at >= DATEADD(day, -30, @seen), 3, 0) AS score
+          + IIF(@floors IS NOT NULL AND f.floors = @floors, 1, 0) AS score
       FROM dbo.krisha_list f
       OUTER APPLY (SELECT MAX(e.at) AS at FROM dbo.krisha_list_events e WHERE e.id = f.id AND e.kind = 'archived') arch
       WHERE f.user_type = 'owner'

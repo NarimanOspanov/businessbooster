@@ -6114,8 +6114,9 @@ http
     // после скана. Только база — быстро, отвечает синхронно.
     // Поиск хозяина по списку карты: агентские без searched_at, кандидаты —
     // хозяева среди всех наших, включая архив (хозяин прячет объявление по
-    // просьбе агента — и найти его можно только у себя). Дом по ЖК/координатам,
-    // квартира по комнатам/этажу/площади, потом фото из photos_json.
+    // просьбе агента — и найти его можно только у себя; сама архивация
+    // признаком не считается). Дом по ЖК/координатам, квартира по
+    // комнатам/этажу/площади, потом фото из photos_json.
     // ?stats=1 — итоги без запуска.
     if (urlPath === "/api/krisha/matchlist") {
       const send = (code, obj) => {
@@ -6149,7 +6150,6 @@ http
           const p = [];
           if (dm(x.bumped_on)) p.push("поднято " + dm(x.bumped_on));
           if (dmT(x.first_seen)) p.push("в базе с " + dmT(x.first_seen));
-          if (x.archived_at) p.push("снято " + dmT(x.archived_at));
           if (x.phones) p.push("номер есть");
           return p.length ? "📅 " + p.join(" · ") : null;
         };
@@ -6160,7 +6160,7 @@ http
         for (const a of agents) {
           const q = {
             deal: a.deal, prop: a.prop, area: a.area, rooms: a.rooms, floor: a.floor, floors: a.floors,
-            complexId: a.complex_id, lat: a.lat, lon: a.lon, id: a.id, agentSeen: a.first_seen,
+            complexId: a.complex_id, lat: a.lat, lon: a.lon, id: a.id,
           };
           let hits = [];
           try { hits = await db.findListOwners(q, 6); } catch { /* пропустим */ }
