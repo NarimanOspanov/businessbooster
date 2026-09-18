@@ -5789,6 +5789,16 @@ http
       const want = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
       if (!want || parsed.searchParams.get("key") !== want) return send(403, { ok: false, error: "bad_key" });
       const q = parsed.searchParams;
+      // ?have=id,id,… — какие из номеров объявлений есть в списке (сверка по id).
+      if (q.get("have")) {
+        (async () => {
+          const ids = String(q.get("have")).split(/[^0-9]+/).filter(Boolean).slice(0, 500);
+          const have = await db.knownListIds(ids);
+          send(200, { ok: true, asked: ids.length, found: ids.filter((id) => have.has(String(id))).length,
+                      missing: ids.filter((id) => !have.has(String(id))) });
+        })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 200) }));
+        return;
+      }
       if (q.get("compare") === "1" || q.get("stats") === "1") {
         (async () => {
           send(200, { ok: true, list: await db.listStats(), compare: await db.listCompare(), cursor: KW.list || null });

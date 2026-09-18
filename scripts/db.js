@@ -2246,6 +2246,23 @@ async function listMatchStats() {
   return { total: t, candidates: p };
 }
 
+// Какие из этих id есть в krisha_list — для сверки по номерам объявлений.
+async function knownListIds(ids) {
+  const list = (ids || []).map((x) => Number(x)).filter(Boolean);
+  if (!list.length) return new Set();
+  const pool = await getPool();
+  await ensureList(pool);
+  const have = new Set();
+  for (let i = 0; i < list.length; i += 200) {
+    const chunk = list.slice(i, i + 200);
+    const req = pool.request();
+    const names = chunk.map((id, n) => { req.input("i" + n, sql.BigInt, id); return "@i" + n; });
+    const r = await req.query("SELECT id FROM dbo.krisha_list WHERE id IN (" + names.join(",") + ")");
+    r.recordset.forEach((x) => have.add(String(x.id)));
+  }
+  return have;
+}
+
 // Дашборд по списку: импорт по дням с разбивкой, поиск и находки, события
 // (поднятия, цены, архив), снятые номера. 60 дней, периоды режет клиент.
 async function listDashboard(days) {
@@ -3033,7 +3050,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveListAdvert, listStats, listCompare,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
-  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts,
+  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,
