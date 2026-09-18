@@ -1678,6 +1678,10 @@ let matchRunning = false;
 // и в течение KRISHA_SCAN_GAP_TTL_MIN минут считаем 404 без запроса.
 const scanGap404 = new Map();
 const KRISHA_SCAN_GAP_TTL_MIN = Number(process.env.KRISHA_SCAN_GAP_TTL_MIN || 15);
+// Ближе этого к потолку скан идёт по одному запросу за раз: новых id у Крыши
+// около 12 в минуту, догонять нечего, а одиночные запросы почти не будят
+// защиту (меньше 468 — меньше повторов и потерь). Дальше — по 8, догоняем.
+const KRISHA_SCAN_NEAR = Number(process.env.KRISHA_SCAN_NEAR || 300);
 // Разобранные страницы текущего прогона: тот же объект нужен и проходу по базе,
 // и сборке страниц для канала, а страница у Крыши одна.
 const parsedNow = new Map();
@@ -5707,10 +5711,12 @@ http
       const KL = require("./scripts/krisha-lib.js");
       if (!KL.viaProxy()) return send(409, { ok: false, error: KL.proxyHint() });
       const batch = Math.max(1, Math.min(500, Number(parsed.searchParams.get("batch")) || 120));
-      const conc = Math.max(1, Math.min(30, Number(parsed.searchParams.get("concurrency")) || 8));
+      const concParam = Math.max(0, Math.min(30, Number(parsed.searchParams.get("concurrency")) || 0));
       const retries = Math.max(1, Math.min(8, Number(parsed.searchParams.get("retries")) || 5));
       const gapTtlMs = Math.max(0, Number(parsed.searchParams.get("gapTtlMin") || KRISHA_SCAN_GAP_TTL_MIN)) * 60e3;
+      const retryPerRun = Math.max(0, Math.min(200, Number(parsed.searchParams.get("retryPerRun") || 30)));
       KW.scan = KW.scan || {};
+      KW.scan.retry = KW.scan.retry || {};
       scanRunning = true;
       (async () => {
         const Scan = require("./scripts/krisha-scan.js");
@@ -5727,11 +5733,38 @@ http
         // повторов тех же 404 бережёт память ниже. Потолок выше курсора —
         // режем пачку по нему: дальше него в выдаче никого нет.
         const ceiling = await KL.frontierFromSearch().catch(() => null);
-        const top = ceiling && ceiling > cursor ? Math.min(cursor + batch, ceiling) : cursor + batch;
+        const lag = ceiling && ceiling > cursor ? ceiling - cursor : null;
+        // Параллельность: у фронтира — по одному, при отставании — по 8.
+        // ?concurrency= задаёт руками, для разового опыта.
+        const conc = concParam || (lag != null && lag <= KRISHA_SCAN_NEAR ? 1 : 8);
+        const top = lag != null ? Math.min(cursor + batch, ceiling) : cursor + batch;
         const ids = [];
         for (let id = cursor + 1; id <= top; id++) ids.push(id);
 
+        // --- Список на повтор: то, что курсор перешагнул, не прочитав. -------
+        // Курсор всегда идёт вперёд, к свежему; а этот список возвращает нас к
+        // пропущенному. Живёт в KW.scan.retry и переживает перезапуск.
+        //  fail — 468/таймаут: через 1, 5, 15 и 60 минут, потом сдаёмся;
+        //  gap  — 404 ниже курсора: id выдан, объявление либо ещё на модерации,
+        //         либо удалено — через 30 мин, 2 ч и 6 ч, потом считаем удалённым.
+        const RETRY_PLAN = { fail: [1, 5, 15, 60], gap: [30, 120, 360] };
+        const retry = KW.scan.retry;
+        // Записать следующую попытку; false — попытки кончились, запись снята.
+        const schedule = (id, kind, tries) => {
+          const plan = RETRY_PLAN[kind];
+          if (tries >= plan.length) { delete retry[id]; return false; }
+          retry[id] = { kind: kind, tries: tries, next: new Date(Date.now() + plan[tries] * 60e3).toISOString() };
+          return true;
+        };
+        const nowTs = Date.now();
+        const due = Object.keys(retry)
+          .filter((id) => Date.parse(retry[id].next) <= nowTs)
+          .sort((a, b) => Date.parse(retry[a].next) - Date.parse(retry[b].next))
+          .slice(0, retryPerRun)
+          .map(Number);
+
         let saved = 0, gaps = 0, gapsCached = 0, unresolved = 0, notListing = 0, maxLive = cursor, scannedTo = cursor;
+        let retried = 0, retryLive = 0, retryDropped = 0;
         const byDeal = {}, bySeller = {};
         // Фронтир — это подряд идущие ПОДТВЕРЖДЁННЫЕ 404 (дальше объявлений ещё
         // нет). Останавливаемся только на такой серии, чтобы не жечь прокси на
@@ -5740,11 +5773,8 @@ http
         // разрежённого участка застопорил бы курсор. Порог больше обычного
         // разрыва в середине потока (там до ~15 подряд 404).
         const FRONTIER_GAP = Math.max(40, conc * 4);
-        // Возвращает исход: 'live' | 'gap'(404) | 'unresolved'(468) | 'skip'.
-        async function handle(id) {
-          // Недавно подтверждённый 404 — не переспрашиваем.
-          const seenAt = scanGap404.get(id);
-          if (seenAt && Date.now() - seenAt < gapTtlMs) { gapsCached++; return "gap"; }
+        // Прочитать один id. Исход: 'live' | 'gap'(404) | 'unresolved'(468/сеть) | 'skip'.
+        async function probe(id) {
           try {
             const html = await KL.fetchText("https://krisha.kz/a/show/" + id, retries, 15000, { proxy: true });
             const obj = Scan.parse(id, html);
@@ -5756,14 +5786,42 @@ http
             bySeller[obj.userType || "?"] = (bySeller[obj.userType || "?"] || 0) + 1;
             return "live";
           } catch (e) {
-            if (e && (e.status === 404 || e.status === 410)) { gaps++; scanGap404.set(id, Date.now()); return "gap"; }
-            unresolved++;
+            if (e && (e.status === 404 || e.status === 410)) return "gap";
             return "unresolved";
           }
         }
+        // Новый id: недавно подтверждённый 404 не переспрашиваем.
+        async function handle(id) {
+          const seenAt = scanGap404.get(id);
+          if (seenAt && Date.now() - seenAt < gapTtlMs) { gapsCached++; return "gap"; }
+          const out = await probe(id);
+          if (out === "gap") { gaps++; scanGap404.set(id, Date.now()); }
+          else if (out === "unresolved") unresolved++;
+          return out;
+        }
+        // Повтор из списка: живое — сняли с повтора; 404 — ждём как «ещё не
+        // вышло» (сбойный id, оказавшийся 404, переходит в план gap с нуля);
+        // снова сбой — следующая ступень плана.
+        async function handleRetry(id) {
+          const r = retry[id] || { kind: "fail", tries: 0 };
+          retried++;
+          const out = await probe(id);
+          if (out === "live" || out === "skip") { delete retry[id]; if (out === "live") retryLive++; return; }
+          if (out === "gap") {
+            if (!schedule(id, "gap", r.kind === "gap" ? r.tries + 1 : 0)) retryDropped++;
+            return;
+          }
+          if (!schedule(id, "fail", r.kind === "fail" ? r.tries + 1 : 0)) retryDropped++;
+        }
         // Память о 404 не растёт бесконечно: всё старше срока — вон.
         for (const [id, at] of scanGap404) if (Date.now() - at >= gapTtlMs) scanGap404.delete(id);
+
+        // Сначала повторы (они старше), потом новые id.
+        for (let i = 0; i < due.length; i += conc) {
+          await Promise.all(due.slice(i, i + conc).map(handleRetry));
+        }
         // Идём вверх окнами по conc (порядок нужен для счёта серии 404).
+        const outcome = new Map();
         let gap404Streak = 0;
         outer:
         for (let i = 0; i < ids.length; i += conc) {
@@ -5771,12 +5829,28 @@ http
           const out = await Promise.all(win.map(handle));
           for (let k = 0; k < win.length; k++) {
             scannedTo = win[k];
+            outcome.set(win[k], out[k]);
             if (out[k] === "gap") {
               if (++gap404Streak >= FRONTIER_GAP) break outer; // прошли фронтир
             } else {
               gap404Streak = 0; // живое, 468 или не-объявление — серия прервана
             }
           }
+        }
+
+        // Что курсор перешагнул, не прочитав, — в список на повтор. Выше нового
+        // курсора ничего не пишем: туда следующий прогон придёт сам.
+        let queued = 0;
+        for (const [id, out] of outcome) {
+          if (id >= maxLive || retry[id]) continue;
+          if (out === "unresolved") { schedule(id, "fail", 0); queued++; }
+          else if (out === "gap") { schedule(id, "gap", 0); queued++; }
+        }
+        // Предохранитель на размер: список не должен расти без предела.
+        const keys = Object.keys(retry);
+        if (keys.length > 5000) {
+          keys.sort((a, b) => Date.parse(retry[b].next) - Date.parse(retry[a].next))
+            .slice(5000).forEach((id) => { delete retry[id]; });
         }
 
         // Курсор двигаем только до самого большого живого id — у фронтира он
@@ -5791,11 +5865,15 @@ http
         scanRunning = false;
         send(200, {
           ok: true,
-          scannedTo: scannedTo, ceiling: ceiling, stoppedAtFrontier: scannedTo < top,
+          scannedTo: scannedTo, ceiling: ceiling, lag: lag, concurrency: conc, stoppedAtFrontier: scannedTo < top,
           saved: saved, gaps404: gaps, gaps404Cached: gapsCached, unresolved468: unresolved, notListing: notListing,
           byDeal: byDeal, bySeller: bySeller,
           cursor: KW.scan.cursor, advanced: KW.scan.cursor - cursor,
           savedTotal: KW.scan.savedTotal,
+          // Список на повтор: сколько было к сроку, сколько перечитали, сколько
+          // из них ожило, сколько сняли по исчерпании, сколько добавили, сколько ждёт.
+          retry: { due: due.length, retried: retried, live: retryLive, dropped: retryDropped,
+                   queued: queued, pending: Object.keys(retry).length },
         });
       })().catch((e) => {
         scanRunning = false;
