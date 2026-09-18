@@ -5799,7 +5799,11 @@ http
       // Страницы независимы, их можно читать окном разом: ?concurrency=N
       // (по умолчанию 4), ?proxy=1 — окно через пул прокси с разных адресов,
       // если Крыша начнёт отбивать частые прямые запросы.
-      const conc = Math.max(1, Math.min(20, Number(q.get("concurrency") || 4)));
+      // Если прошлый прогон видел медленную базу (страница пишется дольше
+      // 1.5 с), стартуем с половины: на 10 DTU обход иначе съедает всё, и
+      // очередь плагина с поиском стоят по 15 секунд.
+      const concAsked = Math.max(1, Math.min(20, Number(q.get("concurrency") || 4)));
+      let conc = KW.list && KW.list.dbSlow ? Math.max(1, Math.floor(concAsked / 2)) : concAsked;
       const viaProxy = q.get("proxy") === "1";
       const L = require("./scripts/krisha-list.js");
       if (!KW.list || q.get("reset") === "1") {
@@ -5840,10 +5844,23 @@ http
           }
           return false;
         };
+        // Самозащита от перегруза базы: считаем, сколько занимает запись
+        // страницы; если в среднем дольше 1.5 с — режем параллельность вдвое
+        // до конца прогона и запоминаем для следующего.
+        let storeMs = 0, storeN = 0, throttled = 0;
+        function checkDbSpeed() {
+          if (storeN < 4) return;
+          const avg = storeMs / storeN;
+          if (avg > 1500 && conc > 1) { conc = Math.max(1, Math.floor(conc / 2)); throttled++; KW.list.dbSlow = true; }
+          else if (avg < 400) KW.list.dbSlow = false;
+          storeMs = 0; storeN = 0;
+        }
         // Записать страницу одним запросом (см. saveListAdverts).
         async function store(res, section) {
           const rows = res.adverts.map((a) => L.parseAdvert(a, section, res.dates)).filter((o) => o.id);
+          const t1 = Date.now();
           const outs = await db.saveListAdverts(rows, st.sweepNo);
+          storeMs += Date.now() - t1; storeN++;
           for (let k = 0; k < rows.length; k++) {
             const o = rows[k], r = outs[k] || {};
             if (!o.city) cityNull++;
@@ -5875,6 +5892,7 @@ http
           }
           if (ended) { if (nextSection()) break outer; continue; }
           if (errors >= 3) break;
+          checkDbSpeed();
           if (pace) await sleep(pace);
         }
         if (sweepDone) st.lastSweep = sweepDone;
@@ -5886,7 +5904,7 @@ http
           pages: pages, adverts: adverts, added: added, priceChanged: priceChanged,
           archived: archived, back: back, bumped: bumped, cityNull: cityNull, errors: errors,
           photosMigrated: migrated, photosLeft: migrateLeft,
-          concurrency: conc, proxy: viaProxy,
+          concurrency: conc, concurrencyAsked: concAsked, throttled: throttled, dbSlow: !!KW.list.dbSlow, proxy: viaProxy,
           cursor: { section: L.SECTIONS[st.section], page: st.page, sweepNo: st.sweepNo,
                     pagesThisSweep: st.pages, advertsThisSweep: st.adverts, startedAt: st.startedAt },
           lastSweep: st.lastSweep || null,
