@@ -67,7 +67,14 @@ async function fetchListPage(section, page, attempts, opts) {
     try {
       const j = await fetchJson(url, 15000, opts);
       const adv = j && j.adverts ? Object.values(j.adverts) : [];
-      return { adverts: adv, empty: adv.length === 0 };
+      // В JSON нет даты поднятия, а в HTML-части ответа у каждой карточки
+      // есть a-map-sidebar-item__date («18 сентября», «сегодня»). Собираем
+      // по id — по ней видно, когда объявление подняли в последний раз.
+      const dates = {};
+      for (const m of String(j && j.html || "").matchAll(/data-id="(\d+)"[\s\S]*?a-map-sidebar-item__date[^>]*>\s*([^<]+?)\s*</g)) {
+        dates[m[1]] = m[2].trim();
+      }
+      return { adverts: adv, empty: adv.length === 0, dates: dates };
     } catch (e) {
       last = e;
       if (i < (attempts || 2) - 1) await new Promise((r) => setTimeout(r, 1500));
@@ -119,8 +126,37 @@ function cityOf(lat, lon) {
   return null;
 }
 
-// Объявление списка -> строка для krisha_list.
-function parseAdvert(a, section) {
+// «18 сентября» / «сегодня» / «вчера» -> YYYY-MM-DD (по Алматы, UTC+5).
+// Года на карточке нет: берём текущий, а если месяц впереди сегодняшнего —
+// прошлый (в январе «28 декабря» — это декабрь прошлого года).
+const MONTHS = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+function bumpDate(text) {
+  const t = String(text || "").toLowerCase().trim();
+  const now = new Date(Date.now() + 5 * 3600e3);
+  const ymd = (d) => d.toISOString().slice(0, 10);
+  if (/^сегодня/.test(t)) return ymd(now);
+  if (/^вчера/.test(t)) return ymd(new Date(now.getTime() - 86400e3));
+  const m = t.match(/^(\d{1,2})\s+([а-яё]+)/);
+  if (!m) return null;
+  const mon = MONTHS.findIndex((x) => m[2].startsWith(x.slice(0, 3)));
+  if (mon < 0) return null;
+  let year = now.getUTCFullYear();
+  if (mon > now.getUTCMonth()) year--;
+  const d = new Date(Date.UTC(year, mon, Number(m[1])));
+  return isNaN(d) ? null : ymd(d);
+}
+
+// Город, когда координаты не попали ни в один полигон: заголовок первого
+// фото начинается с «Продажа квартир в Атырау: …» / «… в Алматинской обл.: …».
+function cityFromCaption(a) {
+  const p = a.photos && a.photos[0];
+  const t = p ? String(p.title || p.alt || "") : "";
+  const m = t.match(/ в ([^:]+):/);
+  return m ? KB.citySlugOf(m[1]) : null;
+}
+
+// Объявление списка -> строка для krisha_list. dates — карта id -> текст даты.
+function parseAdvert(a, section, dates) {
   const title = String(a.title || "");
   const fl = title.match(/(\d+)\s*\/\s*(\d+)\s*этаж/);
   const lat = a.map && typeof a.map.lat === "number" ? a.map.lat : null;
@@ -130,7 +166,8 @@ function parseAdvert(a, section) {
     id: Number(a.id),
     deal: dealOf(section), prop: propOf(section),
     userType: a.userType || null,
-    city: cityOf(lat, lon),
+    city: cityOf(lat, lon) || cityFromCaption(a),
+    bumpedOn: bumpDate(dates && dates[String(a.id)]),
     price: typeof a.price === "number" ? a.price : null,
     rooms: typeof a.rooms === "number" ? a.rooms : null,
     area: typeof a.square === "number" ? a.square : null,
@@ -143,8 +180,10 @@ function parseAdvert(a, section) {
     ownerName: a.ownerName || null,
     photos: photos.length,
     photo1: photos.length ? String(photos[0].src || "") : null,
+    // Все ссылки на фото — по ним потом сверяем «та же квартира».
+    photoUrls: photos.map((p) => String(p.src || "")).filter(Boolean),
     storage: a.storage || a.status || null,
   };
 }
 
-module.exports = { SECTIONS, fetchListPage, parseAdvert, loadRegions, cityOf, dealOf, propOf };
+module.exports = { SECTIONS, fetchListPage, parseAdvert, loadRegions, cityOf, dealOf, propOf, bumpDate };

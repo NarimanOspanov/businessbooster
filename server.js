@@ -5761,7 +5761,7 @@ http
         await L.loadRegions().catch(() => { /* город останется пустым */ });
         const st = KW.list;
         if (!st.startedAt) st.startedAt = new Date().toISOString();
-        let pages = 0, adverts = 0, added = 0, priceChanged = 0, archived = 0, back = 0, cityNull = 0, errors = 0;
+        let pages = 0, adverts = 0, added = 0, priceChanged = 0, archived = 0, back = 0, bumped = 0, cityNull = 0, errors = 0;
         let sweepDone = null;
         // Конец раздела: следующий; кончились все — круг завершён.
         const nextSection = () => {
@@ -5778,7 +5778,7 @@ http
         // Записать страницу — по пять объявлений разом: сеть на страницу 0.3 с,
         // а двадцать последовательных MERGE — секунду; пул mssql держит десять.
         async function store(res, section) {
-          const rows = res.adverts.map((a) => L.parseAdvert(a, section)).filter((o) => o.id);
+          const rows = res.adverts.map((a) => L.parseAdvert(a, section, res.dates)).filter((o) => o.id);
           for (let i = 0; i < rows.length; i += 5) {
             const part = rows.slice(i, i + 5);
             const outs = await Promise.all(part.map((o) => db.saveListAdvert(o, st.sweepNo)));
@@ -5790,6 +5790,7 @@ http
               if (r.price) priceChanged++;
               if (r.archived) archived++;
               if (r.back) back++;
+              if (r.bump) bumped++;
             }
           }
         }
@@ -5822,7 +5823,7 @@ http
         send(200, {
           ok: true, seconds: Math.round((Date.now() - t0) / 100) / 10,
           pages: pages, adverts: adverts, added: added, priceChanged: priceChanged,
-          archived: archived, back: back, cityNull: cityNull, errors: errors,
+          archived: archived, back: back, bumped: bumped, cityNull: cityNull, errors: errors,
           concurrency: conc, proxy: viaProxy,
           cursor: { section: L.SECTIONS[st.section], page: st.page, sweepNo: st.sweepNo,
                     pagesThisSweep: st.pages, advertsThisSweep: st.adverts, startedAt: st.startedAt },

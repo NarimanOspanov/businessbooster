@@ -1846,13 +1846,17 @@ BEGIN
   CREATE INDEX IX_klist_first ON dbo.krisha_list (first_seen DESC);
   CREATE INDEX IX_klist_cat ON dbo.krisha_list (deal, prop, city, user_type);
 END
+-- bumped_on — дата последнего поднятия с карточки; смена даты — событие bump.
+IF COL_LENGTH('dbo.krisha_list', 'bumped_on') IS NULL ALTER TABLE dbo.krisha_list ADD bumped_on DATE NULL;
+-- photos_json — все ссылки на фото JSON-массивом (полноразмерные -full.jpg).
+IF COL_LENGTH('dbo.krisha_list', 'photos_json') IS NULL ALTER TABLE dbo.krisha_list ADD photos_json NVARCHAR(MAX) NULL;
 IF OBJECT_ID('dbo.krisha_list_events', 'U') IS NULL
 BEGIN
   CREATE TABLE dbo.krisha_list_events (
     ev_id     BIGINT IDENTITY(1,1) PRIMARY KEY,
     id        BIGINT        NOT NULL,
     at        DATETIME2(0)  NOT NULL CONSTRAINT DF_klev_at DEFAULT SYSUTCDATETIME(),
-    kind      NVARCHAR(16)  NOT NULL,   -- new | price | archived | back
+    kind      NVARCHAR(16)  NOT NULL,   -- new | price | archived | back | bump
     old_price BIGINT        NULL,
     new_price BIGINT        NULL,
     sweep_no  INT           NULL
@@ -1893,6 +1897,8 @@ async function saveListAdvert(o, sweepNo) {
     .input("photos", sql.Int, o.photos == null ? null : Number(o.photos))
     .input("photo1", sql.NVarChar(300), o.photo1 || null)
     .input("storage", sql.NVarChar(20), o.storage || null)
+    .input("bumped", sql.Date, o.bumpedOn || null)
+    .input("pj", sql.NVarChar(sql.MAX), o.photoUrls && o.photoUrls.length ? JSON.stringify(o.photoUrls) : null)
     .input("sweep", sql.Int, sweepNo == null ? null : Number(sweepNo))
     .query(`
       MERGE dbo.krisha_list AS t
@@ -1902,15 +1908,17 @@ async function saveListAdvert(o, sweepNo) {
         price = @price, rooms = @rooms, area = @area, floor = @floor, floors = @floors,
         complex_id = @cxid, lat = @lat, lon = @lon, title = @title, addr = @addr,
         owner_name = @owner, photos = @photos, photo1 = @photo1, storage = @storage,
+        bumped_on = COALESCE(@bumped, t.bumped_on), photos_json = COALESCE(@pj, t.photos_json),
         last_seen = SYSUTCDATETIME(), seen_count = t.seen_count + 1, sweep_no = @sweep
       WHEN NOT MATCHED THEN INSERT
         (id, deal, prop, user_type, city, price, rooms, area, floor, floors, complex_id, lat, lon,
-         title, addr, owner_name, photos, photo1, storage, sweep_no)
+         title, addr, owner_name, photos, photo1, storage, bumped_on, photos_json, sweep_no)
         VALUES (@id, @deal, @prop, @ut, @city, @price, @rooms, @area, @floor, @floors, @cxid, @lat, @lon,
-         @title, @addr, @owner, @photos, @photo1, @storage, @sweep)
-      OUTPUT $action AS act, deleted.price AS old_price, deleted.storage AS old_storage;`);
+         @title, @addr, @owner, @photos, @photo1, @storage, @bumped, @pj, @sweep)
+      OUTPUT $action AS act, deleted.price AS old_price, deleted.storage AS old_storage,
+             deleted.bumped_on AS old_bumped;`);
   const row = r.recordset[0] || {};
-  const out = { added: row.act === "INSERT", price: false, archived: false, back: false };
+  const out = { added: row.act === "INSERT", price: false, archived: false, back: false, bump: false };
   const events = [];
   if (out.added) events.push(["new", null, o.price]);
   else {
@@ -1921,6 +1929,10 @@ async function saveListAdvert(o, sweepNo) {
       if (now === "live") { out.back = true; events.push(["back", null, null]); }
       else { out.archived = true; events.push(["archived", null, null]); }
     }
+    // Поднятие: дата на карточке стала позже той, что мы видели. Первое
+    // заполнение (раньше даты не было) поднятием не считаем.
+    const oldB = row.old_bumped ? new Date(row.old_bumped).toISOString().slice(0, 10) : null;
+    if (oldB && o.bumpedOn && o.bumpedOn > oldB) { out.bump = true; events.push(["bump", null, null]); }
   }
   for (const [kind, oldP, newP] of events) {
     await pool.request()
@@ -1947,9 +1959,13 @@ async function listStats() {
   const ev = (await pool.request().query(`
     SELECT kind, COUNT(*) AS n FROM dbo.krisha_list_events
     WHERE at >= DATEADD(hour, -24, SYSUTCDATETIME()) GROUP BY kind`)).recordset;
+  const bumps = (await pool.request().query(`
+    SELECT bumped_on, COUNT(*) AS n FROM dbo.krisha_list
+    WHERE bumped_on >= DATEADD(day, -7, CAST(SYSUTCDATETIME() AS DATE))
+    GROUP BY bumped_on ORDER BY bumped_on DESC`)).recordset;
   const byDeal = (await pool.request().query(`
     SELECT deal, prop, COUNT(*) AS n FROM dbo.krisha_list GROUP BY deal, prop`)).recordset;
-  return { total: tot, events24h: ev, byDealProp: byDeal };
+  return { total: tot, events24h: ev, byDealProp: byDeal, bumpedByDay: bumps };
 }
 
 // Кто быстрее и полнее: список карты или обход по id. Считаем по общему
