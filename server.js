@@ -6480,6 +6480,18 @@ http
     }
 
     // Дашборд собственника: импорт по дням/периодам, разбивка, конверсия.
+    // Кто сколько занимает в базе — когда Azure SQL упирается в квоту.
+    if (urlPath === "/api/krisha/dbsize") {
+      const key = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
+      if (!key || parsed.searchParams.get("key") !== key) { res.writeHead(403); res.end("bad key"); return; }
+      (async () => {
+        const d = await db.dbSize();
+        res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+        res.end(JSON.stringify(d, null, 2));
+      })().catch((e) => { res.writeHead(500); res.end(String(e.message)); });
+      return;
+    }
+
     // Те же страницы поверх списка карты. Старые остаются как были.
     if (urlPath === "/api/krisha/liststats") {
       const q = parsed.searchParams;

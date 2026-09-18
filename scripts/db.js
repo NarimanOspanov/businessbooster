@@ -2268,6 +2268,30 @@ async function setListHumanOk(logId, ok) {
     .query("UPDATE dbo.krisha_list_matches SET human_ok = @ok WHERE id = @id");
 }
 
+// Размер базы: лимит и занято, и кто сколько занимает по таблицам и индексам.
+// Нужно, когда Azure SQL упирается в квоту и надо решать, что резать.
+async function dbSize() {
+  const pool = await getPool();
+  const head = (await pool.request().query(`
+    SELECT DB_NAME() AS db,
+      CAST(DATABASEPROPERTYEX(DB_NAME(), 'MaxSizeInBytes') AS BIGINT) / 1048576 AS max_mb,
+      (SELECT SUM(CAST(FILEPROPERTY(name, 'SpaceUsed') AS BIGINT)) * 8 / 1024 FROM sys.database_files WHERE type_desc = 'ROWS') AS used_mb,
+      (SELECT SUM(CAST(size AS BIGINT)) * 8 / 1024 FROM sys.database_files WHERE type_desc = 'ROWS') AS allocated_mb`)).recordset[0];
+  const parts = (await pool.request().query(`
+    SELECT t.name AS table_name, ISNULL(i.name, '(heap)') AS index_name, i.type_desc,
+      SUM(ps.used_page_count) * 8 / 1024 AS used_mb,
+      SUM(CASE WHEN i.index_id IN (0, 1) THEN ps.row_count ELSE 0 END) AS rows_
+    FROM sys.dm_db_partition_stats ps
+    JOIN sys.indexes i ON i.object_id = ps.object_id AND i.index_id = ps.index_id
+    JOIN sys.tables t ON t.object_id = ps.object_id
+    GROUP BY t.name, i.name, i.type_desc
+    HAVING SUM(ps.used_page_count) * 8 / 1024 >= 1
+    ORDER BY used_mb DESC`)).recordset;
+  const byTable = {};
+  for (const p of parts) { byTable[p.table_name] = (byTable[p.table_name] || 0) + Number(p.used_mb); }
+  return { db: head, tables: Object.entries(byTable).sort((a, b) => b[1] - a[1]).map(([t, mb]) => ({ table: t, used_mb: mb })), parts: parts };
+}
+
 // Фото объявления из списка — уменьшенные 560x350, как у objectPhotos.
 function listPhotoUrls(photosJson) {
   try {
@@ -2797,7 +2821,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveListAdvert, listStats, listCompare,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
-  listDashboard, listMatchReviewRows, setListHumanOk,
+  listDashboard, listMatchReviewRows, setListHumanOk, dbSize,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,
