@@ -1852,7 +1852,9 @@ IF COL_LENGTH('dbo.krisha_list', 'bumped_on') IS NULL ALTER TABLE dbo.krisha_lis
 IF COL_LENGTH('dbo.krisha_list', 'photos_json') IS NULL ALTER TABLE dbo.krisha_list ADD photos_json NVARCHAR(MAX) NULL;
 -- photos_c — то же компактно: «папка|номера» (см. packPhotos). photos_json
 -- у старых строк переносится сюда и обнуляется — он и забил квоту базы.
-IF COL_LENGTH('dbo.krisha_list', 'photos_c') IS NULL ALTER TABLE dbo.krisha_list ADD photos_c VARCHAR(2000) NULL;
+IF COL_LENGTH('dbo.krisha_list', 'photos_c') IS NULL ALTER TABLE dbo.krisha_list ADD photos_c VARCHAR(MAX) NULL;
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.krisha_list') AND name = 'photos_c' AND max_length <> -1)
+  ALTER TABLE dbo.krisha_list ALTER COLUMN photos_c VARCHAR(MAX) NULL;
 -- Телефоны хозяев — те же колонки и та же логика промахов, что у krisha_objects:
 -- очередь плагина теперь идёт по списку, он видит хозяев раньше и шире.
 IF COL_LENGTH('dbo.krisha_list', 'phones')        IS NULL ALTER TABLE dbo.krisha_list ADD phones NVARCHAR(300) NULL;
@@ -1865,10 +1867,18 @@ IF COL_LENGTH('dbo.krisha_list', 'searched_at')   IS NULL ALTER TABLE dbo.krisha
 IF COL_LENGTH('dbo.krisha_list', 'match_count')   IS NULL ALTER TABLE dbo.krisha_list ADD match_count INT NULL;
 IF COL_LENGTH('dbo.krisha_list', 'match_top')     IS NULL ALTER TABLE dbo.krisha_list ADD match_top BIGINT NULL;
 -- EXEC: индексы на колонки, добавленные ALTER'ом в этом же батче.
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_nophone' AND object_id = OBJECT_ID('dbo.krisha_list'))
-  EXEC('CREATE INDEX IX_klist_nophone ON dbo.krisha_list (first_seen DESC) WHERE phones IS NULL AND user_type = ''owner''');
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_tosearch' AND object_id = OBJECT_ID('dbo.krisha_list'))
-  EXEC('CREATE INDEX IX_klist_tosearch ON dbo.krisha_list (first_seen DESC) WHERE searched_at IS NULL');
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_nophone' AND object_id = OBJECT_ID('dbo.krisha_list'))
+  DROP INDEX IX_klist_nophone ON dbo.krisha_list;
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_nophone2' AND object_id = OBJECT_ID('dbo.krisha_list'))
+  EXEC('CREATE INDEX IX_klist_nophone2 ON dbo.krisha_list (first_seen DESC)
+        INCLUDE (storage, deal, prop, phone_tries, phone_state, phone_next_at)
+        WHERE phones IS NULL AND user_type = ''owner''');
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_tosearch' AND object_id = OBJECT_ID('dbo.krisha_list'))
+  DROP INDEX IX_klist_tosearch ON dbo.krisha_list;
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_tosearch2' AND object_id = OBJECT_ID('dbo.krisha_list'))
+  EXEC('CREATE INDEX IX_klist_tosearch2 ON dbo.krisha_list (first_seen DESC)
+        INCLUDE (user_type, area, complex_id, lat)
+        WHERE searched_at IS NULL');
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_owner_geo' AND object_id = OBJECT_ID('dbo.krisha_list'))
   EXEC('CREATE INDEX IX_klist_owner_geo ON dbo.krisha_list (lat, lon) INCLUDE (deal, prop, area, rooms, floor, floors) WHERE user_type = ''owner''');
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_owner_cx' AND object_id = OBJECT_ID('dbo.krisha_list'))
@@ -1943,7 +1953,7 @@ async function saveListAdvert(o, sweepNo) {
     .input("photo1", sql.NVarChar(300), cut(o.photo1, 300))
     .input("storage", sql.NVarChar(20), cut(o.storage, 20))
     .input("bumped", sql.Date, o.bumpedOn || null)
-    .input("pc", sql.VarChar(2000), require("./krisha-list.js").packPhotos(o.photoUrls))
+    .input("pc", sql.VarChar(sql.MAX), require("./krisha-list.js").packPhotos(o.photoUrls))
     .input("sweep", sql.Int, sweepNo == null ? null : Number(sweepNo))
     .query(`
       MERGE dbo.krisha_list AS t
@@ -2342,7 +2352,7 @@ async function migrateListPhotos(batch, afterId) {
       try { urls = JSON.parse(r.photos_json || "[]"); } catch { urls = []; }
       await pool.request()
         .input("id", sql.BigInt, Number(r.id))
-        .input("pc", sql.VarChar(2000), L.packPhotos(urls))
+        .input("pc", sql.VarChar(sql.MAX), L.packPhotos(urls))
         .query("UPDATE dbo.krisha_list SET photos_c = COALESCE(photos_c, @pc), photos_json = NULL WHERE id = @id");
       done++;
     }));
@@ -2384,7 +2394,7 @@ async function saveListAdverts(rows, sweepNo) {
       .input("photo1" + k, sql.NVarChar(300), cut(o.photo1, 300))
       .input("storage" + k, sql.NVarChar(20), cut(o.storage, 20))
       .input("bumped" + k, sql.Date, o.bumpedOn || null)
-      .input("pc" + k, sql.VarChar(2000), L.packPhotos(o.photoUrls));
+      .input("pc" + k, sql.VarChar(sql.MAX), L.packPhotos(o.photoUrls));
     vals.push("(@id" + k + ",@deal" + k + ",@prop" + k + ",@ut" + k + ",@city" + k + ",@price" + k + ",@rooms" + k +
       ",@area" + k + ",@floor" + k + ",@floors" + k + ",@cxid" + k + ",@lat" + k + ",@lon" + k + ",@title" + k +
       ",@addr" + k + ",@owner" + k + ",@photos" + k + ",@photo1" + k + ",@storage" + k + ",@bumped" + k + ",@pc" + k + ")");
