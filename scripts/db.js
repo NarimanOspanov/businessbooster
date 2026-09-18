@@ -43,6 +43,25 @@ function getPool() {
   return poolPromise;
 }
 
+// Подключение для миграций схемы: индекс на двухстах тысячах строк на 10 DTU
+// строится минуты, а обычный таймаут запроса — 15 секунд. Обрыв по таймауту
+// откатывал CREATE INDEX, следующий вызов начинал заново — и так по кругу,
+// с процессором и журналом у 100%.
+let ddlPromise = null;
+function ddlPool() {
+  const conn = connectionString();
+  if (!conn) return Promise.reject(new Error("нет строки подключения"));
+  if (!ddlPromise) {
+    let cfg;
+    try { cfg = sql.ConnectionPool.parseConnectionString(conn); } catch { cfg = null; }
+    if (!cfg) return getPool(); // строку не разобрали — обычный пул
+    cfg.requestTimeout = 20 * 60 * 1000;
+    cfg.pool = Object.assign({}, cfg.pool || {}, { max: 1, min: 0 });
+    ddlPromise = new sql.ConnectionPool(cfg).connect().catch((e) => { ddlPromise = null; throw e; });
+  }
+  return ddlPromise;
+}
+
 const SCHEMA = `
 -- Клиника = организация в Clerk. Звонок принадлежит клинике по номеру, на
 -- который позвонили: у каждой он свой, и это единственный признак, известный
@@ -1789,11 +1808,18 @@ async function botStats(days) {
 // --- Крыша: полный поток недвижимости (id-walking) -------------------------
 
 let objectsReady = false;
-async function ensureObjects(pool) {
+let objectsReadyPromise = null;
+async function ensureObjects() {
   if (objectsReady) return;
-  await pool.request().batch(SCHEMA_OBJECTS);
-  await pool.request().batch(SCHEMA_MATCHLOG);
-  objectsReady = true;
+  if (!objectsReadyPromise) {
+    objectsReadyPromise = (async () => {
+      const p = await ddlPool();
+      await p.request().batch(SCHEMA_OBJECTS);
+      await p.request().batch(SCHEMA_MATCHLOG);
+      objectsReady = true;
+    })().catch((e) => { objectsReadyPromise = null; throw e; });
+  }
+  await objectsReadyPromise;
 }
 
 // Ссылки на фото объекта — из сохранённого window.data (advert.photos).
@@ -1867,18 +1893,18 @@ IF COL_LENGTH('dbo.krisha_list', 'searched_at')   IS NULL ALTER TABLE dbo.krisha
 IF COL_LENGTH('dbo.krisha_list', 'match_count')   IS NULL ALTER TABLE dbo.krisha_list ADD match_count INT NULL;
 IF COL_LENGTH('dbo.krisha_list', 'match_top')     IS NULL ALTER TABLE dbo.krisha_list ADD match_top BIGINT NULL;
 -- EXEC: индексы на колонки, добавленные ALTER'ом в этом же батче.
-IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_nophone' AND object_id = OBJECT_ID('dbo.krisha_list'))
-  DROP INDEX IX_klist_nophone ON dbo.krisha_list;
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_nophone2' AND object_id = OBJECT_ID('dbo.krisha_list'))
   EXEC('CREATE INDEX IX_klist_nophone2 ON dbo.krisha_list (first_seen DESC)
         INCLUDE (storage, deal, prop, phone_tries, phone_state, phone_next_at)
         WHERE phones IS NULL AND user_type = ''owner''');
-IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_tosearch' AND object_id = OBJECT_ID('dbo.krisha_list'))
-  DROP INDEX IX_klist_tosearch ON dbo.krisha_list;
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_nophone' AND object_id = OBJECT_ID('dbo.krisha_list'))
+  DROP INDEX IX_klist_nophone ON dbo.krisha_list;
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_tosearch2' AND object_id = OBJECT_ID('dbo.krisha_list'))
   EXEC('CREATE INDEX IX_klist_tosearch2 ON dbo.krisha_list (first_seen DESC)
         INCLUDE (user_type, area, complex_id, lat)
         WHERE searched_at IS NULL');
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_tosearch' AND object_id = OBJECT_ID('dbo.krisha_list'))
+  DROP INDEX IX_klist_tosearch ON dbo.krisha_list;
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_owner_geo' AND object_id = OBJECT_ID('dbo.krisha_list'))
   EXEC('CREATE INDEX IX_klist_owner_geo ON dbo.krisha_list (lat, lon) INCLUDE (deal, prop, area, rooms, floor, floors) WHERE user_type = ''owner''');
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_owner_cx' AND object_id = OBJECT_ID('dbo.krisha_list'))
@@ -1917,10 +1943,17 @@ BEGIN
 END
 `;
 let listReady = false;
-async function ensureList(pool) {
+let listReadyPromise = null;
+async function ensureList() {
   if (listReady) return;
-  await pool.request().batch(SCHEMA_LIST);
-  listReady = true;
+  if (!listReadyPromise) {
+    listReadyPromise = (async () => {
+      const p = await ddlPool();
+      await p.request().batch(SCHEMA_LIST);
+      listReady = true;
+    })().catch((e) => { listReadyPromise = null; throw e; });
+  }
+  await listReadyPromise;
 }
 
 // Записать объявление из списка. Один MERGE с OUTPUT: он же говорит, новое
