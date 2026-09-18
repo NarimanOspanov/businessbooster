@@ -5814,6 +5814,18 @@ http
         const st = KW.list;
         if (!st.startedAt) st.startedAt = new Date().toISOString();
         let pages = 0, adverts = 0, added = 0, priceChanged = 0, archived = 0, back = 0, bumped = 0, cityNull = 0, errors = 0;
+        // Перенос фото старых строк в компактный вид — первым делом, пока
+        // есть что переносить: каждая пачка возвращает базе место.
+        let migrated = 0, migrateLeft = null;
+        if (KW.list.photosMigrated !== true) {
+          try {
+            while (Date.now() - t0 < budgetMs / 2) {
+              const m = await db.migrateListPhotos(500);
+              migrated += m.done; migrateLeft = m.left;
+              if (!m.left) { KW.list.photosMigrated = true; break; }
+            }
+          } catch (e) { errors++; migrateLeft = "ошибка: " + String(e.message).slice(0, 100); }
+        }
         let sweepDone = null;
         // Конец раздела: следующий; кончились все — круг завершён.
         const nextSection = () => {
@@ -5876,6 +5888,7 @@ http
           ok: true, seconds: Math.round((Date.now() - t0) / 100) / 10,
           pages: pages, adverts: adverts, added: added, priceChanged: priceChanged,
           archived: archived, back: back, bumped: bumped, cityNull: cityNull, errors: errors,
+          photosMigrated: migrated, photosLeft: migrateLeft,
           concurrency: conc, proxy: viaProxy,
           cursor: { section: L.SECTIONS[st.section], page: st.page, sweepNo: st.sweepNo,
                     pagesThisSweep: st.pages, advertsThisSweep: st.adverts, startedAt: st.startedAt },
@@ -6222,9 +6235,9 @@ http
           let scores = {};
           if (PhotoMatch.available()) {
             try {
-              const agentPhotos = db.listPhotoUrls(a.photos_json);
+              const agentPhotos = db.listPhotoUrls(a.photos_c, a.photos_json);
               if (agentPhotos.length) {
-                const cands = hits.map((h) => ({ id: String(h.id), photos: db.listPhotoUrls(h.photos_json) }));
+                const cands = hits.map((h) => ({ id: String(h.id), photos: db.listPhotoUrls(h.photos_c, h.photos_json) }));
                 scores = await PhotoMatch.scoreCandidates(agentPhotos, cands);
               }
             } catch { /* фото — уточнение, находка и так записана */ }
@@ -6529,10 +6542,10 @@ http
           const rows = await db.listMatchReviewRows(40);
           const finds = rows.map((r) => {
             const x = Object.assign({}, r, {
-              a_photos: db.listPhotoUrls(r.a_pj).slice(0, 4),
-              o_photos: db.listPhotoUrls(r.o_pj).slice(0, 4),
+              a_photos: db.listPhotoUrls(r.a_pc, r.a_pj).slice(0, 4),
+              o_photos: db.listPhotoUrls(r.o_pc, r.o_pj).slice(0, 4),
             });
-            delete x.a_pj; delete x.o_pj;
+            delete x.a_pj; delete x.o_pj; delete x.a_pc; delete x.o_pc;
             return x;
           });
           // Форма stats — как у старой страницы: total.searched/matched + byDay.

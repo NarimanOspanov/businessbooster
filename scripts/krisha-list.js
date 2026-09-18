@@ -186,4 +186,35 @@ function parseAdvert(a, section, dates) {
   };
 }
 
-module.exports = { SECTIONS, fetchListPage, parseAdvert, loadRegions, cityOf, dealOf, propOf, bumpDate };
+// Ссылки на фото — компактно. У всех фото одного объявления общая папка на
+// CDN, различается только номер файла:
+//   https://krisha-photos.kcdn.online/webp/78/789eb091-…/20-full.jpg
+// Храним «папка|20,21,22» (~200 байт) вместо списка полных ссылок (~4 КБ в
+// NVARCHAR): именно они и забили базу до квоты. Если ссылки не по шаблону —
+// запасной вид «j:» + JSON, он редкий.
+const PHOTO_HOST = "https://krisha-photos.kcdn.online/";
+function packPhotos(urls) {
+  const list = (urls || []).map(String).filter(Boolean);
+  if (!list.length) return null;
+  let folder = null;
+  const nums = [];
+  for (const u of list) {
+    const m = u.match(/^https:\/\/krisha-photos\.kcdn\.online\/(.+)\/(\d+)-full\.jpg$/);
+    if (!m || (folder && m[1] !== folder)) { folder = null; break; }
+    folder = m[1];
+    nums.push(m[2]);
+  }
+  if (folder) return folder + "|" + nums.join(",");
+  return "j:" + JSON.stringify(list);
+}
+function unpackPhotos(packed) {
+  const s = String(packed || "");
+  if (!s) return [];
+  if (s.startsWith("j:")) { try { return JSON.parse(s.slice(2)); } catch { return []; } }
+  const bar = s.indexOf("|");
+  if (bar < 0) return [];
+  const folder = s.slice(0, bar);
+  return s.slice(bar + 1).split(",").filter(Boolean).map((n) => PHOTO_HOST + folder + "/" + n + "-full.jpg");
+}
+
+module.exports = { SECTIONS, fetchListPage, parseAdvert, loadRegions, cityOf, dealOf, propOf, bumpDate, packPhotos, unpackPhotos };

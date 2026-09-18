@@ -1850,6 +1850,9 @@ END
 IF COL_LENGTH('dbo.krisha_list', 'bumped_on') IS NULL ALTER TABLE dbo.krisha_list ADD bumped_on DATE NULL;
 -- photos_json — все ссылки на фото JSON-массивом (полноразмерные -full.jpg).
 IF COL_LENGTH('dbo.krisha_list', 'photos_json') IS NULL ALTER TABLE dbo.krisha_list ADD photos_json NVARCHAR(MAX) NULL;
+-- photos_c — то же компактно: «папка|номера» (см. packPhotos). photos_json
+-- у старых строк переносится сюда и обнуляется — он и забил квоту базы.
+IF COL_LENGTH('dbo.krisha_list', 'photos_c') IS NULL ALTER TABLE dbo.krisha_list ADD photos_c VARCHAR(2000) NULL;
 -- Телефоны хозяев — те же колонки и та же логика промахов, что у krisha_objects:
 -- очередь плагина теперь идёт по списку, он видит хозяев раньше и шире.
 IF COL_LENGTH('dbo.krisha_list', 'phones')        IS NULL ALTER TABLE dbo.krisha_list ADD phones NVARCHAR(300) NULL;
@@ -1940,7 +1943,7 @@ async function saveListAdvert(o, sweepNo) {
     .input("photo1", sql.NVarChar(300), cut(o.photo1, 300))
     .input("storage", sql.NVarChar(20), cut(o.storage, 20))
     .input("bumped", sql.Date, o.bumpedOn || null)
-    .input("pj", sql.NVarChar(sql.MAX), o.photoUrls && o.photoUrls.length ? JSON.stringify(o.photoUrls) : null)
+    .input("pc", sql.VarChar(2000), require("./krisha-list.js").packPhotos(o.photoUrls))
     .input("sweep", sql.Int, sweepNo == null ? null : Number(sweepNo))
     .query(`
       MERGE dbo.krisha_list AS t
@@ -1950,13 +1953,13 @@ async function saveListAdvert(o, sweepNo) {
         price = @price, rooms = @rooms, area = @area, floor = @floor, floors = @floors,
         complex_id = @cxid, lat = @lat, lon = @lon, title = @title, addr = @addr,
         owner_name = @owner, photos = @photos, photo1 = @photo1, storage = @storage,
-        bumped_on = COALESCE(@bumped, t.bumped_on), photos_json = COALESCE(@pj, t.photos_json),
+        bumped_on = COALESCE(@bumped, t.bumped_on), photos_c = COALESCE(@pc, t.photos_c), photos_json = NULL,
         last_seen = SYSUTCDATETIME(), seen_count = t.seen_count + 1, sweep_no = @sweep
       WHEN NOT MATCHED THEN INSERT
         (id, deal, prop, user_type, city, price, rooms, area, floor, floors, complex_id, lat, lon,
-         title, addr, owner_name, photos, photo1, storage, bumped_on, photos_json, sweep_no)
+         title, addr, owner_name, photos, photo1, storage, bumped_on, photos_c, sweep_no)
         VALUES (@id, @deal, @prop, @ut, @city, @price, @rooms, @area, @floor, @floors, @cxid, @lat, @lon,
-         @title, @addr, @owner, @photos, @photo1, @storage, @bumped, @pj, @sweep)
+         @title, @addr, @owner, @photos, @photo1, @storage, @bumped, @pc, @sweep)
       OUTPUT $action AS act, deleted.price AS old_price, deleted.storage AS old_storage,
              deleted.bumped_on AS old_bumped;`);
   const row = r.recordset[0] || {};
@@ -2085,7 +2088,7 @@ async function agentsToMatchList(limit) {
   await ensureList(pool);
   const r = await pool.request().input("n", sql.Int, Number(limit) || 100).query(`
     SELECT TOP (@n) id, deal, prop, city, area, rooms, floor, floors, complex_id, lat, lon,
-      price, title, addr, user_type, first_seen, bumped_on, photos_json
+      price, title, addr, user_type, first_seen, bumped_on, photos_c, photos_json
     FROM dbo.krisha_list
     WHERE searched_at IS NULL
       AND user_type IN ('specialist', 'company', 'agent')
@@ -2121,7 +2124,7 @@ async function findListOwners(q, limit) {
     .query(`
       SELECT TOP (@n) f.id, f.deal, f.prop, f.user_type, f.city, f.area, f.rooms, f.floor, f.floors,
         f.complex_id, f.lat, f.lon, f.price, f.title, f.addr, f.storage, f.first_seen, f.bumped_on,
-        f.phones, f.photos_json, arch.at AS archived_at,
+        f.phones, f.photos_c, f.photos_json, arch.at AS archived_at,
         IIF(@cxid IS NOT NULL AND f.complex_id = @cxid, 4, 0)
           + IIF(@lat IS NOT NULL AND f.lat IS NOT NULL
                 AND ABS(f.lat - @lat) < 0.0006 AND ABS(f.lon - @lon) < 0.0008, 6, 0)
@@ -2249,10 +2252,10 @@ async function listMatchReviewRows(limit) {
       m.photo_why, m.human_ok, m.found_at,
       a.title a_title, a.city a_city, a.area a_area, a.rooms a_rooms, a.floor a_floor, a.floors a_floors,
       a.price a_price, a.deal a_deal, a.prop a_prop, a.complex_id a_cx, a.lat a_lat, a.lon a_lon,
-      a.addr a_addr, a.storage a_storage, a.bumped_on a_bumped, a.first_seen a_seen, a.photos_json a_pj,
+      a.addr a_addr, a.storage a_storage, a.bumped_on a_bumped, a.first_seen a_seen, a.photos_c a_pc, a.photos_json a_pj,
       o.title o_title, o.city o_city, o.area o_area, o.rooms o_rooms, o.floor o_floor, o.floors o_floors,
       o.price o_price, o.complex_id o_cx, o.lat o_lat, o.lon o_lon,
-      o.addr o_addr, o.storage o_storage, o.bumped_on o_bumped, o.first_seen o_seen, o.phones o_phones, o.photos_json o_pj
+      o.addr o_addr, o.storage o_storage, o.bumped_on o_bumped, o.first_seen o_seen, o.phones o_phones, o.photos_c o_pc, o.photos_json o_pj
     FROM dbo.krisha_list_matches m
     JOIN dbo.krisha_list a ON a.id = m.agent_id
     JOIN dbo.krisha_list o ON o.id = m.owner_id
@@ -2293,11 +2296,37 @@ async function dbSize() {
 }
 
 // Фото объявления из списка — уменьшенные 560x350, как у objectPhotos.
-function listPhotoUrls(photosJson) {
-  try {
-    const arr = JSON.parse(photosJson || "[]");
-    return (Array.isArray(arr) ? arr : []).map((u) => String(u).replace(/-full\.jpg$/, "-560x350.jpg")).filter(Boolean);
-  } catch { return []; }
+// Сначала компактная колонка, потом старое JSON-поле (пока не перенесено).
+function listPhotoUrls(photosC, photosJson) {
+  let arr = [];
+  if (photosC) arr = require("./krisha-list.js").unpackPhotos(photosC);
+  else if (photosJson) { try { arr = JSON.parse(photosJson); } catch { arr = []; } }
+  return (Array.isArray(arr) ? arr : []).map((u) => String(u).replace(/-full\.jpg$/, "-560x350.jpg")).filter(Boolean);
+}
+
+// Перенос старых строк: photos_json -> photos_c, старое поле обнуляем, и
+// место освобождается по ходу. Пачками, чтобы не держать базу; возвращает
+// сколько перенесли и сколько осталось.
+async function migrateListPhotos(batch) {
+  const pool = await getPool();
+  await ensureList(pool);
+  const L = require("./krisha-list.js");
+  const rows = (await pool.request().input("n", sql.Int, Math.max(1, Math.min(2000, Number(batch) || 500)))
+    .query("SELECT TOP (@n) id, photos_json FROM dbo.krisha_list WHERE photos_json IS NOT NULL")).recordset;
+  let done = 0;
+  for (let i = 0; i < rows.length; i += 5) {
+    await Promise.all(rows.slice(i, i + 5).map(async (r) => {
+      let urls = [];
+      try { urls = JSON.parse(r.photos_json || "[]"); } catch { urls = []; }
+      await pool.request()
+        .input("id", sql.BigInt, Number(r.id))
+        .input("pc", sql.VarChar(2000), L.packPhotos(urls))
+        .query("UPDATE dbo.krisha_list SET photos_c = COALESCE(photos_c, @pc), photos_json = NULL WHERE id = @id");
+      done++;
+    }));
+  }
+  const left = (await pool.request().query("SELECT COUNT(*) AS n FROM dbo.krisha_list WHERE photos_json IS NOT NULL")).recordset[0].n;
+  return { done: done, left: left };
 }
 
 async function listStats() {
@@ -2821,7 +2850,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveListAdvert, listStats, listCompare,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
-  listDashboard, listMatchReviewRows, setListHumanOk, dbSize,
+  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, migrateListPhotos,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,
