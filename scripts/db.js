@@ -2062,7 +2062,12 @@ async function nextListOwnerWithoutPhone(since, deal, prop, withCounts) {
       SELECT TOP (1) id, title, deal, prop, city, user_type, price, storage, first_seen, bumped_on, phone_tries, phone_state
       FROM dbo.krisha_list
       WHERE ${ready} AND ${now}
-      ORDER BY first_seen DESC, id DESC`);
+      ORDER BY first_seen DESC
+      OPTION (RECOMPILE)`);
+  // Без «, id DESC» в ORDER BY: с ним оптимизатор сортировал все 200 тысяч
+  // подходящих строк ради одной, по 10 секунд на вызов; порядок внутри одной
+  // секунды нам безразличен. RECOMPILE — чтобы @deal/@prop IS NULL стали
+  // константами и план шёл по фильтрованному индексу.
   if (withCounts === false) return { row: r.recordset[0] || null, left: null, waiting: null };
   const c = (await req().query(`SELECT
               SUM(CASE WHEN ${now} THEN 1 ELSE 0 END) AS ready,

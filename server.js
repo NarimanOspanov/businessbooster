@@ -1734,6 +1734,7 @@ let scanRunning = false;
 let listRunning = false;
 // Кэш счётчиков очереди телефонов: ключ «since|deal|prop» -> {at, left, waiting}.
 const objphoneCounts = new Map();
+const listDashCache = { at: 0, body: null };
 let matchListRunning = false;
 let matchRunning = false;
 // Подтверждённые 404 скана: id → когда. Пока курсор стоит у фронтира, каждый
@@ -6536,9 +6537,13 @@ http
       if (!key || q.get("key") !== key) { res.writeHead(403); res.end("bad key"); return; }
       if (q.get("data")) {
         (async () => {
-          const d = await db.listDashboard(60);
+          // Шесть запросов по дням на 10 DTU — десятки секунд; держим минуту.
+          if (!listDashCache.body || Date.now() - listDashCache.at > 60e3) {
+            listDashCache.body = JSON.stringify(await db.listDashboard(60));
+            listDashCache.at = Date.now();
+          }
           res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
-          res.end(JSON.stringify(d));
+          res.end(listDashCache.body);
         })().catch((e) => { res.writeHead(500); res.end(String(e.message)); });
         return;
       }
