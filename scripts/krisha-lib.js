@@ -741,5 +741,5 @@ module.exports = {
   searchUrl, parseCards, parseDetail, districtOf, locationScore, dedupeKey,
   ageBand, areaBand, groupKey, median, buildModel, flagsFor,
   fetchText, fetchSearch, fetchDetail, fetchPriceAnalysis, newestFromSearch, FEED_SECTIONS,
-  viaProxy, proxyHint, proxyCount, rotateProxies, PROXY_FILE,
+  viaProxy, proxyHint, proxyCount, rotateProxies, dispatcher, PROXY_FILE,
 };

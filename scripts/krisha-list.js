@@ -12,6 +12,7 @@
 // той же страницы карты (13 крупных; остальное — null).
 
 const KB = require("./krisha-base.js");
+const { fetch: undiciFetch } = require("undici");
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 const H = {
@@ -35,23 +36,36 @@ function propOf(section) {
     : /uchastk/.test(section) ? "land" : /kommerch/.test(section) ? "commercial" : "other";
 }
 
-async function fetchJson(url, timeoutMs) {
+// opts.proxy — через пул прокси (разные адреса), иначе напрямую с сервера.
+async function fetchJson(url, timeoutMs, opts) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs || 15000);
   try {
-    const r = await fetch(url, { headers: H, signal: ctrl.signal });
-    if (!r.ok) { const e = new Error("HTTP " + r.status); e.status = r.status; throw e; }
+    let agent;
+    if (opts && opts.proxy) {
+      const KL = require("./krisha-lib.js");
+      agent = await KL.dispatcher();
+      if (!agent) throw new Error(KL.proxyHint());
+    }
+    const r = await (agent ? undiciFetch : fetch)(url, {
+      headers: H, signal: ctrl.signal, ...(agent ? { dispatcher: agent } : {}),
+    });
+    if (!r.ok) {
+      try { if (r.body) r.body.cancel().catch(() => {}); } catch { /* уже закрыт */ }
+      ctrl.abort();
+      const e = new Error("HTTP " + r.status); e.status = r.status; throw e;
+    }
     return await r.json();
   } finally { clearTimeout(t); }
 }
 
 // Одна страница списка. { adverts: [...], empty: bool }
-async function fetchListPage(section, page, attempts) {
+async function fetchListPage(section, page, attempts, opts) {
   const url = "https://krisha.kz/a/ajax-map-list/map" + section + "?page=" + page;
   let last;
   for (let i = 0; i < (attempts || 2); i++) {
     try {
-      const j = await fetchJson(url);
+      const j = await fetchJson(url, 15000, opts);
       const adv = j && j.adverts ? Object.values(j.adverts) : [];
       return { adverts: adv, empty: adv.length === 0 };
     } catch (e) {

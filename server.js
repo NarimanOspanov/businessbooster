@@ -5744,6 +5744,11 @@ http
       const budgetMs = Math.max(5, Math.min(600, Number(q.get("budgetSec") || 45))) * 1000;
       const pace = Math.max(0, Math.min(5000, Number(q.get("pace") || 200)));
       const maxPages = Math.max(1, Math.min(5000, Number(q.get("pages") || 400)));
+      // Страницы независимы, их можно читать окном разом: ?concurrency=N
+      // (по умолчанию 4), ?proxy=1 — окно через пул прокси с разных адресов,
+      // если Крыша начнёт отбивать частые прямые запросы.
+      const conc = Math.max(1, Math.min(20, Number(q.get("concurrency") || 4)));
+      const viaProxy = q.get("proxy") === "1";
       const L = require("./scripts/krisha-list.js");
       if (!KW.list || q.get("reset") === "1") {
         KW.list = { section: 0, page: 1, sweepNo: ((KW.list && KW.list.sweepNo) || 0) + 1,
@@ -5758,36 +5763,56 @@ http
         if (!st.startedAt) st.startedAt = new Date().toISOString();
         let pages = 0, adverts = 0, added = 0, priceChanged = 0, archived = 0, back = 0, cityNull = 0, errors = 0;
         let sweepDone = null;
+        // Конец раздела: следующий; кончились все — круг завершён.
+        const nextSection = () => {
+          st.section++; st.page = 1;
+          if (st.section >= L.SECTIONS.length) {
+            sweepDone = { sweepNo: st.sweepNo, pages: st.pages, adverts: st.adverts,
+                          startedAt: st.startedAt, finishedAt: new Date().toISOString(),
+                          minutes: Math.round((Date.now() - Date.parse(st.startedAt)) / 60e3) };
+            st.section = 0; st.sweepNo++; st.startedAt = null; st.pages = 0; st.adverts = 0;
+            return true;
+          }
+          return false;
+        };
+        // Записать страницу — по пять объявлений разом: сеть на страницу 0.3 с,
+        // а двадцать последовательных MERGE — секунду; пул mssql держит десять.
+        async function store(res, section) {
+          const rows = res.adverts.map((a) => L.parseAdvert(a, section)).filter((o) => o.id);
+          for (let i = 0; i < rows.length; i += 5) {
+            const part = rows.slice(i, i + 5);
+            const outs = await Promise.all(part.map((o) => db.saveListAdvert(o, st.sweepNo)));
+            for (let k = 0; k < part.length; k++) {
+              const o = part[k], r = outs[k];
+              if (!o.city) cityNull++;
+              adverts++; st.adverts++;
+              if (r.added) added++;
+              if (r.price) priceChanged++;
+              if (r.archived) archived++;
+              if (r.back) back++;
+            }
+          }
+        }
+        outer:
         while (pages < maxPages && Date.now() - t0 < budgetMs) {
           const section = L.SECTIONS[st.section];
-          let res;
-          try { res = await L.fetchListPage(section, st.page); }
-          catch (e) { errors++; if (errors >= 3) break; await sleep(2000); continue; }
-          pages++; st.pages++;
-          if (res.empty) {
-            // Раздел кончился — следующий; кончились все — круг завершён.
-            st.section++; st.page = 1;
-            if (st.section >= L.SECTIONS.length) {
-              sweepDone = { sweepNo: st.sweepNo, pages: st.pages, adverts: st.adverts,
-                            startedAt: st.startedAt, finishedAt: new Date().toISOString(),
-                            minutes: Math.round((Date.now() - Date.parse(st.startedAt)) / 60e3) };
-              st.section = 0; st.sweepNo++; st.startedAt = null; st.pages = 0; st.adverts = 0;
-              break;
-            }
-            continue;
+          // Окно страниц разом; разбираем по порядку до первой пустой или сбойной:
+          // всё после неё в этом окне не считается, курсор встаёт на неё.
+          const win = [];
+          for (let k = 0; k < conc && pages + k < maxPages; k++) win.push(st.page + k);
+          const got = await Promise.all(win.map((p) =>
+            L.fetchListPage(section, p, 2, { proxy: viaProxy }).then((r) => ({ ok: true, r })).catch((e) => ({ ok: false, e }))));
+          let ended = false;
+          for (let k = 0; k < win.length; k++) {
+            const g = got[k];
+            if (!g.ok) { errors++; break; }            // с этой страницы продолжит следующий вызов
+            pages++; st.pages++;
+            if (g.r.empty) { ended = true; break; }
+            await store(g.r, section);
+            st.page = win[k] + 1;
           }
-          for (const a of res.adverts) {
-            const o = L.parseAdvert(a, section);
-            if (!o.id) continue;
-            if (!o.city) cityNull++;
-            const r = await db.saveListAdvert(o, st.sweepNo);
-            adverts++; st.adverts++;
-            if (r.added) added++;
-            if (r.price) priceChanged++;
-            if (r.archived) archived++;
-            if (r.back) back++;
-          }
-          st.page++;
+          if (ended) { if (nextSection()) break outer; continue; }
+          if (errors >= 3) break;
           if (pace) await sleep(pace);
         }
         if (sweepDone) st.lastSweep = sweepDone;
@@ -5798,6 +5823,7 @@ http
           ok: true, seconds: Math.round((Date.now() - t0) / 100) / 10,
           pages: pages, adverts: adverts, added: added, priceChanged: priceChanged,
           archived: archived, back: back, cityNull: cityNull, errors: errors,
+          concurrency: conc, proxy: viaProxy,
           cursor: { section: L.SECTIONS[st.section], page: st.page, sweepNo: st.sweepNo,
                     pagesThisSweep: st.pages, advertsThisSweep: st.adverts, startedAt: st.startedAt },
           lastSweep: st.lastSweep || null,
