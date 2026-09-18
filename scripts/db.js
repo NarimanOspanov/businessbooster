@@ -1877,12 +1877,16 @@ async function ensureList(pool) {
 async function saveListAdvert(o, sweepNo) {
   const pool = await getPool();
   await ensureList(pool);
+  // Строки режем до длины колонок: адрес или заголовок длиннее объявленного
+  // драйвер не отправит вовсе (TDS «invalid data length»), а одно такое
+  // объявление не должно останавливать весь обход.
+  const cut = (v, n) => (v == null || v === "" ? null : String(v).slice(0, n));
   const r = await pool.request()
     .input("id", sql.BigInt, Number(o.id))
-    .input("deal", sql.NVarChar(10), o.deal || null)
-    .input("prop", sql.NVarChar(20), o.prop || null)
-    .input("ut", sql.NVarChar(20), o.userType || null)
-    .input("city", sql.NVarChar(40), o.city || null)
+    .input("deal", sql.NVarChar(10), cut(o.deal, 10))
+    .input("prop", sql.NVarChar(20), cut(o.prop, 20))
+    .input("ut", sql.NVarChar(20), cut(o.userType, 20))
+    .input("city", sql.NVarChar(40), cut(o.city, 40))
     .input("price", sql.BigInt, o.price == null ? null : Number(o.price))
     .input("rooms", sql.Int, o.rooms == null ? null : Number(o.rooms))
     .input("area", sql.Decimal(9, 2), o.area == null ? null : Number(o.area))
@@ -1891,12 +1895,12 @@ async function saveListAdvert(o, sweepNo) {
     .input("cxid", sql.BigInt, o.complexId == null ? null : Number(o.complexId))
     .input("lat", sql.Decimal(11, 7), o.lat == null ? null : Number(o.lat))
     .input("lon", sql.Decimal(11, 7), o.lon == null ? null : Number(o.lon))
-    .input("title", sql.NVarChar(300), o.title || null)
-    .input("addr", sql.NVarChar(300), o.addr || null)
-    .input("owner", sql.NVarChar(120), o.ownerName || null)
+    .input("title", sql.NVarChar(300), cut(o.title, 300))
+    .input("addr", sql.NVarChar(300), cut(o.addr, 300))
+    .input("owner", sql.NVarChar(120), cut(o.ownerName, 120))
     .input("photos", sql.Int, o.photos == null ? null : Number(o.photos))
-    .input("photo1", sql.NVarChar(300), o.photo1 || null)
-    .input("storage", sql.NVarChar(20), o.storage || null)
+    .input("photo1", sql.NVarChar(300), cut(o.photo1, 300))
+    .input("storage", sql.NVarChar(20), cut(o.storage, 20))
     .input("bumped", sql.Date, o.bumpedOn || null)
     .input("pj", sql.NVarChar(sql.MAX), o.photoUrls && o.photoUrls.length ? JSON.stringify(o.photoUrls) : null)
     .input("sweep", sql.Int, sweepNo == null ? null : Number(sweepNo))
