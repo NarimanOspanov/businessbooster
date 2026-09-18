@@ -5815,14 +5815,15 @@ http
         if (!st.startedAt) st.startedAt = new Date().toISOString();
         let pages = 0, adverts = 0, added = 0, priceChanged = 0, archived = 0, back = 0, bumped = 0, cityNull = 0, errors = 0;
         // Перенос фото старых строк в компактный вид — первым делом, пока
-        // есть что переносить: каждая пачка возвращает базе место.
+        // есть что переносить: идём по id с сохранённого места, каждая пачка
+        // возвращает базе место.
         let migrated = 0, migrateLeft = null;
         if (KW.list.photosMigrated !== true) {
           try {
-            while (Date.now() - t0 < budgetMs / 2) {
-              const m = await db.migrateListPhotos(500);
-              migrated += m.done; migrateLeft = m.left;
-              if (!m.left) { KW.list.photosMigrated = true; break; }
+            while (Date.now() - t0 < budgetMs / 3) {
+              const m = await db.migrateListPhotos(500, KW.list.migrateAfter || 0);
+              migrated += m.done; KW.list.migrateAfter = m.lastId; migrateLeft = "после id " + m.lastId;
+              if (m.finished) { KW.list.photosMigrated = true; migrateLeft = "готово"; break; }
             }
           } catch (e) { errors++; migrateLeft = "ошибка: " + String(e.message).slice(0, 100); }
         }
@@ -5839,23 +5840,19 @@ http
           }
           return false;
         };
-        // Записать страницу — по пять объявлений разом: сеть на страницу 0.3 с,
-        // а двадцать последовательных MERGE — секунду; пул mssql держит десять.
+        // Записать страницу одним запросом (см. saveListAdverts).
         async function store(res, section) {
           const rows = res.adverts.map((a) => L.parseAdvert(a, section, res.dates)).filter((o) => o.id);
-          for (let i = 0; i < rows.length; i += 5) {
-            const part = rows.slice(i, i + 5);
-            const outs = await Promise.all(part.map((o) => db.saveListAdvert(o, st.sweepNo)));
-            for (let k = 0; k < part.length; k++) {
-              const o = part[k], r = outs[k];
-              if (!o.city) cityNull++;
-              adverts++; st.adverts++;
-              if (r.added) added++;
-              if (r.price) priceChanged++;
-              if (r.archived) archived++;
-              if (r.back) back++;
-              if (r.bump) bumped++;
-            }
+          const outs = await db.saveListAdverts(rows, st.sweepNo);
+          for (let k = 0; k < rows.length; k++) {
+            const o = rows[k], r = outs[k] || {};
+            if (!o.city) cityNull++;
+            adverts++; st.adverts++;
+            if (r.added) added++;
+            if (r.price) priceChanged++;
+            if (r.archived) archived++;
+            if (r.back) back++;
+            if (r.bump) bumped++;
           }
         }
         outer:

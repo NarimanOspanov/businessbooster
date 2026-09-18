@@ -2325,15 +2325,19 @@ function listPhotoUrls(photosC, photosJson) {
 // Перенос старых строк: photos_json -> photos_c, старое поле обнуляем, и
 // место освобождается по ходу. Пачками, чтобы не держать базу; возвращает
 // сколько перенесли и сколько осталось.
-async function migrateListPhotos(batch) {
+// Идём по id (кластерный ключ, дёшево), а не «WHERE photos_json IS NOT NULL»
+// — такой поиск по LOB-колонке на 10 DTU не укладывался в таймаут.
+async function migrateListPhotos(batch, afterId) {
   const pool = await getPool();
   await ensureList(pool);
   const L = require("./krisha-list.js");
-  const rows = (await pool.request().input("n", sql.Int, Math.max(1, Math.min(2000, Number(batch) || 500)))
-    .query("SELECT TOP (@n) id, photos_json FROM dbo.krisha_list WHERE photos_json IS NOT NULL")).recordset;
+  const n = Math.max(1, Math.min(2000, Number(batch) || 500));
+  const rows = (await pool.request().input("n", sql.Int, n).input("after", sql.BigInt, Number(afterId) || 0)
+    .query("SELECT TOP (@n) id, photos_json FROM dbo.krisha_list WHERE id > @after ORDER BY id")).recordset;
   let done = 0;
-  for (let i = 0; i < rows.length; i += 5) {
-    await Promise.all(rows.slice(i, i + 5).map(async (r) => {
+  const todo = rows.filter((r) => r.photos_json);
+  for (let i = 0; i < todo.length; i += 5) {
+    await Promise.all(todo.slice(i, i + 5).map(async (r) => {
       let urls = [];
       try { urls = JSON.parse(r.photos_json || "[]"); } catch { urls = []; }
       await pool.request()
@@ -2343,8 +2347,99 @@ async function migrateListPhotos(batch) {
       done++;
     }));
   }
-  const left = (await pool.request().query("SELECT COUNT(*) AS n FROM dbo.krisha_list WHERE photos_json IS NOT NULL")).recordset[0].n;
-  return { done: done, left: left };
+  return { done: done, scanned: rows.length, lastId: rows.length ? Number(rows[rows.length - 1].id) : Number(afterId) || 0,
+           finished: rows.length < n };
+}
+
+// Страница списка одним запросом: MERGE по VALUES из всех строк и один INSERT
+// событий. На 10 DTU двадцать отдельных MERGE на страницу были главным
+// потребителем базы; так — один обмен вместо двадцати с лишним.
+async function saveListAdverts(rows, sweepNo) {
+  const list = (rows || []).filter((o) => o && o.id);
+  if (!list.length) return [];
+  const pool = await getPool();
+  await ensureList(pool);
+  const L = require("./krisha-list.js");
+  const cut = (v, n) => (v == null || v === "" ? null : String(v).slice(0, n));
+  const req = pool.request().input("sweep", sql.Int, sweepNo == null ? null : Number(sweepNo));
+  const vals = [];
+  list.forEach((o, k) => {
+    req.input("id" + k, sql.BigInt, Number(o.id))
+      .input("deal" + k, sql.NVarChar(10), cut(o.deal, 10))
+      .input("prop" + k, sql.NVarChar(20), cut(o.prop, 20))
+      .input("ut" + k, sql.NVarChar(20), cut(o.userType, 20))
+      .input("city" + k, sql.NVarChar(40), cut(o.city, 40))
+      .input("price" + k, sql.BigInt, o.price == null ? null : Number(o.price))
+      .input("rooms" + k, sql.Int, o.rooms == null ? null : Number(o.rooms))
+      .input("area" + k, sql.Decimal(9, 2), o.area == null ? null : Number(o.area))
+      .input("floor" + k, sql.Int, o.floor == null ? null : Number(o.floor))
+      .input("floors" + k, sql.Int, o.floors == null ? null : Number(o.floors))
+      .input("cxid" + k, sql.BigInt, o.complexId == null ? null : Number(o.complexId))
+      .input("lat" + k, sql.Decimal(11, 7), o.lat == null ? null : Number(o.lat))
+      .input("lon" + k, sql.Decimal(11, 7), o.lon == null ? null : Number(o.lon))
+      .input("title" + k, sql.NVarChar(300), cut(o.title, 300))
+      .input("addr" + k, sql.NVarChar(300), cut(o.addr, 300))
+      .input("owner" + k, sql.NVarChar(120), cut(o.ownerName, 120))
+      .input("photos" + k, sql.Int, o.photos == null ? null : Number(o.photos))
+      .input("photo1" + k, sql.NVarChar(300), cut(o.photo1, 300))
+      .input("storage" + k, sql.NVarChar(20), cut(o.storage, 20))
+      .input("bumped" + k, sql.Date, o.bumpedOn || null)
+      .input("pc" + k, sql.VarChar(2000), L.packPhotos(o.photoUrls));
+    vals.push("(@id" + k + ",@deal" + k + ",@prop" + k + ",@ut" + k + ",@city" + k + ",@price" + k + ",@rooms" + k +
+      ",@area" + k + ",@floor" + k + ",@floors" + k + ",@cxid" + k + ",@lat" + k + ",@lon" + k + ",@title" + k +
+      ",@addr" + k + ",@owner" + k + ",@photos" + k + ",@photo1" + k + ",@storage" + k + ",@bumped" + k + ",@pc" + k + ")");
+  });
+  const r = await req.query(`
+    MERGE dbo.krisha_list AS t
+    USING (VALUES ${vals.join(",")}) AS s
+      (id, deal, prop, user_type, city, price, rooms, area, floor, floors, complex_id, lat, lon,
+       title, addr, owner_name, photos, photo1, storage, bumped_on, photos_c)
+    ON t.id = s.id
+    WHEN MATCHED THEN UPDATE SET
+      deal = s.deal, prop = s.prop, user_type = s.user_type, city = COALESCE(s.city, t.city),
+      price = s.price, rooms = s.rooms, area = s.area, floor = s.floor, floors = s.floors,
+      complex_id = s.complex_id, lat = s.lat, lon = s.lon, title = s.title, addr = s.addr,
+      owner_name = s.owner_name, photos = s.photos, photo1 = s.photo1, storage = s.storage,
+      bumped_on = COALESCE(s.bumped_on, t.bumped_on), photos_c = COALESCE(s.photos_c, t.photos_c), photos_json = NULL,
+      last_seen = SYSUTCDATETIME(), seen_count = t.seen_count + 1, sweep_no = @sweep
+    WHEN NOT MATCHED THEN INSERT
+      (id, deal, prop, user_type, city, price, rooms, area, floor, floors, complex_id, lat, lon,
+       title, addr, owner_name, photos, photo1, storage, bumped_on, photos_c, sweep_no)
+      VALUES (s.id, s.deal, s.prop, s.user_type, s.city, s.price, s.rooms, s.area, s.floor, s.floors, s.complex_id, s.lat, s.lon,
+       s.title, s.addr, s.owner_name, s.photos, s.photo1, s.storage, s.bumped_on, s.photos_c, @sweep)
+    OUTPUT $action AS act, inserted.id AS id, deleted.price AS old_price, deleted.storage AS old_storage,
+           deleted.bumped_on AS old_bumped;`);
+  const byId = {};
+  for (const row of r.recordset) byId[String(row.id)] = row;
+  const out = [];
+  const events = [];
+  for (const o of list) {
+    const row = byId[String(o.id)] || {};
+    const res = { id: o.id, added: row.act === "INSERT", price: false, archived: false, back: false, bump: false };
+    if (res.added) events.push([o.id, "new", null, o.price]);
+    else if (row.act === "UPDATE") {
+      const oldP = row.old_price == null ? null : Number(row.old_price);
+      if (oldP != null && o.price != null && oldP !== Number(o.price)) { res.price = true; events.push([o.id, "price", oldP, o.price]); }
+      const was = row.old_storage || null, now = o.storage || null;
+      if (was !== now && (was === "live" || now === "live")) {
+        if (now === "live") { res.back = true; events.push([o.id, "back", null, null]); }
+        else { res.archived = true; events.push([o.id, "archived", null, null]); }
+      }
+      const oldB = row.old_bumped ? new Date(row.old_bumped).toISOString().slice(0, 10) : null;
+      if (oldB && o.bumpedOn && o.bumpedOn > oldB) { res.bump = true; events.push([o.id, "bump", null, null]); }
+    }
+    out.push(res);
+  }
+  if (events.length) {
+    const er = pool.request().input("sweep", sql.Int, sweepNo == null ? null : Number(sweepNo));
+    const ev = events.map(([id, kind, op, np], k) => {
+      er.input("eid" + k, sql.BigInt, Number(id)).input("ek" + k, sql.NVarChar(16), kind)
+        .input("eo" + k, sql.BigInt, op == null ? null : Number(op)).input("en" + k, sql.BigInt, np == null ? null : Number(np));
+      return "(@eid" + k + ",@ek" + k + ",@eo" + k + ",@en" + k + ",@sweep)";
+    });
+    await er.query("INSERT INTO dbo.krisha_list_events (id, kind, old_price, new_price, sweep_no) VALUES " + ev.join(","));
+  }
+  return out;
 }
 
 async function listStats() {
@@ -2868,7 +2963,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveListAdvert, listStats, listCompare,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
-  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, migrateListPhotos,
+  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, migrateListPhotos, saveListAdverts,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,
