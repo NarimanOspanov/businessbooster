@@ -2292,7 +2292,25 @@ async function dbSize() {
     ORDER BY used_mb DESC`)).recordset;
   const byTable = {};
   for (const p of parts) { byTable[p.table_name] = (byTable[p.table_name] || 0) + Number(p.used_mb); }
-  return { db: head, tables: Object.entries(byTable).sort((a, b) => b[1] - a[1]).map(([t, mb]) => ({ table: t, used_mb: mb })), parts: parts };
+  // Нагрузка за последние минуты (Azure SQL пишет её раз в 15 секунд): если
+  // CPU, IO или журнал у 100% — база упёрлась в DTU, а не в место.
+  let load = [];
+  try {
+    load = (await pool.request().query(`
+      SELECT TOP (8) CONVERT(varchar(19), end_time, 120) AS at, avg_cpu_percent AS cpu, avg_data_io_percent AS io,
+        avg_log_write_percent AS log_write, dtu_limit
+      FROM sys.dm_db_resource_stats ORDER BY end_time DESC`)).recordset;
+  } catch { /* нет прав или не Azure */ }
+  let running = [];
+  try {
+    running = (await pool.request().query(`
+      SELECT TOP (10) r.session_id, r.status, r.wait_type, r.wait_time / 1000 AS wait_s, r.total_elapsed_time / 1000 AS elapsed_s,
+        LEFT(t.text, 90) AS sql_text
+      FROM sys.dm_exec_requests r CROSS APPLY sys.dm_exec_sql_text(r.sql_handle) t
+      WHERE r.session_id <> @@SPID ORDER BY r.total_elapsed_time DESC`)).recordset;
+  } catch { /* нет прав */ }
+  return { db: head, load: load, running: running,
+    tables: Object.entries(byTable).sort((a, b) => b[1] - a[1]).map(([t, mb]) => ({ table: t, used_mb: mb })), parts: parts };
 }
 
 // Фото объявления из списка — уменьшенные 560x350, как у objectPhotos.
