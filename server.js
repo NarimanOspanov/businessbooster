@@ -1695,6 +1695,13 @@ const KRISHA_SCAN_BUDGET_SEC = Number(process.env.KRISHA_SCAN_BUDGET_SEC || 50);
 // после восьми): refresh порта бесплатный, а серия отказов означает, что
 // текущие адреса Крыша уже держит на подозрении.
 const KRISHA_SCAN_ROTATE_STREAK = Number(process.env.KRISHA_SCAN_ROTATE_STREAK || 6);
+// Выдача перемешивает свежие публикации с платными поднятиями старых
+// объявлений. «Свежий» — id не старше этого окна от курсора (100 000 id —
+// около шести дней): такие читаем вперёд всех. Старые поднятия — не срочно:
+// добираем по KRISHA_SCAN_OLD_PER_RUN в конце прогона, если остался бюджет,
+// иначе они бы съедали всю минуту и до обхода по id дело бы не доходило.
+const KRISHA_SCAN_RECENT = Number(process.env.KRISHA_SCAN_RECENT || 100000);
+const KRISHA_SCAN_OLD_PER_RUN = Number(process.env.KRISHA_SCAN_OLD_PER_RUN || 10);
 // Разобранные страницы текущего прогона: тот же объект нужен и проходу по базе,
 // и сборке страниц для канала, а страница у Крыши одна.
 const parsedNow = new Map();
@@ -5788,7 +5795,7 @@ http
         let saved = 0, gaps = 0, gapsCached = 0, unresolved = 0, notListing = 0, knownSkipped = 0;
         let maxLive = cursor, scannedTo = cursor;
         let retried = 0, retryLive = 0, retryDropped = 0;
-        let feedCards = 0, feedNew = 0, feedBelow = 0, feedSaved = 0, feedFailed = 0;
+        let feedCards = 0, feedNew = 0, feedBelow = 0, feedSaved = 0, feedFailed = 0, feedOldTaken = 0;
         let rotated = 0, unresolvedStreak = 0;
         const feedSections = {};
         const byDeal = {}, bySeller = {};
@@ -5882,8 +5889,12 @@ http
             feedBelow = feedIds.filter((id) => id <= cursor).length;
           } catch (e) { feedSections.error = String(e.message).slice(0, 120); }
         }
-        for (let i = 0; i < feedIds.length && !overBudget(); i += conc) {
-          await maybeRotate(await Promise.all(feedIds.slice(i, i + conc).map(handleFeed)));
+        // Свежие (id рядом с курсором — только что опубликованные, в том числе
+        // вышедшие из модерации) — сейчас; старые поднятия — в самом конце.
+        const feedRecent = feedIds.filter((id) => id > cursor - KRISHA_SCAN_RECENT);
+        const feedOld = feedIds.filter((id) => id <= cursor - KRISHA_SCAN_RECENT);
+        for (let i = 0; i < feedRecent.length && !overBudget(); i += conc) {
+          await maybeRotate(await Promise.all(feedRecent.slice(i, i + conc).map(handleFeed)));
         }
         // 2. Повторы (они старше новых).
         for (let i = 0; i < due.length && !overBudget(); i += conc) {
@@ -5915,6 +5926,15 @@ http
           }
         }
 
+        // 4. Старые поднятия из выдачи — понемногу, на остаток бюджета. Это
+        //    активные объявления, их стоит иметь, но они не срочные.
+        const oldSlice = feedOld.slice(0, KRISHA_SCAN_OLD_PER_RUN);
+        for (let i = 0; i < oldSlice.length && !overBudget(); i += conc) {
+          const part = oldSlice.slice(i, i + conc);
+          feedOldTaken += part.length;
+          await maybeRotate(await Promise.all(part.map(handleFeed)));
+        }
+
         // Что курсор перешагнул, не прочитав, — в список на повтор. Выше нового
         // курсора ничего не пишем: туда следующий прогон придёт сам.
         let queued = 0;
@@ -5924,10 +5944,12 @@ http
           else if (out === "gap") { schedule(id, "gap", 0); queued++; }
         }
         // Предохранитель на размер: список не должен расти без предела.
+        // 20 000 записей — это дни притока даже при худшем проценте отказов;
+        // ниже этого ничего не теряем.
         const keys = Object.keys(retry);
-        if (keys.length > 5000) {
+        if (keys.length > 20000) {
           keys.sort((a, b) => Date.parse(retry[b].next) - Date.parse(retry[a].next))
-            .slice(5000).forEach((id) => { delete retry[id]; });
+            .slice(20000).forEach((id) => { delete retry[id]; });
         }
 
         // Курсор двигаем только до самого большого живого id — у фронтира он
@@ -5953,7 +5975,8 @@ http
           savedTotal: KW.scan.savedTotal,
           // Выдача: сколько карточек прочитали, сколько из них не было в базе,
           // сколько из новых ниже курсора (вышли из модерации позже), итог.
-          feed: { cards: feedCards, "new": feedNew, belowCursor: feedBelow, saved: feedSaved,
+          feed: { cards: feedCards, "new": feedNew, recent: feedRecent.length, old: feedOld.length,
+                  oldTaken: feedOldTaken, belowCursor: feedBelow, saved: feedSaved,
                   failed: feedFailed, sections: feedSections },
           // Список на повтор: сколько было к сроку, сколько перечитали, сколько
           // из них ожило, сколько сняли по исчерпании, сколько добавили, сколько ждёт.
