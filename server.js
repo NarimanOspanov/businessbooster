@@ -1732,6 +1732,8 @@ let photosRunning = false;
 let deepenRunning = false;
 let scanRunning = false;
 let listRunning = false;
+// Кэш счётчиков очереди телефонов: ключ «since|deal|prop» -> {at, left, waiting}.
+const objphoneCounts = new Map();
 let matchListRunning = false;
 let matchRunning = false;
 // Подтверждённые 404 скана: id → когда. Пока курсор стоит у фронтира, каждый
@@ -6909,10 +6911,17 @@ http
           const since = sinceRaw || day(Date.now() - 7 * 86400e3);
           const dealF = parsed.searchParams.get("deal") || null;
           const propF = parsed.searchParams.get("prop") || null;
-          const q = await db.nextListOwnerWithoutPhone(since, dealF, propF);
+          // Счётчики очереди — раз в минуту на окно, остальные вызовы берут
+          // из кэша: сам подсчёт на 10 DTU стоит секунды, объект — миллисекунды.
+          const ck = since + "|" + (dealF || "") + "|" + (propF || "");
+          const cached = objphoneCounts.get(ck);
+          const fresh = !cached || Date.now() - cached.at > 60e3;
+          const q = await db.nextListOwnerWithoutPhone(since, dealF, propF, fresh);
+          if (fresh) objphoneCounts.set(ck, { at: Date.now(), left: q.left, waiting: q.waiting });
+          const cnt = fresh ? q : objphoneCounts.get(ck);
           const r = q.row;
           return send(200, {
-            ok: true, since: since, left: q.left, waiting: q.waiting,
+            ok: true, since: since, left: cnt.left, waiting: cnt.waiting, countsAt: new Date(fresh ? Date.now() : cached.at).toISOString(),
             item: r ? {
               id: String(r.id), title: r.title, deal: r.deal, prop: r.prop, city: r.city,
               seller: r.user_type, price: r.price == null ? null : Number(r.price),

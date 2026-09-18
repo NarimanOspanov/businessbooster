@@ -2042,7 +2042,10 @@ async function saveListAdvert(o, sweepNo) {
 // Хозяева без номера, живые, свежие первыми: номер надо снять до того, как
 // агент уговорит хозяина спрятать объявление. since — не старше этой даты по
 // first_seen; deal/prop — необязательные фильтры.
-async function nextListOwnerWithoutPhone(since, deal, prop) {
+// withCounts=false — только следующий объект, без пересчёта очереди: подсчёт
+// по 200 тысячам хозяев на 10 DTU занимает секунды, а плагин зовёт это каждую
+// минуту; счётчики кэширует вызывающий.
+async function nextListOwnerWithoutPhone(since, deal, prop, withCounts) {
   const pool = await getPool();
   await ensureList(pool);
   const ready = `user_type = 'owner' AND storage = 'live' AND phones IS NULL
@@ -2060,6 +2063,7 @@ async function nextListOwnerWithoutPhone(since, deal, prop) {
       FROM dbo.krisha_list
       WHERE ${ready} AND ${now}
       ORDER BY first_seen DESC, id DESC`);
+  if (withCounts === false) return { row: r.recordset[0] || null, left: null, waiting: null };
   const c = (await req().query(`SELECT
               SUM(CASE WHEN ${now} THEN 1 ELSE 0 END) AS ready,
               SUM(CASE WHEN ${now} THEN 0 ELSE 1 END) AS waiting
