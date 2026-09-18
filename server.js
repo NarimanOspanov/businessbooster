@@ -5818,6 +5818,11 @@ http
       const concAsked = Math.max(1, Math.min(20, Number(q.get("concurrency") || 4)));
       let conc = KW.list && KW.list.dbSlow ? Math.max(1, Math.floor(concAsked / 2)) : concAsked;
       const viaProxy = q.get("proxy") === "1";
+      // Свежее — первым делом: список карты отсортирован по дате поднятия,
+      // новое объявление появляется на первой странице своей части в минуту
+      // публикации. Читаем по freshPages первых страниц каждой части в начале
+      // каждого прогона, независимо от того, где стоит курсор круга.
+      const freshPages = Math.max(0, Math.min(5, Number(q.get("freshPages") || 1)));
       const L = require("./scripts/krisha-list.js");
       if (!KW.list || q.get("reset") === "1") {
         KW.list = { section: 0, page: 1, sweepNo: ((KW.list && KW.list.sweepNo) || 0) + 1,
@@ -5892,6 +5897,22 @@ http
             if (r.bump) bumped++;
           }
         }
+        // 0. Свежее со всех частей: страницы 1..freshPages, разом, напрямую.
+        let freshPagesRead = 0, freshAdverts = 0, freshAdded = 0;
+        if (freshPages) {
+          const jobs = [];
+          for (const sec of L.SECTIONS) for (let p = 1; p <= freshPages; p++) jobs.push({ sec, p });
+          const got = await Promise.all(jobs.map((j) =>
+            L.fetchListPage(j.sec, j.p, 1, { proxy: viaProxy }).then((r) => ({ ok: true, r, sec: j.sec })).catch(() => ({ ok: false }))));
+          const before = added;
+          for (const g of got) {
+            if (!g.ok || g.r.empty) continue;
+            freshPagesRead++; freshAdverts += g.r.adverts.length;
+            await store(g.r, g.sec);
+          }
+          freshAdded = added - before;
+        }
+
         outer:
         while (pages < maxPages && Date.now() - t0 < budgetMs) {
           if (st.section >= L.SECTIONS.length) st.section = 0; // список частей мог измениться
@@ -5924,6 +5945,8 @@ http
           ok: true, seconds: Math.round((Date.now() - t0) / 100) / 10,
           pages: pages, adverts: adverts, added: added, priceChanged: priceChanged,
           archived: archived, back: back, bumped: bumped, cityNull: cityNull, errors: errors,
+          // Свежее: сколько первых страниц прочитали, сколько объявлений, сколько из них новых для базы.
+          fresh: { pages: freshPagesRead, adverts: freshAdverts, added: freshAdded },
           photosMigrated: migrated, photosLeft: migrateLeft,
           concurrency: conc, concurrencyAsked: concAsked, throttled: throttled, dbSlow: !!KW.list.dbSlow, dbLoad: lastLoad, proxy: viaProxy,
           cursor: { section: (L.SECTIONS[st.section] || L.SECTIONS[0]).label, page: st.page, sweepNo: st.sweepNo,
