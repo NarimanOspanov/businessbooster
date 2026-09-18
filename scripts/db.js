@@ -1850,6 +1850,44 @@ END
 IF COL_LENGTH('dbo.krisha_list', 'bumped_on') IS NULL ALTER TABLE dbo.krisha_list ADD bumped_on DATE NULL;
 -- photos_json — все ссылки на фото JSON-массивом (полноразмерные -full.jpg).
 IF COL_LENGTH('dbo.krisha_list', 'photos_json') IS NULL ALTER TABLE dbo.krisha_list ADD photos_json NVARCHAR(MAX) NULL;
+-- Телефоны хозяев — те же колонки и та же логика промахов, что у krisha_objects:
+-- очередь плагина теперь идёт по списку, он видит хозяев раньше и шире.
+IF COL_LENGTH('dbo.krisha_list', 'phones')        IS NULL ALTER TABLE dbo.krisha_list ADD phones NVARCHAR(300) NULL;
+IF COL_LENGTH('dbo.krisha_list', 'phones_at')     IS NULL ALTER TABLE dbo.krisha_list ADD phones_at DATETIME2(0) NULL;
+IF COL_LENGTH('dbo.krisha_list', 'phone_tries')   IS NULL ALTER TABLE dbo.krisha_list ADD phone_tries SMALLINT NULL;
+IF COL_LENGTH('dbo.krisha_list', 'phone_state')   IS NULL ALTER TABLE dbo.krisha_list ADD phone_state NVARCHAR(20) NULL;
+IF COL_LENGTH('dbo.krisha_list', 'phone_next_at') IS NULL ALTER TABLE dbo.krisha_list ADD phone_next_at DATETIME2(0) NULL;
+-- Поиск хозяина для агентского: когда искали, сколько нашли, лучший.
+IF COL_LENGTH('dbo.krisha_list', 'searched_at')   IS NULL ALTER TABLE dbo.krisha_list ADD searched_at DATETIME2(0) NULL;
+IF COL_LENGTH('dbo.krisha_list', 'match_count')   IS NULL ALTER TABLE dbo.krisha_list ADD match_count INT NULL;
+IF COL_LENGTH('dbo.krisha_list', 'match_top')     IS NULL ALTER TABLE dbo.krisha_list ADD match_top BIGINT NULL;
+-- EXEC: индексы на колонки, добавленные ALTER'ом в этом же батче.
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_nophone' AND object_id = OBJECT_ID('dbo.krisha_list'))
+  EXEC('CREATE INDEX IX_klist_nophone ON dbo.krisha_list (first_seen DESC) WHERE phones IS NULL AND user_type = ''owner''');
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_tosearch' AND object_id = OBJECT_ID('dbo.krisha_list'))
+  EXEC('CREATE INDEX IX_klist_tosearch ON dbo.krisha_list (first_seen DESC) WHERE searched_at IS NULL');
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_owner_geo' AND object_id = OBJECT_ID('dbo.krisha_list'))
+  EXEC('CREATE INDEX IX_klist_owner_geo ON dbo.krisha_list (lat, lon) INCLUDE (deal, prop, area, rooms, floor, floors) WHERE user_type = ''owner''');
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_owner_cx' AND object_id = OBJECT_ID('dbo.krisha_list'))
+  EXEC('CREATE INDEX IX_klist_owner_cx ON dbo.krisha_list (complex_id) INCLUDE (deal, prop, area, rooms, floor, floors) WHERE user_type = ''owner'' AND complex_id IS NOT NULL');
+-- Журнал находок по списку: агентское -> кандидат-хозяин, баллы, фото, архив.
+IF OBJECT_ID('dbo.krisha_list_matches', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.krisha_list_matches (
+    id          BIGINT IDENTITY(1,1) PRIMARY KEY,
+    agent_id    BIGINT        NOT NULL,
+    owner_id    BIGINT        NOT NULL,
+    param_score INT           NULL,
+    photo_match BIT           NULL,
+    photo_conf  FLOAT         NULL,
+    photo_why   NVARCHAR(400) NULL,
+    archived_at DATETIME2(0)  NULL,    -- когда хозяин снял объявление (если снял)
+    found_at    DATETIME2(0)  NOT NULL CONSTRAINT DF_klm_found DEFAULT SYSUTCDATETIME(),
+    human_ok    BIT           NULL
+  );
+  CREATE INDEX IX_klm_found ON dbo.krisha_list_matches (found_at DESC);
+  CREATE INDEX IX_klm_agent ON dbo.krisha_list_matches (agent_id);
+END
 IF OBJECT_ID('dbo.krisha_list_events', 'U') IS NULL
 BEGIN
   CREATE TABLE dbo.krisha_list_events (
@@ -1948,6 +1986,215 @@ async function saveListAdvert(o, sweepNo) {
   return out;
 }
 
+// --- Очередь телефонов по списку -------------------------------------------
+// Хозяева без номера, живые, свежие первыми: номер надо снять до того, как
+// агент уговорит хозяина спрятать объявление. since — не старше этой даты по
+// first_seen; deal/prop — необязательные фильтры.
+async function nextListOwnerWithoutPhone(since, deal, prop) {
+  const pool = await getPool();
+  await ensureList(pool);
+  const ready = `user_type = 'owner' AND storage = 'live' AND phones IS NULL
+        AND first_seen >= @since
+        AND (@deal IS NULL OR deal = @deal) AND (@prop IS NULL OR prop = @prop)
+        AND ISNULL(phone_tries, 0) < 5
+        AND (phone_state IS NULL OR phone_state NOT IN (${PHONE_FINAL_SQL}))`;
+  const now = "(phone_next_at IS NULL OR phone_next_at <= SYSUTCDATETIME())";
+  const req = () => pool.request()
+    .input("since", sql.DateTime2, new Date(since))
+    .input("deal", sql.NVarChar(10), deal || null)
+    .input("prop", sql.NVarChar(20), prop || null);
+  const r = await req().query(`
+      SELECT TOP (1) id, title, deal, prop, city, user_type, price, storage, first_seen, bumped_on, phone_tries, phone_state
+      FROM dbo.krisha_list
+      WHERE ${ready} AND ${now}
+      ORDER BY first_seen DESC, id DESC`);
+  const c = (await req().query(`SELECT
+              SUM(CASE WHEN ${now} THEN 1 ELSE 0 END) AS ready,
+              SUM(CASE WHEN ${now} THEN 0 ELSE 1 END) AS waiting
+            FROM dbo.krisha_list WHERE ${ready}`)).recordset[0];
+  return { row: r.recordset[0] || null, left: c.ready || 0, waiting: c.waiting || 0 };
+}
+
+async function markListPhoneMiss(id, reason) {
+  const key = PHONE_MISS[reason] ? reason : "error";
+  const rule = PHONE_MISS[key];
+  const pool = await getPool();
+  await ensureList(pool);
+  const r = await pool.request()
+    .input("id", sql.BigInt, Number(id))
+    .input("st", sql.NVarChar(20), key)
+    .input("min", sql.Int, rule.retryMin || 0)
+    .query(`
+      UPDATE dbo.krisha_list
+      SET phone_tries = ISNULL(phone_tries, 0) + 1,
+          phone_state = @st,
+          phone_next_at = CASE WHEN @min > 0
+            THEN DATEADD(minute, @min * (ISNULL(phone_tries, 0) + 1), SYSUTCDATETIME())
+            ELSE NULL END
+      OUTPUT INSERTED.phone_tries, INSERTED.phone_next_at
+      WHERE id = @id`);
+  const row = r.recordset[0] || {};
+  const tries = row.phone_tries || 0;
+  return { state: key, tries: tries, final: !!rule.final || tries >= 5,
+           next_at: row.phone_next_at ? new Date(row.phone_next_at).toISOString() : null };
+}
+
+async function listPhonesGet(id) {
+  const pool = await getPool();
+  await ensureList(pool);
+  const r = await pool.request().input("id", sql.BigInt, Number(id))
+    .query("SELECT phones FROM dbo.krisha_list WHERE id = @id");
+  return r.recordset.length ? rawList(r.recordset[0].phones) : [];
+}
+
+async function addListPhones(id, phones) {
+  const pool = await getPool();
+  await ensureList(pool);
+  const cur = await listPhonesGet(id);
+  const merged = cur.slice();
+  for (const p of phones || []) if (p && !merged.includes(p)) merged.push(p);
+  await pool.request()
+    .input("id", sql.BigInt, Number(id))
+    .input("ph", sql.NVarChar(300), merged.length ? merged.join(",") : null)
+    .query(`UPDATE dbo.krisha_list
+            SET phones = @ph, phones_at = SYSUTCDATETIME(),
+                phone_state = CASE WHEN @ph IS NULL THEN NULL ELSE 'ok' END, phone_next_at = NULL
+            WHERE id = @id`);
+  return merged;
+}
+
+async function setListPhones(id, phones) {
+  const pool = await getPool();
+  await ensureList(pool);
+  const clean = [];
+  for (const p of phones || []) if (p && !clean.includes(p)) clean.push(p);
+  await pool.request()
+    .input("id", sql.BigInt, Number(id))
+    .input("ph", sql.NVarChar(300), clean.length ? clean.join(",") : null)
+    .query(`UPDATE dbo.krisha_list
+            SET phones = @ph, phones_at = SYSUTCDATETIME(),
+                phone_state = CASE WHEN @ph IS NULL THEN NULL ELSE 'ok' END, phone_next_at = NULL
+            WHERE id = @id`);
+  return clean;
+}
+
+// --- Поиск хозяина по списку -------------------------------------------------
+// Агентские объявления, для которых ещё не искали; есть по чему опознать дом.
+async function agentsToMatchList(limit) {
+  const pool = await getPool();
+  await ensureList(pool);
+  const r = await pool.request().input("n", sql.Int, Number(limit) || 100).query(`
+    SELECT TOP (@n) id, deal, prop, city, area, rooms, floor, floors, complex_id, lat, lon,
+      price, title, addr, user_type, first_seen, bumped_on, photos_json
+    FROM dbo.krisha_list
+    WHERE searched_at IS NULL
+      AND user_type IN ('specialist', 'company', 'agent')
+      AND area IS NOT NULL
+      AND (complex_id IS NOT NULL OR lat IS NOT NULL)
+    ORDER BY first_seen DESC`);
+  return r.recordset;
+}
+
+// Хозяева той же квартиры среди ВСЕХ наших, включая архив: хозяин по просьбе
+// агента прячет объявление, и найти его можно только у себя. Дом — по ЖК или
+// координатам; дальше комнаты, этаж, площадь (±3%, не меньше 1 м²). Бонус за
+// «снял объявление незадолго до появления агентского» — это почерк агента.
+async function findListOwners(q, limit) {
+  const pool = await getPool();
+  await ensureList(pool);
+  const area = Number(q.area);
+  if (!area) return [];
+  const tol = Math.max(1, area * 0.03);
+  const r = await pool.request()
+    .input("deal", sql.NVarChar(10), q.deal || null)
+    .input("prop", sql.NVarChar(20), q.prop || null)
+    .input("lo", sql.Decimal(9, 2), area - tol)
+    .input("hi", sql.Decimal(9, 2), area + tol)
+    .input("rooms", sql.Int, q.rooms ? Number(q.rooms) : null)
+    .input("floor", sql.Int, q.floor ? Number(q.floor) : null)
+    .input("floors", sql.Int, q.floors ? Number(q.floors) : null)
+    .input("cxid", sql.BigInt, q.complexId ? Number(q.complexId) : null)
+    .input("lat", sql.Decimal(11, 7), q.lat == null ? null : Number(q.lat))
+    .input("lon", sql.Decimal(11, 7), q.lon == null ? null : Number(q.lon))
+    .input("seen", sql.DateTime2, q.agentSeen ? new Date(q.agentSeen) : new Date())
+    .input("exid", sql.BigInt, q.id ? Number(q.id) : null)
+    .input("n", sql.Int, Number(limit) || 6)
+    .query(`
+      SELECT TOP (@n) f.id, f.deal, f.prop, f.user_type, f.city, f.area, f.rooms, f.floor, f.floors,
+        f.complex_id, f.lat, f.lon, f.price, f.title, f.addr, f.storage, f.first_seen, f.bumped_on,
+        f.phones, f.photos_json, arch.at AS archived_at,
+        IIF(@cxid IS NOT NULL AND f.complex_id = @cxid, 4, 0)
+          + IIF(@lat IS NOT NULL AND f.lat IS NOT NULL
+                AND ABS(f.lat - @lat) < 0.0006 AND ABS(f.lon - @lon) < 0.0008, 6, 0)
+          + IIF(@rooms IS NOT NULL AND f.rooms = @rooms, 2, 0)
+          + IIF(@floor IS NOT NULL AND f.floor = @floor, 2, 0)
+          + IIF(@floors IS NOT NULL AND f.floors = @floors, 1, 0)
+          + IIF(arch.at IS NOT NULL AND arch.at <= @seen AND arch.at >= DATEADD(day, -30, @seen), 3, 0) AS score
+      FROM dbo.krisha_list f
+      OUTER APPLY (SELECT MAX(e.at) AS at FROM dbo.krisha_list_events e WHERE e.id = f.id AND e.kind = 'archived') arch
+      WHERE f.user_type = 'owner'
+        AND (@exid IS NULL OR f.id <> @exid)
+        AND (@deal IS NULL OR f.deal = @deal)
+        AND (@prop IS NULL OR f.prop = @prop)
+        AND f.area BETWEEN @lo AND @hi
+        AND (@rooms IS NULL OR f.rooms IS NULL OR f.rooms = @rooms)
+        AND (@floor IS NULL OR f.floor IS NULL OR f.floor = @floor)
+        AND (@floors IS NULL OR f.floors IS NULL OR f.floors = @floors)
+        AND (
+          (@cxid IS NOT NULL AND f.complex_id = @cxid)
+          OR (@lat IS NOT NULL AND f.lat IS NOT NULL
+              AND ABS(f.lat - @lat) < 0.0006 AND ABS(f.lon - @lon) < 0.0008)
+        )
+      ORDER BY score DESC, f.id DESC`);
+  return r.recordset;
+}
+
+async function recordListSearched(id, count, topId) {
+  const pool = await getPool();
+  await pool.request()
+    .input("id", sql.BigInt, Number(id)).input("n", sql.Int, Number(count) || 0)
+    .input("top", sql.BigInt, topId == null ? null : Number(topId))
+    .query("UPDATE dbo.krisha_list SET searched_at = SYSUTCDATETIME(), match_count = @n, match_top = @top WHERE id = @id");
+}
+
+async function logListMatch(m) {
+  const pool = await getPool();
+  await pool.request()
+    .input("a", sql.BigInt, Number(m.agentId)).input("o", sql.BigInt, Number(m.ownerId))
+    .input("ps", sql.Int, m.paramScore == null ? null : Number(m.paramScore))
+    .input("pm", sql.Bit, m.photoMatch == null ? null : (m.photoMatch ? 1 : 0))
+    .input("pc", sql.Float, m.photoConf == null ? null : Number(m.photoConf))
+    .input("pw", sql.NVarChar(400), m.photoWhy ? String(m.photoWhy).slice(0, 400) : null)
+    .input("ar", sql.DateTime2, m.archivedAt ? new Date(m.archivedAt) : null)
+    .query(`INSERT INTO dbo.krisha_list_matches (agent_id, owner_id, param_score, photo_match, photo_conf, photo_why, archived_at)
+            VALUES (@a, @o, @ps, @pm, @pc, @pw, @ar)`);
+}
+
+async function listMatchStats() {
+  const pool = await getPool();
+  await ensureList(pool);
+  const t = (await pool.request().query(`
+    SELECT COUNT(*) AS searched,
+      SUM(CASE WHEN match_count > 0 THEN 1 ELSE 0 END) AS matched
+    FROM dbo.krisha_list WHERE searched_at IS NOT NULL`)).recordset[0];
+  const p = (await pool.request().query(`
+    SELECT COUNT(*) AS candidates,
+      SUM(CASE WHEN photo_match = 1 AND photo_conf >= 0.7 THEN 1 ELSE 0 END) AS photo_confirmed,
+      SUM(CASE WHEN archived_at IS NOT NULL THEN 1 ELSE 0 END) AS owner_archived,
+      SUM(CASE WHEN human_ok = 1 THEN 1 ELSE 0 END) AS human_yes,
+      SUM(CASE WHEN human_ok = 0 THEN 1 ELSE 0 END) AS human_no
+    FROM dbo.krisha_list_matches`)).recordset[0];
+  return { total: t, candidates: p };
+}
+
+// Фото объявления из списка — уменьшенные 560x350, как у objectPhotos.
+function listPhotoUrls(photosJson) {
+  try {
+    const arr = JSON.parse(photosJson || "[]");
+    return (Array.isArray(arr) ? arr : []).map((u) => String(u).replace(/-full\.jpg$/, "-560x350.jpg")).filter(Boolean);
+  } catch { return []; }
+}
+
 async function listStats() {
   const pool = await getPool();
   await ensureList(pool);
@@ -1969,7 +2216,17 @@ async function listStats() {
     GROUP BY bumped_on ORDER BY bumped_on DESC`)).recordset;
   const byDeal = (await pool.request().query(`
     SELECT deal, prop, COUNT(*) AS n FROM dbo.krisha_list GROUP BY deal, prop`)).recordset;
-  return { total: tot, events24h: ev, byDealProp: byDeal, bumpedByDay: bumps };
+  // Главная метрика гонки: у скольких хозяев номер был снят ДО того, как они
+  // спрятали объявление.
+  const race = (await pool.request().query(`
+    SELECT COUNT(*) AS owners_archived,
+      SUM(CASE WHEN l.phones_at IS NOT NULL AND l.phones_at <= e.at THEN 1 ELSE 0 END) AS phone_before_archive,
+      (SELECT COUNT(*) FROM dbo.krisha_list WHERE user_type = 'owner' AND phones IS NOT NULL) AS owners_with_phone,
+      (SELECT COUNT(*) FROM dbo.krisha_list WHERE user_type = 'owner' AND storage = 'live' AND phones IS NULL) AS owners_live_no_phone
+    FROM dbo.krisha_list l
+    JOIN (SELECT id, MIN(at) AS at FROM dbo.krisha_list_events WHERE kind = 'archived' GROUP BY id) e ON e.id = l.id
+    WHERE l.user_type = 'owner'`)).recordset[0];
+  return { total: tot, events24h: ev, byDealProp: byDeal, bumpedByDay: bumps, phoneRace: race };
 }
 
 // Кто быстрее и полнее: список карты или обход по id. Считаем по общему
@@ -2462,6 +2719,8 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
   saveListAdvert, listStats, listCompare,
+  nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
+  agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,

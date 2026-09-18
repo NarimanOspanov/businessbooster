@@ -1681,6 +1681,7 @@ let photosRunning = false;
 let deepenRunning = false;
 let scanRunning = false;
 let listRunning = false;
+let matchListRunning = false;
 let matchRunning = false;
 // Подтверждённые 404 скана: id → когда. Пока курсор стоит у фронтира, каждый
 // прогон заново качал бы те же пустые страницы через прокси; здесь их помним
@@ -6111,6 +6112,137 @@ http
     // исход и находки скидываем в мониторинг-чат. Со временем видно, как
     // растёт доля агентских, у которых нашёлся хозяин. Дёргается Hangfire
     // после скана. Только база — быстро, отвечает синхронно.
+    // Поиск хозяина по списку карты: агентские без searched_at, кандидаты —
+    // хозяева среди всех наших, включая архив (хозяин прячет объявление по
+    // просьбе агента — и найти его можно только у себя). Дом по ЖК/координатам,
+    // квартира по комнатам/этажу/площади, потом фото из photos_json.
+    // ?stats=1 — итоги без запуска.
+    if (urlPath === "/api/krisha/matchlist") {
+      const send = (code, obj) => {
+        res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+        res.end(JSON.stringify(obj, null, 2));
+      };
+      const want = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
+      if (!want || parsed.searchParams.get("key") !== want) return send(403, { ok: false, error: "bad_key" });
+      if (parsed.searchParams.get("stats") === "1") {
+        (async () => send(200, { ok: true, stats: await db.listMatchStats() }))()
+          .catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 200) }));
+        return;
+      }
+      if (matchListRunning) return send(409, { ok: false, running: true, error: "поиск по списку уже идёт" });
+      const batch = Math.max(1, Math.min(1000, Number(parsed.searchParams.get("batch")) || 200));
+      const notify = parsed.searchParams.get("notify") !== "0";
+      matchListRunning = true;
+      (async () => {
+        const show = (id) => "https://krisha.kz/a/show/" + id;
+        const floorText = (x) => x.floor && x.floors ? x.floor + "/" + x.floors
+          : x.floor ? x.floor + " эт." : x.floors ? "дом " + x.floors + " эт." : null;
+        const label = (x) => [x.city, x.rooms ? x.rooms + "к" : null, x.area ? x.area + "м²" : null,
+          floorText(x), x.addr].filter(Boolean).join(" · ");
+        const pad2 = (n) => String(n).padStart(2, "0");
+        const dm = (v) => { const d = v ? new Date(v) : null; return d && !isNaN(d) ? pad2(d.getUTCDate()) + "." + pad2(d.getUTCMonth() + 1) : null; };
+        const dmT = (v) => {
+          const d = v ? new Date(new Date(v).getTime() + 5 * 3600e3) : null;
+          return d && !isNaN(d) ? dm(d) + " " + pad2(d.getUTCHours()) + ":" + pad2(d.getUTCMinutes()) : null;
+        };
+        const dates = (x) => {
+          const p = [];
+          if (dm(x.bumped_on)) p.push("поднято " + dm(x.bumped_on));
+          if (dmT(x.first_seen)) p.push("в базе с " + dmT(x.first_seen));
+          if (x.archived_at) p.push("снято " + dmT(x.archived_at));
+          if (x.phones) p.push("номер есть");
+          return p.length ? "📅 " + p.join(" · ") : null;
+        };
+        const PhotoMatch = require("./scripts/photo-match.js");
+        const agents = await db.agentsToMatchList(batch);
+        let searched = 0, matched = 0, photoConfirmed = 0, archivedOwners = 0;
+        const finds = [];
+        for (const a of agents) {
+          const q = {
+            deal: a.deal, prop: a.prop, area: a.area, rooms: a.rooms, floor: a.floor, floors: a.floors,
+            complexId: a.complex_id, lat: a.lat, lon: a.lon, id: a.id, agentSeen: a.first_seen,
+          };
+          let hits = [];
+          try { hits = await db.findListOwners(q, 6); } catch { /* пропустим */ }
+          await db.recordListSearched(a.id, hits.length, hits[0] ? hits[0].id : null).catch(() => {});
+          searched++;
+          if (!hits.length) continue;
+          matched++;
+          let scores = {};
+          if (PhotoMatch.available()) {
+            try {
+              const agentPhotos = db.listPhotoUrls(a.photos_json);
+              if (agentPhotos.length) {
+                const cands = hits.map((h) => ({ id: String(h.id), photos: db.listPhotoUrls(h.photos_json) }));
+                scores = await PhotoMatch.scoreCandidates(agentPhotos, cands);
+              }
+            } catch { /* фото — уточнение, находка и так записана */ }
+          }
+          const cand = [];
+          let anyPhoto = false;
+          for (const h of hits) {
+            const sc = scores[String(h.id)];
+            if (sc && sc.match && sc.confidence >= 0.7) anyPhoto = true;
+            if (h.archived_at) archivedOwners++;
+            await db.logListMatch({
+              agentId: a.id, ownerId: h.id, paramScore: h.score, archivedAt: h.archived_at || null,
+              photoMatch: sc ? sc.match : null, photoConf: sc ? sc.confidence : null, photoWhy: sc ? sc.why : null,
+            }).catch(() => {});
+            cand.push({ h: h, s: sc });
+          }
+          if (anyPhoto) photoConfirmed++;
+          finds.push({ a: a, cand: cand });
+        }
+
+        if (finds.length && notify) {
+          const esc = (t) => require("./scripts/krisha-bot.js").esc(String(t == null ? "" : t));
+          const photoOk = (c) => !!(c.s && c.s.match && c.s.confidence >= 0.7);
+          const photoText = (c) => !c.s ? "фото не проверить" : photoOk(c) ? "фото совпали " + c.s.confidence : "фото не совпали";
+          const verdict = (c) => "score " + c.h.score + " · " + photoText(c);
+          const lines = [];
+          finds.slice(0, 8).forEach((f, n) => {
+            const best = f.cand[0];
+            if (n) lines.push("");
+            lines.push("🎯 <b>Совпадение по списку</b>" + (best ? " (" + verdict(best) + ")" : ""), "");
+            lines.push("🏢 От агента: " + esc(label(f.a)));
+            if (dates(f.a)) lines.push(dates(f.a));
+            lines.push(show(f.a.id));
+            f.cand.slice(0, 4).forEach((c, k) => {
+              const mark = !c.s ? "➖" : photoOk(c) ? "✅" : "❌";
+              lines.push(mark + " От собственника: " + esc(label(c.h)) + (k ? " (" + verdict(c) + ")" : ""));
+              if (dates(c.h)) lines.push(dates(c.h));
+              lines.push(show(c.h.id));
+            });
+          });
+          const dashKey = encodeURIComponent(KRISHA_JOB_KEY || KRISHA_PHONE_KEY);
+          lines.push("", "",
+            '<a href="' + CANONICAL + "/api/krisha/matchlist?key=" + dashKey + '&stats=1">итоги по списку</a>' +
+            " · " +
+            '<a href="' + CANONICAL + "/api/krisha/scanlist?key=" + dashKey + '&stats=1">статистика списка</a>');
+          notifyTelegram(lines.join("\n"));
+        }
+
+        const st = await db.listMatchStats().catch(() => null);
+        matchListRunning = false;
+        send(200, {
+          ok: true, searched: searched, matched: matched, photoConfirmed: photoConfirmed,
+          ownerArchived: archivedOwners,
+          finds: finds.map((f) => ({
+            agent: f.a.id,
+            owners: f.cand.map((c) => ({
+              id: c.h.id, score: c.h.score, archivedAt: c.h.archived_at || null, hasPhone: !!c.h.phones,
+              photoMatch: c.s ? c.s.match : null, photoConf: c.s ? c.s.confidence : null,
+            })),
+          })),
+          stats: st,
+        });
+      })().catch((e) => {
+        matchListRunning = false;
+        send(500, { ok: false, error: String(e.message).slice(0, 200) });
+      });
+      return;
+    }
+
     if (urlPath === "/api/krisha/match") {
       const send = (code, obj) => {
         res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
@@ -6547,10 +6679,10 @@ http
       return;
     }
 
-    // То же, но для новой архитектуры (krisha_objects): телефоны хранятся
-    // колонкой в самой таблице объектов. Очередь на съём — объекты без номера
-    // от даты since и вверх; GET отдаёт по одному — под плагин на той стороне,
-    // который обрабатывает объекты по одному.
+    // Очередь телефонов для плагина — по списку карты (krisha_list): хозяева,
+    // живые, без номера, свежие первыми. Смысл — снять прямой номер хозяина
+    // раньше, чем агент уговорит его спрятать объявление. GET отдаёт по
+    // одному; номера и промахи пишутся в ту же таблицу.
     if (urlPath === "/api/krisha/objphone" || urlPath === "/api/krisha/objqueue" ||
         urlPath === "/api/krisha/objphone/miss") {
       const cors = {
@@ -6582,7 +6714,7 @@ http
           if (!db.PHONE_MISS_REASONS.includes(reason)) {
             return send(400, { ok: false, error: "reason: один из " + db.PHONE_MISS_REASONS.join(", ") });
           }
-          const m = await db.markObjectPhoneMiss(id, reason);
+          const m = await db.markListPhoneMiss(id, reason);
           console.log("[objphone] промах " + id + ": " + m.state + " (попытка " + m.tries + (m.final ? ", выбыл" : "") + ")");
           return send(200, Object.assign({ ok: true, id: id }, m));
         })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
@@ -6605,25 +6737,36 @@ http
         if (req.method === "GET" || req.method === "HEAD") {
           const id = String(parsed.searchParams.get("id") || "").replace(/\D/g, "");
           if (id) {
-            const phones = await db.objectPhonesGet(id);
+            const phones = await db.listPhonesGet(id);
             return send(200, { ok: true, id: id, phones: phones.map(pretty), raw: phones });
           }
           // Один следующий объект, не пачка. since — нижняя граница по дате
           // публикации (YYYY-MM-DD), от неё идём вверх к сегодняшнему дню;
           // без since — последняя неделя. Курсор клиенту вести не нужно:
           // объект с номером (или пятью промахами) сам выпадает из очереди.
+          // Один следующий хозяин, не пачка: живой, без номера, самый свежий по
+          // попаданию в базу. since — не старше этой даты (YYYY-MM-DD); без
+          // since — последняя неделя. deal/prop — необязательные фильтры.
+          // Курсор клиенту вести не нужно: объект с номером (или выбывший по
+          // промахам) сам выпадает из очереди.
           const sinceRaw = parsed.searchParams.get("since");
           if (sinceRaw && (!/^\d{4}-\d{2}-\d{2}$/.test(sinceRaw) || isNaN(Date.parse(sinceRaw)))) {
             return send(400, { ok: false, error: "since: нужна дата YYYY-MM-DD" });
           }
           const since = sinceRaw || day(Date.now() - 7 * 86400e3);
-          const q = await db.nextObjectWithoutPhone(since);
+          const dealF = parsed.searchParams.get("deal") || null;
+          const propF = parsed.searchParams.get("prop") || null;
+          const q = await db.nextListOwnerWithoutPhone(since, dealF, propF);
           const r = q.row;
           return send(200, {
             ok: true, since: since, left: q.left, waiting: q.waiting,
             item: r ? {
               id: String(r.id), title: r.title, deal: r.deal, prop: r.prop, city: r.city,
-              seller: r.user_type, posted: day(r.created_on), url: "https://krisha.kz/a/show/" + r.id,
+              seller: r.user_type, price: r.price == null ? null : Number(r.price),
+              // posted — дата последнего поднятия с карточки; seen — когда мы
+              // впервые увидели объявление (UTC): это и есть «свежесть».
+              posted: day(r.bumped_on), seen: r.first_seen ? new Date(r.first_seen).toISOString() : null,
+              url: "https://krisha.kz/a/show/" + r.id,
               // Сколько раз уже пробовали и чем кончилось — плагин может,
               // например, на повторной попытке ждать страницу дольше.
               tries: r.phone_tries || 0, last: r.phone_state || null,
@@ -6641,13 +6784,13 @@ http
           if (!phones.length && !("phones" in body || "phone" in body)) {
             return send(400, { ok: false, error: "нужен список phones (может быть пустым)" });
           }
-          const saved = await db.setObjectPhones(id, phones);
+          const saved = await db.setListPhones(id, phones);
           console.log("[objphone] заменено " + id + ": " + saved.length + " шт.");
           return send(200, { ok: true, id: id, phones: saved.map(pretty) });
         }
 
         if (!phones.length) return send(400, { ok: false, error: "номер не разобрал" });
-        const merged = await db.addObjectPhones(id, phones);
+        const merged = await db.addListPhones(id, phones);
         console.log("[objphone] " + id + ": +" + phones.length + " (итого " + merged.length + ")");
         return send(200, { ok: true, id: id, phones: merged.map(pretty) });
       })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
