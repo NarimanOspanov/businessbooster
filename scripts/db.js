@@ -2246,6 +2246,19 @@ async function listMatchStats() {
   return { total: t, candidates: p };
 }
 
+// Хронология одного объявления: текущее состояние и все события по порядку.
+async function listHistory(id) {
+  const pool = await getPool();
+  await ensureList(pool);
+  const row = (await pool.request().input("id", sql.BigInt, Number(id)).query(`
+    SELECT id, deal, prop, user_type, city, price, rooms, area, floor, floors, complex_id, lat, lon, title, addr,
+      owner_name, photos, storage, bumped_on, first_seen, last_seen, seen_count, phones, phones_at, phone_state
+    FROM dbo.krisha_list WHERE id = @id`)).recordset[0] || null;
+  const events = (await pool.request().input("id", sql.BigInt, Number(id)).query(`
+    SELECT at, kind, old_price, new_price FROM dbo.krisha_list_events WHERE id = @id ORDER BY at, ev_id`)).recordset;
+  return { item: row, events: events };
+}
+
 // Какие из этих id есть в krisha_list — для сверки по номерам объявлений.
 async function knownListIds(ids) {
   const list = (ids || []).map((x) => Number(x)).filter(Boolean);
@@ -3050,7 +3063,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveListAdvert, listStats, listCompare,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
-  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds,
+  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,

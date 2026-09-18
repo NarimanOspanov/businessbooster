@@ -5789,6 +5789,32 @@ http
       const want = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
       if (!want || parsed.searchParams.get("key") !== want) return send(403, { ok: false, error: "bad_key" });
       const q = parsed.searchParams;
+      // ?history=<id> — хронология объявления: состояние и события (цены,
+      // поднятия, архив) по порядку; на ней строится «мотивация продавца».
+      if (q.get("history")) {
+        (async () => {
+          const h = await db.listHistory(q.get("history").replace(/D/g, ""));
+          if (!h.item) return send(404, { ok: false, error: "нет такого объявления в списке" });
+          const prices = h.events.filter((e) => e.kind === "price");
+          const first = h.events.find((e) => e.kind === "new");
+          const startPrice = first && first.new_price != null ? Number(first.new_price) : (prices[0] ? Number(prices[0].old_price) : null);
+          const cur = h.item.price == null ? null : Number(h.item.price);
+          send(200, {
+            ok: true, item: h.item, events: h.events,
+            // Сводка: с какой цены начали, где сейчас, сколько снижений/повышений, поднятий.
+            summary: {
+              startPrice: startPrice, currentPrice: cur,
+              changePct: startPrice && cur ? Math.round(1000 * (cur - startPrice) / startPrice) / 10 : null,
+              priceCuts: prices.filter((e) => Number(e.new_price) < Number(e.old_price)).length,
+              priceRaises: prices.filter((e) => Number(e.new_price) > Number(e.old_price)).length,
+              bumps: h.events.filter((e) => e.kind === "bump").length,
+              archived: h.events.filter((e) => e.kind === "archived").length,
+              daysTracked: h.item.first_seen ? Math.round((Date.now() - new Date(h.item.first_seen).getTime()) / 864e5) : null,
+            },
+          });
+        })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 200) }));
+        return;
+      }
       // ?have=id,id,… — какие из номеров объявлений есть в списке (сверка по id).
       if (q.get("have")) {
         (async () => {
