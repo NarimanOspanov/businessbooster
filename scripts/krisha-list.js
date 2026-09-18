@@ -193,28 +193,45 @@ function parseAdvert(a, section, dates) {
 // NVARCHAR): именно они и забили базу до квоты. Если ссылки не по шаблону —
 // запасной вид «j:» + JSON, он редкий.
 const PHOTO_HOST = "https://krisha-photos.kcdn.online/";
+const PACK_MAX = 2000; // длина колонки photos_c; расширять её — переписывать таблицу
+// Несколько папок пишем через «;»: «папка|1,2;папка2|7». Ссылки не по шаблону
+// CDN пропускаем (редкость). Если не влезает — оставляем столько фото, сколько
+// влезает: первые важнее, по ним и сверяем.
 function packPhotos(urls) {
-  const list = (urls || []).map(String).filter(Boolean);
-  if (!list.length) return null;
-  let folder = null;
-  const nums = [];
-  for (const u of list) {
+  const groups = [];
+  for (const u of (urls || []).map(String)) {
     const m = u.match(/^https:\/\/krisha-photos\.kcdn\.online\/(.+)\/(\d+)-full\.jpg$/);
-    if (!m || (folder && m[1] !== folder)) { folder = null; break; }
-    folder = m[1];
-    nums.push(m[2]);
+    if (!m) continue;
+    const g = groups.length && groups[groups.length - 1].folder === m[1] ? groups[groups.length - 1] : null;
+    if (g) g.nums.push(m[2]); else groups.push({ folder: m[1], nums: [m[2]] });
   }
-  if (folder) return folder + "|" + nums.join(",");
-  return "j:" + JSON.stringify(list);
+  if (!groups.length) return null;
+  let out = "";
+  for (const g of groups) {
+    let seg = g.folder + "|", any = false;
+    for (const n of g.nums) {
+      const piece = (any ? "," : "") + n;
+      if (((out ? out + ";" : "") + seg + piece).length > PACK_MAX) {
+        return any ? (out ? out + ";" : "") + seg : (out || null);
+      }
+      seg += piece; any = true;
+    }
+    out = (out ? out + ";" : "") + seg;
+  }
+  return out || null;
 }
 function unpackPhotos(packed) {
   const s = String(packed || "");
   if (!s) return [];
   if (s.startsWith("j:")) { try { return JSON.parse(s.slice(2)); } catch { return []; } }
-  const bar = s.indexOf("|");
-  if (bar < 0) return [];
-  const folder = s.slice(0, bar);
-  return s.slice(bar + 1).split(",").filter(Boolean).map((n) => PHOTO_HOST + folder + "/" + n + "-full.jpg");
+  const out = [];
+  for (const seg of s.split(";")) {
+    const bar = seg.indexOf("|");
+    if (bar < 0) continue;
+    const folder = seg.slice(0, bar);
+    for (const n of seg.slice(bar + 1).split(",")) if (n) out.push(PHOTO_HOST + folder + "/" + n + "-full.jpg");
+  }
+  return out;
 }
 
 module.exports = { SECTIONS, fetchListPage, parseAdvert, loadRegions, cityOf, dealOf, propOf, bumpDate, packPhotos, unpackPhotos };

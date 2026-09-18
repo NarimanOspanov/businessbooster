@@ -55,7 +55,7 @@ function ddlPool() {
     let cfg;
     try { cfg = sql.ConnectionPool.parseConnectionString(conn); } catch { cfg = null; }
     if (!cfg) return getPool(); // строку не разобрали — обычный пул
-    cfg.requestTimeout = 20 * 60 * 1000;
+    cfg.requestTimeout = 60 * 60 * 1000;
     cfg.pool = Object.assign({}, cfg.pool || {}, { max: 1, min: 0 });
     ddlPromise = new sql.ConnectionPool(cfg).connect().catch((e) => { ddlPromise = null; throw e; });
   }
@@ -1808,16 +1808,20 @@ async function botStats(days) {
 // --- Крыша: полный поток недвижимости (id-walking) -------------------------
 
 let objectsReady = false;
-let objectsReadyPromise = null;
+// После сбоя миграции — пауза, а не немедленный повтор: иначе тяжёлый
+// CREATE INDEX, оборвавшийся по таймауту, запускается снова каждым вызовом.
+const DDL_RETRY_MS = 10 * 60 * 1000;
+let objectsReadyPromise = null, objectsFailedAt = 0;
 async function ensureObjects() {
   if (objectsReady) return;
+  if (objectsFailedAt && Date.now() - objectsFailedAt < DDL_RETRY_MS) throw new Error("миграция схемы недавно сорвалась — пауза");
   if (!objectsReadyPromise) {
     objectsReadyPromise = (async () => {
       const p = await ddlPool();
       await p.request().batch(SCHEMA_OBJECTS);
       await p.request().batch(SCHEMA_MATCHLOG);
       objectsReady = true;
-    })().catch((e) => { objectsReadyPromise = null; throw e; });
+    })().catch((e) => { objectsReadyPromise = null; objectsFailedAt = Date.now(); throw e; });
   }
   await objectsReadyPromise;
 }
@@ -1878,9 +1882,10 @@ IF COL_LENGTH('dbo.krisha_list', 'bumped_on') IS NULL ALTER TABLE dbo.krisha_lis
 IF COL_LENGTH('dbo.krisha_list', 'photos_json') IS NULL ALTER TABLE dbo.krisha_list ADD photos_json NVARCHAR(MAX) NULL;
 -- photos_c — то же компактно: «папка|номера» (см. packPhotos). photos_json
 -- у старых строк переносится сюда и обнуляется — он и забил квоту базы.
-IF COL_LENGTH('dbo.krisha_list', 'photos_c') IS NULL ALTER TABLE dbo.krisha_list ADD photos_c VARCHAR(MAX) NULL;
-IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.krisha_list') AND name = 'photos_c' AND max_length <> -1)
-  ALTER TABLE dbo.krisha_list ALTER COLUMN photos_c VARCHAR(MAX) NULL;
+-- Колонку не расширяем: ALTER COLUMN на 200 тысячах строк переписывает
+-- таблицу и на 10 DTU не укладывается ни в какой таймаут. packPhotos сам
+-- укладывает значение в 2000 символов.
+IF COL_LENGTH('dbo.krisha_list', 'photos_c') IS NULL ALTER TABLE dbo.krisha_list ADD photos_c VARCHAR(2000) NULL;
 -- Телефоны хозяев — те же колонки и та же логика промахов, что у krisha_objects:
 -- очередь плагина теперь идёт по списку, он видит хозяев раньше и шире.
 IF COL_LENGTH('dbo.krisha_list', 'phones')        IS NULL ALTER TABLE dbo.krisha_list ADD phones NVARCHAR(300) NULL;
@@ -1943,15 +1948,16 @@ BEGIN
 END
 `;
 let listReady = false;
-let listReadyPromise = null;
+let listReadyPromise = null, listFailedAt = 0;
 async function ensureList() {
   if (listReady) return;
+  if (listFailedAt && Date.now() - listFailedAt < DDL_RETRY_MS) throw new Error("миграция схемы недавно сорвалась — пауза");
   if (!listReadyPromise) {
     listReadyPromise = (async () => {
       const p = await ddlPool();
       await p.request().batch(SCHEMA_LIST);
       listReady = true;
-    })().catch((e) => { listReadyPromise = null; throw e; });
+    })().catch((e) => { listReadyPromise = null; listFailedAt = Date.now(); throw e; });
   }
   await listReadyPromise;
 }
@@ -1986,7 +1992,7 @@ async function saveListAdvert(o, sweepNo) {
     .input("photo1", sql.NVarChar(300), cut(o.photo1, 300))
     .input("storage", sql.NVarChar(20), cut(o.storage, 20))
     .input("bumped", sql.Date, o.bumpedOn || null)
-    .input("pc", sql.VarChar(sql.MAX), require("./krisha-list.js").packPhotos(o.photoUrls))
+    .input("pc", sql.VarChar(2000), require("./krisha-list.js").packPhotos(o.photoUrls))
     .input("sweep", sql.Int, sweepNo == null ? null : Number(sweepNo))
     .query(`
       MERGE dbo.krisha_list AS t
@@ -2385,7 +2391,7 @@ async function migrateListPhotos(batch, afterId) {
       try { urls = JSON.parse(r.photos_json || "[]"); } catch { urls = []; }
       await pool.request()
         .input("id", sql.BigInt, Number(r.id))
-        .input("pc", sql.VarChar(sql.MAX), L.packPhotos(urls))
+        .input("pc", sql.VarChar(2000), L.packPhotos(urls))
         .query("UPDATE dbo.krisha_list SET photos_c = COALESCE(photos_c, @pc), photos_json = NULL WHERE id = @id");
       done++;
     }));
@@ -2427,7 +2433,7 @@ async function saveListAdverts(rows, sweepNo) {
       .input("photo1" + k, sql.NVarChar(300), cut(o.photo1, 300))
       .input("storage" + k, sql.NVarChar(20), cut(o.storage, 20))
       .input("bumped" + k, sql.Date, o.bumpedOn || null)
-      .input("pc" + k, sql.VarChar(sql.MAX), L.packPhotos(o.photoUrls));
+      .input("pc" + k, sql.VarChar(2000), L.packPhotos(o.photoUrls));
     vals.push("(@id" + k + ",@deal" + k + ",@prop" + k + ",@ut" + k + ",@city" + k + ",@price" + k + ",@rooms" + k +
       ",@area" + k + ",@floor" + k + ",@floors" + k + ",@cxid" + k + ",@lat" + k + ",@lon" + k + ",@title" + k +
       ",@addr" + k + ",@owner" + k + ",@photos" + k + ",@photo1" + k + ",@storage" + k + ",@bumped" + k + ",@pc" + k + ")");
