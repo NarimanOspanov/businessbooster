@@ -1680,6 +1680,7 @@ let backfillRunning = false;
 let photosRunning = false;
 let deepenRunning = false;
 let scanRunning = false;
+let listRunning = false;
 let matchRunning = false;
 // Подтверждённые 404 скана: id → когда. Пока курсор стоит у фронтира, каждый
 // прогон заново качал бы те же пустые страницы через прокси; здесь их помним
@@ -5720,6 +5721,94 @@ http
     // id: у фронтира (дальше объявлений ещё нет) он стоит и ждёт, пока новые
     // появятся. Задумано под частый дёрг из Hangfire (раз в 30-60 c).
     // Отвечает синхронно — планировщик видит итог прогона, а не пустой 202.
+    // Альтернатива скану: обход по списку карты Крыши (JSON, без прокси).
+    // Каждый вызов проходит столько страниц, сколько влезает в бюджет, и
+    // запоминает, где остановился (раздел, страница); пройдя все разделы,
+    // начинает новый круг. ?compare=1 — сравнение со сканом по id: кто раньше
+    // увидел объявление и кого сколько не хватает.
+    if (urlPath === "/api/krisha/scanlist") {
+      const send = (code, obj) => {
+        res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+        res.end(JSON.stringify(obj, null, 2));
+      };
+      const want = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
+      if (!want || parsed.searchParams.get("key") !== want) return send(403, { ok: false, error: "bad_key" });
+      const q = parsed.searchParams;
+      if (q.get("compare") === "1" || q.get("stats") === "1") {
+        (async () => {
+          send(200, { ok: true, list: await db.listStats(), compare: await db.listCompare(), cursor: KW.list || null });
+        })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 200) }));
+        return;
+      }
+      if (listRunning) return send(409, { ok: false, running: true, error: "обход списка уже идёт", cursor: KW.list || null });
+      const budgetMs = Math.max(5, Math.min(600, Number(q.get("budgetSec") || 45))) * 1000;
+      const pace = Math.max(0, Math.min(5000, Number(q.get("pace") || 200)));
+      const maxPages = Math.max(1, Math.min(5000, Number(q.get("pages") || 400)));
+      const L = require("./scripts/krisha-list.js");
+      if (!KW.list || q.get("reset") === "1") {
+        KW.list = { section: 0, page: 1, sweepNo: ((KW.list && KW.list.sweepNo) || 0) + 1,
+                    startedAt: null, pages: 0, adverts: 0, lastSweep: (KW.list && KW.list.lastSweep) || null };
+      }
+      listRunning = true;
+      (async () => {
+        const t0 = Date.now();
+        const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+        await L.loadRegions().catch(() => { /* город останется пустым */ });
+        const st = KW.list;
+        if (!st.startedAt) st.startedAt = new Date().toISOString();
+        let pages = 0, adverts = 0, added = 0, priceChanged = 0, archived = 0, back = 0, cityNull = 0, errors = 0;
+        let sweepDone = null;
+        while (pages < maxPages && Date.now() - t0 < budgetMs) {
+          const section = L.SECTIONS[st.section];
+          let res;
+          try { res = await L.fetchListPage(section, st.page); }
+          catch (e) { errors++; if (errors >= 3) break; await sleep(2000); continue; }
+          pages++; st.pages++;
+          if (res.empty) {
+            // Раздел кончился — следующий; кончились все — круг завершён.
+            st.section++; st.page = 1;
+            if (st.section >= L.SECTIONS.length) {
+              sweepDone = { sweepNo: st.sweepNo, pages: st.pages, adverts: st.adverts,
+                            startedAt: st.startedAt, finishedAt: new Date().toISOString(),
+                            minutes: Math.round((Date.now() - Date.parse(st.startedAt)) / 60e3) };
+              st.section = 0; st.sweepNo++; st.startedAt = null; st.pages = 0; st.adverts = 0;
+              break;
+            }
+            continue;
+          }
+          for (const a of res.adverts) {
+            const o = L.parseAdvert(a, section);
+            if (!o.id) continue;
+            if (!o.city) cityNull++;
+            const r = await db.saveListAdvert(o, st.sweepNo);
+            adverts++; st.adverts++;
+            if (r.added) added++;
+            if (r.price) priceChanged++;
+            if (r.archived) archived++;
+            if (r.back) back++;
+          }
+          st.page++;
+          if (pace) await sleep(pace);
+        }
+        if (sweepDone) st.lastSweep = sweepDone;
+        KW.list = st;
+        saveKrisha();
+        listRunning = false;
+        send(200, {
+          ok: true, seconds: Math.round((Date.now() - t0) / 100) / 10,
+          pages: pages, adverts: adverts, added: added, priceChanged: priceChanged,
+          archived: archived, back: back, cityNull: cityNull, errors: errors,
+          cursor: { section: L.SECTIONS[st.section], page: st.page, sweepNo: st.sweepNo,
+                    pagesThisSweep: st.pages, advertsThisSweep: st.adverts, startedAt: st.startedAt },
+          lastSweep: st.lastSweep || null,
+        });
+      })().catch((e) => {
+        listRunning = false;
+        send(500, { ok: false, error: String(e.message).slice(0, 200) });
+      });
+      return;
+    }
+
     if (urlPath === "/api/krisha/scan") {
       const send = (code, obj) => {
         res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });

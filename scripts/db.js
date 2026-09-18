@@ -1810,6 +1810,174 @@ async function objectPhotos(id) {
   } catch { return []; }
 }
 
+// --- Крыша: обход по списку карты (эксперимент) ----------------------------
+// krisha_list — текущее состояние каждого объявления, как его видит список
+// карты; krisha_list_events — журнал: появилось, сменило цену, ушло в архив,
+// вернулось. По журналу видна история объявления с момента, как мы его
+// впервые встретили.
+const SCHEMA_LIST = `
+IF OBJECT_ID('dbo.krisha_list', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.krisha_list (
+    id         BIGINT        NOT NULL PRIMARY KEY,
+    deal       NVARCHAR(10)  NULL,
+    prop       NVARCHAR(20)  NULL,
+    user_type  NVARCHAR(20)  NULL,
+    city       NVARCHAR(40)  NULL,
+    price      BIGINT        NULL,
+    rooms      INT           NULL,
+    area       DECIMAL(9,2)  NULL,
+    floor      INT           NULL,
+    floors     INT           NULL,
+    complex_id BIGINT        NULL,
+    lat        DECIMAL(11,7) NULL,
+    lon        DECIMAL(11,7) NULL,
+    title      NVARCHAR(300) NULL,
+    addr       NVARCHAR(300) NULL,
+    owner_name NVARCHAR(120) NULL,
+    photos     INT           NULL,
+    photo1     NVARCHAR(300) NULL,
+    storage    NVARCHAR(20)  NULL,
+    first_seen DATETIME2(0)  NOT NULL CONSTRAINT DF_klist_first DEFAULT SYSUTCDATETIME(),
+    last_seen  DATETIME2(0)  NOT NULL CONSTRAINT DF_klist_last  DEFAULT SYSUTCDATETIME(),
+    seen_count INT           NOT NULL CONSTRAINT DF_klist_seen  DEFAULT 1,
+    sweep_no   INT           NULL
+  );
+  CREATE INDEX IX_klist_first ON dbo.krisha_list (first_seen DESC);
+  CREATE INDEX IX_klist_cat ON dbo.krisha_list (deal, prop, city, user_type);
+END
+IF OBJECT_ID('dbo.krisha_list_events', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.krisha_list_events (
+    ev_id     BIGINT IDENTITY(1,1) PRIMARY KEY,
+    id        BIGINT        NOT NULL,
+    at        DATETIME2(0)  NOT NULL CONSTRAINT DF_klev_at DEFAULT SYSUTCDATETIME(),
+    kind      NVARCHAR(16)  NOT NULL,   -- new | price | archived | back
+    old_price BIGINT        NULL,
+    new_price BIGINT        NULL,
+    sweep_no  INT           NULL
+  );
+  CREATE INDEX IX_klev_id ON dbo.krisha_list_events (id, at);
+  CREATE INDEX IX_klev_at ON dbo.krisha_list_events (at DESC);
+END
+`;
+let listReady = false;
+async function ensureList(pool) {
+  if (listReady) return;
+  await pool.request().batch(SCHEMA_LIST);
+  listReady = true;
+}
+
+// Записать объявление из списка. Один MERGE с OUTPUT: он же говорит, новое
+// это или обновление, и какие были цена и состояние — по ним пишем журнал.
+async function saveListAdvert(o, sweepNo) {
+  const pool = await getPool();
+  await ensureList(pool);
+  const r = await pool.request()
+    .input("id", sql.BigInt, Number(o.id))
+    .input("deal", sql.NVarChar(10), o.deal || null)
+    .input("prop", sql.NVarChar(20), o.prop || null)
+    .input("ut", sql.NVarChar(20), o.userType || null)
+    .input("city", sql.NVarChar(40), o.city || null)
+    .input("price", sql.BigInt, o.price == null ? null : Number(o.price))
+    .input("rooms", sql.Int, o.rooms == null ? null : Number(o.rooms))
+    .input("area", sql.Decimal(9, 2), o.area == null ? null : Number(o.area))
+    .input("floor", sql.Int, o.floor == null ? null : Number(o.floor))
+    .input("floors", sql.Int, o.floors == null ? null : Number(o.floors))
+    .input("cxid", sql.BigInt, o.complexId == null ? null : Number(o.complexId))
+    .input("lat", sql.Decimal(11, 7), o.lat == null ? null : Number(o.lat))
+    .input("lon", sql.Decimal(11, 7), o.lon == null ? null : Number(o.lon))
+    .input("title", sql.NVarChar(300), o.title || null)
+    .input("addr", sql.NVarChar(300), o.addr || null)
+    .input("owner", sql.NVarChar(120), o.ownerName || null)
+    .input("photos", sql.Int, o.photos == null ? null : Number(o.photos))
+    .input("photo1", sql.NVarChar(300), o.photo1 || null)
+    .input("storage", sql.NVarChar(20), o.storage || null)
+    .input("sweep", sql.Int, sweepNo == null ? null : Number(sweepNo))
+    .query(`
+      MERGE dbo.krisha_list AS t
+      USING (SELECT @id AS id) AS s ON t.id = s.id
+      WHEN MATCHED THEN UPDATE SET
+        deal = @deal, prop = @prop, user_type = @ut, city = COALESCE(@city, t.city),
+        price = @price, rooms = @rooms, area = @area, floor = @floor, floors = @floors,
+        complex_id = @cxid, lat = @lat, lon = @lon, title = @title, addr = @addr,
+        owner_name = @owner, photos = @photos, photo1 = @photo1, storage = @storage,
+        last_seen = SYSUTCDATETIME(), seen_count = t.seen_count + 1, sweep_no = @sweep
+      WHEN NOT MATCHED THEN INSERT
+        (id, deal, prop, user_type, city, price, rooms, area, floor, floors, complex_id, lat, lon,
+         title, addr, owner_name, photos, photo1, storage, sweep_no)
+        VALUES (@id, @deal, @prop, @ut, @city, @price, @rooms, @area, @floor, @floors, @cxid, @lat, @lon,
+         @title, @addr, @owner, @photos, @photo1, @storage, @sweep)
+      OUTPUT $action AS act, deleted.price AS old_price, deleted.storage AS old_storage;`);
+  const row = r.recordset[0] || {};
+  const out = { added: row.act === "INSERT", price: false, archived: false, back: false };
+  const events = [];
+  if (out.added) events.push(["new", null, o.price]);
+  else {
+    const oldP = row.old_price == null ? null : Number(row.old_price);
+    if (oldP != null && o.price != null && oldP !== Number(o.price)) { out.price = true; events.push(["price", oldP, o.price]); }
+    const was = row.old_storage || null, now = o.storage || null;
+    if (was !== now && (was === "live" || now === "live")) {
+      if (now === "live") { out.back = true; events.push(["back", null, null]); }
+      else { out.archived = true; events.push(["archived", null, null]); }
+    }
+  }
+  for (const [kind, oldP, newP] of events) {
+    await pool.request()
+      .input("id", sql.BigInt, Number(o.id)).input("kind", sql.NVarChar(16), kind)
+      .input("op", sql.BigInt, oldP == null ? null : Number(oldP)).input("np", sql.BigInt, newP == null ? null : Number(newP))
+      .input("sweep", sql.Int, sweepNo == null ? null : Number(sweepNo))
+      .query("INSERT INTO dbo.krisha_list_events (id, kind, old_price, new_price, sweep_no) VALUES (@id, @kind, @op, @np, @sweep)");
+  }
+  return out;
+}
+
+async function listStats() {
+  const pool = await getPool();
+  await ensureList(pool);
+  const tot = (await pool.request().query(`
+    SELECT COUNT(*) AS total,
+      SUM(CASE WHEN storage = 'live' THEN 1 ELSE 0 END) AS live,
+      SUM(CASE WHEN user_type = 'owner' THEN 1 ELSE 0 END) AS owner,
+      SUM(CASE WHEN city IS NULL THEN 1 ELSE 0 END) AS city_null,
+      SUM(CASE WHEN lat IS NOT NULL THEN 1 ELSE 0 END) AS with_geo,
+      SUM(CASE WHEN complex_id IS NOT NULL THEN 1 ELSE 0 END) AS with_complex,
+      MIN(first_seen) AS since
+    FROM dbo.krisha_list`)).recordset[0];
+  const ev = (await pool.request().query(`
+    SELECT kind, COUNT(*) AS n FROM dbo.krisha_list_events
+    WHERE at >= DATEADD(hour, -24, SYSUTCDATETIME()) GROUP BY kind`)).recordset;
+  const byDeal = (await pool.request().query(`
+    SELECT deal, prop, COUNT(*) AS n FROM dbo.krisha_list GROUP BY deal, prop`)).recordset;
+  return { total: tot, events24h: ev, byDealProp: byDeal };
+}
+
+// Кто быстрее и полнее: список карты или обход по id. Считаем по общему
+// окну — с момента, когда список начал писать.
+async function listCompare() {
+  const pool = await getPool();
+  await ensureList(pool);
+  await ensureObjects(pool);
+  const r = (await pool.request().query(`
+    DECLARE @since DATETIME2(0) = (SELECT MIN(first_seen) FROM dbo.krisha_list);
+    SELECT
+      @since AS since,
+      (SELECT COUNT(*) FROM dbo.krisha_list) AS list_total,
+      (SELECT COUNT(*) FROM dbo.krisha_objects) AS obj_total,
+      (SELECT COUNT(*) FROM dbo.krisha_list l WHERE NOT EXISTS (SELECT 1 FROM dbo.krisha_objects o WHERE o.id = l.id)) AS list_only,
+      (SELECT COUNT(*) FROM dbo.krisha_list l WHERE l.storage = 'live' AND l.id >= (SELECT MIN(id) FROM dbo.krisha_objects)
+         AND NOT EXISTS (SELECT 1 FROM dbo.krisha_objects o WHERE o.id = l.id)) AS list_only_in_scan_range,
+      (SELECT COUNT(*) FROM dbo.krisha_objects o WHERE o.first_seen >= @since
+         AND NOT EXISTS (SELECT 1 FROM dbo.krisha_list l WHERE l.id = o.id)) AS obj_only_since,
+      (SELECT COUNT(*) FROM dbo.krisha_list l JOIN dbo.krisha_objects o ON o.id = l.id
+         WHERE o.first_seen >= @since AND l.first_seen < o.first_seen) AS list_first,
+      (SELECT COUNT(*) FROM dbo.krisha_list l JOIN dbo.krisha_objects o ON o.id = l.id
+         WHERE o.first_seen >= @since AND l.first_seen > o.first_seen) AS scan_first,
+      (SELECT AVG(CAST(DATEDIFF(minute, o.first_seen, l.first_seen) AS FLOAT)) FROM dbo.krisha_list l JOIN dbo.krisha_objects o ON o.id = l.id
+         WHERE o.first_seen >= @since AND l.first_seen >= @since) AS avg_list_minus_scan_min`)).recordset[0];
+  return r;
+}
+
 // Какие из этих id уже есть в krisha_objects. Скан спрашивает это перед
 // чтением окна и не тратит прокси на то, что уже лежит в базе (например,
 // пришло минутой раньше через выдачу).
@@ -2273,6 +2441,7 @@ async function objectStats() {
 module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
+  saveListAdvert, listStats, listCompare,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,
