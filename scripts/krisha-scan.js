@@ -132,6 +132,8 @@ function parse(id, html) {
     userType: a.userType || null,
     city: city ? String(city).toLowerCase() : null,
     createdOn: c.createdAt || c.addedAt || null,
+    // addedAt — дата последнего поднятия (карточка выдачи показывает её).
+    addedOn: c.addedAt || null,
     price: typeof a.price === "number" ? a.price : null,
     rooms: typeof a.rooms === "number" ? a.rooms : null,
     // Площадь: у квартир/домов в advert.square; у участка/коммерции — из

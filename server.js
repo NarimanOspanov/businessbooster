@@ -694,6 +694,14 @@ var API = "/api/krisha/monitor?key=" + encodeURIComponent(KEY);
 function esc(s){s=(s==null?"":String(s));return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 function money(n){return n?Math.round(n).toLocaleString("ru-RU")+" ₸":"";}
 function show(id){return "https://krisha.kz/a/show/"+id;}
+function pad2(n){return ("0"+n).slice(-2);}
+function dm(v){if(!v)return "";var d=new Date(v);if(isNaN(d))return "";return pad2(d.getUTCDate())+"."+pad2(d.getUTCMonth()+1)+"."+d.getUTCFullYear();}
+function dmT(v){if(!v)return "";var d=new Date(new Date(v).getTime()+5*3600e3);if(isNaN(d))return "";return dm(d)+" "+pad2(d.getUTCHours())+":"+pad2(d.getUTCMinutes());}
+function dates(x,pre){var b=[];
+  if(dm(x[pre+"created"]))b.push("создано "+dm(x[pre+"created"]));
+  if(dm(x[pre+"added"]))b.push("поднято "+dm(x[pre+"added"]));
+  if(dmT(x[pre+"seen"]))b.push("в базе с "+dmT(x[pre+"seen"])+" (Алматы)");
+  return b.length?"<div class='p mut'>"+esc(b.join(" · "))+"</div>":"";}
 function par(x,pre){var b=[];
   if(x[pre+"rooms"])b.push(x[pre+"rooms"]+"-комн");
   if(x[pre+"area"])b.push(x[pre+"area"]+" м²");
@@ -739,7 +747,7 @@ function render(d){
     var list=groups[aid], f0=list[0];
     var el=document.createElement("div"); el.className="find";
     var h="<div class=agenthead><h3>Искомое объявление (агент)</h3>"+imgs(f0.a_photos)+
-      "<div class=p>"+esc(par(f0,"a_")+" · "+money(f0.a_price))+"</div>"+
+      "<div class=p>"+esc(par(f0,"a_")+" · "+money(f0.a_price))+"</div>"+dates(f0,"a_")+
       "<div class=p><a href='"+show(aid)+"' target=_blank>krisha.kz/a/show/"+aid+"</a></div></div>";
     h+="<div class=candhead>Кандидаты-хозяева: "+list.length+"</div>";
     list.forEach(function(f){
@@ -748,7 +756,7 @@ function render(d){
         : "<span class='tag q'>фото не проверено</span>";
       h+="<div class=cand><div class=candtitle>Кандидат · score "+f.param_score+"</div>"+
         imgs(f.o_photos)+
-        "<div class=p>"+esc(par(f,"o_")+" · "+money(f.o_price))+"</div>"+
+        "<div class=p>"+esc(par(f,"o_")+" · "+money(f.o_price))+"</div>"+dates(f,"o_")+
         "<div class=p><a href='"+show(f.owner_id)+"' target=_blank>krisha.kz/a/show/"+f.owner_id+"</a></div>"+
         "<div class=fieldsbox><div class=mut style='font-size:12px;margin-bottom:4px'>что совпало:</div>"+chips(f)+"</div>"+
         "<div class=verdict>"+ph+(f.photo_why?" — "+esc(f.photo_why):"")+"</div>"+
@@ -5903,6 +5911,22 @@ http
           : x.floor ? x.floor + " эт." : x.floors ? "дом " + x.floors + " эт." : null;
         const label = (x) => [x.city, x.rooms ? x.rooms + "к" : null, x.area ? x.area + "м²" : null,
           floorText(x), x.district].filter(Boolean).join(" · ");
+        // Даты: создано и поднято — дни с Крыши (DATE, tedious отдаёт полночь
+        // UTC, поэтому берём UTC-компоненты); «в базе с» — first_seen, UTC в
+        // базе, показываем по Алматы (+5).
+        const pad2 = (n) => String(n).padStart(2, "0");
+        const dm = (v) => { const d = v ? new Date(v) : null; return d && !isNaN(d) ? pad2(d.getUTCDate()) + "." + pad2(d.getUTCMonth() + 1) : null; };
+        const dmT = (v) => {
+          const d = v ? new Date(new Date(v).getTime() + 5 * 3600e3) : null;
+          return d && !isNaN(d) ? dm(d) + " " + pad2(d.getUTCHours()) + ":" + pad2(d.getUTCMinutes()) : null;
+        };
+        const dates = (x) => {
+          const p = [];
+          if (dm(x.created_on)) p.push("создано " + dm(x.created_on));
+          if (dm(x.added_on)) p.push("поднято " + dm(x.added_on));
+          if (dmT(x.first_seen)) p.push("в базе с " + dmT(x.first_seen));
+          return p.length ? "📅 " + p.join(" · ") : null;
+        };
         const PhotoMatch = require("./scripts/photo-match.js");
         const agents = await db.agentsToMatch(batch);
         let searched = 0, matched = 0, photoConfirmed = 0;
@@ -5962,17 +5986,27 @@ http
           const photoOk = (c) => !!(c.s && c.s.match && c.s.confidence >= 0.7);
           const photoText = (c) => !c.s ? "фото не проверить" : photoOk(c) ? "фото совпали " + c.s.confidence : "фото не совпали";
           const verdict = (c) => "score " + c.h.score + " · " + photoText(c);
+          // Дата поднятия у строк, сохранённых до появления колонки, — из
+          // data_gz; находок мало, распаковка дешёвая.
+          for (const f of finds.slice(0, 8)) {
+            if (!f.a.added_on) f.a.added_on = await db.fillAddedOn(f.a.id).catch(() => null);
+            for (const c of f.cand.slice(0, 4)) {
+              if (!c.h.added_on) c.h.added_on = await db.fillAddedOn(c.h.id).catch(() => null);
+            }
+          }
           const lines = [];
           finds.slice(0, 8).forEach((f, n) => {
             const best = f.cand[0];
             if (n) lines.push("");
-            lines.push("🎯 <b>Совпадение</b>" + (best ? " (" + verdict(best) + ")" : ""),
-              "",
-              "🏢 От агента: " + esc(label(f.a)) + "\n" + show(f.a.id));
+            lines.push("🎯 <b>Совпадение</b>" + (best ? " (" + verdict(best) + ")" : ""), "");
+            lines.push("🏢 От агента: " + esc(label(f.a)));
+            if (dates(f.a)) lines.push(dates(f.a));
+            lines.push(show(f.a.id));
             f.cand.slice(0, 4).forEach((c, k) => {
               const mark = !c.s ? "➖" : photoOk(c) ? "✅" : "❌";
-              lines.push(mark + " От собственника: " + esc(label(c.h)) + (k ? " (" + verdict(c) + ")" : "") +
-                "\n" + show(c.h.id));
+              lines.push(mark + " От собственника: " + esc(label(c.h)) + (k ? " (" + verdict(c) + ")" : ""));
+              if (dates(c.h)) lines.push(dates(c.h));
+              lines.push(show(c.h.id));
             });
           });
           // Хвост: куда смотреть дальше. Ключ — тот же, что открывает эти
@@ -6032,6 +6066,8 @@ http
           const finds = await Promise.all(rows.map(async (r) => Object.assign({}, r, {
             a_photos: (await db.objectPhotos(r.agent_id).catch(() => [])).slice(0, 4),
             o_photos: (await db.objectPhotos(r.owner_id).catch(() => [])).slice(0, 4),
+            a_added: r.a_added || (await db.fillAddedOn(r.agent_id).catch(() => null)),
+            o_added: r.o_added || (await db.fillAddedOn(r.owner_id).catch(() => null)),
           })));
           res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
           res.end(JSON.stringify({ stats: stats, finds: finds }));

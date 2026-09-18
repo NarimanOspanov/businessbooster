@@ -442,6 +442,9 @@ IF COL_LENGTH('dbo.krisha_objects', 'house_num')   IS NULL ALTER TABLE dbo.krish
 IF COL_LENGTH('dbo.krisha_objects', 'build_year')  IS NULL ALTER TABLE dbo.krisha_objects ADD build_year INT NULL;
 IF COL_LENGTH('dbo.krisha_objects', 'house')       IS NULL ALTER TABLE dbo.krisha_objects ADD house NVARCHAR(60) NULL;
 IF COL_LENGTH('dbo.krisha_objects', 'toilet')      IS NULL ALTER TABLE dbo.krisha_objects ADD toilet NVARCHAR(40) NULL;
+-- added_on — дата последнего поднятия (addedAt со страницы); created_on — дата
+-- создания. У старых строк заполняется лениво из data_gz (fillAddedOn).
+IF COL_LENGTH('dbo.krisha_objects', 'added_on')    IS NULL ALTER TABLE dbo.krisha_objects ADD added_on DATE NULL;
 -- Телефоны, снятые со страницы (человеком через капчу): цифрами через запятую
 -- 7XXXXXXXXXX; phones_at — когда сняли. Очередь на съём — где phones пусто.
 IF COL_LENGTH('dbo.krisha_objects', 'phones')      IS NULL ALTER TABLE dbo.krisha_objects ADD phones NVARCHAR(300) NULL;
@@ -1807,6 +1810,29 @@ async function objectPhotos(id) {
   } catch { return []; }
 }
 
+// Дата поднятия для строки, сохранённой до появления колонки added_on: берём
+// из сохранённого window.data и дописываем в колонку, чтобы второй раз не
+// распаковывать. Возвращает строку YYYY-MM-DD или null.
+async function fillAddedOn(id) {
+  const pool = await getPool();
+  const r = await pool.request().input("id", sql.BigInt, Number(id))
+    .query("SELECT added_on, data_gz FROM dbo.krisha_objects WHERE id = @id");
+  if (!r.recordset.length) return null;
+  const row = r.recordset[0];
+  if (row.added_on) return row.added_on;
+  if (!row.data_gz) return null;
+  let added = null;
+  try {
+    const j = JSON.parse(require("zlib").gunzipSync(row.data_gz).toString("utf8"));
+    const c = (j.adverts && j.adverts[0]) || {};
+    added = c.addedAt || null;
+  } catch { return null; }
+  if (!added) return null;
+  await pool.request().input("id", sql.BigInt, Number(id)).input("d", sql.Date, added)
+    .query("UPDATE dbo.krisha_objects SET added_on = @d WHERE id = @id AND added_on IS NULL").catch(() => {});
+  return added;
+}
+
 // Записать кандидата в журнал находок (для ручной проверки и статистики).
 async function logMatchCandidate(m) {
   const pool = await getPool();
@@ -1849,6 +1875,7 @@ async function saveObject(o) {
     .input("ut", sql.NVarChar(20), o.userType || null)
     .input("city", sql.NVarChar(40), o.city || null)
     .input("created", sql.Date, o.createdOn || null)
+    .input("added", sql.Date, o.addedOn || null)
     .input("price", sql.BigInt, o.price == null ? null : Number(o.price))
     .input("rooms", sql.Int, o.rooms == null ? null : Number(o.rooms))
     .input("area", sql.Decimal(9, 2), o.area == null ? null : Number(o.area))
@@ -1871,7 +1898,8 @@ async function saveObject(o) {
       USING (SELECT @id AS id) AS s ON t.id = s.id
       WHEN MATCHED THEN UPDATE SET
         deal = @deal, prop = @prop, user_type = @ut, city = @city,
-        created_on = COALESCE(@created, t.created_on), price = @price, rooms = @rooms,
+        created_on = COALESCE(@created, t.created_on), added_on = COALESCE(@added, t.added_on),
+        price = @price, rooms = @rooms,
         area = @area, lat = @lat, lon = @lon, title = @title,
         floor = @floor, floors = @floors, complex_id = @cxid, district = @district,
         mkr = @mkr, street_slug = @sslug, house_num = @hnum,
@@ -1879,9 +1907,9 @@ async function saveObject(o) {
         toilet = COALESCE(@toilet, t.toilet),
         data_gz = COALESCE(@gz, t.data_gz), last_seen = SYSUTCDATETIME()
       WHEN NOT MATCHED THEN INSERT
-        (id, deal, prop, user_type, city, created_on, price, rooms, area, lat, lon, title,
+        (id, deal, prop, user_type, city, created_on, added_on, price, rooms, area, lat, lon, title,
          floor, floors, complex_id, district, mkr, street_slug, house_num, build_year, house, toilet, data_gz)
-        VALUES (@id, @deal, @prop, @ut, @city, @created, @price, @rooms, @area, @lat, @lon, @title,
+        VALUES (@id, @deal, @prop, @ut, @city, @created, @added, @price, @rooms, @area, @lat, @lon, @title,
          @floor, @floors, @cxid, @district, @mkr, @sslug, @hnum, @byear, @house, @toilet, @gz);`);
 }
 
@@ -1919,7 +1947,7 @@ async function findObjects(q, limit) {
     .query(`
       SELECT TOP (@n) f.id, f.deal, f.prop, f.user_type, f.city, f.area, f.rooms, f.floor, f.floors,
         f.complex_id, f.district, f.street_slug, f.house_num, f.lat, f.lon, f.price, f.title, f.created_on,
-        f.build_year, f.house, f.toilet,
+        f.added_on, f.first_seen, f.build_year, f.house, f.toilet,
         IIF(@rooms IS NOT NULL AND f.rooms = @rooms, 2, 0)
           + IIF(@cxid IS NOT NULL AND f.complex_id = @cxid, 4, 0)
           + IIF(@lat IS NOT NULL AND f.lat IS NOT NULL
@@ -1970,7 +1998,8 @@ async function agentsToMatch(limit) {
   await ensureObjects(pool);
   const r = await pool.request().input("n", sql.Int, Number(limit) || 100).query(`
     SELECT TOP (@n) id, deal, prop, city, area, rooms, floor, floors,
-      complex_id, district, street_slug, house_num, lat, lon, build_year, house, toilet, title, user_type
+      complex_id, district, street_slug, house_num, lat, lon, build_year, house, toilet, title, user_type,
+      created_on, added_on, first_seen
     FROM dbo.krisha_objects
     WHERE searched_at IS NULL
       AND user_type IN ('specialist', 'company', 'agent')
@@ -2024,6 +2053,8 @@ async function matchReviewRows(limit) {
       a.build_year a_year, a.house a_house, a.toilet a_toilet,
       a.complex_id a_cx, a.lat a_lat, a.lon a_lon, a.district a_district,
       a.street_slug a_sslug, a.house_num a_hnum,
+      a.created_on a_created, a.added_on a_added, a.first_seen a_seen,
+      o.created_on o_created, o.added_on o_added, o.first_seen o_seen,
       o.title o_title, o.area o_area, o.rooms o_rooms, o.floor o_floor, o.floors o_floors,
       o.price o_price, o.build_year o_year, o.house o_house, o.toilet o_toilet,
       o.complex_id o_cx, o.lat o_lat, o.lon o_lon, o.district o_district,
@@ -2223,7 +2254,7 @@ async function objectStats() {
 module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
-  objectPhotos, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
+  objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,
   getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
