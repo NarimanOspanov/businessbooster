@@ -904,6 +904,57 @@ function tabs(){
 fetch("/api/krisha/stats?data=1&key="+encodeURIComponent(KEY)).then(function(r){return r.json();}).then(function(d){DATA=d;tabs();render();}).catch(function(e){document.getElementById("range").textContent="Ошибка: "+e;});
 </script></body></html>`;
 
+// --- Те же две страницы, но поверх списка карты (krisha_list) ----------------
+// Мониторинг находок по списку: у кандидатов нет года/типа дома/санузла и
+// улицы, зато есть адрес текстом, состояние (архив) и номер.
+const KRISHA_LIST_MONITOR_HTML = KRISHA_MONITOR_HTML
+  .replace("<title>Крыша · мониторинг находок</title>", "<title>Крыша · находки по списку</title>")
+  .replace("<h1>Крыша · мониторинг находок «агент → хозяин»</h1>", "<h1>Крыша · находки по списку «агент → хозяин»</h1>")
+  .replace('"/api/krisha/monitor?key="', '"/api/krisha/listmonitor?key="')
+  .replace(/function chips\(f\)\{[\s\S]*?return "<div class=fields>"\+o\.join\(""\)\+"<\/div>";\}/,
+`function chips(f){var o=[];
+  if(f.a_lat!=null&&f.o_lat!=null)o.push(fld("координаты",(Math.abs(f.a_lat-f.o_lat)<0.0006&&Math.abs(f.a_lon-f.o_lon)<0.0008)?"y":"n"));
+  else o.push(fld("координаты","q"));
+  if(f.a_cx&&f.o_cx)o.push(fld("ЖК",f.a_cx===f.o_cx?"y":"n"));else o.push(fld("ЖК","q"));
+  var tol=Math.max(1,(f.a_area||0)*0.03);
+  o.push(fld("площадь",(Math.abs(f.a_area-f.o_area)<=tol)?"y":"n",f.a_area+"/"+f.o_area));
+  o.push(eq("комнаты",f.a_rooms,f.o_rooms));
+  o.push(eq("этаж",f.a_floor,f.o_floor));
+  o.push(eq("этажность",f.a_floors,f.o_floors));
+  return "<div class=fields>"+o.join("")+"</div>";}`)
+  .replace(/function dates\(x,pre\)\{[\s\S]*?return b\.length\?"<div class='p mut'>"\+esc\(b\.join\(" · "\)\)\+"<\/div>":"";\}/,
+`function dates(x,pre){var b=[];
+  if(x[pre+"addr"])b.push(x[pre+"addr"]);
+  if(dm(x[pre+"bumped"]))b.push("поднято "+dm(x[pre+"bumped"]));
+  if(dmT(x[pre+"seen"]))b.push("в базе с "+dmT(x[pre+"seen"])+" (Алматы)");
+  if(x[pre+"storage"]&&x[pre+"storage"]!=="live")b.push("в архиве");
+  if(x[pre+"phones"])b.push("номер снят");
+  return b.length?"<div class='p mut'>"+esc(b.join(" · "))+"</div>":"";}`);
+
+// Дашборд по списку: те же карточки и график, плюс события списка (поднятия,
+// смены цены, архив) и снятые номера хозяев.
+const KRISHA_LIST_STATS_HTML = KRISHA_STATS_HTML
+  .replace("<title>Крыша · импорт и находки</title>", "<title>Крыша · список: импорт и находки</title>")
+  .replace("<h1>Крыша · импорт и находки</h1>", "<h1>Крыша · список: импорт и находки</h1>")
+  .replace('fetch("/api/krisha/stats?data=1&key="', 'fetch("/api/krisha/liststats?data=1&key="')
+  .replace(`  (DATA.photos||[]).forEach(function(r){m[r.day]=m[r.day]||{day:r.day};m[r.day].photo_ok=r.photo_ok;m[r.day].human_ok=r.human_ok;});`,
+`  (DATA.photos||[]).forEach(function(r){m[r.day]=m[r.day]||{day:r.day};m[r.day].photo_ok=r.photo_ok;m[r.day].human_ok=r.human_ok;});
+  (DATA.events||[]).forEach(function(r){m[r.day]=m[r.day]||{day:r.day};m[r.day].bumps=r.bumps;m[r.day].prices=r.prices;m[r.day].archived=r.archived;});
+  (DATA.phones||[]).forEach(function(r){m[r.day]=m[r.day]||{day:r.day};m[r.day].phones=r.phones;});`)
+  .replace(`    cardBig(conv+"%","конверсия","оригинал / проверенных");`,
+`    cardBig(conv+"%","конверсия","оригинал / проверенных")+
+    card(n(sum(function(r){return r.phones;})),"номеров снято","у хозяев за период")+
+    card(n(sum(function(r){return r.bumps;})),"поднятий","смен цены "+n(sum(function(r){return r.prices;}))+" · в архив "+n(sum(function(r){return r.archived;})))+
+    (DATA.totals?card(n(DATA.totals.owner_queue),"хозяев в очереди","без номера, живых · с номером "+n(DATA.totals.owner_phones)):"");`)
+  .replace(`  var h="<table><tr><th>День</th><th>Всего</th><th>Продажа</th><th>Аренда</th><th>Хозяев</th><th>Проверено</th><th>Найдено</th></tr>";
+  rows.slice().reverse().forEach(function(r){
+    h+="<tr><td>"+r.day+"</td><td>"+n(r.total)+"</td><td>"+n(r.sale)+"</td><td>"+n(r.rent)+"</td><td>"+n(r.owner)+"</td><td>"+n(r.searched)+"</td><td style='color:var(--ok)'>"+n(r.photo_ok)+"</td></tr>";
+  });`,
+`  var h="<table><tr><th>День</th><th>Всего</th><th>Продажа</th><th>Аренда</th><th>Хозяев</th><th>Проверено</th><th>Найдено</th><th>Номеров</th><th>Поднятий</th><th>Цена</th><th>Архив</th></tr>";
+  rows.slice().reverse().forEach(function(r){
+    h+="<tr><td>"+r.day+"</td><td>"+n(r.total)+"</td><td>"+n(r.sale)+"</td><td>"+n(r.rent)+"</td><td>"+n(r.owner)+"</td><td>"+n(r.searched)+"</td><td style='color:var(--ok)'>"+n(r.photo_ok)+"</td><td>"+n(r.phones)+"</td><td>"+n(r.bumps)+"</td><td>"+n(r.prices)+"</td><td>"+n(r.archived)+"</td></tr>";
+  });`);
+
 const SOURCE_LABEL = {
   chatgpt: "ChatGPT", perplexity: "Perplexity", claude: "Claude", google: "Google",
   bing: "Bing / Copilot", yandex: "Яндекс", direct: "прямой заход", internal: "с сайта", other: "другое",
@@ -6216,9 +6267,9 @@ http
           });
           const dashKey = encodeURIComponent(KRISHA_JOB_KEY || KRISHA_PHONE_KEY);
           lines.push("", "",
-            '<a href="' + CANONICAL + "/api/krisha/matchlist?key=" + dashKey + '&stats=1">итоги по списку</a>' +
+            '<a href="' + CANONICAL + "/api/krisha/listmonitor?key=" + dashKey + '">все совпадения</a>' +
             " · " +
-            '<a href="' + CANONICAL + "/api/krisha/scanlist?key=" + dashKey + '&stats=1">статистика списка</a>');
+            '<a href="' + CANONICAL + "/api/krisha/liststats?key=" + dashKey + '">статистика</a>');
           notifyTelegram(lines.join("\n"));
         }
 
@@ -6429,6 +6480,61 @@ http
     }
 
     // Дашборд собственника: импорт по дням/периодам, разбивка, конверсия.
+    // Те же страницы поверх списка карты. Старые остаются как были.
+    if (urlPath === "/api/krisha/liststats") {
+      const q = parsed.searchParams;
+      const key = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
+      if (!key || q.get("key") !== key) { res.writeHead(403); res.end("bad key"); return; }
+      if (q.get("data")) {
+        (async () => {
+          const d = await db.listDashboard(60);
+          res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+          res.end(JSON.stringify(d));
+        })().catch((e) => { res.writeHead(500); res.end(String(e.message)); });
+        return;
+      }
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+      res.end(KRISHA_LIST_STATS_HTML);
+      return;
+    }
+
+    if (urlPath === "/api/krisha/listmonitor") {
+      const q = parsed.searchParams;
+      const key = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
+      if (!key || q.get("key") !== key) { res.writeHead(403); res.end("bad key"); return; }
+      if (q.get("set")) {
+        const okv = q.get("ok");
+        (async () => {
+          await db.setListHumanOk(Number(q.get("set")), okv === "1" ? 1 : okv === "0" ? 0 : null);
+          res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+          res.end(JSON.stringify({ ok: true }));
+        })().catch((e) => { res.writeHead(500); res.end(String(e.message)); });
+        return;
+      }
+      if (q.get("data")) {
+        (async () => {
+          const stats = await db.listMatchStats();
+          const rows = await db.listMatchReviewRows(40);
+          const finds = rows.map((r) => {
+            const x = Object.assign({}, r, {
+              a_photos: db.listPhotoUrls(r.a_pj).slice(0, 4),
+              o_photos: db.listPhotoUrls(r.o_pj).slice(0, 4),
+            });
+            delete x.a_pj; delete x.o_pj;
+            return x;
+          });
+          // Форма stats — как у старой страницы: total.searched/matched + byDay.
+          const byDay = (await db.listDashboard(30).catch(() => ({ searched: [] }))).searched;
+          res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+          res.end(JSON.stringify({ stats: { total: stats.total, byDay: byDay }, finds: finds }));
+        })().catch((e) => { res.writeHead(500); res.end(String(e.message)); });
+        return;
+      }
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+      res.end(KRISHA_LIST_MONITOR_HTML);
+      return;
+    }
+
     if (urlPath === "/api/krisha/stats") {
       const q = parsed.searchParams;
       const key = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;

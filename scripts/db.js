@@ -2185,6 +2185,89 @@ async function listMatchStats() {
   return { total: t, candidates: p };
 }
 
+// Дашборд по списку: импорт по дням с разбивкой, поиск и находки, события
+// (поднятия, цены, архив), снятые номера. 60 дней, периоды режет клиент.
+async function listDashboard(days) {
+  const pool = await getPool();
+  await ensureList(pool);
+  const d = Math.min(120, Math.max(1, Number(days) || 60));
+  const q = (sqlText) => pool.request().input("d", sql.Int, d).query(sqlText).then((r) => r.recordset);
+  const imports = await q(`
+    SELECT CONVERT(char(10), first_seen, 23) AS day, COUNT(*) AS total,
+      SUM(CASE WHEN deal='sale' THEN 1 ELSE 0 END) AS sale,
+      SUM(CASE WHEN deal='rent' THEN 1 ELSE 0 END) AS rent,
+      SUM(CASE WHEN user_type='owner' THEN 1 ELSE 0 END) AS owner,
+      SUM(CASE WHEN user_type='specialist' THEN 1 ELSE 0 END) AS specialist,
+      SUM(CASE WHEN user_type IN ('company','agent') THEN 1 ELSE 0 END) AS company,
+      SUM(CASE WHEN user_type='complex' THEN 1 ELSE 0 END) AS complex
+    FROM dbo.krisha_list
+    WHERE first_seen >= DATEADD(day, -@d, SYSUTCDATETIME())
+    GROUP BY CONVERT(char(10), first_seen, 23) ORDER BY day`);
+  const searched = await q(`
+    SELECT CONVERT(char(10), searched_at, 23) AS day, COUNT(*) AS searched,
+      SUM(CASE WHEN match_count > 0 THEN 1 ELSE 0 END) AS matched
+    FROM dbo.krisha_list
+    WHERE searched_at IS NOT NULL AND searched_at >= DATEADD(day, -@d, SYSUTCDATETIME())
+    GROUP BY CONVERT(char(10), searched_at, 23) ORDER BY day`);
+  const photos = await q(`
+    SELECT CONVERT(char(10), found_at, 23) AS day,
+      COUNT(DISTINCT CASE WHEN photo_match = 1 AND photo_conf >= 0.7 THEN agent_id END) AS photo_ok,
+      COUNT(DISTINCT CASE WHEN human_ok = 1 THEN agent_id END) AS human_ok
+    FROM dbo.krisha_list_matches
+    WHERE found_at >= DATEADD(day, -@d, SYSUTCDATETIME())
+    GROUP BY CONVERT(char(10), found_at, 23) ORDER BY day`);
+  const events = await q(`
+    SELECT CONVERT(char(10), at, 23) AS day,
+      SUM(CASE WHEN kind='bump' THEN 1 ELSE 0 END) AS bumps,
+      SUM(CASE WHEN kind='price' THEN 1 ELSE 0 END) AS prices,
+      SUM(CASE WHEN kind='archived' THEN 1 ELSE 0 END) AS archived,
+      SUM(CASE WHEN kind='back' THEN 1 ELSE 0 END) AS back
+    FROM dbo.krisha_list_events
+    WHERE at >= DATEADD(day, -@d, SYSUTCDATETIME())
+    GROUP BY CONVERT(char(10), at, 23) ORDER BY day`);
+  const phones = await q(`
+    SELECT CONVERT(char(10), phones_at, 23) AS day, COUNT(*) AS phones
+    FROM dbo.krisha_list
+    WHERE user_type='owner' AND phones_at IS NOT NULL AND phones_at >= DATEADD(day, -@d, SYSUTCDATETIME())
+    GROUP BY CONVERT(char(10), phones_at, 23) ORDER BY day`);
+  const totals = (await pool.request().query(`
+    SELECT COUNT(*) AS total,
+      SUM(CASE WHEN storage='live' THEN 1 ELSE 0 END) AS live,
+      SUM(CASE WHEN user_type='owner' THEN 1 ELSE 0 END) AS owner,
+      SUM(CASE WHEN user_type='owner' AND phones IS NOT NULL THEN 1 ELSE 0 END) AS owner_phones,
+      SUM(CASE WHEN user_type='owner' AND storage='live' AND phones IS NULL THEN 1 ELSE 0 END) AS owner_queue
+    FROM dbo.krisha_list`)).recordset[0];
+  return { imports, searched, photos, events, phones, totals };
+}
+
+// Находки по списку для страницы проверки: агентское, кандидат, что совпало.
+async function listMatchReviewRows(limit) {
+  const pool = await getPool();
+  await ensureList(pool);
+  const r = await pool.request().input("n", sql.Int, Number(limit) || 40).query(`
+    SELECT TOP (@n) m.id, m.agent_id, m.owner_id, m.param_score, m.photo_match, m.photo_conf,
+      m.photo_why, m.human_ok, m.found_at,
+      a.title a_title, a.city a_city, a.area a_area, a.rooms a_rooms, a.floor a_floor, a.floors a_floors,
+      a.price a_price, a.deal a_deal, a.prop a_prop, a.complex_id a_cx, a.lat a_lat, a.lon a_lon,
+      a.addr a_addr, a.storage a_storage, a.bumped_on a_bumped, a.first_seen a_seen, a.photos_json a_pj,
+      o.title o_title, o.city o_city, o.area o_area, o.rooms o_rooms, o.floor o_floor, o.floors o_floors,
+      o.price o_price, o.complex_id o_cx, o.lat o_lat, o.lon o_lon,
+      o.addr o_addr, o.storage o_storage, o.bumped_on o_bumped, o.first_seen o_seen, o.phones o_phones, o.photos_json o_pj
+    FROM dbo.krisha_list_matches m
+    JOIN dbo.krisha_list a ON a.id = m.agent_id
+    JOIN dbo.krisha_list o ON o.id = m.owner_id
+    ORDER BY m.found_at DESC`);
+  return r.recordset;
+}
+
+async function setListHumanOk(logId, ok) {
+  const pool = await getPool();
+  await pool.request()
+    .input("id", sql.BigInt, Number(logId))
+    .input("ok", sql.Bit, ok == null ? null : (ok ? 1 : 0))
+    .query("UPDATE dbo.krisha_list_matches SET human_ok = @ok WHERE id = @id");
+}
+
 // Фото объявления из списка — уменьшенные 560x350, как у objectPhotos.
 function listPhotoUrls(photosJson) {
   try {
@@ -2714,6 +2797,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveListAdvert, listStats, listCompare,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
+  listDashboard, listMatchReviewRows, setListHumanOk,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,
