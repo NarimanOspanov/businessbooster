@@ -6919,14 +6919,23 @@ http
           // Счётчики очереди — раз в минуту на окно, остальные вызовы берут
           // из кэша: сам подсчёт на 10 DTU стоит секунды, объект — миллисекунды.
           const ck = since + "|" + (dealF || "") + "|" + (propF || "");
-          const cached = objphoneCounts.get(ck);
-          const fresh = !cached || Date.now() - cached.at > 60e3;
-          const q = await db.nextListOwnerWithoutPhone(since, dealF, propF, fresh);
-          if (fresh) objphoneCounts.set(ck, { at: Date.now(), left: q.left, waiting: q.waiting });
-          const cnt = fresh ? q : objphoneCounts.get(ck);
+          let cached = objphoneCounts.get(ck);
+          // Первый вызов на окно считает синхронно; дальше плагин получает
+          // счётчики из кэша сразу, а пересчёт раз в минуту идёт в фоне.
+          if (!cached) {
+            const q0 = await db.nextListOwnerWithoutPhone(since, dealF, propF, true);
+            cached = { at: Date.now(), left: q0.left, waiting: q0.waiting, busy: false };
+            objphoneCounts.set(ck, cached);
+          } else if (Date.now() - cached.at > 60e3 && !cached.busy) {
+            cached.busy = true;
+            db.nextListOwnerWithoutPhone(since, dealF, propF, true)
+              .then((q1) => { cached.at = Date.now(); cached.left = q1.left; cached.waiting = q1.waiting; })
+              .catch(() => {}).then(() => { cached.busy = false; });
+          }
+          const q = await db.nextListOwnerWithoutPhone(since, dealF, propF, false);
           const r = q.row;
           return send(200, {
-            ok: true, since: since, left: cnt.left, waiting: cnt.waiting, countsAt: new Date(fresh ? Date.now() : cached.at).toISOString(),
+            ok: true, since: since, left: cached.left, waiting: cached.waiting, countsAt: new Date(cached.at).toISOString(),
             item: r ? {
               id: String(r.id), title: r.title, deal: r.deal, prop: r.prop, city: r.city,
               seller: r.user_type, price: r.price == null ? null : Number(r.price),
