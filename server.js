@@ -5867,7 +5867,7 @@ http
         await checkDbSpeed(true);
         // Записать страницу одним запросом (см. saveListAdverts).
         async function store(res, section) {
-          const rows = res.adverts.map((a) => L.parseAdvert(a, section, res.dates)).filter((o) => o.id);
+          const rows = res.adverts.map((a) => L.parseAdvert(a, section.path, res.dates)).filter((o) => o.id);
           const t1 = Date.now();
           const outs = await db.saveListAdverts(rows, st.sweepNo);
           storeMs += Date.now() - t1; storeN++;
@@ -5884,6 +5884,7 @@ http
         }
         outer:
         while (pages < maxPages && Date.now() - t0 < budgetMs) {
+          if (st.section >= L.SECTIONS.length) st.section = 0; // список частей мог измениться
           const section = L.SECTIONS[st.section];
           // Окно страниц разом; разбираем по порядку до первой пустой или сбойной:
           // всё после неё в этом окне не считается, курсор встаёт на неё.
@@ -5915,7 +5916,7 @@ http
           archived: archived, back: back, bumped: bumped, cityNull: cityNull, errors: errors,
           photosMigrated: migrated, photosLeft: migrateLeft,
           concurrency: conc, concurrencyAsked: concAsked, throttled: throttled, dbSlow: !!KW.list.dbSlow, dbLoad: lastLoad, proxy: viaProxy,
-          cursor: { section: L.SECTIONS[st.section], page: st.page, sweepNo: st.sweepNo,
+          cursor: { section: (L.SECTIONS[st.section] || L.SECTIONS[0]).label, page: st.page, sweepNo: st.sweepNo,
                     pagesThisSweep: st.pages, advertsThisSweep: st.adverts, startedAt: st.startedAt },
           lastSweep: st.lastSweep || null,
         });

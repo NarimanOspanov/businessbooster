@@ -23,12 +23,21 @@ const H = {
   "X-Requested-With": "XMLHttpRequest",
 };
 
+// Части обхода. Список карты обрезан примерно на 5 300 страницах (~107 тысяч
+// объявлений), а продажа квартир — 225 тысяч, поэтому её читаем по числу
+// комнат: каждая часть меньше лимита, а вместе они дают весь раздел.
+// Остальные разделы в лимит укладываются целиком.
 const SECTIONS = [
-  "/prodazha/kvartiry/", "/arenda/kvartiry/",
-  "/prodazha/doma-dachi/", "/arenda/doma-dachi/",
-  "/prodazha/kommercheskaya-nedvizhimost/", "/arenda/kommercheskaya-nedvizhimost/",
-  "/prodazha/uchastkov/",
-];
+  { path: "/prodazha/kvartiry/", q: "das[live.rooms][]=1", label: "/prodazha/kvartiry/ 1к" },
+  { path: "/prodazha/kvartiry/", q: "das[live.rooms][]=2", label: "/prodazha/kvartiry/ 2к" },
+  { path: "/prodazha/kvartiry/", q: "das[live.rooms][]=3", label: "/prodazha/kvartiry/ 3к" },
+  { path: "/prodazha/kvartiry/", q: "das[live.rooms][]=4", label: "/prodazha/kvartiry/ 4к" },
+  { path: "/prodazha/kvartiry/", q: "das[live.rooms][]=5&das[live.rooms][]=6&das[live.rooms][]=7&das[live.rooms][]=8&das[live.rooms][]=9", label: "/prodazha/kvartiry/ 5к+" },
+  { path: "/arenda/kvartiry/" },
+  { path: "/prodazha/doma-dachi/" }, { path: "/arenda/doma-dachi/" },
+  { path: "/prodazha/kommercheskaya-nedvizhimost/" }, { path: "/arenda/kommercheskaya-nedvizhimost/" },
+  { path: "/prodazha/uchastkov/" },
+].map((x) => Object.assign({ q: "", label: x.path }, x));
 
 function dealOf(section) { return /^\/arenda\//.test(section) ? "rent" : "sale"; }
 function propOf(section) {
@@ -60,8 +69,10 @@ async function fetchJson(url, timeoutMs, opts) {
 }
 
 // Одна страница списка. { adverts: [...], empty: bool }
+// section — объект из SECTIONS (или путь строкой, тогда без фильтра).
 async function fetchListPage(section, page, attempts, opts) {
-  const url = "https://krisha.kz/a/ajax-map-list/map" + section + "?page=" + page;
+  const sec = typeof section === "string" ? { path: section, q: "" } : section;
+  const url = "https://krisha.kz/a/ajax-map-list/map" + sec.path + "?page=" + page + (sec.q ? "&" + sec.q : "");
   let last;
   for (let i = 0; i < (attempts || 2); i++) {
     try {
