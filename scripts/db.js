@@ -1810,6 +1810,25 @@ async function objectPhotos(id) {
   } catch { return []; }
 }
 
+// Какие из этих id уже есть в krisha_objects. Скан спрашивает это перед
+// чтением окна и не тратит прокси на то, что уже лежит в базе (например,
+// пришло минутой раньше через выдачу).
+async function knownObjectIds(ids) {
+  const list = (ids || []).map((x) => Number(x)).filter(Boolean);
+  if (!list.length) return new Set();
+  const pool = await getPool();
+  await ensureObjects(pool);
+  const have = new Set();
+  for (let i = 0; i < list.length; i += 200) {
+    const chunk = list.slice(i, i + 200);
+    const req = pool.request();
+    const names = chunk.map((id, n) => { req.input("i" + n, sql.BigInt, id); return "@i" + n; });
+    const r = await req.query("SELECT id FROM dbo.krisha_objects WHERE id IN (" + names.join(",") + ")");
+    r.recordset.forEach((x) => have.add(String(x.id)));
+  }
+  return have;
+}
+
 // Дата поднятия для строки, сохранённой до появления колонки added_on: берём
 // из сохранённого window.data и дописываем в колонку, чтобы второй раз не
 // распаковывать. Возвращает строку YYYY-MM-DD или null.
@@ -2253,7 +2272,7 @@ async function objectStats() {
 
 module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
-  maxKnownId, saveObject, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
+  maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,

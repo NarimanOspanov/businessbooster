@@ -254,7 +254,10 @@ function newSessionUrl(raw) {
 }
 
 async function doRotateProxies() {
-  const want = Math.max(currentUrls().length, 1);
+  // KRISHA_PROXY_WANT — сколько входов держать в пуле: больше входов —
+  // реже 468 на каждом. Новые порты создаются в Asocks при ротации
+  // (?rotateProxies=1), это платно, поэтому только по явной переменной.
+  const want = Math.max(Number(process.env.KRISHA_PROXY_WANT) || 0, currentUrls().length, 1);
   const key = asocksKey();
   if (key) {
     const listed = await asocksListPorts(key);
@@ -264,7 +267,12 @@ async function doRotateProxies() {
     }
     let urls = urlsFromPorts(await asocksListPorts(key));
     if (!urls.length && listed.length) urls = urlsFromPorts(listed);
-    if (!urls.length) urls = urlsFromPorts(await asocksCreatePorts(key, want));
+    // Портов меньше, чем хотим (KRISHA_PROXY_WANT), — добираем разницу. Это
+    // платно и случается только при ротации, а не на каждом запросе.
+    if (urls.length < want) {
+      try { urls = urls.concat(urlsFromPorts(await asocksCreatePorts(key, want - urls.length))); }
+      catch (e) { console.log("[proxy] добрать порты не вышло: " + String(e.message).slice(0, 120)); }
+    }
     const kz = urls.filter((u) => /country-KZ/i.test(u) || /KZ/i.test(u));
     liveUrls = (kz.length ? kz : urls).slice(0, Math.max(want, urls.length));
   } else {
@@ -588,24 +596,37 @@ async function fetchText(url, attempts = 3, timeoutMs = 20000, opts) {
   throw last;
 }
 
-// 2. Потолок id для скана — из выдачи, а не щупаньем 404 через прокси.
-// Первые страницы «вся продажа» и «вся аренда» по всему Казахстану идут от
-// свежих к старым; максимальный id на них — это и есть текущий фронтир,
-// выше него объявлений ещё нет. Два прямых запроса (выдачу Крыша с Azure
-// отдаёт, это же читает ежедневный сбор) вместо сорока страниц 404 через
-// прокси на каждый прогон. null — выдача не отдалась; тогда скан идёт
-// по-старому, до серии 404.
-async function frontierFromSearch() {
-  let top = 0;
-  for (const u of ["https://krisha.kz/prodazha/", "https://krisha.kz/arenda/"]) {
+// Выдача как сигнал публикации. Первая страница раздела у Крыши отсортирована
+// по дате поднятия: свежеопубликованное объявление появляется на ней в ту же
+// минуту (вперемешку с платными поднятиями старых). Читаем первые страницы
+// основных разделов напрямую с Azure (выдачу Крыша с него отдаёт, это же
+// читает ежедневный сбор) и отдаём все id карточек — кого из них нет в базе,
+// решает вызывающий. Так объявление, вышедшее из модерации с «старым» id ниже
+// курсора скана, попадает в базу через минуту, а не через полчаса повторов.
+const FEED_SECTIONS = [
+  "/prodazha/kvartiry/", "/arenda/kvartiry/",
+  "/prodazha/doma-dachi/", "/arenda/doma-dachi/",
+  "/prodazha/kommercheskaya-nedvizhimost/", "/arenda/kommercheskaya-nedvizhimost/",
+  "/prodazha/uchastkov/",
+];
+async function newestFromSearch(sections) {
+  const list = sections && sections.length ? sections : FEED_SECTIONS;
+  const seen = new Set();
+  const ids = [];
+  const out = {};
+  for (const sec of list) {
     let html;
-    try { html = await fetchText(u, 1, 10000); } catch { continue; }
-    for (const m of html.matchAll(/\/a\/show\/(\d+)/g)) {
+    try { html = await fetchText("https://krisha.kz" + sec, 1, 10000); } catch (e) { out[sec] = "ошибка: " + (e.status || e.message); continue; }
+    let n = 0;
+    // Только карточки выдачи (a-card), не «горячие» блоки и не меню.
+    for (const m of html.matchAll(/<div\s+data-id="(\d+)"\s+data-uuid="[^"]*"\s+class="a-card/g)) {
       const id = Number(m[1]);
-      if (id > top) top = id;
+      n++;
+      if (id && !seen.has(id)) { seen.add(id); ids.push(id); }
     }
+    out[sec] = n;
   }
-  return top || null;
+  return { ids: ids, sections: out };
 }
 
 // Krisha publishes its own price comparison — I was wrong earlier to say it does
@@ -719,6 +740,6 @@ module.exports = {
   H, CRITERIA, NEAR_DISTRICTS, sleep, num, clean, money,
   searchUrl, parseCards, parseDetail, districtOf, locationScore, dedupeKey,
   ageBand, areaBand, groupKey, median, buildModel, flagsFor,
-  fetchText, fetchSearch, fetchDetail, fetchPriceAnalysis, frontierFromSearch,
+  fetchText, fetchSearch, fetchDetail, fetchPriceAnalysis, newestFromSearch, FEED_SECTIONS,
   viaProxy, proxyHint, proxyCount, rotateProxies, PROXY_FILE,
 };
