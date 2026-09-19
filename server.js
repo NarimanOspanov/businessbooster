@@ -5195,19 +5195,28 @@ http
           // этими полями мы будем не в ту же минуту.
           db.saveZadarmaEvent(fields.event || "", fields).catch((e) =>
             console.log("[zadarma] в базу не записалось: " + String(e.message).slice(0, 120)));
+          // И сводная строка по звонку — журнал phone_calls.
+          db.upsertPhoneCall(fields.event || "", fields).catch((e) =>
+            console.log("[zadarma] журнал звонков: " + String(e.message).slice(0, 120)));
           if (ZADARMA_EVENTS.length > 40) ZADARMA_EVENTS.length = 40;
           console.log("[zadarma] " + (fields.event || "?") + " " + JSON.stringify(fields).slice(0, 400));
 
-          // В телеграм — только поля, похожие на номера: по ним сразу видно,
-          // приехал ли номер переадресации, не открывая кабинет.
-          const nums = Object.keys(fields)
-            .filter((k) => /num|caller|did|dest|forward|divert|redirect|internal/i.test(k))
-            .map((k) => k + ": " + fields[k]);
-          notifyTelegram(
-            "\u260e\ufe0f <b>Zadarma: " + (fields.event || "событие") + "</b>\n" +
-            (nums.length ? nums.join("\n") : "полей с номерами нет") +
-            "\n\nвсего полей: " + Object.keys(fields).length
-          );
+          // В телеграм — по звонку, а не по каждому событию: «входящий» на
+          // старте и итог на завершении; промежуточные события молчат.
+          const ev = String(fields.event || "");
+          const who = fields.caller_id || fields.destination || "?";
+          if (ev === "NOTIFY_START") {
+            notifyTelegram("\u260e\ufe0f <b>Входящий</b> от " + who + (fields.called_did ? " на " + fields.called_did : ""));
+          } else if (ev === "NOTIFY_END" || ev === "NOTIFY_OUT_END") {
+            const secs = Number(fields.duration) || 0;
+            const mm = Math.floor(secs / 60), ss = String(secs % 60).padStart(2, "0");
+            const ok = String(fields.disposition || "").toLowerCase() === "answered";
+            notifyTelegram((ok ? "\u2705 <b>Разговор</b> " : "\u274c <b>Пропущен</b> ") +
+              (ev === "NOTIFY_OUT_END" ? "исходящий на " : "от ") + who +
+              (ok ? " · " + mm + ":" + ss : "") +
+              (fields.disposition && !ok ? " · " + fields.disposition : "") +
+              (String(fields.is_recorded) === "1" ? " · есть запись" : ""));
+          }
           res.writeHead(200, { "Content-Type": "text/plain" });
           res.end("ok");
         })
@@ -5215,6 +5224,21 @@ http
           res.writeHead(200, { "Content-Type": "text/plain" });
           res.end("ok");
         });
+      return;
+    }
+
+    // Журнал звонков: одна строка на звонок, собранная из событий АТС.
+    // ?days=7&limit=200. Ключ — тот же служебный.
+    if (urlPath === "/api/calls") {
+      const want = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
+      if (!want || parsed.searchParams.get("key") !== want) {
+        res.writeHead(403, { "Content-Type": MIME[".json"] }); return res.end(JSON.stringify({ ok: false, error: "bad_key" }));
+      }
+      (async () => {
+        const rows = await db.phoneCalls(parsed.searchParams.get("days"), parsed.searchParams.get("limit"));
+        res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+        res.end(JSON.stringify({ ok: true, count: rows.length, calls: rows }, null, 2));
+      })().catch((e) => { res.writeHead(500, { "Content-Type": MIME[".json"] }); res.end(JSON.stringify({ ok: false, error: String(e.message).slice(0, 200) })); });
       return;
     }
 

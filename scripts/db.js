@@ -946,6 +946,105 @@ async function saveZadarmaEvent(event, fields) {
     .query("INSERT INTO dbo.zadarma_events (event, fields) VALUES (@event, @fields)");
 }
 
+// --- Журнал звонков: одна строка на звонок из событий АТС Zadarma ----------
+// Вебхук присылает по 3–4 события на звонок (START / INTERNAL / ANSWER / END),
+// все они уже лежат сырыми в zadarma_events. Здесь — сводная строка по
+// pbx_call_id: кто звонил, куда, когда, ответили ли, сколько говорили.
+const SCHEMA_CALLS = `
+IF OBJECT_ID('dbo.phone_calls', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.phone_calls (
+    pbx_call_id   NVARCHAR(64)  NOT NULL PRIMARY KEY,
+    direction     NVARCHAR(4)   NULL,    -- in / out
+    caller        NVARCHAR(32)  NULL,    -- кто звонил (caller_id)
+    did           NVARCHAR(32)  NULL,    -- на какой наш номер (called_did)
+    internal      NVARCHAR(16)  NULL,    -- внутренний номер АТС, куда ушёл звонок
+    destination   NVARCHAR(32)  NULL,
+    started_at    DATETIME2(0)  NULL,
+    answered_at   DATETIME2(0)  NULL,
+    ended_at      DATETIME2(0)  NULL,
+    duration_secs INT           NULL,
+    disposition   NVARCHAR(32)  NULL,    -- answered / busy / cancel / no answer / failed…
+    status_code   NVARCHAR(16)  NULL,
+    recorded      BIT           NULL,
+    rec_id        NVARCHAR(64)  NULL,
+    updated_at    DATETIME2(0)  NOT NULL CONSTRAINT DF_pcalls_upd DEFAULT SYSUTCDATETIME()
+  );
+  CREATE INDEX IX_pcalls_started ON dbo.phone_calls (started_at DESC);
+END
+`;
+let callsReady = false, callsReadyPromise = null, callsFailedAt = 0;
+async function ensureCalls() {
+  if (callsReady) return;
+  if (callsFailedAt && Date.now() - callsFailedAt < DDL_RETRY_MS) throw new Error("миграция схемы недавно сорвалась — пауза");
+  if (!callsReadyPromise) {
+    callsReadyPromise = (async () => {
+      const p = await ddlPool();
+      await p.request().batch(SCHEMA_CALLS);
+      callsReady = true;
+    })().catch((e) => { callsReadyPromise = null; callsFailedAt = Date.now(); throw e; });
+  }
+  await callsReadyPromise;
+}
+
+// Zadarma отдаёт call_start как «YYYY-MM-DD HH:MM:SS» по времени аккаунта;
+// сами события мы получаем сразу, так что момент получения точнее.
+async function upsertPhoneCall(event, f) {
+  const ev = String(event || "");
+  const id = String((f && (f.pbx_call_id || f.call_id)) || "").slice(0, 64);
+  if (!id) return null;
+  const out = ev.startsWith("NOTIFY_OUT");
+  const now = new Date();
+  const pool = await getPool();
+  await ensureCalls();
+  const num = (v) => (v == null || v === "" ? null : String(v).slice(0, 32));
+  await pool.request()
+    .input("id", sql.NVarChar(64), id)
+    .input("dir", sql.NVarChar(4), out ? "out" : "in")
+    .input("caller", sql.NVarChar(32), num(f.caller_id))
+    .input("did", sql.NVarChar(32), num(f.called_did))
+    .input("internal", sql.NVarChar(16), f.internal == null ? null : String(f.internal).slice(0, 16))
+    .input("dest", sql.NVarChar(32), num(f.destination))
+    .input("started", sql.DateTime2, /START$/.test(ev) ? now : null)
+    .input("answered", sql.DateTime2, /ANSWER$/.test(ev) ? now : null)
+    .input("ended", sql.DateTime2, /END$/.test(ev) ? now : null)
+    .input("dur", sql.Int, f.duration == null || f.duration === "" ? null : Number(f.duration))
+    .input("disp", sql.NVarChar(32), f.disposition ? String(f.disposition).slice(0, 32) : null)
+    .input("code", sql.NVarChar(16), f.status_code ? String(f.status_code).slice(0, 16) : null)
+    .input("rec", sql.Bit, f.is_recorded == null || f.is_recorded === "" ? null : (String(f.is_recorded) === "1" ? 1 : 0))
+    .input("recid", sql.NVarChar(64), f.call_id_with_rec ? String(f.call_id_with_rec).slice(0, 64) : null)
+    .query(`
+      MERGE dbo.phone_calls AS t USING (SELECT @id AS pbx_call_id) AS s ON t.pbx_call_id = s.pbx_call_id
+      WHEN MATCHED THEN UPDATE SET
+        direction = COALESCE(t.direction, @dir), caller = COALESCE(t.caller, @caller), did = COALESCE(t.did, @did),
+        internal = COALESCE(@internal, t.internal), destination = COALESCE(@dest, t.destination),
+        started_at = COALESCE(t.started_at, @started), answered_at = COALESCE(t.answered_at, @answered),
+        ended_at = COALESCE(@ended, t.ended_at), duration_secs = COALESCE(@dur, t.duration_secs),
+        disposition = COALESCE(@disp, t.disposition), status_code = COALESCE(@code, t.status_code),
+        recorded = COALESCE(@rec, t.recorded), rec_id = COALESCE(@recid, t.rec_id), updated_at = SYSUTCDATETIME()
+      WHEN NOT MATCHED THEN INSERT
+        (pbx_call_id, direction, caller, did, internal, destination, started_at, answered_at, ended_at,
+         duration_secs, disposition, status_code, recorded, rec_id)
+        VALUES (@id, @dir, @caller, @did, @internal, @dest, COALESCE(@started, SYSUTCDATETIME()), @answered, @ended,
+         @dur, @disp, @code, @rec, @recid);`);
+  return id;
+}
+
+async function phoneCalls(days, limit) {
+  const pool = await getPool();
+  await ensureCalls();
+  const r = await pool.request()
+    .input("d", sql.Int, Math.min(365, Math.max(1, Number(days) || 7)))
+    .input("n", sql.Int, Math.min(2000, Math.max(1, Number(limit) || 200)))
+    .query(`
+      SELECT TOP (@n) pbx_call_id, direction, caller, did, internal, destination, started_at, answered_at, ended_at,
+        duration_secs, disposition, recorded, rec_id
+      FROM dbo.phone_calls
+      WHERE started_at >= DATEADD(day, -@d, SYSUTCDATETIME())
+      ORDER BY started_at DESC`);
+  return r.recordset;
+}
+
 async function lastZadarmaEvents(limit) {
   const pool = await getPool();
   const r = await pool
@@ -3089,7 +3188,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,
-  getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
+  getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, upsertPhoneCall, phoneCalls, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 
 if (require.main === module) {
   const cmd = process.argv[2];
