@@ -6282,6 +6282,8 @@ http
       if (matchListRunning) return send(409, { ok: false, running: true, error: "поиск по списку уже идёт" });
       const batch = Math.max(1, Math.min(1000, Number(parsed.searchParams.get("batch")) || 200));
       const notify = parsed.searchParams.get("notify") !== "0";
+      // Через сколько дней перепроверять агентские без находок (KRISHA_RESEARCH_DAYS).
+      const researchDays = Math.max(1, Number(parsed.searchParams.get("researchDays") || process.env.KRISHA_RESEARCH_DAYS || 3));
       matchListRunning = true;
       (async () => {
         const show = (id) => "https://krisha.kz/a/show/" + id;
@@ -6303,8 +6305,8 @@ http
           return p.length ? "📅 " + p.join(" · ") : null;
         };
         const PhotoMatch = require("./scripts/photo-match.js");
-        const agents = await db.agentsToMatchList(batch);
-        let searched = 0, matched = 0, photoConfirmed = 0, archivedOwners = 0;
+        const agents = await db.agentsToMatchList(batch, researchDays);
+        let searched = 0, matched = 0, photoConfirmed = 0, archivedOwners = 0, researched = 0, researchedFound = 0;
         const finds = [];
         for (const a of agents) {
           const q = {
@@ -6315,6 +6317,7 @@ http
           try { hits = await db.findListOwners(q, 6); } catch { /* пропустим */ }
           await db.recordListSearched(a.id, hits.length, hits[0] ? hits[0].id : null).catch(() => {});
           searched++;
+          if (a.research) { researched++; if (hits.length) researchedFound++; }
           if (!hits.length) continue;
           matched++;
           let scores = {};
@@ -6376,6 +6379,8 @@ http
         send(200, {
           ok: true, searched: searched, matched: matched, photoConfirmed: photoConfirmed,
           ownerArchived: archivedOwners,
+          // Перепроверка старых без находок: сколько взяли и у скольких теперь нашлись кандидаты.
+          researched: researched, researchedFound: researchedFound,
           finds: finds.map((f) => ({
             agent: f.a.id,
             owners: f.cand.map((c) => ({

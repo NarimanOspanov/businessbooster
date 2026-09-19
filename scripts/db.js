@@ -1910,6 +1910,11 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_tosearch2' AND o
         WHERE searched_at IS NULL');
 IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_tosearch' AND object_id = OBJECT_ID('dbo.krisha_list'))
   DROP INDEX IX_klist_tosearch ON dbo.krisha_list;
+-- Перепроверка: агентские без находок, по давности проверки.
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_research' AND object_id = OBJECT_ID('dbo.krisha_list'))
+  EXEC('CREATE INDEX IX_klist_research ON dbo.krisha_list (searched_at)
+        INCLUDE (user_type, storage, area, complex_id, lat)
+        WHERE match_count = 0');
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_owner_geo' AND object_id = OBJECT_ID('dbo.krisha_list'))
   EXEC('CREATE INDEX IX_klist_owner_geo ON dbo.krisha_list (lat, lon) INCLUDE (deal, prop, area, rooms, floor, floors) WHERE user_type = ''owner''');
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_owner_cx' AND object_id = OBJECT_ID('dbo.krisha_list'))
@@ -2141,19 +2146,36 @@ async function setListPhones(id, phones) {
 
 // --- Поиск хозяина по списку -------------------------------------------------
 // Агентские объявления, для которых ещё не искали; есть по чему опознать дом.
-async function agentsToMatchList(limit) {
+// Сначала непроверенные (свежие первыми); если их меньше лимита — добираем
+// перепроверкой: живые агентские без находок, проверенные раньше, чем
+// researchDays назад. База растёт, и то, что не нашлось вчера по половине
+// базы, сегодня может найтись.
+async function agentsToMatchList(limit, researchDays) {
   const pool = await getPool();
   await ensureList(pool);
-  const r = await pool.request().input("n", sql.Int, Number(limit) || 100).query(`
-    SELECT TOP (@n) id, deal, prop, city, area, rooms, floor, floors, complex_id, lat, lon,
-      price, title, addr, user_type, first_seen, bumped_on, photos_c, photos_json
+  const n = Number(limit) || 100;
+  const cols = `id, deal, prop, city, area, rooms, floor, floors, complex_id, lat, lon,
+      price, title, addr, user_type, first_seen, bumped_on, photos_c, photos_json, searched_at`;
+  const fresh = (await pool.request().input("n", sql.Int, n).query(`
+    SELECT TOP (@n) ${cols}
     FROM dbo.krisha_list
     WHERE searched_at IS NULL
       AND user_type IN ('specialist', 'company', 'agent')
       AND area IS NOT NULL
       AND (complex_id IS NOT NULL OR lat IS NOT NULL)
-    ORDER BY first_seen DESC`);
-  return r.recordset;
+    ORDER BY first_seen DESC`)).recordset;
+  if (fresh.length >= n) return fresh;
+  const again = (await pool.request().input("n", sql.Int, n - fresh.length)
+    .input("d", sql.Int, Math.max(1, Number(researchDays) || 3)).query(`
+    SELECT TOP (@n) ${cols}
+    FROM dbo.krisha_list
+    WHERE match_count = 0 AND searched_at < DATEADD(day, -@d, SYSUTCDATETIME())
+      AND storage = 'live'
+      AND user_type IN ('specialist', 'company', 'agent')
+      AND area IS NOT NULL
+      AND (complex_id IS NOT NULL OR lat IS NOT NULL)
+    ORDER BY searched_at ASC`)).recordset;
+  return fresh.concat(again.map((r) => Object.assign(r, { research: true })));
 }
 
 // Хозяева той же квартиры среди ВСЕХ наших, включая архив: хозяин по просьбе
