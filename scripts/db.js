@@ -1030,7 +1030,17 @@ async function upsertPhoneCall(event, f) {
   return id;
 }
 
-async function phoneCalls(days, limit) {
+// Номера из пула агента (dbo.numbers), цифрами: звонки на них — сценарий
+// клиник с ElevenLabs, а не личный журнал; их не показываем в уведомлениях
+// и можно исключить из выгрузки.
+async function agentDids() {
+  const pool = await getPool();
+  const r = await pool.request().query("SELECT number FROM dbo.numbers WHERE status <> 'retired'");
+  return new Set(r.recordset.map((x) => String(x.number || "").replace(/D/g, "")).filter(Boolean));
+}
+
+// mineOnly — без звонков на номера агента.
+async function phoneCalls(days, limit, mineOnly) {
   const pool = await getPool();
   await ensureCalls();
   const r = await pool.request()
@@ -1041,6 +1051,7 @@ async function phoneCalls(days, limit) {
         duration_secs, disposition, recorded, rec_id
       FROM dbo.phone_calls
       WHERE started_at >= DATEADD(day, -@d, SYSUTCDATETIME())
+        ${mineOnly ? "AND (did IS NULL OR did NOT IN (SELECT REPLACE(REPLACE(number, '+', ''), ' ', '') FROM dbo.numbers WHERE status <> 'retired'))" : ""}
       ORDER BY started_at DESC`);
   return r.recordset;
 }
@@ -3188,7 +3199,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,
-  getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, upsertPhoneCall, phoneCalls, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
+  getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, upsertPhoneCall, phoneCalls, agentDids, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 
 if (require.main === module) {
   const cmd = process.argv[2];

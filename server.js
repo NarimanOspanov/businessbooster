@@ -1732,6 +1732,8 @@ let photosRunning = false;
 let deepenRunning = false;
 let scanRunning = false;
 let listRunning = false;
+// Номера агента для фильтра уведомлений о звонках: {at, set}.
+const agentDidsCache = { at: 0, set: null };
 // Кэш счётчиков очереди телефонов: ключ «since|deal|prop» -> {at, left, waiting}.
 const objphoneCounts = new Map();
 const listDashCache = { at: 0, body: null };
@@ -5203,9 +5205,18 @@ http
 
           // В телеграм — по звонку, а не по каждому событию: «входящий» на
           // старте и итог на завершении; промежуточные события молчат.
+          // Звонки на номера агента (клиники, ElevenLabs) — не сюда: у них
+          // свой post-call вебхук и свои уведомления.
           const ev = String(fields.event || "");
           const who = fields.caller_id || fields.destination || "?";
-          if (ev === "NOTIFY_START") {
+          const didDigits = String(fields.called_did || "").replace(/D/g, "");
+          if (!agentDidsCache.at || Date.now() - agentDidsCache.at > 300e3) {
+            agentDidsCache.at = Date.now();
+            db.agentDids().then((s) => { agentDidsCache.set = s; }).catch(() => {});
+          }
+          const isAgentDid = !!(didDigits && agentDidsCache.set && agentDidsCache.set.has(didDigits));
+          if (isAgentDid) { /* журнал уже записан выше */ }
+          else if (ev === "NOTIFY_START") {
             notifyTelegram("\u260e\ufe0f <b>Входящий</b> от " + who + (fields.called_did ? " на " + fields.called_did : ""));
           } else if (ev === "NOTIFY_END" || ev === "NOTIFY_OUT_END") {
             const secs = Number(fields.duration) || 0;
@@ -5235,7 +5246,7 @@ http
         res.writeHead(403, { "Content-Type": MIME[".json"] }); return res.end(JSON.stringify({ ok: false, error: "bad_key" }));
       }
       (async () => {
-        const rows = await db.phoneCalls(parsed.searchParams.get("days"), parsed.searchParams.get("limit"));
+        const rows = await db.phoneCalls(parsed.searchParams.get("days"), parsed.searchParams.get("limit"), parsed.searchParams.get("mine") === "1");
         res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
         res.end(JSON.stringify({ ok: true, count: rows.length, calls: rows }, null, 2));
       })().catch((e) => { res.writeHead(500, { "Content-Type": MIME[".json"] }); res.end(JSON.stringify({ ok: false, error: String(e.message).slice(0, 200) })); });
