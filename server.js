@@ -5827,6 +5827,11 @@ http
       if (freshRunning) return send(409, { ok: false, running: true, error: "свежее уже читается" });
       const q = parsed.searchParams;
       const cap = Math.max(1, Math.min(20, Number(q.get("pages") || 10)));
+      // Минимум страниц на часть — всегда, даже если на первой нет нового:
+      // в пиковой части сверху входит до 20+ объявлений в минуту (замер 20.09:
+      // 21 за минуту в «2к»), и новое могло уехать на вторую страницу за
+      // известными поднятиями. Три страницы покрывают 60 вставок в минуту.
+      const minPages = Math.max(1, Math.min(cap, Number(q.get("minPages") || 3)));
       const budgetMs = Math.max(5, Math.min(120, Number(q.get("budgetSec") || 50))) * 1000;
       const viaProxy = q.get("proxy") === "1";
       const L = require("./scripts/krisha-list.js");
@@ -5838,7 +5843,7 @@ http
         // Под нагрузкой базы глубину режем: новое всё равно на первых страницах.
         const load = await db.dbLoad().catch(() => null);
         const hot = load ? Math.max(load.cpu, load.io, load.log) : 0;
-        const depth = hot > 85 ? Math.min(cap, 2) : hot > 70 ? Math.min(cap, 4) : cap;
+        const depth = hot > 85 ? Math.max(minPages, Math.min(cap, 2)) : hot > 70 ? Math.max(minPages, Math.min(cap, 4)) : cap;
         let pages = 0, adverts = 0, added = 0, bumped = 0, priceChanged = 0, errors = 0;
         const parts = [];
         // Части — по три параллельно; внутри части страницы по порядку, потому
@@ -5856,7 +5861,7 @@ http
             let newHere = 0;
             for (const o of outs) { if (o.added) newHere++; if (o.bump) bumped++; if (o.price) priceChanged++; }
             pages++; r.pages++; adverts += rows.length; added += newHere; r.added += newHere;
-            if (!newHere) break; // на этой странице нового нет — глубже тоже
+            if (!newHere && p >= minPages) break; // нового нет и минимум прочитан — глубже только известное
           }
           parts.push(r);
         }
@@ -5866,7 +5871,7 @@ http
         freshRunning = false;
         send(200, {
           ok: true, seconds: Math.round((Date.now() - t0) / 100) / 10,
-          depth: depth, dbLoad: load,
+          depth: depth, minPages: minPages, dbLoad: load,
           pages: pages, adverts: adverts, added: added, bumped: bumped, priceChanged: priceChanged, errors: errors,
           parts: parts,
         });
