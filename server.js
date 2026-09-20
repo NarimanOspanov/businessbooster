@@ -7106,11 +7106,19 @@ http
             return send(400, { ok: false, error: "since: нужна дата YYYY-MM-DD" });
           }
           const since = sinceRaw || day(Date.now() - 7 * 86400e3);
-          const dealF = parsed.searchParams.get("deal") || null;
-          const propF = parsed.searchParams.get("prop") || null;
+          // По умолчанию очередь — продажа в Алматы: аренду и другие города
+          // плагин не снимает. Снять фильтр можно значением any (deal=any, city=any).
+          const filt = (name, def) => {
+            const v = (parsed.searchParams.get(name) || "").trim().toLowerCase();
+            if (!v) return def;
+            return v === "any" || v === "all" ? null : v;
+          };
+          const dealF = filt("deal", "sale");
+          const propF = filt("prop", null);
+          const cityF = filt("city", "almaty");
           // Счётчики очереди — раз в минуту на окно, остальные вызовы берут
           // из кэша: сам подсчёт на 10 DTU стоит секунды, объект — миллисекунды.
-          const ck = since + "|" + (dealF || "") + "|" + (propF || "");
+          const ck = since + "|" + (dealF || "") + "|" + (propF || "") + "|" + (cityF || "");
           let cached = objphoneCounts.get(ck);
           // Первый вызов на окно считает синхронно; дальше плагин получает
           // счётчики из кэша сразу, а пересчёт раз в минуту идёт в фоне.
@@ -7123,14 +7131,15 @@ http
           }
           if (Date.now() - cached.at > 60e3 && !cached.busy) {
             cached.busy = true;
-            db.nextListOwnerWithoutPhone(since, dealF, propF, true)
+            db.nextListOwnerWithoutPhone(since, dealF, propF, cityF, true)
               .then((q1) => { cached.at = Date.now(); cached.left = q1.left; cached.waiting = q1.waiting; })
               .catch(() => {}).then(() => { cached.busy = false; });
           }
-          const q = await db.nextListOwnerWithoutPhone(since, dealF, propF, false);
+          const q = await db.nextListOwnerWithoutPhone(since, dealF, propF, cityF, false);
           const r = q.row;
           return send(200, {
             ok: true, since: since, left: cached.left, waiting: cached.waiting, countsAt: cached.at ? new Date(cached.at).toISOString() : null,
+            filter: { deal: dealF, prop: propF, city: cityF },
             item: r ? {
               id: String(r.id), title: r.title, deal: r.deal, prop: r.prop, city: r.city,
               seller: r.user_type, price: r.price == null ? null : Number(r.price),

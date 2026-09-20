@@ -2014,6 +2014,15 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_nophone2' AND ob
         WHERE phones IS NULL AND user_type = ''owner''');
 IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_nophone' AND object_id = OBJECT_ID('dbo.krisha_list'))
   DROP INDEX IX_klist_nophone ON dbo.krisha_list;
+-- Очередь фильтруется ещё и по городу: город в покрытие, чтобы подсчёт
+-- очереди не ходил в таблицу за каждой строкой. Новый индекс сначала, старый потом.
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_nophone3' AND object_id = OBJECT_ID('dbo.krisha_list'))
+  EXEC('CREATE INDEX IX_klist_nophone3 ON dbo.krisha_list (first_seen DESC)
+        INCLUDE (storage, deal, prop, city, phone_tries, phone_state, phone_next_at)
+        WHERE phones IS NULL AND user_type = ''owner''');
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_nophone3' AND object_id = OBJECT_ID('dbo.krisha_list'))
+   AND EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_nophone2' AND object_id = OBJECT_ID('dbo.krisha_list'))
+  DROP INDEX IX_klist_nophone2 ON dbo.krisha_list;
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_tosearch2' AND object_id = OBJECT_ID('dbo.krisha_list'))
   EXEC('CREATE INDEX IX_klist_tosearch2 ON dbo.krisha_list (first_seen DESC)
         INCLUDE (user_type, area, complex_id, lat)
@@ -2160,19 +2169,23 @@ async function saveListAdvert(o, sweepNo) {
 // withCounts=false — только следующий объект, без пересчёта очереди: подсчёт
 // по 200 тысячам хозяев на 10 DTU занимает секунды, а плагин зовёт это каждую
 // минуту; счётчики кэширует вызывающий.
-async function nextListOwnerWithoutPhone(since, deal, prop, withCounts) {
+// deal/prop/city — фильтры; null — без фильтра. Город хранится латиницей
+// («almaty»), как его отдаёт разбор списка карты.
+async function nextListOwnerWithoutPhone(since, deal, prop, city, withCounts) {
   const pool = await getPool();
   await ensureList(pool);
   const ready = `user_type = 'owner' AND storage = 'live' AND phones IS NULL
         AND first_seen >= @since
         AND (@deal IS NULL OR deal = @deal) AND (@prop IS NULL OR prop = @prop)
+        AND (@city IS NULL OR city = @city)
         AND ISNULL(phone_tries, 0) < 5
         AND (phone_state IS NULL OR phone_state NOT IN (${PHONE_FINAL_SQL}))`;
   const now = "(phone_next_at IS NULL OR phone_next_at <= SYSUTCDATETIME())";
   const req = () => pool.request()
     .input("since", sql.DateTime2, new Date(since))
     .input("deal", sql.NVarChar(10), deal || null)
-    .input("prop", sql.NVarChar(20), prop || null);
+    .input("prop", sql.NVarChar(20), prop || null)
+    .input("city", sql.NVarChar(40), city || null);
   const r = await req().query(`
       SELECT TOP (1) id, title, deal, prop, city, user_type, price, storage, first_seen, bumped_on, phone_tries, phone_state
       FROM dbo.krisha_list

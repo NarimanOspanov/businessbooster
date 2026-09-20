@@ -47,6 +47,9 @@ GET https://saudager.ai/api/krisha/objphone?key=<KEY>&since=2026-09-10
 --- | --- | ---
 `key`   | да  | ключ доступа
 `since` | нет | нижняя граница по дате публикации, `YYYY-MM-DD`; без неё — последние 7 дней
+`deal`  | нет | `sale` по умолчанию; `rent` — аренда; `any` — без фильтра
+`prop`  | нет | `flat`, `house`, `commercial`, `land`; без параметра — все
+`city`  | нет | `almaty` по умолчанию; другой город латиницей (`astana`, `shymkent`…); `any` — все города
 
 Ответ 200:
 
