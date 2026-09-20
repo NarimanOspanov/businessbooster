@@ -1737,6 +1737,7 @@ const agentDidsCache = { at: 0, set: null };
 // Кэш счётчиков очереди телефонов: ключ «since|deal|prop» -> {at, left, waiting}.
 const objphoneCounts = new Map();
 const listDashCache = { at: 0, body: null };
+let freshRunning = false;
 let matchListRunning = false;
 let matchRunning = false;
 // Подтверждённые 404 скана: id → когда. Пока курсор стоит у фронтира, каждый
@@ -5811,6 +5812,71 @@ http
     // id: у фронтира (дальше объявлений ещё нет) он стоит и ждёт, пока новые
     // появятся. Задумано под частый дёрг из Hangfire (раз в 30-60 c).
     // Отвечает синхронно — планировщик видит итог прогона, а не пустой 202.
+    // Свежее: отдельный job, каждую минуту. Список карты отсортирован по дате
+    // поднятия, новое всегда сверху, поэтому читаем страницы каждой части по
+    // порядку и останавливаемся на первой, где нет ни одного нового для базы
+    // объявления (дальше только уже известные поднятия). Потолок — ?pages
+    // (10, максимум 20). Своя блокировка: круг scanlist ему не мешает.
+    if (urlPath === "/api/krisha/fresh") {
+      const send = (code, obj) => {
+        res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+        res.end(JSON.stringify(obj, null, 2));
+      };
+      const want = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
+      if (!want || parsed.searchParams.get("key") !== want) return send(403, { ok: false, error: "bad_key" });
+      if (freshRunning) return send(409, { ok: false, running: true, error: "свежее уже читается" });
+      const q = parsed.searchParams;
+      const cap = Math.max(1, Math.min(20, Number(q.get("pages") || 10)));
+      const budgetMs = Math.max(5, Math.min(120, Number(q.get("budgetSec") || 50))) * 1000;
+      const viaProxy = q.get("proxy") === "1";
+      const L = require("./scripts/krisha-list.js");
+      freshRunning = true;
+      (async () => {
+        const t0 = Date.now();
+        await L.loadRegions().catch(() => { /* город останется пустым */ });
+        const sweepNo = (KW.list && KW.list.sweepNo) || null;
+        // Под нагрузкой базы глубину режем: новое всё равно на первых страницах.
+        const load = await db.dbLoad().catch(() => null);
+        const hot = load ? Math.max(load.cpu, load.io, load.log) : 0;
+        const depth = hot > 85 ? Math.min(cap, 2) : hot > 70 ? Math.min(cap, 4) : cap;
+        let pages = 0, adverts = 0, added = 0, bumped = 0, priceChanged = 0, errors = 0;
+        const parts = [];
+        // Части — по три параллельно; внутри части страницы по порядку, потому
+        // что решение «читать дальше» зависит от предыдущей страницы.
+        async function onePart(sec) {
+          const r = { section: sec.label, pages: 0, added: 0 };
+          for (let p = 1; p <= depth; p++) {
+            if (Date.now() - t0 > budgetMs) break;
+            let res;
+            try { res = await L.fetchListPage(sec, p, 1, { proxy: viaProxy }); }
+            catch { errors++; break; }
+            if (res.empty) break;
+            const rows = res.adverts.map((a) => L.parseAdvert(a, sec.path, res.dates)).filter((o) => o.id);
+            const outs = await db.saveListAdverts(rows, sweepNo);
+            let newHere = 0;
+            for (const o of outs) { if (o.added) newHere++; if (o.bump) bumped++; if (o.price) priceChanged++; }
+            pages++; r.pages++; adverts += rows.length; added += newHere; r.added += newHere;
+            if (!newHere) break; // на этой странице нового нет — глубже тоже
+          }
+          parts.push(r);
+        }
+        for (let i = 0; i < L.SECTIONS.length; i += 3) {
+          await Promise.all(L.SECTIONS.slice(i, i + 3).map(onePart));
+        }
+        freshRunning = false;
+        send(200, {
+          ok: true, seconds: Math.round((Date.now() - t0) / 100) / 10,
+          depth: depth, dbLoad: load,
+          pages: pages, adverts: adverts, added: added, bumped: bumped, priceChanged: priceChanged, errors: errors,
+          parts: parts,
+        });
+      })().catch((e) => {
+        freshRunning = false;
+        send(500, { ok: false, error: String(e.message).slice(0, 200) });
+      });
+      return;
+    }
+
     // Альтернатива скану: обход по списку карты Крыши (JSON, без прокси).
     // Каждый вызов проходит столько страниц, сколько влезает в бюджет, и
     // запоминает, где остановился (раздел, страница); пройдя все разделы,
@@ -5883,7 +5949,9 @@ http
       // новое объявление появляется на первой странице своей части в минуту
       // публикации. Читаем по freshPages первых страниц каждой части в начале
       // каждого прогона, независимо от того, где стоит курсор круга.
-      const freshPages = Math.max(0, Math.min(5, Number(q.get("freshPages") || 1)));
+      // По умолчанию 0: свежее читает отдельный job /api/krisha/fresh, у него
+      // своя блокировка и он не пропадает, пока идёт круг.
+      const freshPages = Math.max(0, Math.min(5, Number(q.get("freshPages") || 0)));
       const L = require("./scripts/krisha-list.js");
       if (!KW.list || q.get("reset") === "1") {
         KW.list = { section: 0, page: 1, sweepNo: ((KW.list && KW.list.sweepNo) || 0) + 1,
