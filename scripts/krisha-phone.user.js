@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reception365 · телефоны с Крыши
 // @namespace    https://saudager.ai/
-// @version      2.1
+// @version      2.2
 // @description  Берёт из очереди следующий объект без номера, сама жмёт «показать телефон», сохраняет номер и идёт дальше — пока не покажется капча; снятые и зависшие страницы отмечает промахом с причиной
 // @match        https://krisha.kz/a/show/*
 // @run-at       document-idle
@@ -102,14 +102,22 @@
   // точные токены класса/атрибута, не подстрока: в подвале каждой страницы
   // есть <p class="g-recaptcha-policy">, и широкий [class*="captcha"] цеплял
   // бы её всегда.
+  //
+  // Крыша держит iframe капчи в DOM постоянно (внутри .a-phones__recaptcha)
+  // и просто переключает ему display: none/blank — не добавляет и не убирает
+  // узел. Поэтому querySelector один не годится: он находит iframe и тогда,
+  // когда капча ни разу не показывалась, а номер отдался сразу. offsetParent
+  // — дешёвая проверка, что элемент (или кто-то из родителей) не спрятан
+  // через display: none.
   var captchaSeen = false;
+  function visible(el) { return !!el && el.offsetParent !== null; }
   function captchaVisible() {
     return !!(
-      document.querySelector('iframe[src*="recaptcha" i]') ||
-      document.querySelector('iframe[title*="recaptcha" i]') ||
-      document.querySelector('iframe[src*="hcaptcha" i]') ||
-      document.querySelector(".g-recaptcha") ||
-      document.querySelector(".h-captcha")
+      visible(document.querySelector('iframe[src*="recaptcha" i]')) ||
+      visible(document.querySelector('iframe[title*="recaptcha" i]')) ||
+      visible(document.querySelector('iframe[src*="hcaptcha" i]')) ||
+      visible(document.querySelector(".g-recaptcha")) ||
+      visible(document.querySelector(".h-captcha"))
     );
   }
 
