@@ -157,6 +157,35 @@ GET https://saudager.ai/api/krisha/objphone?key=<KEY>&id=1015783615
 Если номеров нет — оба массива пустые, `ok` всё равно `true`.
 Смотреть перед правкой — чтобы не перезаписать номер вслепую.
 
+## GET /count — сколько объявлений уже с номером
+
+```
+GET https://saudager.ai/api/krisha/objphone/count?key=<KEY>
+```
+
+Ответ 200 (пересчитывается не чаще раза в минуту, время в `cachedAt`):
+
+```
+{
+  "ok": true,
+  "cachedAt": "2026-09-20T08:30:00.000Z",
+  "withPhones": {
+    "total": 1250, "owners": 1180, "agents": 70,
+    "live": 1200, "archived": 50,
+    "sale": 1000, "rent": 250,
+    "today": 140, "last7d": 900,
+    "last_at": "2026-09-20T08:29:12.000Z"
+  },
+  "misses": { "no_phone": 30, "captcha": 4, "archived": 12 },
+  "queue": 309000
+}
+```
+
+`withPhones` — объявления, у которых сохранён хотя бы один номер: всего, хозяева и агенты,
+живые и снятые, продажа и аренда, снято сегодня и за 7 дней, когда сняли последний.
+`misses` — объявления без номера с последней причиной промаха.
+`queue` — живые объявления хозяев без номера, то есть сколько ещё стоит в очереди.
+
 ## POST — сохранить номер (добавить к тому, что уже есть)
 
 ```
@@ -238,6 +267,7 @@ Access-Control-Allow-Headers: Content-Type
 --- | --- | ---
 `GET` | `/api/krisha/objphone?key=&since=` | следующий объект без номера (один или `null`)
 `GET` | `/api/krisha/objphone?key=&id=` | номера одного объекта
+`GET` | `/api/krisha/objphone/count?key=` | сколько объявлений уже с номером, промахи, размер очереди
 `POST` | `/api/krisha/objphone?key=` + body | добавить номер
 `PUT` / `PATCH` | `/api/krisha/objphone?key=` + body | заменить номера целиком
 `POST` | `/api/krisha/objphone/miss?key=` + body | промах с причиной: архив — насовсем, капча/таймаут — повтор позже

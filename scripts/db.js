@@ -2703,6 +2703,35 @@ async function listStats() {
   return { total: tot, events24h: ev, byDealProp: byDeal, bumpedByDay: bumps, phones: ph };
 }
 
+// Сколько объявлений в krisha_list уже с номером: всего, хозяев, живых,
+// по типу сделки, снято сегодня и за неделю; отдельно — промахи по причинам
+// и размер очереди (живые хозяева без номера).
+async function listPhoneCounts() {
+  const pool = await getPool();
+  await ensureList(pool);
+  const w = (await pool.request().query(`
+    SELECT COUNT(*) AS total,
+      SUM(CASE WHEN user_type = 'owner' THEN 1 ELSE 0 END) AS owners,
+      SUM(CASE WHEN user_type <> 'owner' OR user_type IS NULL THEN 1 ELSE 0 END) AS agents,
+      SUM(CASE WHEN storage = 'live' THEN 1 ELSE 0 END) AS live,
+      SUM(CASE WHEN storage <> 'live' THEN 1 ELSE 0 END) AS archived,
+      SUM(CASE WHEN deal = 'sale' THEN 1 ELSE 0 END) AS sale,
+      SUM(CASE WHEN deal = 'rent' THEN 1 ELSE 0 END) AS rent,
+      SUM(CASE WHEN phones_at >= CAST(SYSUTCDATETIME() AS DATE) THEN 1 ELSE 0 END) AS today,
+      SUM(CASE WHEN phones_at >= DATEADD(day, -7, SYSUTCDATETIME()) THEN 1 ELSE 0 END) AS last7d,
+      MAX(phones_at) AS last_at
+    FROM dbo.krisha_list WHERE phones IS NOT NULL`)).recordset[0];
+  const miss = (await pool.request().query(`
+    SELECT phone_state, COUNT(*) AS n FROM dbo.krisha_list
+    WHERE phones IS NULL AND phone_state IS NOT NULL GROUP BY phone_state`)).recordset;
+  const q = (await pool.request().query(`
+    SELECT COUNT(*) AS n FROM dbo.krisha_list
+    WHERE user_type = 'owner' AND storage = 'live' AND phones IS NULL`)).recordset[0];
+  const misses = {};
+  for (const m of miss) misses[m.phone_state] = m.n;
+  return { withPhones: w, misses: misses, queue: q.n };
+}
+
 // Кто быстрее и полнее: список карты или обход по id. Считаем по общему
 // окну — с момента, когда список начал писать.
 async function listCompare() {
@@ -3192,7 +3221,7 @@ async function objectStats() {
 module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
-  saveListAdvert, listStats, listCompare,
+  saveListAdvert, listStats, listCompare, listPhoneCounts,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
   listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory,

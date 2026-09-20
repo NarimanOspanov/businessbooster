@@ -1736,6 +1736,7 @@ let listRunning = false;
 const agentDidsCache = { at: 0, set: null };
 // Кэш счётчиков очереди телефонов: ключ «since|deal|prop» -> {at, left, waiting}.
 const objphoneCounts = new Map();
+let phoneCountCache = null; // ответ /api/krisha/objphone/count, живёт минуту
 const listDashCache = { at: 0, body: null };
 let freshRunning = false;
 let matchListRunning = false;
@@ -7009,6 +7010,24 @@ http
         console.log("[телефон] " + id + ": " + phones.length + " шт.");
         return send(200, { ok: true, id: id, phones: phones.map(pretty) });
       })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
+      return;
+    }
+
+    // Сколько объявлений уже с номером. Тяжёлый пересчёт по всей таблице,
+    // поэтому ответ держим минуту.
+    if (urlPath === "/api/krisha/objphone/count") {
+      const want = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
+      const send = (code, obj) => {
+        res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+        res.end(JSON.stringify(obj, null, 2));
+      };
+      if (!want || parsed.searchParams.get("key") !== want) return send(403, { ok: false, error: "bad_key" });
+      (async () => {
+        if (!phoneCountCache || Date.now() - phoneCountCache.at > 60 * 1000) {
+          phoneCountCache = { at: Date.now(), data: await db.listPhoneCounts() };
+        }
+        send(200, Object.assign({ ok: true, cachedAt: new Date(phoneCountCache.at).toISOString() }, phoneCountCache.data));
+      })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 200) }));
       return;
     }
 
