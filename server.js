@@ -7041,7 +7041,8 @@ http
     // одному; номера и промахи пишутся в ту же таблицу.
     if (urlPath === "/api/krisha/objphone" || urlPath === "/api/krisha/objqueue" ||
         urlPath === "/api/krisha/objphone/miss" || urlPath === "/api/krisha/objphone/lease" ||
-        urlPath === "/api/krisha/objphone/rotate" || urlPath === "/api/krisha/objphone/ports") {
+        urlPath === "/api/krisha/objphone/rotate" || urlPath === "/api/krisha/objphone/ports" ||
+        urlPath === "/api/krisha/objphone/debug") {
       const cors = {
         "Access-Control-Allow-Origin": "https://krisha.kz",
         "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, OPTIONS",
@@ -7111,6 +7112,19 @@ http
           const r = await K.browserPort(true, check, portId);
           if (r.ok) console.log("[objphone] IP порта " + (r.port && r.port.id) + (r.rotated ? " сменён" : " не сменился"));
           return send(r.ok ? 200 : 503, Object.assign({ at: new Date().toISOString() }, r));
+        })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
+        return;
+      }
+
+      // Отладка: клиент присылает сырой текст экрана (тело как есть, любой
+      // Content-Type), ?id= — объявление, ?src= — кто прислал. Смотрим в базе.
+      if (urlPath === "/api/krisha/objphone/debug") {
+        if (req.method !== "POST") return send(405, { ok: false, error: "only POST" });
+        (async () => {
+          const raw = await readBody(req);
+          const id = String(parsed.searchParams.get("id") || "").replace(/\D/g, "");
+          await db.saveObjphoneDebug(id, parsed.searchParams.get("src") || "tasker", raw);
+          return send(200, { ok: true, id: id || null, bytes: raw.length });
         })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
         return;
       }

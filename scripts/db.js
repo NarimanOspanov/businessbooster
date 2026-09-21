@@ -2253,6 +2253,27 @@ async function renewListLease(id, sec) {
   return r.recordset[0] ? r.recordset[0].phone_lease_until : null;
 }
 
+// Отладка клиентов очереди (телефон с Tasker): что именно клиент прочитал
+// с экрана перед отправкой номера. Сырой текст, чтобы по нему подобрать
+// правило отбора номеров. Таблица маленькая, старше недели чистим сами.
+let debugReady = false;
+async function saveObjphoneDebug(id, src, text) {
+  const pool = await getPool();
+  if (!debugReady) {
+    await pool.request().batch(`
+IF OBJECT_ID('dbo.objphone_debug', 'U') IS NULL
+  CREATE TABLE dbo.objphone_debug (
+    n INT IDENTITY(1,1) PRIMARY KEY, at DATETIME2(0) NOT NULL DEFAULT SYSUTCDATETIME(),
+    id BIGINT NULL, src NVARCHAR(40) NULL, text NVARCHAR(MAX) NULL);`);
+    debugReady = true;
+  }
+  await pool.request()
+    .input("id", sql.BigInt, id ? Number(id) : null)
+    .input("src", sql.NVarChar(40), String(src || "").slice(0, 40) || null)
+    .input("t", sql.NVarChar(sql.MAX), String(text || "").slice(0, 20000))
+    .query("INSERT INTO dbo.objphone_debug (id, src, text) VALUES (@id, @src, @t); DELETE FROM dbo.objphone_debug WHERE at < DATEADD(day, -7, SYSUTCDATETIME())");
+}
+
 async function markListPhoneMiss(id, reason) {
   const key = PHONE_MISS[reason] ? reason : "error";
   const rule = PHONE_MISS[key];
@@ -3291,7 +3312,7 @@ async function objectStats() {
 module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
-  saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease,
+  saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
   listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory,
