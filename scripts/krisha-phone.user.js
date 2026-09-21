@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reception365 · телефоны с Крыши
 // @namespace    https://saudager.ai/
-// @version      3.4
+// @version      3.5
 // @description  Берёт из очереди следующий объект без номера, сама жмёт «показать телефон», сохраняет номер, меняет IP прокси и едет дальше сама; в фоновой вкладке ждёт, пока её откроют; капча, не решённая за минуту, перезагружает страницу; снятые и зависшие страницы отмечает промахом с причиной
 // @match        https://krisha.kz/a/show/*
 // @run-at       document-idle
@@ -79,12 +79,16 @@
     "padding:12px 14px;border-radius:10px;background:#1c1819;color:#fff;" +
     'font:14px/1.4 "Open Sans",Arial,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.35)';
   document.body.appendChild(box);
-  // Секундомер: сколько секунд страница открыта (от начала загрузки, не от
-  // запуска скрипта). Наглядно видно, когда ждать перезагрузку или промах.
-  function openedSec() { return Math.floor(performance.now() / 1000); }
+  // Секундомер: сколько секунд скрипт работает на экране. Время в фоне не
+  // считается — там стоят и таймеры (15 с на номер, минута на капчу), так
+  // что цифра совпадает с тем, когда ждать перезагрузку или промах.
+  var workMs = 0, segStart = null;
+  function workStart() { if (segStart === null) segStart = Date.now(); }
+  function workPause() { if (segStart !== null) { workMs += Date.now() - segStart; segStart = null; } }
+  function openedSec() { return Math.floor((workMs + (segStart === null ? 0 : Date.now() - segStart)) / 1000); }
   // Версия в панели — чтобы было видно, что Tampermonkey подтянул обновление.
   // Держать в одном значении с @version в заголовке.
-  var VERSION = "3.4";
+  var VERSION = "3.5";
   var status = "";
   function say(html) {
     status = html;
@@ -397,6 +401,7 @@
   function start() {
     if (started) return;
     started = true;
+    workStart();
     armGiveUp();
     var seen = found();
     var dead0 = deadReason();
@@ -424,8 +429,9 @@
     }
   }
   document.addEventListener("visibilitychange", function () {
-    if (document.hidden) { clearTimeout(giveUpTimer); clearTimeout(captchaTimer); return; }
+    if (document.hidden) { workPause(); clearTimeout(giveUpTimer); clearTimeout(captchaTimer); return; }
     if (!started) { start(); return; }
+    workStart();
     if (done) return;
     if (captchaSeen) armCaptcha(); else armGiveUp();
   });
