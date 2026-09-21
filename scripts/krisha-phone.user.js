@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reception365 · телефоны с Крыши
 // @namespace    https://saudager.ai/
-// @version      3.7
+// @version      3.8
 // @description  Берёт из очереди следующий объект без номера, сама жмёт «показать телефон», сохраняет номер, меняет IP прокси и едет дальше сама; в фоновой вкладке ждёт, пока её откроют; капча, не решённая за минуту, перезагружает страницу; снятые и зависшие страницы отмечает промахом с причиной
 // @match        https://krisha.kz/a/show/*
 // @run-at       document-idle
@@ -88,7 +88,7 @@
   function openedSec() { return Math.floor((workMs + (segStart === null ? 0 : Date.now() - segStart)) / 1000); }
   // Версия в панели — чтобы было видно, что Tampermonkey подтянул обновление.
   // Держать в одном значении с @version в заголовке.
-  var VERSION = "3.7";
+  var VERSION = "3.8";
   var status = "";
   function say(html) {
     status = html;
@@ -252,8 +252,10 @@
         var n = reloadsSoFar();
         if (n < MAX_RELOADS) {
           try { sessionStorage.setItem(RELOAD_KEY, String(n + 1)); } catch (e) {}
-          append("Капча висит минуту — перезагружаю страницу (" + (n + 1) + " из " + MAX_RELOADS + ").");
-          location.reload();
+          append("Капча висит минуту — меняю IP и перезагружаю страницу (" + (n + 1) + " из " + MAX_RELOADS + ").");
+          // IP меняем и здесь: перезагруженная страница придёт с нового адреса,
+          // и капча на ней может уже не появиться.
+          rotateIp().then(function () { location.reload(); });
           return;
         }
         try { sessionStorage.removeItem(RELOAD_KEY); } catch (e) {}
