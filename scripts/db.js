@@ -2023,6 +2023,15 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_nophone3' AND ob
 IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_nophone3' AND object_id = OBJECT_ID('dbo.krisha_list'))
    AND EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_nophone2' AND object_id = OBJECT_ID('dbo.krisha_list'))
   DROP INDEX IX_klist_nophone2 ON dbo.krisha_list;
+-- Счётчики «сколько уже с номером» и «промахи» считаются на каждый запрос:
+-- индексы только по этим строкам (сотни и тысячи, не вся таблица).
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_withphone' AND object_id = OBJECT_ID('dbo.krisha_list'))
+  EXEC('CREATE INDEX IX_klist_withphone ON dbo.krisha_list (phones_at)
+        INCLUDE (user_type, storage, deal, prop, city)
+        WHERE phones IS NOT NULL');
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_phonemiss' AND object_id = OBJECT_ID('dbo.krisha_list'))
+  EXEC('CREATE INDEX IX_klist_phonemiss ON dbo.krisha_list (phone_state)
+        WHERE phones IS NULL AND phone_state IS NOT NULL');
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_tosearch2' AND object_id = OBJECT_ID('dbo.krisha_list'))
   EXEC('CREATE INDEX IX_klist_tosearch2 ON dbo.krisha_list (first_seen DESC)
         INCLUDE (user_type, area, complex_id, lat)
@@ -2717,8 +2726,8 @@ async function listStats() {
 }
 
 // Сколько объявлений в krisha_list уже с номером: всего, хозяев, живых,
-// по типу сделки, снято сегодня и за неделю; отдельно — промахи по причинам
-// и размер очереди (живые хозяева без номера).
+// по типу сделки, снято сегодня и за неделю; отдельно — промахи по причинам.
+// Считается на каждый запрос: строк с номером мало, индексы фильтрованные.
 async function listPhoneCounts() {
   const pool = await getPool();
   await ensureList(pool);
@@ -2737,12 +2746,20 @@ async function listPhoneCounts() {
   const miss = (await pool.request().query(`
     SELECT phone_state, COUNT(*) AS n FROM dbo.krisha_list
     WHERE phones IS NULL AND phone_state IS NOT NULL GROUP BY phone_state`)).recordset;
+  const misses = {};
+  for (const m of miss) misses[m.phone_state] = m.n;
+  return { withPhones: w, misses: misses };
+}
+
+// Размер очереди — живые хозяева без номера. Это сотни тысяч строк, поэтому
+// считается отдельно и кэшируется на стороне сервера.
+async function listPhoneQueueSize() {
+  const pool = await getPool();
+  await ensureList(pool);
   const q = (await pool.request().query(`
     SELECT COUNT(*) AS n FROM dbo.krisha_list
     WHERE user_type = 'owner' AND storage = 'live' AND phones IS NULL`)).recordset[0];
-  const misses = {};
-  for (const m of miss) misses[m.phone_state] = m.n;
-  return { withPhones: w, misses: misses, queue: q.n };
+  return q.n;
 }
 
 // Кто быстрее и полнее: список карты или обход по id. Считаем по общему
@@ -3234,7 +3251,7 @@ async function objectStats() {
 module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
-  saveListAdvert, listStats, listCompare, listPhoneCounts,
+  saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
   listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory,
