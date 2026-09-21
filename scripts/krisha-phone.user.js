@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Reception365 · телефоны с Крыши
 // @namespace    https://saudager.ai/
-// @version      3.1
-// @description  Берёт из очереди следующий объект без номера, сама жмёт «показать телефон», сохраняет номер и едет дальше сама; в фоновой вкладке ждёт, пока её откроют; капча, не решённая за минуту, перезагружает страницу; снятые и зависшие страницы отмечает промахом с причиной
+// @version      3.2
+// @description  Берёт из очереди следующий объект без номера, сама жмёт «показать телефон», сохраняет номер, меняет IP прокси и едет дальше сама; в фоновой вкладке ждёт, пока её откроют; капча, не решённая за минуту, перезагружает страницу; снятые и зависшие страницы отмечает промахом с причиной
 // @match        https://krisha.kz/a/show/*
 // @run-at       document-idle
 // @grant        none
@@ -291,13 +291,40 @@
   // автоперехода, а просто более осторожный интервал перед ним.
   var NEXT_DELAY_MS = 1000;
   var NEXT_DELAY_AFTER_CAPTCHA_MS = 1000;
+
+  // Смена IP перед следующей страницей: сервер дёргает Asocks, у порта
+  // браузера меняется выходной адрес, следующая страница грузится уже с
+  // него. Если на сервере прокси не настроен, запоминаем и больше не зовём.
+  // Ждём ответа не дольше ROTATE_MAX_MS — страница важнее смены IP.
+  var ROTATE_MAX_MS = 15000;
+  function rotateIp() {
+    try { if (sessionStorage.getItem("r365norotate") === "1") return Promise.resolve(null); } catch (e) {}
+    var timeout = new Promise(function (res) { setTimeout(function () { res({ timeout: true }); }, ROTATE_MAX_MS); });
+    var call = api("/api/krisha/objphone/rotate", "POST", {}).then(function (r) { return r.j || {}; });
+    return Promise.race([call, timeout])
+      .then(function (j) {
+        if (j && (j.error === "no_proxy" || j.error === "no_port")) {
+          try { sessionStorage.setItem("r365norotate", "1"); } catch (e) {}
+          append("Прокси на сервере не настроен — IP не меняю.");
+          return null;
+        }
+        if (j && j.timeout) { append("Смена IP не ответила за 15 с — еду так."); return null; }
+        if (j && j.rotated) append("IP сменён.");
+        else if (j && j.throttled) append("IP менялся только что.");
+        return j;
+      })
+      .catch(function () { return null; });
+  }
+
   function autoNext() {
     nextItem()
       .then(function (q) {
         if (!q.item) { append(emptyNote(q)); return; }
         var delay = captchaSeen ? NEXT_DELAY_AFTER_CAPTCHA_MS : NEXT_DELAY_MS;
-        append("Осталось " + q.left + ". Открываю следующую через " + Math.round(delay / 1000) + " с…");
-        setTimeout(function () { location.href = q.item.url; }, delay);
+        append("Осталось " + q.left + ". Меняю IP и открываю следующую…");
+        rotateIp().then(function () {
+          setTimeout(function () { location.href = q.item.url; }, delay);
+        });
       })
       .catch(nextFailed);
   }

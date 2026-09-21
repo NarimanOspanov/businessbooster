@@ -178,6 +178,30 @@ GET https://saudager.ai/api/krisha/objphone?key=<KEY>&id=1015783615
 Если номеров нет — оба массива пустые, `ok` всё равно `true`.
 Смотреть перед правкой — чтобы не перезаписать номер вслепую.
 
+## POST /rotate — сменить IP прокси браузера
+
+```
+POST https://saudager.ai/api/krisha/objphone/rotate?key=<KEY>
+GET  https://saudager.ai/api/krisha/objphone/rotate?key=<KEY>   — какой порт, без смены
+```
+
+Сервер дёргает Asocks `refresh` у порта браузера: `KRISHA_BROWSER_PORT_ID` или первый
+казахстанский порт кабинета. Адрес порта, логин и пароль не меняются, меняется только
+выходной IP, поэтому Chrome настраивается на этот порт один раз. Не чаще раза в 5 секунд:
+повторный вызов раньше отвечает `rotated: false, throttled: true`. Юзерскрипт зовёт метод
+перед переходом на следующее объявление.
+
+Ответ 200:
+
+```
+{
+  "ok": true, "rotated": true, "at": "2026-09-21T09:00:00.000Z",
+  "port": { "id": 123456, "name": "krisha", "country": "KZ", "proxy": "1.2.3.4:10000", "login": "abc" }
+}
+```
+
+`ok: false` с `error: no_proxy` — на сервере нет ключа Asocks; `no_port` — в кабинете нет портов.
+
 ## GET /count — сколько объявлений уже с номером
 
 ```
@@ -296,3 +320,4 @@ Access-Control-Allow-Headers: Content-Type
 `PUT` / `PATCH` | `/api/krisha/objphone?key=` + body | заменить номера целиком
 `POST` | `/api/krisha/objphone/miss?key=` + body | промах с причиной: архив — насовсем, капча/таймаут — повтор позже
 `POST` | `/api/krisha/objphone/lease?key=` + body | продлить аренду объекта (фоновая вкладка, раз в две минуты)
+`POST` | `/api/krisha/objphone/rotate?key=` | сменить IP порта Asocks, через который ходит браузер (не чаще раза в 5 с)

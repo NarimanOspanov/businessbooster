@@ -735,7 +735,29 @@ async function geocode(addr) {
 const inBox = (c, b) =>
   c && b && c.lat >= b.south && c.lat <= b.north && c.lon >= b.west && c.lon <= b.east;
 
+// Порт Asocks для браузера с плагином: KRISHA_BROWSER_PORT_ID, иначе первый
+// казахстанский порт из кабинета. refresh — сменить у него выходной IP (адрес
+// порта, логин и пароль не меняются, Chrome перенастраивать не нужно).
+// Пароль наружу не отдаём: он есть в кабинете Asocks.
+async function browserPort(refresh) {
+  const key = asocksKey();
+  if (!key) return { ok: false, error: "no_proxy", hint: "на сервере нет ASOCKS_API_KEY" };
+  const list = await asocksListPorts(key);
+  const wantId = String(process.env.KRISHA_BROWSER_PORT_ID || "").trim();
+  const p = (wantId && list.find((x) => String(x.id || x.portId || x.port_id) === wantId)) || pickPort(list);
+  if (!p) return { ok: false, error: "no_port", hint: "в кабинете Asocks нет ни одного порта" };
+  const id = p.id || p.portId || p.port_id;
+  let rotated = false;
+  if (refresh && id) rotated = await asocksRefreshPort(key, id).catch(() => false);
+  return {
+    ok: true, rotated: rotated,
+    port: { id: id, name: p.name || null, country: p.countryName || p.country_code || p.country || null,
+            proxy: portHostPort(p) || null, login: portAuth(p).login || null },
+  };
+}
+
 module.exports = {
+  browserPort,
   addressQueries, geocode, inBox,
   H, CRITERIA, NEAR_DISTRICTS, sleep, num, clean, money,
   searchUrl, parseCards, parseDetail, districtOf, locationScore, dedupeKey,
