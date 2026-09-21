@@ -185,8 +185,10 @@ POST https://saudager.ai/api/krisha/objphone/rotate?key=<KEY>
 GET  https://saudager.ai/api/krisha/objphone/rotate?key=<KEY>   — какой порт, без смены
 ```
 
-Сервер дёргает Asocks `refresh` у порта браузера: `KRISHA_BROWSER_PORT_ID` или первый
-казахстанский порт кабинета. Адрес порта, логин и пароль не меняются, меняется только
+Сервер дёргает Asocks `refresh` у порта браузера: `port=<id>` из запроса (в теле или в адресе),
+иначе `KRISHA_BROWSER_PORT_ID`, иначе первый казахстанский порт кабинета. Когда браузеров
+несколько, у каждого свой порт: `GET /api/krisha/objphone/ports?key=<KEY>` отдаёт список портов
+(id, адрес, логин; пароли — в кабинете Asocks), id вписывается в плагин ссылкой «порт» внизу панели. Адрес порта, логин и пароль не меняются, меняется только
 выходной IP, поэтому Chrome настраивается на этот порт один раз. Не чаще раза в 5 секунд:
 повторный вызов раньше отвечает `rotated: false, throttled: true`. Юзерскрипт зовёт метод
 перед переходом на следующее объявление.
@@ -320,4 +322,5 @@ Access-Control-Allow-Headers: Content-Type
 `PUT` / `PATCH` | `/api/krisha/objphone?key=` + body | заменить номера целиком
 `POST` | `/api/krisha/objphone/miss?key=` + body | промах с причиной: архив — насовсем, капча/таймаут — повтор позже
 `POST` | `/api/krisha/objphone/lease?key=` + body | продлить аренду объекта (фоновая вкладка, раз в две минуты)
-`POST` | `/api/krisha/objphone/rotate?key=` | сменить IP порта Asocks, через который ходит браузер (не чаще раза в 5 с)
+`POST` | `/api/krisha/objphone/rotate?key=` [+ `{"port": id}`] | сменить IP порта Asocks, через который ходит браузер (не чаще раза в 5 с на порт)
+`GET` | `/api/krisha/objphone/ports?key=` | список портов Asocks без паролей — по одному на экземпляр браузера

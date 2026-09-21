@@ -735,18 +735,35 @@ async function geocode(addr) {
 const inBox = (c, b) =>
   c && b && c.lat >= b.south && c.lat <= b.north && c.lon >= b.west && c.lon <= b.east;
 
-// Порт Asocks для браузера с плагином: KRISHA_BROWSER_PORT_ID, иначе первый
+// Порт Asocks для браузера с плагином: portId из запроса (у каждого
+// экземпляра Chrome свой порт), иначе KRISHA_BROWSER_PORT_ID, иначе первый
 // казахстанский порт из кабинета. refresh — сменить у него выходной IP (адрес
 // порта, логин и пароль не меняются, Chrome перенастраивать не нужно).
 // Пароль наружу не отдаём: он есть в кабинете Asocks.
 // check — заодно сходить через порт на api.ipify.org и вернуть выходной IP
 // (exitIp): так видно, что ротация действительно сменила адрес.
-async function browserPort(refresh, check) {
+function portIdOf(x) { return String(x.id || x.portId || x.port_id || ""); }
+function portBrief(p) {
+  return { id: p.id || p.portId || p.port_id, name: p.name || null,
+           country: p.countryName || p.country_code || p.country || null,
+           proxy: portHostPort(p) || null, login: portAuth(p).login || null };
+}
+async function browserPorts() {
   const key = asocksKey();
   if (!key) return { ok: false, error: "no_proxy", hint: "на сервере нет ASOCKS_API_KEY" };
   const list = await asocksListPorts(key);
-  const wantId = String(process.env.KRISHA_BROWSER_PORT_ID || "").trim();
-  const p = (wantId && list.find((x) => String(x.id || x.portId || x.port_id) === wantId)) || pickPort(list);
+  return { ok: true, ports: list.map(portBrief) };
+}
+async function browserPort(refresh, check, portId) {
+  const key = asocksKey();
+  if (!key) return { ok: false, error: "no_proxy", hint: "на сервере нет ASOCKS_API_KEY" };
+  const list = await asocksListPorts(key);
+  const askId = String(portId || "").trim();
+  if (askId && !list.some((x) => portIdOf(x) === askId)) {
+    return { ok: false, error: "bad_port", hint: "порта " + askId + " нет в кабинете Asocks" };
+  }
+  const wantId = askId || String(process.env.KRISHA_BROWSER_PORT_ID || "").trim();
+  const p = (wantId && list.find((x) => portIdOf(x) === wantId)) || pickPort(list);
   if (!p) return { ok: false, error: "no_port", hint: "в кабинете Asocks нет ни одного порта" };
   const id = p.id || p.portId || p.port_id;
   let rotated = false;
@@ -760,15 +777,11 @@ async function browserPort(refresh, check) {
       agent.close().catch(() => {});
     } catch (e) { exitErr = String(e.message).slice(0, 120); }
   }
-  return {
-    ok: true, rotated: rotated, exitIp: exitIp, exitErr: exitErr,
-    port: { id: id, name: p.name || null, country: p.countryName || p.country_code || p.country || null,
-            proxy: portHostPort(p) || null, login: portAuth(p).login || null },
-  };
+  return { ok: true, rotated: rotated, exitIp: exitIp, exitErr: exitErr, port: portBrief(p) };
 }
 
 module.exports = {
-  browserPort,
+  browserPort, browserPorts,
   addressQueries, geocode, inBox,
   H, CRITERIA, NEAR_DISTRICTS, sleep, num, clean, money,
   searchUrl, parseCards, parseDetail, districtOf, locationScore, dedupeKey,

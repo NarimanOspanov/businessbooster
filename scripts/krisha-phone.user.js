@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reception365 · телефоны с Крыши
 // @namespace    https://saudager.ai/
-// @version      3.3
+// @version      3.4
 // @description  Берёт из очереди следующий объект без номера, сама жмёт «показать телефон», сохраняет номер, меняет IP прокси и едет дальше сама; в фоновой вкладке ждёт, пока её откроют; капча, не решённая за минуту, перезагружает страницу; снятые и зависшие страницы отмечает промахом с причиной
 // @match        https://krisha.kz/a/show/*
 // @run-at       document-idle
@@ -50,6 +50,19 @@
 
   // Нижняя граница очереди по дате публикации (YYYY-MM-DD). Пусто — сервер
   // берёт последнюю неделю. Меняется ссылкой «с даты» в углу.
+  // Порт Asocks этого экземпляра Chrome (id из кабинета или из
+  // /api/krisha/objphone/ports). Пусто — порт по умолчанию на сервере. Когда
+  // браузеров несколько, у каждого свой порт, иначе смена IP одним ломает
+  // страницы остальным.
+  var PORT = localStorage.getItem("r365port") || "";
+  function askPort() {
+    var p = prompt("Id порта Asocks для этого браузера (число из кабинета; пусто — порт по умолчанию):", PORT);
+    if (p === null) return;
+    p = p.replace(/\D/g, "");
+    PORT = p;
+    if (p) localStorage.setItem("r365port", p); else localStorage.removeItem("r365port");
+    say(status);
+  }
   var SINCE = localStorage.getItem("r365since") || "";
   function askSince() {
     var s = prompt("С какой даты публикации брать объекты (YYYY-MM-DD, пусто — последняя неделя):", SINCE);
@@ -71,7 +84,7 @@
   function openedSec() { return Math.floor(performance.now() / 1000); }
   // Версия в панели — чтобы было видно, что Tampermonkey подтянул обновление.
   // Держать в одном значении с @version в заголовке.
-  var VERSION = "3.3";
+  var VERSION = "3.4";
   var status = "";
   function say(html) {
     status = html;
@@ -79,9 +92,12 @@
       '<div style="margin-top:8px;font-size:12px;color:#aaa"><b style="color:#ddd">v' + VERSION + '</b> · очередь ' +
       (SINCE ? "с " + SINCE : "за неделю") +
       ' · <a href="#" id="r365-since" style="color:#6fb2f0">с даты</a>' +
+      ' · <a href="#" id="r365-port" style="color:#6fb2f0">порт ' + (PORT || "общий") + '</a>' +
       ' · <span id="r365-clock" style="font-variant-numeric:tabular-nums">' + openedSec() + ' с</span></div>';
     var a = document.getElementById("r365-since");
     if (a) a.onclick = function (e) { e.preventDefault(); askSince(); };
+    var pa = document.getElementById("r365-port");
+    if (pa) pa.onclick = function (e) { e.preventDefault(); askPort(); };
   }
   setInterval(function () {
     var c = document.getElementById("r365-clock");
@@ -303,7 +319,7 @@
   function rotateIp() {
     try { if (sessionStorage.getItem("r365norotate") === "1") return Promise.resolve(null); } catch (e) {}
     var timeout = new Promise(function (res) { setTimeout(function () { res({ timeout: true }); }, ROTATE_MAX_MS); });
-    var call = api("/api/krisha/objphone/rotate", "POST", {}).then(function (r) { return r.j || {}; });
+    var call = api("/api/krisha/objphone/rotate", "POST", PORT ? { port: PORT } : {}).then(function (r) { return r.j || {}; });
     return Promise.race([call, timeout])
       .then(function (j) {
         if (j && (j.error === "no_proxy" || j.error === "no_port")) {
@@ -311,6 +327,7 @@
           append("Прокси на сервере не настроен — IP не меняю.");
           return null;
         }
+        if (j && j.error === "bad_port") { append("Порта " + PORT + " нет в Asocks — проверьте «порт» внизу."); return null; }
         if (j && j.timeout) { append("Смена IP не ответила за 15 с — еду так."); return null; }
         if (j && j.rotated) append("IP сменён.");
         else if (j && j.throttled) append("IP менялся только что.");

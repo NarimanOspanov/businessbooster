@@ -1737,7 +1737,7 @@ const agentDidsCache = { at: 0, set: null };
 // Кэш счётчиков очереди телефонов: ключ «since|deal|prop» -> {at, left, waiting}.
 const objphoneCounts = new Map();
 let phoneQueueCache = null; // размер очереди для /api/krisha/objphone/count, живёт минуту
-let rotateLastAt = 0; // когда последний раз меняли IP порта браузера (/api/krisha/objphone/rotate)
+const rotateLastAt = new Map(); // порт → когда последний раз меняли его IP (/api/krisha/objphone/rotate)
 const listDashCache = { at: 0, body: null };
 let freshRunning = false;
 let matchListRunning = false;
@@ -7041,7 +7041,7 @@ http
     // одному; номера и промахи пишутся в ту же таблицу.
     if (urlPath === "/api/krisha/objphone" || urlPath === "/api/krisha/objqueue" ||
         urlPath === "/api/krisha/objphone/miss" || urlPath === "/api/krisha/objphone/lease" ||
-        urlPath === "/api/krisha/objphone/rotate") {
+        urlPath === "/api/krisha/objphone/rotate" || urlPath === "/api/krisha/objphone/ports") {
       const cors = {
         "Access-Control-Allow-Origin": "https://krisha.kz",
         "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, OPTIONS",
@@ -7078,20 +7078,37 @@ http
         return;
       }
 
+      // Список портов Asocks (без паролей): чтобы раздать по порту на каждый
+      // экземпляр Chrome и вписать id порта в плагин.
+      if (urlPath === "/api/krisha/objphone/ports") {
+        const K = require("./scripts/krisha-lib.js");
+        (async () => {
+          const r = await K.browserPorts();
+          return send(r.ok ? 200 : 503, Object.assign({ at: new Date().toISOString() }, r));
+        })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
+        return;
+      }
+
       // Сменить IP у порта Asocks, через который ходит браузер с плагином.
-      // GET — какой это порт (без пароля); POST — сменить IP. Не чаще раза в
-      // 5 секунд: сто вкладок разом не должны дёргать Asocks сто раз.
+      // GET — какой это порт (без пароля); POST — сменить IP. ?port=<id> —
+      // какой именно (у каждого экземпляра Chrome свой), без него — порт по
+      // умолчанию. Не чаще раза в 5 секунд на порт: сто вкладок разом не
+      // должны дёргать Asocks сто раз.
       if (urlPath === "/api/krisha/objphone/rotate") {
         const K = require("./scripts/krisha-lib.js");
         (async () => {
           // ?check=1 — заодно показать выходной IP порта (запрос через прокси на api.ipify.org).
           const check = parsed.searchParams.get("check") === "1";
-          if (req.method === "GET") return send(200, Object.assign({ at: new Date().toISOString() }, await K.browserPort(false, check)));
+          let body = {};
+          if (req.method === "POST") { try { body = JSON.parse(await readBody(req)) || {}; } catch { /* пусто */ } }
+          const portId = String(body.port || parsed.searchParams.get("port") || "").replace(/\D/g, "");
+          if (req.method === "GET") return send(200, Object.assign({ at: new Date().toISOString() }, await K.browserPort(false, check, portId)));
           if (req.method !== "POST") return send(405, { ok: false, error: "only POST" });
-          const since = Date.now() - rotateLastAt;
-          if (since < 5000) return send(200, { ok: true, rotated: false, throttled: true, waitMs: 5000 - since, at: new Date(rotateLastAt).toISOString() });
-          rotateLastAt = Date.now();
-          const r = await K.browserPort(true, check);
+          const rk = portId || "default";
+          const since = Date.now() - (rotateLastAt.get(rk) || 0);
+          if (since < 5000) return send(200, { ok: true, rotated: false, throttled: true, waitMs: 5000 - since, port: portId || null, at: new Date(rotateLastAt.get(rk)).toISOString() });
+          rotateLastAt.set(rk, Date.now());
+          const r = await K.browserPort(true, check, portId);
           if (r.ok) console.log("[objphone] IP порта " + (r.port && r.port.id) + (r.rotated ? " сменён" : " не сменился"));
           return send(r.ok ? 200 : 503, Object.assign({ at: new Date().toISOString() }, r));
         })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
