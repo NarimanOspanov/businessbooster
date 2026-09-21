@@ -1,11 +1,13 @@
 // ==UserScript==
 // @name         Reception365 · телефоны с Крыши
 // @namespace    https://saudager.ai/
-// @version      2.7
+// @version      2.8
 // @description  Берёт из очереди следующий объект без номера, сама жмёт «показать телефон», сохраняет номер и едет дальше сама (после капчи — с более долгой паузой); капча, не решённая за минуту, перезагружает страницу; снятые и зависшие страницы отмечает промахом с причиной
 // @match        https://krisha.kz/a/show/*
 // @run-at       document-idle
 // @grant        none
+// @updateURL    https://saudager.ai/krisha-phone.user.js
+// @downloadURL  https://saudager.ai/krisha-phone.user.js
 // ==/UserScript==
 
 // Ходит в /api/krisha/objphone (таблица krisha_objects, весь поток
