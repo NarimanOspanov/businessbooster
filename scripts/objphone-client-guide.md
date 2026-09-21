@@ -66,7 +66,7 @@ GET /api/krisha/objphone?key=<KEY>&since=2026-09-10
 `key`   | да  | ключ доступа
 `since` | нет | не старше этой даты по попаданию в базу, `YYYY-MM-DD`. Без неё — последние 7 дней
 `deal`  | нет | по умолчанию `sale` — только продажа; `rent` — аренда; `any` — без фильтра
-`prop`  | нет | `flat`, `house`, `commercial`, `land`; без параметра — все
+`prop`  | нет | по умолчанию `flat` — только квартиры; `house`, `commercial`, `land`; `any` — без фильтра
 `city`  | нет | по умолчанию `almaty` — только Алматы; другой город латиницей (`astana`, `shymkent`…); `any` — все города
 
 Алиас с тем же поведением: `GET /api/krisha/objqueue`.

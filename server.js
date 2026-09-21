@@ -7106,15 +7106,16 @@ http
             return send(400, { ok: false, error: "since: нужна дата YYYY-MM-DD" });
           }
           const since = sinceRaw || day(Date.now() - 7 * 86400e3);
-          // По умолчанию очередь — продажа в Алматы: аренду и другие города
-          // плагин не снимает. Снять фильтр можно значением any (deal=any, city=any).
+          // По умолчанию очередь — продажа квартир в Алматы: аренду, дома,
+          // коммерцию и другие города плагин не снимает. Снять фильтр можно
+          // значением any (deal=any, prop=any, city=any).
           const filt = (name, def) => {
             const v = (parsed.searchParams.get(name) || "").trim().toLowerCase();
             if (!v) return def;
             return v === "any" || v === "all" ? null : v;
           };
           const dealF = filt("deal", "sale");
-          const propF = filt("prop", null);
+          const propF = filt("prop", "flat");
           const cityF = filt("city", "almaty");
           // Счётчики очереди — раз в минуту на окно, остальные вызовы берут
           // из кэша: сам подсчёт на 10 DTU стоит секунды, объект — миллисекунды.
