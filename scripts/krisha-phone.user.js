@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reception365 · телефоны с Крыши
 // @namespace    https://saudager.ai/
-// @version      4.0
+// @version      4.1
 // @description  Берёт из очереди следующий объект без номера, сама жмёт «показать телефон», сохраняет номер, меняет IP прокси и едет дальше сама; в фоновой вкладке ждёт, пока её откроют; капча, не решённая за минуту, перезагружает страницу; снятые и зависшие страницы отмечает промахом с причиной
 // @match        https://krisha.kz/a/show/*
 // @run-at       document-idle
@@ -88,7 +88,7 @@
   function openedSec() { return Math.floor((workMs + (segStart === null ? 0 : Date.now() - segStart)) / 1000); }
   // Версия в панели — чтобы было видно, что Tampermonkey подтянул обновление.
   // Держать в одном значении с @version в заголовке.
-  var VERSION = "4.0";
+  var VERSION = "4.1";
   var status = "";
   function say(html) {
     status = html;
@@ -229,11 +229,10 @@
   function reloadsSoFar() {
     try { return Number(sessionStorage.getItem(RELOAD_KEY)) || 0; } catch (e) { return 0; }
   }
-  // Человек «здесь», когда вкладка на экране и окно в фокусе. Минута на
-  // капчу идёт только в это время: в окне, на которое сейчас не смотрят,
-  // капча просто ждёт, а не сгорает. Кнопку и номер это не касается — их
-  // скрипт нажимает и читает сам, лишь бы браузер рисовал страницу.
-  function humanHere() { return !document.hidden && (typeof document.hasFocus !== "function" || document.hasFocus()); }
+  // Минута на капчу идёт по часам, пока страница на экране (вкладка не в
+  // фоне). Фокус окна не учитывается: с ключами запуска Chrome перекрытые
+  // окна тоже «на экране», и отсчёт в них идёт как в активном.
+  function humanHere() { return !document.hidden; }
   function onCaptcha() {
     if (captchaSeen) return;
     captchaSeen = true;
@@ -279,7 +278,6 @@
   function captchaNote() {
     if (!captchaSeen || done) return "";
     if (document.hidden) return " · капча: вкладка в фоне, таймер стоит";
-    if (!humanHere()) return " · капча ждёт вас, минута пойдёт в фокусе";
     if (captchaArmedAt === null) return " · капча: таймер не заведён";
     return " · перезагрузка через " + Math.ceil(captchaLeftMs() / 1000) + " с";
   }
@@ -471,9 +469,6 @@
     if (done) return;
     if (captchaSeen) { if (humanHere()) armCaptcha(); } else armGiveUp();
   });
-  // Фокус окна: ушли в другое окно — минута на капчу стоит, вернулись — идёт заново.
-  window.addEventListener("blur", function () { if (captchaSeen && !done) pauseCaptcha(); });
-  window.addEventListener("focus", function () { if (captchaSeen && !done && humanHere()) armCaptcha(); });
   // Пока объект ждёт человека (вкладка в фоне или капча без фокуса), держим
   // аренду: раз в две минуты продлеваем, чтобы объект не ушёл другому браузеру.
   var keepLease = setInterval(function () {
