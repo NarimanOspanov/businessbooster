@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reception365 · телефоны с Крыши
 // @namespace    https://saudager.ai/
-// @version      3.9
+// @version      4.0
 // @description  Берёт из очереди следующий объект без номера, сама жмёт «показать телефон», сохраняет номер, меняет IP прокси и едет дальше сама; в фоновой вкладке ждёт, пока её откроют; капча, не решённая за минуту, перезагружает страницу; снятые и зависшие страницы отмечает промахом с причиной
 // @match        https://krisha.kz/a/show/*
 // @run-at       document-idle
@@ -88,7 +88,7 @@
   function openedSec() { return Math.floor((workMs + (segStart === null ? 0 : Date.now() - segStart)) / 1000); }
   // Версия в панели — чтобы было видно, что Tampermonkey подтянул обновление.
   // Держать в одном значении с @version в заголовке.
-  var VERSION = "3.9";
+  var VERSION = "4.0";
   var status = "";
   function say(html) {
     status = html;
@@ -245,7 +245,12 @@
   // Минута на капчу идёт только пока окно на экране и в фокусе.
   // captchaArmedAt — когда завели таймер; по нему в подвале панели идёт
   // обратный отсчёт до перезагрузки, чтобы зависание было видно и понятно.
-  var captchaArmedAt = null;
+  // Минута на капчу накапливается: ушли из окна — отсчёт встал, вернулись —
+  // продолжился с того же места, а не с нуля.
+  var captchaArmedAt = null, captchaWaitedMs = 0;
+  function captchaLeftMs() {
+    return Math.max(0, CAPTCHA_MS - captchaWaitedMs - (captchaArmedAt === null ? 0 : Date.now() - captchaArmedAt));
+  }
   function armCaptcha() {
     clearTimeout(captchaTimer);
     captchaArmedAt = Date.now();
@@ -268,7 +273,7 @@
       } catch (e) {
         append("Ошибка таймера капчи: " + String(e && e.message || e).slice(0, 120));
       }
-    }, CAPTCHA_MS);
+    }, captchaLeftMs());
   }
   // Что показать в подвале про капчу: отсчёт до перезагрузки или почему таймер не идёт.
   function captchaNote() {
@@ -276,8 +281,7 @@
     if (document.hidden) return " · капча: вкладка в фоне, таймер стоит";
     if (!humanHere()) return " · капча ждёт вас, минута пойдёт в фокусе";
     if (captchaArmedAt === null) return " · капча: таймер не заведён";
-    var left = Math.max(0, Math.ceil((CAPTCHA_MS - (Date.now() - captchaArmedAt)) / 1000));
-    return " · перезагрузка через " + left + " с";
+    return " · перезагрузка через " + Math.ceil(captchaLeftMs() / 1000) + " с";
   }
 
   // --- сохранение ---------------------------------------------------------
@@ -455,7 +459,11 @@
       mo.observe(document.body, { childList: true, subtree: true, characterData: true });
     }
   }
-  function pauseCaptcha() { clearTimeout(captchaTimer); captchaArmedAt = null; }
+  function pauseCaptcha() {
+    clearTimeout(captchaTimer);
+    if (captchaArmedAt !== null) captchaWaitedMs += Date.now() - captchaArmedAt;
+    captchaArmedAt = null;
+  }
   document.addEventListener("visibilitychange", function () {
     if (document.hidden) { workPause(); clearTimeout(giveUpTimer); pauseCaptcha(); return; }
     if (!started) { start(); return; }
