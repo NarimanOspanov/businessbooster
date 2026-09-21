@@ -65,12 +65,18 @@ Chrome замораживает страницы в свёрнутых и цел
 поле «Объект»:
 
 ```
-"C:\Program Files\Google\Chrome\Application\chrome.exe" --profile-directory="Profile 2" --disable-backgrounding-occluded-windows --disable-renderer-backgrounding --disable-background-timer-throttling
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --profile-directory="Profile 2" --disable-backgrounding-occluded-windows --disable-renderer-backgrounding --disable-background-timer-throttling --disable-features=IntensiveWakeUpThrottling,CalculateNativeWinOcclusion
 ```
 
 Имя папки профиля (`Default`, `Profile 1`, `Profile 2`…) смотрится в самом профиле на странице
 `chrome://version`, строка «Путь к профилю». На каждый профиль свой ярлык со своим именем папки.
-Перед запуском по ярлыку все окна Chrome нужно закрыть, иначе ключи не применятся.
+Перед запуском по ярлыку все окна Chrome нужно закрыть, иначе ключи не применятся. Если после
+закрытия окон Chrome остаётся в фоне (значок в трее), завершить его: правой кнопкой по значку →
+«Выход», или в командной строке `taskkill /F /IM chrome.exe`. Проверка: на `chrome://version` в
+строке «Командная строка» видны все ключи.
+
+Окна лучше не сворачивать, а держать открытыми одно за другим или рядом: свёрнутое окно
+Chrome экономит сильнее всего, и даже с ключами таймеры в нём могут идти реже.
 
 Вкладок в одном окне это не касается: фоновая вкладка заморожена всегда. Одна вкладка
 на окно.
