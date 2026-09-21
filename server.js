@@ -7039,7 +7039,7 @@ http
     // раньше, чем агент уговорит его спрятать объявление. GET отдаёт по
     // одному; номера и промахи пишутся в ту же таблицу.
     if (urlPath === "/api/krisha/objphone" || urlPath === "/api/krisha/objqueue" ||
-        urlPath === "/api/krisha/objphone/miss") {
+        urlPath === "/api/krisha/objphone/miss" || urlPath === "/api/krisha/objphone/lease") {
       const cors = {
         "Access-Control-Allow-Origin": "https://krisha.kz",
         "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, OPTIONS",
@@ -7072,6 +7072,22 @@ http
           const m = await db.markListPhoneMiss(id, reason);
           console.log("[objphone] промах " + id + ": " + m.state + " (попытка " + m.tries + (m.final ? ", выбыл" : "") + ")");
           return send(200, Object.assign({ ok: true, id: id }, m));
+        })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
+        return;
+      }
+
+      // Продлить аренду объекта: фоновая вкладка зовёт раз в две минуты, пока
+      // ждёт, чтобы объект за это время не ушёл другой вкладке.
+      if (urlPath === "/api/krisha/objphone/lease") {
+        if (req.method !== "POST") return send(405, { ok: false, error: "only POST" });
+        (async () => {
+          let body = {};
+          try { body = JSON.parse(await readBody(req)) || {}; } catch { /* пусто */ }
+          const id = String(body.id || parsed.searchParams.get("id") || "").replace(/\D/g, "");
+          if (!id) return send(400, { ok: false, error: "нет номера объявления" });
+          const sec = Math.max(30, Math.min(900, Number(body.lease || parsed.searchParams.get("lease")) || 240));
+          const until = await db.renewListLease(id, sec);
+          return send(200, { ok: true, id: id, leaseUntil: until ? new Date(until).toISOString() : null });
         })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
         return;
       }

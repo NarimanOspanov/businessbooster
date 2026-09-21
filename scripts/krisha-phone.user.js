@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Reception365 · телефоны с Крыши
 // @namespace    https://saudager.ai/
-// @version      3.0
-// @description  Берёт из очереди следующий объект без номера, сама жмёт «показать телефон», сохраняет номер и едет дальше сама; капча, не решённая за минуту, перезагружает страницу; снятые и зависшие страницы отмечает промахом с причиной
+// @version      3.1
+// @description  Берёт из очереди следующий объект без номера, сама жмёт «показать телефон», сохраняет номер и едет дальше сама; в фоновой вкладке ждёт, пока её откроют; капча, не решённая за минуту, перезагружает страницу; снятые и зависшие страницы отмечает промахом с причиной
 // @match        https://krisha.kz/a/show/*
 // @run-at       document-idle
 // @grant        none
@@ -179,14 +179,21 @@
   // За 15 секунд не нашлось ни номера, ни капчи, ни архивной пометки.
   // Кнопку нажимали — значит, страница живая, но номер не пришёл: timeout.
   // Кнопки не было вовсе — живая страница без телефона (только чат): no_phone.
+  // Таймер заводится только когда вкладка на экране (см. start): в фоновой
+  // вкладке браузер не рисует капчу и не отдаёт номер, и 15 секунд там
+  // кончались промахом «timeout» на живом объявлении.
   var GIVE_UP_MS = 15000;
-  var giveUpTimer = setTimeout(function () {
-    if (done || captchaSeen) return; // капча — значит дело живое, решает человек
-    var dead = deadReason();
-    if (dead) miss(dead, DEAD_WHY[dead]);
-    else if (clicked) miss("timeout", "Номер так и не появился");
-    else miss("no_phone", "На странице нет кнопки с номером");
-  }, GIVE_UP_MS);
+  var giveUpTimer = null;
+  function armGiveUp() {
+    clearTimeout(giveUpTimer);
+    giveUpTimer = setTimeout(function () {
+      if (done || captchaSeen) return; // капча — значит дело живое, решает человек
+      var dead = deadReason();
+      if (dead) miss(dead, DEAD_WHY[dead]);
+      else if (clicked) miss("timeout", "Номер так и не появился");
+      else miss("no_phone", "На странице нет кнопки с номером");
+    }, GIVE_UP_MS);
+  }
 
   // Капча показалась — ждём человека минуту. Не дождались — перезагружаем
   // страницу: капча иногда зависает, и свежая решается быстрее. Больше
@@ -205,6 +212,11 @@
     clearTimeout(giveUpTimer);
     var n = reloadsSoFar();
     append("Капча — решите её, номер сохранится сам." + (n ? " (перезагрузка " + n + " из " + MAX_RELOADS + ")" : ""));
+    if (!document.hidden) armCaptcha();
+  }
+  // Минута на капчу идёт только пока вкладка на экране: в фоне её никто не решит.
+  function armCaptcha() {
+    clearTimeout(captchaTimer);
     captchaTimer = setTimeout(function () {
       if (done) return;
       if (n < MAX_RELOADS) {
@@ -326,29 +338,57 @@
     if (acceptConsent() || ++consentTicks > 60) clearInterval(consentTimer);
   }, 500);
 
+  // --- запуск -------------------------------------------------------------
+  // Вся работа начинается, только когда вкладка на экране. В фоновой вкладке
+  // браузер замораживает отрисовку: капча не появляется, номер не приходит,
+  // а таймеры срабатывают раз в минуту. Поэтому фоновая вкладка просто ждёт,
+  // держит аренду объекта (продлевает её раз в две минуты) и стартует, когда
+  // её откроют. Сто вкладок — это сто заранее открытых страниц, каждая
+  // отрабатывает в момент, когда на неё переключились.
   var mo = null;
-  var seen = found();
-  var dead0 = deadReason();
-  if (seen.length) save(seen);
-  else if (dead0) miss(dead0, DEAD_WHY[dead0]);
-  else if (!clickShow()) {
-    var wait = new MutationObserver(function () {
-      if (clickShow()) wait.disconnect();
-    });
-    wait.observe(document.body, { childList: true, subtree: true });
-  }
-  if (!done) {
-    if (captchaVisible()) onCaptcha();
-    // Ждём, пока номер появится: страница подставляет его после капчи без
-    // перезагрузки, поэтому следим за изменениями разметки.
-    mo = new MutationObserver(function () {
-      if (done) return;
+  var started = false;
+  function start() {
+    if (started) return;
+    started = true;
+    armGiveUp();
+    var seen = found();
+    var dead0 = deadReason();
+    if (seen.length) save(seen);
+    else if (dead0) miss(dead0, DEAD_WHY[dead0]);
+    else if (!clickShow()) {
+      var wait = new MutationObserver(function () {
+        if (clickShow()) wait.disconnect();
+      });
+      wait.observe(document.body, { childList: true, subtree: true });
+    }
+    if (!done) {
       if (captchaVisible()) onCaptcha();
-      var d = deadReason();
-      if (d) { miss(d, DEAD_WHY[d]); return; }
-      var p = found();
-      if (p.length) { mo.disconnect(); save(p); }
-    });
-    mo.observe(document.body, { childList: true, subtree: true, characterData: true });
+      // Ждём, пока номер появится: страница подставляет его после капчи без
+      // перезагрузки, поэтому следим за изменениями разметки.
+      mo = new MutationObserver(function () {
+        if (done) return;
+        if (captchaVisible()) onCaptcha();
+        var d = deadReason();
+        if (d) { miss(d, DEAD_WHY[d]); return; }
+        var p = found();
+        if (p.length) { mo.disconnect(); save(p); }
+      });
+      mo.observe(document.body, { childList: true, subtree: true, characterData: true });
+    }
+  }
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) { clearTimeout(giveUpTimer); clearTimeout(captchaTimer); return; }
+    if (!started) { start(); return; }
+    if (done) return;
+    if (captchaSeen) armCaptcha(); else armGiveUp();
+  });
+  if (document.hidden) {
+    say("Вкладка в фоне — жду, пока её откроют.");
+    var keepLease = setInterval(function () {
+      if (started) { clearInterval(keepLease); return; }
+      api("/api/krisha/objphone/lease", "POST", { id: ID }).catch(function () { /* продлим в следующий раз */ });
+    }, 120000);
+  } else {
+    start();
   }
 })();

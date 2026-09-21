@@ -2240,6 +2240,19 @@ async function nextListOwnerWithoutPhone(since, deal, prop, city, withCounts, le
   return { row: r.recordset[0] || null, left: c.ready || 0, waiting: c.waiting || 0, inWork: w.n || 0 };
 }
 
+// Продлить аренду выданного объекта; null — объекта нет или номер уже снят.
+async function renewListLease(id, sec) {
+  const pool = await getPool();
+  await ensureList(pool);
+  const r = await pool.request()
+    .input("id", sql.BigInt, Number(id))
+    .input("s", sql.Int, Math.max(30, Math.min(900, Number(sec) || 240)))
+    .query(`UPDATE dbo.krisha_list SET phone_lease_until = DATEADD(second, @s, SYSUTCDATETIME())
+            OUTPUT INSERTED.phone_lease_until
+            WHERE id = @id AND phones IS NULL`);
+  return r.recordset[0] ? r.recordset[0].phone_lease_until : null;
+}
+
 async function markListPhoneMiss(id, reason) {
   const key = PHONE_MISS[reason] ? reason : "error";
   const rule = PHONE_MISS[key];
@@ -3278,7 +3291,7 @@ async function objectStats() {
 module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
-  saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize,
+  saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
   listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory,
