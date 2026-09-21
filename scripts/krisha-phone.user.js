@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reception365 · телефоны с Крыши
 // @namespace    https://saudager.ai/
-// @version      3.8
+// @version      3.9
 // @description  Берёт из очереди следующий объект без номера, сама жмёт «показать телефон», сохраняет номер, меняет IP прокси и едет дальше сама; в фоновой вкладке ждёт, пока её откроют; капча, не решённая за минуту, перезагружает страницу; снятые и зависшие страницы отмечает промахом с причиной
 // @match        https://krisha.kz/a/show/*
 // @run-at       document-idle
@@ -88,7 +88,7 @@
   function openedSec() { return Math.floor((workMs + (segStart === null ? 0 : Date.now() - segStart)) / 1000); }
   // Версия в панели — чтобы было видно, что Tampermonkey подтянул обновление.
   // Держать в одном значении с @version в заголовке.
-  var VERSION = "3.8";
+  var VERSION = "3.9";
   var status = "";
   function say(html) {
     status = html;
@@ -229,15 +229,20 @@
   function reloadsSoFar() {
     try { return Number(sessionStorage.getItem(RELOAD_KEY)) || 0; } catch (e) { return 0; }
   }
+  // Человек «здесь», когда вкладка на экране и окно в фокусе. Минута на
+  // капчу идёт только в это время: в окне, на которое сейчас не смотрят,
+  // капча просто ждёт, а не сгорает. Кнопку и номер это не касается — их
+  // скрипт нажимает и читает сам, лишь бы браузер рисовал страницу.
+  function humanHere() { return !document.hidden && (typeof document.hasFocus !== "function" || document.hasFocus()); }
   function onCaptcha() {
     if (captchaSeen) return;
     captchaSeen = true;
     clearTimeout(giveUpTimer);
     var n = reloadsSoFar();
     append("Капча — решите её, номер сохранится сам." + (n ? " (перезагрузка " + n + " из " + MAX_RELOADS + ")" : ""));
-    if (!document.hidden) armCaptcha();
+    if (humanHere()) armCaptcha();
   }
-  // Минута на капчу идёт только пока вкладка на экране: в фоне её никто не решит.
+  // Минута на капчу идёт только пока окно на экране и в фокусе.
   // captchaArmedAt — когда завели таймер; по нему в подвале панели идёт
   // обратный отсчёт до перезагрузки, чтобы зависание было видно и понятно.
   var captchaArmedAt = null;
@@ -269,6 +274,7 @@
   function captchaNote() {
     if (!captchaSeen || done) return "";
     if (document.hidden) return " · капча: вкладка в фоне, таймер стоит";
+    if (!humanHere()) return " · капча ждёт вас, минута пойдёт в фокусе";
     if (captchaArmedAt === null) return " · капча: таймер не заведён";
     var left = Math.max(0, Math.ceil((CAPTCHA_MS - (Date.now() - captchaArmedAt)) / 1000));
     return " · перезагрузка через " + left + " с";
@@ -449,19 +455,27 @@
       mo.observe(document.body, { childList: true, subtree: true, characterData: true });
     }
   }
+  function pauseCaptcha() { clearTimeout(captchaTimer); captchaArmedAt = null; }
   document.addEventListener("visibilitychange", function () {
-    if (document.hidden) { workPause(); clearTimeout(giveUpTimer); clearTimeout(captchaTimer); captchaArmedAt = null; return; }
+    if (document.hidden) { workPause(); clearTimeout(giveUpTimer); pauseCaptcha(); return; }
     if (!started) { start(); return; }
     workStart();
     if (done) return;
-    if (captchaSeen) armCaptcha(); else armGiveUp();
+    if (captchaSeen) { if (humanHere()) armCaptcha(); } else armGiveUp();
   });
+  // Фокус окна: ушли в другое окно — минута на капчу стоит, вернулись — идёт заново.
+  window.addEventListener("blur", function () { if (captchaSeen && !done) pauseCaptcha(); });
+  window.addEventListener("focus", function () { if (captchaSeen && !done && humanHere()) armCaptcha(); });
+  // Пока объект ждёт человека (вкладка в фоне или капча без фокуса), держим
+  // аренду: раз в две минуты продлеваем, чтобы объект не ушёл другому браузеру.
+  var keepLease = setInterval(function () {
+    if (done) { clearInterval(keepLease); return; }
+    if (!started || (captchaSeen && !humanHere())) {
+      api("/api/krisha/objphone/lease", "POST", { id: ID }).catch(function () { /* продлим в следующий раз */ });
+    }
+  }, 120000);
   if (document.hidden) {
     say("Вкладка в фоне — жду, пока её откроют.");
-    var keepLease = setInterval(function () {
-      if (started) { clearInterval(keepLease); return; }
-      api("/api/krisha/objphone/lease", "POST", { id: ID }).catch(function () { /* продлим в следующий раз */ });
-    }, 120000);
   } else {
     start();
   }
