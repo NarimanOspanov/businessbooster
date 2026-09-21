@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reception365 · телефоны с Крыши
 // @namespace    https://saudager.ai/
-// @version      2.6
+// @version      2.7
 // @description  Берёт из очереди следующий объект без номера, сама жмёт «показать телефон», сохраняет номер и едет дальше сама (после капчи — с более долгой паузой); капча, не решённая за минуту, перезагружает страницу; снятые и зависшие страницы отмечает промахом с причиной
 // @match        https://krisha.kz/a/show/*
 // @run-at       document-idle
@@ -64,16 +64,24 @@
     "padding:12px 14px;border-radius:10px;background:#1c1819;color:#fff;" +
     'font:14px/1.4 "Open Sans",Arial,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.35)';
   document.body.appendChild(box);
+  // Секундомер: сколько секунд страница открыта (от начала загрузки, не от
+  // запуска скрипта). Наглядно видно, когда ждать перезагрузку или промах.
+  function openedSec() { return Math.floor(performance.now() / 1000); }
   var status = "";
   function say(html) {
     status = html;
     box.innerHTML = html +
       '<div style="margin-top:8px;font-size:12px;color:#aaa">очередь ' +
       (SINCE ? "с " + SINCE : "за неделю") +
-      ' · <a href="#" id="r365-since" style="color:#6fb2f0">с даты</a></div>';
+      ' · <a href="#" id="r365-since" style="color:#6fb2f0">с даты</a>' +
+      ' · <span id="r365-clock" style="font-variant-numeric:tabular-nums">' + openedSec() + ' с</span></div>';
     var a = document.getElementById("r365-since");
     if (a) a.onclick = function (e) { e.preventDefault(); askSince(); };
   }
+  setInterval(function () {
+    var c = document.getElementById("r365-clock");
+    if (c) c.textContent = openedSec() + " с";
+  }, 1000);
   function append(html) { say(status + "<br>" + html); }
 
   say("Открываю телефон…");
