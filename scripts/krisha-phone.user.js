@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reception365 · телефоны с Крыши
 // @namespace    https://saudager.ai/
-// @version      2.9
+// @version      3.0
 // @description  Берёт из очереди следующий объект без номера, сама жмёт «показать телефон», сохраняет номер и едет дальше сама; капча, не решённая за минуту, перезагружает страницу; снятые и зависшие страницы отмечает промахом с причиной
 // @match        https://krisha.kz/a/show/*
 // @run-at       document-idle
@@ -306,6 +306,25 @@
     btn.click();
     return true;
   }
+
+  // Окно согласия на cookies (Google Funding Choices, класс fc-choice-dialog):
+  // Крыша показывает его, когда меняется IP, и оно закрывает страницу.
+  // Жмём «Consent» сами, как только окно появилось; проверяем полминуты.
+  var consented = false;
+  function acceptConsent() {
+    if (consented) return true;
+    var dlg = document.querySelector(".fc-choice-dialog");
+    var btn = dlg && dlg.querySelector(".fc-cta-consent");
+    if (!btn || btn.offsetParent === null) return false;
+    btn.click();
+    consented = true;
+    append("Окно согласия на cookies закрыто.");
+    return true;
+  }
+  var consentTicks = 0;
+  var consentTimer = setInterval(function () {
+    if (acceptConsent() || ++consentTicks > 60) clearInterval(consentTimer);
+  }, 500);
 
   var mo = null;
   var seen = found();
