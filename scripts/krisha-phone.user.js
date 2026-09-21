@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reception365 · телефоны с Крыши
 // @namespace    https://saudager.ai/
-// @version      3.6
+// @version      3.7
 // @description  Берёт из очереди следующий объект без номера, сама жмёт «показать телефон», сохраняет номер, меняет IP прокси и едет дальше сама; в фоновой вкладке ждёт, пока её откроют; капча, не решённая за минуту, перезагружает страницу; снятые и зависшие страницы отмечает промахом с причиной
 // @match        https://krisha.kz/a/show/*
 // @run-at       document-idle
@@ -88,7 +88,7 @@
   function openedSec() { return Math.floor((workMs + (segStart === null ? 0 : Date.now() - segStart)) / 1000); }
   // Версия в панели — чтобы было видно, что Tampermonkey подтянул обновление.
   // Держать в одном значении с @version в заголовке.
-  var VERSION = "3.6";
+  var VERSION = "3.7";
   var status = "";
   function say(html) {
     status = html;
@@ -105,7 +105,7 @@
   }
   setInterval(function () {
     var c = document.getElementById("r365-clock");
-    if (c) c.textContent = openedSec() + " с";
+    if (c) c.textContent = openedSec() + " с" + captchaNote();
   }, 1000);
   function append(html) { say(status + "<br>" + html); }
 
@@ -238,22 +238,38 @@
     if (!document.hidden) armCaptcha();
   }
   // Минута на капчу идёт только пока вкладка на экране: в фоне её никто не решит.
+  // captchaArmedAt — когда завели таймер; по нему в подвале панели идёт
+  // обратный отсчёт до перезагрузки, чтобы зависание было видно и понятно.
+  var captchaArmedAt = null;
   function armCaptcha() {
     clearTimeout(captchaTimer);
+    captchaArmedAt = Date.now();
     captchaTimer = setTimeout(function () {
-      if (done) return;
-      // Счётчик читаем здесь, а не в onCaptcha: в 3.1–3.5 таймер брал
-      // переменную из другой функции, падал с ошибкой и страница висела вечно.
-      var n = reloadsSoFar();
-      if (n < MAX_RELOADS) {
-        try { sessionStorage.setItem(RELOAD_KEY, String(n + 1)); } catch (e) {}
-        append("Капча висит минуту — перезагружаю страницу (" + (n + 1) + " из " + MAX_RELOADS + ").");
-        location.reload();
-        return;
+      try {
+        if (done) return;
+        // Счётчик читаем здесь, а не в onCaptcha: в 3.1–3.5 таймер брал
+        // переменную из другой функции, падал с ошибкой и страница висела вечно.
+        var n = reloadsSoFar();
+        if (n < MAX_RELOADS) {
+          try { sessionStorage.setItem(RELOAD_KEY, String(n + 1)); } catch (e) {}
+          append("Капча висит минуту — перезагружаю страницу (" + (n + 1) + " из " + MAX_RELOADS + ").");
+          location.reload();
+          return;
+        }
+        try { sessionStorage.removeItem(RELOAD_KEY); } catch (e) {}
+        miss("captcha", "Капча не решена за минуту и после " + MAX_RELOADS + " перезагрузок");
+      } catch (e) {
+        append("Ошибка таймера капчи: " + String(e && e.message || e).slice(0, 120));
       }
-      try { sessionStorage.removeItem(RELOAD_KEY); } catch (e) {}
-      miss("captcha", "Капча не решена за минуту и после " + MAX_RELOADS + " перезагрузок");
     }, CAPTCHA_MS);
+  }
+  // Что показать в подвале про капчу: отсчёт до перезагрузки или почему таймер не идёт.
+  function captchaNote() {
+    if (!captchaSeen || done) return "";
+    if (document.hidden) return " · капча: вкладка в фоне, таймер стоит";
+    if (captchaArmedAt === null) return " · капча: таймер не заведён";
+    var left = Math.max(0, Math.ceil((CAPTCHA_MS - (Date.now() - captchaArmedAt)) / 1000));
+    return " · перезагрузка через " + left + " с";
   }
 
   // --- сохранение ---------------------------------------------------------
@@ -432,7 +448,7 @@
     }
   }
   document.addEventListener("visibilitychange", function () {
-    if (document.hidden) { workPause(); clearTimeout(giveUpTimer); clearTimeout(captchaTimer); return; }
+    if (document.hidden) { workPause(); clearTimeout(giveUpTimer); clearTimeout(captchaTimer); captchaArmedAt = null; return; }
     if (!started) { start(); return; }
     workStart();
     if (done) return;
