@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Reception365 · телефоны с Крыши
 // @namespace    https://saudager.ai/
-// @version      2.5
-// @description  Берёт из очереди следующий объект без номера, сама жмёт «показать телефон», сохраняет номер и едет дальше сама (после капчи — с более долгой паузой); снятые и зависшие страницы отмечает промахом с причиной
+// @version      2.6
+// @description  Берёт из очереди следующий объект без номера, сама жмёт «показать телефон», сохраняет номер и едет дальше сама (после капчи — с более долгой паузой); капча, не решённая за минуту, перезагружает страницу; снятые и зависшие страницы отмечает промахом с причиной
 // @match        https://krisha.kz/a/show/*
 // @run-at       document-idle
 // @grant        none
@@ -178,17 +178,33 @@
     else miss("no_phone", "На странице нет кнопки с номером");
   }, GIVE_UP_MS);
 
-  // Капча показалась — ждём человека две минуты. Не дождались — captcha,
+  // Капча показалась — ждём человека минуту. Не дождались — перезагружаем
+  // страницу: капча иногда зависает, и свежая решается быстрее. Больше
+  // MAX_RELOADS раз подряд на одном объекте не перезагружаем — тогда captcha,
   // сервер даст объекту паузу и вернёт его позже.
-  var CAPTCHA_MS = 120000;
+  var CAPTCHA_MS = 60000;
+  var MAX_RELOADS = 2;
+  var RELOAD_KEY = "r365reload:" + ID;
   var captchaTimer = null;
+  function reloadsSoFar() {
+    try { return Number(sessionStorage.getItem(RELOAD_KEY)) || 0; } catch (e) { return 0; }
+  }
   function onCaptcha() {
     if (captchaSeen) return;
     captchaSeen = true;
     clearTimeout(giveUpTimer);
-    append("Капча — решите её, номер сохранится сам.");
+    var n = reloadsSoFar();
+    append("Капча — решите её, номер сохранится сам." + (n ? " (перезагрузка " + n + " из " + MAX_RELOADS + ")" : ""));
     captchaTimer = setTimeout(function () {
-      if (!done) miss("captcha", "Капча не решена за две минуты");
+      if (done) return;
+      if (n < MAX_RELOADS) {
+        try { sessionStorage.setItem(RELOAD_KEY, String(n + 1)); } catch (e) {}
+        append("Капча висит минуту — перезагружаю страницу (" + (n + 1) + " из " + MAX_RELOADS + ").");
+        location.reload();
+        return;
+      }
+      try { sessionStorage.removeItem(RELOAD_KEY); } catch (e) {}
+      miss("captcha", "Капча не решена за минуту и после " + MAX_RELOADS + " перезагрузок");
     }, CAPTCHA_MS);
   }
 
@@ -212,6 +228,7 @@
           return;
         }
         say("✓ Сохранено: " + r.j.phones.join(", "));
+        try { sessionStorage.removeItem(RELOAD_KEY); } catch (e) {}
         autoNext();
       })
       .catch(function () {
