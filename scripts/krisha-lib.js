@@ -739,7 +739,9 @@ const inBox = (c, b) =>
 // казахстанский порт из кабинета. refresh — сменить у него выходной IP (адрес
 // порта, логин и пароль не меняются, Chrome перенастраивать не нужно).
 // Пароль наружу не отдаём: он есть в кабинете Asocks.
-async function browserPort(refresh) {
+// check — заодно сходить через порт на api.ipify.org и вернуть выходной IP
+// (exitIp): так видно, что ротация действительно сменила адрес.
+async function browserPort(refresh, check) {
   const key = asocksKey();
   if (!key) return { ok: false, error: "no_proxy", hint: "на сервере нет ASOCKS_API_KEY" };
   const list = await asocksListPorts(key);
@@ -749,8 +751,17 @@ async function browserPort(refresh) {
   const id = p.id || p.portId || p.port_id;
   let rotated = false;
   if (refresh && id) rotated = await asocksRefreshPort(key, id).catch(() => false);
+  let exitIp = null, exitErr = null;
+  if (check) {
+    try {
+      const agent = new ProxyAgent(formatAsocksPort(p));
+      const r = await undiciFetch("https://api.ipify.org?format=json", { dispatcher: agent, signal: AbortSignal.timeout(20000) });
+      exitIp = ((await r.json().catch(() => null)) || {}).ip || null;
+      agent.close().catch(() => {});
+    } catch (e) { exitErr = String(e.message).slice(0, 120); }
+  }
   return {
-    ok: true, rotated: rotated,
+    ok: true, rotated: rotated, exitIp: exitIp, exitErr: exitErr,
     port: { id: id, name: p.name || null, country: p.countryName || p.country_code || p.country || null,
             proxy: portHostPort(p) || null, login: portAuth(p).login || null },
   };

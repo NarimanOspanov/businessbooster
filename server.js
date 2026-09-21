@@ -7084,12 +7084,14 @@ http
       if (urlPath === "/api/krisha/objphone/rotate") {
         const K = require("./scripts/krisha-lib.js");
         (async () => {
-          if (req.method === "GET") return send(200, Object.assign({ at: new Date().toISOString() }, await K.browserPort(false)));
+          // ?check=1 — заодно показать выходной IP порта (запрос через прокси на api.ipify.org).
+          const check = parsed.searchParams.get("check") === "1";
+          if (req.method === "GET") return send(200, Object.assign({ at: new Date().toISOString() }, await K.browserPort(false, check)));
           if (req.method !== "POST") return send(405, { ok: false, error: "only POST" });
           const since = Date.now() - rotateLastAt;
           if (since < 5000) return send(200, { ok: true, rotated: false, throttled: true, waitMs: 5000 - since, at: new Date(rotateLastAt).toISOString() });
           rotateLastAt = Date.now();
-          const r = await K.browserPort(true);
+          const r = await K.browserPort(true, check);
           if (r.ok) console.log("[objphone] IP порта " + (r.port && r.port.id) + (r.rotated ? " сменён" : " не сменился"));
           return send(r.ok ? 200 : 503, Object.assign({ at: new Date().toISOString() }, r));
         })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
