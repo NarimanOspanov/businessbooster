@@ -1738,6 +1738,7 @@ const agentDidsCache = { at: 0, set: null };
 const objphoneCounts = new Map();
 let phoneQueueCache = null; // размер очереди для /api/krisha/objphone/count, живёт минуту
 const rotateLastAt = new Map(); // порт → когда последний раз меняли его IP (/api/krisha/objphone/rotate)
+const objphoneLastBySrc = new Map(); // метка клиента → номера из его предыдущей отправки (фильтр прилипших)
 const listDashCache = { at: 0, body: null };
 let freshRunning = false;
 let matchListRunning = false;
@@ -7251,9 +7252,22 @@ http
         }
 
         if (!phones.length) return send(400, { ok: false, error: "номер не разобрал" });
-        const merged = await db.addListPhones(id, phones);
-        console.log("[objphone] " + id + ": +" + phones.length + " (итого " + merged.length + ")");
-        return send(200, { ok: true, id: id, phones: merged.map(pretty) });
+        // src — метка клиента (телефон с Tasker). Приложение Крыши держит в
+        // шторке телефонов номера предыдущего объявления, пока их не вытеснит
+        // следующее с таким же числом номеров; свой номер всегда первый.
+        // Поэтому от клиента с меткой выбрасываем всё, кроме первого, что было
+        // и в его предыдущей отправке. Без метки (браузер) ничего не режем.
+        const src = String(body.src || parsed.searchParams.get("src") || "").slice(0, 40);
+        let kept = phones, dropped = [];
+        if (src) {
+          const prev = objphoneLastBySrc.get(src) || new Set();
+          kept = phones.filter((p, i) => i === 0 || !prev.has(p));
+          dropped = phones.filter((p) => !kept.includes(p));
+          objphoneLastBySrc.set(src, new Set(phones));
+        }
+        const merged = await db.addListPhones(id, kept);
+        console.log("[objphone] " + id + ": +" + kept.length + (dropped.length ? " (отброшено как прилипшие: " + dropped.length + ")" : "") + " (итого " + merged.length + ")");
+        return send(200, { ok: true, id: id, phones: merged.map(pretty), dropped: dropped.map(pretty) });
       })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
       return;
     }
