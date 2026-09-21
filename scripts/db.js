@@ -2032,6 +2032,13 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_withphone' AND o
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_phonemiss' AND object_id = OBJECT_ID('dbo.krisha_list'))
   EXEC('CREATE INDEX IX_klist_phonemiss ON dbo.krisha_list (phone_state)
         WHERE phones IS NULL AND phone_state IS NOT NULL');
+-- Аренда объекта очередью: выданное плагину объявление помечается «в работе
+-- до …», и другие вкладки его не получают. Снимается при сохранении номера
+-- и промахе; брошенная вкладка — истекает сама.
+IF COL_LENGTH('dbo.krisha_list', 'phone_lease_until') IS NULL ALTER TABLE dbo.krisha_list ADD phone_lease_until DATETIME2(0) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_lease' AND object_id = OBJECT_ID('dbo.krisha_list'))
+  EXEC('CREATE INDEX IX_klist_lease ON dbo.krisha_list (phone_lease_until)
+        WHERE phone_lease_until IS NOT NULL');
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_tosearch2' AND object_id = OBJECT_ID('dbo.krisha_list'))
   EXEC('CREATE INDEX IX_klist_tosearch2 ON dbo.krisha_list (first_seen DESC)
         INCLUDE (user_type, area, complex_id, lat)
@@ -2180,9 +2187,14 @@ async function saveListAdvert(o, sweepNo) {
 // минуту; счётчики кэширует вызывающий.
 // deal/prop/city — фильтры; null — без фильтра. Город хранится латиницей
 // («almaty»), как его отдаёт разбор списка карты.
-async function nextListOwnerWithoutPhone(since, deal, prop, city, withCounts) {
+// leaseSec > 0 — выданный объект арендуется на столько секунд: одним
+// оператором UPDATE … OUTPUT с UPDLOCK/READPAST, чтобы сто вкладок разом не
+// получили одно и то же объявление. 0 — просто посмотреть, без аренды.
+async function nextListOwnerWithoutPhone(since, deal, prop, city, withCounts, leaseSec) {
   const pool = await getPool();
   await ensureList(pool);
+  const lease = Math.max(0, Math.min(900, Number(leaseSec) || 0));
+  const free = "(phone_lease_until IS NULL OR phone_lease_until <= SYSUTCDATETIME())";
   const ready = `user_type = 'owner' AND storage = 'live' AND phones IS NULL
         AND first_seen >= @since
         AND (@deal IS NULL OR deal = @deal) AND (@prop IS NULL OR prop = @prop)
@@ -2194,23 +2206,38 @@ async function nextListOwnerWithoutPhone(since, deal, prop, city, withCounts) {
     .input("since", sql.DateTime2, new Date(since))
     .input("deal", sql.NVarChar(10), deal || null)
     .input("prop", sql.NVarChar(20), prop || null)
-    .input("city", sql.NVarChar(40), city || null);
-  const r = await req().query(`
-      SELECT TOP (1) id, title, deal, prop, city, user_type, price, storage, first_seen, bumped_on, phone_tries, phone_state
+    .input("city", sql.NVarChar(40), city || null)
+    .input("lease", sql.Int, lease);
+  const cols = "id, title, deal, prop, city, user_type, price, storage, first_seen, bumped_on, phone_tries, phone_state, phone_lease_until";
+  const r = lease > 0
+    ? await req().query(`
+      WITH c AS (
+        SELECT TOP (1) ${cols}
+        FROM dbo.krisha_list WITH (UPDLOCK, READPAST, ROWLOCK)
+        WHERE ${ready} AND ${now} AND ${free}
+        ORDER BY first_seen DESC)
+      UPDATE c SET phone_lease_until = DATEADD(second, @lease, SYSUTCDATETIME())
+      OUTPUT ${cols.split(", ").map((x) => "INSERTED." + x).join(", ")}
+      OPTION (RECOMPILE)`)
+    : await req().query(`
+      SELECT TOP (1) ${cols}
       FROM dbo.krisha_list
-      WHERE ${ready} AND ${now}
+      WHERE ${ready} AND ${now} AND ${free}
       ORDER BY first_seen DESC
       OPTION (RECOMPILE)`);
   // Без «, id DESC» в ORDER BY: с ним оптимизатор сортировал все 200 тысяч
   // подходящих строк ради одной, по 10 секунд на вызов; порядок внутри одной
   // секунды нам безразличен. RECOMPILE — чтобы @deal/@prop IS NULL стали
   // константами и план шёл по фильтрованному индексу.
-  if (withCounts === false) return { row: r.recordset[0] || null, left: null, waiting: null };
+  if (withCounts === false) return { row: r.recordset[0] || null, left: null, waiting: null, inWork: null };
   const c = (await req().query(`SELECT
               SUM(CASE WHEN ${now} THEN 1 ELSE 0 END) AS ready,
               SUM(CASE WHEN ${now} THEN 0 ELSE 1 END) AS waiting
             FROM dbo.krisha_list WHERE ${ready}`)).recordset[0];
-  return { row: r.recordset[0] || null, left: c.ready || 0, waiting: c.waiting || 0 };
+  // Сколько сейчас в работе у вкладок — по маленькому индексу аренды.
+  const w = (await pool.request().query(`SELECT COUNT(*) AS n FROM dbo.krisha_list
+            WHERE phone_lease_until IS NOT NULL AND phone_lease_until > SYSUTCDATETIME()`)).recordset[0];
+  return { row: r.recordset[0] || null, left: c.ready || 0, waiting: c.waiting || 0, inWork: w.n || 0 };
 }
 
 async function markListPhoneMiss(id, reason) {
@@ -2225,7 +2252,7 @@ async function markListPhoneMiss(id, reason) {
     .query(`
       UPDATE dbo.krisha_list
       SET phone_tries = ISNULL(phone_tries, 0) + 1,
-          phone_state = @st,
+          phone_state = @st, phone_lease_until = NULL,
           phone_next_at = CASE WHEN @min > 0
             THEN DATEADD(minute, @min * (ISNULL(phone_tries, 0) + 1), SYSUTCDATETIME())
             ELSE NULL END
@@ -2256,7 +2283,7 @@ async function addListPhones(id, phones) {
     .input("ph", sql.NVarChar(300), merged.length ? merged.join(",") : null)
     .query(`UPDATE dbo.krisha_list
             SET phones = @ph, phones_at = SYSUTCDATETIME(),
-                phone_state = CASE WHEN @ph IS NULL THEN NULL ELSE 'ok' END, phone_next_at = NULL
+                phone_state = CASE WHEN @ph IS NULL THEN NULL ELSE 'ok' END, phone_next_at = NULL, phone_lease_until = NULL
             WHERE id = @id`);
   return merged;
 }
@@ -2271,7 +2298,7 @@ async function setListPhones(id, phones) {
     .input("ph", sql.NVarChar(300), clean.length ? clean.join(",") : null)
     .query(`UPDATE dbo.krisha_list
             SET phones = @ph, phones_at = SYSUTCDATETIME(),
-                phone_state = CASE WHEN @ph IS NULL THEN NULL ELSE 'ok' END, phone_next_at = NULL
+                phone_state = CASE WHEN @ph IS NULL THEN NULL ELSE 'ok' END, phone_next_at = NULL, phone_lease_until = NULL
             WHERE id = @id`);
   return clean;
 }
