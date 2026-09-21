@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reception365 · телефоны с Крыши
 // @namespace    https://saudager.ai/
-// @version      3.2
+// @version      3.3
 // @description  Берёт из очереди следующий объект без номера, сама жмёт «показать телефон», сохраняет номер, меняет IP прокси и едет дальше сама; в фоновой вкладке ждёт, пока её откроют; капча, не решённая за минуту, перезагружает страницу; снятые и зависшие страницы отмечает промахом с причиной
 // @match        https://krisha.kz/a/show/*
 // @run-at       document-idle
@@ -69,11 +69,14 @@
   // Секундомер: сколько секунд страница открыта (от начала загрузки, не от
   // запуска скрипта). Наглядно видно, когда ждать перезагрузку или промах.
   function openedSec() { return Math.floor(performance.now() / 1000); }
+  // Версия в панели — чтобы было видно, что Tampermonkey подтянул обновление.
+  // Держать в одном значении с @version в заголовке.
+  var VERSION = "3.3";
   var status = "";
   function say(html) {
     status = html;
     box.innerHTML = html +
-      '<div style="margin-top:8px;font-size:12px;color:#aaa">очередь ' +
+      '<div style="margin-top:8px;font-size:12px;color:#aaa"><b style="color:#ddd">v' + VERSION + '</b> · очередь ' +
       (SINCE ? "с " + SINCE : "за неделю") +
       ' · <a href="#" id="r365-since" style="color:#6fb2f0">с даты</a>' +
       ' · <span id="r365-clock" style="font-variant-numeric:tabular-nums">' + openedSec() + ' с</span></div>';
