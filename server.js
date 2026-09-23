@@ -7174,15 +7174,17 @@ http
           // since — последняя неделя. deal/prop — необязательные фильтры.
           // Курсор клиенту вести не нужно: объект с номером (или выбывший по
           // промахам) сам выпадает из очереди.
-          // since — дата YYYY-MM-DD или «последние N дней»: since=3d (окно
-          // едет вместе с календарём, клиенту менять ничего не нужно).
-          let sinceRaw = parsed.searchParams.get("since");
-          const daysM = sinceRaw && /^(\d{1,3})d$/i.exec(sinceRaw.trim());
+          // since — нижняя граница по дате попадания в базу: YYYY-MM-DD,
+          // «последние N дней» (3d) или all — без окна. По умолчанию all:
+          // новые всегда первыми, а когда новых нет, очередь идёт в старые.
+          let sinceRaw = (parsed.searchParams.get("since") || "").trim();
+          const daysM = /^(\d{1,3})d$/i.exec(sinceRaw);
           if (daysM) sinceRaw = day(Date.now() - Number(daysM[1]) * 86400e3);
-          if (sinceRaw && (!/^\d{4}-\d{2}-\d{2}$/.test(sinceRaw) || isNaN(Date.parse(sinceRaw)))) {
-            return send(400, { ok: false, error: "since: нужна дата YYYY-MM-DD или Nd (например 3d)" });
+          if (!sinceRaw || /^all$/i.test(sinceRaw)) sinceRaw = "2000-01-01";
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(sinceRaw) || isNaN(Date.parse(sinceRaw))) {
+            return send(400, { ok: false, error: "since: дата YYYY-MM-DD, Nd (например 3d) или all" });
           }
-          const since = sinceRaw || day(Date.now() - 7 * 86400e3);
+          const since = sinceRaw;
           // По умолчанию очередь — продажа квартир в Алматы: аренду, дома,
           // коммерцию и другие города плагин не снимает. Снять фильтр можно
           // значением any (deal=any, prop=any, city=any).
