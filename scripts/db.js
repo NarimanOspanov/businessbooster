@@ -2274,6 +2274,81 @@ IF OBJECT_ID('dbo.objphone_debug', 'U') IS NULL
     .query("INSERT INTO dbo.objphone_debug (id, src, text) VALUES (@id, @src, @t); DELETE FROM dbo.objphone_debug WHERE at < DATEADD(day, -7, SYSUTCDATETIME())");
 }
 
+// --- Лиды для агента: хозяева с номером и свежим сигналом -------------------
+// Сигналы: новое (first_seen в окне), поднятие, снижение цены, возврат из
+// архива. Статус обзвона — в krisha_leads (одна строка на объявление).
+let leadsReady = false;
+async function ensureLeads(pool) {
+  if (leadsReady) return;
+  await pool.request().batch(`
+IF OBJECT_ID('dbo.krisha_leads', 'U') IS NULL
+  CREATE TABLE dbo.krisha_leads (
+    id BIGINT NOT NULL PRIMARY KEY, status NVARCHAR(20) NULL, note NVARCHAR(400) NULL,
+    updated_at DATETIME2(0) NOT NULL CONSTRAINT DF_kleads_upd DEFAULT SYSUTCDATETIME());`);
+  leadsReady = true;
+}
+
+async function leadsList(f) {
+  const pool = await getPool();
+  await ensureList(pool);
+  await ensureLeads(pool);
+  const hours = Math.max(1, Math.min(24 * 30, Number(f.hours) || 72));
+  const since = new Date(Date.now() - hours * 3600e3);
+  const nul = (v) => (v == null || v === "" || v === "any" ? null : v);
+  const r = await pool.request()
+    .input("since", sql.DateTime2, since)
+    .input("n", sql.Int, Math.max(1, Math.min(500, Number(f.limit) || 200)))
+    .input("city", sql.NVarChar(40), nul(f.city))
+    .input("deal", sql.NVarChar(10), nul(f.deal))
+    .input("prop", sql.NVarChar(20), nul(f.prop))
+    .input("rooms", sql.Int, nul(f.rooms) == null ? null : Number(f.rooms))
+    .input("pmin", sql.BigInt, nul(f.pmin) == null ? null : Number(f.pmin))
+    .input("pmax", sql.BigInt, nul(f.pmax) == null ? null : Number(f.pmax))
+    .input("signal", sql.NVarChar(10), f.signal || "all")
+    .input("status", sql.NVarChar(20), f.status || "open")
+    .query(`
+    SELECT TOP (@n) l.id, l.deal, l.prop, l.city, l.price, l.rooms, l.area, l.floor, l.floors, l.title, l.addr, l.owner_name,
+      l.photos_c, l.photos_json, l.first_seen, l.bumped_on, l.phones, l.phones_at,
+      ev.last_bump, ev.bumps, pr.last_price_at, pr.old_price, pr.new_price, bk.last_back,
+      (SELECT COUNT(*) FROM dbo.krisha_list_matches m WHERE m.owner_id = l.id AND m.photo_match = 1) AS agents,
+      s.status, s.note, s.updated_at AS status_at,
+      (SELECT MAX(v) FROM (VALUES (CASE WHEN l.first_seen >= @since THEN l.first_seen END), (ev.last_bump), (pr.last_price_at), (bk.last_back)) AS t(v)) AS sig
+    FROM dbo.krisha_list l
+    OUTER APPLY (SELECT MAX(at) AS last_bump, COUNT(*) AS bumps FROM dbo.krisha_list_events e WHERE e.id = l.id AND e.kind = 'bump' AND e.at >= @since) ev
+    OUTER APPLY (SELECT TOP (1) at AS last_price_at, old_price, new_price FROM dbo.krisha_list_events e WHERE e.id = l.id AND e.kind = 'price' AND e.at >= @since ORDER BY at DESC) pr
+    OUTER APPLY (SELECT MAX(at) AS last_back FROM dbo.krisha_list_events e WHERE e.id = l.id AND e.kind = 'back' AND e.at >= @since) bk
+    LEFT JOIN dbo.krisha_leads s ON s.id = l.id
+    WHERE l.user_type = 'owner' AND l.storage = 'live' AND l.phones IS NOT NULL
+      AND (@city IS NULL OR l.city = @city) AND (@deal IS NULL OR l.deal = @deal) AND (@prop IS NULL OR l.prop = @prop)
+      AND (@rooms IS NULL OR l.rooms = @rooms) AND (@pmin IS NULL OR l.price >= @pmin) AND (@pmax IS NULL OR l.price <= @pmax)
+      AND (l.first_seen >= @since OR EXISTS (SELECT 1 FROM dbo.krisha_list_events e WHERE e.id = l.id AND e.at >= @since AND e.kind IN ('bump','price','back')))
+      AND (@signal = 'all'
+        OR (@signal = 'new' AND l.first_seen >= @since)
+        OR (@signal = 'bump' AND ev.last_bump IS NOT NULL)
+        OR (@signal = 'price' AND pr.new_price < pr.old_price)
+        OR (@signal = 'back' AND bk.last_back IS NOT NULL))
+      AND (@status = 'all' OR (@status = 'open' AND (s.status IS NULL OR s.status = 'callback')) OR s.status = @status)
+    ORDER BY sig DESC
+    OPTION (RECOMPILE)`);
+  return r.recordset.map((x) => {
+    const o = Object.assign({}, x, { photos: listPhotoUrls(x.photos_c, x.photos_json).slice(0, 3), phones: rawList(x.phones) });
+    delete o.photos_c; delete o.photos_json;
+    return o;
+  });
+}
+
+async function leadSetStatus(id, status, note) {
+  const pool = await getPool();
+  await ensureLeads(pool);
+  const st = ["called", "callback", "refused", "deal"].includes(status) ? status : null;
+  await pool.request().input("id", sql.BigInt, Number(id)).input("st", sql.NVarChar(20), st)
+    .input("note", sql.NVarChar(400), note ? String(note).slice(0, 400) : null).query(`
+    MERGE dbo.krisha_leads AS t USING (SELECT @id AS id) AS s ON t.id = s.id
+    WHEN MATCHED THEN UPDATE SET status = @st, note = COALESCE(@note, t.note), updated_at = SYSUTCDATETIME()
+    WHEN NOT MATCHED THEN INSERT (id, status, note) VALUES (@id, @st, @note);`);
+  return st;
+}
+
 // Снятые объявления. Список карты показывает только живые, поэтому «снято»
 // узнаётся по отсутствию: чего не было два полных круга подряд (круг — час
 // с небольшим), помечаем storage = archived и пишем событие. Появится снова —
@@ -3345,7 +3420,7 @@ async function objectStats() {
 module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
-  saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList,
+  saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
   listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory,

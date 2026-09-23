@@ -907,6 +907,125 @@ fetch("/api/krisha/stats?data=1&key="+encodeURIComponent(KEY)).then(function(r){
 // --- Те же две страницы, но поверх списка карты (krisha_list) ----------------
 // Мониторинг находок по списку: у кандидатов нет года/типа дома/санузла и
 // улицы, зато есть адрес текстом, состояние (архив) и номер.
+// Лиды для агента: хозяева с номером и свежим сигналом (новое, поднятие,
+// снижение цены, возврат из архива), фильтры и статус обзвона.
+const KRISHA_LEADS_HTML = `<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Крыша · лиды хозяев</title>
+<style>
+  :root{--bg:#0f1216;--card:#181d24;--line:#262d37;--fg:#e6e9ee;--mut:#8a95a5;--ok:#2fbf71;--no:#e5484d;--acc:#4c8dff;--warn:#f5a524}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:16px}
+  h1{font-size:18px;margin:0 0 12px}
+  .mut{color:var(--mut)}
+  a{color:var(--acc);text-decoration:none}
+  .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 14px}
+  select,input{border:1px solid var(--line);background:#12161c;color:var(--fg);border-radius:8px;padding:7px 10px;font:inherit}
+  input.num{width:110px}
+  button{border:1px solid var(--line);background:#12161c;color:var(--fg);border-radius:8px;padding:7px 12px;cursor:pointer;font:inherit}
+  button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:0 0 10px;display:grid;grid-template-columns:150px 1fr;gap:12px}
+  @media(max-width:640px){.card{grid-template-columns:1fr}}
+  .photos{display:flex;gap:4px;flex-wrap:wrap}
+  .photos img{width:150px;height:100px;border-radius:6px;object-fit:cover;background:#222}
+  .title{font-weight:600;font-size:15px}
+  .price{font-weight:700;font-size:16px;margin-left:8px}
+  .tag{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;margin-right:6px}
+  .tag.new{background:rgba(76,141,255,.18);color:var(--acc)}
+  .tag.bump{background:rgba(245,165,36,.18);color:var(--warn)}
+  .tag.cut{background:rgba(47,191,113,.18);color:var(--ok)}
+  .tag.up{background:rgba(229,72,77,.18);color:var(--no)}
+  .tag.back{background:rgba(138,149,165,.2);color:var(--fg)}
+  .tag.ag{background:rgba(229,72,77,.15);color:var(--no)}
+  .phones a{font-size:16px;font-weight:600;margin-right:12px}
+  .row{margin:3px 0}
+  .st{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px}
+  .st button{padding:5px 10px;font-size:13px}
+  .st button.called.on{background:#3a4a5f;border-color:#3a4a5f}
+  .st button.callback.on{background:var(--warn);border-color:var(--warn);color:#1a1200}
+  .st button.refused.on{background:var(--no);border-color:var(--no);color:#1a0405}
+  .st button.deal.on{background:var(--ok);border-color:var(--ok);color:#04140b}
+  .st input{flex:1;min-width:160px}
+  .empty{padding:30px;text-align:center;color:var(--mut)}
+</style></head><body>
+<h1>Крыша · лиды хозяев <span id="cnt" class="mut"></span></h1>
+<div class="bar">
+  <select id="city"><option value="almaty">Алматы</option><option value="astana">Астана</option><option value="shymkent">Шымкент</option><option value="any">все города</option></select>
+  <select id="deal"><option value="sale">продажа</option><option value="rent">аренда</option><option value="any">любая</option></select>
+  <select id="prop"><option value="flat">квартиры</option><option value="house">дома</option><option value="commercial">коммерция</option><option value="land">участки</option><option value="any">всё</option></select>
+  <select id="rooms"><option value="any">комнат: любые</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4+</option></select>
+  <input class="num" id="pmin" placeholder="цена от, млн" inputmode="numeric">
+  <input class="num" id="pmax" placeholder="цена до, млн" inputmode="numeric">
+  <select id="hours"><option value="24">за сутки</option><option value="72" selected>за 3 дня</option><option value="168">за неделю</option><option value="720">за месяц</option></select>
+  <select id="signal"><option value="all">любой сигнал</option><option value="new">новые</option><option value="bump">подняли</option><option value="price">снизили цену</option><option value="back">вернули из архива</option></select>
+  <select id="status"><option value="open">не обзвонены</option><option value="called">звонил</option><option value="callback">перезвонить</option><option value="refused">отказ</option><option value="deal">договор</option><option value="all">все</option></select>
+  <button id="go" class="on">Показать</button>
+</div>
+<div id="list" class="mut">загрузка…</div>
+<script>
+var KEY = new URLSearchParams(location.search).get("key") || "";
+var API = "/api/krisha/leads?key=" + encodeURIComponent(KEY);
+function esc(s){s=(s==null?"":String(s));return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function money(n){return n?Math.round(n).toLocaleString("ru-RU")+" ₸":"";}
+function pad2(n){return ("0"+n).slice(-2);}
+function dmT(v){if(!v)return "";var d=new Date(new Date(v).getTime()+5*3600e3);if(isNaN(d))return "";return pad2(d.getUTCDate())+"."+pad2(d.getUTCMonth()+1)+" "+pad2(d.getUTCHours())+":"+pad2(d.getUTCMinutes());}
+function ago(v){if(!v)return "";var m=Math.round((Date.now()-new Date(v).getTime())/60000);if(m<60)return m+" мин назад";var h=Math.round(m/60);if(h<48)return h+" ч назад";return Math.round(h/24)+" дн назад";}
+function pretty(n){n=String(n);return n.length===11?"+"+n[0]+" "+n.slice(1,4)+" "+n.slice(4,7)+" "+n.slice(7,9)+" "+n.slice(9):n;}
+function days(v){return Math.max(0,Math.round((Date.now()-new Date(v).getTime())/864e5));}
+var F=["city","deal","prop","rooms","pmin","pmax","hours","signal","status"];
+function qs(){var p=[];F.forEach(function(k){var v=document.getElementById(k).value;if(v!==""&&v!=="any"){if(k==="pmin"||k==="pmax")v=Math.round(Number(v)*1e6);p.push(k+"="+encodeURIComponent(v));}});return p.join("&");}
+function load(){
+  try{F.forEach(function(k){localStorage.setItem("leads:"+k,document.getElementById(k).value);});}catch(e){}
+  document.getElementById("list").innerHTML="<div class=mut>загрузка…</div>";
+  fetch(API+"&data=1&"+qs()).then(function(r){return r.json();}).then(render).catch(function(e){document.getElementById("list").innerHTML="<div class=empty>ошибка: "+esc(e.message)+"</div>";});
+}
+function tags(x){var t=[];
+  var h=Number(document.getElementById("hours").value)||72;
+  if(x.first_seen&&Date.now()-new Date(x.first_seen).getTime()<h*3600e3)t.push("<span class='tag new'>новое · "+ago(x.first_seen)+"</span>");
+  if(x.last_bump)t.push("<span class='tag bump'>подняли"+(x.bumps>1?" ×"+x.bumps:"")+" · "+ago(x.last_bump)+"</span>");
+  if(x.last_price_at&&x.old_price&&x.new_price){var cut=x.new_price<x.old_price;var pct=Math.round(Math.abs(x.new_price-x.old_price)/x.old_price*100);t.push("<span class='tag "+(cut?"cut":"up")+"'>"+(cut?"снизили":"подняли цену")+" "+money(x.old_price)+" → "+money(x.new_price)+" ("+pct+"%) · "+ago(x.last_price_at)+"</span>");}
+  if(x.last_back)t.push("<span class='tag back'>вернули из архива · "+ago(x.last_back)+"</span>");
+  if(x.agents)t.push("<span class='tag ag'>агентов уже "+x.agents+"</span>");
+  return t.join("");}
+function render(rows){
+  document.getElementById("cnt").textContent="· "+rows.length;
+  if(!rows.length){document.getElementById("list").innerHTML="<div class=empty>по этим фильтрам пусто</div>";return;}
+  var h="";
+  rows.forEach(function(x){
+    var ph=(x.phones||[]).map(function(n){return "<a href='tel:+"+esc(n)+"'>"+esc(pretty(n))+"</a>";}).join("");
+    var par=[x.rooms?x.rooms+"-комн":"",x.area?x.area+" м²":"",x.floor&&x.floors?x.floor+"/"+x.floors+" эт":""].filter(Boolean).join(" · ");
+    h+="<div class=card data-id='"+x.id+"'>"+
+      "<div class=photos>"+(x.photos&&x.photos.length?"<img loading=lazy src='"+esc(x.photos[0])+"'>":"<div class=mut>нет фото</div>")+"</div>"+
+      "<div>"+
+        "<div><span class=title>"+esc(x.title||par)+"</span><span class=price>"+money(x.price)+"</span></div>"+
+        "<div class=row>"+tags(x)+"</div>"+
+        "<div class='row mut'>"+esc(x.addr||"")+(x.addr?" · ":"")+esc(x.city||"")+" · на рынке "+days(x.first_seen)+" дн · <a target=_blank href='https://krisha.kz/a/show/"+x.id+"'>на Крыше</a></div>"+
+        "<div class='row phones'>"+(x.owner_name?"<span class=mut>"+esc(x.owner_name)+" · </span>":"")+ph+"</div>"+
+        "<div class=st>"+
+          ["called|звонил","callback|перезвонить","refused|отказ","deal|договор"].map(function(s){var p=s.split("|");return "<button class='"+p[0]+(x.status===p[0]?" on":"")+"' onclick='setSt("+x.id+",\""+p[0]+"\",this)'>"+p[1]+"</button>";}).join("")+
+          "<input placeholder='заметка' value='"+esc(x.note||"")+"' onchange='setSt("+x.id+",null,this)'>"+
+          (x.status_at?"<span class=mut>"+dmT(x.status_at)+"</span>":"")+
+        "</div>"+
+      "</div></div>";
+  });
+  document.getElementById("list").innerHTML=h;
+}
+function setSt(id,status,el){
+  var card=el.closest(".card");var note=card.querySelector("input").value;
+  var cur=card.querySelector(".st button.on");
+  if(status&&cur&&cur.classList.contains(status))status="clear";
+  var st=status||(cur?cur.className.split(" ")[0]:"");
+  fetch(API+"&set="+id+"&status="+encodeURIComponent(status==="clear"?"":st)+"&note="+encodeURIComponent(note)).then(function(r){return r.json();}).then(function(){
+    if(status){card.querySelectorAll(".st button").forEach(function(b){b.classList.remove("on");});if(status!=="clear")el.classList.add("on");}
+  });
+}
+try{F.forEach(function(k){var v=localStorage.getItem("leads:"+k);if(v!=null)document.getElementById(k).value=v;});}catch(e){}
+document.getElementById("go").onclick=load;
+F.forEach(function(k){document.getElementById(k).addEventListener("change",load);});
+load();
+</script></body></html>`;
+
 const KRISHA_LIST_MONITOR_HTML = KRISHA_MONITOR_HTML
   .replace("<title>Крыша · мониторинг находок</title>", "<title>Крыша · находки по списку</title>")
   .replace("<h1>Крыша · мониторинг находок «агент → хозяин»</h1>", "<h1>Крыша · находки по списку «агент → хозяин»</h1>")
@@ -6736,6 +6855,31 @@ http
       }
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
       res.end(KRISHA_LIST_STATS_HTML);
+      return;
+    }
+
+    // Лиды хозяев для обзвона: страница, ?data=1 — JSON по фильтрам,
+    // ?set=<id>&status=&note= — статус обзвона.
+    if (urlPath === "/api/krisha/leads") {
+      const q = parsed.searchParams;
+      const key = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
+      if (!key || q.get("key") !== key) { res.writeHead(403); res.end("bad key"); return; }
+      const sendJ = (code, obj) => { res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); };
+      if (q.get("set")) {
+        db.leadSetStatus(q.get("set"), q.get("status") || "", q.get("note") || "")
+          .then((st) => sendJ(200, { ok: true, id: q.get("set"), status: st }))
+          .catch((e) => sendJ(500, { ok: false, error: String(e.message).slice(0, 200) }));
+        return;
+      }
+      if (q.get("data")) {
+        const f = {};
+        for (const k of ["city", "deal", "prop", "rooms", "pmin", "pmax", "hours", "signal", "status", "limit"]) f[k] = q.get(k);
+        db.leadsList(f).then((rows) => sendJ(200, rows))
+          .catch((e) => sendJ(500, { ok: false, error: String(e.message).slice(0, 200) }));
+        return;
+      }
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+      res.end(KRISHA_LEADS_HTML);
       return;
     }
 
