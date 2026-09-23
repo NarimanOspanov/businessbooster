@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reception365 · телефоны с Крыши
 // @namespace    https://saudager.ai/
-// @version      4.1
+// @version      4.2
 // @description  Берёт из очереди следующий объект без номера, сама жмёт «показать телефон», сохраняет номер, меняет IP прокси и едет дальше сама; в фоновой вкладке ждёт, пока её откроют; капча, не решённая за минуту, перезагружает страницу; снятые и зависшие страницы отмечает промахом с причиной
 // @match        https://krisha.kz/a/show/*
 // @run-at       document-idle
@@ -65,10 +65,10 @@
   }
   var SINCE = localStorage.getItem("r365since") || "";
   function askSince() {
-    var s = prompt("С какой даты публикации брать объекты (YYYY-MM-DD, пусто — последняя неделя):", SINCE);
+    var s = prompt("С какой даты брать объекты (YYYY-MM-DD или 3d — последние 3 дня; пусто — без окна, новые первыми):", SINCE);
     if (s === null) return;
     s = s.trim();
-    if (s && !/^\d{4}-\d{2}-\d{2}$/.test(s)) { alert("Нужна дата вида 2026-09-10"); return; }
+    if (s && !/^\d{4}-\d{2}-\d{2}$/.test(s) && !/^\d{1,3}d$/i.test(s)) { alert("Нужна дата вида 2026-09-10 или 3d"); return; }
     SINCE = s;
     if (s) localStorage.setItem("r365since", s); else localStorage.removeItem("r365since");
     say(status);
@@ -88,13 +88,13 @@
   function openedSec() { return Math.floor((workMs + (segStart === null ? 0 : Date.now() - segStart)) / 1000); }
   // Версия в панели — чтобы было видно, что Tampermonkey подтянул обновление.
   // Держать в одном значении с @version в заголовке.
-  var VERSION = "4.1";
+  var VERSION = "4.2";
   var status = "";
   function say(html) {
     status = html;
     box.innerHTML = html +
       '<div style="margin-top:8px;font-size:12px;color:#aaa"><b style="color:#ddd">v' + VERSION + '</b> · очередь ' +
-      (SINCE ? "с " + SINCE : "за неделю") +
+      (SINCE ? "с " + SINCE : "все, новые первыми") +
       ' · <a href="#" id="r365-since" style="color:#6fb2f0">с даты</a>' +
       ' · <a href="#" id="r365-port" style="color:#6fb2f0">порт ' + (PORT || "общий") + '</a>' +
       ' · <span id="r365-clock" style="font-variant-numeric:tabular-nums">' + openedSec() + ' с</span></div>';
