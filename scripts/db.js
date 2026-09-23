@@ -2274,11 +2274,44 @@ IF OBJECT_ID('dbo.objphone_debug', 'U') IS NULL
     .query("INSERT INTO dbo.objphone_debug (id, src, text) VALUES (@id, @src, @t); DELETE FROM dbo.objphone_debug WHERE at < DATEADD(day, -7, SYSUTCDATETIME())");
 }
 
+// Снятые объявления. Список карты показывает только живые, поэтому «снято»
+// узнаётся по отсутствию: чего не было два полных круга подряд (круг — час
+// с небольшим), помечаем storage = archived и пишем событие. Появится снова —
+// MERGE вернёт в live с событием back. Пачками по 5 000, чтобы не держать
+// одну длинную транзакцию: в первый раз таких десятки тысяч.
+async function archiveMissingList(sweepNo) {
+  const pool = await getPool();
+  await ensureList(pool);
+  const cutoff = Number(sweepNo) - 1; // не видели ни в круге N-1, ни в N
+  if (!(cutoff > 1)) return { archived: 0, cutoff: cutoff };
+  let total = 0;
+  for (let i = 0; i < 60; i++) {
+    const r = await pool.request().input("c", sql.Int, cutoff).input("s", sql.Int, Number(sweepNo)).query(`
+      DECLARE @ids TABLE (id BIGINT);
+      UPDATE TOP (5000) dbo.krisha_list SET storage = 'archived'
+        OUTPUT inserted.id INTO @ids
+        WHERE storage = 'live' AND (sweep_no IS NULL OR sweep_no < @c);
+      INSERT INTO dbo.krisha_list_events (id, kind, sweep_no) SELECT id, 'archived', @s FROM @ids;
+      SELECT COUNT(*) AS n FROM @ids`);
+    const n = r.recordset[0].n || 0;
+    total += n;
+    if (n < 5000) break;
+  }
+  return { archived: total, cutoff: cutoff };
+}
+
 async function markListPhoneMiss(id, reason) {
   const key = PHONE_MISS[reason] ? reason : "error";
   const rule = PHONE_MISS[key];
   const pool = await getPool();
   await ensureList(pool);
+  // Плагин или телефон увидели, что объявления нет: это и есть «снято».
+  if (key === "archived" || key === "not_found") {
+    await pool.request().input("id", sql.BigInt, Number(id)).query(`
+      DECLARE @ids TABLE (id BIGINT);
+      UPDATE dbo.krisha_list SET storage = 'archived' OUTPUT inserted.id INTO @ids WHERE id = @id AND storage = 'live';
+      INSERT INTO dbo.krisha_list_events (id, kind) SELECT id, 'archived' FROM @ids`).catch(() => {});
+  }
   const r = await pool.request()
     .input("id", sql.BigInt, Number(id))
     .input("st", sql.NVarChar(20), key)
@@ -3312,7 +3345,7 @@ async function objectStats() {
 module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
-  saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug,
+  saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
   listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory,

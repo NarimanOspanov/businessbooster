@@ -6074,7 +6074,17 @@ http
           await checkDbSpeed(false);
           if (pageGap) await sleep(pageGap);
         }
-        if (sweepDone) st.lastSweep = sweepDone;
+        if (sweepDone) {
+          st.lastSweep = sweepDone;
+          // Круг закрыт: чего не было два круга подряд — снято. В фоне, чтобы
+          // не задерживать ответ; итог в cursor.lastArchive.
+          const doneNo = sweepDone.sweepNo;
+          db.archiveMissingList(doneNo)
+            .then((a) => { KW.list.lastArchive = { sweepNo: doneNo, at: new Date().toISOString(), archived: a.archived }; saveKrisha();
+                           console.log("[scanlist] круг " + doneNo + ": снятыми помечено " + a.archived); })
+            .catch((e) => { KW.list.lastArchive = { sweepNo: doneNo, at: new Date().toISOString(), error: String(e.message).slice(0, 120) };
+                            console.log("[scanlist] пометка снятых не удалась: " + String(e.message).slice(0, 120)); });
+        }
         KW.list = st;
         saveKrisha();
         listRunning = false;
@@ -6089,6 +6099,7 @@ http
           cursor: { section: (L.SECTIONS[st.section] || L.SECTIONS[0]).label, page: st.page, sweepNo: st.sweepNo,
                     pagesThisSweep: st.pages, advertsThisSweep: st.adverts, startedAt: st.startedAt },
           lastSweep: st.lastSweep || null,
+          lastArchive: st.lastArchive || null,
         });
       })().catch((e) => {
         listRunning = false;
