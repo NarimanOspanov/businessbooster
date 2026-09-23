@@ -2356,18 +2356,32 @@ async function leadSetStatus(id, status, note) {
 // прилипший. Две защиты: при сохранении (dropKnownSticky) и регулярная
 // чистка свежих строк (cleanStickyPhones), потому что при сохранении номер
 // мог быть ещё неизвестен базе.
+// Множества «где-то первый» и «где-то не первый» строятся одним проходом по
+// строкам с номером (десятки тысяч) раз в пять минут; поиск LIKE по каждому
+// номеру был полным сканом таблицы на каждое сохранение.
+let stickyCache = { at: 0, firsts: new Set(), nonFirst: new Set() };
+async function stickySets(pool) {
+  if (Date.now() - stickyCache.at < 300e3) return stickyCache;
+  const r = await pool.request().query("SELECT phones FROM dbo.krisha_list WHERE phones IS NOT NULL");
+  const firsts = new Set(), nonFirst = new Set();
+  for (const x of r.recordset) {
+    const parts = String(x.phones).split(",");
+    firsts.add(parts[0]);
+    for (let i = 1; i < parts.length; i++) nonFirst.add(parts[i]);
+  }
+  stickyCache = { at: Date.now(), firsts: firsts, nonFirst: nonFirst };
+  return stickyCache;
+}
 async function dropKnownSticky(id, phones) {
   if (!phones || phones.length < 2) return { kept: phones || [], dropped: [] };
-  const pool = await getPool();
+  const c = await stickySets(await getPool());
   const kept = [phones[0]], dropped = [];
   for (const p of phones.slice(1)) {
-    const r = await pool.request().input("p", sql.NVarChar(20), p).input("id", sql.BigInt, Number(id)).query(`
-      SELECT TOP (1) CASE WHEN LEFT(phones, 11) = @p THEN 1 ELSE 0 END AS asfirst
-      FROM dbo.krisha_list WHERE id <> @id AND phones LIKE '%' + @p + '%'
-      ORDER BY asfirst DESC`);
-    const row = r.recordset[0];
-    if (!row || row.asfirst) kept.push(p); else dropped.push(p);
+    if (c.nonFirst.has(p) && !c.firsts.has(p)) dropped.push(p); else kept.push(p);
   }
+  // Эту отправку учитываем сразу: следующее объявление с тем же лишним номером его уже не пропустит.
+  c.firsts.add(phones[0]);
+  for (let i = 1; i < phones.length; i++) c.nonFirst.add(phones[i]);
   return { kept: kept, dropped: dropped };
 }
 
@@ -2400,7 +2414,10 @@ async function cleanStickyPhones(hours) {
 async function archiveMissingList(sweepNo) {
   const pool = await getPool();
   await ensureList(pool);
-  const cutoff = Number(sweepNo) - 1; // не видели ни в круге N-1, ни в N
+  // Три круга подряд и не меньше четырёх часов: поднятое во время круга
+  // объявление проскакивает мимо курсора, и два промаха подряд у ежедневно
+  // поднимаемых — обычное дело (половина «снятых» возвращалась через час).
+  const cutoff = Number(sweepNo) - 2; // не видели ни в N-2, ни в N-1, ни в N
   if (!(cutoff > 1)) return { archived: 0, cutoff: cutoff };
   let total = 0;
   for (let i = 0; i < 60; i++) {
@@ -2408,7 +2425,8 @@ async function archiveMissingList(sweepNo) {
       DECLARE @ids TABLE (id BIGINT);
       UPDATE TOP (5000) dbo.krisha_list SET storage = 'archived'
         OUTPUT inserted.id INTO @ids
-        WHERE storage = 'live' AND (sweep_no IS NULL OR sweep_no < @c);
+        WHERE storage = 'live' AND (sweep_no IS NULL OR sweep_no < @c)
+          AND last_seen < DATEADD(hour, -4, SYSUTCDATETIME());
       INSERT INTO dbo.krisha_list_events (id, kind, sweep_no) SELECT id, 'archived', @s FROM @ids;
       SELECT COUNT(*) AS n FROM @ids`);
     const n = r.recordset[0].n || 0;
