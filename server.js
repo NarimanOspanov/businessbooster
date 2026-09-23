@@ -909,6 +909,78 @@ fetch("/api/krisha/stats?data=1&key="+encodeURIComponent(KEY)).then(function(r){
 // улицы, зато есть адрес текстом, состояние (архив) и номер.
 // Лиды для агента: хозяева с номером и свежим сигналом (новое, поднятие,
 // снижение цены, возврат из архива), фильтры и статус обзвона.
+let consoleTotalCache = null; // итог «всего с номером» для консоли, раз в 30 с
+const KRISHA_CONSOLE_HTML = `<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Крыша · консоль номеров</title>
+<style>
+  :root{--bg:#0f1216;--card:#181d24;--line:#262d37;--fg:#e6e9ee;--mut:#8a95a5;--ok:#2fbf71;--no:#e5484d;--acc:#4c8dff;--warn:#f5a524}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:16px}
+  h1{font-size:18px;margin:0 0 10px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+  .mut{color:var(--mut)} a{color:var(--acc);text-decoration:none}
+  .live{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--ok);margin-right:6px;box-shadow:0 0 0 0 rgba(47,191,113,.6);animation:p 1.6s infinite}
+  .live.off{background:var(--no);animation:none}
+  @keyframes p{0%{box-shadow:0 0 0 0 rgba(47,191,113,.6)}70%{box-shadow:0 0 0 8px rgba(47,191,113,0)}100%{box-shadow:0 0 0 0 rgba(47,191,113,0)}}
+  .stats{display:flex;gap:16px;flex-wrap:wrap;margin:0 0 12px;font-size:13px}
+  .stats b{font-size:18px;font-variant-numeric:tabular-nums}
+  .clients{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+  .cl{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px}
+  .cl b{font-variant-numeric:tabular-nums}
+  table{border-collapse:collapse;width:100%}
+  th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;font-variant-numeric:tabular-nums}
+  th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em}
+  tr.new{animation:hl 2s}
+  @keyframes hl{from{background:rgba(47,191,113,.25)}to{background:transparent}}
+  .tag{display:inline-block;padding:1px 7px;border-radius:99px;font-size:12px}
+  .tag.save{background:rgba(47,191,113,.18);color:var(--ok)}
+  .tag.miss{background:rgba(245,165,36,.18);color:var(--warn)}
+  .tag.final{background:rgba(229,72,77,.18);color:var(--no)}
+  .tag.drop{background:rgba(138,149,165,.2);color:var(--mut)}
+  .ph{font-weight:600} .dr{color:var(--mut);text-decoration:line-through}
+  .src{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--mut)}
+  @media(max-width:640px){.hide{display:none}}
+</style></head><body>
+<h1><span><span id="dot" class="live"></span>Крыша · консоль номеров</span><span id="upd" class="mut"></span></h1>
+<div class="stats">
+  <div>за минуту <b id="m1">–</b></div>
+  <div>за 10 минут <b id="m10">–</b></div>
+  <div>за час <b id="h1">–</b></div>
+  <div>промахов за час <b id="miss1">–</b></div>
+  <div>всего с номером <b id="total">–</b></div>
+</div>
+<div id="clients" class="clients"></div>
+<table><thead><tr><th>время</th><th>событие</th><th>объявление</th><th>номера</th><th class="hide">клиент</th><th class="hide">IP</th></tr></thead>
+<tbody id="rows"></tbody></table>
+<script>
+var KEY = new URLSearchParams(location.search).get("key") || "";
+var API = "/api/krisha/objphone/console?key=" + encodeURIComponent(KEY);
+var last = 0, seen = {};
+function esc(s){s=(s==null?"":String(s));return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function pad2(n){return ("0"+n).slice(-2);}
+function t(v){var d=new Date(v);return pad2(d.getHours())+":"+pad2(d.getMinutes())+":"+pad2(d.getSeconds());}
+function pretty(n){n=String(n);return n.length===11?"+"+n[0]+" "+n.slice(1,4)+" "+n.slice(4,7)+" "+n.slice(7,9)+" "+n.slice(9):n;}
+function row(e){
+  var kind = e.kind==="save" ? "<span class='tag save'>номер</span>" : e.final ? "<span class='tag final'>"+esc(e.reason)+" · выбыл</span>" : "<span class='tag miss'>промах · "+esc(e.reason)+"</span>";
+  var ph = (e.kept||[]).map(function(n){return "<span class=ph>"+esc(pretty(n))+"</span>";}).concat((e.dropped||[]).map(function(n){return "<span class=dr title='отброшен как прилипший'>"+esc(pretty(n))+"</span>";})).join(", ");
+  if (e.kind==="save" && e.total>e.kept.length) ph += " <span class=mut>(всего "+e.total+")</span>";
+  return "<tr class=new><td>"+t(e.at)+"</td><td>"+kind+"</td><td><a target=_blank href='https://krisha.kz/a/show/"+e.id+"'>"+e.id+"</a>"+(e.title?" <span class=mut>"+esc(e.title)+"</span>":"")+"</td><td>"+ph+"</td><td class='hide src'>"+esc(e.src||"")+"</td><td class='hide src'>"+esc(e.ip||"")+"</td></tr>";
+}
+function tick(){
+  fetch(API+"&since="+last).then(function(r){return r.json();}).then(function(j){
+    document.getElementById("dot").className="live";
+    document.getElementById("upd").textContent="обновлено "+t(Date.now());
+    ["m1","m10","h1","miss1","total"].forEach(function(k){document.getElementById(k).textContent=j.stats[k]==null?"–":j.stats[k].toLocaleString("ru-RU");});
+    document.getElementById("clients").innerHTML=(j.clients||[]).map(function(c){return "<div class=cl>"+esc(c.src)+" <span class=mut>"+esc(c.ip||"")+"</span> · <b>"+c.n+"</b> за 10 мин · посл. "+t(c.last)+"</div>";}).join("");
+    var tb=document.getElementById("rows"); var html="";
+    (j.events||[]).forEach(function(e){ if(seen[e.n])return; seen[e.n]=1; html=row(e)+html; if(e.n>last)last=e.n; });
+    if(html){ tb.insertAdjacentHTML("afterbegin",html); while(tb.rows.length>300) tb.deleteRow(-1); }
+  }).catch(function(){ document.getElementById("dot").className="live off"; });
+}
+tick(); setInterval(tick, 2000);
+</script></body></html>`;
+
 const KRISHA_LEADS_HTML = `<!doctype html>
 <html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -1858,6 +1930,17 @@ const objphoneCounts = new Map();
 let phoneQueueCache = null; // размер очереди для /api/krisha/objphone/count, живёт минуту
 const rotateLastAt = new Map(); // порт → когда последний раз меняли его IP (/api/krisha/objphone/rotate)
 const objphoneLastBySrc = new Map(); // клиент (src или ip) → номера из его последних 30 отправок (фильтр прилипших)
+// Лента событий очереди для консоли (/api/krisha/objphone/console): последние
+// 500 сохранений и промахов с меткой клиента и адресом, откуда пришёл запрос.
+const objphoneFeed = [];
+let objphoneFeedNo = 0;
+function objphoneEvent(ev) {
+  ev.n = ++objphoneFeedNo; ev.at = Date.now();
+  objphoneFeed.push(ev); while (objphoneFeed.length > 500) objphoneFeed.shift();
+}
+function clientIp(req) {
+  return String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim().replace(/^::ffff:/, "").slice(0, 60);
+}
 const listDashCache = { at: 0, body: null };
 let freshRunning = false;
 let matchListRunning = false;
@@ -6861,6 +6944,43 @@ http
       return;
     }
 
+    // Консоль очереди: страница с живой лентой сохранений и промахов.
+    // ?since=<n> — события после номера n (JSON), плюс счётчики и клиенты.
+    if (urlPath === "/api/krisha/objphone/console") {
+      const q = parsed.searchParams;
+      const key = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
+      if (!key || q.get("key") !== key) { res.writeHead(403); res.end("bad key"); return; }
+      if (q.has("since")) {
+        const since = Number(q.get("since")) || 0;
+        const now = Date.now();
+        const events = objphoneFeed.filter((e) => e.n > since).slice(-200);
+        const inWin = (ms, kind) => objphoneFeed.filter((e) => e.kind === kind && now - e.at <= ms).length;
+        const clients = {};
+        for (const e of objphoneFeed) if (now - e.at <= 600e3) {
+          const k = e.src || ("ip:" + e.ip); const c = clients[k] || (clients[k] = { src: k, ip: e.ip, n: 0, last: 0 });
+          if (e.kind === "save") c.n++; if (e.at > c.last) c.last = e.at;
+        }
+        (async () => {
+          let total = null;
+          if (!consoleTotalCache || now - consoleTotalCache.at > 30e3) {
+            try { const c = await db.listPhoneCounts(); consoleTotalCache = { at: now, total: c.withPhones.total }; } catch { /* оставим старое */ }
+          }
+          total = consoleTotalCache ? consoleTotalCache.total : null;
+          res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+          res.end(JSON.stringify({
+            events: events,
+            stats: { m1: inWin(60e3, "save"), m10: inWin(600e3, "save"), h1: inWin(3600e3, "save"), miss1: inWin(3600e3, "miss"), total: total },
+            clients: Object.values(clients).sort((a, b) => b.n - a.n),
+            uptimeMin: Math.round(process.uptime() / 60),
+          }));
+        })().catch((e) => { res.writeHead(500); res.end(String(e.message)); });
+        return;
+      }
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+      res.end(KRISHA_CONSOLE_HTML);
+      return;
+    }
+
     // Лиды хозяев для обзвона: страница, ?data=1 — JSON по фильтрам,
     // ?set=<id>&status=&note= — статус обзвона.
     if (urlPath === "/api/krisha/leads") {
@@ -7233,6 +7353,8 @@ http
           }
           const m = await db.markListPhoneMiss(id, reason);
           console.log("[objphone] промах " + id + ": " + m.state + " (попытка " + m.tries + (m.final ? ", выбыл" : "") + ")");
+          objphoneEvent({ kind: "miss", id: id, reason: m.state, tries: m.tries, final: !!m.final,
+            src: String(body.src || parsed.searchParams.get("src") || "").slice(0, 40), ip: clientIp(req) });
           return send(200, Object.assign({ ok: true, id: id }, m));
         })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
         return;
@@ -7421,8 +7543,8 @@ http
         // первый. Поэтому выбрасываем всё, кроме первого, что уже приходило от
         // этого же клиента в последних 30 отправках. Клиент — метка src, а без
         // неё адрес, с которого пришёл запрос: у каждого телефона он свой.
-        const src = String(body.src || parsed.searchParams.get("src") || "").slice(0, 40) ||
-          "ip:" + String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim().slice(0, 60);
+        const ip = clientIp(req);
+        const src = String(body.src || parsed.searchParams.get("src") || "").slice(0, 40) || "ip:" + ip;
         const hist = objphoneLastBySrc.get(src) || [];
         const seen = new Set(); for (const s of hist) for (const p of s) seen.add(p);
         let kept = phones.filter((p, i) => i === 0 || !seen.has(p));
@@ -7435,6 +7557,8 @@ http
         if (objphoneLastBySrc.size > 500) objphoneLastBySrc.delete(objphoneLastBySrc.keys().next().value);
         const merged = await db.addListPhones(id, kept);
         console.log("[objphone] " + id + ": +" + kept.length + (dropped.length ? " (отброшено как прилипшие: " + dropped.length + ")" : "") + " (итого " + merged.length + ")");
+        objphoneEvent({ kind: "save", id: id, kept: kept, dropped: dropped, total: merged.length, src: src, ip: ip,
+          title: body.title ? String(body.title).slice(0, 80) : null });
         return send(200, { ok: true, id: id, phones: merged.map(pretty), dropped: dropped.map(pretty) });
       })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
       return;
