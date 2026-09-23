@@ -2349,6 +2349,49 @@ async function leadSetStatus(id, status, note) {
   return st;
 }
 
+// Прилипшие номера. Приложение Крыши показывает в шторке телефонов номера
+// прошлых объявлений; свой номер объявления всегда первый. Номер, который
+// где-то стоит первым, — настоящий (хозяин с несколькими объявлениями);
+// номер, который нигде не первый, но встречается не в одном объявлении, —
+// прилипший. Две защиты: при сохранении (dropKnownSticky) и регулярная
+// чистка свежих строк (cleanStickyPhones), потому что при сохранении номер
+// мог быть ещё неизвестен базе.
+async function dropKnownSticky(id, phones) {
+  if (!phones || phones.length < 2) return { kept: phones || [], dropped: [] };
+  const pool = await getPool();
+  const kept = [phones[0]], dropped = [];
+  for (const p of phones.slice(1)) {
+    const r = await pool.request().input("p", sql.NVarChar(20), p).input("id", sql.BigInt, Number(id)).query(`
+      SELECT TOP (1) CASE WHEN LEFT(phones, 11) = @p THEN 1 ELSE 0 END AS asfirst
+      FROM dbo.krisha_list WHERE id <> @id AND phones LIKE '%' + @p + '%'
+      ORDER BY asfirst DESC`);
+    const row = r.recordset[0];
+    if (!row || row.asfirst) kept.push(p); else dropped.push(p);
+  }
+  return { kept: kept, dropped: dropped };
+}
+
+async function cleanStickyPhones(hours) {
+  const pool = await getPool();
+  const every = (await pool.request().query("SELECT phones FROM dbo.krisha_list WHERE phones IS NOT NULL")).recordset;
+  const firsts = new Set(), cnt = new Map();
+  for (const x of every) { const parts = String(x.phones).split(","); firsts.add(parts[0]); for (const n of parts) cnt.set(n, (cnt.get(n) || 0) + 1); }
+  const rows = (await pool.request().input("h", sql.Int, Math.max(1, Number(hours) || 48)).query(`
+    SELECT id, phones FROM dbo.krisha_list
+    WHERE phones LIKE '%,%' AND phones_at >= DATEADD(hour, -@h, SYSUTCDATETIME())`)).recordset;
+  let fixed = 0, removed = 0;
+  for (const x of rows) {
+    const parts = String(x.phones).split(",");
+    const keep = parts.filter((n, i) => i === 0 || !((cnt.get(n) || 0) >= 2 && !firsts.has(n)));
+    if (keep.length !== parts.length) {
+      await pool.request().input("id", sql.BigInt, x.id).input("ph", sql.NVarChar(300), keep.join(","))
+        .query("UPDATE dbo.krisha_list SET phones = @ph WHERE id = @id");
+      fixed++; removed += parts.length - keep.length;
+    }
+  }
+  return { rows: fixed, removed: removed };
+}
+
 // Снятые объявления. Список карты показывает только живые, поэтому «снято»
 // узнаётся по отсутствию: чего не было два полных круга подряд (круг — час
 // с небольшим), помечаем storage = archived и пишем событие. Появится снова —
@@ -3420,7 +3463,7 @@ async function objectStats() {
 module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
-  saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus,
+  saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, dropKnownSticky, cleanStickyPhones,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
   listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory,

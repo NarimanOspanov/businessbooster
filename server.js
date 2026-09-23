@@ -6200,7 +6200,10 @@ http
           const doneNo = sweepDone.sweepNo;
           db.archiveMissingList(doneNo)
             .then((a) => { KW.list.lastArchive = { sweepNo: doneNo, at: new Date().toISOString(), archived: a.archived }; saveKrisha();
-                           console.log("[scanlist] круг " + doneNo + ": снятыми помечено " + a.archived); })
+                           console.log("[scanlist] круг " + doneNo + ": снятыми помечено " + a.archived);
+                           // Заодно — чистка прилипших номеров за последние двое суток.
+                           return db.cleanStickyPhones(48).then((c) => { KW.list.lastArchive.stickyRows = c.rows; KW.list.lastArchive.stickyRemoved = c.removed; saveKrisha();
+                             console.log("[scanlist] прилипшие номера: строк " + c.rows + ", убрано " + c.removed); }); })
             .catch((e) => { KW.list.lastArchive = { sweepNo: doneNo, at: new Date().toISOString(), error: String(e.message).slice(0, 120) };
                             console.log("[scanlist] пометка снятых не удалась: " + String(e.message).slice(0, 120)); });
         }
@@ -7422,7 +7425,10 @@ http
           "ip:" + String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim().slice(0, 60);
         const hist = objphoneLastBySrc.get(src) || [];
         const seen = new Set(); for (const s of hist) for (const p of s) seen.add(p);
-        const kept = phones.filter((p, i) => i === 0 || !seen.has(p));
+        let kept = phones.filter((p, i) => i === 0 || !seen.has(p));
+        // И по базе: не первый номер, который где-то уже стоит не первым, — прилипший.
+        const chk = await db.dropKnownSticky(id, kept).catch(() => ({ kept: kept, dropped: [] }));
+        kept = chk.kept;
         const dropped = phones.filter((p) => !kept.includes(p));
         hist.push(new Set(phones)); while (hist.length > 30) hist.shift();
         objphoneLastBySrc.set(src, hist);
