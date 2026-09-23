@@ -910,6 +910,75 @@ fetch("/api/krisha/stats?data=1&key="+encodeURIComponent(KEY)).then(function(r){
 // Лиды для агента: хозяева с номером и свежим сигналом (новое, поднятие,
 // снижение цены, возврат из архива), фильтры и статус обзвона.
 let consoleTotalCache = null; // итог «всего с номером» для консоли, раз в 30 с
+// Консоль обхода: события списка в реальном времени.
+const KRISHA_LIST_CONSOLE_HTML = `<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Крыша · консоль обхода</title>
+<style>
+  :root{--bg:#0f1216;--card:#181d24;--line:#262d37;--fg:#e6e9ee;--mut:#8a95a5;--ok:#2fbf71;--no:#e5484d;--acc:#4c8dff;--warn:#f5a524}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:16px}
+  h1{font-size:18px;margin:0 0 10px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+  .mut{color:var(--mut)} a{color:var(--acc);text-decoration:none}
+  .live{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--ok);margin-right:6px;animation:p 1.6s infinite}
+  .live.off{background:var(--no);animation:none}
+  @keyframes p{0%{box-shadow:0 0 0 0 rgba(47,191,113,.6)}70%{box-shadow:0 0 0 8px rgba(47,191,113,0)}100%{box-shadow:0 0 0 0 rgba(47,191,113,0)}}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:0 0 12px}
+  .c{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+  .c .k{font-size:12px;color:var(--mut)} .c b{font-size:20px;font-variant-numeric:tabular-nums} .c .s{font-size:12px;color:var(--mut)}
+  .cur{font-size:13px;color:var(--mut);margin:0 0 12px}
+  table{border-collapse:collapse;width:100%}
+  th,td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;font-variant-numeric:tabular-nums}
+  th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em}
+  tr.new{animation:hl 2s} @keyframes hl{from{background:rgba(76,141,255,.22)}to{background:transparent}}
+  .tag{display:inline-block;padding:1px 7px;border-radius:99px;font-size:12px;white-space:nowrap}
+  .tag.new{background:rgba(76,141,255,.18);color:var(--acc)} .tag.bump{background:rgba(245,165,36,.18);color:var(--warn)}
+  .tag.cut{background:rgba(47,191,113,.18);color:var(--ok)} .tag.up{background:rgba(229,72,77,.18);color:var(--no)}
+  .tag.archived{background:rgba(138,149,165,.2);color:var(--mut)} .tag.back{background:rgba(47,191,113,.18);color:var(--ok)}
+  .tag.sale{background:rgba(76,141,255,.12);color:var(--acc)} .tag.rent{background:rgba(245,165,36,.12);color:var(--warn)}
+  .src{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--mut)}
+  @media(max-width:640px){.hide{display:none}}
+</style></head><body>
+<h1><span><span id="dot" class="live"></span>Крыша · консоль обхода</span><span id="upd" class="mut"></span></h1>
+<div id="grid" class="grid"></div>
+<div id="cur" class="cur"></div>
+<table><thead><tr><th>время</th><th>событие</th><th>объявление</th><th>цена</th><th class="hide">источник</th></tr></thead>
+<tbody id="rows"></tbody></table>
+<script>
+var KEY = new URLSearchParams(location.search).get("key") || "";
+var API = "/api/krisha/listconsole?key=" + encodeURIComponent(KEY);
+var last = 0, seen = {};
+var KIND = {new:["new","новое"],bump:["bump","поднято"],archived:["archived","снято"],back:["back","вернулось"]};
+var PROP = {flat:"квартира",house:"дом",commercial:"коммерция",land:"участок",garage:"гараж"};
+function esc(s){s=(s==null?"":String(s));return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function pad2(n){return ("0"+n).slice(-2);}
+function t(v){var d=new Date(v);return pad2(d.getHours())+":"+pad2(d.getMinutes())+":"+pad2(d.getSeconds());}
+function money(n){if(n==null)return "";n=Number(n);return n>=1e6?(Math.round(n/1e5)/10).toLocaleString("ru-RU")+" млн":n.toLocaleString("ru-RU")+" ₸";}
+function desc(e){var b=[];if(e.prop)b.push(PROP[e.prop]||e.prop);if(e.rooms)b.push(e.rooms+"-комн");if(e.area)b.push(e.area+" м²");if(e.floor&&e.floors)b.push(e.floor+"/"+e.floors+" эт");if(e.city)b.push(e.city);return b.join(" · ");}
+function kindTag(e){
+  if(e.kind==="price"){var cut=e.oldPrice!=null&&Number(e.price)<Number(e.oldPrice);var pct=e.oldPrice?Math.round(Math.abs(e.price-e.oldPrice)/e.oldPrice*100):0;return "<span class='tag "+(cut?"cut":"up")+"'>цена "+(cut?"↓":"↑")+" "+pct+"%</span>";}
+  var k=KIND[e.kind]||[e.kind,e.kind];return "<span class='tag "+k[0]+"'>"+k[1]+(e.count?" · "+e.count.toLocaleString("ru-RU"):"")+"</span>";}
+function row(e){
+  var deal=e.deal?"<span class='tag "+e.deal+"'>"+(e.deal==="sale"?"продажа":"аренда")+"</span> ":"";
+  var change=e.kind==="price"?"<span class=mut>"+money(e.oldPrice)+" → </span>"+money(e.price):money(e.price);
+  var obj=e.id?"<a target=_blank href='https://krisha.kz/a/show/"+e.id+"'>"+e.id+"</a> "+esc(desc(e)):"<span class=mut>"+esc(e.note||"по итогам круга")+"</span>";
+  return "<tr class=new><td>"+t(e.at)+"</td><td>"+kindTag(e)+"</td><td>"+deal+obj+"</td><td>"+change+"</td><td class='hide src'>"+esc(e.src||"")+"</td></tr>";
+}
+function tick(){
+  fetch(API+"&since="+last).then(function(r){return r.json();}).then(function(j){
+    document.getElementById("dot").className="live";
+    document.getElementById("upd").textContent="обновлено "+t(Date.now());
+    var g="";["new","bump","price","archived","back"].forEach(function(k){var s=j.stats[k]||{};var lab={new:"новых",bump:"поднятий",price:"смен цены",archived:"снято",back:"вернулось"}[k];g+="<div class=c><div class=k>"+lab+"</div><b>"+(s.m10||0).toLocaleString("ru-RU")+"</b> <span class=s>за 10 мин</span><div class=s>за час "+(s.h1||0).toLocaleString("ru-RU")+" · за минуту "+(s.m1||0)+"</div></div>";});
+    document.getElementById("grid").innerHTML=g;
+    var c=j.cursor||{};document.getElementById("cur").textContent=c.sweepNo?"обход: круг "+c.sweepNo+", "+(c.section||"")+" стр. "+c.page+", прочитано "+(c.pages||0).toLocaleString("ru-RU")+" стр."+(c.lastMinutes?" · прошлый круг "+c.lastMinutes+" мин":"")+(c.lastArchived!=null?" · снято по итогам "+c.lastArchived.toLocaleString("ru-RU"):""):"";
+    var tb=document.getElementById("rows"); var html="";
+    (j.events||[]).forEach(function(e){ if(seen[e.n])return; seen[e.n]=1; html=row(e)+html; if(e.n>last)last=e.n; });
+    if(html){ tb.insertAdjacentHTML("afterbegin",html); while(tb.rows.length>400) tb.deleteRow(-1); }
+  }).catch(function(){ document.getElementById("dot").className="live off"; });
+}
+tick(); setInterval(tick, 2000);
+</script></body></html>`;
 const KRISHA_CONSOLE_HTML = `<!doctype html>
 <html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -1137,6 +1206,40 @@ const KRISHA_LIST_STATS_HTML = KRISHA_STATS_HTML
     card(n(sum(function(r){return r.phones;})),"номеров снято","у хозяев за период")+
     card(n(sum(function(r){return r.bumps;})),"поднятий","смен цены "+n(sum(function(r){return r.prices;}))+" · в архив "+n(sum(function(r){return r.archived;})))+
     (DATA.totals?card(n(DATA.totals.owner_queue),"хозяев в очереди","без номера, живых · с номером "+n(DATA.totals.owner_phones)):"");`)
+  .replace('<div class="chartbox"><h3>По дням — таблица</h3><div id="table"></div></div>',
+           '<div class="chartbox"><h3>По дням — таблица</h3><div id="table"></div></div>' + `<div class="chartbox"><h3>Сейчас <span id="lvupd" style="font-weight:normal;color:var(--mut);font-size:12px"></span></h3>
+<div id="lvgrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:0 0 10px"></div>
+<div id="lvcur" style="color:var(--mut);font-size:13px;margin:0 0 8px"></div>
+<div id="lvfeed"></div>
+<div style="margin-top:8px;font-size:13px"><a id="lvlink" href="#" style="color:var(--acc)">открыть полную консоль обхода</a></div></div>`)
+  .replace("</script></body></html>", `
+(function(){
+  var lvApi="/api/krisha/listconsole?key="+encodeURIComponent(KEY), lvLast=0, lvRows=[];
+  document.getElementById("lvlink").href="/api/krisha/listconsole?key="+encodeURIComponent(KEY);
+  var PROP={flat:"квартира",house:"дом",commercial:"коммерция",land:"участок"};
+  function lesc(s){s=(s==null?"":String(s));return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+  function lt(v){var d=new Date(v);return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2)+":"+("0"+d.getSeconds()).slice(-2);}
+  function lm(v){if(v==null)return "";v=Number(v);return v>=1e6?(Math.round(v/1e5)/10).toLocaleString("ru-RU")+" млн":v.toLocaleString("ru-RU");}
+  function ldesc(e){var b=[];if(e.deal)b.push(e.deal==="sale"?"продажа":"аренда");if(e.prop)b.push(PROP[e.prop]||e.prop);if(e.rooms)b.push(e.rooms+"-комн");if(e.area)b.push(e.area+" м²");if(e.city)b.push(e.city);return b.join(" · ");}
+  function lkind(e){if(e.kind==="price"){var cut=e.oldPrice!=null&&Number(e.price)<Number(e.oldPrice);return "<span style='color:"+(cut?"var(--ok)":"#e5484d")+"'>цена "+(cut?"↓":"↑")+" "+lm(e.oldPrice)+" → "+lm(e.price)+"</span>";}
+    var lab={new:"новое",bump:"поднято",archived:"снято",back:"вернулось"}[e.kind]||e.kind;var col={new:"var(--acc)",bump:"var(--rent)",archived:"var(--mut)",back:"var(--ok)"}[e.kind]||"inherit";return "<span style='color:"+col+"'>"+lab+(e.count?" · "+e.count.toLocaleString("ru-RU"):"")+"</span>"+(e.kind!=="price"&&e.price?" <span style='color:var(--mut)'>"+lm(e.price)+"</span>":"");}
+  function tick(){
+    fetch(lvApi+"&since="+lvLast).then(function(r){return r.json();}).then(function(j){
+      document.getElementById("lvupd").textContent="обновлено "+lt(Date.now());
+      var g="";["new","bump","price","archived","back"].forEach(function(k){var s=j.stats[k]||{};var lab={new:"новых",bump:"поднятий",price:"смен цены",archived:"снято",back:"вернулось"}[k];
+        g+="<div style='background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px'><div style='font-size:12px;color:var(--mut)'>"+lab+"</div><b style='font-size:20px'>"+(s.m10||0).toLocaleString("ru-RU")+"</b> <span style='font-size:12px;color:var(--mut)'>за 10 мин</span><div style='font-size:12px;color:var(--mut)'>за час "+(s.h1||0).toLocaleString("ru-RU")+"</div></div>";});
+      document.getElementById("lvgrid").innerHTML=g;
+      var c=j.cursor||{};document.getElementById("lvcur").textContent=c.sweepNo?"обход: круг "+c.sweepNo+", "+(c.section||"")+" стр. "+c.page+(c.lastMinutes?" · прошлый круг "+c.lastMinutes+" мин":""):"";
+      (j.events||[]).forEach(function(e){ if(e.n>lvLast){ lvLast=e.n; lvRows.unshift(e); } });
+      lvRows=lvRows.slice(0,30);
+      var h="<table><tr><th>время</th><th>событие</th><th>объявление</th></tr>";
+      lvRows.forEach(function(e){h+="<tr><td>"+lt(e.at)+"</td><td>"+lkind(e)+"</td><td>"+(e.id?"<a target=_blank style='color:var(--acc)' href='https://krisha.kz/a/show/"+e.id+"'>"+e.id+"</a> "+lesc(ldesc(e)):"<span style='color:var(--mut)'>по итогам круга</span>")+"</td></tr>";});
+      document.getElementById("lvfeed").innerHTML=h+"</table>";
+    }).catch(function(){});
+  }
+  tick(); setInterval(tick, 3000);
+})();
+` + "</script></body></html>")
   .replace(`  var h="<table><tr><th>День</th><th>Всего</th><th>Продажа</th><th>Аренда</th><th>Хозяев</th><th>Проверено</th><th>Найдено</th></tr>";
   rows.slice().reverse().forEach(function(r){
     h+="<tr><td>"+r.day+"</td><td>"+n(r.total)+"</td><td>"+n(r.sale)+"</td><td>"+n(r.rent)+"</td><td>"+n(r.owner)+"</td><td>"+n(r.searched)+"</td><td style='color:var(--ok)'>"+n(r.photo_ok)+"</td></tr>";
@@ -1938,8 +2041,20 @@ function objphoneEvent(ev) {
   ev.n = ++objphoneFeedNo; ev.at = Date.now();
   objphoneFeed.push(ev); while (objphoneFeed.length > 500) objphoneFeed.shift();
 }
-function clientIp(req) {
-  return String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim().replace(/^::ffff:/, "").slice(0, 60);
+// Лента событий обхода для консоли (/api/krisha/listconsole): новое,
+// поднятие, смена цены, снято, вернулось — из fresh, scanlist, пометки
+// снятых по итогам круга и промахов «архив» с телефонов.
+const listFeed = [];
+let listFeedNo = 0;
+function listEvent(ev) {
+  ev.n = ++listFeedNo; ev.at = Date.now();
+  listFeed.push(ev); while (listFeed.length > 2000) listFeed.shift();
+}
+function listEventFrom(row, r, src) {
+  const kind = r.added ? "new" : r.back ? "back" : r.archived ? "archived" : r.price ? "price" : r.bump ? "bump" : null;
+  if (!kind) return;
+  listEvent({ kind: kind, id: String(row.id), deal: row.deal, prop: row.prop, city: row.city, rooms: row.rooms, area: row.area,
+    floor: row.floor, floors: row.floors, price: row.price == null ? null : Number(row.price), oldPrice: r.oldPrice == null ? null : Number(r.oldPrice), src: src });
 }
 const listDashCache = { at: 0, body: null };
 let freshRunning = false;
@@ -6064,7 +6179,11 @@ http
             const rows = res.adverts.map((a) => L.parseAdvert(a, sec.path, res.dates)).filter((o) => o.id);
             const outs = await db.saveListAdverts(rows, sweepNo);
             let newHere = 0;
-            for (const o of outs) { if (o.added) newHere++; if (o.bump) bumped++; if (o.price) priceChanged++; }
+            for (let k = 0; k < outs.length; k++) {
+              const o = outs[k];
+              if (o.added) newHere++; if (o.bump) bumped++; if (o.price) priceChanged++;
+              if (rows[k]) listEventFrom(rows[k], o, "fresh");
+            }
             pages++; r.pages++; adverts += rows.length; added += newHere; r.added += newHere;
             if (!newHere && p >= minPages) break; // нового нет и минимум прочитан — глубже только известное
           }
@@ -6234,6 +6353,7 @@ http
             if (r.archived) archived++;
             if (r.back) back++;
             if (r.bump) bumped++;
+            listEventFrom(o, r, "scanlist");
           }
         }
         // 0. Свежее со всех частей: страницы 1..freshPages, разом, напрямую.
@@ -6284,6 +6404,7 @@ http
           db.archiveMissingList(doneNo)
             .then((a) => { KW.list.lastArchive = { sweepNo: doneNo, at: new Date().toISOString(), archived: a.archived }; saveKrisha();
                            console.log("[scanlist] круг " + doneNo + ": снятыми помечено " + a.archived);
+                           if (a.archived) listEvent({ kind: "archived", count: a.archived, src: "круг " + doneNo, note: "не было два круга подряд" });
                            // Заодно — чистка прилипших номеров за последние двое суток.
                            return db.cleanStickyPhones(48).then((c) => { KW.list.lastArchive.stickyRows = c.rows; KW.list.lastArchive.stickyRemoved = c.removed; saveKrisha();
                              console.log("[scanlist] прилипшие номера: строк " + c.rows + ", убрано " + c.removed); }); })
@@ -6944,6 +7065,42 @@ http
       return;
     }
 
+    // Консоль обхода: страница с живой лентой событий списка (новое, поднято,
+    // цена, снято, вернулось). ?since=<n> — события после n (JSON) + счётчики
+    // по окнам и курсор обхода.
+    if (urlPath === "/api/krisha/listconsole") {
+      const q = parsed.searchParams;
+      const key = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
+      if (!key || q.get("key") !== key) { res.writeHead(403); res.end("bad key"); return; }
+      if (q.has("since")) {
+        const since = Number(q.get("since")) || 0;
+        const now = Date.now();
+        const events = listFeed.filter((e) => e.n > since).slice(-300);
+        const stats = {};
+        for (const k of ["new", "bump", "price", "archived", "back"]) {
+          const s = { m1: 0, m10: 0, h1: 0 };
+          for (const e of listFeed) if (e.kind === k) {
+            const w = e.count || 1, age = now - e.at;
+            if (age <= 60e3) s.m1 += w; if (age <= 600e3) s.m10 += w; if (age <= 3600e3) s.h1 += w;
+          }
+          stats[k] = s;
+        }
+        let cursor = null;
+        if (KW.list) {
+          const L = require("./scripts/krisha-list.js");
+          const sec = L.SECTIONS[KW.list.section] || L.SECTIONS[0];
+          cursor = { sweepNo: KW.list.sweepNo, section: sec && sec.label, page: KW.list.page, pages: KW.list.pages,
+                     lastMinutes: KW.list.lastSweep && KW.list.lastSweep.minutes, lastArchived: KW.list.lastArchive && KW.list.lastArchive.archived };
+        }
+        res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+        res.end(JSON.stringify({ events: events, stats: stats, cursor: cursor }));
+        return;
+      }
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+      res.end(KRISHA_LIST_CONSOLE_HTML);
+      return;
+    }
+
     // Консоль очереди: страница с живой лентой сохранений и промахов.
     // ?since=<n> — события после номера n (JSON), плюс счётчики и клиенты.
     if (urlPath === "/api/krisha/objphone/console") {
@@ -7355,6 +7512,9 @@ http
           console.log("[objphone] промах " + id + ": " + m.state + " (попытка " + m.tries + (m.final ? ", выбыл" : "") + ")");
           objphoneEvent({ kind: "miss", id: id, reason: m.state, tries: m.tries, final: !!m.final,
             src: String(body.src || parsed.searchParams.get("src") || "").slice(0, 40), ip: clientIp(req) });
+          if (m.state === "archived" || m.state === "not_found") {
+            listEvent({ kind: "archived", id: id, src: String(body.src || parsed.searchParams.get("src") || "").slice(0, 40) || "ip:" + clientIp(req) });
+          }
           return send(200, Object.assign({ ok: true, id: id }, m));
         })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
         return;

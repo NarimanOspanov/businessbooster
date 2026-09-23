@@ -2885,7 +2885,7 @@ async function saveListAdverts(rows, sweepNo) {
     if (res.added) events.push([o.id, "new", null, o.price]);
     else if (row.act === "UPDATE") {
       const oldP = row.old_price == null ? null : Number(row.old_price);
-      if (oldP != null && o.price != null && oldP !== Number(o.price)) { res.price = true; events.push([o.id, "price", oldP, o.price]); }
+      if (oldP != null && o.price != null && oldP !== Number(o.price)) { res.price = true; res.oldPrice = oldP; events.push([o.id, "price", oldP, o.price]); }
       const was = row.old_storage || null, now = o.storage || null;
       if (was !== now && (was === "live" || now === "live")) {
         if (now === "live") { res.back = true; events.push([o.id, "back", null, null]); }
