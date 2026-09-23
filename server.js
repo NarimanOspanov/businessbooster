@@ -1003,7 +1003,7 @@ function render(rows){
         "<div class='row mut'>"+esc(x.addr||"")+(x.addr?" · ":"")+esc(x.city||"")+" · на рынке "+days(x.first_seen)+" дн · <a target=_blank href='https://krisha.kz/a/show/"+x.id+"'>на Крыше</a></div>"+
         "<div class='row phones'>"+(x.owner_name?"<span class=mut>"+esc(x.owner_name)+" · </span>":"")+ph+"</div>"+
         "<div class=st>"+
-          ["called|звонил","callback|перезвонить","refused|отказ","deal|договор"].map(function(s){var p=s.split("|");return "<button class='"+p[0]+(x.status===p[0]?" on":"")+"' onclick='setSt("+x.id+",\""+p[0]+"\",this)'>"+p[1]+"</button>";}).join("")+
+          ["called|звонил","callback|перезвонить","refused|отказ","deal|договор"].map(function(s){var p=s.split("|");return "<button class='"+p[0]+(x.status===p[0]?" on":"")+"' onclick='setSt("+x.id+",&#39;"+p[0]+"&#39;,this)'>"+p[1]+"</button>";}).join("")+
           "<input placeholder='заметка' value='"+esc(x.note||"")+"' onchange='setSt("+x.id+",null,this)'>"+
           (x.status_at?"<span class=mut>"+dmT(x.status_at)+"</span>":"")+
         "</div>"+
