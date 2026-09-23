@@ -865,20 +865,27 @@ function card(v,l,sm){return "<div class=c><div class=n>"+v+"</div><div class=l>
 function cardBig(v,l,sm){return "<div class='c big'><div class=n>"+v+"</div><div class=l>"+l+"</div>"+(sm?"<div class=sm>"+sm+"</div>":"")+"</div>";}
 function drawChart(rows){
   var W=860,H=220,pad=28,bw;
+  // День первичной загрузки базы в десятки раз больше обычного и прижимает
+  // остальные столбцы к нулю: обрезаем ось по второму по величине дню, а
+  // столбец-переросток рисуем усечённым с подписью.
+  var tots=rows.map(function(r){return (r.sale||0)+(r.rent||0);}).slice().sort(function(x,y){return y-x;});
+  var cap=tots.length>1&&tots[0]>tots[1]*4?tots[1]*1.15:tots[0];
   if(!rows.length){document.getElementById("chart").innerHTML="<p style='color:var(--mut)'>нет данных</p>";return;}
-  var max=Math.max(1,Math.max.apply(null,rows.map(function(r){return (r.sale||0)+(r.rent||0);})));
+  var max=Math.max(1,cap);
   bw=Math.min(60,(W-pad*2)/rows.length-6);
   var x0=pad, gap=(W-pad*2)/rows.length;
   var svg="<svg viewBox='0 0 "+W+" "+H+"'>";
   // ось
   svg+="<line x1="+pad+" y1="+(H-pad)+" x2="+(W-pad)+" y2="+(H-pad)+" stroke='#262d37'/>";
   rows.forEach(function(r,i){
-    var cx=x0+gap*i+gap/2, s=r.sale||0, rt=r.rent||0, tot=s+rt;
-    var hTot=(H-pad*2)*tot/max, hRent=(H-pad*2)*rt/max;
+    var cx=x0+gap*i+gap/2, s=r.sale||0, rt=r.rent||0, tot=s+rt, cut=tot>max;
+    // Усечённый столбец: доли продажи и аренды сохраняем, высоту режем по оси.
+    var k=cut?max/tot:1, hTot=(H-pad*2)*tot*k/max, hRent=(H-pad*2)*rt*k/max, hSale=(H-pad*2)*s*k/max;
     var y=H-pad-hTot;
     // продажа (низ) + аренда (верх)
-    svg+="<rect x="+(cx-bw/2)+" y="+(H-pad-((H-pad*2)*s/max))+" width="+bw+" height="+((H-pad*2)*s/max)+" fill='var(--sale)' rx=2/>";
+    svg+="<rect x="+(cx-bw/2)+" y="+(H-pad-hSale)+" width="+bw+" height="+hSale+" fill='var(--sale)' rx=2/>";
     svg+="<rect x="+(cx-bw/2)+" y="+y+" width="+bw+" height="+hRent+" fill='var(--rent)' rx=2/>";
+    if(cut){svg+="<text x="+cx+" y="+(y+12)+" fill='#fff' font-size=10 text-anchor=middle>"+Math.round(tot/1000)+"k</text>";}
     // найдено — зелёная точка над столбцом
     var f=r.photo_ok||0; if(f){svg+="<circle cx="+cx+" cy="+(y-8)+" r=4 fill='var(--ok)'/><text x="+cx+" y="+(y-14)+" fill='var(--ok)' font-size=11 text-anchor=middle>"+f+"</text>";}
     svg+="<text x="+cx+" y="+(H-pad+14)+" fill='#8a95a5' font-size=10 text-anchor=middle>"+r.day.slice(5)+"</text>";
