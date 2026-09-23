@@ -7174,9 +7174,13 @@ http
           // since — последняя неделя. deal/prop — необязательные фильтры.
           // Курсор клиенту вести не нужно: объект с номером (или выбывший по
           // промахам) сам выпадает из очереди.
-          const sinceRaw = parsed.searchParams.get("since");
+          // since — дата YYYY-MM-DD или «последние N дней»: since=3d (окно
+          // едет вместе с календарём, клиенту менять ничего не нужно).
+          let sinceRaw = parsed.searchParams.get("since");
+          const daysM = sinceRaw && /^(\d{1,3})d$/i.exec(sinceRaw.trim());
+          if (daysM) sinceRaw = day(Date.now() - Number(daysM[1]) * 86400e3);
           if (sinceRaw && (!/^\d{4}-\d{2}-\d{2}$/.test(sinceRaw) || isNaN(Date.parse(sinceRaw)))) {
-            return send(400, { ok: false, error: "since: нужна дата YYYY-MM-DD" });
+            return send(400, { ok: false, error: "since: нужна дата YYYY-MM-DD или Nd (например 3d)" });
           }
           const since = sinceRaw || day(Date.now() - 7 * 86400e3);
           // По умолчанию очередь — продажа квартир в Алматы: аренду, дома,
