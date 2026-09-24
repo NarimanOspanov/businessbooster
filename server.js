@@ -916,6 +916,93 @@ fetch("/api/krisha/stats?data=1&key="+encodeURIComponent(KEY)).then(function(r){
 // улицы, зато есть адрес текстом, состояние (архив) и номер.
 // Лиды для агента: хозяева с номером и свежим сигналом (новое, поднятие,
 // снижение цены, возврат из архива), фильтры и статус обзвона.
+// Навигатор по страницам Крыши: одна точка входа, ключ подставляется в ссылки.
+const KRISHA_HUB_HTML = `<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Крыша · страницы</title>
+<style>
+  :root{--bg:#0f1216;--card:#181d24;--line:#262d37;--fg:#e6e9ee;--mut:#8a95a5;--ok:#2fbf71;--acc:#4c8dff;--warn:#f5a524}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:20px;max-width:1000px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 4px} .sub{color:var(--mut);margin:0 0 20px}
+  h2{font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--mut);margin:22px 0 10px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+  a.card{display:block;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;color:inherit;text-decoration:none;transition:border-color .15s}
+  a.card:hover{border-color:var(--acc)}
+  .card .t{font-weight:600;font-size:15px;margin:0 0 4px}
+  .card .d{color:var(--mut);font-size:13px}
+  .card .n{margin-top:8px;font-size:13px;color:var(--ok);font-variant-numeric:tabular-nums;min-height:18px}
+  .card.small{padding:10px 14px} .card.small .t{font-size:14px}
+  .live{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:6px;vertical-align:middle}
+</style></head><body>
+<h1>Крыша · страницы</h1>
+<p class="sub">ключ подставлен во все ссылки · <span id="upd"></span></p>
+
+<h2>Риэлтору</h2>
+<div class="grid">
+  <a class="card" data-p="leads"><div class="t">Лиды хозяев</div><div class="d">хозяева с номером и свежим сигналом: новое, поднятие, снижение цены, возврат из архива. Фильтры, статус обзвона.</div><div class="n" id="n-leads"></div></a>
+</div>
+
+<h2>Импорт объявлений</h2>
+<div class="grid">
+  <a class="card" data-p="liststats"><div class="t">Статистика импорта и находок</div><div class="d">по дням: импорт, хозяева, проверено, найдено оригиналов, номера, поднятия. Внизу живой блок обхода.</div><div class="n" id="n-liststats"></div></a>
+  <a class="card" data-p="listconsole"><div class="t"><span class="live"></span>Консоль обхода</div><div class="d">лента в реальном времени: новое, поднято, цена, снято, вернулось, с описанием объекта и курсором обхода.</div><div class="n" id="n-listconsole"></div></a>
+  <a class="card" data-p="listmonitor"><div class="t">Проверка находок</div><div class="d">пары «агентское → хозяйское» с фото и параметрами, ручная отметка верно/неверно.</div><div class="n" id="n-listmonitor"></div></a>
+</div>
+
+<h2>Номера телефонов</h2>
+<div class="grid">
+  <a class="card" data-p="objphone/console"><div class="t"><span class="live"></span>Консоль номеров</div><div class="d">лента сохранений и промахов с метками телефонов и IP, отброшенные прилипшие номера, счётчики по клиентам.</div><div class="n" id="n-phones"></div></a>
+  <a class="card" data-p="objphone/count"><div class="t">Счётчики номеров (JSON)</div><div class="d">сколько объявлений с номером, промахи по причинам, размер очереди.</div></a>
+</div>
+
+<h2>Служебное</h2>
+<div class="grid">
+  <a class="card small" data-p="dbsize"><div class="t">База: размер и нагрузка (JSON)</div><div class="d">таблицы, индексы, DTU по окнам, текущие запросы.</div></a>
+  <a class="card small" data-p="scanlist" data-q="stats=1"><div class="t">Обход: курсор и итоги (JSON)</div><div class="d">круг, часть, страница, прошлый круг, события за сутки.</div></a>
+  <a class="card small" data-p="objphone/ports"><div class="t">Порты Asocks (JSON)</div><div class="d">список портов для браузеров, без паролей.</div></a>
+  <a class="card small" data-abs="/api/calls" data-q="mine=1&days=7"><div class="t">Журнал звонков (JSON)</div><div class="d">входящие на личный номер за 7 дней.</div></a>
+  <a class="card small" data-abs="/krisha-phone.user.js" data-nokey="1"><div class="t">Скрипт для браузера</div><div class="d">Tampermonkey, открыть для установки или обновления.</div></a>
+</div>
+
+<h2>Старые страницы (таблица объектов, не список)</h2>
+<div class="grid">
+  <a class="card small" data-p="stats"><div class="t">Статистика (старая)</div><div class="d">по krisha_objects, не обновляется.</div></a>
+  <a class="card small" data-p="monitor"><div class="t">Мониторинг находок (старый)</div><div class="d">по krisha_objects.</div></a>
+</div>
+<script>
+var KEY = new URLSearchParams(location.search).get("key") || "";
+document.querySelectorAll("a.card").forEach(function(a){
+  var base = a.getAttribute("data-abs") || ("/api/krisha/" + a.getAttribute("data-p"));
+  var q = a.getAttribute("data-q") || "";
+  var key = a.getAttribute("data-nokey") ? "" : "key=" + encodeURIComponent(KEY);
+  a.href = base + ((q || key) ? "?" + [key, q].filter(Boolean).join("&") : "");
+});
+function n(v){return v==null?"–":Number(v).toLocaleString("ru-RU");}
+function pad2(x){return ("0"+x).slice(-2);}
+function live(){
+  var k = "key=" + encodeURIComponent(KEY);
+  fetch("/api/krisha/objphone/console?" + k + "&since=0").then(function(r){return r.json();}).then(function(j){
+    var s=j.stats||{}; document.getElementById("n-phones").textContent = "за час " + n(s.h1) + " · за 10 мин " + n(s.m10) + " · всего " + n(s.total) + (j.clients&&j.clients.length?" · клиентов "+j.clients.length:"");
+  }).catch(function(){});
+  fetch("/api/krisha/listconsole?" + k + "&since=0").then(function(r){return r.json();}).then(function(j){
+    var s=j.stats||{}; var c=j.cursor||{};
+    document.getElementById("n-listconsole").textContent = "за 10 мин: новых " + n(s.new&&s.new.m10) + " · поднятий " + n(s.bump&&s.bump.m10) + " · цен " + n(s.price&&s.price.m10) + (c.sweepNo?" · круг "+c.sweepNo:"");
+  }).catch(function(){});
+  fetch("/api/krisha/leads?" + k + "&data=1&hours=24&limit=500").then(function(r){return r.json();}).then(function(rows){
+    if(Array.isArray(rows)) document.getElementById("n-leads").textContent = "за сутки не обзвонено: " + n(rows.length) + (rows.length>=500?"+":"");
+  }).catch(function(){});
+  fetch("/api/krisha/matchlist?" + k + "&stats=1").then(function(r){return r.json();}).then(function(j){
+    var t=(j.stats||{}).total||{}, c=(j.stats||{}).candidates||{};
+    document.getElementById("n-listmonitor").textContent = "проверено " + n(t.searched) + " · по фото " + n(c.photo_confirmed);
+    document.getElementById("n-liststats").textContent = "найдено оригиналов " + n(c.photo_confirmed);
+  }).catch(function(){});
+  var d=new Date(); document.getElementById("upd").textContent = "обновлено " + pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds());
+}
+live(); setInterval(live, 15000);
+</script></body></html>`;
+
 let consoleTotalCache = null; // итог «всего с номером» для консоли, раз в 30 с
 // Консоль обхода: события списка в реальном времени.
 const KRISHA_LIST_CONSOLE_HTML = `<!doctype html>
@@ -7069,6 +7156,15 @@ http
       }
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
       res.end(KRISHA_LIST_STATS_HTML);
+      return;
+    }
+
+    // Навигатор: список всех страниц по группам с живыми цифрами.
+    if (urlPath === "/api/krisha" || urlPath === "/api/krisha/" || urlPath === "/api/krisha/hub") {
+      const key = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
+      if (!key || parsed.searchParams.get("key") !== key) { res.writeHead(403); res.end("bad key"); return; }
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+      res.end(KRISHA_HUB_HTML);
       return;
     }
 
