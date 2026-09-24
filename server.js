@@ -954,22 +954,15 @@ const KRISHA_HUB_HTML = `<!doctype html>
 <h2>Номера телефонов</h2>
 <div class="grid">
   <a class="card" data-p="objphone/console"><div class="t"><span class="live"></span>Консоль номеров</div><div class="d">лента сохранений и промахов с метками телефонов и IP, отброшенные прилипшие номера, счётчики по клиентам.</div><div class="n" id="n-phones"></div></a>
-  <a class="card" data-p="objphone/count"><div class="t">Счётчики номеров (JSON)</div><div class="d">сколько объявлений с номером, промахи по причинам, размер очереди.</div></a>
+  <a class="card" data-p="phones"><div class="t">Счётчики номеров</div><div class="d">сколько объявлений с номером, снято сегодня, промахи по причинам, размер очереди.</div></a>
 </div>
 
 <h2>Служебное</h2>
 <div class="grid">
-  <a class="card small" data-p="dbsize"><div class="t">База: размер и нагрузка (JSON)</div><div class="d">таблицы, индексы, DTU по окнам, текущие запросы.</div></a>
-  <a class="card small" data-p="scanlist" data-q="stats=1"><div class="t">Обход: курсор и итоги (JSON)</div><div class="d">круг, часть, страница, прошлый круг, события за сутки.</div></a>
-  <a class="card small" data-p="objphone/ports"><div class="t">Порты Asocks (JSON)</div><div class="d">список портов для браузеров, без паролей.</div></a>
-  <a class="card small" data-abs="/api/calls" data-q="mine=1&days=7"><div class="t">Журнал звонков (JSON)</div><div class="d">входящие на личный номер за 7 дней.</div></a>
-  <a class="card small" data-abs="/krisha-phone.user.js" data-nokey="1"><div class="t">Скрипт для браузера</div><div class="d">Tampermonkey, открыть для установки или обновления.</div></a>
-</div>
-
-<h2>Старые страницы (таблица объектов, не список)</h2>
-<div class="grid">
-  <a class="card small" data-p="stats"><div class="t">Статистика (старая)</div><div class="d">по krisha_objects, не обновляется.</div></a>
-  <a class="card small" data-p="monitor"><div class="t">Мониторинг находок (старый)</div><div class="d">по krisha_objects.</div></a>
+  <a class="card small" data-p="db"><div class="t">База: размер и нагрузка</div><div class="d">занято, DTU, процессор и диск по окнам, таблицы, индексы, долгие запросы.</div></a>
+  <a class="card small" data-p="sweep"><div class="t">Обход списка</div><div class="d">круг, часть, страница, прошлый круг, снято по итогам, база по типам, события за сутки.</div></a>
+  <a class="card small" data-p="ports"><div class="t">Порты Asocks</div><div class="d">порты для браузеров, проверка и смена выходного IP.</div></a>
+  <a class="card small" data-p="calls"><div class="t">Журнал звонков</div><div class="d">входящие на личный номер: кто, когда, итог, длительность.</div></a>
 </div>
 <script>
 var KEY = new URLSearchParams(location.search).get("key") || "";
@@ -1002,6 +995,350 @@ function live(){
 }
 live(); setInterval(live, 15000);
 </script></body></html>`;
+
+// Страницы поверх JSON: номера, база, обход, порты, звонки.
+const KRISHA_PHONES_HTML = `<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Крыша · номера: счётчики</title>
+<style>
+  :root{--bg:#0f1216;--card:#181d24;--line:#262d37;--fg:#e6e9ee;--mut:#8a95a5;--ok:#2fbf71;--no:#e5484d;--acc:#4c8dff;--warn:#f5a524}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:18px;max-width:1000px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 4px} .sub{color:var(--mut);margin:0 0 16px} .sub a{color:var(--acc);text-decoration:none}
+  h2{font-size:14px;margin:20px 0 8px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:0 0 6px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .card b{display:block;font-size:22px;font-variant-numeric:tabular-nums} .card .k{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.03em} .card .s{font-size:12px;color:var(--mut)}
+  .card.ok b{color:var(--ok)} .card.warn b{color:var(--warn)} .card.bad b{color:var(--no)}
+  table{border-collapse:collapse;width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;font-variant-numeric:tabular-nums;vertical-align:top}
+  th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em}
+  td.r,th.r{text-align:right}
+  .bar{height:6px;border-radius:3px;background:var(--acc);min-width:2px}
+  .mut{color:var(--mut)} .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;word-break:break-all}
+  button{border:1px solid var(--line);background:#12161c;color:var(--fg);border-radius:8px;padding:5px 10px;cursor:pointer;font:inherit;font-size:13px}
+  select{border:1px solid var(--line);background:#12161c;color:var(--fg);border-radius:8px;padding:6px 10px;font:inherit}
+  .tag{display:inline-block;padding:1px 7px;border-radius:99px;font-size:12px}
+  .tag.ok{background:rgba(47,191,113,.18);color:var(--ok)} .tag.no{background:rgba(229,72,77,.18);color:var(--no)} .tag.mut{background:rgba(138,149,165,.2);color:var(--mut)}
+  .err{color:var(--no)}
+</style></head><body>
+<h1>Крыша · номера: счётчики</h1>
+<p class="sub" id="upd"></p>
+
+<div id="cards" class="cards"></div>
+<h2>Промахи (без номера, с причиной)</h2>
+<div id="misses"></div>
+<h2>Очередь</h2>
+<div id="queue" class="cards"></div>
+<script>
+var KEY = new URLSearchParams(location.search).get("key") || "";
+var K = "key=" + encodeURIComponent(KEY);
+function esc(s){s=(s==null?"":String(s));return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function n(v){return v==null||v===""?"–":Number(v).toLocaleString("ru-RU");}
+function pad2(x){return ("0"+x).slice(-2);}
+function alm(v){if(!v)return "";var d=new Date(typeof v==="string"&&/^\d{4}-\d{2}-\d{2} /.test(v)?v.replace(" ","T")+"Z":v);if(isNaN(d))return String(v);d=new Date(d.getTime()+5*3600e3);return pad2(d.getUTCDate())+"."+pad2(d.getUTCMonth()+1)+" "+pad2(d.getUTCHours())+":"+pad2(d.getUTCMinutes())+":"+pad2(d.getUTCSeconds());}
+function ago(v){if(!v)return "";var m=Math.round((Date.now()-new Date(v).getTime())/60000);if(m<1)return "только что";if(m<60)return m+" мин назад";var h=Math.round(m/60);if(h<48)return h+" ч назад";return Math.round(h/24)+" дн назад";}
+function card(v,k,s,cls){return "<div class='card "+(cls||"")+"'><div class=k>"+esc(k)+"</div><b>"+v+"</b>"+(s?"<div class=s>"+s+"</div>":"")+"</div>";}
+function fail(id,e){document.getElementById(id).innerHTML="<p class=err>ошибка: "+esc(e&&e.message||e)+"</p>";}
+document.getElementById("upd").innerHTML='<a href="/api/krisha/hub?'+K+'">← все страницы</a> · <span id="updt"></span>';
+function stamp(){var d=new Date();document.getElementById("updt").textContent="обновлено "+pad2(d.getHours())+":"+pad2(d.getMinutes())+":"+pad2(d.getSeconds());}
+
+
+function load(){
+  fetch("/api/krisha/objphone/count?"+K).then(function(r){return r.json();}).then(function(j){
+    var w=j.withPhones||{};
+    document.getElementById("cards").innerHTML=
+      card(n(w.total),"всего с номером","хозяев "+n(w.owners)+" · агентов "+n(w.agents),"ok")+
+      card(n(w.today),"снято сегодня","за 7 дней "+n(w.last7d))+
+      card(n(w.live),"живых","снятых "+n(w.archived))+
+      card(n(w.sale),"продажа","аренда "+n(w.rent))+
+      card(w.last_at?ago(w.last_at):"–","последний номер",w.last_at?alm(w.last_at)+" (Алматы)":"");
+    var m=j.misses||{}, keys=Object.keys(m), lab={archived:"снято (окончательно)",not_found:"страницы нет (окончательно)",captcha:"капча, повтор через 30 мин",timeout:"номер не появился, повтор",no_phone:"без кнопки телефона, повтор через сутки",error:"ошибка, повтор"};
+    document.getElementById("misses").innerHTML=keys.length?"<table><tr><th>причина</th><th class=r>объявлений</th></tr>"+keys.map(function(k){return "<tr><td>"+esc(lab[k]||k)+"</td><td class=r>"+n(m[k])+"</td></tr>";}).join("")+"</table>":"<p class=mut>промахов нет</p>";
+    document.getElementById("queue").innerHTML=card(n(j.queue),"хозяев в очереди","живые, без номера, все города и типы · посчитано "+ago(j.queueAt));
+    stamp();
+  }).catch(function(e){fail("cards",e);});
+}
+load(); setInterval(load, 15000);
+</script></body></html>`;
+const KRISHA_DB_HTML = `<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Крыша · база: размер и нагрузка</title>
+<style>
+  :root{--bg:#0f1216;--card:#181d24;--line:#262d37;--fg:#e6e9ee;--mut:#8a95a5;--ok:#2fbf71;--no:#e5484d;--acc:#4c8dff;--warn:#f5a524}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:18px;max-width:1000px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 4px} .sub{color:var(--mut);margin:0 0 16px} .sub a{color:var(--acc);text-decoration:none}
+  h2{font-size:14px;margin:20px 0 8px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:0 0 6px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .card b{display:block;font-size:22px;font-variant-numeric:tabular-nums} .card .k{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.03em} .card .s{font-size:12px;color:var(--mut)}
+  .card.ok b{color:var(--ok)} .card.warn b{color:var(--warn)} .card.bad b{color:var(--no)}
+  table{border-collapse:collapse;width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;font-variant-numeric:tabular-nums;vertical-align:top}
+  th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em}
+  td.r,th.r{text-align:right}
+  .bar{height:6px;border-radius:3px;background:var(--acc);min-width:2px}
+  .mut{color:var(--mut)} .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;word-break:break-all}
+  button{border:1px solid var(--line);background:#12161c;color:var(--fg);border-radius:8px;padding:5px 10px;cursor:pointer;font:inherit;font-size:13px}
+  select{border:1px solid var(--line);background:#12161c;color:var(--fg);border-radius:8px;padding:6px 10px;font:inherit}
+  .tag{display:inline-block;padding:1px 7px;border-radius:99px;font-size:12px}
+  .tag.ok{background:rgba(47,191,113,.18);color:var(--ok)} .tag.no{background:rgba(229,72,77,.18);color:var(--no)} .tag.mut{background:rgba(138,149,165,.2);color:var(--mut)}
+  .err{color:var(--no)}
+</style></head><body>
+<h1>Крыша · база: размер и нагрузка</h1>
+<p class="sub" id="upd"></p>
+
+<div id="cards" class="cards"></div>
+<h2>Нагрузка по окнам (15 с)</h2>
+<div id="load"></div>
+<h2>Таблицы</h2>
+<div id="tables"></div>
+<h2>Индексы</h2>
+<div id="parts"></div>
+<h2>Запросы прямо сейчас</h2>
+<div id="running"></div>
+<script>
+var KEY = new URLSearchParams(location.search).get("key") || "";
+var K = "key=" + encodeURIComponent(KEY);
+function esc(s){s=(s==null?"":String(s));return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function n(v){return v==null||v===""?"–":Number(v).toLocaleString("ru-RU");}
+function pad2(x){return ("0"+x).slice(-2);}
+function alm(v){if(!v)return "";var d=new Date(typeof v==="string"&&/^\d{4}-\d{2}-\d{2} /.test(v)?v.replace(" ","T")+"Z":v);if(isNaN(d))return String(v);d=new Date(d.getTime()+5*3600e3);return pad2(d.getUTCDate())+"."+pad2(d.getUTCMonth()+1)+" "+pad2(d.getUTCHours())+":"+pad2(d.getUTCMinutes())+":"+pad2(d.getUTCSeconds());}
+function ago(v){if(!v)return "";var m=Math.round((Date.now()-new Date(v).getTime())/60000);if(m<1)return "только что";if(m<60)return m+" мин назад";var h=Math.round(m/60);if(h<48)return h+" ч назад";return Math.round(h/24)+" дн назад";}
+function card(v,k,s,cls){return "<div class='card "+(cls||"")+"'><div class=k>"+esc(k)+"</div><b>"+v+"</b>"+(s?"<div class=s>"+s+"</div>":"")+"</div>";}
+function fail(id,e){document.getElementById(id).innerHTML="<p class=err>ошибка: "+esc(e&&e.message||e)+"</p>";}
+document.getElementById("upd").innerHTML='<a href="/api/krisha/hub?'+K+'">← все страницы</a> · <span id="updt"></span>';
+function stamp(){var d=new Date();document.getElementById("updt").textContent="обновлено "+pad2(d.getHours())+":"+pad2(d.getMinutes())+":"+pad2(d.getSeconds());}
+
+
+function pct(v){v=Number(v)||0;var c=v>85?"var(--no)":v>60?"var(--warn)":"var(--ok)";return "<span style='display:inline-block;width:80px;height:6px;border-radius:3px;background:var(--line);vertical-align:middle;margin-right:6px'><span style='display:block;width:"+Math.min(100,v)+"%;height:6px;border-radius:3px;background:"+c+"'></span></span>"+Math.round(v)+"%";}
+function load(){
+  fetch("/api/krisha/dbsize?"+K).then(function(r){return r.json();}).then(function(j){
+    var d=j.db||{}, used=Number(d.used_mb), max=Number(d.max_mb), l0=(j.load||[])[0]||{};
+    var hot=Math.max(l0.cpu||0,l0.io||0,l0.log_write||0);
+    document.getElementById("cards").innerHTML=
+      card(n(used)+" МБ","занято","из "+n(max)+" МБ · "+Math.round(used/max*100)+"%",used/max>0.8?"warn":"")+
+      card(l0.dtu_limit||"–","DTU тариф","S0=10 · S1=20 · S2=50")+
+      card(Math.round(l0.cpu||0)+"%","процессор","последнее окно",l0.cpu>85?"bad":l0.cpu>60?"warn":"ok")+
+      card(Math.round(l0.io||0)+"%","диск","последнее окно",l0.io>85?"bad":l0.io>60?"warn":"ok")+
+      card(n((j.running||[]).length),"запросов сейчас","длиннее секунды");
+    document.getElementById("load").innerHTML="<table><tr><th>время (Алматы)</th><th>процессор</th><th>диск</th><th>журнал</th></tr>"+(j.load||[]).map(function(r){return "<tr><td>"+alm(r.at)+"</td><td>"+pct(r.cpu)+"</td><td>"+pct(r.io)+"</td><td>"+pct(r.log_write)+"</td></tr>";}).join("")+"</table>";
+    var tmax=Math.max.apply(null,(j.tables||[]).map(function(t){return Number(t.used_mb)||0;}).concat([1]));
+    document.getElementById("tables").innerHTML="<table><tr><th>таблица</th><th class=r>МБ</th><th style='width:40%'></th></tr>"+(j.tables||[]).map(function(t){return "<tr><td>"+esc(t.table)+"</td><td class=r>"+n(t.used_mb)+"</td><td><div class=bar style='width:"+Math.round(Number(t.used_mb)/tmax*100)+"%'></div></td></tr>";}).join("")+"</table>";
+    document.getElementById("parts").innerHTML="<table><tr><th>таблица</th><th>индекс</th><th>тип</th><th class=r>МБ</th><th class=r>строк</th></tr>"+(j.parts||[]).map(function(p){return "<tr><td>"+esc(p.table_name)+"</td><td class=mono>"+esc(p.index_name)+"</td><td class=mut>"+esc(p.type_desc)+"</td><td class=r>"+n(p.used_mb)+"</td><td class=r>"+(Number(p.rows_)?n(p.rows_):"")+"</td></tr>";}).join("")+"</table>";
+    var run=j.running||[];
+    document.getElementById("running").innerHTML=run.length?"<table><tr><th>сессия</th><th>статус</th><th>ожидание</th><th class=r>сек</th><th>запрос</th></tr>"+run.map(function(q){return "<tr><td>"+q.session_id+"</td><td>"+esc(q.status)+"</td><td class=mut>"+esc(q.wait_type||"")+"</td><td class=r>"+n(q.elapsed_s)+"</td><td class=mono>"+esc(String(q.sql_text||"").slice(0,160))+"</td></tr>";}).join("")+"</table>":"<p class=mut>долгих запросов нет</p>";
+    stamp();
+  }).catch(function(e){fail("cards",e);});
+}
+load(); setInterval(load, 20000);
+</script></body></html>`;
+const KRISHA_SWEEP_HTML = `<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Крыша · обход списка</title>
+<style>
+  :root{--bg:#0f1216;--card:#181d24;--line:#262d37;--fg:#e6e9ee;--mut:#8a95a5;--ok:#2fbf71;--no:#e5484d;--acc:#4c8dff;--warn:#f5a524}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:18px;max-width:1000px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 4px} .sub{color:var(--mut);margin:0 0 16px} .sub a{color:var(--acc);text-decoration:none}
+  h2{font-size:14px;margin:20px 0 8px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:0 0 6px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .card b{display:block;font-size:22px;font-variant-numeric:tabular-nums} .card .k{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.03em} .card .s{font-size:12px;color:var(--mut)}
+  .card.ok b{color:var(--ok)} .card.warn b{color:var(--warn)} .card.bad b{color:var(--no)}
+  table{border-collapse:collapse;width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;font-variant-numeric:tabular-nums;vertical-align:top}
+  th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em}
+  td.r,th.r{text-align:right}
+  .bar{height:6px;border-radius:3px;background:var(--acc);min-width:2px}
+  .mut{color:var(--mut)} .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;word-break:break-all}
+  button{border:1px solid var(--line);background:#12161c;color:var(--fg);border-radius:8px;padding:5px 10px;cursor:pointer;font:inherit;font-size:13px}
+  select{border:1px solid var(--line);background:#12161c;color:var(--fg);border-radius:8px;padding:6px 10px;font:inherit}
+  .tag{display:inline-block;padding:1px 7px;border-radius:99px;font-size:12px}
+  .tag.ok{background:rgba(47,191,113,.18);color:var(--ok)} .tag.no{background:rgba(229,72,77,.18);color:var(--no)} .tag.mut{background:rgba(138,149,165,.2);color:var(--mut)}
+  .err{color:var(--no)}
+</style></head><body>
+<h1>Крыша · обход списка</h1>
+<p class="sub" id="upd"></p>
+
+<div id="cur" class="cards"></div>
+<h2>База объявлений</h2>
+<div id="tot" class="cards"></div>
+<h2>События за 24 часа</h2>
+<div id="ev" class="cards"></div>
+<h2>По типу сделки и объекта</h2>
+<div id="bydeal"></div>
+<h2>Поднятия по дням</h2>
+<div id="bumps"></div>
+<script>
+var KEY = new URLSearchParams(location.search).get("key") || "";
+var K = "key=" + encodeURIComponent(KEY);
+function esc(s){s=(s==null?"":String(s));return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function n(v){return v==null||v===""?"–":Number(v).toLocaleString("ru-RU");}
+function pad2(x){return ("0"+x).slice(-2);}
+function alm(v){if(!v)return "";var d=new Date(typeof v==="string"&&/^\d{4}-\d{2}-\d{2} /.test(v)?v.replace(" ","T")+"Z":v);if(isNaN(d))return String(v);d=new Date(d.getTime()+5*3600e3);return pad2(d.getUTCDate())+"."+pad2(d.getUTCMonth()+1)+" "+pad2(d.getUTCHours())+":"+pad2(d.getUTCMinutes())+":"+pad2(d.getUTCSeconds());}
+function ago(v){if(!v)return "";var m=Math.round((Date.now()-new Date(v).getTime())/60000);if(m<1)return "только что";if(m<60)return m+" мин назад";var h=Math.round(m/60);if(h<48)return h+" ч назад";return Math.round(h/24)+" дн назад";}
+function card(v,k,s,cls){return "<div class='card "+(cls||"")+"'><div class=k>"+esc(k)+"</div><b>"+v+"</b>"+(s?"<div class=s>"+s+"</div>":"")+"</div>";}
+function fail(id,e){document.getElementById(id).innerHTML="<p class=err>ошибка: "+esc(e&&e.message||e)+"</p>";}
+document.getElementById("upd").innerHTML='<a href="/api/krisha/hub?'+K+'">← все страницы</a> · <span id="updt"></span>';
+function stamp(){var d=new Date();document.getElementById("updt").textContent="обновлено "+pad2(d.getHours())+":"+pad2(d.getMinutes())+":"+pad2(d.getSeconds());}
+
+
+var DEAL={sale:"продажа",rent:"аренда"}, PROP={flat:"квартиры",house:"дома",commercial:"коммерция",land:"участки",garage:"гаражи",other:"другое"};
+var KIND={new:"новых",bump:"поднятий",price:"смен цены",archived:"снято",back:"вернулось"};
+function load(){
+  fetch("/api/krisha/sweep?data=1&"+K).then(function(r){return r.json();}).then(function(j){
+    var c=j.cursor||{}, ls=j.lastSweep||{}, la=j.lastArchive||{};
+    document.getElementById("cur").innerHTML=
+      card(n(c.sweepNo),"круг обхода","начат "+(c.startedAt?alm(c.startedAt):"–"))+
+      card(esc(c.section||"–"),"часть","страница "+n(c.page))+
+      card(n(c.pages),"страниц в этом круге","объявлений "+n(c.adverts))+
+      card(ls.minutes?ls.minutes+" мин":"–","прошлый круг",ls.pages?n(ls.pages)+" стр · "+n(ls.adverts)+" объявл":"")+
+      card(n(la.archived),"снято по итогам круга",la.at?ago(la.at):"")+
+      card(j.dbSlow?"да":"нет","база тормозит","обход снижает потоки",j.dbSlow?"warn":"ok");
+    var s=j.stats||{}, t=s.total||{};
+    document.getElementById("tot").innerHTML=
+      card(n(t.total),"всего в базе","живых "+n(t.live))+
+      card(n(t.owner),"от хозяев","")+
+      card(n(t.with_geo),"с координатами","с ЖК "+n(t.with_complex))+
+      card(n(t.city_null),"без города","вне полигонов городов")+
+      (s.phones?card(n(s.phones.owners_with_phone),"хозяев с номером","живых без номера "+n(s.phones.owners_live_no_phone)):"");
+    var ev=s.events24h||[];
+    document.getElementById("ev").innerHTML=ev.length?ev.map(function(e){return card(n(e.n),KIND[e.kind]||e.kind,"");}).join(""):"<p class=mut>нет данных</p>";
+    var bd=s.byDealProp||[], bmax=Math.max.apply(null,bd.map(function(x){return x.n;}).concat([1]));
+    document.getElementById("bydeal").innerHTML="<table><tr><th>сделка</th><th>объект</th><th class=r>объявлений</th><th style='width:40%'></th></tr>"+bd.map(function(x){return "<tr><td>"+(DEAL[x.deal]||x.deal)+"</td><td>"+(PROP[x.prop]||x.prop)+"</td><td class=r>"+n(x.n)+"</td><td><div class=bar style='width:"+Math.round(x.n/bmax*100)+"%'></div></td></tr>";}).join("")+"</table>";
+    var bb=s.bumpedByDay||[], bbmax=Math.max.apply(null,bb.map(function(x){return x.n;}).concat([1]));
+    document.getElementById("bumps").innerHTML="<table><tr><th>день</th><th class=r>объявлений с поднятием</th><th style='width:40%'></th></tr>"+bb.map(function(x){return "<tr><td>"+String(x.bumped_on).slice(0,10)+"</td><td class=r>"+n(x.n)+"</td><td><div class=bar style='width:"+Math.round(x.n/bbmax*100)+"%'></div></td></tr>";}).join("")+"</table>";
+    stamp();
+  }).catch(function(e){fail("cur",e);});
+}
+load(); setInterval(load, 30000);
+</script></body></html>`;
+const KRISHA_PORTS_HTML = `<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Крыша · порты Asocks</title>
+<style>
+  :root{--bg:#0f1216;--card:#181d24;--line:#262d37;--fg:#e6e9ee;--mut:#8a95a5;--ok:#2fbf71;--no:#e5484d;--acc:#4c8dff;--warn:#f5a524}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:18px;max-width:1000px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 4px} .sub{color:var(--mut);margin:0 0 16px} .sub a{color:var(--acc);text-decoration:none}
+  h2{font-size:14px;margin:20px 0 8px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:0 0 6px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .card b{display:block;font-size:22px;font-variant-numeric:tabular-nums} .card .k{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.03em} .card .s{font-size:12px;color:var(--mut)}
+  .card.ok b{color:var(--ok)} .card.warn b{color:var(--warn)} .card.bad b{color:var(--no)}
+  table{border-collapse:collapse;width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;font-variant-numeric:tabular-nums;vertical-align:top}
+  th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em}
+  td.r,th.r{text-align:right}
+  .bar{height:6px;border-radius:3px;background:var(--acc);min-width:2px}
+  .mut{color:var(--mut)} .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;word-break:break-all}
+  button{border:1px solid var(--line);background:#12161c;color:var(--fg);border-radius:8px;padding:5px 10px;cursor:pointer;font:inherit;font-size:13px}
+  select{border:1px solid var(--line);background:#12161c;color:var(--fg);border-radius:8px;padding:6px 10px;font:inherit}
+  .tag{display:inline-block;padding:1px 7px;border-radius:99px;font-size:12px}
+  .tag.ok{background:rgba(47,191,113,.18);color:var(--ok)} .tag.no{background:rgba(229,72,77,.18);color:var(--no)} .tag.mut{background:rgba(138,149,165,.2);color:var(--mut)}
+  .err{color:var(--no)}
+</style></head><body>
+<h1>Крыша · порты Asocks</h1>
+<p class="sub" id="upd"></p>
+
+<p class="mut">Пароли только в кабинете Asocks. «IP» показывает текущий выходной адрес порта, «сменить» — запрашивает новый.</p>
+<div id="ports"></div>
+<script>
+var KEY = new URLSearchParams(location.search).get("key") || "";
+var K = "key=" + encodeURIComponent(KEY);
+function esc(s){s=(s==null?"":String(s));return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function n(v){return v==null||v===""?"–":Number(v).toLocaleString("ru-RU");}
+function pad2(x){return ("0"+x).slice(-2);}
+function alm(v){if(!v)return "";var d=new Date(typeof v==="string"&&/^\d{4}-\d{2}-\d{2} /.test(v)?v.replace(" ","T")+"Z":v);if(isNaN(d))return String(v);d=new Date(d.getTime()+5*3600e3);return pad2(d.getUTCDate())+"."+pad2(d.getUTCMonth()+1)+" "+pad2(d.getUTCHours())+":"+pad2(d.getUTCMinutes())+":"+pad2(d.getUTCSeconds());}
+function ago(v){if(!v)return "";var m=Math.round((Date.now()-new Date(v).getTime())/60000);if(m<1)return "только что";if(m<60)return m+" мин назад";var h=Math.round(m/60);if(h<48)return h+" ч назад";return Math.round(h/24)+" дн назад";}
+function card(v,k,s,cls){return "<div class='card "+(cls||"")+"'><div class=k>"+esc(k)+"</div><b>"+v+"</b>"+(s?"<div class=s>"+s+"</div>":"")+"</div>";}
+function fail(id,e){document.getElementById(id).innerHTML="<p class=err>ошибка: "+esc(e&&e.message||e)+"</p>";}
+document.getElementById("upd").innerHTML='<a href="/api/krisha/hub?'+K+'">← все страницы</a> · <span id="updt"></span>';
+function stamp(){var d=new Date();document.getElementById("updt").textContent="обновлено "+pad2(d.getHours())+":"+pad2(d.getMinutes())+":"+pad2(d.getSeconds());}
+
+
+function load(){
+  fetch("/api/krisha/objphone/ports?"+K).then(function(r){return r.json();}).then(function(j){
+    var ps=j.ports||[];
+    document.getElementById("ports").innerHTML="<table><tr><th>id</th><th>имя</th><th>адрес</th><th>логин</th><th>выходной IP</th><th></th></tr>"+ps.map(function(p){return "<tr id='p"+p.id+"'><td class=mono>"+p.id+"</td><td>"+esc(p.name||"")+"</td><td class=mono>"+esc(p.proxy||"")+"</td><td class=mono>"+esc(p.login||"")+"</td><td class=mono id='ip"+p.id+"'></td><td><button onclick='chk("+p.id+",0)'>IP</button> <button onclick='chk("+p.id+",1)'>сменить</button></td></tr>";}).join("")+"</table>";
+    stamp();
+  }).catch(function(e){fail("ports",e);});
+}
+function chk(id,rotate){
+  var el=document.getElementById("ip"+id); el.textContent="…";
+  fetch("/api/krisha/objphone/rotate?"+K+"&check=1&port="+id,{method:rotate?"POST":"GET"}).then(function(r){return r.json();}).then(function(j){
+    el.textContent=(j.exitIp||j.exitErr||j.error||"?")+(rotate?(j.rotated?" (сменён)":j.throttled?" (менялся только что)":""):"");
+  }).catch(function(e){el.textContent="ошибка";});
+}
+load();
+</script></body></html>`;
+const KRISHA_CALLS_HTML = `<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Крыша · журнал звонков</title>
+<style>
+  :root{--bg:#0f1216;--card:#181d24;--line:#262d37;--fg:#e6e9ee;--mut:#8a95a5;--ok:#2fbf71;--no:#e5484d;--acc:#4c8dff;--warn:#f5a524}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:18px;max-width:1000px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 4px} .sub{color:var(--mut);margin:0 0 16px} .sub a{color:var(--acc);text-decoration:none}
+  h2{font-size:14px;margin:20px 0 8px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:0 0 6px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .card b{display:block;font-size:22px;font-variant-numeric:tabular-nums} .card .k{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.03em} .card .s{font-size:12px;color:var(--mut)}
+  .card.ok b{color:var(--ok)} .card.warn b{color:var(--warn)} .card.bad b{color:var(--no)}
+  table{border-collapse:collapse;width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;font-variant-numeric:tabular-nums;vertical-align:top}
+  th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em}
+  td.r,th.r{text-align:right}
+  .bar{height:6px;border-radius:3px;background:var(--acc);min-width:2px}
+  .mut{color:var(--mut)} .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;word-break:break-all}
+  button{border:1px solid var(--line);background:#12161c;color:var(--fg);border-radius:8px;padding:5px 10px;cursor:pointer;font:inherit;font-size:13px}
+  select{border:1px solid var(--line);background:#12161c;color:var(--fg);border-radius:8px;padding:6px 10px;font:inherit}
+  .tag{display:inline-block;padding:1px 7px;border-radius:99px;font-size:12px}
+  .tag.ok{background:rgba(47,191,113,.18);color:var(--ok)} .tag.no{background:rgba(229,72,77,.18);color:var(--no)} .tag.mut{background:rgba(138,149,165,.2);color:var(--mut)}
+  .err{color:var(--no)}
+</style></head><body>
+<h1>Крыша · журнал звонков</h1>
+<p class="sub" id="upd"></p>
+
+<p class="mut">Входящие на личный номер через Zadarma. <select id="days"><option value="1">за сутки</option><option value="7" selected>за 7 дней</option><option value="30">за 30 дней</option></select></p>
+<div id="cards" class="cards"></div>
+<div id="calls"></div>
+<script>
+var KEY = new URLSearchParams(location.search).get("key") || "";
+var K = "key=" + encodeURIComponent(KEY);
+function esc(s){s=(s==null?"":String(s));return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function n(v){return v==null||v===""?"–":Number(v).toLocaleString("ru-RU");}
+function pad2(x){return ("0"+x).slice(-2);}
+function alm(v){if(!v)return "";var d=new Date(typeof v==="string"&&/^\d{4}-\d{2}-\d{2} /.test(v)?v.replace(" ","T")+"Z":v);if(isNaN(d))return String(v);d=new Date(d.getTime()+5*3600e3);return pad2(d.getUTCDate())+"."+pad2(d.getUTCMonth()+1)+" "+pad2(d.getUTCHours())+":"+pad2(d.getUTCMinutes())+":"+pad2(d.getUTCSeconds());}
+function ago(v){if(!v)return "";var m=Math.round((Date.now()-new Date(v).getTime())/60000);if(m<1)return "только что";if(m<60)return m+" мин назад";var h=Math.round(m/60);if(h<48)return h+" ч назад";return Math.round(h/24)+" дн назад";}
+function card(v,k,s,cls){return "<div class='card "+(cls||"")+"'><div class=k>"+esc(k)+"</div><b>"+v+"</b>"+(s?"<div class=s>"+s+"</div>":"")+"</div>";}
+function fail(id,e){document.getElementById(id).innerHTML="<p class=err>ошибка: "+esc(e&&e.message||e)+"</p>";}
+document.getElementById("upd").innerHTML='<a href="/api/krisha/hub?'+K+'">← все страницы</a> · <span id="updt"></span>';
+function stamp(){var d=new Date();document.getElementById("updt").textContent="обновлено "+pad2(d.getHours())+":"+pad2(d.getMinutes())+":"+pad2(d.getSeconds());}
+
+
+function dur(s){s=Number(s)||0;return Math.floor(s/60)+":"+pad2(s%60);}
+function pretty(x){x=String(x||"").replace(/\D/g,"");return x.length===11?"+"+x[0]+" "+x.slice(1,4)+" "+x.slice(4,7)+" "+x.slice(7,9)+" "+x.slice(9):x;}
+function load(){
+  var d=document.getElementById("days").value;
+  fetch("/api/calls?mine=1&days="+d+"&limit=500&"+K).then(function(r){return r.json();}).then(function(j){
+    var cs=j.calls||[], ans=cs.filter(function(c){return c.disposition==="answered";}), missed=cs.length-ans.length;
+    document.getElementById("cards").innerHTML=card(n(cs.length),"звонков","")+card(n(ans.length),"отвечено","","ok")+card(n(missed),"пропущено","",missed?"warn":"")+card(dur(ans.reduce(function(a,c){return a+(c.duration_secs||0);},0)),"разговоров всего","мин:сек");
+    document.getElementById("calls").innerHTML=cs.length?"<table><tr><th>время (Алматы)</th><th>откуда</th><th>итог</th><th class=r>длит.</th><th>запись</th></tr>"+cs.map(function(c){var ok=c.disposition==="answered";return "<tr><td>"+alm(c.started_at)+"</td><td><a style='color:var(--acc);text-decoration:none' href='tel:"+esc(c.caller)+"'>"+esc(pretty(c.caller))+"</a>"+(c.direction==="out"?" <span class=mut>(исходящий)</span>":"")+"</td><td><span class='tag "+(ok?"ok":"no")+"'>"+(ok?"разговор":esc(c.disposition||"без ответа"))+"</span></td><td class=r>"+(ok?dur(c.duration_secs):"")+"</td><td>"+(c.recorded?"есть":"")+"</td></tr>";}).join("")+"</table>":"<p class=mut>звонков нет</p>";
+    stamp();
+  }).catch(function(e){fail("cards",e);});
+}
+document.getElementById("days").onchange=load;
+load(); setInterval(load, 30000);
+</script></body></html>`;
+let sweepStatsCache = { at: 0, body: null }; // listStats для страницы обхода, раз в 5 минут
 
 let consoleTotalCache = null; // итог «всего с номером» для консоли, раз в 30 с
 // Консоль обхода: события списка в реальном времени.
@@ -7157,6 +7494,38 @@ http
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
       res.end(KRISHA_LIST_STATS_HTML);
       return;
+    }
+
+    // Страницы поверх JSON. Данные берут с существующих точек; у обхода —
+    // свой ?data=1 с курсором и кэшированной статистикой списка.
+    {
+      const pages = { "/api/krisha/phones": KRISHA_PHONES_HTML, "/api/krisha/db": KRISHA_DB_HTML, "/api/krisha/sweep": KRISHA_SWEEP_HTML,
+                      "/api/krisha/ports": KRISHA_PORTS_HTML, "/api/krisha/calls": KRISHA_CALLS_HTML };
+      if (pages[urlPath]) {
+        const key = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
+        if (!key || parsed.searchParams.get("key") !== key) { res.writeHead(403); res.end("bad key"); return; }
+        if (urlPath === "/api/krisha/sweep" && parsed.searchParams.get("data")) {
+          (async () => {
+            if (!sweepStatsCache.body || Date.now() - sweepStatsCache.at > 300e3) {
+              try { sweepStatsCache = { at: Date.now(), body: await db.listStats() }; }
+              catch (e) { if (!sweepStatsCache.body) throw e; }
+            }
+            const L = require("./scripts/krisha-list.js");
+            const st = KW.list || {};
+            const sec = L.SECTIONS[st.section] || L.SECTIONS[0];
+            res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+            res.end(JSON.stringify({
+              cursor: { sweepNo: st.sweepNo, section: sec && sec.label, page: st.page, pages: st.pages, adverts: st.adverts, startedAt: st.startedAt },
+              lastSweep: st.lastSweep || null, lastArchive: st.lastArchive || null, dbSlow: !!st.dbSlow,
+              stats: sweepStatsCache.body, statsAt: sweepStatsCache.at,
+            }));
+          })().catch((e) => { res.writeHead(500); res.end(String(e.message)); });
+          return;
+        }
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+        res.end(pages[urlPath]);
+        return;
+      }
     }
 
     // Навигатор: список всех страниц по группам с живыми цифрами.
