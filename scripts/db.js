@@ -2346,7 +2346,7 @@ async function leadsList(f) {
     .input("status", sql.NVarChar(20), f.status || "open")
     .query(`
     SELECT TOP (@n) l.id, l.deal, l.prop, l.city, l.price, l.rooms, l.area, l.floor, l.floors, l.title, l.addr, l.owner_name,
-      l.photos_c, l.photos_json, l.first_seen, l.bumped_on, l.phones, l.phones_at,
+      l.lat, l.lon, l.photos_c, l.photos_json, l.first_seen, l.bumped_on, l.phones, l.phones_at,
       ev.last_bump, ev.bumps, pr.last_price_at, pr.old_price, pr.new_price, bk.last_back,
       (SELECT COUNT(*) FROM dbo.krisha_list_matches m WHERE m.owner_id = l.id AND m.photo_match = 1) AS agents,
       s.status, s.note, s.updated_at AS status_at,

@@ -1610,6 +1610,22 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   .skl{height:14px;margin:8px 0}
 
   .skcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:0 0 10px;display:grid;grid-template-columns:150px 1fr;gap:12px}
+  .view{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .view button{border:0;border-radius:0} .view button.on{background:#2a3242}
+  .mapwrap{display:none;grid-template-columns:1fr 440px;gap:12px;height:calc(100vh - 150px);min-height:420px}
+  .mapwrap.on{display:grid}
+  #map{border-radius:12px;border:1px solid var(--line);background:#12161c}
+  #maplist{overflow:auto;padding-right:4px} #maplist .card{grid-template-columns:110px 1fr} #maplist .photos img{width:110px;height:80px}
+  #maplist .card.hl{border-color:var(--acc)}
+  @media(max-width:900px){.mapwrap{grid-template-columns:1fr;height:auto} #map{height:60vh} #maplist{max-height:50vh}}
+  .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--card);color:var(--fg);box-shadow:0 6px 24px rgba(0,0,0,.4)}
+  .leaflet-popup-content{margin:10px 12px;font:13px/1.4 system-ui,sans-serif} .leaflet-popup-content a{color:var(--acc)}
+  .leaflet-container{font-family:system-ui,sans-serif}
+  .marker-cluster-small,.marker-cluster-medium,.marker-cluster-large{background:rgba(76,141,255,.35)}
+  .marker-cluster-small div,.marker-cluster-medium div,.marker-cluster-large div{background:rgba(76,141,255,.9);color:#fff;font-weight:600}
+  .pin{width:12px;height:12px;border-radius:50%;background:var(--acc);border:2px solid #fff;box-shadow:0 0 0 2px rgba(76,141,255,.4)}
+  .pin.hot{background:var(--warn)}
+
   .tag.click{cursor:pointer} .tag.click:hover{filter:brightness(1.25)}
   .ov{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-start;justify-content:center;padding:24px 12px;overflow:auto;z-index:50}
   .ov.on{display:flex}
@@ -1632,9 +1648,11 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   <select id="hours"><option value="24">за сутки</option><option value="72" selected>за 3 дня</option><option value="168">за неделю</option><option value="720">за месяц</option></select>
   <select id="signal"><option value="all">любой сигнал</option><option value="new">новые</option><option value="bump">подняли</option><option value="price">снизили цену</option><option value="back">вернули из архива</option></select>
   <select id="status"><option value="open">не обзвонены</option><option value="called">звонил</option><option value="callback">перезвонить</option><option value="refused">отказ</option><option value="deal">договор</option><option value="all">все</option></select>
-  <button id="go" class="on">Показать</button>
+  <button id="go" class="on">Найти</button>
+  <span class="view"><button id="vlist" class="on">Списком</button><button id="vmap">На карте</button></span>
 </div>
 <div id="list"></div>
+<div id="mapwrap" class="mapwrap"><div id="map"></div><div id="maplist"></div></div>
 <div id="ov" class="ov" onclick="if(event.target===this)closeHist()"><div class="md"><button class="x" onclick="closeHist()">×</button><div id="mdc">загрузка…</div></div></div>
 <script>
 var KEY = new URLSearchParams(location.search).get("key") || "";
@@ -1723,17 +1741,20 @@ function tags(x){var t=[];
 function render(rows){
   if(!Array.isArray(rows)){document.getElementById("cnt").textContent="";document.getElementById("list").innerHTML="<div class=empty>сервер не ответил: "+esc((rows&&rows.error)||"ошибка")+" — попробуйте ещё раз или сузьте период</div>";return;}
   document.getElementById("cnt").textContent="· "+rows.length;
-  if(!rows.length){document.getElementById("list").innerHTML="<div class=empty>по этим фильтрам пусто</div>";return;}
-  var h="";
-  rows.forEach(function(x){
+  ROWS=rows;
+  if(!rows.length){document.getElementById("list").innerHTML="<div class=empty>по этим фильтрам пусто</div>";if(VIEW==="map"&&MAP)plot();return;}
+  document.getElementById("list").innerHTML=rows.map(cardHtml).join("");
+  if(VIEW==="map") ensureMap().then(plot);
+}
+function cardHtml(x){
     var ph=(x.phones||[]).map(function(n){return "<a href='tel:+"+esc(n)+"'>"+esc(pretty(n))+"</a>";}).join("");
     var par=[x.rooms?x.rooms+"-комн":"",x.area?x.area+" м²":"",x.floor&&x.floors?x.floor+"/"+x.floors+" эт":""].filter(Boolean).join(" · ");
-    h+="<div class=card data-id='"+x.id+"'>"+
+    return "<div class=card data-id='"+x.id+"'>"+
       "<div class=photos>"+(x.photos&&x.photos.length?"<img loading=lazy src='"+esc(x.photos[0])+"'>":"<div class=mut>нет фото</div>")+"</div>"+
       "<div>"+
         "<div><span class=title>"+esc(x.title||par)+"</span><span class=price>"+money(x.price)+"</span></div>"+
         "<div class=row>"+tags(x)+"</div>"+
-        "<div class='row mut'>"+esc(x.addr||"")+(x.addr?" · ":"")+esc(x.city||"")+" · на рынке "+days(x.first_seen)+" дн · <a target=_blank href='https://krisha.kz/a/show/"+x.id+"'>на Крыше</a></div>"+
+        "<div class='row mut'>"+esc(x.addr||"")+(x.addr?" · ":"")+esc(x.city||"")+" · на рынке "+days(x.first_seen)+" дн · <a target=_blank href='https://krisha.kz/a/show/"+x.id+"'>на Крыше</a>"+(x.lat!=null?" · <a href='#' onclick='setView(&quot;map&quot;);focusPin("+x.id+");return false'>на карте</a>":"")+"</div>"+
         "<div class='row phones'>"+(x.owner_name?"<span class=mut>"+esc(x.owner_name)+" · </span>":"")+ph+"</div>"+
         "<div class=st>"+
           ["called|звонил","callback|перезвонить","refused|отказ","deal|договор"].map(function(s){var p=s.split("|");return "<button class='"+p[0]+(x.status===p[0]?" on":"")+"' onclick='setSt("+x.id+",&#39;"+p[0]+"&#39;,this)'>"+p[1]+"</button>";}).join("")+
@@ -1741,9 +1762,70 @@ function render(rows){
           (x.status_at?"<span class=mut>"+dmT(x.status_at)+"</span>":"")+
         "</div>"+
       "</div></div>";
-  });
-  document.getElementById("list").innerHTML=h;
 }
+// --- карта: Leaflet и кластеры подгружаются при первом переключении ---
+var ROWS=[], VIEW="list", MAP=null, CLUSTER=null, MARKERS={};
+try{VIEW=localStorage.getItem("leads:view")||"list";}catch(e){}
+function setView(v){
+  VIEW=v; try{localStorage.setItem("leads:view",v);}catch(e){}
+  document.getElementById("vlist").className=v==="list"?"on":""; document.getElementById("vmap").className=v==="map"?"on":"";
+  document.getElementById("list").style.display=v==="list"?"":"none";
+  document.getElementById("mapwrap").className="mapwrap"+(v==="map"?" on":"");
+  if(v==="map") ensureMap().then(function(){ MAP.invalidateSize(); plot(); });
+}
+function loadScript(src){return new Promise(function(res,rej){var s=document.createElement("script");s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
+function loadCss(href){var l=document.createElement("link");l.rel="stylesheet";l.href=href;document.head.appendChild(l);}
+var mapReady=null;
+function ensureMap(){
+  if(mapReady) return mapReady;
+  loadCss("https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css");
+  loadCss("https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css");
+  loadCss("https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.min.css");
+  mapReady=loadScript("https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js")
+    .then(function(){return loadScript("https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js");})
+    .then(function(){
+      MAP=L.map("map",{zoomControl:true}).setView([43.238,76.915],11);
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{maxZoom:19,attribution:"&copy; OpenStreetMap, &copy; CARTO"}).addTo(MAP);
+      CLUSTER=L.markerClusterGroup({maxClusterRadius:50,showCoverageOnHover:false,spiderfyOnMaxZoom:true});
+      MAP.addLayer(CLUSTER);
+      MAP.on("moveend",renderMapList);
+    });
+  return mapReady;
+}
+function pinIcon(hot){return L.divIcon({className:"",html:"<div class='pin"+(hot?" hot":"")+"'></div>",iconSize:[12,12],iconAnchor:[6,6]});}
+function popup(x){
+  var ph=(x.phones||[]).map(function(n){return "<a href='tel:+"+esc(n)+"'>"+esc(pretty(n))+"</a>";}).join(", ");
+  return "<b>"+esc(x.title||"")+"</b> · <b>"+money(x.price)+"</b><br><span style='color:var(--mut)'>"+esc(x.addr||"")+"</span><br>"+(x.owner_name?esc(x.owner_name)+" · ":"")+ph+
+    "<br><a href='#' onclick='openHist("+x.id+");return false'>история</a> · <a target=_blank href='https://krisha.kz/a/show/"+x.id+"'>на Крыше</a>";
+}
+function plot(){
+  if(!MAP) return;
+  CLUSTER.clearLayers(); MARKERS={};
+  var pts=[];
+  ROWS.forEach(function(x){
+    if(x.lat==null||x.lon==null) return;
+    var hot=!!(x.last_bump||x.last_price_at||x.last_back);
+    var m=L.marker([Number(x.lat),Number(x.lon)],{icon:pinIcon(hot)}).bindPopup(popup(x));
+    m.on("click",function(){highlight(x.id);});
+    m._leadId=x.id; MARKERS[x.id]=m; CLUSTER.addLayer(m); pts.push([Number(x.lat),Number(x.lon)]);
+  });
+  if(pts.length) MAP.fitBounds(L.latLngBounds(pts).pad(0.1),{maxZoom:14});
+  renderMapList();
+}
+function renderMapList(){
+  if(!MAP) return;
+  var b=MAP.getBounds(), vis=ROWS.filter(function(x){return x.lat!=null&&x.lon!=null&&b.contains([Number(x.lat),Number(x.lon)]);});
+  var noGeo=ROWS.filter(function(x){return x.lat==null||x.lon==null;}).length;
+  document.getElementById("maplist").innerHTML="<div class='mut' style='margin:0 0 8px'>в видимой области "+vis.length+" из "+ROWS.length+(noGeo?" · без координат "+noGeo:"")+"</div>"+vis.slice(0,150).map(cardHtml).join("")+(vis.length>150?"<div class=mut>показаны первые 150, приблизьте карту</div>":"");
+}
+function highlight(id){
+  document.querySelectorAll("#maplist .card.hl").forEach(function(c){c.classList.remove("hl");});
+  var c=document.querySelector("#maplist .card[data-id='"+id+"']"); if(c){c.classList.add("hl");c.scrollIntoView({block:"nearest",behavior:"smooth"});}
+}
+function focusPin(id){ if(!MAP||!MARKERS[id]) return; var m=MARKERS[id]; CLUSTER.zoomToShowLayer(m,function(){m.openPopup();}); }
+document.getElementById("vlist").onclick=function(){setView("list");};
+document.getElementById("vmap").onclick=function(){setView("map");};
+
 function setSt(id,status,el){
   var card=el.closest(".card");var note=card.querySelector("input").value;
   var cur=card.querySelector(".st button.on");
@@ -1755,6 +1837,7 @@ function setSt(id,status,el){
 }
 try{F.forEach(function(k){var v=localStorage.getItem("leads:"+k);if(v!=null)document.getElementById(k).value=v;});}catch(e){}
 document.getElementById("go").onclick=load;
+setView(VIEW);
 F.forEach(function(k){document.getElementById(k).addEventListener("change",load);});
 load();
 </script></body></html>`;
