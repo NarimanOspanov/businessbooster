@@ -7247,10 +7247,9 @@ http
             });
           });
           const dashKey = encodeURIComponent(KRISHA_JOB_KEY || KRISHA_PHONE_KEY);
-          lines.push("", "",
-            '<a href="' + CANONICAL + "/api/krisha/listmonitor?key=" + dashKey + '">все совпадения</a>' +
-            " · " +
-            '<a href="' + CANONICAL + "/api/krisha/liststats?key=" + dashKey + '">статистика</a>');
+          // Одна ссылка — на навигатор: оттуда все страницы (лиды, статистика,
+          // консоли, проверка находок).
+          lines.push("", "", '<a href="' + CANONICAL + "/api/krisha/hub?key=" + dashKey + '">статистика</a>');
           notifyTelegram(lines.join("\n"));
         }
 
