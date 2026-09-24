@@ -1620,7 +1620,8 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   @media(max-width:900px){.mapwrap{grid-template-columns:1fr;height:auto} #map{height:60vh} #maplist{max-height:50vh}}
   .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--card);color:var(--fg);box-shadow:0 6px 24px rgba(0,0,0,.4)}
   .leaflet-popup-content{margin:10px 12px;font:13px/1.4 system-ui,sans-serif} .leaflet-popup-content a{color:var(--acc)}
-  .leaflet-container{font-family:system-ui,sans-serif}
+  .leaflet-container{font-family:system-ui,sans-serif;background:#0f1216}
+  .leaflet-tile{filter:invert(1) hue-rotate(190deg) brightness(.82) contrast(.9) saturate(.6)}
   .marker-cluster-small,.marker-cluster-medium,.marker-cluster-large{background:rgba(76,141,255,.35)}
   .marker-cluster-small div,.marker-cluster-medium div,.marker-cluster-large div{background:rgba(76,141,255,.9);color:#fff;font-weight:600}
   .pin{width:12px;height:12px;border-radius:50%;background:var(--acc);border:2px solid #fff;box-shadow:0 0 0 2px rgba(76,141,255,.4)}
@@ -1771,25 +1772,29 @@ function setView(v){
   document.getElementById("vlist").className=v==="list"?"on":""; document.getElementById("vmap").className=v==="map"?"on":"";
   document.getElementById("list").style.display=v==="list"?"":"none";
   document.getElementById("mapwrap").className="mapwrap"+(v==="map"?" on":"");
-  if(v==="map") ensureMap().then(function(){ MAP.invalidateSize(); plot(); });
+  if(v==="map") ensureMap().then(function(){ setTimeout(function(){ MAP.invalidateSize(); plot(); },50); });
 }
 function loadScript(src){return new Promise(function(res,rej){var s=document.createElement("script");s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
-function loadCss(href){var l=document.createElement("link");l.rel="stylesheet";l.href=href;document.head.appendChild(l);}
+function loadCss(href){return new Promise(function(res){var l=document.createElement("link");l.rel="stylesheet";l.href=href;l.onload=res;l.onerror=res;document.head.appendChild(l);});}
 var mapReady=null;
 function ensureMap(){
   if(mapReady) return mapReady;
-  loadCss("https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css");
-  loadCss("https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css");
-  loadCss("https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.min.css");
-  mapReady=loadScript("https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js")
+  // Сначала стили (иначе карта считает размеры до их применения), потом скрипты.
+  mapReady=Promise.all([
+      loadCss("https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"),
+      loadCss("https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css"),
+      loadCss("https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.min.css")])
+    .then(function(){return loadScript("https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js");})
     .then(function(){return loadScript("https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js");})
-    .then(function(){
+    .then(function(){return new Promise(function(res){
       MAP=L.map("map",{zoomControl:true}).setView([43.238,76.915],11);
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{maxZoom:19,attribution:"&copy; OpenStreetMap, &copy; CARTO"}).addTo(MAP);
+      // OpenStreetMap без ключа; тёмный вид — инверсией тайлов через CSS.
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"&copy; OpenStreetMap"}).addTo(MAP);
       CLUSTER=L.markerClusterGroup({maxClusterRadius:50,showCoverageOnHover:false,spiderfyOnMaxZoom:true});
       MAP.addLayer(CLUSTER);
       MAP.on("moveend",renderMapList);
-    });
+      MAP.whenReady(function(){setTimeout(res,50);});
+    });});
   return mapReady;
 }
 function pinIcon(hot){return L.divIcon({className:"",html:"<div class='pin"+(hot?" hot":"")+"'></div>",iconSize:[12,12],iconAnchor:[6,6]});}
@@ -1809,12 +1814,13 @@ function plot(){
     m.on("click",function(){highlight(x.id);});
     m._leadId=x.id; MARKERS[x.id]=m; CLUSTER.addLayer(m); pts.push([Number(x.lat),Number(x.lon)]);
   });
+  MAP.invalidateSize();
   if(pts.length) MAP.fitBounds(L.latLngBounds(pts).pad(0.1),{maxZoom:14});
   renderMapList();
 }
 function renderMapList(){
   if(!MAP) return;
-  var b=MAP.getBounds(), vis=ROWS.filter(function(x){return x.lat!=null&&x.lon!=null&&b.contains([Number(x.lat),Number(x.lon)]);});
+  var b=MAP.getBounds(), vis=ROWS.filter(function(x){return x.lat!=null&&x.lon!=null&&b.contains(L.latLng(Number(x.lat),Number(x.lon)));});
   var noGeo=ROWS.filter(function(x){return x.lat==null||x.lon==null;}).length;
   document.getElementById("maplist").innerHTML="<div class='mut' style='margin:0 0 8px'>в видимой области "+vis.length+" из "+ROWS.length+(noGeo?" · без координат "+noGeo:"")+"</div>"+vis.slice(0,150).map(cardHtml).join("")+(vis.length>150?"<div class=mut>показаны первые 150, приблизьте карту</div>":"");
 }
