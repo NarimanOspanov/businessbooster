@@ -972,6 +972,7 @@ BEGIN
   );
   CREATE INDEX IX_pcalls_started ON dbo.phone_calls (started_at DESC);
 END
+IF COL_LENGTH('dbo.phone_calls', 'note') IS NULL ALTER TABLE dbo.phone_calls ADD note NVARCHAR(400) NULL;
 `;
 let callsReady = false, callsReadyPromise = null, callsFailedAt = 0;
 async function ensureCalls() {
@@ -1048,12 +1049,40 @@ async function phoneCalls(days, limit, mineOnly) {
     .input("n", sql.Int, Math.min(2000, Math.max(1, Number(limit) || 200)))
     .query(`
       SELECT TOP (@n) pbx_call_id, direction, caller, did, internal, destination, started_at, answered_at, ended_at,
-        duration_secs, disposition, recorded, rec_id
+        duration_secs, disposition, recorded, rec_id, note
       FROM dbo.phone_calls
       WHERE started_at >= DATEADD(day, -@d, SYSUTCDATETIME())
         ${mineOnly ? "AND (did IS NULL OR did NOT IN (SELECT REPLACE(REPLACE(number, '+', ''), ' ', '') FROM dbo.numbers WHERE status <> 'retired'))" : ""}
       ORDER BY started_at DESC`);
   return r.recordset;
+}
+
+// Заметка к звонку (страница журнала): что сделали по этому контакту.
+async function setCallNote(pbxCallId, note) {
+  const pool = await getPool();
+  await ensureCalls();
+  await pool.request().input("id", sql.NVarChar(64), String(pbxCallId).slice(0, 64))
+    .input("note", sql.NVarChar(400), note ? String(note).slice(0, 400) : null)
+    .query("UPDATE dbo.phone_calls SET note = @note WHERE pbx_call_id = @id");
+}
+
+// Объявления Крыши по номерам звонивших: если хозяин звонит сам, агент сразу
+// видит его объявление. Номера — 11 цифр; поиск по подстроке в phones, по
+// 20 номеров на запрос (строк с номером десятки тысяч, это быстро).
+async function listingsByPhones(numbers) {
+  const nums = [...new Set((numbers || []).map((x) => String(x || "").replace(/\D/g, "")).filter((x) => x.length === 11))];
+  const out = {};
+  if (!nums.length) return out;
+  const pool = await getPool();
+  await ensureList(pool);
+  for (let i = 0; i < nums.length; i += 20) {
+    const chunk = nums.slice(i, i + 20);
+    const req = pool.request();
+    const conds = chunk.map((n, k) => { req.input("p" + k, sql.NVarChar(20), "%" + n + "%"); return "phones LIKE @p" + k; });
+    const r = await req.query("SELECT id, title, price, city, deal, prop, storage, phones FROM dbo.krisha_list WHERE phones IS NOT NULL AND (" + conds.join(" OR ") + ")");
+    for (const row of r.recordset) for (const n of chunk) if (String(row.phones).includes(n)) (out[n] = out[n] || []).push({ id: String(row.id), title: row.title, price: row.price, city: row.city, deal: row.deal, storage: row.storage });
+  }
+  return out;
 }
 
 async function lastZadarmaEvents(limit) {
@@ -3511,7 +3540,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,
-  getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, upsertPhoneCall, phoneCalls, agentDids, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
+  getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, upsertPhoneCall, phoneCalls, setCallNote, listingsByPhones, agentDids, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 
 if (require.main === module) {
   const cmd = process.argv[2];

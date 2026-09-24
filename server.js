@@ -822,7 +822,7 @@ const KRISHA_STATS_HTML = `<!doctype html>
   .leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:middle}
 </style></head><body>
 <h1>Крыша · импорт и находки</h1>
-<p class="sub" id="range">загрузка…</p>
+<p class="sub" id="range"><span class="sk" style="display:inline-block;width:260px;height:14px;border-radius:6px"> </span></p>
 <div class="tabs" id="tabs"></div>
 <div class="cards" id="cards"></div>
 <div class="filters"><span class="lbl">Сделка:</span><span id="deals"></span></div>
@@ -935,6 +935,12 @@ const KRISHA_HUB_HTML = `<!doctype html>
   .card .n{margin-top:8px;font-size:13px;color:var(--ok);font-variant-numeric:tabular-nums;min-height:18px}
   .card.small{padding:10px 14px} .card.small .t{font-size:14px}
   .live{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:6px;vertical-align:middle}
+  .sk{position:relative;overflow:hidden;background:#1c222b;border-radius:8px;color:transparent!important}
+  .sk::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,.07),transparent);animation:skm 1.3s infinite}
+  @keyframes skm{100%{transform:translateX(100%)}}
+  .skc{height:74px;border-radius:12px;margin:0}
+  .skl{height:14px;margin:8px 0}
+
 </style></head><body>
 <h1>Крыша · страницы</h1>
 <p class="sub">ключ подставлен во все ссылки · <span id="upd"></span></p>
@@ -974,6 +980,7 @@ document.querySelectorAll("a.card").forEach(function(a){
 });
 function n(v){return v==null?"–":Number(v).toLocaleString("ru-RU");}
 function pad2(x){return ("0"+x).slice(-2);}
+["n-leads","n-liststats","n-listconsole","n-listmonitor","n-phones"].forEach(function(id){var el=document.getElementById(id);if(el&&!el.textContent)el.innerHTML="<span class='sk' style='display:inline-block;width:60%;height:12px;border-radius:6px'> </span>";});
 function live(){
   var k = "key=" + encodeURIComponent(KEY);
   fetch("/api/krisha/objphone/console?" + k + "&since=0").then(function(r){return r.json();}).then(function(j){
@@ -1022,6 +1029,11 @@ const KRISHA_PHONES_HTML = `<!doctype html>
   .tag{display:inline-block;padding:1px 7px;border-radius:99px;font-size:12px}
   .tag.ok{background:rgba(47,191,113,.18);color:var(--ok)} .tag.no{background:rgba(229,72,77,.18);color:var(--no)} .tag.mut{background:rgba(138,149,165,.2);color:var(--mut)}
   .err{color:var(--no)}
+  .sk{position:relative;overflow:hidden;background:#1c222b;border-radius:8px;color:transparent!important}
+  .sk::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,.07),transparent);animation:skm 1.3s infinite}
+  @keyframes skm{100%{transform:translateX(100%)}}
+  .skc{height:74px;border-radius:12px;margin:0}
+  .skl{height:14px;margin:8px 0}
 </style></head><body>
 <h1>Крыша · номера: счётчики</h1>
 <p class="sub" id="upd"></p>
@@ -1042,10 +1054,16 @@ function ago(v){if(!v)return "";var m=Math.round((Date.now()-new Date(v).getTime
 function card(v,k,s,cls){return "<div class='card "+(cls||"")+"'><div class=k>"+esc(k)+"</div><b>"+v+"</b>"+(s?"<div class=s>"+s+"</div>":"")+"</div>";}
 function fail(id,e){document.getElementById(id).innerHTML="<p class=err>ошибка: "+esc(e&&e.message||e)+"</p>";}
 document.getElementById("upd").innerHTML='<a href="/api/krisha/hub?'+K+'">← все страницы</a> · <span id="updt"></span>';
+function skCards(n){var h="";for(var i=0;i<n;i++)h+="<div class='sk skc'></div>";return h;}
+function skLines(n,w){var h="";for(var i=0;i<n;i++)h+="<div class='sk skl' style='width:"+(w||(60+((i*37)%35)))+"%'></div>";return h;}
+function skTable(n){var h="<table>";for(var i=0;i<n;i++)h+="<tr><td colspan=9><div class='sk skl' style='width:"+(55+((i*41)%40))+"%'></div></td></tr>";return h+"</table>";}
+
 function stamp(){var d=new Date();document.getElementById("updt").textContent="обновлено "+pad2(d.getHours())+":"+pad2(d.getMinutes())+":"+pad2(d.getSeconds());}
 
 
+var first=true;
 function load(){
+  if(first){document.getElementById("cards").innerHTML=skCards(5);document.getElementById("misses").innerHTML=skTable(3);document.getElementById("queue").innerHTML=skCards(1);first=false;}
   fetch("/api/krisha/objphone/count?"+K).then(function(r){return r.json();}).then(function(j){
     var w=j.withPhones||{};
     document.getElementById("cards").innerHTML=
@@ -1087,6 +1105,11 @@ const KRISHA_DB_HTML = `<!doctype html>
   .tag{display:inline-block;padding:1px 7px;border-radius:99px;font-size:12px}
   .tag.ok{background:rgba(47,191,113,.18);color:var(--ok)} .tag.no{background:rgba(229,72,77,.18);color:var(--no)} .tag.mut{background:rgba(138,149,165,.2);color:var(--mut)}
   .err{color:var(--no)}
+  .sk{position:relative;overflow:hidden;background:#1c222b;border-radius:8px;color:transparent!important}
+  .sk::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,.07),transparent);animation:skm 1.3s infinite}
+  @keyframes skm{100%{transform:translateX(100%)}}
+  .skc{height:74px;border-radius:12px;margin:0}
+  .skl{height:14px;margin:8px 0}
 </style></head><body>
 <h1>Крыша · база: размер и нагрузка</h1>
 <p class="sub" id="upd"></p>
@@ -1111,11 +1134,17 @@ function ago(v){if(!v)return "";var m=Math.round((Date.now()-new Date(v).getTime
 function card(v,k,s,cls){return "<div class='card "+(cls||"")+"'><div class=k>"+esc(k)+"</div><b>"+v+"</b>"+(s?"<div class=s>"+s+"</div>":"")+"</div>";}
 function fail(id,e){document.getElementById(id).innerHTML="<p class=err>ошибка: "+esc(e&&e.message||e)+"</p>";}
 document.getElementById("upd").innerHTML='<a href="/api/krisha/hub?'+K+'">← все страницы</a> · <span id="updt"></span>';
+function skCards(n){var h="";for(var i=0;i<n;i++)h+="<div class='sk skc'></div>";return h;}
+function skLines(n,w){var h="";for(var i=0;i<n;i++)h+="<div class='sk skl' style='width:"+(w||(60+((i*37)%35)))+"%'></div>";return h;}
+function skTable(n){var h="<table>";for(var i=0;i<n;i++)h+="<tr><td colspan=9><div class='sk skl' style='width:"+(55+((i*41)%40))+"%'></div></td></tr>";return h+"</table>";}
+
 function stamp(){var d=new Date();document.getElementById("updt").textContent="обновлено "+pad2(d.getHours())+":"+pad2(d.getMinutes())+":"+pad2(d.getSeconds());}
 
 
 function pct(v){v=Number(v)||0;var c=v>85?"var(--no)":v>60?"var(--warn)":"var(--ok)";return "<span style='display:inline-block;width:80px;height:6px;border-radius:3px;background:var(--line);vertical-align:middle;margin-right:6px'><span style='display:block;width:"+Math.min(100,v)+"%;height:6px;border-radius:3px;background:"+c+"'></span></span>"+Math.round(v)+"%";}
+var first=true;
 function load(){
+  if(first){["cards"].forEach(function(i){document.getElementById(i).innerHTML=skCards(5);});["load","tables","parts","running"].forEach(function(i){document.getElementById(i).innerHTML=skTable(4);});first=false;}
   fetch("/api/krisha/dbsize?"+K).then(function(r){return r.json();}).then(function(j){
     var d=j.db||{}, used=Number(d.used_mb), max=Number(d.max_mb), l0=(j.load||[])[0]||{};
     var hot=Math.max(l0.cpu||0,l0.io||0,l0.log_write||0);
@@ -1161,6 +1190,11 @@ const KRISHA_SWEEP_HTML = `<!doctype html>
   .tag{display:inline-block;padding:1px 7px;border-radius:99px;font-size:12px}
   .tag.ok{background:rgba(47,191,113,.18);color:var(--ok)} .tag.no{background:rgba(229,72,77,.18);color:var(--no)} .tag.mut{background:rgba(138,149,165,.2);color:var(--mut)}
   .err{color:var(--no)}
+  .sk{position:relative;overflow:hidden;background:#1c222b;border-radius:8px;color:transparent!important}
+  .sk::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,.07),transparent);animation:skm 1.3s infinite}
+  @keyframes skm{100%{transform:translateX(100%)}}
+  .skc{height:74px;border-radius:12px;margin:0}
+  .skl{height:14px;margin:8px 0}
 </style></head><body>
 <h1>Крыша · обход списка</h1>
 <p class="sub" id="upd"></p>
@@ -1185,12 +1219,18 @@ function ago(v){if(!v)return "";var m=Math.round((Date.now()-new Date(v).getTime
 function card(v,k,s,cls){return "<div class='card "+(cls||"")+"'><div class=k>"+esc(k)+"</div><b>"+v+"</b>"+(s?"<div class=s>"+s+"</div>":"")+"</div>";}
 function fail(id,e){document.getElementById(id).innerHTML="<p class=err>ошибка: "+esc(e&&e.message||e)+"</p>";}
 document.getElementById("upd").innerHTML='<a href="/api/krisha/hub?'+K+'">← все страницы</a> · <span id="updt"></span>';
+function skCards(n){var h="";for(var i=0;i<n;i++)h+="<div class='sk skc'></div>";return h;}
+function skLines(n,w){var h="";for(var i=0;i<n;i++)h+="<div class='sk skl' style='width:"+(w||(60+((i*37)%35)))+"%'></div>";return h;}
+function skTable(n){var h="<table>";for(var i=0;i<n;i++)h+="<tr><td colspan=9><div class='sk skl' style='width:"+(55+((i*41)%40))+"%'></div></td></tr>";return h+"</table>";}
+
 function stamp(){var d=new Date();document.getElementById("updt").textContent="обновлено "+pad2(d.getHours())+":"+pad2(d.getMinutes())+":"+pad2(d.getSeconds());}
 
 
 var DEAL={sale:"продажа",rent:"аренда"}, PROP={flat:"квартиры",house:"дома",commercial:"коммерция",land:"участки",garage:"гаражи",other:"другое"};
 var KIND={new:"новых",bump:"поднятий",price:"смен цены",archived:"снято",back:"вернулось"};
+var first=true;
 function load(){
+  if(first){["cur","tot","ev"].forEach(function(i){document.getElementById(i).innerHTML=skCards(5);});["bydeal","bumps"].forEach(function(i){document.getElementById(i).innerHTML=skTable(5);});first=false;}
   fetch("/api/krisha/sweep?data=1&"+K).then(function(r){return r.json();}).then(function(j){
     var c=j.cursor||{}, ls=j.lastSweep||{}, la=j.lastArchive||{};
     document.getElementById("cur").innerHTML=
@@ -1243,6 +1283,11 @@ const KRISHA_PORTS_HTML = `<!doctype html>
   .tag{display:inline-block;padding:1px 7px;border-radius:99px;font-size:12px}
   .tag.ok{background:rgba(47,191,113,.18);color:var(--ok)} .tag.no{background:rgba(229,72,77,.18);color:var(--no)} .tag.mut{background:rgba(138,149,165,.2);color:var(--mut)}
   .err{color:var(--no)}
+  .sk{position:relative;overflow:hidden;background:#1c222b;border-radius:8px;color:transparent!important}
+  .sk::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,.07),transparent);animation:skm 1.3s infinite}
+  @keyframes skm{100%{transform:translateX(100%)}}
+  .skc{height:74px;border-radius:12px;margin:0}
+  .skl{height:14px;margin:8px 0}
 </style></head><body>
 <h1>Крыша · порты Asocks</h1>
 <p class="sub" id="upd"></p>
@@ -1260,10 +1305,15 @@ function ago(v){if(!v)return "";var m=Math.round((Date.now()-new Date(v).getTime
 function card(v,k,s,cls){return "<div class='card "+(cls||"")+"'><div class=k>"+esc(k)+"</div><b>"+v+"</b>"+(s?"<div class=s>"+s+"</div>":"")+"</div>";}
 function fail(id,e){document.getElementById(id).innerHTML="<p class=err>ошибка: "+esc(e&&e.message||e)+"</p>";}
 document.getElementById("upd").innerHTML='<a href="/api/krisha/hub?'+K+'">← все страницы</a> · <span id="updt"></span>';
+function skCards(n){var h="";for(var i=0;i<n;i++)h+="<div class='sk skc'></div>";return h;}
+function skLines(n,w){var h="";for(var i=0;i<n;i++)h+="<div class='sk skl' style='width:"+(w||(60+((i*37)%35)))+"%'></div>";return h;}
+function skTable(n){var h="<table>";for(var i=0;i<n;i++)h+="<tr><td colspan=9><div class='sk skl' style='width:"+(55+((i*41)%40))+"%'></div></td></tr>";return h+"</table>";}
+
 function stamp(){var d=new Date();document.getElementById("updt").textContent="обновлено "+pad2(d.getHours())+":"+pad2(d.getMinutes())+":"+pad2(d.getSeconds());}
 
 
 function load(){
+  document.getElementById("ports").innerHTML=skTable(8);
   fetch("/api/krisha/objphone/ports?"+K).then(function(r){return r.json();}).then(function(j){
     var ps=j.ports||[];
     document.getElementById("ports").innerHTML="<table><tr><th>id</th><th>имя</th><th>адрес</th><th>логин</th><th>выходной IP</th><th></th></tr>"+ps.map(function(p){return "<tr id='p"+p.id+"'><td class=mono>"+p.id+"</td><td>"+esc(p.name||"")+"</td><td class=mono>"+esc(p.proxy||"")+"</td><td class=mono>"+esc(p.login||"")+"</td><td class=mono id='ip"+p.id+"'></td><td><button onclick='chk("+p.id+",0)'>IP</button> <button onclick='chk("+p.id+",1)'>сменить</button></td></tr>";}).join("")+"</table>";
@@ -1303,6 +1353,11 @@ const KRISHA_CALLS_HTML = `<!doctype html>
   .tag{display:inline-block;padding:1px 7px;border-radius:99px;font-size:12px}
   .tag.ok{background:rgba(47,191,113,.18);color:var(--ok)} .tag.no{background:rgba(229,72,77,.18);color:var(--no)} .tag.mut{background:rgba(138,149,165,.2);color:var(--mut)}
   .err{color:var(--no)}
+  .sk{position:relative;overflow:hidden;background:#1c222b;border-radius:8px;color:transparent!important}
+  .sk::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,.07),transparent);animation:skm 1.3s infinite}
+  @keyframes skm{100%{transform:translateX(100%)}}
+  .skc{height:74px;border-radius:12px;margin:0}
+  .skl{height:14px;margin:8px 0}
 </style></head><body>
 <h1>Крыша · журнал звонков</h1>
 <p class="sub" id="upd"></p>
@@ -1321,21 +1376,33 @@ function ago(v){if(!v)return "";var m=Math.round((Date.now()-new Date(v).getTime
 function card(v,k,s,cls){return "<div class='card "+(cls||"")+"'><div class=k>"+esc(k)+"</div><b>"+v+"</b>"+(s?"<div class=s>"+s+"</div>":"")+"</div>";}
 function fail(id,e){document.getElementById(id).innerHTML="<p class=err>ошибка: "+esc(e&&e.message||e)+"</p>";}
 document.getElementById("upd").innerHTML='<a href="/api/krisha/hub?'+K+'">← все страницы</a> · <span id="updt"></span>';
+function skCards(n){var h="";for(var i=0;i<n;i++)h+="<div class='sk skc'></div>";return h;}
+function skLines(n,w){var h="";for(var i=0;i<n;i++)h+="<div class='sk skl' style='width:"+(w||(60+((i*37)%35)))+"%'></div>";return h;}
+function skTable(n){var h="<table>";for(var i=0;i<n;i++)h+="<tr><td colspan=9><div class='sk skl' style='width:"+(55+((i*41)%40))+"%'></div></td></tr>";return h+"</table>";}
+
 function stamp(){var d=new Date();document.getElementById("updt").textContent="обновлено "+pad2(d.getHours())+":"+pad2(d.getMinutes())+":"+pad2(d.getSeconds());}
 
 
 function dur(s){s=Number(s)||0;return Math.floor(s/60)+":"+pad2(s%60);}
 function pretty(x){x=String(x||"").replace(/\D/g,"");return x.length===11?"+"+x[0]+" "+x.slice(1,4)+" "+x.slice(4,7)+" "+x.slice(7,9)+" "+x.slice(9):x;}
+function money(v){if(v==null)return "";v=Number(v);return v>=1e6?(Math.round(v/1e5)/10).toLocaleString("ru-RU")+" млн":v.toLocaleString("ru-RU");}
+var first=true;
 function load(){
   var d=document.getElementById("days").value;
-  fetch("/api/calls?mine=1&days="+d+"&limit=500&"+K).then(function(r){return r.json();}).then(function(j){
-    var cs=j.calls||[], ans=cs.filter(function(c){return c.disposition==="answered";}), missed=cs.length-ans.length;
+  if(first){document.getElementById("cards").innerHTML=skCards(4);document.getElementById("calls").innerHTML=skTable(8);}
+  fetch("/api/calls?mine=1&listings=1&days="+d+"&limit=500&"+K).then(function(r){return r.json();}).then(function(j){
+    first=false;
+    var cs=j.calls||[], ls=j.listings||{}, ans=cs.filter(function(c){return c.disposition==="answered";}), missed=cs.length-ans.length;
     document.getElementById("cards").innerHTML=card(n(cs.length),"звонков","")+card(n(ans.length),"отвечено","","ok")+card(n(missed),"пропущено","",missed?"warn":"")+card(dur(ans.reduce(function(a,c){return a+(c.duration_secs||0);},0)),"разговоров всего","мин:сек");
-    document.getElementById("calls").innerHTML=cs.length?"<table><tr><th>время (Алматы)</th><th>откуда</th><th>итог</th><th class=r>длит.</th><th>запись</th></tr>"+cs.map(function(c){var ok=c.disposition==="answered";return "<tr><td>"+alm(c.started_at)+"</td><td><a style='color:var(--acc);text-decoration:none' href='tel:"+esc(c.caller)+"'>"+esc(pretty(c.caller))+"</a>"+(c.direction==="out"?" <span class=mut>(исходящий)</span>":"")+"</td><td><span class='tag "+(ok?"ok":"no")+"'>"+(ok?"разговор":esc(c.disposition||"без ответа"))+"</span></td><td class=r>"+(ok?dur(c.duration_secs):"")+"</td><td>"+(c.recorded?"есть":"")+"</td></tr>";}).join("")+"</table>":"<p class=mut>звонков нет</p>";
+    document.getElementById("calls").innerHTML=cs.length?"<table><tr><th>время (Алматы)</th><th>откуда</th><th>итог</th><th class=r>длит.</th><th>объявление в базе</th><th style='width:32%'>заметка</th></tr>"+cs.map(function(c){
+      var ok=c.disposition==="answered", digits=String(c.caller||"").replace(/\D/g,""), L=ls[digits]||[];
+      var lst=L.length?L.slice(0,2).map(function(x){return "<a target=_blank style='color:var(--acc);text-decoration:none' href='https://krisha.kz/a/show/"+x.id+"'>"+esc(x.title||x.id)+"</a> <span class=mut>"+money(x.price)+(x.storage!=="live"?" · снято":"")+"</span>";}).join("<br>")+(L.length>2?"<br><span class=mut>ещё "+(L.length-2)+"</span>":""):"<span class=mut>—</span>";
+      return "<tr><td>"+alm(c.started_at)+"</td><td><a style='color:var(--acc);text-decoration:none' href='tel:"+esc(c.caller)+"'>"+esc(pretty(c.caller))+"</a>"+(c.direction==="out"?" <span class=mut>(исходящий)</span>":"")+(c.recorded?" <span class=mut title='есть запись'>●</span>":"")+"</td><td><span class='tag "+(ok?"ok":"no")+"'>"+(ok?"разговор":esc(c.disposition||"без ответа"))+"</span></td><td class=r>"+(ok?dur(c.duration_secs):"")+"</td><td>"+lst+"</td><td><input style='width:100%;border:1px solid var(--line);background:#12161c;color:var(--fg);border-radius:8px;padding:5px 8px;font:inherit' placeholder='что сделали' value='"+esc(c.note||"")+"' onchange='saveNote(this,\""+esc(c.pbx_call_id)+"\")'></td></tr>";}).join("")+"</table>":"<p class=mut>звонков нет</p>";
     stamp();
   }).catch(function(e){fail("cards",e);});
 }
-document.getElementById("days").onchange=load;
+function saveNote(el,id){el.style.borderColor="var(--warn)";fetch("/api/calls?"+K+"&set="+encodeURIComponent(id)+"&note="+encodeURIComponent(el.value)).then(function(r){return r.json();}).then(function(){el.style.borderColor="var(--ok)";setTimeout(function(){el.style.borderColor="";},1200);}).catch(function(){el.style.borderColor="var(--no)";});}
+document.getElementById("days").onchange=function(){first=true;load();};
 load(); setInterval(load, 30000);
 </script></body></html>`;
 let sweepStatsCache = { at: 0, body: null }; // listStats для страницы обхода, раз в 5 минут
@@ -1370,15 +1437,22 @@ const KRISHA_LIST_CONSOLE_HTML = `<!doctype html>
   .tag.sale{background:rgba(76,141,255,.12);color:var(--acc)} .tag.rent{background:rgba(245,165,36,.12);color:var(--warn)}
   .src{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--mut)}
   @media(max-width:640px){.hide{display:none}}
+  .sk{position:relative;overflow:hidden;background:#1c222b;border-radius:8px;color:transparent!important}
+  .sk::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,.07),transparent);animation:skm 1.3s infinite}
+  @keyframes skm{100%{transform:translateX(100%)}}
+  .skc{height:74px;border-radius:12px;margin:0}
+  .skl{height:14px;margin:8px 0}
+
 </style></head><body>
 <h1><span><span id="dot" class="live"></span>Крыша · консоль обхода</span><span id="upd" class="mut"></span></h1>
 <div id="grid" class="grid"></div>
 <div id="cur" class="cur"></div>
 <table><thead><tr><th>время</th><th>событие</th><th>объявление</th><th>цена</th><th class="hide">источник</th></tr></thead>
-<tbody id="rows"></tbody></table>
+<tbody id="rows"><tr><td colspan=5><div class="sk skl" style="width:70%"></div></td></tr><tr><td colspan=5><div class="sk skl" style="width:55%"></div></td></tr><tr><td colspan=5><div class="sk skl" style="width:80%"></div></td></tr></tbody></table>
 <script>
 var KEY = new URLSearchParams(location.search).get("key") || "";
 var API = "/api/krisha/listconsole?key=" + encodeURIComponent(KEY);
+var firstFill=true;
 var last = 0, seen = {};
 var KIND = {new:["new","новое"],bump:["bump","поднято"],archived:["archived","снято"],back:["back","вернулось"]};
 var PROP = {flat:"квартира",house:"дом",commercial:"коммерция",land:"участок",garage:"гараж"};
@@ -1405,6 +1479,7 @@ function tick(){
     var c=j.cursor||{};document.getElementById("cur").textContent=c.sweepNo?"обход: круг "+c.sweepNo+", "+(c.section||"")+" стр. "+c.page+", прочитано "+(c.pages||0).toLocaleString("ru-RU")+" стр."+(c.lastMinutes?" · прошлый круг "+c.lastMinutes+" мин":"")+(c.lastArchived!=null?" · снято по итогам "+c.lastArchived.toLocaleString("ru-RU"):""):"";
     var tb=document.getElementById("rows"); var html="";
     (j.events||[]).forEach(function(e){ if(seen[e.n])return; seen[e.n]=1; html=row(e)+html; if(e.n>last)last=e.n; });
+    if(firstFill){ tb.innerHTML=""; firstFill=false; }
     if(html){ tb.insertAdjacentHTML("afterbegin",html); while(tb.rows.length>400) tb.deleteRow(-1); }
   }).catch(function(){ document.getElementById("dot").className="live off"; });
 }
@@ -1441,6 +1516,12 @@ const KRISHA_CONSOLE_HTML = `<!doctype html>
   .ph{font-weight:600} .dr{color:var(--mut);text-decoration:line-through}
   .src{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--mut)}
   @media(max-width:640px){.hide{display:none}}
+  .sk{position:relative;overflow:hidden;background:#1c222b;border-radius:8px;color:transparent!important}
+  .sk::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,.07),transparent);animation:skm 1.3s infinite}
+  @keyframes skm{100%{transform:translateX(100%)}}
+  .skc{height:74px;border-radius:12px;margin:0}
+  .skl{height:14px;margin:8px 0}
+
 </style></head><body>
 <h1><span><span id="dot" class="live"></span>Крыша · консоль номеров</span><span id="upd" class="mut"></span></h1>
 <div class="stats">
@@ -1452,10 +1533,11 @@ const KRISHA_CONSOLE_HTML = `<!doctype html>
 </div>
 <div id="clients" class="clients"></div>
 <table><thead><tr><th>время</th><th>событие</th><th>объявление</th><th>номера</th><th class="hide">клиент</th><th class="hide">IP</th></tr></thead>
-<tbody id="rows"></tbody></table>
+<tbody id="rows"><tr><td colspan=6><div class="sk skl" style="width:70%"></div></td></tr><tr><td colspan=6><div class="sk skl" style="width:55%"></div></td></tr><tr><td colspan=6><div class="sk skl" style="width:80%"></div></td></tr></tbody></table>
 <script>
 var KEY = new URLSearchParams(location.search).get("key") || "";
 var API = "/api/krisha/objphone/console?key=" + encodeURIComponent(KEY);
+var firstFill=true;
 var last = 0, seen = {};
 function esc(s){s=(s==null?"":String(s));return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 function pad2(n){return ("0"+n).slice(-2);}
@@ -1475,6 +1557,7 @@ function tick(){
     document.getElementById("clients").innerHTML=(j.clients||[]).map(function(c){return "<div class=cl>"+esc(c.src)+" <span class=mut>"+esc(c.ip||"")+"</span> · <b>"+c.n+"</b> за 10 мин · посл. "+t(c.last)+"</div>";}).join("");
     var tb=document.getElementById("rows"); var html="";
     (j.events||[]).forEach(function(e){ if(seen[e.n])return; seen[e.n]=1; html=row(e)+html; if(e.n>last)last=e.n; });
+    if(firstFill){ tb.innerHTML=""; firstFill=false; }
     if(html){ tb.insertAdjacentHTML("afterbegin",html); while(tb.rows.length>300) tb.deleteRow(-1); }
   }).catch(function(){ document.getElementById("dot").className="live off"; });
 }
@@ -1520,6 +1603,13 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   .st button.deal.on{background:var(--ok);border-color:var(--ok);color:#04140b}
   .st input{flex:1;min-width:160px}
   .empty{padding:30px;text-align:center;color:var(--mut)}
+  .sk{position:relative;overflow:hidden;background:#1c222b;border-radius:8px;color:transparent!important}
+  .sk::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,.07),transparent);animation:skm 1.3s infinite}
+  @keyframes skm{100%{transform:translateX(100%)}}
+  .skc{height:74px;border-radius:12px;margin:0}
+  .skl{height:14px;margin:8px 0}
+
+  .skcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:0 0 10px;display:grid;grid-template-columns:150px 1fr;gap:12px}
   .tag.click{cursor:pointer} .tag.click:hover{filter:brightness(1.25)}
   .ov{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-start;justify-content:center;padding:24px 12px;overflow:auto;z-index:50}
   .ov.on{display:flex}
@@ -1544,17 +1634,23 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   <select id="status"><option value="open">не обзвонены</option><option value="called">звонил</option><option value="callback">перезвонить</option><option value="refused">отказ</option><option value="deal">договор</option><option value="all">все</option></select>
   <button id="go" class="on">Показать</button>
 </div>
-<div id="list" class="mut">загрузка…</div>
+<div id="list"></div>
 <div id="ov" class="ov" onclick="if(event.target===this)closeHist()"><div class="md"><button class="x" onclick="closeHist()">×</button><div id="mdc">загрузка…</div></div></div>
 <script>
 var KEY = new URLSearchParams(location.search).get("key") || "";
 var API = "/api/krisha/leads?key=" + encodeURIComponent(KEY);
+
+function skCards(n){var h="";for(var i=0;i<n;i++)h+="<div class='sk skc'></div>";return h;}
+function skLines(n,w){var h="";for(var i=0;i<n;i++)h+="<div class='sk skl' style='width:"+(w||(60+((i*37)%35)))+"%'></div>";return h;}
+function skTable(n){var h="<table>";for(var i=0;i<n;i++)h+="<tr><td colspan=9><div class='sk skl' style='width:"+(55+((i*41)%40))+"%'></div></td></tr>";return h+"</table>";}
+
+function skLeads(n){var h="";for(var i=0;i<n;i++)h+="<div class=skcard><div class='sk' style='width:150px;height:100px'></div><div>"+skLines(4)+"</div></div>";return h;}
 function dmT2(v){if(!v)return "";var d=new Date(new Date(v).getTime()+5*3600e3);if(isNaN(d))return "";return pad2(d.getUTCDate())+"."+pad2(d.getUTCMonth()+1)+"."+d.getUTCFullYear()+" "+pad2(d.getUTCHours())+":"+pad2(d.getUTCMinutes());}
 function closeHist(){document.getElementById("ov").className="ov";}
 document.addEventListener("keydown",function(e){if(e.key==="Escape")closeHist();});
 function openHist(id){
   var ov=document.getElementById("ov"), c=document.getElementById("mdc");
-  ov.className="ov on"; c.innerHTML="<div class=mut>загрузка…</div>";
+  ov.className="ov on"; c.innerHTML=skLines(2,70)+"<div class=sum>"+skCards(6)+"</div>"+skLines(6);
   Promise.all([
     fetch("/api/krisha/scanlist?history="+id+"&key="+encodeURIComponent(KEY)).then(function(r){return r.json();}),
     fetch(API+"&copies="+id).then(function(r){return r.json();}).catch(function(){return [];})
@@ -1611,7 +1707,7 @@ var F=["city","deal","prop","rooms","pmin","pmax","hours","signal","status"];
 function qs(){var p=[];F.forEach(function(k){var v=document.getElementById(k).value;if(v!==""&&v!=="any"){if(k==="pmin"||k==="pmax")v=Math.round(Number(v)*1e6);p.push(k+"="+encodeURIComponent(v));}});return p.join("&");}
 function load(){
   try{F.forEach(function(k){localStorage.setItem("leads:"+k,document.getElementById(k).value);});}catch(e){}
-  document.getElementById("list").innerHTML="<div class=mut>загрузка…</div>";
+  document.getElementById("list").innerHTML=skLeads(4);
   fetch(API+"&data=1&"+qs()).then(function(r){return r.json();}).then(render).catch(function(e){document.getElementById("list").innerHTML="<div class=empty>ошибка: "+esc(e.message)+"</div>";});
 }
 function tags(x){var t=[];
@@ -6063,9 +6159,20 @@ http
         res.writeHead(403, { "Content-Type": MIME[".json"] }); return res.end(JSON.stringify({ ok: false, error: "bad_key" }));
       }
       (async () => {
+        // ?set=<pbx_call_id>&note=… — заметка к звонку.
+        if (parsed.searchParams.get("set")) {
+          await db.setCallNote(parsed.searchParams.get("set"), parsed.searchParams.get("note") || "");
+          res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+          return res.end(JSON.stringify({ ok: true }));
+        }
         const rows = await db.phoneCalls(parsed.searchParams.get("days"), parsed.searchParams.get("limit"), parsed.searchParams.get("mine") === "1");
+        // Объявления звонивших из нашей базы — если хозяин звонит сам.
+        let listings = {};
+        if (parsed.searchParams.get("listings") === "1") {
+          listings = await db.listingsByPhones(rows.map((r) => r.caller)).catch(() => ({}));
+        }
         res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
-        res.end(JSON.stringify({ ok: true, count: rows.length, calls: rows }, null, 2));
+        res.end(JSON.stringify({ ok: true, count: rows.length, calls: rows, listings: listings }, null, 2));
       })().catch((e) => { res.writeHead(500, { "Content-Type": MIME[".json"] }); res.end(JSON.stringify({ ok: false, error: String(e.message).slice(0, 200) })); });
       return;
     }
