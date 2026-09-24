@@ -1814,9 +1814,16 @@ function plot(){
     m.on("click",function(){highlight(x.id);});
     m._leadId=x.id; MARKERS[x.id]=m; CLUSTER.addLayer(m); pts.push([Number(x.lat),Number(x.lon)]);
   });
-  MAP.invalidateSize();
-  if(pts.length) MAP.fitBounds(L.latLngBounds(pts).pad(0.1),{maxZoom:14});
+  fitAll(pts);
   renderMapList();
+}
+// Подгонка под точки: контейнер мог получить размер позже создания карты,
+// поэтому через 400 мс проверяем и при нулевом масштабе подгоняем ещё раз.
+function fitAll(pts){
+  if(!pts.length) return;
+  var bb=L.latLngBounds(pts).pad(0.1);
+  MAP.invalidateSize(); MAP.fitBounds(bb,{maxZoom:14});
+  setTimeout(function(){ if(MAP.getZoom()<5){ MAP.invalidateSize(); MAP.fitBounds(bb,{maxZoom:14}); } renderMapList(); },400);
 }
 function renderMapList(){
   if(!MAP) return;
