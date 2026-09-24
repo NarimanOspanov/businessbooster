@@ -2036,6 +2036,15 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_phonemiss' AND o
 -- до …», и другие вкладки его не получают. Снимается при сохранении номера
 -- и промахе; брошенная вкладка — истекает сама.
 IF COL_LENGTH('dbo.krisha_list', 'phone_lease_until') IS NULL ALTER TABLE dbo.krisha_list ADD phone_lease_until DATETIME2(0) NULL;
+-- Лиды: совпадения по хозяину (страница лидов считает агентские копии на
+-- каждого кандидата; без индекса — скан таблицы совпадений на каждую строку)
+-- и хозяева с номером по дате.
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klm_owner' AND object_id = OBJECT_ID('dbo.krisha_list_matches'))
+  CREATE INDEX IX_klm_owner ON dbo.krisha_list_matches (owner_id) INCLUDE (photo_match);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_leads' AND object_id = OBJECT_ID('dbo.krisha_list'))
+  EXEC('CREATE INDEX IX_klist_leads ON dbo.krisha_list (first_seen DESC)
+        INCLUDE (deal, prop, city, rooms, price, storage)
+        WHERE user_type = ''owner'' AND phones IS NOT NULL');
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_lease' AND object_id = OBJECT_ID('dbo.krisha_list'))
   EXEC('CREATE INDEX IX_klist_lease ON dbo.krisha_list (phone_lease_until)
         WHERE phone_lease_until IS NOT NULL');

@@ -1561,6 +1561,7 @@ function tags(x){var t=[];
   if(x.agents)t.push("<span class='tag ag'>агентов уже "+x.agents+"</span>");
   return t.join("");}
 function render(rows){
+  if(!Array.isArray(rows)){document.getElementById("cnt").textContent="";document.getElementById("list").innerHTML="<div class=empty>сервер не ответил: "+esc((rows&&rows.error)||"ошибка")+" — попробуйте ещё раз или сузьте период</div>";return;}
   document.getElementById("cnt").textContent="· "+rows.length;
   if(!rows.length){document.getElementById("list").innerHTML="<div class=empty>по этим фильтрам пусто</div>";return;}
   var h="";
