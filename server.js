@@ -1628,7 +1628,7 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   .pin.hot{background:var(--warn)}
 
   .tag.click{cursor:pointer} .tag.click:hover{filter:brightness(1.25)}
-  .ov{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-start;justify-content:center;padding:24px 12px;overflow:auto;z-index:50}
+  .ov{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-start;justify-content:center;padding:24px 12px;overflow:auto;z-index:5000}
   .ov.on{display:flex}
   .md{background:var(--card);border:1px solid var(--line);border-radius:14px;max-width:760px;width:100%;padding:16px 18px;position:relative}
   .md h2{margin:0 36px 4px 0;font-size:16px} .md .x{position:absolute;right:10px;top:8px;border:0;background:transparent;color:var(--mut);font-size:22px;cursor:pointer;padding:4px 8px}
