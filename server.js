@@ -1520,6 +1520,16 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   .st button.deal.on{background:var(--ok);border-color:var(--ok);color:#04140b}
   .st input{flex:1;min-width:160px}
   .empty{padding:30px;text-align:center;color:var(--mut)}
+  .tag.click{cursor:pointer} .tag.click:hover{filter:brightness(1.25)}
+  .ov{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-start;justify-content:center;padding:24px 12px;overflow:auto;z-index:50}
+  .ov.on{display:flex}
+  .md{background:var(--card);border:1px solid var(--line);border-radius:14px;max-width:760px;width:100%;padding:16px 18px;position:relative}
+  .md h2{margin:0 36px 4px 0;font-size:16px} .md .x{position:absolute;right:10px;top:8px;border:0;background:transparent;color:var(--mut);font-size:22px;cursor:pointer;padding:4px 8px}
+  .md .sum{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin:12px 0}
+  .md .sc{background:#12161c;border:1px solid var(--line);border-radius:10px;padding:8px 10px} .md .sc b{display:block;font-size:17px} .md .sc .k{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.03em}
+  .md h3{font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:.03em;margin:14px 0 6px}
+  .md table{width:100%;border-collapse:collapse} .md td,.md th{padding:5px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;font-variant-numeric:tabular-nums} .md th{color:var(--mut);font-size:12px;font-weight:600}
+  .md .cut{color:var(--ok)} .md .up{color:var(--no)}
 </style></head><body>
 <h1>Крыша · лиды хозяев <span id="cnt" class="mut"></span></h1>
 <div class="bar">
@@ -1535,9 +1545,61 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   <button id="go" class="on">Показать</button>
 </div>
 <div id="list" class="mut">загрузка…</div>
+<div id="ov" class="ov" onclick="if(event.target===this)closeHist()"><div class="md"><button class="x" onclick="closeHist()">×</button><div id="mdc">загрузка…</div></div></div>
 <script>
 var KEY = new URLSearchParams(location.search).get("key") || "";
 var API = "/api/krisha/leads?key=" + encodeURIComponent(KEY);
+function dmT2(v){if(!v)return "";var d=new Date(new Date(v).getTime()+5*3600e3);if(isNaN(d))return "";return pad2(d.getUTCDate())+"."+pad2(d.getUTCMonth()+1)+"."+d.getUTCFullYear()+" "+pad2(d.getUTCHours())+":"+pad2(d.getUTCMinutes());}
+function closeHist(){document.getElementById("ov").className="ov";}
+document.addEventListener("keydown",function(e){if(e.key==="Escape")closeHist();});
+function openHist(id){
+  var ov=document.getElementById("ov"), c=document.getElementById("mdc");
+  ov.className="ov on"; c.innerHTML="<div class=mut>загрузка…</div>";
+  Promise.all([
+    fetch("/api/krisha/scanlist?history="+id+"&key="+encodeURIComponent(KEY)).then(function(r){return r.json();}),
+    fetch(API+"&copies="+id).then(function(r){return r.json();}).catch(function(){return [];})
+  ]).then(function(res){
+    var h=res[0]||{}, it=h.item||{}, ev=h.events||[], copies=Array.isArray(res[1])?res[1]:[];
+    var first=ev.filter(function(e){return e.kind==="new"||e.kind==="price";})[0];
+    var startPrice=first&&first.kind==="new"?Number(first.new_price):(ev.filter(function(e){return e.kind==="price";})[0]?Number(ev.filter(function(e){return e.kind==="price";})[0].old_price):Number(it.price));
+    var cur=Number(it.price), chg=startPrice?Math.round((cur-startPrice)/startPrice*100):0;
+    var cuts=ev.filter(function(e){return e.kind==="price"&&Number(e.new_price)<Number(e.old_price);}).length;
+    var raises=ev.filter(function(e){return e.kind==="price"&&Number(e.new_price)>Number(e.old_price);}).length;
+    var bumps=ev.filter(function(e){return e.kind==="bump";}).length;
+    var archs=ev.filter(function(e){return e.kind==="archived";}).length;
+    var daysOn=it.first_seen?Math.max(1,Math.round((Date.now()-new Date(it.first_seen).getTime())/864e5)):null;
+    var rows=ev.map(function(e){return {at:e.at,kind:e.kind,old:e.old_price,nw:e.new_price};});
+    if(it.phones_at) rows.push({at:it.phones_at,kind:"phone"});
+    rows.sort(function(a,b){return new Date(a.at)-new Date(b.at);});
+    function lab(e){
+      if(e.kind==="new")return "<span class=tag style='background:rgba(76,141,255,.18);color:var(--acc)'>опубликовано</span> "+money(e.nw);
+      if(e.kind==="bump")return "<span class=tag style='background:rgba(245,165,36,.18);color:var(--warn)'>поднято</span>";
+      if(e.kind==="price"){var cut=Number(e.nw)<Number(e.old);var pct=e.old?Math.round(Math.abs(e.nw-e.old)/e.old*100):0;return "<span class='"+(cut?"cut":"up")+"'>"+(cut?"снизили":"подняли")+" цену</span> "+money(e.old)+" → <b>"+money(e.nw)+"</b> ("+(cut?"−":"+")+pct+"%)";}
+      if(e.kind==="archived")return "<span class=tag style='background:rgba(138,149,165,.2)'>снято с публикации</span>";
+      if(e.kind==="back")return "<span class=tag style='background:rgba(47,191,113,.18);color:var(--ok)'>вернулось из архива</span>";
+      if(e.kind==="phone")return "<span class=tag style='background:rgba(47,191,113,.18);color:var(--ok)'>номер снят</span>";
+      return esc(e.kind);}
+    var ph=String(it.phones||"").split(",").filter(Boolean).map(function(n){return "<a href='tel:+"+esc(n)+"'>"+esc(pretty(n))+"</a>";}).join(", ");
+    var html="<h2>"+esc(it.title||"")+" <span class=price>"+money(it.price)+"</span></h2>"+
+      "<div class=mut>"+esc(it.addr||"")+(it.addr?" · ":"")+esc(it.city||"")+" · <a target=_blank href='https://krisha.kz/a/show/"+id+"'>на Крыше</a>"+(it.storage&&it.storage!=="live"?" · <b style='color:var(--no)'>сейчас снято</b>":"")+"</div>"+
+      (ph?"<div class='row phones' style='margin-top:6px'>"+(it.owner_name?"<span class=mut>"+esc(it.owner_name)+" · </span>":"")+ph+"</div>":"")+
+      "<div class=sum>"+
+        "<div class=sc><div class=k>цена сейчас</div><b>"+money(cur)+"</b></div>"+
+        "<div class=sc><div class=k>стартовая</div><b>"+money(startPrice)+"</b></div>"+
+        "<div class=sc><div class=k>изменение</div><b class='"+(chg<0?"cut":chg>0?"up":"")+"'>"+(chg>0?"+":"")+chg+"%</b></div>"+
+        "<div class=sc><div class=k>снижений / повышений</div><b>"+cuts+" / "+raises+"</b></div>"+
+        "<div class=sc><div class=k>поднятий</div><b>"+bumps+"</b></div>"+
+        "<div class=sc><div class=k>на рынке</div><b>"+(daysOn!=null?daysOn+" дн":"–")+"</b></div>"+
+        (archs?"<div class=sc><div class=k>снимали</div><b>"+archs+" раз</b></div>":"")+
+        "<div class=sc><div class=k>агентских копий</div><b>"+copies.length+"</b></div>"+
+      "</div>"+
+      "<h3>Хронология</h3><table><tr><th>когда (Алматы)</th><th>событие</th></tr>"+
+      rows.map(function(e){return "<tr><td>"+dmT2(e.at)+"</td><td>"+lab(e)+"</td></tr>";}).join("")+"</table>"+
+      (copies.length?"<h3>Агентские копии</h3><table><tr><th>объявление</th><th>цена</th><th>фото</th><th>найдено</th></tr>"+copies.map(function(cp){return "<tr><td><a target=_blank href='https://krisha.kz/a/show/"+cp.agent_id+"'>"+cp.agent_id+"</a> <span class=mut>"+esc(cp.title||"")+(cp.owner_name?" · "+esc(cp.owner_name):"")+"</span></td><td>"+money(cp.price)+"</td><td>"+(cp.photo_match?"<span style='color:var(--ok)'>совпали "+Math.round((cp.photo_conf||0)*100)+"%</span>":"<span class=mut>нет</span>")+(cp.human_ok===true||cp.human_ok===1?" ✓":cp.human_ok===false||cp.human_ok===0?" ✗":"")+"</td><td class=mut>"+dmT2(cp.found_at)+"</td></tr>";}).join("")+"</table>":"");
+    c.innerHTML=html;
+  }).catch(function(e){c.innerHTML="<div class=empty>не удалось загрузить: "+esc(e.message)+"</div>";});
+}
+
 function esc(s){s=(s==null?"":String(s));return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 function money(n){return n?Math.round(n).toLocaleString("ru-RU")+" ₸":"";}
 function pad2(n){return ("0"+n).slice(-2);}
@@ -1554,12 +1616,14 @@ function load(){
 }
 function tags(x){var t=[];
   var h=Number(document.getElementById("hours").value)||72;
+  var wrap=function(s){return s.replace("<span class='tag ","<span onclick='openHist("+x.id+")' title='вся история' class='tag click ");};
+  var out=function(){return t.map(wrap);};
   if(x.first_seen&&Date.now()-new Date(x.first_seen).getTime()<h*3600e3)t.push("<span class='tag new'>новое · "+ago(x.first_seen)+"</span>");
   if(x.last_bump)t.push("<span class='tag bump'>подняли"+(x.bumps>1?" ×"+x.bumps:"")+" · "+ago(x.last_bump)+"</span>");
   if(x.last_price_at&&x.old_price&&x.new_price){var cut=x.new_price<x.old_price;var pct=Math.round(Math.abs(x.new_price-x.old_price)/x.old_price*100);t.push("<span class='tag "+(cut?"cut":"up")+"'>"+(cut?"снизили":"подняли цену")+" "+money(x.old_price)+" → "+money(x.new_price)+" ("+pct+"%) · "+ago(x.last_price_at)+"</span>");}
   if(x.last_back)t.push("<span class='tag back'>вернули из архива · "+ago(x.last_back)+"</span>");
   if(x.agents)t.push("<span class='tag ag'>агентов уже "+x.agents+"</span>");
-  return t.join("");}
+  return out().join("");}
 function render(rows){
   if(!Array.isArray(rows)){document.getElementById("cnt").textContent="";document.getElementById("list").innerHTML="<div class=empty>сервер не ответил: "+esc((rows&&rows.error)||"ошибка")+" — попробуйте ещё раз или сузьте период</div>";return;}
   document.getElementById("cnt").textContent="· "+rows.length;
@@ -7620,6 +7684,11 @@ http
       if (q.get("set")) {
         db.leadSetStatus(q.get("set"), q.get("status") || "", q.get("note") || "")
           .then((st) => sendJ(200, { ok: true, id: q.get("set"), status: st }))
+          .catch((e) => sendJ(500, { ok: false, error: String(e.message).slice(0, 200) }));
+        return;
+      }
+      if (q.get("copies")) {
+        db.leadCopies(q.get("copies")).then((rows) => sendJ(200, rows))
           .catch((e) => sendJ(500, { ok: false, error: String(e.message).slice(0, 200) }));
         return;
       }

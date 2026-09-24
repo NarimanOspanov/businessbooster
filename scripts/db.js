@@ -2346,6 +2346,20 @@ async function leadsList(f) {
   });
 }
 
+// Агентские копии хозяйского объявления — для окна истории на странице лидов.
+async function leadCopies(ownerId) {
+  const pool = await getPool();
+  await ensureList(pool);
+  const r = await pool.request().input("id", sql.BigInt, Number(ownerId)).query(`
+    SELECT m.agent_id, m.photo_match, m.photo_conf, m.found_at, m.human_ok,
+      a.price, a.title, a.user_type, a.owner_name, a.first_seen, a.storage
+    FROM dbo.krisha_list_matches m
+    LEFT JOIN dbo.krisha_list a ON a.id = m.agent_id
+    WHERE m.owner_id = @id
+    ORDER BY m.photo_match DESC, m.photo_conf DESC, m.found_at DESC`);
+  return r.recordset;
+}
+
 async function leadSetStatus(id, status, note) {
   const pool = await getPool();
   await ensureLeads(pool);
@@ -3490,7 +3504,7 @@ async function objectStats() {
 module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
-  saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, dropKnownSticky, cleanStickyPhones,
+  saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
   listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory,
