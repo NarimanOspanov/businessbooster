@@ -883,8 +883,8 @@ function drawChart(rows){
     var k=cut?max/tot:1, hTot=(H-pad*2)*tot*k/max, hRent=(H-pad*2)*rt*k/max, hSale=(H-pad*2)*s*k/max;
     var y=H-pad-hTot;
     // продажа (низ) + аренда (верх)
-    svg+="<rect x="+(cx-bw/2)+" y="+(H-pad-hSale)+" width="+bw+" height="+hSale+" fill='var(--sale)' rx="2"/>";
-    svg+="<rect x="+(cx-bw/2)+" y="+y+" width="+bw+" height="+hRent+" fill='var(--rent)' rx="2"/>";
+    svg+="<rect x="+(cx-bw/2)+" y="+(H-pad-hSale)+" width="+bw+" height="+hSale+" fill='var(--sale)' rx='2'/>";
+    svg+="<rect x="+(cx-bw/2)+" y="+y+" width="+bw+" height="+hRent+" fill='var(--rent)' rx='2'/>";
     if(cut){svg+="<text x="+cx+" y="+(y+12)+" fill='#fff' font-size=10 text-anchor=middle>"+Math.round(tot/1000)+"k</text>";}
     // найдено — зелёная точка над столбцом
     var f=r.photo_ok||0; if(f){svg+="<circle cx="+cx+" cy="+(y-8)+" r=4 fill='var(--ok)'/><text x="+cx+" y="+(y-14)+" fill='var(--ok)' font-size=11 text-anchor=middle>"+f+"</text>";}
