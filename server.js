@@ -1793,6 +1793,9 @@ function ensureMap(){
       CLUSTER=L.markerClusterGroup({maxClusterRadius:50,showCoverageOnHover:false,spiderfyOnMaxZoom:true});
       MAP.addLayer(CLUSTER);
       MAP.on("moveend",renderMapList);
+      // Размер контейнера появляется позже создания карты: подгоняемся, когда он есть.
+      if(window.ResizeObserver) new ResizeObserver(function(){ MAP.invalidateSize(); tryFit(); }).observe(document.getElementById("map"));
+      var tries=0, iv=setInterval(function(){ tryFit(); if(fitted||++tries>40) clearInterval(iv); },250);
       MAP.whenReady(function(){setTimeout(res,50);});
     });});
   return mapReady;
@@ -1819,11 +1822,13 @@ function plot(){
 }
 // Подгонка под точки: контейнер мог получить размер позже создания карты,
 // поэтому через 400 мс проверяем и при нулевом масштабе подгоняем ещё раз.
-function fitAll(pts){
-  if(!pts.length) return;
-  var bb=L.latLngBounds(pts).pad(0.1);
-  MAP.invalidateSize(); MAP.fitBounds(bb,{maxZoom:14});
-  setTimeout(function(){ if(MAP.getZoom()<5){ MAP.invalidateSize(); MAP.fitBounds(bb,{maxZoom:14}); } renderMapList(); },400);
+var fitPts=[], fitted=true;
+function fitAll(pts){ fitPts=pts; fitted=!pts.length; tryFit(); }
+function tryFit(){
+  if(fitted||!MAP||!fitPts.length) return;
+  var sz=MAP.getSize(); if(sz.x<50||sz.y<50) return; // контейнер ещё без размера — ждём ResizeObserver
+  MAP.invalidateSize(); MAP.fitBounds(L.latLngBounds(fitPts).pad(0.1),{maxZoom:14});
+  fitted=MAP.getZoom()>=5; renderMapList();
 }
 function renderMapList(){
   if(!MAP) return;
