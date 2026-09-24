@@ -1384,7 +1384,7 @@ function stamp(){var d=new Date();document.getElementById("updt").textContent="�
 
 
 function dur(s){s=Number(s)||0;return Math.floor(s/60)+":"+pad2(s%60);}
-function pretty(x){x=String(x||"").replace(/\D/g,"");return x.length===11?"+"+x[0]+" "+x.slice(1,4)+" "+x.slice(4,7)+" "+x.slice(7,9)+" "+x.slice(9):x;}
+function pretty(x){x=String(x||"").replace(/[^0-9]/g,"");return x.length===11?"+"+x[0]+" "+x.slice(1,4)+" "+x.slice(4,7)+" "+x.slice(7,9)+" "+x.slice(9):x;}
 function money(v){if(v==null)return "";v=Number(v);return v>=1e6?(Math.round(v/1e5)/10).toLocaleString("ru-RU")+" млн":v.toLocaleString("ru-RU");}
 var first=true;
 function load(){
@@ -1395,7 +1395,7 @@ function load(){
     var cs=j.calls||[], ls=j.listings||{}, ans=cs.filter(function(c){return c.disposition==="answered";}), missed=cs.length-ans.length;
     document.getElementById("cards").innerHTML=card(n(cs.length),"звонков","")+card(n(ans.length),"отвечено","","ok")+card(n(missed),"пропущено","",missed?"warn":"")+card(dur(ans.reduce(function(a,c){return a+(c.duration_secs||0);},0)),"разговоров всего","мин:сек");
     document.getElementById("calls").innerHTML=cs.length?"<table><tr><th>время (Алматы)</th><th>откуда</th><th>итог</th><th class=r>длит.</th><th>объявление в базе</th><th style='width:32%'>заметка</th></tr>"+cs.map(function(c){
-      var ok=c.disposition==="answered", digits=String(c.caller||"").replace(/\D/g,""), L=ls[digits]||[];
+      var ok=c.disposition==="answered", digits=String(c.caller||"").replace(/[^0-9]/g,""), L=ls[digits]||[];
       var lst=L.length?L.slice(0,2).map(function(x){return "<a target=_blank style='color:var(--acc);text-decoration:none' href='https://krisha.kz/a/show/"+x.id+"'>"+esc(x.title||x.id)+"</a> <span class=mut>"+money(x.price)+(x.storage!=="live"?" · снято":"")+"</span>";}).join("<br>")+(L.length>2?"<br><span class=mut>ещё "+(L.length-2)+"</span>":""):"<span class=mut>—</span>";
       return "<tr><td>"+alm(c.started_at)+"</td><td><a style='color:var(--acc);text-decoration:none' href='tel:"+esc(c.caller)+"'>"+esc(pretty(c.caller))+"</a>"+(c.direction==="out"?" <span class=mut>(исходящий)</span>":"")+(c.recorded?" <span class=mut title='есть запись'>●</span>":"")+"</td><td><span class='tag "+(ok?"ok":"no")+"'>"+(ok?"разговор":esc(c.disposition||"без ответа"))+"</span></td><td class=r>"+(ok?dur(c.duration_secs):"")+"</td><td>"+lst+"</td><td><input style='width:100%;border:1px solid var(--line);background:#12161c;color:var(--fg);border-radius:8px;padding:5px 8px;font:inherit' placeholder='что сделали' value='"+esc(c.note||"")+"' onchange='saveNote(this,&quot;"+esc(c.pbx_call_id)+"&quot;)'></td></tr>";}).join("")+"</table>":"<p class=mut>звонков нет</p>";
     stamp();
