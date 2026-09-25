@@ -8374,9 +8374,9 @@ http
             return send(400, { ok: false, error: "since: дата YYYY-MM-DD, Nd (например 3d) или all" });
           }
           const since = sinceRaw;
-          // По умолчанию очередь — продажа квартир в Алматы: аренду, дома,
-          // коммерцию и другие города плагин не снимает. Снять фильтр можно
-          // значением any (deal=any, prop=any, city=any).
+          // По умолчанию очередь — продажа квартир в Астане и Алматы (Астана
+          // первой): аренду, дома, коммерцию и другие города плагин не снимает.
+          // Снять фильтр можно значением any (deal=any, prop=any, city=any).
           const filt = (name, def) => {
             const v = (parsed.searchParams.get(name) || "").trim().toLowerCase();
             if (!v) return def;
@@ -8384,7 +8384,8 @@ http
           };
           const dealF = filt("deal", "sale");
           const propF = filt("prop", "flat");
-          const cityF = filt("city", "almaty");
+          // Города списком через запятую, порядок — приоритет: сначала Астана, потом Алматы.
+          const cityF = filt("city", "astana,almaty");
           // Аренда: выданный объект на lease секунд не достаётся другим
           // вкладкам (по умолчанию 4 минуты — минута капчи, две перезагрузки
           // и запас). lease=0 — только посмотреть, без аренды.

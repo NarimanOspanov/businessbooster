@@ -2233,19 +2233,28 @@ async function nextListOwnerWithoutPhone(since, deal, prop, city, withCounts, le
   await ensureList(pool);
   const lease = Math.max(0, Math.min(900, Number(leaseSec) || 0));
   const free = "(phone_lease_until IS NULL OR phone_lease_until <= SYSUTCDATETIME())";
+  // city — один город, список через запятую («astana,almaty») или null.
+  // При списке очередь идёт по городам в порядке перечисления: сначала все
+  // свежие первого, потом второго; внутри города — новые первыми.
+  const cities = String(city || "").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean).slice(0, 10);
+  const cityCond = cities.length ? "city IN (" + cities.map((_, i) => "@c" + i).join(",") + ")" : "1 = 1";
+  const cityOrder = cities.length > 1 ? "CASE city " + cities.map((_, i) => "WHEN @c" + i + " THEN " + i).join(" ") + " ELSE 99 END, " : "";
   const ready = `user_type = 'owner' AND storage = 'live' AND phones IS NULL
         AND first_seen >= @since
         AND (@deal IS NULL OR deal = @deal) AND (@prop IS NULL OR prop = @prop)
-        AND (@city IS NULL OR city = @city)
+        AND ${cityCond}
         AND ISNULL(phone_tries, 0) < 5
         AND (phone_state IS NULL OR phone_state NOT IN (${PHONE_FINAL_SQL}))`;
   const now = "(phone_next_at IS NULL OR phone_next_at <= SYSUTCDATETIME())";
-  const req = () => pool.request()
-    .input("since", sql.DateTime2, new Date(since))
-    .input("deal", sql.NVarChar(10), deal || null)
-    .input("prop", sql.NVarChar(20), prop || null)
-    .input("city", sql.NVarChar(40), city || null)
-    .input("lease", sql.Int, lease);
+  const req = () => {
+    const r = pool.request()
+      .input("since", sql.DateTime2, new Date(since))
+      .input("deal", sql.NVarChar(10), deal || null)
+      .input("prop", sql.NVarChar(20), prop || null)
+      .input("lease", sql.Int, lease);
+    cities.forEach((c, i) => r.input("c" + i, sql.NVarChar(40), c));
+    return r;
+  };
   const cols = "id, title, deal, prop, city, user_type, price, storage, first_seen, bumped_on, phone_tries, phone_state, phone_lease_until";
   const r = lease > 0
     ? await req().query(`
@@ -2253,7 +2262,7 @@ async function nextListOwnerWithoutPhone(since, deal, prop, city, withCounts, le
         SELECT TOP (1) ${cols}
         FROM dbo.krisha_list WITH (UPDLOCK, READPAST, ROWLOCK)
         WHERE ${ready} AND ${now} AND ${free}
-        ORDER BY first_seen DESC)
+        ORDER BY ${cityOrder}first_seen DESC)
       UPDATE c SET phone_lease_until = DATEADD(second, @lease, SYSUTCDATETIME())
       OUTPUT ${cols.split(", ").map((x) => "INSERTED." + x).join(", ")}
       OPTION (RECOMPILE)`)
@@ -2261,7 +2270,7 @@ async function nextListOwnerWithoutPhone(since, deal, prop, city, withCounts, le
       SELECT TOP (1) ${cols}
       FROM dbo.krisha_list
       WHERE ${ready} AND ${now} AND ${free}
-      ORDER BY first_seen DESC
+      ORDER BY ${cityOrder}first_seen DESC
       OPTION (RECOMPILE)`);
   // Без «, id DESC» в ORDER BY: с ним оптимизатор сортировал все 200 тысяч
   // подходящих строк ради одной, по 10 секунд на вызов; порядок внутри одной
