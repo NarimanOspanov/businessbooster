@@ -8413,10 +8413,12 @@ http
               .then((q1) => { cached.at = Date.now(); cached.left = q1.left; cached.waiting = q1.waiting; cached.inWork = q1.inWork; })
               .catch(() => {}).then(() => { cached.busy = false; });
           }
-          // Перед выдачей проверяем объявление на Крыше (карточка карты):
-          // удалённое и снятое помечаем окончательно и берём следующее, до
-          // пяти подряд за один вызов. verify=0 — выдать без проверки.
-          const verify = parsed.searchParams.get("verify") !== "0";
+          // verify=1 — перед выдачей проверить объявление на Крыше (карточка
+          // карты): удалённое и снятое пометить окончательно и взять следующее,
+          // до пяти подряд за один вызов. По умолчанию выключено: мёртвых
+          // объявлений около одного на 400 выдач, а проверка стоит 0,3–0,5 с
+          // на каждую и лишний запрос к Крыше с IP сервера.
+          const verify = parsed.searchParams.get("verify") === "1";
           const L = require("./scripts/krisha-list.js");
           let r = null, skipped = [], verified = false, fromRest = false;
           for (let attempt = 0; attempt < 5; attempt++) {
