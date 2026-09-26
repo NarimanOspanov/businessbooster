@@ -2228,53 +2228,74 @@ async function saveListAdvert(o, sweepNo) {
 // leaseSec > 0 — выданный объект арендуется на столько секунд: одним
 // оператором UPDATE … OUTPUT с UPDLOCK/READPAST, чтобы сто вкладок разом не
 // получили одно и то же объявление. 0 — просто посмотреть, без аренды.
-// rest — когда перечисленные города пустые, брать из остальных (и без
-// города); false — только перечисленные.
+// deal, prop, city — одно значение, список через запятую в порядке
+// приоритета («sale,rent», «flat,house,commercial», «astana,almaty») или
+// null (любое). Очередь идёт по ступеням: для каждого вида сделки, для
+// каждого типа объекта, для каждого города по очереди — сначала всё
+// свежее первой ступени, потом второй. Каждая ступень — отдельный
+// запрос TOP (1) по индексу по дате (общая сортировка по приоритету
+// стоила секунды). rest — когда перечисленные города пустые, те же
+// ступени по остальным городам (и без города); false — только
+// перечисленные. Счётчики — одним запросом по всему набору.
+//
+// Пустые ступени запоминаются на EMPTY_STEP_MS: при десятке ступеней
+// иначе каждая выдача начиналась бы с десятка пустых запросов. Новое
+// объявление в приоритетной ступени подхватится с задержкой до минуты.
+const EMPTY_STEP_MS = 45e3;
+const emptyStepUntil = new Map();
+function splitList(v) {
+  return String(v || "").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean).slice(0, 10);
+}
 async function nextListOwnerWithoutPhone(since, deal, prop, city, withCounts, leaseSec, rest) {
   const pool = await getPool();
   await ensureList(pool);
   const lease = Math.max(0, Math.min(900, Number(leaseSec) || 0));
   const free = "(phone_lease_until IS NULL OR phone_lease_until <= SYSUTCDATETIME())";
-  // city — один город, список через запятую («astana,almaty») или null.
-  // При списке объявление ищется по городам по очереди, отдельным запросом
-  // на каждый (так работает индекс по дате; общая сортировка по приоритету
-  // городов стоила секунды): сначала все свежие первого города, потом
-  // второго. Счётчики — одним запросом по всему списку.
-  const cities = String(city || "").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean).slice(0, 10);
-  const cityCond = cities.length ? "city IN (" + cities.map((_, i) => "@c" + i).join(",") + ")" : "1 = 1";
-  const readyFor = (cc) => `user_type = 'owner' AND storage = 'live' AND phones IS NULL
+  const deals = splitList(deal), props = splitList(prop), cities = splitList(city);
+  const inCond = (col, list, pfx) => list.length ? col + " IN (" + list.map((_, i) => "@" + pfx + i).join(",") + ")" : "1 = 1";
+  const readyFor = (dc, pc, cc) => `user_type = 'owner' AND storage = 'live' AND phones IS NULL
         AND first_seen >= @since
-        AND (@deal IS NULL OR deal = @deal) AND (@prop IS NULL OR prop = @prop)
-        AND ${cc}
+        AND ${dc} AND ${pc} AND ${cc}
         AND ISNULL(phone_tries, 0) < 5
         AND (phone_state IS NULL OR phone_state NOT IN (${PHONE_FINAL_SQL}))`;
-  const ready = readyFor(cityCond);
+  const ready = readyFor(inCond("deal", deals, "d"), inCond("prop", props, "p"), inCond("city", cities, "c"));
   const now = "(phone_next_at IS NULL OR phone_next_at <= SYSUTCDATETIME())";
   const req = () => {
     const r = pool.request()
       .input("since", sql.DateTime2, new Date(since))
-      .input("deal", sql.NVarChar(10), deal || null)
-      .input("prop", sql.NVarChar(20), prop || null)
       .input("lease", sql.Int, lease);
-    cities.forEach((c, i) => r.input("c" + i, sql.NVarChar(40), c));
+    deals.forEach((v, i) => r.input("d" + i, sql.NVarChar(10), v));
+    props.forEach((v, i) => r.input("p" + i, sql.NVarChar(20), v));
+    cities.forEach((v, i) => r.input("c" + i, sql.NVarChar(40), v));
     return r;
   };
   const cols = "id, title, deal, prop, city, user_type, price, storage, first_seen, bumped_on, phone_tries, phone_state, phone_lease_until";
+  // Ступени: сделка × тип × город, затем (если rest) сделка × тип по остальным городам.
+  const steps = [];
+  const cityList = cities.length ? cities : [null];
+  for (const d of (deals.length ? deals : [null]))
+    for (const p of (props.length ? props : [null]))
+      for (const c of cityList) steps.push({ d: d, p: p, c: c, rest: false });
+  if (cities.length && rest !== false)
+    for (const d of (deals.length ? deals : [null]))
+      for (const p of (props.length ? props : [null])) steps.push({ d: d, p: p, c: null, rest: true });
   let r = { recordset: [] };
   let fromRest = false;
-  // Порядок: перечисленные города по очереди, затем (если rest) все остальные.
-  const steps = cities.length ? cities.slice() : [null];
-  if (cities.length && rest !== false) steps.push("*");
-  for (const cc of steps) {
-    const cond = cc == null || cc === "*" ? "1 = 1" : "city = @cc";
-    fromRest = cc === "*";
-    const rq = req(); if (cc != null && cc !== "*") rq.input("cc", sql.NVarChar(40), cc);
+  const t0 = Date.now();
+  for (const st of steps) {
+    const key = since + "|" + lease + "|" + (st.d || "") + "|" + (st.p || "") + "|" + (st.c || "") + "|" + st.rest;
+    if ((emptyStepUntil.get(key) || 0) > t0) continue;
+    const rq = pool.request().input("since", sql.DateTime2, new Date(since)).input("lease", sql.Int, lease);
+    if (st.d) rq.input("sd", sql.NVarChar(10), st.d);
+    if (st.p) rq.input("sp", sql.NVarChar(20), st.p);
+    if (st.c) rq.input("sc", sql.NVarChar(40), st.c);
+    const where = readyFor(st.d ? "deal = @sd" : "1 = 1", st.p ? "prop = @sp" : "1 = 1", st.c ? "city = @sc" : "1 = 1");
     r = lease > 0
       ? await rq.query(`
       WITH c AS (
         SELECT TOP (1) ${cols}
         FROM dbo.krisha_list WITH (UPDLOCK, READPAST, ROWLOCK)
-        WHERE ${readyFor(cond)} AND ${now} AND ${free}
+        WHERE ${where} AND ${now} AND ${free}
         ORDER BY first_seen DESC)
       UPDATE c SET phone_lease_until = DATEADD(second, @lease, SYSUTCDATETIME())
       OUTPUT ${cols.split(", ").map((x) => "INSERTED." + x).join(", ")}
@@ -2282,15 +2303,16 @@ async function nextListOwnerWithoutPhone(since, deal, prop, city, withCounts, le
       : await rq.query(`
       SELECT TOP (1) ${cols}
       FROM dbo.krisha_list
-      WHERE ${readyFor(cond)} AND ${now} AND ${free}
+      WHERE ${where} AND ${now} AND ${free}
       ORDER BY first_seen DESC
       OPTION (RECOMPILE)`);
-    if (r.recordset[0]) break;
+    if (r.recordset[0]) { fromRest = st.rest; break; }
+    emptyStepUntil.set(key, Date.now() + EMPTY_STEP_MS);
   }
   // Без «, id DESC» в ORDER BY: с ним оптимизатор сортировал все 200 тысяч
   // подходящих строк ради одной, по 10 секунд на вызов; порядок внутри одной
-  // секунды нам безразличен. RECOMPILE — чтобы @deal/@prop IS NULL стали
-  // константами и план шёл по фильтрованному индексу.
+  // секунды нам безразличен. RECOMPILE — чтобы план каждой ступени шёл по
+  // фильтрованному индексу с известными константами.
   if (withCounts === false) return { row: r.recordset[0] || null, fromRest: fromRest, left: null, waiting: null, inWork: null };
   const c = (await req().query(`SELECT
               SUM(CASE WHEN ${now} THEN 1 ELSE 0 END) AS ready,
