@@ -2228,7 +2228,9 @@ async function saveListAdvert(o, sweepNo) {
 // leaseSec > 0 — выданный объект арендуется на столько секунд: одним
 // оператором UPDATE … OUTPUT с UPDLOCK/READPAST, чтобы сто вкладок разом не
 // получили одно и то же объявление. 0 — просто посмотреть, без аренды.
-async function nextListOwnerWithoutPhone(since, deal, prop, city, withCounts, leaseSec) {
+// rest — когда перечисленные города пустые, брать из остальных (и без
+// города); false — только перечисленные.
+async function nextListOwnerWithoutPhone(since, deal, prop, city, withCounts, leaseSec, rest) {
   const pool = await getPool();
   await ensureList(pool);
   const lease = Math.max(0, Math.min(900, Number(leaseSec) || 0));
@@ -2259,9 +2261,14 @@ async function nextListOwnerWithoutPhone(since, deal, prop, city, withCounts, le
   };
   const cols = "id, title, deal, prop, city, user_type, price, storage, first_seen, bumped_on, phone_tries, phone_state, phone_lease_until";
   let r = { recordset: [] };
-  for (const cc of (cities.length ? cities : [null])) {
-    const cond = cc == null ? "1 = 1" : "city = @cc";
-    const rq = req(); if (cc != null) rq.input("cc", sql.NVarChar(40), cc);
+  let fromRest = false;
+  // Порядок: перечисленные города по очереди, затем (если rest) все остальные.
+  const steps = cities.length ? cities.slice() : [null];
+  if (cities.length && rest !== false) steps.push("*");
+  for (const cc of steps) {
+    const cond = cc == null || cc === "*" ? "1 = 1" : "city = @cc";
+    fromRest = cc === "*";
+    const rq = req(); if (cc != null && cc !== "*") rq.input("cc", sql.NVarChar(40), cc);
     r = lease > 0
       ? await rq.query(`
       WITH c AS (
@@ -2284,7 +2291,7 @@ async function nextListOwnerWithoutPhone(since, deal, prop, city, withCounts, le
   // подходящих строк ради одной, по 10 секунд на вызов; порядок внутри одной
   // секунды нам безразличен. RECOMPILE — чтобы @deal/@prop IS NULL стали
   // константами и план шёл по фильтрованному индексу.
-  if (withCounts === false) return { row: r.recordset[0] || null, left: null, waiting: null, inWork: null };
+  if (withCounts === false) return { row: r.recordset[0] || null, fromRest: fromRest, left: null, waiting: null, inWork: null };
   const c = (await req().query(`SELECT
               SUM(CASE WHEN ${now} THEN 1 ELSE 0 END) AS ready,
               SUM(CASE WHEN ${now} THEN 0 ELSE 1 END) AS waiting
@@ -2292,7 +2299,7 @@ async function nextListOwnerWithoutPhone(since, deal, prop, city, withCounts, le
   // Сколько сейчас в работе у вкладок — по маленькому индексу аренды.
   const w = (await pool.request().query(`SELECT COUNT(*) AS n FROM dbo.krisha_list
             WHERE phone_lease_until IS NOT NULL AND phone_lease_until > SYSUTCDATETIME()`)).recordset[0];
-  return { row: r.recordset[0] || null, left: c.ready || 0, waiting: c.waiting || 0, inWork: w.n || 0 };
+  return { row: r.recordset[0] || null, fromRest: fromRest, left: c.ready || 0, waiting: c.waiting || 0, inWork: w.n || 0 };
 }
 
 // Продлить аренду выданного объекта; null — объекта нет или номер уже снят.

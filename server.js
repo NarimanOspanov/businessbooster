@@ -8385,7 +8385,10 @@ http
           const dealF = filt("deal", "sale");
           const propF = filt("prop", "flat");
           // Города списком через запятую, порядок — приоритет: сначала Астана, потом Алматы.
+          // Когда перечисленные города пустые, очередь идёт по остальным городам
+          // (включая объявления без города); rest=0 — только перечисленные.
           const cityF = filt("city", "astana,almaty");
+          const restF = parsed.searchParams.get("rest") !== "0";
           // Аренда: выданный объект на lease секунд не достаётся другим
           // вкладкам (по умолчанию 4 минуты — минута капчи, две перезагрузки
           // и запас). lease=0 — только посмотреть, без аренды.
@@ -8415,10 +8418,10 @@ http
           // пяти подряд за один вызов. verify=0 — выдать без проверки.
           const verify = parsed.searchParams.get("verify") !== "0";
           const L = require("./scripts/krisha-list.js");
-          let r = null, skipped = [], verified = false;
+          let r = null, skipped = [], verified = false, fromRest = false;
           for (let attempt = 0; attempt < 5; attempt++) {
-            const q = await db.nextListOwnerWithoutPhone(since, dealF, propF, cityF, false, leaseSec);
-            r = q.row;
+            const q = await db.nextListOwnerWithoutPhone(since, dealF, propF, cityF, false, leaseSec, restF);
+            r = q.row; fromRest = !!q.fromRest;
             if (!r || !verify) break;
             const chk = await L.checkAdvert(r.id);
             if (chk.status === "live") { verified = true; break; }
@@ -8434,7 +8437,10 @@ http
           return send(200, {
             ok: true, since: since, left: cached.left, waiting: cached.waiting, inWork: cached.inWork == null ? null : cached.inWork,
             countsAt: cached.at ? new Date(cached.at).toISOString() : null,
-            filter: { deal: dealF, prop: propF, city: cityF },
+            filter: { deal: dealF, prop: propF, city: cityF, rest: restF },
+            // fromRest — перечисленные города пустые, объект взят из остальных.
+            // left/waiting считаются только по перечисленным городам.
+            fromRest: fromRest,
             // Проверено ли объявление на Крыше перед выдачей; что пропущено как снятое/удалённое.
             verified: verified, skipped: skipped,
             // До какого момента объект закреплён за этой вкладкой (UTC); null — без аренды.
