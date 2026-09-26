@@ -2741,6 +2741,36 @@ async function listHistory(id) {
   return { item: row, events: events };
 }
 
+// Бот: что мы знаем об объявлении по присланной ссылке. Само объявление из
+// krisha_list (с телефонами, если сняты) и, когда оно от посредника, —
+// подтверждённый оригинал от хозяина: отмеченный вручную или совпавший по
+// фото и не отклонённый вручную. Телефоны — списками.
+async function botLookup(id) {
+  const pool = await getPool();
+  await ensureList(pool);
+  const cols = "id, deal, prop, user_type, city, price, rooms, area, floor, floors, title, addr, storage, phones, phones_at";
+  const item = (await pool.request().input("id", sql.BigInt, Number(id))
+    .query(`SELECT ${cols} FROM dbo.krisha_list WHERE id = @id`)).recordset[0] || null;
+  let owner = null;
+  if (item) {
+    owner = (await pool.request().input("id", sql.BigInt, Number(id)).query(`
+      SELECT TOP (1) ${cols.split(", ").map((c) => "o." + c).join(", ")}, m.photo_match, m.photo_conf, m.human_ok
+      FROM dbo.krisha_list_matches m
+      JOIN dbo.krisha_list o ON o.id = m.owner_id
+      WHERE m.agent_id = @id AND (m.human_ok = 1 OR (m.photo_match = 1 AND m.human_ok IS NULL))
+      ORDER BY m.human_ok DESC, m.photo_conf DESC, m.found_at DESC`)).recordset[0] || null;
+  }
+  if (item) item.phones = rawList(item.phones);
+  if (owner) owner.phones = rawList(owner.phones);
+  return { item: item, owner: owner };
+}
+
+async function usersCount() {
+  const pool = await getPool();
+  const r = await pool.request().query("SELECT COUNT(*) AS n FROM dbo.users");
+  return r.recordset[0] ? Number(r.recordset[0].n) : 0;
+}
+
 // Какие из этих id есть в krisha_list — для сверки по номерам объявлений.
 async function knownListIds(ids) {
   const list = (ids || []).map((x) => Number(x)).filter(Boolean);
@@ -3582,7 +3612,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
-  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory,
+  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,
