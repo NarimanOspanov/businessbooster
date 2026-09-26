@@ -245,4 +245,24 @@ function unpackPhotos(packed) {
   return out;
 }
 
-module.exports = { SECTIONS, fetchListPage, parseAdvert, loadRegions, cityOf, dealOf, propOf, bumpDate, packPhotos, unpackPhotos };
+// Есть ли объявление на Крыше прямо сейчас. Карточка карты
+// /a/ajax-map-object?id= отвечает теми же заголовками, что и список:
+// 404 — объявления нет (удалено), 200 с data-storage="archive" — снято,
+// data-storage="live" — живое. Любая другая ошибка — «неизвестно»: выдаём
+// как есть, чтобы сбой сети не останавливал очередь.
+async function checkAdvert(id, opts) {
+  const url = "https://krisha.kz/a/ajax-map-object?id=" + encodeURIComponent(String(id));
+  try {
+    const j = await fetchJson(url, (opts && opts.timeoutMs) || 5000, opts);
+    const html = String((j && j.html) || "");
+    const m = /data-storage="([a-z]+)"/.exec(html);
+    if (m && m[1] === "live") return { status: "live" };
+    if (m) return { status: "archived", storage: m[1] };
+    return { status: "unknown", why: "no data-storage" };
+  } catch (e) {
+    if (e && e.status === 404) return { status: "not_found" };
+    return { status: "unknown", why: String((e && e.message) || e).slice(0, 80) };
+  }
+}
+
+module.exports = { SECTIONS, fetchListPage, parseAdvert, loadRegions, cityOf, dealOf, propOf, bumpDate, packPhotos, unpackPhotos, checkAdvert };

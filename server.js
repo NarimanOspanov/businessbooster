@@ -8410,12 +8410,33 @@ http
               .then((q1) => { cached.at = Date.now(); cached.left = q1.left; cached.waiting = q1.waiting; cached.inWork = q1.inWork; })
               .catch(() => {}).then(() => { cached.busy = false; });
           }
-          const q = await db.nextListOwnerWithoutPhone(since, dealF, propF, cityF, false, leaseSec);
-          const r = q.row;
+          // Перед выдачей проверяем объявление на Крыше (карточка карты):
+          // удалённое и снятое помечаем окончательно и берём следующее, до
+          // пяти подряд за один вызов. verify=0 — выдать без проверки.
+          const verify = parsed.searchParams.get("verify") !== "0";
+          const L = require("./scripts/krisha-list.js");
+          let r = null, skipped = [], verified = false;
+          for (let attempt = 0; attempt < 5; attempt++) {
+            const q = await db.nextListOwnerWithoutPhone(since, dealF, propF, cityF, false, leaseSec);
+            r = q.row;
+            if (!r || !verify) break;
+            const chk = await L.checkAdvert(r.id);
+            if (chk.status === "live") { verified = true; break; }
+            if (chk.status === "not_found" || chk.status === "archived") {
+              await db.markListPhoneMiss(r.id, chk.status).catch(() => {});
+              listEvent({ kind: "archived", id: String(r.id), src: "проверка перед выдачей" + (chk.status === "not_found" ? " (404)" : "") });
+              objphoneEvent({ kind: "miss", id: String(r.id), reason: chk.status, tries: 1, final: true, src: "проверка", ip: "" });
+              skipped.push({ id: String(r.id), status: chk.status });
+              r = null; continue;
+            }
+            break; // неизвестно (сеть, 468) — отдаём как есть
+          }
           return send(200, {
             ok: true, since: since, left: cached.left, waiting: cached.waiting, inWork: cached.inWork == null ? null : cached.inWork,
             countsAt: cached.at ? new Date(cached.at).toISOString() : null,
             filter: { deal: dealF, prop: propF, city: cityF },
+            // Проверено ли объявление на Крыше перед выдачей; что пропущено как снятое/удалённое.
+            verified: verified, skipped: skipped,
             // До какого момента объект закреплён за этой вкладкой (UTC); null — без аренды.
             leaseUntil: r && r.phone_lease_until ? new Date(r.phone_lease_until).toISOString() : null,
             item: r ? {
