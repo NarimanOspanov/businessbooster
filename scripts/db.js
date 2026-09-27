@@ -973,6 +973,26 @@ BEGIN
   CREATE INDEX IX_pcalls_started ON dbo.phone_calls (started_at DESC);
 END
 IF COL_LENGTH('dbo.phone_calls', 'note') IS NULL ALTER TABLE dbo.phone_calls ADD note NVARCHAR(400) NULL;
+-- Что мы отправили звонившим: по одной строке на отправку. Канал — sms,
+-- позже whatsapp и голос. Статус доставки приходит от провайдера позже,
+-- поэтому строка заводится сразу со status = queued и обновляется по sid.
+IF OBJECT_ID('dbo.outreach', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.outreach (
+    id          BIGINT IDENTITY(1,1) PRIMARY KEY,
+    phone       NVARCHAR(20)  NOT NULL,   -- 11 цифр, как caller в phone_calls
+    channel     NVARCHAR(16)  NOT NULL,   -- sms | whatsapp | voice
+    sent_at     DATETIME2(0)  NOT NULL CONSTRAINT DF_outreach_sent DEFAULT SYSUTCDATETIME(),
+    provider_id NVARCHAR(64)  NULL,       -- sid сообщения у провайдера
+    status      NVARCHAR(32)  NULL,       -- queued / sent / delivered / failed / undelivered
+    error       NVARCHAR(200) NULL,
+    text        NVARCHAR(400) NULL,
+    call_id     NVARCHAR(64)  NULL,       -- из какого звонка нажали
+    updated_at  DATETIME2(0)  NOT NULL CONSTRAINT DF_outreach_upd DEFAULT SYSUTCDATETIME()
+  );
+  CREATE INDEX IX_outreach_phone ON dbo.outreach (phone, sent_at DESC);
+  CREATE INDEX IX_outreach_sid ON dbo.outreach (provider_id);
+END
 `;
 let callsReady = false, callsReadyPromise = null, callsFailedAt = 0;
 async function ensureCalls() {
@@ -1083,6 +1103,58 @@ async function listingsByPhones(numbers) {
     for (const row of r.recordset) for (const n of chunk) if (String(row.phones).includes(n)) (out[n] = out[n] || []).push({ id: String(row.id), title: row.title, price: row.price, city: row.city, deal: row.deal, storage: row.storage });
   }
   return out;
+}
+
+// Последняя отправка по каждому номеру (страница звонков): номер → строка.
+async function outreachByPhones(numbers) {
+  const nums = [...new Set((numbers || []).map((x) => String(x || "").replace(/\D/g, "")).filter((x) => x.length === 11))];
+  const out = {};
+  if (!nums.length) return out;
+  const pool = await getPool();
+  await ensureCalls();
+  for (let i = 0; i < nums.length; i += 50) {
+    const chunk = nums.slice(i, i + 50);
+    const req = pool.request();
+    chunk.forEach((n, k) => req.input("p" + k, sql.NVarChar(20), n));
+    const r = await req.query(`
+      SELECT phone, channel, sent_at, status, error, provider_id
+      FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY phone, channel ORDER BY sent_at DESC) AS rn
+            FROM dbo.outreach WHERE phone IN (${chunk.map((_, k) => "@p" + k).join(",")})) t
+      WHERE rn = 1`);
+    for (const row of r.recordset) (out[row.phone] = out[row.phone] || {})[row.channel] = {
+      at: row.sent_at, status: row.status, error: row.error, sid: row.provider_id };
+  }
+  return out;
+}
+
+async function outreachAdd(x) {
+  const pool = await getPool();
+  await ensureCalls();
+  const r = await pool.request()
+    .input("phone", sql.NVarChar(20), String(x.phone).replace(/\D/g, "").slice(0, 20))
+    .input("ch", sql.NVarChar(16), x.channel || "sms")
+    .input("sid", sql.NVarChar(64), x.sid ? String(x.sid).slice(0, 64) : null)
+    .input("st", sql.NVarChar(32), x.status ? String(x.status).slice(0, 32) : null)
+    .input("err", sql.NVarChar(200), x.error ? String(x.error).slice(0, 200) : null)
+    .input("text", sql.NVarChar(400), x.text ? String(x.text).slice(0, 400) : null)
+    .input("call", sql.NVarChar(64), x.callId ? String(x.callId).slice(0, 64) : null)
+    .query(`INSERT INTO dbo.outreach (phone, channel, provider_id, status, error, text, call_id)
+            OUTPUT INSERTED.id, INSERTED.sent_at
+            VALUES (@phone, @ch, @sid, @st, @err, @text, @call)`);
+  return r.recordset[0];
+}
+
+// Статус от провайдера по sid. Возвращает номер, чтобы страница знала, кого обновить.
+async function outreachSetStatus(sid, status, error) {
+  const pool = await getPool();
+  await ensureCalls();
+  const r = await pool.request()
+    .input("sid", sql.NVarChar(64), String(sid).slice(0, 64))
+    .input("st", sql.NVarChar(32), String(status || "").slice(0, 32))
+    .input("err", sql.NVarChar(200), error ? String(error).slice(0, 200) : null)
+    .query(`UPDATE dbo.outreach SET status = @st, error = ISNULL(@err, error), updated_at = SYSUTCDATETIME()
+            OUTPUT INSERTED.phone WHERE provider_id = @sid`);
+  return r.recordset[0] ? r.recordset[0].phone : null;
 }
 
 async function lastZadarmaEvents(limit) {
@@ -3630,7 +3702,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,
-  getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, upsertPhoneCall, phoneCalls, setCallNote, listingsByPhones, agentDids, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
+  getPool, migrate, saveCall, setClinicWaSession, saveZadarmaEvent, lastZadarmaEvents, upsertPhoneCall, phoneCalls, setCallNote, listingsByPhones, outreachByPhones, outreachAdd, outreachSetStatus, agentDids, connectionString, clinicIdForCall, upsertClinic, listClinics, clinicsByOrgIds, callsForClinics, callForClinics, clinicById, saveClinicProfile, setClinicAgent, clinicByToolKey, ensureToolKey, numbersByStatus, upsertNumber, assignNumber, releaseNumber };
 
 if (require.main === module) {
   const cmd = process.argv[2];

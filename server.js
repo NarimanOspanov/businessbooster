@@ -1328,6 +1328,54 @@ function chk(id,rotate){
 }
 load();
 </script></body></html>`;
+// СМС звонившим через Twilio. Ключи — из переменных TWILIO_ACCOUNT_SID и
+// TWILIO_AUTH_TOKEN, а без них из ~/.twilio-creds (две строки: SID, токен),
+// как у локального скрипта импорта. Отправитель — единственный номер
+// аккаунта с СМС; операторы Казахстана показывают его как «InfoKZ».
+function twilioConfig() {
+  let sid = process.env.TWILIO_ACCOUNT_SID || "", token = process.env.TWILIO_AUTH_TOKEN || "";
+  if (!sid || !token) {
+    try {
+      const lines = fs.readFileSync(path.join(require("os").homedir(), ".twilio-creds"), "utf8").split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+      if (lines.length >= 2) { sid = sid || lines[0]; token = token || lines[1]; }
+    } catch { /* нет файла — не настроено */ }
+  }
+  return sid && token ? { sid: sid, token: token, from: process.env.TWILIO_SMS_FROM || "+13614016592" } : null;
+}
+// Текст выбран 27.09.2026: 69 знаков, один сегмент UCS-2 (кириллица — 70 на сегмент).
+const OUTREACH_SMS_TEXT = process.env.OUTREACH_SMS_TEXT || "Ищете квартиру? Пишите хозяевам напрямую: t.me/bez_posrednikov_kz_bot";
+async function twilioSendSms(to, body) {
+  const cfg = twilioConfig();
+  if (!cfg) return { ok: false, error: "Twilio не настроен: нужны TWILIO_ACCOUNT_SID и TWILIO_AUTH_TOKEN" };
+  const r = await fetch("https://api.twilio.com/2010-04-01/Accounts/" + cfg.sid + "/Messages.json", {
+    method: "POST",
+    headers: { Authorization: "Basic " + Buffer.from(cfg.sid + ":" + cfg.token).toString("base64"), "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ From: cfg.from, To: to, Body: body, StatusCallback: CANONICAL + "/api/twilio/sms-status" }),
+    signal: AbortSignal.timeout(20000),
+  }).then((x) => x.json()).catch((e) => ({ message: e.message }));
+  if (!r.sid) return { ok: false, error: String(r.message || r.error_message || "Twilio не ответил").slice(0, 200) };
+  return { ok: true, sid: r.sid, status: r.status, segments: Number(r.num_segments) || null };
+}
+async function twilioMessageStatus(sid) {
+  const cfg = twilioConfig();
+  if (!cfg) return null;
+  const r = await fetch("https://api.twilio.com/2010-04-01/Accounts/" + cfg.sid + "/Messages/" + sid + ".json", {
+    headers: { Authorization: "Basic " + Buffer.from(cfg.sid + ":" + cfg.token).toString("base64") }, signal: AbortSignal.timeout(15000),
+  }).then((x) => x.json()).catch(() => null);
+  return r && r.status ? { status: r.status, error: r.error_message || null } : null;
+}
+// Подпись вебхука Twilio: HMAC-SHA1 от полного URL и параметров формы по
+// алфавиту (ключ+значение подряд), ключ — auth token, base64.
+function twilioSignatureOk(req, url, params) {
+  const cfg = twilioConfig();
+  if (!cfg) return false;
+  let s = url;
+  for (const k of Object.keys(params).sort()) s += k + params[k];
+  const want = crypto.createHmac("sha1", cfg.token).update(s).digest("base64");
+  const got = String(req.headers["x-twilio-signature"] || "");
+  return got.length === want.length && crypto.timingSafeEqual(Buffer.from(got), Buffer.from(want));
+}
+
 const KRISHA_CALLS_HTML = `<!doctype html>
 <html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -1392,14 +1440,37 @@ function load(){
   if(first){document.getElementById("cards").innerHTML=skCards(4);document.getElementById("calls").innerHTML=skTable(8);}
   fetch("/api/calls?mine=1&listings=1&days="+d+"&limit=500&"+K).then(function(r){return r.json();}).then(function(j){
     first=false;
+    OUT=j.outreach||{};
     var cs=j.calls||[], ls=j.listings||{}, ans=cs.filter(function(c){return c.disposition==="answered";}), missed=cs.length-ans.length;
     document.getElementById("cards").innerHTML=card(n(cs.length),"звонков","")+card(n(ans.length),"отвечено","","ok")+card(n(missed),"пропущено","",missed?"warn":"")+card(dur(ans.reduce(function(a,c){return a+(c.duration_secs||0);},0)),"разговоров всего","мин:сек");
-    document.getElementById("calls").innerHTML=cs.length?"<table><tr><th>время (Алматы)</th><th>откуда</th><th>итог</th><th class=r>длит.</th><th>объявление в базе</th><th style='width:32%'>заметка</th></tr>"+cs.map(function(c){
-      var ok=c.disposition==="answered", digits=String(c.caller||"").replace(/[^0-9]/g,""), L=ls[digits]||[];
+    document.getElementById("calls").innerHTML=cs.length?"<table><tr><th>время (Алматы)</th><th>откуда</th><th>итог</th><th class=r>длит.</th><th>объявление в базе</th><th>СМС</th><th style='width:28%'>заметка</th></tr>"+cs.map(function(c){
+      var ok=c.disposition==="answered", digits=String(c.caller||"").replace(/[^0-9]/g,""), L=ls[digits]||[], O=(j.outreach||{})[digits]||{};
       var lst=L.length?L.slice(0,2).map(function(x){return "<a target=_blank style='color:var(--acc);text-decoration:none' href='https://krisha.kz/a/show/"+x.id+"'>"+esc(x.title||x.id)+"</a> <span class=mut>"+money(x.price)+(x.storage!=="live"?" · снято":"")+"</span>";}).join("<br>")+(L.length>2?"<br><span class=mut>ещё "+(L.length-2)+"</span>":""):"<span class=mut>—</span>";
-      return "<tr><td>"+alm(c.started_at)+"</td><td><a style='color:var(--acc);text-decoration:none' href='tel:"+esc(c.caller)+"'>"+esc(pretty(c.caller))+"</a>"+(c.direction==="out"?" <span class=mut>(исходящий)</span>":"")+(c.recorded?" <span class=mut title='есть запись'>●</span>":"")+"</td><td><span class='tag "+(ok?"ok":"no")+"'>"+(ok?"разговор":esc(c.disposition||"без ответа"))+"</span></td><td class=r>"+(ok?dur(c.duration_secs):"")+"</td><td>"+lst+"</td><td><input style='width:100%;border:1px solid var(--line);background:#12161c;color:var(--fg);border-radius:8px;padding:5px 8px;font:inherit' placeholder='что сделали' value='"+esc(c.note||"")+"' onchange='saveNote(this,&quot;"+esc(c.pbx_call_id)+"&quot;)'></td></tr>";}).join("")+"</table>":"<p class=mut>звонков нет</p>";
+      return "<tr><td>"+alm(c.started_at)+"</td><td><a style='color:var(--acc);text-decoration:none' href='tel:"+esc(c.caller)+"'>"+esc(pretty(c.caller))+"</a>"+(c.direction==="out"?" <span class=mut>(исходящий)</span>":"")+(c.recorded?" <span class=mut title='есть запись'>●</span>":"")+"</td><td><span class='tag "+(ok?"ok":"no")+"'>"+(ok?"разговор":esc(c.disposition||"без ответа"))+"</span></td><td class=r>"+(ok?dur(c.duration_secs):"")+"</td><td>"+lst+"</td><td id='sms-"+digits+"-"+esc(c.pbx_call_id)+"'>"+smsCell(digits,c.pbx_call_id,O.sms)+"</td><td><input style='width:100%;border:1px solid var(--line);background:#12161c;color:var(--fg);border-radius:8px;padding:5px 8px;font:inherit' placeholder='что сделали' value='"+esc(c.note||"")+"' onchange='saveNote(this,&quot;"+esc(c.pbx_call_id)+"&quot;)'></td></tr>";}).join("")+"</table>":"<p class=mut>звонков нет</p>";
     stamp();
   }).catch(function(e){fail("cards",e);});
+}
+// СМС со ссылкой на бота. Одна отправка на номер: если уже отправляли —
+// показываем статус и дату, повтор только через «ещё раз» с подтверждением.
+var OUT={};
+var SMS_ST={queued:["mut","в очереди"],accepted:["mut","принято"],sending:["mut","отправляется"],sent:["mut","отправлено"],delivered:["ok","доставлено"],failed:["no","ошибка"],undelivered:["no","не доставлено"]};
+function smsCell(digits,callId,o){
+  if(digits.length!==11)return "<span class=mut>—</span>";
+  var btn="<button onclick='sendSms(&quot;"+digits+"&quot;,&quot;"+esc(callId)+"&quot;,"+(o?"true":"false")+")'>"+(o?"ещё раз":"Отправить СМС")+"</button>";
+  if(!o)return btn;
+  var st=SMS_ST[o.status]||["mut",esc(o.status||"?")];
+  return "<span class='tag "+st[0]+"' title='"+esc(o.error||"")+"'>"+st[1]+"</span> <span class=mut>"+alm(o.at)+"</span> "+btn;
+}
+function sendSms(digits,callId,again){
+  if(again&&!confirm("Этому номеру уже отправляли. Отправить ещё раз?"))return;
+  var cells=document.querySelectorAll("[id^='sms-"+digits+"-']");
+  cells.forEach(function(td){td.innerHTML="<span class=mut>отправляем…</span>";});
+  fetch("/api/calls?"+K,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sms:digits,call:callId,force:!!again})}).then(function(r){return r.json();}).then(function(j){
+    if(!j.ok){cells.forEach(function(td){td.innerHTML="<span class='tag no' title='"+esc(j.error||"")+"'>ошибка</span> <button onclick='sendSms(&quot;"+digits+"&quot;,&quot;"+esc(callId)+"&quot;,"+(again?"true":"false")+")'>повторить</button> <span class=mut>"+esc(j.error||"")+"</span>";});return;}
+    OUT[digits]=OUT[digits]||{};OUT[digits].sms=j.sms;
+    cells.forEach(function(td){td.innerHTML=smsCell(digits,callId,j.sms);});
+    setTimeout(load,20000);
+  }).catch(function(e){cells.forEach(function(td){td.innerHTML="<span class='tag no'>ошибка</span> <span class=mut>"+esc(e.message)+"</span>";});});
 }
 function saveNote(el,id){el.style.borderColor="var(--warn)";fetch("/api/calls?"+K+"&set="+encodeURIComponent(id)+"&note="+encodeURIComponent(el.value)).then(function(r){return r.json();}).then(function(){el.style.borderColor="var(--ok)";setTimeout(function(){el.style.borderColor="";},1200);}).catch(function(){el.style.borderColor="var(--no)";});}
 document.getElementById("days").onchange=function(){first=true;load();};
@@ -6212,6 +6283,33 @@ http
         res.writeHead(403, { "Content-Type": MIME[".json"] }); return res.end(JSON.stringify({ ok: false, error: "bad_key" }));
       }
       (async () => {
+        // POST {sms: <11 цифр>, call, force} — СМС со ссылкой на бота этому
+        // номеру. Повтор на тот же номер только с force. Строка в outreach
+        // заводится сразу, статус доставки приходит от Twilio вебхуком, а на
+        // всякий случай ещё раз спрашиваем через 20 с.
+        if (req.method === "POST") {
+          const send = (code, obj) => { res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); };
+          let body = {};
+          try { body = JSON.parse(await readBody(req)) || {}; } catch { body = {}; }
+          const phone = String(body.sms || "").replace(/\D/g, "");
+          if (!/^7\d{10}$/.test(phone)) return send(400, { ok: false, error: "номер: 11 цифр, начиная с 7" });
+          const prev = (await db.outreachByPhones([phone]))[phone];
+          if (prev && prev.sms && !body.force && !/^(failed|undelivered)$/.test(prev.sms.status || "")) {
+            return send(409, { ok: false, error: "уже отправляли " + new Date(prev.sms.at).toISOString().slice(0, 16).replace("T", " ") + " UTC, статус " + prev.sms.status, sms: prev.sms });
+          }
+          const r = await twilioSendSms("+" + phone, OUTREACH_SMS_TEXT);
+          const row = await db.outreachAdd({ phone: phone, channel: "sms", sid: r.sid || null, status: r.ok ? (r.status || "queued") : "failed",
+            error: r.ok ? null : r.error, text: OUTREACH_SMS_TEXT, callId: body.call || null });
+          console.log("[sms] " + phone + " " + (r.ok ? r.status + " " + r.sid : "ошибка: " + r.error));
+          if (r.ok) {
+            // Запасной опрос статуса, если вебхук не дошёл.
+            for (const ms of [20e3, 90e3]) setTimeout(() => {
+              twilioMessageStatus(r.sid).then((s) => s && db.outreachSetStatus(r.sid, s.status, s.error)).catch(() => {});
+            }, ms);
+          }
+          if (!r.ok) return send(502, { ok: false, error: r.error, sms: { at: row.sent_at, status: "failed", error: r.error } });
+          return send(200, { ok: true, sms: { at: row.sent_at, status: r.status || "queued", error: null, sid: r.sid }, segments: r.segments });
+        }
         // ?set=<pbx_call_id>&note=… — заметка к звонку.
         if (parsed.searchParams.get("set")) {
           await db.setCallNote(parsed.searchParams.get("set"), parsed.searchParams.get("note") || "");
@@ -6220,13 +6318,30 @@ http
         }
         const rows = await db.phoneCalls(parsed.searchParams.get("days"), parsed.searchParams.get("limit"), parsed.searchParams.get("mine") === "1");
         // Объявления звонивших из нашей базы — если хозяин звонит сам.
-        let listings = {};
+        let listings = {}, outreach = {};
         if (parsed.searchParams.get("listings") === "1") {
           listings = await db.listingsByPhones(rows.map((r) => r.caller)).catch(() => ({}));
+          outreach = await db.outreachByPhones(rows.map((r) => r.caller)).catch(() => ({}));
         }
         res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
-        res.end(JSON.stringify({ ok: true, count: rows.length, calls: rows, listings: listings }, null, 2));
+        res.end(JSON.stringify({ ok: true, count: rows.length, calls: rows, listings: listings, outreach: outreach }, null, 2));
       })().catch((e) => { res.writeHead(500, { "Content-Type": MIME[".json"] }); res.end(JSON.stringify({ ok: false, error: String(e.message).slice(0, 200) })); });
+      return;
+    }
+
+    // Статус СМС от Twilio (StatusCallback при отправке). Подпись проверяем
+    // по auth token, посторонний статус не подменит.
+    if (urlPath === "/api/twilio/sms-status") {
+      if (req.method !== "POST") { res.writeHead(405, { Allow: "POST" }).end(); return; }
+      readBody(req).then(async (raw) => {
+        const p = Object.fromEntries(new URLSearchParams(raw || ""));
+        if (!twilioSignatureOk(req, CANONICAL + "/api/twilio/sms-status", p)) { res.writeHead(403).end(); return; }
+        res.writeHead(204).end();
+        if (p.MessageSid && p.MessageStatus) {
+          const phone = await db.outreachSetStatus(p.MessageSid, p.MessageStatus, p.ErrorCode ? "код " + p.ErrorCode : null).catch(() => null);
+          console.log("[sms] статус " + p.MessageSid + " " + p.MessageStatus + (phone ? " для " + phone : ""));
+        }
+      }).catch(() => { try { res.writeHead(400).end(); } catch { /* уже ответили */ } });
       return;
     }
 
