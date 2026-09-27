@@ -2944,6 +2944,8 @@ const BOT_PRICE_RENT = Number(process.env.BOT_PRICE_RENT_STARS || 50);
 const BOT_TOPUPS = String(process.env.BOT_TOPUP_STARS || "50,500,1000").split(",").map(Number).filter((n) => n > 0);
 const revealPrice = (deal) => (deal === "rent" ? BOT_PRICE_RENT : BOT_PRICE_SALE);
 const dealName = (deal) => (deal === "rent" ? "аренда" : "продажа");
+// Примерно в долларах: звезда обходится покупателю около 0,02 $.
+const usdApprox = (stars) => { const v = stars * 0.02; return "≈ $" + (v >= 1 ? Math.round(v) : v.toFixed(2).replace(/0+$/, "")); };
 const parsePayload = (s) => { const m = /^(reveal|topup):(\d+)$/.exec(String(s || "")); return m ? { kind: m[1], id: m[2] } : null; };
 
 // Что мы можем отдать по присланной ссылке: само объявление с телефоном,
@@ -3022,8 +3024,8 @@ async function handleTelegramUpdate(u) {
     await say(chat, (prefix ? prefix + "\n\n" : "") + "⭐ <b>Ваш баланс: " + b.balance + " звёзд</b>\n" +
       "Открыто контактов: " + b.reveals + "\n\n" +
       "<b>Стоимость одного контакта</b>\n" +
-      "🏠 Покупка квартиры — " + BOT_PRICE_SALE + " ⭐\n" +
-      "🔑 Аренда — " + BOT_PRICE_RENT + " ⭐\n\n" +
+      "🏠 Покупка квартиры — " + BOT_PRICE_SALE + " ⭐ (" + usdApprox(BOT_PRICE_SALE) + ")\n" +
+      "🔑 Аренда — " + BOT_PRICE_RENT + " ⭐ (" + usdApprox(BOT_PRICE_RENT) + ")\n\n" +
       "Оплата звёздами Telegram прямо в чате. Пополните баланс или платите за каждый контакт отдельно — как удобнее.",
       { reply_markup: inline(BOT_TOPUPS.map((n) => [{ text: "Пополнить на " + n + " ⭐", callback_data: "t:" + n }])) });
   };
@@ -3211,7 +3213,7 @@ async function handleTelegramUpdate(u) {
   const b = await db.starsBalance(uid).catch(() => ({ balance: 0, reveals: 0 }));
   const enough = b.balance >= price;
   await say(chat, "✅ <b>Нашли контакты хозяина</b>\n" + (f.short ? bot.esc(f.short) + "\n" : "") +
-    "\nОткрытие: <b>" + price + " ⭐</b> (" + dealName(f.deal) + ")\nВаш баланс: " + b.balance + " ⭐",
+    "\nСтоимость открытия: <b>" + price + " ⭐</b> (" + usdApprox(price) + ")\nВаш баланс: " + b.balance + " ⭐",
     { reply_markup: inline([[enough
       ? { text: "Открыть за " + price + " ⭐", callback_data: "r:" + id }
       : { text: "Оплатить " + price + " ⭐", callback_data: "p:" + id }]]) });
