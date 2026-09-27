@@ -6424,12 +6424,16 @@ http
         });
         // Меню команд слева от поля ввода: одна команда, как и функция.
         const cmds = await bot.api(TG_TOKEN, "setMyCommands", { commands: bot.COMMANDS });
+        // Описание и «about» в карточке бота — из кода, чтобы не заполнять руками.
+        const desc = await bot.api(TG_TOKEN, "setMyDescription", { description: bot.PROFILE.description });
+        const about = await bot.api(TG_TOKEN, "setMyShortDescription", { short_description: bot.PROFILE.short_description });
         const info = await bot.api(TG_TOKEN, "getWebhookInfo", {});
         const me = await bot.api(TG_TOKEN, "getMe", {});
         return send(200, {
           ok: !!set.ok,
           set: set.description || set.result,
           commands: cmds.ok ? bot.COMMANDS.map((c) => "/" + c.command).join(" ") : (cmds.description || "не установлены"),
+          profile: { name: me.result ? me.result.first_name : null, description: desc.ok ? "ок" : desc.description, about: about.ok ? "ок" : about.description },
           bot: me.result ? "@" + me.result.username : null,
           webhook: info.result ? {
             url: info.result.url,

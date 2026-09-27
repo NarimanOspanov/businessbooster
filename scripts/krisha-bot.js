@@ -92,10 +92,17 @@ const mainKeyboard = () => ({
   input_field_placeholder: "Ссылка на объявление с Крыши",
 });
 const COMMANDS = [{ command: "find", description: "Найти хозяина" }];
+// Профиль бота: «about» в карточке (до 120 знаков) и описание на пустом
+// экране чата (до 512). Ставится тем же /api/telegram/setup.
+const PROFILE = {
+  short_description: "Контакты хозяев квартир по ссылке с Крыши — без посредников.",
+  description: "Пришлите ссылку на объявление с Крыши — вернём контакты хозяина, если объявление есть в нашей базе.\n\n" +
+    "Прислали ссылку от посредника? Найдём то же объявление от владельца. Без посредников и переплат.",
+};
 const isFindCmd = (text) => /^\/(start|help|find)\b/.test(String(text || "")) || String(text || "").trim() === FIND_BUTTON;
 
 const contactsButton = (id) => ({
   inline_keyboard: [[{ text: "📞 Показать контакты", callback_data: "c:" + id }]],
 });
 
-module.exports = { api, idFromText, caption, askedLine, webhookSecret, contactsButton, money, esc, mainKeyboard, COMMANDS, isFindCmd, FIND_BUTTON };
+module.exports = { api, idFromText, caption, askedLine, webhookSecret, contactsButton, money, esc, mainKeyboard, COMMANDS, PROFILE, isFindCmd, FIND_BUTTON };
