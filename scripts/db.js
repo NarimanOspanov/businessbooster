@@ -2765,6 +2765,20 @@ async function botLookup(id) {
   return { item: item, owner: owner };
 }
 
+// Удалить пользователя бота целиком — запись и журнал его обращений. Для
+// регрессионных проверок: после удаления следующее сообщение снова считается
+// первым (приветствие, уведомление админам).
+async function deleteUser(id) {
+  const pool = await getPool();
+  const r = await pool.request().input("id", sql.BigInt, Number(id)).query(`
+    DELETE FROM dbo.bot_requests WHERE user_id = @id;
+    SELECT @@ROWCOUNT AS requests;
+    DELETE FROM dbo.users WHERE id = @id;
+    SELECT @@ROWCOUNT AS users;`);
+  const rs = r.recordsets || [];
+  return { requests: rs[0] && rs[0][0] ? Number(rs[0][0].requests) : 0, users: rs[1] && rs[1][0] ? Number(rs[1][0].users) : 0 };
+}
+
 async function usersCount() {
   const pool = await getPool();
   const r = await pool.request().query("SELECT COUNT(*) AS n FROM dbo.users");
@@ -3612,7 +3626,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
-  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount,
+  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,

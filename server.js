@@ -2937,6 +2937,32 @@ async function handleTelegramUpdate(u) {
     return;
   }
 
+  // Скрытая команда админа: /remove_user <telegram id> или /remove_user me —
+  // удалить пользователя целиком (запись и журнал), чтобы прогнать сценарий
+  // «новый пользователь» заново. В меню команд её нет.
+  const rm = /^\/remove_?user(?:@\w+)?\s*(\S*)/i.exec(text);
+  if (rm) {
+    if (!TG_ADMINS.includes(String(uid))) {
+      await say(chat, "Не вижу ссылки. Пришлите ссылку на объявление с сайта Крыши, например " + example + ".");
+      return;
+    }
+    const arg = rm[1].toLowerCase();
+    const target = arg === "me" ? String(uid) : arg.replace(/[^\d-]/g, "");
+    if (!target) {
+      await say(chat, "Формат: /remove_user &lt;telegram id&gt; или /remove_user me");
+      return;
+    }
+    let d;
+    try { d = await db.deleteUser(target); } catch (e) {
+      await say(chat, "База не ответила: " + bot.esc(String(e.message).slice(0, 100)));
+      return;
+    }
+    await say(chat, d.users
+      ? "🗑 Пользователь " + target + " удалён, записей в журнале: " + d.requests + ". Следующее сообщение от него будет как от нового."
+      : "Пользователь " + target + " не найден.");
+    return;
+  }
+
   const id = bot.idFromText(text);
   if (!id) {
     await say(chat, "Не вижу ссылки. Пришлите ссылку на объявление с сайта Крыши, например " + example + ".");
