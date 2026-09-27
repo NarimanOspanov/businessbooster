@@ -3034,7 +3034,8 @@ async function runKrishaBackfill(city, pages, fromPage) {
 // Цена открытия контакта в Telegram Stars по виду сделки. Ориентир владельца:
 // продажа около 10 $, аренда около 1 $; звезда обходится покупателю примерно
 // в 0,02 $. Пакеты пополнения — для тех, кто открывает много.
-const BOT_PRICE_SALE = Number(process.env.BOT_PRICE_SALE_STARS || 500);
+// Временно 1 ⭐ вместо 500: проверка настоящей оплаты (27.09.2026). Вернуть 500.
+const BOT_PRICE_SALE = Number(process.env.BOT_PRICE_SALE_STARS || 1);
 const BOT_PRICE_RENT = Number(process.env.BOT_PRICE_RENT_STARS || 50);
 const BOT_TOPUPS = String(process.env.BOT_TOPUP_STARS || "50,500,1000").split(",").map(Number).filter((n) => n > 0);
 // Какие сделки ищем. На старте — только продажа: аренда низкомаржинальна.
