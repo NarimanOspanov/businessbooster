@@ -2851,6 +2851,130 @@ async function deleteUser(id) {
   return { requests: rs[0] && rs[0][0] ? Number(rs[0][0].requests) : 0, users: rs[1] && rs[1][0] ? Number(rs[1][0].users) : 0 };
 }
 
+// --- Оплата открытий Telegram Stars -----------------------------------
+// Баланс звёзд у пользователя, платежи (по charge id, идемпотентно) и
+// открытия контактов: одно объявление один раз за пользователя, повторно
+// показываем бесплатно. Схема заводится при первом обращении, как у звонков.
+const SCHEMA_STARS = `
+IF COL_LENGTH('dbo.users', 'stars_balance') IS NULL
+  ALTER TABLE dbo.users ADD stars_balance INT NOT NULL CONSTRAINT DF_users_stars DEFAULT 0;
+IF OBJECT_ID('dbo.star_payments', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.star_payments (
+    charge_id   NVARCHAR(128) NOT NULL PRIMARY KEY,   -- telegram_payment_charge_id
+    user_id     BIGINT        NOT NULL,
+    stars       INT           NOT NULL,
+    payload     NVARCHAR(100) NULL,                   -- reveal:<id> | topup:<n>
+    at          DATETIME2(0)  NOT NULL CONSTRAINT DF_spay_at DEFAULT SYSUTCDATETIME(),
+    refunded_at DATETIME2(0)  NULL
+  );
+  CREATE INDEX IX_spay_user ON dbo.star_payments (user_id, at DESC);
+END
+IF OBJECT_ID('dbo.reveals', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.reveals (
+    id         BIGINT IDENTITY(1,1) PRIMARY KEY,
+    user_id    BIGINT       NOT NULL,
+    listing_id BIGINT       NOT NULL,   -- что прислали
+    owner_id   BIGINT       NULL,       -- чей телефон отдали (хозяин)
+    deal       NVARCHAR(10) NULL,
+    stars      INT          NOT NULL,
+    at         DATETIME2(0) NOT NULL CONSTRAINT DF_reveals_at DEFAULT SYSUTCDATETIME()
+  );
+  CREATE UNIQUE INDEX UX_reveals_user_listing ON dbo.reveals (user_id, listing_id);
+END
+`;
+let starsReady = false, starsReadyPromise = null, starsFailedAt = 0;
+async function ensureStars() {
+  if (starsReady) return;
+  if (starsFailedAt && Date.now() - starsFailedAt < DDL_RETRY_MS) throw new Error("миграция схемы недавно сорвалась — пауза");
+  if (!starsReadyPromise) {
+    starsReadyPromise = (async () => {
+      const p = await ddlPool();
+      await p.request().batch(SCHEMA_STARS);
+      starsReady = true;
+    })().catch((e) => { starsReadyPromise = null; starsFailedAt = Date.now(); throw e; });
+  }
+  await starsReadyPromise;
+}
+
+async function starsBalance(uid) {
+  const pool = await getPool();
+  await ensureStars();
+  const r = await pool.request().input("id", sql.BigInt, Number(uid))
+    .query("SELECT stars_balance, (SELECT COUNT(*) FROM dbo.reveals WHERE user_id = @id) AS reveals FROM dbo.users WHERE id = @id");
+  return r.recordset[0] ? { balance: Number(r.recordset[0].stars_balance) || 0, reveals: Number(r.recordset[0].reveals) || 0 } : { balance: 0, reveals: 0 };
+}
+
+// Зачислить оплату. Телеграм может доставить successful_payment повторно —
+// второй раз по тому же charge id ничего не делаем.
+async function starsCredit(uid, stars, chargeId, payload) {
+  const pool = await getPool();
+  await ensureStars();
+  const r = await pool.request()
+    .input("id", sql.BigInt, Number(uid)).input("s", sql.Int, Number(stars) || 0)
+    .input("c", sql.NVarChar(128), String(chargeId).slice(0, 128)).input("p", sql.NVarChar(100), payload ? String(payload).slice(0, 100) : null)
+    .query(`
+      IF NOT EXISTS (SELECT 1 FROM dbo.star_payments WHERE charge_id = @c)
+      BEGIN
+        INSERT INTO dbo.star_payments (charge_id, user_id, stars, payload) VALUES (@c, @id, @s, @p);
+        UPDATE dbo.users SET stars_balance = stars_balance + @s WHERE id = @id;
+        SELECT 1 AS credited, stars_balance AS balance FROM dbo.users WHERE id = @id;
+      END
+      ELSE SELECT 0 AS credited, stars_balance AS balance FROM dbo.users WHERE id = @id`);
+  const row = r.recordset[0] || {};
+  return { credited: !!row.credited, balance: Number(row.balance) || 0 };
+}
+
+async function revealGet(uid, listingId) {
+  const pool = await getPool();
+  await ensureStars();
+  const r = await pool.request().input("id", sql.BigInt, Number(uid)).input("l", sql.BigInt, Number(listingId))
+    .query("SELECT id, owner_id, deal, stars, at FROM dbo.reveals WHERE user_id = @id AND listing_id = @l");
+  return r.recordset[0] || null;
+}
+
+// Списать звёзды и записать открытие — одним запросом, чтобы два нажатия
+// подряд не списали дважды. already — уже открывал; ok=false — не хватает.
+async function revealBuy(uid, listingId, ownerId, deal, stars) {
+  const pool = await getPool();
+  await ensureStars();
+  const r = await pool.request()
+    .input("id", sql.BigInt, Number(uid)).input("l", sql.BigInt, Number(listingId))
+    .input("o", sql.BigInt, ownerId == null ? null : Number(ownerId)).input("d", sql.NVarChar(10), deal || null)
+    .input("s", sql.Int, Number(stars) || 0)
+    .query(`
+      IF EXISTS (SELECT 1 FROM dbo.reveals WHERE user_id = @id AND listing_id = @l)
+        SELECT 'already' AS res, stars_balance AS balance FROM dbo.users WHERE id = @id;
+      ELSE
+      BEGIN
+        UPDATE dbo.users SET stars_balance = stars_balance - @s WHERE id = @id AND stars_balance >= @s;
+        IF @@ROWCOUNT = 1
+        BEGIN
+          INSERT INTO dbo.reveals (user_id, listing_id, owner_id, deal, stars) VALUES (@id, @l, @o, @d, @s);
+          SELECT 'ok' AS res, stars_balance AS balance FROM dbo.users WHERE id = @id;
+        END
+        ELSE SELECT 'short' AS res, stars_balance AS balance FROM dbo.users WHERE id = @id;
+      END`);
+  const row = r.recordset[0] || { res: "short", balance: 0 };
+  return { ok: row.res === "ok", already: row.res === "already", balance: Number(row.balance) || 0 };
+}
+
+// Возврат по charge id (админ): отмечаем и снимаем звёзды с баланса, если
+// они ещё там; сам возврат делает Telegram по refundStarPayment.
+async function starsRefundMark(chargeId) {
+  const pool = await getPool();
+  await ensureStars();
+  const r = await pool.request().input("c", sql.NVarChar(128), String(chargeId).slice(0, 128)).query(`
+    UPDATE dbo.star_payments SET refunded_at = SYSUTCDATETIME() OUTPUT INSERTED.user_id, INSERTED.stars
+    WHERE charge_id = @c AND refunded_at IS NULL`);
+  const row = r.recordset[0];
+  if (!row) return null;
+  await pool.request().input("id", sql.BigInt, Number(row.user_id)).input("s", sql.Int, Number(row.stars))
+    .query("UPDATE dbo.users SET stars_balance = CASE WHEN stars_balance >= @s THEN stars_balance - @s ELSE 0 END WHERE id = @id");
+  return { userId: String(row.user_id), stars: Number(row.stars) };
+}
+
 async function usersCount() {
   const pool = await getPool();
   const r = await pool.request().query("SELECT COUNT(*) AS n FROM dbo.users");
@@ -3698,7 +3822,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
-  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser,
+  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,

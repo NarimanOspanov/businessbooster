@@ -2936,18 +2936,68 @@ async function runKrishaBackfill(city, pages, fromPage) {
   return { city: c, from: start, to: page - 1, seen: seen, saved: saved, copied: copied, total: total, next: page };
 }
 
+// Цена открытия контакта в Telegram Stars по виду сделки. Ориентир владельца:
+// продажа около 10 $, аренда около 1 $; звезда обходится покупателю примерно
+// в 0,02 $. Пакеты пополнения — для тех, кто открывает много.
+const BOT_PRICE_SALE = Number(process.env.BOT_PRICE_SALE_STARS || 500);
+const BOT_PRICE_RENT = Number(process.env.BOT_PRICE_RENT_STARS || 50);
+const BOT_TOPUPS = String(process.env.BOT_TOPUP_STARS || "50,500,1000").split(",").map(Number).filter((n) => n > 0);
+const revealPrice = (deal) => (deal === "rent" ? BOT_PRICE_RENT : BOT_PRICE_SALE);
+const dealName = (deal) => (deal === "rent" ? "аренда" : "продажа");
+const parsePayload = (s) => { const m = /^(reveal|topup):(\d+)$/.exec(String(s || "")); return m ? { kind: m[1], id: m[2] } : null; };
+
+// Что мы можем отдать по присланной ссылке: само объявление с телефоном,
+// объявление посредника с подтверждённым оригиналом хозяина, старая база.
+async function lookupContacts(id) {
+  const bot = require("./scripts/krisha-bot.js");
+  const line = (r) => bot.esc([r.title, r.price ? bot.money(Number(r.price)) : null].filter(Boolean).join(" · "));
+  const out = { found: false, phones: [], header: "", short: "", deal: "sale", ownerId: null, why: "" };
+  try {
+    const k = await db.botLookup(id);
+    if (k.item && k.item.phones.length) {
+      out.found = true; out.phones = k.item.phones; out.deal = k.item.deal || "sale"; out.ownerId = k.item.id;
+      out.header = "📞 <b>Контакты по объявлению</b>\n" + line(k.item);
+      out.short = [k.item.title, k.item.price ? bot.money(Number(k.item.price)) : null].filter(Boolean).join(" · ");
+    } else if (k.owner && k.owner.phones.length) {
+      out.found = true; out.phones = k.owner.phones; out.deal = (k.item && k.item.deal) || k.owner.deal || "sale"; out.ownerId = k.owner.id;
+      out.header = "📞 <b>Контакты хозяина</b>\nЭто объявление от посредника, тот же объект разместил хозяин:\n" + line(k.owner) +
+        "\n" + '<a href="https://krisha.kz/a/show/' + k.owner.id + '">Объявление хозяина</a>';
+      out.short = [k.owner.title, k.owner.price ? bot.money(Number(k.owner.price)) : null].filter(Boolean).join(" · ");
+    } else if (k.item && k.item.user_type === "owner") {
+      out.why = "объявление от хозяина есть в базе, телефон ещё не собран";
+    } else if (k.item) {
+      out.why = "объявление от посредника, оригинала от хозяина у нас нет";
+    } else {
+      out.why = "объявления нет в базе";
+    }
+    if (!out.found) {
+      let old = [];
+      try { old = await db.flatPhones(id); } catch { /* старой базы может не быть */ }
+      if (old.length) { out.found = true; out.phones = old; out.header = "📞 <b>Контакты по объявлению</b>"; out.short = "квартира " + id; out.why = ""; }
+    }
+  } catch (e) {
+    out.why = "база не ответила: " + String(e.message).slice(0, 80);
+  }
+  return out;
+}
+
 async function handleTelegramUpdate(u) {
   const bot = require("./scripts/krisha-bot.js");
   // Клавиатура с одной кнопкой идёт с каждым ответом: так она всегда на виду.
   const say = (chat, text, extra) => bot.api(TG_TOKEN, "sendMessage", Object.assign(
     { chat_id: chat, text: text, parse_mode: "HTML", disable_web_page_preview: true, reply_markup: bot.mainKeyboard() }, extra || {}));
+  const inline = (rows) => ({ inline_keyboard: rows });
+  // Счёт в Stars: валюта XTR, provider_token не нужен.
+  const invoice = (chat, title, desc, payload, stars) => bot.api(TG_TOKEN, "sendInvoice", {
+    chat_id: chat, title: title, description: desc, payload: payload, currency: "XTR",
+    prices: [{ label: title, amount: stars }] });
 
   // Кто пишет. Проверяем и заводим при каждом обращении — Телеграм не сообщает
   // о новых подписчиках отдельно, так что первое сообщение и есть регистрация.
-  const from = (u.callback_query && u.callback_query.from) ||
+  const from = (u.callback_query && u.callback_query.from) || (u.pre_checkout_query && u.pre_checkout_query.from) ||
     ((u.message || u.edited_message || {}).from) || null;
   const fromChat = (u.callback_query && u.callback_query.message && u.callback_query.message.chat
-    && u.callback_query.message.chat.id) || ((u.message || u.edited_message || {}).chat || {}).id;
+    && u.callback_query.message.chat.id) || ((u.message || u.edited_message || {}).chat || {}).id || (from && from.id);
   let fresh = { isNew: false };
   try { fresh = await db.upsertUser(from, fromChat); } catch { /* не мешаем ответу */ }
   const uid = from && from.id ? from.id : null;
@@ -2960,32 +3010,91 @@ async function handleTelegramUpdate(u) {
       (total != null ? "\nВсего пользователей: " + total : ""));
   }
 
-  // Нажали «Показать контакты».
+  const link = (x) => "https://krisha.kz/a/show/" + x;
+  const sendContacts = async (chat, f, id) => {
+    await say(chat, f.header + "\n\n" + f.phones.map((p) => "+" + p).join("\n") +
+      "\n\nСкажите, что видели объявление — так разговор начнётся понятнее." +
+      "\n\n" + '<a href="' + link(id) + '">Открыть объявление</a>');
+  };
+  const showBalance = async (chat, prefix) => {
+    const b = await db.starsBalance(uid).catch(() => ({ balance: 0, reveals: 0 }));
+    await say(chat, (prefix ? prefix + "\n\n" : "") + "⭐ <b>Баланс: " + b.balance + " Stars</b>\n" +
+      "Открыто контактов: " + b.reveals + "\n\n" +
+      "Открытие контакта: продажа " + BOT_PRICE_SALE + " ⭐, аренда " + BOT_PRICE_RENT + " ⭐.\n" +
+      "Оплата звёздами Telegram — прямо здесь, в чате.",
+      { reply_markup: inline([BOT_TOPUPS.map((n) => ({ text: "Пополнить " + n + " ⭐", callback_data: "t:" + n }))]) });
+  };
+  // Открыть контакт с баланса: списать и показать. Одно объявление за
+  // пользователя оплачивается один раз, дальше показываем бесплатно.
+  const revealFlow = async (chat, id) => {
+    const f = await lookupContacts(id);
+    if (!f.found) { await say(chat, "😔 Контакт по этому объявлению уже недоступен."); return; }
+    const price = revealPrice(f.deal);
+    const r = await db.revealBuy(uid, id, f.ownerId, f.deal, price);
+    if (r.ok || r.already) {
+      await sendContacts(chat, f, id);
+      if (r.ok) notifyTelegram("📞 <b>Открыт контакт</b> за " + price + " ⭐ (" + dealName(f.deal) + ")\n" + bot.esc(who) + " · id " + uid +
+        "\n" + link(id) + "\nОтдано: " + f.phones.map((p) => "+" + p).join(", ") + "\nОстаток: " + r.balance + " ⭐");
+      return;
+    }
+    await say(chat, "Не хватает звёзд: нужно " + price + " ⭐, на балансе " + r.balance + " ⭐.",
+      { reply_markup: inline([[{ text: "Оплатить " + price + " ⭐", callback_data: "p:" + id }]]) });
+  };
+
+  // Оплата Stars: Телеграм спрашивает перед списанием, ответить нужно за 10 с.
+  if (u.pre_checkout_query) {
+    const pq = u.pre_checkout_query;
+    const pl = parsePayload(pq.invoice_payload);
+    let ok = !!pl, err = "Счёт устарел, запросите контакт заново.";
+    if (pl && pl.kind === "reveal") {
+      const f = await lookupContacts(pl.id).catch(() => null);
+      if (!f || !f.found) { ok = false; err = "Контакт уже недоступен, оплата не нужна."; }
+    }
+    await bot.api(TG_TOKEN, "answerPreCheckoutQuery", ok
+      ? { pre_checkout_query_id: pq.id, ok: true }
+      : { pre_checkout_query_id: pq.id, ok: false, error_message: err });
+    return;
+  }
+
+  // Кнопки: c — старая «Показать контакты», r — открыть с баланса,
+  // p — оплатить открытие, t — пополнить.
   if (u.callback_query) {
     const cq = u.callback_query;
     const chat = cq.message && cq.message.chat && cq.message.chat.id;
-    const id = String(cq.data || "").replace(/^c:/, "").replace(/\D/g, "");
     await bot.api(TG_TOKEN, "answerCallbackQuery", { callback_query_id: cq.id });
-    if (!id || !chat) return;
-
-    let phones = [];
-    try { phones = await db.flatPhones(id); } catch { /* база ответит в другой раз */ }
-    db.logBotRequest({ userId: uid, kind: "contact", flatId: id, found: phones.length > 0,
-      matches: phones.length }).catch(() => {});
-
-    if (phones.length) {
-      await say(chat, "📞 <b>Контакты хозяина</b>\n\n" +
-        phones.map((p) => "+" + p).join("\n") +
-        "\n\nСкажите, что видели объявление — так разговор начнётся понятнее.");
-    } else {
-      await say(chat, "Телефон этой квартиры мы ещё не открывали. Мы запросим его и вернёмся к вам.\n\n" +
-        '<a href="https://krisha.kz/a/show/' + id + '">Открыть объявление</a>');
+    const m = /^([crpt]):(\d+)$/.exec(String(cq.data || ""));
+    if (!m || !chat) return;
+    const id = m[2];
+    if (m[1] === "c") {
+      let phones = [];
+      try { phones = await db.flatPhones(id); } catch { /* база ответит в другой раз */ }
+      db.logBotRequest({ userId: uid, kind: "contact", flatId: id, found: phones.length > 0, matches: phones.length }).catch(() => {});
+      if (phones.length) {
+        await say(chat, "📞 <b>Контакты хозяина</b>\n\n" + phones.map((p) => "+" + p).join("\n") +
+          "\n\nСкажите, что видели объявление — так разговор начнётся понятнее.");
+      } else {
+        await say(chat, "Телефон этой квартиры мы ещё не открывали. Мы запросим его и вернёмся к вам.\n\n" +
+          '<a href="' + link(id) + '">Открыть объявление</a>');
+      }
+      notifyTelegram("🔔 <b>Запрос контактов</b>\n" + bot.esc(who) + "\nКвартира: " + CANONICAL + "/kv/" + id +
+        "\nТелефон " + (phones.length ? "отдан: +" + phones[0] : "у нас не собран"));
+      return;
     }
-    // Заявку показываем себе всегда: даже когда телефон отдан, полезно знать,
-    // кто и что спрашивал.
-    notifyTelegram("🔔 <b>Запрос контактов</b>\n" + bot.esc(who) +
-      "\nКвартира: " + CANONICAL + "/kv/" + id +
-      "\nТелефон " + (phones.length ? "отдан: +" + phones[0] : "у нас не собран"));
+    if (m[1] === "t") {
+      const stars = Number(id);
+      if (!BOT_TOPUPS.includes(stars)) return;
+      await invoice(chat, "Пополнение баланса", stars + " ⭐ на открытие контактов хозяев", "topup:" + stars, stars);
+      return;
+    }
+    if (m[1] === "p") {
+      const f = await lookupContacts(id);
+      if (!f.found) { await say(chat, "😔 Контакт по этому объявлению уже недоступен."); return; }
+      const had = await db.revealGet(uid, id).catch(() => null);
+      if (had) { await sendContacts(chat, f, id); return; }
+      await invoice(chat, "Контакты хозяина", f.short + ". После оплаты откроем номер.", "reveal:" + id, revealPrice(f.deal));
+      return;
+    }
+    if (m[1] === "r") { await revealFlow(chat, id); return; }
     return;
   }
 
@@ -2994,6 +3103,27 @@ async function handleTelegramUpdate(u) {
   const chat = msg.chat.id;
   const text = String(msg.text || msg.caption || "");
   const example = "krisha.kz/a/show/1015591221";
+
+  // Оплата прошла: зачисляем (повторную доставку того же charge id
+  // пропускаем) и делаем то, ради чего платили.
+  if (msg.successful_payment) {
+    const sp = msg.successful_payment;
+    const pl = parsePayload(sp.invoice_payload);
+    let c = { credited: false, balance: 0 };
+    try { c = await db.starsCredit(uid, sp.total_amount, sp.telegram_payment_charge_id, sp.invoice_payload); }
+    catch (e) {
+      await say(chat, "Оплата получена, но зачислить не вышло: " + bot.esc(String(e.message).slice(0, 80)) + ". Напишите нам, разберёмся.");
+      notifyTelegram("⚠️ <b>Оплата не зачислена</b> " + sp.total_amount + " ⭐ от " + bot.esc(who) + " · id " + uid + "\n" + bot.esc(sp.telegram_payment_charge_id));
+      return;
+    }
+    if (c.credited) {
+      notifyTelegram("💫 <b>Оплата</b> " + sp.total_amount + " ⭐ от " + bot.esc(who) + " · id " + uid +
+        "\n" + bot.esc(sp.invoice_payload || "") + "\ncharge " + bot.esc(sp.telegram_payment_charge_id));
+    }
+    if (pl && pl.kind === "reveal") await revealFlow(chat, pl.id);
+    else await showBalance(chat, "✅ Баланс пополнен на " + sp.total_amount + " ⭐.");
+    return;
+  }
 
   // Сценарий один: ссылка на объявление → контакты хозяина или «не нашли».
   // Новому пользователю сначала приветствие — оно же объясняет, что слать.
@@ -3007,14 +3137,27 @@ async function handleTelegramUpdate(u) {
     await say(chat, "Пришлите ссылку на объявление, например " + example + ", и мы попробуем найти контакты владельца.");
     return;
   }
+  if (bot.isBalanceCmd(text)) { await showBalance(chat); return; }
 
-  // Скрытая команда админа: /remove_user <telegram id> или /remove_user me —
-  // удалить пользователя целиком (запись и журнал), чтобы прогнать сценарий
-  // «новый пользователь» заново. В меню команд её нет.
+  // Скрытые команды админа. /remove_user <telegram id> или me — удалить
+  // пользователя целиком (запись и журнал), чтобы прогнать сценарий «новый
+  // пользователь» заново. /refund <charge id> — вернуть оплату звёздами.
+  // В меню команд их нет.
   const rm = /^\/remove_?user(?:@\w+)?\s*(\S*)/i.exec(text);
-  if (rm) {
+  const rf = /^\/refund(?:@\w+)?\s*(\S*)/i.exec(text);
+  if (rm || rf) {
     if (!TG_ADMINS.includes(String(uid))) {
       await say(chat, "Не вижу ссылки. Пришлите ссылку на объявление, например " + example + ".");
+      return;
+    }
+    if (rf) {
+      const charge = rf[1];
+      if (!charge) { await say(chat, "Формат: /refund &lt;charge id из уведомления об оплате&gt;"); return; }
+      const mark = await db.starsRefundMark(charge).catch(() => null);
+      if (!mark) { await say(chat, "Платёж " + bot.esc(charge) + " не найден или уже возвращён."); return; }
+      const r = await bot.api(TG_TOKEN, "refundStarPayment", { user_id: Number(mark.userId), telegram_payment_charge_id: charge });
+      await say(chat, r.ok ? "↩️ Возвращено " + mark.stars + " ⭐ пользователю " + mark.userId + "."
+        : "Telegram отказал: " + bot.esc(r.description || "?") + ". В базе платёж помечен возвращённым.");
       return;
     }
     const arg = rm[1].toLowerCase();
@@ -3040,53 +3183,37 @@ async function handleTelegramUpdate(u) {
     return;
   }
 
-  const link = "https://krisha.kz/a/show/" + id;
-  const krishaLink = (x) => "https://krisha.kz/a/show/" + x;
-  const line = (r) => bot.esc([r.title, r.price ? bot.money(Number(r.price)) : null].filter(Boolean).join(" · "));
+  const f = await lookupContacts(id);
+  db.logBotRequest({ userId: uid, kind: "search", krishaId: id, found: f.found,
+    matches: f.found ? f.phones.length : 0, note: f.why || null }).catch(() => {});
 
-  // Ищем: само объявление с телефоном; объявление посредника с подтверждённым
-  // оригиналом хозяина; старая база квартир. Иначе — не нашли.
-  let found = null, why = "";
-  try {
-    const k = await db.botLookup(id);
-    if (k.item && k.item.phones.length) {
-      found = { phones: k.item.phones, text: "📞 <b>Контакты по объявлению</b>\n" + line(k.item) };
-    } else if (k.owner && k.owner.phones.length) {
-      found = { phones: k.owner.phones, text: "📞 <b>Контакты хозяина</b>\n" +
-        "Это объявление от посредника, тот же объект разместил хозяин:\n" + line(k.owner) +
-        "\n" + '<a href="' + krishaLink(k.owner.id) + '">Объявление хозяина</a>' };
-    } else if (k.item && k.item.user_type === "owner") {
-      why = "объявление от хозяина есть в базе, телефон ещё не собран";
-    } else if (k.item) {
-      why = "объявление от посредника, оригинала от хозяина у нас нет";
-    } else {
-      why = "объявления нет в базе";
-    }
-    if (!found) {
-      let old = [];
-      try { old = await db.flatPhones(id); } catch { /* старой базы может не быть */ }
-      if (old.length) { found = { phones: old, text: "📞 <b>Контакты по объявлению</b>" }; why = ""; }
-    }
-  } catch (e) {
-    why = "база не ответила: " + String(e.message).slice(0, 80);
-  }
-
-  db.logBotRequest({ userId: uid, kind: "search", krishaId: id, found: !!found,
-    matches: found ? found.phones.length : 0, note: why || null }).catch(() => {});
-
-  if (found) {
-    await say(chat, found.text + "\n\n" + found.phones.map((p) => "+" + p).join("\n") +
-      "\n\nСкажите, что видели объявление — так разговор начнётся понятнее." +
-      "\n\n" + '<a href="' + link + '">Открыть объявление</a>');
-  } else {
+  if (!f.found) {
     // Причину знаем только мы (журнал и уведомление админам); пользователю —
     // просто «не смогли найти», без упоминания базы.
     await say(chat, "😔 Мы не смогли найти контакты по этому объявлению.\n\n" +
       "Попробуйте прислать ссылку позже или пришлите другое объявление.");
+    notifyTelegram("🔍 <b>Запрос в боте</b>\n" + bot.esc(who) + " · id " + uid + "\n" + link(id) + "\nНе нашли: " + bot.esc(f.why));
+    return;
   }
 
-  notifyTelegram("🔍 <b>Запрос в боте</b>\n" + bot.esc(who) + " · id " + uid + "\n" + link +
-    "\n" + (found ? "Отдано: " + found.phones.map((p) => "+" + p).join(", ") : "Не нашли: " + bot.esc(why)));
+  // Нашли. Уже открывал — показываем бесплатно; иначе — цена по виду сделки
+  // и кнопка: открыть с баланса, если хватает, или оплатить ровно цену.
+  const had = await db.revealGet(uid, id).catch(() => null);
+  if (had) {
+    await sendContacts(chat, f, id);
+    notifyTelegram("🔍 <b>Запрос в боте</b>\n" + bot.esc(who) + " · id " + uid + "\n" + link(id) + "\nПовторно показан открытый контакт");
+    return;
+  }
+  const price = revealPrice(f.deal);
+  const b = await db.starsBalance(uid).catch(() => ({ balance: 0, reveals: 0 }));
+  const enough = b.balance >= price;
+  await say(chat, "✅ <b>Нашли контакты хозяина</b>\n" + (f.short ? bot.esc(f.short) + "\n" : "") +
+    "\nОткрытие: <b>" + price + " ⭐</b> (" + dealName(f.deal) + ")\nВаш баланс: " + b.balance + " ⭐",
+    { reply_markup: inline([[enough
+      ? { text: "Открыть за " + price + " ⭐", callback_data: "r:" + id }
+      : { text: "Оплатить " + price + " ⭐", callback_data: "p:" + id }]]) });
+  notifyTelegram("🔍 <b>Запрос в боте</b>\n" + bot.esc(who) + " · id " + uid + "\n" + link(id) +
+    "\nНашли, предложили открыть за " + price + " ⭐ (" + dealName(f.deal) + "), баланс " + b.balance + " ⭐");
 }
 
 async function runKrishaWatch() {
@@ -6561,7 +6688,7 @@ http
         const set = await bot.api(TG_TOKEN, "setWebhook", {
           url: CANONICAL + "/api/telegram/webhook",
           secret_token: bot.webhookSecret(TG_TOKEN),
-          allowed_updates: ["message", "callback_query"],
+          allowed_updates: ["message", "callback_query", "pre_checkout_query"],
           drop_pending_updates: true,
         });
         // Меню команд слева от поля ввода: одна команда, как и функция.

@@ -87,11 +87,12 @@ function caption(f, site, photoNote) {
 // У бота одна функция, поэтому и кнопка одна: постоянная клавиатура с
 // «Найти хозяина» и та же команда в меню слева от поля ввода.
 const FIND_BUTTON = "🔍 Найти хозяина";
+const BALANCE_BUTTON = "⭐ Баланс";
 const mainKeyboard = () => ({
-  keyboard: [[{ text: FIND_BUTTON }]], resize_keyboard: true, is_persistent: true,
+  keyboard: [[{ text: FIND_BUTTON }, { text: BALANCE_BUTTON }]], resize_keyboard: true, is_persistent: true,
   input_field_placeholder: "Ссылка на объявление",
 });
-const COMMANDS = [{ command: "find", description: "Найти хозяина" }];
+const COMMANDS = [{ command: "find", description: "Найти хозяина" }, { command: "balance", description: "Баланс" }];
 // Профиль бота: «about» в карточке (до 120 знаков) и описание на пустом
 // экране чата (до 512). Ставится тем же /api/telegram/setup.
 const PROFILE = {
@@ -99,10 +100,11 @@ const PROFILE = {
   description: "Устали от посредников, риелторов и переплат? Мы поможем: найдём контакты хозяина, и вы сможете договориться напрямую.\n\n" +
     "Пришлите ссылку на объявление, и мы попробуем найти контакты.",
 };
+const isBalanceCmd = (text) => /^\/balance\b/.test(String(text || "")) || String(text || "").trim() === BALANCE_BUTTON;
 const isFindCmd = (text) => /^\/(start|help|find)\b/.test(String(text || "")) || String(text || "").trim() === FIND_BUTTON;
 
 const contactsButton = (id) => ({
   inline_keyboard: [[{ text: "📞 Показать контакты", callback_data: "c:" + id }]],
 });
 
-module.exports = { api, idFromText, caption, askedLine, webhookSecret, contactsButton, money, esc, mainKeyboard, COMMANDS, PROFILE, isFindCmd, FIND_BUTTON };
+module.exports = { api, idFromText, caption, askedLine, webhookSecret, contactsButton, money, esc, mainKeyboard, COMMANDS, PROFILE, isFindCmd, isBalanceCmd, FIND_BUTTON, BALANCE_BUTTON };
