@@ -1414,10 +1414,19 @@ const KRISHA_CALLS_HTML = `<!doctype html>
   @keyframes skm{100%{transform:translateX(100%)}}
   .skc{height:74px;border-radius:12px;margin:0}
   .skl{height:14px;margin:8px 0}
+  .smsbox{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:0 0 14px}
+  .smsbox input{flex:1 1 200px;max-width:260px;border:1px solid var(--line);background:#12161c;color:var(--fg);border-radius:8px;padding:7px 10px;font:inherit;font-size:15px}
+  .smsbox button{padding:7px 14px;background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+  .smsbox button:disabled{opacity:.6;cursor:default}
 </style></head><body>
 <h1>Крыша · журнал звонков</h1>
 <p class="sub" id="upd"></p>
 
+<div class="smsbox">
+  <input id="smsTo" type="tel" inputmode="tel" autocomplete="off" placeholder="+7 7__ ___ __ __">
+  <button id="smsBtn">Отправить СМС</button>
+  <span id="smsRes" class="mut"></span>
+</div>
 <p class="mut">Входящие на личный номер через Zadarma. <select id="days"><option value="1">за сутки</option><option value="7" selected>за 7 дней</option><option value="30">за 30 дней</option></select></p>
 <div id="cards" class="cards"></div>
 <div id="calls"></div>
@@ -1482,6 +1491,28 @@ function sendSms(digits,callId,again){
 }
 function saveNote(el,id){el.style.borderColor="var(--warn)";fetch("/api/calls?"+K+"&set="+encodeURIComponent(id)+"&note="+encodeURIComponent(el.value)).then(function(r){return r.json();}).then(function(){el.style.borderColor="var(--ok)";setTimeout(function(){el.style.borderColor="";},1200);}).catch(function(){el.style.borderColor="var(--no)";});}
 document.getElementById("days").onchange=function(){first=true;load();};
+// СМС на любой номер: +7 702…, 8 702…, 702… — всё приводится к 7XXXXXXXXXX.
+function normPhone(v){var d=String(v||"").replace(/[^0-9]/g,"");if(d.length===10)d="7"+d;if(d.length===11&&d[0]==="8")d="7"+d.slice(1);return /^7[0-9]{10}$/.test(d)?d:null;}
+function smsAny(force){
+  var inp=document.getElementById("smsTo"),btn=document.getElementById("smsBtn"),res=document.getElementById("smsRes");
+  var d=normPhone(inp.value);
+  if(!d){res.innerHTML="<span class=err>номер: 10 цифр после +7</span>";inp.focus();return;}
+  btn.disabled=true;res.innerHTML="<span class=mut>отправляем на "+esc(pretty(d))+"…</span>";
+  fetch("/api/calls?"+K,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sms:d,call:"manual",force:!!force})}).then(function(r){return r.json();}).then(function(j){
+    btn.disabled=false;
+    if(!j.ok&&j.sms&&!force&&/уже отправляли/.test(j.error||"")){
+      if(confirm("На "+pretty(d)+" уже отправляли ("+(j.sms.status||"?")+", "+alm(j.sms.at)+"). Отправить ещё раз?"))return smsAny(true);
+      res.innerHTML="<span class=mut>не отправили: уже было "+alm(j.sms.at)+"</span>";return;
+    }
+    if(!j.ok){res.innerHTML="<span class=err>ошибка: "+esc(j.error||"?")+"</span>";return;}
+    res.innerHTML="<span class='tag ok'>отправлено</span> <span class=mut>"+esc(pretty(d))+" · статус обновится в таблице, если номер там есть</span>";
+    inp.value="";
+    OUT[d]=OUT[d]||{};OUT[d].sms=j.sms;
+    setTimeout(load,20000);
+  }).catch(function(e){btn.disabled=false;res.innerHTML="<span class=err>ошибка: "+esc(e.message)+"</span>";});
+}
+document.getElementById("smsBtn").onclick=function(){smsAny(false);};
+document.getElementById("smsTo").onkeydown=function(e){if(e.key==="Enter")smsAny(false);};
 load(); setInterval(load, 30000);
 </script></body></html>`;
 // Сводка бота: люди, запросы, находки, открытия и выручка в звёздах.
