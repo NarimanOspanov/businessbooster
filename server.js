@@ -3063,8 +3063,9 @@ async function lookupContacts(id) {
       out.short = [k.item.title, k.item.price ? bot.money(Number(k.item.price)) : null].filter(Boolean).join(" · ");
     } else if (k.owner && k.owner.phones.length) {
       out.found = true; out.phones = k.owner.phones; out.deal = (k.item && k.item.deal) || k.owner.deal || "sale"; out.ownerId = k.owner.id;
-      out.header = "📞 <b>Контакты хозяина</b>\nЭто объявление от посредника, тот же объект разместил хозяин:\n" + line(k.owner) +
-        "\n" + '<a href="https://krisha.kz/a/show/' + k.owner.id + '">Объявление хозяина</a>';
+      // Без пояснений про посредника и без ссылки на объявление хозяина:
+      // покупателю нужен только номер.
+      out.header = "📞 <b>Контакты хозяина</b>\n" + line(k.item || k.owner);
       out.short = [k.owner.title, k.owner.price ? bot.money(Number(k.owner.price)) : null].filter(Boolean).join(" · ");
     } else if (k.item && k.item.user_type === "owner") {
       out.why = "объявление от хозяина есть в базе, телефон ещё не собран";
