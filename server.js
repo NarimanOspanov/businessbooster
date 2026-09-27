@@ -3018,11 +3018,14 @@ async function handleTelegramUpdate(u) {
   };
   const showBalance = async (chat, prefix) => {
     const b = await db.starsBalance(uid).catch(() => ({ balance: 0, reveals: 0 }));
-    await say(chat, (prefix ? prefix + "\n\n" : "") + "⭐ <b>Баланс: " + b.balance + " Stars</b>\n" +
+    // Кнопки пополнения — каждая на своей строке: три в ряд не помещаются.
+    await say(chat, (prefix ? prefix + "\n\n" : "") + "⭐ <b>Ваш баланс: " + b.balance + " звёзд</b>\n" +
       "Открыто контактов: " + b.reveals + "\n\n" +
-      "Открытие контакта: продажа " + BOT_PRICE_SALE + " ⭐, аренда " + BOT_PRICE_RENT + " ⭐.\n" +
-      "Оплата звёздами Telegram — прямо здесь, в чате.",
-      { reply_markup: inline([BOT_TOPUPS.map((n) => ({ text: "Пополнить " + n + " ⭐", callback_data: "t:" + n }))]) });
+      "<b>Стоимость одного контакта</b>\n" +
+      "🏠 Покупка квартиры — " + BOT_PRICE_SALE + " ⭐\n" +
+      "🔑 Аренда — " + BOT_PRICE_RENT + " ⭐\n\n" +
+      "Оплата звёздами Telegram прямо в чате. Пополните баланс или платите за каждый контакт отдельно — как удобнее.",
+      { reply_markup: inline(BOT_TOPUPS.map((n) => [{ text: "Пополнить на " + n + " ⭐", callback_data: "t:" + n }])) });
   };
   // Открыть контакт с баланса: списать и показать. Одно объявление за
   // пользователя оплачивается один раз, дальше показываем бесплатно.
