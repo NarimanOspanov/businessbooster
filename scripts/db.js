@@ -2975,6 +2975,26 @@ async function starsRefundMark(chargeId) {
   return { userId: String(row.user_id), stars: Number(row.stars) };
 }
 
+// История поиска пользователя для бота: по одному объявлению на строку
+// (последний запрос по нему), с заголовком из krisha_list и отметкой, был ли
+// контакт открыт.
+async function botHistory(uid, limit) {
+  const pool = await getPool();
+  await ensureStars();
+  const r = await pool.request().input("id", sql.BigInt, Number(uid)).input("n", sql.Int, Math.min(50, Math.max(1, Number(limit) || 10)))
+    .query(`
+      SELECT TOP (@n) r.krisha_id, MAX(r.at) AS at, MAX(CAST(ISNULL(r.found, 0) AS INT)) AS found,
+        l.title, l.price, l.deal, l.storage,
+        CASE WHEN EXISTS (SELECT 1 FROM dbo.reveals v WHERE v.user_id = @id AND v.listing_id = r.krisha_id) THEN 1 ELSE 0 END AS revealed
+      FROM dbo.bot_requests r
+      LEFT JOIN dbo.krisha_list l ON l.id = r.krisha_id
+      WHERE r.user_id = @id AND r.kind = 'search' AND r.krisha_id IS NOT NULL
+      GROUP BY r.krisha_id, l.title, l.price, l.deal, l.storage
+      ORDER BY MAX(r.at) DESC`);
+  return r.recordset.map((x) => ({ id: String(x.krisha_id), at: x.at, found: !!x.found, revealed: !!x.revealed,
+    title: x.title, price: x.price == null ? null : Number(x.price), deal: x.deal, storage: x.storage }));
+}
+
 async function usersCount() {
   const pool = await getPool();
   const r = await pool.request().query("SELECT COUNT(*) AS n FROM dbo.users");
@@ -3822,7 +3842,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
-  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark,
+  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,

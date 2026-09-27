@@ -92,7 +92,11 @@ const mainKeyboard = () => ({
   keyboard: [[{ text: FIND_BUTTON }]], resize_keyboard: true, is_persistent: true,
   input_field_placeholder: "Ссылка на объявление",
 });
-const COMMANDS = [{ command: "find", description: "Найти хозяина" }, { command: "balance", description: "Баланс" }];
+const COMMANDS = [
+  { command: "find", description: "Найти хозяина" },
+  { command: "balance", description: "Баланс" },
+  { command: "history", description: "История поиска" },
+];
 // Профиль бота: «about» в карточке (до 120 знаков) и описание на пустом
 // экране чата (до 512). Ставится тем же /api/telegram/setup.
 const PROFILE = {
@@ -100,6 +104,7 @@ const PROFILE = {
   description: "Устали от посредников, риелторов и переплат? Мы поможем: найдём контакты хозяина, и вы сможете договориться напрямую.\n\n" +
     "Пришлите ссылку на объявление, и мы попробуем найти контакты.",
 };
+const isHistoryCmd = (text) => /^\/history\b/.test(String(text || ""));
 const isBalanceCmd = (text) => /^\/balance\b/.test(String(text || "")) || String(text || "").trim() === BALANCE_BUTTON;
 const isFindCmd = (text) => /^\/(start|help|find)\b/.test(String(text || "")) || String(text || "").trim() === FIND_BUTTON;
 
@@ -107,4 +112,4 @@ const contactsButton = (id) => ({
   inline_keyboard: [[{ text: "📞 Показать контакты", callback_data: "c:" + id }]],
 });
 
-module.exports = { api, idFromText, caption, askedLine, webhookSecret, contactsButton, money, esc, mainKeyboard, COMMANDS, PROFILE, isFindCmd, isBalanceCmd, FIND_BUTTON, BALANCE_BUTTON };
+module.exports = { api, idFromText, caption, askedLine, webhookSecret, contactsButton, money, esc, mainKeyboard, COMMANDS, PROFILE, isFindCmd, isBalanceCmd, isHistoryCmd, FIND_BUTTON, BALANCE_BUTTON };

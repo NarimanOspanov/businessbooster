@@ -2942,6 +2942,10 @@ async function runKrishaBackfill(city, pages, fromPage) {
 const BOT_PRICE_SALE = Number(process.env.BOT_PRICE_SALE_STARS || 500);
 const BOT_PRICE_RENT = Number(process.env.BOT_PRICE_RENT_STARS || 50);
 const BOT_TOPUPS = String(process.env.BOT_TOPUP_STARS || "50,500,1000").split(",").map(Number).filter((n) => n > 0);
+// Какие сделки ищем. На старте — только продажа: аренда низкомаржинальна.
+const BOT_DEALS = String(process.env.BOT_DEALS || "sale").split(",").map((x) => x.trim()).filter(Boolean);
+const dealAllowed = (deal) => BOT_DEALS.includes(deal || "sale");
+const ONLY_SALE_TEXT = "Пока мы помогаем только с покупкой квартир, аренду не ищем.\n\nПришлите ссылку на объявление о продаже.";
 const revealPrice = (deal) => (deal === "rent" ? BOT_PRICE_RENT : BOT_PRICE_SALE);
 const dealName = (deal) => (deal === "rent" ? "аренда" : "продажа");
 // Примерно в долларах: звезда обходится покупателю около 0,02 $.
@@ -2956,6 +2960,7 @@ async function lookupContacts(id) {
   const out = { found: false, phones: [], header: "", short: "", deal: "sale", ownerId: null, why: "" };
   try {
     const k = await db.botLookup(id);
+    if (k.item && k.item.deal) out.deal = k.item.deal;
     if (k.item && k.item.phones.length) {
       out.found = true; out.phones = k.item.phones; out.deal = k.item.deal || "sale"; out.ownerId = k.item.id;
       out.header = "📞 <b>Контакты по объявлению</b>\n" + line(k.item);
@@ -3023,17 +3028,31 @@ async function handleTelegramUpdate(u) {
     // Кнопки пополнения — каждая на своей строке: три в ряд не помещаются.
     await say(chat, (prefix ? prefix + "\n\n" : "") + "⭐ <b>Ваш баланс: " + b.balance + " звёзд</b>\n" +
       "Открыто контактов: " + b.reveals + "\n\n" +
-      "<b>Стоимость одного контакта</b>\n" +
-      "🏠 Покупка квартиры — " + BOT_PRICE_SALE + " ⭐ (" + usdApprox(BOT_PRICE_SALE) + ")\n" +
-      "🔑 Аренда — " + BOT_PRICE_RENT + " ⭐ (" + usdApprox(BOT_PRICE_RENT) + ")\n\n" +
+      "Стоимость одного контакта — <b>" + BOT_PRICE_SALE + " ⭐</b> (" + usdApprox(BOT_PRICE_SALE) + ")\n\n" +
       "Оплата звёздами Telegram прямо в чате. Пополните баланс или платите за каждый контакт отдельно — как удобнее.",
       { reply_markup: inline(BOT_TOPUPS.map((n) => [{ text: "Пополнить на " + n + " ⭐", callback_data: "t:" + n }])) });
+  };
+  const showHistory = async (chat) => {
+    const rows = await db.botHistory(uid, 10).catch(() => []);
+    if (!rows.length) {
+      await say(chat, "🕘 <b>История поиска</b>\n\nВы ещё ничего не искали. Пришлите ссылку на объявление о продаже — попробуем найти контакты владельца.");
+      return;
+    }
+    const pad = (n) => ("0" + n).slice(-2);
+    const when = (v) => { const d = new Date(new Date(v).getTime() + 5 * 3600e3); return pad(d.getUTCDate()) + "." + pad(d.getUTCMonth() + 1) + " " + pad(d.getUTCHours()) + ":" + pad(d.getUTCMinutes()); };
+    const lines = rows.map((r) => {
+      const name = r.title ? [r.title, r.price ? bot.money(r.price) : null].filter(Boolean).join(" · ") : "объявление " + r.id;
+      const st = r.revealed ? "✅ контакт открыт" : r.found ? "🔎 контакт найден, не открыт" : !dealAllowed(r.deal) ? "🔑 аренда — пока не ищем" : "😔 не нашли";
+      return when(r.at) + " · " + '<a href="' + link(r.id) + '">' + bot.esc(name) + "</a>\n" + st;
+    });
+    await say(chat, "🕘 <b>История поиска</b>\n\n" + lines.join("\n\n"));
   };
   // Открыть контакт с баланса: списать и показать. Одно объявление за
   // пользователя оплачивается один раз, дальше показываем бесплатно.
   const revealFlow = async (chat, id) => {
     const f = await lookupContacts(id);
     if (!f.found) { await say(chat, "😔 Контакт по этому объявлению уже недоступен."); return; }
+    if (!dealAllowed(f.deal)) { await say(chat, ONLY_SALE_TEXT); return; }
     const price = revealPrice(f.deal);
     const r = await db.revealBuy(uid, id, f.ownerId, f.deal, price);
     if (r.ok || r.already) {
@@ -3054,6 +3073,7 @@ async function handleTelegramUpdate(u) {
     if (pl && pl.kind === "reveal") {
       const f = await lookupContacts(pl.id).catch(() => null);
       if (!f || !f.found) { ok = false; err = "Контакт уже недоступен, оплата не нужна."; }
+      else if (!dealAllowed(f.deal)) { ok = false; err = "Пока работаем только с продажей."; }
     }
     await bot.api(TG_TOKEN, "answerPreCheckoutQuery", ok
       ? { pre_checkout_query_id: pq.id, ok: true }
@@ -3094,6 +3114,7 @@ async function handleTelegramUpdate(u) {
     if (m[1] === "p") {
       const f = await lookupContacts(id);
       if (!f.found) { await say(chat, "😔 Контакт по этому объявлению уже недоступен."); return; }
+      if (!dealAllowed(f.deal)) { await say(chat, ONLY_SALE_TEXT); return; }
       const had = await db.revealGet(uid, id).catch(() => null);
       if (had) { await sendContacts(chat, f, id); return; }
       await invoice(chat, "Контакты хозяина", f.short + ". После оплаты откроем номер.", "reveal:" + id, revealPrice(f.deal));
@@ -3143,6 +3164,7 @@ async function handleTelegramUpdate(u) {
     return;
   }
   if (bot.isBalanceCmd(text)) { await showBalance(chat); return; }
+  if (bot.isHistoryCmd(text)) { await showHistory(chat); return; }
 
   // Скрытые команды админа. /remove_user <telegram id> или me — удалить
   // пользователя целиком (запись и журнал), чтобы прогнать сценарий «новый
@@ -3189,6 +3211,12 @@ async function handleTelegramUpdate(u) {
   }
 
   const f = await lookupContacts(id);
+  if (!dealAllowed(f.deal)) {
+    db.logBotRequest({ userId: uid, kind: "search", krishaId: id, found: false, matches: 0, note: "аренда — пока не ищем" }).catch(() => {});
+    await say(chat, ONLY_SALE_TEXT);
+    notifyTelegram("🔍 <b>Запрос в боте</b>\n" + bot.esc(who) + " · id " + uid + "\n" + link(id) + "\nАренда — отказали, пока только продажа");
+    return;
+  }
   db.logBotRequest({ userId: uid, kind: "search", krishaId: id, found: f.found,
     matches: f.found ? f.phones.length : 0, note: f.why || null }).catch(() => {});
 
