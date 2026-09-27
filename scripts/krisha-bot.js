@@ -89,15 +89,15 @@ function caption(f, site, photoNote) {
 const FIND_BUTTON = "🔍 Найти хозяина";
 const mainKeyboard = () => ({
   keyboard: [[{ text: FIND_BUTTON }]], resize_keyboard: true, is_persistent: true,
-  input_field_placeholder: "Ссылка на объявление с Крыши",
+  input_field_placeholder: "Ссылка на объявление",
 });
 const COMMANDS = [{ command: "find", description: "Найти хозяина" }];
 // Профиль бота: «about» в карточке (до 120 знаков) и описание на пустом
 // экране чата (до 512). Ставится тем же /api/telegram/setup.
 const PROFILE = {
-  short_description: "Контакты хозяев квартир по ссылке с Крыши — без посредников.",
-  description: "Пришлите ссылку на объявление с Крыши — вернём контакты хозяина, если объявление есть в нашей базе.\n\n" +
-    "Прислали ссылку от посредника? Найдём то же объявление от владельца. Без посредников и переплат.",
+  short_description: "Контакты хозяев квартир по ссылке на объявление — без посредников.",
+  description: "Пришлите ссылку на объявление — проверим, есть ли у нас контакт владельца, и если найдём, вернём его.\n\n" +
+    "Прислали ссылку от посредника? Найдём то же объявление от хозяина. Без посредников и переплат.",
 };
 const isFindCmd = (text) => /^\/(start|help|find)\b/.test(String(text || "")) || String(text || "").trim() === FIND_BUTTON;
 

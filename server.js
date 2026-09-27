@@ -2976,10 +2976,10 @@ async function handleTelegramUpdate(u) {
     if (phones.length) {
       await say(chat, "📞 <b>Контакты хозяина</b>\n\n" +
         phones.map((p) => "+" + p).join("\n") +
-        "\n\nСкажите, что нашли объявление на Крыше — так разговор начнётся понятнее.");
+        "\n\nСкажите, что видели объявление — так разговор начнётся понятнее.");
     } else {
       await say(chat, "Телефон этой квартиры мы ещё не открывали. Мы запросим его и вернёмся к вам.\n\n" +
-        '<a href="https://krisha.kz/a/show/' + id + '">Объявление на Крыше</a>');
+        '<a href="https://krisha.kz/a/show/' + id + '">Открыть объявление</a>');
     }
     // Заявку показываем себе всегда: даже когда телефон отдан, полезно знать,
     // кто и что спрашивал.
@@ -2999,12 +2999,12 @@ async function handleTelegramUpdate(u) {
   // Новому пользователю сначала приветствие — оно же объясняет, что слать.
   if (fresh.isNew) {
     await say(chat, "👋 <b>Добро пожаловать!</b>\n\n" +
-      "Мы находим контакты хозяев по объявлениям с Крыши — без посредников.\n\n" +
-      "Пришлите ссылку на объявление с сайта Крыши, например " + example +
-      ", и если оно есть в нашей базе, мы вернём контакты владельца.");
+      "Мы находим контакты хозяев квартир — без посредников.\n\n" +
+      "Пришлите ссылку на объявление, например " + example +
+      ". Проверим, есть ли у нас контакт владельца, и если найдём — вернём его.");
     if (bot.isFindCmd(text)) return;
   } else if (bot.isFindCmd(text)) {
-    await say(chat, "Введите ссылку на объявление с сайта Крыши, например " + example + ".");
+    await say(chat, "Пришлите ссылку на объявление, например " + example + ". Проверим, есть ли у нас контакт владельца.");
     return;
   }
 
@@ -3014,7 +3014,7 @@ async function handleTelegramUpdate(u) {
   const rm = /^\/remove_?user(?:@\w+)?\s*(\S*)/i.exec(text);
   if (rm) {
     if (!TG_ADMINS.includes(String(uid))) {
-      await say(chat, "Не вижу ссылки. Пришлите ссылку на объявление с сайта Крыши, например " + example + ".");
+      await say(chat, "Не вижу ссылки. Пришлите ссылку на объявление, например " + example + ".");
       return;
     }
     const arg = rm[1].toLowerCase();
@@ -3036,7 +3036,7 @@ async function handleTelegramUpdate(u) {
 
   const id = bot.idFromText(text);
   if (!id) {
-    await say(chat, "Не вижу ссылки. Пришлите ссылку на объявление с сайта Крыши, например " + example + ".");
+    await say(chat, "Не вижу ссылки. Пришлите ссылку на объявление, например " + example + ".");
     return;
   }
 
@@ -3054,7 +3054,7 @@ async function handleTelegramUpdate(u) {
     } else if (k.owner && k.owner.phones.length) {
       found = { phones: k.owner.phones, text: "📞 <b>Контакты хозяина</b>\n" +
         "Это объявление от посредника, тот же объект разместил хозяин:\n" + line(k.owner) +
-        "\n" + '<a href="' + krishaLink(k.owner.id) + '">Объявление хозяина на Крыше</a>' };
+        "\n" + '<a href="' + krishaLink(k.owner.id) + '">Объявление хозяина</a>' };
     } else if (k.item && k.item.user_type === "owner") {
       why = "объявление от хозяина есть в базе, телефон ещё не собран";
     } else if (k.item) {
@@ -3076,8 +3076,8 @@ async function handleTelegramUpdate(u) {
 
   if (found) {
     await say(chat, found.text + "\n\n" + found.phones.map((p) => "+" + p).join("\n") +
-      "\n\nСкажите, что нашли объявление на Крыше — так разговор начнётся понятнее." +
-      "\n\n" + '<a href="' + link + '">Объявление на Крыше</a>');
+      "\n\nСкажите, что видели объявление — так разговор начнётся понятнее." +
+      "\n\n" + '<a href="' + link + '">Открыть объявление</a>');
   } else {
     await say(chat, "😔 Мы не нашли контакты по этому объявлению." +
       (why && !/база не ответила/.test(why) ? "\n" + bot.esc(why[0].toUpperCase() + why.slice(1)) + "." : "") +
