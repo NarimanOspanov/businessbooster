@@ -945,6 +945,11 @@ const KRISHA_HUB_HTML = `<!doctype html>
 <h1>Крыша · страницы</h1>
 <p class="sub">ключ подставлен во все ссылки · <span id="upd"></span></p>
 
+<h2>Бот для покупателя</h2>
+<div class="grid">
+  <a class="card" data-p="bot"><div class="t">Бот: люди, запросы, продажи</div><div class="d">за период: новые и активные пользователи, запросов, нашли и не нашли с причинами, открытий контактов и выручка в звёздах, по дням, последние запросы.</div><div class="n" id="n-bot"></div></a>
+</div>
+
 <h2>Риэлтору</h2>
 <div class="grid">
   <a class="card" data-p="leads"><div class="t">Лиды хозяев</div><div class="d">хозяева с номером и свежим сигналом: новое, поднятие, снижение цены, возврат из архива. Фильтры, статус обзвона.</div><div class="n" id="n-leads"></div></a>
@@ -980,9 +985,12 @@ document.querySelectorAll("a.card").forEach(function(a){
 });
 function n(v){return v==null?"–":Number(v).toLocaleString("ru-RU");}
 function pad2(x){return ("0"+x).slice(-2);}
-["n-leads","n-liststats","n-listconsole","n-listmonitor","n-phones"].forEach(function(id){var el=document.getElementById(id);if(el&&!el.textContent)el.innerHTML="<span class='sk' style='display:inline-block;width:60%;height:12px;border-radius:6px'> </span>";});
+["n-bot","n-leads","n-liststats","n-listconsole","n-listmonitor","n-phones"].forEach(function(id){var el=document.getElementById(id);if(el&&!el.textContent)el.innerHTML="<span class='sk' style='display:inline-block;width:60%;height:12px;border-radius:6px'> </span>";});
 function live(){
   var k = "key=" + encodeURIComponent(KEY);
+  fetch("/api/krisha/bot?" + k + "&data=1&days=7").then(function(r){return r.json();}).then(function(j){
+    var t=j.totals||{}; document.getElementById("n-bot").textContent = "за 7 дней: запросов " + n(t.searches) + " · нашли " + n(t.found) + " · открытий " + n(t.reveals) + " · " + n(t.reveal_stars) + " ⭐ · новых людей " + n(t.users_new);
+  }).catch(function(){});
   fetch("/api/krisha/objphone/console?" + k + "&since=0").then(function(r){return r.json();}).then(function(j){
     var s=j.stats||{}; document.getElementById("n-phones").textContent = "за час " + n(s.h1) + " · за 10 мин " + n(s.m10) + " · всего " + n(s.total) + (j.clients&&j.clients.length?" · клиентов "+j.clients.length:"");
   }).catch(function(){});
@@ -1475,6 +1483,93 @@ function sendSms(digits,callId,again){
 function saveNote(el,id){el.style.borderColor="var(--warn)";fetch("/api/calls?"+K+"&set="+encodeURIComponent(id)+"&note="+encodeURIComponent(el.value)).then(function(r){return r.json();}).then(function(){el.style.borderColor="var(--ok)";setTimeout(function(){el.style.borderColor="";},1200);}).catch(function(){el.style.borderColor="var(--no)";});}
 document.getElementById("days").onchange=function(){first=true;load();};
 load(); setInterval(load, 30000);
+</script></body></html>`;
+// Сводка бота: люди, запросы, находки, открытия и выручка в звёздах.
+const KRISHA_BOT_HTML = `<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Крыша · бот</title>
+<style>
+  :root{--bg:#0f1216;--card:#181d24;--line:#262d37;--fg:#e6e9ee;--mut:#8a95a5;--ok:#2fbf71;--no:#e5484d;--acc:#4c8dff;--warn:#f5a524;--star:#f5c542}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:18px;max-width:1100px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 4px} .sub{color:var(--mut);margin:0 0 16px} .sub a{color:var(--acc);text-decoration:none}
+  h2{font-size:14px;margin:22px 0 8px;color:var(--mut);text-transform:uppercase;letter-spacing:.03em}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin:0 0 6px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .card b{display:block;font-size:22px;font-variant-numeric:tabular-nums} .card .k{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.03em} .card .s{font-size:12px;color:var(--mut)}
+  .card.ok b{color:var(--ok)} .card.warn b{color:var(--warn)} .card.bad b{color:var(--no)} .card.star b{color:var(--star)}
+  table{border-collapse:collapse;width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;font-variant-numeric:tabular-nums;vertical-align:top}
+  th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em}
+  td.r,th.r{text-align:right}
+  .mut{color:var(--mut)} a{color:var(--acc);text-decoration:none}
+  select{border:1px solid var(--line);background:#12161c;color:var(--fg);border-radius:8px;padding:6px 10px;font:inherit}
+  .tag{display:inline-block;padding:1px 7px;border-radius:99px;font-size:12px;white-space:nowrap}
+  .tag.ok{background:rgba(47,191,113,.18);color:var(--ok)} .tag.no{background:rgba(229,72,77,.18);color:var(--no)} .tag.mut{background:rgba(138,149,165,.2);color:var(--mut)} .tag.star{background:rgba(245,197,66,.18);color:var(--star)}
+  .bar{height:6px;border-radius:3px;background:var(--acc);min-width:2px;display:inline-block;vertical-align:middle}
+  .err{color:var(--no)}
+  .sk{position:relative;overflow:hidden;background:#1c222b;border-radius:8px;color:transparent!important}
+  .sk::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,.07),transparent);animation:skm 1.3s infinite}
+  @keyframes skm{100%{transform:translateX(100%)}}
+  .skc{height:74px;border-radius:12px;margin:0} .skl{height:14px;margin:8px 0}
+  @media(max-width:640px){.hide{display:none}}
+</style></head><body>
+<h1>Крыша · бот «Квартиры без посредников»</h1>
+<p class="sub" id="upd"></p>
+<p class="mut">Период: <select id="days"><option value="1">сутки</option><option value="7" selected>7 дней</option><option value="30">30 дней</option><option value="90">90 дней</option></select> · сутки по Алматы · звезда ≈ $0,02 для покупателя, ≈ $0,013 к выводу</p>
+
+<h2>Люди</h2><div id="c-users" class="cards"></div>
+<h2>Запросы</h2><div id="c-search" class="cards"></div>
+<h2>Продажи</h2><div id="c-sales" class="cards"></div>
+
+<h2>Почему не нашли</h2><div id="reasons"></div>
+<h2>По дням</h2><div id="days-t"></div>
+<h2>Последние запросы</h2><div id="recent"></div>
+<h2>Кто пользовался</h2><div id="people"></div>
+<script>
+var KEY = new URLSearchParams(location.search).get("key") || "";
+var K = "key=" + encodeURIComponent(KEY);
+function esc(s){s=(s==null?"":String(s));return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function n(v){return v==null||v===""?"–":Number(v).toLocaleString("ru-RU");}
+function pad2(x){return ("0"+x).slice(-2);}
+function alm(v){if(!v)return "";var d=new Date(v);if(isNaN(d))return String(v);d=new Date(d.getTime()+5*3600e3);return pad2(d.getUTCDate())+"."+pad2(d.getUTCMonth()+1)+" "+pad2(d.getUTCHours())+":"+pad2(d.getUTCMinutes());}
+function day(v){var d=new Date(v);return isNaN(d)?String(v).slice(0,10):pad2(d.getUTCDate())+"."+pad2(d.getUTCMonth()+1);}
+function usd(st){var v=Number(st||0)*0.02;return "$"+(v>=10?Math.round(v):v.toFixed(1)).toLocaleString("ru-RU");}
+function pct(a,b){return b?Math.round(100*a/b)+"%":"–";}
+function card(v,k,s,cls){return "<div class='card "+(cls||"")+"'><div class=k>"+esc(k)+"</div><b>"+v+"</b>"+(s?"<div class=s>"+s+"</div>":"")+"</div>";}
+function who(u){return esc([u.first_name,u.last_name].filter(Boolean).join(" ")||("id "+u.user_id||u.id))+(u.username?" <span class=mut>@"+esc(u.username)+"</span>":"");}
+function money(v){if(v==null)return "";v=Number(v);return v>=1e6?(Math.round(v/1e5)/10).toLocaleString("ru-RU")+" млн":v.toLocaleString("ru-RU");}
+function skCards(n){var h="";for(var i=0;i<n;i++)h+="<div class='sk skc'></div>";return h;}
+function skTable(n){var h="<table>";for(var i=0;i<n;i++)h+="<tr><td colspan=9><div class='sk skl' style='width:"+(55+((i*41)%40))+"%'></div></td></tr>";return h+"</table>";}
+document.getElementById("upd").innerHTML='<a href="/api/krisha/hub?'+K+'">← все страницы</a> · <span id="updt"></span>';
+function stamp(){var d=new Date();document.getElementById("updt").textContent="обновлено "+pad2(d.getHours())+":"+pad2(d.getMinutes())+":"+pad2(d.getSeconds());}
+var first=true;
+function load(){
+  var d=document.getElementById("days").value;
+  if(first){["c-users","c-search","c-sales"].forEach(function(id){document.getElementById(id).innerHTML=skCards(4);});["reasons","days-t","recent","people"].forEach(function(id){document.getElementById(id).innerHTML=skTable(4);});}
+  fetch("/api/krisha/bot?data=1&days="+d+"&"+K).then(function(r){return r.json();}).then(function(j){
+    first=false; var t=j.totals||{};
+    document.getElementById("c-users").innerHTML=card(n(t.users_new),"новых","за период","ok")+card(n(t.users_active),"активных","заходили за период")+card(n(t.searchers),"искали","хоть одну ссылку")+card(n(t.users_all),"всего","за всё время");
+    var notFound=(t.searches||0)-(t.found||0);
+    document.getElementById("c-search").innerHTML=card(n(t.searches),"запросов","объявлений "+n(t.listings))+card(n(t.found),"нашли",pct(t.found,t.searches)+" запросов","ok")+card(n(notFound),"не нашли",pct(notFound,t.searches)+" запросов",notFound?"warn":"")+card(pct(t.reveals,t.found),"нашли → открыли","конверсия в оплату","star");
+    document.getElementById("c-sales").innerHTML=card(n(t.reveals),"открытий","покупателей "+n(t.buyers),"star")+card(n(t.reveal_stars)+" ⭐","выручка за открытия",usd(t.reveal_stars)+" · к выводу ≈ $"+(Number(t.reveal_stars||0)*0.013).toFixed(0),"star")+card(n(t.paid_stars)+" ⭐","оплачено","платежей "+n(t.payments)+(t.refunds?" · возвратов "+n(t.refunds)+" ("+n(t.refund_stars)+" ⭐)":""))+card(n(t.balances)+" ⭐","на балансах","не потрачено пользователями","mut");
+    var rs=j.reasons||[], rmax=rs.reduce(function(m,x){return Math.max(m,x.n);},0);
+    document.getElementById("reasons").innerHTML=rs.length?"<table><tr><th>причина</th><th class=r>запросов</th><th style='width:40%'></th></tr>"+rs.map(function(x){return "<tr><td>"+esc(x.reason)+"</td><td class=r>"+n(x.n)+"</td><td><span class=bar style='width:"+Math.round(100*x.n/rmax)+"%'></span></td></tr>";}).join("")+"</table>":"<p class=mut>промахов нет</p>";
+    var bd=j.byDay||[];
+    document.getElementById("days-t").innerHTML=bd.length?"<table><tr><th>день</th><th class=r>новых</th><th class=r>искали</th><th class=r>запросов</th><th class=r>нашли</th><th class=r>открытий</th><th class=r>звёзд</th></tr>"+bd.map(function(x){return "<tr><td>"+day(x.day)+"</td><td class=r>"+n(x.new_users)+"</td><td class=r>"+n(x.people)+"</td><td class=r>"+n(x.searches)+"</td><td class=r>"+n(x.found)+" <span class=mut>"+pct(x.found,x.searches)+"</span></td><td class=r>"+n(x.reveals)+"</td><td class=r>"+n(x.stars)+"</td></tr>";}).join("")+"</table>":"<p class=mut>пока пусто</p>";
+    var rc=j.recent||[];
+    document.getElementById("recent").innerHTML=rc.length?"<table><tr><th>время</th><th>кто</th><th>объявление</th><th>итог</th></tr>"+rc.map(function(x){
+      var name=x.title?esc(x.title)+" <span class=mut>"+money(x.price)+"</span>":"объявление "+esc(x.krisha_id);
+      var st=x.revealed_stars!=null?"<span class='tag star'>открыт за "+n(x.revealed_stars)+" ⭐</span>":x.found?"<span class='tag ok'>нашли</span>":"<span class='tag no'>не нашли</span>"+(x.note?" <span class=mut>"+esc(x.note)+"</span>":"");
+      return "<tr><td>"+alm(x.at)+"</td><td>"+who(x)+"</td><td><a target=_blank href='https://krisha.kz/a/show/"+esc(x.krisha_id)+"'>"+name+"</a>"+(x.deal==="rent"?" <span class='tag mut'>аренда</span>":"")+"</td><td>"+st+"</td></tr>";}).join("")+"</table>":"<p class=mut>запросов не было</p>";
+    var pp=j.people||[];
+    document.getElementById("people").innerHTML=pp.length?"<table><tr><th>кто</th><th>пришёл</th><th>был</th><th class=r>запросов</th><th class=r>открытий</th><th class=r>оплатил</th><th class=r>баланс</th></tr>"+pp.map(function(u){return "<tr><td>"+who(u)+" <span class=mut>"+esc(u.id)+"</span></td><td>"+alm(u.joined_at)+"</td><td>"+alm(u.last_seen_at)+"</td><td class=r>"+n(u.searches)+"</td><td class=r>"+n(u.reveals)+"</td><td class=r>"+n(u.paid)+" ⭐</td><td class=r>"+n(u.stars_balance)+" ⭐</td></tr>";}).join("")+"</table>":"<p class=mut>никого</p>";
+    stamp();
+  }).catch(function(e){document.getElementById("c-users").innerHTML="<p class=err>ошибка: "+esc(e&&e.message||e)+"</p>";});
+}
+document.getElementById("days").onchange=function(){first=true;load();};
+load(); setInterval(load, 60000);
 </script></body></html>`;
 let sweepStatsCache = { at: 0, body: null }; // listStats для страницы обхода, раз в 5 минут
 
@@ -8007,10 +8102,17 @@ http
     // свой ?data=1 с курсором и кэшированной статистикой списка.
     {
       const pages = { "/api/krisha/phones": KRISHA_PHONES_HTML, "/api/krisha/db": KRISHA_DB_HTML, "/api/krisha/sweep": KRISHA_SWEEP_HTML,
-                      "/api/krisha/ports": KRISHA_PORTS_HTML, "/api/krisha/calls": KRISHA_CALLS_HTML };
+                      "/api/krisha/ports": KRISHA_PORTS_HTML, "/api/krisha/calls": KRISHA_CALLS_HTML, "/api/krisha/bot": KRISHA_BOT_HTML };
       if (pages[urlPath]) {
         const key = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
         if (!key || parsed.searchParams.get("key") !== key) { res.writeHead(403); res.end("bad key"); return; }
+        if (urlPath === "/api/krisha/bot" && parsed.searchParams.get("data")) {
+          db.botFunnel(parsed.searchParams.get("days")).then((j) => {
+            res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+            res.end(JSON.stringify(Object.assign({ ok: true }, j)));
+          }).catch((e) => { res.writeHead(500, { "Content-Type": MIME[".json"] }); res.end(JSON.stringify({ ok: false, error: String(e.message).slice(0, 200) })); });
+          return;
+        }
         if (urlPath === "/api/krisha/sweep" && parsed.searchParams.get("data")) {
           (async () => {
             if (!sweepStatsCache.body || Date.now() - sweepStatsCache.at > 300e3) {

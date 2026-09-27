@@ -2995,6 +2995,69 @@ async function botHistory(uid, limit) {
     title: x.title, price: x.price == null ? null : Number(x.price), deal: x.deal, storage: x.storage }));
 }
 
+// Сводка бота за период для страницы /api/krisha/bot: люди, запросы,
+// находки и причины промахов, открытия и выручка в звёздах, по дням,
+// последние запросы. Сутки — по Алматы (UTC+5).
+async function botFunnel(days) {
+  const pool = await getPool();
+  await ensureStars();
+  const n = Math.min(90, Math.max(1, Number(days) || 7));
+  const q = (sqlText) => pool.request().input("n", sql.Int, n).query(sqlText).then((r) => r.recordset);
+  const since = "DATEADD(day, -@n, SYSUTCDATETIME())";
+  const [tot] = await q(`
+    SELECT
+      (SELECT COUNT(*) FROM dbo.users) AS users_all,
+      (SELECT COUNT(*) FROM dbo.users WHERE joined_at >= ${since}) AS users_new,
+      (SELECT COUNT(*) FROM dbo.users WHERE last_seen_at >= ${since}) AS users_active,
+      (SELECT COUNT(*) FROM dbo.bot_requests WHERE kind = 'search' AND at >= ${since}) AS searches,
+      (SELECT COUNT(DISTINCT user_id) FROM dbo.bot_requests WHERE kind = 'search' AND at >= ${since}) AS searchers,
+      (SELECT COUNT(*) FROM dbo.bot_requests WHERE kind = 'search' AND found = 1 AND at >= ${since}) AS found,
+      (SELECT COUNT(DISTINCT krisha_id) FROM dbo.bot_requests WHERE kind = 'search' AND at >= ${since}) AS listings,
+      (SELECT COUNT(*) FROM dbo.reveals WHERE at >= ${since}) AS reveals,
+      (SELECT COUNT(DISTINCT user_id) FROM dbo.reveals WHERE at >= ${since}) AS buyers,
+      (SELECT ISNULL(SUM(stars), 0) FROM dbo.reveals WHERE at >= ${since}) AS reveal_stars,
+      (SELECT COUNT(*) FROM dbo.star_payments WHERE at >= ${since}) AS payments,
+      (SELECT ISNULL(SUM(stars), 0) FROM dbo.star_payments WHERE at >= ${since}) AS paid_stars,
+      (SELECT COUNT(*) FROM dbo.star_payments WHERE refunded_at IS NOT NULL AND refunded_at >= ${since}) AS refunds,
+      (SELECT ISNULL(SUM(stars), 0) FROM dbo.star_payments WHERE refunded_at IS NOT NULL AND refunded_at >= ${since}) AS refund_stars,
+      (SELECT ISNULL(SUM(stars_balance), 0) FROM dbo.users) AS balances`);
+  const reasons = await q(`
+    SELECT TOP (8) ISNULL(note, 'без причины') AS reason, COUNT(*) AS n
+    FROM dbo.bot_requests WHERE kind = 'search' AND ISNULL(found, 0) = 0 AND at >= ${since}
+    GROUP BY note ORDER BY n DESC`);
+  const byDay = await q(`
+    SELECT d.day,
+      ISNULL(s.searches, 0) AS searches, ISNULL(s.found, 0) AS found, ISNULL(s.people, 0) AS people,
+      ISNULL(r.reveals, 0) AS reveals, ISNULL(r.stars, 0) AS stars, ISNULL(u.new_users, 0) AS new_users
+    FROM (SELECT DISTINCT CAST(DATEADD(hour, 5, at) AS date) AS day FROM dbo.bot_requests WHERE at >= ${since}
+          UNION SELECT DISTINCT CAST(DATEADD(hour, 5, at) AS date) FROM dbo.reveals WHERE at >= ${since}
+          UNION SELECT DISTINCT CAST(DATEADD(hour, 5, joined_at) AS date) FROM dbo.users WHERE joined_at >= ${since}) d
+    LEFT JOIN (SELECT CAST(DATEADD(hour, 5, at) AS date) AS day, COUNT(*) AS searches, SUM(IIF(found = 1, 1, 0)) AS found, COUNT(DISTINCT user_id) AS people
+               FROM dbo.bot_requests WHERE kind = 'search' AND at >= ${since} GROUP BY CAST(DATEADD(hour, 5, at) AS date)) s ON s.day = d.day
+    LEFT JOIN (SELECT CAST(DATEADD(hour, 5, at) AS date) AS day, COUNT(*) AS reveals, SUM(stars) AS stars
+               FROM dbo.reveals WHERE at >= ${since} GROUP BY CAST(DATEADD(hour, 5, at) AS date)) r ON r.day = d.day
+    LEFT JOIN (SELECT CAST(DATEADD(hour, 5, joined_at) AS date) AS day, COUNT(*) AS new_users
+               FROM dbo.users WHERE joined_at >= ${since} GROUP BY CAST(DATEADD(hour, 5, joined_at) AS date)) u ON u.day = d.day
+    ORDER BY d.day DESC`);
+  const recent = await q(`
+    SELECT TOP (60) r.at, r.krisha_id, r.found, r.note, u.id AS user_id, u.username, u.first_name, u.last_name,
+      l.title, l.price, l.deal, l.user_type,
+      (SELECT TOP (1) v.stars FROM dbo.reveals v WHERE v.user_id = r.user_id AND v.listing_id = r.krisha_id) AS revealed_stars
+    FROM dbo.bot_requests r
+    LEFT JOIN dbo.users u ON u.id = r.user_id
+    LEFT JOIN dbo.krisha_list l ON l.id = r.krisha_id
+    WHERE r.kind = 'search' AND r.at >= ${since}
+    ORDER BY r.at DESC`);
+  const people = await q(`
+    SELECT TOP (30) u.id, u.username, u.first_name, u.last_name, u.joined_at, u.last_seen_at, u.stars_balance,
+      (SELECT COUNT(*) FROM dbo.bot_requests b WHERE b.user_id = u.id AND b.kind = 'search' AND b.at >= ${since}) AS searches,
+      (SELECT COUNT(*) FROM dbo.reveals v WHERE v.user_id = u.id AND v.at >= ${since}) AS reveals,
+      (SELECT ISNULL(SUM(stars), 0) FROM dbo.star_payments p WHERE p.user_id = u.id AND p.at >= ${since}) AS paid
+    FROM dbo.users u WHERE u.last_seen_at >= ${since}
+    ORDER BY u.last_seen_at DESC`);
+  return { days: n, totals: tot, reasons: reasons, byDay: byDay, recent: recent, people: people };
+}
+
 async function usersCount() {
   const pool = await getPool();
   const r = await pool.request().query("SELECT COUNT(*) AS n FROM dbo.users");
@@ -3842,7 +3905,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
-  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory,
+  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,
