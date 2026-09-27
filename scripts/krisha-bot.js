@@ -89,7 +89,7 @@ function caption(f, site, photoNote) {
 const FIND_BUTTON = "🔍 Найти хозяина";
 const BALANCE_BUTTON = "⭐ Баланс";
 const mainKeyboard = () => ({
-  keyboard: [[{ text: FIND_BUTTON }, { text: BALANCE_BUTTON }]], resize_keyboard: true, is_persistent: true,
+  keyboard: [[{ text: FIND_BUTTON }]], resize_keyboard: true, is_persistent: true,
   input_field_placeholder: "Ссылка на объявление",
 });
 const COMMANDS = [{ command: "find", description: "Найти хозяина" }, { command: "balance", description: "Баланс" }];
