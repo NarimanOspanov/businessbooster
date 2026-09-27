@@ -84,8 +84,18 @@ function caption(f, site, photoNote) {
   return cap.length > 1000 ? cap.slice(0, 997) + "…" : cap;
 }
 
+// У бота одна функция, поэтому и кнопка одна: постоянная клавиатура с
+// «Найти хозяина» и та же команда в меню слева от поля ввода.
+const FIND_BUTTON = "🔍 Найти хозяина";
+const mainKeyboard = () => ({
+  keyboard: [[{ text: FIND_BUTTON }]], resize_keyboard: true, is_persistent: true,
+  input_field_placeholder: "Ссылка на объявление с Крыши",
+});
+const COMMANDS = [{ command: "find", description: "Найти хозяина" }];
+const isFindCmd = (text) => /^\/(start|help|find)\b/.test(String(text || "")) || String(text || "").trim() === FIND_BUTTON;
+
 const contactsButton = (id) => ({
   inline_keyboard: [[{ text: "📞 Показать контакты", callback_data: "c:" + id }]],
 });
 
-module.exports = { api, idFromText, caption, askedLine, webhookSecret, contactsButton, money, esc };
+module.exports = { api, idFromText, caption, askedLine, webhookSecret, contactsButton, money, esc, mainKeyboard, COMMANDS, isFindCmd, FIND_BUTTON };

@@ -2867,8 +2867,9 @@ async function runKrishaBackfill(city, pages, fromPage) {
 
 async function handleTelegramUpdate(u) {
   const bot = require("./scripts/krisha-bot.js");
+  // Клавиатура с одной кнопкой идёт с каждым ответом: так она всегда на виду.
   const say = (chat, text, extra) => bot.api(TG_TOKEN, "sendMessage", Object.assign(
-    { chat_id: chat, text: text, parse_mode: "HTML", disable_web_page_preview: true }, extra || {}));
+    { chat_id: chat, text: text, parse_mode: "HTML", disable_web_page_preview: true, reply_markup: bot.mainKeyboard() }, extra || {}));
 
   // Кто пишет. Проверяем и заводим при каждом обращении — Телеграм не сообщает
   // о новых подписчиках отдельно, так что первое сообщение и есть регистрация.
@@ -2930,8 +2931,8 @@ async function handleTelegramUpdate(u) {
       "Мы находим контакты хозяев по объявлениям с Крыши — без посредников.\n\n" +
       "Пришлите ссылку на объявление с сайта Крыши, например " + example +
       ", и если оно есть в нашей базе, мы вернём контакты владельца.");
-    if (/^\/start|^\/help/.test(text)) return;
-  } else if (/^\/start|^\/help/.test(text)) {
+    if (bot.isFindCmd(text)) return;
+  } else if (bot.isFindCmd(text)) {
     await say(chat, "Введите ссылку на объявление с сайта Крыши, например " + example + ".");
     return;
   }
@@ -6421,11 +6422,14 @@ http
           allowed_updates: ["message", "callback_query"],
           drop_pending_updates: true,
         });
+        // Меню команд слева от поля ввода: одна команда, как и функция.
+        const cmds = await bot.api(TG_TOKEN, "setMyCommands", { commands: bot.COMMANDS });
         const info = await bot.api(TG_TOKEN, "getWebhookInfo", {});
         const me = await bot.api(TG_TOKEN, "getMe", {});
         return send(200, {
           ok: !!set.ok,
           set: set.description || set.result,
+          commands: cmds.ok ? bot.COMMANDS.map((c) => "/" + c.command).join(" ") : (cmds.description || "не установлены"),
           bot: me.result ? "@" + me.result.username : null,
           webhook: info.result ? {
             url: info.result.url,
