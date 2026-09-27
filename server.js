@@ -3059,13 +3059,11 @@ async function lookupContacts(id) {
     if (k.item && k.item.deal) out.deal = k.item.deal;
     if (k.item && k.item.phones.length) {
       out.found = true; out.phones = k.item.phones; out.deal = k.item.deal || "sale"; out.ownerId = k.item.id;
-      out.header = "📞 <b>Контакты по объявлению</b>\n" + line(k.item);
+      out.header = "📞 <b>Контакты хозяина</b>";
       out.short = [k.item.title, k.item.price ? bot.money(Number(k.item.price)) : null].filter(Boolean).join(" · ");
     } else if (k.owner && k.owner.phones.length) {
       out.found = true; out.phones = k.owner.phones; out.deal = (k.item && k.item.deal) || k.owner.deal || "sale"; out.ownerId = k.owner.id;
-      // Без пояснений про посредника и без ссылки на объявление хозяина:
-      // покупателю нужен только номер.
-      out.header = "📞 <b>Контакты хозяина</b>\n" + line(k.item || k.owner);
+      out.header = "📞 <b>Контакты хозяина</b>";
       out.short = [k.owner.title, k.owner.price ? bot.money(Number(k.owner.price)) : null].filter(Boolean).join(" · ");
     } else if (k.item && k.item.user_type === "owner") {
       out.why = "объявление от хозяина есть в базе, телефон ещё не собран";
@@ -3077,7 +3075,7 @@ async function lookupContacts(id) {
     if (!out.found) {
       let old = [];
       try { old = await db.flatPhones(id); } catch { /* старой базы может не быть */ }
-      if (old.length) { out.found = true; out.phones = old; out.header = "📞 <b>Контакты по объявлению</b>"; out.short = "квартира " + id; out.why = ""; }
+      if (old.length) { out.found = true; out.phones = old; out.header = "📞 <b>Контакты хозяина</b>"; out.short = "квартира " + id; out.why = ""; }
     }
   } catch (e) {
     out.why = "база не ответила: " + String(e.message).slice(0, 80);
@@ -3116,9 +3114,9 @@ async function handleTelegramUpdate(u) {
 
   const link = (x) => "https://krisha.kz/a/show/" + x;
   const sendContacts = async (chat, f, id) => {
+    // Только заголовок, номера и совет: описание и ссылку покупатель уже видел.
     await say(chat, f.header + "\n\n" + f.phones.map((p) => "+" + p).join("\n") +
-      "\n\nСкажите, что видели объявление — так разговор начнётся понятнее." +
-      "\n\n" + '<a href="' + link(id) + '">Открыть объявление</a>');
+      "\n\nСкажите, что видели объявление — так разговор начнётся понятнее.");
   };
   const showBalance = async (chat, prefix) => {
     const b = await db.starsBalance(uid).catch(() => ({ balance: 0, reveals: 0 }));
