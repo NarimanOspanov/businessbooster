@@ -4462,6 +4462,7 @@ function tooOften(key, limit, windowMs) {
 }
 
 const ipotekaHits = new Map(); // ip → времена заявок с лендинга ипотеки за час
+let demoListingsCache = { at: 0, body: null }; // витрина /ipoteka, раз в 30 минут
 const creditHits = new Map();   // ip → времена запросов кредитного рейтинга за час
 const creditReq = new Map();    // requestId → { iin (маской), phone } до подтверждения кода
 function clientIp(req) {
@@ -6743,6 +6744,19 @@ http
             "\nИИН " + bot.esc(who.iin) + " · +" + who.phone + "\nРейтинг " + r.score + " — " + bot.esc(r.bandText));
         }
         return send(r.ok ? 200 : 400, r);
+      })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
+      return;
+    }
+    // Демо-витрина портала ипотеки: реальные объявления хозяев для примера,
+    // кэш на 30 минут (запрос тяжёлый, а витрине свежесть до минуты не нужна).
+    if (urlPath === "/api/ipoteka/demo-listings") {
+      const send = (code, obj) => { res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "public, max-age=600" }); res.end(JSON.stringify(obj)); };
+      (async () => {
+        if (!demoListingsCache.body || Date.now() - demoListingsCache.at > 30 * 60e3) {
+          try { demoListingsCache = { at: Date.now(), body: await db.demoListings(12) }; }
+          catch (e) { if (!demoListingsCache.body) throw e; }
+        }
+        send(200, { ok: true, listings: demoListingsCache.body });
       })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
       return;
     }

@@ -3148,6 +3148,34 @@ async function mortgageLeadAdd(x) {
   const cnt = (r.recordsets && r.recordsets[1] && r.recordsets[1][0]) || {};
   return { id: row.id == null ? null : String(row.id), at: row.at, sameCount: Number(cnt.n) || 1 };
 }
+// Демо-витрина портала: свежие объявления хозяев (продажа квартир, Алматы и
+// Астана, с фото) — чтобы показать, как будет выглядеть портал. Без номеров,
+// имён и id Крыши: только то, что видно на карточке. Разнообразим по городу,
+// комнатам и новостройка/вторичка.
+async function demoListings(n) {
+  const pool = await getPool();
+  await ensureList(pool);
+  const r = await pool.request().query(`
+    SELECT TOP (160) city, rooms, area, floor, floors, price, addr, complex_id, photos_c, photos_json
+    FROM dbo.krisha_list
+    WHERE user_type = 'owner' AND storage = 'live' AND deal = 'sale' AND prop = 'flat'
+      AND city IN ('almaty', 'astana') AND price BETWEEN 15000000 AND 70000000 AND rooms BETWEEN 1 AND 4
+      AND (photos_c IS NOT NULL OR photos_json IS NOT NULL)
+    ORDER BY first_seen DESC`);
+  const rows = r.recordset.map((x) => {
+    const photos = listPhotoUrls(x.photos_c, x.photos_json).slice(0, 5);
+    return { city: x.city, rooms: x.rooms, area: x.area == null ? null : Number(x.area), floor: x.floor, floors: x.floors,
+      price: Number(x.price), addr: x.addr || null, isNew: x.complex_id != null, photos: photos };
+  }).filter((x) => x.photos.length >= 2 && x.area);
+  // Раскладываем по корзинам и берём по кругу: город × новостройка × комнаты.
+  const buckets = {};
+  for (const x of rows) { const k = x.city + (x.isNew ? "n" : "s") + Math.min(3, x.rooms); (buckets[k] = buckets[k] || []).push(x); }
+  const keys = Object.keys(buckets).sort();
+  const out = [];
+  for (let i = 0; out.length < (n || 12) && i < 40; i++) for (const k of keys) { if (buckets[k][i] && out.length < (n || 12)) out.push(buckets[k][i]); }
+  return out;
+}
+
 async function mortgageLeads(limit) {
   const pool = await getPool();
   await ensureMortgage();
@@ -4003,7 +4031,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
-  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
+  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, demoListings, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,
