@@ -4461,6 +4461,7 @@ function tooOften(key, limit, windowMs) {
   return false;
 }
 
+const ipotekaHits = new Map(); // ip → времена заявок с лендинга ипотеки за час
 function clientIp(req) {
   return String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() ||
          req.socket.remoteAddress || "";
@@ -6658,6 +6659,56 @@ http
           console.log("[sms] статус " + p.MessageSid + " " + p.MessageStatus + (phone ? " для " + phone : ""));
         }
       }).catch(() => { try { res.writeHead(400).end(); } catch { /* уже ответили */ } });
+      return;
+    }
+
+    // Заявка с лендинга подбора ипотеки (/ipoteka): анкета, подходящие
+    // программы, контакт. Пишем в базу и сразу шлём админам в Телеграм.
+    // Не больше 5 заявок в час с одного адреса — от случайных повторов и ботов.
+    if (urlPath === "/api/ipoteka/lead") {
+      const send = (code, obj) => { res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); };
+      if (req.method !== "POST") return send(405, { ok: false, error: "POST" });
+      (async () => {
+        let b = {};
+        try { b = JSON.parse(await readBody(req)) || {}; } catch { b = {}; }
+        let phone = String(b.phone || "").replace(/\D/g, "");
+        if (phone.length === 10) phone = "7" + phone;
+        if (phone.length === 11 && phone[0] === "8") phone = "7" + phone.slice(1);
+        if (!/^7\d{10}$/.test(phone)) return send(400, { ok: false, error: "номер телефона: +7 и 10 цифр" });
+        if (b.consent !== true) return send(400, { ok: false, error: "нужно согласие на обработку данных" });
+        const ip = clientIp(req);
+        const now = Date.now();
+        const hits = (ipotekaHits.get(ip) || []).filter((t) => now - t < 3600e3);
+        if (hits.length >= 5) return send(429, { ok: false, error: "слишком много заявок, попробуйте позже" });
+        hits.push(now); ipotekaHits.set(ip, hits);
+        const a = b.answers && typeof b.answers === "object" ? b.answers : {};
+        const saved = await db.mortgageLeadAdd({ name: b.name, phone: phone, via: b.via, answers: a, ok: b.ok, maybe: b.maybe, best: b.best,
+          src: b.src, campaign: b.campaign, ref: b.ref, ip: ip });
+        const bot = require("./scripts/krisha-bot.js");
+        const mln = (v) => (Number(v) ? (Math.round(Number(v) / 1e5) / 10).toLocaleString("ru-RU") + " млн" : "—");
+        const T = { building: "строится", ready: "новостройка сдана", secondary: "вторичка", unknown: "не решил" };
+        const C = { almaty: "Алматы", astana: "Астана", shymkent: "Шымкент", other: "другой город" };
+        const dp = Number(a.price) ? Math.round((Number(a.down) || 0) / Number(a.price) * 100) + "%" : "—";
+        notifyTelegram([
+          "🏠 <b>Заявка на подбор ипотеки</b>" + (saved.sameCount > 1 ? " (повторная, " + saved.sameCount + "-я)" : ""),
+          bot.esc(b.name || "без имени") + " · +" + phone + " · " + bot.esc({ whatsapp: "WhatsApp", telegram: "Telegram", call: "звонок" }[b.via] || b.via || "—"),
+          (C[a.city] || a.city || "—") + " · " + (T[a.type] || a.type || "—") + " · " + mln(a.price) + ", взнос " + dp + " · срок " + (a.term || "—") + " лет",
+          "Доход " + (Number(a.income) ? Number(a.income).toLocaleString("ru-RU") + " ₸" : "—") + (Number(a.debts) ? ", кредиты " + Number(a.debts).toLocaleString("ru-RU") + " ₸" : "") +
+            " · возраст " + (a.age || "—") + (a.home === "yes" ? " · жильё было" : "") + (a.otbasy && a.otbasy !== "no" ? " · депозит Отбасы" : ""),
+          "Подходит: " + ((b.ok || []).join(", ") || "—") + ((b.maybe || []).length ? " · уточнить: " + b.maybe.join(", ") : ""),
+          b.src || b.campaign ? "Источник: " + bot.esc([b.src, b.campaign].filter(Boolean).join(" / ")) : null,
+        ].filter(Boolean).join("\n"));
+        return send(200, { ok: true, id: saved.id });
+      })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
+      return;
+    }
+    // Список заявок для админа (по ключу).
+    if (urlPath === "/api/ipoteka/leads") {
+      const send = (code, obj) => { res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" }); res.end(JSON.stringify(obj, null, 2)); };
+      const want = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
+      if (!want || parsed.searchParams.get("key") !== want) return send(403, { ok: false, error: "bad_key" });
+      db.mortgageLeads(parsed.searchParams.get("limit")).then((rows) => send(200, { ok: true, count: rows.length, leads: rows }))
+        .catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 160) }));
       return;
     }
 

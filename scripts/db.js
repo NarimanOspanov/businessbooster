@@ -3086,6 +3086,76 @@ async function botFunnel(days) {
   return { days: n, totals: tot, reasons: reasons, byDay: byDay, recent: recent, people: people };
 }
 
+// --- Заявки с лендинга подбора ипотеки (/ipoteka) -----------------------
+const SCHEMA_MORTGAGE = `
+IF OBJECT_ID('dbo.mortgage_leads', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.mortgage_leads (
+    id        BIGINT IDENTITY(1,1) PRIMARY KEY,
+    at        DATETIME2(0)  NOT NULL CONSTRAINT DF_mlead_at DEFAULT SYSUTCDATETIME(),
+    name      NVARCHAR(80)  NULL,
+    phone     NVARCHAR(20)  NOT NULL,
+    via       NVARCHAR(16)  NULL,             -- whatsapp | telegram | call
+    answers   NVARCHAR(MAX) NULL,             -- анкета целиком, JSON
+    ok        NVARCHAR(400) NULL,             -- подходящие программы
+    maybe     NVARCHAR(400) NULL,             -- «уточнить»
+    best      NVARCHAR(40)  NULL,
+    src       NVARCHAR(80)  NULL,
+    campaign  NVARCHAR(80)  NULL,
+    ref       NVARCHAR(300) NULL,
+    ip        NVARCHAR(64)  NULL,
+    status    NVARCHAR(20)  NULL,             -- new | contacted | approved | lost
+    note      NVARCHAR(400) NULL
+  );
+  CREATE INDEX IX_mlead_at ON dbo.mortgage_leads (at DESC);
+  CREATE INDEX IX_mlead_phone ON dbo.mortgage_leads (phone, at DESC);
+END
+`;
+let mortgageReady = false, mortgageReadyPromise = null, mortgageFailedAt = 0;
+async function ensureMortgage() {
+  if (mortgageReady) return;
+  if (mortgageFailedAt && Date.now() - mortgageFailedAt < DDL_RETRY_MS) throw new Error("миграция схемы недавно сорвалась — пауза");
+  if (!mortgageReadyPromise) {
+    mortgageReadyPromise = (async () => {
+      const p = await ddlPool();
+      await p.request().batch(SCHEMA_MORTGAGE);
+      mortgageReady = true;
+    })().catch((e) => { mortgageReadyPromise = null; mortgageFailedAt = Date.now(); throw e; });
+  }
+  await mortgageReadyPromise;
+}
+async function mortgageLeadAdd(x) {
+  const pool = await getPool();
+  await ensureMortgage();
+  const s = (v, n) => (v == null || v === "" ? null : String(v).slice(0, n));
+  const r = await pool.request()
+    .input("name", sql.NVarChar(80), s(x.name, 80))
+    .input("phone", sql.NVarChar(20), s(x.phone, 20))
+    .input("via", sql.NVarChar(16), s(x.via, 16))
+    .input("answers", sql.NVarChar(sql.MAX), x.answers ? JSON.stringify(x.answers).slice(0, 8000) : null)
+    .input("ok", sql.NVarChar(400), s((x.ok || []).join(","), 400))
+    .input("maybe", sql.NVarChar(400), s((x.maybe || []).join(","), 400))
+    .input("best", sql.NVarChar(40), s(x.best, 40))
+    .input("src", sql.NVarChar(80), s(x.src, 80))
+    .input("campaign", sql.NVarChar(80), s(x.campaign, 80))
+    .input("ref", sql.NVarChar(300), s(x.ref, 300))
+    .input("ip", sql.NVarChar(64), s(x.ip, 64))
+    .query(`INSERT INTO dbo.mortgage_leads (name, phone, via, answers, ok, maybe, best, src, campaign, ref, ip, status)
+            OUTPUT INSERTED.id, INSERTED.at
+            VALUES (@name, @phone, @via, @answers, @ok, @maybe, @best, @src, @campaign, @ref, @ip, 'new');
+            SELECT COUNT(*) AS n FROM dbo.mortgage_leads WHERE phone = @phone;`);
+  const row = (r.recordsets && r.recordsets[0] && r.recordsets[0][0]) || {};
+  const cnt = (r.recordsets && r.recordsets[1] && r.recordsets[1][0]) || {};
+  return { id: row.id == null ? null : String(row.id), at: row.at, sameCount: Number(cnt.n) || 1 };
+}
+async function mortgageLeads(limit) {
+  const pool = await getPool();
+  await ensureMortgage();
+  const r = await pool.request().input("n", sql.Int, Math.min(500, Math.max(1, Number(limit) || 100)))
+    .query("SELECT TOP (@n) id, at, name, phone, via, answers, ok, maybe, best, src, campaign, status, note FROM dbo.mortgage_leads ORDER BY at DESC");
+  return r.recordset.map((x) => Object.assign({}, x, { answers: (() => { try { return JSON.parse(x.answers || "null"); } catch { return null; } })() }));
+}
+
 async function usersCount() {
   const pool = await getPool();
   const r = await pool.request().query("SELECT COUNT(*) AS n FROM dbo.users");
@@ -3933,7 +4003,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
-  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
+  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,
