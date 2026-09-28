@@ -1837,6 +1837,9 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   .md h3{font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:.03em;margin:14px 0 6px}
   .md table{width:100%;border-collapse:collapse} .md td,.md th{padding:5px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;font-variant-numeric:tabular-nums} .md th{color:var(--mut);font-size:12px;font-weight:600}
   .md .cut{color:var(--ok)} .md .up{color:var(--no)}
+  .pager{display:flex;gap:10px;align-items:center;justify-content:center;margin:14px 0 22px;flex-wrap:wrap}
+  .pager button{min-width:110px}
+  .pager button:disabled{opacity:.4;cursor:default}
 </style></head><body>
 <h1>Крыша · лиды хозяев <span id="cnt" class="mut"></span></h1>
 <div class="bar">
@@ -1853,6 +1856,7 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   <span class="view"><button id="vlist" class="on">Списком</button><button id="vmap">На карте</button></span>
 </div>
 <div id="list"></div>
+<div id="pager" class="pager"></div>
 <div id="mapwrap" class="mapwrap"><div id="map"></div><div id="maplist"></div></div>
 <div id="ov" class="ov" onclick="if(event.target===this)closeHist()"><div class="md"><button class="x" onclick="closeHist()">×</button><div id="mdc">загрузка…</div></div></div>
 <script>
@@ -1924,10 +1928,28 @@ function pretty(n){n=String(n);return n.length===11?"+"+n[0]+" "+n.slice(1,4)+" 
 function days(v){return Math.max(0,Math.round((Date.now()-new Date(v).getTime())/864e5));}
 var F=["city","deal","prop","rooms","pmin","pmax","hours","signal","status"];
 function qs(){var p=[];F.forEach(function(k){var v=document.getElementById(k).value;if(v!==""&&v!=="any"){if(k==="pmin"||k==="pmax")v=Math.round(Number(v)*1e6);p.push(k+"="+encodeURIComponent(v));}});return p.join("&");}
-function load(){
+// Постранично по 200: просим на одну строку больше — по ней видно, есть ли
+// следующая страница, без отдельного подсчёта.
+var PAGE=200, OFF=0, MORE=false;
+function load(keep){
+  if(keep!==true)OFF=0;
   try{F.forEach(function(k){localStorage.setItem("leads:"+k,document.getElementById(k).value);});}catch(e){}
   document.getElementById("list").innerHTML=skLeads(4);
-  fetch(API+"&data=1&"+qs()).then(function(r){return r.json();}).then(render).catch(function(e){document.getElementById("list").innerHTML="<div class=empty>ошибка: "+esc(e.message)+"</div>";});
+  document.getElementById("pager").innerHTML="";
+  fetch(API+"&data=1&"+qs()+"&limit="+(PAGE+1)+"&offset="+OFF).then(function(r){return r.json();}).then(render).catch(function(e){document.getElementById("list").innerHTML="<div class=empty>ошибка: "+esc(e.message)+"</div>";});
+}
+function page(dir){
+  OFF=Math.max(0,OFF+dir*PAGE); load(true);
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+function pager(){
+  var el=document.getElementById("pager");
+  if(!OFF&&!MORE){el.innerHTML="";return;}
+  el.innerHTML="<button id='pprev'"+(OFF?"":" disabled")+">← Назад</button>"+
+    "<span class=mut>стр. "+(OFF/PAGE+1)+" · "+(OFF+1)+"–"+(OFF+ROWS.length)+"</span>"+
+    "<button id='pnext'"+(MORE?"":" disabled")+">Дальше →</button>";
+  document.getElementById("pprev").onclick=function(){page(-1);};
+  document.getElementById("pnext").onclick=function(){page(1);};
 }
 function tags(x){var t=[];
   var h=Number(document.getElementById("hours").value)||72;
@@ -1944,9 +1966,11 @@ function tags(x){var t=[];
   return out().join("");}
 function render(rows){
   if(!Array.isArray(rows)){document.getElementById("cnt").textContent="";document.getElementById("list").innerHTML="<div class=empty>сервер не ответил: "+esc((rows&&rows.error)||"ошибка")+" — попробуйте ещё раз или сузьте период</div>";return;}
-  document.getElementById("cnt").textContent="· "+rows.length;
+  MORE=rows.length>PAGE; if(MORE)rows=rows.slice(0,PAGE);
+  document.getElementById("cnt").textContent=rows.length?"· "+(OFF+1)+"–"+(OFF+rows.length)+(MORE?" из многих":""):"· 0";
   ROWS=rows;
-  if(!rows.length){document.getElementById("list").innerHTML="<div class=empty>по этим фильтрам пусто</div>";if(VIEW==="map"&&MAP)plot();return;}
+  pager();
+  if(!rows.length){document.getElementById("list").innerHTML="<div class=empty>"+(OFF?"дальше пусто":"по этим фильтрам пусто")+"</div>";if(VIEW==="map"&&MAP)plot();return;}
   document.getElementById("list").innerHTML=rows.map(cardHtml).join("");
   if(VIEW==="map") ensureMap().then(plot);
 }
@@ -8275,7 +8299,7 @@ http
       }
       if (q.get("data")) {
         const f = {};
-        for (const k of ["city", "deal", "prop", "rooms", "pmin", "pmax", "hours", "signal", "status", "limit"]) f[k] = q.get(k);
+        for (const k of ["city", "deal", "prop", "rooms", "pmin", "pmax", "hours", "signal", "status", "limit", "offset"]) f[k] = q.get(k);
         db.leadsList(f).then((rows) => sendJ(200, rows))
           .catch((e) => sendJ(500, { ok: false, error: String(e.message).slice(0, 200) }));
         return;

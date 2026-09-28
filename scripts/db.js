@@ -2456,6 +2456,8 @@ async function leadsList(f) {
   const r = await pool.request()
     .input("since", sql.DateTime2, since)
     .input("n", sql.Int, Math.max(1, Math.min(500, Number(f.limit) || 200)))
+    // offset — сколько пропустить: страница лидов листает по 200.
+    .input("off", sql.Int, Math.max(0, Math.min(100000, Number(f.offset) || 0)))
     .input("city", sql.NVarChar(40), nul(f.city))
     .input("deal", sql.NVarChar(10), nul(f.deal))
     .input("prop", sql.NVarChar(20), nul(f.prop))
@@ -2466,7 +2468,7 @@ async function leadsList(f) {
     .input("relist", sql.Int, LEAD_RELIST_MIN)
     .input("status", sql.NVarChar(20), f.status || "open")
     .query(`
-    SELECT TOP (@n) l.id, l.deal, l.prop, l.city, l.price, l.rooms, l.area, l.floor, l.floors, l.title, l.addr, l.owner_name,
+    SELECT l.id, l.deal, l.prop, l.city, l.price, l.rooms, l.area, l.floor, l.floors, l.title, l.addr, l.owner_name,
       l.lat, l.lon, l.photos_c, l.photos_json, l.first_seen, l.bumped_on, l.phones, l.phones_at,
       ev.last_bump, ev.bumps, pr.last_price_at, pr.old_price, pr.new_price, bk.last_back,
       l.storage, x.exp_in, CASE WHEN x.expired = 1 THEN ar.last_archived END AS expired_at, ba.backs_all, ba.last_back_all,
@@ -2509,7 +2511,8 @@ async function leadsList(f) {
         OR (@signal = 'expired' AND x.expired = 1)
         OR (@signal = 'relist' AND l.storage = 'live' AND ba.backs_all >= @relist))
       AND (@status = 'all' OR (@status = 'open' AND (s.status IS NULL OR s.status = 'callback')) OR s.status = @status)
-    ORDER BY sig DESC
+    ORDER BY sig DESC, l.id DESC
+    OFFSET @off ROWS FETCH NEXT @n ROWS ONLY
     OPTION (RECOMPILE)`);
   return r.recordset.map((x) => {
     const o = Object.assign({}, x, { photos: listPhotoUrls(x.photos_c, x.photos_json).slice(0, 3), phones: rawList(x.phones) });
