@@ -4462,6 +4462,8 @@ function tooOften(key, limit, windowMs) {
 }
 
 const ipotekaHits = new Map(); // ip → времена заявок с лендинга ипотеки за час
+const creditHits = new Map();   // ip → времена запросов кредитного рейтинга за час
+const creditReq = new Map();    // requestId → { iin (маской), phone } до подтверждения кода
 function clientIp(req) {
   return String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() ||
          req.socket.remoteAddress || "";
@@ -6681,7 +6683,10 @@ http
         const hits = (ipotekaHits.get(ip) || []).filter((t) => now - t < 3600e3);
         if (hits.length >= 5) return send(429, { ok: false, error: "слишком много заявок, попробуйте позже" });
         hits.push(now); ipotekaHits.set(ip, hits);
-        const a = b.answers && typeof b.answers === "object" ? b.answers : {};
+        const a = b.answers && typeof b.answers === "object" ? Object.assign({}, b.answers) : {};
+        if (b.program) a._program = String(b.program).slice(0, 40);
+        if (b.product) a._product = String(b.product).slice(0, 20);
+        if (b.score) a._score = Number(b.score) || null;
         const saved = await db.mortgageLeadAdd({ name: b.name, phone: phone, via: b.via, answers: a, ok: b.ok, maybe: b.maybe, best: b.best,
           src: b.src, campaign: b.campaign, ref: b.ref, ip: ip });
         const bot = require("./scripts/krisha-bot.js");
@@ -6690,7 +6695,8 @@ http
         const C = { almaty: "Алматы", astana: "Астана", shymkent: "Шымкент", other: "другой город" };
         const dp = Number(a.price) ? Math.round((Number(a.down) || 0) / Number(a.price) * 100) + "%" : "—";
         notifyTelegram([
-          "🏠 <b>Заявка на подбор ипотеки</b>" + (saved.sameCount > 1 ? " (повторная, " + saved.sameCount + "-я)" : ""),
+          "🏠 <b>" + (b.product === "apply" ? "Заявка на ипотеку" : "Заявка на подбор ипотеки") + "</b>" + (saved.sameCount > 1 ? " (повторная, " + saved.sameCount + "-я)" : "") +
+            (b.programName ? "\nПрограмма: " + bot.esc(String(b.programName).slice(0, 80)) : "") + (a._score ? "\nКредитный рейтинг: " + a._score : ""),
           bot.esc(b.name || "без имени") + " · +" + phone + " · " + bot.esc({ whatsapp: "WhatsApp", telegram: "Telegram", call: "звонок" }[b.via] || b.via || "—"),
           (C[a.city] || a.city || "—") + " · " + (T[a.type] || a.type || "—") + " · " + mln(a.price) + ", взнос " + dp + " · срок " + (a.term || "—") + " лет",
           "Доход " + (Number(a.income) ? Number(a.income).toLocaleString("ru-RU") + " ₸" : "—") + (Number(a.debts) ? ", кредиты " + Number(a.debts).toLocaleString("ru-RU") + " ₸" : "") +
@@ -6699,6 +6705,42 @@ http
           b.src || b.campaign ? "Источник: " + bot.esc([b.src, b.campaign].filter(Boolean).join(" / ")) : null,
         ].filter(Boolean).join("\n"));
         return send(200, { ok: true, id: saved.id });
+      })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
+      return;
+    }
+    // Кредитный рейтинг для лендинга: /api/credit/start (ИИН, телефон,
+    // согласие) → код клиенту → /api/credit/confirm (код) → рейтинг. Бюро
+    // пока заглушка — см. scripts/credit-bureau.js. ИИН в базу не пишем, в
+    // уведомлении — только маской. Не больше 10 запросов в час с адреса.
+    if (urlPath === "/api/credit/start" || urlPath === "/api/credit/confirm") {
+      const send = (code, obj) => { res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); };
+      if (req.method !== "POST") return send(405, { ok: false, error: "POST" });
+      (async () => {
+        const CB = require("./scripts/credit-bureau.js");
+        let b = {};
+        try { b = JSON.parse(await readBody(req)) || {}; } catch { b = {}; }
+        const ip = clientIp(req), now = Date.now();
+        const hits = (creditHits.get(ip) || []).filter((t) => now - t < 3600e3);
+        if (hits.length >= 10) return send(429, { ok: false, error: "слишком много запросов, попробуйте позже" });
+        hits.push(now); creditHits.set(ip, hits);
+        if (urlPath === "/api/credit/start") {
+          if (b.consent !== true) return send(400, { ok: false, error: "нужно согласие на запрос в кредитное бюро" });
+          let phone = String(b.phone || "").replace(/\D/g, "");
+          if (phone.length === 10) phone = "7" + phone;
+          if (phone.length === 11 && phone[0] === "8") phone = "7" + phone.slice(1);
+          const r = await CB.startRequest({ iin: String(b.iin || "").replace(/\D/g, ""), phone: phone });
+          if (r.ok) creditReq.set(r.requestId, { iin: CB.mask(b.iin), phone: phone });
+          return send(r.ok ? 200 : 400, r);
+        }
+        const r = await CB.confirmRequest({ requestId: b.requestId, code: b.code });
+        const who = creditReq.get(String(b.requestId || ""));
+        if (r.ok && who) {
+          creditReq.delete(String(b.requestId));
+          const bot = require("./scripts/krisha-bot.js");
+          notifyTelegram("🧾 <b>Проверка кредитного рейтинга</b>" + (r.stub ? " (тестовый режим)" : "") +
+            "\nИИН " + bot.esc(who.iin) + " · +" + who.phone + "\nРейтинг " + r.score + " — " + bot.esc(r.bandText));
+        }
+        return send(r.ok ? 200 : 400, r);
       })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
       return;
     }
