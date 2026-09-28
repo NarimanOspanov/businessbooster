@@ -38,8 +38,23 @@
   .ph::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 55%,rgba(0,0,0,.45))}
   .ph .ok,.ph .rooms{z-index:1}
   .ph .cnt{position:absolute;right:12px;bottom:12px;z-index:1;font-size:12px;background:rgba(0,0,0,.5);color:#fff;border-radius:99px;padding:2px 8px}
-  .gallery{display:flex;gap:6px;overflow-x:auto;scroll-snap-type:x mandatory;border-radius:12px 12px 0 0;background:#dfe4ea}
-  .gallery img{flex:none;width:100%;aspect-ratio:16/10;object-fit:cover;scroll-snap-align:start}
+  .car{touch-action:pan-y;user-select:none}
+  .car img{transition:opacity .18s}
+  .car img.fade{opacity:.35}
+  .arr{position:absolute;top:50%;transform:translateY(-50%);z-index:2;width:36px;height:36px;border-radius:50%;border:0;background:rgba(255,255,255,.94);color:var(--ink2);
+    display:grid;place-items:center;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.18);opacity:0;transition:opacity .15s,transform .15s,background .15s}
+  .arr:hover{background:#fff;transform:translateY(-50%) scale(1.06)}
+  .arr:focus-visible{opacity:1;outline:2px solid var(--green);outline-offset:2px}
+  .arr.prev{left:10px} .arr.next{right:10px}
+  .car:hover .arr{opacity:1}
+  @media (hover:none){ .arr{opacity:1;width:32px;height:32px} }
+  .dots{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:1;display:flex;gap:5px}
+  .dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.55);transition:background .15s,transform .15s}
+  .dots i.on{background:#fff;transform:scale(1.25)}
+  .car.big{aspect-ratio:16/10;border-radius:12px 12px 0 0}
+  .car.big .arr{width:44px;height:44px;opacity:1}
+  .car.big .arr.prev{left:14px} .car.big .arr.next{right:14px}
+  .car.big .cnt{right:14px;bottom:14px;font-size:13px;padding:3px 10px}
   .skel{height:330px;border-radius:12px;background:linear-gradient(90deg,#f1f2f3,#fafafa,#f1f2f3);background-size:200% 100%;animation:sk 1.2s infinite}
   @keyframes sk{to{background-position:-200% 0}}
   .ph .rooms{font-weight:600;font-size:14px;text-shadow:0 1px 2px rgba(0,0,0,.25)}
@@ -226,8 +241,38 @@
       return true;
     });
   }
-  function photo(f){ return "<div class='ph'><img src='"+esc(f.photos[0])+"' alt='' loading='lazy' referrerpolicy='no-referrer' onerror='this.remove()'><span class='ok'>✓ Проверено для ипотеки</span><span class='rooms'>"+f.rooms+"-комн · "+String(f.area).replace(".",",")+" м²</span><span class='cnt'>"+f.photos.length+" фото</span></div>"; }
-  function gallery(f){ return "<div class='gallery'>"+f.photos.map(function(u){ return "<img src='"+esc(u.replace("-560x350.jpg","-750x470.jpg"))+"' alt='' loading='lazy' referrerpolicy='no-referrer'>"; }).join("")+"</div>"; }
+  // Карусель фото: в карточке и (крупнее) в окне квартиры. Стрелки, точки,
+  // свайп пальцем; стрелки не открывают окно.
+  var CHEV_L = "<svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M15 18l-6-6 6-6'/></svg>";
+  var CHEV_R = "<svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M9 18l6-6-6-6'/></svg>";
+  function srcOf(f, i, big){ var u = f.photos[i] || f.photos[0]; return big ? u.replace("-560x350.jpg","-750x470.jpg") : u; }
+  function arrows(f){ return f.photos.length>1 ? "<button type='button' class='arr prev' data-dir='-1' aria-label='Предыдущее фото'>"+CHEV_L+"</button><button type='button' class='arr next' data-dir='1' aria-label='Следующее фото'>"+CHEV_R+"</button>" : ""; }
+  function dots(f, i){ return f.photos.length>1 ? "<span class='dots'>"+f.photos.map(function(_,k){ return "<i"+(k===i?" class='on'":"")+"></i>"; }).join("")+"</span>" : ""; }
+  function photo(f){ return "<div class='ph car' data-car='"+f.id+"' data-i='0'><img src='"+esc(srcOf(f,0))+"' alt='' loading='lazy' referrerpolicy='no-referrer' draggable='false'>"+
+    "<span class='ok'>✓ Проверено для ипотеки</span><span class='rooms'>"+f.rooms+"-комн · "+String(f.area).replace(".",",")+" м²</span>"+arrows(f)+dots(f,0)+"</div>"; }
+  function gallery(f){ return "<div class='ph car big' data-car='"+f.id+"' data-big='1' data-i='0'><img src='"+esc(srcOf(f,0,true))+"' alt='' referrerpolicy='no-referrer' draggable='false'>"+
+    arrows(f)+"<span class='cnt'>1 / "+f.photos.length+"</span></div>"; }
+  function slide(car, dir){
+    var f = F.filter(function(x){return x.id===Number(car.getAttribute("data-car"));})[0]; if(!f || f.photos.length<2) return;
+    var big = car.hasAttribute("data-big"), n = f.photos.length, i = (Number(car.getAttribute("data-i")) + dir + n) % n;
+    car.setAttribute("data-i", i);
+    var img = car.querySelector("img"); img.classList.add("fade");
+    var pre = new Image(); pre.referrerPolicy = "no-referrer";
+    pre.onload = pre.onerror = function(){ img.src = pre.src; img.classList.remove("fade"); };
+    pre.src = srcOf(f, i, big);
+    // Следующее фото — заранее, чтобы листалось без задержки.
+    var nx = new Image(); nx.referrerPolicy = "no-referrer"; nx.src = srcOf(f, (i+1)%n, big);
+    IP.$$(".dots i", car).forEach(function(d,k){ d.classList.toggle("on", k===i); });
+    var c = car.querySelector(".cnt"); if(c && big) c.textContent = (i+1)+" / "+n;
+  }
+  // Свайп: горизонтальное движение больше 40 px листает фото.
+  var touch = null;
+  document.addEventListener("touchstart", function(e){ var car = e.target.closest && e.target.closest(".car"); if(car && e.touches.length===1) touch = {car:car, x:e.touches[0].clientX, y:e.touches[0].clientY, moved:false}; }, {passive:true});
+  document.addEventListener("touchend", function(e){
+    if(!touch) return; var t = e.changedTouches[0], dx = t.clientX - touch.x, dy = t.clientY - touch.y;
+    if(Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)){ slide(touch.car, dx < 0 ? 1 : -1); touch.car.setAttribute("data-swiped", Date.now()); }
+    touch = null;
+  }, {passive:true});
   function render(){
     var list = visible();
     $("#flatsCount").textContent = list.length+" "+IP.plural(list.length,["квартира","квартиры","квартир"]);
@@ -260,13 +305,19 @@
     IP.openModal("m-flat");
   }
   document.addEventListener("click", function(e){
+    var arr = e.target.closest(".arr");
+    if(arr){ e.preventDefault(); e.stopPropagation(); slide(arr.closest(".car"), Number(arr.getAttribute("data-dir"))); return; }
+    var sw = e.target.closest(".car[data-swiped]"); if(sw && Date.now() - Number(sw.getAttribute("data-swiped")) < 400) return;
     var t = e.target.closest("[data-flat],[data-f],[data-contact]"); if(!t) return;
     if(t.hasAttribute("data-f")){ FILTER = t.getAttribute("data-f"); $$(".fchip").forEach(function(c){ c.classList.toggle("on", c===t); }); render(); return; }
     if(t.hasAttribute("data-contact")){ var f = F.filter(function(x){return x.id===Number(t.getAttribute("data-contact"));})[0];
       IP.openLead({ product:"listing", program:{ id:"flat-"+f.id, name:f.rooms+"-комн, "+String(f.area).replace(".",",")+" м², "+fmt(f.price)+" ₸", bank:CITY[f.city]+(f.district?", "+f.district:"") } }); return; }
     openFlat(Number(t.getAttribute("data-flat")));
   });
-  document.addEventListener("keydown", function(e){ if(e.key==="Enter" && e.target.hasAttribute && e.target.hasAttribute("data-flat")) openFlat(Number(e.target.getAttribute("data-flat"))); });
+  document.addEventListener("keydown", function(e){
+    if(e.key==="Enter" && e.target.hasAttribute && e.target.hasAttribute("data-flat")) openFlat(Number(e.target.getAttribute("data-flat")));
+    if((e.key==="ArrowLeft"||e.key==="ArrowRight") && $("#m-flat").classList.contains("on")){ var car = $("#flBody .car"); if(car) slide(car, e.key==="ArrowLeft" ? -1 : 1); }
+  });
   function search(){ Q = { city:$("#fCity").value, rooms:$("#fRooms").value, pay:num($("#fPay").value), down:num($("#fDown").value) }; render(); $("#flats").scrollIntoView({behavior:"smooth"}); }
   $("#fGo").addEventListener("click", search);
   $("#finder").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); search(); } });
