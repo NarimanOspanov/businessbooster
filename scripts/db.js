@@ -2444,6 +2444,8 @@ IF OBJECT_ID('dbo.krisha_leads', 'U') IS NULL
   leadsReady = true;
 }
 
+// «Продлевает по кругу» — сколько возвратов из архива считать признаком.
+const LEAD_RELIST_MIN = 2;
 async function leadsList(f) {
   const pool = await getPool();
   await ensureList(pool);
@@ -2461,28 +2463,51 @@ async function leadsList(f) {
     .input("pmin", sql.BigInt, nul(f.pmin) == null ? null : Number(f.pmin))
     .input("pmax", sql.BigInt, nul(f.pmax) == null ? null : Number(f.pmax))
     .input("signal", sql.NVarChar(10), f.signal || "all")
+    .input("relist", sql.Int, LEAD_RELIST_MIN)
     .input("status", sql.NVarChar(20), f.status || "open")
     .query(`
     SELECT TOP (@n) l.id, l.deal, l.prop, l.city, l.price, l.rooms, l.area, l.floor, l.floors, l.title, l.addr, l.owner_name,
       l.lat, l.lon, l.photos_c, l.photos_json, l.first_seen, l.bumped_on, l.phones, l.phones_at,
       ev.last_bump, ev.bumps, pr.last_price_at, pr.old_price, pr.new_price, bk.last_back,
+      l.storage, x.exp_in, CASE WHEN x.expired = 1 THEN ar.last_archived END AS expired_at, ba.backs_all, ba.last_back_all,
       (SELECT COUNT(*) FROM dbo.krisha_list_matches m WHERE m.owner_id = l.id AND m.photo_match = 1) AS agents,
       s.status, s.note, s.updated_at AS status_at,
-      (SELECT MAX(v) FROM (VALUES (CASE WHEN l.first_seen >= @since THEN l.first_seen END), (ev.last_bump), (pr.last_price_at), (bk.last_back)) AS t(v)) AS sig
+      (SELECT MAX(v) FROM (VALUES (CASE WHEN l.first_seen >= @since THEN l.first_seen END), (ev.last_bump), (pr.last_price_at), (bk.last_back),
+        (CASE WHEN x.exp_in BETWEEN 0 AND 1 THEN DATEADD(hour, -5, CAST(CAST(DATEADD(hour, 5, SYSUTCDATETIME()) AS date) AS datetime2)) END),
+        (CASE WHEN x.expired = 1 THEN ar.last_archived END),
+        (CASE WHEN ba.backs_all >= @relist THEN ba.last_back_all END)) AS t(v)) AS sig
     FROM dbo.krisha_list l
     OUTER APPLY (SELECT MAX(at) AS last_bump, COUNT(*) AS bumps FROM dbo.krisha_list_events e WHERE e.id = l.id AND e.kind = 'bump' AND e.at >= @since) ev
     OUTER APPLY (SELECT TOP (1) at AS last_price_at, old_price, new_price FROM dbo.krisha_list_events e WHERE e.id = l.id AND e.kind = 'price' AND e.at >= @since ORDER BY at DESC) pr
     OUTER APPLY (SELECT MAX(at) AS last_back FROM dbo.krisha_list_events e WHERE e.id = l.id AND e.kind = 'back' AND e.at >= @since) bk
+    -- Срок: бесплатное объявление, которое не поднимали и не продлевали, уходит
+    -- в архив через 7 дней после даты на карточке (bumped_on, по Алматы). Так
+    -- видно по нашей истории: у живых дата не старше 7 дней, а в архив больше
+    -- всего уходят ровно на седьмой день. exp_in — сколько дней осталось
+    -- (0 — истекает сегодня). expired — ушло в архив по сроку (7–8 дней от
+    -- даты), а не снято хозяином раньше, и с тех пор не вернулось.
+    OUTER APPLY (SELECT MAX(at) AS last_archived FROM dbo.krisha_list_events e WHERE e.id = l.id AND e.kind = 'archived' AND e.at >= @since) ar
+    -- По кругу: сколько раз объявление возвращалось из архива за всю историю.
+    OUTER APPLY (SELECT COUNT(*) AS backs_all, MAX(at) AS last_back_all FROM dbo.krisha_list_events e WHERE e.id = l.id AND e.kind = 'back') ba
+    CROSS APPLY (SELECT
+      CASE WHEN l.storage = 'live' AND l.bumped_on IS NOT NULL
+        THEN 7 - DATEDIFF(day, l.bumped_on, CAST(DATEADD(hour, 5, SYSUTCDATETIME()) AS date)) END AS exp_in,
+      CASE WHEN l.storage = 'archived' AND ar.last_archived IS NOT NULL AND l.bumped_on IS NOT NULL
+        AND DATEDIFF(day, l.bumped_on, CAST(DATEADD(hour, 5, ar.last_archived) AS date)) BETWEEN 7 AND 8 THEN 1 ELSE 0 END AS expired) x
     LEFT JOIN dbo.krisha_leads s ON s.id = l.id
-    WHERE l.user_type = 'owner' AND l.storage = 'live' AND l.phones IS NOT NULL
+    WHERE l.user_type = 'owner' AND (l.storage = 'live' OR x.expired = 1) AND l.phones IS NOT NULL
       AND (@city IS NULL OR l.city = @city) AND (@deal IS NULL OR l.deal = @deal) AND (@prop IS NULL OR l.prop = @prop)
       AND (@rooms IS NULL OR l.rooms = @rooms) AND (@pmin IS NULL OR l.price >= @pmin) AND (@pmax IS NULL OR l.price <= @pmax)
-      AND (l.first_seen >= @since OR EXISTS (SELECT 1 FROM dbo.krisha_list_events e WHERE e.id = l.id AND e.at >= @since AND e.kind IN ('bump','price','back')))
+      AND (l.first_seen >= @since OR EXISTS (SELECT 1 FROM dbo.krisha_list_events e WHERE e.id = l.id AND e.at >= @since AND e.kind IN ('bump','price','back'))
+        OR x.exp_in BETWEEN 0 AND 1 OR x.expired = 1 OR (l.storage = 'live' AND ba.backs_all >= @relist))
       AND (@signal = 'all'
         OR (@signal = 'new' AND l.first_seen >= @since)
         OR (@signal = 'bump' AND ev.last_bump IS NOT NULL)
         OR (@signal = 'price' AND pr.new_price < pr.old_price)
-        OR (@signal = 'back' AND bk.last_back IS NOT NULL))
+        OR (@signal = 'back' AND bk.last_back IS NOT NULL)
+        OR (@signal = 'expiring' AND x.exp_in BETWEEN 0 AND 1)
+        OR (@signal = 'expired' AND x.expired = 1)
+        OR (@signal = 'relist' AND l.storage = 'live' AND ba.backs_all >= @relist))
       AND (@status = 'all' OR (@status = 'open' AND (s.status IS NULL OR s.status = 'callback')) OR s.status = @status)
     ORDER BY sig DESC
     OPTION (RECOMPILE)`);

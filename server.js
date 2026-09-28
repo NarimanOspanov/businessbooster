@@ -1789,6 +1789,9 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   .tag.cut{background:rgba(47,191,113,.18);color:var(--ok)}
   .tag.up{background:rgba(229,72,77,.18);color:var(--no)}
   .tag.back{background:rgba(138,149,165,.2);color:var(--fg)}
+  .tag.exp{background:rgba(229,72,77,.16);color:#ff8a8d}
+  .tag.gone{background:rgba(138,149,165,.28);color:var(--mut)}
+  .tag.relist{background:rgba(168,85,247,.18);color:#c9a5ff}
   .tag.ag{background:rgba(229,72,77,.15);color:var(--no)}
   .phones a{font-size:16px;font-weight:600;margin-right:12px}
   .row{margin:3px 0}
@@ -1844,7 +1847,7 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   <input class="num" id="pmin" placeholder="цена от, млн" inputmode="numeric">
   <input class="num" id="pmax" placeholder="цена до, млн" inputmode="numeric">
   <select id="hours"><option value="24">за сутки</option><option value="72" selected>за 3 дня</option><option value="168">за неделю</option><option value="720">за месяц</option></select>
-  <select id="signal"><option value="all">любой сигнал</option><option value="new">новые</option><option value="bump">подняли</option><option value="price">снизили цену</option><option value="back">вернули из архива</option></select>
+  <select id="signal"><option value="all">любой сигнал</option><option value="new">новые</option><option value="bump">подняли</option><option value="price">снизили цену</option><option value="back">вернули из архива</option><option value="expiring">истекает сегодня/завтра</option><option value="expired">истекло, не вернули</option><option value="relist">продлевают по кругу</option></select>
   <select id="status"><option value="open">не обзвонены</option><option value="called">звонил</option><option value="callback">перезвонить</option><option value="refused">отказ</option><option value="deal">договор</option><option value="all">все</option></select>
   <button id="go" class="on">Найти</button>
   <span class="view"><button id="vlist" class="on">Списком</button><button id="vmap">На карте</button></span>
@@ -1934,6 +1937,9 @@ function tags(x){var t=[];
   if(x.last_bump)t.push("<span class='tag bump'>подняли"+(x.bumps>1?" ×"+x.bumps:"")+" · "+ago(x.last_bump)+"</span>");
   if(x.last_price_at&&x.old_price&&x.new_price){var cut=x.new_price<x.old_price;var pct=Math.round(Math.abs(x.new_price-x.old_price)/x.old_price*100);t.push("<span class='tag "+(cut?"cut":"up")+"'>"+(cut?"снизили":"подняли цену")+" "+money(x.old_price)+" → "+money(x.new_price)+" ("+pct+"%) · "+ago(x.last_price_at)+"</span>");}
   if(x.last_back)t.push("<span class='tag back'>вернули из архива · "+ago(x.last_back)+"</span>");
+  if(x.exp_in===0||x.exp_in===1)t.push("<span class='tag exp' title='не поднимали 7 дней — уйдёт в архив, если хозяин не продлит'>истекает "+(x.exp_in===0?"сегодня":"завтра")+"</span>");
+  if(x.expired_at)t.push("<span class='tag gone' title='ушло в архив по сроку и не вернулось'>истекло, не продлили · "+ago(x.expired_at)+"</span>");
+  if(x.backs_all>=2)t.push("<span class='tag relist' title='уходило в архив и возвращалось'>продлевают по кругу ×"+x.backs_all+"</span>");
   if(x.agents)t.push("<span class='tag ag'>агентов уже "+x.agents+"</span>");
   return out().join("");}
 function render(rows){
@@ -2009,7 +2015,7 @@ function plot(){
   var pts=[];
   ROWS.forEach(function(x){
     if(x.lat==null||x.lon==null) return;
-    var hot=!!(x.last_bump||x.last_price_at||x.last_back);
+    var hot=!!(x.last_bump||x.last_price_at||x.last_back||x.exp_in===0||x.exp_in===1||x.expired_at);
     var m=L.marker([Number(x.lat),Number(x.lon)],{icon:pinIcon(hot)}).bindPopup(popup(x));
     m.on("click",function(){highlight(x.id);});
     m._leadId=x.id; MARKERS[x.id]=m; CLUSTER.addLayer(m); pts.push([Number(x.lat),Number(x.lon)]);
