@@ -6695,8 +6695,10 @@ http
         const C = { almaty: "Алматы", astana: "Астана", shymkent: "Шымкент", other: "другой город" };
         const dp = Number(a.price) ? Math.round((Number(a.down) || 0) / Number(a.price) * 100) + "%" : "—";
         notifyTelegram([
-          "🏠 <b>" + (b.product === "apply" ? "Заявка на ипотеку" : "Заявка на подбор ипотеки") + "</b>" + (saved.sameCount > 1 ? " (повторная, " + saved.sameCount + "-я)" : "") +
-            (b.programName ? "\nПрограмма: " + bot.esc(String(b.programName).slice(0, 80)) : "") + (a._score ? "\nКредитный рейтинг: " + a._score : ""),
+          "🏠 <b>" + ({ apply: "Заявка на ипотеку", refusal: "Разбор шансов и отказа", history: "Разбор кредитной истории" }[b.product] || "Консультация по ипотеке") + "</b>" + (saved.sameCount > 1 ? " (повторная, " + saved.sameCount + "-я)" : "") +
+            (b.programName ? "\nПрограмма: " + bot.esc(String(b.programName).slice(0, 80)) : "") + (a._score ? "\nКредитный рейтинг: " + a._score : "") +
+            (a.verdict ? "\nПроверка шансов: " + bot.esc(String(a.verdict)) + ", нагрузка " + a.loadMarket + "% (с госпрограммой " + a.loadGov + "%)" : "") +
+            (b.page ? "\nСтраница: " + bot.esc(String(b.page).slice(0, 60)) : ""),
           bot.esc(b.name || "без имени") + " · +" + phone + " · " + bot.esc({ whatsapp: "WhatsApp", telegram: "Telegram", call: "звонок" }[b.via] || b.via || "—"),
           (C[a.city] || a.city || "—") + " · " + (T[a.type] || a.type || "—") + " · " + mln(a.price) + ", взнос " + dp + " · срок " + (a.term || "—") + " лет",
           "Доход " + (Number(a.income) ? Number(a.income).toLocaleString("ru-RU") + " ₸" : "—") + (Number(a.debts) ? ", кредиты " + Number(a.debts).toLocaleString("ru-RU") + " ₸" : "") +
