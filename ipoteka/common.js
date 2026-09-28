@@ -68,7 +68,9 @@
       }).catch(function(x){ b.disabled = false; b.textContent = "Отправить заявку"; e.textContent = "Ошибка: "+x.message; });
     });
   };
-  var TITLES = { consult:"Бесплатная консультация", refusal:"Разберём причину отказа", history:"Разбор кредитной истории" };
+  var TITLES = { consult:"Бесплатная консультация", refusal:"Разберём причину отказа", history:"Разбор кредитной истории",
+    listing:"Связаться с хозяином", seller:"Разместить квартиру" };
+  var SUBS = { listing:"Передадим ваш контакт хозяину и расскажем, как купить эту квартиру в ипотеку.", seller:"Перезвоним, расскажем об условиях и проверим квартиру под ипотеку. Размещение бесплатное." };
   IP.openLead = function(ctx){
     ctx = ctx || {};
     var m = document.getElementById("m-lead");
@@ -78,8 +80,9 @@
       document.body.appendChild(m);
     }
     var p = ctx.program;
-    document.getElementById("ldT").textContent = p ? "Заявка: "+p.name : (TITLES[ctx.product] || TITLES.consult);
-    document.getElementById("ldSub").textContent = p ? p.bank+". Проверим ваши условия и поможем подать заявку." : "Свяжемся в течение рабочего дня. Это бесплатно.";
+    var listing = ctx.product==="listing";
+    document.getElementById("ldT").textContent = listing ? TITLES.listing : (p ? "Заявка: "+p.name : (TITLES[ctx.product] || TITLES.consult));
+    document.getElementById("ldSub").textContent = listing ? (p ? p.name+". " : "")+SUBS.listing : (p ? p.bank+". Проверим ваши условия и поможем подать заявку." : (SUBS[ctx.product] || "Свяжемся в течение рабочего дня. Это бесплатно."));
     var body = document.getElementById("ldBody");
     body.innerHTML = IP.leadForm("m");
     IP.bindLead("m", body, ctx);
