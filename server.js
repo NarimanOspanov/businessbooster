@@ -6752,7 +6752,7 @@ http
     if (urlPath === "/api/ipoteka/listings") {
       const send = (code, obj) => { res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "public, max-age=120" }); res.end(JSON.stringify(obj)); };
       const q = parsed.searchParams, f = {};
-      for (const k of ["city", "rooms", "pmin", "pmax", "amin", "amax", "type", "sort", "offset", "limit"]) f[k] = q.get(k) || "";
+      for (const k of ["city", "rooms", "pmin", "pmax", "amin", "amax", "type", "sort", "offset", "limit", "ids", "points"]) f[k] = q.get(k) || "";
       const key = JSON.stringify(f);
       const hit = portalCache.get(key);
       if (hit && Date.now() - hit.at < 5 * 60e3) return send(200, hit.body);

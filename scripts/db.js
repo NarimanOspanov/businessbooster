@@ -3182,6 +3182,26 @@ async function portalSearch(f) {
       AND city IN (${cities.map((_, i) => "@c" + i).join(",")})
       AND price BETWEEN @pmin AND @pmax AND area BETWEEN @amin AND @amax ${roomCond} ${typeCond}
       AND price >= area * 150000 AND area >= 20`; // дешевле 150 тыс/м² — опечатка в цене или рассрочка, не показываем
+  const ids = String(f.ids || "").split(",").map((x) => x.replace(/\D/g, "")).filter(Boolean).slice(0, 48);
+  if (ids.length) {
+    const rows = (await pool.request().query(`
+      SELECT id, city, rooms, area, floor, floors, price, addr, complex_id, photos_c, photos_json
+      FROM dbo.krisha_list WHERE id IN (${ids.join(",")}) AND user_type = 'owner' AND deal = 'sale' AND prop = 'flat'`)).recordset;
+    const byId = {}; rows.forEach((x) => { byId[String(x.id)] = x; });
+    return { total: rows.length, offset: 0, listings: ids.map((i) => byId[i]).filter(Boolean).map(portalRow) };
+  }
+  // Точки для карты: только координаты и цена, до 5000 — дальше карта
+  // всё равно рисует кластеры, а ответ остаётся лёгким.
+  if (f.points) {
+    const pts = (await req().query(`
+      SELECT TOP (5000) id, lat, lon, price FROM dbo.krisha_list
+      WHERE ${where} AND lat IS NOT NULL AND lon IS NOT NULL
+        -- Координаты вне города — ошибка в объявлении, на карте не показываем.
+        AND ((city = 'almaty' AND lat BETWEEN 43.0 AND 43.5 AND lon BETWEEN 76.6 AND 77.3)
+          OR (city = 'astana' AND lat BETWEEN 50.9 AND 51.4 AND lon BETWEEN 71.1 AND 71.8))
+      ORDER BY first_seen DESC OPTION (RECOMPILE)`)).recordset;
+    return { points: pts.map((x) => [String(x.id), Math.round(x.lat * 1e5) / 1e5, Math.round(x.lon * 1e5) / 1e5, Number(x.price)]) };
+  }
   const total = (await req().query(`SELECT COUNT(*) AS n FROM dbo.krisha_list WHERE ${where} OPTION (RECOMPILE)`)).recordset[0].n;
   const rows = (await req().query(`
     WITH pg AS (
@@ -3190,9 +3210,11 @@ async function portalSearch(f) {
     SELECT l.id, l.city, l.rooms, l.area, l.floor, l.floors, l.price, l.addr, l.complex_id, l.photos_c, l.photos_json
     FROM pg JOIN dbo.krisha_list l ON l.id = pg.id ORDER BY pg.rn
     OPTION (RECOMPILE)`)).recordset;
-  return { total: total, offset: off, listings: rows.map((x) => ({ id: String(x.id), city: x.city, rooms: x.rooms,
-    area: x.area == null ? null : Number(x.area), floor: x.floor, floors: x.floors, price: Number(x.price), addr: x.addr || null,
-    isNew: x.complex_id != null, photos: listPhotoUrls(x.photos_c, x.photos_json).slice(0, 6) })) };
+  return { total: total, offset: off, listings: rows.map(portalRow) };
+}
+function portalRow(x) {
+  return { id: String(x.id), city: x.city, rooms: x.rooms, area: x.area == null ? null : Number(x.area), floor: x.floor, floors: x.floors,
+    price: Number(x.price), addr: x.addr || null, isNew: x.complex_id != null, photos: listPhotoUrls(x.photos_c, x.photos_json).slice(0, 6) };
 }
 
 async function mortgageLeads(limit) {
