@@ -136,9 +136,10 @@
   </section>
 
   <section class="blk" id="flats">
-    <div class="listbar"><div><h2 id="flatsTitle">Проверенные квартиры</h2><span class="addr" id="flatsCount"></span></div>
+    <div class="listbar"><div><h2 id="flatsTitle">Квартиры от хозяев</h2><span class="addr" id="flatsCount"></span></div>
       <select class="inp sortsel" id="fSort" aria-label="Сортировка"><option value="new">Сначала новые</option><option value="cheap">Сначала дешевле</option><option value="exp">Сначала дороже</option><option value="area">По площади</option></select></div>
     <div class="listings" id="listings"></div>
+    <div id="more" style="text-align:center;margin-top:22px"></div>
   </section>
 
   <section class="blk">
@@ -233,38 +234,51 @@
   // Поиск — по параметрам квартиры, как на порталах объявлений. Ипотека
   // подбирается уже для выбранной квартиры (кнопка в карточке).
   var Q = { rooms:[] };
-  function visible(){
-    var list = F.filter(function(f){
-      if(Q.city && f.city!==Q.city) return false;
-      if(Q.rooms.length && !Q.rooms.some(function(r){ return r===4 ? f.rooms>=4 : f.rooms===r; })) return false;
-      if(Q.pmin && f.price < Q.pmin) return false;
-      if(Q.pmax && f.price > Q.pmax) return false;
-      if(Q.amin && f.area < Q.amin) return false;
-      if(Q.amax && f.area > Q.amax) return false;
-      if(Q.type==="new" && f.type==="secondary") return false;
-      if(Q.type==="secondary" && f.type!=="secondary") return false;
-      return true;
-    });
-    var sort = $("#fSort").value;
-    if(sort==="cheap") list.sort(function(a,b){return a.price-b.price;});
-    else if(sort==="exp") list.sort(function(a,b){return b.price-a.price;});
-    else if(sort==="area") list.sort(function(a,b){return b.area-a.area;});
-    return list;
+  var TOTAL = 0, LOADING = false, REQ = 0;
+  function byId(id){ return F.filter(function(x){ return x.id===String(id); })[0]; }
+  function toFlat(x){
+    var isNew = !!x.isNew;
+    return { id:String(x.id), city:x.city, rooms:x.rooms, area:x.area, floor:(x.floor||"?")+"/"+(x.floors||"?"), district:short(x.addr),
+      type:isNew?"ready":"secondary", finish:"", price:x.price, photos:x.photos || [], progs: isNew ? ["nauryz","p72025","svoy","market"] : ["market"] };
+  }
+  function params(offset){
+    var p = new URLSearchParams();
+    if(Q.city) p.set("city", Q.city);
+    if(Q.rooms.length) p.set("rooms", Q.rooms.join(","));
+    if(Q.pmin) p.set("pmin", Q.pmin); if(Q.pmax) p.set("pmax", Q.pmax);
+    if(Q.amin) p.set("amin", Q.amin); if(Q.amax) p.set("amax", Q.amax);
+    if(Q.type) p.set("type", Q.type);
+    p.set("sort", $("#fSort").value); p.set("offset", offset||0);
+    return p.toString();
+  }
+  // Загрузить страницу: reset — новый поиск с первой страницы.
+  function load(reset){
+    var my = ++REQ; LOADING = true;
+    if(reset){ $("#listings").innerHTML = "<div class='skel'></div><div class='skel'></div><div class='skel'></div>"; $("#more").innerHTML = ""; }
+    else $("#more").innerHTML = "<button class='btn outline lg' type='button' disabled>Загружаем…</button>";
+    return fetch("/api/ipoteka/listings?"+params(reset ? 0 : F.length)).then(function(r){ return r.json(); }).then(function(j){
+      if(my!==REQ) return;
+      if(!j.ok) throw new Error(j.error || "ошибка");
+      var page = (j.listings || []).map(toFlat);
+      F = reset ? page : F.concat(page); TOTAL = j.total || 0;
+      LOADING = false; render();
+    }).catch(function(){ if(my!==REQ) return; LOADING = false; $("#listings").innerHTML = "<div class='card' style='padding:28px;text-align:center;color:var(--mut)'>Не удалось загрузить квартиры. Попробуйте ещё раз.</div>"; });
   }
   function podborUrl(f){ return "/ipoteka/podbor/?price="+f.price+"&down="+Math.round(f.price*0.2); }
   // Карусель фото: в карточке и (крупнее) в окне квартиры. Стрелки, точки,
   // свайп пальцем; стрелки не открывают окно.
   var CHEV_L = "<svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M15 18l-6-6 6-6'/></svg>";
   var CHEV_R = "<svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M9 18l6-6-6-6'/></svg>";
-  function srcOf(f, i, big){ var u = f.photos[i] || f.photos[0]; return big ? u.replace("-560x350.jpg","-750x470.jpg") : u; }
+  var NOPHOTO = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 10'%3E%3Crect width='16' height='10' fill='%23dfe4ea'/%3E%3Cpath d='M6 7V4.5L8 3l2 1.5V7' fill='none' stroke='%239aa4b1' stroke-width='.4'/%3E%3C/svg%3E";
+  function srcOf(f, i, big){ var u = f.photos[i] || f.photos[0]; if(!u) return NOPHOTO; return big ? u.replace("-560x350.jpg","-750x470.jpg") : u; }
   function arrows(f){ return f.photos.length>1 ? "<button type='button' class='arr prev' data-dir='-1' aria-label='Предыдущее фото'>"+CHEV_L+"</button><button type='button' class='arr next' data-dir='1' aria-label='Следующее фото'>"+CHEV_R+"</button>" : ""; }
   function dots(f, i){ return f.photos.length>1 ? "<span class='dots'>"+f.photos.map(function(_,k){ return "<i"+(k===i?" class='on'":"")+"></i>"; }).join("")+"</span>" : ""; }
   function photo(f){ return "<div class='ph car' data-car='"+f.id+"' data-i='0'><img src='"+esc(srcOf(f,0))+"' alt='' loading='lazy' referrerpolicy='no-referrer' draggable='false'>"+
-    "<span class='ok'>✓ Проверено для ипотеки</span><span class='rooms'>"+f.rooms+"-комн · "+String(f.area).replace(".",",")+" м²</span>"+arrows(f)+dots(f,0)+"</div>"; }
+    "<span class='ok'>От хозяина</span><span class='rooms'>"+f.rooms+"-комн · "+String(f.area).replace(".",",")+" м²</span>"+arrows(f)+dots(f,0)+"</div>"; }
   function gallery(f){ return "<div class='ph car big' data-car='"+f.id+"' data-big='1' data-i='0'><img src='"+esc(srcOf(f,0,true))+"' alt='' referrerpolicy='no-referrer' draggable='false'>"+
     arrows(f)+"<span class='cnt'>1 / "+f.photos.length+"</span></div>"; }
   function slide(car, dir){
-    var f = F.filter(function(x){return x.id===Number(car.getAttribute("data-car"));})[0]; if(!f || f.photos.length<2) return;
+    var f = byId(car.getAttribute("data-car")); if(!f || f.photos.length<2) return;
     var big = car.hasAttribute("data-big"), n = f.photos.length, i = (Number(car.getAttribute("data-i")) + dir + n) % n;
     car.setAttribute("data-i", i);
     var img = car.querySelector("img"); img.classList.add("fade");
@@ -285,9 +299,10 @@
     touch = null;
   }, {passive:true});
   function render(){
-    var list = visible();
-    $("#flatsCount").textContent = list.length+" "+IP.plural(list.length,["квартира","квартиры","квартир"]);
-    $("#fGo").textContent = F.length ? "Показать "+list.length : "Показать";
+    var list = F;
+    $("#flatsCount").textContent = "Найдено "+fmt(TOTAL)+" "+IP.plural(TOTAL,["квартира","квартиры","квартир"]);
+    $("#fGo").textContent = "Показать "+fmt(TOTAL);
+    $("#more").innerHTML = F.length < TOTAL ? "<button class='btn outline lg' type='button' id='moreBtn'>Показать ещё</button><div class='addr' style='margin-top:8px'>Показано "+fmt(F.length)+" из "+fmt(TOTAL)+"</div>" : "";
     $("#listings").innerHTML = list.length ? list.map(function(f){
       var o = options(f)[0], govs = f.progs.filter(function(k){return PR[k].gov;}).map(function(k){return PR[k].name.split(",")[0];});
       return "<article class='card lst' data-flat='"+f.id+"' tabindex='0'>"+photo(f)+"<div class='lb'>"+
@@ -295,18 +310,18 @@
         "<div class='mpay'>в ипотеку от "+fmt(o.pay)+" ₸/мес <span>· взнос "+mln(o.down)+"</span></div>"+
         "<div class='params'>"+f.rooms+"-комнатная, "+String(f.area).replace(".",",")+" м², "+f.floor+" этаж</div>"+
         "<div class='addr'>"+CITY[f.city]+(f.district?", "+esc(f.district):"")+" · "+TYPE[f.type]+"</div>"+
-        "<div class='tags'><span class='tag own'>От хозяина</span>"+govs.map(function(g){return "<span class='tag gov'>"+esc(g)+"</span>";}).join("")+(f.progs.indexOf("svoy")>=0?"<span class='tag gov'>Отбасы</span>":"")+"</div>"+
+        "<div class='tags'>"+govs.map(function(g){return "<span class='tag gov'>"+esc(g)+"</span>";}).join("")+(f.progs.indexOf("svoy")>=0?"<span class='tag gov'>Отбасы</span>":"")+"</div>"+
         "<a class='btn outline block' href='"+podborUrl(f)+"'>Подобрать ипотеку</a>"+
         "</div></article>";
     }).join("") : "<div class='card' style='padding:28px;text-align:center;color:var(--mut)'>По этим параметрам квартир пока нет. Измените фильтры — или <a href='#' data-lead='consult'>оставьте заявку</a>, подберём.</div>";
   }
   function openFlat(id){
-    var f = F.filter(function(x){return x.id===id;})[0]; if(!f) return;
+    var f = byId(id); if(!f) return;
     var opts = options(f), best = opts[0];
     var house = f.type==="secondary" ? "вторичное жильё" : "новостройка (ЖК)";
     $("#flBody").innerHTML = gallery(f)+"<div class='hd'><h3 id='flT'>"+f.rooms+"-комнатная квартира, "+String(f.area).replace(".",",")+" м² — "+fmt(f.price)+" ₸</h3><p>"+CITY[f.city]+(f.district?", "+esc(f.district):"")+" · "+TYPE[f.type]+"</p></div>"+
       "<div class='bd'>"+
-      "<div class='checked'>✓ Проверено для ипотеки: хозяин продаёт сам и согласен на ипотечную сделку, дом подходит под требования банков.</div>"+
+      "<div class='checked'>Продаёт хозяин, без посредников. Подходит ли квартира под ипотеку и согласен ли хозяин на ипотечную сделку — проверим по вашей заявке.</div>"+
       "<div class='kv'><div><span>Этаж:</span> "+f.floor+"</div><div><span>Дом:</span> "+esc(house)+"</div><div><span>Продавец:</span> хозяин</div><div><span>Программ:</span> "+opts.length+"</div></div>"+
       "<b style='color:var(--ink2)'>Примерный платёж по программам</b>"+
       "<div class='progs'>"+opts.map(function(o,i){ return "<div class='prog"+(i===0?" best":"")+"'><span><b>"+esc(o.p.name)+"</b> · "+String(o.p.rate).replace(".",",")+"% · взнос "+mln(o.down)+"</span><span class='p'>"+fmt(o.pay)+" ₸/мес</span></div>"; }).join("")+"</div>"+
@@ -325,34 +340,29 @@
     if(r){ r.classList.toggle("on"); search(false); return; }
     if(e.target.closest("a")) return;
     var t = e.target.closest("[data-flat],[data-contact]"); if(!t) return;
-    if(t.hasAttribute("data-contact")){ var f = F.filter(function(x){return x.id===Number(t.getAttribute("data-contact"));})[0];
+    if(t.hasAttribute("data-contact")){ var f = byId(t.getAttribute("data-contact"));
       IP.openLead({ product:"listing", program:{ id:"flat-"+f.id, name:f.rooms+"-комн, "+String(f.area).replace(".",",")+" м², "+fmt(f.price)+" ₸", bank:CITY[f.city]+(f.district?", "+f.district:"") } }); return; }
-    openFlat(Number(t.getAttribute("data-flat")));
+    openFlat(t.getAttribute("data-flat"));
   });
   document.addEventListener("keydown", function(e){
-    if(e.key==="Enter" && e.target.hasAttribute && e.target.hasAttribute("data-flat")) openFlat(Number(e.target.getAttribute("data-flat")));
+    if(e.key==="Enter" && e.target.hasAttribute && e.target.hasAttribute("data-flat")) openFlat(e.target.getAttribute("data-flat"));
     if((e.key==="ArrowLeft"||e.key==="ArrowRight") && $("#m-flat").classList.contains("on")){ var car = $("#flBody .car"); if(car) slide(car, e.key==="ArrowLeft" ? -1 : 1); }
   });
   function search(scroll){
     Q = { city:$("#fCity").value, rooms:$$("#fRooms .on").map(function(b){ return Number(b.getAttribute("data-r")); }),
       pmin:num($("#fPmin").value), pmax:num($("#fPmax").value), amin:num($("#fAmin").value), amax:num($("#fAmax").value), type:$("#fType").value };
-    render(); if(scroll!==false) $("#flats").scrollIntoView({behavior:"smooth"});
+    load(true); if(scroll!==false) $("#flats").scrollIntoView({behavior:"smooth"});
   }
+  var typing = null;
+  ["fPmin","fPmax","fAmin","fAmax"].forEach(function(id){ $("#"+id).addEventListener("input", function(){ clearTimeout(typing); typing = setTimeout(function(){ search(false); }, 700); }); });
   $("#fCity").addEventListener("change", function(){ search(false); });
   $("#fType").addEventListener("change", function(){ search(false); });
-  $("#fSort").addEventListener("change", function(){ render(); });
+  $("#fSort").addEventListener("change", function(){ search(false); });
+  document.addEventListener("click", function(e){ if(e.target.id==="moreBtn") load(false); });
   $("#fGo").addEventListener("click", function(){ search(true); });
   $("#finder").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); search(true); } });
-  // Загрузка витрины.
-  $("#listings").innerHTML = "<div class='skel'></div><div class='skel'></div><div class='skel'></div>";
-  fetch("/api/ipoteka/demo-listings").then(function(r){ return r.json(); }).then(function(j){
-    F = (j.listings || []).map(function(x, i){
-      var isNew = !!x.isNew;
-      return { id:i+1, city:x.city, rooms:x.rooms, area:x.area, floor:x.floor+"/"+x.floors, district:short(x.addr), type:isNew?"ready":"secondary",
-        finish:"", price:x.price, photos:x.photos, progs: isNew ? ["nauryz","p72025","svoy","market"] : ["market"] };
-    });
-    render();
-  }).catch(function(){ $("#listings").innerHTML = "<div class='card' style='padding:28px;text-align:center;color:var(--mut)'>Не удалось загрузить квартиры. Обновите страницу.</div>"; });
+  // Первая загрузка — все живые объявления хозяев, новые сверху.
+  load(true);
   var box = $("#inlineLead"); box.innerHTML = IP.leadForm("i"); IP.bindLead("i", box, {product:"consult"});
 })();
 </script>

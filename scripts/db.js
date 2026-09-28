@@ -2162,6 +2162,10 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_research' AND ob
         WHERE match_count = 0');
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_owner_geo' AND object_id = OBJECT_ID('dbo.krisha_list'))
   EXEC('CREATE INDEX IX_klist_owner_geo ON dbo.krisha_list (lat, lon) INCLUDE (deal, prop, area, rooms, floor, floors) WHERE user_type = ''owner''');
+-- Поиск портала ипотеки (/ipoteka): живые объявления хозяев о продаже квартир.
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_portal' AND object_id = OBJECT_ID('dbo.krisha_list'))
+  EXEC('CREATE INDEX IX_klist_portal ON dbo.krisha_list (city, first_seen DESC) INCLUDE (rooms, price, area, complex_id)
+        WHERE user_type = ''owner'' AND deal = ''sale'' AND prop = ''flat'' AND storage = ''live''');
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_owner_cx' AND object_id = OBJECT_ID('dbo.krisha_list'))
   EXEC('CREATE INDEX IX_klist_owner_cx ON dbo.krisha_list (complex_id) INCLUDE (deal, prop, area, rooms, floor, floors) WHERE user_type = ''owner'' AND complex_id IS NOT NULL');
 -- Журнал находок по списку: агентское -> кандидат-хозяин, баллы, фото, архив.
@@ -3148,32 +3152,47 @@ async function mortgageLeadAdd(x) {
   const cnt = (r.recordsets && r.recordsets[1] && r.recordsets[1][0]) || {};
   return { id: row.id == null ? null : String(row.id), at: row.at, sameCount: Number(cnt.n) || 1 };
 }
-// Демо-витрина портала: свежие объявления хозяев (продажа квартир, Алматы и
-// Астана, с фото) — чтобы показать, как будет выглядеть портал. Без номеров,
-// имён и id Крыши: только то, что видно на карточке. Разнообразим по городу,
-// комнатам и новостройка/вторичка.
-async function demoListings(n) {
+// Поиск портала ипотеки: живые объявления хозяев о продаже квартир в
+// Алматы и Астане, как поиск на порталах объявлений — город, комнаты, цена,
+// площадь, новостройка или вторичка, сортировка, страницы. Идёт по индексу
+// IX_klist_portal: сначала id нужной страницы, потом детали только для них.
+// Номеров и имён не отдаём.
+const PORTAL_SORT = { new: "first_seen DESC", cheap: "price ASC", exp: "price DESC", area: "area DESC" };
+async function portalSearch(f) {
   const pool = await getPool();
   await ensureList(pool);
-  const r = await pool.request().query(`
-    SELECT TOP (160) city, rooms, area, floor, floors, price, addr, complex_id, photos_c, photos_json
-    FROM dbo.krisha_list
-    WHERE user_type = 'owner' AND storage = 'live' AND deal = 'sale' AND prop = 'flat'
-      AND city IN ('almaty', 'astana') AND price BETWEEN 15000000 AND 70000000 AND rooms BETWEEN 1 AND 4
-      AND (photos_c IS NOT NULL OR photos_json IS NOT NULL)
-    ORDER BY first_seen DESC`);
-  const rows = r.recordset.map((x) => {
-    const photos = listPhotoUrls(x.photos_c, x.photos_json).slice(0, 5);
-    return { city: x.city, rooms: x.rooms, area: x.area == null ? null : Number(x.area), floor: x.floor, floors: x.floors,
-      price: Number(x.price), addr: x.addr || null, isNew: x.complex_id != null, photos: photos };
-  }).filter((x) => x.photos.length >= 2 && x.area);
-  // Раскладываем по корзинам и берём по кругу: город × новостройка × комнаты.
-  const buckets = {};
-  for (const x of rows) { const k = x.city + (x.isNew ? "n" : "s") + Math.min(3, x.rooms); (buckets[k] = buckets[k] || []).push(x); }
-  const keys = Object.keys(buckets).sort();
-  const out = [];
-  for (let i = 0; out.length < (n || 12) && i < 40; i++) for (const k of keys) { if (buckets[k][i] && out.length < (n || 12)) out.push(buckets[k][i]); }
-  return out;
+  const cities = ["almaty", "astana"].includes(f.city) ? [f.city] : ["almaty", "astana"];
+  const rooms = String(f.rooms || "").split(",").map(Number).filter((x) => x >= 1 && x <= 4);
+  const n = Math.min(48, Math.max(1, Number(f.limit) || 24));
+  const off = Math.max(0, Math.min(5000, Number(f.offset) || 0));
+  const order = PORTAL_SORT[f.sort] || PORTAL_SORT.new;
+  const req = () => {
+    const r = pool.request()
+      .input("pmin", sql.BigInt, Math.max(3000000, Number(f.pmin) || 0))
+      .input("pmax", sql.BigInt, Number(f.pmax) || 2000000000)
+      .input("amin", sql.Float, Number(f.amin) || 0)
+      .input("amax", sql.Float, Number(f.amax) || 100000)
+      .input("off", sql.Int, off).input("n", sql.Int, n);
+    cities.forEach((c, i) => r.input("c" + i, sql.NVarChar(40), c));
+    return r;
+  };
+  const roomCond = rooms.length ? "AND (" + rooms.map((x) => (x === 4 ? "rooms >= 4" : "rooms = " + x)).join(" OR ") + ")" : "";
+  const typeCond = f.type === "new" ? "AND complex_id IS NOT NULL" : (f.type === "secondary" ? "AND complex_id IS NULL" : "");
+  const where = `user_type = 'owner' AND deal = 'sale' AND prop = 'flat' AND storage = 'live'
+      AND city IN (${cities.map((_, i) => "@c" + i).join(",")})
+      AND price BETWEEN @pmin AND @pmax AND area BETWEEN @amin AND @amax ${roomCond} ${typeCond}
+      AND price >= area * 150000 AND area >= 20`; // дешевле 150 тыс/м² — опечатка в цене или рассрочка, не показываем
+  const total = (await req().query(`SELECT COUNT(*) AS n FROM dbo.krisha_list WHERE ${where} OPTION (RECOMPILE)`)).recordset[0].n;
+  const rows = (await req().query(`
+    WITH pg AS (
+      SELECT id, ROW_NUMBER() OVER (ORDER BY ${order}, id DESC) AS rn FROM dbo.krisha_list WHERE ${where}
+      ORDER BY ${order}, id DESC OFFSET @off ROWS FETCH NEXT @n ROWS ONLY)
+    SELECT l.id, l.city, l.rooms, l.area, l.floor, l.floors, l.price, l.addr, l.complex_id, l.photos_c, l.photos_json
+    FROM pg JOIN dbo.krisha_list l ON l.id = pg.id ORDER BY pg.rn
+    OPTION (RECOMPILE)`)).recordset;
+  return { total: total, offset: off, listings: rows.map((x) => ({ id: String(x.id), city: x.city, rooms: x.rooms,
+    area: x.area == null ? null : Number(x.area), floor: x.floor, floors: x.floors, price: Number(x.price), addr: x.addr || null,
+    isNew: x.complex_id != null, photos: listPhotoUrls(x.photos_c, x.photos_json).slice(0, 6) })) };
 }
 
 async function mortgageLeads(limit) {
@@ -4031,7 +4050,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
-  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, demoListings, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
+  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,

@@ -4462,7 +4462,7 @@ function tooOften(key, limit, windowMs) {
 }
 
 const ipotekaHits = new Map(); // ip → времена заявок с лендинга ипотеки за час
-let demoListingsCache = { at: 0, body: null }; // витрина /ipoteka, раз в 30 минут
+const portalCache = new Map(); // поиск /ipoteka: фильтры → ответ, 5 минут
 const creditHits = new Map();   // ip → времена запросов кредитного рейтинга за час
 const creditReq = new Map();    // requestId → { iin (маской), phone } до подтверждения кода
 function clientIp(req) {
@@ -6747,17 +6747,21 @@ http
       })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
       return;
     }
-    // Демо-витрина портала ипотеки: реальные объявления хозяев для примера,
-    // кэш на 30 минут (запрос тяжёлый, а витрине свежесть до минуты не нужна).
-    if (urlPath === "/api/ipoteka/demo-listings") {
-      const send = (code, obj) => { res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "public, max-age=600" }); res.end(JSON.stringify(obj)); };
-      (async () => {
-        if (!demoListingsCache.body || Date.now() - demoListingsCache.at > 30 * 60e3) {
-          try { demoListingsCache = { at: Date.now(), body: await db.demoListings(12) }; }
-          catch (e) { if (!demoListingsCache.body) throw e; }
-        }
-        send(200, { ok: true, listings: demoListingsCache.body });
-      })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
+    // Поиск портала ипотеки. Ответы кэшируются на 5 минут по набору фильтров:
+    // одни и те же запросы (первая страница без фильтров) повторяются часто.
+    if (urlPath === "/api/ipoteka/listings") {
+      const send = (code, obj) => { res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "public, max-age=120" }); res.end(JSON.stringify(obj)); };
+      const q = parsed.searchParams, f = {};
+      for (const k of ["city", "rooms", "pmin", "pmax", "amin", "amax", "type", "sort", "offset", "limit"]) f[k] = q.get(k) || "";
+      const key = JSON.stringify(f);
+      const hit = portalCache.get(key);
+      if (hit && Date.now() - hit.at < 5 * 60e3) return send(200, hit.body);
+      db.portalSearch(f).then((r) => {
+        const body = Object.assign({ ok: true }, r);
+        portalCache.set(key, { at: Date.now(), body: body });
+        if (portalCache.size > 300) portalCache.delete(portalCache.keys().next().value);
+        send(200, body);
+      }).catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
       return;
     }
     // Список заявок для админа (по ключу).
