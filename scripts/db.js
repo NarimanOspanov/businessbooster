@@ -3217,6 +3217,217 @@ function portalRow(x) {
     price: Number(x.price), addr: x.addr || null, isNew: x.complex_id != null, photos: listPhotoUrls(x.photos_c, x.photos_json).slice(0, 6) };
 }
 
+// --- Instagram: аккаунты по городам, посты-карусели, выдача номеров -------
+// insta_accounts — токен и настройки автопостинга аккаунта города;
+// insta_posts — что и когда опубликовали (квартира не повторяется);
+// insta_dms — кому отдали номер по «+» под постом.
+const SCHEMA_INSTA = `
+IF OBJECT_ID('dbo.insta_accounts', 'U') IS NULL
+  CREATE TABLE dbo.insta_accounts (
+    acc        NVARCHAR(20)  NOT NULL PRIMARY KEY,   -- almaty | astana
+    ig_user_id NVARCHAR(40)  NULL,
+    username   NVARCHAR(60)  NULL,
+    token      NVARCHAR(800) NULL,
+    token_exp  DATETIME2(0)  NULL,
+    auto       BIT           NOT NULL CONSTRAINT DF_iacc_auto DEFAULT 0,
+    per_day    INT           NOT NULL CONSTRAINT DF_iacc_pd DEFAULT 4,
+    updated_at DATETIME2(0)  NOT NULL CONSTRAINT DF_iacc_upd DEFAULT SYSUTCDATETIME()
+  );
+IF OBJECT_ID('dbo.insta_posts', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.insta_posts (
+    post_id      INT IDENTITY(1,1) PRIMARY KEY,
+    acc          NVARCHAR(20)   NOT NULL,
+    listing_id   BIGINT         NOT NULL,
+    status       NVARCHAR(16)   NOT NULL,          -- published | failed
+    reason       NVARCHAR(40)   NULL,              -- below | drop
+    media_id     NVARCHAR(40)   NULL,
+    permalink    NVARCHAR(300)  NULL,
+    caption      NVARCHAR(2200) NULL,
+    error        NVARCHAR(500)  NULL,
+    created_at   DATETIME2(0)   NOT NULL CONSTRAINT DF_ipost_at DEFAULT SYSUTCDATETIME()
+  );
+  CREATE INDEX IX_ipost_acc ON dbo.insta_posts (acc, created_at DESC);
+  CREATE INDEX IX_ipost_listing ON dbo.insta_posts (listing_id);
+END
+IF OBJECT_ID('dbo.insta_dms', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.insta_dms (
+    id         INT IDENTITY(1,1) PRIMARY KEY,
+    at         DATETIME2(0)  NOT NULL CONSTRAINT DF_idm_at DEFAULT SYSUTCDATETIME(),
+    acc        NVARCHAR(20)  NULL,
+    username   NVARCHAR(60)  NULL,
+    listing_id BIGINT        NULL,
+    media_id   NVARCHAR(40)  NULL,
+    found      BIT           NOT NULL
+  );
+  CREATE INDEX IX_idm_at ON dbo.insta_dms (at DESC);
+END
+`;
+let instaReady = false, instaReadyPromise = null, instaFailedAt = 0;
+async function ensureInsta() {
+  if (instaReady) return;
+  if (instaFailedAt && Date.now() - instaFailedAt < DDL_RETRY_MS) throw new Error("миграция схемы недавно сорвалась — пауза");
+  if (!instaReadyPromise) {
+    instaReadyPromise = (async () => {
+      const p = await ddlPool();
+      await p.request().batch(SCHEMA_INSTA);
+      instaReady = true;
+    })().catch((e) => { instaReadyPromise = null; instaFailedAt = Date.now(); throw e; });
+  }
+  await instaReadyPromise;
+}
+
+// Кандидаты в посты: живые квартиры хозяев на продажу с номером и 5+ фото,
+// появились или сменили цену за последние дни, ещё не публиковались (и не
+// падали при публикации — иначе автопостинг долбил бы одну и ту же).
+// Два повода: «ниже рынка» — цена за метр на 8–35% ниже средней по тем же
+// комнатам в том же ЖК (5+ соседей; сильнее 35% — скорее доля, ошибка или
+// обман), и «снизили цену» — минус 3–25% за 3 дня (больше — опечатка в цене). Номера, которые висят на
+// 3+ живых объявлениях, отсеиваем: это посредник под видом хозяина.
+async function instaCandidates(city, limit) {
+  const pool = await getPool();
+  await ensureList(pool);
+  await ensureInsta();
+  const n = Math.min(40, Math.max(1, Number(limit) || 12));
+  const rows = (await pool.request().input("city", sql.NVarChar(40), city).input("n", sql.Int, n * 3).query(`
+    WITH c AS (
+      SELECT id, rooms, area, price, complex_id, addr, phones, photos, photos_c, photos_json, floor, floors, first_seen,
+             CAST(price AS FLOAT) / NULLIF(area, 0) AS ppm
+      FROM dbo.krisha_list
+      WHERE user_type = 'owner' AND deal = 'sale' AND prop = 'flat' AND storage = 'live' AND city = @city
+        AND area >= 20 AND price >= area * 150000
+    ),
+    peers AS (
+      SELECT complex_id, rooms, COUNT(*) AS n, AVG(ppm) AS avg_ppm
+      FROM c WHERE complex_id IS NOT NULL GROUP BY complex_id, rooms HAVING COUNT(*) >= 5
+    ),
+    drops AS (
+      SELECT e.id, MAX(e.old_price) AS old_price, MIN(e.new_price) AS new_price
+      FROM dbo.krisha_list_events e
+      WHERE e.kind = 'price' AND e.at >= DATEADD(day, -3, SYSUTCDATETIME()) AND e.new_price < e.old_price
+      GROUP BY e.id
+    )
+    SELECT TOP (@n) c.id, c.rooms, c.area, c.price, c.complex_id, c.addr, c.phones, c.photos, c.photos_c, c.photos_json,
+           c.floor, c.floors, c.first_seen, p.n AS peers, p.avg_ppm,
+           CASE WHEN p.avg_ppm IS NULL THEN NULL ELSE c.ppm / p.avg_ppm END AS ratio,
+           d.old_price
+    FROM c
+    LEFT JOIN peers p ON p.complex_id = c.complex_id AND p.rooms = c.rooms
+    LEFT JOIN drops d ON d.id = c.id AND d.new_price = c.price AND d.old_price >= c.price * 1.03 AND d.old_price <= c.price * 1.25
+    WHERE c.phones IS NOT NULL AND c.photos >= 5
+      AND NOT EXISTS (SELECT 1 FROM dbo.insta_posts ip WHERE ip.listing_id = c.id)
+      AND (
+        (c.first_seen >= DATEADD(day, -3, SYSUTCDATETIME()) AND c.ppm BETWEEN p.avg_ppm * 0.65 AND p.avg_ppm * 0.92)
+        OR d.id IS NOT NULL
+      )
+    ORDER BY CASE WHEN d.id IS NOT NULL THEN 1 - CAST(c.price AS FLOAT) / d.old_price ELSE 0 END
+           + CASE WHEN p.avg_ppm IS NULL THEN 0 ELSE 1 - c.ppm / p.avg_ppm END DESC
+    OPTION (RECOMPILE)`)).recordset;
+  const busy = await listingsByPhones(rows.flatMap((x) => String(x.phones || "").split(",")));
+  const live = (num) => (busy[String(num).replace(/\D/g, "")] || []).filter((l) => l.storage === "live").length;
+  return rows
+    .filter((x) => String(x.phones).split(",").every((num) => live(num) < 3))
+    .slice(0, n)
+    .map((x) => ({
+      id: String(x.id), city: city, rooms: x.rooms, area: x.area == null ? null : Number(x.area), floor: x.floor, floors: x.floors,
+      price: Number(x.price), addr: x.addr || null, isNew: x.complex_id != null,
+      below: x.ratio != null && x.ratio <= 0.92 ? Math.round((1 - x.ratio) * 100) : null, peers: x.peers || null,
+      oldPrice: x.old_price == null ? null : Number(x.old_price),
+      photos: listPhotoUrls(x.photos_c, x.photos_json).map((u) => u.replace(/-560x350\.jpg$/, "-full.jpg")),
+    }));
+}
+
+// Одна квартира для превью и выдачи номера — с номерами (только внутрь).
+async function instaListing(id) {
+  const pool = await getPool();
+  await ensureList(pool);
+  const x = (await pool.request().input("id", sql.BigInt, Number(id) || 0).query(`
+    SELECT id, city, rooms, area, floor, floors, price, addr, complex_id, phones, storage, photos_c, photos_json
+    FROM dbo.krisha_list WHERE id = @id AND user_type = 'owner' AND deal = 'sale' AND prop = 'flat'`)).recordset[0];
+  if (!x) return null;
+  return { id: String(x.id), city: x.city, rooms: x.rooms, area: x.area == null ? null : Number(x.area), floor: x.floor, floors: x.floors,
+    price: Number(x.price), addr: x.addr || null, isNew: x.complex_id != null, phones: x.phones || null, storage: x.storage,
+    below: null, oldPrice: null,
+    photos: listPhotoUrls(x.photos_c, x.photos_json).map((u) => u.replace(/-560x350\.jpg$/, "-full.jpg")) };
+}
+
+async function instaAccounts() {
+  const pool = await getPool();
+  await ensureInsta();
+  return (await pool.request().query("SELECT acc, ig_user_id, username, token, token_exp, auto, per_day, updated_at FROM dbo.insta_accounts")).recordset;
+}
+async function instaAccountSet(acc, x) {
+  const pool = await getPool();
+  await ensureInsta();
+  const cols = { ig_user_id: sql.NVarChar(40), username: sql.NVarChar(60), token: sql.NVarChar(800), token_exp: sql.DateTime2(0), auto: sql.Bit, per_day: sql.Int };
+  const keys = Object.keys(x).filter((k) => cols[k] && x[k] !== undefined);
+  const r = pool.request().input("acc", sql.NVarChar(20), acc);
+  keys.forEach((k) => r.input(k, cols[k], x[k]));
+  await r.query(`
+    IF NOT EXISTS (SELECT 1 FROM dbo.insta_accounts WHERE acc = @acc) INSERT INTO dbo.insta_accounts (acc) VALUES (@acc);
+    UPDATE dbo.insta_accounts SET ${keys.map((k) => k + " = @" + k).concat("updated_at = SYSUTCDATETIME()").join(", ")} WHERE acc = @acc;`);
+}
+async function instaPostAdd(p) {
+  const pool = await getPool();
+  await ensureInsta();
+  await pool.request()
+    .input("acc", sql.NVarChar(20), p.acc).input("lid", sql.BigInt, Number(p.listingId))
+    .input("status", sql.NVarChar(16), p.status).input("reason", sql.NVarChar(40), p.reason || null)
+    .input("mid", sql.NVarChar(40), p.mediaId || null).input("link", sql.NVarChar(300), p.permalink || null)
+    .input("cap", sql.NVarChar(2200), p.caption || null).input("err", sql.NVarChar(500), p.error ? String(p.error).slice(0, 500) : null)
+    .query(`INSERT INTO dbo.insta_posts (acc, listing_id, status, reason, media_id, permalink, caption, error)
+            VALUES (@acc, @lid, @status, @reason, @mid, @link, @cap, @err)`);
+}
+async function instaPosts(acc, limit) {
+  const pool = await getPool();
+  await ensureInsta();
+  return (await pool.request().input("acc", sql.NVarChar(20), acc || null).input("n", sql.Int, Math.min(200, Number(limit) || 50)).query(`
+    SELECT TOP (@n) p.post_id, p.acc, CAST(p.listing_id AS NVARCHAR(20)) AS listing_id, p.status, p.reason, p.media_id, p.permalink, p.error, p.created_at,
+           (SELECT COUNT(*) FROM dbo.insta_dms d WHERE d.media_id = p.media_id AND d.found = 1) AS dms
+    FROM dbo.insta_posts p WHERE @acc IS NULL OR p.acc = @acc ORDER BY p.created_at DESC`)).recordset;
+}
+// Сколько опубликовано аккаунтом с момента since (для дневного лимита).
+async function instaPostedSince(acc, since) {
+  const pool = await getPool();
+  await ensureInsta();
+  return (await pool.request().input("acc", sql.NVarChar(20), acc).input("since", sql.DateTime2(0), since).query(
+    "SELECT COUNT(*) AS n, MAX(created_at) AS last_at FROM dbo.insta_posts WHERE acc = @acc AND status = 'published' AND created_at >= @since")).recordset[0];
+}
+async function instaPostByMedia(mediaId) {
+  const pool = await getPool();
+  await ensureInsta();
+  return (await pool.request().input("mid", sql.NVarChar(40), String(mediaId)).query(
+    "SELECT TOP 1 acc, CAST(listing_id AS NVARCHAR(20)) AS listing_id, media_id FROM dbo.insta_posts WHERE media_id = @mid")).recordset[0] || null;
+}
+async function instaRecentMedia(acc, n) {
+  const pool = await getPool();
+  await ensureInsta();
+  return (await pool.request().input("acc", sql.NVarChar(20), acc).input("n", sql.Int, n || 30).query(
+    "SELECT TOP (@n) media_id, CAST(listing_id AS NVARCHAR(20)) AS listing_id FROM dbo.insta_posts WHERE acc = @acc AND status = 'published' AND media_id IS NOT NULL ORDER BY created_at DESC")).recordset;
+}
+async function instaDmAdd(x) {
+  const pool = await getPool();
+  await ensureInsta();
+  await pool.request().input("acc", sql.NVarChar(20), x.acc || null).input("u", sql.NVarChar(60), x.username ? String(x.username).slice(0, 60) : null)
+    .input("lid", sql.BigInt, x.listingId ? Number(x.listingId) : null).input("mid", sql.NVarChar(40), x.mediaId || null).input("found", sql.Bit, x.found ? 1 : 0)
+    .query("INSERT INTO dbo.insta_dms (acc, username, listing_id, media_id, found) VALUES (@acc, @u, @lid, @mid, @found)");
+}
+// Какие посты этому человеку уже отдали — чтобы на второй «+» отдать новый.
+async function instaDmMedia(username) {
+  const pool = await getPool();
+  await ensureInsta();
+  return (await pool.request().input("u", sql.NVarChar(60), String(username || "").slice(0, 60)).query(
+    "SELECT DISTINCT media_id FROM dbo.insta_dms WHERE username = @u AND found = 1 AND media_id IS NOT NULL")).recordset.map((x) => x.media_id);
+}
+async function instaDmStats(days) {
+  const pool = await getPool();
+  await ensureInsta();
+  return (await pool.request().input("d", sql.Int, Math.min(90, Number(days) || 7)).query(`
+    SELECT acc, COUNT(*) AS asked, SUM(CASE WHEN found = 1 THEN 1 ELSE 0 END) AS sent, COUNT(DISTINCT username) AS people
+    FROM dbo.insta_dms WHERE at >= DATEADD(day, -@d, SYSUTCDATETIME()) GROUP BY acc`)).recordset;
+}
+
 async function mortgageLeads(limit) {
   const pool = await getPool();
   await ensureMortgage();
@@ -4072,7 +4283,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
-  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
+  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, instaCandidates, instaListing, instaAccounts, instaAccountSet, instaPostAdd, instaPosts, instaPostedSince, instaPostByMedia, instaRecentMedia, instaDmAdd, instaDmMedia, instaDmStats, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,

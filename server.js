@@ -950,6 +950,11 @@ const KRISHA_HUB_HTML = `<!doctype html>
   <a class="card" data-p="bot"><div class="t">Бот: люди, запросы, продажи</div><div class="d">за период: новые и активные пользователи, запросов, нашли и не нашли с причинами, открытий контактов и выручка в звёздах, по дням, последние запросы.</div><div class="n" id="n-bot"></div></a>
 </div>
 
+<h2>Instagram</h2>
+<div class="grid">
+  <a class="card" data-p="insta"><div class="t">Контент-завод Instagram</div><div class="d">выгодные квартиры хозяев в карусели для @bezposrednikov_kz_almaty и _astana: превью, публикация, автопостинг, номера по «+» через ManyChat.</div></a>
+</div>
+
 <h2>Риэлтору</h2>
 <div class="grid">
   <a class="card" data-p="leads"><div class="t">Лиды хозяев</div><div class="d">хозяева с номером и свежим сигналом: новое, поднятие, снижение цены, возврат из архива. Фильтры, статус обзвона.</div><div class="n" id="n-leads"></div></a>
@@ -1516,6 +1521,8 @@ document.getElementById("smsTo").onkeydown=function(e){if(e.key==="Enter")smsAny
 load(); setInterval(load, 30000);
 </script></body></html>`;
 // Сводка бота: люди, запросы, находки, открытия и выручка в звёздах.
+const KRISHA_INSTA_HTML = "<!doctype html>\n<html lang=\"ru\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>Instagram · контент-завод</title>\n<style>\n  :root{--bg:#0f1318;--card:#161b22;--line:#262d37;--ink:#e6edf3;--mut:#8b96a3;--acc:#58a6ff;--ok:#3fb950;--warn:#d29922;--bad:#f85149;--ig:#e1306c}\n  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:20px 16px 60px;max-width:1200px;margin:0 auto}\n  h1{font-size:22px;margin:0 0 4px} h2{font-size:16px;margin:28px 0 10px} .sub{color:var(--mut);margin:0 0 16px}\n  a{color:var(--acc)}\n  .tabs{display:flex;gap:6px;margin:0 0 16px} .tabs button{background:var(--card);border:1px solid var(--line);color:var(--ink);padding:8px 14px;border-radius:8px;cursor:pointer;font:inherit}\n  .tabs button.on{border-color:var(--ig);background:#2a1520}\n  .box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:0 0 12px}\n  .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}\n  .btn{background:#238636;border:0;color:#fff;border-radius:8px;padding:8px 14px;font:600 13px system-ui;cursor:pointer} .btn:disabled{opacity:.5;cursor:default}\n  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)} .btn.red{background:#6e2020}\n  input[type=text],input[type=password],select{background:#0d1117;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 10px;font:inherit}\n  input.tok{flex:1;min-width:220px}\n  .mut{color:var(--mut)} .ok{color:var(--ok)} .bad{color:var(--bad)} .warn{color:var(--warn)}\n  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(250px,100%),1fr));gap:12px}\n  .c{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;min-width:0}\n  .c .cov{aspect-ratio:4/5;background:#0d1117;display:block;width:100%;object-fit:cover;cursor:zoom-in}\n  .c .b{padding:10px 12px;display:flex;flex-direction:column;gap:6px;flex:1}\n  .c .p{font-weight:700;font-size:16px} .tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:10px;background:#3b2412;color:#ffa657}\n  .c .act{display:flex;gap:6px;margin-top:auto}\n  table{width:100%;border-collapse:collapse;font-size:13px} td,th{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top} th{color:var(--mut);font-weight:500}\n  .tw{overflow-x:auto}\n  code{background:#0d1117;border:1px solid var(--line);padding:2px 6px;border-radius:6px;word-break:break-all}\n  ol{margin:6px 0 0;padding-left:20px} li{margin:4px 0}\n  .modal{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:10;padding:16px}\n  .modal.on{display:flex} .strip{display:flex;gap:10px;overflow-x:auto;max-width:100%;scroll-snap-type:x mandatory;padding-bottom:8px}\n  .strip img{height:min(78vh,700px);aspect-ratio:4/5;border-radius:8px;scroll-snap-align:center;background:#111}\n  .modal .x{position:absolute;top:10px;right:16px;font-size:30px;color:#fff;cursor:pointer;background:none;border:0}\n  .sk{background:#1c222b;border-radius:8px;min-height:40px}\n  details summary{cursor:pointer;color:var(--acc)}\n</style></head><body>\n<h1>Instagram · контент-завод</h1>\n<p class=\"sub\">Выгодные квартиры хозяев → карусель → пост. «+» в комментариях → ManyChat → номер хозяина в директ.</p>\n<div class=\"tabs\" id=\"tabs\"><button data-a=\"almaty\">Алматы</button><button data-a=\"astana\">Астана</button></div>\n\n<div class=\"box\" id=\"acc\"><div class=\"sk\"></div></div>\n\n<h2>Кандидаты в посты <span class=\"mut\" id=\"candAt\"></span> <button class=\"btn ghost\" id=\"fresh\" style=\"margin-left:8px\">Обновить</button></h2>\n<p class=\"mut\" style=\"margin-top:-4px\">Живые объявления хозяев с номером и 5+ фото: цена за м² на 8–35% ниже средней в том же ЖК (за 3 дня) или хозяин снизил цену на 3–25%. Номера, висящие на 3+ объявлениях, отсеяны. Клик по обложке — вся карусель.</p>\n<div class=\"grid\" id=\"cands\"><div class=\"sk\" style=\"height:300px\"></div><div class=\"sk\" style=\"height:300px\"></div><div class=\"sk\" style=\"height:300px\"></div></div>\n\n<h2>Опубликовано</h2>\n<div class=\"box tw\"><table><thead><tr><th>Когда</th><th>Квартира</th><th>Статус</th><th>Номеров отдали</th></tr></thead><tbody id=\"posts\"><tr><td colspan=\"4\" class=\"mut\">…</td></tr></tbody></table></div>\n\n<h2>ManyChat: номер по «+»</h2>\n<div class=\"box\" id=\"mc\"></div>\n\n<div class=\"modal\" id=\"modal\"><button class=\"x\" id=\"mx\">×</button><div class=\"strip\" id=\"strip\"></div></div>\n<script>\nvar KEY = new URLSearchParams(location.search).get(\"key\") || \"\";\nvar ACC = (function(){ try { return localStorage.getItem(\"insta_acc\") || \"almaty\"; } catch(e){ return \"almaty\"; } })();\nvar D = null;\nfunction $(s){ return document.querySelector(s); }\nfunction esc(s){ return String(s==null?\"\":s).replace(/[&<>\"']/g,function(c){return {\"&\":\"&amp;\",\"<\":\"&lt;\",\">\":\"&gt;\",'\"':\"&quot;\",\"'\":\"&#39;\"}[c];}); }\nfunction money(n){ return Math.round(Number(n)||0).toLocaleString(\"ru-RU\"); }\nfunction dt(s){ if(!s) return \"—\"; var d=new Date(s); return d.toLocaleString(\"ru-RU\",{day:\"2-digit\",month:\"2-digit\",hour:\"2-digit\",minute:\"2-digit\",timeZone:\"Asia/Almaty\"}); }\nfunction api(q){ return fetch(\"/api/krisha/insta?key=\"+encodeURIComponent(KEY)+\"&acc=\"+ACC+\"&\"+q).then(function(r){ return r.json(); }); }\nfunction post(body){ body.acc = ACC; return fetch(\"/api/krisha/insta?key=\"+encodeURIComponent(KEY), { method:\"POST\", headers:{\"Content-Type\":\"application/json\"}, body: JSON.stringify(body) }).then(function(r){ return r.json(); }); }\nfunction slideUrl(id, n, all){ return \"/api/krisha/insta?key=\"+encodeURIComponent(KEY)+\"&acc=\"+ACC+\"&id=\"+id+\"&slide=\"+n+(all?\"&all=1\":\"\"); }\n\nfunction renderAcc(){\n  var a = D.accounts.filter(function(x){ return x.acc===ACC; })[0];\n  var h = \"\";\n  if(!a.connected){\n    h = \"<div class='row' style='margin-bottom:8px'><b>@\"+esc(a.handle)+\"</b> <span class='warn'>не подключён</span></div>\"+\n      \"<div class='row'><input class='tok' type='password' id='tok' placeholder='Токен доступа Instagram (из кабинета Meta for Developers)'><button class='btn' id='conn'>Подключить</button></div>\"+\n      \"<details style='margin-top:10px'><summary>Как получить токен</summary><ol>\"+\n      \"<li>Instagram → Настройки → Тип аккаунта → переключить на <b>профессиональный</b> (Автор или Бизнес).</li>\"+\n      \"<li><a href='https://developers.facebook.com/apps' target='_blank' rel='noopener'>developers.facebook.com/apps</a> → Создать приложение → вариант «Управление сообщениями и контентом в Instagram».</li>\"+\n      \"<li>В приложении: Instagram → «Настройка API со входом через Instagram» → «Создать маркеры доступа» → Добавить аккаунт → войти в @\"+esc(a.handle)+\" и разрешить доступ.</li>\"+\n      \"<li>Нажать «Создать маркер» рядом с аккаунтом, скопировать и вставить сюда. Токен живёт 60 дней, дальше сервер продлевает его сам.</li></ol></details>\";\n  } else {\n    var exp = a.token_exp ? \" · токен до \"+new Date(a.token_exp).toLocaleDateString(\"ru-RU\") : \"\";\n    var per = [1,2,3,4,5,6,8,10].map(function(n){ return \"<option\"+(n===a.per_day?\" selected\":\"\")+\">\"+n+\"</option>\"; }).join(\"\");\n    h = \"<div class='row'><b>@\"+esc(a.username||a.handle)+\"</b> <span class='ok'>подключён</span><span class='mut'>\"+exp+\" · сегодня опубликовано \"+a.today+\"</span>\"+\n      (a.paused_until && a.paused_until>Date.now() ? \" <span class='bad'>пауза после ошибки до \"+dt(a.paused_until)+\"</span>\" : \"\")+\"</div>\"+\n      \"<div class='row' style='margin-top:10px'><label><input type='checkbox' id='auto'\"+(a.auto?\" checked\":\"\")+\"> Автопостинг</label>\"+\n      \"<label class='mut'>постов в день <select id='per'>\"+per+\"</select></label><span class='mut'>с 9:00 до 22:00 по Алматы, равномерно</span>\"+\n      \"<button class='btn ghost' id='recon' style='margin-left:auto'>Заменить токен</button><button class='btn red' id='disc'>Отключить</button></div>\";\n  }\n  $(\"#acc\").innerHTML = h;\n  var c = $(\"#conn\"); if(c) c.onclick = function(){\n    c.disabled = true; c.textContent = \"Проверяем…\";\n    post({ action:\"token\", token: $(\"#tok\").value }).then(function(j){\n      if(!j.ok){ alert(\"Не получилось: \"+j.error); c.disabled=false; c.textContent=\"Подключить\"; return; }\n      load();\n    });\n  };\n  var au = $(\"#auto\"); if(au) au.onchange = function(){ post({ action:\"settings\", auto: au.checked }).then(load); };\n  var pe = $(\"#per\"); if(pe) pe.onchange = function(){ post({ action:\"settings\", per_day: Number(pe.value) }).then(load); };\n  var rc = $(\"#recon\"); if(rc) rc.onclick = function(){ a.connected = false; renderAcc(); };\n  var ds = $(\"#disc\"); if(ds) ds.onclick = function(){ if(confirm(\"Отключить аккаунт и выключить автопостинг?\")) post({ action:\"disconnect\" }).then(load); };\n}\nfunction renderCands(){\n  var a = D.accounts.filter(function(x){ return x.acc===ACC; })[0];\n  $(\"#candAt\").textContent = D.candidatesAt ? \"· подобраны в \"+dt(D.candidatesAt) : \"\";\n  if(!D.candidates.length){ $(\"#cands\").innerHTML = \"<p class='mut'>Сейчас подходящих нет — появятся с новыми объявлениями.</p>\"; return; }\n  $(\"#cands\").innerHTML = D.candidates.map(function(f){\n    var tag = f.oldPrice ? \"Цена снижена на \"+Math.round((1-f.price/f.oldPrice)*100)+\"%\" : (f.below ? \"На \"+f.below+\"% ниже рынка ЖК\" : \"\");\n    return \"<div class='c'><img class='cov' loading='lazy' src='\"+slideUrl(f.id,0)+\"' data-id='\"+f.id+\"' alt=''>\"+\n      \"<div class='b'><div class='p'>\"+money(f.price)+\" ₸</div><div>\"+f.rooms+\"-комн · \"+String(f.area).replace(\".\",\",\")+\" м² · \"+esc(f.addr||\"\")+\"</div>\"+\n      (tag?\"<div><span class='tag'>\"+tag+\"</span></div>\":\"\")+\n      \"<div class='mut'>фото: \"+f.photos+\" · <a href='https://krisha.kz/a/show/\"+f.id+\"' target='_blank' rel='noopener'>объявление</a></div>\"+\n      \"<div class='act'><button class='btn' data-pub='\"+f.id+\"'\"+(a.connected?\"\":\" disabled title='Сначала подключите аккаунт'\")+\">Опубликовать</button><button class='btn ghost' data-skip='\"+f.id+\"'>Пропустить</button></div></div></div>\";\n  }).join(\"\");\n}\nfunction renderPosts(){\n  var m = {published:\"<span class='ok'>опубликован</span>\", failed:\"<span class='bad'>ошибка</span>\", skipped:\"<span class='mut'>пропущен</span>\"};\n  var rows = D.posts.filter(function(p){ return p.status!==\"skipped\"; });\n  $(\"#posts\").innerHTML = rows.length ? rows.map(function(p){\n    return \"<tr><td>\"+dt(p.created_at)+\"</td><td><a href='https://krisha.kz/a/show/\"+p.listing_id+\"' target='_blank' rel='noopener'>\"+p.listing_id+\"</a>\"+(p.reason?\" <span class='mut'>\"+(p.reason===\"drop\"?\"снижение\":\"ниже рынка\")+\"</span>\":\"\")+\"</td>\"+\n      \"<td>\"+(m[p.status]||esc(p.status))+(p.permalink?\" · <a href='\"+esc(p.permalink)+\"' target='_blank' rel='noopener'>пост</a>\":\"\")+(p.error?\"<div class='bad'>\"+esc(p.error)+\"</div>\":\"\")+\"</td><td>\"+(p.dms||0)+\"</td></tr>\";\n  }).join(\"\") : \"<tr><td colspan='4' class='mut'>Пока ничего</td></tr>\";\n}\nfunction renderMc(){\n  var s = D.dms.filter(function(x){ return x.acc===ACC; })[0] || {asked:0,sent:0,people:0};\n  $(\"#mc\").innerHTML = \"<div class='mut' style='margin-bottom:8px'>За 7 дней: запросов \"+s.asked+\" · номеров отдали \"+s.sent+\" · людей \"+s.people+\"</div>\"+\n    \"<b>External Request (GET)</b> — в конец ссылки подставьте поле ManyChat «Instagram Username»:<div style='margin:6px 0 10px'><code id='hook'>\"+esc(D.hook)+\"</code> <button class='btn ghost' id='cp'>Скопировать</button></div>\"+\n    \"Ответ — JSON: <code>found</code> (нашли ли номер), <code>phone</code>, <code>text</code> — готовое сообщение. В Response mapping: <code>$.text</code> → поле «owner_text», <code>$.found</code> → «owner_found».<ol>\"+\n    \"<li>Automation → триггер <b>«Comments on your Post or Reel»</b> → Any post → ключевые слова <code>+</code>, <code>плюс</code>. Публичный ответ: «Отправили в директ 📩».</li>\"+\n    \"<li>Первое сообщение в директ: «Чтобы получить номер хозяина, подпишитесь на нас и нажмите кнопку 👇» + кнопка «Получить номер».</li>\"+\n    \"<li>По кнопке — Condition <b>«Is following your account»</b>. Нет → «Похоже, вы ещё не подписаны 🙂 Подпишитесь и нажмите ещё раз» + та же кнопка.</li>\"+\n    \"<li>Да → Action <b>External Request</b> на ссылку выше → сообщение с текстом <code>{{owner_text}}</code>.</li></ol>\";\n  var cp = $(\"#cp\"); cp.onclick = function(){ navigator.clipboard.writeText(D.hook).then(function(){ cp.textContent=\"Скопировано\"; }); };\n}\nfunction load(fresh){\n  document.querySelectorAll(\"#tabs button\").forEach(function(b){ b.classList.toggle(\"on\", b.getAttribute(\"data-a\")===ACC); });\n  return api(\"data=1\"+(fresh?\"&fresh=1\":\"\")).then(function(j){\n    if(!j.ok){ $(\"#acc\").innerHTML = \"<span class='bad'>Ошибка: \"+esc(j.error)+\"</span>\"; return; }\n    D = j; renderAcc(); renderCands(); renderPosts(); renderMc();\n  }).catch(function(e){ $(\"#acc\").innerHTML = \"<span class='bad'>\"+esc(e.message)+\"</span>\"; });\n}\ndocument.addEventListener(\"click\", function(e){\n  var t = e.target;\n  var tab = t.closest(\"#tabs button\"); if(tab){ ACC = tab.getAttribute(\"data-a\"); try{ localStorage.setItem(\"insta_acc\", ACC); }catch(x){} $(\"#cands\").innerHTML = \"<div class='sk' style='height:300px'></div>\"; load(); return; }\n  if(t.id===\"fresh\"){ t.disabled = true; t.textContent = \"Подбираем… (до минуты)\"; load(true).then(function(){ t.disabled=false; t.textContent=\"Обновить\"; }); return; }\n  if(t.classList.contains(\"cov\")){\n    var id = t.getAttribute(\"data-id\");\n    $(\"#strip\").innerHTML = \"<img src='\"+slideUrl(id,0,true)+\"'>\" + \"<p class='mut' style='align-self:center;min-width:200px'>Рисуем карусель… (10–20 сек)</p>\";\n    $(\"#modal\").classList.add(\"on\");\n    fetch(slideUrl(id,0,true)).then(function(r){\n      var n = Number(r.headers.get(\"X-Slides\"))||1, h = \"\";\n      for(var i=0;i<n;i++) h += \"<img src='\"+slideUrl(id,i,true)+\"'>\";\n      $(\"#strip\").innerHTML = h;\n    });\n    return;\n  }\n  if(t.id===\"modal\"||t.id===\"mx\"){ $(\"#modal\").classList.remove(\"on\"); return; }\n  var pub = t.getAttribute(\"data-pub\");\n  if(pub){\n    if(!confirm(\"Опубликовать эту квартиру в Instagram сейчас?\")) return;\n    t.disabled = true; t.textContent = \"Публикуем… (до минуты)\";\n    post({ action:\"publish\", id: pub }).then(function(j){\n      if(!j.ok){ alert(\"Не вышло: \"+j.error); t.disabled=false; t.textContent=\"Опубликовать\"; return; }\n      load();\n    });\n    return;\n  }\n  var sk = t.getAttribute(\"data-skip\");\n  if(sk){ post({ action:\"skip\", id: sk }).then(function(){ var c=t.closest(\".c\"); if(c) c.remove(); }); }\n});\nload();\n</script>\n</body></html>\n";
+
 const KRISHA_BOT_HTML = `<!doctype html>
 <html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -4808,6 +4815,166 @@ function buildGoogleFeed(slug, origin) {
 // Model Context Protocol over Streamable HTTP, stateless JSON responses.
 // ---------------------------------------------------------------------------
 
+// --- Instagram-завод: посты-карусели квартир хозяев и номер по «+» ---------
+// Аккаунты по городам (almaty, astana) подключаются токеном со страницы
+// /api/krisha/insta; токен и настройки лежат в dbo.insta_accounts.
+// Картинки для Instagram отдаём сами по одноразовой ссылке: API берёт их
+// по URL, пока собирает контейнеры, после этого они не нужны.
+const INSTA = require("./scripts/insta.js");
+const INSTA_ACCS = ["almaty", "astana"];
+const instaImgs = new Map();      // токен ссылки → { at, slides }
+const instaPreview = new Map();   // acc:id → { at, slides | cover }
+const instaCand = {};             // acc → { at, rows }
+const instaPauseUntil = {};       // acc → время, до которого автопостинг молчит после ошибки
+const instaComments = new Map();  // media_id → { at, rows }
+let instaBusy = false;
+// Ключ для ManyChat: из ключа страниц, но не он сам — его не жалко показать в настройках ManyChat.
+function instaHookKey() {
+  const k = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
+  return k ? crypto.createHash("sha256").update("insta:" + k).digest("hex").slice(0, 20) : "";
+}
+function instaGc() {
+  const now = Date.now();
+  for (const [k, v] of instaImgs) if (now - v.at > 3600e3) instaImgs.delete(k);
+  for (const [k, v] of instaPreview) if (now - v.at > 1800e3) instaPreview.delete(k);
+  for (const [k, v] of instaComments) if (now - v.at > 600e3) instaComments.delete(k);
+}
+async function instaCandidates(acc, fresh) {
+  const c = instaCand[acc];
+  if (!fresh && c && Date.now() - c.at < 20 * 60e3) return c.rows;
+  const rows = await db.instaCandidates(acc, 12);
+  instaCand[acc] = { at: Date.now(), rows: rows };
+  return rows;
+}
+// Квартира для превью и публикации: из кандидатов (там есть повод поста), иначе из базы.
+async function instaFlat(acc, id) {
+  const c = instaCand[acc];
+  const hit = c && c.rows.find((x) => x.id === String(id));
+  if (hit) return hit;
+  const f = await db.instaListing(id);
+  if (!f || f.city !== acc) return null;
+  delete f.phones;
+  return f;
+}
+async function instaSlides(acc, f, coverOnly) {
+  const k = acc + ":" + f.id;
+  const hit = instaPreview.get(k);
+  if (hit && hit.slides) return hit.slides;
+  if (coverOnly && hit && hit.cover) return [hit.cover];
+  if (coverOnly) {
+    const cover = await INSTA.renderCover(f, acc);
+    instaPreview.set(k, { at: Date.now(), cover: cover });
+    return [cover];
+  }
+  const slides = await INSTA.renderCarousel(f, acc);
+  instaPreview.set(k, { at: Date.now(), slides: slides });
+  if (instaPreview.size > 40) instaPreview.delete(instaPreview.keys().next().value);
+  return slides;
+}
+function instaDropCandidate(acc, id) {
+  if (instaCand[acc]) instaCand[acc].rows = instaCand[acc].rows.filter((x) => x.id !== String(id));
+}
+async function instaPublish(acc, f) {
+  if (instaBusy) throw new Error("уже публикуем другой пост — подождите минуту");
+  instaBusy = true;
+  try {
+    const a = (await db.instaAccounts()).find((x) => x.acc === acc);
+    if (!a || !a.token || !a.ig_user_id) throw new Error("аккаунт не подключён");
+    const reason = f.oldPrice ? "drop" : (f.below ? "below" : null);
+    const cap = INSTA.caption(f, acc);
+    try {
+      const slides = await instaSlides(acc, f);
+      const tok = crypto.randomBytes(12).toString("hex");
+      instaImgs.set(tok, { at: Date.now(), slides: slides });
+      const urls = slides.map((_, i) => PUBLIC_URL + "/api/insta/img/" + tok + "/" + i + ".jpg");
+      const r = await INSTA.publishCarousel(a.ig_user_id, a.token, urls, cap);
+      await db.instaPostAdd({ acc: acc, listingId: f.id, status: "published", reason: reason, mediaId: r.mediaId, permalink: r.permalink, caption: cap });
+      instaDropCandidate(acc, f.id);
+      return r;
+    } catch (e) {
+      await db.instaPostAdd({ acc: acc, listingId: f.id, status: "failed", reason: reason, caption: cap, error: e.message }).catch(() => {});
+      instaDropCandidate(acc, f.id);
+      throw e;
+    }
+  } finally { instaBusy = false; }
+}
+// Полночь по Алматы (UTC+5) в UTC — начало «сегодня» для дневного лимита.
+function almatyDayStart(now) {
+  const t = new Date(now.getTime() + 5 * 3600e3);
+  return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()) - 5 * 3600e3);
+}
+// Автопостинг: с 9 до 22 по Алматы, per_day постов в день, равномерно.
+// Раз в 10 минут смотрим, не пора ли. После ошибки аккаунт молчит час, а
+// админам уходит уведомление. Токен продлеваем за 10 дней до конца.
+async function instaTick() {
+  instaGc();
+  let accs;
+  try { accs = await db.instaAccounts(); } catch (e) { return; }
+  const now = new Date();
+  const hour = (now.getUTCHours() + 5) % 24;
+  for (const a of accs) {
+    if (!a.token) continue;
+    if (a.token_exp && new Date(a.token_exp).getTime() - now.getTime() < 10 * 86400e3) {
+      try {
+        const r = await INSTA.refreshToken(a.token);
+        await db.instaAccountSet(a.acc, { token: r.token, token_exp: new Date(Date.now() + (Number(r.expiresIn) || 5184000) * 1000) });
+        a.token = r.token;
+      } catch (e) {
+        console.log("[insta] refresh " + a.acc + ": " + e.message);
+      }
+    }
+    if (!a.auto || hour < 9 || hour >= 22) continue;
+    if (instaPauseUntil[a.acc] && Date.now() < instaPauseUntil[a.acc]) continue;
+    const per = Math.max(1, Math.min(20, Number(a.per_day) || 4));
+    const st = await db.instaPostedSince(a.acc, almatyDayStart(now));
+    if (st.n >= per) continue;
+    if (st.last_at && now.getTime() - new Date(st.last_at).getTime() < 13 * 3600e3 / per) continue;
+    const rows = await instaCandidates(a.acc, true).catch(() => []);
+    if (!rows.length) continue;
+    try {
+      const r = await instaPublish(a.acc, rows[0]);
+      console.log("[insta] " + a.acc + " posted " + rows[0].id + " → " + r.mediaId);
+    } catch (e) {
+      instaPauseUntil[a.acc] = Date.now() + 3600e3;
+      console.log("[insta] " + a.acc + " failed: " + e.message);
+      notifyTelegram("📸 Instagram " + a.acc + ": пост не вышел — " + String(e.message).slice(0, 200) + ". Автопостинг на паузе час.");
+    }
+  }
+}
+// Только на проде (или явно INSTA_AUTO=1): локальный сервер ходит в ту же
+// базу, и два расписания опубликовали бы одно и то же дважды.
+if (process.env.WEBSITE_SITE_NAME || process.env.INSTA_AUTO === "1") {
+  setTimeout(() => instaTick().catch((e) => console.log("[insta] tick: " + e.message)), 120e3).unref();
+  setInterval(() => instaTick().catch((e) => console.log("[insta] tick: " + e.message)), 10 * 60e3).unref();
+}
+// «+» от человека под нашими постами: сначала свежие посты, потом глубже.
+// Отдаём самый свежий «+», номер по которому ему ещё не отправляли.
+async function instaFindPlus(acc, username) {
+  const a = (await db.instaAccounts()).find((x) => x.acc === acc);
+  if (!a || !a.token) throw new Error("аккаунт не подключён");
+  const media = await db.instaRecentMedia(acc, 30);
+  const u = String(username || "").replace(/^@/, "").toLowerCase();
+  const hits = [];
+  for (let i = 0; i < media.length && !hits.length; i += 6) {
+    await Promise.all(media.slice(i, i + 6).map(async (m) => {
+      let c = instaComments.get(m.media_id);
+      if (!c || Date.now() - c.at > 15e3) {
+        c = { at: Date.now(), rows: await INSTA.comments(m.media_id, a.token).catch(() => []) };
+        instaComments.set(m.media_id, c);
+      }
+      for (const x of c.rows) if (String(x.username || "").toLowerCase() === u && INSTA.isPlus(x.text)) hits.push({ media: m.media_id, listing: m.listing_id, at: x.timestamp });
+    }));
+  }
+  if (!hits.length) return null;
+  hits.sort((x, y) => String(y.at).localeCompare(String(x.at)));
+  const done = new Set(await db.instaDmMedia(u).catch(() => []));
+  return hits.find((h) => !done.has(h.media)) || hits[0];
+}
+function instaPhoneFmt(p) {
+  const d = String(p || "").replace(/\D/g, "");
+  return d.length === 11 ? "+7 " + d.slice(1, 4) + " " + d.slice(4, 7) + " " + d.slice(7, 9) + " " + d.slice(9) : p;
+}
+
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let data = "";
@@ -6747,6 +6914,52 @@ http
       })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
       return;
     }
+    // Картинки поста для Instagram: одноразовая ссылка, живёт час.
+    {
+      const m = /^\/api\/insta\/img\/([a-f0-9]{24})\/(\d+)\.jpg$/.exec(urlPath);
+      if (m) {
+        const hit = instaImgs.get(m[1]);
+        const img = hit && hit.slides[Number(m[2])];
+        if (!img) { res.writeHead(404); res.end(); return; }
+        res.writeHead(200, { "Content-Type": "image/jpeg", "Content-Length": img.length, "Cache-Control": "no-store" });
+        res.end(img);
+        return;
+      }
+    }
+    // Номер хозяина для ManyChat: человек поставил «+» под постом и подписался,
+    // ManyChat делает External Request с его ником — находим его «+», по посту
+    // квартиру, отдаём номер и готовый текст для сообщения.
+    if (urlPath === "/api/insta/phone") {
+      const q = parsed.searchParams;
+      const send = (code, obj) => { res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); };
+      const want = instaHookKey();
+      if (!want || q.get("k") !== want) return send(403, { ok: false, error: "bad_key" });
+      const acc = INSTA_ACCS.includes(q.get("acc")) ? q.get("acc") : "almaty";
+      const user = String(q.get("u") || "").trim().replace(/^@/, "");
+      if (!user) return send(400, { ok: false, found: false, text: "Не получилось определить ваш аккаунт. Напишите нам, какая квартира интересует." });
+      (async () => {
+        const hit = await instaFindPlus(acc, user);
+        if (!hit) {
+          await db.instaDmAdd({ acc: acc, username: user, found: false }).catch(() => {});
+          return send(200, { ok: true, found: false, text: "Не нашли ваш «+» под нашими постами 🤔 Поставьте «+» в комментариях под квартирой, которая понравилась, — и пришлём номер хозяина." });
+        }
+        const f = await db.instaListing(hit.listing);
+        const phones = String((f && f.phones) || "").split(",").map((x) => x.trim()).filter(Boolean);
+        if (!f || !phones.length) {
+          await db.instaDmAdd({ acc: acc, username: user, listingId: hit.listing, mediaId: hit.media, found: false }).catch(() => {});
+          return send(200, { ok: true, found: false, text: "По этой квартире номер сейчас недоступен 😔 Посмотрите другие предложения в нашем профиле — новые квартиры от хозяев каждый день." });
+        }
+        await db.instaDmAdd({ acc: acc, username: user, listingId: hit.listing, mediaId: hit.media, found: true }).catch(() => {});
+        const what = [f.rooms ? f.rooms + "-комн" : null, f.area ? String(f.area).replace(".", ",") + " м²" : null, INSTA.cleanAddr(f.addr),
+          Math.round(f.price / 1e5) / 10 + " млн ₸"].filter(Boolean).join(" · ").replace(/(\d)\.(\d)/, "$1,$2");
+        const nums = phones.map(instaPhoneFmt).join("\n");
+        const gone = f.storage && f.storage !== "live" ? "\n\n⚠️ Объявление уже снято — возможно, квартиру продали." : "";
+        return send(200, { ok: true, found: true, phone: phones.map(instaPhoneFmt).join(", "),
+          text: "📞 Номер хозяина:\n" + nums + "\n\n🏠 " + what + gone + "\n\nПишите или звоните напрямую — без посредников. Новые квартиры от хозяев каждый день у нас в профиле 🔑" });
+      })().catch((e) => send(200, { ok: false, found: false, error: String(e.message).slice(0, 200),
+        text: "Не получилось найти номер прямо сейчас. Напишите нам в ответ, какая квартира интересует, — пришлём вручную." }));
+      return;
+    }
     // Поиск портала ипотеки. Ответы кэшируются на 5 минут по набору фильтров:
     // одни и те же запросы (первая страница без фильтров) повторяются часто.
     if (urlPath === "/api/ipoteka/listings") {
@@ -8275,10 +8488,83 @@ http
     // свой ?data=1 с курсором и кэшированной статистикой списка.
     {
       const pages = { "/api/krisha/phones": KRISHA_PHONES_HTML, "/api/krisha/db": KRISHA_DB_HTML, "/api/krisha/sweep": KRISHA_SWEEP_HTML,
-                      "/api/krisha/ports": KRISHA_PORTS_HTML, "/api/krisha/calls": KRISHA_CALLS_HTML, "/api/krisha/bot": KRISHA_BOT_HTML };
+                      "/api/krisha/ports": KRISHA_PORTS_HTML, "/api/krisha/calls": KRISHA_CALLS_HTML, "/api/krisha/bot": KRISHA_BOT_HTML, "/api/krisha/insta": KRISHA_INSTA_HTML };
       if (pages[urlPath]) {
         const key = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
         if (!key || parsed.searchParams.get("key") !== key) { res.writeHead(403); res.end("bad key"); return; }
+        if (urlPath === "/api/krisha/insta" && (parsed.searchParams.get("data") || parsed.searchParams.get("slide") != null || req.method === "POST")) {
+          const q = parsed.searchParams;
+          const send = (code, obj) => { res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); };
+          const acc = INSTA_ACCS.includes(q.get("acc")) ? q.get("acc") : "almaty";
+          // Слайд превью: n=0 — только обложка (быстро), остальные — вся карусель.
+          if (q.get("slide") != null) {
+            (async () => {
+              const f = await instaFlat(acc, q.get("id"));
+              if (!f) { res.writeHead(404); res.end("нет квартиры"); return; }
+              const n = Math.max(0, Number(q.get("slide")) || 0);
+              const slides = await instaSlides(acc, f, n === 0 && !q.get("all"));
+              if (!slides[n]) { res.writeHead(404); res.end("нет слайда"); return; }
+              res.writeHead(200, { "Content-Type": "image/jpeg", "Cache-Control": "private, max-age=600", "X-Slides": String(slides.length) });
+              res.end(slides[n]);
+            })().catch((e) => { res.writeHead(500); res.end(String(e.message).slice(0, 200)); });
+            return;
+          }
+          if (req.method === "POST") {
+            (async () => {
+              let b = {};
+              try { b = JSON.parse(await readBody(req)) || {}; } catch { b = {}; }
+              const A = INSTA_ACCS.includes(b.acc) ? b.acc : null;
+              if (!A) return send(400, { ok: false, error: "acc" });
+              if (b.action === "token") {
+                const token = String(b.token || "").trim();
+                if (!token) return send(400, { ok: false, error: "пустой токен" });
+                const who = await INSTA.me(token);
+                // Токен из кабинета Meta живёт 60 дней; продлить сразу нельзя, если ему нет суток, — тогда продлит расписание.
+                let tok = token, exp = new Date(Date.now() + 60 * 86400e3);
+                try { const r = await INSTA.refreshToken(token); if (r.token) { tok = r.token; exp = new Date(Date.now() + (Number(r.expiresIn) || 5184000) * 1000); } } catch { /* продлим позже */ }
+                await db.instaAccountSet(A, { token: tok, ig_user_id: String(who.user_id || who.id), username: who.username || null, token_exp: exp });
+                return send(200, { ok: true, username: who.username });
+              }
+              if (b.action === "settings") {
+                const x = {};
+                if (b.auto != null) x.auto = b.auto ? 1 : 0;
+                if (b.per_day != null) x.per_day = Math.max(1, Math.min(20, Number(b.per_day) || 4));
+                await db.instaAccountSet(A, x);
+                return send(200, { ok: true });
+              }
+              if (b.action === "disconnect") {
+                await db.instaAccountSet(A, { token: null, auto: 0 });
+                return send(200, { ok: true });
+              }
+              if (b.action === "publish") {
+                const f = await instaFlat(A, b.id);
+                if (!f) return send(404, { ok: false, error: "квартира не найдена" });
+                const r = await instaPublish(A, f);
+                return send(200, { ok: true, mediaId: r.mediaId, permalink: r.permalink });
+              }
+              if (b.action === "skip") { instaDropCandidate(A, b.id); await db.instaPostAdd({ acc: A, listingId: b.id, status: "skipped" }); return send(200, { ok: true }); }
+              return send(400, { ok: false, error: "action" });
+            })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 300) }));
+            return;
+          }
+          (async () => {
+            const accs = await db.instaAccounts();
+            const now = new Date();
+            const out = [];
+            for (const A of INSTA_ACCS) {
+              const a = accs.find((x) => x.acc === A) || {};
+              const st = a.token ? await db.instaPostedSince(A, almatyDayStart(now)) : { n: 0 };
+              out.push({ acc: A, handle: INSTA.ACCOUNTS[A].handle, connected: !!a.token, username: a.username || null, token_exp: a.token_exp || null,
+                auto: !!a.auto, per_day: a.per_day || 4, today: st.n, paused_until: instaPauseUntil[A] || null });
+            }
+            const cands = await instaCandidates(acc, q.get("fresh") === "1");
+            const posts = await db.instaPosts(acc, 60);
+            const dms = await db.instaDmStats(7);
+            send(200, { ok: true, accounts: out, candidates: cands.map((f) => Object.assign({}, f, { photos: f.photos.length })), posts: posts, dms: dms,
+              hook: PUBLIC_URL + "/api/insta/phone?acc=" + acc + "&k=" + instaHookKey() + "&u=", candidatesAt: instaCand[acc] && instaCand[acc].at });
+          })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 300) }));
+          return;
+        }
         if (urlPath === "/api/krisha/bot" && parsed.searchParams.get("data")) {
           db.botFunnel(parsed.searchParams.get("days")).then((j) => {
             res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
