@@ -17,8 +17,8 @@ const FONTS = ["Montserrat_500Medium.ttf", "Montserrat_700Bold.ttf", "Montserrat
 const GRAPH = "https://graph.instagram.com/v23.0";
 
 const ACCOUNTS = {
-  almaty: { city: "Алматы", handle: "bezposrednikov_kz_almaty", tags: "#квартирыалматы #продажаквартиралматы #недвижимостьалматы #алматы #квартираотхозяина #безпосредников #купитьквартиру #квартиравалматы" },
-  astana: { city: "Астана", handle: "bezposrednikov_kz_astana", tags: "#квартирыастана #продажаквартирастана #недвижимостьастана #астана #квартираотхозяина #безпосредников #купитьквартиру #квартиравастане" },
+  almaty: { city: "Алматы", handle: "bezposrednikov_kz_almaty", tags: "#квартирыалматы #продажаквартиралматы #недвижимостьалматы #алматы #квартираотхозяина #безпосредников #купитьквартиру #квартиравалматы #ипотекаалматы #квартиравипотеку" },
+  astana: { city: "Астана", handle: "bezposrednikov_kz_astana", tags: "#квартирыастана #продажаквартирастана #недвижимостьастана #астана #квартираотхозяина #безпосредников #купитьквартиру #квартиравастане #ипотекаастана #квартиравипотеку" },
 };
 
 const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -41,7 +41,8 @@ function paramsLine(f) {
 function hook(f) {
   if (!f.mortgage) return null;
   const pr = (f.programs || [])[0];
-  return { kind: "mortgage", badge: pr ? "Ипотека · " + pr : "Подходит под ипотеку", text: "Можно купить в ипотеку — хозяин готов" };
+  // Рубрика «от хозяев · можно в ипотеку» уже на плашке сверху; оранжевая — только если названа программа.
+  return { kind: "mortgage", badge: pr ? "Программа · " + pr : null, text: "Можно купить в ипотеку — хозяин готов" };
 }
 // Ширина надписи на глаз: у Montserrat средний знак ≈ 0,6 кегля (жирный ≈ 0,64).
 const textW = (s, size, bold) => String(s).length * size * (bold ? 0.64 : 0.58);
@@ -69,11 +70,11 @@ function coverSvg(f, photo, acc) {
   const A = ACCOUNTS[acc] || ACCOUNTS.almaty;
   const h = hook(f);
   const PH = 810;
-  const pill = "ОТ ХОЗЯИНА · БЕЗ ПОСРЕДНИКОВ";
+  const pill = f.mortgage ? "ОТ ХОЗЯИНА · МОЖНО В ИПОТЕКУ" : "ОТ ХОЗЯИНА · БЕЗ ПОСРЕДНИКОВ";
   const pw = pill.length * 26 * 0.78 + 64; // заглавные с разрядкой шире строчных
   const ppm = f.area ? Math.round(f.price / f.area / 1000) : null;
   let badge = "";
-  if (h) {
+  if (h && h.badge) {
     const bw = textW(h.badge, 34, true) + 64;
     badge = `<rect x="${W - 48 - bw}" y="${PH - 44}" width="${bw}" height="88" rx="44" fill="#ff7a1a"/>
       <text x="${W - 48 - bw / 2}" y="${PH + 12}" text-anchor="middle" font-size="34" font-weight="800" fill="#fff">${esc(h.badge)}</text>`;
@@ -135,8 +136,8 @@ function ctaSvg(f, photo, acc) {
   <text x="68" y="592" font-size="72" font-weight="800" fill="#ffd166">бесплатно в директ</text>
   ${stepSvg.replace(/y="(\d+)"/g, (m, v) => 'y="' + (Number(v) + 90) + '"')}
   <rect x="68" y="${H - 190}" width="${W - 136}" height="2" fill="#fff" opacity=".25"/>
-  <text x="${W / 2}" y="${H - 110}" text-anchor="middle" font-size="32" font-weight="700" fill="#fff">Квартиры от хозяев · Без посредников</text>
-  <text x="${W / 2}" y="${H - 62}" text-anchor="middle" font-size="30" font-weight="500" fill="#d5ecd9">Выгодные предложения каждый день</text>
+  <text x="${W / 2}" y="${H - 110}" text-anchor="middle" font-size="32" font-weight="700" fill="#fff">Квартиры от хозяев · Можно в ипотеку</text>
+  <text x="${W / 2}" y="${H - 62}" text-anchor="middle" font-size="30" font-weight="500" fill="#d5ecd9">Без посредников · Новые каждый день</text>
 </svg>`;
 }
 
@@ -171,6 +172,7 @@ function caption(f, acc) {
   const A = ACCOUNTS[acc] || ACCOUNTS.almaty;
   const h = hook(f);
   const lines = [
+    "🔑 От хозяев · можно в ипотеку", "",
     "🏠 " + paramsLine(f).replace(/-комн/, "-комнатная квартира") + (f.isNew ? ", новостройка" : ""),
     "📍 " + A.city + ", " + cleanAddr(f.addr),
     "💰 " + money(f.price) + " ₸" + (f.area ? " (" + money(Math.round(f.price / f.area / 1000)) + " тыс ₸/м²)" : ""),
