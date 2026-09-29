@@ -952,7 +952,7 @@ const KRISHA_HUB_HTML = `<!doctype html>
 
 <h2>Instagram</h2>
 <div class="grid">
-  <a class="card" data-p="insta"><div class="t">Контент-завод Instagram</div><div class="d">выгодные квартиры хозяев в карусели для @bezposrednikov_kz_almaty и _astana: превью, публикация, автопостинг, номера по «+» через ManyChat.</div></a>
+  <a class="card" data-p="insta"><div class="t">Контент-завод Instagram</div><div class="d">квартиры хозяев «можно в ипотеку» в карусели для @ipoteka1.kz_almaty и _astana: превью, публикация, автопостинг, номера по «+» через ManyChat.</div></a>
 </div>
 
 <h2>Риэлтору</h2>
