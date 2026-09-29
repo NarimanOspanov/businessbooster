@@ -41,7 +41,7 @@ function paramsLine(f) {
 function hook(f) {
   if (!f.mortgage) return null;
   const pr = (f.programs || [])[0];
-  return { kind: "mortgage", badge: pr ? "Ипотека · " + pr : "Подходит под ипотеку", text: "Хозяин готов продать в ипотеку" };
+  return { kind: "mortgage", badge: pr ? "Ипотека · " + pr : "Подходит под ипотеку", text: "Можно купить в ипотеку — хозяин готов" };
 }
 // Ширина надписи на глаз: у Montserrat средний знак ≈ 0,6 кегля (жирный ≈ 0,64).
 const textW = (s, size, bold) => String(s).length * size * (bold ? 0.64 : 0.58);

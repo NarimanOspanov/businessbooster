@@ -3264,6 +3264,18 @@ BEGIN
   );
   CREATE INDEX IX_kltext_mortgage ON dbo.krisha_list_text (mortgage, at DESC);
 END
+-- Объявления с отметкой «можно в ипотеку» (фильтр Крыши das[mortgage]):
+-- обход раз в несколько часов обновляет seen_at; давно не виденные — флаг сняли или объявление ушло.
+IF OBJECT_ID('dbo.krisha_mortgage', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.krisha_mortgage (
+    id       BIGINT        NOT NULL PRIMARY KEY,
+    city     NVARCHAR(40)  NULL,
+    first_at DATETIME2(0)  NOT NULL CONSTRAINT DF_kmort_first DEFAULT SYSUTCDATETIME(),
+    seen_at  DATETIME2(0)  NOT NULL CONSTRAINT DF_kmort_seen DEFAULT SYSUTCDATETIME()
+  );
+  CREATE INDEX IX_kmort_seen ON dbo.krisha_mortgage (seen_at DESC);
+END
 IF OBJECT_ID('dbo.insta_dms', 'U') IS NULL
 BEGIN
   CREATE TABLE dbo.insta_dms (
@@ -3314,6 +3326,28 @@ async function listTextSave(id, desc, params) {
       IF @@ROWCOUNT = 0 INSERT INTO dbo.krisha_list_text (id, descr, params, mortgage, mortgage_why, programs, quote) VALUES (@id, @d, @p, @m, @why, @pr, @q);`);
   return c;
 }
+// Отметить объявления, найденные с фильтром «ипотека»: новые добавить, старым обновить seen_at.
+async function mortgageFlagSave(ids, city) {
+  const pool = await getPool();
+  await ensureInsta();
+  const list = [...new Set((ids || []).map((x) => Number(x)).filter((x) => Number.isSafeInteger(x) && x > 0))];
+  for (let i = 0; i < list.length; i += 400) {
+    const chunk = list.slice(i, i + 400);
+    await pool.request().input("city", sql.NVarChar(40), city).query(`
+      MERGE dbo.krisha_mortgage AS t
+      USING (VALUES ${chunk.map((x) => "(" + x + ")").join(",")}) AS s(id) ON t.id = s.id
+      WHEN MATCHED THEN UPDATE SET seen_at = SYSUTCDATETIME(), city = @city
+      WHEN NOT MATCHED THEN INSERT (id, city) VALUES (s.id, @city);`);
+  }
+  return list.length;
+}
+async function mortgageFlagStats() {
+  const pool = await getPool();
+  await ensureInsta();
+  return (await pool.request().query(`
+    SELECT city, COUNT(*) AS n, SUM(CASE WHEN first_at >= DATEADD(day, -1, SYSUTCDATETIME()) THEN 1 ELSE 0 END) AS day, MAX(seen_at) AS last_at
+    FROM dbo.krisha_mortgage WHERE seen_at >= DATEADD(day, -2, SYSUTCDATETIME()) GROUP BY city`)).recordset;
+}
 async function listTextStats() {
   const pool = await getPool();
   await ensureInsta();
@@ -3324,8 +3358,9 @@ async function listTextStats() {
 }
 
 // Кандидаты в посты: живые квартиры хозяев на продажу с номером и 5+ фото,
-// про которые хозяин написал, что ипотека возможна (см. listTextSave), за
-// последние 10 дней, свежие первыми. Ещё не публиковались (и не падали при
+// которые можно купить в ипотеку — хозяин отметил это в объявлении (фильтр
+// Крыши, dbo.krisha_mortgage) или написал в описании (listTextSave; «нет» в
+// тексте перевешивает отметку), за последние 10 дней, свежие первыми. Ещё не публиковались (и не падали при
 // публикации — иначе автопостинг долбил бы одну и ту же). Номера, которые
 // висят на 3+ живых объявлениях, отсеиваем: это посредник под видом хозяина.
 async function instaCandidates(city, limit) {
@@ -3336,9 +3371,11 @@ async function instaCandidates(city, limit) {
   const rows = (await pool.request().input("city", sql.NVarChar(40), city).input("n", sql.Int, n * 3).query(`
     SELECT TOP (@n) c.id, c.rooms, c.area, c.price, c.complex_id, c.addr, c.phones, c.photos, c.photos_c, c.photos_json,
            c.floor, c.floors, c.first_seen, t.programs, t.quote
-    FROM dbo.krisha_list_text t
-    JOIN dbo.krisha_list c ON c.id = t.id
-    WHERE t.mortgage = 'yes'
+    FROM dbo.krisha_list c
+    LEFT JOIN dbo.krisha_list_text t ON t.id = c.id
+    WHERE c.id IN (SELECT id FROM dbo.krisha_mortgage WHERE seen_at >= DATEADD(day, -2, SYSUTCDATETIME())
+                   UNION SELECT id FROM dbo.krisha_list_text WHERE mortgage = 'yes')
+      AND (t.mortgage IS NULL OR t.mortgage <> 'no')
       AND c.user_type = 'owner' AND c.deal = 'sale' AND c.prop = 'flat' AND c.storage = 'live' AND c.city = @city
       AND c.area >= 20 AND c.price >= c.area * 150000 AND c.phones IS NOT NULL AND c.photos >= 5
       AND c.first_seen >= DATEADD(day, -10, SYSUTCDATETIME())
@@ -4302,7 +4339,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
-  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, instaCandidates, instaListing, listTextSave, listTextStats, instaAccounts, instaAccountSet, instaPostAdd, instaPosts, instaPostedSince, instaPostByMedia, instaRecentMedia, instaDmAdd, instaDmMedia, instaDmStats, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
+  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, instaCandidates, instaListing, listTextSave, listTextStats, mortgageFlagSave, mortgageFlagStats, instaAccounts, instaAccountSet, instaPostAdd, instaPosts, instaPostedSince, instaPostByMedia, instaRecentMedia, instaDmAdd, instaDmMedia, instaDmStats, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,
