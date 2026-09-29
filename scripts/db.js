@@ -3363,12 +3363,63 @@ async function listTextStats() {
 // тексте перевешивает отметку), за последние 10 дней, свежие первыми. Ещё не публиковались (и не падали при
 // публикации — иначе автопостинг долбил бы одну и ту же). Номера, которые
 // висят на 3+ живых объявлениях, отсеиваем: это посредник под видом хозяина.
+// Средняя цена метра по ЖК и комнатам среди живых квартир хозяев — для
+// «дешевле соседей по ЖК». Считать дорого (весь город), поэтому раз в 6 часов.
+const peersCache = {};
+async function complexPeers(city) {
+  const hit = peersCache[city];
+  if (hit && Date.now() - hit.at < 6 * 3600e3) return hit.map;
+  const pool = await getPool();
+  const rows = (await pool.request().input("city", sql.NVarChar(40), city).query(`
+    SELECT complex_id, rooms, COUNT(*) AS n, AVG(CAST(price AS FLOAT) / area) AS ppm
+    FROM dbo.krisha_list
+    WHERE user_type = 'owner' AND deal = 'sale' AND prop = 'flat' AND storage = 'live' AND city = @city
+      AND complex_id IS NOT NULL AND area >= 20 AND price >= area * 150000
+    GROUP BY complex_id, rooms HAVING COUNT(*) >= 5 OPTION (RECOMPILE)`)).recordset;
+  const map = {};
+  rows.forEach((r) => { map[r.complex_id + ":" + r.rooms] = { n: r.n, ppm: Number(r.ppm) }; });
+  peersCache[city] = { at: Date.now(), map: map };
+  return map;
+}
+
+// Балл кандидата: чем выше, тем больше шансов собрать «+». Доступная цена —
+// главное (в ипотеку берут массовые 1–2-комнатные), дальше «дешевле соседей
+// по ЖК», фото, свежесть, названная программа, понятный адрес. Возвращает
+// балл и причины — их видно на странице кандидатов.
+const INSTA_PRICE_CAP = { almaty: 40e6, astana: 30e6 };
+function instaScore(x, city, peers) {
+  const why = [];
+  let s = 0;
+  const add = (pts, text) => { pts = Math.round(pts); if (pts) { s += pts; why.push(text + " " + (pts > 0 ? "+" : "") + pts); } };
+  const cap = INSTA_PRICE_CAP[city] || 40e6, price = Number(x.price);
+  const mln = (v) => (Math.round(v / 1e5) / 10).toString().replace(".", ",") + " млн";
+  if (price <= cap) add(25 + 15 * (1 - price / cap), mln(price) + " — массовый сегмент");
+  else add(Math.max(-15, 25 - 50 * (price / cap - 1)), mln(price) + " — дороже " + mln(cap));
+  if (x.rooms === 1 || x.rooms === 2) add(10, x.rooms + "-комн");
+  else if (x.rooms === 3) add(5, "3-комн");
+  const p = x.complex_id != null && peers[x.complex_id + ":" + x.rooms];
+  let below = null;
+  if (p && x.area) {
+    below = Math.round((1 - Number(x.price) / Number(x.area) / p.ppm) * 100);
+    if (below >= 5 && below <= 40) add(Math.min(20, below * 0.8), "на " + below + "% дешевле соседей по ЖК");
+    else if (below <= -15) add(-10, "на " + -below + "% дороже соседей по ЖК");
+  }
+  add(Math.min(Number(x.photos) || 0, 12) / 12 * 10, (x.photos || 0) + " фото");
+  const age = Math.floor((Date.now() - new Date(x.first_seen).getTime()) / 86400e3);
+  add(Math.max(0, 10 - age), age <= 0 ? "сегодня" : age === 1 ? "вчера" : age + " дн. назад");
+  if (x.programs) add(5, "программа: " + x.programs);
+  const a = String(x.addr || "").split(" — ")[0];
+  if (!/[А-Яа-яЁёӘәҒғҚқҢңӨөҰұҮүҺһІі]{3}/.test(a)) add(-5, "адрес без улицы");
+  return { score: s, why: why, below: below };
+}
+
 async function instaCandidates(city, limit) {
   const pool = await getPool();
   await ensureList(pool);
   await ensureInsta();
   const n = Math.min(40, Math.max(1, Number(limit) || 12));
-  const rows = (await pool.request().input("city", sql.NVarChar(40), city).input("n", sql.Int, n * 3).query(`
+  const peers = await complexPeers(city).catch(() => ({}));
+  const rows = (await pool.request().input("city", sql.NVarChar(40), city).input("n", sql.Int, 400).query(`
     SELECT TOP (@n) c.id, c.rooms, c.area, c.price, c.complex_id, c.addr, c.phones, c.photos, c.photos_c, c.photos_json,
            c.floor, c.floors, c.first_seen, t.programs, t.quote
     FROM dbo.krisha_list c
@@ -3381,12 +3432,18 @@ async function instaCandidates(city, limit) {
       AND c.first_seen >= DATEADD(day, -10, SYSUTCDATETIME())
       AND NOT EXISTS (SELECT 1 FROM dbo.insta_posts ip WHERE ip.listing_id = c.id)
     ORDER BY c.first_seen DESC`)).recordset;
-  const busy = await listingsByPhones(rows.flatMap((x) => String(x.phones || "").split(",")));
+  // Сначала балл, потом проверка номеров на посредника — только для верхушки:
+  // поиск номера по базе дорогой, на 400 номерах он был бы полным сканом много раз.
+  rows.forEach((x) => { x.sc = instaScore(x, city, peers); });
+  rows.sort((a, b) => b.sc.score - a.sc.score);
+  const top = rows.slice(0, n * 3);
+  const busy = await listingsByPhones(top.flatMap((x) => String(x.phones || "").split(",")));
   const live = (num) => (busy[String(num).replace(/\D/g, "")] || []).filter((l) => l.storage === "live").length;
-  return rows
+  return top
     .filter((x) => String(x.phones).split(",").every((num) => live(num) < 3))
     .slice(0, n)
     .map((x) => ({
+      score: x.sc.score, why: x.sc.why, below: x.sc.below, complexId: x.complex_id == null ? null : String(x.complex_id),
       id: String(x.id), city: city, rooms: x.rooms, area: x.area == null ? null : Number(x.area), floor: x.floor, floors: x.floors,
       price: Number(x.price), addr: x.addr || null, isNew: x.complex_id != null,
       mortgage: true, programs: x.programs ? String(x.programs).split(",") : [], quote: x.quote || null,
@@ -3461,6 +3518,15 @@ async function instaRecentMedia(acc, n) {
   await ensureInsta();
   return (await pool.request().input("acc", sql.NVarChar(20), acc).input("n", sql.Int, n || 30).query(
     "SELECT TOP (@n) media_id, CAST(listing_id AS NVARCHAR(20)) AS listing_id FROM dbo.insta_posts WHERE acc = @acc AND status = 'published' AND media_id IS NOT NULL ORDER BY created_at DESC")).recordset;
+}
+// Квартиры последних постов аккаунта: ЖК и комнаты — чтобы не повторяться.
+async function instaRecentListings(acc, days) {
+  const pool = await getPool();
+  await ensureInsta();
+  return (await pool.request().input("acc", sql.NVarChar(20), acc).input("d", sql.Int, days || 3).query(`
+    SELECT l.complex_id, l.rooms, p.created_at FROM dbo.insta_posts p JOIN dbo.krisha_list l ON l.id = p.listing_id
+    WHERE p.acc = @acc AND p.status = 'published' AND p.created_at >= DATEADD(day, -@d, SYSUTCDATETIME())
+    ORDER BY p.created_at DESC`)).recordset;
 }
 async function instaDmAdd(x) {
   const pool = await getPool();
@@ -4339,7 +4405,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
-  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, instaCandidates, instaListing, listTextSave, listTextStats, mortgageFlagSave, mortgageFlagStats, instaAccounts, instaAccountSet, instaPostAdd, instaPosts, instaPostedSince, instaPostByMedia, instaRecentMedia, instaDmAdd, instaDmMedia, instaDmStats, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
+  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, instaCandidates, instaListing, listTextSave, listTextStats, mortgageFlagSave, mortgageFlagStats, instaAccounts, instaAccountSet, instaPostAdd, instaPosts, instaPostedSince, instaPostByMedia, instaRecentMedia, instaRecentListings, instaDmAdd, instaDmMedia, instaDmStats, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,
