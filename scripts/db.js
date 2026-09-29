@@ -3250,6 +3250,20 @@ BEGIN
   CREATE INDEX IX_ipost_acc ON dbo.insta_posts (acc, created_at DESC);
   CREATE INDEX IX_ipost_listing ON dbo.insta_posts (listing_id);
 END
+IF OBJECT_ID('dbo.krisha_list_text', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.krisha_list_text (
+    id           BIGINT         NOT NULL PRIMARY KEY,
+    descr        NVARCHAR(3000) NULL,
+    params       NVARCHAR(1500) NULL,
+    mortgage     NVARCHAR(8)    NULL,    -- yes | no | NULL (не сказано)
+    mortgage_why NVARCHAR(80)   NULL,
+    programs     NVARCHAR(120)  NULL,
+    quote        NVARCHAR(160)  NULL,
+    at           DATETIME2(0)   NOT NULL CONSTRAINT DF_kltext_at DEFAULT SYSUTCDATETIME()
+  );
+  CREATE INDEX IX_kltext_mortgage ON dbo.krisha_list_text (mortgage, at DESC);
+END
 IF OBJECT_ID('dbo.insta_dms', 'U') IS NULL
 BEGIN
   CREATE TABLE dbo.insta_dms (
@@ -3278,52 +3292,58 @@ async function ensureInsta() {
   await instaReadyPromise;
 }
 
+// Текст карточки: описание хозяина и параметры. Их присылает плагин номеров
+// вместе с номером — он и так открывает карточку, а сервер Крыша не пускает.
+// Отдельная таблица, чтобы не раздувать krisha_list. mortgage — вывод из
+// текста (scripts/mortgage-text.js): yes | no | NULL, why — на чём решили,
+// programs — названные программы, quote — фраза хозяина про ипотеку.
+async function listTextSave(id, desc, params) {
+  const pool = await getPool();
+  await ensureInsta();
+  const c = require("./mortgage-text.js").classify(desc, params);
+  await pool.request()
+    .input("id", sql.BigInt, Number(id))
+    .input("d", sql.NVarChar(3000), desc ? String(desc).slice(0, 3000) : null)
+    .input("p", sql.NVarChar(1500), params ? String(params).slice(0, 1500) : null)
+    .input("m", sql.NVarChar(8), c.mortgage)
+    .input("why", sql.NVarChar(80), c.why ? String(c.why).slice(0, 80) : null)
+    .input("pr", sql.NVarChar(120), c.programs.length ? c.programs.join(",").slice(0, 120) : null)
+    .input("q", sql.NVarChar(160), c.quote ? String(c.quote).slice(0, 160) : null)
+    .query(`
+      UPDATE dbo.krisha_list_text SET descr = @d, params = @p, mortgage = @m, mortgage_why = @why, programs = @pr, quote = @q, at = SYSUTCDATETIME() WHERE id = @id;
+      IF @@ROWCOUNT = 0 INSERT INTO dbo.krisha_list_text (id, descr, params, mortgage, mortgage_why, programs, quote) VALUES (@id, @d, @p, @m, @why, @pr, @q);`);
+  return c;
+}
+async function listTextStats() {
+  const pool = await getPool();
+  await ensureInsta();
+  return (await pool.request().query(`
+    SELECT COUNT(*) AS total, SUM(CASE WHEN mortgage = 'yes' THEN 1 ELSE 0 END) AS yes, SUM(CASE WHEN mortgage = 'no' THEN 1 ELSE 0 END) AS no,
+           SUM(CASE WHEN at >= DATEADD(day, -1, SYSUTCDATETIME()) THEN 1 ELSE 0 END) AS day
+    FROM dbo.krisha_list_text`)).recordset[0];
+}
+
 // Кандидаты в посты: живые квартиры хозяев на продажу с номером и 5+ фото,
-// появились или сменили цену за последние дни, ещё не публиковались (и не
-// падали при публикации — иначе автопостинг долбил бы одну и ту же).
-// Два повода: «ниже рынка» — цена за метр на 8–35% ниже средней по тем же
-// комнатам в том же ЖК (5+ соседей; сильнее 35% — скорее доля, ошибка или
-// обман), и «снизили цену» — минус 3–25% за 3 дня (больше — опечатка в цене). Номера, которые висят на
-// 3+ живых объявлениях, отсеиваем: это посредник под видом хозяина.
+// про которые хозяин написал, что ипотека возможна (см. listTextSave), за
+// последние 10 дней, свежие первыми. Ещё не публиковались (и не падали при
+// публикации — иначе автопостинг долбил бы одну и ту же). Номера, которые
+// висят на 3+ живых объявлениях, отсеиваем: это посредник под видом хозяина.
 async function instaCandidates(city, limit) {
   const pool = await getPool();
   await ensureList(pool);
   await ensureInsta();
   const n = Math.min(40, Math.max(1, Number(limit) || 12));
   const rows = (await pool.request().input("city", sql.NVarChar(40), city).input("n", sql.Int, n * 3).query(`
-    WITH c AS (
-      SELECT id, rooms, area, price, complex_id, addr, phones, photos, photos_c, photos_json, floor, floors, first_seen,
-             CAST(price AS FLOAT) / NULLIF(area, 0) AS ppm
-      FROM dbo.krisha_list
-      WHERE user_type = 'owner' AND deal = 'sale' AND prop = 'flat' AND storage = 'live' AND city = @city
-        AND area >= 20 AND price >= area * 150000
-    ),
-    peers AS (
-      SELECT complex_id, rooms, COUNT(*) AS n, AVG(ppm) AS avg_ppm
-      FROM c WHERE complex_id IS NOT NULL GROUP BY complex_id, rooms HAVING COUNT(*) >= 5
-    ),
-    drops AS (
-      SELECT e.id, MAX(e.old_price) AS old_price, MIN(e.new_price) AS new_price
-      FROM dbo.krisha_list_events e
-      WHERE e.kind = 'price' AND e.at >= DATEADD(day, -3, SYSUTCDATETIME()) AND e.new_price < e.old_price
-      GROUP BY e.id
-    )
     SELECT TOP (@n) c.id, c.rooms, c.area, c.price, c.complex_id, c.addr, c.phones, c.photos, c.photos_c, c.photos_json,
-           c.floor, c.floors, c.first_seen, p.n AS peers, p.avg_ppm,
-           CASE WHEN p.avg_ppm IS NULL THEN NULL ELSE c.ppm / p.avg_ppm END AS ratio,
-           d.old_price
-    FROM c
-    LEFT JOIN peers p ON p.complex_id = c.complex_id AND p.rooms = c.rooms
-    LEFT JOIN drops d ON d.id = c.id AND d.new_price = c.price AND d.old_price >= c.price * 1.03 AND d.old_price <= c.price * 1.25
-    WHERE c.phones IS NOT NULL AND c.photos >= 5
+           c.floor, c.floors, c.first_seen, t.programs, t.quote
+    FROM dbo.krisha_list_text t
+    JOIN dbo.krisha_list c ON c.id = t.id
+    WHERE t.mortgage = 'yes'
+      AND c.user_type = 'owner' AND c.deal = 'sale' AND c.prop = 'flat' AND c.storage = 'live' AND c.city = @city
+      AND c.area >= 20 AND c.price >= c.area * 150000 AND c.phones IS NOT NULL AND c.photos >= 5
+      AND c.first_seen >= DATEADD(day, -10, SYSUTCDATETIME())
       AND NOT EXISTS (SELECT 1 FROM dbo.insta_posts ip WHERE ip.listing_id = c.id)
-      AND (
-        (c.first_seen >= DATEADD(day, -3, SYSUTCDATETIME()) AND c.ppm BETWEEN p.avg_ppm * 0.65 AND p.avg_ppm * 0.92)
-        OR d.id IS NOT NULL
-      )
-    ORDER BY CASE WHEN d.id IS NOT NULL THEN 1 - CAST(c.price AS FLOAT) / d.old_price ELSE 0 END
-           + CASE WHEN p.avg_ppm IS NULL THEN 0 ELSE 1 - c.ppm / p.avg_ppm END DESC
-    OPTION (RECOMPILE)`)).recordset;
+    ORDER BY c.first_seen DESC`)).recordset;
   const busy = await listingsByPhones(rows.flatMap((x) => String(x.phones || "").split(",")));
   const live = (num) => (busy[String(num).replace(/\D/g, "")] || []).filter((l) => l.storage === "live").length;
   return rows
@@ -3332,8 +3352,7 @@ async function instaCandidates(city, limit) {
     .map((x) => ({
       id: String(x.id), city: city, rooms: x.rooms, area: x.area == null ? null : Number(x.area), floor: x.floor, floors: x.floors,
       price: Number(x.price), addr: x.addr || null, isNew: x.complex_id != null,
-      below: x.ratio != null && x.ratio <= 0.92 ? Math.round((1 - x.ratio) * 100) : null, peers: x.peers || null,
-      oldPrice: x.old_price == null ? null : Number(x.old_price),
+      mortgage: true, programs: x.programs ? String(x.programs).split(",") : [], quote: x.quote || null,
       photos: listPhotoUrls(x.photos_c, x.photos_json).map((u) => u.replace(/-560x350\.jpg$/, "-full.jpg")),
     }));
 }
@@ -4283,7 +4302,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
-  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, instaCandidates, instaListing, instaAccounts, instaAccountSet, instaPostAdd, instaPosts, instaPostedSince, instaPostByMedia, instaRecentMedia, instaDmAdd, instaDmMedia, instaDmStats, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
+  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, instaCandidates, instaListing, listTextSave, listTextStats, instaAccounts, instaAccountSet, instaPostAdd, instaPosts, instaPostedSince, instaPostByMedia, instaRecentMedia, instaDmAdd, instaDmMedia, instaDmStats, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,

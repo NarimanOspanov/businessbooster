@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reception365 · телефоны с Крыши
 // @namespace    https://saudager.ai/
-// @version      4.2
+// @version      4.3
 // @description  Берёт из очереди следующий объект без номера, сама жмёт «показать телефон», сохраняет номер, меняет IP прокси и едет дальше сама; в фоновой вкладке ждёт, пока её откроют; капча, не решённая за минуту, перезагружает страницу; снятые и зависшие страницы отмечает промахом с причиной
 // @match        https://krisha.kz/a/show/*
 // @run-at       document-idle
@@ -88,7 +88,7 @@
   function openedSec() { return Math.floor((workMs + (segStart === null ? 0 : Date.now() - segStart)) / 1000); }
   // Версия в панели — чтобы было видно, что Tampermonkey подтянул обновление.
   // Держать в одном значении с @version в заголовке.
-  var VERSION = "4.2";
+  var VERSION = "4.3";
   var status = "";
   function say(html) {
     status = html;
@@ -282,6 +282,22 @@
     return " · перезагрузка через " + Math.ceil(captchaLeftMs() / 1000) + " с";
   }
 
+  // Текст карточки — описание хозяина и параметры. Отправляем вместе с
+  // номером: по нему сервер решает, подходит ли квартира под ипотеку.
+  function cardText() {
+    try {
+      var d = document.querySelector(".js-description") || document.querySelector(".offer__description .text") ||
+        document.querySelector(".offer__description .a-text") || document.querySelector(".offer__description");
+      var params = [];
+      var items = document.querySelectorAll(".offer__short-description .offer__info-item, .offer__parameters dl");
+      for (var i = 0; i < items.length; i++) {
+        var t = (items[i].innerText || "").replace(/\s*\n\s*/g, ": ").trim();
+        if (t) params.push(t);
+      }
+      return { desc: d ? (d.innerText || "").trim().slice(0, 3000) : "", params: params.join("\n").slice(0, 1500) };
+    } catch (e) { return { desc: "", params: "" }; }
+  }
+
   // --- сохранение ---------------------------------------------------------
   function save(phones) {
     if (done) return;
@@ -290,7 +306,8 @@
     clearTimeout(captchaTimer);
     if (!KEY && !askKey()) { say("Без ключа сохранять некуда."); done = false; return; }
     say("Сохраняю " + phones.join(", ") + " …");
-    api("/api/krisha/objphone", "POST", { id: ID, phones: phones })
+    var txt = cardText();
+    api("/api/krisha/objphone", "POST", { id: ID, phones: phones, desc: txt.desc, params: txt.params })
       .then(function (r) {
         if (!r.ok || !r.j.ok) {
           done = false;

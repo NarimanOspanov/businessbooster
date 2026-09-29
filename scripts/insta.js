@@ -36,14 +36,12 @@ function paramsLine(f) {
     f.floor ? f.floor + (f.floors ? "/" + f.floors : "") + " этаж" : null];
   return p.filter(Boolean).join(" · ");
 }
-// Повод поста: снижение цены важнее, иначе «ниже рынка».
+// Повод поста — ипотека: хозяин сам написал, что готов продать в ипотеку.
+// Если назвал программу — она на плашке.
 function hook(f) {
-  if (f.oldPrice && f.oldPrice > f.price) {
-    const pct = Math.round((1 - f.price / f.oldPrice) * 100);
-    return { kind: "drop", badge: "Цена снижена на " + pct + "%", text: "Хозяин снизил цену: было " + money(f.oldPrice) + " ₸, стало " + money(f.price) + " ₸" };
-  }
-  if (f.below) return { kind: "below", badge: "На " + f.below + "% ниже рынка", text: "Цена за метр на " + f.below + "% ниже средней по " + f.rooms + "-комнатным в этом ЖК" };
-  return null;
+  if (!f.mortgage) return null;
+  const pr = (f.programs || [])[0];
+  return { kind: "mortgage", badge: pr ? "Ипотека · " + pr : "Подходит под ипотеку", text: "Хозяин готов продать в ипотеку" };
 }
 // Ширина надписи на глаз: у Montserrat средний знак ≈ 0,6 кегля (жирный ≈ 0,64).
 const textW = (s, size, bold) => String(s).length * size * (bold ? 0.64 : 0.58);
@@ -77,7 +75,7 @@ function coverSvg(f, photo, acc) {
   let badge = "";
   if (h) {
     const bw = textW(h.badge, 34, true) + 64;
-    badge = `<rect x="${W - 48 - bw}" y="${PH - 44}" width="${bw}" height="88" rx="44" fill="#ff6b1a"/>
+    badge = `<rect x="${W - 48 - bw}" y="${PH - 44}" width="${bw}" height="88" rx="44" fill="#ff7a1a"/>
       <text x="${W - 48 - bw / 2}" y="${PH + 12}" text-anchor="middle" font-size="34" font-weight="800" fill="#fff">${esc(h.badge)}</text>`;
   }
   const img = photo ? `<image href="${dataUri(photo)}" x="0" y="0" width="${W}" height="${PH}" preserveAspectRatio="xMidYMid slice"/>` : "";
@@ -177,8 +175,12 @@ function caption(f, acc) {
     "📍 " + A.city + ", " + cleanAddr(f.addr),
     "💰 " + money(f.price) + " ₸" + (f.area ? " (" + money(Math.round(f.price / f.area / 1000)) + " тыс ₸/м²)" : ""),
   ];
-  if (h) lines.push((h.kind === "drop" ? "📉 " : "🔥 ") + h.text);
+  if (h) {
+    lines.push("🏦 " + h.text + ((f.programs || []).length ? " (" + f.programs.join(", ") + ")" : ""));
+    if (f.quote) lines.push("💬 Из объявления: «" + f.quote + "»");
+  }
   lines.push("", "✅ Продаёт хозяин — без посредников и лишних комиссий.", "",
+    "📊 Подобрать ипотечную программу и посчитать платёж — ссылка в шапке профиля.", "",
     "👉 Хотите номер хозяина? Подпишитесь на @" + A.handle + " и поставьте «+» в комментариях — пришлём номер в директ.", "",
     A.tags);
   return lines.join("\n");
