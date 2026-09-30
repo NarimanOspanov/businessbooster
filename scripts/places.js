@@ -67,7 +67,7 @@ async function nearby(lat, lon) {
   const metro = named(g.metro);
   if (metro) parts.push("метро «" + metro.replace(/^метро\s+/i, "") + "»");
   const mall = named(g.mall);
-  if (mall) parts.push("ТРЦ «" + mall.replace(/^(ТРЦ|ТЦ)\s+/i, "") + "»");
+  if (mall) parts.push("ТРЦ «" + mall.replace(/^(ТРЦ|ТРК|ТЦ)\s+/i, "") + "»");
   const cnt = (k, one, few, many) => { const n = g[k].size; if (n) parts.push(n === 1 ? one : n + " " + plural(n, one, few, many)); };
   cnt("school", "школа", "школы", "школ");
   cnt("kinder", "детсад", "детсада", "детсадов");
