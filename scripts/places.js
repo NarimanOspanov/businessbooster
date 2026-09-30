@@ -45,9 +45,9 @@ async function nearby(lat, lon) {
   if (!lat || !lon) return null;
   const body = "data=" + encodeURIComponent(query(Number(lat).toFixed(6), Number(lon).toFixed(6)));
   let j = null, last = null;
-  for (const url of OVERPASS.concat(OVERPASS)) {
+  for (const url of OVERPASS) {
     try {
-      const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "ipoteka1-bot/1.0" }, body: body, signal: AbortSignal.timeout(30000) });
+      const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "ipoteka1-bot/1.0" }, body: body, signal: AbortSignal.timeout(20000) });
       if (!r.ok) { last = new Error("overpass_" + r.status); continue; }
       j = await r.json();
       break;

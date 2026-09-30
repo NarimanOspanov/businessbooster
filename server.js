@@ -4861,19 +4861,32 @@ async function instaCandidates(acc, fresh) {
 }
 // «Что рядом» (scripts/places.js): одна фраза для обложки и подписи. Только
 // для отобранных кандидатов, с кэшем в базе; не нашли — строки просто нет.
+// Overpass бывает медленным, а у Azure запрос живёт ~230 секунд, поэтому
+// недостающее ищем в фоне (по 3 параллельно) и не ждём: строка появится у
+// квартиры в следующем подборе, а пока пост выйдет без неё.
 const PLACES = require("./scripts/places.js");
+const instaPlacesBusy = new Set();
 async function instaApplyPlaces(rows) {
   const have = await db.instaPlacesGet(rows.map((r) => r.id));
+  const todo = [];
   for (const r of rows) {
-    if (!have[r.id] && r.lat && r.lon) {
-      try {
-        const p = await PLACES.nearby(r.lat, r.lon);
-        await db.instaPlaceSave(r.id, p);
-        have[r.id] = { text: p ? p.text : null };
-      } catch (e) { console.log("[insta] places " + r.id + ": " + e.message); }
-    }
     if (have[r.id] && have[r.id].text) r.near = have[r.id].text;
+    else if (!have[r.id] && r.lat && r.lon && !instaPlacesBusy.has(r.id)) todo.push(r);
   }
+  if (!todo.length) return;
+  todo.forEach((r) => instaPlacesBusy.add(r.id));
+  (async () => {
+    for (let i = 0; i < todo.length; i += 3) {
+      await Promise.all(todo.slice(i, i + 3).map(async (r) => {
+        try {
+          const p = await PLACES.nearby(r.lat, r.lon);
+          await db.instaPlaceSave(r.id, p);
+          if (p && p.text) r.near = p.text; // тот же объект лежит в кэше кандидатов
+        } catch (e) { console.log("[insta] places " + r.id + ": " + e.message); }
+        finally { instaPlacesBusy.delete(r.id); }
+      }));
+    }
+  })();
 }
 // Взгляд на фото (Gemini, scripts/photo-score.js): совсем непрезентабельные
 // квартиры не публикуем, остальным балл ±, а фото ставим в порядке от
