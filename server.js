@@ -4823,6 +4823,10 @@ function buildGoogleFeed(slug, origin) {
 const INSTA = require("./scripts/insta.js");
 const INSTA_ACCS = ["almaty", "astana"];
 const instaImgs = new Map();      // токен ссылки → { at, slides }
+// Картинки ещё и на диск: на Azure бывает несколько экземпляров сервера, а
+// /home у них общий — Instagram приходит за картинкой не обязательно туда,
+// где она лежит в памяти. Локально — во временную папку.
+const INSTA_IMG_DIR = path.join(fs.existsSync("/home/site") ? "/home/data" : require("os").tmpdir(), "insta-img");
 const instaPreview = new Map();   // acc:id → { at, slides | cover }
 const instaCand = {};             // acc → { at, rows }
 const instaPauseUntil = {};       // acc → время, до которого автопостинг молчит после ошибки
@@ -4836,6 +4840,12 @@ function instaHookKey() {
 function instaGc() {
   const now = Date.now();
   for (const [k, v] of instaImgs) if (now - v.at > 3600e3) instaImgs.delete(k);
+  try {
+    for (const d of fs.readdirSync(INSTA_IMG_DIR)) {
+      const p = path.join(INSTA_IMG_DIR, d);
+      if (now - fs.statSync(p).mtimeMs > 3600e3) fs.rmSync(p, { recursive: true, force: true });
+    }
+  } catch { /* папки ещё нет */ }
   for (const [k, v] of instaPreview) if (now - v.at > 1800e3) instaPreview.delete(k);
   for (const [k, v] of instaComments) if (now - v.at > 600e3) instaComments.delete(k);
 }
@@ -4929,6 +4939,10 @@ async function instaPublish(acc, f) {
       const slides = await INSTA.renderCarousel(fc, acc);
       const tok = crypto.randomBytes(12).toString("hex");
       instaImgs.set(tok, { at: Date.now(), slides: slides });
+      try {
+        fs.mkdirSync(path.join(INSTA_IMG_DIR, tok), { recursive: true });
+        slides.forEach((b, i) => fs.writeFileSync(path.join(INSTA_IMG_DIR, tok, i + ".jpg"), b));
+      } catch (e) { console.log("[insta] img to disk: " + e.message); }
       const urls = slides.map((_, i) => PUBLIC_URL + "/api/insta/img/" + tok + "/" + i + ".jpg");
       const r = await INSTA.publishCarousel(a.ig_user_id, a.token, urls, cap);
       await db.instaPostFinish(code, { status: "published", mediaId: r.mediaId, permalink: r.permalink, caption: cap });
@@ -7014,7 +7028,8 @@ http
       const m = /^\/api\/insta\/img\/([a-f0-9]{24})\/(\d+)\.jpg$/.exec(urlPath);
       if (m) {
         const hit = instaImgs.get(m[1]);
-        const img = hit && hit.slides[Number(m[2])];
+        let img = hit && hit.slides[Number(m[2])];
+        if (!img) { try { img = fs.readFileSync(path.join(INSTA_IMG_DIR, m[1], Number(m[2]) + ".jpg")); } catch { img = null; } }
         if (!img) { res.writeHead(404); res.end(); return; }
         res.writeHead(200, { "Content-Type": "image/jpeg", "Content-Length": img.length, "Cache-Control": "no-store" });
         res.end(img);
