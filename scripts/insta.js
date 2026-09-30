@@ -225,7 +225,16 @@ async function publishCarousel(userId, token, imageUrls, text) {
   for (const k of kids) await waitReady(k, token);
   const car = await ig("POST", "/" + userId + "/media", { media_type: "CAROUSEL", children: kids.join(","), caption: text }, token);
   await waitReady(car.id, token);
-  const pub = await ig("POST", "/" + userId + "/media_publish", { creation_id: car.id }, token);
+  // Instagram бывает говорит FINISHED, а публикация всё равно отвечает «media
+  // is not ready» — карусель доделывается у них ещё несколько секунд. Повторяем.
+  let pub;
+  for (let i = 0; ; i++) {
+    try { pub = await ig("POST", "/" + userId + "/media_publish", { creation_id: car.id }, token); break; }
+    catch (e) {
+      if (!/not ready|2207027|9007/i.test(String(e.message)) || i >= 7) throw e;
+      await new Promise((r) => setTimeout(r, [3, 5, 7, 10, 12, 15, 15][i] * 1000));
+    }
+  }
   let permalink = null;
   try { permalink = (await ig("GET", "/" + pub.id, { fields: "permalink" }, token)).permalink || null; } catch { /* ссылка — не главное */ }
   return { mediaId: pub.id, permalink: permalink };

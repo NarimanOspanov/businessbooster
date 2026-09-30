@@ -3360,8 +3360,9 @@ async function listTextStats() {
 // Кандидаты в посты: живые квартиры хозяев на продажу с номером и 5+ фото,
 // которые можно купить в ипотеку — хозяин отметил это в объявлении (фильтр
 // Крыши, dbo.krisha_mortgage) или написал в описании (listTextSave; «нет» в
-// тексте перевешивает отметку), за последние 10 дней, свежие первыми. Ещё не публиковались (и не падали при
-// публикации — иначе автопостинг долбил бы одну и ту же). Номера, которые
+// тексте перевешивает отметку), за последние 10 дней, свежие первыми. Ещё не публиковались и не пропущены;
+// упавшие при публикации возвращаются через час (иначе автопостинг долбил бы
+// одну и ту же, а разовый сбой Instagram выкидывал бы квартиру насовсем). Номера, которые
 // висят на 3+ живых объявлениях, отсеиваем: это посредник под видом хозяина.
 // Средняя цена метра по ЖК и комнатам среди живых квартир хозяев — для
 // «дешевле соседей по ЖК». Считать дорого (весь город), поэтому раз в 6 часов.
@@ -3430,7 +3431,8 @@ async function instaCandidates(city, limit) {
       AND c.user_type = 'owner' AND c.deal = 'sale' AND c.prop = 'flat' AND c.storage = 'live' AND c.city = @city
       AND c.area >= 20 AND c.price >= c.area * 150000 AND c.phones IS NOT NULL AND c.photos >= 5
       AND c.first_seen >= DATEADD(day, -10, SYSUTCDATETIME())
-      AND NOT EXISTS (SELECT 1 FROM dbo.insta_posts ip WHERE ip.listing_id = c.id)
+      AND NOT EXISTS (SELECT 1 FROM dbo.insta_posts ip WHERE ip.listing_id = c.id
+                      AND (ip.status <> 'failed' OR ip.created_at >= DATEADD(hour, -1, SYSUTCDATETIME())))
     ORDER BY c.first_seen DESC`)).recordset;
   // Сначала балл, потом проверка номеров на посредника — только для верхушки:
   // поиск номера по базе дорогой, на 400 номерах он был бы полным сканом много раз.
