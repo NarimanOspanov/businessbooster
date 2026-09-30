@@ -4908,8 +4908,13 @@ function almatyDayStart(now) {
 // Раз в 10 минут смотрим, не наступил ли очередной час, за который ещё не постили. После ошибки аккаунт молчит час, а
 // админам уходит уведомление. Токен продлеваем за 10 дней до конца.
 const INSTA_SLOTS = { 1: [19], 2: [10, 19], 3: [9, 14, 20], 4: [9, 13, 17, 21], 5: [9, 12, 15, 18, 21], 6: [9, 11, 14, 17, 19, 21] };
+let instaPrunedAt = 0;
 async function instaTick() {
   instaGc();
+  if (Date.now() - instaPrunedAt > 86400e3) {
+    instaPrunedAt = Date.now();
+    db.instaDmPrune().then((n) => { if (n) console.log("[insta] удалено старых запросов: " + n); }).catch(() => {});
+  }
   let accs;
   try { accs = await db.instaAccounts(); } catch (e) { return; }
   const now = new Date();
