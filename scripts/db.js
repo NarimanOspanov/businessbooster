@@ -3494,6 +3494,30 @@ async function instaPostAdd(p) {
     .query(`INSERT INTO dbo.insta_posts (acc, listing_id, status, reason, media_id, permalink, caption, error)
             VALUES (@acc, @lid, @status, @reason, @mid, @link, @cap, @err)`);
 }
+// Номер поста (post_id) — это и есть его код для комментариев. Поэтому
+// строку заводим до публикации: код должен попасть на слайды и в подпись.
+async function instaPostReserve(acc, listingId, reason) {
+  const pool = await getPool();
+  await ensureInsta();
+  const r = await pool.request().input("acc", sql.NVarChar(20), acc).input("lid", sql.BigInt, Number(listingId)).input("reason", sql.NVarChar(40), reason || null)
+    .query("INSERT INTO dbo.insta_posts (acc, listing_id, status, reason) OUTPUT INSERTED.post_id VALUES (@acc, @lid, 'publishing', @reason)");
+  return r.recordset[0].post_id;
+}
+async function instaPostFinish(postId, p) {
+  const pool = await getPool();
+  await ensureInsta();
+  await pool.request().input("id", sql.Int, postId).input("status", sql.NVarChar(16), p.status)
+    .input("mid", sql.NVarChar(40), p.mediaId || null).input("link", sql.NVarChar(300), p.permalink || null)
+    .input("cap", sql.NVarChar(2200), p.caption || null).input("err", sql.NVarChar(500), p.error ? String(p.error).slice(0, 500) : null)
+    .query("UPDATE dbo.insta_posts SET status = @status, media_id = @mid, permalink = @link, caption = @cap, error = @err WHERE post_id = @id");
+}
+// Пост по коду из комментария: только опубликованный и только этого аккаунта.
+async function instaPostByCode(acc, code) {
+  const pool = await getPool();
+  await ensureInsta();
+  return (await pool.request().input("acc", sql.NVarChar(20), acc).input("id", sql.Int, Number(code) || 0).query(
+    "SELECT post_id, CAST(listing_id AS NVARCHAR(20)) AS listing_id, media_id FROM dbo.insta_posts WHERE post_id = @id AND acc = @acc AND status = 'published'")).recordset[0] || null;
+}
 async function instaPosts(acc, limit) {
   const pool = await getPool();
   await ensureInsta();
@@ -4415,7 +4439,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
-  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, instaCandidates, instaListing, listTextSave, listTextStats, mortgageFlagSave, mortgageFlagStats, instaAccounts, instaAccountSet, instaPostAdd, instaPosts, instaPostedSince, instaPostByMedia, instaRecentMedia, instaRecentListings, instaDmAdd, instaDmMedia, instaDmStats, instaDmPrune, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
+  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, instaCandidates, instaListing, instaPostReserve, instaPostFinish, instaPostByCode, listTextSave, listTextStats, mortgageFlagSave, mortgageFlagStats, instaAccounts, instaAccountSet, instaPostAdd, instaPosts, instaPostedSince, instaPostByMedia, instaRecentMedia, instaRecentListings, instaDmAdd, instaDmMedia, instaDmStats, instaDmPrune, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,
