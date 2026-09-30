@@ -3287,6 +3287,14 @@ IF OBJECT_ID('dbo.insta_photo_scores', 'U') IS NULL
     best       NVARCHAR(200) NULL,   -- JSON: индексы фото от лучшего
     at         DATETIME2(0)  NOT NULL CONSTRAINT DF_iphs_at DEFAULT SYSUTCDATETIME()
   );
+-- «Что рядом» с домом (scripts/places.js, OpenStreetMap) — фраза для поста.
+IF OBJECT_ID('dbo.insta_places', 'U') IS NULL
+  CREATE TABLE dbo.insta_places (
+    listing_id BIGINT        NOT NULL PRIMARY KEY,
+    text       NVARCHAR(120) NULL,   -- NULL: рядом ничего не нашлось
+    facts      NVARCHAR(200) NULL,
+    at         DATETIME2(0)  NOT NULL CONSTRAINT DF_iplc_at DEFAULT SYSUTCDATETIME()
+  );
 IF OBJECT_ID('dbo.insta_dms', 'U') IS NULL
 BEGIN
   CREATE TABLE dbo.insta_dms (
@@ -3413,7 +3421,10 @@ function instaScore(x, city, peers) {
   let below = null;
   if (p && x.area) {
     below = Math.round((1 - Number(x.price) / Number(x.area) / p.ppm) * 100);
-    if (below >= 5 && below <= 40) add(Math.min(20, below * 0.8), "на " + below + "% дешевле соседей по ЖК");
+    // Выгодно, но без «тухляка»: 3–10% дешевле соседей — находка (+6 и плашка
+    // «ниже рынка»); 10–20% — без бонуса; дешевле на 20%+ обычно неспроста — минус.
+    if (below >= 3 && below <= 10) add(6, "на " + below + "% дешевле соседей по ЖК");
+    else if (below > 20) add(-5, "на " + below + "% дешевле соседей — подозрительно");
     else if (below <= -15) add(-10, "на " + -below + "% дороже соседей по ЖК");
   }
   add(Math.min(Number(x.photos) || 0, 12) / 12 * 10, (x.photos || 0) + " фото");
@@ -3422,7 +3433,7 @@ function instaScore(x, city, peers) {
   if (x.programs) add(5, "программа: " + x.programs);
   const a = String(x.addr || "").split(" — ")[0];
   if (!/[А-Яа-яЁёӘәҒғҚқҢңӨөҰұҮүҺһІі]{3}/.test(a)) add(-5, "адрес без улицы");
-  return { score: s, why: why, below: below };
+  return { score: s, why: why, below: below != null && below >= 3 && below <= 10 ? below : null };
 }
 
 async function instaCandidates(city, limit) {
@@ -3433,7 +3444,7 @@ async function instaCandidates(city, limit) {
   const peers = await complexPeers(city).catch(() => ({}));
   const rows = (await pool.request().input("city", sql.NVarChar(40), city).input("n", sql.Int, 400).query(`
     SELECT TOP (@n) c.id, c.rooms, c.area, c.price, c.complex_id, c.addr, c.phones, c.photos, c.photos_c, c.photos_json,
-           c.floor, c.floors, c.first_seen, t.programs, t.quote
+           c.floor, c.floors, c.first_seen, c.lat, c.lon, t.programs, t.quote
     FROM dbo.krisha_list c
     LEFT JOIN dbo.krisha_list_text t ON t.id = c.id
     WHERE c.id IN (SELECT id FROM dbo.krisha_mortgage WHERE seen_at >= DATEADD(day, -2, SYSUTCDATETIME())
@@ -3457,6 +3468,7 @@ async function instaCandidates(city, limit) {
     .slice(0, n)
     .map((x) => ({
       score: x.sc.score, why: x.sc.why, below: x.sc.below, complexId: x.complex_id == null ? null : String(x.complex_id),
+      lat: x.lat == null ? null : Number(x.lat), lon: x.lon == null ? null : Number(x.lon),
       id: String(x.id), city: city, rooms: x.rooms, area: x.area == null ? null : Number(x.area), floor: x.floor, floors: x.floors,
       price: Number(x.price), addr: x.addr || null, isNew: x.complex_id != null,
       mortgage: true, programs: x.programs ? String(x.programs).split(",") : [], quote: x.quote || null,
@@ -3528,6 +3540,24 @@ async function instaPhotoScoreSave(id, s) {
     .input("rs", sql.NVarChar(200), String(s.reason || "").slice(0, 200)).input("b", sql.NVarChar(200), JSON.stringify(s.order || []).slice(0, 200))
     .query(`UPDATE dbo.insta_photo_scores SET overall = @o, reject = @rj, reason = @rs, best = @b, at = SYSUTCDATETIME() WHERE listing_id = @id;
             IF @@ROWCOUNT = 0 INSERT INTO dbo.insta_photo_scores (listing_id, overall, reject, reason, best) VALUES (@id, @o, @rj, @rs, @b);`);
+}
+async function instaPlacesGet(ids) {
+  const list = [...new Set((ids || []).map((x) => Number(x)).filter((x) => Number.isSafeInteger(x) && x > 0))];
+  const out = {};
+  if (!list.length) return out;
+  const pool = await getPool();
+  await ensureInsta();
+  const rows = (await pool.request().query("SELECT listing_id, text FROM dbo.insta_places WHERE listing_id IN (" + list.join(",") + ")")).recordset;
+  for (const r of rows) out[String(r.listing_id)] = { text: r.text || null };
+  return out;
+}
+async function instaPlaceSave(id, p) {
+  const pool = await getPool();
+  await ensureInsta();
+  await pool.request().input("id", sql.BigInt, Number(id)).input("t", sql.NVarChar(120), p && p.text ? String(p.text).slice(0, 120) : null)
+    .input("f", sql.NVarChar(200), p && p.facts ? JSON.stringify(p.facts).slice(0, 200) : null)
+    .query(`UPDATE dbo.insta_places SET text = @t, facts = @f, at = SYSUTCDATETIME() WHERE listing_id = @id;
+            IF @@ROWCOUNT = 0 INSERT INTO dbo.insta_places (listing_id, text, facts) VALUES (@id, @t, @f);`);
 }
 async function instaPostReserve(acc, listingId, reason) {
   const pool = await getPool();
@@ -4472,7 +4502,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
-  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, instaCandidates, instaListing, instaPostReserve, instaPostFinish, instaPostByCode, instaPhotoScoresGet, instaPhotoScoreSave, listTextSave, listTextStats, mortgageFlagSave, mortgageFlagStats, instaAccounts, instaAccountSet, instaPostAdd, instaPosts, instaPostedSince, instaPostByMedia, instaRecentMedia, instaRecentListings, instaDmAdd, instaDmMedia, instaDmStats, instaDmPrune, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
+  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, instaCandidates, instaListing, instaPostReserve, instaPostFinish, instaPostByCode, instaPhotoScoresGet, instaPhotoScoreSave, instaPlacesGet, instaPlaceSave, listTextSave, listTextStats, mortgageFlagSave, mortgageFlagStats, instaAccounts, instaAccountSet, instaPostAdd, instaPosts, instaPostedSince, instaPostByMedia, instaRecentMedia, instaRecentListings, instaDmAdd, instaDmMedia, instaDmStats, instaDmPrune, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,

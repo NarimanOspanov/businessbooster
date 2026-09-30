@@ -85,14 +85,24 @@ function coverSvg(f, photo, acc) {
   ${img}
   <rect x="40" y="40" width="${pw}" height="64" rx="32" fill="#1e8422"/>
   <text x="${40 + pw / 2}" y="82" text-anchor="middle" font-size="26" font-weight="700" fill="#fff" letter-spacing="1">${pill}</text>
+  ${f.below ? belowPill(f.below) : ""}
   ${badge}
   <text x="56" y="${PH + 170}" font-size="96" font-weight="800" fill="#fff">${esc(money(f.price))} ₸</text>
   <text x="56" y="${PH + 250}" font-size="42" font-weight="700" fill="#e9f2ec">${esc(paramsLine(f))}</text>
   <text x="56" y="${PH + 318}" font-size="36" font-weight="500" fill="#a9c2b3">${esc(A.city + ", " + cleanAddr(f.addr))}</text>
   ${ppm ? `<text x="56" y="${PH + 378}" font-size="30" font-weight="500" fill="#7f9a8a">${esc(money(ppm))} тыс ₸ за м²${f.isNew ? " · новостройка" : ""}</text>` : ""}
+  ${f.near ? `<text x="56" y="${PH + 432}" font-size="28" font-weight="500" fill="#9fc3ad">${esc(f.near)}</text>` : ""}
   <text x="${W - 56}" y="${H - 44}" text-anchor="end" font-size="26" font-weight="500" fill="#6f8a7b">листайте →</text>
   ${f.code ? codePill(f.code) : ""}
 </svg>`;
+}
+
+// Третья ценность: «ниже рынка на N%» — вторая зелёная плашка под первой.
+function belowPill(pct) {
+  const t = "НИЖЕ РЫНКА НА " + pct + "%";
+  const w = t.length * 26 * 0.78 + 64;
+  return `<rect x="40" y="116" width="${w}" height="64" rx="32" fill="#1e8422"/>
+  <text x="${40 + w / 2}" y="158" text-anchor="middle" font-size="26" font-weight="700" fill="#fff" letter-spacing="1">${esc(t)}</text>`;
 }
 
 // Код поста: его пишут в комментарии, и по нему сервер отдаёт номер хозяина
@@ -184,7 +194,7 @@ function caption(f, acc) {
   const A = ACCOUNTS[acc] || ACCOUNTS.almaty;
   const h = hook(f);
   const lines = [
-    "🔑 От хозяев · можно в ипотеку", "",
+    "🔑 От хозяев · можно в ипотеку" + (f.below ? " · ниже рынка" : ""), "",
     "🏠 " + paramsLine(f).replace(/-комн/, "-комнатная квартира") + (f.isNew ? ", новостройка" : ""),
     "📍 " + A.city + ", " + cleanAddr(f.addr),
     "💰 " + money(f.price) + " ₸" + (f.area ? " (" + money(Math.round(f.price / f.area / 1000)) + " тыс ₸/м²)" : ""),
@@ -193,6 +203,8 @@ function caption(f, acc) {
     lines.push("🏦 " + h.text + ((f.programs || []).length ? " (" + f.programs.join(", ") + ")" : ""));
     if (f.quote) lines.push("💬 Из объявления: «" + f.quote + "»");
   }
+  if (f.below) lines.push("💚 Ниже рынка: метр на " + f.below + "% дешевле похожих квартир в этом ЖК");
+  if (f.near) lines.push("📍 " + f.near);
   lines.push("", "✅ Продаёт хозяин — без посредников и лишних комиссий.", "",
     "📊 Подобрать ипотечную программу и посчитать платёж — ссылка в шапке профиля.", "",
     f.code
