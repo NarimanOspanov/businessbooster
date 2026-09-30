@@ -232,8 +232,17 @@ async function waitReady(id, token) {
 // Карусель: контейнер на каждую картинку, контейнер карусели, публикация.
 async function publishCarousel(userId, token, imageUrls, text) {
   const kids = [];
+  // Instagram иногда не дожидается картинки и отвечает «could not be fetched»,
+  // хотя ссылка живая (проверяли: отдаётся стабильно). Пробуем слайд ещё раз.
   for (const url of imageUrls) {
-    const j = await ig("POST", "/" + userId + "/media", { image_url: url, is_carousel_item: "true" }, token);
+    let j;
+    for (let t = 0; ; t++) {
+      try { j = await ig("POST", "/" + userId + "/media", { image_url: url, is_carousel_item: "true" }, token); break; }
+      catch (e) {
+        if (!/could not be fetched|2207052|9004/i.test(String(e.message)) || t >= 3) throw e;
+        await new Promise((r) => setTimeout(r, 4000 * (t + 1)));
+      }
+    }
     kids.push(j.id);
   }
   for (const k of kids) await waitReady(k, token);
