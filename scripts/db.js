@@ -3276,6 +3276,17 @@ BEGIN
   );
   CREATE INDEX IX_kmort_seen ON dbo.krisha_mortgage (seen_at DESC);
 END
+-- Оценка фото объявления (scripts/photo-score.js): общий балл, «не публиковать»,
+-- порядок лучших фото. Считаем один раз на квартиру — это платный вызов модели.
+IF OBJECT_ID('dbo.insta_photo_scores', 'U') IS NULL
+  CREATE TABLE dbo.insta_photo_scores (
+    listing_id BIGINT        NOT NULL PRIMARY KEY,
+    overall    DECIMAL(4,1)  NOT NULL,
+    reject     BIT           NOT NULL,
+    reason     NVARCHAR(200) NULL,
+    best       NVARCHAR(200) NULL,   -- JSON: индексы фото от лучшего
+    at         DATETIME2(0)  NOT NULL CONSTRAINT DF_iphs_at DEFAULT SYSUTCDATETIME()
+  );
 IF OBJECT_ID('dbo.insta_dms', 'U') IS NULL
 BEGIN
   CREATE TABLE dbo.insta_dms (
@@ -3496,6 +3507,28 @@ async function instaPostAdd(p) {
 }
 // Номер поста (post_id) — это и есть его код для комментариев. Поэтому
 // строку заводим до публикации: код должен попасть на слайды и в подпись.
+async function instaPhotoScoresGet(ids) {
+  const list = [...new Set((ids || []).map((x) => Number(x)).filter((x) => Number.isSafeInteger(x) && x > 0))];
+  const out = {};
+  if (!list.length) return out;
+  const pool = await getPool();
+  await ensureInsta();
+  const rows = (await pool.request().query("SELECT listing_id, overall, reject, reason, best FROM dbo.insta_photo_scores WHERE listing_id IN (" + list.join(",") + ")")).recordset;
+  for (const r of rows) {
+    let order = [];
+    try { order = JSON.parse(r.best || "[]"); } catch { order = []; }
+    out[String(r.listing_id)] = { overall: Number(r.overall), reject: !!r.reject, reason: r.reason || "", order: order };
+  }
+  return out;
+}
+async function instaPhotoScoreSave(id, s) {
+  const pool = await getPool();
+  await ensureInsta();
+  await pool.request().input("id", sql.BigInt, Number(id)).input("o", sql.Decimal(4, 1), Number(s.overall) || 0).input("rj", sql.Bit, s.reject ? 1 : 0)
+    .input("rs", sql.NVarChar(200), String(s.reason || "").slice(0, 200)).input("b", sql.NVarChar(200), JSON.stringify(s.order || []).slice(0, 200))
+    .query(`UPDATE dbo.insta_photo_scores SET overall = @o, reject = @rj, reason = @rs, best = @b, at = SYSUTCDATETIME() WHERE listing_id = @id;
+            IF @@ROWCOUNT = 0 INSERT INTO dbo.insta_photo_scores (listing_id, overall, reject, reason, best) VALUES (@id, @o, @rj, @rs, @b);`);
+}
 async function instaPostReserve(acc, listingId, reason) {
   const pool = await getPool();
   await ensureInsta();
@@ -4439,7 +4472,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
-  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, instaCandidates, instaListing, instaPostReserve, instaPostFinish, instaPostByCode, listTextSave, listTextStats, mortgageFlagSave, mortgageFlagStats, instaAccounts, instaAccountSet, instaPostAdd, instaPosts, instaPostedSince, instaPostByMedia, instaRecentMedia, instaRecentListings, instaDmAdd, instaDmMedia, instaDmStats, instaDmPrune, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
+  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, instaCandidates, instaListing, instaPostReserve, instaPostFinish, instaPostByCode, instaPhotoScoresGet, instaPhotoScoreSave, listTextSave, listTextStats, mortgageFlagSave, mortgageFlagStats, instaAccounts, instaAccountSet, instaPostAdd, instaPosts, instaPostedSince, instaPostByMedia, instaRecentMedia, instaRecentListings, instaDmAdd, instaDmMedia, instaDmStats, instaDmPrune, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,
