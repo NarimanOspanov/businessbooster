@@ -3361,7 +3361,7 @@ async function listTextStats() {
 // которые можно купить в ипотеку — хозяин отметил это в объявлении (фильтр
 // Крыши, dbo.krisha_mortgage) или написал в описании (listTextSave; «нет» в
 // тексте перевешивает отметку), за последние 10 дней, свежие первыми. Ещё не публиковались и не пропущены;
-// упавшие при публикации возвращаются через час (иначе автопостинг долбил бы
+// удалённые из Instagram (status deleted) — сразу; упавшие при публикации возвращаются через час (иначе автопостинг долбил бы
 // одну и ту же, а разовый сбой Instagram выкидывал бы квартиру насовсем). Номера, которые
 // висят на 3+ живых объявлениях, отсеиваем: это посредник под видом хозяина.
 // Средняя цена метра по ЖК и комнатам среди живых квартир хозяев — для
@@ -3432,7 +3432,7 @@ async function instaCandidates(city, limit) {
       AND c.area >= 20 AND c.price >= c.area * 150000 AND c.phones IS NOT NULL AND c.photos >= 5
       AND c.first_seen >= DATEADD(day, -10, SYSUTCDATETIME())
       AND NOT EXISTS (SELECT 1 FROM dbo.insta_posts ip WHERE ip.listing_id = c.id
-                      AND (ip.status <> 'failed' OR ip.created_at >= DATEADD(hour, -1, SYSUTCDATETIME())))
+                      AND (ip.status NOT IN ('failed', 'deleted') OR (ip.status = 'failed' AND ip.created_at >= DATEADD(hour, -1, SYSUTCDATETIME()))))
     ORDER BY c.first_seen DESC`)).recordset;
   // Сначала балл, потом проверка номеров на посредника — только для верхушки:
   // поиск номера по базе дорогой, на 400 номерах он был бы полным сканом много раз.
