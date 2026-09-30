@@ -7006,22 +7006,30 @@ http
         if (!hit) hit = await instaFindPlus(acc, user);
         if (!hit) {
           // Пока приложение Meta не прошло проверку, Instagram не отдаёт нам
-          // комментарии посторонних людей, и какой пост с «+», не узнать. Тогда
-          // присылаем номера хозяев из последних постов — каждый с описанием квартиры.
-          const recent = await db.instaRecentMedia(acc, 3);
+          // комментарии посторонних людей, и какой пост с «+», не узнать, а
+          // ManyChat текст комментария не передаёт. Тогда присылаем номера хозяев
+          // из постов от нового к старому, у каждого код поста — тот же, что на
+          // обложке. Сколько влезет: сообщение в Instagram — до 1000 символов.
+          const LIMIT = 1000;
+          const head = "Номера хозяев по коду поста (код — на обложке, справа вверху):";
+          const tail = "Нет вашего кода? Напишите его в ответ — пришлём номер 🔑";
+          const recent = await db.instaRecentMedia(acc, 100);
           const lines = [];
+          let size = head.length + tail.length + 4;
           for (const m of recent) {
             const r = await db.instaListing(m.listing_id).catch(() => null);
             const ph = String((r && r.phones) || "").split(",").map((x) => x.trim()).filter(Boolean);
             if (!r || !ph.length || (r.storage && r.storage !== "live")) continue;
             const what = [r.rooms ? r.rooms + "-комн" : null, r.area ? String(r.area).replace(".", ",") + " м²" : null, INSTA.cleanAddr(r.addr),
-              (Math.round(r.price / 1e5) / 10).toString().replace(".", ",") + " млн ₸"].filter(Boolean).join(" · ");
-            lines.push("🏠 " + what + "\n📞 " + ph.map(instaPhoneFmt).join(", "));
+              (Math.round(r.price / 1e5) / 10).toString().replace(".", ",") + " млн ₸"].filter(Boolean).join(", ");
+            const line = "КОД " + m.post_id + " — " + what + "\n📞 " + ph.map(instaPhoneFmt).join(", ");
+            if (size + line.length + 2 > LIMIT) break;
+            size += line.length + 2;
+            lines.push(line);
           }
           await db.instaDmAdd({ acc: acc, username: user, found: lines.length > 0 }).catch(() => {});
-          if (!lines.length) return send(200, { ok: true, found: false, text: "Не получилось найти номер прямо сейчас 😔 Напишите нам в ответ, какая квартира понравилась, — пришлём номер хозяина." });
-          return send(200, { ok: true, found: true, text: "Номера хозяев из наших последних постов:\n\n" + lines.join("\n\n") +
-            "\n\nПишите или звоните напрямую — без посредников. Если нужна другая квартира, напишите нам её цену или адрес 🔑" });
+          if (!lines.length) return send(200, { ok: true, found: false, text: "Не получилось найти номер прямо сейчас 😔 Напишите нам в ответ код квартиры с обложки поста — пришлём номер хозяина." });
+          return send(200, { ok: true, found: true, text: head + "\n\n" + lines.join("\n\n") + "\n\n" + tail });
         }
         const f = await db.instaListing(hit.listing);
         const phones = String((f && f.phones) || "").split(",").map((x) => x.trim()).filter(Boolean);

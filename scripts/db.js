@@ -3543,7 +3543,7 @@ async function instaRecentMedia(acc, n) {
   const pool = await getPool();
   await ensureInsta();
   return (await pool.request().input("acc", sql.NVarChar(20), acc).input("n", sql.Int, n || 30).query(
-    "SELECT TOP (@n) media_id, CAST(listing_id AS NVARCHAR(20)) AS listing_id FROM dbo.insta_posts WHERE acc = @acc AND status = 'published' AND media_id IS NOT NULL ORDER BY created_at DESC")).recordset;
+    "SELECT TOP (@n) post_id, media_id, CAST(listing_id AS NVARCHAR(20)) AS listing_id FROM dbo.insta_posts WHERE acc = @acc AND status = 'published' AND media_id IS NOT NULL ORDER BY created_at DESC")).recordset;
 }
 // Квартиры последних постов аккаунта: ЖК и комнаты — чтобы не повторяться.
 async function instaRecentListings(acc, days) {
