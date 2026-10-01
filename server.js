@@ -4962,6 +4962,13 @@ async function instaPublish(acc, f) {
     const reason = f.mortgage ? "mortgage" : null;
     // Код поста — его номер в insta_posts; строку заводим заранее, чтобы код
     // попал на обложку, последний слайд и в подпись.
+    if (!f.near && f.lat && f.lon) {
+      try {
+        const p = await Promise.race([PLACES.nearby(f.lat, f.lon), new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 40000))]);
+        await db.instaPlaceSave(f.id, p);
+        if (p && p.text) f.near = p.text;
+      } catch (e) { console.log("[insta] places before publish " + f.id + ": " + e.message); }
+    }
     const code = await db.instaPostReserve(acc, f.id, reason);
     const fc = Object.assign({}, f, { code: code });
     const cap = INSTA.caption(fc, acc);
@@ -4979,6 +4986,16 @@ async function instaPublish(acc, f) {
       instaDropCandidate(acc, f.id);
       return Object.assign({ code: code }, r);
     } catch (e) {
+      // Instagram бывает отвечает ошибкой («restrict certain activity»), а пост
+      // всё равно выходит — тогда повтор через час даёт дубль. Проверяем по
+      // подписи последних постов, нет ли там нашего «№ N».
+      const live = await INSTA.findByCaption(a.ig_user_id, a.token, "объявление № " + code + ",").catch(() => null);
+      if (live) {
+        await db.instaPostFinish(code, { status: "published", mediaId: live.id, permalink: live.permalink, caption: cap }).catch(() => {});
+        instaDropCandidate(acc, f.id);
+        notifyTelegram("📸 Instagram " + acc + ": пост № " + code + " вышел, хотя Instagram ответил ошибкой: " + String(e.message).slice(0, 150));
+        return { code: code, mediaId: live.id, permalink: live.permalink, warning: e.message };
+      }
       await db.instaPostFinish(code, { status: "failed", caption: cap, error: e.message }).catch(() => {});
       instaDropCandidate(acc, f.id);
       throw e;

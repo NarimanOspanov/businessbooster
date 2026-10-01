@@ -3398,6 +3398,15 @@ async function complexPeers(city) {
     GROUP BY complex_id, rooms HAVING COUNT(*) >= 5 OPTION (RECOMPILE)`)).recordset;
   const map = {};
   rows.forEach((r) => { map[r.complex_id + ":" + r.rooms] = { n: r.n, ppm: Number(r.ppm) }; });
+  // Для вторички без ЖК — соседи по клетке ~1 км (координаты до сотых) с теми
+  // же комнатами, минимум 8 квартир.
+  const grid = (await pool.request().input("city", sql.NVarChar(40), city).query(`
+    SELECT ROUND(lat, 2) AS la, ROUND(lon, 2) AS lo, rooms, COUNT(*) AS n, AVG(CAST(price AS FLOAT) / area) AS ppm
+    FROM dbo.krisha_list
+    WHERE user_type = 'owner' AND deal = 'sale' AND prop = 'flat' AND storage = 'live' AND city = @city
+      AND lat IS NOT NULL AND lon IS NOT NULL AND area >= 20 AND price >= area * 150000
+    GROUP BY ROUND(lat, 2), ROUND(lon, 2), rooms HAVING COUNT(*) >= 8 OPTION (RECOMPILE)`)).recordset;
+  grid.forEach((r) => { map["g:" + Number(r.la).toFixed(2) + ":" + Number(r.lo).toFixed(2) + ":" + r.rooms] = { n: r.n, ppm: Number(r.ppm) }; });
   peersCache[city] = { at: Date.now(), map: map };
   return map;
 }
@@ -3417,15 +3426,20 @@ function instaScore(x, city, peers) {
   else add(Math.max(-15, 25 - 50 * (price / cap - 1)), mln(price) + " — дороже " + mln(cap));
   if (x.rooms === 1 || x.rooms === 2) add(10, x.rooms + "-комн");
   else if (x.rooms === 3) add(5, "3-комн");
-  const p = x.complex_id != null && peers[x.complex_id + ":" + x.rooms];
+  // Соседи: тот же ЖК, а если его нет или мало соседей — квартиры с теми же
+  // комнатами в радиусе ~1 км.
+  const pc = x.complex_id != null && peers[x.complex_id + ":" + x.rooms];
+  const pg = x.lat != null && x.lon != null && peers["g:" + Number(x.lat).toFixed(2) + ":" + Number(x.lon).toFixed(2) + ":" + x.rooms];
+  const p = pc || pg;
+  const where = pc ? "соседей по ЖК" : "похожих рядом";
   let below = null;
   if (p && x.area) {
     below = Math.round((1 - Number(x.price) / Number(x.area) / p.ppm) * 100);
     // Выгодно, но без «тухляка»: 3–10% дешевле соседей — находка (+6 и плашка
     // «ниже рынка»); 10–20% — без бонуса; дешевле на 20%+ обычно неспроста — минус.
-    if (below >= 3 && below <= 10) add(6, "на " + below + "% дешевле соседей по ЖК");
-    else if (below > 20) add(-5, "на " + below + "% дешевле соседей — подозрительно");
-    else if (below <= -15) add(-10, "на " + -below + "% дороже соседей по ЖК");
+    if (below >= 3 && below <= 10) add(6, "на " + below + "% дешевле " + where);
+    else if (below > 20) add(-5, "на " + below + "% дешевле " + where + " — подозрительно");
+    else if (below <= -15) add(-10, "на " + -below + "% дороже " + where);
   }
   add(Math.min(Number(x.photos) || 0, 12) / 12 * 10, (x.photos || 0) + " фото");
   const age = Math.floor((Date.now() - new Date(x.first_seen).getTime()) / 86400e3);
@@ -3433,7 +3447,7 @@ function instaScore(x, city, peers) {
   if (x.programs) add(5, "программа: " + x.programs);
   const a = String(x.addr || "").split(" — ")[0];
   if (!/[А-Яа-яЁёӘәҒғҚқҢңӨөҰұҮүҺһІі]{3}/.test(a)) add(-5, "адрес без улицы");
-  return { score: s, why: why, below: below != null && below >= 3 && below <= 10 ? below : null };
+  return { score: s, why: why, below: below != null && below >= 3 && below <= 10 ? below : null, belowWhere: pc ? "complex" : "near" };
 }
 
 async function instaCandidates(city, limit) {
@@ -3467,7 +3481,7 @@ async function instaCandidates(city, limit) {
     .filter((x) => String(x.phones).split(",").every((num) => live(num) < 3))
     .slice(0, n)
     .map((x) => ({
-      score: x.sc.score, why: x.sc.why, below: x.sc.below, complexId: x.complex_id == null ? null : String(x.complex_id),
+      score: x.sc.score, why: x.sc.why, below: x.sc.below, belowWhere: x.sc.belowWhere, complexId: x.complex_id == null ? null : String(x.complex_id),
       lat: x.lat == null ? null : Number(x.lat), lon: x.lon == null ? null : Number(x.lon),
       id: String(x.id), city: city, rooms: x.rooms, area: x.area == null ? null : Number(x.area), floor: x.floor, floors: x.floors,
       price: Number(x.price), addr: x.addr || null, isNew: x.complex_id != null,

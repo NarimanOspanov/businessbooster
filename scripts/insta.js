@@ -76,8 +76,8 @@ function coverSvg(f, photo, acc) {
   let badge = "";
   if (h && h.badge) {
     const bw = textW(h.badge, 34, true) + 64;
-    badge = `<rect x="${W - 48 - bw}" y="${PH - 44}" width="${bw}" height="88" rx="44" fill="#ff7a1a"/>
-      <text x="${W - 48 - bw / 2}" y="${PH + 12}" text-anchor="middle" font-size="34" font-weight="800" fill="#fff">${esc(h.badge)}</text>`;
+    badge = `<rect x="40" y="${PH - 44}" width="${bw}" height="88" rx="44" fill="#ff7a1a"/>
+      <text x="${40 + bw / 2}" y="${PH + 12}" text-anchor="middle" font-size="34" font-weight="800" fill="#fff">${esc(h.badge)}</text>`;
   }
   const img = photo ? `<image href="${dataUri(photo)}" x="0" y="0" width="${W}" height="${PH}" preserveAspectRatio="xMidYMid slice"/>` : "";
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Montserrat">
@@ -91,9 +91,9 @@ function coverSvg(f, photo, acc) {
   <text x="56" y="${PH + 250}" font-size="42" font-weight="700" fill="#e9f2ec">${esc(paramsLine(f))}</text>
   <text x="56" y="${PH + 318}" font-size="36" font-weight="500" fill="#a9c2b3">${esc(A.city + ", " + cleanAddr(f.addr))}</text>
   ${ppm ? `<text x="56" y="${PH + 378}" font-size="30" font-weight="500" fill="#7f9a8a">${esc(money(ppm))} тыс ₸ за м²${f.isNew ? " · новостройка" : ""}</text>` : ""}
-  ${f.near ? `<text x="56" y="${PH + 432}" font-size="28" font-weight="500" fill="#9fc3ad">${esc(f.near)}</text>` : ""}
+  ${f.near ? pinIcon(70, PH + 418, 20, "#4cc35a") + `<text x="100" y="${PH + 432}" font-size="28" font-weight="500" fill="#9fc3ad">${esc(f.near)}</text>` : ""}
   <text x="${W - 56}" y="${H - 44}" text-anchor="end" font-size="26" font-weight="500" fill="#6f8a7b">листайте →</text>
-  ${f.code ? codePill(f.code) : ""}
+  ${f.code ? codePill(f.code, PH - 100) : ""}
 </svg>`;
 }
 
@@ -107,15 +107,28 @@ function belowPill(pct) {
 
 // Код поста: его пишут в комментарии, и по нему сервер отдаёт номер хозяина
 // именно этой квартиры (какой пост прокомментировали, нам не видно).
-function codePill(code) {
-  const t = "№ " + code; // номер объявления: коротко, чтобы не наезжать на плашку слева
+function codePill(code, y) {
+  const t = "№ " + code; // номер объявления: коротко
   const w = t.length * 34 * 0.8 + 64;
-  return `<rect x="${W - 40 - w}" y="36" width="${w}" height="72" rx="36" fill="#000" opacity=".6"/>
-  <text x="${W - 40 - w / 2}" y="85" text-anchor="middle" font-size="34" font-weight="800" fill="#ffd166" letter-spacing="1">${esc(t)}</text>`;
+  return `<rect x="${W - 40 - w}" y="${y}" width="${w}" height="72" rx="36" fill="#000" opacity=".6"/>
+  <text x="${W - 40 - w / 2}" y="${y + 49}" text-anchor="middle" font-size="34" font-weight="800" fill="#ffd166" letter-spacing="1">${esc(t)}</text>`;
+}
+// Значок метки на карте (рисуем сами: эмодзи в нашем шрифте нет).
+function pinIcon(x, y, s, color) {
+  return `<path d="M${x} ${y + s} C${x - s * 0.15} ${y + s * 0.6} ${x - s * 0.55} ${y + s * 0.25} ${x - s * 0.55} ${y - s * 0.05} A${s * 0.55} ${s * 0.55} 0 1 1 ${x + s * 0.55} ${y - s * 0.05} C${x + s * 0.55} ${y + s * 0.25} ${x + s * 0.15} ${y + s * 0.6} ${x} ${y + s} Z" fill="${color}"/>
+  <circle cx="${x}" cy="${y - s * 0.05}" r="${s * 0.2}" fill="#12211a"/>`;
+}
+// «Что рядом» плашкой поверх фото — сверху слева: внизу водяной знак сайта
+// (его не закрываем), справа сверху счётчик карусели Instagram.
+function nearBar(text) {
+  const w = Math.min(W - 260, text.length * 24 * 0.56 + 100);
+  return `<rect x="40" y="40" width="${w}" height="64" rx="32" fill="#000" opacity=".6"/>
+  ${pinIcon(80, 66, 18, "#4cc35a")}
+  <text x="110" y="82" font-size="24" font-weight="600" fill="#fff">${esc(text)}</text>`;
 }
 
 // Фото квартиры: целиком по центру поверх размытой и затемнённой копии.
-function photoSvg(photo, acc, i, n) {
+function photoSvg(photo, acc, i, n, f) {
   const A = ACCOUNTS[acc] || ACCOUNTS.almaty;
   const u = dataUri(photo);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Montserrat">
@@ -124,8 +137,7 @@ function photoSvg(photo, acc, i, n) {
   <image href="${u}" x="-60" y="-60" width="${W + 120}" height="${H + 120}" preserveAspectRatio="xMidYMid slice" filter="url(#b)"/>
   <rect width="${W}" height="${H}" fill="#000" opacity=".38"/>
   <image href="${u}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid meet"/>
-  <rect x="${W - 150}" y="36" width="114" height="52" rx="26" fill="#000" opacity=".45"/>
-  <text x="${W - 93}" y="71" text-anchor="middle" font-size="26" font-weight="700" fill="#fff">${i}/${n}</text>
+  ${f && f.near ? nearBar(f.near) : ""}
   <text x="${W / 2}" y="${H - 40}" text-anchor="middle" font-size="26" font-weight="600" fill="#fff" opacity=".8">@${esc(A.handle)}</text>
 </svg>`;
 }
@@ -133,33 +145,15 @@ function photoSvg(photo, acc, i, n) {
 // Последний слайд: как получить номер. Миниатюра квартиры — чтобы было ясно, о какой речь.
 function ctaSvg(f, photo, acc) {
   const A = ACCOUNTS[acc] || ACCOUNTS.almaty;
-  const steps = [["1", "Подпишитесь на", "@" + A.handle],
-    ["2", "Поставьте «+»", "в комментариях к посту"],
-    ["3", "Получите номер хозяина", "в личные сообщения"]];
-  const sy = 640;
-  const stepSvg = steps.map((s, k) => {
-    const y = sy + k * 150;
-    return `<circle cx="112" cy="${y}" r="44" fill="#fff"/>
-      <text x="112" y="${y + 16}" text-anchor="middle" font-size="44" font-weight="800" fill="#1e8422">${s[0]}</text>
-      <text x="186" y="${y - 6}" font-size="42" font-weight="800" fill="#fff">${esc(s[1])}</text>
-      <text x="186" y="${y + 44}" font-size="32" font-weight="500" fill="#d5ecd9">${esc(s[2])}</text>`;
-  }).join("");
-  const thumb = photo ? `<clipPath id="c"><rect x="68" y="150" width="300" height="225" rx="24"/></clipPath>
-    <image href="${dataUri(photo)}" x="68" y="150" width="300" height="225" preserveAspectRatio="xMidYMid slice" clip-path="url(#c)"/>` : "";
-  const tx = photo ? 400 : 68;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Montserrat">
   <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0f4d24"/><stop offset="1" stop-color="#1e8422"/></linearGradient></defs>
   <rect width="${W}" height="${H}" fill="url(#g)"/>
-  ${thumb}
-  <text x="${tx}" y="228" font-size="54" font-weight="800" fill="#fff">${esc(mln(f.price))} ₸</text>
-  <text x="${tx}" y="286" font-size="34" font-weight="600" fill="#d5ecd9">${esc(paramsLine(f))}</text>
-  <text x="${tx}" y="336" font-size="30" font-weight="500" fill="#b5dcbc">${esc(cleanAddr(f.addr))}</text>
-  <text x="68" y="510" font-size="72" font-weight="800" fill="#fff">Номер хозяина —</text>
-  <text x="68" y="592" font-size="72" font-weight="800" fill="#ffd166">бесплатно в директ</text>
-  ${stepSvg.replace(/y="(\d+)"/g, (m, v) => 'y="' + (Number(v) + 90) + '"')}
-  <rect x="68" y="${H - 190}" width="${W - 136}" height="2" fill="#fff" opacity=".25"/>
-  <text x="${W / 2}" y="${H - 110}" text-anchor="middle" font-size="32" font-weight="700" fill="#fff">Квартиры от хозяев · Можно в ипотеку</text>
-  <text x="${W / 2}" y="${H - 62}" text-anchor="middle" font-size="30" font-weight="500" fill="#d5ecd9">Без посредников · Новые каждый день</text>
+  <text x="${W / 2}" y="420" text-anchor="middle" font-size="84" font-weight="800" fill="#fff">Номер хозяина</text>
+  <text x="${W / 2}" y="520" text-anchor="middle" font-size="84" font-weight="800" fill="#ffd166">бесплатно в директ</text>
+  <rect x="140" y="660" width="${W - 280}" height="240" rx="48" fill="#fff"/>
+  <text x="${W / 2}" y="790" text-anchor="middle" font-size="64" font-weight="800" fill="#1e8422">Поставьте «+»</text>
+  <text x="${W / 2}" y="852" text-anchor="middle" font-size="36" font-weight="600" fill="#2f5d3c">в комментариях</text>
+  <text x="${W / 2}" y="${H - 70}" text-anchor="middle" font-size="30" font-weight="600" fill="#d5ecd9">@${esc(A.handle)}</text>
 </svg>`;
 }
 
@@ -176,7 +170,7 @@ async function renderCarousel(f, acc, opts) {
   const inner = got.slice(1, max + 1);
   const n = inner.length + 2;
   const slides = [toJpeg(coverSvg(f, got[0], acc))];
-  inner.forEach((b, k) => slides.push(toJpeg(photoSvg(b, acc, k + 2, n))));
+  inner.forEach((b, k) => slides.push(toJpeg(photoSvg(b, acc, k + 2, n, f))));
   slides.push(toJpeg(ctaSvg(f, got[0], acc)));
   return slides;
 }
@@ -203,7 +197,7 @@ function caption(f, acc) {
     lines.push("🏦 " + h.text + ((f.programs || []).length ? " (" + f.programs.join(", ") + ")" : ""));
     if (f.quote) lines.push("💬 Из объявления: «" + f.quote + "»");
   }
-  if (f.below) lines.push("💚 Ниже рынка: метр на " + f.below + "% дешевле похожих квартир в этом ЖК");
+  if (f.below) lines.push("💚 Ниже рынка: метр на " + f.below + "% дешевле похожих квартир " + (f.belowWhere === "near" ? "поблизости" : "в этом ЖК"));
   if (f.near) lines.push("📍 " + f.near);
   lines.push("", "✅ Продаёт хозяин — без посредников и лишних комиссий.", "",
     "📊 Подобрать ипотечную программу и посчитать платёж — ссылка в шапке профиля.", "",
@@ -279,6 +273,11 @@ async function comments(mediaId, token) {
   const j = await ig("GET", "/" + mediaId + "/comments", { fields: "id,text,username,timestamp", limit: "50" }, token);
   return j.data || [];
 }
+// Последние посты аккаунта: найти тот, в подписи которого есть метка.
+async function findByCaption(userId, token, mark) {
+  const j = await ig("GET", "/" + userId + "/media", { fields: "id,caption,permalink,timestamp", limit: "10" }, token);
+  return (j.data || []).find((m) => String(m.caption || "").includes(mark)) || null;
+}
 const isPlus = (t) => /^\s*(\+|➕|плюс)/i.test(String(t || ""));
 
-module.exports = { ACCOUNTS, renderCarousel, renderCover, caption, hook, cleanAddr, publishCarousel, me, refreshToken, comments, isPlus, coverSvg, photoSvg, ctaSvg, toJpeg };
+module.exports = { findByCaption, ACCOUNTS, renderCarousel, renderCover, caption, hook, cleanAddr, publishCarousel, me, refreshToken, comments, isPlus, coverSvg, photoSvg, ctaSvg, toJpeg };
