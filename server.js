@@ -8780,6 +8780,33 @@ http
                 instaCand[A] = null;
                 return send(200, { ok: true, value: v });
               }
+              // Проба полировки: случайное фото кандидата, тексты — из полей страницы.
+              if (b.action === "polish_test") {
+                const P = require("./scripts/polish.js");
+                const rows = (instaCand[A] && instaCand[A].rows) || await instaCandidates(A);
+                const withPh = rows.filter((r) => r.photos && r.photos.length);
+                if (!withPh.length) return send(400, { ok: false, error: "нет кандидатов с фото" });
+                const r = withPh[Math.floor(Math.random() * withPh.length)];
+                let buf = null;
+                for (const u of [...r.photos].sort(() => Math.random() - 0.5).slice(0, 4)) {
+                  try {
+                    const res = await fetch(u, { signal: AbortSignal.timeout(15000), headers: { "User-Agent": "Mozilla/5.0" } });
+                    const bb = Buffer.from(await res.arrayBuffer());
+                    if (res.ok && bb[0] === 0xff && bb[1] === 0xd8) { buf = bb; break; }
+                  } catch { /* следующее фото */ }
+                }
+                if (!buf) return send(502, { ok: false, error: "фото не скачалось" });
+                const prompt = typeof b.prompt === "string" && b.prompt.trim() ? b.prompt.trim() : P.DEFAULT_PROMPT;
+                const system = typeof b.system === "string" && b.system.trim() ? b.system.trim() : P.DEFAULT_SYSTEM;
+                const [params] = await P.adjust([buf], prompt, system);
+                const u = "data:image/jpeg;base64," + buf.toString("base64");
+                const pic = (fx) => INSTA.toJpeg('<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="810" viewBox="0 0 1080 810">' +
+                  (fx ? "<defs>" + P.filterSvg("fx", fx) + "</defs>" : "") +
+                  '<image href="' + u + '" x="0" y="0" width="1080" height="810" preserveAspectRatio="xMidYMid slice"' + (fx ? ' filter="url(#fx)"' : "") + "/></svg>");
+                return send(200, { ok: true, id: r.id, params: params,
+                  before: "data:image/jpeg;base64," + Buffer.from(pic(null)).toString("base64"),
+                  after: "data:image/jpeg;base64," + Buffer.from(pic(params)).toString("base64") });
+              }
               if (b.action === "polish") {
                 await db.configSet("insta.polish.enabled", b.enabled ? "1" : "0");
                 if (typeof b.prompt === "string") await db.configSet("insta.polish.prompt", b.prompt.trim().slice(0, 2000));

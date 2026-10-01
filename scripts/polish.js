@@ -39,16 +39,18 @@ sharpen от 0 до 1, denoise от 0 до 1.
 Если фото уже хорошее — оставь значения близкими к нейтральным. Тёмное — подними яркость; серое и плоское — контраст; мутное — резкость; зернистое — шумоподавление.`;
 // Формат ответа добавляем всегда, к любой инструкции из настроек: без него
 // разбор ответа ломается. Рамки значений всё равно режем в clamp().
+// Числа — целыми в сотых: с дробями модель иногда пишет 0.2244444… до обрыва
+// ответа, и он не разбирается.
 const FORMAT = `
-Числа пиши с двумя знаками после точки (например 0.12, 1.08).
+Ответ дай ЦЕЛЫМИ числами в сотых долях: brightness 12 означает 0.12, contrast 108 означает 1.08, saturation 105 — 1.05, warmth -20 — -0.20, sharpen 30 — 0.30, denoise 10 — 0.10.
 Верни JSON: photos — массив {i, brightness, contrast, saturation, warmth, sharpen, denoise} по номеру фото i (с 0).`;
 
 const SCHEMA = {
   type: "OBJECT",
   properties: {
     photos: { type: "ARRAY", items: { type: "OBJECT", properties: {
-      i: { type: "INTEGER" }, brightness: { type: "NUMBER" }, contrast: { type: "NUMBER" }, saturation: { type: "NUMBER" },
-      warmth: { type: "NUMBER" }, sharpen: { type: "NUMBER" }, denoise: { type: "NUMBER" },
+      i: { type: "INTEGER" }, brightness: { type: "INTEGER" }, contrast: { type: "INTEGER" }, saturation: { type: "INTEGER" },
+      warmth: { type: "INTEGER" }, sharpen: { type: "INTEGER" }, denoise: { type: "INTEGER" },
     }, required: ["i"] } },
   },
   required: ["photos"],
@@ -57,7 +59,9 @@ const SCHEMA = {
 function clamp(p) {
   const out = {};
   for (const k of Object.keys(NEUTRAL)) {
-    const v = Number(p && p[k]);
+    let v = Number(p && p[k]);
+    // Пришло в сотых (108 вместо 1.08, 12 вместо 0.12) — переводим.
+    if (Number.isFinite(v) && ((k === "contrast" || k === "saturation") ? v > 3 : Math.abs(v) > 1.5)) v = v / 100;
     const [lo, hi] = LIMITS[k];
     out[k] = Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : NEUTRAL[k];
   }
@@ -82,11 +86,12 @@ async function ask(parts, prompt, system, model) {
   const cand = (j.candidates || [])[0] || {};
   const out = ((cand.content || {}).parts || []).map((x) => x.text || "").join("");
   try { return JSON.parse(out); } catch {
-    // Ответ оборвался или число вышло бесконечным — вытаскиваем целые объекты по одному.
+    // Ответ оборвался (модель иногда пишет число-«простыню» до лимита) —
+    // режем по «"i":» и берём из каждого куска те поля, что успели прийти.
     const photos = [];
-    for (const m of out.matchAll(/{[^{}]*"i"s*:s*d+[^{}]*}/g)) {
-      const o = {};
-      for (const kv of m[0].matchAll(/"(w+)"s*:s*(-?d+(?:.d{1,6})?)/g)) o[kv[1]] = Number(kv[2]);
+    for (const chunk of out.split(/"i"\s*:/).slice(1)) {
+      const o = { i: parseInt(chunk, 10) };
+      for (const kv of chunk.matchAll(/"(\w+)"\s*:\s*(-?\d{1,6}(?:\.\d{1,6})?)/g)) o[kv[1]] = Number(kv[2]);
       if (Number.isInteger(o.i)) photos.push(o);
     }
     return { photos: photos };

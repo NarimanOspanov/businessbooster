@@ -177,9 +177,27 @@ function renderPolish(){
     "<textarea id='pol-prompt' rows='4' style='width:100%;background:#0d1117;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px;font:inherit'>"+esc(p.prompt||"")+"</textarea>"+
     "<details style='margin-top:10px'><summary>Инструкция для Gemini (как подбирать числа)</summary><div class='mut' style='margin:6px 0'>Хранится в базе: app_config → insta.polish.system. Формат ответа и рамки значений сервер добавляет сам.</div>"+
     "<textarea id='pol-system' rows='9' style='width:100%;background:#0d1117;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px;font:inherit'>"+esc(p.system||"")+"</textarea></details>"+
-    "<div class='row' style='margin-top:8px'><button class='btn' id='pol-save'>Сохранить</button><span class='mut' id='pol-msg'></span></div>";
+    "<div class='row' style='margin-top:8px'><button class='btn' id='pol-save'>Сохранить</button><button class='btn ghost' id='pol-try'>Попробовать на случайном фото</button><span class='mut' id='pol-msg'></span></div>"+
+    "<div id='pol-test' style='margin-top:12px'></div>";
   $("#pol-save").onclick = function(){
     post({ action:"polish", enabled: $("#pol-on").checked, prompt: $("#pol-prompt").value, system: $("#pol-system").value }).then(function(j){ $("#pol-msg").textContent = j.ok ? "Сохранено" : ("Ошибка: "+j.error); });
+  };
+  // Проба: случайное фото кандидата, обработка по текстам из полей (даже не сохранённым).
+  var tryBtn = $("#pol-try");
+  tryBtn.onclick = function(){
+    tryBtn.disabled = true; tryBtn.textContent = "Обрабатываем… 10–20 сек";
+    post({ action:"polish_test", prompt: $("#pol-prompt").value, system: $("#pol-system").value }).then(function(j){
+      tryBtn.disabled = false; tryBtn.textContent = "Попробовать на другом фото";
+      if(!j.ok){ $("#pol-test").innerHTML = "<span class='bad'>Не вышло: "+esc(j.error)+"</span>"; return; }
+      var p = j.params || {}, f = function(v){ return (v>0?"+":"")+Number(v).toFixed(2); };
+      $("#pol-test").innerHTML =
+        "<div class='grid' style='grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr))'>"+
+        "<div><div class='mut' style='margin-bottom:4px'>Было</div><img src='"+j.before+"' style='width:100%;border-radius:8px;display:block'></div>"+
+        "<div><div class='mut' style='margin-bottom:4px'>Стало</div><img src='"+j.after+"' style='width:100%;border-radius:8px;display:block'></div></div>"+
+        "<div class='mut' style='margin-top:6px'>Gemini выбрал: яркость "+f(p.brightness)+" · контраст ×"+Number(p.contrast).toFixed(2)+" · насыщенность ×"+Number(p.saturation).toFixed(2)+
+        " · теплота "+f(p.warmth)+" · резкость "+Number(p.sharpen).toFixed(2)+" · шумоподавление "+Number(p.denoise).toFixed(2)+
+        " · фото из <a href='https://krisha.kz/a/show/"+j.id+"' target='_blank' rel='noopener'>объявления</a></div>";
+    });
   };
 }
 function renderMc(){
