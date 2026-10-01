@@ -3514,11 +3514,12 @@ async function instaListing(id) {
   const pool = await getPool();
   await ensureList(pool);
   const x = (await pool.request().input("id", sql.BigInt, Number(id) || 0).query(`
-    SELECT id, city, rooms, area, floor, floors, price, addr, complex_id, phones, storage, photos_c, photos_json
+    SELECT id, city, rooms, area, floor, floors, price, addr, complex_id, phones, storage, photos_c, photos_json, lat, lon
     FROM dbo.krisha_list WHERE id = @id AND user_type = 'owner' AND deal = 'sale' AND prop = 'flat'`)).recordset[0];
   if (!x) return null;
   return { id: String(x.id), city: x.city, rooms: x.rooms, area: x.area == null ? null : Number(x.area), floor: x.floor, floors: x.floors,
     price: Number(x.price), addr: x.addr || null, isNew: x.complex_id != null, phones: x.phones || null, storage: x.storage,
+    lat: x.lat == null ? null : Number(x.lat), lon: x.lon == null ? null : Number(x.lon),
     below: null, oldPrice: null,
     photos: listPhotoUrls(x.photos_c, x.photos_json).map((u) => u.replace(/-560x350\.jpg$/, "-full.jpg")) };
 }

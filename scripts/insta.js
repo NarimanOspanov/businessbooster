@@ -155,11 +155,67 @@ function ctaSvg(f, photo, acc) {
   <rect x="140" y="660" width="${W - 280}" height="240" rx="48" fill="#fff"/>
   <text x="${W / 2}" y="790" text-anchor="middle" font-size="64" font-weight="800" fill="#1e8422">Поставьте «+»</text>
   <text x="${W / 2}" y="852" text-anchor="middle" font-size="36" font-weight="600" fill="#2f5d3c">в комментариях</text>
+  ${f.code ? `<text x="${W / 2}" y="1010" text-anchor="middle" font-size="44" font-weight="800" fill="#ffd166">Объявление № ${f.code}</text>` : ""}
   <text x="${W / 2}" y="${H - 70}" text-anchor="middle" font-size="30" font-weight="600" fill="#d5ecd9">@${esc(A.handle)}</text>
 </svg>`;
 }
 
-// Все слайды поста: обложка, до 7 фото, призыв. Битые фото пропускаем.
+// --- Слайд «где находится»: карта из тайлов OpenStreetMap ------------------
+// Масштаб 17 — видно дома и улицы; тайлы рисуем вдвое крупнее (512 px), чтобы
+// подписи читались на телефоне. По правилам OSM нужен понятный User-Agent и
+// подпись «© OpenStreetMap»; тайлы кэшируем, постов в день — единицы.
+const TILE_Z = 17, TILE_PX = 512;
+const tileCache = new Map();
+async function tile(x, y) {
+  const k = x + ":" + y;
+  if (tileCache.has(k)) return tileCache.get(k);
+  const r = await fetch("https://tile.openstreetmap.org/" + TILE_Z + "/" + x + "/" + y + ".png", {
+    headers: { "User-Agent": "ipoteka1-instagram/1.0 (+https://reception365.online)" }, signal: AbortSignal.timeout(15000),
+  });
+  if (!r.ok) throw new Error("tile " + r.status);
+  const b = Buffer.from(await r.arrayBuffer());
+  tileCache.set(k, b);
+  if (tileCache.size > 400) tileCache.delete(tileCache.keys().next().value);
+  return b;
+}
+async function mapSlide(f, acc) {
+  if (f.lat == null || f.lon == null) return null;
+  const A = ACCOUNTS[acc] || ACCOUNTS.almaty;
+  const n = Math.pow(2, TILE_Z);
+  const lat = Number(f.lat) * Math.PI / 180;
+  const gx = (Number(f.lon) + 180) / 360 * n * TILE_PX;
+  const gy = (1 - Math.log(Math.tan(lat) + 1 / Math.cos(lat)) / Math.PI) / 2 * n * TILE_PX;
+  // Точка дома — выше центра: снизу карточка с адресом.
+  const cx = W / 2, cy = 600;
+  const x0 = gx - cx, y0 = gy - cy;
+  const tx0 = Math.floor(x0 / TILE_PX), tx1 = Math.floor((x0 + W) / TILE_PX);
+  const ty0 = Math.floor(y0 / TILE_PX), ty1 = Math.floor((y0 + H) / TILE_PX);
+  const jobs = [];
+  for (let tx = tx0; tx <= tx1; tx++) for (let ty = ty0; ty <= ty1; ty++) jobs.push({ tx, ty });
+  const imgs = await Promise.all(jobs.map((j) => tile(j.tx, j.ty).then((b) => Object.assign(j, { b }))));
+  const tiles = imgs.map((j) => `<image href="data:image/png;base64,${j.b.toString("base64")}" x="${(j.tx * TILE_PX - x0).toFixed(1)}" y="${(j.ty * TILE_PX - y0).toFixed(1)}" width="${TILE_PX}" height="${TILE_PX}"/>`).join("");
+  const addr = A.city + ", " + cleanAddr(f.addr);
+  const near = f.near ? f.near : "";
+  const cardH = near ? 220 : 160;
+  return toJpeg(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Montserrat">
+  <rect width="${W}" height="${H}" fill="#e8e4dc"/>
+  ${tiles}
+  <rect x="40" y="40" width="360" height="72" rx="36" fill="#1e8422"/>
+  <text x="220" y="88" text-anchor="middle" font-size="32" font-weight="800" fill="#fff">ГДЕ НАХОДИТСЯ</text>
+  <circle cx="${cx}" cy="${cy}" r="70" fill="#e5484d" opacity=".18"/>
+  <circle cx="${cx}" cy="${cy}" r="36" fill="#e5484d" opacity=".3"/>
+  <path d="M${cx} ${cy} C${cx - 14} ${cy - 38} ${cx - 52} ${cy - 62} ${cx - 52} ${cy - 98} A52 52 0 1 1 ${cx + 52} ${cy - 98} C${cx + 52} ${cy - 62} ${cx + 14} ${cy - 38} ${cx} ${cy} Z" fill="#e5484d" stroke="#fff" stroke-width="6"/>
+  <circle cx="${cx}" cy="${cy - 98}" r="20" fill="#fff"/>
+  <rect x="40" y="${H - 90 - cardH}" width="${W - 80}" height="${cardH}" rx="36" fill="#fff"/>
+  <text x="80" y="${H - 90 - cardH + 72}" font-size="42" font-weight="800" fill="#12211a">${esc(addr)}</text>
+  <text x="80" y="${H - 90 - cardH + 124}" font-size="30" font-weight="600" fill="#4b5d52">${esc(paramsLine(f))} · ${esc(mln(f.price))} ₸</text>
+  ${near ? pinIcon(96, H - 90 - cardH + 168, 18, "#1e8422") + `<text x="124" y="${H - 90 - cardH + 182}" font-size="27" font-weight="500" fill="#4b5d52">${esc(near)}</text>` : ""}
+  <rect x="${W - 260}" y="${H - 56}" width="230" height="34" rx="8" fill="#fff" opacity=".9"/>
+  <text x="${W - 145}" y="${H - 32}" text-anchor="middle" font-size="20" font-weight="500" fill="#555">© OpenStreetMap</text>
+</svg>`);
+}
+
+// Все слайды поста: обложка, до 7 фото, карта, призыв. Битые фото пропускаем.
 async function renderCarousel(f, acc, opts) {
   const max = (opts && opts.maxPhotos) || 7;
   const urls = (f.photos || []).slice(0, max + 4);
@@ -179,6 +235,8 @@ async function renderCarousel(f, acc, opts) {
   }
   const slides = [toJpeg(coverSvg(f, got[0], acc, fx[0]))];
   inner.forEach((b, k) => slides.push(toJpeg(photoSvg(b, acc, k + 2, n, f, fx[k + 1]))));
+  const map = await mapSlide(f, acc).catch((e) => { console.log("[insta] map: " + e.message); return null; });
+  if (map) slides.push(map);
   slides.push(toJpeg(ctaSvg(f, got[0], acc)));
   return slides;
 }
@@ -208,7 +266,6 @@ function caption(f, acc) {
   if (f.below) lines.push("💚 Ниже рынка: метр на " + f.below + "% дешевле похожих квартир " + (f.belowWhere === "near" ? "поблизости" : "в этом ЖК"));
   if (f.near) lines.push("📍 " + f.near);
   lines.push("", "✅ Продаёт хозяин — без посредников и лишних комиссий.", "",
-    "📊 Подобрать ипотечную программу и посчитать платёж — ссылка в шапке профиля.", "",
     f.code
       ? "👉 Хотите номер хозяина? Подпишитесь на @" + A.handle + " и поставьте «+» в комментариях — пришлём номер в директ. Это объявление № " + f.code + ", ищите его в списке."
       : "👉 Хотите номер хозяина? Подпишитесь на @" + A.handle + " и поставьте «+» в комментариях — пришлём номер в директ.", "",
