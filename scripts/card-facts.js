@@ -137,7 +137,7 @@ async function fromDescription(desc) {
     .filter((s) => s && s.length <= MAX_LEN && grounded(s, text)).slice(0, 3);
 }
 
-// { params: [...], price: "…" | null, desc: [...] } — каждая часть отдельно:
+// { params: [...], price: "…" | null, desc: [...], text } — каждая часть отдельно:
 // сбой оценки цены или Gemini не отменяет характеристики.
 async function cardFacts(id) {
   const card = CARD.parse(await fetchKrisha("https://krisha.kz/a/show/" + id), id);
@@ -145,7 +145,13 @@ async function cardFacts(id) {
     priceFact(id).catch((e) => { console.log("[card-facts] price " + id + ": " + e.message); return null; }),
     fromDescription(card.description).catch((e) => { console.log("[card-facts] desc " + id + ": " + e.message); return []; }),
   ]);
-  return { params: fromParams(card), price: price, desc: desc };
+  // Текст карточки — сохранить как есть (описание и «параметр: значение»
+  // строками, тот же вид, что присылает плагин номеров).
+  const text = {
+    desc: card.description || "",
+    params: (card.short || []).concat((card.params || []).map((p) => p.label + ": " + p.value)).join("\n"),
+  };
+  return { params: fromParams(card), price: price, desc: desc, text: text };
 }
 
 module.exports = { cardFacts, fromParams };

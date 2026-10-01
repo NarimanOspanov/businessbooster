@@ -4857,7 +4857,6 @@ async function instaCandidates(acc, fresh) {
   rows = await instaApplyPhotoScores(rows).catch((e) => { console.log("[insta] photo score: " + e.message); return rows; });
   rows = rows.slice(0, 12);
   await instaApplyPlaces(rows).catch((e) => console.log("[insta] places: " + e.message));
-  await instaApplyCardFacts(rows).catch((e) => console.log("[insta] card facts: " + e.message));
   instaCand[acc] = { at: Date.now(), rows: rows };
   return rows;
 }
@@ -4895,36 +4894,24 @@ async function instaApplyPlaces(rows) {
 }
 // Факты из карточки объявления (scripts/card-facts.js): характеристики,
 // оценка цены Крыши и доводы из описания — по одному на фото карусели.
-// Как и «что рядом»: из базы сразу, недостающее снимаем в фоне по 2 и не
-// ждём. Крыша отказала (468) — не повторяем 30 минут.
+// Карточку открываем только у квартиры, которая идёт в пост (или которую
+// смотрят полной каруселью): это единицы в день. Снятое сохраняем — факты в
+// insta_card_facts, описание и параметры в krisha_list_text, — второй раз
+// эту карточку не открываем.
 const CARD_FACTS = require("./scripts/card-facts.js");
-const instaCardBusy = new Set();
-const instaCardFailedAt = new Map();
-async function instaCardFactsFetch(id) {
-  const c = await CARD_FACTS.cardFacts(id);
-  await db.instaCardFactsSave(id, c);
-  return c;
+async function instaEnsureCard(f) {
+  if (f.card) return f.card;
+  const have = await db.instaCardFactsGet([f.id]).catch(() => ({}));
+  if (have[f.id]) return (f.card = have[f.id]);
+  const c = await Promise.race([CARD_FACTS.cardFacts(f.id), new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 60000))]);
+  await db.instaCardFactsSave(f.id, c);
+  // Тот же разбор, что у текста от плагина: «ипотеку не рассматриваю» или
+  // бывшее общежитие — и пост «можно в ипотеку» был бы неправдой.
+  const m = c.text ? await db.listTextSave(f.id, c.text.desc, c.text.params).catch((e) => { console.log("[insta] card text " + f.id + ": " + e.message); return null; }) : null;
+  if (m && m.mortgage === "no") c.mortgageNo = m.why || "нет";
+  return (f.card = c);
 }
-async function instaApplyCardFacts(rows) {
-  const have = await db.instaCardFactsGet(rows.map((r) => r.id));
-  const todo = [];
-  for (const r of rows) {
-    if (have[r.id]) { r.card = have[r.id]; continue; }
-    if (instaCardBusy.has(r.id) || Date.now() - (instaCardFailedAt.get(r.id) || 0) < 30 * 60e3) continue;
-    todo.push(r);
-  }
-  if (!todo.length) return;
-  todo.forEach((r) => instaCardBusy.add(r.id));
-  (async () => {
-    for (let i = 0; i < todo.length; i += 2) {
-      await Promise.all(todo.slice(i, i + 2).map(async (r) => {
-        try { r.card = await instaCardFactsFetch(r.id); } // тот же объект лежит в кэше кандидатов
-        catch (e) { instaCardFailedAt.set(r.id, Date.now()); console.log("[insta] card facts " + r.id + ": " + e.message); }
-        finally { instaCardBusy.delete(r.id); }
-      }));
-    }
-  })();
-}
+
 // Взгляд на фото (Gemini, scripts/photo-score.js): совсем непрезентабельные
 // квартиры не публикуем, остальным балл ±, а фото ставим в порядке от
 // лучшего — первое станет обложкой, слабые в карусель не попадут.
@@ -4982,6 +4969,7 @@ async function instaSlides(acc, f, coverOnly) {
     instaPreview.set(k, { at: Date.now(), cover: cover });
     return [cover];
   }
+  await instaEnsureCard(f).catch((e) => console.log("[insta] card facts for preview " + f.id + ": " + e.message));
   const slides = await INSTA.renderCarousel(f, acc, { polish: await instaPolish() });
   instaPreview.set(k, { at: Date.now(), slides: slides });
   if (instaPreview.size > 40) instaPreview.delete(instaPreview.keys().next().value);
@@ -5034,11 +5022,10 @@ async function instaPublish(acc, f) {
         if (p && p.text) { f.near = p.text; f.chips = p.chips; }
       } catch (e) { console.log("[insta] places before publish " + f.id + ": " + e.message); }
     }
-    if (!f.card) {
-      try {
-        const have = await db.instaCardFactsGet([f.id]);
-        f.card = have[f.id] || await Promise.race([instaCardFactsFetch(f.id), new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 60000))]);
-      } catch (e) { console.log("[insta] card facts before publish " + f.id + ": " + e.message); }
+    await instaEnsureCard(f).catch((e) => console.log("[insta] card facts before publish " + f.id + ": " + e.message));
+    if (f.card && f.card.mortgageNo) {
+      instaDropCandidate(acc, f.id);
+      throw new Error("в описании хозяина: «" + f.card.mortgageNo + "» — под ипотеку не публикуем");
     }
     const code = await db.instaPostReserve(acc, f.id, reason);
     const fc = Object.assign({}, f, { code: code });
