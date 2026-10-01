@@ -3295,6 +3295,10 @@ IF OBJECT_ID('dbo.insta_places', 'U') IS NULL
     facts      NVARCHAR(200) NULL,
     at         DATETIME2(0)  NOT NULL CONSTRAINT DF_iplc_at DEFAULT SYSUTCDATETIME()
   );
+-- Короткие факты о районе для фото карусели (JSON-массив строк): «Метро
+-- «Алатау» — 12 мин пешком», «6 школ рядом, ближайшая — 7 мин». NULL у старых
+-- строк — их пересчитываем при следующем подборе.
+IF COL_LENGTH('dbo.insta_places', 'chips') IS NULL ALTER TABLE dbo.insta_places ADD chips NVARCHAR(600) NULL;
 -- Настройки, которые правят со страниц (промпты и т. п.): ключ → значение.
 IF OBJECT_ID('dbo.app_config', 'U') IS NULL
   CREATE TABLE dbo.app_config (
@@ -3581,8 +3585,12 @@ async function instaPlacesGet(ids) {
   if (!list.length) return out;
   const pool = await getPool();
   await ensureInsta();
-  const rows = (await pool.request().query("SELECT listing_id, text FROM dbo.insta_places WHERE listing_id IN (" + list.join(",") + ")")).recordset;
-  for (const r of rows) out[String(r.listing_id)] = { text: r.text || null };
+  const rows = (await pool.request().query("SELECT listing_id, text, chips FROM dbo.insta_places WHERE listing_id IN (" + list.join(",") + ")")).recordset;
+  for (const r of rows) {
+    let chips = null;
+    try { chips = r.chips ? JSON.parse(r.chips) : null; } catch { /* битая строка — пересчитаем */ }
+    out[String(r.listing_id)] = { text: r.text || null, chips: Array.isArray(chips) ? chips : null };
+  }
   return out;
 }
 async function instaPlaceSave(id, p) {
@@ -3590,8 +3598,15 @@ async function instaPlaceSave(id, p) {
   await ensureInsta();
   await pool.request().input("id", sql.BigInt, Number(id)).input("t", sql.NVarChar(120), p && p.text ? String(p.text).slice(0, 120) : null)
     .input("f", sql.NVarChar(200), p && p.facts ? JSON.stringify(p.facts).slice(0, 200) : null)
-    .query(`UPDATE dbo.insta_places SET text = @t, facts = @f, at = SYSUTCDATETIME() WHERE listing_id = @id;
-            IF @@ROWCOUNT = 0 INSERT INTO dbo.insta_places (listing_id, text, facts) VALUES (@id, @t, @f);`);
+    .input("c", sql.NVarChar(600), p && p.chips ? chipsJson(p.chips) : null)
+    .query(`UPDATE dbo.insta_places SET text = @t, facts = @f, chips = @c, at = SYSUTCDATETIME() WHERE listing_id = @id;
+            IF @@ROWCOUNT = 0 INSERT INTO dbo.insta_places (listing_id, text, facts, chips) VALUES (@id, @t, @f, @c);`);
+}
+// Сколько фактов влезает в колонку целиком — обрезанный JSON не прочитать.
+function chipsJson(chips) {
+  const a = chips.map(String);
+  while (a.length && JSON.stringify(a).length > 600) a.pop();
+  return a.length ? JSON.stringify(a) : null;
 }
 async function configGet(keys) {
   const pool = await getPool();

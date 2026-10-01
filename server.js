@@ -4871,8 +4871,11 @@ async function instaApplyPlaces(rows) {
   const have = await db.instaPlacesGet(rows.map((r) => r.id));
   const todo = [];
   for (const r of rows) {
-    if (have[r.id] && have[r.id].text) r.near = have[r.id].text;
-    else if (!have[r.id] && r.lat && r.lon && !instaPlacesBusy.has(r.id)) todo.push(r);
+    const h = have[r.id];
+    if (h && h.text) { r.near = h.text; if (h.chips) r.chips = h.chips; }
+    // Нет строки — ищем; есть «Рядом: …», но без фактов для фото (записана до
+    // них) — пересчитываем один раз. Строка без текста — рядом пусто, не ищем.
+    if ((!h || (h.text && !h.chips)) && r.lat && r.lon && !instaPlacesBusy.has(r.id)) todo.push(r);
   }
   if (!todo.length) return;
   todo.forEach((r) => instaPlacesBusy.add(r.id));
@@ -4881,8 +4884,8 @@ async function instaApplyPlaces(rows) {
       await Promise.all(todo.slice(i, i + 3).map(async (r) => {
         try {
           const p = await PLACES.nearby(r.lat, r.lon);
-          await db.instaPlaceSave(r.id, p);
-          if (p && p.text) r.near = p.text; // тот же объект лежит в кэше кандидатов
+          if (p || !r.near) await db.instaPlaceSave(r.id, p); // пересчёт впустую не стирает прежнюю строку
+          if (p && p.text) { r.near = p.text; r.chips = p.chips; } // тот же объект лежит в кэше кандидатов
         } catch (e) { console.log("[insta] places " + r.id + ": " + e.message); }
         finally { instaPlacesBusy.delete(r.id); }
       }));
@@ -4991,11 +4994,11 @@ async function instaPublish(acc, f) {
     const reason = f.mortgage ? "mortgage" : null;
     // Код поста — его номер в insta_posts; строку заводим заранее, чтобы код
     // попал на обложку, последний слайд и в подпись.
-    if (!f.near && f.lat && f.lon) {
+    if ((!f.near || !f.chips) && f.lat && f.lon) {
       try {
         const p = await Promise.race([PLACES.nearby(f.lat, f.lon), new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 40000))]);
-        await db.instaPlaceSave(f.id, p);
-        if (p && p.text) f.near = p.text;
+        if (p || !f.near) await db.instaPlaceSave(f.id, p);
+        if (p && p.text) { f.near = p.text; f.chips = p.chips; }
       } catch (e) { console.log("[insta] places before publish " + f.id + ": " + e.message); }
     }
     const code = await db.instaPostReserve(acc, f.id, reason);

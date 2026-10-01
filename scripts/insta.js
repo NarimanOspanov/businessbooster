@@ -47,6 +47,30 @@ function hook(f) {
 }
 // Ширина надписи на глаз: у Montserrat средний знак ≈ 0,6 кегля (жирный ≈ 0,64).
 const textW = (s, size, bold) => String(s).length * size * (bold ? 0.64 : 0.58);
+// Точная ширина строки: рисуем её тем же шрифтом и берём рамку. Нужна там,
+// где плашка подгоняется под текст — на глаз кириллица выходила шире расчёта.
+const measured = new Map();
+function measure(s, size, weight) {
+  const k = size + ":" + weight + ":" + s;
+  if (measured.has(k)) return measured.get(k);
+  let w = textW(s, size, weight >= 700) * 1.1;
+  try {
+    const bb = new Resvg(`<svg xmlns="http://www.w3.org/2000/svg" width="4000" height="200" font-family="Montserrat"><text x="0" y="100" font-size="${size}" font-weight="${weight}">${esc(s)}</text></svg>`,
+      { font: { fontFiles: FONTS, loadSystemFonts: false, defaultFontFamily: "Montserrat" } }).getBBox();
+    if (bb) w = bb.x + bb.width;
+  } catch { /* остаётся оценка */ }
+  if (measured.size > 2000) measured.clear();
+  measured.set(k, w);
+  return w;
+}
+// Строка не шире max: сначала отбрасываем перечисления с конца («, парк»),
+// потом режем по слову с «…».
+function fit(s, size, weight, max) {
+  s = String(s || "");
+  while (measure(s, size, weight) > max && s.includes(", ")) s = s.slice(0, s.lastIndexOf(", "));
+  while (measure(s, size, weight) > max && s.length > 4) s = s.slice(0, -2).replace(/[\s,.;:—-]+\S*$/, "") + "…";
+  return s;
+}
 
 async function fetchPhoto(url) {
   const ctl = new AbortController();
@@ -93,7 +117,7 @@ function coverSvg(f, photo, acc, fx) {
   <text x="56" y="${PH + 250}" font-size="42" font-weight="700" fill="#e9f2ec">${esc(paramsLine(f))}</text>
   <text x="56" y="${PH + 318}" font-size="36" font-weight="500" fill="#a9c2b3">${esc(A.city + ", " + cleanAddr(f.addr))}</text>
   ${ppm ? `<text x="56" y="${PH + 378}" font-size="30" font-weight="500" fill="#7f9a8a">${esc(money(ppm))} тыс ₸ за м²${f.isNew ? " · новостройка" : ""}</text>` : ""}
-  ${f.near ? pinIcon(70, PH + 418, 20, "#4cc35a") + `<text x="100" y="${PH + 432}" font-size="28" font-weight="500" fill="#9fc3ad">${esc(f.near)}</text>` : ""}
+  ${f.near ? pinIcon(70, PH + 418, 20, "#4cc35a") + `<text x="100" y="${PH + 432}" font-size="28" font-weight="500" fill="#9fc3ad">${esc(fit(f.near, 28, 500, W - 100 - 56))}</text>` : ""}
   <text x="${W - 56}" y="${H - 44}" text-anchor="end" font-size="26" font-weight="500" fill="#6f8a7b">листайте →</text>
   ${f.code ? codePill(f.code, PH - 100) : ""}
 </svg>`;
@@ -121,16 +145,18 @@ function pinIcon(x, y, s, color) {
   <circle cx="${x}" cy="${y - s * 0.05}" r="${s * 0.2}" fill="#12211a"/>`;
 }
 // «Что рядом» плашкой поверх фото — сверху слева: внизу водяной знак сайта
-// (его не закрываем), справа сверху счётчик карусели Instagram.
+// (его не закрываем), справа сверху счётчик карусели Instagram («2/9»), под
+// него оставляем 220 px. Ширина плашки — по измеренному тексту.
 function nearBar(text) {
-  const w = Math.min(W - 260, text.length * 24 * 0.56 + 100);
-  return `<rect x="40" y="40" width="${w}" height="64" rx="32" fill="#000" opacity=".6"/>
+  const t = fit(text, 26, 600, W - 220 - 40 - 110 - 30);
+  const w = 110 + measure(t, 26, 600) + 30;
+  return `<rect x="40" y="40" width="${w.toFixed(0)}" height="64" rx="32" fill="#000" opacity=".6"/>
   ${pinIcon(80, 66, 18, "#4cc35a")}
-  <text x="110" y="82" font-size="24" font-weight="600" fill="#fff">${esc(text)}</text>`;
+  <text x="110" y="82" font-size="26" font-weight="600" fill="#fff">${esc(t)}</text>`;
 }
 
 // Фото квартиры: целиком по центру поверх размытой и затемнённой копии.
-function photoSvg(photo, acc, i, n, f, fx) {
+function photoSvg(photo, acc, i, n, f, fx, fact) {
   const A = ACCOUNTS[acc] || ACCOUNTS.almaty;
   const u = dataUri(photo);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Montserrat">
@@ -139,7 +165,7 @@ function photoSvg(photo, acc, i, n, f, fx) {
   <image href="${u}" x="-60" y="-60" width="${W + 120}" height="${H + 120}" preserveAspectRatio="xMidYMid slice" filter="url(#b)"/>
   <rect width="${W}" height="${H}" fill="#000" opacity=".38"/>
   <image href="${u}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid meet"${fx ? ' filter="url(#fx)"' : ""}/>
-  ${f && f.near ? nearBar(f.near) : ""}
+  ${fact ? nearBar(fact) : ""}
   <text x="${W / 2}" y="${H - 40}" text-anchor="middle" font-size="26" font-weight="600" fill="#fff" opacity=".8">@${esc(A.handle)}</text>
 </svg>`;
 }
@@ -195,7 +221,7 @@ async function mapSlide(f, acc) {
   const imgs = await Promise.all(jobs.map((j) => tile(j.tx, j.ty).then((b) => Object.assign(j, { b }))));
   const tiles = imgs.map((j) => `<image href="data:image/png;base64,${j.b.toString("base64")}" x="${(j.tx * TILE_PX - x0).toFixed(1)}" y="${(j.ty * TILE_PX - y0).toFixed(1)}" width="${TILE_PX}" height="${TILE_PX}"/>`).join("");
   const addr = A.city + ", " + cleanAddr(f.addr);
-  const near = f.near ? f.near : "";
+  const near = f.near ? fit(f.near, 27, 500, W - 40 - 124 - 40) : "";
   const cardH = near ? 220 : 160;
   return toJpeg(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Montserrat">
   <rect width="${W}" height="${H}" fill="#e8e4dc"/>
@@ -243,7 +269,10 @@ async function renderCarousel(f, acc, opts) {
   const inner2 = got.slice(1, max + 1);
   inner.splice(0, inner.length, ...inner2);
   const slides = [toJpeg(coverSvg(f, got[0], acc, fx[0]))];
-  inner.forEach((b, k) => slides.push(toJpeg(photoSvg(b, acc, k + 2, n, f, fx[k + 1]))));
+  // На каждом фото свой факт о районе; кончились — фото без плашки. Нет
+  // фактов (старый кэш) — общая строка «Рядом: …» только на первом фото.
+  const facts = (f.chips && f.chips.length) ? f.chips : (f.near ? [f.near] : []);
+  inner.forEach((b, k) => slides.push(toJpeg(photoSvg(b, acc, k + 2, n, f, fx[k + 1], facts[k]))));
   const map = await mapSlide(f, acc).catch((e) => { console.log("[insta] map: " + e.message); return null; });
   if (map) slides.push(map);
   slides.push(toJpeg(ctaSvg(f, got[0], acc)));
