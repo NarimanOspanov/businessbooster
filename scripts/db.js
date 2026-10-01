@@ -3302,6 +3302,8 @@ IF OBJECT_ID('dbo.app_config', 'U') IS NULL
     v          NVARCHAR(MAX) NULL,
     updated_at DATETIME2(0)  NOT NULL CONSTRAINT DF_appcfg_at DEFAULT SYSUTCDATETIME()
   );
+-- Район отметки «ипотека» — раздел Крыши, из которого её сняли (almaty-medeuskij…).
+IF COL_LENGTH('dbo.krisha_mortgage', 'district') IS NULL ALTER TABLE dbo.krisha_mortgage ADD district NVARCHAR(40) NULL;
 IF OBJECT_ID('dbo.insta_dms', 'U') IS NULL
 BEGIN
   CREATE TABLE dbo.insta_dms (
@@ -3353,17 +3355,17 @@ async function listTextSave(id, desc, params) {
   return c;
 }
 // Отметить объявления, найденные с фильтром «ипотека»: новые добавить, старым обновить seen_at.
-async function mortgageFlagSave(ids, city) {
+async function mortgageFlagSave(ids, city, district) {
   const pool = await getPool();
   await ensureInsta();
   const list = [...new Set((ids || []).map((x) => Number(x)).filter((x) => Number.isSafeInteger(x) && x > 0))];
   for (let i = 0; i < list.length; i += 400) {
     const chunk = list.slice(i, i + 400);
-    await pool.request().input("city", sql.NVarChar(40), city).query(`
+    await pool.request().input("city", sql.NVarChar(40), city).input("d", sql.NVarChar(40), district || null).query(`
       MERGE dbo.krisha_mortgage AS t
       USING (VALUES ${chunk.map((x) => "(" + x + ")").join(",")}) AS s(id) ON t.id = s.id
-      WHEN MATCHED THEN UPDATE SET seen_at = SYSUTCDATETIME(), city = @city
-      WHEN NOT MATCHED THEN INSERT (id, city) VALUES (s.id, @city);`);
+      WHEN MATCHED THEN UPDATE SET seen_at = SYSUTCDATETIME(), city = @city, district = COALESCE(@d, t.district)
+      WHEN NOT MATCHED THEN INSERT (id, city, district) VALUES (s.id, @city, @d);`);
   }
   return list.length;
 }
@@ -3457,19 +3459,29 @@ function instaScore(x, city, peers) {
   return { score: s, why: why, below: below != null && below >= 3 && below <= 10 ? below : null, belowWhere: pc ? "complex" : "near" };
 }
 
-async function instaCandidates(city, limit) {
+// Центр города и радиус: в «центральный» район Крыша относит и далёкие
+// посёлки (мкр Алатау/ИЯФ — Медеуский, ~20 км), их отсекаем по расстоянию.
+const INSTA_CENTER = { almaty: { lat: 43.2383, lon: 76.9456, km: 12 }, astana: { lat: 51.128, lon: 71.43, km: 15 } };
+async function instaCandidates(city, limit, districts) {
   const pool = await getPool();
   await ensureList(pool);
   await ensureInsta();
   const n = Math.min(40, Math.max(1, Number(limit) || 12));
   const peers = await complexPeers(city).catch(() => ({}));
-  const rows = (await pool.request().input("city", sql.NVarChar(40), city).input("n", sql.Int, 400).query(`
+  const dl = (districts || []).map(String).filter(Boolean);
+  const ctr = INSTA_CENTER[city] || null;
+  const rq = pool.request().input("city", sql.NVarChar(40), city).input("n", sql.Int, 400)
+    .input("lat", sql.Float, ctr ? ctr.lat : null).input("lon", sql.Float, ctr ? ctr.lon : null).input("km", sql.Float, ctr ? ctr.km : null);
+  dl.forEach((d, i) => rq.input("d" + i, sql.NVarChar(40), d));
+  const rows = (await rq.query(`
     SELECT TOP (@n) c.id, c.rooms, c.area, c.price, c.complex_id, c.addr, c.phones, c.photos, c.photos_c, c.photos_json,
            c.floor, c.floors, c.first_seen, c.lat, c.lon, t.programs, t.quote
     FROM dbo.krisha_list c
     LEFT JOIN dbo.krisha_list_text t ON t.id = c.id
     WHERE c.id IN (SELECT id FROM dbo.krisha_mortgage WHERE seen_at >= DATEADD(day, -2, SYSUTCDATETIME())
-                   UNION SELECT id FROM dbo.krisha_list_text WHERE mortgage = 'yes')
+                     ${dl.length ? "AND district IN (" + dl.map((_, i) => "@d" + i).join(",") + ")" : ""})
+      AND (@lat IS NULL OR (c.lat IS NOT NULL AND
+           SQRT(POWER((c.lat - @lat) * 111.0, 2) + POWER((c.lon - @lon) * 111.0 * COS(RADIANS(@lat)), 2)) <= @km))
       AND (t.mortgage IS NULL OR t.mortgage <> 'no')
       AND c.user_type = 'owner' AND c.deal = 'sale' AND c.prop = 'flat' AND c.storage = 'live' AND c.city = @city
       AND c.area >= 20 AND c.price >= c.area * 150000 AND c.phones IS NOT NULL AND c.photos >= 5
