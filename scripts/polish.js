@@ -184,11 +184,16 @@ function corr(a, b) {
   return sa && sb ? s / Math.sqrt(sa * sb) : 0;
 }
 
+// Текст проверки по умолчанию; в работе — из настроек (insta.polish.check).
 const CHECK = `Тебе дают два фото: первое — оригинал, второе — после обработки. Проверь честность обработки.
 same_content — true, если на втором фото те же предметы, мебель, двери, окна, отделка и ракурс; ничего не убрано и не добавлено (изменились только свет, цвет, резкость).
-watermark_kept — true, если все водяные знаки и надписи оригинала (например «krisha.kz», «ID…») видны на втором фото на тех же местах. Если на оригинале водяных знаков нет — true.
 note — 3–8 слов по-русски, что изменилось.`;
-async function verify(orig, edited) {
+// Условие про водяные знаки — в коде и добавляется к любому тексту проверки:
+// фото с затёртой отметкой правообладателя в пост не попадает, что бы ни
+// стояло в настройках.
+const CHECK_WATERMARK = `
+watermark_kept — true, если все водяные знаки и надписи оригинала (например «krisha.kz», «ID…») видны на втором фото на тех же местах. Если на оригинале водяных знаков нет — true.`;
+async function verify(orig, edited, checkText) {
   const edge = corr(edgeMap(orig), edgeMap(edited));
   const out = { edge: Math.round(edge * 1000) / 1000, same_content: null, watermark_kept: null, note: "" };
   if (edge < EDGE_MIN) { out.ok = false; out.note = "кадр изменился (контуры не совпадают)"; return out; }
@@ -196,7 +201,7 @@ async function verify(orig, edited) {
     method: "POST",
     headers: { "x-goog-api-key": key(), "Content-Type": "application/json" },
     body: JSON.stringify({
-      system_instruction: { parts: [{ text: CHECK }] },
+      system_instruction: { parts: [{ text: (checkText || CHECK) + CHECK_WATERMARK }] },
       contents: [{ role: "user", parts: [
         { text: "Оригинал:" }, { inline_data: { mime_type: "image/jpeg", data: orig.toString("base64") } },
         { text: "После обработки:" }, { inline_data: { mime_type: sniffMime(edited), data: edited.toString("base64") } }] }],
@@ -226,7 +231,7 @@ async function polishPhotos(buffers, cfg) {
       const idx = i + k;
       try {
         const g = await generate(b, cfg.prompt, cfg.imageModel, cfg.guard);
-        const v = await verify(b, g);
+        const v = await verify(b, g, cfg.check);
         out[idx].check = v;
         if (v.ok) { out[idx].buf = g; out[idx].how = "ai"; }
       } catch (e) { out[idx].check = { ok: false, note: String(e.message).slice(0, 100) }; }
@@ -244,6 +249,6 @@ async function polishPhotos(buffers, cfg) {
 function info() {
   return { model: MODEL, fallback: FALLBACK, format: FORMAT, limits: LIMITS, neutral: NEUTRAL,
     defaultPrompt: DEFAULT_PROMPT, defaultSystem: DEFAULT_SYSTEM, userPrefix: "Пожелания редактора: ",
-    imageModel: IMAGE_MODEL, guard: GUARD, check: CHECK, edgeMin: EDGE_MIN };
+    imageModel: IMAGE_MODEL, guard: GUARD, check: CHECK, checkWatermark: CHECK_WATERMARK, edgeMin: EDGE_MIN };
 }
-module.exports = { adjust, filterSvg, info, polishPhotos, generate, verify, IMAGE_MODEL, GUARD, DEFAULT_PROMPT, DEFAULT_SYSTEM, NEUTRAL, LIMITS };
+module.exports = { adjust, filterSvg, info, polishPhotos, generate, verify, IMAGE_MODEL, GUARD, CHECK, DEFAULT_PROMPT, DEFAULT_SYSTEM, NEUTRAL, LIMITS };
