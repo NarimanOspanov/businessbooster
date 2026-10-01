@@ -43,12 +43,18 @@ function sentenceAt(text, idx) {
   return out;
 }
 
+const MIN_YEAR = 1980;
+
 function classify(desc, params) {
   const text = String(desc || "");
   const p = String(params || "");
   const programs = PROGRAMS.filter(([re]) => re.test(text)).map(([, name]) => name);
   if (/бывшее\s+общежитие:\s*да/i.test(p)) return { mortgage: "no", why: "бывшее общежитие", programs: programs, quote: null };
   if (/(?:квартира\s+)?в\s+залоге:\s*да/i.test(p)) return { mortgage: "no", why: "в залоге", programs: programs, quote: null };
+  // Почти все банки берут в залог дом не старше 1980 года постройки (Крыша,
+  // «Какой год постройки подходит под ипотеку в 2026 году»).
+  const year = Number((p.match(/год\s+постройки:\s*(\d{4})/i) || [])[1]) || null;
+  if (year && year < MIN_YEAR) return { mortgage: "no", why: "дом " + year + " года — банки берут с " + MIN_YEAR, programs: programs, quote: null };
   for (const re of NEG) { const m = re.exec(text); if (m) return { mortgage: "no", why: m[0].slice(0, 60), programs: programs, quote: null }; }
   let hit = null;
   for (const re of POS) { const m = re.exec(text); if (m && (!hit || m.index < hit.index)) hit = m; }
@@ -57,4 +63,4 @@ function classify(desc, params) {
   return { mortgage: null, why: null, programs: programs, quote: null };
 }
 
-module.exports = { classify };
+module.exports = { classify, MIN_YEAR };

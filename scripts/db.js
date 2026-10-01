@@ -3495,6 +3495,9 @@ async function instaCandidates(city, limit, districts) {
       AND (@lat IS NULL OR (c.lat IS NOT NULL AND
            SQRT(POWER((c.lat - @lat) * 111.0, 2) + POWER((c.lon - @lon) * 111.0 * COS(RADIANS(@lat)), 2)) <= @km))
       AND (t.mortgage IS NULL OR t.mortgage <> 'no')
+      -- Дом старше 1980 года банки в залог не берут (mortgage-text.js MIN_YEAR);
+      -- год тут — если квартира уже есть в базе объектов, иначе его проверит карточка.
+      AND NOT EXISTS (SELECT 1 FROM dbo.krisha_flats kf WHERE kf.id = c.id AND kf.build_year < 1980)
       AND c.user_type = 'owner' AND c.deal = 'sale' AND c.prop = 'flat' AND c.storage = 'live' AND c.city = @city
       AND c.area >= 20 AND c.price >= c.area * 150000 AND c.phones IS NOT NULL AND c.photos >= 5
       AND c.first_seen >= DATEADD(day, -10, SYSUTCDATETIME())
