@@ -129,4 +129,9 @@ function filterSvg(id, p) {
   </filter>`;
 }
 
-module.exports = { adjust, filterSvg, DEFAULT_PROMPT, DEFAULT_SYSTEM, NEUTRAL, LIMITS };
+// Всё, что влияет на обработку, — для страницы настроек (только просмотр).
+function info() {
+  return { model: MODEL, fallback: FALLBACK, format: FORMAT, limits: LIMITS, neutral: NEUTRAL,
+    defaultPrompt: DEFAULT_PROMPT, defaultSystem: DEFAULT_SYSTEM, userPrefix: "Пожелания редактора: " };
+}
+module.exports = { adjust, filterSvg, info, DEFAULT_PROMPT, DEFAULT_SYSTEM, NEUTRAL, LIMITS };

@@ -8836,7 +8836,7 @@ http
             const dms = await db.instaDmStats(7);
             const texts = await db.listTextStats().catch(() => null);
             const flags = await db.mortgageFlagStats().catch(() => []);
-            send(200, { ok: true, accounts: out, candidates: cands.map((f) => Object.assign({}, f, { photos: f.photos.length })), posts: posts, dms: dms, texts: texts, flags: flags, polish: await instaPolish(), districts: (await instaDistricts(acc)).join(","), photoAi: PHOTO_SCORE.available(), photoRejected: instaPhotoRejected[acc] || 0, flagSweep: { running: instaMortgage.running, at: instaMortgage.lastAt, last: instaMortgage.last },
+            send(200, { ok: true, accounts: out, candidates: cands.map((f) => Object.assign({}, f, { photos: f.photos.length })), posts: posts, dms: dms, texts: texts, flags: flags, polish: await instaPolish(), polishInfo: require("./scripts/polish.js").info(), districts: (await instaDistricts(acc)).join(","), photoAi: PHOTO_SCORE.available(), photoRejected: instaPhotoRejected[acc] || 0, flagSweep: { running: instaMortgage.running, at: instaMortgage.lastAt, last: instaMortgage.last },
               hook: PUBLIC_URL + "/api/insta/phone?acc=" + acc + "&k=" + instaHookKey() + "&u=", candidatesAt: instaCand[acc] && instaCand[acc].at });
           })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 300) }));
           return;
