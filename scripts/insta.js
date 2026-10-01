@@ -175,7 +175,7 @@ async function renderCarousel(f, acc, opts) {
   // цифры коррекции для каждого фото, применяем их фильтром. Сбой — без неё.
   let fx = [];
   if (opts && opts.polish && opts.polish.enabled) {
-    fx = await POLISH.adjust(got.slice(0, max + 1), opts.polish.prompt).catch((e) => { console.log("[insta] polish: " + e.message); return []; });
+    fx = await POLISH.adjust(got.slice(0, max + 1), opts.polish.prompt, opts.polish.system).catch((e) => { console.log("[insta] polish: " + e.message); return []; });
   }
   const slides = [toJpeg(coverSvg(f, got[0], acc, fx[0]))];
   inner.forEach((b, k) => slides.push(toJpeg(photoSvg(b, acc, k + 2, n, f, fx[k + 1]))));

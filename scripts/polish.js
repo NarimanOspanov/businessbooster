@@ -28,14 +28,18 @@ function key() {
   try { return fs.readFileSync(path.join(os.homedir(), ".gemini-key"), "utf8").trim() || null; } catch { return null; }
 }
 
-const RULES = `Ты настраиваешь цветокоррекцию фото квартир для Instagram. Тебе дают фото и пожелания редактора.
+// Инструкция модели по умолчанию; в работе — из настроек (insta.polish.system).
+const DEFAULT_SYSTEM = `Ты настраиваешь цветокоррекцию фото квартир для Instagram. Тебе дают фото и пожелания редактора.
 Ты НЕ рисуешь и не меняешь содержимое кадра — только выбираешь числовые настройки для каждого фото:
 brightness от ${LIMITS.brightness[0]} до ${LIMITS.brightness[1]} (0 — без изменений),
 contrast от ${LIMITS.contrast[0]} до ${LIMITS.contrast[1]} (1 — без изменений),
 saturation от ${LIMITS.saturation[0]} до ${LIMITS.saturation[1]} (1 — без изменений),
 warmth от ${LIMITS.warmth[0]} до ${LIMITS.warmth[1]} (0 — без изменений, плюс — теплее),
 sharpen от 0 до 1, denoise от 0 до 1.
-Если фото уже хорошее — оставь значения близкими к нейтральным. Тёмное — подними яркость; серое и плоское — контраст; мутное — резкость; зернистое — шумоподавление.
+Если фото уже хорошее — оставь значения близкими к нейтральным. Тёмное — подними яркость; серое и плоское — контраст; мутное — резкость; зернистое — шумоподавление.`;
+// Формат ответа добавляем всегда, к любой инструкции из настроек: без него
+// разбор ответа ломается. Рамки значений всё равно режем в clamp().
+const FORMAT = `
 Числа пиши с двумя знаками после точки (например 0.12, 1.08).
 Верни JSON: photos — массив {i, brightness, contrast, saturation, warmth, sharpen, denoise} по номеру фото i (с 0).`;
 
@@ -60,19 +64,19 @@ function clamp(p) {
   return out;
 }
 
-async function ask(parts, prompt, model) {
+async function ask(parts, prompt, system, model) {
   const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
     method: "POST",
     headers: { "x-goog-api-key": key(), "Content-Type": "application/json" },
     body: JSON.stringify({
-      system_instruction: { parts: [{ text: RULES }] },
+      system_instruction: { parts: [{ text: (system || DEFAULT_SYSTEM) + FORMAT }] },
       contents: [{ role: "user", parts: [{ text: "Пожелания редактора: " + (prompt || DEFAULT_PROMPT) }].concat(parts) }],
       generationConfig: { temperature: 0, maxOutputTokens: 4096, thinkingConfig: { thinkingBudget: 0 }, responseMimeType: "application/json", responseSchema: SCHEMA },
     }),
     signal: AbortSignal.timeout(90000),
   });
   const text = await res.text();
-  if (res.status === 404 && model !== FALLBACK) return ask(parts, prompt, FALLBACK);
+  if (res.status === 404 && model !== FALLBACK) return ask(parts, prompt, system, FALLBACK);
   if (!res.ok) throw new Error("gemini_" + res.status + ": " + text.slice(0, 200));
   const j = JSON.parse(text);
   const cand = (j.candidates || [])[0] || {};
@@ -90,14 +94,14 @@ async function ask(parts, prompt, model) {
 }
 
 // buffers — JPEG фото поста (как скачали); возвращает массив настроек той же длины.
-async function adjust(buffers, prompt) {
+async function adjust(buffers, prompt, system) {
   if (!key() || !buffers.length) return buffers.map(() => Object.assign({}, NEUTRAL));
   const parts = [];
   buffers.forEach((b, i) => {
     parts.push({ text: "Фото " + i + ":" });
     parts.push({ inline_data: { mime_type: "image/jpeg", data: b.toString("base64") } });
   });
-  const r = await ask(parts, prompt, MODEL);
+  const r = await ask(parts, prompt, system, MODEL);
   const byI = {};
   (r.photos || []).forEach((p) => { if (Number.isInteger(p.i)) byI[p.i] = clamp(p); });
   return buffers.map((_, i) => byI[i] || Object.assign({}, NEUTRAL));
@@ -120,4 +124,4 @@ function filterSvg(id, p) {
   </filter>`;
 }
 
-module.exports = { adjust, filterSvg, DEFAULT_PROMPT, NEUTRAL, LIMITS };
+module.exports = { adjust, filterSvg, DEFAULT_PROMPT, DEFAULT_SYSTEM, NEUTRAL, LIMITS };

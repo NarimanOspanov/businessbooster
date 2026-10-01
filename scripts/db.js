@@ -3610,6 +3610,13 @@ async function configSet(k, v) {
     .query(`UPDATE dbo.app_config SET v = @v, updated_at = SYSUTCDATETIME() WHERE k = @k;
             IF @@ROWCOUNT = 0 INSERT INTO dbo.app_config (k, v) VALUES (@k, @v);`);
 }
+// Какой номер получит следующий пост — для превью.
+async function instaNextCode() {
+  const pool = await getPool();
+  await ensureInsta();
+  const r = (await pool.request().query("SELECT CAST(IDENT_CURRENT('dbo.insta_posts') AS INT) + 1 AS n")).recordset[0];
+  return r && r.n ? r.n : 1;
+}
 async function instaPostReserve(acc, listingId, reason) {
   const pool = await getPool();
   await ensureInsta();
@@ -4553,7 +4560,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
-  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, instaCandidates, instaListing, instaPostReserve, instaPostFinish, instaPostByCode, instaPhotoScoresGet, instaPhotoScoreSave, instaPlacesGet, instaPlaceSave, configGet, configSet, listTextSave, listTextStats, mortgageFlagSave, mortgageFlagStats, instaAccounts, instaAccountSet, instaPostAdd, instaPosts, instaPostedSince, instaPostByMedia, instaRecentMedia, instaRecentListings, instaDmAdd, instaDmMedia, instaDmStats, instaDmPrune, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
+  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, instaCandidates, instaListing, instaPostReserve, instaPostFinish, instaPostByCode, instaPhotoScoresGet, instaPhotoScoreSave, instaPlacesGet, instaPlaceSave, configGet, configSet, instaNextCode, listTextSave, listTextStats, mortgageFlagSave, mortgageFlagStats, instaAccounts, instaAccountSet, instaPostAdd, instaPosts, instaPostedSince, instaPostByMedia, instaRecentMedia, instaRecentListings, instaDmAdd, instaDmMedia, instaDmStats, instaDmPrune, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,
