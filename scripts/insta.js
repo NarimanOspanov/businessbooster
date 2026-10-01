@@ -12,6 +12,7 @@ const { Resvg } = require("@resvg/resvg-js");
 const jpeg = require("jpeg-js");
 
 const W = 1080, H = 1350;
+const POLISH = require("./polish.js");
 const FONT_DIR = path.join(__dirname, "..", "assets", "fonts");
 const FONTS = ["Montserrat_500Medium.ttf", "Montserrat_700Bold.ttf", "Montserrat_800ExtraBold.ttf"].map((f) => path.join(FONT_DIR, f));
 const GRAPH = "https://graph.instagram.com/v23.0";
@@ -66,7 +67,7 @@ function toJpeg(svg) {
 }
 
 // Слайд 1: фото сверху целиком (4:3), ниже тёмная плашка с ценой и параметрами.
-function coverSvg(f, photo, acc) {
+function coverSvg(f, photo, acc, fx) {
   const A = ACCOUNTS[acc] || ACCOUNTS.almaty;
   const h = hook(f);
   const PH = 810;
@@ -79,8 +80,9 @@ function coverSvg(f, photo, acc) {
     badge = `<rect x="40" y="${PH - 44}" width="${bw}" height="88" rx="44" fill="#ff7a1a"/>
       <text x="${40 + bw / 2}" y="${PH + 12}" text-anchor="middle" font-size="34" font-weight="800" fill="#fff">${esc(h.badge)}</text>`;
   }
-  const img = photo ? `<image href="${dataUri(photo)}" x="0" y="0" width="${W}" height="${PH}" preserveAspectRatio="xMidYMid slice"/>` : "";
+  const img = photo ? `<image href="${dataUri(photo)}" x="0" y="0" width="${W}" height="${PH}" preserveAspectRatio="xMidYMid slice"${fx ? ' filter="url(#fx)"' : ""}/>` : "";
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Montserrat">
+  ${fx ? "<defs>" + POLISH.filterSvg("fx", fx) + "</defs>" : ""}
   <rect width="${W}" height="${H}" fill="#12211a"/>
   ${img}
   <rect x="40" y="40" width="${pw}" height="64" rx="32" fill="#1e8422"/>
@@ -128,15 +130,15 @@ function nearBar(text) {
 }
 
 // Фото квартиры: целиком по центру поверх размытой и затемнённой копии.
-function photoSvg(photo, acc, i, n, f) {
+function photoSvg(photo, acc, i, n, f, fx) {
   const A = ACCOUNTS[acc] || ACCOUNTS.almaty;
   const u = dataUri(photo);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Montserrat">
-  <defs><filter id="b" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="36"/></filter></defs>
+  <defs><filter id="b" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="36"/></filter>${fx ? POLISH.filterSvg("fx", fx) : ""}</defs>
   <rect width="${W}" height="${H}" fill="#12211a"/>
   <image href="${u}" x="-60" y="-60" width="${W + 120}" height="${H + 120}" preserveAspectRatio="xMidYMid slice" filter="url(#b)"/>
   <rect width="${W}" height="${H}" fill="#000" opacity=".38"/>
-  <image href="${u}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid meet"/>
+  <image href="${u}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid meet"${fx ? ' filter="url(#fx)"' : ""}/>
   ${f && f.near ? nearBar(f.near) : ""}
   <text x="${W / 2}" y="${H - 40}" text-anchor="middle" font-size="26" font-weight="600" fill="#fff" opacity=".8">@${esc(A.handle)}</text>
 </svg>`;
@@ -169,8 +171,14 @@ async function renderCarousel(f, acc, opts) {
   if (!got.length) throw new Error("нет фото");
   const inner = got.slice(1, max + 1);
   const n = inner.length + 2;
-  const slides = [toJpeg(coverSvg(f, got[0], acc))];
-  inner.forEach((b, k) => slides.push(toJpeg(photoSvg(b, acc, k + 2, n, f))));
+  // Полировка (если включена): Gemini по промпту из настроек подбирает
+  // цифры коррекции для каждого фото, применяем их фильтром. Сбой — без неё.
+  let fx = [];
+  if (opts && opts.polish && opts.polish.enabled) {
+    fx = await POLISH.adjust(got.slice(0, max + 1), opts.polish.prompt).catch((e) => { console.log("[insta] polish: " + e.message); return []; });
+  }
+  const slides = [toJpeg(coverSvg(f, got[0], acc, fx[0]))];
+  inner.forEach((b, k) => slides.push(toJpeg(photoSvg(b, acc, k + 2, n, f, fx[k + 1]))));
   slides.push(toJpeg(ctaSvg(f, got[0], acc)));
   return slides;
 }

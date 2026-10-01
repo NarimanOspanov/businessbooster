@@ -3295,6 +3295,13 @@ IF OBJECT_ID('dbo.insta_places', 'U') IS NULL
     facts      NVARCHAR(200) NULL,
     at         DATETIME2(0)  NOT NULL CONSTRAINT DF_iplc_at DEFAULT SYSUTCDATETIME()
   );
+-- Настройки, которые правят со страниц (промпты и т. п.): ключ → значение.
+IF OBJECT_ID('dbo.app_config', 'U') IS NULL
+  CREATE TABLE dbo.app_config (
+    k          NVARCHAR(100) NOT NULL PRIMARY KEY,
+    v          NVARCHAR(MAX) NULL,
+    updated_at DATETIME2(0)  NOT NULL CONSTRAINT DF_appcfg_at DEFAULT SYSUTCDATETIME()
+  );
 IF OBJECT_ID('dbo.insta_dms', 'U') IS NULL
 BEGIN
   CREATE TABLE dbo.insta_dms (
@@ -3572,6 +3579,24 @@ async function instaPlaceSave(id, p) {
     .input("f", sql.NVarChar(200), p && p.facts ? JSON.stringify(p.facts).slice(0, 200) : null)
     .query(`UPDATE dbo.insta_places SET text = @t, facts = @f, at = SYSUTCDATETIME() WHERE listing_id = @id;
             IF @@ROWCOUNT = 0 INSERT INTO dbo.insta_places (listing_id, text, facts) VALUES (@id, @t, @f);`);
+}
+async function configGet(keys) {
+  const pool = await getPool();
+  await ensureInsta();
+  const r = pool.request();
+  const list = (keys || []).map(String);
+  list.forEach((k, i) => r.input("k" + i, sql.NVarChar(100), k));
+  const rows = list.length ? (await r.query("SELECT k, v FROM dbo.app_config WHERE k IN (" + list.map((_, i) => "@k" + i).join(",") + ")")).recordset : [];
+  const out = {};
+  rows.forEach((x) => { out[x.k] = x.v; });
+  return out;
+}
+async function configSet(k, v) {
+  const pool = await getPool();
+  await ensureInsta();
+  await pool.request().input("k", sql.NVarChar(100), String(k)).input("v", sql.NVarChar(sql.MAX), v == null ? null : String(v))
+    .query(`UPDATE dbo.app_config SET v = @v, updated_at = SYSUTCDATETIME() WHERE k = @k;
+            IF @@ROWCOUNT = 0 INSERT INTO dbo.app_config (k, v) VALUES (@k, @v);`);
 }
 async function instaPostReserve(acc, listingId, reason) {
   const pool = await getPool();
@@ -4516,7 +4541,7 @@ module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, 
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
-  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, instaCandidates, instaListing, instaPostReserve, instaPostFinish, instaPostByCode, instaPhotoScoresGet, instaPhotoScoreSave, instaPlacesGet, instaPlaceSave, listTextSave, listTextStats, mortgageFlagSave, mortgageFlagStats, instaAccounts, instaAccountSet, instaPostAdd, instaPosts, instaPostedSince, instaPostByMedia, instaRecentMedia, instaRecentListings, instaDmAdd, instaDmMedia, instaDmStats, instaDmPrune, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
+  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, instaCandidates, instaListing, instaPostReserve, instaPostFinish, instaPostByCode, instaPhotoScoresGet, instaPhotoScoreSave, instaPlacesGet, instaPlaceSave, configGet, configSet, listTextSave, listTextStats, mortgageFlagSave, mortgageFlagStats, instaAccounts, instaAccountSet, instaPostAdd, instaPosts, instaPostedSince, instaPostByMedia, instaRecentMedia, instaRecentListings, instaDmAdd, instaDmMedia, instaDmStats, instaDmPrune, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,
