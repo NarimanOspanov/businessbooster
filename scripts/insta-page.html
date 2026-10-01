@@ -193,8 +193,8 @@ function polishInfoHtml(p){
     "<ul style='margin:4px 0 10px'><li>Gemini не возвращает картинку — только числа. Перерисовать кадр, убрать предметы, мусор или водяной знак он не может, что бы ни было в промпте.</li>"+
     "<li>Фильтры применяются ко всему фото одинаково (свет, цвет, резкость) — водяной знак сайта и номер объявления на фото остаются как были.</li>"+
     "<li>Размытый фон за фото на слайдах не обрабатывается — только само фото.</li></ul>"+
-    "<b>Режим «готовое фото»: правила из кода</b> <span class='mut'>— добавляются перед вашими пожеланиями всегда, отсюда не меняются</span>"+pre(I.guard)+
-    "<b>Проверка каждого готового фото</b> <span class='mut'>— не прошло хоть одно условие → для этого фото берётся коррекция цифрами</span>"+
+    "<b>Режим «готовое фото»: правила по умолчанию</b> <span class='mut'>— сейчас правила берутся из поля выше (app_config → insta.polish.guard); пустое поле → эти</span>"+pre(I.guard)+
+    "<b>Проверка каждого готового фото</b> <span class='mut'>— в коде, отсюда не меняется; не прошло хоть одно условие → для этого фото берётся коррекция цифрами</span>"+
     "<ul style='margin:4px 0 10px'><li>Совпадение контуров кадра с оригиналом ≥ "+I.edgeMin+" (тот же кадр обычно ~0,98, другой кадр ~0,1).</li><li>Отдельная модель ("+esc(I.model)+") сравнивает оригинал и результат по инструкции:</li></ul>"+pre(I.check)+
     "<b>5. Модель и сбои</b>"+
     "<ul style='margin:4px 0 10px'><li>Модель: "+esc(I.model)+" (если недоступна — "+esc(I.fallback)+"), температура 0.</li>"+
@@ -219,19 +219,22 @@ function renderPolish(){
     "<label class='mut'>модель <input type='text' id='pol-model' value='"+esc(p.imageModel||"")+"' style='width:200px'></label></div>"+
     "<div class='mut' style='margin:6px 0'>Gemini по этому промпту подбирает для каждого фото яркость, контраст, насыщенность, теплоту, резкость и шумоподавление — в разумных рамках. Содержимое кадра он не меняет. Посмотреть результат: клик по обложке кандидата — вся карусель.</div>"+
     "<textarea id='pol-prompt' rows='4' style='width:100%;background:#0d1117;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px;font:inherit'>"+esc(p.prompt||"")+"</textarea>"+
-    "<details style='margin-top:10px'><summary>Инструкция для Gemini (как подбирать числа)</summary><div class='mut' style='margin:6px 0'>Хранится в базе: app_config → insta.polish.system. Формат ответа и рамки значений сервер добавляет сам.</div>"+
+    "<details style='margin-top:10px'><summary>Правила и инструкция для Gemini</summary><div class='mut' style='margin:6px 0'>Хранится в базе: app_config → insta.polish.system. Формат ответа и рамки значений сервер добавляет сам.</div>"+
+    "<div class='mut' style='margin:10px 0 4px'>Правила для режима «готовое фото» (app_config → insta.polish.guard) — идут перед вашими пожеланиями:</div>"+
+    "<textarea id='pol-guard' rows='6' style='width:100%;background:#0d1117;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px;font:inherit'>"+esc(p.guard||"")+"</textarea>"+
+    "<div class='mut' style='margin:10px 0 4px'>Инструкция для режима «цифры» (app_config → insta.polish.system):</div>"+
     "<textarea id='pol-system' rows='9' style='width:100%;background:#0d1117;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px;font:inherit'>"+esc(p.system||"")+"</textarea></details>"+
     "<div class='row' style='margin-top:8px'><button class='btn' id='pol-save'>Сохранить</button><button class='btn ghost' id='pol-try'>Попробовать на случайном фото</button><span class='mut' id='pol-msg'></span></div>"+
     "<div id='pol-test' style='margin-top:12px'></div>"+
     polishInfoHtml(p);
   $("#pol-save").onclick = function(){
-    post({ action:"polish", enabled: $("#pol-on").checked, prompt: $("#pol-prompt").value, system: $("#pol-system").value, mode: polMode(), imageModel: $("#pol-model").value }).then(function(j){ $("#pol-msg").textContent = j.ok ? "Сохранено" : ("Ошибка: "+j.error); });
+    post({ action:"polish", enabled: $("#pol-on").checked, prompt: $("#pol-prompt").value, system: $("#pol-system").value, guard: $("#pol-guard").value, mode: polMode(), imageModel: $("#pol-model").value }).then(function(j){ $("#pol-msg").textContent = j.ok ? "Сохранено" : ("Ошибка: "+j.error); });
   };
   // Проба: случайное фото кандидата, обработка по текстам из полей (даже не сохранённым).
   var tryBtn = $("#pol-try");
   tryBtn.onclick = function(){
     tryBtn.disabled = true; tryBtn.textContent = "Обрабатываем… 10–20 сек";
-    post({ action:"polish_test", prompt: $("#pol-prompt").value, system: $("#pol-system").value, mode: polMode(), imageModel: $("#pol-model").value }).then(function(j){
+    post({ action:"polish_test", prompt: $("#pol-prompt").value, system: $("#pol-system").value, guard: $("#pol-guard").value, mode: polMode(), imageModel: $("#pol-model").value }).then(function(j){
       tryBtn.disabled = false; tryBtn.textContent = "Попробовать на другом фото";
       if(!j.ok){ $("#pol-test").innerHTML = "<span class='bad'>Не вышло: "+esc(j.error)+"</span>"; return; }
       var p = j.params || {}, f = function(v){ return (v>0?"+":"")+Number(v).toFixed(2); };

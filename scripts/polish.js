@@ -145,12 +145,12 @@ const EDGE_MIN = 0.8; // корреляция контуров оригинал�
 
 function sniffMime(b) { return b && b[0] === 0x89 && b[1] === 0x50 ? "image/png" : "image/jpeg"; }
 
-async function generate(buf, prompt, model) {
+async function generate(buf, prompt, model, guard) {
   const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model || IMAGE_MODEL) + ":generateContent", {
     method: "POST",
     headers: { "x-goog-api-key": key(), "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: GUARD + "\n\nПожелания редактора: " + (prompt || DEFAULT_PROMPT) }, { inline_data: { mime_type: "image/jpeg", data: buf.toString("base64") } }] }],
+      contents: [{ role: "user", parts: [{ text: (guard || GUARD) + "\n\nПожелания редактора: " + (prompt || DEFAULT_PROMPT) }, { inline_data: { mime_type: "image/jpeg", data: buf.toString("base64") } }] }],
       generationConfig: { responseModalities: ["IMAGE"] },
     }),
     signal: AbortSignal.timeout(120000),
@@ -225,7 +225,7 @@ async function polishPhotos(buffers, cfg) {
     await Promise.all(buffers.slice(i, i + 3).map(async (b, k) => {
       const idx = i + k;
       try {
-        const g = await generate(b, cfg.prompt, cfg.imageModel);
+        const g = await generate(b, cfg.prompt, cfg.imageModel, cfg.guard);
         const v = await verify(b, g);
         out[idx].check = v;
         if (v.ok) { out[idx].buf = g; out[idx].how = "ai"; }
@@ -246,4 +246,4 @@ function info() {
     defaultPrompt: DEFAULT_PROMPT, defaultSystem: DEFAULT_SYSTEM, userPrefix: "Пожелания редактора: ",
     imageModel: IMAGE_MODEL, guard: GUARD, check: CHECK, edgeMin: EDGE_MIN };
 }
-module.exports = { adjust, filterSvg, info, polishPhotos, generate, verify, IMAGE_MODEL, DEFAULT_PROMPT, DEFAULT_SYSTEM, NEUTRAL, LIMITS };
+module.exports = { adjust, filterSvg, info, polishPhotos, generate, verify, IMAGE_MODEL, GUARD, DEFAULT_PROMPT, DEFAULT_SYSTEM, NEUTRAL, LIMITS };
