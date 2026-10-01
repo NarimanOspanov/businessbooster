@@ -4899,8 +4899,16 @@ async function instaApplyPlaces(rows) {
 // insta_card_facts, описание и параметры в krisha_list_text, — второй раз
 // эту карточку не открываем.
 const CARD_FACTS = require("./scripts/card-facts.js");
-async function instaEnsureCard(f) {
-  if (f.card) return f.card;
+// Превью просит подпись и карусель одновременно — карточку открываем один раз.
+const instaCardPending = new Map();
+function instaEnsureCard(f) {
+  if (f.card) return Promise.resolve(f.card);
+  if (!instaCardPending.has(f.id)) {
+    instaCardPending.set(f.id, instaLoadCard(f).finally(() => instaCardPending.delete(f.id)));
+  }
+  return instaCardPending.get(f.id).then((c) => (f.card = c));
+}
+async function instaLoadCard(f) {
   const have = await db.instaCardFactsGet([f.id]).catch(() => ({}));
   if (have[f.id]) return (f.card = have[f.id]);
   const c = await Promise.race([CARD_FACTS.cardFacts(f.id), new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 60000))]);
@@ -4909,6 +4917,9 @@ async function instaEnsureCard(f) {
   // бывшее общежитие — и пост «можно в ипотеку» был бы неправдой.
   const m = c.text ? await db.listTextSave(f.id, c.text.desc, c.text.params).catch((e) => { console.log("[insta] card text " + f.id + ": " + e.message); return null; }) : null;
   if (m && m.mortgage === "no") c.mortgageNo = m.why || "нет";
+  // Программа и фраза хозяина про ипотеку — на обложку и в подпись.
+  if (m && m.programs.length && !(f.programs || []).length) f.programs = m.programs;
+  if (m && m.quote && !f.quote) f.quote = m.quote;
   return (f.card = c);
 }
 
@@ -8770,6 +8781,8 @@ http
             (async () => {
               const f = await instaFlat(acc, q.get("id"));
               if (!f) return send(404, { ok: false, error: "квартира не найдена" });
+              // Подпись — с фактами из карточки, как в настоящем посте.
+              await instaEnsureCard(f).catch((e) => console.log("[insta] card facts for caption " + f.id + ": " + e.message));
               const code = await db.instaNextCode();
               send(200, { ok: true, code: code, handle: INSTA.ACCOUNTS[acc].handle, caption: INSTA.caption(Object.assign({}, f, { code: code }), acc) });
             })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 200) }));

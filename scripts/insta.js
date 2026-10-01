@@ -309,31 +309,65 @@ async function renderCover(f, acc) {
   return toJpeg(coverSvg(f, null, acc));
 }
 
+// Значок к факту — по смыслу, чтобы список читался глазами, а не строкой.
+const ICONS = [
+  [/метро/i, "🚇"], [/трц|тц/i, "🛍"], [/школ/i, "🏫"], [/детсад/i, "🧸"], [/парк(?!инг)/i, "🌳"],
+  [/супермаркет/i, "🛒"], [/поликлиник/i, "🏥"], [/дом(\s|$)/i, "🏢"], [/жк/i, "🏙"], [/кухн/i, "🍳"],
+  [/потолк/i, "📐"], [/санузл/i, "🚿"], [/паркинг|стоянк/i, "🚗"], [/консьерж|охран|видеонаблюд/i, "🛡"],
+  [/лоджи|балкон/i, "🌿"], [/мебел/i, "🛋"], [/ремонт/i, "🎨"],
+];
+const iconOf = (t) => (ICONS.find(([re]) => re.test(t)) || [null, "▫️"])[1];
+
+// Хэштеги про ипотеку: общие и по названной программе. Instagram берёт не
+// больше 30 — лишние с конца отбрасываем.
+const MORTGAGE_TAGS = "#ипотека #ипотекакз #ипотекаказахстан #купитьквартирувипотеку #жильевипотеку #квартиравипотекуотхозяина #ипотеканаквартиру #отбасыбанк #ипотекаотбасы";
+const PROGRAM_TAGS = { "Отбасы банк": "#отбасы", "7-20-25": "#72025 #ипотека72025", "Наурыз": "#наурыз #ипотеканаурыз", "Баспана Хит": "#баспанахит", "Алматы жастары": "#алматыжастары", "Шаңырақ": "#шанырак" };
+function hashtags(f, acc) {
+  const A = ACCOUNTS[acc] || ACCOUNTS.almaty;
+  const city = acc === "astana" ? "#ипотекаастана" : "#ипотекаалматы";
+  const all = (A.tags + " " + city + " " + MORTGAGE_TAGS + " " + (f.programs || []).map((p) => PROGRAM_TAGS[p] || "").join(" ")).split(/\s+/).filter(Boolean);
+  return [...new Set(all)].slice(0, 30).join(" ");
+}
+
+// Подпись поста: сверху то, по чему решают (цена, где, сколько метров), потом
+// почему эта квартира, что в доме, что рядом, ипотека, как получить номер.
+// Всё — из объявления и карт, ничего от себя: доводы — слова хозяина.
 function caption(f, acc) {
   const A = ACCOUNTS[acc] || ACCOUNTS.almaty;
   const h = hook(f);
+  const c = f.card || {};
+  const kind = (f.rooms ? f.rooms + "-комнатная квартира" : "Квартира") + (f.area ? " " + String(f.area).replace(".", ",") + " м²" : "");
   const lines = [
-    "🔑 От хозяев · можно в ипотеку" + (f.below ? " · ниже рынка" : ""), "",
-    "🏠 " + paramsLine(f).replace(/-комн/, "-комнатная квартира") + (f.isNew ? ", новостройка" : ""),
+    "🔑 От хозяина · можно в ипотеку" + (f.below ? " · ниже рынка" : ""), "",
+    kind + " в " + (acc === "astana" ? "Астане" : "Алматы") + (f.isNew ? ", новостройка" : "") + " — продаёт сам хозяин, без посредников.", "",
+    "💰 " + money(f.price) + " ₸" + (f.area ? " · " + money(Math.round(f.price / f.area / 1000)) + " тыс ₸ за м²" : ""),
     "📍 " + A.city + ", " + cleanAddr(f.addr),
-    "💰 " + money(f.price) + " ₸" + (f.area ? " (" + money(Math.round(f.price / f.area / 1000)) + " тыс ₸/м²)" : ""),
-  ];
+    f.floor ? "🏠 Этаж " + f.floor + (f.floors ? " из " + f.floors : "") : null,
+  ].filter((x) => x != null);
+  if (f.below) lines.push("💚 Метр на " + f.below + "% дешевле похожих квартир " + (f.belowWhere === "near" ? "поблизости" : "в этом ЖК"));
+  else if (c.price) lines.push("📉 " + c.price + " — по оценке Крыши");
+
+  const why = c.desc || [];
+  if (why.length) lines.push("", "Почему стоит посмотреть:", ...why.map((t) => "✔️ " + t));
+  const params = c.params || [];
+  if (params.length) lines.push("", "О доме и квартире:", ...params.slice(0, 8).map((t) => iconOf(t) + " " + t));
+  const near = (f.chips || []).slice(0, 5);
+  if (near.length) lines.push("", "Что рядом:", ...near.map((t) => iconOf(t) + " " + t));
+  else if (f.near) lines.push("", "🗺 " + f.near);
+
   if (h) {
-    lines.push("🏦 " + h.text + ((f.programs || []).length ? " (" + f.programs.join(", ") + ")" : ""));
+    lines.push("", "🏦 Можно купить в ипотеку — хозяин готов" + ((f.programs || []).length ? ", в том числе по программе " + f.programs.join(", ") : "") + ".");
     if (f.quote) lines.push("💬 Из объявления: «" + f.quote + "»");
   }
-  if (f.below) lines.push("💚 Ниже рынка: метр на " + f.below + "% дешевле похожих квартир " + (f.belowWhere === "near" ? "поблизости" : "в этом ЖК"));
-  const c = f.card || {};
-  if (c.price && !f.below) lines.push("📉 " + c.price + " (оценка Крыши)");
-  if ((c.params || []).length) lines.push("🏢 " + c.params.slice(0, 6).join(" · "));
-  if ((c.desc || []).length) lines.push("✨ " + c.desc.join(" · "));
-  if (f.near) lines.push("📍 " + f.near);
-  lines.push("", "✅ Продаёт хозяин — без посредников и лишних комиссий.", "",
-    f.code
-      ? "👉 Хотите номер хозяина? Подпишитесь на @" + A.handle + " и поставьте «+» в комментариях — пришлём номер в директ. Это объявление № " + f.code + ", ищите его в списке."
-      : "👉 Хотите номер хозяина? Подпишитесь на @" + A.handle + " и поставьте «+» в комментариях — пришлём номер в директ.", "",
-    A.tags);
-  return lines.join("\n");
+  lines.push("", "✅ Без посредников и лишних комиссий — договариваетесь напрямую с хозяином.", "",
+    "👉 Хотите номер хозяина? Подпишитесь на @" + A.handle + " и поставьте «+» в комментариях — пришлём номер в директ." +
+      (f.code ? " Это объявление № " + f.code + ", ищите его в списке." : ""),
+    "", hashtags(f, acc));
+  // Instagram режет подпись после 2200 знаков: лишнее убираем из середины,
+  // начиная с «что рядом», а не хвост с призывом и хэштегами.
+  let out = lines.join("\n");
+  while (out.length > 2200 && near.length) { near.pop(); out = caption(Object.assign({}, f, { chips: near.slice() }), acc); }
+  return out.length > 2200 ? out.slice(0, 2200) : out;
 }
 
 // --- Instagram API --------------------------------------------------------
