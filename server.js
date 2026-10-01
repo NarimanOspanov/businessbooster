@@ -4966,14 +4966,17 @@ async function instaDistricts(acc) {
 async function instaPolish() {
   if (instaPolishCache.v && Date.now() - instaPolishCache.at < 60e3) return instaPolishCache.v;
   const P = require("./scripts/polish.js");
-  const c = await db.configGet(["insta.polish.enabled", "insta.polish.prompt", "insta.polish.system"]).catch(() => null);
+  const c = await db.configGet(["insta.polish.enabled", "insta.polish.prompt", "insta.polish.system", "insta.polish.mode", "insta.polish.image_model"]).catch(() => null);
   if (!c) return { enabled: false, prompt: P.DEFAULT_PROMPT, system: P.DEFAULT_SYSTEM };
   // Тексты по умолчанию кладём в базу при первом обращении — чтобы их было
   // видно и править в app_config, а не искать в коде.
   if (c["insta.polish.prompt"] == null) { c["insta.polish.prompt"] = P.DEFAULT_PROMPT; await db.configSet("insta.polish.prompt", P.DEFAULT_PROMPT).catch(() => {}); }
   if (c["insta.polish.system"] == null) { c["insta.polish.system"] = P.DEFAULT_SYSTEM; await db.configSet("insta.polish.system", P.DEFAULT_SYSTEM).catch(() => {}); }
   if (c["insta.polish.enabled"] == null) { c["insta.polish.enabled"] = "0"; await db.configSet("insta.polish.enabled", "0").catch(() => {}); }
-  const v = { enabled: c["insta.polish.enabled"] === "1", prompt: c["insta.polish.prompt"] || P.DEFAULT_PROMPT, system: c["insta.polish.system"] || P.DEFAULT_SYSTEM };
+  if (c["insta.polish.mode"] == null) { c["insta.polish.mode"] = "image"; await db.configSet("insta.polish.mode", "image").catch(() => {}); }
+  if (c["insta.polish.image_model"] == null) { c["insta.polish.image_model"] = P.IMAGE_MODEL; await db.configSet("insta.polish.image_model", P.IMAGE_MODEL).catch(() => {}); }
+  const v = { enabled: c["insta.polish.enabled"] === "1", prompt: c["insta.polish.prompt"] || P.DEFAULT_PROMPT, system: c["insta.polish.system"] || P.DEFAULT_SYSTEM,
+    mode: c["insta.polish.mode"] === "numbers" ? "numbers" : "image", imageModel: c["insta.polish.image_model"] || P.IMAGE_MODEL };
   instaPolishCache = { at: Date.now(), v: v };
   return v;
 }
@@ -8798,6 +8801,16 @@ http
                 if (!buf) return send(502, { ok: false, error: "фото не скачалось" });
                 const prompt = typeof b.prompt === "string" && b.prompt.trim() ? b.prompt.trim() : P.DEFAULT_PROMPT;
                 const system = typeof b.system === "string" && b.system.trim() ? b.system.trim() : P.DEFAULT_SYSTEM;
+                if (b.mode === "image") {
+                  const cur = await instaPolish();
+                  const [res] = await P.polishPhotos([buf], { prompt: prompt, system: system, imageModel: (typeof b.imageModel === "string" && b.imageModel.trim()) || cur.imageModel });
+                  const show = (pb, fx) => INSTA.toJpeg('<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="810" viewBox="0 0 1080 810">' +
+                    (fx ? "<defs>" + P.filterSvg("fx", fx) + "</defs>" : "") +
+                    '<image href="data:' + (pb[0] === 0x89 ? "image/png" : "image/jpeg") + ";base64," + pb.toString("base64") + '" x="0" y="0" width="1080" height="810" preserveAspectRatio="xMidYMid slice"' + (fx ? ' filter="url(#fx)"' : "") + "/></svg>");
+                  return send(200, { ok: true, id: r.id, mode: "image", how: res.how, check: res.check, params: res.fx,
+                    before: "data:image/jpeg;base64," + Buffer.from(show(buf, null)).toString("base64"),
+                    after: "data:image/jpeg;base64," + Buffer.from(show(res.buf, res.fx)).toString("base64") });
+                }
                 const [params] = await P.adjust([buf], prompt, system);
                 const u = "data:image/jpeg;base64," + buf.toString("base64");
                 const pic = (fx) => INSTA.toJpeg('<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="810" viewBox="0 0 1080 810">' +
@@ -8811,6 +8824,8 @@ http
                 await db.configSet("insta.polish.enabled", b.enabled ? "1" : "0");
                 if (typeof b.prompt === "string") await db.configSet("insta.polish.prompt", b.prompt.trim().slice(0, 2000));
                 if (typeof b.system === "string") await db.configSet("insta.polish.system", b.system.trim().slice(0, 6000) || require("./scripts/polish.js").DEFAULT_SYSTEM);
+                if (b.mode === "image" || b.mode === "numbers") await db.configSet("insta.polish.mode", b.mode);
+                if (typeof b.imageModel === "string" && /^[a-z0-9.\-]+$/.test(b.imageModel.trim())) await db.configSet("insta.polish.image_model", b.imageModel.trim());
                 instaPolishCache = { at: 0, v: null };
                 instaPreview.clear(); // превью перерисуются с новыми настройками
                 return send(200, { ok: true });

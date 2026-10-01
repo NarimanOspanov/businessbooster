@@ -129,9 +129,121 @@ function filterSvg(id, p) {
   </filter>`;
 }
 
+// --- Режим «готовое фото»: Gemini возвращает обработанную картинку -----------
+// Модель редактирования картинок (Nano Banana) получает фото и промпт. К
+// промпту из настроек всегда добавляем правила из кода (GUARD): только свет и
+// цвет, содержимое и водяные знаки не трогать. Модель может их нарушить,
+// поэтому каждый результат проверяем: (1) контуры кадра совпадают с оригиналом,
+// (2) отдельная модель сравнивает пару — водяные знаки на месте, предметы те же.
+// Не прошло — для этого фото берём обработку цифрами (adjust/filterSvg).
+const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image";
+const GUARD = `Это фото квартиры из объявления о продаже. Сделай только цветокоррекцию и улучшение качества изображения.
+СТРОГО ЗАПРЕЩЕНО: убирать, добавлять или менять предметы, мебель, стены, пол, потолок, окна, двери, вид из окна; менять ракурс, кадрирование и пропорции.
+СТРОГО: сохрани все водяные знаки и надписи на фото (например «krisha.kz» и номер «ID…») без изменений и на тех же местах.
+Верни фото тех же пропорций.`;
+const EDGE_MIN = 0.8; // корреляция контуров оригинала и результата: тот же кадр ~0,98, другой ~0,1
+
+function sniffMime(b) { return b && b[0] === 0x89 && b[1] === 0x50 ? "image/png" : "image/jpeg"; }
+
+async function generate(buf, prompt, model) {
+  const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model || IMAGE_MODEL) + ":generateContent", {
+    method: "POST",
+    headers: { "x-goog-api-key": key(), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: GUARD + "\n\nПожелания редактора: " + (prompt || DEFAULT_PROMPT) }, { inline_data: { mime_type: "image/jpeg", data: buf.toString("base64") } }] }],
+      generationConfig: { responseModalities: ["IMAGE"] },
+    }),
+    signal: AbortSignal.timeout(120000),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error("gemini_image_" + res.status + ": " + String((j.error && j.error.message) || "").slice(0, 160));
+  const parts = (((j.candidates || [])[0] || {}).content || {}).parts || [];
+  const img = parts.find((p) => p.inline_data || p.inlineData);
+  if (!img) throw new Error("модель не вернула картинку");
+  return Buffer.from((img.inline_data || img.inlineData).data, "base64");
+}
+
+// Контуры кадра в маленьком сером варианте — для сравнения «тот же кадр или нет».
+const GW = 64, GH = 80;
+function edgeMap(buf) {
+  const { Resvg } = require("@resvg/resvg-js");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${GW}" height="${GH}"><image href="data:${sniffMime(buf)};base64,${buf.toString("base64")}" width="${GW}" height="${GH}" preserveAspectRatio="none"/></svg>`;
+  const px = new Resvg(svg).render().pixels;
+  const g = new Float64Array(GW * GH);
+  for (let i = 0; i < GW * GH; i++) g[i] = 0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2];
+  const e = new Float64Array(GW * GH);
+  for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 1; x++) { const i = y * GW + x; e[i] = Math.abs(g[i + 1] - g[i - 1]) + Math.abs(g[i + GW] - g[i - GW]); }
+  return e;
+}
+function corr(a, b) {
+  const n = a.length; let ma = 0, mb = 0;
+  for (let i = 0; i < n; i++) { ma += a[i]; mb += b[i]; }
+  ma /= n; mb /= n;
+  let s = 0, sa = 0, sb = 0;
+  for (let i = 0; i < n; i++) { const x = a[i] - ma, y = b[i] - mb; s += x * y; sa += x * x; sb += y * y; }
+  return sa && sb ? s / Math.sqrt(sa * sb) : 0;
+}
+
+const CHECK = `Тебе дают два фото: первое — оригинал, второе — после обработки. Проверь честность обработки.
+same_content — true, если на втором фото те же предметы, мебель, двери, окна, отделка и ракурс; ничего не убрано и не добавлено (изменились только свет, цвет, резкость).
+watermark_kept — true, если все водяные знаки и надписи оригинала (например «krisha.kz», «ID…») видны на втором фото на тех же местах. Если на оригинале водяных знаков нет — true.
+note — 3–8 слов по-русски, что изменилось.`;
+async function verify(orig, edited) {
+  const edge = corr(edgeMap(orig), edgeMap(edited));
+  const out = { edge: Math.round(edge * 1000) / 1000, same_content: null, watermark_kept: null, note: "" };
+  if (edge < EDGE_MIN) { out.ok = false; out.note = "кадр изменился (контуры не совпадают)"; return out; }
+  const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(MODEL) + ":generateContent", {
+    method: "POST",
+    headers: { "x-goog-api-key": key(), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: CHECK }] },
+      contents: [{ role: "user", parts: [
+        { text: "Оригинал:" }, { inline_data: { mime_type: "image/jpeg", data: orig.toString("base64") } },
+        { text: "После обработки:" }, { inline_data: { mime_type: sniffMime(edited), data: edited.toString("base64") } }] }],
+      generationConfig: { temperature: 0, maxOutputTokens: 400, thinkingConfig: { thinkingBudget: 0 }, responseMimeType: "application/json",
+        responseSchema: { type: "OBJECT", properties: { same_content: { type: "BOOLEAN" }, watermark_kept: { type: "BOOLEAN" }, note: { type: "STRING" } }, required: ["same_content", "watermark_kept"] } },
+    }),
+    signal: AbortSignal.timeout(60000),
+  });
+  const j = await res.json().catch(() => ({}));
+  try {
+    const t = (((j.candidates || [])[0] || {}).content || {}).parts.map((p) => p.text || "").join("");
+    const v = JSON.parse(t);
+    out.same_content = !!v.same_content; out.watermark_kept = !!v.watermark_kept; out.note = String(v.note || "").slice(0, 80);
+  } catch { out.note = "проверка не ответила"; }
+  out.ok = out.same_content === true && out.watermark_kept === true;
+  return out;
+}
+
+// Обработать фото поста в режиме «готовое фото». Возвращает для каждого
+// { buf, fx, how, check }: how = "ai" (взяли картинку модели) | "numbers"
+// (не прошла проверку — коррекция цифрами) | "none".
+async function polishPhotos(buffers, cfg) {
+  const out = buffers.map((b) => ({ buf: b, fx: null, how: "none", check: null }));
+  if (!key()) return out;
+  for (let i = 0; i < buffers.length; i += 3) {
+    await Promise.all(buffers.slice(i, i + 3).map(async (b, k) => {
+      const idx = i + k;
+      try {
+        const g = await generate(b, cfg.prompt, cfg.imageModel);
+        const v = await verify(b, g);
+        out[idx].check = v;
+        if (v.ok) { out[idx].buf = g; out[idx].how = "ai"; }
+      } catch (e) { out[idx].check = { ok: false, note: String(e.message).slice(0, 100) }; }
+    }));
+  }
+  const failed = out.map((o, i) => (o.how === "ai" ? -1 : i)).filter((i) => i >= 0);
+  if (failed.length) {
+    const fx = await adjust(failed.map((i) => buffers[i]), cfg.prompt, cfg.system).catch(() => []);
+    failed.forEach((i, k) => { if (fx[k]) { out[i].fx = fx[k]; out[i].how = "numbers"; } });
+  }
+  return out;
+}
+
 // Всё, что влияет на обработку, — для страницы настроек (только просмотр).
 function info() {
   return { model: MODEL, fallback: FALLBACK, format: FORMAT, limits: LIMITS, neutral: NEUTRAL,
-    defaultPrompt: DEFAULT_PROMPT, defaultSystem: DEFAULT_SYSTEM, userPrefix: "Пожелания редактора: " };
+    defaultPrompt: DEFAULT_PROMPT, defaultSystem: DEFAULT_SYSTEM, userPrefix: "Пожелания редактора: ",
+    imageModel: IMAGE_MODEL, guard: GUARD, check: CHECK, edgeMin: EDGE_MIN };
 }
-module.exports = { adjust, filterSvg, info, DEFAULT_PROMPT, DEFAULT_SYSTEM, NEUTRAL, LIMITS };
+module.exports = { adjust, filterSvg, info, polishPhotos, generate, verify, IMAGE_MODEL, DEFAULT_PROMPT, DEFAULT_SYSTEM, NEUTRAL, LIMITS };

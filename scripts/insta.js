@@ -58,7 +58,7 @@ async function fetchPhoto(url) {
     return b.length > 2000 && b[0] === 0xff && b[1] === 0xd8 ? b : null;
   } catch { return null; } finally { clearTimeout(t); }
 }
-const dataUri = (buf) => "data:image/jpeg;base64," + buf.toString("base64");
+const dataUri = (buf) => "data:" + (buf[0] === 0x89 && buf[1] === 0x50 ? "image/png" : "image/jpeg") + ";base64," + buf.toString("base64");
 
 function toJpeg(svg) {
   const r = new Resvg(svg, { fitTo: { mode: "width", value: W }, font: { fontFiles: FONTS, loadSystemFonts: false, defaultFontFamily: "Montserrat" } });
@@ -231,8 +231,17 @@ async function renderCarousel(f, acc, opts) {
   // цифры коррекции для каждого фото, применяем их фильтром. Сбой — без неё.
   let fx = [];
   if (opts && opts.polish && opts.polish.enabled) {
-    fx = await POLISH.adjust(got.slice(0, max + 1), opts.polish.prompt, opts.polish.system).catch((e) => { console.log("[insta] polish: " + e.message); return []; });
+    if (opts.polish.mode === "image") {
+      // Gemini возвращает готовые фото; что не прошло проверку — цифрами.
+      const res = await POLISH.polishPhotos(got.slice(0, max + 1), opts.polish).catch((e) => { console.log("[insta] polish image: " + e.message); return []; });
+      res.forEach((r, i) => { got[i] = r.buf; fx[i] = r.fx || undefined; });
+      if (opts.report) opts.report.polish = res.map((r) => ({ how: r.how, check: r.check }));
+    } else {
+      fx = await POLISH.adjust(got.slice(0, max + 1), opts.polish.prompt, opts.polish.system).catch((e) => { console.log("[insta] polish: " + e.message); return []; });
+    }
   }
+  const inner2 = got.slice(1, max + 1);
+  inner.splice(0, inner.length, ...inner2);
   const slides = [toJpeg(coverSvg(f, got[0], acc, fx[0]))];
   inner.forEach((b, k) => slides.push(toJpeg(photoSvg(b, acc, k + 2, n, f, fx[k + 1]))));
   const map = await mapSlide(f, acc).catch((e) => { console.log("[insta] map: " + e.message); return null; });
