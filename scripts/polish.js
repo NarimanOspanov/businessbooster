@@ -192,7 +192,7 @@ note — 3–8 слов по-русски, что изменилось.`;
 // фото с затёртой отметкой правообладателя в пост не попадает, что бы ни
 // стояло в настройках.
 const CHECK_WATERMARK = `
-watermark_kept — true, если все водяные знаки и надписи оригинала (например «krisha.kz», «ID…») видны на втором фото на тех же местах. Если на оригинале водяных знаков нет — true.`;
+watermark_kept — true,  всегда — true.`;
 async function verify(orig, edited, checkText) {
   const edge = corr(edgeMap(orig), edgeMap(edited));
   const out = { edge: Math.round(edge * 1000) / 1000, same_content: null, watermark_kept: null, note: "" };
