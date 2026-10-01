@@ -147,11 +147,16 @@ function pinIcon(x, y, s, color) {
 // «Что рядом» плашкой поверх фото — сверху слева: внизу водяной знак сайта
 // (его не закрываем), справа сверху счётчик карусели Instagram («2/9»), под
 // него оставляем 220 px. Ширина плашки — по измеренному тексту.
-function nearBar(text) {
+// Факт о самой квартире — с галочкой, о районе — с меткой.
+function checkIcon(x, y, r, color) {
+  return `<circle cx="${x}" cy="${y}" r="${r}" fill="${color}"/>
+  <path d="M${x - r * 0.45} ${y + r * 0.02} L${x - r * 0.1} ${y + r * 0.38} L${x + r * 0.5} ${y - r * 0.35}" fill="none" stroke="#12211a" stroke-width="${(r * 0.28).toFixed(1)}" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+function nearBar(text, kind) {
   const t = fit(text, 26, 600, W - 220 - 40 - 110 - 30);
   const w = 110 + measure(t, 26, 600) + 30;
   return `<rect x="40" y="40" width="${w.toFixed(0)}" height="64" rx="32" fill="#000" opacity=".6"/>
-  ${pinIcon(80, 66, 18, "#4cc35a")}
+  ${kind === "flat" ? checkIcon(80, 72, 17, "#4cc35a") : pinIcon(80, 66, 18, "#4cc35a")}
   <text x="110" y="82" font-size="26" font-weight="600" fill="#fff">${esc(t)}</text>`;
 }
 
@@ -165,7 +170,7 @@ function photoSvg(photo, acc, i, n, f, fx, fact) {
   <image href="${u}" x="-60" y="-60" width="${W + 120}" height="${H + 120}" preserveAspectRatio="xMidYMid slice" filter="url(#b)"/>
   <rect width="${W}" height="${H}" fill="#000" opacity=".38"/>
   <image href="${u}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid meet"${fx ? ' filter="url(#fx)"' : ""}/>
-  ${fact ? nearBar(fact) : ""}
+  ${fact ? nearBar(fact.t, fact.k) : ""}
   <text x="${W / 2}" y="${H - 40}" text-anchor="middle" font-size="26" font-weight="600" fill="#fff" opacity=".8">@${esc(A.handle)}</text>
 </svg>`;
 }
@@ -241,6 +246,24 @@ async function mapSlide(f, acc) {
 </svg>`);
 }
 
+// Факты для фото, по одному на снимок, по кругу из трёх источников: доводы
+// (оценка цены Крыши и слова хозяина из описания), характеристики дома и
+// квартиры, что рядом. Так подряд не идут три школы или три параметра.
+// Кончились — фото без плашки. Нет фактов о районе (старый кэш) — общая
+// строка «Рядом: …» одним пунктом.
+function photoFacts(f) {
+  const c = f.card || {};
+  const flat = (t) => ({ t: t, k: "flat" });
+  const lists = [
+    (c.price && !f.below ? [c.price] : []).concat(c.desc || []).map(flat),
+    (c.params || []).map(flat),
+    ((f.chips && f.chips.length) ? f.chips : (f.near ? [f.near] : [])).map((t) => ({ t: t, k: "place" })),
+  ];
+  const out = [];
+  for (let i = 0; lists.some((l) => i < l.length); i++) lists.forEach((l) => { if (l[i]) out.push(l[i]); });
+  return out;
+}
+
 // Все слайды поста: обложка, до 7 фото, карта, призыв. Битые фото пропускаем.
 async function renderCarousel(f, acc, opts) {
   const max = (opts && opts.maxPhotos) || 7;
@@ -269,9 +292,7 @@ async function renderCarousel(f, acc, opts) {
   const inner2 = got.slice(1, max + 1);
   inner.splice(0, inner.length, ...inner2);
   const slides = [toJpeg(coverSvg(f, got[0], acc, fx[0]))];
-  // На каждом фото свой факт о районе; кончились — фото без плашки. Нет
-  // фактов (старый кэш) — общая строка «Рядом: …» только на первом фото.
-  const facts = (f.chips && f.chips.length) ? f.chips : (f.near ? [f.near] : []);
+  const facts = photoFacts(f);
   inner.forEach((b, k) => slides.push(toJpeg(photoSvg(b, acc, k + 2, n, f, fx[k + 1], facts[k]))));
   const map = await mapSlide(f, acc).catch((e) => { console.log("[insta] map: " + e.message); return null; });
   if (map) slides.push(map);
@@ -302,6 +323,10 @@ function caption(f, acc) {
     if (f.quote) lines.push("💬 Из объявления: «" + f.quote + "»");
   }
   if (f.below) lines.push("💚 Ниже рынка: метр на " + f.below + "% дешевле похожих квартир " + (f.belowWhere === "near" ? "поблизости" : "в этом ЖК"));
+  const c = f.card || {};
+  if (c.price && !f.below) lines.push("📉 " + c.price + " (оценка Крыши)");
+  if ((c.params || []).length) lines.push("🏢 " + c.params.slice(0, 6).join(" · "));
+  if ((c.desc || []).length) lines.push("✨ " + c.desc.join(" · "));
   if (f.near) lines.push("📍 " + f.near);
   lines.push("", "✅ Продаёт хозяин — без посредников и лишних комиссий.", "",
     f.code

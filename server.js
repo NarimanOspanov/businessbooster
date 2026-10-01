@@ -4857,6 +4857,7 @@ async function instaCandidates(acc, fresh) {
   rows = await instaApplyPhotoScores(rows).catch((e) => { console.log("[insta] photo score: " + e.message); return rows; });
   rows = rows.slice(0, 12);
   await instaApplyPlaces(rows).catch((e) => console.log("[insta] places: " + e.message));
+  await instaApplyCardFacts(rows).catch((e) => console.log("[insta] card facts: " + e.message));
   instaCand[acc] = { at: Date.now(), rows: rows };
   return rows;
 }
@@ -4888,6 +4889,38 @@ async function instaApplyPlaces(rows) {
           if (p && p.text) { r.near = p.text; r.chips = p.chips; } // тот же объект лежит в кэше кандидатов
         } catch (e) { console.log("[insta] places " + r.id + ": " + e.message); }
         finally { instaPlacesBusy.delete(r.id); }
+      }));
+    }
+  })();
+}
+// Факты из карточки объявления (scripts/card-facts.js): характеристики,
+// оценка цены Крыши и доводы из описания — по одному на фото карусели.
+// Как и «что рядом»: из базы сразу, недостающее снимаем в фоне по 2 и не
+// ждём. Крыша отказала (468) — не повторяем 30 минут.
+const CARD_FACTS = require("./scripts/card-facts.js");
+const instaCardBusy = new Set();
+const instaCardFailedAt = new Map();
+async function instaCardFactsFetch(id) {
+  const c = await CARD_FACTS.cardFacts(id);
+  await db.instaCardFactsSave(id, c);
+  return c;
+}
+async function instaApplyCardFacts(rows) {
+  const have = await db.instaCardFactsGet(rows.map((r) => r.id));
+  const todo = [];
+  for (const r of rows) {
+    if (have[r.id]) { r.card = have[r.id]; continue; }
+    if (instaCardBusy.has(r.id) || Date.now() - (instaCardFailedAt.get(r.id) || 0) < 30 * 60e3) continue;
+    todo.push(r);
+  }
+  if (!todo.length) return;
+  todo.forEach((r) => instaCardBusy.add(r.id));
+  (async () => {
+    for (let i = 0; i < todo.length; i += 2) {
+      await Promise.all(todo.slice(i, i + 2).map(async (r) => {
+        try { r.card = await instaCardFactsFetch(r.id); } // тот же объект лежит в кэше кандидатов
+        catch (e) { instaCardFailedAt.set(r.id, Date.now()); console.log("[insta] card facts " + r.id + ": " + e.message); }
+        finally { instaCardBusy.delete(r.id); }
       }));
     }
   })();
@@ -5000,6 +5033,12 @@ async function instaPublish(acc, f) {
         if (p || !f.near) await db.instaPlaceSave(f.id, p);
         if (p && p.text) { f.near = p.text; f.chips = p.chips; }
       } catch (e) { console.log("[insta] places before publish " + f.id + ": " + e.message); }
+    }
+    if (!f.card) {
+      try {
+        const have = await db.instaCardFactsGet([f.id]);
+        f.card = have[f.id] || await Promise.race([instaCardFactsFetch(f.id), new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 60000))]);
+      } catch (e) { console.log("[insta] card facts before publish " + f.id + ": " + e.message); }
     }
     const code = await db.instaPostReserve(acc, f.id, reason);
     const fc = Object.assign({}, f, { code: code });

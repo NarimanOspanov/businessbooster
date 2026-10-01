@@ -3299,6 +3299,14 @@ IF OBJECT_ID('dbo.insta_places', 'U') IS NULL
 -- «Алатау» — 12 мин пешком», «6 школ рядом, ближайшая — 7 мин». NULL у старых
 -- строк — их пересчитываем при следующем подборе.
 IF COL_LENGTH('dbo.insta_places', 'chips') IS NULL ALTER TABLE dbo.insta_places ADD chips NVARCHAR(600) NULL;
+-- Факты из карточки объявления для фото карусели (scripts/card-facts.js):
+-- JSON { params: [...], price: "…", desc: [...] }. Снимаем один раз на квартиру.
+IF OBJECT_ID('dbo.insta_card_facts', 'U') IS NULL
+  CREATE TABLE dbo.insta_card_facts (
+    listing_id BIGINT         NOT NULL PRIMARY KEY,
+    facts      NVARCHAR(2000) NOT NULL,
+    at         DATETIME2(0)   NOT NULL CONSTRAINT DF_icf_at DEFAULT SYSUTCDATETIME()
+  );
 -- Настройки, которые правят со страниц (промпты и т. п.): ключ → значение.
 IF OBJECT_ID('dbo.app_config', 'U') IS NULL
   CREATE TABLE dbo.app_config (
@@ -3607,6 +3615,24 @@ function chipsJson(chips) {
   const a = chips.map(String);
   while (a.length && JSON.stringify(a).length > 600) a.pop();
   return a.length ? JSON.stringify(a) : null;
+}
+async function instaCardFactsGet(ids) {
+  const list = [...new Set((ids || []).map((x) => Number(x)).filter((x) => Number.isSafeInteger(x) && x > 0))];
+  const out = {};
+  if (!list.length) return out;
+  const pool = await getPool();
+  await ensureInsta();
+  const rows = (await pool.request().query("SELECT listing_id, facts FROM dbo.insta_card_facts WHERE listing_id IN (" + list.join(",") + ")")).recordset;
+  for (const r of rows) { try { out[String(r.listing_id)] = JSON.parse(r.facts); } catch { /* битая строка — снимем заново */ } }
+  return out;
+}
+async function instaCardFactsSave(id, f) {
+  const pool = await getPool();
+  await ensureInsta();
+  const j = JSON.stringify({ params: (f.params || []).slice(0, 12), price: f.price || null, desc: (f.desc || []).slice(0, 3) });
+  await pool.request().input("id", sql.BigInt, Number(id)).input("f", sql.NVarChar(2000), j.slice(0, 2000))
+    .query(`UPDATE dbo.insta_card_facts SET facts = @f, at = SYSUTCDATETIME() WHERE listing_id = @id;
+            IF @@ROWCOUNT = 0 INSERT INTO dbo.insta_card_facts (listing_id, facts) VALUES (@id, @f);`);
 }
 async function configGet(keys) {
   const pool = await getPool();
@@ -4570,7 +4596,7 @@ async function objectStats() {
   return r.recordset[0];
 }
 
-module.exports = { saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
+module.exports = { instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,
