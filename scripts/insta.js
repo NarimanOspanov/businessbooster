@@ -357,7 +357,7 @@ function caption(f, acc) {
     f.floor ? "🏠 Этаж " + f.floor + (f.floors ? " из " + f.floors : "") : null,
   ].filter((x) => x != null);
   if (f.below) lines.push("💚 Метр на " + f.below + "% дешевле похожих квартир " + (f.belowWhere === "near" ? "поблизости" : "в этом ЖК"));
-  else if (c.price) lines.push("📉 " + c.price + " — по оценке Крыши");
+  else if (c.price) lines.push("📉 " + c.price);
 
   const why = c.desc || [];
   if (why.length) lines.push("", "Почему стоит посмотреть:", ...why.map((t) => "✔️ " + t));
