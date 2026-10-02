@@ -5133,7 +5133,10 @@ async function instaTick() {
 // фильтр das[mortgage]. Раз в 3 часа проходим выдачу хозяев с этим фильтром
 // по Алматы и Астане (~65 и ~95 страниц по 20) и отмечаем id в
 // dbo.krisha_mortgage. Страница в 1,5 с, по одной — нагрузка как у обычного
-// посетителя, листающего карту.
+// посетителя, листающего карту. В выдаче без фильтра этого признака нет
+// (ни поля в JSON, ни надёжной метки в вёрстке), поэтому проход отдельный.
+// Сразу и год дома от 1980 (das[house.year][from]): старше банки не берут;
+// в Алмалинском это отсекает 29 из 112 — дома 1978–1979.
 const instaMortgage = { running: false, lastAt: null, last: null };
 async function instaMortgageSweep() {
   if (instaMortgage.running) return instaMortgage.last;
@@ -5152,7 +5155,7 @@ async function instaMortgageSweep() {
         let errors = 0;
         for (let p = 1; p <= 200; p++) {
           let r;
-          try { r = await L.fetchListPage({ path: "/prodazha/kvartiry/" + sec + "/", q: "das[mortgage]=1&das[who]=1" }, p, 2); }
+          try { r = await L.fetchListPage({ path: "/prodazha/kvartiry/" + sec + "/", q: "das[mortgage]=1&das[who]=1&das[house.year][from]=" + require("./scripts/mortgage-text.js").MIN_YEAR }, p, 2); }
           catch (e) { if (++errors >= 3) break; continue; }
           out[city].pages++;
           if (r.empty) break;
