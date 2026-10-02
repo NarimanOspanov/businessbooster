@@ -4967,6 +4967,9 @@ async function instaFlat(acc, id) {
   if (hit) return hit;
   const f = await db.instaListing(id);
   if (!f || f.city !== acc) return null;
+  // Те же условия, что в подборе: без номера хозяина на «+» нечего прислать,
+  // а снятое объявление публиковать незачем.
+  if (!f.phones || f.storage !== "live") return null;
   delete f.phones;
   return f;
 }
