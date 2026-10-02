@@ -98,6 +98,12 @@ function coverSvg(f, photo, acc, fx) {
   const pill = f.mortgage ? "ОТ ХОЗЯИНА · МОЖНО В ИПОТЕКУ" : "ОТ ХОЗЯИНА · БЕЗ ПОСРЕДНИКОВ";
   const pw = pill.length * 26 * 0.78 + 64; // заглавные с разрядкой шире строчных
   const ppm = f.area ? Math.round(f.price / f.area / 1000) : null;
+  // Ниже рынка — строкой прямо под ценой: наша оценка (3–10%) или оценка
+  // Крыши из карточки. Остальные строки сдвигаются вниз на dy.
+  const c = f.card || {};
+  const belowText = f.below ? "Метр на " + f.below + "% дешевле похожих " + (f.belowWhere === "near" ? "поблизости" : "в этом ЖК")
+    : c.price ? c.price : null;
+  const dy = belowText ? 58 : 0;
   let badge = "";
   if (h && h.badge) {
     const bw = textW(h.badge, 34, true) + 64;
@@ -114,10 +120,11 @@ function coverSvg(f, photo, acc, fx) {
   ${f.below ? belowPill(f.below) : ""}
   ${badge}
   <text x="56" y="${PH + 170}" font-size="96" font-weight="800" fill="#fff">${esc(money(f.price))} ₸</text>
-  <text x="56" y="${PH + 250}" font-size="42" font-weight="700" fill="#e9f2ec">${esc(paramsLine(f))}</text>
-  <text x="56" y="${PH + 318}" font-size="36" font-weight="500" fill="#a9c2b3">${esc(A.city + ", " + cleanAddr(f.addr))}</text>
-  ${ppm ? `<text x="56" y="${PH + 378}" font-size="30" font-weight="500" fill="#7f9a8a">${esc(money(ppm))} тыс ₸ за м²${f.isNew ? " · новостройка" : ""}</text>` : ""}
-  ${f.near ? pinIcon(70, PH + 418, 20, "#4cc35a") + `<text x="100" y="${PH + 432}" font-size="28" font-weight="500" fill="#9fc3ad">${esc(fit(f.near, 28, 500, W - 100 - 56))}</text>` : ""}
+  ${belowText ? `<path d="M56 ${PH + 206} h30 l-15 22 z" fill="#4cc35a"/><text x="100" y="${PH + 228}" font-size="34" font-weight="700" fill="#4cc35a">${esc(fit(belowText, 34, 700, W - 100 - 56))}</text>` : ""}
+  <text x="56" y="${PH + 250 + dy}" font-size="42" font-weight="700" fill="#e9f2ec">${esc(paramsLine(f))}</text>
+  <text x="56" y="${PH + 318 + dy}" font-size="36" font-weight="500" fill="#a9c2b3">${esc(A.city + ", " + cleanAddr(f.addr))}</text>
+  ${ppm ? `<text x="56" y="${PH + 378 + dy}" font-size="30" font-weight="500" fill="#7f9a8a">${esc(money(ppm))} тыс ₸ за м²${f.isNew ? " · новостройка" : ""}</text>` : ""}
+  ${f.near ? pinIcon(70, PH + 418 + dy, 20, "#4cc35a") + `<text x="100" y="${PH + 432 + dy}" font-size="28" font-weight="500" fill="#9fc3ad">${esc(fit(f.near, 28, 500, W - 100 - 56 - (dy ? 210 : 0)))}</text>` : ""}
   <text x="${W - 56}" y="${H - 44}" text-anchor="end" font-size="26" font-weight="500" fill="#6f8a7b">листайте →</text>
   ${f.code ? codePill(f.code, PH - 100) : ""}
 </svg>`;
@@ -248,7 +255,7 @@ async function mapSlide(f, acc) {
 }
 
 // Факты для фото, по одному на снимок, по кругу из трёх источников: доводы
-// (оценка цены Крыши и слова хозяина из описания), характеристики дома и
+// (слова хозяина из описания), характеристики дома и
 // квартиры, что рядом. Так подряд не идут три школы или три параметра.
 // Кончились — фото без плашки. Нет фактов о районе (старый кэш) — общая
 // строка «Рядом: …» одним пунктом.
@@ -256,7 +263,7 @@ function photoFacts(f) {
   const c = f.card || {};
   const flat = (t) => ({ t: t, k: "flat" });
   const lists = [
-    (c.price && !f.below ? [c.price] : []).concat(c.desc || []).map(flat),
+    (c.desc || []).map(flat), // «дешевле похожих» — уже под ценой на обложке
     (c.params || []).map(flat),
     ((f.chips && f.chips.length) ? f.chips : (f.near ? [f.near] : [])).map((t) => ({ t: t, k: "place" })),
   ];
