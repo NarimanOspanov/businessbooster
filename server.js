@@ -7220,7 +7220,7 @@ http
         const nums = phones.map(instaPhoneFmt).join("\n");
         const gone = f.storage && f.storage !== "live" ? "\n\n⚠️ Объявление уже снято — возможно, квартиру продали." : "";
         return send(200, { ok: true, found: true, phone: phones.map(instaPhoneFmt).join(", "),
-          text: "📞 Номер хозяина:\n" + nums + "\n\n🏠 " + what + gone + "\n\nПишите или звоните напрямую — без посредников. Новые квартиры от хозяев каждый день у нас в профиле 🔑" });
+          text: "📞 Номер хозяина:\n" + nums + "\n\n🏠 " + what + gone + "\n\nПишите или звоните хозяину напрямую. Новые квартиры от хозяев каждый день у нас в профиле 🔑" });
       })().catch((e) => send(200, { ok: false, found: false, error: String(e.message).slice(0, 200),
         text: "Не получилось найти номер прямо сейчас. Напишите нам в ответ, какая квартира интересует, — пришлём вручную." }));
       return;

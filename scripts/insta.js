@@ -18,8 +18,8 @@ const FONTS = ["Montserrat_500Medium.ttf", "Montserrat_700Bold.ttf", "Montserrat
 const GRAPH = "https://graph.instagram.com/v23.0";
 
 const ACCOUNTS = {
-  almaty: { city: "Алматы", handle: "ipoteka1.kz_almaty", tags: "#квартирыалматы #продажаквартиралматы #недвижимостьалматы #алматы #квартираотхозяина #безпосредников #купитьквартиру #квартиравалматы #ипотекаалматы #квартиравипотеку #ipoteka1" },
-  astana: { city: "Астана", handle: "ipoteka1.kz_astana", tags: "#квартирыастана #продажаквартирастана #недвижимостьастана #астана #квартираотхозяина #безпосредников #купитьквартиру #квартиравастане #ипотекаастана #квартиравипотеку #ipoteka1" },
+  almaty: { city: "Алматы", handle: "ipoteka1.kz_almaty", tags: "#квартирыалматы #продажаквартиралматы #недвижимостьалматы #алматы #квартираотхозяина #купитьквартиру #квартиравалматы #ипотекаалматы #квартиравипотеку #ipoteka1" },
+  astana: { city: "Астана", handle: "ipoteka1.kz_astana", tags: "#квартирыастана #продажаквартирастана #недвижимостьастана #астана #квартираотхозяина #купитьквартиру #квартиравастане #ипотекаастана #квартиравипотеку #ipoteka1" },
 };
 
 const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -95,8 +95,14 @@ function coverSvg(f, photo, acc, fx) {
   const A = ACCOUNTS[acc] || ACCOUNTS.almaty;
   const h = hook(f);
   const PH = 810;
-  const pill = f.mortgage ? "ОТ ХОЗЯИНА · МОЖНО В ИПОТЕКУ" : "ОТ ХОЗЯИНА · БЕЗ ПОСРЕДНИКОВ";
-  const pw = pill.length * 26 * 0.78 + 64; // заглавные с разрядкой шире строчных
+  // Плашка слева сверху: «от хозяина» и, если хозяин готов к ипотеке, второй
+  // строкой «проходит под ипотеку». Ширина — по измеренной длинной строке
+  // (заглавные с разрядкой: +1 px на знак).
+  const pillLines = f.mortgage ? ["ОТ ХОЗЯИНА", "ПРОХОДИТ ПОД ИПОТЕКУ"] : ["ОТ ХОЗЯИНА"];
+  const pw = Math.max(...pillLines.map((t) => measure(t, 26, 700) + t.length)) + 64;
+  const ph = pillLines.length === 2 ? 100 : 64;
+  const pillSvg = `<rect x="40" y="40" width="${pw.toFixed(0)}" height="${ph}" rx="${ph === 64 ? 32 : 28}" fill="#1e8422"/>` +
+    pillLines.map((t, i) => `<text x="${(40 + pw / 2).toFixed(0)}" y="${pillLines.length === 2 ? 80 + i * 38 : 82}" text-anchor="middle" font-size="26" font-weight="700" fill="#fff" letter-spacing="1">${t}</text>`).join("");
   const ppm = f.area ? Math.round(f.price / f.area / 1000) : null;
   // Ниже рынка — строкой прямо под ценой: наша оценка (3–10%) или оценка
   // Крыши из карточки. Остальные строки сдвигаются вниз на dy.
@@ -115,9 +121,8 @@ function coverSvg(f, photo, acc, fx) {
   ${fx ? "<defs>" + POLISH.filterSvg("fx", fx) + "</defs>" : ""}
   <rect width="${W}" height="${H}" fill="#12211a"/>
   ${img}
-  <rect x="40" y="40" width="${pw}" height="64" rx="32" fill="#1e8422"/>
-  <text x="${40 + pw / 2}" y="82" text-anchor="middle" font-size="26" font-weight="700" fill="#fff" letter-spacing="1">${pill}</text>
-  ${f.below ? belowPill(f.below) : ""}
+  ${pillSvg}
+  ${f.below ? belowPill(f.below, 40 + ph + 12) : ""}
   ${badge}
   <text x="56" y="${PH + 170}" font-size="96" font-weight="800" fill="#fff">${esc(money(f.price))} ₸</text>
   ${belowText ? `<path d="M56 ${PH + 206} h30 l-15 22 z" fill="#4cc35a"/><text x="100" y="${PH + 228}" font-size="34" font-weight="700" fill="#4cc35a">${esc(fit(belowText, 34, 700, W - 100 - 56))}</text>` : ""}
@@ -131,11 +136,11 @@ function coverSvg(f, photo, acc, fx) {
 }
 
 // Третья ценность: «ниже рынка на N%» — вторая зелёная плашка под первой.
-function belowPill(pct) {
+function belowPill(pct, y) {
   const t = "НИЖЕ РЫНКА НА " + pct + "%";
   const w = t.length * 26 * 0.78 + 64;
-  return `<rect x="40" y="116" width="${w}" height="64" rx="32" fill="#1e8422"/>
-  <text x="${40 + w / 2}" y="158" text-anchor="middle" font-size="26" font-weight="700" fill="#fff" letter-spacing="1">${esc(t)}</text>`;
+  return `<rect x="40" y="${y}" width="${w}" height="64" rx="32" fill="#1e8422"/>
+  <text x="${40 + w / 2}" y="${y + 42}" text-anchor="middle" font-size="26" font-weight="700" fill="#fff" letter-spacing="1">${esc(t)}</text>`;
 }
 
 // Код поста: его пишут в комментарии, и по нему сервер отдаёт номер хозяина
@@ -346,8 +351,8 @@ function caption(f, acc) {
   const c = f.card || {};
   const kind = (f.rooms ? f.rooms + "-комнатная квартира" : "Квартира") + (f.area ? " " + String(f.area).replace(".", ",") + " м²" : "");
   const lines = [
-    "🔑 От хозяина · можно в ипотеку" + (f.below ? " · ниже рынка" : ""), "",
-    kind + " в " + (acc === "astana" ? "Астане" : "Алматы") + (f.isNew ? ", новостройка" : "") + " — продаёт сам хозяин, без посредников.", "",
+    "🔑 От хозяина · проходит под ипотеку" + (f.below ? " · ниже рынка" : ""), "",
+    kind + " в " + (acc === "astana" ? "Астане" : "Алматы") + (f.isNew ? ", новостройка" : "") + " — продаёт сам хозяин.", "",
     "💰 " + money(f.price) + " ₸" + (f.area ? " · " + money(Math.round(f.price / f.area / 1000)) + " тыс ₸ за м²" : ""),
     "📍 " + A.city + ", " + cleanAddr(f.addr),
     f.floor ? "🏠 Этаж " + f.floor + (f.floors ? " из " + f.floors : "") : null,
@@ -367,7 +372,7 @@ function caption(f, acc) {
     lines.push("", "🏦 Можно купить в ипотеку — хозяин готов" + ((f.programs || []).length ? ", в том числе по программе " + f.programs.join(", ") : "") + ".");
     if (f.quote) lines.push("💬 Из объявления: «" + f.quote + "»");
   }
-  lines.push("", "✅ Без посредников и лишних комиссий — договариваетесь напрямую с хозяином.", "",
+  lines.push("", "✅ Договариваетесь напрямую с хозяином.", "",
     "👉 Хотите узнать больше и получить номер хозяина? Подпишитесь на @" + A.handle + " и поставьте «+» в комментариях — пришлём номер в директ." +
       (f.code ? " Это объявление № " + f.code + ", ищите его в списке." : ""),
     "", hashtags(f, acc));
