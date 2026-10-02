@@ -3529,13 +3529,21 @@ async function instaListing(id) {
   const pool = await getPool();
   await ensureList(pool);
   const x = (await pool.request().input("id", sql.BigInt, Number(id) || 0).query(`
-    SELECT id, city, rooms, area, floor, floors, price, addr, complex_id, phones, storage, photos_c, photos_json, lat, lon
-    FROM dbo.krisha_list WHERE id = @id AND user_type = 'owner' AND deal = 'sale' AND prop = 'flat'`)).recordset[0];
+    SELECT c.id, c.city, c.rooms, c.area, c.floor, c.floors, c.price, c.addr, c.complex_id, c.phones, c.storage, c.photos_c, c.photos_json, c.lat, c.lon,
+           t.programs, t.quote,
+           -- «Можно в ипотеку» — как в подборе кандидатов: отметка Крыши (das[mortgage])
+           -- и хозяин в описании не отказывается. Без этого превью и пост
+           -- квартиры, выпавшей из кэша кандидатов, выходили без ипотеки.
+           CASE WHEN EXISTS (SELECT 1 FROM dbo.krisha_mortgage m WHERE m.id = c.id AND m.seen_at >= DATEADD(day, -2, SYSUTCDATETIME()))
+                 AND (t.mortgage IS NULL OR t.mortgage <> 'no') THEN 1 ELSE 0 END AS mortgage
+    FROM dbo.krisha_list c LEFT JOIN dbo.krisha_list_text t ON t.id = c.id
+    WHERE c.id = @id AND c.user_type = 'owner' AND c.deal = 'sale' AND c.prop = 'flat'`)).recordset[0];
   if (!x) return null;
   return { id: String(x.id), city: x.city, rooms: x.rooms, area: x.area == null ? null : Number(x.area), floor: x.floor, floors: x.floors,
     price: Number(x.price), addr: x.addr || null, isNew: x.complex_id != null, phones: x.phones || null, storage: x.storage,
     lat: x.lat == null ? null : Number(x.lat), lon: x.lon == null ? null : Number(x.lon),
     below: null, oldPrice: null,
+    mortgage: !!x.mortgage, programs: x.programs ? String(x.programs).split(",") : [], quote: x.quote || null,
     photos: listPhotoUrls(x.photos_c, x.photos_json).map((u) => u.replace(/-560x350\.jpg$/, "-full.jpg")) };
 }
 
