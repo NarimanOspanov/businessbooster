@@ -351,7 +351,7 @@ function caption(f, acc) {
   const kind = (f.rooms ? f.rooms + "-комнатная квартира" : "Квартира") + (f.area ? " " + String(f.area).replace(".", ",") + " м²" : "");
   const lines = [
     "🔑 От хозяина · можно в ипотеку" + (f.below ? " · ниже рынка" : ""), "",
-    kind + " в " + (acc === "astana" ? "Астане" : "Алматы") + (f.isNew ? ", новостройка" : "") + " — продаёт сам хозяин.", "",
+    kind + " в " + (acc === "astana" ? "Астане" : "Алматы") + (f.isNew ? ", новостройка" : "") + " — продаёт сам хозяин. Без посредников", "",
     "💰 " + money(f.price) + " ₸",
     "📍 " + A.city + ", " + cleanAddr(f.addr),
     f.floor ? "🏠 Этаж " + f.floor + (f.floors ? " из " + f.floors : "") : null,
