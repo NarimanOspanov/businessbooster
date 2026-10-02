@@ -352,7 +352,7 @@ function caption(f, acc) {
   const lines = [
     "🔑 От хозяина · можно в ипотеку" + (f.below ? " · ниже рынка" : ""), "",
     kind + " в " + (acc === "astana" ? "Астане" : "Алматы") + (f.isNew ? ", новостройка" : "") + " — продаёт сам хозяин.", "",
-    "💰 " + money(f.price) + " ₸" + (f.area ? " · " + money(Math.round(f.price / f.area / 1000)) + " тыс ₸ за м²" : ""),
+    "💰 " + money(f.price) + " ₸",
     "📍 " + A.city + ", " + cleanAddr(f.addr),
     f.floor ? "🏠 Этаж " + f.floor + (f.floors ? " из " + f.floors : "") : null,
   ].filter((x) => x != null);
