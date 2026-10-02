@@ -181,8 +181,9 @@ function ctaSvg(f, photo, acc) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Montserrat">
   <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0f4d24"/><stop offset="1" stop-color="#1e8422"/></linearGradient></defs>
   <rect width="${W}" height="${H}" fill="url(#g)"/>
-  <text x="${W / 2}" y="420" text-anchor="middle" font-size="84" font-weight="800" fill="#fff">Чтобы получить</text>
-  <text x="${W / 2}" y="520" text-anchor="middle" font-size="84" font-weight="800" fill="#ffd166">номер хозяина</text>
+  <text x="${W / 2}" y="330" text-anchor="middle" font-size="76" font-weight="800" fill="#fff">Чтобы узнать больше</text>
+  <text x="${W / 2}" y="425" text-anchor="middle" font-size="76" font-weight="800" fill="#fff">и получить</text>
+  <text x="${W / 2}" y="520" text-anchor="middle" font-size="76" font-weight="800" fill="#ffd166">номер хозяина</text>
   <rect x="140" y="660" width="${W - 280}" height="240" rx="48" fill="#fff"/>
   <text x="${W / 2}" y="790" text-anchor="middle" font-size="64" font-weight="800" fill="#1e8422">Поставьте «+»</text>
   <text x="${W / 2}" y="852" text-anchor="middle" font-size="36" font-weight="600" fill="#2f5d3c">в комментариях</text>
@@ -360,7 +361,7 @@ function caption(f, acc) {
     if (f.quote) lines.push("💬 Из объявления: «" + f.quote + "»");
   }
   lines.push("", "✅ Без посредников и лишних комиссий — договариваетесь напрямую с хозяином.", "",
-    "👉 Хотите номер хозяина? Подпишитесь на @" + A.handle + " и поставьте «+» в комментариях — пришлём номер в директ." +
+    "👉 Хотите узнать больше и получить номер хозяина? Подпишитесь на @" + A.handle + " и поставьте «+» в комментариях — пришлём номер в директ." +
       (f.code ? " Это объявление № " + f.code + ", ищите его в списке." : ""),
     "", hashtags(f, acc));
   // Instagram режет подпись после 2200 знаков: лишнее убираем из середины,
