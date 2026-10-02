@@ -95,10 +95,9 @@ function coverSvg(f, photo, acc, fx) {
   const A = ACCOUNTS[acc] || ACCOUNTS.almaty;
   const h = hook(f);
   const PH = 810;
-  // Плашка слева сверху: «от хозяина» и, если хозяин готов к ипотеке, второй
-  // строкой «проходит под ипотеку». Ширина — по измеренной длинной строке
-  // (заглавные с разрядкой: +1 px на знак).
-  const pillLines = f.mortgage ? ["ОТ ХОЗЯИНА", "ПРОХОДИТ ПОД ИПОТЕКУ"] : ["ОТ ХОЗЯИНА"];
+  // Плашка слева сверху: «от хозяина · можно в ипотеку» одной строкой.
+  // Ширина — по измеренному тексту (заглавные с разрядкой: +1 px на знак).
+  const pillLines = f.mortgage ? ["ОТ ХОЗЯИНА · МОЖНО В ИПОТЕКУ"] : ["ОТ ХОЗЯИНА"];
   const pw = Math.max(...pillLines.map((t) => measure(t, 26, 700) + t.length)) + 64;
   const ph = pillLines.length === 2 ? 100 : 64;
   const pillSvg = `<rect x="40" y="40" width="${pw.toFixed(0)}" height="${ph}" rx="${ph === 64 ? 32 : 28}" fill="#1e8422"/>` +
@@ -351,7 +350,7 @@ function caption(f, acc) {
   const c = f.card || {};
   const kind = (f.rooms ? f.rooms + "-комнатная квартира" : "Квартира") + (f.area ? " " + String(f.area).replace(".", ",") + " м²" : "");
   const lines = [
-    "🔑 От хозяина · проходит под ипотеку" + (f.below ? " · ниже рынка" : ""), "",
+    "🔑 От хозяина · можно в ипотеку" + (f.below ? " · ниже рынка" : ""), "",
     kind + " в " + (acc === "astana" ? "Астане" : "Алматы") + (f.isNew ? ", новостройка" : "") + " — продаёт сам хозяин.", "",
     "💰 " + money(f.price) + " ₸" + (f.area ? " · " + money(Math.round(f.price / f.area / 1000)) + " тыс ₸ за м²" : ""),
     "📍 " + A.city + ", " + cleanAddr(f.addr),
