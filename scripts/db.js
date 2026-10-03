@@ -4110,6 +4110,18 @@ async function listPhoneCounts() {
   return { withPhones: w, misses: misses };
 }
 
+// Для сторожа номеров: когда пришёл последний номер, сколько за последние
+// minutes минут и сколько объявлений сейчас «в работе» у вкладок плагина.
+// Оба запроса идут по фильтрованным индексам (IX_klist_withphone, IX_klist_lease).
+async function listPhoneFlow(minutes) {
+  const pool = await getPool();
+  await ensureList(pool);
+  return (await pool.request().input("m", sql.Int, Number(minutes) || 10).query(`
+    SELECT (SELECT MAX(phones_at) FROM dbo.krisha_list WHERE phones IS NOT NULL) AS last_at,
+           (SELECT COUNT(*) FROM dbo.krisha_list WHERE phones IS NOT NULL AND phones_at >= DATEADD(minute, -@m, SYSUTCDATETIME())) AS recent,
+           (SELECT COUNT(*) FROM dbo.krisha_list WHERE phone_lease_until > SYSUTCDATETIME()) AS leased`)).recordset[0];
+}
+
 // Размер очереди — живые хозяева без номера. Это сотни тысяч строк, поэтому
 // считается отдельно и кэшируется на стороне сервера.
 async function listPhoneQueueSize() {
@@ -4607,7 +4619,7 @@ async function objectStats() {
   return r.recordset[0];
 }
 
-module.exports = { instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
+module.exports = { listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,

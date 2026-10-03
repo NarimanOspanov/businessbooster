@@ -5185,6 +5185,39 @@ if (process.env.WEBSITE_SITE_NAME || process.env.INSTA_AUTO === "1") {
   setTimeout(() => instaMortgageSweep().catch((e) => console.log("[insta] mortgage: " + e.message)), 60e3).unref();
   setInterval(() => instaMortgageSweep().catch((e) => console.log("[insta] mortgage: " + e.message)), 3 * 3600e3).unref();
 }
+// Сторож номеров: раз в 5 минут смотрим, когда в krisha_list пришёл последний
+// номер (то же, что last_at в /api/krisha/objphone/count). Тишина дольше
+// PHONES_ALERT_MIN минут (по умолчанию 10) — админам бота сообщение; пока
+// тихо — напоминание раз в час; пошли снова — «восстановилось» с длительностью.
+// Только на проде, как и остальные расписания.
+const phoneWatch = { down: false, since: null, remindedAt: 0 };
+async function phoneWatchTick() {
+  const lim = Math.max(3, Number(process.env.PHONES_ALERT_MIN) || 10);
+  const r = await db.listPhoneFlow(lim);
+  const last = r.last_at ? new Date(r.last_at) : null;
+  const idle = last ? Math.round((Date.now() - last.getTime()) / 60e3) : null;
+  const hhmm = (d) => d ? new Date(d.getTime() + 5 * 3600e3).toISOString().slice(11, 16) : "—"; // время Алматы
+  if (idle == null || idle >= lim) {
+    if (phoneWatch.down && Date.now() - phoneWatch.remindedAt < 3600e3) return;
+    // Вкладки плагина берут объявления в работу — значит, плагин жив, но номера
+    // не сохраняются (капча, вход на Крыше слетел); иначе плагин не запущен.
+    const why = r.leased ? "плагин берёт объявления (" + r.leased + " в работе), но номера не сохраняются — капча или слетел вход на Крыше"
+      : "плагин не берёт объявления — похоже, не запущен";
+    notifyTelegram((phoneWatch.down ? "⏰ Номеров всё ещё нет" : "⚠️ <b>Номера перестали поступать</b>") +
+      "\nПоследний: " + hhmm(last) + (idle != null ? " (" + idle + " мин назад)" : "") + "\n" + why);
+    if (!phoneWatch.down) phoneWatch.since = last || new Date();
+    phoneWatch.down = true;
+    phoneWatch.remindedAt = Date.now();
+  } else if (phoneWatch.down) {
+    const mins = Math.round((Date.now() - phoneWatch.since.getTime()) / 60e3);
+    notifyTelegram("✅ <b>Номера снова поступают</b>\nПерерыв ≈ " + mins + " мин, за последние " + lim + " мин — " + r.recent);
+    phoneWatch.down = false;
+  }
+}
+if (process.env.WEBSITE_SITE_NAME) {
+  setInterval(() => phoneWatchTick().catch((e) => console.log("[phone-watch] " + e.message)), 5 * 60e3).unref();
+}
+
 // «+» от человека под нашими постами: сначала свежие посты, потом глубже.
 // Отдаём самый свежий «+», номер по которому ему ещё не отправляли.
 async function instaFindPlus(acc, username) {
