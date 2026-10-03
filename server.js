@@ -4910,20 +4910,25 @@ function instaEnsureCard(f) {
 }
 async function instaLoadCard(f) {
   const have = await db.instaCardFactsGet([f.id]).catch(() => ({}));
-  // Снятое до проверки залога (нет поля pledged) — открываем карточку заново.
-  if (have[f.id] && have[f.id].pledged != null) {
-    if (have[f.id].pledged) have[f.id].mortgageNo = "в залоге";
-    return (f.card = have[f.id]);
+  let c = have[f.id];
+  // Снятое до проверки ипотеки по тексту (нет verdict) — открываем заново.
+  if (!c || !c.verdict) {
+    c = await Promise.race([CARD_FACTS.cardFacts(f.id), new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 60000))]);
+    // Тот же разбор, что у текста от плагина (mortgage-text.js): залог, бывшее
+    // общежитие, дом до 1980, «ипотеку не рассматриваю» — «нет»; явное
+    // согласие хозяина или названная программа — «да»; молчание — null.
+    const m = c.text ? await db.listTextSave(f.id, c.text.desc, c.text.params).catch((e) => { console.log("[insta] card text " + f.id + ": " + e.message); return null; }) : null;
+    c.verdict = m ? { mortgage: m.mortgage, why: m.why, programs: m.programs, quote: m.quote } : { mortgage: null };
+    await db.instaCardFactsSave(f.id, c);
   }
-  const c = await Promise.race([CARD_FACTS.cardFacts(f.id), new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 60000))]);
-  await db.instaCardFactsSave(f.id, c);
-  // Тот же разбор, что у текста от плагина: «ипотеку не рассматриваю» или
-  // бывшее общежитие — и пост «можно в ипотеку» был бы неправдой.
-  const m = c.text ? await db.listTextSave(f.id, c.text.desc, c.text.params).catch((e) => { console.log("[insta] card text " + f.id + ": " + e.message); return null; }) : null;
-  if (m && m.mortgage === "no") c.mortgageNo = m.why || "нет";
+  // Пост «можно в ипотеку» — только если хозяин сам это написал: поиск
+  // находит слово «ипотека», а не согласие («без ипотеки» он тоже найдёт).
+  const v = c.verdict;
+  if (v.mortgage === "no") c.mortgageNo = v.why || "нет";
+  else if (v.mortgage !== "yes") c.mortgageNo = "хозяин не пишет, что можно в ипотеку";
   // Программа и фраза хозяина про ипотеку — на обложку и в подпись.
-  if (m && m.programs.length && !(f.programs || []).length) f.programs = m.programs;
-  if (m && m.quote && !f.quote) f.quote = m.quote;
+  if ((v.programs || []).length && !(f.programs || []).length) f.programs = v.programs;
+  if (v.quote && !f.quote) f.quote = v.quote;
   return (f.card = c);
 }
 
@@ -5041,9 +5046,11 @@ async function instaPublish(acc, f) {
       } catch (e) { console.log("[insta] places before publish " + f.id + ": " + e.message); }
     }
     await instaEnsureCard(f).catch((e) => console.log("[insta] card facts before publish " + f.id + ": " + e.message));
-    if (f.card && f.card.mortgageNo) {
+    // Без открытой карточки не знаем ни залога, ни слов хозяина — не публикуем.
+    if (!f.card) throw new Error("не открылась карточка объявления — проверить залог и ипотеку не вышло, повторите позже");
+    if (f.card.mortgageNo) {
       instaDropCandidate(acc, f.id);
-      throw new Error("в описании хозяина: «" + f.card.mortgageNo + "» — под ипотеку не публикуем");
+      throw new Error("под ипотеку не публикуем: " + f.card.mortgageNo);
     }
     const code = await db.instaPostReserve(acc, f.id, reason);
     const fc = Object.assign({}, f, { code: code });
@@ -5136,14 +5143,22 @@ async function instaTick() {
     }
   }
 }
-// Отметка «можно в ипотеку»: хозяин ставит её в объявлении, у Крыши есть
-// фильтр das[mortgage]. Раз в 3 часа проходим выдачу хозяев с этим фильтром
-// по Алматы и Астане (~65 и ~95 страниц по 20) и отмечаем id в
-// dbo.krisha_mortgage. Страница в 1,5 с, по одной — нагрузка как у обычного
-// посетителя, листающего карту. В выдаче без фильтра этого признака нет
-// (ни поля в JSON, ни надёжной метки в вёрстке), поэтому проход отдельный.
-// Сразу и год дома от 1980 (das[house.year][from]): старше банки не берут;
-// в Алмалинском это отсекает 29 из 112 — дома 1978–1979.
+// Кандидаты «можно в ипотеку». Фильтра «можно в ипотеку» у Крыши нет;
+// das[mortgage] — это «В залоге» (1 = да, 0 = нет), раньше его ошибочно
+// считали ипотекой и собирали залоговые квартиры. Теперь в поиске — условия
+// банков и слово в описании:
+//   das[who]=1               — от хозяина;
+//   das[mortgage]=0          — не в залоге;
+//   das[house.year][from]=1980 — дом не старше 1980 года;
+//   das[flat.priv_dorm]=2    — не бывшее общежитие;
+//   _txt_=ипотека            — текстовый поиск Крыши по описанию (с формами
+//                              слова: «ипотеку», «ипотеки»).
+// Алмалинский: 1266 подходят под условия банков, из них 206 со словом.
+// «Без ипотеки» поиск тоже найдёт — поэтому при открытии карточки полный текст
+// проверяет mortgage-text.js, и публикуется только явное «да» хозяина.
+// Раз в 3 часа, страница в 1,5 с; id — в dbo.krisha_mortgage.
+const INSTA_SWEEP_Q = "das[who]=1&das[mortgage]=0&das[house.year][from]=" + require("./scripts/mortgage-text.js").MIN_YEAR +
+  "&das[flat.priv_dorm]=2&_txt_=" + encodeURIComponent("ипотека");
 const instaMortgage = { running: false, lastAt: null, last: null };
 async function instaMortgageSweep() {
   if (instaMortgage.running) return instaMortgage.last;
@@ -5151,6 +5166,15 @@ async function instaMortgageSweep() {
   const L = require("./scripts/krisha-list.js");
   const out = {};
   try {
+    // Один раз: в таблице лежат залоговые квартиры из старого прохода —
+    // убираем их, чтобы ни одна не дожила до поста.
+    const v = await db.configGet(["insta.sweep.v"]).catch(() => ({}));
+    if (v["insta.sweep.v"] !== "2") {
+      await db.mortgageFlagsReset();
+      await db.configSet("insta.sweep.v", "2");
+      instaCand.almaty = null; instaCand.astana = null;
+      console.log("[insta] mortgage flags reset: old pledged-flat sweep dropped");
+    }
     // По разделам районов из настроек: так у отметки есть район, а в посты
     // идут только нужные. Нет районов в настройках — весь город.
     for (const city of INSTA_ACCS) {
@@ -5162,7 +5186,7 @@ async function instaMortgageSweep() {
         let errors = 0;
         for (let p = 1; p <= 200; p++) {
           let r;
-          try { r = await L.fetchListPage({ path: "/prodazha/kvartiry/" + sec + "/", q: "das[mortgage]=1&das[who]=1&das[house.year][from]=" + require("./scripts/mortgage-text.js").MIN_YEAR }, p, 2); }
+          try { r = await L.fetchListPage({ path: "/prodazha/kvartiry/" + sec + "/", q: INSTA_SWEEP_Q }, p, 2); }
           catch (e) { if (++errors >= 3) break; continue; }
           out[city].pages++;
           if (r.empty) break;
@@ -8827,7 +8851,9 @@ http
               // Подпись — с фактами из карточки, как в настоящем посте.
               await instaEnsureCard(f).catch((e) => console.log("[insta] card facts for caption " + f.id + ": " + e.message));
               const code = await db.instaNextCode();
-              send(200, { ok: true, code: code, handle: INSTA.ACCOUNTS[acc].handle, caption: INSTA.caption(Object.assign({}, f, { code: code }), acc) });
+              send(200, { ok: true, code: code, handle: INSTA.ACCOUNTS[acc].handle, caption: INSTA.caption(Object.assign({}, f, { code: code }), acc),
+                // Опубликовать не дадут — пусть это видно уже в превью.
+                block: !f.card ? "карточка не открылась — залог и ипотеку не проверить" : f.card.mortgageNo ? "не опубликуется: " + f.card.mortgageNo : null });
             })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 200) }));
             return;
           }

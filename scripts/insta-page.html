@@ -114,7 +114,8 @@ function pvOpen(id){
   }).catch(function(){ $("#ig-load").textContent = "Не получилось нарисовать карусель"; });
   api("caption=1&id="+id).then(function(j){ if(PV.id === id) $("#ig-cap").textContent = j.ok ? j.caption : ("Ошибка: "+j.error);
     // Номер в посте — следующий свободный: у всех кандидатов он одинаковый, пока никого не опубликовали.
-    if(PV.id === id && j.ok && j.code) $("#ig-note").textContent = "предпросмотр · № "+j.code+" присвоится при публикации"; });
+    if(PV.id === id && j.ok && j.code) $("#ig-note").textContent = "предпросмотр · № "+j.code+" присвоится при публикации";
+    if(PV.id === id && j.ok && j.block){ $("#ig-note").textContent = "⛔ " + j.block; $("#ig-note").style.color = "#e5484d"; } else $("#ig-note").style.color = ""; });
 }
 document.addEventListener("keydown", function(e){ if(!PV.id) return; if(e.key==="ArrowLeft") pvGo(-1); if(e.key==="ArrowRight") pvGo(1); if(e.key==="Escape"){ $("#modal").classList.remove("on"); PV.id = null; } });
 function slideUrl(id, n, all){ return "/api/krisha/insta?key="+encodeURIComponent(KEY)+"&acc="+ACC+"&id="+id+"&slide="+n+(all?"&all=1":""); }
@@ -150,12 +151,12 @@ function renderAcc(){
   var au = $("#auto"); if(au) au.onchange = function(){ post({ action:"settings", auto: au.checked }).then(load); };
   var pe = $("#per"); if(pe) pe.onchange = function(){ post({ action:"settings", per_day: Number(pe.value) }).then(load); };
   var rc = $("#recon"); if(rc) rc.onclick = function(){ a.connected = false; renderAcc(); };
-  var dsv = $("#dist-save"); if(dsv) dsv.onclick = function(){ post({ action:"districts", value: $("#dist").value }).then(function(j){ dsv.textContent = j.ok ? "Сохранено — обход «ипотеки» обновит отметки" : "Ошибка"; }); }; var ds = $("#disc"); if(ds) ds.onclick = function(){ if(confirm("Отключить аккаунт и выключить автопостинг?")) post({ action:"disconnect" }).then(load); };
+  var dsv = $("#dist-save"); if(dsv) dsv.onclick = function(){ post({ action:"districts", value: $("#dist").value }).then(function(j){ dsv.textContent = j.ok ? "Сохранено — обход поиска обновит кандидатов" : "Ошибка"; }); }; var ds = $("#disc"); if(ds) ds.onclick = function(){ if(confirm("Отключить аккаунт и выключить автопостинг?")) post({ action:"disconnect" }).then(load); };
 }
 function renderCands(){
   var a = D.accounts.filter(function(x){ return x.acc===ACC; })[0];
   $("#candAt").textContent = D.candidatesAt ? "· подобраны в "+dt(D.candidatesAt) : "";
-  var fl = (D.flags||[]).filter(function(x){ return x.city===ACC; })[0]; var fs = D.flagSweep||{}; $("#texts").innerHTML = (D.photoAi ? "Фото оценивает Gemini, отсеяно непрезентабельных: "+(D.photoRejected||0)+". " : "<span class='warn'>Оценка фото выключена: на сервере нет GEMINI_API_KEY.</span> ")+"С отметкой «ипотека»: "+(fl?fl.n:0)+(fl&&fl.day?" (новых за сутки "+fl.day+")":"")+" · обход "+(fs.running?"идёт…":(fs.at?dt(fs.at):"ещё не было"))+" <a href='#' id='msw'>обойти сейчас</a>"; if(!D.candidates.length){ $("#cands").innerHTML = "<p class='mut'>Сейчас подходящих нет — появятся после обхода с фильтром «ипотека».</p>"; return; }
+  var fl = (D.flags||[]).filter(function(x){ return x.city===ACC; })[0]; var fs = D.flagSweep||{}; $("#texts").innerHTML = (D.photoAi ? "Фото оценивает Gemini, отсеяно непрезентабельных: "+(D.photoRejected||0)+". " : "<span class='warn'>Оценка фото выключена: на сервере нет GEMINI_API_KEY.</span> ")+"Найдено поиском (не в залоге, дом с 1980, не общежитие, «ипотека» в описании): "+(fl?fl.n:0)+(fl&&fl.day?" (новых за сутки "+fl.day+")":"")+" · обход "+(fs.running?"идёт…":(fs.at?dt(fs.at):"ещё не было"))+" <a href='#' id='msw'>обойти сейчас</a>"; if(!D.candidates.length){ $("#cands").innerHTML = "<p class='mut'>Сейчас подходящих нет — появятся после обхода поиска.</p>"; return; }
   $("#cands").innerHTML = D.candidates.map(function(f){
     var tag = f.mortgage ? "Ипотека"+(f.programs&&f.programs.length?" · "+f.programs.join(", "):"") : "";
     return "<div class='c'><img class='cov' loading='lazy' src='"+slideUrl(f.id,0)+"' data-id='"+f.id+"' alt=''>"+

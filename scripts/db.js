@@ -3264,7 +3264,7 @@ BEGIN
   );
   CREATE INDEX IX_kltext_mortgage ON dbo.krisha_list_text (mortgage, at DESC);
 END
--- Объявления с отметкой «можно в ипотеку» (фильтр Крыши das[mortgage]):
+-- Кандидаты «можно в ипотеку» из поиска (server.js INSTA_SWEEP_Q: не в залоге, дом с 1980, не общежитие, слово «ипотека» в описании):
 -- обход раз в несколько часов обновляет seen_at; давно не виденные — флаг сняли или объявление ушло.
 IF OBJECT_ID('dbo.krisha_mortgage', 'U') IS NULL
 BEGIN
@@ -3380,6 +3380,11 @@ async function mortgageFlagSave(ids, city, district) {
       WHEN NOT MATCHED THEN INSERT (id, city, district) VALUES (s.id, @city, @d);`);
   }
   return list.length;
+}
+async function mortgageFlagsReset() {
+  const pool = await getPool();
+  await ensureInsta();
+  await pool.request().query("DELETE FROM dbo.krisha_mortgage");
 }
 async function mortgageFlagStats() {
   const pool = await getPool();
@@ -3531,7 +3536,7 @@ async function instaListing(id) {
   const x = (await pool.request().input("id", sql.BigInt, Number(id) || 0).query(`
     SELECT c.id, c.city, c.rooms, c.area, c.floor, c.floors, c.price, c.addr, c.complex_id, c.phones, c.storage, c.photos_c, c.photos_json, c.lat, c.lon,
            t.programs, t.quote,
-           -- «Можно в ипотеку» — как в подборе кандидатов: отметка Крыши (das[mortgage])
+           -- «Можно в ипотеку» — как в подборе кандидатов: квартира из поиска кандидатов (INSTA_SWEEP_Q)
            -- и хозяин в описании не отказывается. Без этого превью и пост
            -- квартиры, выпавшей из кэша кандидатов, выходили без ипотеки.
            CASE WHEN EXISTS (SELECT 1 FROM dbo.krisha_mortgage m WHERE m.id = c.id AND m.seen_at >= DATEADD(day, -2, SYSUTCDATETIME()))
@@ -3640,7 +3645,8 @@ async function instaCardFactsGet(ids) {
 async function instaCardFactsSave(id, f) {
   const pool = await getPool();
   await ensureInsta();
-  const j = JSON.stringify({ params: (f.params || []).slice(0, 12), price: f.price || null, desc: (f.desc || []).slice(0, 3), pledged: !!f.pledged });
+  const j = JSON.stringify({ params: (f.params || []).slice(0, 12), price: f.price || null, desc: (f.desc || []).slice(0, 3), pledged: !!f.pledged,
+    verdict: f.verdict ? { mortgage: f.verdict.mortgage || null, why: f.verdict.why ? String(f.verdict.why).slice(0, 80) : null, programs: (f.verdict.programs || []).slice(0, 3), quote: f.verdict.quote ? String(f.verdict.quote).slice(0, 160) : null } : null });
   await pool.request().input("id", sql.BigInt, Number(id)).input("f", sql.NVarChar(2000), j.slice(0, 2000))
     .query(`UPDATE dbo.insta_card_facts SET facts = @f, at = SYSUTCDATETIME() WHERE listing_id = @id;
             IF @@ROWCOUNT = 0 INSERT INTO dbo.insta_card_facts (listing_id, facts) VALUES (@id, @f);`);
@@ -4619,7 +4625,7 @@ async function objectStats() {
   return r.recordset[0];
 }
 
-module.exports = { listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
+module.exports = { mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,
