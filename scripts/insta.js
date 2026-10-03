@@ -368,7 +368,7 @@ function caption(f, acc) {
   else if (f.near) lines.push("", "🗺 " + f.near);
 
   if (h) {
-    lines.push("", "🏦 Можно купить в ипотеку — хозяин готов" + ((f.programs || []).length ? ", в том числе по программе " + f.programs.join(", ") : "") + ".");
+    lines.push("", "🏦 Можно купить в ипотеку — хозяин готов" + ((f.programs || []).length ? ", в том числе по программе " + f.programs.join(", ") : "") + ", документы в порядке.");
     if (f.quote) lines.push("💬 Из объявления: «" + f.quote + "»");
   }
   lines.push("", "✅ Договариваетесь напрямую с хозяином.", "",
