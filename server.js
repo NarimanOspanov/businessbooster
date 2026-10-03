@@ -5125,7 +5125,10 @@ async function instaTick() {
     const st = await db.instaPostedSince(a.acc, almatyDayStart(now));
     const slots = INSTA_SLOTS[per] || Array.from({ length: per }, (_, i) => 9 + Math.floor(i * 13 / per));
     if (st.n >= slots.filter((h) => h <= hour).length) continue;
-    if (st.last_at && now.getTime() - new Date(st.last_at).getTime() < 45 * 60e3) continue;
+    // Пауза между постами — app_config insta.gap_min (по умолчанию 45 минут, не меньше 20).
+    const gapCfg = await db.configGet(["insta.gap_min"]).catch(() => ({}));
+    const gap = Math.max(20, Number(gapCfg["insta.gap_min"]) || 45);
+    if (st.last_at && now.getTime() - new Date(st.last_at).getTime() < gap * 60e3) continue;
     const rows = await instaCandidates(a.acc, true).catch(() => []);
     if (!rows.length) continue;
     // Разнообразие: не тот же ЖК, что в постах за 3 дня, и не те же комнаты,
