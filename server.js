@@ -5047,10 +5047,12 @@ async function instaPublish(acc, f) {
     }
     await instaEnsureCard(f).catch((e) => console.log("[insta] card facts before publish " + f.id + ": " + e.message));
     // Без открытой карточки не знаем ни залога, ни слов хозяина — не публикуем.
-    if (!f.card) throw new Error("не открылась карточка объявления — проверить залог и ипотеку не вышло, повторите позже");
+    // e.skip — квартира не подошла, а не сбой: автопостинг берёт следующую.
+    const skip = (msg) => Object.assign(new Error(msg), { skip: true });
+    if (!f.card) throw skip("не открылась карточка объявления — проверить залог и ипотеку не вышло, повторите позже");
     if (f.card.mortgageNo) {
       instaDropCandidate(acc, f.id);
-      throw new Error("под ипотеку не публикуем: " + f.card.mortgageNo);
+      throw skip("под ипотеку не публикуем: " + f.card.mortgageNo);
     }
     const code = await db.instaPostReserve(acc, f.id, reason);
     const fc = Object.assign({}, f, { code: code });
@@ -5133,13 +5135,22 @@ async function instaTick() {
     const lastRooms = recent.length ? recent[0].rooms : null;
     const pool5 = rows.slice(0, 5).filter((f) => !f.complexId || !usedCx.has(f.complexId));
     const pick = pool5.find((f) => f.rooms !== lastRooms) || pool5[0] || rows[0];
-    try {
-      const r = await instaPublish(a.acc, pick);
-      console.log("[insta] " + a.acc + " posted " + pick.id + " (балл " + pick.score + ") → " + r.mediaId);
-    } catch (e) {
-      instaPauseUntil[a.acc] = Date.now() + 3600e3;
-      console.log("[insta] " + a.acc + " failed: " + e.message);
-      notifyTelegram("📸 Instagram " + a.acc + ": пост не вышел — " + String(e.message).slice(0, 200) + ". Автопостинг на паузе час.");
+    // Квартира, не прошедшая проверку карточки (залог, хозяин не пишет про
+    // ипотеку, карточка не открылась), — не сбой Instagram: берём следующую
+    // в этом же заходе, без паузы и без сообщения. До 5 попыток за заход.
+    const order = [pick].concat(rows.filter((f) => f !== pick)).slice(0, 5);
+    for (const f of order) {
+      try {
+        const r = await instaPublish(a.acc, f);
+        console.log("[insta] " + a.acc + " posted " + f.id + " (балл " + f.score + ") → " + r.mediaId);
+        break;
+      } catch (e) {
+        if (e.skip) { console.log("[insta] " + a.acc + " skip " + f.id + ": " + e.message); continue; }
+        instaPauseUntil[a.acc] = Date.now() + 3600e3;
+        console.log("[insta] " + a.acc + " failed: " + e.message);
+        notifyTelegram("📸 Instagram " + a.acc + ": пост не вышел — " + String(e.message).slice(0, 200) + ". Автопостинг на паузе час.");
+        break;
+      }
     }
   }
 }

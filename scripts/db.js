@@ -3499,7 +3499,9 @@ async function instaCandidates(city, limit, districts) {
                      ${dl.length ? "AND district IN (" + dl.map((_, i) => "@d" + i).join(",") + ")" : ""})
       AND (@lat IS NULL OR (c.lat IS NOT NULL AND
            SQRT(POWER((c.lat - @lat) * 111.0, 2) + POWER((c.lon - @lon) * 111.0 * COS(RADIANS(@lat)), 2)) <= @km))
-      AND (t.mortgage IS NULL OR t.mortgage <> 'no')
+      -- Описание ещё не читали (t.id IS NULL) или хозяин явно за ипотеку; «нет» и
+      -- молчание после проверки карточки — из кандидатов вон.
+      AND (t.id IS NULL OR t.mortgage = 'yes')
       -- Дом старше 1980 года банки в залог не берут (mortgage-text.js MIN_YEAR);
       -- год тут — если квартира уже есть в базе объектов, иначе его проверит карточка.
       AND NOT EXISTS (SELECT 1 FROM dbo.krisha_flats kf WHERE kf.id = c.id AND kf.build_year < 1980)
