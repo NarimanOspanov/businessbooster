@@ -149,9 +149,10 @@ async function cardFacts(id) {
   // строками, тот же вид, что присылает плагин номеров).
   const text = {
     desc: card.description || "",
-    params: (card.short || []).concat((card.params || []).map((p) => p.label + ": " + p.value)).join("\n"),
+    // «Квартира в залоге: да» первой строкой — её ловит mortgage-text.js.
+    params: (card.pledged ? ["Квартира в залоге: да"] : []).concat(card.short || [], (card.params || []).map((p) => p.label + ": " + p.value)).join("\n"),
   };
-  return { params: fromParams(card), price: price, desc: desc, text: text };
+  return { params: fromParams(card), price: price, desc: desc, text: text, pledged: !!card.pledged };
 }
 
 module.exports = { cardFacts, fromParams };

@@ -3640,7 +3640,7 @@ async function instaCardFactsGet(ids) {
 async function instaCardFactsSave(id, f) {
   const pool = await getPool();
   await ensureInsta();
-  const j = JSON.stringify({ params: (f.params || []).slice(0, 12), price: f.price || null, desc: (f.desc || []).slice(0, 3) });
+  const j = JSON.stringify({ params: (f.params || []).slice(0, 12), price: f.price || null, desc: (f.desc || []).slice(0, 3), pledged: !!f.pledged });
   await pool.request().input("id", sql.BigInt, Number(id)).input("f", sql.NVarChar(2000), j.slice(0, 2000))
     .query(`UPDATE dbo.insta_card_facts SET facts = @f, at = SYSUTCDATETIME() WHERE listing_id = @id;
             IF @@ROWCOUNT = 0 INSERT INTO dbo.insta_card_facts (listing_id, facts) VALUES (@id, @f);`);

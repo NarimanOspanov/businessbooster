@@ -4910,7 +4910,11 @@ function instaEnsureCard(f) {
 }
 async function instaLoadCard(f) {
   const have = await db.instaCardFactsGet([f.id]).catch(() => ({}));
-  if (have[f.id]) return (f.card = have[f.id]);
+  // Снятое до проверки залога (нет поля pledged) — открываем карточку заново.
+  if (have[f.id] && have[f.id].pledged != null) {
+    if (have[f.id].pledged) have[f.id].mortgageNo = "в залоге";
+    return (f.card = have[f.id]);
+  }
   const c = await Promise.race([CARD_FACTS.cardFacts(f.id), new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 60000))]);
   await db.instaCardFactsSave(f.id, c);
   // Тот же разбор, что у текста от плагина: «ипотеку не рассматриваю» или

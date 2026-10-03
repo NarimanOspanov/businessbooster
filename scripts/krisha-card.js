@@ -195,6 +195,9 @@ function parse(html, id) {
     description: description(html),
     short: shortItems,
     params: params(html),
+    // «В залоге» — красная метка под «О квартире» (span.a-is-mortgaged). В
+    // параметрах dt/dd её нет: только эта метка в разметке и в описании JSON.
+    pledged: /a-is-mortgaged/.test(html),
     photos: photos(html),
     // Полного номера в разметке нет — только начало и сколько их всего.
     phonePreview: (html.match(/"phonePreview":"([^"]*)"/) || [])[1] || null,
