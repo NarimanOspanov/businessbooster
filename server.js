@@ -5232,12 +5232,21 @@ if (process.env.WEBSITE_SITE_NAME || process.env.INSTA_AUTO === "1") {
 // PHONES_ALERT_MIN минут (по умолчанию 10) — админам бота сообщение; пока
 // тихо — напоминание раз в час; пошли снова — «восстановилось» с длительностью.
 // Только на проде, как и остальные расписания.
-const phoneWatch = { down: false, since: null, remindedAt: 0 };
+const phoneWatch = { down: false, since: null, remindedAt: 0, checkedAt: null, idle: null, sent: null, error: null };
+// Сигнал сторожа — мимо общего лимита notifyTelegram (40 в час на все
+// уведомления): он редкий (раз в час максимум), а выбросить его нельзя.
+// Что ответил Telegram, сохраняем — видно в /api/krisha/objphone/count.
+function phoneWatchSend(text) {
+  if (!TG_TOKEN || !TG_ADMINS.length) { phoneWatch.sent = { at: new Date().toISOString(), ok: false, error: "нет TELEGRAM_BOT_TOKEN или BOT_ADMIN_TELEGRAM_IDS" }; return; }
+  Promise.all(TG_ADMINS.map((chat) => sendTelegram(chat, text).then((r) => ({ chat, ok: !!(r && r.ok), error: r && !r.ok ? r.description : undefined }))))
+    .then((all) => { phoneWatch.sent = { at: new Date().toISOString(), text: text.slice(0, 80), to: all }; });
+}
 async function phoneWatchTick() {
   const lim = Math.max(3, Number(process.env.PHONES_ALERT_MIN) || 10);
   const r = await db.listPhoneFlow(lim);
   const last = r.last_at ? new Date(r.last_at) : null;
   const idle = last ? Math.round((Date.now() - last.getTime()) / 60e3) : null;
+  phoneWatch.checkedAt = new Date().toISOString(); phoneWatch.idle = idle; phoneWatch.error = null;
   const hhmm = (d) => d ? new Date(d.getTime() + 5 * 3600e3).toISOString().slice(11, 16) : "—"; // время Алматы
   if (idle == null || idle >= lim) {
     if (phoneWatch.down && Date.now() - phoneWatch.remindedAt < 3600e3) return;
@@ -5245,19 +5254,21 @@ async function phoneWatchTick() {
     // не сохраняются (капча, вход на Крыше слетел); иначе плагин не запущен.
     const why = r.leased ? "плагин берёт объявления (" + r.leased + " в работе), но номера не сохраняются — капча или слетел вход на Крыше"
       : "плагин не берёт объявления — похоже, не запущен";
-    notifyTelegram((phoneWatch.down ? "⏰ Номеров всё ещё нет" : "⚠️ <b>Номера перестали поступать</b>") +
+    phoneWatchSend((phoneWatch.down ? "⏰ Номеров всё ещё нет" : "⚠️ <b>Номера перестали поступать</b>") +
       "\nПоследний: " + hhmm(last) + (idle != null ? " (" + idle + " мин назад)" : "") + "\n" + why);
     if (!phoneWatch.down) phoneWatch.since = last || new Date();
     phoneWatch.down = true;
     phoneWatch.remindedAt = Date.now();
   } else if (phoneWatch.down) {
     const mins = Math.round((Date.now() - phoneWatch.since.getTime()) / 60e3);
-    notifyTelegram("✅ <b>Номера снова поступают</b>\nПерерыв ≈ " + mins + " мин, за последние " + lim + " мин — " + r.recent);
+    phoneWatchSend("✅ <b>Номера снова поступают</b>\nПерерыв ≈ " + mins + " мин, за последние " + lim + " мин — " + r.recent);
     phoneWatch.down = false;
   }
 }
 if (process.env.WEBSITE_SITE_NAME) {
-  setInterval(() => phoneWatchTick().catch((e) => console.log("[phone-watch] " + e.message)), 5 * 60e3).unref();
+  // Первая проверка через минуту после старта (деплой не должен откладывать сигнал), дальше раз в 5 минут.
+  setTimeout(() => phoneWatchTick().catch((e) => { phoneWatch.error = e.message; console.log("[phone-watch] " + e.message); }), 60e3).unref();
+  setInterval(() => phoneWatchTick().catch((e) => { phoneWatch.error = e.message; console.log("[phone-watch] " + e.message); }), 5 * 60e3).unref();
 }
 
 // «+» от человека под нашими постами: сначала свежие посты, потом глубже.
@@ -9432,7 +9443,9 @@ http
           phoneQueueCache = { at: Date.now(), n: await db.listPhoneQueueSize() };
         }
         send(200, Object.assign({ ok: true, at: new Date().toISOString() }, live,
-          { queue: phoneQueueCache.n, queueAt: new Date(phoneQueueCache.at).toISOString() }));
+          { queue: phoneQueueCache.n, queueAt: new Date(phoneQueueCache.at).toISOString() },
+          // Сторож номеров: когда проверял, сколько минут тишины, что ушло в Telegram.
+          { watch: Object.assign({ active: !!process.env.WEBSITE_SITE_NAME, admins: TG_ADMINS.length }, phoneWatch) }));
       })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 200) }));
       return;
     }
