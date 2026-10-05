@@ -8529,6 +8529,7 @@ http
           if (x.phones) p.push("номер есть");
           return p.length ? "📅 " + p.join(" · ") : null;
         };
+        const sweepPhotoOn = String((await db.configGet(["list.photo_match"]).catch(() => ({})))["list.photo_match"] || "") === "1";
         const PhotoMatch = require("./scripts/photo-match.js");
         const agents = await db.agentsToMatchList(batch, researchDays);
         let searched = 0, matched = 0, photoConfirmed = 0, archivedOwners = 0, researched = 0, researchedFound = 0;
@@ -8546,7 +8547,11 @@ http
           if (!hits.length) continue;
           matched++;
           let scores = {};
-          if (PhotoMatch.available()) {
+          // Фото при обходе сверяем, только если включено (app_config list.photo_match=1):
+          // Gemini на каждое агентское объявление — ~$25–30 в день ради статистики.
+          // Находка по параметрам записывается и так; точное сравнение фото
+          // остаётся там, где оно нужно, — когда пользователь присылает объявление.
+          if (sweepPhotoOn && PhotoMatch.available()) {
             try {
               const agentPhotos = db.listPhotoUrls(a.photos_c, a.photos_json);
               if (agentPhotos.length) {
@@ -8574,7 +8579,7 @@ http
         if (finds.length && notify) {
           const esc = (t) => require("./scripts/krisha-bot.js").esc(String(t == null ? "" : t));
           const photoOk = (c) => !!(c.s && c.s.match && c.s.confidence >= 0.7);
-          const photoText = (c) => !c.s ? "фото не проверить" : photoOk(c) ? "фото совпали " + c.s.confidence : "фото не совпали";
+          const photoText = (c) => !c.s ? (sweepPhotoOn ? "фото не проверить" : "по параметрам") : photoOk(c) ? "фото совпали " + c.s.confidence : "фото не совпали";
           const verdict = (c) => "score " + c.h.score + " · " + photoText(c);
           const lines = [];
           finds.slice(0, 8).forEach((f, n) => {
@@ -8653,6 +8658,7 @@ http
           if (dmT(x.first_seen)) p.push("в базе с " + dmT(x.first_seen));
           return p.length ? "📅 " + p.join(" · ") : null;
         };
+        const sweepPhotoOn = String((await db.configGet(["list.photo_match"]).catch(() => ({})))["list.photo_match"] || "") === "1";
         const PhotoMatch = require("./scripts/photo-match.js");
         const agents = await db.agentsToMatch(batch);
         let searched = 0, matched = 0, photoConfirmed = 0;
@@ -8674,7 +8680,11 @@ http
           // Нашли по параметрам — сразу сверяем по фото (Gemini). Дорого только
           // на самих находках, а они редки, так что нагрузки почти нет.
           let scores = {};
-          if (PhotoMatch.available()) {
+          // Фото при обходе сверяем, только если включено (app_config list.photo_match=1):
+          // Gemini на каждое агентское объявление — ~$25–30 в день ради статистики.
+          // Находка по параметрам записывается и так; точное сравнение фото
+          // остаётся там, где оно нужно, — когда пользователь присылает объявление.
+          if (sweepPhotoOn && PhotoMatch.available()) {
             try {
               const agentPhotos = await db.objectPhotos(a.id);
               if (agentPhotos.length) {
@@ -8710,7 +8720,7 @@ http
           // в порядке findObjects — лучший первым; у остальных оценка своя,
           // поэтому она дописана к строке.
           const photoOk = (c) => !!(c.s && c.s.match && c.s.confidence >= 0.7);
-          const photoText = (c) => !c.s ? "фото не проверить" : photoOk(c) ? "фото совпали " + c.s.confidence : "фото не совпали";
+          const photoText = (c) => !c.s ? (sweepPhotoOn ? "фото не проверить" : "по параметрам") : photoOk(c) ? "фото совпали " + c.s.confidence : "фото не совпали";
           const verdict = (c) => "score " + c.h.score + " · " + photoText(c);
           // Дата поднятия у строк, сохранённых до появления колонки, — из
           // data_gz; находок мало, распаковка дешёвая.
