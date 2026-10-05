@@ -3487,7 +3487,12 @@ async function instaCandidates(city, limit, districts) {
   const peers = await complexPeers(city).catch(() => ({}));
   const dl = (districts || []).map(String).filter(Boolean);
   const ctr = INSTA_CENTER[city] || null;
-  const rq = pool.request().input("city", sql.NVarChar(40), city).input("n", sql.Int, 400)
+  // Свежесть — сколько дней назад квартира впервые попала в нашу базу
+  // (app_config insta.fresh_days, по умолчанию 14). База собирается с 18.09.2026:
+  // всё, что уже висело на Крыше, получило first_seen около этой даты.
+  const fdCfg = await configGet(["insta.fresh_days"]).catch(() => ({}));
+  const freshDays = Math.max(1, Math.min(90, Number(fdCfg["insta.fresh_days"]) || 14));
+  const rq = pool.request().input("city", sql.NVarChar(40), city).input("n", sql.Int, 400).input("fd", sql.Int, freshDays)
     .input("lat", sql.Float, ctr ? ctr.lat : null).input("lon", sql.Float, ctr ? ctr.lon : null).input("km", sql.Float, ctr ? ctr.km : null);
   dl.forEach((d, i) => rq.input("d" + i, sql.NVarChar(40), d));
   const rows = (await rq.query(`
@@ -3507,7 +3512,7 @@ async function instaCandidates(city, limit, districts) {
       AND NOT EXISTS (SELECT 1 FROM dbo.krisha_flats kf WHERE kf.id = c.id AND kf.build_year < 1980)
       AND c.user_type = 'owner' AND c.deal = 'sale' AND c.prop = 'flat' AND c.storage = 'live' AND c.city = @city
       AND c.area >= 20 AND c.price >= c.area * 150000 AND c.phones IS NOT NULL AND c.photos >= 5
-      AND c.first_seen >= DATEADD(day, -10, SYSUTCDATETIME())
+      AND c.first_seen >= DATEADD(day, -@fd, SYSUTCDATETIME())
       AND NOT EXISTS (SELECT 1 FROM dbo.insta_posts ip WHERE ip.listing_id = c.id
                       AND (ip.status NOT IN ('failed', 'deleted') OR (ip.status = 'failed' AND ip.created_at >= DATEADD(hour, -1, SYSUTCDATETIME()))))
     ORDER BY c.first_seen DESC`)).recordset;
