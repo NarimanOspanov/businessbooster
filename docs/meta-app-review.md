@@ -26,8 +26,8 @@
 |---|---|
 | App name | Ipoteka1 |
 | App category | Business and pages |
-| Privacy Policy URL | `https://reception365.online/ipoteka1/privacy/` *[или ipoteka1.kz, если домен подключён]* |
-| User data deletion | Data deletion instructions URL: `https://reception365.online/ipoteka1/data-deletion/` |
+| Privacy Policy URL | `https://saudager.ai/ipoteka1/privacy/` |
+| User data deletion | Data deletion instructions URL: `https://saudager.ai/ipoteka1/data-deletion/` |
 | Contact email | nospanov9@gmail.com |
 
 ## 2. Permissions to request
