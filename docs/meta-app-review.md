@@ -14,8 +14,7 @@
 ## 0. Что сделать до подачи
 
 - [ ] **Business verification** в Meta Business Suite (документы ИП/ТОО, сайт). Без неё Advanced Access не дают.
-- [ ] Заполнить заглушки на страницах (оператор данных, email):
-      `ipoteka1/privacy/index.html`, `ipoteka1/data-deletion/index.html` — сейчас там «___@___».
+- [x] Оператор данных (ИП IT-bench) и email на страницах политики и удаления данных — заполнено.
 - [ ] Тестовый аккаунт Instagram для проверяющих (обычный личный, НЕ наш бизнес-аккаунт), добавить его
       в приложение как **Instagram Tester** (App roles → Roles → Instagram Testers) и принять приглашение
       в настройках Instagram этого аккаунта. Так сценарий будет работать и до одобрения — и на видео, и у проверяющего.
@@ -29,7 +28,7 @@
 | App category | Business and pages |
 | Privacy Policy URL | `https://reception365.online/ipoteka1/privacy/` *[или ipoteka1.kz, если домен подключён]* |
 | User data deletion | Data deletion instructions URL: `https://reception365.online/ipoteka1/data-deletion/` |
-| Contact email | *[ваш email]* |
+| Contact email | nospanov9@gmail.com |
 
 ## 2. Permissions to request
 
@@ -98,7 +97,7 @@ We do not access any other accounts or any data of people who are not our users.
    other apartment only.
 
 Test account: <username> / <password>
-(If a login code is requested, contact us at <email>.)
+(If a login code is requested, contact us at nospanov9@gmail.com.)
 ```
 
 ### 3.4 Data handling questions (Data Use Checkup / Data handling)
@@ -108,7 +107,7 @@ Data processors / service providers with access to Platform Data:
 - Microsoft Azure (hosting and database, region: West Europe)
 - ManyChat (sends the direct message on our behalf; its own Meta-approved app)
 
-Responsible entity: <ИП / ТОО name>, <address>, Kazakhstan
+Responsible entity: IT-bench (individual entrepreneur), <address>, Kazakhstan
 Country of the responsible entity: Kazakhstan
 Requests from public authorities in the last 12 months: none
 Policies for handling such requests: we disclose data only when required by the law of
