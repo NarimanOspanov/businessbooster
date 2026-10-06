@@ -443,9 +443,12 @@ async function publishCarousel(userId, token, imageUrls, text) {
   return { mediaId: pub.id, permalink: permalink };
 }
 // Комментарии поста: ник, текст, время. Для поиска «+» от конкретного человека.
+// У комментариев посторонних людей Instagram оставляет поле username пустым,
+// а ник отдаёт в from{username} — берём оттуда (проверено 06.10.2026 после
+// перевода приложения в рабочий режим).
 async function comments(mediaId, token) {
-  const j = await ig("GET", "/" + mediaId + "/comments", { fields: "id,text,username,timestamp", limit: "50" }, token);
-  return j.data || [];
+  const j = await ig("GET", "/" + mediaId + "/comments", { fields: "id,text,username,timestamp,from{id,username}", limit: "50" }, token);
+  return (j.data || []).map((c) => Object.assign({}, c, { username: c.username || (c.from && c.from.username) || null }));
 }
 // Последние посты аккаунта: найти тот, в подписи которого есть метка.
 async function findByCaption(userId, token, mark) {
