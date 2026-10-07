@@ -266,6 +266,22 @@ function renderMc(){
     "<li>По кнопке — Condition <b>«Is following your account»</b>. Нет → «Похоже, вы ещё не подписаны 🙂 Подпишитесь и нажмите ещё раз» + та же кнопка.</li>"+
     "<li>Да → Action <b>External Request</b> на ссылку выше → сообщение с текстом <code>{{owner_text}}</code>.</li></ol>";
   var cp = $("#cp"); cp.onclick = function(){ navigator.clipboard.writeText(D.hook).then(function(){ cp.textContent="Скопировано"; }); };
+  // Вебхук Instagram: события о комментариях приходят прямо к нам, с id поста.
+  var w = D.webhook || {}, st = w.stats || {};
+  var ev = (st.recent || []).map(function(r){ return "<li>"+esc(new Date(r.at).toLocaleString("ru-RU"))+" · @"+esc(r.username||"?")+" «"+esc(r.text||"")+"» → "+esc(r.status)+(r.note?" <span class='mut'>("+esc(r.note)+")</span>":"")+"</li>"; }).join("");
+  $("#mc").insertAdjacentHTML("beforeend", "<h3 style='margin:18px 0 6px'>Вебхук Instagram</h3>"+
+    "<div class='mut' style='margin-bottom:6px'>Instagram сам присылает каждый комментарий вместе с постом — «+» привязывается к квартире точно, без поиска по нику.</div>"+
+    "<div>Callback URL: <code>"+esc(w.url)+"</code></div><div style='margin:4px 0'>Verify token: <code>"+esc(w.verifyToken)+"</code></div>"+
+    "<ol><li>Meta → приложение → Сценарии использования → «Управление сообщениями и контентом в Instagram» → «3. Настройте Webhooks»: вставьте Callback URL и Verify token, «Подтвердить и сохранить», подпишитесь на поле <b>comments</b>.</li>"+
+    "<li>Там же, «Секрет приложения Instagram» → «Показать» → вставьте сюда"+(w.secretEnv?" (сейчас задан в переменной окружения)":"")+":"+
+    "<div class='row' style='margin-top:6px'><input class='tok' type='password' id='whsec' placeholder='"+(w.secretSet?"секрет задан — вставьте новый, чтобы заменить":"секрет приложения Instagram")+"'><button class='btn ghost' id='whsave'>Сохранить</button></div></li>"+
+    "<li>Поставьте «+» под постом и проверьте, что событие появилось ниже. Потом выключите автоматизацию в ManyChat и включите ответы:</li></ol>"+
+    "<label class='row' style='gap:8px'><input type='checkbox' id='whreply'"+(w.reply?" checked":"")+(w.secretSet?"":" disabled")+"> отвечать на «+» вебхуком (номер в директ + «Отправили в директ 📩»)</label>"+
+    (w.secretSet?"":"<div class='warn'>Без секрета приложения ответы не включить: не сможем проверить, что событие пришло от Instagram.</div>")+
+    (w.reply?"<div class='warn'>Ответы включены — автоматизация «+» в ManyChat должна быть выключена, иначе человеку придут два сообщения.</div>":"")+
+    "<div class='mut' style='margin-top:8px'>За сутки событий: "+(st.day||0)+" · ответили: "+(st.replied||0)+"</div>"+(ev?"<ul style='margin:4px 0 0;padding-left:18px'>"+ev+"</ul>":"<div class='mut'>Событий пока не было.</div>"));
+  $("#whsave").onclick = function(){ var v = $("#whsec").value.trim(); if(!v) return; post({ action:"webhook", secret: v }).then(function(){ load(); }); };
+  $("#whreply").onchange = function(){ post({ action:"webhook", reply: this.checked }).then(function(){ load(); }); };
 }
 function load(fresh){
   document.querySelectorAll("#tabs button").forEach(function(b){ b.classList.toggle("on", b.getAttribute("data-a")===ACC); });

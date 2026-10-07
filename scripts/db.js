@@ -3328,6 +3328,24 @@ IF OBJECT_ID('dbo.insta_manual_photos', 'U') IS NULL
     img        VARBINARY(MAX) NOT NULL,
     CONSTRAINT PK_imanual_photos PRIMARY KEY (listing_id, n)
   );
+-- События вебхука Instagram о комментариях: один комментарий — одна строка
+-- (comment_id — ключ), поэтому повтор события от Instagram не даёт второй
+-- ответ. status: seen (записали, отвечать выключено) | replied | skipped | error.
+IF OBJECT_ID('dbo.insta_comment_events', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.insta_comment_events (
+    comment_id NVARCHAR(40)  NOT NULL PRIMARY KEY,
+    acc        NVARCHAR(20)  NULL,
+    media_id   NVARCHAR(40)  NULL,
+    username   NVARCHAR(60)  NULL,
+    text       NVARCHAR(300) NULL,
+    listing_id BIGINT        NULL,
+    status     NVARCHAR(16)  NOT NULL,
+    note       NVARCHAR(300) NULL,
+    at         DATETIME2(0)  NOT NULL CONSTRAINT DF_ice_at DEFAULT SYSUTCDATETIME()
+  );
+  CREATE INDEX IX_ice_at ON dbo.insta_comment_events (at DESC);
+END
 -- Настройки, которые правят со страниц (промпты и т. п.): ключ → значение.
 IF OBJECT_ID('dbo.app_config', 'U') IS NULL
   CREATE TABLE dbo.app_config (
@@ -3813,6 +3831,36 @@ async function instaPostedSince(acc, since) {
   await ensureInsta();
   return (await pool.request().input("acc", sql.NVarChar(20), acc).input("since", sql.DateTime2(0), since).query(
     "SELECT COUNT(*) AS n, MAX(created_at) AS last_at FROM dbo.insta_posts WHERE acc = @acc AND status = 'published' AND created_at >= @since")).recordset[0];
+}
+// Событие о комментарии: записать, если такого comment_id ещё не было.
+// Возвращает true — новое (можно обрабатывать), false — повтор.
+async function instaCommentEventAdd(e) {
+  const pool = await getPool();
+  await ensureInsta();
+  const r = await pool.request().input("cid", sql.NVarChar(40), String(e.commentId)).input("acc", sql.NVarChar(20), e.acc || null)
+    .input("mid", sql.NVarChar(40), e.mediaId || null).input("u", sql.NVarChar(60), e.username ? String(e.username).slice(0, 60) : null)
+    .input("t", sql.NVarChar(300), e.text ? String(e.text).slice(0, 300) : null).input("st", sql.NVarChar(16), e.status || "seen")
+    .query(`IF NOT EXISTS (SELECT 1 FROM dbo.insta_comment_events WHERE comment_id = @cid)
+            BEGIN INSERT INTO dbo.insta_comment_events (comment_id, acc, media_id, username, text, status) VALUES (@cid, @acc, @mid, @u, @t, @st); SELECT 1 AS fresh; END
+            ELSE SELECT 0 AS fresh;`);
+  return !!(r.recordset[0] && r.recordset[0].fresh);
+}
+async function instaCommentEventSet(commentId, status, note, listingId) {
+  const pool = await getPool();
+  await ensureInsta();
+  await pool.request().input("cid", sql.NVarChar(40), String(commentId)).input("st", sql.NVarChar(16), status)
+    .input("n", sql.NVarChar(300), note ? String(note).slice(0, 300) : null).input("lid", sql.BigInt, listingId ? Number(listingId) : null)
+    .query("UPDATE dbo.insta_comment_events SET status = @st, note = @n, listing_id = COALESCE(@lid, listing_id) WHERE comment_id = @cid");
+}
+async function instaCommentEventStats(acc) {
+  const pool = await getPool();
+  await ensureInsta();
+  const r = await pool.request().input("acc", sql.NVarChar(20), acc).query(`
+    SELECT COUNT(*) AS day, SUM(CASE WHEN status = 'replied' THEN 1 ELSE 0 END) AS replied, MAX(at) AS last_at
+    FROM dbo.insta_comment_events WHERE acc = @acc AND at >= DATEADD(day, -1, SYSUTCDATETIME())`);
+  const last = await pool.request().input("acc", sql.NVarChar(20), acc).query(
+    "SELECT TOP 5 username, text, status, note, at FROM dbo.insta_comment_events WHERE acc = @acc ORDER BY at DESC");
+  return Object.assign({}, r.recordset[0], { recent: last.recordset });
 }
 async function instaPostByMedia(mediaId) {
   const pool = await getPool();
@@ -4726,7 +4774,7 @@ async function objectStats() {
   return r.recordset[0];
 }
 
-module.exports = { instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
+module.exports = { instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,

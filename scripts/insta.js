@@ -467,6 +467,20 @@ async function findByCaption(userId, token, mark) {
   const j = await ig("GET", "/" + userId + "/media", { fields: "id,caption,permalink,timestamp", limit: "10" }, token);
   return (j.data || []).find((m) => String(m.caption || "").includes(mark)) || null;
 }
+// Приватный ответ на комментарий — сообщение в директ автору комментария
+// (Instagram разрешает в течение 7 дней после комментария, один раз).
+async function privateReply(userId, token, commentId, text) {
+  const r = await fetch(GRAPH + "/" + userId + "/messages", {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+    body: JSON.stringify({ recipient: { comment_id: String(commentId) }, message: { text: String(text).slice(0, 1000) } }),
+    signal: AbortSignal.timeout(20000),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.error) throw new Error("Instagram: " + ((j.error && (j.error.error_user_msg || j.error.message)) || ("HTTP " + r.status)));
+  return j;
+}
+// Публичный ответ под комментарием («Отправили в директ 📩»).
+async function replyComment(commentId, token, text) { return ig("POST", "/" + commentId + "/replies", { message: text }, token); }
 const isPlus = (t) => /^\s*(\+|➕|плюс)/i.test(String(t || ""));
 
-module.exports = { findByCaption, ACCOUNTS, renderCarousel, renderCover, caption, hook, cleanAddr, publishCarousel, me, refreshToken, comments, isPlus, coverSvg, photoSvg, ctaSvg, toJpeg, rawSlides };
+module.exports = { findByCaption, ACCOUNTS, renderCarousel, renderCover, caption, hook, cleanAddr, publishCarousel, me, refreshToken, comments, isPlus, coverSvg, photoSvg, ctaSvg, toJpeg, rawSlides, privateReply, replyComment };

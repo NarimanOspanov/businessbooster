@@ -5401,6 +5401,78 @@ if (process.env.WEBSITE_SITE_NAME) {
 
 // «+» от человека под нашими постами: сначала свежие посты, потом глубже.
 // Отдаём самый свежий «+», номер по которому ему ещё не отправляли.
+// --- Вебхук Instagram: комментарии под нашими постами ---------------------
+// Instagram сам присылает событие о каждом комментарии: текст, автор, id
+// комментария и id поста. По id поста (insta_posts.media_id) знаем квартиру
+// точно — не нужно искать «+» человека по последним постам, как через ManyChat.
+// Отвечаем приватным ответом на комментарий (сообщение в директ) и публично
+// «Отправили в директ 📩». Отвечать или только записывать — app_config
+// insta.webhook_reply ("1" — отвечать); пока ответы шлёт ManyChat, держите
+// выключенным, иначе человек получит два сообщения.
+
+// Текст ответа с номером хозяина — общий для ManyChat и вебхука.
+function instaPhoneText(f, phones) {
+  const what = [f.rooms ? f.rooms + "-комн" : null, f.area ? String(f.area).replace(".", ",") + " м²" : null, INSTA.cleanAddr(f.addr),
+    Math.round(f.price / 1e5) / 10 + " млн ₸"].filter(Boolean).join(" · ").replace(/(\d)\.(\d)/, "$1,$2");
+  const gone = f.storage && f.storage !== "live" ? "\n\n⚠️ Объявление уже снято — возможно, квартиру продали." : "";
+  return "📞 Номер хозяина:\n" + phones.map(instaPhoneFmt).join("\n") + "\n\n🏠 " + what + gone +
+    "\n\nПишите или звоните хозяину напрямую. Новые квартиры от хозяев каждый день у нас в профиле 🔑";
+}
+
+// Секрет приложения Instagram — для проверки подписи событий
+// (X-Hub-Signature-256). Из переменной окружения или из настроек страницы.
+async function instaHookCfg() {
+  const c = await db.configGet(["insta.app_secret", "insta.webhook_reply"]).catch(() => ({}));
+  return { secret: (process.env.INSTA_APP_SECRET || c["insta.app_secret"] || "").trim(), reply: c["insta.webhook_reply"] === "1" };
+}
+
+async function instaWebhook(raw, sig) {
+  const cfg = await instaHookCfg();
+  let verified = false;
+  if (cfg.secret && sig) {
+    const want = "sha256=" + crypto.createHmac("sha256", cfg.secret).update(raw).digest("hex");
+    verified = want.length === String(sig).length && crypto.timingSafeEqual(Buffer.from(want), Buffer.from(String(sig)));
+  }
+  // Секрет задан, а подпись не сошлась — событие не от Instagram, не трогаем.
+  if (cfg.secret && !verified) { console.log("[insta-hook] подпись не сошлась — событие отброшено"); return; }
+  let j;
+  try { j = JSON.parse(raw.toString("utf8")); } catch { return; }
+  const accs = await db.instaAccounts();
+  for (const e of j.entry || []) {
+    for (const ch of e.changes || []) {
+      if (ch.field !== "comments") continue;
+      const v = ch.value || {};
+      const cid = v.id, mediaId = v.media && v.media.id, uname = v.from && v.from.username, text = String(v.text || "");
+      if (!cid) continue;
+      const post = mediaId ? await db.instaPostByMedia(mediaId).catch(() => null) : null;
+      const acct = post ? accs.find((x) => x.acc === post.acc) : accs.find((x) => String(x.ig_user_id) === String(e.id));
+      if (!acct) continue;
+      // Свои ответы («Отправили в директ») не обрабатываем.
+      if (uname && acct.username && String(uname).toLowerCase() === String(acct.username).toLowerCase()) continue;
+      const fresh = await db.instaCommentEventAdd({ commentId: cid, acc: acct.acc, mediaId: mediaId, username: uname, text: text, status: "seen" }).catch(() => false);
+      if (!fresh) continue; // повтор события — уже обработали
+      if (!INSTA.isPlus(text)) { await db.instaCommentEventSet(cid, "skipped", "не «+»").catch(() => {}); continue; }
+      if (!post) { await db.instaCommentEventSet(cid, "skipped", "пост не из нашей базы").catch(() => {}); continue; }
+      if (!cfg.reply) continue; // только записываем — отвечает ManyChat
+      if (!verified) { await db.instaCommentEventSet(cid, "skipped", "не задан секрет приложения — без проверки подписи не отвечаем").catch(() => {}); continue; }
+      try {
+        const f = await db.instaListing(post.listing_id);
+        const phones = String((f && f.phones) || "").split(",").map((x) => x.trim()).filter(Boolean);
+        const msg = f && phones.length ? instaPhoneText(f, phones)
+          : "По этой квартире номер сейчас недоступен 😔 Посмотрите другие предложения в нашем профиле — новые квартиры от хозяев каждый день.";
+        await INSTA.privateReply(acct.ig_user_id, acct.token, cid, msg);
+        await INSTA.replyComment(cid, acct.token, "Отправили в директ 📩").catch((err) => console.log("[insta-hook] public reply: " + err.message));
+        await db.instaDmAdd({ acc: acct.acc, username: uname, listingId: post.listing_id, mediaId: mediaId, found: !!(f && phones.length) }).catch(() => {});
+        await db.instaCommentEventSet(cid, "replied", null, post.listing_id);
+        console.log("[insta-hook] «+» от " + uname + " под постом " + mediaId + " → номер квартиры " + post.listing_id);
+      } catch (err) {
+        await db.instaCommentEventSet(cid, "error", err.message, post.listing_id).catch(() => {});
+        console.log("[insta-hook] ответ " + cid + ": " + err.message);
+      }
+    }
+  }
+}
+
 async function instaFindPlus(acc, username) {
   const a = (await db.instaAccounts()).find((x) => x.acc === acc);
   if (!a || !a.token) throw new Error("аккаунт не подключён");
@@ -7396,6 +7468,25 @@ http
     // Номер хозяина для ManyChat: человек поставил «+» под постом и подписался,
     // ManyChat делает External Request с его ником — находим его «+», по посту
     // квартиру, отдаём номер и готовый текст для сообщения.
+    // Вебхук Instagram: GET — подтверждение подписки (hub.verify_token — наш
+    // ключ вебхука, он показан на странице Instagram), POST — события.
+    // Отвечаем 200 сразу: Instagram ждёт ответ быстро и иначе повторяет.
+    if (urlPath === "/api/insta/webhook") {
+      if (req.method === "GET") {
+        const q = parsed.searchParams;
+        if (q.get("hub.mode") === "subscribe" && instaHookKey() && q.get("hub.verify_token") === instaHookKey()) {
+          res.writeHead(200, { "Content-Type": "text/plain" }); res.end(q.get("hub.challenge") || ""); return;
+        }
+        res.writeHead(403); res.end("bad verify token"); return;
+      }
+      const chunks = []; let size = 0;
+      req.on("data", (c) => { size += c.length; if (size > 1e6) { req.destroy(); return; } chunks.push(c); });
+      req.on("end", () => {
+        res.writeHead(200, { "Content-Type": "text/plain" }); res.end("ok");
+        instaWebhook(Buffer.concat(chunks), req.headers["x-hub-signature-256"]).catch((e) => console.log("[insta-hook] " + e.message));
+      });
+      return;
+    }
     if (urlPath === "/api/insta/phone") {
       const q = parsed.searchParams;
       const send = (code, obj) => { res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); };
@@ -7449,12 +7540,7 @@ http
           return send(200, { ok: true, found: false, text: "По этой квартире номер сейчас недоступен 😔 Посмотрите другие предложения в нашем профиле — новые квартиры от хозяев каждый день." });
         }
         await db.instaDmAdd({ acc: acc, username: user, listingId: hit.listing, mediaId: hit.media, found: true }).catch(() => {});
-        const what = [f.rooms ? f.rooms + "-комн" : null, f.area ? String(f.area).replace(".", ",") + " м²" : null, INSTA.cleanAddr(f.addr),
-          Math.round(f.price / 1e5) / 10 + " млн ₸"].filter(Boolean).join(" · ").replace(/(\d)\.(\d)/, "$1,$2");
-        const nums = phones.map(instaPhoneFmt).join("\n");
-        const gone = f.storage && f.storage !== "live" ? "\n\n⚠️ Объявление уже снято — возможно, квартиру продали." : "";
-        return send(200, { ok: true, found: true, phone: phones.map(instaPhoneFmt).join(", "),
-          text: "📞 Номер хозяина:\n" + nums + "\n\n🏠 " + what + gone + "\n\nПишите или звоните хозяину напрямую. Новые квартиры от хозяев каждый день у нас в профиле 🔑" });
+        return send(200, { ok: true, found: true, phone: phones.map(instaPhoneFmt).join(", "), text: instaPhoneText(f, phones) });
       })().catch((e) => send(200, { ok: false, found: false, error: String(e.message).slice(0, 200),
         text: "Не получилось найти номер прямо сейчас. Напишите нам в ответ, какая квартира интересует, — пришлём вручную." }));
       return;
@@ -9245,6 +9331,12 @@ http
                 instaPreview.clear(); // превью перерисуются с новыми настройками
                 return send(200, { ok: true });
               }
+              // Вебхук: секрет приложения (для проверки подписи) и «отвечать вебхуком».
+              if (b.action === "webhook") {
+                if (typeof b.secret === "string" && b.secret.trim()) await db.configSet("insta.app_secret", b.secret.trim().slice(0, 100));
+                if (b.reply != null) await db.configSet("insta.webhook_reply", b.reply ? "1" : "0");
+                return send(200, { ok: true });
+              }
               if (b.action === "mortgage_sweep") { instaMortgageSweep().catch(() => {}); return send(200, { ok: true, started: true }); }
               if (b.action === "skip") { instaDropCandidate(A, b.id); await db.instaPostAdd({ acc: A, listingId: b.id, status: "skipped" }); return send(200, { ok: true }); }
               return send(400, { ok: false, error: "action" });
@@ -9267,7 +9359,9 @@ http
             const texts = await db.listTextStats().catch(() => null);
             const flags = await db.mortgageFlagStats().catch(() => []);
             send(200, { ok: true, accounts: out, candidates: cands.map((f) => Object.assign({}, f, { photos: f.photos.length })), posts: posts, dms: dms, texts: texts, flags: flags, polish: await instaPolish(), polishInfo: require("./scripts/polish.js").info(), districts: (await instaDistricts(acc)).join(","), photoAi: PHOTO_SCORE.available(), photoRejected: instaPhotoRejected[acc] || 0, flagSweep: { running: instaMortgage.running, at: instaMortgage.lastAt, last: instaMortgage.last },
-              hook: PUBLIC_URL + "/api/insta/phone?acc=" + acc + "&k=" + instaHookKey() + "&u=", candidatesAt: instaCand[acc] && instaCand[acc].at });
+              hook: PUBLIC_URL + "/api/insta/phone?acc=" + acc + "&k=" + instaHookKey() + "&u=", candidatesAt: instaCand[acc] && instaCand[acc].at,
+              webhook: await (async () => { const c = await instaHookCfg(); return { url: PUBLIC_URL + "/api/insta/webhook", verifyToken: instaHookKey(), secretSet: !!c.secret,
+                secretEnv: !!process.env.INSTA_APP_SECRET, reply: c.reply, stats: await db.instaCommentEventStats(acc).catch(() => null) }; })() });
           })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 300) }));
           return;
         }
