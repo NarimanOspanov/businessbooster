@@ -5436,6 +5436,8 @@ async function instaWebhook(raw, sig) {
   }
   // Секрет задан, а подпись не сошлась — событие не от Instagram, не трогаем.
   if (cfg.secret && !verified) { console.log("[insta-hook] подпись не сошлась — событие отброшено"); return; }
+  // Каждое событие — в журнал (последние 200), как пришло.
+  await db.instaHookLogAdd(verified, raw.toString("utf8")).catch(() => {});
   let j;
   try { j = JSON.parse(raw.toString("utf8")); } catch { return; }
   const accs = await db.instaAccounts();
@@ -5494,8 +5496,9 @@ async function instaHookMessage(e, m, accs, cfg, verified) {
   const igsid = String(m.sender.id);
   const payload = (msg.quick_reply && msg.quick_reply.payload) || "";
   let cid = /^PHONE:/.test(payload) ? payload.slice(6) : null;
-  // Написал текстом «+» / «номер» вместо кнопки — берём его последний «+».
-  if (!cid && /^\s*(\+|➕|плюс|номер)/i.test(String(msg.text || ""))) cid = ((await db.instaCommentEventAsked(igsid)) || {}).comment_id || null;
+  // Нажатие может прийти без метки кнопки — просто текстом «Получить номер»;
+  // так же засчитываем «номер», «+», «плюс» — берём его последний «+».
+  if (!cid && /номер|^\s*(\+|➕|плюс)/i.test(String(msg.text || ""))) cid = ((await db.instaCommentEventAsked(igsid)) || {}).comment_id || null;
   if (!cid) return;
   const ev = await db.instaCommentEventGet(cid);
   if (!ev || !ev.listing_id) return;

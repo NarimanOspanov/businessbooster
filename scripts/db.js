@@ -3346,6 +3346,15 @@ BEGIN
   );
   CREATE INDEX IX_ice_at ON dbo.insta_comment_events (at DESC);
 END
+-- Сырые события вебхука Instagram (последние 200) — чтобы видеть, что
+-- именно присылает Instagram, когда что-то не сработало.
+IF OBJECT_ID('dbo.insta_hook_log', 'U') IS NULL
+  CREATE TABLE dbo.insta_hook_log (
+    id   INT IDENTITY(1,1) PRIMARY KEY,
+    at   DATETIME2(0)   NOT NULL CONSTRAINT DF_ihl_at DEFAULT SYSUTCDATETIME(),
+    sig  BIT            NOT NULL,
+    body NVARCHAR(4000) NULL
+  );
 -- igsid — id автора комментария в переписке с нами (из ответа на приватный
 -- ответ): по нему нажатие «Получить номер» связываем с комментарием.
 IF COL_LENGTH('dbo.insta_comment_events', 'igsid') IS NULL ALTER TABLE dbo.insta_comment_events ADD igsid NVARCHAR(40) NULL;
@@ -3854,6 +3863,12 @@ async function instaCommentEventSet(commentId, status, note, listingId) {
   await pool.request().input("cid", sql.NVarChar(40), String(commentId)).input("st", sql.NVarChar(16), status)
     .input("n", sql.NVarChar(300), note ? String(note).slice(0, 300) : null).input("lid", sql.BigInt, listingId ? Number(listingId) : null)
     .query("UPDATE dbo.insta_comment_events SET status = @st, note = @n, listing_id = COALESCE(@lid, listing_id) WHERE comment_id = @cid");
+}
+async function instaHookLogAdd(verified, body) {
+  const pool = await getPool();
+  await ensureInsta();
+  await pool.request().input("s", sql.Bit, verified ? 1 : 0).input("b", sql.NVarChar(4000), String(body || "").slice(0, 4000))
+    .query("INSERT INTO dbo.insta_hook_log (sig, body) VALUES (@s, @b); DELETE FROM dbo.insta_hook_log WHERE id <= (SELECT MAX(id) - 200 FROM dbo.insta_hook_log);");
 }
 async function instaCommentEventGet(commentId) {
   const pool = await getPool();
@@ -4797,7 +4812,7 @@ async function objectStats() {
   return r.recordset[0];
 }
 
-module.exports = { instaCommentEventGet, instaCommentEventIgsid, instaCommentEventAsked, instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
+module.exports = { instaHookLogAdd, instaCommentEventGet, instaCommentEventIgsid, instaCommentEventAsked, instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,
