@@ -3358,6 +3358,9 @@ IF OBJECT_ID('dbo.insta_hook_log', 'U') IS NULL
 -- igsid — id автора комментария в переписке с нами (из ответа на приватный
 -- ответ): по нему нажатие «Получить номер» связываем с комментарием.
 IF COL_LENGTH('dbo.insta_comment_events', 'igsid') IS NULL ALTER TABLE dbo.insta_comment_events ADD igsid NVARCHAR(40) NULL;
+-- Нажал «Получить номер», но не подписан: когда (tap_at) и напомнили ли (reminded).
+IF COL_LENGTH('dbo.insta_comment_events', 'tap_at') IS NULL ALTER TABLE dbo.insta_comment_events ADD tap_at DATETIME2(0) NULL;
+IF COL_LENGTH('dbo.insta_comment_events', 'reminded') IS NULL ALTER TABLE dbo.insta_comment_events ADD reminded BIT NULL;
 -- Настройки, которые правят со страниц (промпты и т. п.): ключ → значение.
 IF OBJECT_ID('dbo.app_config', 'U') IS NULL
   CREATE TABLE dbo.app_config (
@@ -3888,7 +3891,48 @@ async function instaCommentEventAsked(igsid) {
   const pool = await getPool();
   await ensureInsta();
   return (await pool.request().input("g", sql.NVarChar(40), String(igsid)).query(
-    "SELECT TOP 1 comment_id FROM dbo.insta_comment_events WHERE igsid = @g AND status = 'asked' ORDER BY at DESC")).recordset[0] || null;
+    "SELECT TOP 1 comment_id FROM dbo.insta_comment_events WHERE igsid = @g AND status IN ('asked', 'need_follow') ORDER BY at DESC")).recordset[0] || null;
+}
+// Нажал кнопку, но не подписан — ждём подписки, через ~20 ч напомним раз.
+async function instaCommentEventNeedFollow(commentId) {
+  const pool = await getPool();
+  await ensureInsta();
+  await pool.request().input("cid", sql.NVarChar(40), String(commentId))
+    .query("UPDATE dbo.insta_comment_events SET status = 'need_follow', tap_at = SYSUTCDATETIME() WHERE comment_id = @cid AND status <> 'replied'");
+}
+// Кому напомнить: нажали 20–23 ч назад (в пределах суток, пока Instagram
+// разрешает писать), так и не подписались, ещё не напоминали.
+async function instaCommentEventsToRemind() {
+  const pool = await getPool();
+  await ensureInsta();
+  return (await pool.request().query(`
+    SELECT comment_id, acc, igsid, media_id, CAST(listing_id AS NVARCHAR(20)) AS listing_id FROM dbo.insta_comment_events
+    WHERE status = 'need_follow' AND reminded IS NULL AND igsid IS NOT NULL
+      AND tap_at BETWEEN DATEADD(hour, -23, SYSUTCDATETIME()) AND DATEADD(hour, -20, SYSUTCDATETIME())`)).recordset;
+}
+async function instaCommentEventReminded(commentId) {
+  const pool = await getPool();
+  await ensureInsta();
+  await pool.request().input("cid", sql.NVarChar(40), String(commentId)).query("UPDATE dbo.insta_comment_events SET reminded = 1 WHERE comment_id = @cid");
+}
+// Похожие квартиры рядом из наших опубликованных постов (живые объявления):
+// ближе всего и с тем же числом комнат ±1 — первыми.
+async function instaSimilarPosts(acc, listingId, n) {
+  const pool = await getPool();
+  await ensureInsta();
+  const base = await instaListing(listingId);
+  if (!base || base.lat == null || base.lon == null) return [];
+  const rows = (await pool.request().input("acc", sql.NVarChar(20), acc).input("lid", sql.BigInt, Number(listingId))
+    .input("lat", sql.Float, base.lat).input("lon", sql.Float, base.lon).input("rooms", sql.Int, base.rooms || null).input("n", sql.Int, Math.min(5, Number(n) || 3)).query(`
+    SELECT TOP (@n) p.post_id, p.permalink, c.id, c.rooms, c.area, c.price, c.addr, d.km
+    FROM dbo.insta_posts p
+    JOIN dbo.krisha_list c ON c.id = p.listing_id
+    CROSS APPLY (SELECT SQRT(POWER((c.lat - @lat) * 111.0, 2) + POWER((c.lon - @lon) * 111.0 * COS(RADIANS(@lat)), 2)) AS km) d
+    WHERE p.acc = @acc AND p.status = 'published' AND p.permalink IS NOT NULL AND p.listing_id <> @lid
+      AND p.created_at >= DATEADD(day, -60, SYSUTCDATETIME()) AND c.storage = 'live' AND c.lat IS NOT NULL
+    ORDER BY CASE WHEN @rooms IS NULL OR ABS(ISNULL(c.rooms, 0) - @rooms) <= 1 THEN 0 ELSE 1 END, d.km`)).recordset;
+  return rows.map((r) => ({ code: r.post_id, permalink: r.permalink, id: String(r.id), rooms: r.rooms, area: r.area == null ? null : Number(r.area),
+    price: Number(r.price), addr: r.addr, km: Number(r.km) }));
 }
 async function instaCommentEventStats(acc) {
   const pool = await getPool();
@@ -4812,7 +4856,7 @@ async function objectStats() {
   return r.recordset[0];
 }
 
-module.exports = { instaHookLogAdd, instaCommentEventGet, instaCommentEventIgsid, instaCommentEventAsked, instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
+module.exports = { instaCommentEventNeedFollow, instaCommentEventsToRemind, instaCommentEventReminded, instaSimilarPosts, instaHookLogAdd, instaCommentEventGet, instaCommentEventIgsid, instaCommentEventAsked, instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,

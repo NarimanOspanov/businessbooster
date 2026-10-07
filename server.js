@@ -5352,6 +5352,8 @@ async function instaMortgageSweep() {
 if (process.env.WEBSITE_SITE_NAME || process.env.INSTA_AUTO === "1") {
   setTimeout(() => instaTick().catch((e) => console.log("[insta] tick: " + e.message)), 120e3).unref();
   setInterval(() => instaTick().catch((e) => console.log("[insta] tick: " + e.message)), 10 * 60e3).unref();
+  // Напоминания «номер ждёт» тем, кто нажал кнопку, но не подписался.
+  setInterval(() => instaHookRemind().catch((e) => console.log("[insta-hook] remind: " + e.message)), 10 * 60e3).unref();
   setTimeout(() => instaMortgageSweep().catch((e) => console.log("[insta] mortgage: " + e.message)), 60e3).unref();
   setInterval(() => instaMortgageSweep().catch((e) => console.log("[insta] mortgage: " + e.message)), 3 * 3600e3).unref();
 }
@@ -5503,6 +5505,13 @@ async function instaHookMessage(e, m, accs, cfg, verified) {
   if (!cfg.reply || !verified) return;
   const igsid = String(m.sender.id);
   const payload = (msg.quick_reply && msg.quick_reply.payload) || "";
+  // «Ещё квартиры рядом» после номера.
+  if (/^MORE:/.test(payload)) {
+    const ev0 = await db.instaCommentEventGet(payload.slice(5));
+    const acct0 = ev0 && accs.find((x) => x.acc === ev0.acc);
+    if (ev0 && acct0 && acct0.token) await instaHookMore(acct0, igsid, ev0);
+    return;
+  }
   let cid = /^PHONE:/.test(payload) ? payload.slice(6) : null;
   // Нажатие может прийти без метки кнопки — просто текстом «Получить номер»;
   // так же засчитываем «номер», «+», «плюс» — берём его последний «+».
@@ -5521,6 +5530,7 @@ async function instaHookMessage(e, m, accs, cfg, verified) {
     await INSTA.sendMessage(acct.ig_user_id, acct.token, igsid,
       "Пока не видим подписки 🙂 Чтобы получить номер, подпишитесь на @" + handle + " (нажмите на имя → «Подписаться») и вернитесь сюда 👇",
       "PHONE:" + cid, "Я подписался ✅");
+    await db.instaCommentEventNeedFollow(cid).catch(() => {});
     return;
   }
   const f = await db.instaListing(ev.listing_id);
@@ -5528,13 +5538,50 @@ async function instaHookMessage(e, m, accs, cfg, verified) {
   const post = ev.media_id ? await db.instaPostByMedia(ev.media_id).catch(() => null) : null;
   const text = f && phones.length ? instaPhoneText(f, phones, post && post.post_id)
     : "По этой квартире номер сейчас недоступен 😔 Посмотрите другие предложения в нашем профиле — новые квартиры от хозяев каждый день.";
-  await INSTA.sendMessage(acct.ig_user_id, acct.token, igsid, text);
+  // После номера — кнопка «Ещё квартиры рядом» (похожие из наших постов).
+  await INSTA.sendMessage(acct.ig_user_id, acct.token, igsid, text, "MORE:" + cid, "Ещё квартиры рядом");
   // Повторное нажатие после ответа — номер ещё раз, но в журнале один раз.
   if (ev.status !== "replied") {
     await db.instaDmAdd({ acc: acct.acc, username: ev.username, listingId: ev.listing_id, mediaId: ev.media_id, found: !!(f && phones.length) }).catch(() => {});
     await db.instaCommentEventSet(cid, "replied", null, ev.listing_id);
   }
   console.log("[insta-hook] номер квартиры " + ev.listing_id + " → @" + ev.username);
+}
+
+// До 3 похожих квартир рядом из наших постов: номер поста, параметры,
+// расстояние и ссылка. Номер по ним — тем же «+» под постом.
+async function instaHookMore(acct, igsid, ev) {
+  const handle = (INSTA.ACCOUNTS[acct.acc] || {}).handle || acct.username;
+  const list = await db.instaSimilarPosts(acct.acc, ev.listing_id, 3).catch(() => []);
+  if (!list.length) {
+    await INSTA.sendMessage(acct.ig_user_id, acct.token, igsid, "Рядом пока ничего нового нет 🙂 Все квартиры от хозяев — в профиле @" + handle + ", новые каждый день.");
+    return;
+  }
+  const dist = (km) => km < 1 ? Math.max(50, Math.round(km * 1000 / 50) * 50) + " м" : String(Math.round(km * 10) / 10).replace(".", ",") + " км";
+  const text = "Ещё квартиры от хозяев рядом:\n\n" + list.map((x) => "🏠 Пост № " + x.code + " · " + instaFlatLine(x) + " · " + dist(x.km) + "\n" + x.permalink).join("\n\n") +
+    "\n\nЧтобы получить номер, поставьте «+» под постом.";
+  await INSTA.sendMessage(acct.ig_user_id, acct.token, igsid, text);
+}
+
+// Напоминание раз в сутки: нажал «Получить номер», но не подписался —
+// через ~20 ч (пока Instagram разрешает писать) напомнить, что номер ждёт.
+async function instaHookRemind() {
+  const cfg = await instaHookCfg();
+  if (!cfg.reply) return;
+  const accs = await db.instaAccounts();
+  for (const ev of await db.instaCommentEventsToRemind()) {
+    const acct = accs.find((x) => x.acc === ev.acc);
+    if (!acct || !acct.token) continue;
+    await db.instaCommentEventReminded(ev.comment_id);
+    try {
+      const handle = (INSTA.ACCOUNTS[acct.acc] || {}).handle || acct.username;
+      const post = ev.media_id ? await db.instaPostByMedia(ev.media_id).catch(() => null) : null;
+      const f = await db.instaListing(ev.listing_id).catch(() => null);
+      await INSTA.sendMessage(acct.ig_user_id, acct.token, ev.igsid,
+        "Номер хозяина ждёт вас 🙂" + (f ? "\n🏠 " + (post ? "Пост № " + post.post_id + ": " : "") + instaFlatLine(f) : "") +
+        "\n\nПодпишитесь на @" + handle + " и нажмите кнопку 👇", "PHONE:" + ev.comment_id, "Я подписался ✅");
+    } catch (err) { console.log("[insta-hook] напоминание " + ev.comment_id + ": " + err.message); }
+  }
 }
 
 async function instaFindPlus(acc, username) {
