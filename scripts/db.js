@@ -3346,6 +3346,9 @@ BEGIN
   );
   CREATE INDEX IX_ice_at ON dbo.insta_comment_events (at DESC);
 END
+-- igsid — id автора комментария в переписке с нами (из ответа на приватный
+-- ответ): по нему нажатие «Получить номер» связываем с комментарием.
+IF COL_LENGTH('dbo.insta_comment_events', 'igsid') IS NULL ALTER TABLE dbo.insta_comment_events ADD igsid NVARCHAR(40) NULL;
 -- Настройки, которые правят со страниц (промпты и т. п.): ключ → значение.
 IF OBJECT_ID('dbo.app_config', 'U') IS NULL
   CREATE TABLE dbo.app_config (
@@ -3851,6 +3854,26 @@ async function instaCommentEventSet(commentId, status, note, listingId) {
   await pool.request().input("cid", sql.NVarChar(40), String(commentId)).input("st", sql.NVarChar(16), status)
     .input("n", sql.NVarChar(300), note ? String(note).slice(0, 300) : null).input("lid", sql.BigInt, listingId ? Number(listingId) : null)
     .query("UPDATE dbo.insta_comment_events SET status = @st, note = @n, listing_id = COALESCE(@lid, listing_id) WHERE comment_id = @cid");
+}
+async function instaCommentEventGet(commentId) {
+  const pool = await getPool();
+  await ensureInsta();
+  return (await pool.request().input("cid", sql.NVarChar(40), String(commentId)).query(
+    "SELECT comment_id, acc, media_id, username, CAST(listing_id AS NVARCHAR(20)) AS listing_id, status, igsid FROM dbo.insta_comment_events WHERE comment_id = @cid")).recordset[0] || null;
+}
+async function instaCommentEventIgsid(commentId, igsid) {
+  const pool = await getPool();
+  await ensureInsta();
+  await pool.request().input("cid", sql.NVarChar(40), String(commentId)).input("g", sql.NVarChar(40), String(igsid))
+    .query("UPDATE dbo.insta_comment_events SET igsid = @g WHERE comment_id = @cid");
+}
+// Последний комментарий человека, по которому ждём нажатия «Получить номер»
+// (если он написал текстом, а не нажал кнопку).
+async function instaCommentEventAsked(igsid) {
+  const pool = await getPool();
+  await ensureInsta();
+  return (await pool.request().input("g", sql.NVarChar(40), String(igsid)).query(
+    "SELECT TOP 1 comment_id FROM dbo.insta_comment_events WHERE igsid = @g AND status = 'asked' ORDER BY at DESC")).recordset[0] || null;
 }
 async function instaCommentEventStats(acc) {
   const pool = await getPool();
@@ -4774,7 +4797,7 @@ async function objectStats() {
   return r.recordset[0];
 }
 
-module.exports = { instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
+module.exports = { instaCommentEventGet, instaCommentEventIgsid, instaCommentEventAsked, instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,

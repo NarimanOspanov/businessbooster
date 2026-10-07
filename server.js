@@ -5405,8 +5405,9 @@ if (process.env.WEBSITE_SITE_NAME) {
 // Instagram сам присылает событие о каждом комментарии: текст, автор, id
 // комментария и id поста. По id поста (insta_posts.media_id) знаем квартиру
 // точно — не нужно искать «+» человека по последним постам, как через ManyChat.
-// Отвечаем приватным ответом на комментарий (сообщение в директ) и публично
-// «Отправили в директ 📩». Отвечать или только записывать — app_config
+// На «+» — приватный ответ с кнопкой «Получить номер» и публично «Отправили в
+// директ 📩»; по нажатию проверяем подписку на аккаунт и шлём номер хозяина
+// (как было в ManyChat). Отвечать или только записывать — app_config
 // insta.webhook_reply ("1" — отвечать); пока ответы шлёт ManyChat, держите
 // выключенным, иначе человек получит два сообщения.
 
@@ -5439,38 +5440,87 @@ async function instaWebhook(raw, sig) {
   try { j = JSON.parse(raw.toString("utf8")); } catch { return; }
   const accs = await db.instaAccounts();
   for (const e of j.entry || []) {
+    // Комментарии под постами.
     for (const ch of e.changes || []) {
       if (ch.field !== "comments") continue;
-      const v = ch.value || {};
-      const cid = v.id, mediaId = v.media && v.media.id, uname = v.from && v.from.username, text = String(v.text || "");
-      if (!cid) continue;
-      const post = mediaId ? await db.instaPostByMedia(mediaId).catch(() => null) : null;
-      const acct = post ? accs.find((x) => x.acc === post.acc) : accs.find((x) => String(x.ig_user_id) === String(e.id));
-      if (!acct) continue;
-      // Свои ответы («Отправили в директ») не обрабатываем.
-      if (uname && acct.username && String(uname).toLowerCase() === String(acct.username).toLowerCase()) continue;
-      const fresh = await db.instaCommentEventAdd({ commentId: cid, acc: acct.acc, mediaId: mediaId, username: uname, text: text, status: "seen" }).catch(() => false);
-      if (!fresh) continue; // повтор события — уже обработали
-      if (!INSTA.isPlus(text)) { await db.instaCommentEventSet(cid, "skipped", "не «+»").catch(() => {}); continue; }
-      if (!post) { await db.instaCommentEventSet(cid, "skipped", "пост не из нашей базы").catch(() => {}); continue; }
-      if (!cfg.reply) continue; // только записываем — отвечает ManyChat
-      if (!verified) { await db.instaCommentEventSet(cid, "skipped", "не задан секрет приложения — без проверки подписи не отвечаем").catch(() => {}); continue; }
-      try {
-        const f = await db.instaListing(post.listing_id);
-        const phones = String((f && f.phones) || "").split(",").map((x) => x.trim()).filter(Boolean);
-        const msg = f && phones.length ? instaPhoneText(f, phones)
-          : "По этой квартире номер сейчас недоступен 😔 Посмотрите другие предложения в нашем профиле — новые квартиры от хозяев каждый день.";
-        await INSTA.privateReply(acct.ig_user_id, acct.token, cid, msg);
-        await INSTA.replyComment(cid, acct.token, "Отправили в директ 📩").catch((err) => console.log("[insta-hook] public reply: " + err.message));
-        await db.instaDmAdd({ acc: acct.acc, username: uname, listingId: post.listing_id, mediaId: mediaId, found: !!(f && phones.length) }).catch(() => {});
-        await db.instaCommentEventSet(cid, "replied", null, post.listing_id);
-        console.log("[insta-hook] «+» от " + uname + " под постом " + mediaId + " → номер квартиры " + post.listing_id);
-      } catch (err) {
-        await db.instaCommentEventSet(cid, "error", err.message, post.listing_id).catch(() => {});
-        console.log("[insta-hook] ответ " + cid + ": " + err.message);
-      }
+      await instaHookComment(e, ch.value || {}, accs, cfg, verified).catch((err) => console.log("[insta-hook] comment: " + err.message));
+    }
+    // Сообщения в директ: нажатие «Получить номер» (или «+»/«номер» текстом).
+    for (const m of e.messaging || []) {
+      await instaHookMessage(e, m, accs, cfg, verified).catch((err) => console.log("[insta-hook] message: " + err.message));
     }
   }
+}
+
+// «+» под постом → приватный ответ с кнопкой «Получить номер». Номер — после
+// нажатия и проверки подписки (instaHookMessage), как было в ManyChat.
+async function instaHookComment(e, v, accs, cfg, verified) {
+  const cid = v.id, mediaId = v.media && v.media.id, uname = v.from && v.from.username, text = String(v.text || "");
+  if (!cid) return;
+  const post = mediaId ? await db.instaPostByMedia(mediaId).catch(() => null) : null;
+  const acct = post ? accs.find((x) => x.acc === post.acc) : accs.find((x) => String(x.ig_user_id) === String(e.id));
+  if (!acct) return;
+  // Свои ответы («Отправили в директ») не обрабатываем.
+  if (uname && acct.username && String(uname).toLowerCase() === String(acct.username).toLowerCase()) return;
+  const fresh = await db.instaCommentEventAdd({ commentId: cid, acc: acct.acc, mediaId: mediaId, username: uname, text: text, status: "seen" }).catch(() => false);
+  if (!fresh) return; // повтор события — уже обработали
+  if (!INSTA.isPlus(text)) { await db.instaCommentEventSet(cid, "skipped", "не «+»").catch(() => {}); return; }
+  if (!post) { await db.instaCommentEventSet(cid, "skipped", "пост не из нашей базы").catch(() => {}); return; }
+  if (!cfg.reply) return; // только записываем — отвечает ManyChat
+  if (!verified) { await db.instaCommentEventSet(cid, "skipped", "не задан секрет приложения — без проверки подписи не отвечаем").catch(() => {}); return; }
+  try {
+    const handle = (INSTA.ACCOUNTS[acct.acc] || {}).handle || acct.username;
+    // Кнопку в приватном ответе Instagram может не принять — тогда без неё:
+    // человек ответит словом «номер», это тоже засчитывается как нажатие.
+    const r = await INSTA.privateReply(acct.ig_user_id, acct.token, cid,
+      "Чтобы получить номер хозяина, подпишитесь на @" + handle + " и нажмите кнопку 👇", "PHONE:" + cid)
+      .catch((err) => { console.log("[insta-hook] кнопка не прошла: " + err.message);
+        return INSTA.privateReply(acct.ig_user_id, acct.token, cid, "Чтобы получить номер хозяина, подпишитесь на @" + handle + " и ответьте на это сообщение словом «номер»."); });
+    if (r.recipient_id) await db.instaCommentEventIgsid(cid, r.recipient_id);
+    await INSTA.replyComment(cid, acct.token, "Отправили в директ 📩").catch((err) => console.log("[insta-hook] public reply: " + err.message));
+    await db.instaCommentEventSet(cid, "asked", null, post.listing_id);
+  } catch (err) {
+    await db.instaCommentEventSet(cid, "error", err.message, post.listing_id).catch(() => {});
+    console.log("[insta-hook] ответ " + cid + ": " + err.message);
+  }
+}
+
+// Нажатие «Получить номер»: проверяем подписку; подписан — номер квартиры
+// того поста, под которым был «+»; нет — просим подписаться и нажать ещё раз.
+async function instaHookMessage(e, m, accs, cfg, verified) {
+  const msg = m.message || {};
+  if (!m.sender || !msg || msg.is_echo) return; // свои же сообщения
+  if (!cfg.reply || !verified) return;
+  const igsid = String(m.sender.id);
+  const payload = (msg.quick_reply && msg.quick_reply.payload) || "";
+  let cid = /^PHONE:/.test(payload) ? payload.slice(6) : null;
+  // Написал текстом «+» / «номер» вместо кнопки — берём его последний «+».
+  if (!cid && /^\s*(\+|➕|плюс|номер)/i.test(String(msg.text || ""))) cid = ((await db.instaCommentEventAsked(igsid)) || {}).comment_id || null;
+  if (!cid) return;
+  const ev = await db.instaCommentEventGet(cid);
+  if (!ev || !ev.listing_id) return;
+  const acct = accs.find((x) => x.acc === ev.acc);
+  if (!acct || !acct.token) return;
+  const handle = (INSTA.ACCOUNTS[acct.acc] || {}).handle || acct.username;
+  let follows = false;
+  try { follows = (await INSTA.userFollows(igsid, acct.token)).follows; }
+  catch (err) { console.log("[insta-hook] подписка " + igsid + ": " + err.message); }
+  if (!follows) {
+    await INSTA.sendMessage(acct.ig_user_id, acct.token, igsid,
+      "Похоже, вы ещё не подписаны на @" + handle + " 🙂 Подпишитесь и нажмите кнопку ещё раз 👇", "PHONE:" + cid);
+    return;
+  }
+  const f = await db.instaListing(ev.listing_id);
+  const phones = String((f && f.phones) || "").split(",").map((x) => x.trim()).filter(Boolean);
+  const text = f && phones.length ? instaPhoneText(f, phones)
+    : "По этой квартире номер сейчас недоступен 😔 Посмотрите другие предложения в нашем профиле — новые квартиры от хозяев каждый день.";
+  await INSTA.sendMessage(acct.ig_user_id, acct.token, igsid, text);
+  // Повторное нажатие после ответа — номер ещё раз, но в журнале один раз.
+  if (ev.status !== "replied") {
+    await db.instaDmAdd({ acc: acct.acc, username: ev.username, listingId: ev.listing_id, mediaId: ev.media_id, found: !!(f && phones.length) }).catch(() => {});
+    await db.instaCommentEventSet(cid, "replied", null, ev.listing_id);
+  }
+  console.log("[insta-hook] номер квартиры " + ev.listing_id + " → @" + ev.username);
 }
 
 async function instaFindPlus(acc, username) {
