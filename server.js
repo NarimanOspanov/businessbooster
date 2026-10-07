@@ -5083,6 +5083,12 @@ async function instaOwnCode(acc, id) {
 async function instaOwnPolish(f) {
   return (f.data || {}).polish === false ? { enabled: false } : instaPolish();
 }
+// Карусель своего объявления: шаблоном (обложка, факты, карта, призыв) или,
+// если в форме отмечено «без шаблона» (data.raw), — только фото как есть.
+async function instaOwnRender(f, acc) {
+  if ((f.data || {}).raw) return INSTA.rawSlides(f.photos);
+  return INSTA.renderCarousel(f, acc, { polish: await instaOwnPolish(f) });
+}
 async function instaOwnSlides(acc, id) {
   const hit = instaOwnPreview.get(String(id));
   if (hit && Date.now() - hit.at < 1800e3) return hit.slides;
@@ -5090,7 +5096,7 @@ async function instaOwnSlides(acc, id) {
   if (!f) throw new Error("объявление не найдено");
   if (!f.photos.length) throw new Error("нет фото");
   const c = await instaOwnCode(acc, id);
-  const slides = await INSTA.renderCarousel(Object.assign({}, f, { code: c.code }), acc, { polish: await instaOwnPolish(f) });
+  const slides = await instaOwnRender(Object.assign({}, f, { code: c.code }), acc);
   instaOwnPreview.set(String(id), { at: Date.now(), slides: slides });
   if (instaOwnPreview.size > 20) instaOwnPreview.delete(instaOwnPreview.keys().next().value);
   return slides;
@@ -5115,7 +5121,7 @@ async function instaOwnPublish(acc, id, caption) {
     const cap = String(caption || "").trim() || INSTA.caption(fc, acc);
     try {
       const hit = instaOwnPreview.get(String(id));
-      const slides = hit && Date.now() - hit.at < 1800e3 && c.reserved ? hit.slides : await INSTA.renderCarousel(fc, acc, { polish: await instaOwnPolish(f) });
+      const slides = hit && Date.now() - hit.at < 1800e3 && c.reserved ? hit.slides : await instaOwnRender(fc, acc);
       const tok = crypto.randomBytes(12).toString("hex");
       instaImgs.set(tok, { at: Date.now(), slides: slides });
       try {
@@ -9032,7 +9038,7 @@ http
                 const data = {
                   rooms: num(d.rooms), area: num(d.area), floor: num(d.floor), floors: num(d.floors), price: num(d.price),
                   addr: String(d.addr || "").trim().slice(0, 160), complex: String(d.complex || "").trim().slice(0, 80) || null,
-                  isNew: !!d.isNew, mortgage: !!d.mortgage, polish: d.polish !== false, desc: String(d.desc || "").slice(0, 4000),
+                  isNew: !!d.isNew, mortgage: !!d.mortgage, polish: d.polish !== false, raw: !!d.raw, desc: String(d.desc || "").slice(0, 4000),
                   facts: String(d.facts || "").split(/\r?\n/).map((x) => x.trim()).filter(Boolean).slice(0, 10),
                   points: String(d.points || "").split(/\r?\n/).map((x) => x.trim()).filter(Boolean).slice(0, 4),
                   extra: String(d.extra || "").slice(0, 600),

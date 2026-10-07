@@ -313,6 +313,14 @@ async function renderCarousel(f, acc, opts) {
   return slides;
 }
 
+// Фото без шаблона (свои объявления, «как есть»): только обрезка по центру до
+// 4:5 — Instagram не принимает в карусель кадры уже 4:5 (обычные 3:4 с
+// телефона), — без надписей, плашек, карты и последнего слайда. До 10 фото.
+function rawSlides(buffers) {
+  return (buffers || []).slice(0, 10).map((b) => toJpeg(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  <image href="${dataUri(b)}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/></svg>`));
+}
+
 // Только обложка — для превью в списке кандидатов: одно фото вместо восьми.
 async function renderCover(f, acc) {
   for (const u of (f.photos || []).slice(0, 4)) {
@@ -461,4 +469,4 @@ async function findByCaption(userId, token, mark) {
 }
 const isPlus = (t) => /^\s*(\+|➕|плюс)/i.test(String(t || ""));
 
-module.exports = { findByCaption, ACCOUNTS, renderCarousel, renderCover, caption, hook, cleanAddr, publishCarousel, me, refreshToken, comments, isPlus, coverSvg, photoSvg, ctaSvg, toJpeg };
+module.exports = { findByCaption, ACCOUNTS, renderCarousel, renderCover, caption, hook, cleanAddr, publishCarousel, me, refreshToken, comments, isPlus, coverSvg, photoSvg, ctaSvg, toJpeg, rawSlides };
