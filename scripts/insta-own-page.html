@@ -27,6 +27,10 @@
   .f2{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
   .thumbs{display:flex;flex-wrap:wrap;gap:6px} .thumbs img{width:84px;height:84px;object-fit:cover;border-radius:6px;border:1px solid var(--line)}
   .thumbs .first{outline:2px solid var(--ig)}
+  .th{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:grab}
+  .thb{display:flex;gap:2px} .thb button{background:#0d1117;border:1px solid var(--line);color:var(--ink);border-radius:5px;padding:1px 7px;cursor:pointer;font-size:12px}
+  .thb button:disabled{opacity:.3;cursor:default}
+  .thc{position:absolute;top:2px;left:2px;background:var(--ig);color:#fff;font-size:10px;padding:0 5px;border-radius:4px}
   .igpost{background:#000;color:#f5f5f5;width:min(440px,100%);border-radius:12px;border:1px solid #262626}
   .igimg{position:relative;aspect-ratio:4/5;background:#111} .igimg img{width:100%;height:100%;object-fit:cover;display:block}
   .igload{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:13px;text-align:center;padding:20px}
@@ -69,7 +73,7 @@
       <label style="grid-column:1/-1">Почему стоит посмотреть — до 3 строк (пусто — возьмём из описания)<textarea id="f_points"></textarea></label>
       <label style="grid-column:1/-1">Дополнительно в подпись (условия сделки и т. п.)<textarea id="f_extra" placeholder="🏦 Квартира сейчас в ипотеке — остаток хозяин закрывает при покупке.&#10;⏳ Срочная продажа"></textarea></label>
     </div>
-    <h2>Фото <span class="mut" style="font-size:13px;font-weight:400">— первое станет обложкой; новые фото заменят старые</span></h2>
+    <h2>Фото <span class="mut" style="font-size:13px;font-weight:400">— первое станет обложкой; порядок — стрелками или перетаскиванием, ✕ — убрать; новые добавляются в конец</span></h2>
     <input type="file" id="f_files" accept="image/*" multiple>
     <div class="thumbs" id="f_thumbs" style="margin-top:8px"></div>
     <div class="row" style="margin-top:14px"><button class="btn" id="f_save">Сохранить</button><span id="f_st" class="mut"></span></div>
@@ -143,18 +147,43 @@ function openForm(x){
   $("#f_phones").value = x ? x.phones : ""; $("#f_new").checked = !!d.isNew; $("#f_mortgage").checked = !!d.mortgage; $("#f_polish").checked = d.polish !== false; $("#f_raw").checked = !!d.raw; $("#f_polish").disabled = !!d.raw;
   $("#f_desc").value = d.desc || ""; $("#f_facts").value = (d.facts || []).join("\n"); $("#f_points").value = (d.points || []).join("\n"); $("#f_extra").value = d.extra || "";
   $("#f_files").value = ""; $("#f_st").textContent = "";
-  var th = "";
-  if (x) for (var i = 0; i < x.photos; i++) th += "<img class='"+(i===0?"first":"")+"' src='"+base()+"&photo="+i+"&id="+x.id+"'>";
-  $("#f_thumbs").innerHTML = th;
+  // Фото формы: уже загруженные ({from: n}) и новые ({file}) — в том порядке,
+  // в каком пойдут в пост. Первое — обложка.
+  FILES = [];
+  if (x) for (var i = 0; i < x.photos; i++) FILES.push({ from: i, src: base() + "&photo=" + i + "&id=" + x.id });
+  FILES.changed = false;
+  drawThumbs();
   $("#mf").classList.add("on");
 }
 $("#new").onclick = function(){ openForm(null); };
 // «Как есть» — значит и без обработки фото.
 $("#f_raw").onchange = function(){ $("#f_polish").disabled = this.checked; };
 $("#f_files").onchange = function(){
-  FILES = Array.prototype.slice.call(this.files || []);
-  $("#f_thumbs").innerHTML = FILES.map(function(f, i){ return "<img class='"+(i===0?"first":"")+"' src='"+URL.createObjectURL(f)+"'>"; }).join("");
+  Array.prototype.slice.call(this.files || []).forEach(function(f){ FILES.push({ file: f, src: URL.createObjectURL(f) }); });
+  FILES.changed = true; this.value = ""; drawThumbs();
 };
+function moveFile(i, to){
+  if (to < 0 || to >= FILES.length) return;
+  var it = FILES.splice(i, 1)[0]; FILES.splice(to, 0, it); FILES.changed = true; drawThumbs();
+}
+// Миниатюры со стрелками и ✕; на компьютере можно ещё перетаскивать мышью.
+function drawThumbs(){
+  $("#f_thumbs").innerHTML = FILES.map(function(p, i){
+    return "<div class='th' draggable='true' data-i='"+i+"'><img class='"+(i===0?"first":"")+"' src='"+p.src+"'>"+
+      "<div class='thb'><button type='button' data-mv='"+i+"' data-to='"+(i-1)+"'"+(i===0?" disabled":"")+">◀</button>"+
+      "<button type='button' data-del='"+i+"'>✕</button>"+
+      "<button type='button' data-mv='"+i+"' data-to='"+(i+1)+"'"+(i===FILES.length-1?" disabled":"")+">▶</button></div>"+
+      (i===0?"<div class='thc'>обложка</div>":"")+"</div>";
+  }).join("") || "<span class='mut'>нет фото</span>";
+  document.querySelectorAll("[data-mv]").forEach(function(b){ b.onclick = function(){ moveFile(+b.getAttribute("data-mv"), +b.getAttribute("data-to")); }; });
+  document.querySelectorAll("[data-del]").forEach(function(b){ b.onclick = function(){ FILES.splice(+b.getAttribute("data-del"), 1); FILES.changed = true; drawThumbs(); }; });
+  var drag = null;
+  document.querySelectorAll("#f_thumbs .th").forEach(function(el){
+    el.ondragstart = function(){ drag = +el.getAttribute("data-i"); };
+    el.ondragover = function(e){ e.preventDefault(); };
+    el.ondrop = function(e){ e.preventDefault(); if (drag != null) moveFile(drag, +el.getAttribute("data-i")); drag = null; };
+  });
+}
 // Фото уменьшаем в браузере до 1600 px по длинной стороне и в JPEG — так
 // они проходят одним запросом и не раздувают базу.
 function toJpeg(file){
@@ -180,18 +209,23 @@ $("#f_save").onclick = function(){
     if (!j.ok) throw new Error(j.error);
     var id = j.id;
     if (j.points && !$("#f_points").value.trim()) $("#f_points").value = j.points.join("\n");
-    if (!FILES.length) return id;
-    return post({ action: "photos_clear", acc: acc, id: id }).then(function(){
-      var chain = Promise.resolve();
-      FILES.forEach(function(f, i){
-        chain = chain.then(function(){ $("#f_st").textContent = "загружаю фото " + (i + 1) + " из " + FILES.length + "…"; return toJpeg(f); })
+    if (!FILES.changed) return id;
+    // Сначала сервер расставляет уже загруженные фото по новым местам (и
+    // убирает удалённые), потом догружаем новые на их места.
+    var items = FILES.map(function(p){ return { from: p.from == null ? null : p.from }; });
+    return post({ action: "photos_arrange", acc: acc, id: id, items: items }).then(function(r){
+      if (!r.ok) throw new Error(r.error);
+      var chain = Promise.resolve(), news = FILES.filter(function(p){ return p.file; }).length, k = 0;
+      FILES.forEach(function(p, i){
+        if (!p.file) return;
+        chain = chain.then(function(){ k++; $("#f_st").textContent = "загружаю фото " + k + " из " + news + "…"; return toJpeg(p.file); })
           .then(function(data){ return post({ action: "photo", acc: acc, id: id, n: i, data: data }); })
           .then(function(r){ if (!r.ok) throw new Error(r.error); });
       });
       return chain.then(function(){ return id; });
     });
   }).then(function(){
-    $("#f_st").innerHTML = "<span class='ok'>сохранено</span>"; btn.disabled = false; FILES = [];
+    $("#f_st").innerHTML = "<span class='ok'>сохранено</span>"; btn.disabled = false; FILES.changed = false;
     setTimeout(function(){ $("#mf").classList.remove("on"); load(); }, 500);
   }).catch(function(e){ $("#f_st").innerHTML = "<span class='bad'>" + esc(e.message) + "</span>"; btn.disabled = false; });
 };

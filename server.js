@@ -9071,6 +9071,20 @@ http
                 const pts = await require("./scripts/card-facts.js").fromDescription((f.data || {}).desc || "");
                 return send(200, { ok: true, points: pts });
               }
+              // Новый порядок фото: items[i].from — какое из уже загруженных (по
+              // порядку, с 0) встаёт на место i; null — место под новое фото,
+              // его догрузят следом действием photo. Не попавшие в список — удалены.
+              if (b.action === "photos_arrange") {
+                const old = await db.instaManualPhotos(b.id);
+                const items = Array.isArray(b.items) ? b.items.slice(0, 20) : [];
+                await db.instaManualPhotosClear(b.id);
+                for (let i = 0; i < items.length; i++) {
+                  const from = items[i] && items[i].from;
+                  if (from != null && old[from]) await db.instaManualPhotoSet(b.id, i, old[from]);
+                }
+                instaOwnPreview.delete(String(b.id));
+                return send(200, { ok: true });
+              }
               if (b.action === "photos_clear") { await db.instaManualPhotosClear(b.id); instaOwnPreview.delete(String(b.id)); return send(200, { ok: true }); }
               if (b.action === "photo") {
                 const buf = Buffer.from(String(b.data || "").replace(/^data:image\/\w+;base64,/, ""), "base64");
