@@ -3319,6 +3319,15 @@ IF OBJECT_ID('dbo.insta_manual', 'U') IS NULL
     data       NVARCHAR(MAX) NOT NULL,
     created_at DATETIME2(0)  NOT NULL CONSTRAINT DF_imanual_at DEFAULT SYSUTCDATETIME()
   );
+-- Фото ручных объявлений — в базе, а не на диске: их видят и прод, и
+-- локальный сервер. n — порядок в карусели, 0 — обложка.
+IF OBJECT_ID('dbo.insta_manual_photos', 'U') IS NULL
+  CREATE TABLE dbo.insta_manual_photos (
+    listing_id BIGINT         NOT NULL,
+    n          INT            NOT NULL,
+    img        VARBINARY(MAX) NOT NULL,
+    CONSTRAINT PK_imanual_photos PRIMARY KEY (listing_id, n)
+  );
 -- Настройки, которые правят со страниц (промпты и т. п.): ключ → значение.
 IF OBJECT_ID('dbo.app_config', 'U') IS NULL
   CREATE TABLE dbo.app_config (
@@ -3584,7 +3593,7 @@ async function instaManualListing(id) {
   return { id: String(r.id), city: r.acc, rooms: d.rooms || null, area: d.area || null, floor: d.floor || null, floors: d.floors || null,
     price: Number(d.price) || 0, addr: d.addr || null, isNew: !!d.isNew, phones: r.phones, storage: "live",
     lat: d.lat == null ? null : Number(d.lat), lon: d.lon == null ? null : Number(d.lon),
-    below: null, oldPrice: null, mortgage: !!d.mortgage, programs: d.programs || [], quote: d.quote || null, photos: [], manual: true };
+    below: null, oldPrice: null, mortgage: !!d.mortgage, programs: d.programs || [], quote: d.quote || null, photos: [], manual: true, data: d };
 }
 async function instaManualAdd(acc, phones, data) {
   const pool = await getPool();
@@ -3592,6 +3601,50 @@ async function instaManualAdd(acc, phones, data) {
   const r = await pool.request().input("acc", sql.NVarChar(20), acc).input("ph", sql.NVarChar(300), phones).input("d", sql.NVarChar(sql.MAX), JSON.stringify(data))
     .query("INSERT INTO dbo.insta_manual (acc, phones, data) OUTPUT INSERTED.id VALUES (@acc, @ph, @d)");
   return String(r.recordset[0].id);
+}
+// Список ручных объявлений аккаунта для страницы «Свои объявления»: параметры,
+// номер хозяина, сколько фото и последний пост по объявлению.
+async function instaManualList(acc) {
+  const pool = await getPool();
+  await ensureInsta();
+  const rows = (await pool.request().input("acc", sql.NVarChar(20), acc).query(`
+    SELECT m.id, m.acc, m.phones, m.data, m.created_at,
+           (SELECT COUNT(*) FROM dbo.insta_manual_photos ph WHERE ph.listing_id = m.id) AS photos,
+           p.post_id, p.status, p.permalink, p.created_at AS post_at,
+           (SELECT COUNT(*) FROM dbo.insta_dms d WHERE d.media_id = p.media_id AND d.found = 1) AS dms
+    FROM dbo.insta_manual m
+    OUTER APPLY (SELECT TOP 1 post_id, status, permalink, created_at, media_id FROM dbo.insta_posts ip
+                 WHERE ip.listing_id = m.id AND ip.status <> 'failed' ORDER BY ip.created_at DESC) p
+    WHERE m.acc = @acc ORDER BY m.created_at DESC`)).recordset;
+  return rows.map((r) => { let d = {}; try { d = JSON.parse(r.data) || {}; } catch { /* пусто */ }
+    return { id: String(r.id), acc: r.acc, phones: r.phones, data: d, created_at: r.created_at, photos: r.photos,
+      post: r.post_id ? { code: r.post_id, status: r.status, permalink: r.permalink, at: r.post_at, dms: r.dms } : null }; });
+}
+async function instaManualUpdate(id, phones, data) {
+  const pool = await getPool();
+  await ensureInsta();
+  await pool.request().input("id", sql.BigInt, Number(id)).input("ph", sql.NVarChar(300), phones).input("d", sql.NVarChar(sql.MAX), JSON.stringify(data))
+    .query("UPDATE dbo.insta_manual SET phones = @ph, data = @d WHERE id = @id");
+}
+async function instaManualPhotosClear(id) {
+  const pool = await getPool();
+  await ensureInsta();
+  await pool.request().input("id", sql.BigInt, Number(id)).query("DELETE FROM dbo.insta_manual_photos WHERE listing_id = @id");
+}
+async function instaManualPhotoSet(id, n, buf) {
+  const pool = await getPool();
+  await ensureInsta();
+  await pool.request().input("id", sql.BigInt, Number(id)).input("n", sql.Int, Number(n)).input("img", sql.VarBinary(sql.MAX), buf)
+    .query(`UPDATE dbo.insta_manual_photos SET img = @img WHERE listing_id = @id AND n = @n;
+            IF @@ROWCOUNT = 0 INSERT INTO dbo.insta_manual_photos (listing_id, n, img) VALUES (@id, @n, @img);`);
+}
+// Фото по порядку (n); first — только обложка, для миниатюры в списке.
+async function instaManualPhotos(id, first) {
+  const pool = await getPool();
+  await ensureInsta();
+  const rows = (await pool.request().input("id", sql.BigInt, Number(id))
+    .query("SELECT " + (first ? "TOP 1 " : "") + "img FROM dbo.insta_manual_photos WHERE listing_id = @id ORDER BY n")).recordset;
+  return rows.map((r) => r.img);
 }
 // Посты, которые ждут ручной публикации (reason = 'manual', статус 'publishing').
 async function instaManualPending(acc) {
@@ -4673,7 +4726,7 @@ async function objectStats() {
   return r.recordset[0];
 }
 
-module.exports = { instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
+module.exports = { instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,

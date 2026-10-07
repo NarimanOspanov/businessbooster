@@ -155,4 +155,4 @@ async function cardFacts(id) {
   return { params: fromParams(card), price: price, desc: desc, text: text, pledged: !!card.pledged };
 }
 
-module.exports = { cardFacts, fromParams };
+module.exports = { cardFacts, fromParams, fromDescription };

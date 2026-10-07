@@ -1523,6 +1523,7 @@ load(); setInterval(load, 30000);
 // Сводка бота: люди, запросы, находки, открытия и выручка в звёздах.
 // Страница «Контент-завод Instagram» лежит отдельным файлом — так её проще править.
 const KRISHA_INSTA_HTML = fs.readFileSync(path.join(__dirname, "scripts", "insta-page.html"), "utf8");
+const KRISHA_INSTA_OWN_HTML = fs.readFileSync(path.join(__dirname, "scripts", "insta-own-page.html"), "utf8");
 
 const KRISHA_BOT_HTML = `<!doctype html>
 <html lang="ru"><head><meta charset="utf-8">
@@ -5029,6 +5030,111 @@ async function instaPolish() {
   instaPolishCache = { at: Date.now(), v: v };
   return v;
 }
+// --- Свои объявления (страница /api/krisha/insta-own) ---------------------
+// Квартиры, которые прислал сам хозяин, а не взяты с Крыши: параметры, номер
+// хозяина и фото лежат в dbo.insta_manual / insta_manual_photos. Карусель и
+// подпись — тем же шаблоном, что автопосты; публикация — тем же Instagram API.
+// «+» под таким постом отдаёт номер хозяина как под любым нашим постом.
+const instaOwnPreview = new Map(); // id → { at, slides }
+
+// Адрес → координаты через Nominatim (OpenStreetMap): для карты и «что рядом».
+async function instaOwnGeocode(addr, acc) {
+  const city = (INSTA.ACCOUNTS[acc] || INSTA.ACCOUNTS.almaty).city;
+  const q = String(addr || "").split(" — ")[0].replace(/^пр\.?\s*/i, "проспект ").trim();
+  if (!q) return null;
+  const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + encodeURIComponent(q + ", " + city),
+    { headers: { "User-Agent": "ipoteka1-insta/1.0 (+https://saudager.ai)" }, signal: AbortSignal.timeout(15000) });
+  const j = await r.json().catch(() => []);
+  return j && j[0] ? { lat: Number(j[0].lat), lon: Number(j[0].lon) } : null;
+}
+
+// Объявление со всем, что нужно шаблону: фото из базы, факты, доводы, «что рядом».
+async function instaOwnBuild(id) {
+  const f = await db.instaManualListing(id);
+  if (!f) return null;
+  const d = f.data || {};
+  f.photos = await db.instaManualPhotos(id);
+  f.isNew = !!d.isNew;
+  f.card = { params: (d.facts || []).filter(Boolean), desc: (d.points || []).filter(Boolean), price: null, pledged: false, verdict: { mortgage: f.mortgage ? "yes" : null } };
+  f.extra = d.extra || "";
+  if (f.lat && f.lon) {
+    const have = await db.instaPlacesGet([f.id]).catch(() => ({}));
+    const h = have[f.id];
+    if (h && h.text && h.chips) { f.near = h.text; f.chips = h.chips; }
+    else {
+      try {
+        const p = await Promise.race([PLACES.nearby(f.lat, f.lon), new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 40000))]);
+        if (p) { await db.instaPlaceSave(f.id, p); f.near = p.text; f.chips = p.chips; }
+      } catch (e) { console.log("[insta-own] places " + f.id + ": " + e.message); }
+    }
+  }
+  return f;
+}
+
+// Номер поста: уже зарезервированный под это объявление (ручной, ещё не
+// вышел) или следующий свободный — для превью.
+async function instaOwnCode(acc, id) {
+  const pending = (await db.instaManualPending(acc)).find((m) => m.listing_id === String(id));
+  return pending ? { code: pending.post_id, reserved: true } : { code: await db.instaNextCode(), reserved: false };
+}
+
+async function instaOwnSlides(acc, id) {
+  const hit = instaOwnPreview.get(String(id));
+  if (hit && Date.now() - hit.at < 1800e3) return hit.slides;
+  const f = await instaOwnBuild(id);
+  if (!f) throw new Error("объявление не найдено");
+  if (!f.photos.length) throw new Error("нет фото");
+  const c = await instaOwnCode(acc, id);
+  const slides = await INSTA.renderCarousel(Object.assign({}, f, { code: c.code }), acc, { polish: await instaPolish() });
+  instaOwnPreview.set(String(id), { at: Date.now(), slides: slides });
+  if (instaOwnPreview.size > 20) instaOwnPreview.delete(instaOwnPreview.keys().next().value);
+  return slides;
+}
+
+// Публикация своего объявления через Instagram API. caption — подпись из
+// превью (её можно править на странице); пустая — собираем шаблоном.
+async function instaOwnPublish(acc, id, caption) {
+  if (instaBusy) throw new Error("уже публикуем другой пост — подождите минуту");
+  instaBusy = true;
+  try {
+    const a = (await db.instaAccounts()).find((x) => x.acc === acc);
+    if (!a || !a.token || !a.ig_user_id) throw new Error("аккаунт не подключён");
+    const f = await instaOwnBuild(id);
+    if (!f) throw new Error("объявление не найдено");
+    if (f.city !== acc) throw new Error("объявление другого города");
+    if (!f.photos.length) throw new Error("нет фото");
+    if (!f.phones) throw new Error("нет номера хозяина");
+    const c = await instaOwnCode(acc, id);
+    const code = c.reserved ? c.code : await db.instaPostReserve(acc, id, "manual");
+    const fc = Object.assign({}, f, { code: code });
+    const cap = String(caption || "").trim() || INSTA.caption(fc, acc);
+    try {
+      const hit = instaOwnPreview.get(String(id));
+      const slides = hit && Date.now() - hit.at < 1800e3 && c.reserved ? hit.slides : await INSTA.renderCarousel(fc, acc, { polish: await instaPolish() });
+      const tok = crypto.randomBytes(12).toString("hex");
+      instaImgs.set(tok, { at: Date.now(), slides: slides });
+      try {
+        fs.mkdirSync(path.join(INSTA_IMG_DIR, tok), { recursive: true });
+        slides.forEach((b, i) => fs.writeFileSync(path.join(INSTA_IMG_DIR, tok, i + ".jpg"), b));
+      } catch (e) { console.log("[insta-own] img to disk: " + e.message); }
+      const urls = slides.map((_, i) => PUBLIC_URL + "/api/insta/img/" + tok + "/" + i + ".jpg");
+      const r = await INSTA.publishCarousel(a.ig_user_id, a.token, urls, cap);
+      await db.instaPostFinish(code, { status: "published", mediaId: r.mediaId, permalink: r.permalink, caption: cap });
+      instaOwnPreview.delete(String(id));
+      return Object.assign({ code: code }, r);
+    } catch (e) {
+      const live = await INSTA.findByCaption(a.ig_user_id, a.token, "объявление № " + code + ",").catch(() => null);
+      if (live) {
+        await db.instaPostFinish(code, { status: "published", mediaId: live.id, permalink: live.permalink, caption: cap }).catch(() => {});
+        return { code: code, mediaId: live.id, permalink: live.permalink, warning: e.message };
+      }
+      // Номер остаётся зарезервированным под объявление (статус «публикуется»):
+      // повторная публикация возьмёт тот же номер, что уже на картинках.
+      throw e;
+    }
+  } finally { instaBusy = false; }
+}
+
 async function instaPublish(acc, f) {
   if (instaBusy) throw new Error("уже публикуем другой пост — подождите минуту");
   instaBusy = true;
@@ -8866,10 +8972,118 @@ http
     // свой ?data=1 с курсором и кэшированной статистикой списка.
     {
       const pages = { "/api/krisha/phones": KRISHA_PHONES_HTML, "/api/krisha/db": KRISHA_DB_HTML, "/api/krisha/sweep": KRISHA_SWEEP_HTML,
-                      "/api/krisha/ports": KRISHA_PORTS_HTML, "/api/krisha/calls": KRISHA_CALLS_HTML, "/api/krisha/bot": KRISHA_BOT_HTML, "/api/krisha/insta": KRISHA_INSTA_HTML };
+                      "/api/krisha/ports": KRISHA_PORTS_HTML, "/api/krisha/calls": KRISHA_CALLS_HTML, "/api/krisha/bot": KRISHA_BOT_HTML, "/api/krisha/insta": KRISHA_INSTA_HTML, "/api/krisha/insta-own": KRISHA_INSTA_OWN_HTML };
       if (pages[urlPath]) {
         const key = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
         if (!key || parsed.searchParams.get("key") !== key) { res.writeHead(403); res.end("bad key"); return; }
+        // «Свои объявления»: данные, фото, превью, подпись и действия страницы.
+        if (urlPath === "/api/krisha/insta-own" && (parsed.searchParams.get("data") || parsed.searchParams.get("photo") != null || parsed.searchParams.get("slide") != null || parsed.searchParams.get("caption") || req.method === "POST")) {
+          const q = parsed.searchParams;
+          const send = (code, obj) => { res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); };
+          const acc = INSTA_ACCS.includes(q.get("acc")) ? q.get("acc") : "almaty";
+          if (q.get("photo") != null) {
+            (async () => {
+              const all = await db.instaManualPhotos(q.get("id"), Number(q.get("photo")) === 0);
+              const img = all[Math.max(0, Number(q.get("photo")) || 0)];
+              if (!img) { res.writeHead(404); res.end(); return; }
+              res.writeHead(200, { "Content-Type": "image/jpeg", "Cache-Control": "private, max-age=300" });
+              res.end(img);
+            })().catch((e) => { res.writeHead(500); res.end(String(e.message).slice(0, 200)); });
+            return;
+          }
+          if (q.get("slide") != null) {
+            (async () => {
+              const slides = await instaOwnSlides(acc, q.get("id"));
+              const n = Math.max(0, Number(q.get("slide")) || 0);
+              if (!slides[n]) { res.writeHead(404); res.end("нет слайда"); return; }
+              res.writeHead(200, { "Content-Type": "image/jpeg", "Cache-Control": "private, max-age=600", "X-Slides": String(slides.length) });
+              res.end(slides[n]);
+            })().catch((e) => { res.writeHead(500); res.end(String(e.message).slice(0, 200)); });
+            return;
+          }
+          if (q.get("caption")) {
+            (async () => {
+              const f = await instaOwnBuild(q.get("id"));
+              if (!f) return send(404, { ok: false, error: "объявление не найдено" });
+              const c = await instaOwnCode(acc, f.id);
+              send(200, { ok: true, code: c.code, reserved: c.reserved, caption: INSTA.caption(Object.assign({}, f, { code: c.code }), acc) });
+            })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 200) }));
+            return;
+          }
+          if (req.method === "POST") {
+            // Фото приходят по одному в base64 — до ~4 МБ на запрос.
+            let raw = "";
+            req.on("data", (ch) => { raw += ch; if (raw.length > 6e6) { req.destroy(); } });
+            req.on("end", () => (async () => {
+              let b = {};
+              try { b = JSON.parse(raw) || {}; } catch { return send(400, { ok: false, error: "json" }); }
+              const A = INSTA_ACCS.includes(b.acc) ? b.acc : "almaty";
+              if (b.action === "save") {
+                const phones = String(b.phones || "").split(/[,;\n]/).map((x) => x.replace(/\D/g, "")).map((x) => (x.length === 10 ? "7" + x : x.replace(/^8(\d{10})$/, "7$1")))
+                  .filter((x) => /^7\d{10}$/.test(x));
+                if (!phones.length) return send(400, { ok: false, error: "номер хозяина: нужен телефон вида +7 7XX XXX XX XX" });
+                const d = b.data || {};
+                const num = (v) => (v === "" || v == null ? null : Number(String(v).replace(",", ".").replace(/\s/g, "")) || null);
+                const data = {
+                  rooms: num(d.rooms), area: num(d.area), floor: num(d.floor), floors: num(d.floors), price: num(d.price),
+                  addr: String(d.addr || "").trim().slice(0, 160), complex: String(d.complex || "").trim().slice(0, 80) || null,
+                  isNew: !!d.isNew, mortgage: !!d.mortgage, desc: String(d.desc || "").slice(0, 4000),
+                  facts: String(d.facts || "").split(/\r?\n/).map((x) => x.trim()).filter(Boolean).slice(0, 10),
+                  points: String(d.points || "").split(/\r?\n/).map((x) => x.trim()).filter(Boolean).slice(0, 4),
+                  extra: String(d.extra || "").slice(0, 600),
+                  lat: num(d.lat), lon: num(d.lon),
+                };
+                if (!data.price || !data.addr) return send(400, { ok: false, error: "нужны адрес и цена" });
+                const old = b.id ? await db.instaManualListing(b.id) : null;
+                const oldData = (old && old.data) || {};
+                // Координаты руками не заданы — берём прежние; адрес поменялся или
+                // координат нет совсем — ищем заново (и «что рядом» пересчитается).
+                if (d.lat == null && old && oldData.addr === data.addr) { data.lat = oldData.lat || null; data.lon = oldData.lon || null; }
+                if (!data.lat || !data.lon) {
+                  const g = await instaOwnGeocode(data.addr, A).catch(() => null);
+                  if (g) { data.lat = g.lat; data.lon = g.lon; }
+                }
+                // Доводы «почему стоит посмотреть» — из описания, если не заданы руками.
+                if (!data.points.length && data.desc.length > 80) {
+                  data.points = await require("./scripts/card-facts.js").fromDescription(data.desc).catch(() => []);
+                }
+                let id = b.id;
+                if (old) await db.instaManualUpdate(id, phones.join(","), data);
+                else id = await db.instaManualAdd(A, phones.join(","), data);
+                if (old && (oldData.lat !== data.lat || oldData.lon !== data.lon)) await db.instaPlaceSave(id, null).catch(() => {});
+                instaOwnPreview.delete(String(id));
+                return send(200, { ok: true, id: String(id), lat: data.lat, lon: data.lon, points: data.points });
+              }
+              if (b.action === "points") {
+                const f = await db.instaManualListing(b.id);
+                if (!f) return send(404, { ok: false, error: "объявление не найдено" });
+                const pts = await require("./scripts/card-facts.js").fromDescription((f.data || {}).desc || "");
+                return send(200, { ok: true, points: pts });
+              }
+              if (b.action === "photos_clear") { await db.instaManualPhotosClear(b.id); instaOwnPreview.delete(String(b.id)); return send(200, { ok: true }); }
+              if (b.action === "photo") {
+                const buf = Buffer.from(String(b.data || "").replace(/^data:image\/\w+;base64,/, ""), "base64");
+                if (buf.length < 2000 || buf[0] !== 0xff || buf[1] !== 0xd8) return send(400, { ok: false, error: "нужен JPEG" });
+                await db.instaManualPhotoSet(b.id, Number(b.n) || 0, buf);
+                instaOwnPreview.delete(String(b.id));
+                return send(200, { ok: true });
+              }
+              if (b.action === "publish") {
+                const r = await instaOwnPublish(A, b.id, b.caption);
+                return send(200, { ok: true, code: r.code, permalink: r.permalink || null, warning: r.warning || null });
+              }
+              return send(400, { ok: false, error: "action" });
+            })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 300) })));
+            return;
+          }
+          (async () => {
+            const accs = await db.instaAccounts();
+            const out = INSTA_ACCS.map((A) => { const a = accs.find((x) => x.acc === A) || {}; return { acc: A, handle: INSTA.ACCOUNTS[A].handle, connected: !!a.token }; });
+            const list = await db.instaManualList(acc);
+            send(200, { ok: true, accounts: out, listings: list.map((x) => Object.assign({}, x, { phones: x.phones.split(",").map(instaPhoneFmt).join(", ") })) });
+          })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 300) }));
+          return;
+        }
         if (urlPath === "/api/krisha/insta" && (parsed.searchParams.get("data") || parsed.searchParams.get("caption") || parsed.searchParams.get("slide") != null || req.method === "POST")) {
           const q = parsed.searchParams;
           const send = (code, obj) => { res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); };

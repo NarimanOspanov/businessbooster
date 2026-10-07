@@ -282,7 +282,8 @@ async function renderCarousel(f, acc, opts) {
   const urls = (f.photos || []).slice(0, max + 4);
   const got = [];
   for (let i = 0; i < urls.length && got.length < max + 1; i += 4) {
-    const part = await Promise.all(urls.slice(i, i + 4).map(fetchPhoto));
+    // Фото — ссылки (Крыша) или уже готовые буферы (свои объявления из базы).
+    const part = await Promise.all(urls.slice(i, i + 4).map((u) => Buffer.isBuffer(u) ? u : fetchPhoto(u)));
     part.forEach((b) => { if (b && got.length < max + 1) got.push(b); });
   }
   if (!got.length) throw new Error("нет фото");
@@ -350,7 +351,8 @@ function caption(f, acc) {
   const c = f.card || {};
   const kind = (f.rooms ? f.rooms + "-комнатная квартира" : "Квартира") + (f.area ? " " + String(f.area).replace(".", ",") + " м²" : "");
   const lines = [
-    "🔑 От хозяина · можно в ипотеку" + (f.below ? " · ниже рынка" : ""), "",
+    // «Можно в ипотеку» — только если это так (у своих объявлений — галочка в форме).
+    "🔑 От хозяина" + (f.mortgage ? " · можно в ипотеку" : "") + (f.below ? " · ниже рынка" : ""), "",
     kind + " в " + (acc === "astana" ? "Астане" : "Алматы") + (f.isNew ? ", новостройка" : "") + " — продаёт сам хозяин. Без посредников", "",
     "💰 " + money(f.price) + " ₸",
     "📍 " + A.city + ", " + cleanAddr(f.addr),
@@ -371,6 +373,8 @@ function caption(f, acc) {
     lines.push("", "🏦 Можно купить в ипотеку — хозяин готов" + ((f.programs || []).length ? ", в том числе по программе " + f.programs.join(", ") : "") + ", документы в порядке. Не в залоге");
     if (f.quote) lines.push("💬 Из объявления: «" + f.quote + "»");
   }
+  // Свои объявления: строки от себя (условия сделки, срочность) — перед призывом.
+  if (f.extra) lines.push("", ...String(f.extra).split(/\r?\n/).map((x) => x.trim()).filter(Boolean));
   lines.push("", "✅ Договариваетесь напрямую с хозяином.", "",
     "👉 Хотите узнать больше и получить номер хозяина? Подпишитесь на @" + A.handle + " и поставьте «+» в комментариях к этому посту — пришлём номер в директ." +
       (f.code ? " Это объявление № " + f.code + ", ищите его в списке." : ""),
