@@ -5412,11 +5412,15 @@ if (process.env.WEBSITE_SITE_NAME) {
 // выключенным, иначе человек получит два сообщения.
 
 // Текст ответа с номером хозяина — общий для ManyChat и вебхука.
-function instaPhoneText(f, phones) {
-  const what = [f.rooms ? f.rooms + "-комн" : null, f.area ? String(f.area).replace(".", ",") + " м²" : null, INSTA.cleanAddr(f.addr),
+// Квартира одной строкой: «3-комн · 89,6 м² · Талды 63 · 99 млн ₸».
+function instaFlatLine(f) {
+  return [f.rooms ? f.rooms + "-комн" : null, f.area ? String(f.area).replace(".", ",") + " м²" : null, INSTA.cleanAddr(f.addr),
     Math.round(f.price / 1e5) / 10 + " млн ₸"].filter(Boolean).join(" · ").replace(/(\d)\.(\d)/, "$1,$2");
+}
+// code — номер поста: при нескольких «+» человек видит, какая квартира какая.
+function instaPhoneText(f, phones, code) {
   const gone = f.storage && f.storage !== "live" ? "\n\n⚠️ Объявление уже снято — возможно, квартиру продали." : "";
-  return "📞 Номер хозяина:\n" + phones.map(instaPhoneFmt).join("\n") + "\n\n🏠 " + what + gone +
+  return "📞 Номер хозяина:\n" + phones.map(instaPhoneFmt).join("\n") + "\n\n🏠 " + (code ? "Пост № " + code + ": " : "") + instaFlatLine(f) + gone +
     "\n\nПишите или звоните хозяину напрямую. Новые квартиры от хозяев каждый день у нас в профиле 🔑";
 }
 
@@ -5472,12 +5476,16 @@ async function instaHookComment(e, v, accs, cfg, verified) {
   if (!verified) { await db.instaCommentEventSet(cid, "skipped", "не задан секрет приложения — без проверки подписи не отвечаем").catch(() => {}); return; }
   try {
     const handle = (INSTA.ACCOUNTS[acct.acc] || {}).handle || acct.username;
+    // Первое сообщение сразу показывает квартиру, о которой речь (человек мог
+    // поставить «+» под несколькими постами), и что нужно для номера.
+    const f = await db.instaListing(post.listing_id).catch(() => null);
+    const head = f ? "🏠 Квартира из поста № " + post.post_id + ":\n" + instaFlatLine(f) + "\n\n" : "";
     // Кнопку в приватном ответе Instagram может не принять — тогда без неё:
     // человек ответит словом «номер», это тоже засчитывается как нажатие.
     const r = await INSTA.privateReply(acct.ig_user_id, acct.token, cid,
-      "Чтобы получить номер хозяина, подпишитесь на @" + handle + " и нажмите кнопку 👇", "PHONE:" + cid)
+      head + "Номер хозяина пришлём сюда. Чтобы его получить, подпишитесь на @" + handle + " и нажмите кнопку 👇\nУже подписаны — просто нажмите.", "PHONE:" + cid)
       .catch((err) => { console.log("[insta-hook] кнопка не прошла: " + err.message);
-        return INSTA.privateReply(acct.ig_user_id, acct.token, cid, "Чтобы получить номер хозяина, подпишитесь на @" + handle + " и ответьте на это сообщение словом «номер»."); });
+        return INSTA.privateReply(acct.ig_user_id, acct.token, cid, head + "Номер хозяина пришлём сюда. Чтобы его получить, подпишитесь на @" + handle + " и ответьте на это сообщение словом «номер»."); });
     if (r.recipient_id) await db.instaCommentEventIgsid(cid, r.recipient_id);
     await INSTA.replyComment(cid, acct.token, "Отправили в директ 📩").catch((err) => console.log("[insta-hook] public reply: " + err.message));
     await db.instaCommentEventSet(cid, "asked", null, post.listing_id);
@@ -5509,13 +5517,16 @@ async function instaHookMessage(e, m, accs, cfg, verified) {
   try { follows = (await INSTA.userFollows(igsid, acct.token)).follows; }
   catch (err) { console.log("[insta-hook] подписка " + igsid + ": " + err.message); }
   if (!follows) {
+    // Не подписан: как подписаться и кнопка «Я подписался» — по ней проверим снова.
     await INSTA.sendMessage(acct.ig_user_id, acct.token, igsid,
-      "Похоже, вы ещё не подписаны на @" + handle + " 🙂 Подпишитесь и нажмите кнопку ещё раз 👇", "PHONE:" + cid);
+      "Пока не видим подписки 🙂 Чтобы получить номер, подпишитесь на @" + handle + " (нажмите на имя → «Подписаться») и вернитесь сюда 👇",
+      "PHONE:" + cid, "Я подписался ✅");
     return;
   }
   const f = await db.instaListing(ev.listing_id);
   const phones = String((f && f.phones) || "").split(",").map((x) => x.trim()).filter(Boolean);
-  const text = f && phones.length ? instaPhoneText(f, phones)
+  const post = ev.media_id ? await db.instaPostByMedia(ev.media_id).catch(() => null) : null;
+  const text = f && phones.length ? instaPhoneText(f, phones, post && post.post_id)
     : "По этой квартире номер сейчас недоступен 😔 Посмотрите другие предложения в нашем профиле — новые квартиры от хозяев каждый день.";
   await INSTA.sendMessage(acct.ig_user_id, acct.token, igsid, text);
   // Повторное нажатие после ответа — номер ещё раз, но в журнале один раз.

@@ -469,11 +469,11 @@ async function findByCaption(userId, token, mark) {
 }
 // Приватный ответ на комментарий — сообщение в директ автору комментария
 // (Instagram разрешает в течение 7 дней после комментария, один раз).
-async function igMessage(userId, token, recipient, text, buttonPayload) {
+async function igMessage(userId, token, recipient, text, buttonPayload, buttonTitle) {
   const message = { text: String(text).slice(0, 1000) };
   // Кнопка — «быстрый ответ»: нажатие приходит нам событием messages, и
   // после него Instagram разрешает спросить, подписан ли человек.
-  if (buttonPayload) message.quick_replies = [{ content_type: "text", title: "Получить номер", payload: String(buttonPayload) }];
+  if (buttonPayload) message.quick_replies = [{ content_type: "text", title: String(buttonTitle || "Получить номер").slice(0, 20), payload: String(buttonPayload) }];
   const r = await fetch(GRAPH + "/" + userId + "/messages", {
     method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
     body: JSON.stringify({ recipient: recipient, message: message }),
@@ -489,8 +489,8 @@ function privateReply(userId, token, commentId, text, buttonPayload) {
   return igMessage(userId, token, { comment_id: String(commentId) }, text, buttonPayload);
 }
 // Сообщение в уже начатую переписку (после нажатия кнопки человеком).
-function sendMessage(userId, token, igsid, text, buttonPayload) {
-  return igMessage(userId, token, { id: String(igsid) }, text, buttonPayload);
+function sendMessage(userId, token, igsid, text, buttonPayload, buttonTitle) {
+  return igMessage(userId, token, { id: String(igsid) }, text, buttonPayload, buttonTitle);
 }
 // Подписан ли человек на наш аккаунт. Instagram отвечает, только если
 // человек сам написал нам или нажал кнопку в переписке.

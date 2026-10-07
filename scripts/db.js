@@ -3904,7 +3904,7 @@ async function instaPostByMedia(mediaId) {
   const pool = await getPool();
   await ensureInsta();
   return (await pool.request().input("mid", sql.NVarChar(40), String(mediaId)).query(
-    "SELECT TOP 1 acc, CAST(listing_id AS NVARCHAR(20)) AS listing_id, media_id FROM dbo.insta_posts WHERE media_id = @mid")).recordset[0] || null;
+    "SELECT TOP 1 acc, post_id, CAST(listing_id AS NVARCHAR(20)) AS listing_id, media_id FROM dbo.insta_posts WHERE media_id = @mid")).recordset[0] || null;
 }
 async function instaRecentMedia(acc, n) {
   const pool = await getPool();
