@@ -5119,6 +5119,17 @@ async function instaTick() {
         console.log("[insta] refresh " + a.acc + ": " + e.message);
       }
     }
+    // Ручные посты (reason='manual'): номер зарезервирован, публикует человек
+    // сам. Находим пост по фразе из подписи «объявление № N, ищите» и
+    // привязываем — дальше «+» под ним работает как под любым нашим постом.
+    try {
+      for (const m of await db.instaManualPending(a.acc)) {
+        const media = await INSTA.findByCaption(a.ig_user_id, a.token, "объявление № " + m.post_id + ", ищите");
+        if (!media) continue;
+        await db.instaPostFinish(m.post_id, { status: "published", mediaId: media.id, permalink: media.permalink || null, caption: String(media.caption || "").slice(0, 2200) });
+        console.log("[insta] manual post № " + m.post_id + " linked → " + media.id);
+      }
+    } catch (e) { console.log("[insta] manual link " + a.acc + ": " + e.message); }
     if (!a.auto || hour < 9 || hour >= 22) continue;
     if (instaPauseUntil[a.acc] && Date.now() < instaPauseUntil[a.acc]) continue;
     const per = Math.max(1, Math.min(20, Number(a.per_day) || 4));

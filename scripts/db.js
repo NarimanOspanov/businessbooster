@@ -3307,6 +3307,18 @@ IF OBJECT_ID('dbo.insta_card_facts', 'U') IS NULL
     facts      NVARCHAR(2000) NOT NULL,
     at         DATETIME2(0)   NOT NULL CONSTRAINT DF_icf_at DEFAULT SYSUTCDATETIME()
   );
+-- Ручные объявления для Instagram: квартиры не с Крыши (хозяин прислал сам),
+-- пост публикуется вручную. id — с 9e12, чтобы не пересечься с номерами Крыши;
+-- в krisha_list их не кладём — там их подхватили бы бот, поиск и обход.
+-- data — JSON с параметрами (rooms, area, floor, floors, price, addr, lat, lon).
+IF OBJECT_ID('dbo.insta_manual', 'U') IS NULL
+  CREATE TABLE dbo.insta_manual (
+    id         BIGINT IDENTITY(9000000000001, 1) PRIMARY KEY,
+    acc        NVARCHAR(20)  NOT NULL,
+    phones     NVARCHAR(300) NOT NULL,   -- только цифры, через запятую: 7XXXXXXXXXX
+    data       NVARCHAR(MAX) NOT NULL,
+    created_at DATETIME2(0)  NOT NULL CONSTRAINT DF_imanual_at DEFAULT SYSUTCDATETIME()
+  );
 -- Настройки, которые правят со страниц (промпты и т. п.): ключ → значение.
 IF OBJECT_ID('dbo.app_config', 'U') IS NULL
   CREATE TABLE dbo.app_config (
@@ -3550,7 +3562,7 @@ async function instaListing(id) {
                  AND (t.mortgage IS NULL OR t.mortgage <> 'no') THEN 1 ELSE 0 END AS mortgage
     FROM dbo.krisha_list c LEFT JOIN dbo.krisha_list_text t ON t.id = c.id
     WHERE c.id = @id AND c.user_type = 'owner' AND c.deal = 'sale' AND c.prop = 'flat'`)).recordset[0];
-  if (!x) return null;
+  if (!x) return instaManualListing(id);
   return { id: String(x.id), city: x.city, rooms: x.rooms, area: x.area == null ? null : Number(x.area), floor: x.floor, floors: x.floors,
     price: Number(x.price), addr: x.addr || null, isNew: x.complex_id != null, phones: x.phones || null, storage: x.storage,
     lat: x.lat == null ? null : Number(x.lat), lon: x.lon == null ? null : Number(x.lon),
@@ -3559,6 +3571,35 @@ async function instaListing(id) {
     photos: listPhotoUrls(x.photos_c, x.photos_json).map((u) => u.replace(/-560x350\.jpg$/, "-full.jpg")) };
 }
 
+// Ручное объявление (dbo.insta_manual) в том же виде, что instaListing.
+async function instaManualListing(id) {
+  const n = Number(id) || 0;
+  if (n < 9000000000001) return null;
+  const pool = await getPool();
+  await ensureInsta();
+  const r = (await pool.request().input("id", sql.BigInt, n).query("SELECT id, acc, phones, data FROM dbo.insta_manual WHERE id = @id")).recordset[0];
+  if (!r) return null;
+  let d = {};
+  try { d = JSON.parse(r.data) || {}; } catch { /* пустые параметры */ }
+  return { id: String(r.id), city: r.acc, rooms: d.rooms || null, area: d.area || null, floor: d.floor || null, floors: d.floors || null,
+    price: Number(d.price) || 0, addr: d.addr || null, isNew: !!d.isNew, phones: r.phones, storage: "live",
+    lat: d.lat == null ? null : Number(d.lat), lon: d.lon == null ? null : Number(d.lon),
+    below: null, oldPrice: null, mortgage: !!d.mortgage, programs: d.programs || [], quote: d.quote || null, photos: [], manual: true };
+}
+async function instaManualAdd(acc, phones, data) {
+  const pool = await getPool();
+  await ensureInsta();
+  const r = await pool.request().input("acc", sql.NVarChar(20), acc).input("ph", sql.NVarChar(300), phones).input("d", sql.NVarChar(sql.MAX), JSON.stringify(data))
+    .query("INSERT INTO dbo.insta_manual (acc, phones, data) OUTPUT INSERTED.id VALUES (@acc, @ph, @d)");
+  return String(r.recordset[0].id);
+}
+// Посты, которые ждут ручной публикации (reason = 'manual', статус 'publishing').
+async function instaManualPending(acc) {
+  const pool = await getPool();
+  await ensureInsta();
+  return (await pool.request().input("acc", sql.NVarChar(20), acc).query(
+    "SELECT post_id, CAST(listing_id AS NVARCHAR(20)) AS listing_id, created_at FROM dbo.insta_posts WHERE acc = @acc AND reason = 'manual' AND status = 'publishing' AND created_at >= DATEADD(day, -14, SYSUTCDATETIME())")).recordset;
+}
 async function instaAccounts() {
   const pool = await getPool();
   await ensureInsta();
@@ -4632,7 +4673,7 @@ async function objectStats() {
   return r.recordset[0];
 }
 
-module.exports = { mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
+module.exports = { instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,
