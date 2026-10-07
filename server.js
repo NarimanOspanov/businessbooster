@@ -5406,21 +5406,35 @@ async function instaFindPlus(acc, username) {
   if (!a || !a.token) throw new Error("аккаунт не подключён");
   const media = await db.instaRecentMedia(acc, 30);
   const u = String(username || "").replace(/^@/, "").toLowerCase();
-  const hits = [];
-  for (let i = 0; i < media.length && !hits.length; i += 6) {
-    await Promise.all(media.slice(i, i + 6).map(async (m) => {
-      let c = instaComments.get(m.media_id);
-      if (!c || Date.now() - c.at > 15e3) {
-        c = { at: Date.now(), rows: await INSTA.comments(m.media_id, a.token).catch(() => []) };
-        instaComments.set(m.media_id, c);
-      }
-      for (const x of c.rows) if (String(x.username || "").toLowerCase() === u && INSTA.isPlus(x.text)) hits.push({ media: m.media_id, listing: m.listing_id, at: x.timestamp });
-    }));
-  }
-  if (!hits.length) return null;
-  hits.sort((x, y) => String(y.at).localeCompare(String(x.at)));
+  // Все «+» этого человека под последними 30 постами. Смотрим ВСЕ посты, а не
+  // до первой находки: раньше поиск останавливался на первой шестёрке, где был
+  // хоть какой-то «+» (например, вчерашний под № 67), и свежий «+» под более
+  // старым постом (№ 52) не находился — человеку уходила не та квартира.
+  const scan = async (fresh) => {
+    const hits = [];
+    for (let i = 0; i < media.length; i += 6) {
+      await Promise.all(media.slice(i, i + 6).map(async (m) => {
+        let c = instaComments.get(m.media_id);
+        if (fresh || !c || Date.now() - c.at > 5e3) {
+          c = { at: Date.now(), rows: await INSTA.comments(m.media_id, a.token).catch(() => []) };
+          instaComments.set(m.media_id, c);
+        }
+        for (const x of c.rows) if (String(x.username || "").toLowerCase() === u && INSTA.isPlus(x.text)) hits.push({ media: m.media_id, listing: m.listing_id, at: x.timestamp });
+      }));
+    }
+    return hits.sort((x, y) => String(y.at).localeCompare(String(x.at)));
+  };
+  let hits = await scan(false);
+  // Отвечаем на самый свежий «+» — он и вызвал запрос. Если он старше 3 минут
+  // и по нему номер уже отправляли, новый комментарий Instagram, видимо, ещё
+  // не отдаёт: ждём 2 секунды и спрашиваем заново, без кэша.
   const done = new Set(await db.instaDmMedia(u).catch(() => []));
-  return hits.find((h) => !done.has(h.media)) || hits[0];
+  const stale = (h) => !h || (Date.now() - new Date(h.at).getTime() > 3 * 60e3 && done.has(h.media));
+  if (stale(hits[0])) {
+    await new Promise((r) => setTimeout(r, 2000));
+    hits = await scan(true);
+  }
+  return hits[0] || null;
 }
 function instaPhoneFmt(p) {
   const d = String(p || "").replace(/\D/g, "");
