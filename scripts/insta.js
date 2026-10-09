@@ -473,7 +473,9 @@ async function igMessage(userId, token, recipient, text, buttonPayload, buttonTi
   const message = { text: String(text).slice(0, 1000) };
   // Кнопка — «быстрый ответ»: нажатие приходит нам событием messages, и
   // после него Instagram разрешает спросить, подписан ли человек.
-  if (buttonPayload) message.quick_replies = [{ content_type: "text", title: String(buttonTitle || "Получить номер").slice(0, 20), payload: String(buttonPayload) }];
+  // Несколько кнопок — массив { title, payload } (до 13, как разрешает Instagram).
+  if (Array.isArray(buttonPayload)) message.quick_replies = buttonPayload.slice(0, 13).map((b) => ({ content_type: "text", title: String(b.title).slice(0, 20), payload: String(b.payload) }));
+  else if (buttonPayload) message.quick_replies = [{ content_type: "text", title: String(buttonTitle || "Получить номер").slice(0, 20), payload: String(buttonPayload) }];
   const r = await fetch(GRAPH + "/" + userId + "/messages", {
     method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
     body: JSON.stringify({ recipient: recipient, message: message }),

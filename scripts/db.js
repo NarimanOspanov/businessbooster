@@ -3361,6 +3361,15 @@ IF COL_LENGTH('dbo.insta_comment_events', 'igsid') IS NULL ALTER TABLE dbo.insta
 -- Нажал «Получить номер», но не подписан: когда (tap_at) и напомнили ли (reminded).
 IF COL_LENGTH('dbo.insta_comment_events', 'tap_at') IS NULL ALTER TABLE dbo.insta_comment_events ADD tap_at DATETIME2(0) NULL;
 IF COL_LENGTH('dbo.insta_comment_events', 'reminded') IS NULL ALTER TABLE dbo.insta_comment_events ADD reminded BIT NULL;
+-- Подборка: один пост — несколько квартир. n — номер квартиры в подборке
+-- (как «3/7» на слайде); «+3» под постом — номер хозяина квартиры № 3.
+IF OBJECT_ID('dbo.insta_post_items', 'U') IS NULL
+  CREATE TABLE dbo.insta_post_items (
+    post_id    INT    NOT NULL,
+    n          INT    NOT NULL,
+    listing_id BIGINT NOT NULL,
+    CONSTRAINT PK_insta_post_items PRIMARY KEY (post_id, n)
+  );
 -- Настройки, которые правят со страниц (промпты и т. п.): ключ → значение.
 IF OBJECT_ID('dbo.app_config', 'U') IS NULL
   CREATE TABLE dbo.app_config (
@@ -3943,6 +3952,21 @@ async function instaCommentEventStats(acc) {
   const last = await pool.request().input("acc", sql.NVarChar(20), acc).query(
     "SELECT TOP 5 username, text, status, note, at FROM dbo.insta_comment_events WHERE acc = @acc ORDER BY at DESC");
   return Object.assign({}, r.recordset[0], { recent: last.recordset });
+}
+async function instaPostItemsSet(postId, listingIds) {
+  const pool = await getPool();
+  await ensureInsta();
+  await pool.request().input("p", sql.Int, Number(postId)).query("DELETE FROM dbo.insta_post_items WHERE post_id = @p");
+  for (let i = 0; i < listingIds.length; i++) {
+    await pool.request().input("p", sql.Int, Number(postId)).input("n", sql.Int, i + 1).input("l", sql.BigInt, Number(listingIds[i]))
+      .query("INSERT INTO dbo.insta_post_items (post_id, n, listing_id) VALUES (@p, @n, @l)");
+  }
+}
+async function instaPostItems(postId) {
+  const pool = await getPool();
+  await ensureInsta();
+  return (await pool.request().input("p", sql.Int, Number(postId)).query(
+    "SELECT n, CAST(listing_id AS NVARCHAR(20)) AS listing_id FROM dbo.insta_post_items WHERE post_id = @p ORDER BY n")).recordset;
 }
 async function instaPostByMedia(mediaId) {
   const pool = await getPool();
@@ -4856,7 +4880,7 @@ async function objectStats() {
   return r.recordset[0];
 }
 
-module.exports = { instaCommentEventNeedFollow, instaCommentEventsToRemind, instaCommentEventReminded, instaSimilarPosts, instaHookLogAdd, instaCommentEventGet, instaCommentEventIgsid, instaCommentEventAsked, instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
+module.exports = { instaPostItemsSet, instaPostItems, instaCommentEventNeedFollow, instaCommentEventsToRemind, instaCommentEventReminded, instaSimilarPosts, instaHookLogAdd, instaCommentEventGet, instaCommentEventIgsid, instaCommentEventAsked, instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,

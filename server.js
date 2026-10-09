@@ -5241,7 +5241,8 @@ async function instaTick() {
     // привязываем — дальше «+» под ним работает как под любым нашим постом.
     try {
       for (const m of await db.instaManualPending(a.acc)) {
-        const media = await INSTA.findByCaption(a.ig_user_id, a.token, "объявление № " + m.post_id + ", ищите");
+        const media = await INSTA.findByCaption(a.ig_user_id, a.token, "объявление № " + m.post_id + ", ищите")
+          || await INSTA.findByCaption(a.ig_user_id, a.token, "подборка № " + m.post_id + ".");
         if (!media) continue;
         await db.instaPostFinish(m.post_id, { status: "published", mediaId: media.id, permalink: media.permalink || null, caption: String(media.caption || "").slice(0, 2200) });
         console.log("[insta] manual post № " + m.post_id + " linked → " + media.id);
@@ -5419,10 +5420,17 @@ function instaFlatLine(f) {
   return [f.rooms ? f.rooms + "-комн" : null, f.area ? String(f.area).replace(".", ",") + " м²" : null, INSTA.cleanAddr(f.addr),
     Math.round(f.price / 1e5) / 10 + " млн ₸"].filter(Boolean).join(" · ").replace(/(\d)\.(\d)/, "$1,$2");
 }
-// code — номер поста: при нескольких «+» человек видит, какая квартира какая.
+// Как назвать квартиру в сообщении: «Пост № 62» или «Подборка № 70, квартира 3».
+async function instaPostLabel(post, listingId) {
+  if (!post) return null;
+  const items = await db.instaPostItems(post.post_id).catch(() => []);
+  const it = items.find((x) => String(x.listing_id) === String(listingId));
+  return it ? "Подборка № " + post.post_id + ", квартира " + it.n : "Пост № " + post.post_id;
+}
+// code — номер поста (или готовая подпись): при нескольких «+» человек видит, какая квартира какая.
 function instaPhoneText(f, phones, code) {
   const gone = f.storage && f.storage !== "live" ? "\n\n⚠️ Объявление уже снято — возможно, квартиру продали." : "";
-  return "📞 Номер хозяина:\n" + phones.map(instaPhoneFmt).join("\n") + "\n\n🏠 " + (code ? "Пост № " + code + ": " : "") + instaFlatLine(f) + gone +
+  return "📞 Номер хозяина:\n" + phones.map(instaPhoneFmt).join("\n") + "\n\n🏠 " + (code ? (typeof code === "string" ? code : "Пост № " + code) + ": " : "") + instaFlatLine(f) + gone +
     "\n\nПишите или звоните хозяину напрямую. Новые квартиры от хозяев каждый день у нас в профиле 🔑";
 }
 
@@ -5472,16 +5480,26 @@ async function instaHookComment(e, v, accs, cfg, verified) {
   if (uname && acct.username && String(uname).toLowerCase() === String(acct.username).toLowerCase()) return;
   const fresh = await db.instaCommentEventAdd({ commentId: cid, acc: acct.acc, mediaId: mediaId, username: uname, text: text, status: "seen" }).catch(() => false);
   if (!fresh) return; // повтор события — уже обработали
-  if (!INSTA.isPlus(text)) { await db.instaCommentEventSet(cid, "skipped", "не «+»").catch(() => {}); return; }
+  // Подборка (несколько квартир в посте): «+3» или «3» — квартира № 3.
+  const items = post ? await db.instaPostItems(post.post_id).catch(() => []) : [];
+  const plus = INSTA.isPlus(text) || (items.length > 0 && /^\s*\d{1,2}\s*$/.test(text));
+  if (!plus) { await db.instaCommentEventSet(cid, "skipped", "не «+»").catch(() => {}); return; }
   if (!post) { await db.instaCommentEventSet(cid, "skipped", "пост не из нашей базы").catch(() => {}); return; }
   if (!cfg.reply) return; // только записываем — отвечает ManyChat
   if (!verified) { await db.instaCommentEventSet(cid, "skipped", "не задан секрет приложения — без проверки подписи не отвечаем").catch(() => {}); return; }
+  let listingId = post.listing_id, label = "Квартира из поста № " + post.post_id;
+  if (items.length) {
+    const num = (text.match(/\d{1,2}/) || [])[0];
+    const it = num ? items.find((x) => x.n === Number(num)) : null;
+    if (!it) return instaHookPick(acct, cid, post, items); // «+» без номера — спросим, какая квартира
+    listingId = it.listing_id; label = "Квартира " + it.n + " из подборки № " + post.post_id;
+  }
   try {
     const handle = (INSTA.ACCOUNTS[acct.acc] || {}).handle || acct.username;
     // Первое сообщение сразу показывает квартиру, о которой речь (человек мог
     // поставить «+» под несколькими постами), и что нужно для номера.
-    const f = await db.instaListing(post.listing_id).catch(() => null);
-    const head = f ? "🏠 Квартира из поста № " + post.post_id + ":\n" + instaFlatLine(f) + "\n\n" : "";
+    const f = await db.instaListing(listingId).catch(() => null);
+    const head = f ? "🏠 " + label + ":\n" + instaFlatLine(f) + "\n\n" : "";
     // Кнопку в приватном ответе Instagram может не принять — тогда без неё:
     // человек ответит словом «номер», это тоже засчитывается как нажатие.
     const r = await INSTA.privateReply(acct.ig_user_id, acct.token, cid,
@@ -5490,10 +5508,34 @@ async function instaHookComment(e, v, accs, cfg, verified) {
         return INSTA.privateReply(acct.ig_user_id, acct.token, cid, head + "Номер хозяина пришлём сюда. Чтобы его получить, подпишитесь на @" + handle + " и ответьте на это сообщение словом «номер»."); });
     if (r.recipient_id) await db.instaCommentEventIgsid(cid, r.recipient_id);
     await INSTA.replyComment(cid, acct.token, "Отправили в директ 📩").catch((err) => console.log("[insta-hook] public reply: " + err.message));
-    await db.instaCommentEventSet(cid, "asked", null, post.listing_id);
+    await db.instaCommentEventSet(cid, "asked", null, listingId);
   } catch (err) {
-    await db.instaCommentEventSet(cid, "error", err.message, post.listing_id).catch(() => {});
+    await db.instaCommentEventSet(cid, "error", err.message, listingId).catch(() => {});
     console.log("[insta-hook] ответ " + cid + ": " + err.message);
+  }
+}
+
+// «+» под подборкой без номера квартиры: список квартир и кнопки «1»…«N».
+// Нажатие (PHONE:cid:n) выбирает квартиру и дальше — как обычно: подписка → номер.
+async function instaHookPick(acct, cid, post, items) {
+  try {
+    const handle = (INSTA.ACCOUNTS[acct.acc] || {}).handle || acct.username;
+    const rows = [];
+    for (const it of items) {
+      const f = await db.instaListing(it.listing_id).catch(() => null);
+      if (f) rows.push({ n: it.n, f: f });
+    }
+    const text = "Какая квартира из подборки № " + post.post_id + " интересует?\n\n" +
+      rows.map((r) => r.n + ") " + instaFlatLine(r.f)).join("\n") +
+      "\n\nНажмите её номер 👇 Номер хозяина пришлём, если вы подписаны на @" + handle + ".";
+    const buttons = rows.map((r) => ({ title: r.n + " · " + (Math.round(r.f.price / 1e5) / 10).toString().replace(".", ",") + " млн", payload: "PHONE:" + cid + ":" + r.n }));
+    const r = await INSTA.privateReply(acct.ig_user_id, acct.token, cid, text.slice(0, 1000), buttons);
+    if (r.recipient_id) await db.instaCommentEventIgsid(cid, r.recipient_id);
+    await INSTA.replyComment(cid, acct.token, "Отправили в директ 📩").catch(() => {});
+    await db.instaCommentEventSet(cid, "asked", "выбор квартиры из подборки");
+  } catch (err) {
+    await db.instaCommentEventSet(cid, "error", err.message).catch(() => {});
+    console.log("[insta-hook] подборка " + cid + ": " + err.message);
   }
 }
 
@@ -5513,6 +5555,15 @@ async function instaHookMessage(e, m, accs, cfg, verified) {
     return;
   }
   let cid = /^PHONE:/.test(payload) ? payload.slice(6) : null;
+  // Подборка: PHONE:<комментарий>:<номер квартиры> — запоминаем выбор.
+  const pick = cid && cid.match(/^(\d+):(\d{1,2})$/);
+  if (pick) {
+    cid = pick[1];
+    const ev1 = await db.instaCommentEventGet(cid);
+    const post1 = ev1 && ev1.media_id ? await db.instaPostByMedia(ev1.media_id).catch(() => null) : null;
+    const it = post1 ? (await db.instaPostItems(post1.post_id).catch(() => [])).find((x) => x.n === Number(pick[2])) : null;
+    if (it) await db.instaCommentEventSet(cid, ev1.status === "replied" ? "asked" : ev1.status, "квартира " + it.n + " из подборки", it.listing_id);
+  }
   // Нажатие может прийти без метки кнопки — просто текстом «Получить номер»;
   // так же засчитываем «номер», «+», «плюс» — берём его последний «+».
   if (!cid && /номер|^\s*(\+|➕|плюс)/i.test(String(msg.text || ""))) cid = ((await db.instaCommentEventAsked(igsid)) || {}).comment_id || null;
@@ -5536,7 +5587,7 @@ async function instaHookMessage(e, m, accs, cfg, verified) {
   const f = await db.instaListing(ev.listing_id);
   const phones = String((f && f.phones) || "").split(",").map((x) => x.trim()).filter(Boolean);
   const post = ev.media_id ? await db.instaPostByMedia(ev.media_id).catch(() => null) : null;
-  const text = f && phones.length ? instaPhoneText(f, phones, post && post.post_id)
+  const text = f && phones.length ? instaPhoneText(f, phones, await instaPostLabel(post, ev.listing_id))
     : "По этой квартире номер сейчас недоступен 😔 Посмотрите другие предложения в нашем профиле — новые квартиры от хозяев каждый день.";
   // После номера — кнопка «Ещё квартиры рядом» (похожие из наших постов).
   await INSTA.sendMessage(acct.ig_user_id, acct.token, igsid, text, "MORE:" + cid, "Ещё квартиры рядом");
@@ -5578,7 +5629,7 @@ async function instaHookRemind() {
       const post = ev.media_id ? await db.instaPostByMedia(ev.media_id).catch(() => null) : null;
       const f = await db.instaListing(ev.listing_id).catch(() => null);
       await INSTA.sendMessage(acct.ig_user_id, acct.token, ev.igsid,
-        "Номер хозяина ждёт вас 🙂" + (f ? "\n🏠 " + (post ? "Пост № " + post.post_id + ": " : "") + instaFlatLine(f) : "") +
+        "Номер хозяина ждёт вас 🙂" + (f ? "\n🏠 " + (post ? (await instaPostLabel(post, ev.listing_id)) + ": " : "") + instaFlatLine(f) : "") +
         "\n\nПодпишитесь на @" + handle + " и нажмите кнопку 👇", "PHONE:" + ev.comment_id, "Я подписался ✅");
     } catch (err) { console.log("[insta-hook] напоминание " + ev.comment_id + ": " + err.message); }
   }
