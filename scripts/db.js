@@ -2744,19 +2744,29 @@ async function agentsToMatchList(limit, researchDays) {
 
 // Хозяева той же квартиры среди ВСЕХ наших, включая архив: хозяин по просьбе
 // агента прячет объявление, и найти его можно только у себя. Дом — по ЖК или
-// координатам; дальше комнаты, этаж, площадь (±3%, не меньше 1 м²). Сам факт
-// архивации признаком не считается и баллов не даёт.
+// координатам (~120 м: агент часто ставит точку не на тот подъезд); дальше
+// комнаты, площадь ±6% (не меньше 1,5 м²), этаж и этажность ±1 — агент и
+// хозяин пишут их по-разному. Сначала точные (дом ~70 м, площадь ±3%, этаж и
+// этажность как есть): если они есть — только они, иначе в большом ЖК соседи
+// по широким допускам вытесняют настоящего хозяина из limit. Широкие — только
+// когда точных нет, так и фото-сверка (Gemini) не раздувается.
+// Проверка на 100 агентских Алматы (10.10.2026): точные — хозяин подтверждён
+// фото у 21; широкие добавили ещё 5 (гео 116–133 м, площадь 73/70, этажность 9/10).
+// Сам факт архивации признаком не считается и баллов не даёт.
 async function findListOwners(q, limit) {
   const pool = await getPool();
   await ensureList(pool);
   const area = Number(q.area);
   if (!area) return [];
-  const tol = Math.max(1, area * 0.03);
+  const tol = Math.max(1.5, area * 0.06);
+  const near = Math.max(1, area * 0.03);
   const r = await pool.request()
     .input("deal", sql.NVarChar(10), q.deal || null)
     .input("prop", sql.NVarChar(20), q.prop || null)
     .input("lo", sql.Decimal(9, 2), area - tol)
     .input("hi", sql.Decimal(9, 2), area + tol)
+    .input("area", sql.Decimal(9, 2), area)
+    .input("near", sql.Decimal(9, 2), near)
     .input("rooms", sql.Int, q.rooms ? Number(q.rooms) : null)
     .input("floor", sql.Int, q.floor ? Number(q.floor) : null)
     .input("floors", sql.Int, q.floors ? Number(q.floors) : null)
@@ -2771,10 +2781,19 @@ async function findListOwners(q, limit) {
         f.phones, f.photos_c, f.photos_json, arch.at AS archived_at,
         IIF(@cxid IS NOT NULL AND f.complex_id = @cxid, 4, 0)
           + IIF(@lat IS NOT NULL AND f.lat IS NOT NULL
-                AND ABS(f.lat - @lat) < 0.0006 AND ABS(f.lon - @lon) < 0.0008, 6, 0)
+                AND ABS(f.lat - @lat) < 0.0006 AND ABS(f.lon - @lon) < 0.0008, 6,
+              IIF(@lat IS NOT NULL AND f.lat IS NOT NULL
+                AND ABS(f.lat - @lat) < 0.0011 AND ABS(f.lon - @lon) < 0.0014, 3, 0))
           + IIF(@rooms IS NOT NULL AND f.rooms = @rooms, 2, 0)
-          + IIF(@floor IS NOT NULL AND f.floor = @floor, 2, 0)
-          + IIF(@floors IS NOT NULL AND f.floors = @floors, 1, 0) AS score
+          + IIF(ABS(f.area - @area) <= @near, 2, 0)
+          + IIF(@floor IS NOT NULL AND f.floor = @floor, 2, IIF(@floor IS NOT NULL AND ABS(f.floor - @floor) = 1, 1, 0))
+          + IIF(@floors IS NOT NULL AND f.floors = @floors, 1, 0) AS score,
+        IIF(ABS(f.area - @area) <= @near
+          AND (@floor IS NULL OR f.floor IS NULL OR f.floor = @floor)
+          AND (@floors IS NULL OR f.floors IS NULL OR f.floors = @floors)
+          AND ((@cxid IS NOT NULL AND f.complex_id = @cxid)
+            OR (@lat IS NOT NULL AND f.lat IS NOT NULL
+                AND ABS(f.lat - @lat) < 0.0006 AND ABS(f.lon - @lon) < 0.0008)), 1, 0) AS strict
       FROM dbo.krisha_list f
       OUTER APPLY (SELECT MAX(e.at) AS at FROM dbo.krisha_list_events e WHERE e.id = f.id AND e.kind = 'archived') arch
       WHERE f.user_type = 'owner'
@@ -2783,15 +2802,16 @@ async function findListOwners(q, limit) {
         AND (@prop IS NULL OR f.prop = @prop)
         AND f.area BETWEEN @lo AND @hi
         AND (@rooms IS NULL OR f.rooms IS NULL OR f.rooms = @rooms)
-        AND (@floor IS NULL OR f.floor IS NULL OR f.floor = @floor)
-        AND (@floors IS NULL OR f.floors IS NULL OR f.floors = @floors)
+        AND (@floor IS NULL OR f.floor IS NULL OR ABS(f.floor - @floor) <= 1)
+        AND (@floors IS NULL OR f.floors IS NULL OR ABS(f.floors - @floors) <= 1)
         AND (
           (@cxid IS NOT NULL AND f.complex_id = @cxid)
           OR (@lat IS NOT NULL AND f.lat IS NOT NULL
-              AND ABS(f.lat - @lat) < 0.0006 AND ABS(f.lon - @lon) < 0.0008)
+              AND ABS(f.lat - @lat) < 0.0011 AND ABS(f.lon - @lon) < 0.0014)
         )
-      ORDER BY score DESC, f.id DESC`);
-  return r.recordset;
+      ORDER BY strict DESC, score DESC, ABS(f.area - @area), f.id DESC`);
+  const rows = r.recordset;
+  return rows.some((x) => x.strict) ? rows.filter((x) => x.strict) : rows;
 }
 
 async function recordListSearched(id, count, topId) {
