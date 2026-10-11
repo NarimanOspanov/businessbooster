@@ -130,7 +130,6 @@ function coverSvg(f, photo, acc, fx) {
   ${ppm ? `<text x="56" y="${PH + 378 + dy}" font-size="30" font-weight="500" fill="#7f9a8a">${esc(money(ppm))} тыс ₸ за м²${f.isNew ? " · новостройка" : ""}</text>` : ""}
   ${f.near ? pinIcon(70, PH + 418 + dy, 20, "#4cc35a") + `<text x="100" y="${PH + 432 + dy}" font-size="28" font-weight="500" fill="#9fc3ad">${esc(fit(f.near, 28, 500, W - 100 - 56 - (dy ? 210 : 0)))}</text>` : ""}
   <text x="${W - 56}" y="${H - 44}" text-anchor="end" font-size="26" font-weight="500" fill="#6f8a7b">листайте →</text>
-  ${f.code ? codePill(f.code, PH - 100) : ""}
 </svg>`;
 }
 
@@ -142,14 +141,6 @@ function belowPill(pct, y) {
   <text x="${40 + w / 2}" y="${y + 42}" text-anchor="middle" font-size="26" font-weight="700" fill="#fff" letter-spacing="1">${esc(t)}</text>`;
 }
 
-// Код поста: его пишут в комментарии, и по нему сервер отдаёт номер хозяина
-// именно этой квартиры (какой пост прокомментировали, нам не видно).
-function codePill(code, y) {
-  const t = "№ " + code; // номер объявления: коротко
-  const w = t.length * 34 * 0.8 + 64;
-  return `<rect x="${W - 40 - w}" y="${y}" width="${w}" height="72" rx="36" fill="#000" opacity=".6"/>
-  <text x="${W - 40 - w / 2}" y="${y + 49}" text-anchor="middle" font-size="34" font-weight="800" fill="#ffd166" letter-spacing="1">${esc(t)}</text>`;
-}
 // Значок метки на карте (рисуем сами: эмодзи в нашем шрифте нет).
 function pinIcon(x, y, s, color) {
   return `<path d="M${x} ${y + s} C${x - s * 0.15} ${y + s * 0.6} ${x - s * 0.55} ${y + s * 0.25} ${x - s * 0.55} ${y - s * 0.05} A${s * 0.55} ${s * 0.55} 0 1 1 ${x + s * 0.55} ${y - s * 0.05} C${x + s * 0.55} ${y + s * 0.25} ${x + s * 0.15} ${y + s * 0.6} ${x} ${y + s} Z" fill="${color}"/>
@@ -186,7 +177,7 @@ function photoSvg(photo, acc, i, n, f, fx, fact) {
 </svg>`;
 }
 
-// Последний слайд: как получить номер. Миниатюра квартиры — чтобы было ясно, о какой речь.
+// Последний слайд: как получить контакты (без номера поста — «+» сам находит пост). Миниатюра квартиры — чтобы было ясно, о какой речь.
 function ctaSvg(f, photo, acc) {
   const A = ACCOUNTS[acc] || ACCOUNTS.almaty;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Montserrat">
@@ -194,11 +185,10 @@ function ctaSvg(f, photo, acc) {
   <rect width="${W}" height="${H}" fill="url(#g)"/>
   <text x="${W / 2}" y="330" text-anchor="middle" font-size="76" font-weight="800" fill="#fff">Чтобы узнать больше</text>
   <text x="${W / 2}" y="425" text-anchor="middle" font-size="76" font-weight="800" fill="#fff">и получить</text>
-  <text x="${W / 2}" y="520" text-anchor="middle" font-size="76" font-weight="800" fill="#ffd166">номер хозяина</text>
+  <text x="${W / 2}" y="520" text-anchor="middle" font-size="76" font-weight="800" fill="#ffd166">контакты</text>
   <rect x="140" y="660" width="${W - 280}" height="240" rx="48" fill="#fff"/>
   <text x="${W / 2}" y="790" text-anchor="middle" font-size="64" font-weight="800" fill="#1e8422">Поставьте «+»</text>
   <text x="${W / 2}" y="852" text-anchor="middle" font-size="36" font-weight="600" fill="#2f5d3c">в комментариях</text>
-  ${f.code ? `<text x="${W / 2}" y="1010" text-anchor="middle" font-size="44" font-weight="800" fill="#ffd166">Объявление № ${f.code}</text>` : ""}
   <text x="${W / 2}" y="${H - 70}" text-anchor="middle" font-size="30" font-weight="600" fill="#d5ecd9">@${esc(A.handle)}</text>
 </svg>`;
 }
