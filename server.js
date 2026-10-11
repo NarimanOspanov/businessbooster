@@ -5195,7 +5195,8 @@ async function instaPublish(acc, f) {
           const voiceName = (await db.configGet(["insta.reel_voice"]).catch(() => ({})))["insta.reel_voice"] || "Kore";
           const voice = await REEL.reelVoice(fc, voiceName).catch((e) => { console.log("[insta] reel voice: " + e.message); return { wav: null }; });
           if (voice.text) console.log("[insta] reel " + code + " текст: " + voice.text + (voice.wav ? "" : " (без голоса)"));
-          mp4 = await REEL.renderReel(slides.filter((_, i) => i !== slides.mapAt), { hook: REEL.reelHook(fc), top: REEL.TOP, voice: voice.wav });
+          // Без обложки (на ней цена — в ролике её не называем, её присылаем после «+») и без карты.
+          mp4 = await REEL.renderReel(slides.filter((_, i) => i !== 0 && i !== slides.mapAt), { hook: REEL.reelHook(fc), top: REEL.TOP, voice: voice.wav });
           instaImgs.get(tok).video = mp4;
           try { fs.writeFileSync(path.join(INSTA_IMG_DIR, tok, "reel.mp4"), mp4); } catch { /* из памяти тоже отдадим */ }
         } catch (e) { mp4 = null; console.log("[insta] reel " + code + ": " + e.message + " — публикуем каруселью"); }
