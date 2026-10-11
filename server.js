@@ -5208,8 +5208,8 @@ async function instaPublish(acc, f) {
     }
   } finally { instaBusy = false; }
 }
-// Ролик той же квартиры после карусели: слайды без обложки (на ней цена) и
-// карты, голос продавца (Gemini — текст, Gemini TTS — озвучка с проверкой),
+// Ролик той же квартиры после карусели: слайды без обложки (на ней цена),
+// карта без цены, голос продавца (Gemini — текст, Gemini TTS — озвучка с проверкой),
 // музыка; в сетку профиля не идёт (share_to_feed=false) — только Reels и
 // рекомендации. media_id ролика пишем к посту: «+» под ним — тот же номер.
 // Сбой — уведомление админам, карусель от него не зависит.
@@ -5222,7 +5222,14 @@ async function instaReelAfter(a, fc, slides, tok, code, tell) {
     const voiceName = (await db.configGet(["insta.reel_voice"]).catch(() => ({})))["insta.reel_voice"] || "Kore";
     const voice = await REEL.reelVoice(fc, voiceName).catch((e) => { console.log("[insta] reel voice: " + e.message); return { wav: null }; });
     if (voice.text) console.log("[insta] reel " + code + " текст: " + voice.text + (voice.wav ? "" : " (без голоса)"));
-    const mp4 = await REEL.renderReel(slides.filter((_, i) => i !== 0 && i !== slides.mapAt), { hook: REEL.reelHook(fc), top: REEL.TOP, voice: voice.wav });
+    // Без обложки (на ней цена); карта — предпоследним кадром, но без цены.
+    let reelSlides = slides.filter((_, i) => i !== 0);
+    if (slides.mapAt != null) {
+      const map = await INSTA.mapSlide(fc, a.acc, true).catch(() => null);
+      reelSlides = slides.filter((_, i) => i !== 0 && i !== slides.mapAt);
+      if (map) reelSlides.splice(reelSlides.length - 1, 0, map);
+    }
+    const mp4 = await REEL.renderReel(reelSlides, { hook: REEL.reelHook(fc), top: REEL.TOP, voice: voice.wav });
     const hit = instaImgs.get(tok) || { at: Date.now(), slides: [] };
     hit.at = Date.now(); hit.video = mp4; instaImgs.set(tok, hit);
     try { fs.mkdirSync(path.join(INSTA_IMG_DIR, tok), { recursive: true }); fs.writeFileSync(path.join(INSTA_IMG_DIR, tok, "reel.mp4"), mp4); } catch { /* из памяти тоже отдадим */ }

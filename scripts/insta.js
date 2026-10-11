@@ -211,7 +211,8 @@ async function tile(x, y) {
   if (tileCache.size > 400) tileCache.delete(tileCache.keys().next().value);
   return b;
 }
-async function mapSlide(f, acc) {
+// noPrice — для Reels: там цену не называем, её присылаем после «+».
+async function mapSlide(f, acc, noPrice) {
   if (f.lat == null || f.lon == null) return null;
   const A = ACCOUNTS[acc] || ACCOUNTS.almaty;
   const n = Math.pow(2, TILE_Z);
@@ -241,7 +242,7 @@ async function mapSlide(f, acc) {
   <circle cx="${cx}" cy="${cy - 98}" r="20" fill="#fff"/>
   <rect x="40" y="${H - 90 - cardH}" width="${W - 80}" height="${cardH}" rx="36" fill="#fff"/>
   <text x="80" y="${H - 90 - cardH + 72}" font-size="42" font-weight="800" fill="#12211a">${esc(addr)}</text>
-  <text x="80" y="${H - 90 - cardH + 124}" font-size="30" font-weight="600" fill="#4b5d52">${esc(paramsLine(f))} · ${esc(mln(f.price))} ₸</text>
+  <text x="80" y="${H - 90 - cardH + 124}" font-size="30" font-weight="600" fill="#4b5d52">${esc(paramsLine(f))}${noPrice ? "" : " · " + esc(mln(f.price)) + " ₸"}</text>
   ${near ? pinIcon(96, H - 90 - cardH + 168, 18, "#1e8422") + `<text x="124" y="${H - 90 - cardH + 182}" font-size="27" font-weight="500" fill="#4b5d52">${esc(near)}</text>` : ""}
   <rect x="${W - 260}" y="${H - 56}" width="230" height="34" rx="8" fill="#fff" opacity=".9"/>
   <text x="${W - 145}" y="${H - 32}" text-anchor="middle" font-size="20" font-weight="500" fill="#555">© OpenStreetMap</text>
@@ -514,4 +515,4 @@ async function userFollows(igsid, token) {
 async function replyComment(commentId, token, text) { return ig("POST", "/" + commentId + "/replies", { message: text }, token); }
 const isPlus = (t) => /^\s*(\+|➕|плюс)/i.test(String(t || ""));
 
-module.exports = { hashtags, publishReel, findByCaption, ACCOUNTS, renderCarousel, renderCover, caption, hook, cleanAddr, publishCarousel, me, refreshToken, comments, isPlus, coverSvg, photoSvg, ctaSvg, toJpeg, rawSlides, privateReply, replyComment, sendMessage, userFollows };
+module.exports = { mapSlide, hashtags, publishReel, findByCaption, ACCOUNTS, renderCarousel, renderCover, caption, hook, cleanAddr, publishCarousel, me, refreshToken, comments, isPlus, coverSvg, photoSvg, ctaSvg, toJpeg, rawSlides, privateReply, replyComment, sendMessage, userFollows };
