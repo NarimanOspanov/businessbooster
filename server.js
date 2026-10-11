@@ -5230,6 +5230,9 @@ async function instaReelAfter(a, fc, slides, tok, code, tell) {
       reelSlides = slides.filter((_, i) => i !== 0 && i !== slides.mapAt);
       if (map) reelSlides.splice(reelSlides.length - 1, 0, map);
     }
+    // Первый кадр — главное фото с обложки (без плашек и цены): иначе ролик
+    // открывался вторым фото объявления, бывало — планировкой (№ 88).
+    if (slides.coverPhoto) reelSlides.unshift(INSTA.rawSlides([slides.coverPhoto])[0]);
     const mp4 = await REEL.renderReel(reelSlides, { hook: REEL.reelHook(fc), top: REEL.TOP, voice: voice.wav });
     const hit = instaImgs.get(tok) || { at: Date.now(), slides: [] };
     hit.at = Date.now(); hit.video = mp4; instaImgs.set(tok, hit);

@@ -305,6 +305,8 @@ async function renderCarousel(f, acc, opts) {
   const inner2 = got.slice(1, max + 1);
   inner.splice(0, inner.length, ...inner2);
   const slides = [toJpeg(coverSvg(f, got[0], acc, fx[0]))];
+  // Фото обложки без плашек и цены — первым кадром Reels (там цену не называем).
+  slides.coverPhoto = got[0];
   const facts = photoFacts(f);
   inner.forEach((b, k) => slides.push(toJpeg(photoSvg(b, acc, k + 2, n, f, fx[k + 1], facts[k]))));
   const map = await mapSlide(f, acc).catch((e) => { console.log("[insta] map: " + e.message); return null; });
