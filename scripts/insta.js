@@ -446,10 +446,11 @@ async function publishCarousel(userId, token, imageUrls, text) {
   try { permalink = (await ig("GET", "/" + pub.id, { fields: "permalink" }, token)).permalink || null; } catch { /* ссылка — не главное */ }
   return { mediaId: pub.id, permalink: permalink };
 }
-// Reels: видео по ссылке, тоже в ленту (share_to_feed). Instagram обрабатывает
+// Reels: видео по ссылке. Instagram обрабатывает
 // видео дольше картинок — ждём до 5 минут.
-async function publishReel(userId, token, videoUrl, text) {
-  const c = await ig("POST", "/" + userId + "/media", { media_type: "REELS", video_url: videoUrl, caption: text, share_to_feed: "true" }, token);
+// toFeed=false — только вкладка Reels и рекомендации, в сетке профиля остаётся карусель.
+async function publishReel(userId, token, videoUrl, text, toFeed) {
+  const c = await ig("POST", "/" + userId + "/media", { media_type: "REELS", video_url: videoUrl, caption: text, share_to_feed: toFeed === false ? "false" : "true" }, token);
   await waitReady(c.id, token, 150);
   let pub;
   for (let i = 0; ; i++) {
@@ -513,4 +514,4 @@ async function userFollows(igsid, token) {
 async function replyComment(commentId, token, text) { return ig("POST", "/" + commentId + "/replies", { message: text }, token); }
 const isPlus = (t) => /^\s*(\+|➕|плюс)/i.test(String(t || ""));
 
-module.exports = { publishReel, findByCaption, ACCOUNTS, renderCarousel, renderCover, caption, hook, cleanAddr, publishCarousel, me, refreshToken, comments, isPlus, coverSvg, photoSvg, ctaSvg, toJpeg, rawSlides, privateReply, replyComment, sendMessage, userFollows };
+module.exports = { hashtags, publishReel, findByCaption, ACCOUNTS, renderCarousel, renderCover, caption, hook, cleanAddr, publishCarousel, me, refreshToken, comments, isPlus, coverSvg, photoSvg, ctaSvg, toJpeg, rawSlides, privateReply, replyComment, sendMessage, userFollows };

@@ -287,4 +287,13 @@ async function reelVoice(f, voice) {
   return { text: text, wav: null };
 }
 
-module.exports = { renderReel, reelHook, reelVoice, reelScript, priceWords, TOP };
+// Подпись ролика — коротко и тем же голосом, что за кадром: без цены и номера
+// объявления; рубрика, одна строка о квартире, призыв, хэштеги.
+function reelCaption(f, tags) {
+  const rubric = "🔑 От хозяина" + (f.mortgage ? " · можно в ипотеку" : "") + (belowMarket(f) ? " · ниже рынка" : "");
+  const what = "Продаю " + (ROOMS[f.rooms] || "") + " квартиру " + placeOf(f) + (f.area ? ", " + String(f.area).replace(".", ",") + " м²" : "") +
+    (belowMarket(f) ? " — ниже рыночной стоимости." : ".");
+  return [rubric, "", what, "", "👉 " + CTA(f).replace("поставьте плюс", "поставьте «+»"), "", tags || ""].join("\n").trim();
+}
+
+module.exports = { renderReel, reelHook, reelVoice, reelScript, reelCaption, priceWords, TOP };

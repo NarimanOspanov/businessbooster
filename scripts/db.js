@@ -3381,6 +3381,9 @@ IF COL_LENGTH('dbo.insta_comment_events', 'igsid') IS NULL ALTER TABLE dbo.insta
 -- Нажал «Получить номер», но не подписан: когда (tap_at) и напомнили ли (reminded).
 IF COL_LENGTH('dbo.insta_comment_events', 'tap_at') IS NULL ALTER TABLE dbo.insta_comment_events ADD tap_at DATETIME2(0) NULL;
 IF COL_LENGTH('dbo.insta_comment_events', 'reminded') IS NULL ALTER TABLE dbo.insta_comment_events ADD reminded BIT NULL;
+-- Reels к посту: ролик той же квартиры — свой media_id; «+» под ним ищет пост по нему.
+IF COL_LENGTH('dbo.insta_posts', 'reel_media_id') IS NULL ALTER TABLE dbo.insta_posts ADD reel_media_id NVARCHAR(40) NULL;
+IF COL_LENGTH('dbo.insta_posts', 'reel_permalink') IS NULL ALTER TABLE dbo.insta_posts ADD reel_permalink NVARCHAR(300) NULL;
 -- Подборка: один пост — несколько квартир. n — номер квартиры в подборке
 -- (как «3/7» на слайде); «+3» под постом — номер хозяина квартиры № 3.
 IF OBJECT_ID('dbo.insta_post_items', 'U') IS NULL
@@ -4003,7 +4006,13 @@ async function instaPostByMedia(mediaId) {
   const pool = await getPool();
   await ensureInsta();
   return (await pool.request().input("mid", sql.NVarChar(40), String(mediaId)).query(
-    "SELECT TOP 1 acc, post_id, CAST(listing_id AS NVARCHAR(20)) AS listing_id, media_id FROM dbo.insta_posts WHERE media_id = @mid")).recordset[0] || null;
+    "SELECT TOP 1 acc, post_id, CAST(listing_id AS NVARCHAR(20)) AS listing_id, media_id FROM dbo.insta_posts WHERE media_id = @mid OR reel_media_id = @mid")).recordset[0] || null;
+}
+async function instaPostReel(postId, mediaId, permalink) {
+  const pool = await getPool();
+  await ensureInsta();
+  await pool.request().input("id", sql.Int, postId).input("mid", sql.NVarChar(40), mediaId || null).input("link", sql.NVarChar(300), permalink || null)
+    .query("UPDATE dbo.insta_posts SET reel_media_id = @mid, reel_permalink = @link WHERE post_id = @id");
 }
 async function instaRecentMedia(acc, n) {
   const pool = await getPool();
@@ -4911,7 +4920,7 @@ async function objectStats() {
   return r.recordset[0];
 }
 
-module.exports = { instaCommentAnswered, instaPostItemsSet, instaPostItems, instaCommentEventNeedFollow, instaCommentEventsToRemind, instaCommentEventReminded, instaSimilarPosts, instaHookLogAdd, instaCommentEventGet, instaCommentEventIgsid, instaCommentEventAsked, instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
+module.exports = { instaPostReel, instaCommentAnswered, instaPostItemsSet, instaPostItems, instaCommentEventNeedFollow, instaCommentEventsToRemind, instaCommentEventReminded, instaSimilarPosts, instaHookLogAdd, instaCommentEventGet, instaCommentEventIgsid, instaCommentEventAsked, instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,

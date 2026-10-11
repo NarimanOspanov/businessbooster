@@ -5182,29 +5182,13 @@ async function instaPublish(acc, f) {
         fs.mkdirSync(path.join(INSTA_IMG_DIR, tok), { recursive: true });
         slides.forEach((b, i) => fs.writeFileSync(path.join(INSTA_IMG_DIR, tok, i + ".jpg"), b));
       } catch (e) { console.log("[insta] img to disk: " + e.message); }
-      // Reels: каждый N-й пост (app_config insta.reel_every, 0 — выкл.) —
-      // ролик из тех же слайдов: зацеп с ценой, фото, призыв «+». «+» под ним
-      // работает так же — media_id ролика записывается как у поста.
-      const reelEvery = Number((await db.configGet(["insta.reel_every"]).catch(() => ({})))["insta.reel_every"]) || 0;
-      let mp4 = null;
-      if (reelEvery > 0 && code % reelEvery === 0) {
-        try {
-          const REEL = require("./scripts/insta-reel.js");
-          // Голос за кадром: текст по фактам (Gemini), озвучка Gemini TTS с проверкой
-          // цены; голос — app_config insta.reel_voice (по умолчанию Kore).
-          const voiceName = (await db.configGet(["insta.reel_voice"]).catch(() => ({})))["insta.reel_voice"] || "Kore";
-          const voice = await REEL.reelVoice(fc, voiceName).catch((e) => { console.log("[insta] reel voice: " + e.message); return { wav: null }; });
-          if (voice.text) console.log("[insta] reel " + code + " текст: " + voice.text + (voice.wav ? "" : " (без голоса)"));
-          // Без обложки (на ней цена — в ролике её не называем, её присылаем после «+») и без карты.
-          mp4 = await REEL.renderReel(slides.filter((_, i) => i !== 0 && i !== slides.mapAt), { hook: REEL.reelHook(fc), top: REEL.TOP, voice: voice.wav });
-          instaImgs.get(tok).video = mp4;
-          try { fs.writeFileSync(path.join(INSTA_IMG_DIR, tok, "reel.mp4"), mp4); } catch { /* из памяти тоже отдадим */ }
-        } catch (e) { mp4 = null; console.log("[insta] reel " + code + ": " + e.message + " — публикуем каруселью"); }
-      }
       const urls = slides.map((_, i) => PUBLIC_URL + "/api/insta/img/" + tok + "/" + i + ".jpg");
-      const r = mp4 ? await INSTA.publishReel(a.ig_user_id, a.token, PUBLIC_URL + "/api/insta/vid/" + tok + ".mp4", cap)
-        : await INSTA.publishCarousel(a.ig_user_id, a.token, urls, cap);
+      const r = await INSTA.publishCarousel(a.ig_user_id, a.token, urls, cap);
       await db.instaPostFinish(code, { status: "published", mediaId: r.mediaId, permalink: r.permalink, caption: cap });
+      // Reels к каждому посту (app_config insta.reel_each=1): собираем и
+      // выкладываем следом, не держа публикацию — карусель уже вышла.
+      const reelOn = String((await db.configGet(["insta.reel_each"]).catch(() => ({})))["insta.reel_each"] || "") === "1";
+      if (reelOn) instaReelAfter(a, fc, slides, tok, code).catch(() => {});
       instaDropCandidate(acc, f.id);
       return Object.assign({ code: code }, r);
     } catch (e) {
@@ -5223,6 +5207,33 @@ async function instaPublish(acc, f) {
       throw e;
     }
   } finally { instaBusy = false; }
+}
+// Ролик той же квартиры после карусели: слайды без обложки (на ней цена) и
+// карты, голос продавца (Gemini — текст, Gemini TTS — озвучка с проверкой),
+// музыка; в сетку профиля не идёт (share_to_feed=false) — только Reels и
+// рекомендации. media_id ролика пишем к посту: «+» под ним — тот же номер.
+// Сбой — уведомление админам, карусель от него не зависит.
+let instaReelBusy = false;
+async function instaReelAfter(a, fc, slides, tok, code) {
+  if (instaReelBusy) { console.log("[insta] reel " + code + ": предыдущий ролик ещё собирается — пропускаем"); return; }
+  instaReelBusy = true;
+  try {
+    const REEL = require("./scripts/insta-reel.js");
+    const voiceName = (await db.configGet(["insta.reel_voice"]).catch(() => ({})))["insta.reel_voice"] || "Kore";
+    const voice = await REEL.reelVoice(fc, voiceName).catch((e) => { console.log("[insta] reel voice: " + e.message); return { wav: null }; });
+    if (voice.text) console.log("[insta] reel " + code + " текст: " + voice.text + (voice.wav ? "" : " (без голоса)"));
+    const mp4 = await REEL.renderReel(slides.filter((_, i) => i !== 0 && i !== slides.mapAt), { hook: REEL.reelHook(fc), top: REEL.TOP, voice: voice.wav });
+    const hit = instaImgs.get(tok) || { at: Date.now(), slides: [] };
+    hit.at = Date.now(); hit.video = mp4; instaImgs.set(tok, hit);
+    try { fs.mkdirSync(path.join(INSTA_IMG_DIR, tok), { recursive: true }); fs.writeFileSync(path.join(INSTA_IMG_DIR, tok, "reel.mp4"), mp4); } catch { /* из памяти тоже отдадим */ }
+    const cap = REEL.reelCaption(fc, INSTA.hashtags(fc, a.acc));
+    const r = await INSTA.publishReel(a.ig_user_id, a.token, PUBLIC_URL + "/api/insta/vid/" + tok + ".mp4", cap, false);
+    await db.instaPostReel(code, r.mediaId, r.permalink);
+    console.log("[insta] reel " + code + " → " + (r.permalink || r.mediaId));
+  } catch (e) {
+    console.log("[insta] reel " + code + ": " + e.message);
+    notifyTelegram("🎬 Instagram: ролик к посту № " + code + " не вышел (карусель вышла): " + String(e.message).slice(0, 200));
+  } finally { instaReelBusy = false; }
 }
 // Полночь по Алматы (UTC+5) в UTC — начало «сегодня» для дневного лимита.
 function almatyDayStart(now) {
