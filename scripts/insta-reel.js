@@ -1,8 +1,10 @@
 // Reels из готовых слайдов карусели: каждый слайд 4:5 ставим в кадр 9:16
 // поверх размытой копии самого себя (без чёрных полос), медленный наезд и
 // плавная смена. Последний слайд (призыв поставить «+») держим дольше.
-// Звука нет: музыку из библиотеки Instagram через API не добавить, а
-// немая дорожка Reels не мешает. Кодируем ffmpeg (пакет ffmpeg-static).
+// Звук: закадровый голос (текст по фактам квартиры пишет Gemini, озвучивает
+// Gemini TTS) поверх тихой музыки из assets/reel-music (сгенерирована Lyria —
+// музыку из библиотеки Instagram через API не добавить). Длина ролика — по
+// голосу. Голос не вышел — ролик с одной музыкой. Кодируем ffmpeg-static.
 
 const fs = require("fs");
 const os = require("os");
@@ -11,6 +13,7 @@ const { execFile } = require("child_process");
 const { Resvg } = require("@resvg/resvg-js");
 
 const W = 1080, H = 1920, SW = 1080, SH = 1350;
+const MUSIC_DIR = path.join(__dirname, "..", "assets", "reel-music");
 const FPS = 30;
 
 function ffmpegPath() {
@@ -62,6 +65,17 @@ async function renderReel(slides, opts) {
   try {
     const dur = list.map((_, i) => (i === list.length - 1 ? 3.5 : i === 0 ? 2.6 : 2.0));
     const fade = 0.35;
+    // Голос начинается через 0,3 с; ролик — на секунду длиннее голоса:
+    // недостающее время раздаём фото посередине.
+    const voiceLen = o.voice ? wavSeconds(o.voice) : 0;
+    const need = voiceLen ? voiceLen + 1.3 : 0;
+    const have = dur.reduce((a, b) => a + b, 0);
+    if (need > have && list.length > 2) {
+      const add = (need - have) / (list.length - 2);
+      for (let i = 1; i < list.length - 1; i++) dur[i] += add;
+    }
+    const total = dur.reduce((a, b) => a + b, 0);
+    const music = o.music === false ? null : pickMusic();
     list.forEach((b, i) => fs.writeFileSync(path.join(dir, i + ".png"), toPng(frameSvg(b, i === 0 ? o.hook : i === list.length - 1 ? null : o.top, i === 0))));
     const args = ["-y", "-loglevel", "error"];
     // Каждый кадр — одна картинка: zoompan сам растягивает её на d кадров
@@ -80,8 +94,25 @@ async function renderReel(slides, opts) {
       f.push(`[${last}][v${i}]xfade=transition=fade:duration=${fade}:offset=${t.toFixed(2)}[${out}]`);
       last = out;
     }
+    let ai = list.length;
+    const mix = [];
+    if (o.voice) {
+      fs.writeFileSync(path.join(dir, "voice.wav"), o.voice);
+      args.push("-i", path.join(dir, "voice.wav"));
+      f.push(`[${ai}:a]adelay=300|300,aformat=sample_rates=44100:channel_layouts=stereo[va]`);
+      mix.push("[va]"); ai++;
+    }
+    if (music) {
+      args.push("-i", music);
+      // Под голосом музыка тихо, без голоса — заметнее; в конце затухает.
+      f.push(`[${ai}:a]atrim=0:${total.toFixed(2)},aformat=sample_rates=44100:channel_layouts=stereo,volume=${o.voice ? 0.13 : 0.5},afade=t=in:d=0.5,afade=t=out:st=${(total - 1.5).toFixed(2)}:d=1.5[ma]`);
+      mix.push("[ma]"); ai++;
+    }
+    if (mix.length) f.push(`${mix.join("")}amix=inputs=${mix.length}:duration=longest:normalize=0,atrim=0:${total.toFixed(2)}[aout]`);
     const outFile = path.join(dir, "reel.mp4");
-    args.push("-filter_complex", f.join(";"), "-map", "[vout]",
+    args.push("-filter_complex", f.join(";"), "-map", "[vout]");
+    if (mix.length) args.push("-map", "[aout]", "-c:a", "aac", "-b:a", "128k");
+    args.push(
       "-c:v", "libx264", "-preset", "medium", "-crf", "21", "-profile:v", "high", "-pix_fmt", "yuv420p",
       "-r", String(FPS), "-movflags", "+faststart", outFile);
     await run(ffmpegPath(), args);
@@ -102,4 +133,140 @@ function reelHook(f) {
 }
 const TOP = "Поставьте «+» — пришлём номер хозяина";
 
-module.exports = { renderReel, reelHook, TOP };
+// --- Звук ------------------------------------------------------------------
+function pickMusic() {
+  try {
+    const all = fs.readdirSync(MUSIC_DIR).filter((x) => /\.mp3$/i.test(x));
+    return all.length ? path.join(MUSIC_DIR, all[Math.floor(Math.random() * all.length)]) : null;
+  } catch { return null; }
+}
+// Длина WAV (PCM) в секундах — по заголовку.
+function wavSeconds(b) {
+  const rate = b.readUInt32LE(24), ch = b.readUInt16LE(22) || 1, bits = b.readUInt16LE(34) || 16;
+  return (b.length - 44) / (rate * ch * bits / 8);
+}
+function geminiKey() {
+  if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY.trim();
+  try { return fs.readFileSync(path.join(os.homedir(), ".gemini-key"), "utf8").trim() || null; } catch { return null; }
+}
+async function gemini(model, body) {
+  const key = geminiKey();
+  if (!key) throw new Error("no_gemini_key");
+  const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent", {
+    method: "POST", headers: { "x-goog-api-key": key, "Content-Type": "application/json" }, body: JSON.stringify(body),
+    signal: AbortSignal.timeout(90000),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.error) throw new Error(model + ": " + ((j.error && j.error.message) || "HTTP " + r.status));
+  return j;
+}
+
+const CTA = "Поставьте плюс в комментариях — пришлём номер хозяина в директ.";
+// Цена так, как её говорят: «54 миллиона 700 тысяч тенге». «54,7 миллиона»
+// голос иногда читал неверно (54,5), целые числа — без ошибок.
+const plural = (n, a, b, c) => { const m = n % 100, k = n % 10; return m > 10 && m < 20 ? c : k === 1 ? a : k > 1 && k < 5 ? b : c; };
+function priceWords(p) {
+  const t = Math.round(Number(p) / 1000), mln = Math.floor(t / 1000), th = t % 1000;
+  return (mln ? mln + " " + plural(mln, "миллион", "миллиона", "миллионов") : "") +
+    (th ? (mln ? " " : "") + th + " " + plural(th, "тысяча", "тысячи", "тысяч") : "") + " тенге";
+}
+// Текст за кадром: 30–45 слов, зацеп → польза → призыв. Только факты из
+// объявления (Gemini получает их списком и ничего не добавляет от себя);
+// без «посредников» и названий сайтов. Не вышло — простой текст по шаблону.
+function factsOf(f) {
+  const c = f.card || {};
+  return [
+    f.rooms ? f.rooms + "-комнатная квартира" : "квартира",
+    f.area ? "площадь " + String(f.area).replace(".", ",") + " м²" : null,
+    "город Алматы",
+    f.addr ? "адрес: " + String(f.addr).split(" — ")[0] : null,
+    f.floor ? "этаж " + f.floor + (f.floors ? " из " + f.floors : "") : null,
+    "цена " + priceWords(f.price),
+    f.below ? "метр на " + f.below + "% дешевле похожих квартир рядом" : (f.card && f.card.price) || null,
+    "продаёт сам хозяин",
+    f.mortgage ? "хозяин готов продать в ипотеку, квартира не в залоге" : null,
+  ].concat((c.desc || []).slice(0, 4).map((t) => "из описания хозяина: " + t), (c.params || []).slice(0, 4),
+    (f.chips || []).slice(0, 3).map((t) => "рядом: " + t)).filter(Boolean);
+}
+function fallbackScript(f) {
+  const what = (f.rooms ? f.rooms + "-комнатная квартира" : "Квартира") + " в Алматы" +
+    (f.area ? ", " + String(f.area).replace(".", ",") + " квадратных метров" : "");
+  return what + " — за " + priceWords(f.price) + ". Продаёт сам хозяин" +
+    (f.mortgage ? ", и квартиру можно купить в ипотеку" : "") + ". " + CTA;
+}
+async function reelScript(f) {
+  try {
+    const j = await gemini(process.env.GEMINI_MODEL || "gemini-3.7-flash", {
+      contents: [{ role: "user", parts: [{ text: "Факты о квартире:\n- " + factsOf(f).join("\n- ") }] }],
+      system_instruction: { parts: [{ text:
+        "Ты пишешь текст за кадром для 15-секундного Reels о квартире на продажу в Алматы. По-русски, 30–45 слов, живо и по делу, как говорит человек, а не реклама. " +
+        "Первая фраза — зацеп до 10 слов: цена или главная выгода. Дальше 1–2 самых полезных факта для покупателя (ипотека, что рядом, ремонт — только из списка). " +
+        "Используй ТОЛЬКО факты из списка, ничего не придумывай и не преувеличивай. Не говори «без посредников», «агент», не называй сайты. " +
+        "Цену пиши ровно как в списке («" + priceWords(f.price) + "»), площадь — «50 квадратных метров». Без эмодзи, хэштегов и кавычек. " +
+        "Последнее предложение ровно такое: «" + CTA + "» Ответь только текстом." }] },
+      // Модель думает перед ответом — запас токенов, иначе текст обрывается.
+      generationConfig: { temperature: 0.7, maxOutputTokens: 4000 },
+    });
+    const c = ((j.candidates || [])[0] || {}).content;
+    let t = c && c.parts ? c.parts.map((p) => p.text || "").join("").trim() : "";
+    t = t.replace(/[«»"*#]/g, "").replace(/\s+/g, " ").trim();
+    const words = t.split(" ").length;
+    if (!t || words < 15 || words > 70 || /посредник|крыш|krisha|агент/i.test(t) || !t.includes(priceWords(f.price))) return fallbackScript(f);
+    if (!t.includes("Поставьте плюс")) t += " " + CTA;
+    return t;
+  } catch (e) {
+    console.log("[reel] текст: " + e.message);
+    return fallbackScript(f);
+  }
+}
+// Озвучка: Gemini TTS, голос — app_config insta.reel_voice (по умолчанию Kore).
+// Возвращает WAV; Gemini отдаёт то готовый WAV (бывает WAV внутри WAV), то сырой PCM.
+async function tts(text, voice) {
+  const j = await gemini(process.env.GEMINI_TTS_MODEL || "gemini-3.8-flash-tts", {
+    // Только сам текст: подводку о манере («прочитай энергично…», и
+    // по-английски тоже) модель время от времени зачитывала вслух (проверено
+    // расшифровкой 11.10.2026). Без неё голос Kore и так звучит живо.
+    contents: [{ parts: [{ text: text }] }],
+    generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice || "Kore" } } } },
+  });
+  const part = ((((j.candidates || [])[0] || {}).content || {}).parts || []).find((p) => p.inlineData);
+  if (!part) throw new Error("tts: нет звука в ответе");
+  let b = Buffer.from(part.inlineData.data, "base64");
+  const inner = b.indexOf("RIFF", 4);
+  if (b.slice(0, 4).toString() === "RIFF" && inner > 0 && inner < 100) b = b.slice(inner);
+  if (b.slice(0, 4).toString() === "RIFF") return b;
+  const rate = Number((String(part.inlineData.mimeType).match(/rate=(\d+)/) || [])[1]) || 24000;
+  const h = Buffer.alloc(44);
+  h.write("RIFF", 0); h.writeUInt32LE(36 + b.length, 4); h.write("WAVEfmt ", 8); h.writeUInt32LE(16, 16);
+  h.writeUInt16LE(1, 20); h.writeUInt16LE(1, 22); h.writeUInt32LE(rate, 24); h.writeUInt32LE(rate * 2, 28);
+  h.writeUInt16LE(2, 32); h.writeUInt16LE(16, 34); h.write("data", 36); h.writeUInt32LE(b.length, 40);
+  return Buffer.concat([h, b]);
+}
+// Проверка озвучки: расшифровываем и смотрим, что цена прозвучала верно
+// (число миллионов) и нет посторонних слов в начале. Ошибка в цене в ролике
+// хуже, чем ролик без голоса.
+async function voiceOk(wav, f) {
+  const j = await gemini(process.env.GEMINI_MODEL || "gemini-3.7-flash", {
+    contents: [{ parts: [{ inlineData: { mimeType: "audio/wav", data: wav.toString("base64") } }, { text: "Дословно расшифруй речь, числа цифрами. Только текст." }] }],
+    generationConfig: { temperature: 0, maxOutputTokens: 3000 },
+  });
+  const c = ((j.candidates || [])[0] || {}).content;
+  const t = (c && c.parts ? c.parts.map((p) => p.text || "").join("") : "").replace(/\s+/g, " ");
+  const mln = String(Math.floor(Math.round(Number(f.price) / 1000) / 1000));
+  return new RegExp("(^|\\D)" + mln + "(\\D|$)").test(t) && !/\b(say|tone|pace)\b|прочитай/i.test(t) && /плюс/i.test(t);
+}
+// Текст + голос для ролика; до двух попыток озвучки с проверкой. Не вышло —
+// wav: null (ролик выйдет с одной музыкой).
+async function reelVoice(f, voice) {
+  const text = await reelScript(f);
+  for (let i = 0; i < 2; i++) {
+    try {
+      const wav = await tts(text, voice);
+      if (await voiceOk(wav, f).catch(() => true)) return { text: text, wav: wav };
+      console.log("[reel] озвучка не прошла проверку, попытка " + (i + 1));
+    } catch (e) { console.log("[reel] голос: " + e.message); }
+  }
+  return { text: text, wav: null };
+}
+
+module.exports = { renderReel, reelHook, reelVoice, reelScript, priceWords, TOP };
