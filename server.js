@@ -5552,6 +5552,14 @@ async function instaHookComment(e, v, accs, cfg, verified) {
   if (uname && acct.username && String(uname).toLowerCase() === String(acct.username).toLowerCase()) return;
   const fresh = await db.instaCommentEventAdd({ commentId: cid, acc: acct.acc, mediaId: mediaId, username: uname, text: text, status: "seen" }).catch(() => false);
   if (!fresh) return; // повтор события — уже обработали
+  // Бесплатная консультация: слово «консультация» под любым нашим постом или
+  // любой комментарий под постом-приманкой (app_config insta.consult_posts —
+  // id постов через запятую).
+  const consultPosts = String((await db.configGet(["insta.consult_posts"]).catch(() => ({})))["insta.consult_posts"] || "").split(",").map((x) => x.trim()).filter(Boolean);
+  if (/консульт/i.test(text) || (mediaId && consultPosts.includes(String(mediaId)) && text.trim())) {
+    if (!cfg.reply || !verified) return;
+    return instaHookConsult(acct, cid, uname, mediaId, text);
+  }
   // Подборка (несколько квартир в посте): «+3» или «3» — квартира № 3.
   const items = post ? await db.instaPostItems(post.post_id).catch(() => []) : [];
   const plus = INSTA.isPlus(text) || (items.length > 0 && /^\s*\d{1,2}\s*$/.test(text));
@@ -5635,6 +5643,7 @@ async function instaHookMessage(e, m, accs, cfg, verified) {
     if (ev0 && acct0 && acct0.token) await instaHookMore(acct0, igsid, ev0);
     return;
   }
+  if (await instaConsultMessage(accs, igsid, payload, String(msg.text || ""))) return;
   let cid = /^PHONE:/.test(payload) ? payload.slice(6) : null;
   // Подборка: PHONE:<комментарий>:<номер квартиры> — запоминаем выбор.
   const pick = cid && cid.match(/^(\d+):(\d{1,2})$/);
@@ -5689,6 +5698,80 @@ async function instaHookMessage(e, m, accs, cfg, verified) {
     await db.instaCommentEventSet(cid, "replied", null, ev.listing_id);
   }
   console.log("[insta-hook] номер квартиры " + ev.listing_id + " → @" + ev.username);
+}
+
+// --- Бесплатная консультация (лид-магнит) ------------------------------------
+// Комментарий → приватный ответ с кнопкой «Записаться» → проверка подписки →
+// «Оставьте номер телефона — мы с вами свяжемся» → номер → заявка админам.
+const CONSULT_INTRO = "Бесплатная консультация по ипотеке 👋\nПодскажем, какая программа вам подходит (Отбасы банк, банки второго уровня), сколько нужно на первый взнос и какой будет платёж.";
+async function instaHookConsult(acct, cid, uname, mediaId, text) {
+  const handle = (INSTA.ACCOUNTS[acct.acc] || {}).handle || acct.username;
+  try {
+    const id = await db.consultAdd({ acc: acct.acc, username: uname, commentId: cid, mediaId: mediaId, text: text });
+    const r = await INSTA.privateReply(acct.ig_user_id, acct.token, cid,
+      CONSULT_INTRO + "\n\nЧтобы записаться, подпишитесь на @" + handle + " и нажмите кнопку 👇\nУже подписаны — просто нажмите.", [{ title: "Записаться", payload: "CONSULT:" + id }])
+      .catch((err) => { console.log("[insta-hook] консультация, кнопка: " + err.message);
+        return INSTA.privateReply(acct.ig_user_id, acct.token, cid, CONSULT_INTRO + "\n\nЧтобы записаться, подпишитесь на @" + handle + " и пришлите сюда номер телефона — мы с вами свяжемся."); });
+    if (r && r.recipient_id) await db.consultSet(id, { igsid: r.recipient_id });
+    await INSTA.replyComment(cid, acct.token, "Отправили в директ 📩").catch(() => {});
+    await db.instaCommentEventSet(cid, "asked", "консультация").catch(() => {});
+  } catch (err) {
+    await db.instaCommentEventSet(cid, "error", "консультация: " + err.message).catch(() => {});
+    console.log("[insta-hook] консультация " + cid + ": " + err.message);
+  }
+}
+// Сообщение в директе по консультации; true — обработано.
+async function instaConsultMessage(accs, igsid, payload, text) {
+  const acct = accs.find((x) => x.token);
+  if (!acct) return false;
+  const handle = (INSTA.ACCOUNTS[acct.acc] || {}).handle || acct.username;
+  let lead = null;
+  if (/^CONSULT:\d+$/.test(payload)) {
+    lead = await db.consultGet("id", payload.slice(8)).catch(() => null);
+    if (lead && !lead.igsid) await db.consultSet(lead.id, { igsid: igsid });
+  } else {
+    lead = await db.consultGet("igsid", igsid).catch(() => null);
+    if (lead && lead.status === "done" && !/консульт/i.test(text)) lead = null;
+    // Написали «консультация» прямо в директ (например, из рекламы «Написать»).
+    if (!lead && /консульт/i.test(text)) {
+      const id = await db.consultAdd({ acc: acct.acc, igsid: igsid, text: text });
+      lead = await db.consultGet("id", id);
+    }
+    if (!lead) return false;
+    // Не номер и не нажатие — пусть разбирают остальные обработчики (квартиры).
+    const digits = text.replace(/\D/g, "");
+    if (!/консульт/i.test(text) && digits.length < 10) {
+      if (lead.status === "wait_phone" && text.trim()) {
+        await INSTA.sendMessage(acct.ig_user_id, acct.token, igsid, "Напишите, пожалуйста, номер телефона, например +7 701 123 45 67 🙏");
+        return true;
+      }
+      return false;
+    }
+  }
+  if (!lead) return false;
+  let follows = false;
+  try { follows = (await INSTA.userFollows(igsid, acct.token)).follows; } catch (err) { console.log("[insta-hook] консультация, подписка: " + err.message); }
+  if (!follows) {
+    await INSTA.sendMessage(acct.ig_user_id, acct.token, igsid,
+      "Пока не видим подписки 🙂 Подпишитесь на @" + handle + " (нажмите на имя → «Подписаться») и нажмите кнопку 👇", "CONSULT:" + lead.id, "Я подписался ✅");
+    return true;
+  }
+  const digits = text.replace(/\D/g, "");
+  if (digits.length >= 10 && !/^CONSULT:/.test(payload)) {
+    const d = digits.length === 10 ? "7" + digits : digits.replace(/^8(\d{10})$/, "7$1");
+    const phone = "+" + d;
+    await db.consultSet(lead.id, { status: "done", phone: phone });
+    await INSTA.sendMessage(acct.ig_user_id, acct.token, igsid, "Спасибо! Мы с вами свяжемся в ближайшее время 🙌");
+    const post = lead.media_id ? await db.instaPostByMedia(lead.media_id).catch(() => null) : null;
+    phoneWatchSend("📞 Заявка на консультацию по ипотеке\n@" + (lead.username || "?") + " · " + phone +
+      (post ? "\nс поста № " + post.post_id : lead.media_id ? "\nс поста " + lead.media_id : "\nиз директа") +
+      (lead.text && !/^\s*\+\s*$/.test(lead.text) ? "\nНаписал(а): " + String(lead.text).slice(0, 120) : ""));
+    console.log("[insta-hook] консультация: заявка " + lead.id + " @" + lead.username);
+    return true;
+  }
+  await db.consultSet(lead.id, { status: "wait_phone" });
+  await INSTA.sendMessage(acct.ig_user_id, acct.token, igsid, "Отлично! Оставьте, пожалуйста, номер телефона — мы с вами свяжемся 📞");
+  return true;
 }
 
 // До 3 похожих квартир рядом из наших постов: номер поста, параметры,
@@ -7525,7 +7608,7 @@ http
           // свой post-call вебхук и свои уведомления.
           const ev = String(fields.event || "");
           const who = fields.caller_id || fields.destination || "?";
-          const didDigits = String(fields.called_did || "").replace(/D/g, "");
+          const didDigits = String(fields.called_did || "").replace(/\D/g, "");
           if (!agentDidsCache.at || Date.now() - agentDidsCache.at > 300e3) {
             agentDidsCache.at = Date.now();
             db.agentDids().then((s) => { agentDidsCache.set = s; }).catch(() => {});
@@ -8495,7 +8578,7 @@ http
       // поднятия, архив) по порядку; на ней строится «мотивация продавца».
       if (q.get("history")) {
         (async () => {
-          const h = await db.listHistory(q.get("history").replace(/D/g, ""));
+          const h = await db.listHistory(q.get("history").replace(/\D/g, ""));
           if (!h.item) return send(404, { ok: false, error: "нет такого объявления в списке" });
           const prices = h.events.filter((e) => e.kind === "price");
           const first = h.events.find((e) => e.kind === "new");

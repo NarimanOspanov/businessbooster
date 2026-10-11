@@ -3455,6 +3455,22 @@ IF COL_LENGTH('dbo.insta_posts', 'reel_media_id') IS NULL ALTER TABLE dbo.insta_
 IF COL_LENGTH('dbo.insta_posts', 'reel_permalink') IS NULL ALTER TABLE dbo.insta_posts ADD reel_permalink NVARCHAR(300) NULL;
 -- Подборка: один пост — несколько квартир. n — номер квартиры в подборке
 -- (как «3/7» на слайде); «+3» под постом — номер хозяина квартиры № 3.
+-- Заявки на бесплатную консультацию из Instagram: комментарий «консультация»
+-- (или «+» под постом-приманкой) → директ → подписка → номер телефона.
+IF OBJECT_ID('dbo.insta_consult_leads', 'U') IS NULL
+  CREATE TABLE dbo.insta_consult_leads (
+    id         INT IDENTITY(1,1) PRIMARY KEY,
+    acc        NVARCHAR(20)  NULL,
+    igsid      NVARCHAR(40)  NULL,
+    username   NVARCHAR(60)  NULL,
+    comment_id NVARCHAR(40)  NULL,
+    media_id   NVARCHAR(40)  NULL,
+    phone      NVARCHAR(40)  NULL,
+    text       NVARCHAR(300) NULL,
+    status     NVARCHAR(16)  NOT NULL DEFAULT 'asked', -- asked | wait_phone | done
+    created_at DATETIME2(0)  NOT NULL DEFAULT SYSUTCDATETIME(),
+    phone_at   DATETIME2(0)  NULL
+  );
 IF OBJECT_ID('dbo.insta_post_items', 'U') IS NULL
   CREATE TABLE dbo.insta_post_items (
     post_id    INT    NOT NULL,
@@ -3960,6 +3976,31 @@ async function instaCommentEventAdd(e) {
             BEGIN INSERT INTO dbo.insta_comment_events (comment_id, acc, media_id, username, text, status) VALUES (@cid, @acc, @mid, @u, @t, @st); SELECT 1 AS fresh; END
             ELSE SELECT 0 AS fresh;`);
   return !!(r.recordset[0] && r.recordset[0].fresh);
+}
+// --- Заявки на консультацию -----------------------------------------------
+async function consultAdd(l) {
+  const pool = await getPool();
+  await ensureInsta();
+  const r = await pool.request().input("acc", sql.NVarChar(20), l.acc || null).input("igsid", sql.NVarChar(40), l.igsid || null)
+    .input("u", sql.NVarChar(60), l.username ? String(l.username).slice(0, 60) : null).input("cid", sql.NVarChar(40), l.commentId || null)
+    .input("mid", sql.NVarChar(40), l.mediaId || null).input("t", sql.NVarChar(300), l.text ? String(l.text).slice(0, 300) : null)
+    .query("INSERT INTO dbo.insta_consult_leads (acc, igsid, username, comment_id, media_id, text) OUTPUT inserted.id VALUES (@acc, @igsid, @u, @cid, @mid, @t)");
+  return r.recordset[0].id;
+}
+async function consultGet(by, v) {
+  const pool = await getPool();
+  await ensureInsta();
+  const col = by === "comment" ? "comment_id" : by === "id" ? "id" : "igsid";
+  return (await pool.request().input("v", by === "id" ? sql.Int : sql.NVarChar(40), by === "id" ? Number(v) : String(v)).query(
+    "SELECT TOP 1 * FROM dbo.insta_consult_leads WHERE " + col + " = @v ORDER BY id DESC")).recordset[0] || null;
+}
+async function consultSet(id, f) {
+  const pool = await getPool();
+  await ensureInsta();
+  await pool.request().input("id", sql.Int, Number(id)).input("st", sql.NVarChar(16), f.status || null)
+    .input("ph", sql.NVarChar(40), f.phone || null).input("igsid", sql.NVarChar(40), f.igsid || null)
+    .query(`UPDATE dbo.insta_consult_leads SET status = COALESCE(@st, status), igsid = COALESCE(@igsid, igsid),
+            phone = COALESCE(@ph, phone), phone_at = CASE WHEN @ph IS NULL THEN phone_at ELSE SYSUTCDATETIME() END WHERE id = @id`);
 }
 // Этому человеку под этим постом уже писали в директ (по «+» или вопросу).
 async function instaCommentAnswered(mediaId, username, exceptCid) {
@@ -4999,7 +5040,7 @@ async function objectStats() {
   return r.recordset[0];
 }
 
-module.exports = { phoneSharedCount, stickyFirstPhone, listPhoneRetryLater, instaPostForReel, instaPostReel, instaCommentAnswered, instaPostItemsSet, instaPostItems, instaCommentEventNeedFollow, instaCommentEventsToRemind, instaCommentEventReminded, instaSimilarPosts, instaHookLogAdd, instaCommentEventGet, instaCommentEventIgsid, instaCommentEventAsked, instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
+module.exports = { consultAdd, consultGet, consultSet, phoneSharedCount, stickyFirstPhone, listPhoneRetryLater, instaPostForReel, instaPostReel, instaCommentAnswered, instaPostItemsSet, instaPostItems, instaCommentEventNeedFollow, instaCommentEventsToRemind, instaCommentEventReminded, instaSimilarPosts, instaHookLogAdd, instaCommentEventGet, instaCommentEventIgsid, instaCommentEventAsked, instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,
