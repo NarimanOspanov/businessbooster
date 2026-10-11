@@ -5223,9 +5223,10 @@ async function instaReelAfter(a, fc, slides, tok, code, tell) {
     const voice = await REEL.reelVoice(fc, voiceName).catch((e) => { console.log("[insta] reel voice: " + e.message); return { wav: null }; });
     if (voice.text) console.log("[insta] reel " + code + " текст: " + voice.text + (voice.wav ? "" : " (без голоса)"));
     // Без обложки (на ней цена); карта — предпоследним кадром, но без цены.
+    // Карты в карусели нет (не загрузилась) — пробуем нарисовать её для ролика.
     let reelSlides = slides.filter((_, i) => i !== 0);
-    if (slides.mapAt != null) {
-      const map = await INSTA.mapSlide(fc, a.acc, true).catch(() => null);
+    if (slides.mapAt != null || (fc.lat != null && fc.lon != null)) {
+      const map = await INSTA.mapSlide(fc, a.acc, true).catch((e) => { console.log("[insta] reel " + code + " карта: " + e.message); return null; });
       reelSlides = slides.filter((_, i) => i !== 0 && i !== slides.mapAt);
       if (map) reelSlides.splice(reelSlides.length - 1, 0, map);
     }

@@ -164,9 +164,9 @@ async function gemini(model, body) {
 
 // От лица продавца: «Продаю…», в конце — «отправлю информацию и номер».
 // Цену в ролике не называем — её получают вместе с номером после «+».
-// Призыв — слово в слово, как попросили; «вариантах ипотеки» — только у ипотечных.
-const CTA = (f) => "Чтобы узнать больше о квартире, стоимости" + (f && f.mortgage ? " и вариантах ипотеки" : "") +
-  ", поставьте плюс в комментариях к этому посту — отправлю в личку.";
+// Призыв — слово в слово, как попросили; про ипотеку — только у ипотечных.
+const CTA = (f) => "Чтобы получить контакты, узнать стоимость, подробности" + (f && f.mortgage ? " и дополнительную информацию о вариантах ипотеки" : "") +
+  ", ставьте плюс в комментариях к этому посту — отправлю в личку.";
 const ROOMS_NOM = { 1: "1", 2: "2", 3: "3", 4: "4", 5: "5" };
 // Ниже рынка — если метр дешевле похожих (своя оценка или карточка).
 const belowMarket = (f) => (Number(f.below) || 0) >= 3 || /дешевле/i.test(String((f.card || {}).price || ""));
@@ -245,7 +245,7 @@ async function reelScript(f) {
     let t = c && c.parts ? c.parts.map((p) => p.text || "").join("").trim() : "";
     t = t.replace(/[«»"*#]/g, "").replace(/^\s*[-•\d.)]+\s*/gm, "").replace(/\s+/g, " ").trim();
     const words = t.split(" ").length;
-    if (!t || words < 10 || words > 60 || /посредник|крыш|krisha|агент|миллион|тенге|₸|%|поставьте плюс|продаю/i.test(t)) return fallbackScript(f);
+    if (!t || words < 10 || words > 60 || /посредник|крыш|krisha|агент|миллион|тенге|₸|%|ставьте плюс|продаю/i.test(t)) return fallbackScript(f);
     return opening(f) + " " + t + " " + CTA(f);
   } catch (e) {
     console.log("[reel] текст: " + e.message);
@@ -306,7 +306,7 @@ async function reelVoice(f, voice) {
 function reelCaption(f, tags) {
   const rubric = "🔑 От хозяина" + (f.mortgage ? " · можно в ипотеку" : "") + (belowMarket(f) ? " · ниже рынка" : "");
   const what = opening(f);
-  return [rubric, "", what, "", "👉 " + CTA(f).replace("поставьте плюс", "поставьте «+»"), "", tags || ""].join("\n").trim();
+  return [rubric, "", what, "", "👉 " + CTA(f).replace("ставьте плюс", "ставьте «+»"), "", tags || ""].join("\n").trim();
 }
 
 module.exports = { renderReel, reelHook, reelVoice, reelScript, reelCaption, priceWords, tts, TOP };

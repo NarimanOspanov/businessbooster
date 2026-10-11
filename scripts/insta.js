@@ -202,11 +202,20 @@ const tileCache = new Map();
 async function tile(x, y) {
   const k = x + ":" + y;
   if (tileCache.has(k)) return tileCache.get(k);
-  const r = await fetch("https://tile.openstreetmap.org/" + TILE_Z + "/" + x + "/" + y + ".png", {
-    headers: { "User-Agent": "ipoteka1-instagram/1.0 (+https://reception365.online)" }, signal: AbortSignal.timeout(15000),
-  });
-  if (!r.ok) throw new Error("tile " + r.status);
-  const b = Buffer.from(await r.arrayBuffer());
+  // Сервер карт иногда отвечает ошибкой или не успевает — три попытки с паузой
+  // (без этого Reels к посту № 90 вышел без карты).
+  let b = null, err = null;
+  for (let t = 0; t < 3 && !b; t++) {
+    if (t) await new Promise((res) => setTimeout(res, 1500 * t));
+    try {
+      const r = await fetch("https://tile.openstreetmap.org/" + TILE_Z + "/" + x + "/" + y + ".png", {
+        headers: { "User-Agent": "ipoteka1-instagram/1.0 (+https://reception365.online)" }, signal: AbortSignal.timeout(15000),
+      });
+      if (!r.ok) throw new Error("tile " + r.status);
+      b = Buffer.from(await r.arrayBuffer());
+    } catch (e) { err = e; }
+  }
+  if (!b) throw err;
   tileCache.set(k, b);
   if (tileCache.size > 400) tileCache.delete(tileCache.keys().next().value);
   return b;
