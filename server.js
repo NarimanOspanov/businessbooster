@@ -5487,8 +5487,16 @@ async function instaHookComment(e, v, accs, cfg, verified) {
   // Подборка (несколько квартир в посте): «+3» или «3» — квартира № 3.
   const items = post ? await db.instaPostItems(post.post_id).catch(() => []) : [];
   const plus = INSTA.isPlus(text) || (items.length > 0 && /^\s*\d{1,2}\s*$/.test(text));
-  if (!plus) { await db.instaCommentEventSet(cid, "skipped", "не «+»").catch(() => {}); return; }
+  // Любой другой комментарий под нашим постом («где адрес?», «подвал?»,
+  // «дорого») — тоже в директ: отвечаем там тем же путём к номеру хозяина
+  // (все вопросы — ему), а в комментарии «Отправили в директ». Одному
+  // человеку под одним постом — один раз, на остальные его реплики молчим.
+  const question = !plus && !!text.trim();
+  if (!plus && !question) { await db.instaCommentEventSet(cid, "skipped", "не «+»").catch(() => {}); return; }
   if (!post) { await db.instaCommentEventSet(cid, "skipped", "пост не из нашей базы").catch(() => {}); return; }
+  if (question && await db.instaCommentAnswered(mediaId, uname, cid).catch(() => false)) {
+    await db.instaCommentEventSet(cid, "skipped", "вопрос — этому человеку под постом уже ответили").catch(() => {}); return;
+  }
   if (!cfg.reply) return; // только записываем — отвечает ManyChat
   if (!verified) { await db.instaCommentEventSet(cid, "skipped", "не задан секрет приложения — без проверки подписи не отвечаем").catch(() => {}); return; }
   let listingId = post.listing_id, label = "Квартира из поста № " + post.post_id;
@@ -5503,7 +5511,8 @@ async function instaHookComment(e, v, accs, cfg, verified) {
     // Первое сообщение сразу показывает квартиру, о которой речь (человек мог
     // поставить «+» под несколькими постами), и что нужно для номера.
     const f = await db.instaListing(listingId).catch(() => null);
-    const head = f ? "🏠 " + label + ":\n" + instaFlatLine(f) + "\n\n" : "";
+    const head = (question ? "Здравствуйте! Ответим здесь 🙂 Все вопросы по квартире лучше задать напрямую хозяину.\n\n" : "") +
+      (f ? "🏠 " + label + ":\n" + instaFlatLine(f) + "\n\n" : "");
     // Кнопку в приватном ответе Instagram может не принять — тогда без неё:
     // человек ответит словом «номер», это тоже засчитывается как нажатие.
     const r = await INSTA.privateReply(acct.ig_user_id, acct.token, cid,

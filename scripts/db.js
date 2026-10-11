@@ -3889,6 +3889,17 @@ async function instaCommentEventAdd(e) {
             ELSE SELECT 0 AS fresh;`);
   return !!(r.recordset[0] && r.recordset[0].fresh);
 }
+// Этому человеку под этим постом уже писали в директ (по «+» или вопросу).
+async function instaCommentAnswered(mediaId, username, exceptCid) {
+  if (!mediaId || !username) return false;
+  const pool = await getPool();
+  await ensureInsta();
+  const r = await pool.request().input("mid", sql.NVarChar(40), String(mediaId)).input("u", sql.NVarChar(60), String(username).slice(0, 60))
+    .input("cid", sql.NVarChar(40), String(exceptCid || ""))
+    .query(`SELECT TOP 1 1 AS x FROM dbo.insta_comment_events
+            WHERE media_id = @mid AND username = @u AND comment_id <> @cid AND status IN ('asked', 'replied')`);
+  return r.recordset.length > 0;
+}
 async function instaCommentEventSet(commentId, status, note, listingId) {
   const pool = await getPool();
   await ensureInsta();
@@ -4900,7 +4911,7 @@ async function objectStats() {
   return r.recordset[0];
 }
 
-module.exports = { instaPostItemsSet, instaPostItems, instaCommentEventNeedFollow, instaCommentEventsToRemind, instaCommentEventReminded, instaSimilarPosts, instaHookLogAdd, instaCommentEventGet, instaCommentEventIgsid, instaCommentEventAsked, instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
+module.exports = { instaCommentAnswered, instaPostItemsSet, instaPostItems, instaCommentEventNeedFollow, instaCommentEventsToRemind, instaCommentEventReminded, instaSimilarPosts, instaHookLogAdd, instaCommentEventGet, instaCommentEventIgsid, instaCommentEventAsked, instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,
