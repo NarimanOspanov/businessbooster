@@ -4008,6 +4008,16 @@ async function instaPostByMedia(mediaId) {
   return (await pool.request().input("mid", sql.NVarChar(40), String(mediaId)).query(
     "SELECT TOP 1 acc, post_id, CAST(listing_id AS NVARCHAR(20)) AS listing_id, media_id FROM dbo.insta_posts WHERE media_id = @mid OR reel_media_id = @mid")).recordset[0] || null;
 }
+// Пост для ролика вручную: названный или последний вышедший без ролика.
+async function instaPostForReel(acc, postId) {
+  const pool = await getPool();
+  await ensureInsta();
+  return (await pool.request().input("acc", sql.NVarChar(20), acc).input("id", sql.Int, Number(postId) || 0).query(
+    `SELECT TOP 1 post_id, CAST(listing_id AS NVARCHAR(20)) AS listing_id, reel_media_id, reel_permalink FROM dbo.insta_posts
+     WHERE acc = @acc AND status = 'published' AND media_id IS NOT NULL AND (reason IS NULL OR reason <> 'manual')
+       AND (@id = 0 AND reel_media_id IS NULL OR post_id = @id)
+     ORDER BY created_at DESC`)).recordset[0] || null;
+}
 async function instaPostReel(postId, mediaId, permalink) {
   const pool = await getPool();
   await ensureInsta();
@@ -4920,7 +4930,7 @@ async function objectStats() {
   return r.recordset[0];
 }
 
-module.exports = { instaPostReel, instaCommentAnswered, instaPostItemsSet, instaPostItems, instaCommentEventNeedFollow, instaCommentEventsToRemind, instaCommentEventReminded, instaSimilarPosts, instaHookLogAdd, instaCommentEventGet, instaCommentEventIgsid, instaCommentEventAsked, instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
+module.exports = { instaPostForReel, instaPostReel, instaCommentAnswered, instaPostItemsSet, instaPostItems, instaCommentEventNeedFollow, instaCommentEventsToRemind, instaCommentEventReminded, instaSimilarPosts, instaHookLogAdd, instaCommentEventGet, instaCommentEventIgsid, instaCommentEventAsked, instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,

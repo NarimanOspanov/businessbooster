@@ -5214,7 +5214,7 @@ async function instaPublish(acc, f) {
 // рекомендации. media_id ролика пишем к посту: «+» под ним — тот же номер.
 // Сбой — уведомление админам, карусель от него не зависит.
 let instaReelBusy = false;
-async function instaReelAfter(a, fc, slides, tok, code) {
+async function instaReelAfter(a, fc, slides, tok, code, tell) {
   if (instaReelBusy) { console.log("[insta] reel " + code + ": предыдущий ролик ещё собирается — пропускаем"); return; }
   instaReelBusy = true;
   try {
@@ -5230,6 +5230,7 @@ async function instaReelAfter(a, fc, slides, tok, code) {
     const r = await INSTA.publishReel(a.ig_user_id, a.token, PUBLIC_URL + "/api/insta/vid/" + tok + ".mp4", cap, false);
     await db.instaPostReel(code, r.mediaId, r.permalink);
     console.log("[insta] reel " + code + " → " + (r.permalink || r.mediaId));
+    if (tell) notifyTelegram("🎬 Instagram: ролик к посту № " + code + " вышел" + (r.permalink ? "\n" + r.permalink : ""));
   } catch (e) {
     console.log("[insta] reel " + code + ": " + e.message);
     notifyTelegram("🎬 Instagram: ролик к посту № " + code + " не вышел (карусель вышла): " + String(e.message).slice(0, 200));
@@ -9295,6 +9296,36 @@ http
       }
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
       res.end(KRISHA_LIST_STATS_HTML);
+      return;
+    }
+
+    // Ролик Reels к уже вышедшему посту: ?post=N (без него — последний пост
+    // без ролика). Собирается и выкладывается в фоне несколько минут; итог —
+    // в Telegram админам. Слайды собираем заново (та же квартира, те же фото).
+    if (urlPath === "/api/krisha/insta-reel") {
+      const send = (code, obj) => { res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); };
+      const key = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
+      if (!key || parsed.searchParams.get("key") !== key) return send(403, { ok: false, error: "bad_key" });
+      const acc = INSTA_ACCS.includes(parsed.searchParams.get("acc")) ? parsed.searchParams.get("acc") : "almaty";
+      (async () => {
+        if (instaReelBusy) return send(409, { ok: false, error: "ролик уже собирается — подождите пару минут" });
+        const p = await db.instaPostForReel(acc, parsed.searchParams.get("post"));
+        if (!p) return send(404, { ok: false, error: "нет поста без ролика" });
+        if (p.reel_media_id) return send(409, { ok: false, post: p.post_id, error: "у поста уже есть ролик", reel: p.reel_permalink });
+        const a = (await db.instaAccounts()).find((x) => x.acc === acc);
+        if (!a || !a.token) return send(400, { ok: false, error: "аккаунт не подключён" });
+        const f = await db.instaListing(p.listing_id);
+        if (!f) return send(404, { ok: false, error: "квартира поста не найдена" });
+        const pl = (await db.instaPlacesGet([f.id]).catch(() => ({})))[String(f.id)];
+        if (pl) { f.near = pl.text; f.chips = pl.chips; }
+        await instaEnsureCard(f).catch(() => {});
+        const fc = Object.assign({}, f, { code: p.post_id });
+        send(202, { ok: true, post: p.post_id, started: true, note: "ролик собирается, итог придёт в Telegram через 3–7 минут" });
+        const slides = await INSTA.renderCarousel(fc, acc, { polish: await instaPolish() });
+        const tok = crypto.randomBytes(12).toString("hex");
+        instaImgs.set(tok, { at: Date.now(), slides: slides });
+        await instaReelAfter(a, fc, slides, tok, p.post_id, true);
+      })().catch((e) => { try { send(500, { ok: false, error: String(e.message).slice(0, 200) }); } catch { /* уже ответили */ } console.log("[insta] reel route: " + e.message); });
       return;
     }
 
