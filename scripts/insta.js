@@ -308,7 +308,8 @@ async function renderCarousel(f, acc, opts) {
   const facts = photoFacts(f);
   inner.forEach((b, k) => slides.push(toJpeg(photoSvg(b, acc, k + 2, n, f, fx[k + 1], facts[k]))));
   const map = await mapSlide(f, acc).catch((e) => { console.log("[insta] map: " + e.message); return null; });
-  if (map) slides.push(map);
+  // Где карта — Reels её пропускает (в ролике она не читается).
+  if (map) { slides.mapAt = slides.length; slides.push(map); }
   slides.push(toJpeg(ctaSvg(f, got[0], acc)));
   return slides;
 }
@@ -412,14 +413,15 @@ async function refreshToken(token) {
   const j = await ig("GET", "https://graph.instagram.com/refresh_access_token", { grant_type: "ig_refresh_token" }, token);
   return { token: j.access_token, expiresIn: j.expires_in };
 }
-async function waitReady(id, token) {
-  for (let i = 0; i < 30; i++) {
+async function waitReady(id, token, tries) {
+  const n = tries || 30;
+  for (let i = 0; i < n; i++) {
     const j = await ig("GET", "/" + id, { fields: "status_code,status" }, token);
     if (j.status_code === "FINISHED") return;
     if (j.status_code === "ERROR" || j.status_code === "EXPIRED") throw new Error("контейнер " + id + ": " + (j.status || j.status_code));
     await new Promise((r) => setTimeout(r, 2000));
   }
-  throw new Error("контейнер " + id + " не готов за минуту");
+  throw new Error("контейнер " + id + " не готов за " + Math.round(n * 2 / 60) + " мин");
 }
 // Карусель: контейнер на каждую картинку, контейнер карусели, публикация.
 async function publishCarousel(userId, token, imageUrls, text) {
@@ -445,6 +447,23 @@ async function publishCarousel(userId, token, imageUrls, text) {
   let pub;
   for (let i = 0; ; i++) {
     try { pub = await ig("POST", "/" + userId + "/media_publish", { creation_id: car.id }, token); break; }
+    catch (e) {
+      if (!/not ready|2207027|9007/i.test(String(e.message)) || i >= 7) throw e;
+      await new Promise((r) => setTimeout(r, [3, 5, 7, 10, 12, 15, 15][i] * 1000));
+    }
+  }
+  let permalink = null;
+  try { permalink = (await ig("GET", "/" + pub.id, { fields: "permalink" }, token)).permalink || null; } catch { /* ссылка — не главное */ }
+  return { mediaId: pub.id, permalink: permalink };
+}
+// Reels: видео по ссылке, тоже в ленту (share_to_feed). Instagram обрабатывает
+// видео дольше картинок — ждём до 5 минут.
+async function publishReel(userId, token, videoUrl, text) {
+  const c = await ig("POST", "/" + userId + "/media", { media_type: "REELS", video_url: videoUrl, caption: text, share_to_feed: "true" }, token);
+  await waitReady(c.id, token, 150);
+  let pub;
+  for (let i = 0; ; i++) {
+    try { pub = await ig("POST", "/" + userId + "/media_publish", { creation_id: c.id }, token); break; }
     catch (e) {
       if (!/not ready|2207027|9007/i.test(String(e.message)) || i >= 7) throw e;
       await new Promise((r) => setTimeout(r, [3, 5, 7, 10, 12, 15, 15][i] * 1000));
@@ -504,4 +523,4 @@ async function userFollows(igsid, token) {
 async function replyComment(commentId, token, text) { return ig("POST", "/" + commentId + "/replies", { message: text }, token); }
 const isPlus = (t) => /^\s*(\+|➕|плюс)/i.test(String(t || ""));
 
-module.exports = { findByCaption, ACCOUNTS, renderCarousel, renderCover, caption, hook, cleanAddr, publishCarousel, me, refreshToken, comments, isPlus, coverSvg, photoSvg, ctaSvg, toJpeg, rawSlides, privateReply, replyComment, sendMessage, userFollows };
+module.exports = { publishReel, findByCaption, ACCOUNTS, renderCarousel, renderCover, caption, hook, cleanAddr, publishCarousel, me, refreshToken, comments, isPlus, coverSvg, photoSvg, ctaSvg, toJpeg, rawSlides, privateReply, replyComment, sendMessage, userFollows };

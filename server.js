@@ -5182,8 +5182,22 @@ async function instaPublish(acc, f) {
         fs.mkdirSync(path.join(INSTA_IMG_DIR, tok), { recursive: true });
         slides.forEach((b, i) => fs.writeFileSync(path.join(INSTA_IMG_DIR, tok, i + ".jpg"), b));
       } catch (e) { console.log("[insta] img to disk: " + e.message); }
+      // Reels: каждый N-й пост (app_config insta.reel_every, 0 — выкл.) —
+      // ролик из тех же слайдов: зацеп с ценой, фото, призыв «+». «+» под ним
+      // работает так же — media_id ролика записывается как у поста.
+      const reelEvery = Number((await db.configGet(["insta.reel_every"]).catch(() => ({})))["insta.reel_every"]) || 0;
+      let mp4 = null;
+      if (reelEvery > 0 && code % reelEvery === 0) {
+        try {
+          const REEL = require("./scripts/insta-reel.js");
+          mp4 = await REEL.renderReel(slides.filter((_, i) => i !== slides.mapAt), { hook: REEL.reelHook(fc), top: REEL.TOP });
+          instaImgs.get(tok).video = mp4;
+          try { fs.writeFileSync(path.join(INSTA_IMG_DIR, tok, "reel.mp4"), mp4); } catch { /* из памяти тоже отдадим */ }
+        } catch (e) { mp4 = null; console.log("[insta] reel " + code + ": " + e.message + " — публикуем каруселью"); }
+      }
       const urls = slides.map((_, i) => PUBLIC_URL + "/api/insta/img/" + tok + "/" + i + ".jpg");
-      const r = await INSTA.publishCarousel(a.ig_user_id, a.token, urls, cap);
+      const r = mp4 ? await INSTA.publishReel(a.ig_user_id, a.token, PUBLIC_URL + "/api/insta/vid/" + tok + ".mp4", cap)
+        : await INSTA.publishCarousel(a.ig_user_id, a.token, urls, cap);
       await db.instaPostFinish(code, { status: "published", mediaId: r.mediaId, permalink: r.permalink, caption: cap });
       instaDropCandidate(acc, f.id);
       return Object.assign({ code: code }, r);
@@ -7626,6 +7640,19 @@ http
         return send(r.ok ? 200 : 400, r);
       })().catch((e) => send(500, { ok: false, error: String(e.message).slice(0, 120) }));
       return;
+    }
+    // Ролик Reels для Instagram — как картинки: одноразовая ссылка, живёт час.
+    {
+      const m = /^\/api\/insta\/vid\/([a-f0-9]{24})\.mp4$/.exec(urlPath);
+      if (m) {
+        const hit = instaImgs.get(m[1]);
+        let vid = hit && hit.video;
+        if (!vid) { try { vid = fs.readFileSync(path.join(INSTA_IMG_DIR, m[1], "reel.mp4")); } catch { vid = null; } }
+        if (!vid) { res.writeHead(404); res.end(); return; }
+        res.writeHead(200, { "Content-Type": "video/mp4", "Content-Length": vid.length, "Cache-Control": "no-store" });
+        res.end(vid);
+        return;
+      }
     }
     // Картинки поста для Instagram: одноразовая ссылка, живёт час.
     {
