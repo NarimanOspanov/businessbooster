@@ -5171,6 +5171,12 @@ async function instaPublish(acc, f) {
       instaDropCandidate(acc, f.id);
       throw skip("под ипотеку не публикуем: " + f.card.mortgageNo);
     }
+    // Номер хозяина стоит у многих объявлений — чужой или агент: на «+» пришлём не тот номер.
+    const shared = await db.phoneSharedCount(f.id).catch(() => ({ n: 0 }));
+    if (shared.n > 3) {
+      instaDropCandidate(acc, f.id);
+      throw skip("номер " + shared.p + " стоит у " + shared.n + " объявлений «от хозяина» — не публикуем");
+    }
     const code = await db.instaPostReserve(acc, f.id, reason);
     const fc = Object.assign({}, f, { code: code });
     const cap = INSTA.caption(fc, acc);
@@ -5643,6 +5649,17 @@ async function instaHookMessage(e, m, accs, cfg, verified) {
   const f = await db.instaListing(ev.listing_id);
   const phones = String((f && f.phones) || "").split(",").map((x) => x.trim()).filter(Boolean);
   const post = ev.media_id ? await db.instaPostByMedia(ev.media_id).catch(() => null) : null;
+  // Номер стоит у многих объявлений «от хозяина» — скорее всего чужой (прилип
+  // в приложении Крыши) или это агент: не отдаём, админам — разобраться.
+  const shared = phones.length ? await db.phoneSharedCount(ev.listing_id).catch(() => ({ n: 0 })) : { n: 0 };
+  if (shared.n > 3) {
+    await INSTA.sendMessage(acct.ig_user_id, acct.token, igsid,
+      "Номер хозяина по этой квартире уточняем 🙏 Пришлём сюда, как только проверим. А пока — другие квартиры от хозяев:", "MORE:" + cid, "Ещё квартиры рядом");
+    await db.instaCommentEventSet(cid, "asked", "номер у " + shared.n + " объявлений — не отправлен", ev.listing_id).catch(() => {});
+    notifyTelegram("⚠️ Instagram: @" + ev.username + " ждёт номер по квартире " + ev.listing_id + " (https://krisha.kz/a/show/" + ev.listing_id + "), но номер " + phones[0] +
+      " стоит у " + shared.n + " объявлений «от хозяина» — не отправили. Проверьте номер и ответьте в директе.");
+    return;
+  }
   const text = f && phones.length ? instaPhoneText(f, phones, await instaPostLabel(post, ev.listing_id))
     : "По этой квартире номер сейчас недоступен 😔 Посмотрите другие предложения в нашем профиле — новые квартиры от хозяев каждый день.";
   // После номера — кнопка «Ещё квартиры рядом» (похожие из наших постов).
@@ -10354,6 +10371,20 @@ http
         hist.push(new Set(phones)); while (hist.length > 30) hist.shift();
         objphoneLastBySrc.set(src, hist);
         if (objphoneLastBySrc.size > 500) objphoneLastBySrc.delete(objphoneLastBySrc.keys().next().value);
+        // Прилип и первый номер: приложение не успело подгрузить номер этого
+        // объявления и показало прошлый. Если этот номер первым уже записан к
+        // другому объявлению «от хозяина» за последние 3 часа — не записываем,
+        // объявление попробуем ещё раз через полчаса.
+        const cur = await db.listPhonesGet(id).catch(() => []);
+        if (!cur.length && kept.length) {
+          const other = await db.stickyFirstPhone(id, kept[0], 3).catch(() => null);
+          if (other) {
+            await db.listPhoneRetryLater(id, 30).catch(() => {});
+            console.log("[objphone] " + id + ": номер " + kept[0] + " прилип (только что был у " + other + ") — не записан, повтор через 30 мин");
+            objphoneEvent({ kind: "save", id: id, kept: [], dropped: phones, total: 0, src: src, ip: ip, title: "прилип номер от " + other });
+            return send(200, { ok: true, id: id, phones: [], dropped: phones.map(pretty), sticky: true, retry: true });
+          }
+        }
         const merged = await db.addListPhones(id, kept);
         // Плагин присылает и текст карточки: по нему решаем, подходит ли под ипотеку.
         if (body.desc || body.params) db.listTextSave(id, String(body.desc || ""), String(body.params || "")).catch((e) => console.log("[objphone] text " + id + ": " + e.message));

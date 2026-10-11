@@ -2693,6 +2693,42 @@ async function addListPhones(id, phones) {
   return merged;
 }
 
+// Сколько объявлений «от хозяина» с тем же первым номером, что у этого.
+// Больше трёх — номер чужой: прилип в приложении Крыши (так +7 702 210 05 00
+// за 16 минут встал к 54 квартирам) или это агент под видом хозяина. Такой
+// номер в Instagram не отдаём.
+async function phoneSharedCount(id) {
+  const pool = await getPool();
+  await ensureList(pool);
+  const r = await pool.request().input("id", sql.BigInt, Number(id)).query(`
+    DECLARE @p NVARCHAR(300) = (SELECT phones FROM dbo.krisha_list WHERE id = @id);
+    IF @p IS NULL OR @p = '' SELECT 0 AS n, NULL AS p ELSE BEGIN
+      DECLARE @f NVARCHAR(40) = LEFT(@p, ISNULL(NULLIF(CHARINDEX(',', @p), 0) - 1, LEN(@p)));
+      SELECT COUNT(*) AS n, @f AS p FROM dbo.krisha_list WHERE user_type = 'owner' AND phones LIKE @f + '%';
+    END`);
+  return r.recordset[0] || { n: 0, p: null };
+}
+// Номер прилип: тот же номер первым только что (за hours часов) записан к
+// другому объявлению «от хозяина». Возвращает id того объявления или null.
+async function stickyFirstPhone(id, phone, hours) {
+  if (!phone) return null;
+  const pool = await getPool();
+  await ensureList(pool);
+  const r = await pool.request().input("id", sql.BigInt, Number(id)).input("p", sql.NVarChar(40), String(phone))
+    .input("h", sql.Int, Math.max(1, Number(hours) || 3)).query(`
+    SELECT TOP 1 id FROM dbo.krisha_list WITH (INDEX(IX_klist_withphone))
+    WHERE phones_at >= DATEADD(hour, -@h, SYSUTCDATETIME()) AND id <> @id AND user_type = 'owner'
+      AND (phones = @p OR phones LIKE @p + ',%')`);
+  return r.recordset[0] ? String(r.recordset[0].id) : null;
+}
+// Номер не приняли (прилип) — попробовать это объявление ещё раз позже.
+async function listPhoneRetryLater(id, minutes) {
+  const pool = await getPool();
+  await ensureList(pool);
+  await pool.request().input("id", sql.BigInt, Number(id)).input("m", sql.Int, Math.max(1, Number(minutes) || 30))
+    .query("UPDATE dbo.krisha_list SET phone_tries = ISNULL(phone_tries, 0) + 1, phone_next_at = DATEADD(minute, @m, SYSUTCDATETIME()), phone_lease_until = NULL WHERE id = @id AND phones IS NULL");
+}
+
 async function setListPhones(id, phones) {
   const pool = await getPool();
   await ensureList(pool);
@@ -4930,7 +4966,7 @@ async function objectStats() {
   return r.recordset[0];
 }
 
-module.exports = { instaPostForReel, instaPostReel, instaCommentAnswered, instaPostItemsSet, instaPostItems, instaCommentEventNeedFollow, instaCommentEventsToRemind, instaCommentEventReminded, instaSimilarPosts, instaHookLogAdd, instaCommentEventGet, instaCommentEventIgsid, instaCommentEventAsked, instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
+module.exports = { phoneSharedCount, stickyFirstPhone, listPhoneRetryLater, instaPostForReel, instaPostReel, instaCommentAnswered, instaPostItemsSet, instaPostItems, instaCommentEventNeedFollow, instaCommentEventsToRemind, instaCommentEventReminded, instaSimilarPosts, instaHookLogAdd, instaCommentEventGet, instaCommentEventIgsid, instaCommentEventAsked, instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,
