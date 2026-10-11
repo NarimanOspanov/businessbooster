@@ -5471,7 +5471,11 @@ async function instaWebhook(raw, sig) {
 // «+» под постом → приватный ответ с кнопкой «Получить номер». Номер — после
 // нажатия и проверки подписки (instaHookMessage), как было в ManyChat.
 async function instaHookComment(e, v, accs, cfg, verified) {
-  const cid = v.id, mediaId = v.media && v.media.id, uname = v.from && v.from.username, text = String(v.text || "");
+  // Комментарий под рекламой приходит с id рекламного поста (media_product_type
+  // AD); наш пост — в original_media_id. Без этого «+» под рекламой терялись
+  // как «пост не из нашей базы».
+  const m = v.media || {};
+  const cid = v.id, mediaId = m.original_media_id || m.id, uname = v.from && v.from.username, text = String(v.text || "");
   if (!cid) return;
   const post = mediaId ? await db.instaPostByMedia(mediaId).catch(() => null) : null;
   const acct = post ? accs.find((x) => x.acc === post.acc) : accs.find((x) => String(x.ig_user_id) === String(e.id));
