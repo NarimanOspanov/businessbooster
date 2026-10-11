@@ -5421,6 +5421,25 @@ function phoneWatchSend(text) {
   Promise.all(TG_ADMINS.map((chat) => sendTelegram(chat, text).then((r) => ({ chat, ok: !!(r && r.ok), error: r && !r.ok ? r.description : undefined }))))
     .then((all) => { phoneWatch.sent = { at: new Date().toISOString(), text: text.slice(0, 80), to: all }; });
 }
+// Прилипший номер (приложение Крыши показывает номер прошлого объявления) —
+// админам в бот: первый раз сразу, дальше по этому номеру не чаще раза в
+// 30 минут, со счётчиком отброшенных за это время. Мимо общего лимита, как
+// и сторож: сигнал редкий, а пропустить его нельзя.
+const objphoneSticky = new Map(); // номер → { n, sentAt, first }
+function objphoneStickyAlert(phone, id, other, src) {
+  const now = Date.now();
+  let x = objphoneSticky.get(phone);
+  if (!x) { x = { n: 0, sentAt: 0, first: now }; objphoneSticky.set(phone, x); }
+  x.n++;
+  if (now - x.sentAt < 30 * 60e3) return;
+  const hhmm = new Date(now + 5 * 3600e3).toISOString().slice(11, 16);
+  phoneWatchSend("⚠️ Плагин номеров: приложение Крыши показывает старый номер +" + phone + " (" + hhmm + ").\n" +
+    "Он уже записан к https://krisha.kz/a/show/" + other + ", а пришёл для https://krisha.kz/a/show/" + id + ".\n" +
+    "Не записали: " + x.n + (x.sentAt ? " за последние 30 мин" : "") + ". Объявления попробуем снова через 30 мин.\n" +
+    "Источник: " + src + ". Если повторяется — перезапустите приложение/вкладку плагина.");
+  x.sentAt = now; x.n = 0;
+  if (objphoneSticky.size > 200) objphoneSticky.delete(objphoneSticky.keys().next().value);
+}
 async function phoneWatchTick() {
   const lim = Math.max(3, Number(process.env.PHONES_ALERT_MIN) || 10);
   const r = await db.listPhoneFlow(lim);
@@ -10381,6 +10400,7 @@ http
           if (other) {
             await db.listPhoneRetryLater(id, 30).catch(() => {});
             console.log("[objphone] " + id + ": номер " + kept[0] + " прилип (только что был у " + other + ") — не записан, повтор через 30 мин");
+            objphoneStickyAlert(kept[0], id, other, src);
             objphoneEvent({ kind: "save", id: id, kept: [], dropped: phones, total: 0, src: src, ip: ip, title: "прилип номер от " + other });
             return send(200, { ok: true, id: id, phones: [], dropped: phones.map(pretty), sticky: true, retry: true });
           }
