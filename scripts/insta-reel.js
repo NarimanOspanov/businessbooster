@@ -57,6 +57,7 @@ function run(bin, args) {
 // slides — JPEG-буферы карусели (обложка, фото, …, призыв). Возвращает MP4.
 // opts.hook — крупный зацеп над первым слайдом (строка или две, до 15 слов):
 // решают первые 1–2 секунды. opts.top — мелкая надпись над остальными.
+// opts.tops / opts.big — свои надписи по кадрам (общие ролики о странице).
 async function renderReel(slides, opts) {
   const o = opts || {};
   const list = (slides || []).filter(Boolean);
@@ -76,7 +77,7 @@ async function renderReel(slides, opts) {
     }
     const total = dur.reduce((a, b) => a + b, 0);
     const music = o.music === false ? null : pickMusic();
-    list.forEach((b, i) => fs.writeFileSync(path.join(dir, i + ".png"), toPng(frameSvg(b, i === 0 ? o.hook : i === list.length - 1 ? null : o.top, i === 0))));
+    list.forEach((b, i) => fs.writeFileSync(path.join(dir, i + ".png"), toPng(frameSvg(b, o.tops ? o.tops[i] : i === 0 ? o.hook : i === list.length - 1 ? null : o.top, o.tops ? !!(o.big && o.big[i]) : i === 0))));
     const args = ["-y", "-loglevel", "error"];
     // Каждый кадр — одна картинка: zoompan сам растягивает её на d кадров
     // (с -loop он делал бы d кадров из каждого повтора — в сотни раз дольше).
@@ -308,4 +309,4 @@ function reelCaption(f, tags) {
   return [rubric, "", what, "", "👉 " + CTA(f).replace("поставьте плюс", "поставьте «+»"), "", tags || ""].join("\n").trim();
 }
 
-module.exports = { renderReel, reelHook, reelVoice, reelScript, reelCaption, priceWords, TOP };
+module.exports = { renderReel, reelHook, reelVoice, reelScript, reelCaption, priceWords, tts, TOP };
