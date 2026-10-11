@@ -2200,7 +2200,29 @@ BEGIN
   CREATE INDEX IX_klev_id ON dbo.krisha_list_events (id, at);
   CREATE INDEX IX_klev_at ON dbo.krisha_list_events (at DESC);
 END
+-- Номера агентов под видом хозяев: один номер у многих объявлений «от хозяина»,
+-- набравшихся постепенно (за недели). Такие объявления хозяйскими не считаем —
+-- ни в поиске хозяина, ни в боте. Тип объявления менять бесполезно: обход
+-- Крыши перезаписывает его обратно, поэтому — отдельный список номеров.
+IF OBJECT_ID('dbo.agent_phones', 'U') IS NULL
+  CREATE TABLE dbo.agent_phones (
+    phone     NVARCHAR(40) NOT NULL PRIMARY KEY,
+    n         INT          NULL,
+    reason    NVARCHAR(60) NULL,
+    marked_at DATETIME2(0) NOT NULL DEFAULT SYSUTCDATETIME()
+  );
+-- Копия номеров перед чисткой (сбойные номера плагина) — чтобы можно было вернуть.
+IF OBJECT_ID('dbo.krisha_list_phone_backup', 'U') IS NULL
+  CREATE TABLE dbo.krisha_list_phone_backup (
+    id        BIGINT        NOT NULL,
+    phones    NVARCHAR(300) NULL,
+    phones_at DATETIME2(0)  NULL,
+    reason    NVARCHAR(60)  NULL,
+    backed_at DATETIME2(0)  NOT NULL DEFAULT SYSUTCDATETIME()
+  );
 `;
+// Первый номер из списка phones (SQL-выражение для столбца col).
+const FIRST_PHONE = (col) => `LEFT(${col}, ISNULL(NULLIF(CHARINDEX(',', ${col}), 0) - 1, LEN(${col})))`;
 let listReady = false;
 let listReadyPromise = null, listFailedAt = 0;
 async function ensureList() {
@@ -2833,6 +2855,7 @@ async function findListOwners(q, limit) {
       FROM dbo.krisha_list f
       OUTER APPLY (SELECT MAX(e.at) AS at FROM dbo.krisha_list_events e WHERE e.id = f.id AND e.kind = 'archived') arch
       WHERE f.user_type = 'owner'
+        AND (f.phones IS NULL OR NOT EXISTS (SELECT 1 FROM dbo.agent_phones ap WHERE ap.phone = ${FIRST_PHONE("f.phones")}))
         AND (@exid IS NULL OR f.id <> @exid)
         AND (@deal IS NULL OR f.deal = @deal)
         AND (@prop IS NULL OR f.prop = @prop)
@@ -2920,6 +2943,16 @@ async function botLookup(id) {
       WHERE m.agent_id = @id AND (m.human_ok = 1 OR (m.photo_match = 1 AND m.human_ok IS NULL))
       ORDER BY m.human_ok DESC, m.photo_conf DESC, m.found_at DESC`)).recordset[0] || null;
   }
+  const agentSet = new Set();
+  const firsts = [item, owner].filter((x) => x && x.phones).map((x) => String(x.phones).split(",")[0]);
+  if (firsts.length) {
+    const rq = pool.request();
+    firsts.forEach((p, i) => rq.input("p" + i, sql.NVarChar(40), p));
+    (await rq.query("SELECT phone FROM dbo.agent_phones WHERE phone IN (" + firsts.map((_, i) => "@p" + i).join(",") + ")")).recordset
+      .forEach((r) => agentSet.add(r.phone));
+  }
+  if (owner && owner.phones && agentSet.has(String(owner.phones).split(",")[0])) owner = null;
+  if (item && item.user_type === "owner" && item.phones && agentSet.has(String(item.phones).split(",")[0])) item.user_type = "specialist";
   if (item) item.phones = rawList(item.phones);
   if (owner) owner.phones = rawList(owner.phones);
   return { item: item, owner: owner };
