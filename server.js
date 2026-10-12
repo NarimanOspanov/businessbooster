@@ -4914,7 +4914,14 @@ async function instaLoadCard(f) {
   let c = have[f.id];
   // Снятое до проверки ипотеки по тексту (нет verdict) — открываем заново.
   if (!c || !c.verdict) {
-    c = await Promise.race([CARD_FACTS.cardFacts(f.id), new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 60000))]);
+    const once = () => Promise.race([CARD_FACTS.cardFacts(f.id), new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 60000))]);
+    // Крыша отвечает 468 на частые запросы — вторая попытка через 8 секунд.
+    c = await once().catch(async (e) => {
+      if (e && (e.status === 404 || e.status === 410)) throw e;
+      console.log("[insta] card " + f.id + ": " + (e && e.message) + " — повтор через 8 с");
+      await new Promise((r) => setTimeout(r, 8000));
+      return once();
+    });
     // Тот же разбор, что у текста от плагина (mortgage-text.js): залог, бывшее
     // общежитие, дом до 1980, «ипотеку не рассматриваю» — «нет»; явное
     // согласие хозяина или названная программа — «да»; молчание — null.
@@ -4999,6 +5006,10 @@ async function instaSlides(acc, f, coverOnly) {
   if (instaPreview.size > 40) instaPreview.delete(instaPreview.keys().next().value);
   return slides;
 }
+// Квартиры, чья карточка не открылась: id → когда пробовать снова.
+const instaCardRetryAt = new Map();
+// Когда последний раз сообщали, что автопостинг всех пропустил (раз в 3 часа).
+const instaSkipAlertAt = {};
 function instaDropCandidate(acc, id) {
   if (instaCand[acc]) instaCand[acc].rows = instaCand[acc].rows.filter((x) => x.id !== String(id));
 }
@@ -5166,7 +5177,7 @@ async function instaPublish(acc, f) {
     // Без открытой карточки не знаем ни залога, ни слов хозяина — не публикуем.
     // e.skip — квартира не подошла, а не сбой: автопостинг берёт следующую.
     const skip = (msg) => Object.assign(new Error(msg), { skip: true });
-    if (!f.card) throw skip("не открылась карточка объявления — проверить залог и ипотеку не вышло, повторите позже");
+    if (!f.card) { instaCardRetryAt.set(String(f.id), Date.now() + 3600e3); throw skip("не открылась карточка объявления — проверить залог и ипотеку не вышло, повторите позже"); }
     if (f.card.mortgageNo) {
       instaDropCandidate(acc, f.id);
       throw skip("под ипотеку не публикуем: " + f.card.mortgageNo);
@@ -5307,7 +5318,7 @@ async function instaTick() {
     const gapCfg = await db.configGet(["insta.gap_min"]).catch(() => ({}));
     const gap = Math.max(20, Number(gapCfg["insta.gap_min"]) || 45);
     if (st.last_at && now.getTime() - new Date(st.last_at).getTime() < gap * 60e3) continue;
-    const rows = await instaCandidates(a.acc, true).catch(() => []);
+    const rows = (await instaCandidates(a.acc, true).catch(() => [])).filter((f) => (instaCardRetryAt.get(String(f.id)) || 0) <= Date.now());
     if (!rows.length) continue;
     // Разнообразие: не тот же ЖК, что в постах за 3 дня, и не те же комнаты,
     // что в прошлом посте, — если среди лучших пяти есть такой вариант.
@@ -5320,18 +5331,28 @@ async function instaTick() {
     // ипотеку, карточка не открылась), — не сбой Instagram: берём следующую
     // в этом же заходе, без паузы и без сообщения. До 5 попыток за заход.
     const order = [pick].concat(rows.filter((f) => f !== pick)).slice(0, 5);
+    const skipped = [];
+    let posted = false;
     for (const f of order) {
       try {
         const r = await instaPublish(a.acc, f);
         console.log("[insta] " + a.acc + " posted " + f.id + " (балл " + f.score + ") → " + r.mediaId);
+        posted = true;
         break;
       } catch (e) {
-        if (e.skip) { console.log("[insta] " + a.acc + " skip " + f.id + ": " + e.message); continue; }
+        if (e.skip) { console.log("[insta] " + a.acc + " skip " + f.id + ": " + e.message); skipped.push(f.id + ": " + e.message); continue; }
         instaPauseUntil[a.acc] = Date.now() + 3600e3;
         console.log("[insta] " + a.acc + " failed: " + e.message);
         notifyTelegram("📸 Instagram " + a.acc + ": пост не вышел — " + String(e.message).slice(0, 200) + ". Автопостинг на паузе час.");
+        posted = true; // об ошибке уже сообщили
         break;
       }
+    }
+    // Пора было постить, а все кандидаты пропущены — админам, почему (раз в 3 часа).
+    if (!posted && skipped.length && Date.now() - (instaSkipAlertAt[a.acc] || 0) > 3 * 3600e3) {
+      instaSkipAlertAt[a.acc] = Date.now();
+      phoneWatchSend("📸 Instagram " + a.acc + ": пора постить, но все " + skipped.length + " кандидата пропущены:\n" +
+        skipped.map((x) => "• https://krisha.kz/a/show/" + x.slice(0, 160)).join("\n"));
     }
   }
 }
