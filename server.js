@@ -1803,6 +1803,7 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   .tag.relist{background:rgba(168,85,247,.18);color:#c9a5ff}
   .tag.ag{background:rgba(229,72,77,.15);color:var(--no)}
   .phones a{font-size:16px;font-weight:600;margin-right:12px}
+  .reveal{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:6px 12px;font-weight:600;cursor:pointer}
   .row{margin:3px 0}
   .st{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px}
   .st button{padding:5px 10px;font-size:13px}
@@ -1870,7 +1871,15 @@ const KRISHA_LEADS_HTML = `<!doctype html>
 <div id="ov" class="ov" onclick="if(event.target===this)closeHist()"><div class="md"><button class="x" onclick="closeHist()">×</button><div id="mdc">загрузка…</div></div></div>
 <script>
 var KEY = new URLSearchParams(location.search).get("key") || "";
-var API = "/api/krisha/leads?key=" + encodeURIComponent(KEY);
+var U = new URLSearchParams(location.search).get("u") || "";
+var API = U ? "/api/krisha/leads?u=" + encodeURIComponent(U) : "/api/krisha/leads?key=" + encodeURIComponent(KEY);
+// Риэлтор (?u=…): номер скрыт до «Показать номер» — каждое нажатие в журнал.
+function phLinks(arr,sep){return (arr||[]).map(function(n){return "<a href='tel:+"+esc(n)+"'>"+esc(pretty(n))+"</a>";}).join(sep||"");}
+function phHtml(x,sep){if(x.ph_hidden)return "<button class='reveal' onclick='reveal("+x.id+",this)'>Показать номер</button>";return phLinks(x.phones,sep);}
+function reveal(id,btn){btn.disabled=true;btn.textContent="…";fetch(API+"&reveal="+id).then(function(r){return r.json();}).then(function(j){if(!j.ok){btn.disabled=false;btn.textContent="Показать номер";alert(j.error||"не получилось");return;}var s=document.createElement("span");s.innerHTML=phLinks(j.phones," ");btn.replaceWith(s);}).catch(function(e){btn.disabled=false;btn.textContent="Показать номер";alert(e.message);});}
+// Доступ риэлтора: в фильтрах только его города, сделки и типы.
+if(window.PORTAL){[["city",PORTAL.cities],["deal",PORTAL.deals],["prop",PORTAL.props]].forEach(function(z){var el=document.getElementById(z[0]);if(!el)return;Array.prototype.slice.call(el.options).forEach(function(o){if(z[1].indexOf(o.value)<0)o.remove();});});
+  var hdr=document.querySelector("h1");if(hdr)hdr.insertAdjacentHTML("beforeend"," <span class=mut style='font-weight:400;font-size:13px'>· "+esc(PORTAL.name)+" · номеров в сутки: "+PORTAL.limit+"</span>");}
 
 function skCards(n){var h="";for(var i=0;i<n;i++)h+="<div class='sk skc'></div>";return h;}
 function skLines(n,w){var h="";for(var i=0;i<n;i++)h+="<div class='sk skl' style='width:"+(w||(60+((i*37)%35)))+"%'></div>";return h;}
@@ -1884,7 +1893,7 @@ function openHist(id){
   var ov=document.getElementById("ov"), c=document.getElementById("mdc");
   ov.className="ov on"; c.innerHTML=skLines(2,70)+"<div class=sum>"+skCards(6)+"</div>"+skLines(6);
   Promise.all([
-    fetch("/api/krisha/scanlist?history="+id+"&key="+encodeURIComponent(KEY)).then(function(r){return r.json();}),
+    fetch(U ? API+"&hist="+id : "/api/krisha/scanlist?history="+id+"&key="+encodeURIComponent(KEY)).then(function(r){return r.json();}),
     fetch(API+"&copies="+id).then(function(r){return r.json();}).catch(function(){return [];})
   ]).then(function(res){
     var h=res[0]||{}, it=h.item||{}, ev=h.events||[], copies=Array.isArray(res[1])?res[1]:[];
@@ -1907,7 +1916,7 @@ function openHist(id){
       if(e.kind==="back")return "<span class=tag style='background:rgba(47,191,113,.18);color:var(--ok)'>вернулось из архива</span>";
       if(e.kind==="phone")return "<span class=tag style='background:rgba(47,191,113,.18);color:var(--ok)'>номер снят</span>";
       return esc(e.kind);}
-    var ph=String(it.phones||"").split(",").filter(Boolean).map(function(n){return "<a href='tel:+"+esc(n)+"'>"+esc(pretty(n))+"</a>";}).join(", ");
+    var ph=it.ph_hidden?phHtml({id:id,ph_hidden:1}):phLinks(String(it.phones||"").split(",").filter(Boolean),", ");
     var html="<h2>"+esc(it.title||"")+" <span class=price>"+money(it.price)+"</span></h2>"+
       "<div class=mut>"+esc(it.addr||"")+(it.addr?" · ":"")+esc(it.city||"")+" · <a target=_blank href='https://krisha.kz/a/show/"+id+"'>на Крыше</a>"+(it.storage&&it.storage!=="live"?" · <b style='color:var(--no)'>сейчас снято</b>":"")+"</div>"+
       (ph?"<div class='row phones' style='margin-top:6px'>"+(it.owner_name?"<span class=mut>"+esc(it.owner_name)+" · </span>":"")+ph+"</div>":"")+
@@ -1984,7 +1993,7 @@ function render(rows){
   if(VIEW==="map") ensureMap().then(plot);
 }
 function cardHtml(x){
-    var ph=(x.phones||[]).map(function(n){return "<a href='tel:+"+esc(n)+"'>"+esc(pretty(n))+"</a>";}).join("");
+    var ph=phHtml(x,"");
     var par=[x.rooms?x.rooms+"-комн":"",x.area?x.area+" м²":"",x.floor&&x.floors?x.floor+"/"+x.floors+" эт":""].filter(Boolean).join(" · ");
     return "<div class=card data-id='"+x.id+"'>"+
       "<div class=photos>"+(x.photos&&x.photos.length?"<img loading=lazy src='"+esc(x.photos[0])+"'>":"<div class=mut>нет фото</div>")+"</div>"+
@@ -2038,7 +2047,7 @@ function ensureMap(){
 }
 function pinIcon(hot){return L.divIcon({className:"",html:"<div class='pin"+(hot?" hot":"")+"'></div>",iconSize:[12,12],iconAnchor:[6,6]});}
 function popup(x){
-  var ph=(x.phones||[]).map(function(n){return "<a href='tel:+"+esc(n)+"'>"+esc(pretty(n))+"</a>";}).join(", ");
+  var ph=phHtml(x,", ");
   return "<b>"+esc(x.title||"")+"</b> · <b>"+money(x.price)+"</b><br><span style='color:var(--mut)'>"+esc(x.addr||"")+"</span><br>"+(x.owner_name?esc(x.owner_name)+" · ":"")+ph+
     "<br><a href='#' onclick='openHist("+x.id+");return false'>история</a> · <a target=_blank href='https://krisha.kz/a/show/"+x.id+"'>на Крыше</a>";
 }
@@ -4474,6 +4483,141 @@ const ipotekaHits = new Map(); // ip → времена заявок с ленд
 const portalCache = new Map(); // поиск /ipoteka: фильтры → ответ, 5 минут
 const creditHits = new Map();   // ip → времена запросов кредитного рейтинга за час
 const creditReq = new Map();    // requestId → { iin (маской), phone } до подтверждения кода
+// --- Риэлторы: доступ к лидам по своей ссылке --------------------------------
+// Каждый риэлтор — строка в dbo.portal_users (города, сделки, типы, лимит
+// номеров в сутки). Номера в списке скрыты; «Показать номер» — запись в
+// dbo.portal_audit. Подозрительное — админам в бот (по типу не чаще раза в 30 мин).
+function portalIp(req) { return clientIp(req).replace(/^(\d+\.\d+\.\d+\.\d+):\d+$/, "$1"); }
+const portalAlertAt = new Map();
+function portalAlert(u, kind, text) {
+  const k = u.id + ":" + kind;
+  if (Date.now() - (portalAlertAt.get(k) || 0) < 30 * 60e3) return;
+  portalAlertAt.set(k, Date.now());
+  phoneWatchSend(text);
+}
+function portalWatch(u, ip, ua, action, r) {
+  if (!r) return;
+  const who = "«" + u.name + "»";
+  const dev = String(ua || "").replace(/\s+/g, " ").slice(0, 90);
+  if (r.newip) portalAlert(u, "ip:" + ip, "🔐 Лиды: " + who + " — вход с нового IP " + ip + "\n" + dev);
+  if (r.ips_1h >= 2) portalAlert(u, "ips", "⚠️ Лиды: у " + who + " за час " + r.ips_1h + " разных IP (сейчас " + ip + ") — возможно, ссылку передали другому");
+  if (action === "reveal" && r.same_10m >= 15) portalAlert(u, "reveal", "⚠️ Лиды: " + who + " открыл(а) " + r.same_10m + " номеров за 10 минут");
+  if (action === "list" && r.same_10m >= 40) portalAlert(u, "list", "⚠️ Лиды: " + who + " — " + r.same_10m + " загрузок списка за 10 минут, похоже на выгрузку базы");
+  if (action === "limit") portalAlert(u, "limit", "⛔ Лиды: " + who + " исчерпал(а) лимит номеров на сутки (" + u.phone_limit + ")");
+  if (action === "denied") portalAlert(u, "denied", "⚠️ Лиды: " + who + " пытался(ась) открыть объявление вне своего доступа");
+}
+async function portalLeads(req, res, parsed) {
+  const q = parsed.searchParams;
+  const sendJ = (code, obj) => { res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); };
+  const u = await db.portalUserByToken(q.get("u")).catch(() => null);
+  if (!u || !u.active) { res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" }); res.end("Доступ закрыт. Обратитесь к администратору."); return; }
+  const ip = portalIp(req), ua = String(req.headers["user-agent"] || "");
+  const log = async (action, listingId, info) => {
+    const r = await db.portalLog(u.id, ip, ua, action, listingId, info).catch((e) => { console.log("[portal] log: " + e.message); return null; });
+    portalWatch(u, ip, ua, action, r);
+    return r;
+  };
+  const inScope = (x) => !!x && x.user_type === "owner" && u.cities.includes(String(x.city)) && u.deals.includes(String(x.deal)) && u.props.includes(String(x.prop));
+  const item = async (raw) => {
+    const id = String(raw || "").replace(/\D/g, "");
+    const h = id ? await db.listHistory(id) : { item: null, events: [] };
+    return { id: id, h: h, ok: inScope(h.item) };
+  };
+  if (q.get("reveal")) {
+    const x = await item(q.get("reveal"));
+    if (!x.ok) { await log("denied", x.id, "номер вне доступа"); return sendJ(403, { ok: false, error: "Нет доступа к этому объявлению" }); }
+    const rv = await db.portalReveals(u.id, [x.id]);
+    if (!rv.opened.has(x.id) && rv.day >= u.phone_limit) {
+      await log("limit", x.id, "лимит " + u.phone_limit);
+      return sendJ(429, { ok: false, error: "Лимит номеров на сутки исчерпан (" + u.phone_limit + "). Напишите администратору." });
+    }
+    const it = x.h.item;
+    await log("reveal", x.id, [it.city, it.rooms ? it.rooms + "-комн" : it.prop, it.price, it.addr].filter(Boolean).join(" · "));
+    return sendJ(200, { ok: true, phones: String(it.phones || "").split(",").filter(Boolean) });
+  }
+  if (q.get("set")) {
+    const x = await item(q.get("set"));
+    if (!x.ok) { await log("denied", x.id, "статус вне доступа"); return sendJ(403, { ok: false, error: "Нет доступа" }); }
+    const st = await db.leadSetStatus(x.id, q.get("status") || "", q.get("note") || "");
+    await log("status", x.id, (q.get("status") || "") + (q.get("note") ? " · " + q.get("note") : ""));
+    return sendJ(200, { ok: true, id: x.id, status: st });
+  }
+  if (q.get("copies")) {
+    const x = await item(q.get("copies"));
+    if (!x.ok) return sendJ(200, []);
+    return sendJ(200, await db.leadCopies(x.id));
+  }
+  if (q.get("hist")) {
+    const x = await item(q.get("hist"));
+    if (!x.ok) { await log("denied", x.id, "история вне доступа"); return sendJ(403, { ok: false, error: "Нет доступа" }); }
+    const rv = await db.portalReveals(u.id, [x.id]);
+    const it = Object.assign({}, x.h.item);
+    if (!rv.opened.has(x.id)) { it.ph_hidden = it.phones ? 1 : 0; delete it.phones; }
+    await log("history", x.id, null);
+    return sendJ(200, { item: it, events: x.h.events });
+  }
+  if (q.get("data")) {
+    const f = {};
+    for (const k of ["city", "deal", "prop", "rooms", "pmin", "pmax", "hours", "signal", "status", "limit", "offset"]) f[k] = q.get(k);
+    // Только своё: город, сделка и тип — из доступа (чужое или «любые» → первое разрешённое).
+    if (!u.cities.includes(String(f.city))) f.city = u.cities[0];
+    if (!u.deals.includes(String(f.deal))) f.deal = u.deals[0];
+    if (!u.props.includes(String(f.prop))) f.prop = u.props[0];
+    f.limit = Math.min(200, Number(f.limit) || 200);
+    const rows = await db.leadsList(f);
+    const rv = await db.portalReveals(u.id, rows.map((r) => r.id));
+    const out = rows.map((r) => {
+      if (rv.opened.has(String(r.id))) return r;
+      const o = Object.assign({}, r, { ph_hidden: (r.phones || []).length ? 1 : 0, phones: [] });
+      return o;
+    });
+    await log("list", null, [f.city, f.deal, f.prop, f.rooms, f.signal, f.hours + "ч", "стр " + (Math.floor((Number(f.offset) || 0) / 200) + 1), rows.length + " шт"].filter(Boolean).join(" · "));
+    return sendJ(200, out);
+  }
+  await log("open", null, null);
+  const portal = { name: u.name, cities: u.cities, deals: u.deals, props: u.props, limit: u.phone_limit };
+  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+  res.end(KRISHA_LEADS_HTML.replace("<script>\nvar KEY", "<script>window.PORTAL=" + JSON.stringify(portal).replace(/</g, "\\u003c") + ";</script>\n<script>\nvar KEY"));
+}
+async function portalAdmin(req, res, parsed) {
+  const q = parsed.searchParams;
+  const sendJ = (code, obj) => { res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); };
+  if (req.method === "POST") {
+    let b = {};
+    try { b = JSON.parse(await readBody(req)) || {}; } catch { /* пусто */ }
+    if (b.action === "token") return sendJ(200, { ok: true, token: await db.portalNewToken(b.id) });
+    if (!String(b.name || "").trim() || !String(b.cities || "").trim()) return sendJ(400, { ok: false, error: "нужны имя и города" });
+    return sendJ(200, { ok: true, id: await db.portalUserSave(b) });
+  }
+  if (q.get("data")) {
+    return sendJ(200, { users: await db.portalUsers(), audit: await db.portalAudit(Number(q.get("user")) || 0, Number(q.get("limit")) || 300) });
+  }
+  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+  res.end(PORTAL_ADMIN_HTML);
+}
+const PORTAL_ADMIN_HTML = '<!doctype html><html lang=ru><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Риэлторы · доступ к лидам</title>' +
+'<style>:root{--bg:#0f1318;--card:#171c23;--line:#262d37;--tx:#e6ebf2;--mut:#8a95a5;--acc:#4c8dff;--no:#ef5b5b;--ok:#2fbf71;--warn:#f5a524}body{margin:0;background:var(--bg);color:var(--tx);font:14px system-ui,sans-serif;padding:16px}h1{font-size:18px;margin:0 0 12px}h2{font-size:15px;margin:22px 0 8px}' +
+'table{width:100%;border-collapse:collapse;background:var(--card);border-radius:10px;overflow:hidden}td,th{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;font-size:13px}th{color:var(--mut);font-weight:500}' +
+'input,select{background:#0b0f14;color:var(--tx);border:1px solid var(--line);border-radius:7px;padding:6px 8px;font:inherit}button{background:var(--acc);color:#fff;border:0;border-radius:7px;padding:6px 11px;font:inherit;cursor:pointer}button.g{background:#2a313b}.mut{color:var(--mut)}.off{opacity:.5}' +
+'.link{font-family:monospace;font-size:12px;word-break:break-all}.form{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--card);padding:10px;border-radius:10px}.a-reveal{color:var(--warn)}.a-denied,.a-limit{color:var(--no)}.a-open{color:var(--ok)}</style></head><body>' +
+'<h1>Риэлторы · доступ к лидам</h1>' +
+'<div class=form><input id=nm placeholder="Имя риэлтора"><input id=ct placeholder="города: almaty,astana" value="almaty" size=18><input id=dl placeholder="сделки" value="sale,rent" size=10><input id=pr placeholder="типы" value="flat,house,commercial,land" size=26><input id=lm type=number value=40 style="width:70px" title="номеров в сутки"><button onclick="add()">Добавить</button><span class=mut>города: almaty, astana, shymkent… · сделки: sale, rent · типы: flat, house, commercial, land</span></div>' +
+'<h2>Риэлторы</h2><div id=users class=mut>загрузка…</div><h2>Журнал <select id=fu onchange="load()"><option value=0>все</option></select></h2><div id=audit class=mut>загрузка…</div>' +
+'<script>var KEY=new URLSearchParams(location.search).get("key")||"";var API="/api/krisha/portal?key="+encodeURIComponent(KEY);var USERS=[];' +
+'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}' +
+'function dt(v){if(!v)return "";var d=new Date(new Date(v).getTime()+5*3600e3);return ("0"+d.getUTCDate()).slice(-2)+"."+("0"+(d.getUTCMonth()+1)).slice(-2)+" "+("0"+d.getUTCHours()).slice(-2)+":"+("0"+d.getUTCMinutes()).slice(-2);}' +
+'function link(t){return location.origin+"/api/krisha/leads?u="+encodeURIComponent(t);}' +
+'var ACT={open:"открыл(а) страницу",list:"список",reveal:"открыл(а) номер",status:"статус",history:"история",denied:"вне доступа",limit:"лимит"};' +
+'function post(o){return fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(o)}).then(function(r){return r.json();});}' +
+'function add(){var o={name:nm.value,cities:ct.value,deals:dl.value,props:pr.value,phone_limit:lm.value};post(o).then(function(j){if(!j.ok)return alert(j.error);nm.value="";load();});}' +
+'function save(id){var r=document.getElementById("u"+id);var g=function(c){return r.querySelector("[data-f="+c+"]");};post({id:id,name:g("name").value,cities:g("cities").value,deals:g("deals").value,props:g("props").value,phone_limit:g("lim").value,active:g("active").checked}).then(function(j){if(!j.ok)alert(j.error);load();});}' +
+'function tok(id){if(!confirm("Выдать новую ссылку? Старая перестанет работать."))return;post({action:"token",id:id}).then(function(){load();});}' +
+'function copy(t){navigator.clipboard.writeText(link(t));}' +
+'function load(){var fu=document.getElementById("fu").value;fetch(API+"&data=1&user="+fu).then(function(r){return r.json();}).then(function(d){USERS=d.users;' +
+'document.getElementById("users").innerHTML="<table><tr><th>имя</th><th>доступ</th><th>номеров/сутки</th><th>за 24 ч</th><th>IP за 7 дн</th><th>был(а)</th><th>ссылка</th><th></th></tr>"+d.users.map(function(u){return "<tr id=u"+u.id+" class=\'"+(u.active?"":"off")+"\'><td><input data-f=name value=\'"+esc(u.name)+"\' size=12><br><label class=mut><input type=checkbox data-f=active "+(u.active?"checked":"")+"> включён</label></td><td><input data-f=cities value=\'"+esc(u.cities.join(","))+"\' size=14><br><input data-f=deals value=\'"+esc(u.deals.join(","))+"\' size=10><br><input data-f=props value=\'"+esc(u.props.join(","))+"\' size=22></td><td><input data-f=lim type=number value="+u.phone_limit+" style=\'width:60px\'></td><td>номеров: <b>"+u.reveals_24h+"</b><br>списков: "+u.lists_24h+"</td><td>"+u.ips_7d+"</td><td>"+dt(u.last_seen)+"<br><span class=mut>"+esc(u.last_ip||"")+"</span></td><td class=link>"+esc(link(u.token))+"<br><button class=g onclick=\'copy(&quot;"+u.token+"&quot;)\'>копировать</button> <button class=g onclick=\'tok("+u.id+")\'>новая ссылка</button></td><td><button onclick=\'save("+u.id+")\'>сохранить</button></td></tr>";}).join("")+"</table>";' +
+'var sel=document.getElementById("fu");if(sel.options.length<=1)d.users.forEach(function(u){var o=document.createElement("option");o.value=u.id;o.textContent=u.name;sel.appendChild(o);});' +
+'document.getElementById("audit").innerHTML=d.audit.length?"<table><tr><th>когда</th><th>кто</th><th>действие</th><th>объявление</th><th>что</th><th>IP · браузер</th></tr>"+d.audit.map(function(a){return "<tr><td>"+dt(a.at)+"</td><td>"+esc(a.name)+"</td><td class=a-"+a.action+">"+(ACT[a.action]||a.action)+"</td><td>"+(a.listing_id?"<a style=\'color:var(--acc)\' target=_blank href=\'https://krisha.kz/a/show/"+a.listing_id+"\'>"+a.listing_id+"</a>":"")+"</td><td>"+esc(a.info||"")+"</td><td class=mut>"+esc(a.ip||"")+"<br>"+esc(String(a.ua||"").slice(0,70))+"</td></tr>";}).join("")+"</table>":"пусто";});}' +
+'load();setInterval(load,60000);</script></body></html>';
 function clientIp(req) {
   return String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() ||
          req.socket.remoteAddress || "";
@@ -9881,6 +10025,18 @@ http
 
     // Лиды хозяев для обзвона: страница, ?data=1 — JSON по фильтрам,
     // ?set=<id>&status=&note= — статус обзвона.
+    // Риэлтор: своя ссылка ?u=<token>, доступ по городам/сделкам/типам, журнал.
+    if (urlPath === "/api/krisha/leads" && parsed.searchParams.get("u") && parsed.searchParams.get("key") !== (KRISHA_JOB_KEY || KRISHA_PHONE_KEY)) {
+      portalLeads(req, res, parsed).catch((e) => { try { res.writeHead(500, { "Content-Type": MIME[".json"] }); res.end(JSON.stringify({ ok: false, error: String(e.message).slice(0, 200) })); } catch { /* уже ответили */ } });
+      return;
+    }
+    // Риэлторы: кто, какой доступ, ссылки, журнал (только администратор).
+    if (urlPath === "/api/krisha/portal") {
+      const key = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
+      if (!key || parsed.searchParams.get("key") !== key) { res.writeHead(403); res.end("bad key"); return; }
+      portalAdmin(req, res, parsed).catch((e) => { try { res.writeHead(500, { "Content-Type": MIME[".json"] }); res.end(JSON.stringify({ ok: false, error: String(e.message).slice(0, 200) })); } catch { /* уже ответили */ } });
+      return;
+    }
     if (urlPath === "/api/krisha/leads") {
       const q = parsed.searchParams;
       const key = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;

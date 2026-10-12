@@ -2205,6 +2205,37 @@ END
 -- укладывался в 15 секунд (3,4 млн событий, 12.10.2026).
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klev_id_kind' AND object_id = OBJECT_ID('dbo.krisha_list_events'))
   CREATE INDEX IX_klev_id_kind ON dbo.krisha_list_events (id, kind, at) INCLUDE (old_price, new_price) WITH (ONLINE = ON);
+-- Риэлторы с ограниченным доступом к лидам: своя ссылка (token), города,
+-- сделки и типы объектов, дневной лимит открытых номеров.
+IF OBJECT_ID('dbo.portal_users', 'U') IS NULL
+  CREATE TABLE dbo.portal_users (
+    id          INT IDENTITY(1,1) PRIMARY KEY,
+    name        NVARCHAR(80)  NOT NULL,
+    token       NVARCHAR(64)  NOT NULL UNIQUE,
+    cities      NVARCHAR(200) NOT NULL,          -- almaty,astana
+    deals       NVARCHAR(40)  NOT NULL DEFAULT 'sale,rent',
+    props       NVARCHAR(80)  NOT NULL DEFAULT 'flat,house,commercial,land',
+    phone_limit INT           NOT NULL DEFAULT 40, -- открытых номеров в сутки
+    active      BIT           NOT NULL DEFAULT 1,
+    created_at  DATETIME2(0)  NOT NULL DEFAULT SYSUTCDATETIME(),
+    last_seen   DATETIME2(0)  NULL,
+    last_ip     NVARCHAR(60)  NULL
+  );
+-- Журнал действий риэлторов: открыл страницу, список, номер, статус.
+IF OBJECT_ID('dbo.portal_audit', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.portal_audit (
+    id         BIGINT IDENTITY(1,1) PRIMARY KEY,
+    at         DATETIME2(0)  NOT NULL DEFAULT SYSUTCDATETIME(),
+    user_id    INT           NOT NULL,
+    ip         NVARCHAR(60)  NULL,
+    ua         NVARCHAR(200) NULL,
+    action     NVARCHAR(20)  NOT NULL,          -- open | list | reveal | status | history | denied | limit
+    listing_id BIGINT        NULL,
+    info       NVARCHAR(400) NULL
+  );
+  CREATE INDEX IX_paudit_user ON dbo.portal_audit (user_id, at DESC);
+END
 -- Номера агентов под видом хозяев: один номер у многих объявлений «от хозяина»,
 -- набравшихся постепенно (за недели). Такие объявления хозяйскими не считаем —
 -- ни в поиске хозяина, ни в боте. Тип объявления менять бесполезно: обход
@@ -4012,6 +4043,89 @@ async function consultSet(id, f) {
     .query(`UPDATE dbo.insta_consult_leads SET status = COALESCE(@st, status), igsid = COALESCE(@igsid, igsid),
             phone = COALESCE(@ph, phone), phone_at = CASE WHEN @ph IS NULL THEN phone_at ELSE SYSUTCDATETIME() END WHERE id = @id`);
 }
+// --- Доступ риэлторов (страница лидов) ------------------------------------
+const portalSplit = (v) => String(v || "").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean);
+function portalShape(u) {
+  return u ? Object.assign({}, u, { cities: portalSplit(u.cities), deals: portalSplit(u.deals), props: portalSplit(u.props) }) : null;
+}
+async function portalUserByToken(token) {
+  if (!token || String(token).length < 16) return null;
+  const pool = await getPool();
+  await ensureList(pool);
+  return portalShape((await pool.request().input("t", sql.NVarChar(64), String(token)).query(
+    "SELECT * FROM dbo.portal_users WHERE token = @t")).recordset[0]);
+}
+async function portalUsers() {
+  const pool = await getPool();
+  await ensureList(pool);
+  return (await pool.request().query(`
+    SELECT u.*,
+      (SELECT COUNT(DISTINCT listing_id) FROM dbo.portal_audit a WHERE a.user_id = u.id AND a.action = 'reveal' AND a.at >= DATEADD(hour, -24, SYSUTCDATETIME())) AS reveals_24h,
+      (SELECT COUNT(*) FROM dbo.portal_audit a WHERE a.user_id = u.id AND a.action = 'list' AND a.at >= DATEADD(hour, -24, SYSUTCDATETIME())) AS lists_24h,
+      (SELECT COUNT(DISTINCT ip) FROM dbo.portal_audit a WHERE a.user_id = u.id AND a.at >= DATEADD(day, -7, SYSUTCDATETIME())) AS ips_7d
+    FROM dbo.portal_users u ORDER BY u.id`)).recordset.map(portalShape);
+}
+async function portalUserSave(u) {
+  const pool = await getPool();
+  await ensureList(pool);
+  const rq = pool.request()
+    .input("name", sql.NVarChar(80), String(u.name || "").slice(0, 80))
+    .input("cities", sql.NVarChar(200), portalSplit(u.cities).join(","))
+    .input("deals", sql.NVarChar(40), portalSplit(u.deals).join(",") || "sale,rent")
+    .input("props", sql.NVarChar(80), portalSplit(u.props).join(",") || "flat,house,commercial,land")
+    .input("lim", sql.Int, Math.max(1, Math.min(1000, Number(u.phone_limit) || 40)))
+    .input("active", sql.Bit, u.active === false || u.active === 0 || u.active === "0" ? 0 : 1);
+  if (u.id) {
+    await rq.input("id", sql.Int, Number(u.id)).query(`UPDATE dbo.portal_users SET name = @name, cities = @cities, deals = @deals, props = @props,
+      phone_limit = @lim, active = @active WHERE id = @id`);
+    return Number(u.id);
+  }
+  const token = require("crypto").randomBytes(18).toString("base64url");
+  return (await rq.input("t", sql.NVarChar(64), token).query(`INSERT INTO dbo.portal_users (name, token, cities, deals, props, phone_limit, active)
+    OUTPUT inserted.id VALUES (@name, @t, @cities, @deals, @props, @lim, @active)`)).recordset[0].id;
+}
+async function portalNewToken(id) {
+  const pool = await getPool();
+  await ensureList(pool);
+  const token = require("crypto").randomBytes(18).toString("base64url");
+  await pool.request().input("id", sql.Int, Number(id)).input("t", sql.NVarChar(64), token).query("UPDATE dbo.portal_users SET token = @t WHERE id = @id");
+  return token;
+}
+// Запись в журнал; возвращает, впервые ли этот IP у пользователя.
+async function portalLog(userId, ip, ua, action, listingId, info) {
+  const pool = await getPool();
+  await ensureList(pool);
+  const r = await pool.request().input("u", sql.Int, Number(userId)).input("ip", sql.NVarChar(60), ip ? String(ip).slice(0, 60) : null)
+    .input("ua", sql.NVarChar(200), ua ? String(ua).slice(0, 200) : null).input("a", sql.NVarChar(20), action)
+    .input("l", sql.BigInt, listingId ? Number(listingId) : null).input("i", sql.NVarChar(400), info ? String(info).slice(0, 400) : null)
+    .query(`DECLARE @newip BIT = CASE WHEN @ip IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.portal_audit WHERE user_id = @u AND ip = @ip) THEN 1 ELSE 0 END;
+            INSERT INTO dbo.portal_audit (user_id, ip, ua, action, listing_id, info) VALUES (@u, @ip, @ua, @a, @l, @i);
+            UPDATE dbo.portal_users SET last_seen = SYSUTCDATETIME(), last_ip = @ip WHERE id = @u;
+            SELECT @newip AS newip,
+              (SELECT COUNT(DISTINCT ip) FROM dbo.portal_audit WHERE user_id = @u AND at >= DATEADD(hour, -1, SYSUTCDATETIME())) AS ips_1h,
+              (SELECT COUNT(*) FROM dbo.portal_audit WHERE user_id = @u AND action = @a AND at >= DATEADD(minute, -10, SYSUTCDATETIME())) AS same_10m`);
+  return r.recordset[0];
+}
+// Какие из этих объявлений риэлтор уже открывал (номер показываем сразу) и
+// сколько разных номеров открыл за сутки.
+async function portalReveals(userId, ids) {
+  const pool = await getPool();
+  await ensureList(pool);
+  const list = (ids || []).map(Number).filter(Number.isSafeInteger);
+  const rq = pool.request().input("u", sql.Int, Number(userId));
+  const opened = list.length ? (await rq.query("SELECT DISTINCT listing_id FROM dbo.portal_audit WHERE user_id = @u AND action = 'reveal' AND listing_id IN (" + list.join(",") + ")")).recordset.map((r) => String(r.listing_id)) : [];
+  const day = (await pool.request().input("u", sql.Int, Number(userId)).query(
+    "SELECT COUNT(DISTINCT listing_id) AS n FROM dbo.portal_audit WHERE user_id = @u AND action = 'reveal' AND at >= DATEADD(hour, -24, SYSUTCDATETIME())")).recordset[0].n;
+  return { opened: new Set(opened), day: day };
+}
+async function portalAudit(userId, limit) {
+  const pool = await getPool();
+  await ensureList(pool);
+  return (await pool.request().input("u", sql.Int, Number(userId) || 0).input("n", sql.Int, Math.max(1, Math.min(2000, Number(limit) || 300))).query(`
+    SELECT TOP (@n) a.at, a.user_id, u.name, a.ip, a.ua, a.action, a.listing_id, a.info
+    FROM dbo.portal_audit a JOIN dbo.portal_users u ON u.id = a.user_id
+    WHERE @u = 0 OR a.user_id = @u ORDER BY a.id DESC`)).recordset;
+}
 // Этому человеку под этим постом уже писали в директ (по «+» или вопросу).
 async function instaCommentAnswered(mediaId, username, exceptCid) {
   if (!mediaId || !username) return false;
@@ -5050,7 +5164,7 @@ async function objectStats() {
   return r.recordset[0];
 }
 
-module.exports = { consultAdd, consultGet, consultSet, phoneSharedCount, stickyFirstPhone, listPhoneRetryLater, instaPostForReel, instaPostReel, instaCommentAnswered, instaPostItemsSet, instaPostItems, instaCommentEventNeedFollow, instaCommentEventsToRemind, instaCommentEventReminded, instaSimilarPosts, instaHookLogAdd, instaCommentEventGet, instaCommentEventIgsid, instaCommentEventAsked, instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
+module.exports = { portalUserByToken, portalUsers, portalUserSave, portalNewToken, portalLog, portalReveals, portalAudit, consultAdd, consultGet, consultSet, phoneSharedCount, stickyFirstPhone, listPhoneRetryLater, instaPostForReel, instaPostReel, instaCommentAnswered, instaPostItemsSet, instaPostItems, instaCommentEventNeedFollow, instaCommentEventsToRemind, instaCommentEventReminded, instaSimilarPosts, instaHookLogAdd, instaCommentEventGet, instaCommentEventIgsid, instaCommentEventAsked, instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,
