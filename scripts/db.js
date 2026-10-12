@@ -2736,16 +2736,21 @@ async function phoneSharedCount(id) {
   return r.recordset[0] || { n: 0, p: null };
 }
 // Номер прилип: тот же номер первым только что (за hours часов) записан к
-// другому объявлению «от хозяина». Возвращает id того объявления или null.
+// другому объявлению «от хозяина» другого автора. Так было и с парами:
+// номер Жанны (аренда, 32Б мкр) через 6 секунд записался к Таугулю.
+// Возвращает id того объявления или null.
 async function stickyFirstPhone(id, phone, hours) {
   if (!phone) return null;
   const pool = await getPool();
   await ensureList(pool);
   const r = await pool.request().input("id", sql.BigInt, Number(id)).input("p", sql.NVarChar(40), String(phone))
     .input("h", sql.Int, Math.max(1, Number(hours) || 3)).query(`
-    SELECT TOP 1 id FROM dbo.krisha_list WITH (INDEX(IX_klist_withphone))
-    WHERE phones_at >= DATEADD(hour, -@h, SYSUTCDATETIME()) AND id <> @id AND user_type = 'owner'
-      AND (phones = @p OR phones LIKE @p + ',%')`);
+    DECLARE @me NVARCHAR(200) = (SELECT NULLIF(LTRIM(RTRIM(owner_name)), '') FROM dbo.krisha_list WHERE id = @id);
+    SELECT TOP 1 o.id FROM dbo.krisha_list o WITH (INDEX(IX_klist_withphone))
+    WHERE o.phones_at >= DATEADD(hour, -@h, SYSUTCDATETIME()) AND o.id <> @id AND o.user_type = 'owner'
+      AND (o.phones = @p OR o.phones LIKE @p + ',%')
+      -- Тот же автор (одно имя на обоих) — его же вторая квартира, не прилипание.
+      AND NOT (@me IS NOT NULL AND NULLIF(LTRIM(RTRIM(o.owner_name)), '') = @me)`);
   return r.recordset[0] ? String(r.recordset[0].id) : null;
 }
 // Номер не приняли (прилип) — попробовать это объявление ещё раз позже.
