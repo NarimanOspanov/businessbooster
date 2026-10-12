@@ -2200,6 +2200,11 @@ BEGIN
   CREATE INDEX IX_klev_id ON dbo.krisha_list_events (id, at);
   CREATE INDEX IX_klev_at ON dbo.krisha_list_events (at DESC);
 END
+-- Лиды хозяев (leadsList) на каждое объявление смотрят поднятия, цены, возвраты
+-- и архив за период: без вида события в индексе запрос за неделю-месяц не
+-- укладывался в 15 секунд (3,4 млн событий, 12.10.2026).
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klev_id_kind' AND object_id = OBJECT_ID('dbo.krisha_list_events'))
+  CREATE INDEX IX_klev_id_kind ON dbo.krisha_list_events (id, kind, at) INCLUDE (old_price, new_price) WITH (ONLINE = ON);
 -- Номера агентов под видом хозяев: один номер у многих объявлений «от хозяина»,
 -- набравшихся постепенно (за недели). Такие объявления хозяйскими не считаем —
 -- ни в поиске хозяина, ни в боте. Тип объявления менять бесполезно: обход
