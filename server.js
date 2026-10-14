@@ -5373,8 +5373,8 @@ async function instaPublish(acc, f) {
 }
 // Ролик той же квартиры после карусели: слайды без обложки (на ней цена),
 // карта без цены, голос продавца (Gemini — текст, Gemini TTS — озвучка с проверкой),
-// музыка; в сетку профиля не идёт (share_to_feed=false) — только Reels и
-// рекомендации. media_id ролика пишем к посту: «+» под ним — тот же номер.
+// музыка; идёт и в ленту/сетку профиля (share_to_feed=true, с 14.10: в одном
+// Reels охват был в 4–7 раз ниже карусели). media_id ролика пишем к посту: «+» под ним — тот же номер.
 // Сбой — уведомление админам, карусель от него не зависит.
 let instaReelBusy = false;
 async function instaReelAfter(a, fc, slides, tok, code, tell) {
@@ -5401,7 +5401,7 @@ async function instaReelAfter(a, fc, slides, tok, code, tell) {
     hit.at = Date.now(); hit.video = mp4; instaImgs.set(tok, hit);
     try { fs.mkdirSync(path.join(INSTA_IMG_DIR, tok), { recursive: true }); fs.writeFileSync(path.join(INSTA_IMG_DIR, tok, "reel.mp4"), mp4); } catch { /* из памяти тоже отдадим */ }
     const cap = REEL.reelCaption(fc, INSTA.hashtags(fc, a.acc));
-    const r = await INSTA.publishReel(a.ig_user_id, a.token, PUBLIC_URL + "/api/insta/vid/" + tok + ".mp4", cap, false);
+    const r = await INSTA.publishReel(a.ig_user_id, a.token, PUBLIC_URL + "/api/insta/vid/" + tok + ".mp4", cap, true);
     await db.instaPostReel(code, r.mediaId, r.permalink);
     console.log("[insta] reel " + code + " → " + (r.permalink || r.mediaId));
     if (tell) notifyTelegram("🎬 Instagram: ролик к посту № " + code + " вышел" + (r.permalink ? "\n" + r.permalink : ""));
@@ -5416,10 +5416,10 @@ function almatyDayStart(now) {
   return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()) - 5 * 3600e3);
 }
 // Автопостинг: per_day постов в день в часы по Алматы из INSTA_SLOTS — утро
-// и вечер, когда квартиры смотрят чаще (больше 6 в день — равномерно с 9 до 22).
+// и вечер, когда квартиры смотрят чаще (аудит 14.10: утренние посты дают больше «+») (больше 6 в день — равномерно с 9 до 22).
 // Раз в 10 минут смотрим, не наступил ли очередной час, за который ещё не постили. После ошибки аккаунт молчит час, а
 // админам уходит уведомление. Токен продлеваем за 10 дней до конца.
-const INSTA_SLOTS = { 1: [19], 2: [10, 19], 3: [9, 14, 20], 4: [9, 13, 17, 21], 5: [9, 12, 15, 18, 21], 6: [9, 11, 14, 17, 19, 21] };
+const INSTA_SLOTS = { 1: [19], 2: [10, 19], 3: [9, 14, 20], 4: [9, 11, 19, 21], 5: [9, 12, 15, 18, 21], 6: [9, 11, 14, 17, 19, 21] };
 let instaPrunedAt = 0;
 async function instaTick() {
   instaGc();
