@@ -6,9 +6,9 @@
 //   curl -X POST "$URL" --form "original_preview_image=@image.jpg" --form "api_key=$KEY"
 //
 // Без ключа сервис отвечает 401 {"error":true,"message":"Get credit failed"}.
-// Формат удачного ответа заранее не известен, поэтому принимаем: картинку
-// напрямую (image/*), JSON с картинкой в base64 (в т.ч. data:-URI) или JSON со
-// ссылкой на картинку.
+// Удачный ответ: JSON {"edited_image":{"image":"<base64 JPEG>", "image_id",
+// "mask", "watermark_mask"}} — берём edited_image.image. Про запас принимаем и
+// картинку напрямую (image/*), другой JSON с base64 / data:-URI или ссылкой.
 
 const URL_DEFAULT = "https://imageenhancer-cfeqfqcff3hzeed9.northeurope-01.azurewebsites.net/enhance";
 
@@ -52,6 +52,13 @@ async function enhance(buf) {
   let j = null;
   try { j = JSON.parse(body.toString()); } catch { /* не JSON */ }
   if (j && j.error) throw new Error("enhancer: " + String(j.message || JSON.stringify(j)).slice(0, 160));
+  // Известный формат: {"edited_image":{"image":"<base64 JPEG>","image_id":…,"mask":…,"watermark_mask":…}}.
+  // Маски (PNG) не нужны — берём только image.
+  const ei = j && j.edited_image && j.edited_image.image;
+  if (typeof ei === "string") {
+    const b = Buffer.from(ei.replace(/^data:image\/[a-z+]+;base64,/i, ""), "base64");
+    if (isImage(b)) return { buf: b, ok: true };
+  }
   const hit = j ? findInJson(j, 0) : null;
   if (hit && hit.buf) return { buf: hit.buf, ok: true };
   if (hit && hit.url) {
