@@ -5706,6 +5706,25 @@ async function phoneWatchTick() {
     phoneWatch.down = false;
   }
 }
+// Неверный ключ: первый вызов по адресу — сообщение сразу, дальше по этому
+// адресу не чаще раза в 30 минут, со счётчиком. Сам ключ в сообщение не пишем.
+// Только на проде. Вызовы совсем без ключа не считаем — это чужие сканеры.
+const badKeySeen = new Map(); // путь → { n, sentAt }
+function badKeyAlert(path, req) {
+  if (!process.env.WEBSITE_SITE_NAME) return;
+  const now = Date.now();
+  let x = badKeySeen.get(path);
+  if (!x) { x = { n: 0, sentAt: 0 }; badKeySeen.set(path, x); }
+  x.n++;
+  if (now - x.sentAt < 30 * 60e3) return;
+  const hhmm = new Date(now + 5 * 3600e3).toISOString().slice(11, 16);
+  phoneWatchSend("🔑 <b>Вызов с неверным ключом</b> (" + hhmm + ")\n" + path +
+    (x.sentAt ? "\nЗа последние 30 мин таких вызовов: " + x.n : "") +
+    "\nIP: " + clientIp(req) + " · " + String(req.headers["user-agent"] || "—").slice(0, 60) +
+    "\nЕсли это планировщик или закладка — замените ключ на KRISHA_JOB_KEY (плагин номеров — KRISHA_PHONE_KEY).");
+  x.sentAt = now; x.n = 0;
+  if (badKeySeen.size > 100) badKeySeen.delete(badKeySeen.keys().next().value);
+}
 // Сторож обхода списка (/api/krisha/scanlist): обход запускает внешний
 // планировщик по ключу. 12–14.10 ключ сменили, планировщик двое суток получал
 // «bad_key», и этого никто не видел. Раз в 5 минут: когда обход последний раз
@@ -6448,6 +6467,12 @@ http
   .createServer((req, res) => {
     const parsed = new URL(req.url, "http://localhost");
     const urlPath = decodeURIComponent(parsed.pathname);
+    // Вызов с ключом, который сервер отверг (403), — сразу админам в бот:
+    // так узнаём о старом ключе в планировщике или закладке в ту же минуту.
+    if (urlPath.startsWith("/api/") && parsed.searchParams.get("key")) {
+      const wh = res.writeHead;
+      res.writeHead = function (code, ...rest) { if (code === 403) badKeyAlert(urlPath, req); return wh.call(this, code, ...rest); };
+    }
 
     if (urlPath === "/api/foundations" || urlPath === "/api/competitors") {
       const target = parsed.searchParams.get("url") || "";
