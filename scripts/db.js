@@ -2537,6 +2537,8 @@ async function leadsList(f) {
   // Районы: список ключей (almaty-bostandykskij, almaty-out); пусто — без фильтра.
   const dl = (Array.isArray(f.districts) ? f.districts : []).map(String).filter((x) => /^[a-z0-9-]{3,40}$/.test(x)).slice(0, 30);
   dl.forEach((d, i) => r.input("dd" + i, sql.NVarChar(40), d));
+  // Первый запрос после паузы читает события с диска (~14 с), следующие — 2 с; общий лимит 15 с мал.
+  r.timeout = 60000;
   return (await r.query(`
     SELECT l.id, l.deal, l.prop, l.city, l.district, l.price, l.rooms, l.area, l.floor, l.floors, l.title, l.addr, l.owner_name,
       l.lat, l.lon, l.photos_c, l.photos_json, l.first_seen, l.bumped_on, l.phones, l.phones_at,
