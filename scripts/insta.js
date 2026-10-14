@@ -13,6 +13,7 @@ const jpeg = require("jpeg-js");
 
 const W = 1080, H = 1350;
 const POLISH = require("./polish.js");
+const ENHANCE = require("./enhance.js");
 const FONT_DIR = path.join(__dirname, "..", "assets", "fonts");
 const FONTS = ["Montserrat_500Medium.ttf", "Montserrat_700Bold.ttf", "Montserrat_800ExtraBold.ttf"].map((f) => path.join(FONT_DIR, f));
 const GRAPH = "https://graph.instagram.com/v23.0";
@@ -293,6 +294,14 @@ async function renderCarousel(f, acc, opts) {
   // цифры коррекции для каждого фото, применяем их фильтром. Сбой — без неё.
   let fx = [];
   if (opts && opts.polish && opts.polish.enabled) {
+    // Первый шаг полировки — внешний улучшатель фото (enhance.js, ключ
+    // IMAGE_ENHANCER_API_KEY), до нейросети. Нет ключа или сбой — фото как было.
+    if (ENHANCE.available()) {
+      const e = await ENHANCE.enhanceAll(got.slice(0, max + 1)).catch((err) => ({ bufs: null, stat: { ok: 0, failed: 1, errors: [err.message] } }));
+      if (e.bufs) e.bufs.forEach((b, i) => { got[i] = b; });
+      if (e.stat.failed) console.log("[insta] enhance: улучшено " + e.stat.ok + ", сбой " + e.stat.failed + " — " + e.stat.errors.join(" | "));
+      if (opts.report) opts.report.enhance = e.stat;
+    }
     if (opts.polish.mode === "image") {
       // Gemini возвращает готовые фото; что не прошло проверку — цифрами.
       const res = await POLISH.polishPhotos(got.slice(0, max + 1), opts.polish).catch((e) => { console.log("[insta] polish image: " + e.message); return []; });
