@@ -4672,6 +4672,12 @@ async function listPhoneCounts() {
 // Для сторожа номеров: когда пришёл последний номер, сколько за последние
 // minutes минут и сколько объявлений сейчас «в работе» у вкладок плагина.
 // Оба запроса идут по фильтрованным индексам (IX_klist_withphone, IX_klist_lease).
+// Когда в список попало последнее новое объявление — сторож обхода после перезапуска сервера.
+async function listLastNew() {
+  const pool = await getPool();
+  await ensureList(pool);
+  return (await pool.request().query("SELECT MAX(first_seen) AS t FROM dbo.krisha_list")).recordset[0].t;
+}
 async function listPhoneFlow(minutes) {
   const pool = await getPool();
   await ensureList(pool);
@@ -5178,7 +5184,7 @@ async function objectStats() {
   return r.recordset[0];
 }
 
-module.exports = { portalUserByToken, portalUsers, portalUserSave, portalNewToken, portalLog, portalReveals, portalAudit, consultAdd, consultGet, consultSet, phoneSharedCount, stickyFirstPhone, listPhoneRetryLater, instaPostForReel, instaPostReel, instaCommentAnswered, instaPostItemsSet, instaPostItems, instaCommentEventNeedFollow, instaCommentEventsToRemind, instaCommentEventReminded, instaSimilarPosts, instaHookLogAdd, instaCommentEventGet, instaCommentEventIgsid, instaCommentEventAsked, instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
+module.exports = { portalUserByToken, portalUsers, portalUserSave, portalNewToken, portalLog, portalReveals, portalAudit, consultAdd, consultGet, consultSet, phoneSharedCount, stickyFirstPhone, listPhoneRetryLater, instaPostForReel, instaPostReel, instaCommentAnswered, instaPostItemsSet, instaPostItems, instaCommentEventNeedFollow, instaCommentEventsToRemind, instaCommentEventReminded, instaSimilarPosts, instaHookLogAdd, instaCommentEventGet, instaCommentEventIgsid, instaCommentEventAsked, instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, listLastNew, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,

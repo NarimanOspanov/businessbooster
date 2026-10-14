@@ -5706,7 +5706,50 @@ async function phoneWatchTick() {
     phoneWatch.down = false;
   }
 }
+// Сторож обхода списка (/api/krisha/scanlist): обход запускает внешний
+// планировщик по ключу. 12–14.10 ключ сменили, планировщик двое суток получал
+// «bad_key», и этого никто не видел. Раз в 5 минут: когда обход последний раз
+// прочитал страницы (после перезапуска сервера — последнее новое объявление в
+// базе). Тишина дольше LIST_ALERT_MIN минут (по умолчанию 30) или 3 прогона
+// подряд без страниц — админам в бот с вероятной причиной; пока тихо —
+// напоминание раз в час; заработал — «восстановился» с длительностью.
+const listWatch = { down: false, since: null, remindedAt: 0, lastOkAt: null, lastRunAt: null, emptyRuns: 0, badKey: [], checkedAt: null, idle: null };
+function listWatchBadKey(where) {
+  listWatch.badKey.push({ at: Date.now(), where: where });
+  if (listWatch.badKey.length > 200) listWatch.badKey.splice(0, 100);
+}
+async function listWatchTick() {
+  const lim = Math.max(10, Number(process.env.LIST_ALERT_MIN) || 30);
+  let last = listWatch.lastOkAt;
+  if (!last) { const t = await db.listLastNew(); last = t ? new Date(t).getTime() : null; }
+  const idle = last ? Math.round((Date.now() - last) / 60e3) : null;
+  listWatch.checkedAt = new Date().toISOString(); listWatch.idle = idle;
+  const hhmm = (ms) => ms ? new Date(ms + 5 * 3600e3).toISOString().slice(11, 16) : "—"; // время Алматы
+  const bad = listWatch.badKey.filter((x) => Date.now() - x.at < 3600e3);
+  if (idle == null || idle >= lim || listWatch.emptyRuns >= 3) {
+    if (listWatch.down && Date.now() - listWatch.remindedAt < 3600e3) return;
+    const why = bad.length
+      ? "За час " + bad.length + " вызовов с неверным ключом (" + [...new Set(bad.map((x) => x.where))].join(", ") + ") — обновите ключ KRISHA_JOB_KEY в планировщике, который вызывает /api/krisha/scanlist"
+      : listWatch.emptyRuns >= 3
+        ? "Обход запускается, но Крыша не отдаёт страниц (" + listWatch.emptyRuns + " прогонов подряд) — возможно, блокировка адреса"
+        : listWatch.lastRunAt && Date.now() - listWatch.lastRunAt < lim * 60e3
+          ? "Обход запускается, но страницы не читаются — смотрите ответ /api/krisha/scanlist"
+          : "Обход не запускается — проверьте планировщик (cron), который вызывает /api/krisha/scanlist";
+    phoneWatchSend((listWatch.down ? "⏰ Обход Крыши всё ещё стоит" : "⚠️ <b>Обход Крыши остановился</b>") +
+      "\nПоследний раз читал страницы: " + hhmm(last) + (idle != null ? " (" + idle + " мин назад)" : "") +
+      "\nНовых объявлений, поднятий и снижений цены в базе нет.\n" + why);
+    if (!listWatch.down) listWatch.since = last || Date.now();
+    listWatch.down = true;
+    listWatch.remindedAt = Date.now();
+  } else if (listWatch.down) {
+    phoneWatchSend("✅ <b>Обход Крыши снова работает</b>\nПерерыв ≈ " + Math.round((Date.now() - listWatch.since) / 60e3) + " мин");
+    listWatch.down = false;
+  }
+}
 if (process.env.WEBSITE_SITE_NAME) {
+  // Обход: первая проверка через 10 минут после старта — дать планировщику прийти, дальше раз в 5 минут.
+  setTimeout(() => listWatchTick().catch((e) => console.log("[list-watch] " + e.message)), 10 * 60e3).unref();
+  setInterval(() => listWatchTick().catch((e) => console.log("[list-watch] " + e.message)), 5 * 60e3).unref();
   // Первая проверка через минуту после старта (деплой не должен откладывать сигнал), дальше раз в 5 минут.
   setTimeout(() => phoneWatchTick().catch((e) => { phoneWatch.error = e.message; console.log("[phone-watch] " + e.message); }), 60e3).unref();
   setInterval(() => phoneWatchTick().catch((e) => { phoneWatch.error = e.message; console.log("[phone-watch] " + e.message); }), 5 * 60e3).unref();
@@ -8740,7 +8783,7 @@ http
         res.end(JSON.stringify(obj, null, 2));
       };
       const want = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
-      if (!want || parsed.searchParams.get("key") !== want) return send(403, { ok: false, error: "bad_key" });
+      if (!want || parsed.searchParams.get("key") !== want) { listWatchBadKey("fresh"); return send(403, { ok: false, error: "bad_key" }); }
       if (freshRunning) return send(409, { ok: false, running: true, error: "свежее уже читается" });
       const q = parsed.searchParams;
       const cap = Math.max(1, Math.min(20, Number(q.get("pages") || 10)));
@@ -8814,7 +8857,7 @@ http
         res.end(JSON.stringify(obj, null, 2));
       };
       const want = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
-      if (!want || parsed.searchParams.get("key") !== want) return send(403, { ok: false, error: "bad_key" });
+      if (!want || parsed.searchParams.get("key") !== want) { listWatchBadKey("scanlist"); return send(403, { ok: false, error: "bad_key" }); }
       const q = parsed.searchParams;
       // ?history=<id> — хронология объявления: состояние и события (цены,
       // поднятия, архив) по порядку; на ней строится «мотивация продавца».
@@ -9011,6 +9054,8 @@ http
         KW.list = st;
         saveKrisha();
         listRunning = false;
+        listWatch.lastRunAt = Date.now();
+        if (pages > 0) { listWatch.lastOkAt = Date.now(); listWatch.emptyRuns = 0; } else listWatch.emptyRuns++;
         send(200, {
           ok: true, seconds: Math.round((Date.now() - t0) / 100) / 10,
           pages: pages, adverts: adverts, added: added, priceChanged: priceChanged,
