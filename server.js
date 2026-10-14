@@ -9857,7 +9857,10 @@ http
                     catch (e) { enh = { ok: false, error: String(e.message).slice(0, 200), sec: Math.round((Date.now() - t0) / 100) / 10 }; }
                   }
                 }
-                const midUrl = mid ? "data:image/jpeg;base64," + Buffer.from(INSTA.toJpeg('<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="810" viewBox="0 0 1080 810"><image href="data:' + (mid[0] === 0x89 ? "image/png" : "image/jpeg") + ";base64," + mid.toString("base64") + '" x="0" y="0" width="1080" height="810" preserveAspectRatio="xMidYMid slice"/></svg>')).toString("base64") : null;
+                const frame = (pb) => "data:image/jpeg;base64," + Buffer.from(INSTA.toJpeg('<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="810" viewBox="0 0 1080 810"><image href="data:' + (pb[0] === 0x89 ? "image/png" : "image/jpeg") + ";base64," + pb.toString("base64") + '" x="0" y="0" width="1080" height="810" preserveAspectRatio="xMidYMid slice"/></svg>')).toString("base64");
+                const midUrl = mid ? frame(mid) : null;
+                // Gemini выключен в пробе — итог = после ImageEnhancer (или исходное фото).
+                if (b.ai === false) return send(200, { ok: true, id: r.id, ai: false, enhance: enh, mid: midUrl, trace: trace, before: frame(orig), after: frame(buf) });
                 const prompt = typeof b.prompt === "string" && b.prompt.trim() ? b.prompt.trim() : P.DEFAULT_PROMPT;
                 const system = typeof b.system === "string" && b.system.trim() ? b.system.trim() : P.DEFAULT_SYSTEM;
                 if (b.mode === "image") {

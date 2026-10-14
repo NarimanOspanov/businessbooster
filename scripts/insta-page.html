@@ -227,8 +227,10 @@ function polTraceHtml(t){
 }
 function renderPolish(){
   var p = D.polish || {};
-  $("#polish").innerHTML = "<label><input type='checkbox' id='pol-on'"+(p.enabled?" checked":"")+"> Полировать фото при публикации</label>"+
-    "<div style='margin:6px 0 0'><label><input type='checkbox' id='pol-enh'"+(p.enhance!==false?" checked":"")+"> Сначала ImageEnhancer (до Gemini; убирает водяные знаки)</label> "+(p.enhanceKey?"<span class='ok'>ключ есть</span>":"<span class='bad'>нет ключа IMAGE_ENHANCER_API_KEY — шаг пропускается</span>")+"</div>"+
+  $("#polish").innerHTML = "<div style='font-weight:600;margin-bottom:4px'>Обработка фото при публикации — два шага, каждый включается отдельно</div>"+
+    "<div><label><input type='checkbox' id='pol-enh'"+(p.enhance!==false?" checked":"")+"> 1. ImageEnhancer — сторонний сервис (убирает водяные знаки)</label> "+(p.enhanceKey?"<span class='ok'>ключ есть</span>":"<span class='bad'>нет ключа IMAGE_ENHANCER_API_KEY — шаг пропускается</span>")+"</div>"+
+    "<div style='margin-top:4px'><label><input type='checkbox' id='pol-on'"+(p.enabled?" checked":"")+"> 2. Gemini AI — свет и цвет (режим ниже)</label></div>"+
+    "<div class='mut' id='pol-sum' style='margin-top:4px'></div>"+
     "<div class='row' style='margin:8px 0'><label><input type='radio' name='pol-mode' value='image'"+(p.mode!=="numbers"?" checked":"")+"> Gemini возвращает готовое фото (с проверкой: водяные знаки и содержимое на месте)</label>"+
     "<label><input type='radio' name='pol-mode' value='numbers'"+(p.mode==="numbers"?" checked":"")+"> Только цифры коррекции (свет, цвет, резкость)</label>"+
     "<label class='mut'>модель <input type='text' id='pol-model' value='"+esc(p.imageModel||"")+"' style='width:200px'></label></div>"+
@@ -241,9 +243,16 @@ function renderPolish(){
     "<textarea id='pol-check' rows='4' style='width:100%;background:#0d1117;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px;font:inherit'>"+esc(p.check||"")+"</textarea>"+
     "<div class='mut' style='margin:10px 0 4px'>Инструкция для режима «цифры» (app_config → insta.polish.system):</div>"+
     "<textarea id='pol-system' rows='9' style='width:100%;background:#0d1117;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px;font:inherit'>"+esc(p.system||"")+"</textarea></details>"+
-    "<div class='row' style='margin-top:8px'><button class='btn' id='pol-save'>Сохранить</button><button class='btn ghost' id='pol-try'>Попробовать на случайном фото</button><span class='mut' id='pol-msg'></span></div>"+
+    "<div class='row' style='margin-top:8px'><button class='btn' id='pol-save'>Сохранить</button><button class='btn ghost' id='pol-try'>Проверить на одном фото (шаги, как отмечено)</button><span class='mut' id='pol-msg'></span></div>"+
     "<div id='pol-test' style='margin-top:12px'></div>"+
     polishInfoHtml(p);
+  // Что сейчас отмечено — одной строкой: так видно, что уйдёт в пост и в пробу.
+  var polSum = function(){
+    var e = $("#pol-enh").checked, a = $("#pol-on").checked;
+    $("#pol-sum").innerHTML = "Цепочка: фото → "+(e?"<span class='ok'>ImageEnhancer</span>":"<s>ImageEnhancer</s>")+" → "+(a?"<span class='ok'>Gemini</span>":"<s>Gemini</s>")+" → пост"+
+      (!e && !a ? " · <span class='warn'>оба выключены — фото как есть</span>" : "")+" <span class='mut'>(для публикации — нажмите «Сохранить»)</span>";
+  };
+  $("#pol-enh").onchange = polSum; $("#pol-on").onchange = polSum; polSum();
   $("#pol-save").onclick = function(){
     post({ action:"polish", enabled: $("#pol-on").checked, prompt: $("#pol-prompt").value, system: $("#pol-system").value, guard: $("#pol-guard").value, check: $("#pol-check").value, mode: polMode(), imageModel: $("#pol-model").value, enhance: $("#pol-enh").checked }).then(function(j){ $("#pol-msg").textContent = j.ok ? "Сохранено" : ("Ошибка: "+j.error); });
   };
@@ -251,16 +260,18 @@ function renderPolish(){
   var tryBtn = $("#pol-try");
   tryBtn.onclick = function(){
     tryBtn.disabled = true; tryBtn.textContent = "Обрабатываем… 10–60 сек";
-    post({ action:"polish_test", prompt: $("#pol-prompt").value, system: $("#pol-system").value, guard: $("#pol-guard").value, check: $("#pol-check").value, mode: polMode(), imageModel: $("#pol-model").value, enhance: $("#pol-enh").checked }).then(function(j){
-      tryBtn.disabled = false; tryBtn.textContent = "Попробовать на другом фото";
+    post({ action:"polish_test", prompt: $("#pol-prompt").value, system: $("#pol-system").value, guard: $("#pol-guard").value, check: $("#pol-check").value, mode: polMode(), imageModel: $("#pol-model").value, enhance: $("#pol-enh").checked, ai: $("#pol-on").checked }).then(function(j){
+      tryBtn.disabled = false; tryBtn.textContent = "Проверить на другом фото";
       if(!j.ok){ $("#pol-test").innerHTML = "<span class='bad'>Не вышло: "+esc(j.error)+"</span>"; return; }
       var p = j.params || {}, f = function(v){ return (v>0?"+":"")+Number(v).toFixed(2); };
       $("#pol-test").innerHTML =
         "<div class='grid' style='grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr))'>"+
         "<div><div class='mut' style='margin-bottom:4px'>Было</div><img src='"+j.before+"' style='width:100%;border-radius:8px;display:block'></div>"+
         (j.mid ? "<div><div class='mut' style='margin-bottom:4px'>После ImageEnhancer</div><img src='"+j.mid+"' style='width:100%;border-radius:8px;display:block'></div>" : "")+
-        "<div><div class='mut' style='margin-bottom:4px'>Стало</div><img src='"+j.after+"' style='width:100%;border-radius:8px;display:block'></div></div>"+
-        (j.enhance ? "<div style='margin-top:6px'>ImageEnhancer: "+(j.enhance.ok ? "<span class='ok'>обработал</span>" : "<span class='bad'>не сработал — "+esc(j.enhance.error||"")+"</span> (дальше исходное фото)")+(j.enhance.sec!=null?" · "+j.enhance.sec+" с":"")+"</div>" : "<div class='mut' style='margin-top:6px'>ImageEnhancer выключен — Gemini получил исходное фото</div>")+
+        (j.ai===false ? (j.mid ? "" : "<div><div class='mut' style='margin-bottom:4px'>Итог</div><img src='"+j.after+"' style='width:100%;border-radius:8px;display:block'></div>")
+          : "<div><div class='mut' style='margin-bottom:4px'>После Gemini (итог)</div><img src='"+j.after+"' style='width:100%;border-radius:8px;display:block'></div>")+"</div>"+
+        (j.ai===false ? "<div class='mut' style='margin-top:6px'>Gemini выключен — в пост пошло бы фото "+(j.mid?"после ImageEnhancer":"как есть")+"</div>" : "")+
+        (j.enhance ? "<div style='margin-top:6px'>ImageEnhancer: "+(j.enhance.ok ? "<span class='ok'>обработал</span>" : "<span class='bad'>не сработал — "+esc(j.enhance.error||"")+"</span> (дальше исходное фото)")+(j.enhance.sec!=null?" · "+j.enhance.sec+" с":"")+"</div>" : "<div class='mut' style='margin-top:6px'>ImageEnhancer выключен</div>")+
         (j.mode==="image" ? polCheckHtml(j) : "")+
         polTraceHtml(j.trace)+
         (j.params ? "<div class='mut' style='margin-top:6px'>Цифры коррекции: яркость "+f(p.brightness)+" · контраст ×"+Number(p.contrast).toFixed(2)+" · насыщенность ×"+Number(p.saturation).toFixed(2)+

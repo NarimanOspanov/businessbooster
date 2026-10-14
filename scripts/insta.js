@@ -290,18 +290,20 @@ async function renderCarousel(f, acc, opts) {
   if (!got.length) throw new Error("нет фото");
   const inner = got.slice(1, max + 1);
   const n = inner.length + 2;
-  // Полировка (если включена): Gemini по промпту из настроек подбирает
-  // цифры коррекции для каждого фото, применяем их фильтром. Сбой — без неё.
+  // Обработка фото — два независимых шага, каждый включается в настройках:
+  // 1) ImageEnhancer (enhance.js, ключ IMAGE_ENHANCER_API_KEY) — polish.enhance;
+  // 2) Gemini (готовое фото или цифры коррекции) — polish.enabled.
+  // Сбой шага — фото идёт дальше как было.
   let fx = [];
-  if (opts && opts.polish && opts.polish.enabled) {
-    // Первый шаг полировки — внешний улучшатель фото (enhance.js, ключ
-    // IMAGE_ENHANCER_API_KEY), до нейросети. Нет ключа или сбой — фото как было.
-    if (opts.polish.enhance !== false && ENHANCE.available()) {
+  if (opts && opts.polish && opts.polish.enhance === true && ENHANCE.available()) {
+    {
       const e = await ENHANCE.enhanceAll(got.slice(0, max + 1)).catch((err) => ({ bufs: null, stat: { ok: 0, failed: 1, errors: [err.message] } }));
       if (e.bufs) e.bufs.forEach((b, i) => { got[i] = b; });
       if (e.stat.failed) console.log("[insta] enhance: улучшено " + e.stat.ok + ", сбой " + e.stat.failed + " — " + e.stat.errors.join(" | "));
       if (opts.report) opts.report.enhance = e.stat;
     }
+  }
+  if (opts && opts.polish && opts.polish.enabled) {
     if (opts.polish.mode === "image") {
       // Gemini возвращает готовые фото; что не прошло проверку — цифрами.
       const res = await POLISH.polishPhotos(got.slice(0, max + 1), opts.polish).catch((e) => { console.log("[insta] polish image: " + e.message); return []; });
