@@ -68,19 +68,43 @@ function clamp(p) {
   return out;
 }
 
-async function ask(parts, prompt, system, model) {
+// Журнал для страницы пробы: что ушло в модель и что вернулось. Картинки
+// (base64) заменяем пометкой с размером, ключ не пишем.
+function redact(v) {
+  if (Array.isArray(v)) return v.map(redact);
+  if (v && typeof v === "object") {
+    const o = {};
+    for (const [k, x] of Object.entries(v)) {
+      if (k === "data" && typeof x === "string" && x.length > 200) o[k] = "<картинка base64, " + Math.round(x.length * 0.75 / 1024) + " КБ>";
+      else o[k] = redact(x);
+    }
+    return o;
+  }
+  return v;
+}
+function logCall(trace, step, model, body, status, resp, t0) {
+  if (!Array.isArray(trace)) return;
+  trace.push({ step: step, url: "POST https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent", status: status,
+    sec: Math.round((Date.now() - t0) / 100) / 10, request: redact(body), response: redact(resp) });
+}
+
+async function ask(parts, prompt, system, model, trace) {
+  const body = {
+    system_instruction: { parts: [{ text: (system || DEFAULT_SYSTEM) + FORMAT }] },
+    contents: [{ role: "user", parts: [{ text: "Пожелания редактора: " + (prompt || DEFAULT_PROMPT) }].concat(parts) }],
+    generationConfig: { temperature: 0, maxOutputTokens: 4096, thinkingConfig: { thinkingBudget: 0 }, responseMimeType: "application/json", responseSchema: SCHEMA },
+  };
+  const t0 = Date.now();
   const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
     method: "POST",
     headers: { "x-goog-api-key": key(), "Content-Type": "application/json" },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: (system || DEFAULT_SYSTEM) + FORMAT }] },
-      contents: [{ role: "user", parts: [{ text: "Пожелания редактора: " + (prompt || DEFAULT_PROMPT) }].concat(parts) }],
-      generationConfig: { temperature: 0, maxOutputTokens: 4096, thinkingConfig: { thinkingBudget: 0 }, responseMimeType: "application/json", responseSchema: SCHEMA },
-    }),
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(90000),
   });
   const text = await res.text();
-  if (res.status === 404 && model !== FALLBACK) return ask(parts, prompt, system, FALLBACK);
+  let parsed = text; try { parsed = JSON.parse(text); } catch { /* как есть */ }
+  logCall(trace, "Цифры коррекции", model, body, res.status, parsed, t0);
+  if (res.status === 404 && model !== FALLBACK) return ask(parts, prompt, system, FALLBACK, trace);
   if (!res.ok) throw new Error("gemini_" + res.status + ": " + text.slice(0, 200));
   const j = JSON.parse(text);
   const cand = (j.candidates || [])[0] || {};
@@ -99,14 +123,14 @@ async function ask(parts, prompt, system, model) {
 }
 
 // buffers — JPEG фото поста (как скачали); возвращает массив настроек той же длины.
-async function adjust(buffers, prompt, system) {
+async function adjust(buffers, prompt, system, trace) {
   if (!key() || !buffers.length) return buffers.map(() => Object.assign({}, NEUTRAL));
   const parts = [];
   buffers.forEach((b, i) => {
     parts.push({ text: "Фото " + i + ":" });
     parts.push({ inline_data: { mime_type: "image/jpeg", data: b.toString("base64") } });
   });
-  const r = await ask(parts, prompt, system, MODEL);
+  const r = await ask(parts, prompt, system, MODEL, trace);
   const byI = {};
   (r.photos || []).forEach((p) => { if (Number.isInteger(p.i)) byI[p.i] = clamp(p); });
   return buffers.map((_, i) => byI[i] || Object.assign({}, NEUTRAL));
@@ -145,17 +169,20 @@ const EDGE_MIN = 0.8; // корреляция контуров оригинал�
 
 function sniffMime(b) { return b && b[0] === 0x89 && b[1] === 0x50 ? "image/png" : "image/jpeg"; }
 
-async function generate(buf, prompt, model, guard) {
+async function generate(buf, prompt, model, guard, trace) {
+  const body = {
+    contents: [{ role: "user", parts: [{ text: (guard || GUARD) + "\n\nПожелания редактора: " + (prompt || DEFAULT_PROMPT) }, { inline_data: { mime_type: sniffMime(buf), data: buf.toString("base64") } }] }],
+    generationConfig: { responseModalities: ["IMAGE"] },
+  };
+  const t0 = Date.now();
   const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model || IMAGE_MODEL) + ":generateContent", {
     method: "POST",
     headers: { "x-goog-api-key": key(), "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: (guard || GUARD) + "\n\nПожелания редактора: " + (prompt || DEFAULT_PROMPT) }, { inline_data: { mime_type: "image/jpeg", data: buf.toString("base64") } }] }],
-      generationConfig: { responseModalities: ["IMAGE"] },
-    }),
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(120000),
   });
   const j = await res.json().catch(() => ({}));
+  logCall(trace, "Готовое фото", model || IMAGE_MODEL, body, res.status, j, t0);
   if (!res.ok) throw new Error("gemini_image_" + res.status + ": " + String((j.error && j.error.message) || "").slice(0, 160));
   const parts = (((j.candidates || [])[0] || {}).content || {}).parts || [];
   const img = parts.find((p) => p.inline_data || p.inlineData);
@@ -193,24 +220,27 @@ note — 3–8 слов по-русски, что изменилось.`;
 // стояло в настройках.
 const CHECK_WATERMARK = `
 watermark_kept — true,  всегда — true.`;
-async function verify(orig, edited, checkText) {
+async function verify(orig, edited, checkText, trace) {
   const edge = corr(edgeMap(orig), edgeMap(edited));
   const out = { edge: Math.round(edge * 1000) / 1000, same_content: null, watermark_kept: null, note: "" };
   if (edge < EDGE_MIN) { out.ok = false; out.note = "кадр изменился (контуры не совпадают)"; return out; }
+  const body = {
+    system_instruction: { parts: [{ text: (checkText || CHECK) + CHECK_WATERMARK }] },
+    contents: [{ role: "user", parts: [
+      { text: "Оригинал:" }, { inline_data: { mime_type: sniffMime(orig), data: orig.toString("base64") } },
+      { text: "После обработки:" }, { inline_data: { mime_type: sniffMime(edited), data: edited.toString("base64") } }] }],
+    generationConfig: { temperature: 0, maxOutputTokens: 400, thinkingConfig: { thinkingBudget: 0 }, responseMimeType: "application/json",
+      responseSchema: { type: "OBJECT", properties: { same_content: { type: "BOOLEAN" }, watermark_kept: { type: "BOOLEAN" }, note: { type: "STRING" } }, required: ["same_content", "watermark_kept"] } },
+  };
+  const t0 = Date.now();
   const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(MODEL) + ":generateContent", {
     method: "POST",
     headers: { "x-goog-api-key": key(), "Content-Type": "application/json" },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: (checkText || CHECK) + CHECK_WATERMARK }] },
-      contents: [{ role: "user", parts: [
-        { text: "Оригинал:" }, { inline_data: { mime_type: "image/jpeg", data: orig.toString("base64") } },
-        { text: "После обработки:" }, { inline_data: { mime_type: sniffMime(edited), data: edited.toString("base64") } }] }],
-      generationConfig: { temperature: 0, maxOutputTokens: 400, thinkingConfig: { thinkingBudget: 0 }, responseMimeType: "application/json",
-        responseSchema: { type: "OBJECT", properties: { same_content: { type: "BOOLEAN" }, watermark_kept: { type: "BOOLEAN" }, note: { type: "STRING" } }, required: ["same_content", "watermark_kept"] } },
-    }),
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(60000),
   });
   const j = await res.json().catch(() => ({}));
+  logCall(trace, "Проверка результата", MODEL, body, res.status, j, t0);
   try {
     const t = (((j.candidates || [])[0] || {}).content || {}).parts.map((p) => p.text || "").join("");
     const v = JSON.parse(t);
@@ -230,8 +260,8 @@ async function polishPhotos(buffers, cfg) {
     await Promise.all(buffers.slice(i, i + 3).map(async (b, k) => {
       const idx = i + k;
       try {
-        const g = await generate(b, cfg.prompt, cfg.imageModel, cfg.guard);
-        const v = await verify(b, g, cfg.check);
+        const g = await generate(b, cfg.prompt, cfg.imageModel, cfg.guard, cfg.trace);
+        const v = await verify(b, g, cfg.check, cfg.trace);
         out[idx].check = v;
         if (v.ok) { out[idx].buf = g; out[idx].how = "ai"; }
       } catch (e) { out[idx].check = { ok: false, note: String(e.message).slice(0, 100) }; }
@@ -239,7 +269,7 @@ async function polishPhotos(buffers, cfg) {
   }
   const failed = out.map((o, i) => (o.how === "ai" ? -1 : i)).filter((i) => i >= 0);
   if (failed.length) {
-    const fx = await adjust(failed.map((i) => buffers[i]), cfg.prompt, cfg.system).catch(() => []);
+    const fx = await adjust(failed.map((i) => buffers[i]), cfg.prompt, cfg.system, cfg.trace).catch(() => []);
     failed.forEach((i, k) => { if (fx[k]) { out[i].fx = fx[k]; out[i].how = "numbers"; } });
   }
   return out;

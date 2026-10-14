@@ -38,15 +38,28 @@ function findInJson(j, depth) {
   return null;
 }
 
-async function enhance(buf) {
+// trace (необязательно) — массив, куда пишем запрос и ответ для страницы пробы.
+async function enhance(buf, trace) {
   const key = apiKey();
   if (!key || !buf) return { buf: buf, ok: false, why: "нет ключа" };
   const form = new FormData();
   form.append("original_preview_image", new Blob([buf], { type: "image/jpeg" }), "image.jpg");
   form.append("api_key", key);
-  const r = await fetch(process.env.IMAGE_ENHANCER_URL || URL_DEFAULT, { method: "POST", body: form, signal: AbortSignal.timeout(90000) });
+  const url = process.env.IMAGE_ENHANCER_URL || URL_DEFAULT;
+  const t0 = Date.now();
+  const r = await fetch(url, { method: "POST", body: form, signal: AbortSignal.timeout(90000) });
   const type = String(r.headers.get("content-type") || "");
   const body = Buffer.from(await r.arrayBuffer());
+  if (Array.isArray(trace)) {
+    let resp = "<" + type + ", " + Math.round(body.length / 1024) + " КБ>";
+    if (!/^image\//i.test(type)) {
+      try {
+        resp = JSON.parse(body.toString(), (k, v) => (typeof v === "string" && v.length > 200 ? "<строка " + v.length + " символов — картинка base64, " + Math.round(v.length * 0.75 / 1024) + " КБ>" : v));
+      } catch { resp = body.toString().slice(0, 500); }
+    }
+    trace.push({ step: "ImageEnhancer", url: "POST " + url, status: r.status, sec: Math.round((Date.now() - t0) / 100) / 10,
+      request: { "multipart/form-data": { original_preview_image: "<image.jpg, " + Math.round(buf.length / 1024) + " КБ>", api_key: "<ключ из IMAGE_ENHANCER_API_KEY, скрыт>" } }, response: resp });
+  }
   if (!r.ok) throw new Error("enhancer " + r.status + ": " + body.toString().slice(0, 160));
   if (/^image\//i.test(type) || isImage(body)) return { buf: body, ok: true };
   let j = null;

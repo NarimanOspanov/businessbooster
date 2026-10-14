@@ -296,7 +296,7 @@ async function renderCarousel(f, acc, opts) {
   if (opts && opts.polish && opts.polish.enabled) {
     // Первый шаг полировки — внешний улучшатель фото (enhance.js, ключ
     // IMAGE_ENHANCER_API_KEY), до нейросети. Нет ключа или сбой — фото как было.
-    if (ENHANCE.available()) {
+    if (opts.polish.enhance !== false && ENHANCE.available()) {
       const e = await ENHANCE.enhanceAll(got.slice(0, max + 1)).catch((err) => ({ bufs: null, stat: { ok: 0, failed: 1, errors: [err.message] } }));
       if (e.bufs) e.bufs.forEach((b, i) => { got[i] = b; });
       if (e.stat.failed) console.log("[insta] enhance: улучшено " + e.stat.ok + ", сбой " + e.stat.failed + " — " + e.stat.errors.join(" | "));

@@ -5169,7 +5169,7 @@ async function instaDistricts(acc) {
 async function instaPolish() {
   if (instaPolishCache.v && Date.now() - instaPolishCache.at < 60e3) return instaPolishCache.v;
   const P = require("./scripts/polish.js");
-  const c = await db.configGet(["insta.polish.enabled", "insta.polish.prompt", "insta.polish.system", "insta.polish.mode", "insta.polish.image_model", "insta.polish.guard", "insta.polish.check"]).catch(() => null);
+  const c = await db.configGet(["insta.polish.enabled", "insta.polish.prompt", "insta.polish.system", "insta.polish.mode", "insta.polish.image_model", "insta.polish.guard", "insta.polish.check", "insta.polish.enhance"]).catch(() => null);
   if (!c) return { enabled: false, prompt: P.DEFAULT_PROMPT, system: P.DEFAULT_SYSTEM };
   // Тексты по умолчанию кладём в базу при первом обращении — чтобы их было
   // видно и править в app_config, а не искать в коде.
@@ -5181,7 +5181,9 @@ async function instaPolish() {
   if (c["insta.polish.guard"] == null) { c["insta.polish.guard"] = P.GUARD; await db.configSet("insta.polish.guard", P.GUARD).catch(() => {}); }
   if (c["insta.polish.image_model"] == null) { c["insta.polish.image_model"] = P.IMAGE_MODEL; await db.configSet("insta.polish.image_model", P.IMAGE_MODEL).catch(() => {}); }
   const v = { enabled: c["insta.polish.enabled"] === "1", prompt: c["insta.polish.prompt"] || P.DEFAULT_PROMPT, system: c["insta.polish.system"] || P.DEFAULT_SYSTEM,
-    mode: c["insta.polish.mode"] === "numbers" ? "numbers" : "image", imageModel: c["insta.polish.image_model"] || P.IMAGE_MODEL, guard: c["insta.polish.guard"] || P.GUARD, check: c["insta.polish.check"] || P.CHECK };
+    mode: c["insta.polish.mode"] === "numbers" ? "numbers" : "image", imageModel: c["insta.polish.image_model"] || P.IMAGE_MODEL, guard: c["insta.polish.guard"] || P.GUARD, check: c["insta.polish.check"] || P.CHECK,
+    // ImageEnhancer первым шагом: включён, пока не выключили (insta.polish.enhance = "0"); работает только с ключом.
+    enhance: c["insta.polish.enhance"] !== "0", enhanceKey: require("./scripts/enhance.js").available() };
   instaPolishCache = { at: Date.now(), v: v };
   return v;
 }
@@ -9842,27 +9844,40 @@ http
                   } catch { /* следующее фото */ }
                 }
                 if (!buf) return send(502, { ok: false, error: "фото не скачалось" });
+                // Как при публикации: сначала ImageEnhancer (галочка на странице), потом Gemini.
+                // trace — все запросы к сервисам и ответы, для показа на странице.
+                const orig = buf, trace = [];
+                let enh = null, mid = null;
+                if (b.enhance) {
+                  const E = require("./scripts/enhance.js");
+                  const t0 = Date.now();
+                  if (!E.available()) enh = { ok: false, error: "нет ключа IMAGE_ENHANCER_API_KEY" };
+                  else {
+                    try { const er = await E.enhance(buf, trace); if (er.ok) { buf = er.buf; mid = buf; } enh = { ok: !!er.ok, error: er.ok ? null : er.why, sec: Math.round((Date.now() - t0) / 100) / 10 }; }
+                    catch (e) { enh = { ok: false, error: String(e.message).slice(0, 200), sec: Math.round((Date.now() - t0) / 100) / 10 }; }
+                  }
+                }
+                const midUrl = mid ? "data:image/jpeg;base64," + Buffer.from(INSTA.toJpeg('<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="810" viewBox="0 0 1080 810"><image href="data:' + (mid[0] === 0x89 ? "image/png" : "image/jpeg") + ";base64," + mid.toString("base64") + '" x="0" y="0" width="1080" height="810" preserveAspectRatio="xMidYMid slice"/></svg>')).toString("base64") : null;
                 const prompt = typeof b.prompt === "string" && b.prompt.trim() ? b.prompt.trim() : P.DEFAULT_PROMPT;
                 const system = typeof b.system === "string" && b.system.trim() ? b.system.trim() : P.DEFAULT_SYSTEM;
                 if (b.mode === "image") {
                   const cur = await instaPolish();
                   const [res] = await P.polishPhotos([buf], { prompt: prompt, system: system, imageModel: (typeof b.imageModel === "string" && b.imageModel.trim()) || cur.imageModel,
-                    guard: (typeof b.guard === "string" && b.guard.trim()) || cur.guard, check: (typeof b.check === "string" && b.check.trim()) || cur.check });
+                    guard: (typeof b.guard === "string" && b.guard.trim()) || cur.guard, check: (typeof b.check === "string" && b.check.trim()) || cur.check, trace: trace });
                   const show = (pb, fx) => INSTA.toJpeg('<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="810" viewBox="0 0 1080 810">' +
                     (fx ? "<defs>" + P.filterSvg("fx", fx) + "</defs>" : "") +
                     '<image href="data:' + (pb[0] === 0x89 ? "image/png" : "image/jpeg") + ";base64," + pb.toString("base64") + '" x="0" y="0" width="1080" height="810" preserveAspectRatio="xMidYMid slice"' + (fx ? ' filter="url(#fx)"' : "") + "/></svg>");
-                  return send(200, { ok: true, id: r.id, mode: "image", how: res.how, check: res.check, params: res.fx,
-                    before: "data:image/jpeg;base64," + Buffer.from(show(buf, null)).toString("base64"),
+                  return send(200, { ok: true, id: r.id, mode: "image", how: res.how, check: res.check, params: res.fx, enhance: enh, mid: midUrl, trace: trace,
+                    before: "data:image/jpeg;base64," + Buffer.from(show(orig, null)).toString("base64"),
                     after: "data:image/jpeg;base64," + Buffer.from(show(res.buf, res.fx)).toString("base64") });
                 }
-                const [params] = await P.adjust([buf], prompt, system);
-                const u = "data:image/jpeg;base64," + buf.toString("base64");
-                const pic = (fx) => INSTA.toJpeg('<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="810" viewBox="0 0 1080 810">' +
+                const [params] = await P.adjust([buf], prompt, system, trace);
+                const pic = (fx, pb) => INSTA.toJpeg('<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="810" viewBox="0 0 1080 810">' +
                   (fx ? "<defs>" + P.filterSvg("fx", fx) + "</defs>" : "") +
-                  '<image href="' + u + '" x="0" y="0" width="1080" height="810" preserveAspectRatio="xMidYMid slice"' + (fx ? ' filter="url(#fx)"' : "") + "/></svg>");
-                return send(200, { ok: true, id: r.id, params: params,
-                  before: "data:image/jpeg;base64," + Buffer.from(pic(null)).toString("base64"),
-                  after: "data:image/jpeg;base64," + Buffer.from(pic(params)).toString("base64") });
+                  '<image href="data:' + (pb[0] === 0x89 ? "image/png" : "image/jpeg") + ";base64," + pb.toString("base64") + '" x="0" y="0" width="1080" height="810" preserveAspectRatio="xMidYMid slice"' + (fx ? ' filter="url(#fx)"' : "") + "/></svg>");
+                return send(200, { ok: true, id: r.id, params: params, enhance: enh, mid: midUrl, trace: trace,
+                  before: "data:image/jpeg;base64," + Buffer.from(pic(null, orig)).toString("base64"),
+                  after: "data:image/jpeg;base64," + Buffer.from(pic(params, buf)).toString("base64") });
               }
               if (b.action === "polish") {
                 await db.configSet("insta.polish.enabled", b.enabled ? "1" : "0");
@@ -9872,6 +9887,7 @@ http
                 if (typeof b.check === "string") await db.configSet("insta.polish.check", b.check.trim().slice(0, 4000) || require("./scripts/polish.js").CHECK);
                 if (typeof b.guard === "string") await db.configSet("insta.polish.guard", b.guard.trim().slice(0, 4000) || require("./scripts/polish.js").GUARD);
                 if (typeof b.imageModel === "string" && /^[a-z0-9.\-]+$/.test(b.imageModel.trim())) await db.configSet("insta.polish.image_model", b.imageModel.trim());
+                if (b.enhance != null) await db.configSet("insta.polish.enhance", b.enhance ? "1" : "0");
                 instaPolishCache = { at: 0, v: null };
                 instaPreview.clear(); // превью перерисуются с новыми настройками
                 return send(200, { ok: true });

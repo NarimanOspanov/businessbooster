@@ -216,9 +216,19 @@ function polCheckHtml(j){
   var how = j.how==="ai" ? "<span class='ok'>Взято готовое фото от Gemini</span>" : j.how==="numbers" ? "<span class='warn'>Готовое фото не прошло проверку — применена коррекция цифрами</span>" : "<span class='warn'>Обработка не удалась — фото без изменений</span>";
   return "<div style='margin-top:6px'>"+how+"</div><div class='mut'>Проверка: совпадение контуров кадра "+(c.edge!=null?c.edge:"—")+" (нужно ≥ "+((D.polishInfo||{}).edgeMin||0.8)+") · водяные знаки на месте: "+yn(c.watermark_kept)+" · содержимое то же: "+yn(c.same_content)+(c.note?" · «"+esc(c.note)+"»":"")+"</div>";
 }
+// Журнал пробы: каждый запрос к сервису — что ушло и что вернулось (картинки заменены пометкой).
+function polTraceHtml(t){
+  if(!t || !t.length) return "";
+  var pre = function(o){ return "<pre style='white-space:pre-wrap;word-break:break-word;background:#0d1117;border:1px solid var(--line);border-radius:8px;padding:8px;max-height:420px;overflow:auto;font-size:12px'>"+esc(typeof o==="string"?o:JSON.stringify(o,null,2))+"</pre>"; };
+  return "<details style='margin-top:8px'><summary>Запросы к сервисам и ответы ("+t.length+")</summary>"+t.map(function(x,i){
+    return "<div style='margin-top:8px'><b>"+(i+1)+". "+esc(x.step)+"</b> <span class='mut'>"+esc(x.url)+" · "+x.status+" · "+x.sec+" с</span>"+
+      "<div class='mut' style='margin-top:4px'>Запрос:</div>"+pre(x.request)+"<div class='mut'>Ответ:</div>"+pre(x.response)+"</div>";
+  }).join("")+"</details>";
+}
 function renderPolish(){
   var p = D.polish || {};
   $("#polish").innerHTML = "<label><input type='checkbox' id='pol-on'"+(p.enabled?" checked":"")+"> Полировать фото при публикации</label>"+
+    "<div style='margin:6px 0 0'><label><input type='checkbox' id='pol-enh'"+(p.enhance!==false?" checked":"")+"> Сначала ImageEnhancer (до Gemini; убирает водяные знаки)</label> "+(p.enhanceKey?"<span class='ok'>ключ есть</span>":"<span class='bad'>нет ключа IMAGE_ENHANCER_API_KEY — шаг пропускается</span>")+"</div>"+
     "<div class='row' style='margin:8px 0'><label><input type='radio' name='pol-mode' value='image'"+(p.mode!=="numbers"?" checked":"")+"> Gemini возвращает готовое фото (с проверкой: водяные знаки и содержимое на месте)</label>"+
     "<label><input type='radio' name='pol-mode' value='numbers'"+(p.mode==="numbers"?" checked":"")+"> Только цифры коррекции (свет, цвет, резкость)</label>"+
     "<label class='mut'>модель <input type='text' id='pol-model' value='"+esc(p.imageModel||"")+"' style='width:200px'></label></div>"+
@@ -235,21 +245,24 @@ function renderPolish(){
     "<div id='pol-test' style='margin-top:12px'></div>"+
     polishInfoHtml(p);
   $("#pol-save").onclick = function(){
-    post({ action:"polish", enabled: $("#pol-on").checked, prompt: $("#pol-prompt").value, system: $("#pol-system").value, guard: $("#pol-guard").value, check: $("#pol-check").value, mode: polMode(), imageModel: $("#pol-model").value }).then(function(j){ $("#pol-msg").textContent = j.ok ? "Сохранено" : ("Ошибка: "+j.error); });
+    post({ action:"polish", enabled: $("#pol-on").checked, prompt: $("#pol-prompt").value, system: $("#pol-system").value, guard: $("#pol-guard").value, check: $("#pol-check").value, mode: polMode(), imageModel: $("#pol-model").value, enhance: $("#pol-enh").checked }).then(function(j){ $("#pol-msg").textContent = j.ok ? "Сохранено" : ("Ошибка: "+j.error); });
   };
   // Проба: случайное фото кандидата, обработка по текстам из полей (даже не сохранённым).
   var tryBtn = $("#pol-try");
   tryBtn.onclick = function(){
-    tryBtn.disabled = true; tryBtn.textContent = "Обрабатываем… 10–20 сек";
-    post({ action:"polish_test", prompt: $("#pol-prompt").value, system: $("#pol-system").value, guard: $("#pol-guard").value, check: $("#pol-check").value, mode: polMode(), imageModel: $("#pol-model").value }).then(function(j){
+    tryBtn.disabled = true; tryBtn.textContent = "Обрабатываем… 10–60 сек";
+    post({ action:"polish_test", prompt: $("#pol-prompt").value, system: $("#pol-system").value, guard: $("#pol-guard").value, check: $("#pol-check").value, mode: polMode(), imageModel: $("#pol-model").value, enhance: $("#pol-enh").checked }).then(function(j){
       tryBtn.disabled = false; tryBtn.textContent = "Попробовать на другом фото";
       if(!j.ok){ $("#pol-test").innerHTML = "<span class='bad'>Не вышло: "+esc(j.error)+"</span>"; return; }
       var p = j.params || {}, f = function(v){ return (v>0?"+":"")+Number(v).toFixed(2); };
       $("#pol-test").innerHTML =
         "<div class='grid' style='grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr))'>"+
         "<div><div class='mut' style='margin-bottom:4px'>Было</div><img src='"+j.before+"' style='width:100%;border-radius:8px;display:block'></div>"+
+        (j.mid ? "<div><div class='mut' style='margin-bottom:4px'>После ImageEnhancer</div><img src='"+j.mid+"' style='width:100%;border-radius:8px;display:block'></div>" : "")+
         "<div><div class='mut' style='margin-bottom:4px'>Стало</div><img src='"+j.after+"' style='width:100%;border-radius:8px;display:block'></div></div>"+
+        (j.enhance ? "<div style='margin-top:6px'>ImageEnhancer: "+(j.enhance.ok ? "<span class='ok'>обработал</span>" : "<span class='bad'>не сработал — "+esc(j.enhance.error||"")+"</span> (дальше исходное фото)")+(j.enhance.sec!=null?" · "+j.enhance.sec+" с":"")+"</div>" : "<div class='mut' style='margin-top:6px'>ImageEnhancer выключен — Gemini получил исходное фото</div>")+
         (j.mode==="image" ? polCheckHtml(j) : "")+
+        polTraceHtml(j.trace)+
         (j.params ? "<div class='mut' style='margin-top:6px'>Цифры коррекции: яркость "+f(p.brightness)+" · контраст ×"+Number(p.contrast).toFixed(2)+" · насыщенность ×"+Number(p.saturation).toFixed(2)+
         " · теплота "+f(p.warmth)+" · резкость "+Number(p.sharpen).toFixed(2)+" · шумоподавление "+Number(p.denoise).toFixed(2)+"</div>" : "")+
         "<div class='mut'>Фото из <a href='https://krisha.kz/a/show/"+j.id+"' target='_blank' rel='noopener'>объявления</a></div>";
