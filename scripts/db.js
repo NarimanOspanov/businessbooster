@@ -2104,6 +2104,8 @@ IF COL_LENGTH('dbo.krisha_list', 'phones_at')     IS NULL ALTER TABLE dbo.krisha
 IF COL_LENGTH('dbo.krisha_list', 'phone_tries')   IS NULL ALTER TABLE dbo.krisha_list ADD phone_tries SMALLINT NULL;
 IF COL_LENGTH('dbo.krisha_list', 'phone_state')   IS NULL ALTER TABLE dbo.krisha_list ADD phone_state NVARCHAR(20) NULL;
 IF COL_LENGTH('dbo.krisha_list', 'phone_next_at') IS NULL ALTER TABLE dbo.krisha_list ADD phone_next_at DATETIME2(0) NULL;
+-- Район по координатам (scripts/districts.js): almaty-bostandykskij, almaty-out — пригород.
+IF COL_LENGTH('dbo.krisha_list', 'district')      IS NULL ALTER TABLE dbo.krisha_list ADD district NVARCHAR(40) NULL;
 -- Поиск хозяина для агентского: когда искали, сколько нашли, лучший.
 IF COL_LENGTH('dbo.krisha_list', 'searched_at')   IS NULL ALTER TABLE dbo.krisha_list ADD searched_at DATETIME2(0) NULL;
 IF COL_LENGTH('dbo.krisha_list', 'match_count')   IS NULL ALTER TABLE dbo.krisha_list ADD match_count INT NULL;
@@ -2221,6 +2223,8 @@ IF OBJECT_ID('dbo.portal_users', 'U') IS NULL
     last_seen   DATETIME2(0)  NULL,
     last_ip     NVARCHAR(60)  NULL
   );
+-- Районы доступа риэлтора: пусто — весь город; иначе только эти районы в своих городах.
+IF COL_LENGTH('dbo.portal_users', 'districts') IS NULL ALTER TABLE dbo.portal_users ADD districts NVARCHAR(800) NULL;
 -- Журнал действий риэлторов: открыл страницу, список, номер, статус.
 IF OBJECT_ID('dbo.portal_audit', 'U') IS NULL
 BEGIN
@@ -2306,20 +2310,21 @@ async function saveListAdvert(o, sweepNo) {
     .input("bumped", sql.Date, o.bumpedOn || null)
     .input("pc", sql.VarChar(2000), require("./krisha-list.js").packPhotos(o.photoUrls))
     .input("sweep", sql.Int, sweepNo == null ? null : Number(sweepNo))
+    .input("dist", sql.NVarChar(40), require("./districts.js").districtFor(o.city, o.lat, o.lon))
     .query(`
       MERGE dbo.krisha_list AS t
       USING (SELECT @id AS id) AS s ON t.id = s.id
       WHEN MATCHED THEN UPDATE SET
         deal = @deal, prop = @prop, user_type = @ut, city = COALESCE(@city, t.city),
         price = @price, rooms = @rooms, area = @area, floor = @floor, floors = @floors,
-        complex_id = @cxid, lat = @lat, lon = @lon, title = @title, addr = @addr,
+        complex_id = @cxid, lat = @lat, lon = @lon, district = COALESCE(@dist, t.district), title = @title, addr = @addr,
         owner_name = @owner, photos = @photos, photo1 = @photo1, storage = @storage,
         bumped_on = COALESCE(@bumped, t.bumped_on), photos_c = COALESCE(@pc, t.photos_c), photos_json = NULL,
         last_seen = SYSUTCDATETIME(), seen_count = t.seen_count + 1, sweep_no = @sweep
       WHEN NOT MATCHED THEN INSERT
-        (id, deal, prop, user_type, city, price, rooms, area, floor, floors, complex_id, lat, lon,
+        (id, deal, prop, user_type, city, price, rooms, area, floor, floors, complex_id, lat, lon, district,
          title, addr, owner_name, photos, photo1, storage, bumped_on, photos_c, sweep_no)
-        VALUES (@id, @deal, @prop, @ut, @city, @price, @rooms, @area, @floor, @floors, @cxid, @lat, @lon,
+        VALUES (@id, @deal, @prop, @ut, @city, @price, @rooms, @area, @floor, @floors, @cxid, @lat, @lon, @dist,
          @title, @addr, @owner, @photos, @photo1, @storage, @bumped, @pc, @sweep)
       OUTPUT $action AS act, deleted.price AS old_price, deleted.storage AS old_storage,
              deleted.bumped_on AS old_bumped;`);
@@ -2515,7 +2520,7 @@ async function leadsList(f) {
   const hours = Math.max(1, Math.min(24 * 30, Number(f.hours) || 72));
   const since = new Date(Date.now() - hours * 3600e3);
   const nul = (v) => (v == null || v === "" || v === "any" ? null : v);
-  const r = await pool.request()
+  const r = pool.request()
     .input("since", sql.DateTime2, since)
     .input("n", sql.Int, Math.max(1, Math.min(500, Number(f.limit) || 200)))
     // offset — сколько пропустить: страница лидов листает по 200.
@@ -2528,9 +2533,12 @@ async function leadsList(f) {
     .input("pmax", sql.BigInt, nul(f.pmax) == null ? null : Number(f.pmax))
     .input("signal", sql.NVarChar(10), f.signal || "all")
     .input("relist", sql.Int, LEAD_RELIST_MIN)
-    .input("status", sql.NVarChar(20), f.status || "open")
-    .query(`
-    SELECT l.id, l.deal, l.prop, l.city, l.price, l.rooms, l.area, l.floor, l.floors, l.title, l.addr, l.owner_name,
+    .input("status", sql.NVarChar(20), f.status || "open");
+  // Районы: список ключей (almaty-bostandykskij, almaty-out); пусто — без фильтра.
+  const dl = (Array.isArray(f.districts) ? f.districts : []).map(String).filter((x) => /^[a-z0-9-]{3,40}$/.test(x)).slice(0, 30);
+  dl.forEach((d, i) => r.input("dd" + i, sql.NVarChar(40), d));
+  return (await r.query(`
+    SELECT l.id, l.deal, l.prop, l.city, l.district, l.price, l.rooms, l.area, l.floor, l.floors, l.title, l.addr, l.owner_name,
       l.lat, l.lon, l.photos_c, l.photos_json, l.first_seen, l.bumped_on, l.phones, l.phones_at,
       ev.last_bump, ev.bumps, pr.last_price_at, pr.old_price, pr.new_price, bk.last_back,
       l.storage, x.exp_in, CASE WHEN x.expired = 1 THEN ar.last_archived END AS expired_at, ba.backs_all, ba.last_back_all,
@@ -2562,6 +2570,7 @@ async function leadsList(f) {
     WHERE l.user_type = 'owner' AND (l.storage = 'live' OR x.expired = 1) AND l.phones IS NOT NULL
       AND (@city IS NULL OR l.city = @city) AND (@deal IS NULL OR l.deal = @deal) AND (@prop IS NULL OR l.prop = @prop)
       AND (@rooms IS NULL OR l.rooms = @rooms) AND (@pmin IS NULL OR l.price >= @pmin) AND (@pmax IS NULL OR l.price <= @pmax)
+      ${dl.length ? "AND l.district IN (" + dl.map((_, i) => "@dd" + i).join(",") + ")" : ""}
       AND (l.first_seen >= @since OR EXISTS (SELECT 1 FROM dbo.krisha_list_events e WHERE e.id = l.id AND e.at >= @since AND e.kind IN ('bump','price','back'))
         OR x.exp_in BETWEEN 0 AND 1 OR x.expired = 1 OR (l.storage = 'live' AND ba.backs_all >= @relist))
       AND (@signal = 'all'
@@ -2575,8 +2584,7 @@ async function leadsList(f) {
       AND (@status = 'all' OR (@status = 'open' AND (s.status IS NULL OR s.status = 'callback')) OR s.status = @status)
     ORDER BY sig DESC, l.id DESC
     OFFSET @off ROWS FETCH NEXT @n ROWS ONLY
-    OPTION (RECOMPILE)`);
-  return r.recordset.map((x) => {
+    OPTION (RECOMPILE)`)).recordset.map((x) => {
     const o = Object.assign({}, x, { photos: listPhotoUrls(x.photos_c, x.photos_json).slice(0, 3), phones: rawList(x.phones) });
     delete o.photos_c; delete o.photos_json;
     return o;
@@ -2957,7 +2965,7 @@ async function listHistory(id) {
   const pool = await getPool();
   await ensureList(pool);
   const row = (await pool.request().input("id", sql.BigInt, Number(id)).query(`
-    SELECT id, deal, prop, user_type, city, price, rooms, area, floor, floors, complex_id, lat, lon, title, addr,
+    SELECT id, deal, prop, user_type, city, district, price, rooms, area, floor, floors, complex_id, lat, lon, title, addr,
       owner_name, photos, storage, bumped_on, first_seen, last_seen, seen_count, phones, phones_at, phone_state
     FROM dbo.krisha_list WHERE id = @id`)).recordset[0] || null;
   const events = (await pool.request().input("id", sql.BigInt, Number(id)).query(`
@@ -4046,7 +4054,7 @@ async function consultSet(id, f) {
 // --- Доступ риэлторов (страница лидов) ------------------------------------
 const portalSplit = (v) => String(v || "").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean);
 function portalShape(u) {
-  return u ? Object.assign({}, u, { cities: portalSplit(u.cities), deals: portalSplit(u.deals), props: portalSplit(u.props) }) : null;
+  return u ? Object.assign({}, u, { cities: portalSplit(u.cities), deals: portalSplit(u.deals), props: portalSplit(u.props), districts: portalSplit(u.districts) }) : null;
 }
 async function portalUserByToken(token) {
   if (!token || String(token).length < 16) return null;
@@ -4074,15 +4082,17 @@ async function portalUserSave(u) {
     .input("deals", sql.NVarChar(40), portalSplit(u.deals).join(",") || "sale,rent")
     .input("props", sql.NVarChar(80), portalSplit(u.props).join(",") || "flat,house,commercial,land")
     .input("lim", sql.Int, Math.max(1, Math.min(1000, Number(u.phone_limit) || 40)))
-    .input("active", sql.Bit, u.active === false || u.active === 0 || u.active === "0" ? 0 : 1);
+    .input("active", sql.Bit, u.active === false || u.active === 0 || u.active === "0" ? 0 : 1)
+    // Районы — только в выбранных городах (almaty-… при городе almaty).
+    .input("districts", sql.NVarChar(800), portalSplit(u.districts).filter((d) => portalSplit(u.cities).some((c) => d.startsWith(c + "-"))).join(",").slice(0, 800));
   if (u.id) {
     await rq.input("id", sql.Int, Number(u.id)).query(`UPDATE dbo.portal_users SET name = @name, cities = @cities, deals = @deals, props = @props,
-      phone_limit = @lim, active = @active WHERE id = @id`);
+      districts = @districts, phone_limit = @lim, active = @active WHERE id = @id`);
     return Number(u.id);
   }
   const token = require("crypto").randomBytes(18).toString("base64url");
-  return (await rq.input("t", sql.NVarChar(64), token).query(`INSERT INTO dbo.portal_users (name, token, cities, deals, props, phone_limit, active)
-    OUTPUT inserted.id VALUES (@name, @t, @cities, @deals, @props, @lim, @active)`)).recordset[0].id;
+  return (await rq.input("t", sql.NVarChar(64), token).query(`INSERT INTO dbo.portal_users (name, token, cities, deals, props, districts, phone_limit, active)
+    OUTPUT inserted.id VALUES (@name, @t, @cities, @deals, @props, @districts, @lim, @active)`)).recordset[0].id;
 }
 async function portalNewToken(id) {
   const pool = await getPool();
@@ -4518,6 +4528,7 @@ async function saveListAdverts(rows, sweepNo) {
   const pool = await getPool();
   await ensureList(pool);
   const L = require("./krisha-list.js");
+  const DIST = require("./districts.js");
   const cut = (v, n) => (v == null || v === "" ? null : String(v).slice(0, n));
   const req = pool.request().input("sweep", sql.Int, sweepNo == null ? null : Number(sweepNo));
   const vals = [];
@@ -4542,28 +4553,29 @@ async function saveListAdverts(rows, sweepNo) {
       .input("photo1" + k, sql.NVarChar(300), cut(o.photo1, 300))
       .input("storage" + k, sql.NVarChar(20), cut(o.storage, 20))
       .input("bumped" + k, sql.Date, o.bumpedOn || null)
-      .input("pc" + k, sql.VarChar(2000), L.packPhotos(o.photoUrls));
+      .input("pc" + k, sql.VarChar(2000), L.packPhotos(o.photoUrls))
+      .input("dist" + k, sql.NVarChar(40), DIST.districtFor(o.city, o.lat, o.lon));
     vals.push("(@id" + k + ",@deal" + k + ",@prop" + k + ",@ut" + k + ",@city" + k + ",@price" + k + ",@rooms" + k +
       ",@area" + k + ",@floor" + k + ",@floors" + k + ",@cxid" + k + ",@lat" + k + ",@lon" + k + ",@title" + k +
-      ",@addr" + k + ",@owner" + k + ",@photos" + k + ",@photo1" + k + ",@storage" + k + ",@bumped" + k + ",@pc" + k + ")");
+      ",@addr" + k + ",@owner" + k + ",@photos" + k + ",@photo1" + k + ",@storage" + k + ",@bumped" + k + ",@pc" + k + ",@dist" + k + ")");
   });
   const r = await req.query(`
     MERGE dbo.krisha_list AS t
     USING (VALUES ${vals.join(",")}) AS s
       (id, deal, prop, user_type, city, price, rooms, area, floor, floors, complex_id, lat, lon,
-       title, addr, owner_name, photos, photo1, storage, bumped_on, photos_c)
+       title, addr, owner_name, photos, photo1, storage, bumped_on, photos_c, district)
     ON t.id = s.id
     WHEN MATCHED THEN UPDATE SET
       deal = s.deal, prop = s.prop, user_type = s.user_type, city = COALESCE(s.city, t.city),
       price = s.price, rooms = s.rooms, area = s.area, floor = s.floor, floors = s.floors,
-      complex_id = s.complex_id, lat = s.lat, lon = s.lon, title = s.title, addr = s.addr,
+      complex_id = s.complex_id, lat = s.lat, lon = s.lon, district = COALESCE(s.district, t.district), title = s.title, addr = s.addr,
       owner_name = s.owner_name, photos = s.photos, photo1 = s.photo1, storage = s.storage,
       bumped_on = COALESCE(s.bumped_on, t.bumped_on), photos_c = COALESCE(s.photos_c, t.photos_c), photos_json = NULL,
       last_seen = SYSUTCDATETIME(), seen_count = t.seen_count + 1, sweep_no = @sweep
     WHEN NOT MATCHED THEN INSERT
-      (id, deal, prop, user_type, city, price, rooms, area, floor, floors, complex_id, lat, lon,
+      (id, deal, prop, user_type, city, price, rooms, area, floor, floors, complex_id, lat, lon, district,
        title, addr, owner_name, photos, photo1, storage, bumped_on, photos_c, sweep_no)
-      VALUES (s.id, s.deal, s.prop, s.user_type, s.city, s.price, s.rooms, s.area, s.floor, s.floors, s.complex_id, s.lat, s.lon,
+      VALUES (s.id, s.deal, s.prop, s.user_type, s.city, s.price, s.rooms, s.area, s.floor, s.floors, s.complex_id, s.lat, s.lon, s.district,
        s.title, s.addr, s.owner_name, s.photos, s.photo1, s.storage, s.bumped_on, s.photos_c, @sweep)
     OUTPUT $action AS act, inserted.id AS id, deleted.price AS old_price, deleted.storage AS old_storage,
            deleted.bumped_on AS old_bumped;`);

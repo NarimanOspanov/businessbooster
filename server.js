@@ -1854,6 +1854,7 @@ const KRISHA_LEADS_HTML = `<!doctype html>
 <h1>Крыша · лиды хозяев <span id="cnt" class="mut"></span></h1>
 <div class="bar">
   <select id="city"><option value="almaty">Алматы</option><option value="astana">Астана</option><option value="shymkent">Шымкент</option><option value="any">все города</option></select>
+  <select id="district"><option value="any">район: любой</option></select>
   <select id="deal"><option value="sale">продажа</option><option value="rent">аренда</option><option value="any">любая</option></select>
   <select id="prop"><option value="flat">квартиры</option><option value="house">дома</option><option value="commercial">коммерция</option><option value="land">участки</option><option value="any">всё</option></select>
   <select id="rooms"><option value="any">комнат: любые</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4+</option></select>
@@ -1944,7 +1945,13 @@ function dmT(v){if(!v)return "";var d=new Date(new Date(v).getTime()+5*3600e3);i
 function ago(v){if(!v)return "";var m=Math.round((Date.now()-new Date(v).getTime())/60000);if(m<60)return m+" мин назад";var h=Math.round(m/60);if(h<48)return h+" ч назад";return Math.round(h/24)+" дн назад";}
 function pretty(n){n=String(n);return n.length===11?"+"+n[0]+" "+n.slice(1,4)+" "+n.slice(4,7)+" "+n.slice(7,9)+" "+n.slice(9):n;}
 function days(v){return Math.max(0,Math.round((Date.now()-new Date(v).getTime())/864e5));}
-var F=["city","deal","prop","rooms","pmin","pmax","hours","signal","status"];
+var F=["city","district","deal","prop","rooms","pmin","pmax","hours","signal","status"];
+// Районы выбранного города (window.DISTRICTS — с сервера; у риэлтора только разрешённые).
+var DN={};(window.DISTRICTS||[]).forEach(function(d){DN[d.slug]=d.name;});
+function fillDistricts(){var el=document.getElementById("district"),c=document.getElementById("city").value,cur=el.value;
+  var ds=(window.DISTRICTS||[]).filter(function(d){return d.city===c;});
+  el.innerHTML="<option value='any'>"+(window.PORTAL?"район: все доступные":"район: любой")+"</option>"+ds.map(function(d){return "<option value='"+d.slug+"'>"+esc(d.name)+"</option>";}).join("");
+  el.value=ds.some(function(d){return d.slug===cur;})?cur:"any"; el.style.display=ds.length?"":"none";}
 function qs(){var p=[];F.forEach(function(k){var v=document.getElementById(k).value;if(v!==""&&v!=="any"){if(k==="pmin"||k==="pmax")v=Math.round(Number(v)*1e6);p.push(k+"="+encodeURIComponent(v));}});return p.join("&");}
 // Постранично по 200: просим на одну строку больше — по ней видно, есть ли
 // следующая страница, без отдельного подсчёта.
@@ -2000,7 +2007,7 @@ function cardHtml(x){
       "<div>"+
         "<div><span class=title>"+esc(x.title||par)+"</span><span class=price>"+money(x.price)+"</span></div>"+
         "<div class=row>"+tags(x)+"</div>"+
-        "<div class='row mut'>"+esc(x.addr||"")+(x.addr?" · ":"")+esc(x.city||"")+" · на рынке "+days(x.first_seen)+" дн · <a target=_blank href='https://krisha.kz/a/show/"+x.id+"'>на Крыше</a>"+(x.lat!=null?" · <a href='#' onclick='setView(&quot;map&quot;);focusPin("+x.id+");return false'>на карте</a>":"")+"</div>"+
+        "<div class='row mut'>"+esc(x.addr||"")+(x.addr?" · ":"")+esc(x.city||"")+(x.district&&DN[x.district]?" · "+esc(DN[x.district]):"")+" · на рынке "+days(x.first_seen)+" дн · <a target=_blank href='https://krisha.kz/a/show/"+x.id+"'>на Крыше</a>"+(x.lat!=null?" · <a href='#' onclick='setView(&quot;map&quot;);focusPin("+x.id+");return false'>на карте</a>":"")+"</div>"+
         "<div class='row phones'>"+(x.owner_name?"<span class=mut>"+esc(x.owner_name)+" · </span>":"")+ph+"</div>"+
         "<div class=st>"+
           ["called|звонил","callback|перезвонить","refused|отказ","deal|договор"].map(function(s){var p=s.split("|");return "<button class='"+p[0]+(x.status===p[0]?" on":"")+"' onclick='setSt("+x.id+",&#39;"+p[0]+"&#39;,this)'>"+p[1]+"</button>";}).join("")+
@@ -2099,6 +2106,8 @@ function setSt(id,status,el){
   });
 }
 try{F.forEach(function(k){var v=localStorage.getItem("leads:"+k);if(v!=null)document.getElementById(k).value=v;});}catch(e){}
+fillDistricts();try{var dv=localStorage.getItem("leads:district");if(dv)document.getElementById("district").value=dv;if(!document.getElementById("district").value)document.getElementById("district").value="any";}catch(e){}
+document.getElementById("city").addEventListener("change",fillDistricts);
 document.getElementById("go").onclick=load;
 setView(VIEW);
 F.forEach(function(k){document.getElementById(k).addEventListener("change",load);});
@@ -4506,6 +4515,13 @@ function portalWatch(u, ip, ua, action, r) {
   if (action === "limit") portalAlert(u, "limit", "⛔ Лиды: " + who + " исчерпал(а) лимит номеров на сутки (" + u.phone_limit + ")");
   if (action === "denied") portalAlert(u, "denied", "⚠️ Лиды: " + who + " пытался(ась) открыть объявление вне своего доступа");
 }
+// Районы городов по координатам (scripts/districts.js) — для доступа риэлторов и фильтра лидов.
+const DISTRICTS = require("./scripts/districts.js");
+// Страница лидов с данными для скрипта: window.PORTAL (риэлтор), window.DISTRICTS.
+function leadsHtml(vars) {
+  const js = Object.entries(vars).map(([k, v]) => "window." + k + "=" + JSON.stringify(v).replace(/</g, "\\u003c") + ";").join("");
+  return KRISHA_LEADS_HTML.replace("<script>\nvar KEY", "<script>" + js + "</script>\n<script>\nvar KEY");
+}
 async function portalLeads(req, res, parsed) {
   const q = parsed.searchParams;
   const sendJ = (code, obj) => { res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); };
@@ -4517,7 +4533,10 @@ async function portalLeads(req, res, parsed) {
     portalWatch(u, ip, ua, action, r);
     return r;
   };
-  const inScope = (x) => !!x && x.user_type === "owner" && u.cities.includes(String(x.city)) && u.deals.includes(String(x.deal)) && u.props.includes(String(x.prop));
+  // Районы: если в городе объявления у риэлтора отмечены районы — только они; нет отметок — весь город.
+  const myDist = (city) => u.districts.filter((d) => d.startsWith(String(city) + "-"));
+  const inScope = (x) => !!x && x.user_type === "owner" && u.cities.includes(String(x.city)) && u.deals.includes(String(x.deal)) && u.props.includes(String(x.prop)) &&
+    (!myDist(x.city).length || myDist(x.city).includes(String(x.district || "")));
   const item = async (raw) => {
     const id = String(raw || "").replace(/\D/g, "");
     const h = id ? await db.listHistory(id) : { item: null, events: [] };
@@ -4563,6 +4582,9 @@ async function portalLeads(req, res, parsed) {
     if (!u.cities.includes(String(f.city))) f.city = u.cities[0];
     if (!u.deals.includes(String(f.deal))) f.deal = u.deals[0];
     if (!u.props.includes(String(f.prop))) f.prop = u.props[0];
+    // Район: выбранный, если он в доступе; иначе все разрешённые районы города (или весь город).
+    const dsel = String(q.get("district") || ""), allow = myDist(f.city);
+    f.districts = allow.length ? (allow.includes(dsel) ? [dsel] : allow) : (dsel.startsWith(f.city + "-") ? [dsel] : null);
     f.limit = Math.min(200, Number(f.limit) || 200);
     const rows = await db.leadsList(f);
     const rv = await db.portalReveals(u.id, rows.map((r) => r.id));
@@ -4571,13 +4593,15 @@ async function portalLeads(req, res, parsed) {
       const o = Object.assign({}, r, { ph_hidden: (r.phones || []).length ? 1 : 0, phones: [] });
       return o;
     });
-    await log("list", null, [f.city, f.deal, f.prop, f.rooms, f.signal, f.hours + "ч", "стр " + (Math.floor((Number(f.offset) || 0) / 200) + 1), rows.length + " шт"].filter(Boolean).join(" · "));
+    await log("list", null, [f.city, (f.districts || []).length === 1 ? DISTRICTS.NAMES[f.districts[0]] : null, f.deal, f.prop, f.rooms, f.signal, f.hours + "ч", "стр " + (Math.floor((Number(f.offset) || 0) / 200) + 1), rows.length + " шт"].filter(Boolean).join(" · "));
     return sendJ(200, out);
   }
   await log("open", null, null);
   const portal = { name: u.name, cities: u.cities, deals: u.deals, props: u.props, limit: u.phone_limit };
+  // Районы в фильтре — только разрешённые (в городе без отметок — все районы города).
+  const dists = DISTRICTS.list().filter((d) => u.cities.includes(d.city) && (!myDist(d.city).length || myDist(d.city).includes(d.slug)));
   res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
-  res.end(KRISHA_LEADS_HTML.replace("<script>\nvar KEY", "<script>window.PORTAL=" + JSON.stringify(portal).replace(/</g, "\\u003c") + ";</script>\n<script>\nvar KEY"));
+  res.end(leadsHtml({ PORTAL: portal, DISTRICTS: dists }));
 }
 async function portalAdmin(req, res, parsed) {
   const q = parsed.searchParams;
@@ -4590,34 +4614,85 @@ async function portalAdmin(req, res, parsed) {
     return sendJ(200, { ok: true, id: await db.portalUserSave(b) });
   }
   if (q.get("data")) {
-    return sendJ(200, { users: await db.portalUsers(), audit: await db.portalAudit(Number(q.get("user")) || 0, Number(q.get("limit")) || 300) });
+    return sendJ(200, { users: await db.portalUsers(), audit: await db.portalAudit(Number(q.get("user")) || 0, Number(q.get("limit")) || 300),
+      opts: { cities: PORTAL_CITIES, deals: [["sale", "продажа"], ["rent", "аренда"]], props: [["flat", "квартиры"], ["house", "дома"], ["commercial", "коммерция"], ["land", "участки"]],
+        districts: DISTRICTS.list() } });
   }
   res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
   res.end(PORTAL_ADMIN_HTML);
 }
-const PORTAL_ADMIN_HTML = '<!doctype html><html lang=ru><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Риэлторы · доступ к лидам</title>' +
-'<style>:root{--bg:#0f1318;--card:#171c23;--line:#262d37;--tx:#e6ebf2;--mut:#8a95a5;--acc:#4c8dff;--no:#ef5b5b;--ok:#2fbf71;--warn:#f5a524}body{margin:0;background:var(--bg);color:var(--tx);font:14px system-ui,sans-serif;padding:16px}h1{font-size:18px;margin:0 0 12px}h2{font-size:15px;margin:22px 0 8px}' +
-'table{width:100%;border-collapse:collapse;background:var(--card);border-radius:10px;overflow:hidden}td,th{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;font-size:13px}th{color:var(--mut);font-weight:500}' +
-'input,select{background:#0b0f14;color:var(--tx);border:1px solid var(--line);border-radius:7px;padding:6px 8px;font:inherit}button{background:var(--acc);color:#fff;border:0;border-radius:7px;padding:6px 11px;font:inherit;cursor:pointer}button.g{background:#2a313b}.mut{color:var(--mut)}.off{opacity:.5}' +
-'.link{font-family:monospace;font-size:12px;word-break:break-all}.form{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--card);padding:10px;border-radius:10px}.a-reveal{color:var(--warn)}.a-denied,.a-limit{color:var(--no)}.a-open{color:var(--ok)}</style></head><body>' +
-'<h1>Риэлторы · доступ к лидам</h1>' +
-'<div class=form><input id=nm placeholder="Имя риэлтора"><input id=ct placeholder="города: almaty,astana" value="almaty" size=18><input id=dl placeholder="сделки" value="sale,rent" size=10><input id=pr placeholder="типы" value="flat,house,commercial,land" size=26><input id=lm type=number value=40 style="width:70px" title="номеров в сутки"><button onclick="add()">Добавить</button><span class=mut>города: almaty, astana, shymkent… · сделки: sale, rent · типы: flat, house, commercial, land</span></div>' +
-'<h2>Риэлторы</h2><div id=users class=mut>загрузка…</div><h2>Журнал <select id=fu onchange="load()"><option value=0>все</option></select></h2><div id=audit class=mut>загрузка…</div>' +
-'<script>var KEY=new URLSearchParams(location.search).get("key")||"";var API="/api/krisha/portal?key="+encodeURIComponent(KEY);var USERS=[];' +
-'function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}' +
-'function dt(v){if(!v)return "";var d=new Date(new Date(v).getTime()+5*3600e3);return ("0"+d.getUTCDate()).slice(-2)+"."+("0"+(d.getUTCMonth()+1)).slice(-2)+" "+("0"+d.getUTCHours()).slice(-2)+":"+("0"+d.getUTCMinutes()).slice(-2);}' +
-'function link(t){return location.origin+"/api/krisha/leads?u="+encodeURIComponent(t);}' +
-'var ACT={open:"открыл(а) страницу",list:"список",reveal:"открыл(а) номер",status:"статус",history:"история",denied:"вне доступа",limit:"лимит"};' +
-'function post(o){return fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(o)}).then(function(r){return r.json();});}' +
-'function add(){var o={name:nm.value,cities:ct.value,deals:dl.value,props:pr.value,phone_limit:lm.value};post(o).then(function(j){if(!j.ok)return alert(j.error);nm.value="";load();});}' +
-'function save(id){var r=document.getElementById("u"+id);var g=function(c){return r.querySelector("[data-f="+c+"]");};post({id:id,name:g("name").value,cities:g("cities").value,deals:g("deals").value,props:g("props").value,phone_limit:g("lim").value,active:g("active").checked}).then(function(j){if(!j.ok)alert(j.error);load();});}' +
-'function tok(id){if(!confirm("Выдать новую ссылку? Старая перестанет работать."))return;post({action:"token",id:id}).then(function(){load();});}' +
-'function copy(t){navigator.clipboard.writeText(link(t));}' +
-'function load(){var fu=document.getElementById("fu").value;fetch(API+"&data=1&user="+fu).then(function(r){return r.json();}).then(function(d){USERS=d.users;' +
-'document.getElementById("users").innerHTML="<table><tr><th>имя</th><th>доступ</th><th>номеров/сутки</th><th>за 24 ч</th><th>IP за 7 дн</th><th>был(а)</th><th>ссылка</th><th></th></tr>"+d.users.map(function(u){return "<tr id=u"+u.id+" class=\'"+(u.active?"":"off")+"\'><td><input data-f=name value=\'"+esc(u.name)+"\' size=12><br><label class=mut><input type=checkbox data-f=active "+(u.active?"checked":"")+"> включён</label></td><td><input data-f=cities value=\'"+esc(u.cities.join(","))+"\' size=14><br><input data-f=deals value=\'"+esc(u.deals.join(","))+"\' size=10><br><input data-f=props value=\'"+esc(u.props.join(","))+"\' size=22></td><td><input data-f=lim type=number value="+u.phone_limit+" style=\'width:60px\'></td><td>номеров: <b>"+u.reveals_24h+"</b><br>списков: "+u.lists_24h+"</td><td>"+u.ips_7d+"</td><td>"+dt(u.last_seen)+"<br><span class=mut>"+esc(u.last_ip||"")+"</span></td><td class=link>"+esc(link(u.token))+"<br><button class=g onclick=\'copy(&quot;"+u.token+"&quot;)\'>копировать</button> <button class=g onclick=\'tok("+u.id+")\'>новая ссылка</button></td><td><button onclick=\'save("+u.id+")\'>сохранить</button></td></tr>";}).join("")+"</table>";' +
-'var sel=document.getElementById("fu");if(sel.options.length<=1)d.users.forEach(function(u){var o=document.createElement("option");o.value=u.id;o.textContent=u.name;sel.appendChild(o);});' +
-'document.getElementById("audit").innerHTML=d.audit.length?"<table><tr><th>когда</th><th>кто</th><th>действие</th><th>объявление</th><th>что</th><th>IP · браузер</th></tr>"+d.audit.map(function(a){return "<tr><td>"+dt(a.at)+"</td><td>"+esc(a.name)+"</td><td class=a-"+a.action+">"+(ACT[a.action]||a.action)+"</td><td>"+(a.listing_id?"<a style=\'color:var(--acc)\' target=_blank href=\'https://krisha.kz/a/show/"+a.listing_id+"\'>"+a.listing_id+"</a>":"")+"</td><td>"+esc(a.info||"")+"</td><td class=mut>"+esc(a.ip||"")+"<br>"+esc(String(a.ua||"").slice(0,70))+"</td></tr>";}).join("")+"</table>":"пусто";});}' +
-'load();setInterval(load,60000);</script></body></html>';
+// Города для доступа риэлторов: [ключ Крыши, название].
+const PORTAL_CITIES = [["almaty", "Алматы"], ["astana", "Астана"], ["shymkent", "Шымкент"], ["karaganda", "Караганда"], ["aktobe", "Актобе"],
+  ["atyrau", "Атырау"], ["aktau", "Актау"], ["uralsk", "Уральск"], ["pavlodar", "Павлодар"], ["ust-kamenogorsk", "Усть-Каменогорск"],
+  ["kostanay", "Костанай"], ["kokshetau", "Кокшетау"], ["petropavlovsk", "Петропавловск"], ["turkestan", "Туркестан"], ["taraz", "Тараз"],
+  ["semey", "Семей"], ["kyzylorda", "Кызылорда"], ["taldykorgan", "Талдыкорган"]];
+// Страница доступа риэлторов: доступ задаётся выпадающими списками с галочками —
+// города, сделки, типы и районы (районы — только у городов, где они известны;
+// ни одного района — весь город).
+const PORTAL_ADMIN_HTML = `<!doctype html><html lang=ru><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Риэлторы · доступ к лидам</title>
+<style>:root{--bg:#0f1318;--card:#171c23;--line:#262d37;--tx:#e6ebf2;--mut:#8a95a5;--acc:#4c8dff;--no:#ef5b5b;--ok:#2fbf71;--warn:#f5a524}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px system-ui,sans-serif;padding:16px}h1{font-size:18px;margin:0 0 12px}h2{font-size:15px;margin:22px 0 8px}
+table{width:100%;border-collapse:collapse;background:var(--card);border-radius:10px}td,th{padding:8px 9px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;font-size:13px}th{color:var(--mut);font-weight:500}
+input,select{background:#0b0f14;color:var(--tx);border:1px solid var(--line);border-radius:7px;padding:6px 8px;font:inherit}button{background:var(--acc);color:#fff;border:0;border-radius:7px;padding:6px 11px;font:inherit;cursor:pointer}button.g{background:#2a313b}
+.mut{color:var(--mut)}.off{opacity:.5}.link{font-family:monospace;font-size:12px;word-break:break-all}
+.card{background:var(--card);padding:12px;border-radius:10px;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start}
+.fld{display:flex;flex-direction:column;gap:3px}.fld>span{color:var(--mut);font-size:12px}
+.acc{display:flex;flex-wrap:wrap;gap:8px}
+.dd{position:relative}.dd>summary{list-style:none;cursor:pointer;background:#0b0f14;border:1px solid var(--line);border-radius:7px;padding:6px 26px 6px 9px;min-width:150px;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative}
+.dd>summary::-webkit-details-marker{display:none}.dd>summary::after{content:"\\25BE";position:absolute;right:9px;color:var(--mut)}
+.dd[open]>summary{border-color:var(--acc)}
+.dd>div{position:absolute;z-index:20;top:calc(100% + 4px);left:0;background:var(--card);border:1px solid var(--line);border-radius:9px;padding:8px 10px;max-height:340px;overflow:auto;min-width:230px;box-shadow:0 10px 28px rgba(0,0,0,.5)}
+.dd label{display:flex;gap:7px;align-items:center;padding:3px 0;white-space:nowrap;cursor:pointer}.dd .grp{color:var(--mut);font-size:12px;margin:8px 0 2px;text-transform:uppercase;letter-spacing:.04em}
+.dd .tools{display:flex;gap:10px;margin-bottom:6px;font-size:12px}.dd .tools a{color:var(--acc);cursor:pointer}
+.a-reveal{color:var(--warn)}.a-denied,.a-limit{color:var(--no)}.a-open{color:var(--ok)}.saved{color:var(--ok);font-size:12px}</style></head><body>
+<h1>Риэлторы · доступ к лидам</h1>
+<div class=card id=newrow><div class=fld><span>Имя</span><input data-f=name placeholder="Имя риэлтора" size=16></div><div class=fld><span>Доступ</span><div class=acc data-acc></div></div><div class=fld><span>Номеров в сутки</span><input data-f=lim type=number value=40 style="width:80px"></div><div class=fld><span>&nbsp;</span><button onclick="add()">Добавить риэлтора</button></div></div>
+<h2>Риэлторы</h2><div id=users class=mut>загрузка…</div><h2>Журнал <select id=fu onchange="load()"><option value=0>все</option></select></h2><div id=audit class=mut>загрузка…</div>
+<script>var KEY=new URLSearchParams(location.search).get("key")||"";var API="/api/krisha/portal?key="+encodeURIComponent(KEY);var USERS=[],OPT=null;
+function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/'/g,"&#39;");}
+function dt(v){if(!v)return "";var d=new Date(new Date(v).getTime()+5*3600e3);return ("0"+d.getUTCDate()).slice(-2)+"."+("0"+(d.getUTCMonth()+1)).slice(-2)+" "+("0"+d.getUTCHours()).slice(-2)+":"+("0"+d.getUTCMinutes()).slice(-2);}
+function link(t){return location.origin+"/api/krisha/leads?u="+encodeURIComponent(t);}
+var ACT={open:"открыл(а) страницу",list:"список",reveal:"открыл(а) номер",status:"статус",history:"история",denied:"вне доступа",limit:"лимит"};
+function post(o){return fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(o)}).then(function(r){return r.json();});}
+// Выпадающий список с галочками. items: [[ключ, название, группа?]].
+function dd(name,items,sel,empty){var g="",h="<div class=tools><a data-all>все</a><a data-none>ничего</a></div>";
+  items.forEach(function(it){if(it[2]&&it[2]!==g){g=it[2];h+="<div class=grp>"+esc(g)+"</div>";}h+="<label><input type=checkbox value='"+esc(it[0])+"'"+(sel.indexOf(it[0])>=0?" checked":"")+"> "+esc(it[1])+"</label>";});
+  return "<details class=dd data-n='"+name+"' data-empty='"+esc(empty)+"'><summary></summary><div>"+(items.length?h:"<span class=mut>нет вариантов</span>")+"</div></details>";}
+function ddVals(box,name){var el=box.querySelector(".dd[data-n="+name+"]");if(!el)return [];return Array.prototype.slice.call(el.querySelectorAll("input:checked")).map(function(i){return i.value;});}
+function ddSum(el){var t=Array.prototype.slice.call(el.querySelectorAll("input:checked")).map(function(i){return i.parentNode.textContent.trim();});
+  el.querySelector("summary").textContent=t.length?(t.length>2?t.slice(0,2).join(", ")+" и ещё "+(t.length-2):t.join(", ")):el.getAttribute("data-empty");}
+function cityName(c){var x=OPT.cities.filter(function(z){return z[0]===c;})[0];return x?x[1]:c;}
+// Районы — только у отмеченных городов, по группам.
+function distItems(cities){return OPT.districts.filter(function(d){return cities.indexOf(d.city)>=0;}).map(function(d){return [d.slug,d.name,cityName(d.city)];});}
+function accHtml(u){return "<div class=fld><span>Города</span>"+dd("cities",OPT.cities,u.cities,"— выберите город —")+"</div>"+
+  "<div class=fld><span>Сделки</span>"+dd("deals",OPT.deals,u.deals,"— выберите —")+"</div>"+
+  "<div class=fld><span>Типы</span>"+dd("props",OPT.props,u.props,"— выберите —")+"</div>"+
+  "<div class=fld><span>Районы</span>"+dd("districts",distItems(u.cities),u.districts||[],"весь город")+"</div>";}
+function wire(box){box.querySelectorAll(".dd").forEach(ddSum);
+  box.addEventListener("change",function(e){var d=e.target.closest(".dd");if(!d)return;ddSum(d);
+    if(d.getAttribute("data-n")==="cities"){var keep=ddVals(box,"districts"),dw=box.querySelector(".dd[data-n=districts]"),nw=document.createElement("div");
+      nw.innerHTML=dd("districts",distItems(ddVals(box,"cities")),keep,"весь город");var n=nw.firstChild;dw.parentNode.replaceChild(n,dw);ddSum(n);}});
+  box.addEventListener("click",function(e){var a=e.target.closest("[data-all],[data-none]");if(!a)return;var d=a.closest(".dd");
+    d.querySelectorAll("input").forEach(function(i){i.checked=a.hasAttribute("data-all");});d.dispatchEvent(new Event("change",{bubbles:true}));});}
+document.addEventListener("click",function(e){document.querySelectorAll(".dd[open]").forEach(function(d){if(!d.contains(e.target))d.removeAttribute("open");});});
+function collect(box){return {cities:ddVals(box,"cities").join(","),deals:ddVals(box,"deals").join(","),props:ddVals(box,"props").join(","),districts:ddVals(box,"districts").join(",")};}
+function check(o){if(!o.cities)return "Отметьте хотя бы один город";if(!o.deals)return "Отметьте сделку";if(!o.props)return "Отметьте тип объектов";return null;}
+function add(){var box=document.getElementById("newrow"),o=collect(box);o.name=box.querySelector("[data-f=name]").value;o.phone_limit=box.querySelector("[data-f=lim]").value;
+  var err=!o.name.trim()?"Впишите имя":check(o);if(err)return alert(err);post(o).then(function(j){if(!j.ok)return alert(j.error);box.querySelector("[data-f=name]").value="";load();});}
+function save(id){var r=document.getElementById("u"+id),o=collect(r);o.id=id;o.name=r.querySelector("[data-f=name]").value;o.phone_limit=r.querySelector("[data-f=lim]").value;o.active=r.querySelector("[data-f=active]").checked;
+  var err=check(o);if(err)return alert(err);post(o).then(function(j){if(!j.ok)return alert(j.error);var m=r.querySelector(".saved");if(m){m.textContent="сохранено";setTimeout(function(){m.textContent="";},2500);}});}
+function tok(id){if(!confirm("Выдать новую ссылку? Старая перестанет работать."))return;post({action:"token",id:id}).then(function(){load();});}
+function copy(t,btn){navigator.clipboard.writeText(link(t));btn.textContent="скопировано";setTimeout(function(){btn.textContent="копировать";},1500);}
+var first=true;
+function load(){var fu=document.getElementById("fu").value;fetch(API+"&data=1&user="+fu).then(function(r){return r.json();}).then(function(d){USERS=d.users;OPT=d.opts;
+  if(first){first=false;var nb=document.querySelector("#newrow [data-acc]");nb.innerHTML=accHtml({cities:["almaty"],deals:["sale"],props:["flat"],districts:[]});wire(document.getElementById("newrow"));}
+  // Пока открыт список или идёт правка — таблицу не перерисовываем.
+  if(!document.querySelector("#users .dd[open]")&&!(document.activeElement&&document.activeElement.closest&&document.activeElement.closest("#users"))){
+  document.getElementById("users").innerHTML=d.users.length?"<table><tr><th>имя</th><th>доступ</th><th>номеров/сутки</th><th>за 24 ч</th><th>IP за 7 дн</th><th>был(а)</th><th>ссылка</th><th></th></tr>"+d.users.map(function(u){return "<tr id=u"+u.id+" class='"+(u.active?"":"off")+"'><td><input data-f=name value='"+esc(u.name)+"' size=12><br><label class=mut><input type=checkbox data-f=active "+(u.active?"checked":"")+"> включён</label></td><td><div class=acc>"+accHtml(u)+"</div></td><td><input data-f=lim type=number value="+u.phone_limit+" style='width:70px'></td><td>номеров: <b>"+u.reveals_24h+"</b><br>списков: "+u.lists_24h+"</td><td>"+u.ips_7d+"</td><td>"+dt(u.last_seen)+"<br><span class=mut>"+esc(u.last_ip||"")+"</span></td><td class=link>"+esc(link(u.token))+"<br><button class=g onclick='copy(&quot;"+u.token+"&quot;,this)'>копировать</button> <button class=g onclick='tok("+u.id+")'>новая ссылка</button></td><td><button onclick='save("+u.id+")'>сохранить</button><div class=saved></div></td></tr>";}).join("")+"</table>":"пока никого";
+  d.users.forEach(function(u){wire(document.getElementById("u"+u.id));});}
+  var sel=document.getElementById("fu");if(sel.options.length<=1)d.users.forEach(function(u){var o=document.createElement("option");o.value=u.id;o.textContent=u.name;sel.appendChild(o);});
+  document.getElementById("audit").innerHTML=d.audit.length?"<table><tr><th>когда</th><th>кто</th><th>действие</th><th>объявление</th><th>что</th><th>IP · браузер</th></tr>"+d.audit.map(function(a){return "<tr><td>"+dt(a.at)+"</td><td>"+esc(a.name)+"</td><td class=a-"+a.action+">"+(ACT[a.action]||a.action)+"</td><td>"+(a.listing_id?"<a style='color:var(--acc)' target=_blank href='https://krisha.kz/a/show/"+a.listing_id+"'>"+a.listing_id+"</a>":"")+"</td><td>"+esc(a.info||"")+"</td><td class=mut>"+esc(a.ip||"")+"<br>"+esc(String(a.ua||"").slice(0,70))+"</td></tr>";}).join("")+"</table>":"пусто";});}
+load();setInterval(load,60000);</script></body></html>`;
 function clientIp(req) {
   return String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() ||
          req.socket.remoteAddress || "";
@@ -10075,12 +10150,13 @@ http
       if (q.get("data")) {
         const f = {};
         for (const k of ["city", "deal", "prop", "rooms", "pmin", "pmax", "hours", "signal", "status", "limit", "offset"]) f[k] = q.get(k);
+        if (/^[a-z0-9-]{3,40}$/.test(String(q.get("district") || ""))) f.districts = [q.get("district")];
         db.leadsList(f).then((rows) => sendJ(200, rows))
           .catch((e) => sendJ(500, { ok: false, error: String(e.message).slice(0, 200) }));
         return;
       }
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
-      res.end(KRISHA_LEADS_HTML);
+      res.end(leadsHtml({ DISTRICTS: DISTRICTS.list() }));
       return;
     }
 
