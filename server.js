@@ -1898,6 +1898,10 @@ function openHist(id){
     fetch(API+"&copies="+id).then(function(r){return r.json();}).catch(function(){return [];})
   ]).then(function(res){
     var h=res[0]||{}, it=h.item||{}, ev=h.events||[], copies=Array.isArray(res[1])?res[1]:[];
+    // Копия — только совпавшая по фото (или подтверждённая человеком); похожие по параметрам — отдельно.
+    var cpOk=function(cp){return (cp.human_ok===true||cp.human_ok===1)||((cp.photo_match===true||cp.photo_match===1)&&!(cp.human_ok===false||cp.human_ok===0));};
+    var okCopies=copies.filter(cpOk), likeCopies=copies.filter(function(cp){return cp.photo_match==null&&cp.human_ok==null;}); // по фото ещё не сравнивали; «не та квартира» не показываем
+    var cpRow=function(cp){return "<tr><td><a target=_blank href='https://krisha.kz/a/show/"+cp.agent_id+"'>"+cp.agent_id+"</a> <span class=mut>"+esc(cp.title||"")+(cp.owner_name?" · "+esc(cp.owner_name):"")+"</span></td><td>"+money(cp.price)+"</td><td>"+(cp.photo_match?"<span style='color:var(--ok)'>совпали "+Math.round((cp.photo_conf||0)*100)+"%</span>":"<span class=mut>нет</span>")+(cp.human_ok===true||cp.human_ok===1?" ✓":cp.human_ok===false||cp.human_ok===0?" ✗":"")+"</td><td class=mut>"+dmT2(cp.found_at)+"</td></tr>";};
     var first=ev.filter(function(e){return e.kind==="new"||e.kind==="price";})[0];
     var startPrice=first&&first.kind==="new"?Number(first.new_price):(ev.filter(function(e){return e.kind==="price";})[0]?Number(ev.filter(function(e){return e.kind==="price";})[0].old_price):Number(it.price));
     var cur=Number(it.price), chg=startPrice?Math.round((cur-startPrice)/startPrice*100):0;
@@ -1929,11 +1933,12 @@ function openHist(id){
         "<div class=sc><div class=k>поднятий</div><b>"+bumps+"</b></div>"+
         "<div class=sc><div class=k>на рынке</div><b>"+(daysOn!=null?daysOn+" дн":"–")+"</b></div>"+
         (archs?"<div class=sc><div class=k>снимали</div><b>"+archs+" раз</b></div>":"")+
-        "<div class=sc><div class=k>агентских копий</div><b>"+copies.length+"</b></div>"+
+        "<div class=sc><div class=k>агентских копий</div><b>"+okCopies.length+"</b></div>"+
       "</div>"+
       "<h3>Хронология</h3><table><tr><th>когда (Алматы)</th><th>событие</th></tr>"+
       rows.map(function(e){return "<tr><td>"+dmT2(e.at)+"</td><td>"+lab(e)+"</td></tr>";}).join("")+"</table>"+
-      (copies.length?"<h3>Агентские копии</h3><table><tr><th>объявление</th><th>цена</th><th>фото</th><th>найдено</th></tr>"+copies.map(function(cp){return "<tr><td><a target=_blank href='https://krisha.kz/a/show/"+cp.agent_id+"'>"+cp.agent_id+"</a> <span class=mut>"+esc(cp.title||"")+(cp.owner_name?" · "+esc(cp.owner_name):"")+"</span></td><td>"+money(cp.price)+"</td><td>"+(cp.photo_match?"<span style='color:var(--ok)'>совпали "+Math.round((cp.photo_conf||0)*100)+"%</span>":"<span class=mut>нет</span>")+(cp.human_ok===true||cp.human_ok===1?" ✓":cp.human_ok===false||cp.human_ok===0?" ✗":"")+"</td><td class=mut>"+dmT2(cp.found_at)+"</td></tr>";}).join("")+"</table>":"");
+      (okCopies.length?"<h3>Агентские копии <span class=mut style='font-weight:400;font-size:12px'>— та же квартира, подтверждено по фото</span></h3><table><tr><th>объявление</th><th>цена</th><th>фото</th><th>найдено</th></tr>"+okCopies.map(cpRow).join("")+"</table>":"")+
+      (likeCopies.length?"<h3>Похожие по параметрам <span class=mut style='font-weight:400;font-size:12px'>— по фото ещё не сравнивали: может быть та же квартира, а может просто похожая</span></h3><table class=mut><tr><th>объявление</th><th>цена</th><th>фото</th><th>найдено</th></tr>"+likeCopies.map(cpRow).join("")+"</table>":"");
     c.innerHTML=html;
   }).catch(function(e){c.innerHTML="<div class=empty>не удалось загрузить: "+esc(e.message)+"</div>";});
 }
