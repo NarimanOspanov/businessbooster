@@ -2605,6 +2605,31 @@ async function leadsList(f) {
   });
 }
 
+// Сравнение фото по кнопке: фото хозяйского объявления и агентских кандидатов,
+// которых ещё не сравнивали (photo_match IS NULL), — до 6 за раз.
+async function leadUncheckedCopies(ownerId, limit) {
+  const pool = await getPool();
+  await ensureList(pool);
+  const rq = pool.request().input("id", sql.BigInt, Number(ownerId)).input("n", sql.Int, Math.max(1, Math.min(10, Number(limit) || 6)));
+  const owner = (await rq.query("SELECT id, photos_c, photos_json FROM dbo.krisha_list WHERE id = @id")).recordset[0] || null;
+  const agents = (await pool.request().input("id", sql.BigInt, Number(ownerId)).input("n", sql.Int, Math.max(1, Math.min(10, Number(limit) || 6))).query(`
+    SELECT TOP (@n) m.agent_id, a.photos_c, a.photos_json FROM dbo.krisha_list_matches m
+    JOIN dbo.krisha_list a ON a.id = m.agent_id
+    WHERE m.owner_id = @id AND m.photo_match IS NULL AND m.human_ok IS NULL
+    ORDER BY m.found_at DESC`)).recordset;
+  return {
+    owner: owner ? listPhotoUrls(owner.photos_c, owner.photos_json) : [],
+    agents: agents.map((a) => ({ id: String(a.agent_id), photos: listPhotoUrls(a.photos_c, a.photos_json) })),
+  };
+}
+async function leadSetCopyPhoto(ownerId, agentId, match, conf, why) {
+  const pool = await getPool();
+  await ensureList(pool);
+  await pool.request().input("o", sql.BigInt, Number(ownerId)).input("a", sql.BigInt, Number(agentId))
+    .input("m", sql.Bit, match ? 1 : 0).input("c", sql.Decimal(4, 3), Math.max(0, Math.min(1, Number(conf) || 0)))
+    .input("w", sql.NVarChar(400), String(why || "").slice(0, 400))
+    .query("UPDATE dbo.krisha_list_matches SET photo_match = @m, photo_conf = @c, photo_why = @w WHERE owner_id = @o AND agent_id = @a");
+}
 // Агентские копии хозяйского объявления — для окна истории на странице лидов.
 async function leadCopies(ownerId) {
   const pool = await getPool();
@@ -5199,7 +5224,7 @@ async function objectStats() {
 module.exports = { portalUserByToken, portalUsers, portalUserSave, portalNewToken, portalLog, portalReveals, portalAudit, consultAdd, consultGet, consultSet, phoneSharedCount, stickyFirstPhone, listPhoneRetryLater, instaPostForReel, instaPostReel, instaCommentAnswered, instaPostItemsSet, instaPostItems, instaCommentEventNeedFollow, instaCommentEventsToRemind, instaCommentEventReminded, instaSimilarPosts, instaHookLogAdd, instaCommentEventGet, instaCommentEventIgsid, instaCommentEventAsked, instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, listLastNew, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
-  saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, dropKnownSticky, cleanStickyPhones,
+  saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadCopies, leadUncheckedCopies, leadSetCopyPhoto, dropKnownSticky, cleanStickyPhones,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
   listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, instaCandidates, instaListing, instaPostReserve, instaPostFinish, instaPostByCode, instaPhotoScoresGet, instaPhotoScoreSave, instaPlacesGet, instaPlaceSave, configGet, configSet, instaNextCode, listTextSave, listTextStats, mortgageFlagSave, mortgageFlagStats, instaAccounts, instaAccountSet, instaPostAdd, instaPosts, instaPostedSince, instaPostByMedia, instaRecentMedia, instaRecentListings, instaDmAdd, instaDmMedia, instaDmStats, instaDmPrune, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
