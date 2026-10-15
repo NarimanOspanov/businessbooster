@@ -2007,7 +2007,8 @@ function tags(x){var t=[];
 function render(rows){
   if(!Array.isArray(rows)){document.getElementById("cnt").textContent="";document.getElementById("list").innerHTML="<div class=empty>сервер не ответил: "+esc((rows&&rows.error)||"ошибка")+" — попробуйте ещё раз или сузьте период</div>";return;}
   MORE=rows.length>PAGE; if(MORE)rows=rows.slice(0,PAGE);
-  document.getElementById("cnt").textContent=rows.length?"· "+(OFF+1)+"–"+(OFF+rows.length)+(MORE?" из многих":""):"· 0";
+  var TOTAL=rows.length&&rows[0].total!=null?Number(rows[0].total):null;
+  document.getElementById("cnt").textContent=rows.length?"· найдено "+(TOTAL!=null?TOTAL.toLocaleString("ru-RU"):(OFF+rows.length)+(MORE?"+":""))+(TOTAL!=null&&TOTAL>PAGE?" · показаны "+(OFF+1)+"–"+(OFF+rows.length):""):"· найдено 0";
   ROWS=rows;
   pager();
   if(!rows.length){document.getElementById("list").innerHTML="<div class=empty>"+(OFF?"дальше пусто":"по этим фильтрам пусто")+"</div>";if(VIEW==="map"&&MAP)plot();return;}

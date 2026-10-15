@@ -2548,7 +2548,7 @@ async function leadsList(f) {
   // Первый запрос после паузы читает события с диска (~14 с), следующие — 2 с; общий лимит 15 с мал.
   r.timeout = 60000;
   return (await r.query(`
-    SELECT l.id, l.deal, l.prop, l.city, l.district, l.price, l.rooms, l.area, l.floor, l.floors, l.title, l.addr, l.owner_name,
+    SELECT COUNT(*) OVER () AS total, l.id, l.deal, l.prop, l.city, l.district, l.price, l.rooms, l.area, l.floor, l.floors, l.title, l.addr, l.owner_name,
       l.lat, l.lon, l.photos_c, l.photos_json, l.first_seen, l.bumped_on, l.phones, l.phones_at,
       ev.last_bump, ev.bumps, pr.last_price_at, pr.old_price, pr.new_price, bk.last_back,
       l.storage, x.exp_in, CASE WHEN x.expired = 1 THEN ar.last_archived END AS expired_at, ba.backs_all, ba.last_back_all,
