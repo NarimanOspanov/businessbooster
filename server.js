@@ -1897,11 +1897,11 @@ function skTable(n){var h="<table>";for(var i=0;i<n;i++)h+="<tr><td colspan=9><d
 function skLeads(n){var h="";for(var i=0;i<n;i++)h+="<div class=skcard><div class='sk' style='width:150px;height:100px'></div><div>"+skLines(4)+"</div></div>";return h;}
 function dmT2(v){if(!v)return "";var d=new Date(new Date(v).getTime()+5*3600e3);if(isNaN(d))return "";return pad2(d.getUTCDate())+"."+pad2(d.getUTCMonth()+1)+"."+d.getUTCFullYear()+" "+pad2(d.getUTCHours())+":"+pad2(d.getUTCMinutes());}
 // Сравнение похожих по фото: совпавшие уходят в «Агентские копии», остальные пропадают.
-function photoCheck(id,btn){btn.disabled=true;btn.textContent="Сравниваем фото… 10–40 сек";
+function photoCheck(id,btn){btn.disabled=true;btn.textContent="Ищем копии по фото… 10–40 сек";
   fetch(API+"&photocheck="+id).then(function(r){return r.json();}).then(function(j){
-    if(!j.ok){btn.disabled=false;btn.textContent="Сравнить фото";alert(j.error||"не получилось");return;}
+    if(!j.ok){btn.disabled=false;btn.textContent="Найти копии";alert(j.error||"не получилось");return;}
     openHist(id);
-  }).catch(function(e){btn.disabled=false;btn.textContent="Сравнить фото";alert(e.message);});}
+  }).catch(function(e){btn.disabled=false;btn.textContent="Найти копии";alert(e.message);});}
 function closeHist(){document.getElementById("ov").className="ov";}
 document.addEventListener("keydown",function(e){if(e.key==="Escape")closeHist();});
 function openHist(id){
@@ -1952,7 +1952,7 @@ function openHist(id){
       "<h3>Хронология</h3><table><tr><th>когда (Алматы)</th><th>событие</th></tr>"+
       rows.map(function(e){return "<tr><td>"+dmT2(e.at)+"</td><td>"+lab(e)+"</td></tr>";}).join("")+"</table>"+
       (okCopies.length?"<h3>Агентские копии <span class=mut style='font-weight:400;font-size:12px'>— та же квартира, подтверждено по фото</span></h3><table><tr><th>объявление</th><th>цена</th><th>фото</th><th>найдено</th></tr>"+okCopies.map(cpRow).join("")+"</table>":"")+
-      (likeCopies.length?"<h3>Похожие по параметрам <span class=mut style='font-weight:400;font-size:12px'>— по фото ещё не сравнивали: может быть та же квартира, а может просто похожая</span> <button id='pcheck' onclick='photoCheck("+id+",this)'>Сравнить фото</button></h3><table class=mut><tr><th>объявление</th><th>цена</th><th>фото</th><th>найдено</th></tr>"+likeCopies.map(cpRow).join("")+"</table>":"");
+      (likeCopies.length?"<h3>Похожие по параметрам <span class=mut style='font-weight:400;font-size:12px'>— по фото ещё не сравнивали: может быть та же квартира, а может просто похожая</span> <button id='pcheck' onclick='photoCheck("+id+",this)'>Найти копии</button></h3><table class=mut><tr><th>объявление</th><th>цена</th><th>фото</th><th>найдено</th></tr>"+likeCopies.map(cpRow).join("")+"</table>":"");
     c.innerHTML=html;
   }).catch(function(e){c.innerHTML="<div class=empty>не удалось загрузить: "+esc(e.message)+"</div>";});
 }
