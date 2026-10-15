@@ -2115,6 +2115,9 @@ function setSt(id,status,el){
 try{F.forEach(function(k){var v=localStorage.getItem("leads:"+k);if(v!=null)document.getElementById(k).value=v;});}catch(e){}
 fillDistricts();try{var dv=localStorage.getItem("leads:district");if(dv)document.getElementById("district").value=dv;if(!document.getElementById("district").value)document.getElementById("district").value="any";}catch(e){}
 document.getElementById("city").addEventListener("change",fillDistricts);
+// Комнаты есть только у квартир и домов: для коммерции и участков фильтр прячем и сбрасываем.
+function syncFields(){var p=document.getElementById("prop").value,r=document.getElementById("rooms");var on=p==="flat"||p==="house"||p==="any";r.style.display=on?"":"none";if(!on)r.value="any";}
+document.getElementById("prop").addEventListener("change",syncFields);syncFields();
 document.getElementById("go").onclick=load;
 setView(VIEW);
 F.forEach(function(k){document.getElementById(k).addEventListener("change",load);});
