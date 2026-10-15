@@ -1858,8 +1858,8 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   <select id="deal"><option value="sale">продажа</option><option value="rent">аренда</option><option value="any">любая</option></select>
   <select id="prop"><option value="flat">квартиры</option><option value="house">дома</option><option value="commercial">коммерция</option><option value="land">участки</option><option value="any">всё</option></select>
   <select id="rooms"><option value="any">комнат: любые</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4+</option></select>
-  <input class="num" id="pmin" placeholder="цена от, млн" inputmode="numeric">
-  <input class="num" id="pmax" placeholder="цена до, млн" inputmode="numeric">
+  <input class="num" id="pmin" placeholder="цена от, ₸" inputmode="numeric">
+  <input class="num" id="pmax" placeholder="цена до, ₸" inputmode="numeric">
   <select id="hours"><option value="24">за сутки</option><option value="72" selected>за 3 дня</option><option value="168">за неделю</option><option value="720">за месяц</option></select>
   <select id="signal"><option value="all">любой сигнал</option><option value="new">новые</option><option value="bump">подняли</option><option value="price">снизили цену</option><option value="back">вернули из архива</option><option value="expiring">истекает сегодня/завтра</option><option value="expired">истекло, не вернули</option><option value="relist">продлевают по кругу</option></select>
   <select id="status"><option value="open">не обзвонены</option><option value="called">звонил</option><option value="callback">перезвонить</option><option value="refused">отказ</option><option value="deal">договор</option><option value="all">все</option></select>
@@ -1957,7 +1957,9 @@ function fillDistricts(){var el=document.getElementById("district"),c=document.g
   var ds=(window.DISTRICTS||[]).filter(function(d){return d.city===c;});
   el.innerHTML="<option value='any'>"+(window.PORTAL?"район: все доступные":"район: любой")+"</option>"+ds.map(function(d){return "<option value='"+d.slug+"'>"+esc(d.name)+"</option>";}).join("");
   el.value=ds.some(function(d){return d.slug===cur;})?cur:"any"; el.style.display=ds.length?"":"none";}
-function qs(){var p=[];F.forEach(function(k){var v=document.getElementById(k).value;if(v!==""&&v!=="any"){if(k==="pmin"||k==="pmax")v=Math.round(Number(v)*1e6);p.push(k+"="+encodeURIComponent(v));}});return p.join("&");}
+// Цена — число в тенге; пробелы и знак ₸ не мешают (700 000 = 700000).
+function priceVal(v){var t="";String(v).split("").forEach(function(c){if(c>="0"&&c<="9")t+=c;});var n=Number(t);return t&&n>0?n:null;}
+function qs(){var p=[];F.forEach(function(k){var v=document.getElementById(k).value;if(v!==""&&v!=="any"){if(k==="pmin"||k==="pmax"){v=priceVal(v);if(v==null)return;}p.push(k+"="+encodeURIComponent(v));}});return p.join("&");}
 // Постранично по 200: просим на одну строку больше — по ней видно, есть ли
 // следующая страница, без отдельного подсчёта.
 var PAGE=200, OFF=0, MORE=false;
