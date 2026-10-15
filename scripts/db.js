@@ -2533,7 +2533,15 @@ async function leadsList(f) {
     .input("pmax", sql.BigInt, nul(f.pmax) == null ? null : Number(f.pmax))
     .input("signal", sql.NVarChar(10), f.signal || "all")
     .input("relist", sql.Int, LEAD_RELIST_MIN)
-    .input("status", sql.NVarChar(20), f.status || "open");
+    .input("status", sql.NVarChar(20), f.status || "open")
+    .input("amin", sql.Decimal(9, 2), nul(f.amin) == null || !(Number(f.amin) > 0) ? null : Number(f.amin))
+    .input("amax", sql.Decimal(9, 2), nul(f.amax) == null || !(Number(f.amax) > 0) ? null : Number(f.amax))
+    .input("fmin", sql.Int, nul(f.fmin) == null || !(Number(f.fmin) > 0) ? null : Number(f.fmin))
+    .input("fmax", sql.Int, nul(f.fmax) == null || !(Number(f.fmax) > 0) ? null : Number(f.fmax))
+    .input("nfirst", sql.Bit, f.nfirst === "1" ? 1 : 0)
+    .input("nlast", sql.Bit, f.nlast === "1" ? 1 : 0)
+    // Назначение коммерции — словом из заголовка («склады», «офисы»…).
+    .input("use", sql.NVarChar(40), /^[а-яё ,-]{3,40}$/i.test(String(f.use || "")) ? String(f.use) : null);
   // Районы: список ключей (almaty-bostandykskij, almaty-out); пусто — без фильтра.
   const dl = (Array.isArray(f.districts) ? f.districts : []).map(String).filter((x) => /^[a-z0-9-]{3,40}$/.test(x)).slice(0, 30);
   dl.forEach((d, i) => r.input("dd" + i, sql.NVarChar(40), d));
@@ -2572,6 +2580,10 @@ async function leadsList(f) {
     WHERE l.user_type = 'owner' AND (l.storage = 'live' OR x.expired = 1) AND l.phones IS NOT NULL
       AND (@city IS NULL OR l.city = @city) AND (@deal IS NULL OR l.deal = @deal) AND (@prop IS NULL OR l.prop = @prop)
       AND (@rooms IS NULL OR l.rooms = @rooms) AND (@pmin IS NULL OR l.price >= @pmin) AND (@pmax IS NULL OR l.price <= @pmax)
+      AND (@amin IS NULL OR l.area >= @amin) AND (@amax IS NULL OR l.area <= @amax)
+      AND (@fmin IS NULL OR l.floor >= @fmin) AND (@fmax IS NULL OR l.floor <= @fmax)
+      AND (@nfirst = 0 OR l.floor > 1) AND (@nlast = 0 OR l.floor < l.floors)
+      AND (@use IS NULL OR l.title LIKE N'%' + @use + N'%')
       ${dl.length ? "AND l.district IN (" + dl.map((_, i) => "@dd" + i).join(",") + ")" : ""}
       AND (l.first_seen >= @since OR EXISTS (SELECT 1 FROM dbo.krisha_list_events e WHERE e.id = l.id AND e.at >= @since AND e.kind IN ('bump','price','back'))
         OR x.exp_in BETWEEN 0 AND 1 OR x.expired = 1 OR (l.storage = 'live' AND ba.backs_all >= @relist))

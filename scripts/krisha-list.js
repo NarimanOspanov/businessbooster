@@ -166,6 +166,11 @@ function cityFromCaption(a) {
   return m ? KB.citySlugOf(m[1]) : null;
 }
 
+// Площадь из заголовка: «Свободное назначение · 62 м²» → 62, «Участок · 5.58 соток» → 5.58 (сотки).
+function areaFromTitle(title) {
+  const m = String(title || "").match(/([\d]+(?:[.,][\d]+)?)\s*(м²|сот)/);
+  return m ? Number(m[1].replace(",", ".")) : null;
+}
 // Объявление списка -> строка для krisha_list. dates — карта id -> текст даты.
 function parseAdvert(a, section, dates) {
   const title = String(a.title || "");
@@ -181,7 +186,7 @@ function parseAdvert(a, section, dates) {
     bumpedOn: bumpDate(dates && dates[String(a.id)]),
     price: typeof a.price === "number" ? a.price : null,
     rooms: typeof a.rooms === "number" ? a.rooms : null,
-    area: typeof a.square === "number" ? a.square : null,
+    area: typeof a.square === "number" ? a.square : areaFromTitle(title),
     floor: fl ? Number(fl[1]) : null,
     floors: fl ? Number(fl[2]) : null,
     complexId: a.complexId == null ? null : (Number(a.complexId) || null),
@@ -265,4 +270,4 @@ async function checkAdvert(id, opts) {
   }
 }
 
-module.exports = { SECTIONS, fetchListPage, parseAdvert, loadRegions, cityOf, dealOf, propOf, bumpDate, packPhotos, unpackPhotos, checkAdvert };
+module.exports = { areaFromTitle, SECTIONS, fetchListPage, parseAdvert, loadRegions, cityOf, dealOf, propOf, bumpDate, packPhotos, unpackPhotos, checkAdvert };

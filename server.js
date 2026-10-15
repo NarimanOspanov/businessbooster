@@ -1858,6 +1858,13 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   <select id="deal"><option value="sale">продажа</option><option value="rent">аренда</option><option value="any">любая</option></select>
   <select id="prop"><option value="flat">квартиры</option><option value="house">дома</option><option value="commercial">коммерция</option><option value="land">участки</option><option value="any">всё</option></select>
   <select id="rooms"><option value="any">комнат: любые</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4+</option></select>
+  <select id="use"><option value="any">назначение: любое</option><option value="свободное назначение">свободное назначение</option><option value="офисы">офисы</option><option value="магазины и бутики">магазины и бутики</option><option value="салоны красоты">салоны красоты</option><option value="образование">образование</option><option value="склады">склады</option><option value="медцентры и аптеки">медцентры и аптеки</option><option value="общепит">общепит</option><option value="развлечения">развлечения</option><option value="кабинеты и рабочие места">кабинеты и рабочие места</option><option value="студии">студии</option><option value="конференц-залы">конференц-залы</option><option value="фитнес и спорт">фитнес и спорт</option><option value="бани">бани</option><option value="гостиницы и зоны отдыха">гостиницы и зоны отдыха</option><option value="азс">АЗС</option><option value="автосервисы и автомойки">автосервисы и автомойки</option><option value="сельское хозяйство">сельское хозяйство</option></select>
+  <input class="num" id="amin" placeholder="площадь от, м²" inputmode="decimal">
+  <input class="num" id="amax" placeholder="площадь до, м²" inputmode="decimal">
+  <input class="num" id="fmin" placeholder="этаж от" inputmode="numeric" style="width:80px">
+  <input class="num" id="fmax" placeholder="этаж до" inputmode="numeric" style="width:80px">
+  <label id="nfirstl" class="mut"><input type="checkbox" id="nfirst"> не первый</label>
+  <label id="nlastl" class="mut"><input type="checkbox" id="nlast"> не последний</label>
   <input class="num" id="pmin" placeholder="цена от, ₸" inputmode="numeric">
   <input class="num" id="pmax" placeholder="цена до, ₸" inputmode="numeric">
   <select id="hours"><option value="24">за сутки</option><option value="72" selected>за 3 дня</option><option value="168">за неделю</option><option value="720">за месяц</option></select>
@@ -1950,7 +1957,7 @@ function dmT(v){if(!v)return "";var d=new Date(new Date(v).getTime()+5*3600e3);i
 function ago(v){if(!v)return "";var m=Math.round((Date.now()-new Date(v).getTime())/60000);if(m<60)return m+" мин назад";var h=Math.round(m/60);if(h<48)return h+" ч назад";return Math.round(h/24)+" дн назад";}
 function pretty(n){n=String(n);return n.length===11?"+"+n[0]+" "+n.slice(1,4)+" "+n.slice(4,7)+" "+n.slice(7,9)+" "+n.slice(9):n;}
 function days(v){return Math.max(0,Math.round((Date.now()-new Date(v).getTime())/864e5));}
-var F=["city","district","deal","prop","rooms","pmin","pmax","hours","signal","status"];
+var F=["city","district","deal","prop","rooms","use","amin","amax","fmin","fmax","pmin","pmax","hours","signal","status"];
 // Районы выбранного города (window.DISTRICTS — с сервера; у риэлтора только разрешённые).
 var DN={};(window.DISTRICTS||[]).forEach(function(d){DN[d.slug]=d.name;});
 function fillDistricts(){var el=document.getElementById("district"),c=document.getElementById("city").value,cur=el.value;
@@ -1959,7 +1966,7 @@ function fillDistricts(){var el=document.getElementById("district"),c=document.g
   el.value=ds.some(function(d){return d.slug===cur;})?cur:"any"; el.style.display=ds.length?"":"none";}
 // Цена — число в тенге; пробелы и знак ₸ не мешают (700 000 = 700000).
 function priceVal(v){var t="";String(v).split("").forEach(function(c){if(c>="0"&&c<="9")t+=c;});var n=Number(t);return t&&n>0?n:null;}
-function qs(){var p=[];F.forEach(function(k){var v=document.getElementById(k).value;if(v!==""&&v!=="any"){if(k==="pmin"||k==="pmax"){v=priceVal(v);if(v==null)return;}p.push(k+"="+encodeURIComponent(v));}});return p.join("&");}
+function qs(){var p=[];["nfirst","nlast"].forEach(function(k){var el=document.getElementById(k);if(el&&el.checked&&el.offsetParent!==null)p.push(k+"=1");});F.forEach(function(k){var v=document.getElementById(k).value;if(v!==""&&v!=="any"){if(k==="pmin"||k==="pmax"){v=priceVal(v);if(v==null)return;}p.push(k+"="+encodeURIComponent(v));}});return p.join("&");}
 // Постранично по 200: просим на одну строку больше — по ней видно, есть ли
 // следующая страница, без отдельного подсчёта.
 var PAGE=200, OFF=0, MORE=false;
@@ -2116,7 +2123,13 @@ try{F.forEach(function(k){var v=localStorage.getItem("leads:"+k);if(v!=null)docu
 fillDistricts();try{var dv=localStorage.getItem("leads:district");if(dv)document.getElementById("district").value=dv;if(!document.getElementById("district").value)document.getElementById("district").value="any";}catch(e){}
 document.getElementById("city").addEventListener("change",fillDistricts);
 // Комнаты есть только у квартир и домов: для коммерции и участков фильтр прячем и сбрасываем.
-function syncFields(){var p=document.getElementById("prop").value,r=document.getElementById("rooms");var on=p==="flat"||p==="house"||p==="any";r.style.display=on?"":"none";if(!on)r.value="any";}
+function syncFields(){var p=document.getElementById("prop").value;
+  var show=function(id,on){var el=document.getElementById(id);if(!el)return;el.style.display=on?"":"none";if(!on){if(el.tagName==="SELECT")el.value="any";else if(el.type==="checkbox")el.checked=false;else if(el.tagName==="INPUT")el.value="";el.querySelectorAll&&el.querySelectorAll("input[type=checkbox]").forEach(function(c){c.checked=false;});}};
+  show("rooms",p==="flat"||p==="house"||p==="any");
+  show("use",p==="commercial");
+  show("amin",p!=="any");show("amax",p!=="any");
+  var unit=p==="land"?"сот.":"м²";document.getElementById("amin").placeholder="площадь от, "+unit;document.getElementById("amax").placeholder="площадь до, "+unit;
+  show("fmin",p==="flat");show("fmax",p==="flat");show("nfirstl",p==="flat");show("nlastl",p==="flat");}
 document.getElementById("prop").addEventListener("change",syncFields);syncFields();
 document.getElementById("go").onclick=load;
 setView(VIEW);
@@ -4587,7 +4600,7 @@ async function portalLeads(req, res, parsed) {
   }
   if (q.get("data")) {
     const f = {};
-    for (const k of ["city", "deal", "prop", "rooms", "pmin", "pmax", "hours", "signal", "status", "limit", "offset"]) f[k] = q.get(k);
+    for (const k of ["city", "deal", "prop", "rooms", "pmin", "pmax", "amin", "amax", "fmin", "fmax", "nfirst", "nlast", "use", "hours", "signal", "status", "limit", "offset"]) f[k] = q.get(k);
     // Только своё: город, сделка и тип — из доступа (чужое или «любые» → первое разрешённое).
     if (!u.cities.includes(String(f.city))) f.city = u.cities[0];
     if (!u.deals.includes(String(f.deal))) f.deal = u.deals[0];
@@ -10229,7 +10242,7 @@ http
       }
       if (q.get("data")) {
         const f = {};
-        for (const k of ["city", "deal", "prop", "rooms", "pmin", "pmax", "hours", "signal", "status", "limit", "offset"]) f[k] = q.get(k);
+        for (const k of ["city", "deal", "prop", "rooms", "pmin", "pmax", "amin", "amax", "fmin", "fmax", "nfirst", "nlast", "use", "hours", "signal", "status", "limit", "offset"]) f[k] = q.get(k);
         if (/^[a-z0-9-]{3,40}$/.test(String(q.get("district") || ""))) f.districts = [q.get("district")];
         db.leadsList(f).then((rows) => sendJ(200, rows))
           .catch((e) => sendJ(500, { ok: false, error: String(e.message).slice(0, 200) }));
