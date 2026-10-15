@@ -958,6 +958,7 @@ const KRISHA_HUB_HTML = `<!doctype html>
 <h2>Риэлтору</h2>
 <div class="grid">
   <a class="card" data-p="leads"><div class="t">Лиды хозяев</div><div class="d">хозяева с номером и свежим сигналом: новое, поднятие, снижение цены, возврат из архива. Фильтры, статус обзвона.</div><div class="n" id="n-leads"></div></a>
+  <a class="card" data-p="portal"><div class="t">Риэлторы: доступ</div><div class="d">добавить риэлтора, города, сделки, типы и районы, лимит номеров в сутки, личные ссылки, отключить; журнал действий и тревоги.</div></a>
 </div>
 
 <h2>Импорт объявлений</h2>
@@ -9512,7 +9513,7 @@ http
           const dashKey = encodeURIComponent(KRISHA_JOB_KEY || KRISHA_PHONE_KEY);
           // Одна ссылка — на навигатор: оттуда все страницы (лиды, статистика,
           // консоли, проверка находок).
-          lines.push("", "", '<a href="' + CANONICAL + "/api/krisha/hub?key=" + dashKey + '">статистика</a>');
+          lines.push("", "", '<a href="' + CANONICAL + "/api/krisha/hub?key=" + dashKey + '">статистика</a> · <a href="' + CANONICAL + "/api/krisha/portal?key=" + dashKey + '">риэлторы</a>');
           notifyTelegram(lines.join("\n"));
         }
 
