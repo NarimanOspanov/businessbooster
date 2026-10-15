@@ -2133,6 +2133,10 @@ function syncFields(){var p=document.getElementById("prop").value;
   var unit=p==="land"?"сот.":"м²";document.getElementById("amin").placeholder="площадь от, "+unit;document.getElementById("amax").placeholder="площадь до, "+unit;
   show("fmin",p==="flat");show("fmax",p==="flat");show("nfirstl",p==="flat");show("nlastl",p==="flat");}
 document.getElementById("prop").addEventListener("change",syncFields);syncFields();
+// Сменили сделку или тип — цена (и площадь) от прежнего выбора уже не про то: очищаем.
+function clearIds(ids){ids.forEach(function(id){var el=document.getElementById(id);if(el)el.value="";});}
+document.getElementById("deal").addEventListener("change",function(){clearIds(["pmin","pmax"]);});
+document.getElementById("prop").addEventListener("change",function(){clearIds(["pmin","pmax","amin","amax"]);});
 document.getElementById("go").onclick=load;
 setView(VIEW);
 F.forEach(function(k){document.getElementById(k).addEventListener("change",load);});
