@@ -1789,8 +1789,16 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   button.on{background:var(--acc);border-color:var(--acc);color:#fff}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:0 0 10px;display:grid;grid-template-columns:150px 1fr;gap:12px}
   @media(max-width:640px){.card{grid-template-columns:1fr}}
-  .photos{display:flex;gap:4px;flex-wrap:wrap}
-  .photos img{width:150px;height:100px;border-radius:6px;object-fit:cover;background:#222}
+  .photos{display:flex;gap:4px;flex-wrap:wrap;position:relative;align-self:start}
+  .photos img{width:150px;height:100px;border-radius:6px;object-fit:cover;background:#222;cursor:zoom-in}
+  .photos .pcnt{position:absolute;right:5px;bottom:5px;background:rgba(0,0,0,.65);color:#fff;font-size:11px;padding:1px 6px;border-radius:5px;pointer-events:none}
+  #gal{display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.92);align-items:center;justify-content:center;user-select:none}
+  #gal.on{display:flex}
+  #gal img{max-width:92vw;max-height:88vh;object-fit:contain;border-radius:6px}
+  #gal button{position:absolute;background:rgba(255,255,255,.12);color:#fff;border:0;border-radius:50%;width:46px;height:46px;font-size:28px;line-height:1;cursor:pointer}
+  #gal button:hover{background:rgba(255,255,255,.25)}
+  #gal .gp{left:16px;top:50%;margin-top:-23px} #gal .gnx{right:16px;top:50%;margin-top:-23px} #gal .gx{right:16px;top:16px;font-size:24px}
+  #gal #gcnt{position:absolute;bottom:14px;left:0;right:0;text-align:center;color:#ccc;font-size:13px}
   .title{font-weight:600;font-size:15px}
   .price{font-weight:700;font-size:16px;margin-left:8px}
   .tag{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;margin-right:6px}
@@ -1905,6 +1913,26 @@ function photoCheck(id,btn){btn.disabled=true;btn.textContent="Ищем копи
   }).catch(function(e){btn.disabled=false;btn.textContent="Найти копии";alert(e.message);});}
 function closeHist(){document.getElementById("ov").className="ov";}
 document.addEventListener("keydown",function(e){if(e.key==="Escape")closeHist();});
+// Галерея: фото объявления во весь экран, листать стрелками, свайпом, клавишами; Esc или клик мимо — закрыть.
+var PH={},GI=null;
+function gal(id,i){var a=PH[id];if(!a||!a.length)return;GI={a:a.map(function(u){return String(u).replace("-560x350.jpg","-full.jpg");}),i:i||0};
+  var g=document.getElementById("gal");
+  if(!g){g=document.createElement("div");g.id="gal";
+    g.innerHTML="<button class=gx onclick='galClose()'>×</button><button class=gp onclick='galGo(-1)'>‹</button><img id=gimg alt=''><button class=gnx onclick='galGo(1)'>›</button><div id=gcnt></div>";
+    document.body.appendChild(g);
+    g.addEventListener("click",function(e){if(e.target===g)galClose();});
+    document.getElementById("gimg").addEventListener("click",function(){galGo(1);});
+    var sx=null;g.addEventListener("touchstart",function(e){sx=e.touches[0].clientX;},{passive:true});
+    g.addEventListener("touchend",function(e){if(sx==null)return;var dx=e.changedTouches[0].clientX-sx;if(Math.abs(dx)>40)galGo(dx<0?1:-1);sx=null;});}
+  g.className="on";galShow();}
+function galShow(){var n=GI.a.length;document.getElementById("gimg").src=GI.a[GI.i];document.getElementById("gcnt").textContent=(GI.i+1)+" / "+n;
+  var many=n>1;document.querySelector("#gal .gp").style.display=many?"":"none";document.querySelector("#gal .gnx").style.display=many?"":"none";
+  if(many){new Image().src=GI.a[(GI.i+1)%n];}}
+function galGo(d){if(!GI)return;GI.i=(GI.i+d+GI.a.length)%GI.a.length;galShow();}
+function galClose(){var g=document.getElementById("gal");if(g)g.className="";GI=null;}
+document.addEventListener("keydown",function(e){if(!GI)return;
+  if(e.key==="ArrowRight"){galGo(1);e.preventDefault();}else if(e.key==="ArrowLeft"){galGo(-1);e.preventDefault();}
+  else if(e.key==="Escape"){galClose();e.stopImmediatePropagation();}},true);
 function openHist(id){
   var ov=document.getElementById("ov"), c=document.getElementById("mdc");
   ov.className="ov on"; c.innerHTML=skLines(2,70)+"<div class=sum>"+skCards(6)+"</div>"+skLines(6);
@@ -2026,7 +2054,7 @@ function cardHtml(x){
     var ph=phHtml(x,"");
     var par=[x.rooms?x.rooms+"-комн":"",x.area?x.area+" м²":"",x.floor&&x.floors?x.floor+"/"+x.floors+" эт":""].filter(Boolean).join(" · ");
     return "<div class=card data-id='"+x.id+"'>"+
-      "<div class=photos>"+(x.photos&&x.photos.length?"<img loading=lazy src='"+esc(x.photos[0])+"'>":"<div class=mut>нет фото</div>")+"</div>"+
+      "<div class=photos>"+(x.photos&&x.photos.length?(PH[x.id]=x.photos,"")+"<img loading=lazy src='"+esc(x.photos[0])+"' onclick='gal("+x.id+",0)'>"+(x.photos.length>1?"<span class=pcnt>"+x.photos.length+" фото</span>":""):"<div class=mut>нет фото</div>")+"</div>"+
       "<div>"+
         "<div><span class=title>"+esc(x.title||par)+"</span><span class=price>"+money(x.price)+"</span></div>"+
         "<div class=row>"+tags(x)+"</div>"+

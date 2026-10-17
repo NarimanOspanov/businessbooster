@@ -2609,7 +2609,7 @@ async function leadsList(f) {
     ORDER BY sig DESC, l.id DESC
     OFFSET @off ROWS FETCH NEXT @n ROWS ONLY
     OPTION (RECOMPILE)`)).recordset.map((x) => {
-    const o = Object.assign({}, x, { photos: listPhotoUrls(x.photos_c, x.photos_json).slice(0, 3), phones: rawList(x.phones) });
+    const o = Object.assign({}, x, { photos: listPhotoUrls(x.photos_c, x.photos_json).slice(0, 30), phones: rawList(x.phones) });
     delete o.photos_c; delete o.photos_json;
     return o;
   });
