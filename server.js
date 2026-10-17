@@ -1811,7 +1811,8 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   .st button.called.on{background:#3a4a5f;border-color:#3a4a5f}
   .st button.callback.on{background:var(--warn);border-color:var(--warn);color:#1a1200}
   .st button.refused.on{background:var(--no);border-color:var(--no);color:#1a0405}
-  .st button.deal.on{background:var(--ok);border-color:var(--ok);color:#04140b}
+  .st button.deal.on,.st button.deposit.on,.st button.closed.on{background:var(--ok);border-color:var(--ok);color:#04140b}
+  .st button.meeting.on{background:var(--acc);border-color:var(--acc);color:#fff}
   .st input{flex:1;min-width:160px}
   .empty{padding:30px;text-align:center;color:var(--mut)}
   .sk{position:relative;overflow:hidden;background:#1c222b;border-radius:8px;color:transparent!important}
@@ -1870,7 +1871,7 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   <input class="num" id="pmax" placeholder="цена до, ₸" inputmode="numeric">
   <select id="hours"><option value="24">за сутки</option><option value="72" selected>за 3 дня</option><option value="168">за неделю</option><option value="720">за месяц</option></select>
   <select id="signal"><option value="all">любой сигнал</option><option value="new">новые</option><option value="bump">подняли</option><option value="price">снизили цену</option><option value="back">вернули из архива</option><option value="expiring">истекает сегодня/завтра</option><option value="expired">истекло, не вернули</option><option value="relist">продлевают по кругу</option></select>
-  <select id="status"><option value="open">не обзвонены</option><option value="called">звонил</option><option value="callback">перезвонить</option><option value="refused">отказ</option><option value="deal">договор</option><option value="all">все</option></select>
+  <select id="status"><option value="open">не обзвонены</option><option value="called">звонил</option><option value="callback">перезвонить</option><option value="work">в работе</option><option value="meeting">встреча</option><option value="deal">договор</option><option value="deposit">задаток</option><option value="closed">сделка</option><option value="refused">отказ</option><option value="all">все</option></select>
   <button id="go" class="on">Найти</button>
   <span class="view"><button id="vlist" class="on">Списком</button><button id="vmap">На карте</button></span>
 </div>
@@ -2032,7 +2033,7 @@ function cardHtml(x){
         "<div class='row mut'>"+esc(x.addr||"")+(x.addr?" · ":"")+esc(x.city||"")+(x.district&&DN[x.district]?" · "+esc(DN[x.district]):"")+" · на рынке "+days(x.first_seen)+" дн · <a target=_blank href='https://krisha.kz/a/show/"+x.id+"'>на Крыше</a>"+(x.lat!=null?" · <a href='#' onclick='setView(&quot;map&quot;);focusPin("+x.id+");return false'>на карте</a>":"")+"</div>"+
         "<div class='row phones'>"+(x.owner_name?"<span class=mut>"+esc(x.owner_name)+" · </span>":"")+ph+"</div>"+
         "<div class=st>"+
-          ["called|звонил","callback|перезвонить","refused|отказ","deal|договор"].map(function(s){var p=s.split("|");return "<button class='"+p[0]+(x.status===p[0]?" on":"")+"' onclick='setSt("+x.id+",&#39;"+p[0]+"&#39;,this)'>"+p[1]+"</button>";}).join("")+
+          ["called|звонил","callback|перезвонить","meeting|встреча","deal|договор","deposit|задаток","closed|сделка","refused|отказ"].map(function(s){var p=s.split("|");return "<button class='"+p[0]+(x.status===p[0]?" on":"")+"' onclick='setSt("+x.id+",&#39;"+p[0]+"&#39;,this)'>"+p[1]+"</button>";}).join("")+
           "<input placeholder='заметка' value='"+esc(x.note||"")+"' onchange='setSt("+x.id+",null,this)'>"+
           (x.status_at?"<span class=mut>"+dmT(x.status_at)+"</span>":"")+
         "</div>"+
@@ -2123,7 +2124,9 @@ function setSt(id,status,el){
   var cur=card.querySelector(".st button.on");
   if(status&&cur&&cur.classList.contains(status))status="clear";
   var st=status||(cur?cur.className.split(" ")[0]:"");
-  fetch(API+"&set="+id+"&status="+encodeURIComponent(status==="clear"?"":st)+"&note="+encodeURIComponent(note)).then(function(r){return r.json();}).then(function(){
+  // Сделка — спрашиваем комиссию агентства по ней (для рейтинга и выручки).
+  var fee="";if(status==="closed"){fee=prompt("Комиссия по сделке, тенге (можно пусто):","");if(fee===null)return;fee=String(fee).split("").filter(function(c){return c>="0"&&c<="9";}).join("");}
+  fetch(API+"&set="+id+"&status="+encodeURIComponent(status==="clear"?"":st)+"&note="+encodeURIComponent(note)+(fee?"&fee="+fee:"")).then(function(r){return r.json();}).then(function(){
     if(status){card.querySelectorAll(".st button").forEach(function(b){b.classList.remove("on");});if(status!=="clear")el.classList.add("on");}
   });
 }
@@ -4591,8 +4594,10 @@ async function portalLeads(req, res, parsed) {
   };
   // Районы: если в городе объявления у риэлтора отмечены районы — только они; нет отметок — весь город.
   const myDist = (city) => u.districts.filter((d) => d.startsWith(String(city) + "-"));
+  // Доля потока: при part_n ≥ 2 риэлтору достаются только объявления с id % part_n = part_k.
+  const inPart = (id) => !(u.part_n >= 2) || Number(id) % u.part_n === (u.part_k || 0);
   const inScope = (x) => !!x && x.user_type === "owner" && u.cities.includes(String(x.city)) && u.deals.includes(String(x.deal)) && u.props.includes(String(x.prop)) &&
-    (!myDist(x.city).length || myDist(x.city).includes(String(x.district || "")));
+    (!myDist(x.city).length || myDist(x.city).includes(String(x.district || ""))) && inPart(x.id);
   const item = async (raw) => {
     const id = String(raw || "").replace(/\D/g, "");
     const h = id ? await db.listHistory(id) : { item: null, events: [] };
@@ -4613,8 +4618,8 @@ async function portalLeads(req, res, parsed) {
   if (q.get("set")) {
     const x = await item(q.get("set"));
     if (!x.ok) { await log("denied", x.id, "статус вне доступа"); return sendJ(403, { ok: false, error: "Нет доступа" }); }
-    const st = await db.leadSetStatus(x.id, q.get("status") || "", q.get("note") || "");
-    await log("status", x.id, (q.get("status") || "") + (q.get("note") ? " · " + q.get("note") : ""));
+    const st = await db.leadSetStatus(x.id, q.get("status") || "", q.get("note") || "", u.id, q.get("fee"));
+    await log("status", x.id, (q.get("status") || "") + (q.get("fee") ? " · комиссия " + q.get("fee") : "") + (q.get("note") ? " · " + q.get("note") : ""));
     return sendJ(200, { ok: true, id: x.id, status: st });
   }
   if (q.get("copies")) {
@@ -4648,6 +4653,7 @@ async function portalLeads(req, res, parsed) {
     const dsel = String(q.get("district") || ""), allow = myDist(f.city);
     f.districts = allow.length ? (allow.includes(dsel) ? [dsel] : allow) : (dsel.startsWith(f.city + "-") ? [dsel] : null);
     f.limit = Math.min(200, Number(f.limit) || 200);
+    f.part_n = u.part_n; f.part_k = u.part_k;
     const rows = await db.leadsList(f);
     const rv = await db.portalReveals(u.id, rows.map((r) => r.id));
     const out = rows.map((r) => {
@@ -4709,7 +4715,7 @@ input,select{background:#0b0f14;color:var(--tx);border:1px solid var(--line);bor
 .a-reveal{color:var(--warn)}.a-denied,.a-limit{color:var(--no)}.a-open{color:var(--ok)}.saved{color:var(--ok);font-size:12px}</style></head><body>
 <h1>Риэлторы · доступ к лидам</h1>
 <div class=card id=newrow><div class=fld><span>Имя</span><input data-f=name placeholder="Имя риэлтора" size=16></div><div class=fld><span>Доступ</span><div class=acc data-acc></div></div><div class=fld><span>Номеров в сутки</span><input data-f=lim type=number value=40 style="width:80px"></div><div class=fld><span>&nbsp;</span><button onclick="add()">Добавить риэлтора</button></div></div>
-<h2>Риэлторы</h2><div id=users class=mut>загрузка…</div><h2>Журнал <select id=fu onchange="load()"><option value=0>все</option></select></h2><div id=audit class=mut>загрузка…</div>
+<h2>Риэлторы</h2><div id=users class=mut>загрузка…</div><h2>Рейтинг за 30 дней</h2><div id=rating class=mut>загрузка…</div><h2>Журнал <select id=fu onchange="load()"><option value=0>все</option></select></h2><div id=audit class=mut>загрузка…</div>
 <script>var KEY=new URLSearchParams(location.search).get("key")||"";var API="/api/krisha/portal?key="+encodeURIComponent(KEY);var USERS=[],OPT=null;
 function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/'/g,"&#39;");}
 function dt(v){if(!v)return "";var d=new Date(new Date(v).getTime()+5*3600e3);return ("0"+d.getUTCDate()).slice(-2)+"."+("0"+(d.getUTCMonth()+1)).slice(-2)+" "+("0"+d.getUTCHours()).slice(-2)+":"+("0"+d.getUTCMinutes()).slice(-2);}
@@ -4729,7 +4735,17 @@ function distItems(cities){return OPT.districts.filter(function(d){return cities
 function accHtml(u){return "<div class=fld><span>Города</span>"+dd("cities",OPT.cities,u.cities,"— выберите город —")+"</div>"+
   "<div class=fld><span>Сделки</span>"+dd("deals",OPT.deals,u.deals,"— выберите —")+"</div>"+
   "<div class=fld><span>Типы</span>"+dd("props",OPT.props,u.props,"— выберите —")+"</div>"+
-  "<div class=fld><span>Районы</span>"+dd("districts",distItems(u.cities),u.districts||[],"весь город")+"</div>";}
+  "<div class=fld><span>Районы</span>"+dd("districts",distItems(u.cities),u.districts||[],"весь город")+"</div>"+
+  "<div class=fld><span>Доля потока</span>"+partSel(u)+"</div>";}
+// Доля потока в районах: 1 из 2 — объявления с чётным id, 2 из 2 — с нечётным и т. д.
+function partSel(u){var cur=u.part_n>=2?u.part_n+":"+(u.part_k||0):"",h="<select data-f=part><option value=''>весь поток</option>";
+  [2,3,4].forEach(function(n){for(var k=0;k<n;k++)h+="<option value='"+n+":"+k+"'"+(cur===n+":"+k?" selected":"")+">"+(k+1)+" из "+n+"</option>";});return h+"</select>";}
+function money(v){return v?Number(v).toLocaleString("ru-RU")+" ₸":"—";}
+function pct(a,b){return b?" <span class=mut>"+Math.round(100*a/b)+"%</span>":"";}
+function rating(us){var rs=us.slice().sort(function(a,b){return (b.r_fee||0)-(a.r_fee||0)||(b.r_closed||0)-(a.r_closed||0)||(b.r_contract||0)-(a.r_contract||0)||(b.r_meeting||0)-(a.r_meeting||0);});
+  return "<table><tr><th>риэлтор</th><th>открыл номеров</th><th>с отметкой</th><th>встреча</th><th>договор</th><th>задаток</th><th>сделка</th><th>комиссия</th></tr>"+rs.map(function(u){
+    return "<tr class='"+(u.active?"":"off")+"'><td>"+esc(u.name)+"</td><td>"+(u.r_reveals||0)+"</td><td>"+(u.r_called||0)+pct(u.r_called||0,u.r_reveals)+"</td><td>"+(u.r_meeting||0)+pct(u.r_meeting||0,u.r_called)+"</td><td>"+(u.r_contract||0)+pct(u.r_contract||0,u.r_meeting)+"</td><td>"+(u.r_deposit||0)+"</td><td><b>"+(u.r_closed||0)+"</b></td><td>"+money(u.r_fee)+"</td></tr>";}).join("")+
+  "</table><div class=mut style='margin-top:6px;font-size:12px'>Этап лида — последняя отметка риэлтора за 30 дней; проценты — переход с предыдущего этапа.</div>";}
 function wire(box){box.querySelectorAll(".dd").forEach(ddSum);
   box.addEventListener("change",function(e){var d=e.target.closest(".dd");if(!d)return;ddSum(d);
     if(d.getAttribute("data-n")==="cities"){var keep=ddVals(box,"districts"),dw=box.querySelector(".dd[data-n=districts]"),nw=document.createElement("div");
@@ -4737,7 +4753,7 @@ function wire(box){box.querySelectorAll(".dd").forEach(ddSum);
   box.addEventListener("click",function(e){var a=e.target.closest("[data-all],[data-none]");if(!a)return;var d=a.closest(".dd");
     d.querySelectorAll("input").forEach(function(i){i.checked=a.hasAttribute("data-all");});d.dispatchEvent(new Event("change",{bubbles:true}));});}
 document.addEventListener("click",function(e){document.querySelectorAll(".dd[open]").forEach(function(d){if(!d.contains(e.target))d.removeAttribute("open");});});
-function collect(box){return {cities:ddVals(box,"cities").join(","),deals:ddVals(box,"deals").join(","),props:ddVals(box,"props").join(","),districts:ddVals(box,"districts").join(",")};}
+function collect(box){var p=box.querySelector("[data-f=part]");return {cities:ddVals(box,"cities").join(","),deals:ddVals(box,"deals").join(","),props:ddVals(box,"props").join(","),districts:ddVals(box,"districts").join(","),part:p?p.value:""};}
 function check(o){if(!o.cities)return "Отметьте хотя бы один город";if(!o.deals)return "Отметьте сделку";if(!o.props)return "Отметьте тип объектов";return null;}
 function add(){var box=document.getElementById("newrow"),o=collect(box);o.name=box.querySelector("[data-f=name]").value;o.phone_limit=box.querySelector("[data-f=lim]").value;
   var err=!o.name.trim()?"Впишите имя":check(o);if(err)return alert(err);post(o).then(function(j){if(!j.ok)return alert(j.error);box.querySelector("[data-f=name]").value="";load();});}
@@ -4752,6 +4768,7 @@ function load(){var fu=document.getElementById("fu").value;fetch(API+"&data=1&us
   if(!document.querySelector("#users .dd[open]")&&!(document.activeElement&&document.activeElement.closest&&document.activeElement.closest("#users"))){
   document.getElementById("users").innerHTML=d.users.length?"<table><tr><th>имя</th><th>доступ</th><th>номеров/сутки</th><th>за 24 ч</th><th>IP за 7 дн</th><th>был(а)</th><th>ссылка</th><th></th></tr>"+d.users.map(function(u){return "<tr id=u"+u.id+" class='"+(u.active?"":"off")+"'><td><input data-f=name value='"+esc(u.name)+"' size=12><br><label class=mut><input type=checkbox data-f=active "+(u.active?"checked":"")+"> включён</label></td><td><div class=acc>"+accHtml(u)+"</div></td><td><input data-f=lim type=number value="+u.phone_limit+" style='width:70px'></td><td>номеров: <b>"+u.reveals_24h+"</b><br>списков: "+u.lists_24h+"</td><td>"+u.ips_7d+"</td><td>"+dt(u.last_seen)+"<br><span class=mut>"+esc(u.last_ip||"")+"</span></td><td class=link>"+esc(link(u.token))+"<br><button class=g onclick='copy(&quot;"+u.token+"&quot;,this)'>копировать</button> <button class=g onclick='tok("+u.id+")'>новая ссылка</button></td><td><button onclick='save("+u.id+")'>сохранить</button><div class=saved></div></td></tr>";}).join("")+"</table>":"пока никого";
   d.users.forEach(function(u){wire(document.getElementById("u"+u.id));});}
+  document.getElementById("rating").innerHTML=d.users.length?rating(d.users):"пока никого";
   var sel=document.getElementById("fu");if(sel.options.length<=1)d.users.forEach(function(u){var o=document.createElement("option");o.value=u.id;o.textContent=u.name;sel.appendChild(o);});
   document.getElementById("audit").innerHTML=d.audit.length?"<table><tr><th>когда</th><th>кто</th><th>действие</th><th>объявление</th><th>что</th><th>IP · браузер</th></tr>"+d.audit.map(function(a){return "<tr><td>"+dt(a.at)+"</td><td>"+esc(a.name)+"</td><td class=a-"+a.action+">"+(ACT[a.action]||a.action)+"</td><td>"+(a.listing_id?"<a style='color:var(--acc)' target=_blank href='https://krisha.kz/a/show/"+a.listing_id+"'>"+a.listing_id+"</a>":"")+"</td><td>"+esc(a.info||"")+"</td><td class=mut>"+esc(a.ip||"")+"<br>"+esc(String(a.ua||"").slice(0,70))+"</td></tr>";}).join("")+"</table>":"пусто";});}
 load();setInterval(load,60000);</script></body></html>`;
@@ -10269,7 +10286,7 @@ http
       if (!key || q.get("key") !== key) { res.writeHead(403); res.end("bad key"); return; }
       const sendJ = (code, obj) => { res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); };
       if (q.get("set")) {
-        db.leadSetStatus(q.get("set"), q.get("status") || "", q.get("note") || "")
+        db.leadSetStatus(q.get("set"), q.get("status") || "", q.get("note") || "", null, q.get("fee"))
           .then((st) => sendJ(200, { ok: true, id: q.get("set"), status: st }))
           .catch((e) => sendJ(500, { ok: false, error: String(e.message).slice(0, 200) }));
         return;

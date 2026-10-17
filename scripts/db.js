@@ -2225,6 +2225,8 @@ IF OBJECT_ID('dbo.portal_users', 'U') IS NULL
   );
 -- Районы доступа риэлтора: пусто — весь город; иначе только эти районы в своих городах.
 IF COL_LENGTH('dbo.portal_users', 'districts') IS NULL ALTER TABLE dbo.portal_users ADD districts NVARCHAR(800) NULL;
+-- Доля потока в своих районах: part_n — на сколько частей делим, part_k — какая часть (0…N-1).
+IF COL_LENGTH('dbo.portal_users', 'part_n') IS NULL ALTER TABLE dbo.portal_users ADD part_n TINYINT NULL, part_k TINYINT NULL;
 -- Журнал действий риэлторов: открыл страницу, список, номер, статус.
 IF OBJECT_ID('dbo.portal_audit', 'U') IS NULL
 BEGIN
@@ -2507,7 +2509,10 @@ async function ensureLeads(pool) {
 IF OBJECT_ID('dbo.krisha_leads', 'U') IS NULL
   CREATE TABLE dbo.krisha_leads (
     id BIGINT NOT NULL PRIMARY KEY, status NVARCHAR(20) NULL, note NVARCHAR(400) NULL,
-    updated_at DATETIME2(0) NOT NULL CONSTRAINT DF_kleads_upd DEFAULT SYSUTCDATETIME());`);
+    updated_at DATETIME2(0) NOT NULL CONSTRAINT DF_kleads_upd DEFAULT SYSUTCDATETIME());
+-- Кто из риэлторов ведёт лид (для рейтинга) и комиссия по закрытой сделке, ₸.
+IF COL_LENGTH('dbo.krisha_leads', 'user_id') IS NULL ALTER TABLE dbo.krisha_leads ADD user_id INT NULL;
+IF COL_LENGTH('dbo.krisha_leads', 'fee') IS NULL ALTER TABLE dbo.krisha_leads ADD fee BIGINT NULL;`);
   leadsReady = true;
 }
 
@@ -2534,6 +2539,9 @@ async function leadsList(f) {
     .input("signal", sql.NVarChar(10), f.signal || "all")
     .input("relist", sql.Int, LEAD_RELIST_MIN)
     .input("status", sql.NVarChar(20), f.status || "open")
+    // Доля потока: риэлтору видны только объявления с id % N = K (делим район между двумя-тремя).
+    .input("pn", sql.Int, Number(f.part_n) >= 2 ? Number(f.part_n) : null)
+    .input("pk", sql.Int, Number(f.part_n) >= 2 ? Math.max(0, Number(f.part_k) || 0) % Number(f.part_n) : 0)
     .input("amin", sql.Decimal(9, 2), nul(f.amin) == null || !(Number(f.amin) > 0) ? null : Number(f.amin))
     .input("amax", sql.Decimal(9, 2), nul(f.amax) == null || !(Number(f.amax) > 0) ? null : Number(f.amax))
     .input("fmin", sql.Int, nul(f.fmin) == null || !(Number(f.fmin) > 0) ? null : Number(f.fmin))
@@ -2595,7 +2603,9 @@ async function leadsList(f) {
         OR (@signal = 'expiring' AND x.exp_in BETWEEN 0 AND 1)
         OR (@signal = 'expired' AND x.expired = 1)
         OR (@signal = 'relist' AND l.storage = 'live' AND ba.backs_all >= @relist))
-      AND (@status = 'all' OR (@status = 'open' AND (s.status IS NULL OR s.status = 'callback')) OR s.status = @status)
+      AND (@pn IS NULL OR l.id % @pn = @pk)
+      AND (@status = 'all' OR (@status = 'open' AND (s.status IS NULL OR s.status = 'callback'))
+        OR (@status = 'work' AND s.status IN ('meeting', 'deal', 'deposit')) OR s.status = @status)
     ORDER BY sig DESC, l.id DESC
     OFFSET @off ROWS FETCH NEXT @n ROWS ONLY
     OPTION (RECOMPILE)`)).recordset.map((x) => {
@@ -2644,15 +2654,21 @@ async function leadCopies(ownerId) {
   return r.recordset;
 }
 
-async function leadSetStatus(id, status, note) {
+// Этапы лида: звонил / перезвонить / отказ, дальше встреча → договор (deal) →
+// задаток → сделка (closed, с комиссией). userId — риэлтор портала (null — админ).
+const LEAD_STATUSES = ["called", "callback", "refused", "meeting", "deal", "deposit", "closed"];
+async function leadSetStatus(id, status, note, userId, fee) {
   const pool = await getPool();
   await ensureLeads(pool);
-  const st = ["called", "callback", "refused", "deal"].includes(status) ? status : null;
+  const st = LEAD_STATUSES.includes(status) ? status : null;
+  const fe = st === "closed" && Number(String(fee || "").replace(/\D/g, "")) > 0 ? Number(String(fee).replace(/\D/g, "")) : null;
   await pool.request().input("id", sql.BigInt, Number(id)).input("st", sql.NVarChar(20), st)
-    .input("note", sql.NVarChar(400), note ? String(note).slice(0, 400) : null).query(`
+    .input("note", sql.NVarChar(400), note ? String(note).slice(0, 400) : null)
+    .input("u", sql.Int, userId ? Number(userId) : null).input("fee", sql.BigInt, fe).query(`
     MERGE dbo.krisha_leads AS t USING (SELECT @id AS id) AS s ON t.id = s.id
-    WHEN MATCHED THEN UPDATE SET status = @st, note = COALESCE(@note, t.note), updated_at = SYSUTCDATETIME()
-    WHEN NOT MATCHED THEN INSERT (id, status, note) VALUES (@id, @st, @note);`);
+    WHEN MATCHED THEN UPDATE SET status = @st, note = COALESCE(@note, t.note), updated_at = SYSUTCDATETIME(),
+      user_id = COALESCE(@u, t.user_id), fee = CASE WHEN @st = 'closed' THEN COALESCE(@fee, t.fee) ELSE NULL END
+    WHEN NOT MATCHED THEN INSERT (id, status, note, user_id, fee) VALUES (@id, @st, @note, @u, @fee);`);
   return st;
 }
 
@@ -4105,12 +4121,25 @@ async function portalUserByToken(token) {
 async function portalUsers() {
   const pool = await getPool();
   await ensureList(pool);
+  await ensureLeads(pool); // рейтинг читает user_id и fee из krisha_leads
   return (await pool.request().query(`
     SELECT u.*,
       (SELECT COUNT(DISTINCT listing_id) FROM dbo.portal_audit a WHERE a.user_id = u.id AND a.action = 'reveal' AND a.at >= DATEADD(hour, -24, SYSUTCDATETIME())) AS reveals_24h,
       (SELECT COUNT(*) FROM dbo.portal_audit a WHERE a.user_id = u.id AND a.action = 'list' AND a.at >= DATEADD(hour, -24, SYSUTCDATETIME())) AS lists_24h,
-      (SELECT COUNT(DISTINCT ip) FROM dbo.portal_audit a WHERE a.user_id = u.id AND a.at >= DATEADD(day, -7, SYSUTCDATETIME())) AS ips_7d
-    FROM dbo.portal_users u ORDER BY u.id`)).recordset.map(portalShape);
+      (SELECT COUNT(DISTINCT ip) FROM dbo.portal_audit a WHERE a.user_id = u.id AND a.at >= DATEADD(day, -7, SYSUTCDATETIME())) AS ips_7d,
+      -- Рейтинг за 30 дней: открытые номера и до какого этапа дошли лиды риэлтора.
+      (SELECT COUNT(DISTINCT listing_id) FROM dbo.portal_audit a WHERE a.user_id = u.id AND a.action = 'reveal' AND a.at >= DATEADD(day, -30, SYSUTCDATETIME())) AS r_reveals,
+      rt.r_called, rt.r_meeting, rt.r_contract, rt.r_deposit, rt.r_closed, rt.r_fee
+    FROM dbo.portal_users u
+    OUTER APPLY (SELECT
+        SUM(CASE WHEN s.status IS NOT NULL THEN 1 ELSE 0 END) AS r_called,
+        SUM(CASE WHEN s.status IN ('meeting', 'deal', 'deposit', 'closed') THEN 1 ELSE 0 END) AS r_meeting,
+        SUM(CASE WHEN s.status IN ('deal', 'deposit', 'closed') THEN 1 ELSE 0 END) AS r_contract,
+        SUM(CASE WHEN s.status IN ('deposit', 'closed') THEN 1 ELSE 0 END) AS r_deposit,
+        SUM(CASE WHEN s.status = 'closed' THEN 1 ELSE 0 END) AS r_closed,
+        SUM(CASE WHEN s.status = 'closed' THEN s.fee ELSE 0 END) AS r_fee
+      FROM dbo.krisha_leads s WHERE s.user_id = u.id AND s.updated_at >= DATEADD(day, -30, SYSUTCDATETIME())) rt
+    ORDER BY u.id`)).recordset.map(portalShape);
 }
 async function portalUserSave(u) {
   const pool = await getPool();
@@ -4124,14 +4153,17 @@ async function portalUserSave(u) {
     .input("active", sql.Bit, u.active === false || u.active === 0 || u.active === "0" ? 0 : 1)
     // Районы — только в выбранных городах (almaty-… при городе almaty).
     .input("districts", sql.NVarChar(800), portalSplit(u.districts).filter((d) => portalSplit(u.cities).some((c) => d.startsWith(c + "-"))).join(",").slice(0, 800));
+  // Доля потока «N:K» (2:0 — первая из двух частей); пусто или 1 — весь поток.
+  const pm = /^(\d+):(\d+)$/.exec(String(u.part || "")), pn = pm && Number(pm[1]) >= 2 && Number(pm[1]) <= 10 ? Number(pm[1]) : null;
+  rq.input("pn", sql.TinyInt, pn).input("pk", sql.TinyInt, pn ? Number(pm[2]) % pn : null);
   if (u.id) {
     await rq.input("id", sql.Int, Number(u.id)).query(`UPDATE dbo.portal_users SET name = @name, cities = @cities, deals = @deals, props = @props,
-      districts = @districts, phone_limit = @lim, active = @active WHERE id = @id`);
+      districts = @districts, phone_limit = @lim, active = @active, part_n = @pn, part_k = @pk WHERE id = @id`);
     return Number(u.id);
   }
   const token = require("crypto").randomBytes(18).toString("base64url");
-  return (await rq.input("t", sql.NVarChar(64), token).query(`INSERT INTO dbo.portal_users (name, token, cities, deals, props, districts, phone_limit, active)
-    OUTPUT inserted.id VALUES (@name, @t, @cities, @deals, @props, @districts, @lim, @active)`)).recordset[0].id;
+  return (await rq.input("t", sql.NVarChar(64), token).query(`INSERT INTO dbo.portal_users (name, token, cities, deals, props, districts, phone_limit, active, part_n, part_k)
+    OUTPUT inserted.id VALUES (@name, @t, @cities, @deals, @props, @districts, @lim, @active, @pn, @pk)`)).recordset[0].id;
 }
 async function portalNewToken(id) {
   const pool = await getPool();
