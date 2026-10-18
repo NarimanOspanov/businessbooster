@@ -1788,19 +1788,26 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   button.fav{background:none;border:0;padding:0 8px 0 0;font-size:20px;line-height:1;color:var(--mut);cursor:pointer;vertical-align:-2px}
   button.fav:hover{color:#ff6b81} button.fav.on{color:#ff4d6d}
   button.hide{background:none;border:0;padding:0 0 0 8px;font-size:15px;color:var(--mut);cursor:pointer;float:right} button.hide:hover{color:var(--no)}
-  .swipe{display:none;max-width:520px;margin:0 auto}
-  .swipe.on{display:block}
-  #swhead{font-size:12px;margin:2px 0 8px;text-align:center}
-  #swcard{position:relative;touch-action:pan-y;user-select:none}
-  .swc{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;transition:transform .25s ease,opacity .25s ease}
+  .swipe{display:none}
+  /* на весь экран поверх страницы; высота — видимая (dvh), с учётом «чёлки» */
+  .swipe.on{display:flex;flex-direction:column;position:fixed;inset:0;z-index:50;background:var(--bg);
+    padding:calc(8px + env(safe-area-inset-top)) 12px calc(8px + env(safe-area-inset-bottom));height:100vh;height:100dvh;box-sizing:border-box;overscroll-behavior:contain}
+  body.swmode{overflow:hidden;position:fixed;width:100%}
+  .swtop{display:flex;align-items:center;gap:10px;max-width:520px;width:100%;margin:0 auto 8px}
+  #swexit{padding:6px 10px;font-size:13px;flex:0 0 auto}
+  #swhead{font-size:12px;flex:1;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #swcard{position:relative;flex:1;min-height:0;max-width:520px;width:100%;margin:0 auto;touch-action:none;user-select:none}
+  .swc{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;transition:transform .25s ease,opacity .25s ease}
   .swc.drag{transition:none}
-  .swc .ph{position:relative;height:min(56vh,420px);background:#111 center/cover no-repeat}
+  .swc .ph{position:relative;flex:1;min-height:120px;background:#111 center/cover no-repeat}
+  .swc .bd{flex:0 0 auto;max-height:46%;overflow:hidden}
+  .swc .bd .row{margin:4px 0}
   .swc .ph .pcnt{position:absolute;right:8px;bottom:8px;background:rgba(0,0,0,.65);color:#fff;font-size:12px;padding:2px 8px;border-radius:6px}
   .swc .bd{padding:12px 14px}
   .swc .price{font-size:20px;font-weight:700;margin-right:8px}
   .swc .mark{position:absolute;top:18px;padding:6px 12px;border:3px solid;border-radius:10px;font-weight:800;font-size:22px;opacity:0;transform:rotate(-12deg)}
   .swc .mark.yes{left:16px;color:var(--ok);border-color:var(--ok)} .swc .mark.no{right:16px;color:var(--no);border-color:var(--no);transform:rotate(12deg)}
-  .swbtns{display:flex;justify-content:center;gap:22px;margin:14px 0 24px}
+  .swbtns{display:flex;justify-content:center;gap:22px;margin:10px 0 0;flex:0 0 auto}
   .swbtns button{width:58px;height:58px;border-radius:50%;font-size:24px;padding:0}
   #swno{color:var(--no)} #swyes{color:#ff4d6d} #swundo{width:44px;height:44px;font-size:18px;align-self:center;color:var(--mut)}
   .swempty{text-align:center;padding:40px 10px;color:var(--mut)}
@@ -1916,7 +1923,7 @@ const KRISHA_LEADS_HTML = `<!doctype html>
 </div>
 <div id="list"></div>
 <div id="pager" class="pager"></div>
-<div id="swipe" class="swipe"><div id="swhead" class="mut"></div><div id="swcard"></div>
+<div id="swipe" class="swipe"><div class="swtop"><button id="swexit" title="выйти из свайпов — к фильтрам и списку">← фильтры</button><div id="swhead" class="mut"></div></div><div id="swcard"></div>
   <div class="swbtns"><button id="swno" title="скрыть в этом фильтре (свайп влево)">✕</button><button id="swundo" title="вернуть последнее">↶</button><button id="swyes" title="в избранное (свайп вправо)">♥</button></div></div>
 <div id="mapwrap" class="mapwrap"><div id="map"></div><div id="maplist"></div></div>
 <div id="ov" class="ov" onclick="if(event.target===this)closeHist()"><div class="md"><button class="x" onclick="closeHist()">×</button><div id="mdc">загрузка…</div></div></div>
@@ -2143,6 +2150,7 @@ function setView(v){
   document.getElementById("vswipe").className=v==="swipe"?"on":"";
   document.getElementById("swipe").className="swipe"+(v==="swipe"?" on":"");
   document.getElementById("pager").style.display=v==="list"?"":"none";
+  document.body.classList.toggle("swmode",v==="swipe");
   if(v==="swipe")swDraw();
   document.getElementById("mapwrap").className="mapwrap"+(v==="map"?" on":"");
   if(v==="map") ensureMap().then(function(){ setTimeout(function(){ MAP.invalidateSize(); plot(); },50); });
@@ -2250,13 +2258,14 @@ function swUndo(){var u=SWUNDO.pop();if(!u)return;var x=u.x;
   (u.dir==="right"?favApi(x.id,false):hideApi(x.id,false)).then(function(){x._done=false;x.fav=0;SWI=Math.min(SWI,u.i);swDraw();}).catch(function(e){alert(e.message);});}
 function swWire(c,x){var sx=null,dx=0;
   var down=function(e){if(e.target.closest("button,a"))return;sx=(e.touches?e.touches[0]:e).clientX;dx=0;c.classList.add("drag");};
-  var move=function(e){if(sx==null)return;dx=(e.touches?e.touches[0]:e).clientX-sx;c.style.transform="translateX("+dx+"px) rotate("+(dx/20)+"deg)";
+  var move=function(e){if(sx==null)return;dx=(e.touches?e.touches[0]:e).clientX-sx;
+    if(e.cancelable&&e.touches)e.preventDefault();c.style.transform="translateX("+dx+"px) rotate("+(dx/20)+"deg)";
     c.querySelector(".mark.yes").style.opacity=Math.max(0,Math.min(1,dx/90));c.querySelector(".mark.no").style.opacity=Math.max(0,Math.min(1,-dx/90));};
   var up=function(){if(sx==null)return;sx=null;c.classList.remove("drag");
     if(dx>90)swDecide("right");else if(dx<-90)swDecide("left");
     else{c.style.transform="";c.querySelectorAll(".mark").forEach(function(m){m.style.opacity=0;});}
     if(Math.abs(dx)>8){var stop=function(ev){ev.stopPropagation();ev.preventDefault();c.removeEventListener("click",stop,true);};c.addEventListener("click",stop,true);setTimeout(function(){c.removeEventListener("click",stop,true);},50);}};
-  c.addEventListener("touchstart",down,{passive:true});c.addEventListener("touchmove",move,{passive:true});c.addEventListener("touchend",up);
+  c.addEventListener("touchstart",down,{passive:true});c.addEventListener("touchmove",move,{passive:false});c.addEventListener("touchend",up);
   // Мышь (на компьютере): слушатели окна — только для текущей карточки.
   if(SWL){window.removeEventListener("mousemove",SWL.m);window.removeEventListener("mouseup",SWL.u);}SWL={m:move,u:up};
   c.addEventListener("mousedown",down);window.addEventListener("mousemove",move);window.addEventListener("mouseup",up);}
@@ -2264,8 +2273,10 @@ var SWL=null;
 document.getElementById("swyes").onclick=function(){swDecide("right");};
 document.getElementById("swno").onclick=function(){swDecide("left");};
 document.getElementById("swundo").onclick=swUndo;
+document.getElementById("swexit").onclick=function(){setView("list");window.scrollTo(0,0);};
 document.addEventListener("keydown",function(e){if(VIEW!=="swipe"||GI||e.target.closest("input,select,textarea"))return;
-  if(e.key==="ArrowRight")swDecide("right");else if(e.key==="ArrowLeft")swDecide("left");else if(e.key==="Backspace"){e.preventDefault();swUndo();}});
+  if(e.key==="ArrowRight")swDecide("right");else if(e.key==="ArrowLeft")swDecide("left");else if(e.key==="Backspace"){e.preventDefault();swUndo();}
+  else if(e.key==="Escape"&&!document.querySelector(".ov.on"))setView("list");});
 document.getElementById("vmap").onclick=function(){setView("map");};
 
 function setSt(id,status,el){
