@@ -1787,6 +1787,23 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   input.num{width:110px}
   button.fav{background:none;border:0;padding:0 8px 0 0;font-size:20px;line-height:1;color:var(--mut);cursor:pointer;vertical-align:-2px}
   button.fav:hover{color:#ff6b81} button.fav.on{color:#ff4d6d}
+  button.hide{background:none;border:0;padding:0 0 0 8px;font-size:15px;color:var(--mut);cursor:pointer;float:right} button.hide:hover{color:var(--no)}
+  .swipe{display:none;max-width:520px;margin:0 auto}
+  .swipe.on{display:block}
+  #swhead{font-size:12px;margin:2px 0 8px;text-align:center}
+  #swcard{position:relative;touch-action:pan-y;user-select:none}
+  .swc{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;transition:transform .25s ease,opacity .25s ease}
+  .swc.drag{transition:none}
+  .swc .ph{position:relative;height:min(56vh,420px);background:#111 center/cover no-repeat}
+  .swc .ph .pcnt{position:absolute;right:8px;bottom:8px;background:rgba(0,0,0,.65);color:#fff;font-size:12px;padding:2px 8px;border-radius:6px}
+  .swc .bd{padding:12px 14px}
+  .swc .price{font-size:20px;font-weight:700;margin-right:8px}
+  .swc .mark{position:absolute;top:18px;padding:6px 12px;border:3px solid;border-radius:10px;font-weight:800;font-size:22px;opacity:0;transform:rotate(-12deg)}
+  .swc .mark.yes{left:16px;color:var(--ok);border-color:var(--ok)} .swc .mark.no{right:16px;color:var(--no);border-color:var(--no);transform:rotate(12deg)}
+  .swbtns{display:flex;justify-content:center;gap:22px;margin:14px 0 24px}
+  .swbtns button{width:58px;height:58px;border-radius:50%;font-size:24px;padding:0}
+  #swno{color:var(--no)} #swyes{color:#ff4d6d} #swundo{width:44px;height:44px;font-size:18px;align-self:center;color:var(--mut)}
+  .swempty{text-align:center;padding:40px 10px;color:var(--mut)}
   .dd{position:relative;display:inline-block}
   .dd>summary{list-style:none;cursor:pointer;border:1px solid var(--line);background:#12161c;border-radius:8px;padding:7px 28px 7px 10px;min-width:140px;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative}
   .dd>summary::-webkit-details-marker{display:none}
@@ -1895,10 +1912,12 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   <span class="presets"><select id="preset" title="сохранённые фильтры"><option value="">мои фильтры…</option></select><button id="psave" type="button" title="сохранить текущие фильтры под именем">сохранить</button><button id="pdel" type="button" style="display:none" title="удалить выбранный фильтр">удалить</button></span>
   <select id="sort" title="порядок списка"><option value="sig">сначала свежие</option><option value="prio">кому звонить первым</option></select>
   <button id="go" class="on">Найти</button>
-  <span class="view"><button id="vlist" class="on">Списком</button><button id="vmap">На карте</button></span>
+  <span class="view"><button id="vlist" class="on">Списком</button><button id="vswipe">Свайпы</button><button id="vmap">На карте</button></span>
 </div>
 <div id="list"></div>
 <div id="pager" class="pager"></div>
+<div id="swipe" class="swipe"><div id="swhead" class="mut"></div><div id="swcard"></div>
+  <div class="swbtns"><button id="swno" title="скрыть в этом фильтре (свайп влево)">✕</button><button id="swundo" title="вернуть последнее">↶</button><button id="swyes" title="в избранное (свайп вправо)">♥</button></div></div>
 <div id="mapwrap" class="mapwrap"><div id="map"></div><div id="maplist"></div></div>
 <div id="ov" class="ov" onclick="if(event.target===this)closeHist()"><div class="md"><button class="x" onclick="closeHist()">×</button><div id="mdc">загрузка…</div></div></div>
 <script>
@@ -2031,7 +2050,7 @@ function fillDistricts(){var c=document.getElementById("city").value,cur=distVal
   document.addEventListener("click",function(e){if(dd.open&&!dd.contains(e.target))dd.removeAttribute("open");});})();
 // Цена — число в тенге; пробелы и знак ₸ не мешают (700 000 = 700000).
 function priceVal(v){var t="";String(v).split("").forEach(function(c){if(c>="0"&&c<="9")t+=c;});var n=Number(t);return t&&n>0?n:null;}
-function qs(){var p=[];["nfirst","nlast","favonly"].forEach(function(k){var el=document.getElementById(k);if(el&&el.checked&&el.offsetParent!==null)p.push(k+"=1");});F.forEach(function(k){var v=document.getElementById(k).value;if(v!==""&&v!=="any"){if(k==="pmin"||k==="pmax"){v=priceVal(v);if(v==null)return;}p.push(k+"="+encodeURIComponent(v));}});return p.join("&");}
+function qs(){var p=["scope="+encodeURIComponent(scopeName())];["nfirst","nlast","favonly"].forEach(function(k){var el=document.getElementById(k);if(el&&el.checked&&el.offsetParent!==null)p.push(k+"=1");});F.forEach(function(k){var v=document.getElementById(k).value;if(v!==""&&v!=="any"){if(k==="pmin"||k==="pmax"){v=priceVal(v);if(v==null)return;}p.push(k+"="+encodeURIComponent(v));}});return p.join("&");}
 // Постранично по 200: просим на одну строку больше — по ней видно, есть ли
 // следующая страница, без отдельного подсчёта.
 var PAGE=200, OFF=0, MORE=false, LOADSEQ=0, TOTAL=null;
@@ -2095,6 +2114,7 @@ function render(rows,append){
   if(append)document.getElementById("list").insertAdjacentHTML("beforeend",rows.map(cardHtml).join(""));
   else document.getElementById("list").innerHTML=rows.map(cardHtml).join("");
   if(VIEW==="map") ensureMap().then(plot);
+  if(VIEW==="swipe"){if(!append)SWI=0;swDraw();}
 }
 function cardHtml(x){
     var ph=phHtml(x,"");
@@ -2102,7 +2122,7 @@ function cardHtml(x){
     return "<div class=card data-id='"+x.id+"'>"+
       "<div class=photos>"+(x.photos&&x.photos.length?(PH[x.id]=x.photos,"")+"<img loading=lazy src='"+esc(x.photos[0])+"' onclick='gal("+x.id+",0)'>"+(x.photos.length>1?"<span class=pcnt>"+x.photos.length+" фото</span>":""):"<div class=mut>нет фото</div>")+"</div>"+
       "<div>"+
-        "<div><button class='fav"+(x.fav?" on":"")+"' title='в избранное' onclick='favToggle("+x.id+",this)'>"+(x.fav?"♥":"♡")+"</button><span class=title>"+esc(x.title||par)+"</span><span class=price>"+money(x.price)+"</span></div>"+
+        "<div><button class=hide title='скрыть в этом фильтре' onclick='hideCard("+x.id+",this)'>✕</button><button class='fav"+(x.fav?" on":"")+"' title='в избранное' onclick='favToggle("+x.id+",this)'>"+(x.fav?"♥":"♡")+"</button><span class=title>"+esc(x.title||par)+"</span><span class=price>"+money(x.price)+"</span></div>"+
         "<div class=row>"+tags(x)+"</div>"+
         "<div class='row mut'>"+esc(x.addr||"")+(x.addr?" · ":"")+esc(x.city||"")+(x.district&&DN[x.district]?" · "+esc(DN[x.district]):"")+" · на рынке "+days(x.first_seen)+" дн · <a target=_blank href='https://krisha.kz/a/show/"+x.id+"'>на Крыше</a>"+(x.lat!=null?" · <a href='#' onclick='setView(&quot;map&quot;);focusPin("+x.id+");return false'>на карте</a>":"")+"</div>"+
         "<div class='row phones'>"+(x.owner_name?"<span class=mut>"+esc(x.owner_name)+" · </span>":"")+ph+"</div>"+
@@ -2120,6 +2140,10 @@ function setView(v){
   VIEW=v; try{localStorage.setItem("leads:view",v);}catch(e){}
   document.getElementById("vlist").className=v==="list"?"on":""; document.getElementById("vmap").className=v==="map"?"on":"";
   document.getElementById("list").style.display=v==="list"?"":"none";
+  document.getElementById("vswipe").className=v==="swipe"?"on":"";
+  document.getElementById("swipe").className="swipe"+(v==="swipe"?" on":"");
+  document.getElementById("pager").style.display=v==="list"?"":"none";
+  if(v==="swipe")swDraw();
   document.getElementById("mapwrap").className="mapwrap"+(v==="map"?" on":"");
   if(v==="map") ensureMap().then(function(){ setTimeout(function(){ MAP.invalidateSize(); plot(); },50); });
 }
@@ -2191,6 +2215,57 @@ function highlight(id){
 }
 function focusPin(id){ if(!MAP||!MARKERS[id]) return; var m=MARKERS[id]; CLUSTER.zoomToShowLayer(m,function(){m.openPopup();}); }
 document.getElementById("vlist").onclick=function(){setView("list");};
+document.getElementById("vswipe").onclick=function(){setView("swipe");};
+// --- скрыть («дизлайк») и свайпы ---
+// Скрытое не показывается в этом фильтре: scope — имя выбранного сохранённого фильтра.
+function scopeName(){var el=document.getElementById("preset");return el?el.value:"";}
+function hideApi(id,on){return fetch(API+"&hide="+id+"&on="+(on?1:0)+"&scope="+encodeURIComponent(scopeName())).then(function(r){return r.json();}).then(function(j){if(!j.ok)throw new Error(j.error||"не получилось");return j;});}
+function favApi(id,on){return fetch(API+"&fav="+id+"&on="+(on?1:0)).then(function(r){return r.json();}).then(function(j){if(!j.ok)throw new Error(j.error||"не получилось");return j;});}
+function hideCard(id,btn){var c=btn.closest(".card");c.style.opacity=".35";
+  hideApi(id,true).then(function(){c.remove();ROWS=ROWS.filter(function(r){return String(r.id)!==String(id);});}).catch(function(e){c.style.opacity="";alert(e.message);});}
+// Очередь свайпов — загруженные строки по порядку; решённые (избранное/скрыто) пропускаем.
+var SWI=0, SWUNDO=[];
+function swNext(){while(SWI<ROWS.length&&(ROWS[SWI]._done||ROWS[SWI].fav))SWI++;
+  if(ROWS.length-SWI<6&&MORE)loadMore();return ROWS[SWI]||null;}
+function swHtml(x){var ph=(x.photos||[])[0];
+  return "<div class=swc id=swc data-id='"+x.id+"'>"+
+    "<div class=ph"+(ph?" style='background-image:url("+esc(ph)+")' onclick='gal("+x.id+",0)'":"")+">"+(ph?"":"<div class=swempty>нет фото</div>")+
+      ((x.photos||[]).length>1?"<span class=pcnt>"+x.photos.length+" фото</span>":"")+"<div class='mark yes'>ЛАЙК</div><div class='mark no'>НЕТ</div></div>"+
+    "<div class=bd><div><span class=price>"+money(x.price)+"</span><span class=title>"+esc(x.title||"")+"</span></div>"+
+      "<div class=row>"+tags(x)+"</div>"+
+      "<div class='row mut'>"+esc(x.addr||"")+(x.district&&DN[x.district]?" · "+esc(DN[x.district]):"")+" · на рынке "+days(x.first_seen)+" дн · <a target=_blank href='https://krisha.kz/a/show/"+x.id+"'>на Крыше</a> · <a href='#' onclick='openHist("+x.id+");return false'>история</a></div>"+
+      "<div class='row phones'>"+(x.owner_name?"<span class=mut>"+esc(x.owner_name)+" · </span>":"")+phHtml(x," ")+"</div></div></div>";}
+function swDraw(){var x=swNext(),box=document.getElementById("swcard"),left=ROWS.slice(SWI).filter(function(r){return !r._done&&!r.fav;}).length;
+  var sc=scopeName();document.getElementById("swhead").textContent=(sc?"фильтр «"+sc+"»":"без сохранённого фильтра — скрытое общее")+" · осталось "+left+(MORE?"+":"")+(TOTAL!=null?" из "+TOTAL.toLocaleString("ru-RU"):"");
+  if(x&&x.photos)PH[x.id]=x.photos;
+  box.innerHTML=x?swHtml(x):"<div class=swempty>"+(MORELOADING?"загружаем ещё…":"Всё просмотрено в этом фильтре. Поменяйте фильтр или период.")+"</div>";
+  if(x)swWire(document.getElementById("swc"),x);}
+// right — в избранное, left — скрыть; анимация улёта, потом следующая.
+function swDecide(dir){var x=ROWS[SWI];if(!x)return;var c=document.getElementById("swc");
+  x._done=true;SWUNDO.push({x:x,dir:dir,i:SWI});
+  if(c){c.style.transform="translateX("+(dir==="right"?120:-120)+"%) rotate("+(dir==="right"?18:-18)+"deg)";c.style.opacity="0";}
+  (dir==="right"?favApi(x.id,true).then(function(){x.fav=1;}):hideApi(x.id,true)).catch(function(e){x._done=false;alert(e.message);});
+  setTimeout(function(){SWI++;swDraw();},220);}
+function swUndo(){var u=SWUNDO.pop();if(!u)return;var x=u.x;
+  (u.dir==="right"?favApi(x.id,false):hideApi(x.id,false)).then(function(){x._done=false;x.fav=0;SWI=Math.min(SWI,u.i);swDraw();}).catch(function(e){alert(e.message);});}
+function swWire(c,x){var sx=null,dx=0;
+  var down=function(e){if(e.target.closest("button,a"))return;sx=(e.touches?e.touches[0]:e).clientX;dx=0;c.classList.add("drag");};
+  var move=function(e){if(sx==null)return;dx=(e.touches?e.touches[0]:e).clientX-sx;c.style.transform="translateX("+dx+"px) rotate("+(dx/20)+"deg)";
+    c.querySelector(".mark.yes").style.opacity=Math.max(0,Math.min(1,dx/90));c.querySelector(".mark.no").style.opacity=Math.max(0,Math.min(1,-dx/90));};
+  var up=function(){if(sx==null)return;sx=null;c.classList.remove("drag");
+    if(dx>90)swDecide("right");else if(dx<-90)swDecide("left");
+    else{c.style.transform="";c.querySelectorAll(".mark").forEach(function(m){m.style.opacity=0;});}
+    if(Math.abs(dx)>8){var stop=function(ev){ev.stopPropagation();ev.preventDefault();c.removeEventListener("click",stop,true);};c.addEventListener("click",stop,true);setTimeout(function(){c.removeEventListener("click",stop,true);},50);}};
+  c.addEventListener("touchstart",down,{passive:true});c.addEventListener("touchmove",move,{passive:true});c.addEventListener("touchend",up);
+  // Мышь (на компьютере): слушатели окна — только для текущей карточки.
+  if(SWL){window.removeEventListener("mousemove",SWL.m);window.removeEventListener("mouseup",SWL.u);}SWL={m:move,u:up};
+  c.addEventListener("mousedown",down);window.addEventListener("mousemove",move);window.addEventListener("mouseup",up);}
+var SWL=null;
+document.getElementById("swyes").onclick=function(){swDecide("right");};
+document.getElementById("swno").onclick=function(){swDecide("left");};
+document.getElementById("swundo").onclick=swUndo;
+document.addEventListener("keydown",function(e){if(VIEW!=="swipe"||GI||e.target.closest("input,select,textarea"))return;
+  if(e.key==="ArrowRight")swDecide("right");else if(e.key==="ArrowLeft")swDecide("left");else if(e.key==="Backspace"){e.preventDefault();swUndo();}});
 document.getElementById("vmap").onclick=function(){setView("map");};
 
 function setSt(id,status,el){
@@ -4745,6 +4820,11 @@ async function portalLeads(req, res, parsed) {
     await log("reveal", x.id, [it.city, it.rooms ? it.rooms + "-комн" : it.prop, it.price, it.addr].filter(Boolean).join(" · "));
     return sendJ(200, { ok: true, phones: String(it.phones || "").split(",").filter(Boolean) });
   }
+  if (q.get("hide")) {
+    const x = await item(q.get("hide"));
+    if (!x.ok) return sendJ(403, { ok: false, error: "Нет доступа" });
+    return sendJ(200, { ok: true, id: x.id, hidden: await db.leadSetHide(u.id, q.get("scope") || "", x.id, q.get("on") === "1") });
+  }
   if (q.get("fav")) {
     const x = await item(q.get("fav"));
     if (!x.ok) return sendJ(403, { ok: false, error: "Нет доступа" });
@@ -4780,7 +4860,7 @@ async function portalLeads(req, res, parsed) {
   }
   if (q.get("data")) {
     const f = {};
-    for (const k of ["city", "deal", "prop", "rooms", "pmin", "pmax", "amin", "amax", "fmin", "fmax", "nfirst", "nlast", "use", "hours", "signal", "status", "sort", "favonly", "limit", "offset"]) f[k] = q.get(k);
+    for (const k of ["city", "deal", "prop", "rooms", "pmin", "pmax", "amin", "amax", "fmin", "fmax", "nfirst", "nlast", "use", "hours", "signal", "status", "sort", "favonly", "scope", "limit", "offset"]) f[k] = q.get(k);
     // Только своё: город, сделка и тип — из доступа (чужое или «любые» → первое разрешённое).
     if (!u.cities.includes(String(f.city))) f.city = u.cities[0];
     if (!u.deals.includes(String(f.deal))) f.deal = u.deals[0];
@@ -10422,6 +10502,11 @@ http
       const key = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
       if (!key || q.get("key") !== key) { res.writeHead(403); res.end("bad key"); return; }
       const sendJ = (code, obj) => { res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); };
+      if (q.get("hide")) {
+        db.leadSetHide(0, q.get("scope") || "", String(q.get("hide")).replace(/\D/g, ""), q.get("on") === "1").then((h) => sendJ(200, { ok: true, id: q.get("hide"), hidden: h }))
+          .catch((e) => sendJ(500, { ok: false, error: String(e.message).slice(0, 200) }));
+        return;
+      }
       if (q.get("fav")) {
         db.leadSetFav(0, String(q.get("fav")).replace(/\D/g, ""), q.get("on") === "1").then((on) => sendJ(200, { ok: true, id: q.get("fav"), fav: on }))
           .catch((e) => sendJ(500, { ok: false, error: String(e.message).slice(0, 200) }));
@@ -10445,7 +10530,7 @@ http
       }
       if (q.get("data")) {
         const f = {};
-        for (const k of ["city", "deal", "prop", "rooms", "pmin", "pmax", "amin", "amax", "fmin", "fmax", "nfirst", "nlast", "use", "hours", "signal", "status", "sort", "favonly", "limit", "offset"]) f[k] = q.get(k);
+        for (const k of ["city", "deal", "prop", "rooms", "pmin", "pmax", "amin", "amax", "fmin", "fmax", "nfirst", "nlast", "use", "hours", "signal", "status", "sort", "favonly", "scope", "limit", "offset"]) f[k] = q.get(k);
         const dl = String(q.get("district") || "").split(",").filter((d) => /^[a-z0-9-]{3,40}$/.test(d));
         if (dl.length) f.districts = dl;
         db.leadsList(f).then((rows) => sendJ(200, rows))

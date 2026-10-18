@@ -2518,7 +2518,14 @@ IF OBJECT_ID('dbo.krisha_lead_favs', 'U') IS NULL
   CREATE TABLE dbo.krisha_lead_favs (
     user_id INT NOT NULL, id BIGINT NOT NULL,
     at DATETIME2(0) NOT NULL CONSTRAINT DF_kfav_at DEFAULT SYSUTCDATETIME(),
-    CONSTRAINT PK_krisha_lead_favs PRIMARY KEY (user_id, id));`);
+    CONSTRAINT PK_krisha_lead_favs PRIMARY KEY (user_id, id));
+-- Скрытые («дизлайк»): не показывать это объявление этому пользователю в этом
+-- фильтре (scope — имя сохранённого фильтра, '' — без фильтра).
+IF OBJECT_ID('dbo.krisha_lead_hides', 'U') IS NULL
+  CREATE TABLE dbo.krisha_lead_hides (
+    user_id INT NOT NULL, scope NVARCHAR(60) NOT NULL, id BIGINT NOT NULL,
+    at DATETIME2(0) NOT NULL CONSTRAINT DF_khide_at DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT PK_krisha_lead_hides PRIMARY KEY (user_id, scope, id));`);
   leadsReady = true;
 }
 
@@ -2549,6 +2556,7 @@ async function leadsList(f) {
     // Избранное: чьё (fav_user) и «только избранное» — тогда без окна по времени, сигнала и статуса.
     .input("fu", sql.Int, Number.isInteger(Number(f.fav_user)) ? Number(f.fav_user) : 0)
     .input("favonly", sql.Bit, f.favonly === "1" ? 1 : 0)
+    .input("hs", sql.NVarChar(60), String(f.scope || "").slice(0, 60))
     // Доля потока: риэлтору видны только объявления с id % N = K (делим район между двумя-тремя).
     .input("pn", sql.Int, Number(f.part_n) >= 2 ? Number(f.part_n) : null)
     .input("pk", sql.Int, Number(f.part_n) >= 2 ? Math.max(0, Number(f.part_k) || 0) % Number(f.part_n) : 0)
@@ -2640,6 +2648,7 @@ async function leadsList(f) {
       AND (@use IS NULL OR l.title LIKE N'%' + @use + N'%')
       ${dl.length ? "AND l.district IN (" + dl.map((_, i) => "@dd" + i).join(",") + ")" : ""}
       AND (@favonly = 0 OR fv.id IS NOT NULL)
+      AND (@favonly = 1 OR NOT EXISTS (SELECT 1 FROM dbo.krisha_lead_hides h WHERE h.user_id = @fu AND h.scope = @hs AND h.id = l.id))
       AND (@favonly = 1 OR l.first_seen >= @since OR EXISTS (SELECT 1 FROM dbo.krisha_list_events e WHERE e.id = l.id AND e.at >= @since AND e.kind IN ('bump','price','back'))
         OR x.exp_in BETWEEN 0 AND 1 OR x.expired = 1 OR (l.storage = 'live' AND ba.backs_all >= @relist))
       ${f.favonly === "1" ? "" : signalSql}
@@ -2696,6 +2705,15 @@ async function leadCopies(ownerId) {
 // Этапы лида: звонил / перезвонить / отказ, дальше встреча → договор (deal) →
 // задаток → сделка (closed, с комиссией). userId — риэлтор портала (null — админ).
 const LEAD_STATUSES = ["called", "callback", "refused", "meeting", "deal", "deposit", "closed"];
+async function leadSetHide(userId, scope, id, on) {
+  const pool = await getPool();
+  await ensureLeads(pool);
+  const rq = pool.request().input("u", sql.Int, Number(userId) || 0).input("s", sql.NVarChar(60), String(scope || "").slice(0, 60)).input("id", sql.BigInt, Number(id));
+  await rq.query(on
+    ? "IF NOT EXISTS (SELECT 1 FROM dbo.krisha_lead_hides WHERE user_id = @u AND scope = @s AND id = @id) INSERT INTO dbo.krisha_lead_hides (user_id, scope, id) VALUES (@u, @s, @id)"
+    : "DELETE FROM dbo.krisha_lead_hides WHERE user_id = @u AND scope = @s AND id = @id");
+  return !!on;
+}
 async function leadSetFav(userId, id, on) {
   const pool = await getPool();
   await ensureLeads(pool);
@@ -5304,7 +5322,7 @@ async function objectStats() {
 module.exports = { portalUserByToken, portalUsers, portalUserSave, portalNewToken, portalLog, portalReveals, portalAudit, consultAdd, consultGet, consultSet, phoneSharedCount, stickyFirstPhone, listPhoneRetryLater, instaPostForReel, instaPostReel, instaCommentAnswered, instaPostItemsSet, instaPostItems, instaCommentEventNeedFollow, instaCommentEventsToRemind, instaCommentEventReminded, instaSimilarPosts, instaHookLogAdd, instaCommentEventGet, instaCommentEventIgsid, instaCommentEventAsked, instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, listLastNew, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
-  saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadSetFav, leadCopies, leadUncheckedCopies, leadSetCopyPhoto, dropKnownSticky, cleanStickyPhones,
+  saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadSetFav, leadSetHide, leadCopies, leadUncheckedCopies, leadSetCopyPhoto, dropKnownSticky, cleanStickyPhones,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
   listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, instaCandidates, instaListing, instaPostReserve, instaPostFinish, instaPostByCode, instaPhotoScoresGet, instaPhotoScoreSave, instaPlacesGet, instaPlaceSave, configGet, configSet, instaNextCode, listTextSave, listTextStats, mortgageFlagSave, mortgageFlagStats, instaAccounts, instaAccountSet, instaPostAdd, instaPosts, instaPostedSince, instaPostByMedia, instaRecentMedia, instaRecentListings, instaDmAdd, instaDmMedia, instaDmStats, instaDmPrune, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
