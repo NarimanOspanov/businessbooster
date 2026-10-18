@@ -1810,6 +1810,7 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   .tag.exp{background:rgba(229,72,77,.16);color:#ff8a8d}
   .tag.gone{background:rgba(138,149,165,.28);color:var(--mut)}
   .tag.relist{background:rgba(168,85,247,.18);color:#c9a5ff}
+  .tag.prio{background:rgba(47,191,113,.16);color:var(--ok);font-weight:600} .tag.prio.lo{background:rgba(138,149,165,.15);color:var(--mut)}
   .tag.ag{background:rgba(229,72,77,.15);color:var(--no)}
   .phones a{font-size:16px;font-weight:600;margin-right:12px}
   .reveal{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:6px 12px;font-weight:600;cursor:pointer}
@@ -1880,6 +1881,7 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   <select id="hours"><option value="24">за сутки</option><option value="72" selected>за 3 дня</option><option value="168">за неделю</option><option value="720">за месяц</option></select>
   <select id="signal"><option value="all">любой сигнал</option><option value="new">новые</option><option value="bump">подняли</option><option value="price">снизили цену</option><option value="back">вернули из архива</option><option value="expiring">истекает сегодня/завтра</option><option value="expired">истекло, не вернули</option><option value="relist">продлевают по кругу</option></select>
   <select id="status"><option value="open">не обзвонены</option><option value="called">звонил</option><option value="callback">перезвонить</option><option value="work">в работе</option><option value="meeting">встреча</option><option value="deal">договор</option><option value="deposit">задаток</option><option value="closed">сделка</option><option value="refused">отказ</option><option value="all">все</option></select>
+  <select id="sort" title="порядок списка"><option value="sig">сначала свежие</option><option value="prio">кому звонить первым</option></select>
   <button id="go" class="on">Найти</button>
   <span class="view"><button id="vlist" class="on">Списком</button><button id="vmap">На карте</button></span>
 </div>
@@ -1993,7 +1995,7 @@ function dmT(v){if(!v)return "";var d=new Date(new Date(v).getTime()+5*3600e3);i
 function ago(v){if(!v)return "";var m=Math.round((Date.now()-new Date(v).getTime())/60000);if(m<60)return m+" мин назад";var h=Math.round(m/60);if(h<48)return h+" ч назад";return Math.round(h/24)+" дн назад";}
 function pretty(n){n=String(n);return n.length===11?"+"+n[0]+" "+n.slice(1,4)+" "+n.slice(4,7)+" "+n.slice(7,9)+" "+n.slice(9):n;}
 function days(v){return Math.max(0,Math.round((Date.now()-new Date(v).getTime())/864e5));}
-var F=["city","district","deal","prop","rooms","use","amin","amax","fmin","fmax","pmin","pmax","hours","signal","status"];
+var F=["city","district","deal","prop","rooms","use","amin","amax","fmin","fmax","pmin","pmax","hours","signal","status","sort"];
 // Районы выбранного города (window.DISTRICTS — с сервера; у риэлтора только разрешённые).
 var DN={};(window.DISTRICTS||[]).forEach(function(d){DN[d.slug]=d.name;});
 function fillDistricts(){var el=document.getElementById("district"),c=document.getElementById("city").value,cur=el.value;
@@ -2026,10 +2028,18 @@ function pager(){
   document.getElementById("pprev").onclick=function(){page(-1);};
   document.getElementById("pnext").onclick=function(){page(1);};
 }
+// Почему лид высоко в «кому звонить первым» — те же баллы, что в SQL (leadsList, prio).
+function prioWhy(x){var w=[],d=Math.floor((Date.now()-new Date(x.first_seen).getTime())/864e5);
+  if(x.new_price!=null&&Number(x.new_price)<Number(x.old_price))w.push("снизил цену"+(Number(x.new_price)<=Number(x.old_price)*0.97?" на 3%+":""));
+  if(x.exp_in!=null&&x.exp_in>=0&&x.exp_in<=1)w.push("истекает");else if(x.expired_at)w.push("истекло");
+  if(x.backs_all>=2)w.push("продлевает по кругу");if(x.last_back)w.push("вернул из архива");
+  if(d>=14&&d<=60)w.push(d+" дн на рынке");else if(d>90)w.push("давно на рынке");
+  w.push(x.agents?"есть агентские копии":"агентов нет");return w.join(", ");}
 function tags(x){var t=[];
   var h=Number(document.getElementById("hours").value)||72;
   var wrap=function(s){return s.replace("<span class='tag ","<span onclick='openHist("+x.id+")' title='вся история' class='tag click ");};
   var out=function(){return t.map(wrap);};
+  if(document.getElementById("sort").value==="prio"&&x.prio!=null)t.push("<span title='"+esc(prioWhy(x))+"' class='tag prio"+(x.prio<30?" lo":"")+"'>приоритет "+x.prio+"</span>"); // title первым: wrap() не трогает бейдж
   if(x.first_seen&&Date.now()-new Date(x.first_seen).getTime()<h*3600e3)t.push("<span class='tag new'>новое · "+ago(x.first_seen)+"</span>");
   if(x.last_bump)t.push("<span class='tag bump'>подняли"+(x.bumps>1?" ×"+x.bumps:"")+" · "+ago(x.last_bump)+"</span>");
   if(x.last_price_at&&x.old_price&&x.new_price){var cut=x.new_price<x.old_price;var pct=Math.round(Math.abs(x.new_price-x.old_price)/x.old_price*100);t.push("<span class='tag "+(cut?"cut":"up")+"'>"+(cut?"снизили":"подняли цену")+" "+money(x.old_price)+" → "+money(x.new_price)+" ("+pct+"%) · "+ago(x.last_price_at)+"</span>");}
@@ -4672,7 +4682,7 @@ async function portalLeads(req, res, parsed) {
   }
   if (q.get("data")) {
     const f = {};
-    for (const k of ["city", "deal", "prop", "rooms", "pmin", "pmax", "amin", "amax", "fmin", "fmax", "nfirst", "nlast", "use", "hours", "signal", "status", "limit", "offset"]) f[k] = q.get(k);
+    for (const k of ["city", "deal", "prop", "rooms", "pmin", "pmax", "amin", "amax", "fmin", "fmax", "nfirst", "nlast", "use", "hours", "signal", "status", "sort", "limit", "offset"]) f[k] = q.get(k);
     // Только своё: город, сделка и тип — из доступа (чужое или «любые» → первое разрешённое).
     if (!u.cities.includes(String(f.city))) f.city = u.cities[0];
     if (!u.deals.includes(String(f.deal))) f.deal = u.deals[0];
@@ -10331,7 +10341,7 @@ http
       }
       if (q.get("data")) {
         const f = {};
-        for (const k of ["city", "deal", "prop", "rooms", "pmin", "pmax", "amin", "amax", "fmin", "fmax", "nfirst", "nlast", "use", "hours", "signal", "status", "limit", "offset"]) f[k] = q.get(k);
+        for (const k of ["city", "deal", "prop", "rooms", "pmin", "pmax", "amin", "amax", "fmin", "fmax", "nfirst", "nlast", "use", "hours", "signal", "status", "sort", "limit", "offset"]) f[k] = q.get(k);
         if (/^[a-z0-9-]{3,40}$/.test(String(q.get("district") || ""))) f.districts = [q.get("district")];
         db.leadsList(f).then((rows) => sendJ(200, rows))
           .catch((e) => sendJ(500, { ok: false, error: String(e.message).slice(0, 200) }));

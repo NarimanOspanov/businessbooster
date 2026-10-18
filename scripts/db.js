@@ -2539,6 +2539,7 @@ async function leadsList(f) {
     .input("signal", sql.NVarChar(10), f.signal || "all")
     .input("relist", sql.Int, LEAD_RELIST_MIN)
     .input("status", sql.NVarChar(20), f.status || "open")
+    .input("sort", sql.NVarChar(10), f.sort === "prio" ? "prio" : "sig")
     // Доля потока: риэлтору видны только объявления с id % N = K (делим район между двумя-тремя).
     .input("pn", sql.Int, Number(f.part_n) >= 2 ? Number(f.part_n) : null)
     .input("pk", sql.Int, Number(f.part_n) >= 2 ? Math.max(0, Number(f.part_k) || 0) % Number(f.part_n) : 0)
@@ -2560,7 +2561,7 @@ async function leadsList(f) {
       l.lat, l.lon, l.photos_c, l.photos_json, l.first_seen, l.bumped_on, l.phones, l.phones_at,
       ev.last_bump, ev.bumps, pr.last_price_at, pr.old_price, pr.new_price, bk.last_back,
       l.storage, x.exp_in, CASE WHEN x.expired = 1 THEN ar.last_archived END AS expired_at, ba.backs_all, ba.last_back_all,
-      (SELECT COUNT(*) FROM dbo.krisha_list_matches m WHERE m.owner_id = l.id AND m.photo_match = 1) AS agents,
+      ag.agents, pp.prio,
       s.status, s.note, s.updated_at AS status_at,
       (SELECT MAX(v) FROM (VALUES (CASE WHEN l.first_seen >= @since THEN l.first_seen END), (ev.last_bump), (pr.last_price_at), (bk.last_back),
         (CASE WHEN x.exp_in BETWEEN 0 AND 1 THEN DATEADD(hour, -5, CAST(CAST(DATEADD(hour, 5, SYSUTCDATETIME()) AS date) AS datetime2)) END),
@@ -2584,6 +2585,21 @@ async function leadsList(f) {
         THEN 7 - DATEDIFF(day, l.bumped_on, CAST(DATEADD(hour, 5, SYSUTCDATETIME()) AS date)) END AS exp_in,
       CASE WHEN l.storage = 'archived' AND ar.last_archived IS NOT NULL AND l.bumped_on IS NOT NULL
         AND DATEDIFF(day, l.bumped_on, CAST(DATEADD(hour, 5, ar.last_archived) AS date)) BETWEEN 7 AND 8 THEN 1 ELSE 0 END AS expired) x
+    OUTER APPLY (SELECT COUNT(*) AS agents FROM dbo.krisha_list_matches m WHERE m.owner_id = l.id AND m.photo_match = 1) ag
+    -- Приоритет звонка («кому звонить первым»): хозяину сейчас нужнее продать —
+    -- снизил цену (сильнее, если на 3%+), истекает или истекло, продлевает по
+    -- кругу, вернул из архива; 2–8 недель на рынке — уже понял, что быстро не
+    -- выходит; без агентских копий — его ещё никто не обрабатывает. Баллы те же,
+    -- что в бейдже на странице (prioWhy).
+    CROSS APPLY (SELECT
+        (CASE WHEN pr.new_price < pr.old_price THEN 40 + (CASE WHEN pr.new_price <= pr.old_price * 0.97 THEN 10 ELSE 0 END) ELSE 0 END)
+      + (CASE WHEN x.exp_in BETWEEN 0 AND 1 THEN 30 WHEN x.expired = 1 THEN 25 ELSE 0 END)
+      + (CASE WHEN l.storage = 'live' AND ba.backs_all >= @relist THEN 20 ELSE 0 END)
+      + (CASE WHEN bk.last_back IS NOT NULL THEN 10 ELSE 0 END)
+      + (CASE WHEN DATEDIFF(day, l.first_seen, SYSUTCDATETIME()) BETWEEN 14 AND 60 THEN 15
+              WHEN DATEDIFF(day, l.first_seen, SYSUTCDATETIME()) BETWEEN 7 AND 13 THEN 5
+              WHEN DATEDIFF(day, l.first_seen, SYSUTCDATETIME()) > 90 THEN -10 ELSE 0 END)
+      + (CASE WHEN ag.agents = 0 THEN 10 ELSE -15 END) AS prio) pp
     LEFT JOIN dbo.krisha_leads s ON s.id = l.id
     WHERE l.user_type = 'owner' AND (l.storage = 'live' OR x.expired = 1) AND l.phones IS NOT NULL
       AND (@city IS NULL OR l.city = @city) AND (@deal IS NULL OR l.deal = @deal) AND (@prop IS NULL OR l.prop = @prop)
@@ -2606,7 +2622,7 @@ async function leadsList(f) {
       AND (@pn IS NULL OR l.id % @pn = @pk)
       AND (@status = 'all' OR (@status = 'open' AND (s.status IS NULL OR s.status = 'callback'))
         OR (@status = 'work' AND s.status IN ('meeting', 'deal', 'deposit')) OR s.status = @status)
-    ORDER BY sig DESC, l.id DESC
+    ORDER BY CASE WHEN @sort = 'prio' THEN pp.prio END DESC, sig DESC, l.id DESC
     OFFSET @off ROWS FETCH NEXT @n ROWS ONLY
     OPTION (RECOMPILE)`)).recordset.map((x) => {
     const o = Object.assign({}, x, { photos: listPhotoUrls(x.photos_c, x.photos_json).slice(0, 30), phones: rawList(x.phones) });
