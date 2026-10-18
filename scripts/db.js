@@ -2533,12 +2533,12 @@ async function leadsList(f) {
     .input("city", sql.NVarChar(40), nul(f.city))
     .input("deal", sql.NVarChar(10), nul(f.deal))
     .input("prop", sql.NVarChar(20), nul(f.prop))
-    .input("rooms", sql.Int, nul(f.rooms) == null ? null : Number(f.rooms))
+    .input("rooms", sql.Int, null) // комнаты, сигнал и статус — списками, см. roomsSql/signalSql/statusSql ниже
     .input("pmin", sql.BigInt, nul(f.pmin) == null ? null : Number(f.pmin))
     .input("pmax", sql.BigInt, nul(f.pmax) == null ? null : Number(f.pmax))
-    .input("signal", sql.NVarChar(10), f.signal || "all")
+    .input("signal", sql.NVarChar(200), String(f.signal || "all").slice(0, 200))
     .input("relist", sql.Int, LEAD_RELIST_MIN)
-    .input("status", sql.NVarChar(20), f.status || "open")
+    .input("status", sql.NVarChar(200), String(f.status || "open").slice(0, 200))
     .input("sort", sql.NVarChar(10), f.sort === "prio" ? "prio" : "sig")
     // Доля потока: риэлтору видны только объявления с id % N = K (делим район между двумя-тремя).
     .input("pn", sql.Int, Number(f.part_n) >= 2 ? Number(f.part_n) : null)
@@ -2551,6 +2551,26 @@ async function leadsList(f) {
     .input("nlast", sql.Bit, f.nlast === "1" ? 1 : 0)
     // Назначение коммерции — словом из заголовка («склады», «офисы»…).
     .input("use", sql.NVarChar(40), /^[а-яё ,-]{3,40}$/i.test(String(f.use || "")) ? String(f.use) : null);
+  // Комнаты, сигналы, статусы — несколько через запятую (галочки на странице).
+  // В SQL идут только значения из белых списков, поэтому подставляем текстом.
+  const lst = (v) => String(v == null ? "" : v).split(",").map((x) => x.trim()).filter(Boolean);
+  const rl = lst(f.rooms).map(Number).filter((n) => Number.isInteger(n) && n >= 1 && n <= 4);
+  // «4» на странице — это «4+».
+  const roomsSql = rl.length ? "AND (l.rooms IN (" + (rl.filter((n) => n < 4).join(",") || "-1") + ")" + (rl.includes(4) ? " OR l.rooms >= 4" : "") + ")" : "";
+  const SIG = {
+    new: "l.first_seen >= @since", bump: "ev.last_bump IS NOT NULL", price: "pr.new_price < pr.old_price",
+    back: "bk.last_back IS NOT NULL", expiring: "x.exp_in BETWEEN 0 AND 1", expired: "x.expired = 1",
+    relist: "(l.storage = 'live' AND ba.backs_all >= @relist)",
+  };
+  const sl = lst(f.signal).filter((k) => SIG[k]);
+  const signalSql = sl.length ? "AND (" + sl.map((k) => SIG[k]).join(" OR ") + ")" : "";
+  const ST = {
+    open: "(s.status IS NULL OR s.status = 'callback')", work: "s.status IN ('meeting', 'deal', 'deposit')",
+    called: "s.status = 'called'", callback: "s.status = 'callback'", meeting: "s.status = 'meeting'", deal: "s.status = 'deal'",
+    deposit: "s.status = 'deposit'", closed: "s.status = 'closed'", refused: "s.status = 'refused'",
+  };
+  const stl = f.status == null || f.status === "" ? ["open"] : lst(f.status).filter((k) => ST[k]);
+  const statusSql = stl.length && !lst(f.status).includes("all") ? "AND (" + stl.map((k) => ST[k]).join(" OR ") + ")" : "";
   // Районы: список ключей (almaty-bostandykskij, almaty-out); пусто — без фильтра.
   const dl = (Array.isArray(f.districts) ? f.districts : []).map(String).filter((x) => /^[a-z0-9-]{3,40}$/.test(x)).slice(0, 30);
   dl.forEach((d, i) => r.input("dd" + i, sql.NVarChar(40), d));
@@ -2603,7 +2623,7 @@ async function leadsList(f) {
     LEFT JOIN dbo.krisha_leads s ON s.id = l.id
     WHERE l.user_type = 'owner' AND (l.storage = 'live' OR x.expired = 1) AND l.phones IS NOT NULL
       AND (@city IS NULL OR l.city = @city) AND (@deal IS NULL OR l.deal = @deal) AND (@prop IS NULL OR l.prop = @prop)
-      AND (@rooms IS NULL OR l.rooms = @rooms) AND (@pmin IS NULL OR l.price >= @pmin) AND (@pmax IS NULL OR l.price <= @pmax)
+      ${roomsSql} AND (@pmin IS NULL OR l.price >= @pmin) AND (@pmax IS NULL OR l.price <= @pmax)
       AND (@amin IS NULL OR l.area >= @amin) AND (@amax IS NULL OR l.area <= @amax)
       AND (@fmin IS NULL OR l.floor >= @fmin) AND (@fmax IS NULL OR l.floor <= @fmax)
       AND (@nfirst = 0 OR l.floor > 1) AND (@nlast = 0 OR l.floor < l.floors)
@@ -2611,17 +2631,9 @@ async function leadsList(f) {
       ${dl.length ? "AND l.district IN (" + dl.map((_, i) => "@dd" + i).join(",") + ")" : ""}
       AND (l.first_seen >= @since OR EXISTS (SELECT 1 FROM dbo.krisha_list_events e WHERE e.id = l.id AND e.at >= @since AND e.kind IN ('bump','price','back'))
         OR x.exp_in BETWEEN 0 AND 1 OR x.expired = 1 OR (l.storage = 'live' AND ba.backs_all >= @relist))
-      AND (@signal = 'all'
-        OR (@signal = 'new' AND l.first_seen >= @since)
-        OR (@signal = 'bump' AND ev.last_bump IS NOT NULL)
-        OR (@signal = 'price' AND pr.new_price < pr.old_price)
-        OR (@signal = 'back' AND bk.last_back IS NOT NULL)
-        OR (@signal = 'expiring' AND x.exp_in BETWEEN 0 AND 1)
-        OR (@signal = 'expired' AND x.expired = 1)
-        OR (@signal = 'relist' AND l.storage = 'live' AND ba.backs_all >= @relist))
+      ${signalSql}
       AND (@pn IS NULL OR l.id % @pn = @pk)
-      AND (@status = 'all' OR (@status = 'open' AND (s.status IS NULL OR s.status = 'callback'))
-        OR (@status = 'work' AND s.status IN ('meeting', 'deal', 'deposit')) OR s.status = @status)
+      ${statusSql}
     ORDER BY CASE WHEN @sort = 'prio' THEN pp.prio END DESC, sig DESC, l.id DESC
     OFFSET @off ROWS FETCH NEXT @n ROWS ONLY
     OPTION (RECOMPILE)`)).recordset.map((x) => {

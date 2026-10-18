@@ -1785,6 +1785,14 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 14px}
   select,input{border:1px solid var(--line);background:#12161c;color:var(--fg);border-radius:8px;padding:7px 10px;font:inherit}
   input.num{width:110px}
+  .dd{position:relative;display:inline-block}
+  .dd>summary{list-style:none;cursor:pointer;border:1px solid var(--line);background:#12161c;border-radius:8px;padding:7px 28px 7px 10px;min-width:140px;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative}
+  .dd>summary::-webkit-details-marker{display:none}
+  .dd>summary::after{content:"";position:absolute;right:11px;top:50%;margin-top:-2px;border:5px solid transparent;border-top-color:var(--mut)}
+  .dd[open]>summary{border-color:var(--acc)}
+  .dd>div{position:absolute;z-index:30;top:calc(100% + 4px);left:0;background:#171c23;border:1px solid var(--line);border-radius:9px;padding:8px 10px;min-width:220px;max-height:340px;overflow:auto;box-shadow:0 10px 28px rgba(0,0,0,.5)}
+  .dd label{display:flex;gap:7px;align-items:center;padding:3px 0;white-space:nowrap;cursor:pointer}
+  .dd .tools{display:flex;gap:12px;margin-bottom:6px;font-size:12px}.dd .tools a{color:var(--acc);cursor:pointer}
   button{border:1px solid var(--line);background:#12161c;color:var(--fg);border-radius:8px;padding:7px 12px;cursor:pointer;font:inherit}
   button.on{background:var(--acc);border-color:var(--acc);color:#fff}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:0 0 10px;display:grid;grid-template-columns:150px 1fr;gap:12px}
@@ -1865,7 +1873,7 @@ const KRISHA_LEADS_HTML = `<!doctype html>
 <h1>Крыша · лиды хозяев <span id="cnt" class="mut"></span></h1>
 <div class="bar">
   <select id="city"><option value="almaty">Алматы</option><option value="astana">Астана</option><option value="shymkent">Шымкент</option><option value="any">все города</option></select>
-  <select id="district"><option value="any">район: любой</option></select>
+  <input type="hidden" id="district" value="any"><details id="distdd" class="dd"><summary>район: любой</summary><div></div></details>
   <select id="deal"><option value="sale">продажа</option><option value="rent">аренда</option><option value="any">любая</option></select>
   <select id="prop"><option value="flat">квартиры</option><option value="house">дома</option><option value="commercial">коммерция</option><option value="land">участки</option><option value="any">всё</option></select>
   <select id="rooms"><option value="any">комнат: любые</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4+</option></select>
@@ -1998,36 +2006,57 @@ function days(v){return Math.max(0,Math.round((Date.now()-new Date(v).getTime())
 var F=["city","district","deal","prop","rooms","use","amin","amax","fmin","fmax","pmin","pmax","hours","signal","status","sort"];
 // Районы выбранного города (window.DISTRICTS — с сервера; у риэлтора только разрешённые).
 var DN={};(window.DISTRICTS||[]).forEach(function(d){DN[d.slug]=d.name;});
-function fillDistricts(){var el=document.getElementById("district"),c=document.getElementById("city").value,cur=el.value;
+// Районы: несколько галочками; в скрытом поле district — через запятую (any — все).
+// Список перестраивается при смене города, отмеченные из другого города сбрасываются.
+// Список обновляется, когда закрываете выпадашку (а не на каждую галочку).
+function distVals(){var v=document.getElementById("district").value;return v&&v!=="any"?v.split(","):[];}
+function distSum(){var dd=document.getElementById("distdd"),n=dd.querySelectorAll("input:checked");
+  var t=Array.prototype.slice.call(n).map(function(i){return i.parentNode.textContent.trim();});
+  dd.querySelector("summary").textContent=t.length?(t.length>2?t.slice(0,2).join(", ")+" и ещё "+(t.length-2):t.join(", ")):(window.PORTAL?"район: все доступные":"район: любой");}
+function fillDistricts(){var c=document.getElementById("city").value,cur=distVals(),dd=document.getElementById("distdd");
   var ds=(window.DISTRICTS||[]).filter(function(d){return d.city===c;});
-  el.innerHTML="<option value='any'>"+(window.PORTAL?"район: все доступные":"район: любой")+"</option>"+ds.map(function(d){return "<option value='"+d.slug+"'>"+esc(d.name)+"</option>";}).join("");
-  el.value=ds.some(function(d){return d.slug===cur;})?cur:"any"; el.style.display=ds.length?"":"none";}
+  dd.querySelector("div").innerHTML="<div class=tools><a data-all>все</a><a data-none>сбросить</a></div>"+ds.map(function(d){return "<label><input type=checkbox value='"+d.slug+"'"+(cur.indexOf(d.slug)>=0?" checked":"")+"> "+esc(d.name)+"</label>";}).join("");
+  var keep=cur.filter(function(s){return ds.some(function(d){return d.slug===s;});});
+  document.getElementById("district").value=keep.length?keep.join(","):"any";
+  dd.style.display=ds.length?"":"none";distSum();}
+(function(){var dd=document.getElementById("distdd"),inp=document.getElementById("district"),was="";
+  var sync=function(){var v=Array.prototype.slice.call(dd.querySelectorAll("input:checked")).map(function(i){return i.value;});inp.value=v.length?v.join(","):"any";distSum();};
+  dd.addEventListener("change",sync);
+  dd.addEventListener("click",function(e){var a=e.target.closest("[data-all],[data-none]");if(!a)return;dd.querySelectorAll("input").forEach(function(i){i.checked=a.hasAttribute("data-all");});sync();});
+  dd.addEventListener("toggle",function(){if(dd.open){was=inp.value;}else if(inp.value!==was){inp.dispatchEvent(new Event("change"));}});
+  document.addEventListener("click",function(e){if(dd.open&&!dd.contains(e.target))dd.removeAttribute("open");});})();
 // Цена — число в тенге; пробелы и знак ₸ не мешают (700 000 = 700000).
 function priceVal(v){var t="";String(v).split("").forEach(function(c){if(c>="0"&&c<="9")t+=c;});var n=Number(t);return t&&n>0?n:null;}
 function qs(){var p=[];["nfirst","nlast"].forEach(function(k){var el=document.getElementById(k);if(el&&el.checked&&el.offsetParent!==null)p.push(k+"=1");});F.forEach(function(k){var v=document.getElementById(k).value;if(v!==""&&v!=="any"){if(k==="pmin"||k==="pmax"){v=priceVal(v);if(v==null)return;}p.push(k+"="+encodeURIComponent(v));}});return p.join("&");}
 // Постранично по 200: просим на одну строку больше — по ней видно, есть ли
 // следующая страница, без отдельного подсчёта.
-var PAGE=200, OFF=0, MORE=false;
-function load(keep){
-  if(keep!==true)OFF=0;
+var PAGE=200, OFF=0, MORE=false, LOADSEQ=0, TOTAL=null;
+function load(){
+  OFF=0;ROWS=[];MORE=false;
   try{F.forEach(function(k){localStorage.setItem("leads:"+k,document.getElementById(k).value);});}catch(e){}
   document.getElementById("list").innerHTML=skLeads(4);
   document.getElementById("pager").innerHTML="";
-  fetch(API+"&data=1&"+qs()+"&limit="+(PAGE+1)+"&offset="+OFF).then(function(r){return r.json();}).then(render).catch(function(e){document.getElementById("list").innerHTML="<div class=empty>ошибка: "+esc(e.message)+"</div>";});
+  // Ответ на старый запрос (фильтр успели поменять, пока он шёл) не рисуем — иначе он затрёт новый список.
+  var my=++LOADSEQ;
+  fetch(API+"&data=1&"+qs()+"&limit="+(PAGE+1)+"&offset=0").then(function(r){return r.json();}).then(function(rows){if(my===LOADSEQ)render(rows);}).catch(function(e){if(my===LOADSEQ)document.getElementById("list").innerHTML="<div class=empty>ошибка: "+esc(e.message)+"</div>";});
 }
-function page(dir){
-  OFF=Math.max(0,OFF+dir*PAGE); load(true);
-  window.scrollTo({top:0,behavior:"smooth"});
+// Докрутили до низа — подгружаем следующие PAGE и дописываем в конец списка.
+var MORELOADING=false;
+function loadMore(){
+  if(!MORE||MORELOADING)return;
+  MORELOADING=true;var my=LOADSEQ,off=OFF+PAGE;
+  document.getElementById("pager").innerHTML="<span class=mut>загружаем ещё…</span>";
+  fetch(API+"&data=1&"+qs()+"&limit="+(PAGE+1)+"&offset="+off).then(function(r){return r.json();}).then(function(rows){
+    MORELOADING=false;if(my!==LOADSEQ)return;OFF=off;render(rows,true);
+  }).catch(function(e){MORELOADING=false;if(my===LOADSEQ)document.getElementById("pager").innerHTML="<button id=pmore>Не загрузилось — ещё раз</button>";var b=document.getElementById("pmore");if(b)b.onclick=loadMore;});
 }
 function pager(){
   var el=document.getElementById("pager");
-  if(!OFF&&!MORE){el.innerHTML="";return;}
-  el.innerHTML="<button id='pprev'"+(OFF?"":" disabled")+">← Назад</button>"+
-    "<span class=mut>стр. "+(OFF/PAGE+1)+" · "+(OFF+1)+"–"+(OFF+ROWS.length)+"</span>"+
-    "<button id='pnext'"+(MORE?"":" disabled")+">Дальше →</button>";
-  document.getElementById("pprev").onclick=function(){page(-1);};
-  document.getElementById("pnext").onclick=function(){page(1);};
+  el.innerHTML=MORE?"<button id=pmore>Показать ещё</button>":(ROWS.length>PAGE?"<span class=mut>показаны все "+ROWS.length+"</span>":"");
+  var b=document.getElementById("pmore");if(b)b.onclick=loadMore;
 }
+// Низ списка виден (с запасом в полэкрана) — грузим дальше; кнопка «Показать ещё» — на всякий случай.
+if("IntersectionObserver" in window)new IntersectionObserver(function(es){if(es[0].isIntersecting&&VIEW==="list")loadMore();},{rootMargin:"600px 0px"}).observe(document.getElementById("pager"));
 // Почему лид высоко в «кому звонить первым» — те же баллы, что в SQL (leadsList, prio).
 function prioWhy(x){var w=[],d=Math.floor((Date.now()-new Date(x.first_seen).getTime())/864e5);
   if(x.new_price!=null&&Number(x.new_price)<Number(x.old_price))w.push("снизил цену"+(Number(x.new_price)<=Number(x.old_price)*0.97?" на 3%+":""));
@@ -2049,15 +2078,18 @@ function tags(x){var t=[];
   if(x.backs_all>=2)t.push("<span class='tag relist' title='уходило в архив и возвращалось'>продлевают по кругу ×"+x.backs_all+"</span>");
   if(x.agents)t.push("<span class='tag ag'>агентов уже "+x.agents+"</span>");
   return out().join("");}
-function render(rows){
-  if(!Array.isArray(rows)){document.getElementById("cnt").textContent="";document.getElementById("list").innerHTML="<div class=empty>сервер не ответил: "+esc((rows&&rows.error)||"ошибка")+" — попробуйте ещё раз или сузьте период</div>";return;}
+// append — следующая порция при прокрутке: дописываем карточки, а не перерисовываем.
+function render(rows,append){
+  if(!Array.isArray(rows)){if(append){document.getElementById("pager").innerHTML="<button id=pmore>Не загрузилось — ещё раз</button>";document.getElementById("pmore").onclick=loadMore;return;}
+    document.getElementById("cnt").textContent="";document.getElementById("list").innerHTML="<div class=empty>сервер не ответил: "+esc((rows&&rows.error)||"ошибка")+" — попробуйте ещё раз или сузьте период</div>";return;}
   MORE=rows.length>PAGE; if(MORE)rows=rows.slice(0,PAGE);
-  var TOTAL=rows.length&&rows[0].total!=null?Number(rows[0].total):null;
-  document.getElementById("cnt").textContent=rows.length?"· найдено "+(TOTAL!=null?TOTAL.toLocaleString("ru-RU"):(OFF+rows.length)+(MORE?"+":""))+(TOTAL!=null&&TOTAL>PAGE?" · показаны "+(OFF+1)+"–"+(OFF+rows.length):""):"· найдено 0";
-  ROWS=rows;
+  if(rows.length&&rows[0].total!=null)TOTAL=Number(rows[0].total);else if(!append)TOTAL=null;
+  ROWS=append?ROWS.concat(rows):rows;
+  document.getElementById("cnt").textContent=ROWS.length?"· найдено "+(TOTAL!=null?TOTAL.toLocaleString("ru-RU"):ROWS.length+(MORE?"+":""))+(MORE||ROWS.length>PAGE?" · показаны "+ROWS.length:""):"· найдено 0";
   pager();
-  if(!rows.length){document.getElementById("list").innerHTML="<div class=empty>"+(OFF?"дальше пусто":"по этим фильтрам пусто")+"</div>";if(VIEW==="map"&&MAP)plot();return;}
-  document.getElementById("list").innerHTML=rows.map(cardHtml).join("");
+  if(!ROWS.length){document.getElementById("list").innerHTML="<div class=empty>по этим фильтрам пусто</div>";if(VIEW==="map"&&MAP)plot();return;}
+  if(append)document.getElementById("list").insertAdjacentHTML("beforeend",rows.map(cardHtml).join(""));
+  else document.getElementById("list").innerHTML=rows.map(cardHtml).join("");
   if(VIEW==="map") ensureMap().then(plot);
 }
 function cardHtml(x){
@@ -2168,12 +2200,38 @@ function setSt(id,status,el){
     if(status){card.querySelectorAll(".st button").forEach(function(b){b.classList.remove("on");});if(status!=="clear")el.classList.add("on");}
   });
 }
+// Мультивыбор: обычный <select> превращается в список с галочками (как районы).
+// Значение — в скрытом поле с тем же id, через запятую; пусто — значение-«любое».
+// Список обновляется, когда выпадашку закрывают.
+var MULTI={};
+function multiSum(id){var m=MULTI[id],dd=document.getElementById(id+"_dd");
+  var t=Array.prototype.slice.call(dd.querySelectorAll("input:checked")).map(function(i){return i.parentNode.textContent.trim();});
+  dd.querySelector("summary").textContent=t.length?m.pre+(t.length>2?t.slice(0,2).join(", ")+" и ещё "+(t.length-2):t.join(", ")):m.label;}
+function multiRefresh(id){var inp=document.getElementById(id),dd=document.getElementById(id+"_dd"),m=MULTI[id];
+  var v=inp.value&&inp.value!==m.empty?inp.value.split(","):[];
+  dd.querySelectorAll("input").forEach(function(c){c.checked=v.indexOf(c.value)>=0;});multiSum(id);}
+function multiMake(id,empty,pre){var s=document.getElementById(id);if(!s||s.tagName!=="SELECT")return;
+  var opts=[],label="";Array.prototype.forEach.call(s.options,function(o){if(o.value===empty)label=o.textContent;else opts.push([o.value,o.textContent]);});
+  var inp=document.createElement("input");inp.type="hidden";inp.id=id;inp.value=s.value;
+  var dd=document.createElement("details");dd.className="dd";dd.id=id+"_dd";
+  dd.innerHTML="<summary></summary><div><div class=tools><a data-all>все</a><a data-none>сбросить</a></div>"+opts.map(function(o){return "<label><input type=checkbox value='"+o[0]+"'> "+esc(o[1])+"</label>";}).join("")+"</div>";
+  s.parentNode.insertBefore(dd,s);s.parentNode.replaceChild(inp,s);
+  MULTI[id]={empty:empty,label:label,pre:pre||""};
+  var was="",sync=function(){var v=Array.prototype.slice.call(dd.querySelectorAll("input:checked")).map(function(i){return i.value;});inp.value=v.length?v.join(","):empty;multiSum(id);};
+  dd.addEventListener("change",sync);
+  dd.addEventListener("click",function(e){var a=e.target.closest("[data-all],[data-none]");if(!a)return;dd.querySelectorAll("input").forEach(function(i){i.checked=a.hasAttribute("data-all");});sync();});
+  dd.addEventListener("toggle",function(){if(dd.open)was=inp.value;else if(inp.value!==was)inp.dispatchEvent(new Event("change"));});
+  multiRefresh(id);}
+multiMake("rooms","any","комнат: ");multiMake("signal","all","");multiMake("status","all","");
+document.addEventListener("click",function(e){document.querySelectorAll(".dd[open]").forEach(function(d){if(!d.contains(e.target))d.removeAttribute("open");});});
 try{F.forEach(function(k){var v=localStorage.getItem("leads:"+k);if(v!=null)document.getElementById(k).value=v;});}catch(e){}
-fillDistricts();try{var dv=localStorage.getItem("leads:district");if(dv)document.getElementById("district").value=dv;if(!document.getElementById("district").value)document.getElementById("district").value="any";}catch(e){}
+["rooms","signal","status"].forEach(multiRefresh);
+fillDistricts(); // district уже восстановлен из localStorage вместе с остальными полями F
 document.getElementById("city").addEventListener("change",fillDistricts);
 // Комнаты есть только у квартир и домов: для коммерции и участков фильтр прячем и сбрасываем.
 function syncFields(){var p=document.getElementById("prop").value;
-  var show=function(id,on){var el=document.getElementById(id);if(!el)return;el.style.display=on?"":"none";if(!on){if(el.tagName==="SELECT")el.value="any";else if(el.type==="checkbox")el.checked=false;else if(el.tagName==="INPUT")el.value="";el.querySelectorAll&&el.querySelectorAll("input[type=checkbox]").forEach(function(c){c.checked=false;});}};
+  var show=function(id,on){var el=document.getElementById(id);if(!el)return;el.style.display=on?"":"none";
+    var md=document.getElementById(id+"_dd");if(md){md.style.display=on?"":"none";if(!on){el.value=MULTI[id].empty;multiRefresh(id);}return;}if(!on){if(el.tagName==="SELECT")el.value="any";else if(el.type==="checkbox")el.checked=false;else if(el.tagName==="INPUT")el.value="";el.querySelectorAll&&el.querySelectorAll("input[type=checkbox]").forEach(function(c){c.checked=false;});}};
   show("rooms",p==="flat"||p==="house"||p==="any");
   show("use",p==="commercial");
   show("amin",p!=="any");show("amax",p!=="any");
@@ -4687,9 +4745,10 @@ async function portalLeads(req, res, parsed) {
     if (!u.cities.includes(String(f.city))) f.city = u.cities[0];
     if (!u.deals.includes(String(f.deal))) f.deal = u.deals[0];
     if (!u.props.includes(String(f.prop))) f.prop = u.props[0];
-    // Район: выбранный, если он в доступе; иначе все разрешённые районы города (или весь город).
-    const dsel = String(q.get("district") || ""), allow = myDist(f.city);
-    f.districts = allow.length ? (allow.includes(dsel) ? [dsel] : allow) : (dsel.startsWith(f.city + "-") ? [dsel] : null);
+    // Районы: отмеченные (через запятую), если они в доступе; иначе все разрешённые районы города (или весь город).
+    const dsel = String(q.get("district") || "").split(",").filter((d) => d.startsWith(String(f.city) + "-")), allow = myDist(f.city);
+    const pick = allow.length ? dsel.filter((d) => allow.includes(d)) : dsel;
+    f.districts = pick.length ? pick : (allow.length ? allow : null);
     f.limit = Math.min(200, Number(f.limit) || 200);
     f.part_n = u.part_n; f.part_k = u.part_k;
     const rows = await db.leadsList(f);
@@ -4699,7 +4758,7 @@ async function portalLeads(req, res, parsed) {
       const o = Object.assign({}, r, { ph_hidden: (r.phones || []).length ? 1 : 0, phones: [] });
       return o;
     });
-    await log("list", null, [f.city, (f.districts || []).length === 1 ? DISTRICTS.NAMES[f.districts[0]] : null, f.deal, f.prop, f.rooms, f.signal, f.hours + "ч", "стр " + (Math.floor((Number(f.offset) || 0) / 200) + 1), rows.length + " шт"].filter(Boolean).join(" · "));
+    await log("list", null, [f.city, pick.length ? pick.map((d) => DISTRICTS.NAMES[d] || d).join(", ") : null, f.deal, f.prop, f.rooms, f.signal, f.hours + "ч", "стр " + (Math.floor((Number(f.offset) || 0) / 200) + 1), rows.length + " шт"].filter(Boolean).join(" · "));
     return sendJ(200, out);
   }
   await log("open", null, null);
@@ -10342,7 +10401,8 @@ http
       if (q.get("data")) {
         const f = {};
         for (const k of ["city", "deal", "prop", "rooms", "pmin", "pmax", "amin", "amax", "fmin", "fmax", "nfirst", "nlast", "use", "hours", "signal", "status", "sort", "limit", "offset"]) f[k] = q.get(k);
-        if (/^[a-z0-9-]{3,40}$/.test(String(q.get("district") || ""))) f.districts = [q.get("district")];
+        const dl = String(q.get("district") || "").split(",").filter((d) => /^[a-z0-9-]{3,40}$/.test(d));
+        if (dl.length) f.districts = dl;
         db.leadsList(f).then((rows) => sendJ(200, rows))
           .catch((e) => sendJ(500, { ok: false, error: String(e.message).slice(0, 200) }));
         return;
