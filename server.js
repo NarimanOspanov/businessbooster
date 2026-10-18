@@ -1889,6 +1889,7 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   <select id="hours"><option value="24">за сутки</option><option value="72" selected>за 3 дня</option><option value="168">за неделю</option><option value="720">за месяц</option></select>
   <select id="signal"><option value="all">любой сигнал</option><option value="new">новые</option><option value="bump">подняли</option><option value="price">снизили цену</option><option value="back">вернули из архива</option><option value="expiring">истекает сегодня/завтра</option><option value="expired">истекло, не вернули</option><option value="relist">продлевают по кругу</option></select>
   <select id="status"><option value="open">не обзвонены</option><option value="called">звонил</option><option value="callback">перезвонить</option><option value="work">в работе</option><option value="meeting">встреча</option><option value="deal">договор</option><option value="deposit">задаток</option><option value="closed">сделка</option><option value="refused">отказ</option><option value="all">все</option></select>
+  <span class="presets"><select id="preset" title="сохранённые фильтры"><option value="">мои фильтры…</option></select><button id="psave" type="button" title="сохранить текущие фильтры под именем">сохранить</button><button id="pdel" type="button" style="display:none" title="удалить выбранный фильтр">удалить</button></span>
   <select id="sort" title="порядок списка"><option value="sig">сначала свежие</option><option value="prio">кому звонить первым</option></select>
   <button id="go" class="on">Найти</button>
   <span class="view"><button id="vlist" class="on">Списком</button><button id="vmap">На карте</button></span>
@@ -2226,6 +2227,30 @@ multiMake("rooms","any","комнат: ");multiMake("signal","all","");multiMake
 document.addEventListener("click",function(e){document.querySelectorAll(".dd[open]").forEach(function(d){if(!d.contains(e.target))d.removeAttribute("open");});});
 try{F.forEach(function(k){var v=localStorage.getItem("leads:"+k);if(v!=null)document.getElementById(k).value=v;});}catch(e){}
 ["rooms","signal","status"].forEach(multiRefresh);
+// Мои фильтры: имя → значения полей F (и галочки «не первый/не последний»).
+// Хранятся в этом браузере (localStorage), на другом устройстве их нет.
+function presetsGet(){try{return JSON.parse(localStorage.getItem("leads:presets")||"{}")||{};}catch(e){return {};}}
+function presetsPut(p){try{localStorage.setItem("leads:presets",JSON.stringify(p));}catch(e){alert("не получилось сохранить: "+e.message);}}
+function presetsFill(sel){var p=presetsGet(),el=document.getElementById("preset");
+  el.innerHTML="<option value=''>мои фильтры…</option>"+Object.keys(p).sort().map(function(n){return "<option value='"+esc(n).replace(/'/g,"&#39;")+"'>"+esc(n)+"</option>";}).join("");
+  el.value=sel&&p[sel]?sel:"";document.getElementById("pdel").style.display=el.value?"":"none";}
+function presetSnap(){var o={};F.forEach(function(k){o[k]=document.getElementById(k).value;});
+  ["nfirst","nlast"].forEach(function(k){var el=document.getElementById(k);if(el)o[k]=el.checked;});return o;}
+function presetApply(o){var set=function(k){var el=document.getElementById(k);if(el&&o[k]!=null)el.value=o[k];};
+  set("city");set("district");fillDistricts();
+  set("deal");set("prop");syncFields();
+  F.forEach(function(k){if(k!=="city"&&k!=="district"&&k!=="deal"&&k!=="prop")set(k);});
+  ["nfirst","nlast"].forEach(function(k){var el=document.getElementById(k);if(el&&o[k]!=null)el.checked=!!o[k];});
+  ["rooms","signal","status"].forEach(multiRefresh);load();}
+document.getElementById("preset").addEventListener("change",function(){var n=this.value,p=presetsGet();
+  document.getElementById("pdel").style.display=n?"":"none";if(n&&p[n])presetApply(p[n]);});
+document.getElementById("psave").onclick=function(){var cur=document.getElementById("preset").value;
+  var n=prompt("Название фильтра (например «1-2 комн до 30 млн, Бостандыкский»):",cur||"");if(n==null)return;n=String(n).trim().slice(0,60);if(!n)return;
+  var p=presetsGet();if(p[n]&&n!==cur&&!confirm("Фильтр «"+n+"» уже есть. Заменить?"))return;
+  p[n]=presetSnap();presetsPut(p);presetsFill(n);};
+document.getElementById("pdel").onclick=function(){var n=document.getElementById("preset").value;if(!n||!confirm("Удалить фильтр «"+n+"»?"))return;
+  var p=presetsGet();delete p[n];presetsPut(p);presetsFill("");};
+presetsFill("");
 fillDistricts(); // district уже восстановлен из localStorage вместе с остальными полями F
 document.getElementById("city").addEventListener("change",fillDistricts);
 // Комнаты есть только у квартир и домов: для коммерции и участков фильтр прячем и сбрасываем.
