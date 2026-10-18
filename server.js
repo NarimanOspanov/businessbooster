@@ -1785,6 +1785,8 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 14px}
   select,input{border:1px solid var(--line);background:#12161c;color:var(--fg);border-radius:8px;padding:7px 10px;font:inherit}
   input.num{width:110px}
+  button.fav{background:none;border:0;padding:0 8px 0 0;font-size:20px;line-height:1;color:var(--mut);cursor:pointer;vertical-align:-2px}
+  button.fav:hover{color:#ff6b81} button.fav.on{color:#ff4d6d}
   .dd{position:relative;display:inline-block}
   .dd>summary{list-style:none;cursor:pointer;border:1px solid var(--line);background:#12161c;border-radius:8px;padding:7px 28px 7px 10px;min-width:140px;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative}
   .dd>summary::-webkit-details-marker{display:none}
@@ -1884,6 +1886,7 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   <input class="num" id="fmax" placeholder="этаж до" inputmode="numeric" style="width:80px">
   <label id="nfirstl" class="mut"><input type="checkbox" id="nfirst"> не первый</label>
   <label id="nlastl" class="mut"><input type="checkbox" id="nlast"> не последний</label>
+  <label class="mut" title="только объявления с сердечком — без ограничения по периоду, сигналу и статусу"><input type="checkbox" id="favonly"> ♥ избранное</label>
   <input class="num" id="pmin" placeholder="цена от, ₸" inputmode="numeric">
   <input class="num" id="pmax" placeholder="цена до, ₸" inputmode="numeric">
   <select id="hours"><option value="24">за сутки</option><option value="72" selected>за 3 дня</option><option value="168">за неделю</option><option value="720">за месяц</option></select>
@@ -2028,7 +2031,7 @@ function fillDistricts(){var c=document.getElementById("city").value,cur=distVal
   document.addEventListener("click",function(e){if(dd.open&&!dd.contains(e.target))dd.removeAttribute("open");});})();
 // Цена — число в тенге; пробелы и знак ₸ не мешают (700 000 = 700000).
 function priceVal(v){var t="";String(v).split("").forEach(function(c){if(c>="0"&&c<="9")t+=c;});var n=Number(t);return t&&n>0?n:null;}
-function qs(){var p=[];["nfirst","nlast"].forEach(function(k){var el=document.getElementById(k);if(el&&el.checked&&el.offsetParent!==null)p.push(k+"=1");});F.forEach(function(k){var v=document.getElementById(k).value;if(v!==""&&v!=="any"){if(k==="pmin"||k==="pmax"){v=priceVal(v);if(v==null)return;}p.push(k+"="+encodeURIComponent(v));}});return p.join("&");}
+function qs(){var p=[];["nfirst","nlast","favonly"].forEach(function(k){var el=document.getElementById(k);if(el&&el.checked&&el.offsetParent!==null)p.push(k+"=1");});F.forEach(function(k){var v=document.getElementById(k).value;if(v!==""&&v!=="any"){if(k==="pmin"||k==="pmax"){v=priceVal(v);if(v==null)return;}p.push(k+"="+encodeURIComponent(v));}});return p.join("&");}
 // Постранично по 200: просим на одну строку больше — по ней видно, есть ли
 // следующая страница, без отдельного подсчёта.
 var PAGE=200, OFF=0, MORE=false, LOADSEQ=0, TOTAL=null;
@@ -2099,7 +2102,7 @@ function cardHtml(x){
     return "<div class=card data-id='"+x.id+"'>"+
       "<div class=photos>"+(x.photos&&x.photos.length?(PH[x.id]=x.photos,"")+"<img loading=lazy src='"+esc(x.photos[0])+"' onclick='gal("+x.id+",0)'>"+(x.photos.length>1?"<span class=pcnt>"+x.photos.length+" фото</span>":""):"<div class=mut>нет фото</div>")+"</div>"+
       "<div>"+
-        "<div><span class=title>"+esc(x.title||par)+"</span><span class=price>"+money(x.price)+"</span></div>"+
+        "<div><button class='fav"+(x.fav?" on":"")+"' title='в избранное' onclick='favToggle("+x.id+",this)'>"+(x.fav?"♥":"♡")+"</button><span class=title>"+esc(x.title||par)+"</span><span class=price>"+money(x.price)+"</span></div>"+
         "<div class=row>"+tags(x)+"</div>"+
         "<div class='row mut'>"+esc(x.addr||"")+(x.addr?" · ":"")+esc(x.city||"")+(x.district&&DN[x.district]?" · "+esc(DN[x.district]):"")+" · на рынке "+days(x.first_seen)+" дн · <a target=_blank href='https://krisha.kz/a/show/"+x.id+"'>на Крыше</a>"+(x.lat!=null?" · <a href='#' onclick='setView(&quot;map&quot;);focusPin("+x.id+");return false'>на карте</a>":"")+"</div>"+
         "<div class='row phones'>"+(x.owner_name?"<span class=mut>"+esc(x.owner_name)+" · </span>":"")+ph+"</div>"+
@@ -2235,12 +2238,12 @@ function presetsFill(sel){var p=presetsGet(),el=document.getElementById("preset"
   el.innerHTML="<option value=''>мои фильтры…</option>"+Object.keys(p).sort().map(function(n){return "<option value='"+esc(n).replace(/'/g,"&#39;")+"'>"+esc(n)+"</option>";}).join("");
   el.value=sel&&p[sel]?sel:"";document.getElementById("pdel").style.display=el.value?"":"none";}
 function presetSnap(){var o={};F.forEach(function(k){o[k]=document.getElementById(k).value;});
-  ["nfirst","nlast"].forEach(function(k){var el=document.getElementById(k);if(el)o[k]=el.checked;});return o;}
+  ["nfirst","nlast","favonly"].forEach(function(k){var el=document.getElementById(k);if(el)o[k]=el.checked;});return o;}
 function presetApply(o){var set=function(k){var el=document.getElementById(k);if(el&&o[k]!=null)el.value=o[k];};
   set("city");set("district");fillDistricts();
   set("deal");set("prop");syncFields();
   F.forEach(function(k){if(k!=="city"&&k!=="district"&&k!=="deal"&&k!=="prop")set(k);});
-  ["nfirst","nlast"].forEach(function(k){var el=document.getElementById(k);if(el&&o[k]!=null)el.checked=!!o[k];});
+  ["nfirst","nlast","favonly"].forEach(function(k){var el=document.getElementById(k);if(el&&o[k]!=null)el.checked=!!o[k];});
   ["rooms","signal","status"].forEach(multiRefresh);load();}
 document.getElementById("preset").addEventListener("change",function(){var n=this.value,p=presetsGet();
   document.getElementById("pdel").style.display=n?"":"none";if(n&&p[n])presetApply(p[n]);});
@@ -2270,6 +2273,12 @@ document.getElementById("prop").addEventListener("change",function(){clearIds(["
 document.getElementById("go").onclick=load;
 setView(VIEW);
 F.forEach(function(k){document.getElementById(k).addEventListener("change",load);});
+document.getElementById("favonly").addEventListener("change",load);
+// Сердечко: в избранное и обратно (своё у каждого риэлтора).
+function favToggle(id,btn){var on=!btn.classList.contains("on");btn.classList.toggle("on",on);btn.textContent=on?"♥":"♡";
+  fetch(API+"&fav="+id+"&on="+(on?1:0)).then(function(r){return r.json();}).then(function(j){if(!j.ok){btn.classList.toggle("on",!on);btn.textContent=!on?"♥":"♡";alert(j.error||"не получилось");}
+    var x=ROWS.filter(function(r){return String(r.id)===String(id);})[0];if(x)x.fav=on?1:0;})
+  .catch(function(e){btn.classList.toggle("on",!on);btn.textContent=!on?"♥":"♡";alert(e.message);});}
 load();
 </script></body></html>`;
 
@@ -4736,6 +4745,12 @@ async function portalLeads(req, res, parsed) {
     await log("reveal", x.id, [it.city, it.rooms ? it.rooms + "-комн" : it.prop, it.price, it.addr].filter(Boolean).join(" · "));
     return sendJ(200, { ok: true, phones: String(it.phones || "").split(",").filter(Boolean) });
   }
+  if (q.get("fav")) {
+    const x = await item(q.get("fav"));
+    if (!x.ok) return sendJ(403, { ok: false, error: "Нет доступа" });
+    const on = await db.leadSetFav(u.id, x.id, q.get("on") === "1");
+    return sendJ(200, { ok: true, id: x.id, fav: on });
+  }
   if (q.get("set")) {
     const x = await item(q.get("set"));
     if (!x.ok) { await log("denied", x.id, "статус вне доступа"); return sendJ(403, { ok: false, error: "Нет доступа" }); }
@@ -4765,7 +4780,7 @@ async function portalLeads(req, res, parsed) {
   }
   if (q.get("data")) {
     const f = {};
-    for (const k of ["city", "deal", "prop", "rooms", "pmin", "pmax", "amin", "amax", "fmin", "fmax", "nfirst", "nlast", "use", "hours", "signal", "status", "sort", "limit", "offset"]) f[k] = q.get(k);
+    for (const k of ["city", "deal", "prop", "rooms", "pmin", "pmax", "amin", "amax", "fmin", "fmax", "nfirst", "nlast", "use", "hours", "signal", "status", "sort", "favonly", "limit", "offset"]) f[k] = q.get(k);
     // Только своё: город, сделка и тип — из доступа (чужое или «любые» → первое разрешённое).
     if (!u.cities.includes(String(f.city))) f.city = u.cities[0];
     if (!u.deals.includes(String(f.deal))) f.deal = u.deals[0];
@@ -4775,7 +4790,7 @@ async function portalLeads(req, res, parsed) {
     const pick = allow.length ? dsel.filter((d) => allow.includes(d)) : dsel;
     f.districts = pick.length ? pick : (allow.length ? allow : null);
     f.limit = Math.min(200, Number(f.limit) || 200);
-    f.part_n = u.part_n; f.part_k = u.part_k;
+    f.part_n = u.part_n; f.part_k = u.part_k; f.fav_user = u.id;
     const rows = await db.leadsList(f);
     const rv = await db.portalReveals(u.id, rows.map((r) => r.id));
     const out = rows.map((r) => {
@@ -10407,6 +10422,11 @@ http
       const key = KRISHA_JOB_KEY || KRISHA_PHONE_KEY;
       if (!key || q.get("key") !== key) { res.writeHead(403); res.end("bad key"); return; }
       const sendJ = (code, obj) => { res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); };
+      if (q.get("fav")) {
+        db.leadSetFav(0, String(q.get("fav")).replace(/\D/g, ""), q.get("on") === "1").then((on) => sendJ(200, { ok: true, id: q.get("fav"), fav: on }))
+          .catch((e) => sendJ(500, { ok: false, error: String(e.message).slice(0, 200) }));
+        return;
+      }
       if (q.get("set")) {
         db.leadSetStatus(q.get("set"), q.get("status") || "", q.get("note") || "", null, q.get("fee"))
           .then((st) => sendJ(200, { ok: true, id: q.get("set"), status: st }))
@@ -10425,7 +10445,7 @@ http
       }
       if (q.get("data")) {
         const f = {};
-        for (const k of ["city", "deal", "prop", "rooms", "pmin", "pmax", "amin", "amax", "fmin", "fmax", "nfirst", "nlast", "use", "hours", "signal", "status", "sort", "limit", "offset"]) f[k] = q.get(k);
+        for (const k of ["city", "deal", "prop", "rooms", "pmin", "pmax", "amin", "amax", "fmin", "fmax", "nfirst", "nlast", "use", "hours", "signal", "status", "sort", "favonly", "limit", "offset"]) f[k] = q.get(k);
         const dl = String(q.get("district") || "").split(",").filter((d) => /^[a-z0-9-]{3,40}$/.test(d));
         if (dl.length) f.districts = dl;
         db.leadsList(f).then((rows) => sendJ(200, rows))
