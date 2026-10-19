@@ -2552,6 +2552,14 @@ IF OBJECT_ID('dbo.krisha_lead_favs', 'U') IS NULL
     user_id INT NOT NULL, id BIGINT NOT NULL,
     at DATETIME2(0) NOT NULL CONSTRAINT DF_kfav_at DEFAULT SYSUTCDATETIME(),
     CONSTRAINT PK_krisha_lead_favs PRIMARY KEY (user_id, id));
+-- Избранное своё у каждого сохранённого фильтра (scope — имя фильтра, '' — без фильтра).
+-- Ключ меняем на (user_id, scope, id); старое избранное остаётся в '' (миграция копирует его в фильтры отдельно).
+IF COL_LENGTH('dbo.krisha_lead_favs', 'scope') IS NULL
+BEGIN
+  ALTER TABLE dbo.krisha_lead_favs ADD scope NVARCHAR(60) NOT NULL CONSTRAINT DF_kfav_scope DEFAULT '';
+  ALTER TABLE dbo.krisha_lead_favs DROP CONSTRAINT PK_krisha_lead_favs;
+  EXEC(N'ALTER TABLE dbo.krisha_lead_favs ADD CONSTRAINT PK_krisha_lead_favs PRIMARY KEY (user_id, scope, id)');
+END
 -- Сохранённые фильтры страницы лидов («мои фильтры»): имя → JSON полей.
 IF OBJECT_ID('dbo.krisha_lead_presets', 'U') IS NULL
   CREATE TABLE dbo.krisha_lead_presets (
@@ -2699,7 +2707,7 @@ async function leadsList(f) {
               WHEN DATEDIFF(day, l.first_seen, SYSUTCDATETIME()) > 90 THEN -10 ELSE 0 END)
       + (CASE WHEN ag.agents = 0 THEN 10 ELSE -15 END) AS prio) pp
     LEFT JOIN dbo.krisha_leads s ON s.id = l.id
-    LEFT JOIN dbo.krisha_lead_favs fv ON fv.user_id = @fu AND fv.id = l.id
+    LEFT JOIN dbo.krisha_lead_favs fv ON fv.user_id = @fu AND fv.scope = @hs AND fv.id = l.id
     -- Номер не обязателен: плагин собирает номера отдельно, без него — ссылка на Крышу.
     WHERE l.user_type = 'owner' AND (l.storage = 'live' OR x.expired = 1)
       AND (@city IS NULL OR l.city = @city) AND (@deal IS NULL OR l.deal = @deal) AND (@prop IS NULL OR l.prop = @prop)
@@ -2813,7 +2821,9 @@ async function leadPresetDel(userId, name) {
   const pool = await getPool();
   await ensureLeads(pool);
   await reqT(pool).input("u", sql.Int, Number(userId) || 0).input("n", sql.NVarChar(60), String(name || "").slice(0, 60))
-    .query("DELETE FROM dbo.krisha_lead_presets WHERE user_id = @u AND name = @n");
+    .query(`DELETE FROM dbo.krisha_lead_presets WHERE user_id = @u AND name = @n;
+      DELETE FROM dbo.krisha_lead_favs WHERE user_id = @u AND scope = @n AND @n <> '';
+      DELETE FROM dbo.krisha_lead_hides WHERE user_id = @u AND scope = @n AND @n <> '';`);
 }
 // Год постройки: источники — разобранные объявления с годом и координатами.
 async function listYearSources() {
@@ -2853,13 +2863,13 @@ async function leadSetHide(userId, scope, id, on) {
     : "DELETE FROM dbo.krisha_lead_hides WHERE user_id = @u AND scope = @s AND id = @id");
   return !!on;
 }
-async function leadSetFav(userId, id, on) {
+async function leadSetFav(userId, id, on, scope) {
   const pool = await getPool();
   await ensureLeads(pool);
-  const rq = reqT(pool).input("u", sql.Int, Number(userId) || 0).input("id", sql.BigInt, Number(id));
+  const rq = reqT(pool).input("u", sql.Int, Number(userId) || 0).input("id", sql.BigInt, Number(id)).input("s", sql.NVarChar(60), String(scope || "").slice(0, 60));
   await rq.query(on
-    ? "IF NOT EXISTS (SELECT 1 FROM dbo.krisha_lead_favs WHERE user_id = @u AND id = @id) INSERT INTO dbo.krisha_lead_favs (user_id, id) VALUES (@u, @id)"
-    : "DELETE FROM dbo.krisha_lead_favs WHERE user_id = @u AND id = @id");
+    ? "IF NOT EXISTS (SELECT 1 FROM dbo.krisha_lead_favs WHERE user_id = @u AND scope = @s AND id = @id) INSERT INTO dbo.krisha_lead_favs (user_id, scope, id) VALUES (@u, @s, @id)"
+    : "DELETE FROM dbo.krisha_lead_favs WHERE user_id = @u AND scope = @s AND id = @id");
   return !!on;
 }
 async function leadSetStatus(id, status, note, userId, fee) {

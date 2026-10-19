@@ -1788,6 +1788,9 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   .bar .gl{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;min-width:96px}
   .bar .tools{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;width:100%;padding:2px 2px 0}
   .bar .tg{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .myf{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:-4px 0 12px;padding:10px 12px;border:1px solid var(--acc);border-radius:12px;background:rgba(76,141,255,.08)}
+  .myf .gl{font-size:11px;color:var(--acc);text-transform:uppercase;letter-spacing:.05em;font-weight:700;margin-right:4px}
+  .myf #preset{min-width:200px;font-weight:600} .myf label{margin-left:8px} #psaved{font-size:12px}
   @media(max-width:640px){.bar .grp>.gl{width:100%}}
   select,input{border:1px solid var(--line);background:#12161c;color:var(--fg);border-radius:8px;padding:7px 10px;font:inherit}
   input.num{width:110px}
@@ -1909,6 +1912,8 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   .pager button:disabled{opacity:.4;cursor:default}
 </style></head><body>
 <h1>Крыша · лиды хозяев <span id="cnt" class="mut"></span></h1>
+<!-- мой фильтр — главное: выбрал, и все поля ниже выставились; правки в нём сохраняются сами; избранное у каждого фильтра своё -->
+<div class="myf"><span class="gl">Мой фильтр</span><span class="presets"><select id="preset" title="сохранённые фильтры"><option value="">мои фильтры…</option></select><button id="psave" type="button" title="сохранить текущие фильтры под именем">сохранить</button><button id="pdel" type="button" style="display:none" title="удалить выбранный фильтр">удалить</button></span><label class="mut" title="только объявления с сердечком — без ограничения по периоду, сигналу и статусу"><input type="checkbox" id="favonly"> ♥ избранное этого фильтра</label><span id="psaved" class="mut"></span></div>
 <div class="bar">
   <div class="grp"><span class="gl">Поиск</span>
     <select id="city"><option value="almaty">Алматы</option><option value="astana">Астана</option><option value="shymkent">Шымкент</option><option value="any">все города</option></select>
@@ -1933,10 +1938,6 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   </div>
   <div class="grp"><span class="gl">Статусы</span>
     <select id="status"><option value="open">не обзвонены</option><option value="called">звонил</option><option value="callback">перезвонить</option><option value="work">в работе</option><option value="meeting">встреча</option><option value="deal">договор</option><option value="deposit">задаток</option><option value="closed">сделка</option><option value="refused">отказ</option><option value="all">все</option></select>
-    <label class="mut" title="только объявления с сердечком — без ограничения по периоду, сигналу и статусу"><input type="checkbox" id="favonly"> ♥ избранное</label>
-  </div>
-  <div class="grp"><span class="gl">Мои фильтры</span>
-    <span class="presets"><select id="preset" title="сохранённые фильтры"><option value="">мои фильтры…</option></select><button id="psave" type="button" title="сохранить текущие фильтры под именем">сохранить</button><button id="pdel" type="button" style="display:none" title="удалить выбранный фильтр">удалить</button></span>
   </div>
   <div class="grp"><span class="gl">Сортировка</span>
     <select id="sort" title="порядок списка"><option value="new">сначала новые объявления</option><option value="sig">по последнему событию (подняли, снизили…)</option><option value="prio">кому звонить первым</option></select>
@@ -2092,7 +2093,12 @@ function qs(){var p=["scope="+encodeURIComponent(scopeName())];["nfirst","nlast"
 // Постранично по 200: просим на одну строку больше — по ней видно, есть ли
 // следующая страница, без отдельного подсчёта.
 var PAGE=200, OFF=0, MORE=false, LOADSEQ=0, TOTAL=null;
+var PRESET_QUIET=false,PSAVE_T=null;
+function presetAutosave(){var n=scopeName();if(!n||PRESET_QUIET)return;clearTimeout(PSAVE_T);
+  PSAVE_T=setTimeout(function(){var o=presetSnap(),p=presetsGet();if(p[n]&&JSON.stringify(p[n])===JSON.stringify(o))return;
+    presetSaveRemote(n,o).then(function(){presetsFill(n);var m=document.getElementById("psaved");m.textContent="сохранено в «"+n+"»";setTimeout(function(){m.textContent="";},2500);}).catch(function(){});},1000);}
 function load(){
+  presetAutosave();
   OFF=0;ROWS=[];MORE=false;
   try{F.forEach(function(k){localStorage.setItem("leads:"+k,document.getElementById(k).value);});}catch(e){}
   document.getElementById("list").innerHTML=skLeads(4);
@@ -2267,7 +2273,7 @@ document.getElementById("vswipe").onclick=function(){setView("swipe");};
 // Скрытое не показывается в этом фильтре: scope — имя выбранного сохранённого фильтра.
 function scopeName(){var el=document.getElementById("preset");return el?el.value:"";}
 function hideApi(id,on){return fetch(API+"&hide="+id+"&on="+(on?1:0)+"&scope="+encodeURIComponent(scopeName())).then(function(r){return r.json();}).then(function(j){if(!j.ok)throw new Error(j.error||"не получилось");return j;});}
-function favApi(id,on){return fetch(API+"&fav="+id+"&on="+(on?1:0)).then(function(r){return r.json();}).then(function(j){if(!j.ok)throw new Error(j.error||"не получилось");return j;});}
+function favApi(id,on){return fetch(API+"&fav="+id+"&on="+(on?1:0)+"&scope="+encodeURIComponent(scopeName())).then(function(r){return r.json();}).then(function(j){if(!j.ok)throw new Error(j.error||"не получилось");return j;});}
 function hideCard(id,btn){var c=btn.closest(".card");c.style.opacity=".35";
   hideApi(id,true).then(function(){c.remove();ROWS=ROWS.filter(function(r){return String(r.id)!==String(id);});}).catch(function(e){c.style.opacity="";alert(e.message);});}
 // Очередь свайпов — загруженные строки по порядку; решённые (избранное/скрыто) пропускаем.
@@ -2370,7 +2376,7 @@ function presetsFill(sel){var p=presetsGet(),el=document.getElementById("preset"
   try{localStorage.setItem("leads:preset",el.value);}catch(e){}}
 function presetSnap(){var o={};F.forEach(function(k){o[k]=document.getElementById(k).value;});
   ["nfirst","nlast","favonly"].forEach(function(k){var el=document.getElementById(k);if(el)o[k]=el.checked;});return o;}
-function presetApply(o){var set=function(k){var el=document.getElementById(k);if(el&&o[k]!=null)el.value=o[k];};
+function presetApply(o){PRESET_QUIET=true;setTimeout(function(){PRESET_QUIET=false;},0);var set=function(k){var el=document.getElementById(k);if(el&&o[k]!=null)el.value=o[k];};
   set("city");set("district");fillDistricts();
   set("deal");set("prop");syncFields();
   F.forEach(function(k){if(k!=="city"&&k!=="district"&&k!=="deal"&&k!=="prop")set(k);});
@@ -2393,7 +2399,8 @@ document.getElementById("pdel").onclick=function(){var n=document.getElementById
     return miss.reduce(function(pr,n){return pr.then(function(){return presetSaveRemote(n,loc[n]);});},Promise.resolve());
   }).then(function(){presetsFill(last);
     // выбранный фильтр после перезагрузки: поля уже восстановлены, но скрытые зависят от имени — перечитываем список
-    if(document.getElementById("preset").value)load();
+    // при открытии страницы — поля из выбранного фильтра (он мог измениться на другом устройстве)
+    var pv=document.getElementById("preset").value;if(pv&&PRESETS[pv])presetApply(PRESETS[pv]);
   }).catch(function(e){console.log("presets: "+e.message);presetsFill("");});})();
 fillDistricts(); // district уже восстановлен из localStorage вместе с остальными полями F
 document.getElementById("city").addEventListener("change",fillDistricts);
@@ -2417,7 +2424,7 @@ F.forEach(function(k){document.getElementById(k).addEventListener("change",load)
 document.getElementById("favonly").addEventListener("change",load);
 // Сердечко: в избранное и обратно (своё у каждого риэлтора).
 function favToggle(id,btn){var on=!btn.classList.contains("on");btn.classList.toggle("on",on);btn.textContent=on?"♥":"♡";
-  fetch(API+"&fav="+id+"&on="+(on?1:0)).then(function(r){return r.json();}).then(function(j){if(!j.ok){btn.classList.toggle("on",!on);btn.textContent=!on?"♥":"♡";alert(j.error||"не получилось");}
+  fetch(API+"&fav="+id+"&on="+(on?1:0)+"&scope="+encodeURIComponent(scopeName())).then(function(r){return r.json();}).then(function(j){if(!j.ok){btn.classList.toggle("on",!on);btn.textContent=!on?"♥":"♡";alert(j.error||"не получилось");}
     var x=ROWS.filter(function(r){return String(r.id)===String(id);})[0];if(x)x.fav=on?1:0;})
   .catch(function(e){btn.classList.toggle("on",!on);btn.textContent=!on?"♥":"♡";alert(e.message);});}
 load();
@@ -4907,7 +4914,7 @@ async function portalLeads(req, res, parsed) {
   if (q.get("fav")) {
     const x = await item(q.get("fav"));
     if (!x.ok) return sendJ(403, { ok: false, error: "Нет доступа" });
-    const on = await db.leadSetFav(u.id, x.id, q.get("on") === "1");
+    const on = await db.leadSetFav(u.id, x.id, q.get("on") === "1", q.get("scope") || "");
     return sendJ(200, { ok: true, id: x.id, fav: on });
   }
   if (q.get("set")) {
@@ -10599,7 +10606,7 @@ http
         return;
       }
       if (q.get("fav")) {
-        db.leadSetFav(0, String(q.get("fav")).replace(/\D/g, ""), q.get("on") === "1").then((on) => sendJ(200, { ok: true, id: q.get("fav"), fav: on }))
+        db.leadSetFav(0, String(q.get("fav")).replace(/\D/g, ""), q.get("on") === "1", q.get("scope") || "").then((on) => sendJ(200, { ok: true, id: q.get("fav"), fav: on }))
           .catch((e) => sendJ(500, { ok: false, error: String(e.message).slice(0, 200) }));
         return;
       }
