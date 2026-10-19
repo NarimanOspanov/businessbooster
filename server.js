@@ -1855,6 +1855,7 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   .tag.exp{background:rgba(229,72,77,.16);color:#ff8a8d}
   .tag.gone{background:rgba(138,149,165,.28);color:var(--mut)}
   .tag.relist{background:rgba(168,85,247,.18);color:#c9a5ff}
+  .tag.hist{background:rgba(76,141,255,.14);color:var(--acc);cursor:pointer}
   .tag.prio{background:rgba(47,191,113,.16);color:var(--ok);font-weight:600} .tag.prio.lo{background:rgba(138,149,165,.15);color:var(--mut)}
   .tag.ag{background:rgba(229,72,77,.15);color:var(--no)}
   .phones a{font-size:16px;font-weight:600;margin-right:12px}
@@ -2137,7 +2138,10 @@ function tags(x){var t=[];
   if(x.expired_at)t.push("<span class='tag gone' title='ушло в архив по сроку и не вернулось'>истекло, не продлили · "+ago(x.expired_at)+"</span>");
   if(x.backs_all>=2)t.push("<span class='tag relist' title='уходило в архив и возвращалось'>продлевают по кругу ×"+x.backs_all+"</span>");
   if(x.agents)t.push("<span class='tag ag'>агентов уже "+x.agents+"</span>");
-  return out().join("");}
+  // Вместо ряда событий — одна кнопка «История объявления»: события в подсказке и в окне истории.
+  var pr=t.length&&t[0].indexOf("tag prio")>=0?t.shift():"";
+  var plain=t.map(function(v){return v.replace(/<[^>]+>/g,"");});
+  return pr+"<span class='tag hist click' onclick='openHist("+x.id+")' title='"+esc(plain.join(" · ")||"история цены и событий")+"'>История объявления"+(t.length?" · "+t.length:"")+"</span>";}
 // append — следующая порция при прокрутке: дописываем карточки, а не перерисовываем.
 function render(rows,append){
   if(!Array.isArray(rows)){if(append){document.getElementById("pager").innerHTML="<button id=pmore>Не загрузилось — ещё раз</button>";document.getElementById("pmore").onclick=loadMore;return;}
