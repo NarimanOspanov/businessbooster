@@ -1934,8 +1934,11 @@ const KRISHA_LEADS_HTML = `<!doctype html>
     <input class="num" id="pmax" placeholder="цена до, ₸" inputmode="numeric">
   </div>
   <div class="grp"><span class="gl">Сигналы</span>
-    <input type="hidden" id="hours" value="0"><!-- сигналы всегда за всё время -->
-    <select id="signal"><option value="all">любой сигнал</option><option value="new">новые</option><option value="bump">подняли</option><option value="price">снизили цену</option><option value="back">вернули из архива</option><option value="expiring">истекает сегодня/завтра</option><option value="expired">истекло, не вернули</option><option value="relist">продлевают по кругу</option></select>
+    <select id="hours" title="за какой период смотреть события: новые, подняли, снизили цену, вернули из архива"><option value="24">за сутки</option><option value="72">за 3 дня</option><option value="168">за неделю</option><option value="720">за месяц</option></select>
+    <select id="signal"><option value="all">любой сигнал</option><option value="new">новые</option><option value="bump">подняли</option><option value="price">снизили цену</option><option value="back">вернули из архива</option></select>
+    <label class="mut" title="срок бесплатного размещения кончается сегодня или завтра"><input type="checkbox" id="sg_expiring"> истекает сегодня/завтра</label>
+    <label class="mut" title="ушло в архив по сроку (за выбранный период) и не вернулось"><input type="checkbox" id="sg_expired"> истекло, не продлили</label>
+    <label class="mut" title="уходило в архив и возвращалось 2+ раза"><input type="checkbox" id="sg_relist"> продлевают по кругу</label>
   </div>
   <div class="grp"><span class="gl">Статусы</span>
     <select id="status"><option value="open">не обзвонены</option><option value="called">звонил</option><option value="callback">перезвонить</option><option value="work">в работе</option><option value="meeting">встреча</option><option value="deal">договор</option><option value="deposit">задаток</option><option value="closed">сделка</option><option value="refused">отказ</option><option value="all">все</option></select>
@@ -2066,7 +2069,7 @@ function dmT(v){if(!v)return "";var d=new Date(new Date(v).getTime()+5*3600e3);i
 function ago(v){if(!v)return "";var m=Math.round((Date.now()-new Date(v).getTime())/60000);if(m<60)return m+" мин назад";var h=Math.round(m/60);if(h<48)return h+" ч назад";return Math.round(h/24)+" дн назад";}
 function pretty(n){n=String(n);return n.length===11?"+"+n[0]+" "+n.slice(1,4)+" "+n.slice(4,7)+" "+n.slice(7,9)+" "+n.slice(9):n;}
 function days(v){return Math.max(0,Math.round((Date.now()-new Date(v).getTime())/864e5));}
-var F=["city","district","pub","deal","prop","rooms","use","amin","amax","fmin","fmax","ymin","pmin","pmax","signal","status","sort"];
+var F=["city","district","pub","deal","prop","rooms","use","amin","amax","fmin","fmax","ymin","pmin","pmax","hours","signal","status","sort"];
 // Районы выбранного города (window.DISTRICTS — с сервера; у риэлтора только разрешённые).
 var DN={};(window.DISTRICTS||[]).forEach(function(d){DN[d.slug]=d.name;});
 // Районы: несколько галочками; в скрытом поле district — через запятую (any — все).
@@ -2090,7 +2093,16 @@ function fillDistricts(){var c=document.getElementById("city").value,cur=distVal
   document.addEventListener("click",function(e){if(dd.open&&!dd.contains(e.target))dd.removeAttribute("open");});})();
 // Цена — число в тенге; пробелы и знак ₸ не мешают (700 000 = 700000).
 function priceVal(v){var t="";String(v).split("").forEach(function(c){if(c>="0"&&c<="9")t+=c;});var n=Number(t);return t&&n>0?n:null;}
-function qs(){var p=["scope="+encodeURIComponent(scopeName()),"hours=0"];["nfirst","nlast","favonly"].forEach(function(k){var el=document.getElementById(k);if(el&&el.checked&&el.offsetParent!==null)p.push(k+"=1");});F.forEach(function(k){var v=document.getElementById(k).value;if(v!==""&&v!=="any"){if(k==="pmin"||k==="pmax"){v=priceVal(v);if(v==null)return;}p.push(k+"="+encodeURIComponent(v));}});return p.join("&");}
+// Сигнал в запрос: отмеченные события + галочки состояний (через запятую, любой из них).
+var SGST=["expiring","expired","relist"];
+function sigValue(){var v=document.getElementById("signal").value,a=v&&v!=="all"?v.split(","):[];
+  SGST.forEach(function(k){if(document.getElementById("sg_"+k).checked)a.push(k);});return a.length?a.join(","):"all";}
+// Старые сохранения, где состояния были в списке сигналов, — переносим в галочки.
+function sigSplit(o){var el=document.getElementById("signal"),v=el.value&&el.value!=="all"?el.value.split(","):[];
+  SGST.forEach(function(k){var c=document.getElementById("sg_"+k);if(v.indexOf(k)>=0)c.checked=true;else if(o&&o["sg_"+k]!=null)c.checked=!!o["sg_"+k];});
+  var rest=v.filter(function(k){return SGST.indexOf(k)<0;});el.value=rest.length?rest.join(","):"all";
+  var h=document.getElementById("hours");if(!h.value)h.value="24";multiRefresh("signal");}
+function qs(){var p=["scope="+encodeURIComponent(scopeName())];["nfirst","nlast","favonly"].forEach(function(k){var el=document.getElementById(k);if(el&&el.checked&&el.offsetParent!==null)p.push(k+"=1");});F.forEach(function(k){var v=k==="signal"?sigValue():document.getElementById(k).value;if(v!==""&&v!=="any"){if(k==="pmin"||k==="pmax"){v=priceVal(v);if(v==null)return;}p.push(k+"="+encodeURIComponent(v));}});return p.join("&");}
 // Постранично по 200: просим на одну строку больше — по ней видно, есть ли
 // следующая страница, без отдельного подсчёта.
 var PAGE=200, OFF=0, MORE=false, LOADSEQ=0, TOTAL=null;
@@ -2361,7 +2373,7 @@ function multiMake(id,empty,pre){var s=document.getElementById(id);if(!s||s.tagN
 multiMake("rooms","any","комнат: ");multiMake("signal","all","");multiMake("status","all","");
 document.addEventListener("click",function(e){document.querySelectorAll(".dd[open]").forEach(function(d){if(!d.contains(e.target))d.removeAttribute("open");});});
 try{F.forEach(function(k){var v=localStorage.getItem("leads:"+k);if(v!=null)document.getElementById(k).value=v;});}catch(e){}
-["rooms","signal","status"].forEach(multiRefresh);
+["rooms","signal","status"].forEach(multiRefresh);sigSplit();
 // Мои фильтры: имя → значения полей F (и галочки). Хранятся на сервере у
 // каждого риэлтора (у админа — свои), поэтому одинаковы на телефоне и компьютере.
 // Старые, сохранённые раньше только в этом браузере, при первом заходе
@@ -2376,13 +2388,13 @@ function presetsFill(sel){var p=presetsGet(),el=document.getElementById("preset"
   el.value=sel&&p[sel]?sel:"";document.getElementById("pdel").style.display=el.value?"":"none";
   try{localStorage.setItem("leads:preset",el.value);}catch(e){}}
 function presetSnap(){var o={};F.forEach(function(k){o[k]=document.getElementById(k).value;});
-  ["nfirst","nlast","favonly"].forEach(function(k){var el=document.getElementById(k);if(el)o[k]=el.checked;});return o;}
+  ["nfirst","nlast","favonly","sg_expiring","sg_expired","sg_relist"].forEach(function(k){var el=document.getElementById(k);if(el)o[k]=el.checked;});return o;}
 function presetApply(o){PRESET_QUIET=true;setTimeout(function(){PRESET_QUIET=false;},0);var set=function(k){var el=document.getElementById(k);if(el&&o[k]!=null)el.value=o[k];};
   set("city");set("district");fillDistricts();
   set("deal");set("prop");syncFields();
   F.forEach(function(k){if(k!=="city"&&k!=="district"&&k!=="deal"&&k!=="prop")set(k);});
   ["nfirst","nlast","favonly"].forEach(function(k){var el=document.getElementById(k);if(el&&o[k]!=null)el.checked=!!o[k];});
-  ["rooms","signal","status"].forEach(multiRefresh);load();}
+  ["rooms","signal","status"].forEach(multiRefresh);sigSplit(o);load();}
 document.getElementById("preset").addEventListener("change",function(){var n=this.value,p=presetsGet();
   document.getElementById("pdel").style.display=n?"":"none";try{localStorage.setItem("leads:preset",n);}catch(e){}
   if(n&&p[n])presetApply(p[n]);else load();});
@@ -2423,6 +2435,7 @@ document.getElementById("go").onclick=load;
 setView(VIEW);
 F.forEach(function(k){document.getElementById(k).addEventListener("change",load);});
 document.getElementById("favonly").addEventListener("change",load);
+["sg_expiring","sg_expired","sg_relist"].forEach(function(k){document.getElementById(k).addEventListener("change",load);});
 // Сердечко: в избранное и обратно (своё у каждого риэлтора).
 function favToggle(id,btn){var on=!btn.classList.contains("on");btn.classList.toggle("on",on);btn.textContent=on?"♥":"♡";
   fetch(API+"&fav="+id+"&on="+(on?1:0)+"&scope="+encodeURIComponent(scopeName())).then(function(r){return r.json();}).then(function(j){if(!j.ok){btn.classList.toggle("on",!on);btn.textContent=!on?"♥":"♡";alert(j.error||"не получилось");}
