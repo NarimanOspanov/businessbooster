@@ -1922,7 +1922,7 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   <select id="signal"><option value="all">любой сигнал</option><option value="new">новые</option><option value="bump">подняли</option><option value="price">снизили цену</option><option value="back">вернули из архива</option><option value="expiring">истекает сегодня/завтра</option><option value="expired">истекло, не вернули</option><option value="relist">продлевают по кругу</option></select>
   <select id="status"><option value="open">не обзвонены</option><option value="called">звонил</option><option value="callback">перезвонить</option><option value="work">в работе</option><option value="meeting">встреча</option><option value="deal">договор</option><option value="deposit">задаток</option><option value="closed">сделка</option><option value="refused">отказ</option><option value="all">все</option></select>
   <span class="presets"><select id="preset" title="сохранённые фильтры"><option value="">мои фильтры…</option></select><button id="psave" type="button" title="сохранить текущие фильтры под именем">сохранить</button><button id="pdel" type="button" style="display:none" title="удалить выбранный фильтр">удалить</button></span>
-  <select id="sort" title="порядок списка"><option value="sig">сначала свежие</option><option value="prio">кому звонить первым</option></select>
+  <select id="sort" title="порядок списка"><option value="new">сначала новые объявления</option><option value="sig">по последнему событию (подняли, снизили…)</option><option value="prio">кому звонить первым</option></select>
   <button id="go" class="on">Найти</button>
   <span class="view"><button id="vlist" class="on">Списком</button><button id="vswipe">Свайпы</button><button id="vmap">На карте</button></span>
 </div>

@@ -2561,7 +2561,7 @@ async function leadsList(f) {
     .input("signal", sql.NVarChar(200), String(f.signal || "all").slice(0, 200))
     .input("relist", sql.Int, LEAD_RELIST_MIN)
     .input("status", sql.NVarChar(200), String(f.status || "open").slice(0, 200))
-    .input("sort", sql.NVarChar(10), f.sort === "prio" ? "prio" : "sig")
+    .input("sort", sql.NVarChar(10), f.sort === "prio" || f.sort === "new" ? f.sort : "sig")
     // Избранное: чьё (fav_user) и «только избранное» — тогда без окна по времени, сигнала и статуса.
     .input("fu", sql.Int, Number.isInteger(Number(f.fav_user)) ? Number(f.fav_user) : 0)
     .input("favonly", sql.Bit, f.favonly === "1" ? 1 : 0)
@@ -2666,7 +2666,8 @@ async function leadsList(f) {
       ${f.favonly === "1" ? "" : signalSql}
       AND (@pn IS NULL OR l.id % @pn = @pk)
       ${f.favonly === "1" ? "" : statusSql}
-    ORDER BY CASE WHEN @sort = 'prio' THEN pp.prio END DESC, sig DESC, l.id DESC
+    -- sig — по последнему событию (поднятие, снижение, возврат, новое); new — по дате появления объявления; prio — кому звонить первым.
+    ORDER BY CASE WHEN @sort = 'prio' THEN pp.prio END DESC, CASE WHEN @sort = 'new' THEN l.first_seen END DESC, sig DESC, l.id DESC
     OFFSET @off ROWS FETCH NEXT @n ROWS ONLY
     OPTION (RECOMPILE)`)).recordset.map((x) => {
     const o = Object.assign({}, x, { photos: listPhotoUrls(x.photos_c, x.photos_json).slice(0, 30), phones: rawList(x.phones) });
