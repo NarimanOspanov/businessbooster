@@ -2138,10 +2138,13 @@ function tags(x){var t=[];
   if(x.expired_at)t.push("<span class='tag gone' title='ушло в архив по сроку и не вернулось'>истекло, не продлили · "+ago(x.expired_at)+"</span>");
   if(x.backs_all>=2)t.push("<span class='tag relist' title='уходило в архив и возвращалось'>продлевают по кругу ×"+x.backs_all+"</span>");
   if(x.agents)t.push("<span class='tag ag'>агентов уже "+x.agents+"</span>");
-  // Вместо ряда событий — одна кнопка «История объявления»: события в подсказке и в окне истории.
+  // Что важно знать сейчас (снизили цену, истекает, истекло, вернули из архива, по кругу, агенты) — меткой на карточке;
+  // частые события (новое, подняли) — в кнопке «История объявления» и её подсказке.
   var pr=t.length&&t[0].indexOf("tag prio")>=0?t.shift():"";
-  var plain=t.map(function(v){return v.replace(/<[^>]+>/g,"");});
-  return pr+"<span class='tag hist click' onclick='openHist("+x.id+")' title='"+esc(plain.join(" · ")||"история цены и событий")+"'>История объявления"+(t.length?" · "+t.length:"")+"</span>";}
+  var isIns=function(v){return /class='tag (cut|exp|gone|relist|back|ag)'/.test(v);};
+  var ins=t.filter(isIns).map(wrap),rest=t.filter(function(v){return !isIns(v);});
+  var plain=rest.map(function(v){return v.replace(/<[^>]+>/g,"");});
+  return pr+ins.join("")+"<span class='tag hist click' onclick='openHist("+x.id+")' title='"+esc(plain.join(" · ")||"история цены и событий")+"'>История объявления"+(rest.length?" · "+rest.length:"")+"</span>";}
 // append — следующая порция при прокрутке: дописываем карточки, а не перерисовываем.
 function render(rows,append){
   if(!Array.isArray(rows)){if(append){document.getElementById("pager").innerHTML="<button id=pmore>Не загрузилось — ещё раз</button>";document.getElementById("pmore").onclick=loadMore;return;}
