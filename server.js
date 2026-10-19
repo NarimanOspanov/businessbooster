@@ -1783,6 +1783,13 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   .mut{color:var(--mut)}
   a{color:var(--acc);text-decoration:none}
   .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 14px}
+  /* группы фильтров: подпись слева, поля в ряд; на телефоне подпись над полями */
+  .bar .grp{display:flex;flex-wrap:wrap;gap:8px;align-items:center;width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.02)}
+  .bar .gl{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;min-width:64px}
+  .bar .tools{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;width:100%;padding:2px 2px 0}
+  .bar .tg{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .bar .tv{margin-left:auto}
+  @media(max-width:640px){.bar .grp>.gl{width:100%}.bar .tv{margin-left:0}}
   select,input{border:1px solid var(--line);background:#12161c;color:var(--fg);border-radius:8px;padding:7px 10px;font:inherit}
   input.num{width:110px}
   /* лайк и «не интересно» — справа на карточке, рядом */
@@ -1851,7 +1858,8 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   .tag.prio{background:rgba(47,191,113,.16);color:var(--ok);font-weight:600} .tag.prio.lo{background:rgba(138,149,165,.15);color:var(--mut)}
   .tag.ag{background:rgba(229,72,77,.15);color:var(--no)}
   .phones a{font-size:16px;font-weight:600;margin-right:12px}
-  .reveal{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:6px 12px;font-weight:600;cursor:pointer}
+  .reveal{background:var(--acc);color:#fff;border:0;border-radius:50%;width:36px;height:36px;padding:0;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;vertical-align:middle}
+  .reveal svg{width:18px;height:18px;fill:currentColor} .reveal:disabled{opacity:.6}
   .row{margin:3px 0}
   .st{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px}
   .st button{padding:5px 10px;font-size:13px}
@@ -1902,29 +1910,38 @@ const KRISHA_LEADS_HTML = `<!doctype html>
 </style></head><body>
 <h1>Крыша · лиды хозяев <span id="cnt" class="mut"></span></h1>
 <div class="bar">
-  <select id="city"><option value="almaty">Алматы</option><option value="astana">Астана</option><option value="shymkent">Шымкент</option><option value="any">все города</option></select>
-  <input type="hidden" id="district" value="any"><details id="distdd" class="dd"><summary>район: любой</summary><div></div></details>
-  <select id="deal"><option value="sale">продажа</option><option value="rent">аренда</option><option value="any">любая</option></select>
-  <select id="prop"><option value="flat">квартиры</option><option value="house">дома</option><option value="commercial">коммерция</option><option value="land">участки</option><option value="any">всё</option></select>
-  <select id="rooms"><option value="any">комнат: любые</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4+</option></select>
-  <select id="use"><option value="any">назначение: любое</option><option value="свободное назначение">свободное назначение</option><option value="офисы">офисы</option><option value="магазины и бутики">магазины и бутики</option><option value="салоны красоты">салоны красоты</option><option value="образование">образование</option><option value="склады">склады</option><option value="медцентры и аптеки">медцентры и аптеки</option><option value="общепит">общепит</option><option value="развлечения">развлечения</option><option value="кабинеты и рабочие места">кабинеты и рабочие места</option><option value="студии">студии</option><option value="конференц-залы">конференц-залы</option><option value="фитнес и спорт">фитнес и спорт</option><option value="бани">бани</option><option value="гостиницы и зоны отдыха">гостиницы и зоны отдыха</option><option value="азс">АЗС</option><option value="автосервисы и автомойки">автосервисы и автомойки</option><option value="сельское хозяйство">сельское хозяйство</option></select>
-  <input class="num" id="amin" placeholder="площадь от, м²" inputmode="decimal">
-  <input class="num" id="amax" placeholder="площадь до, м²" inputmode="decimal">
-  <input class="num" id="fmin" placeholder="этаж от" inputmode="numeric" style="width:80px">
-  <input class="num" id="fmax" placeholder="этаж до" inputmode="numeric" style="width:80px">
-  <input class="num" id="ymin" placeholder="год от" inputmode="numeric" title="год постройки от; квартиры с неизвестным годом остаются" style="width:80px">
-  <label id="nfirstl" class="mut"><input type="checkbox" id="nfirst"> не первый</label>
-  <label id="nlastl" class="mut"><input type="checkbox" id="nlast"> не последний</label>
-  <label class="mut" title="только объявления с сердечком — без ограничения по периоду, сигналу и статусу"><input type="checkbox" id="favonly"> ♥ избранное</label>
-  <input class="num" id="pmin" placeholder="цена от, ₸" inputmode="numeric">
-  <input class="num" id="pmax" placeholder="цена до, ₸" inputmode="numeric">
-  <select id="hours"><option value="24">за сутки</option><option value="72" selected>за 3 дня</option><option value="168">за неделю</option><option value="720">за месяц</option></select>
-  <select id="signal"><option value="all">любой сигнал</option><option value="new">новые</option><option value="bump">подняли</option><option value="price">снизили цену</option><option value="back">вернули из архива</option><option value="expiring">истекает сегодня/завтра</option><option value="expired">истекло, не вернули</option><option value="relist">продлевают по кругу</option></select>
-  <select id="status"><option value="open">не обзвонены</option><option value="called">звонил</option><option value="callback">перезвонить</option><option value="work">в работе</option><option value="meeting">встреча</option><option value="deal">договор</option><option value="deposit">задаток</option><option value="closed">сделка</option><option value="refused">отказ</option><option value="all">все</option></select>
-  <span class="presets"><select id="preset" title="сохранённые фильтры"><option value="">мои фильтры…</option></select><button id="psave" type="button" title="сохранить текущие фильтры под именем">сохранить</button><button id="pdel" type="button" style="display:none" title="удалить выбранный фильтр">удалить</button></span>
-  <select id="sort" title="порядок списка"><option value="new">сначала новые объявления</option><option value="sig">по последнему событию (подняли, снизили…)</option><option value="prio">кому звонить первым</option></select>
-  <button id="go" class="on">Найти</button>
-  <span class="view"><button id="vlist" class="on">Списком</button><button id="vswipe">Свайпы</button><button id="vmap">На карте</button></span>
+  <!-- что ищем -->
+  <div class="grp"><span class="gl">Объект</span>
+    <select id="city"><option value="almaty">Алматы</option><option value="astana">Астана</option><option value="shymkent">Шымкент</option><option value="any">все города</option></select>
+    <input type="hidden" id="district" value="any"><details id="distdd" class="dd"><summary>район: любой</summary><div></div></details>
+    <select id="deal"><option value="sale">продажа</option><option value="rent">аренда</option><option value="any">любая</option></select>
+    <select id="prop"><option value="flat">квартиры</option><option value="house">дома</option><option value="commercial">коммерция</option><option value="land">участки</option><option value="any">всё</option></select>
+    <select id="rooms"><option value="any">комнат: любые</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4+</option></select>
+    <select id="use"><option value="any">назначение: любое</option><option value="свободное назначение">свободное назначение</option><option value="офисы">офисы</option><option value="магазины и бутики">магазины и бутики</option><option value="салоны красоты">салоны красоты</option><option value="образование">образование</option><option value="склады">склады</option><option value="медцентры и аптеки">медцентры и аптеки</option><option value="общепит">общепит</option><option value="развлечения">развлечения</option><option value="кабинеты и рабочие места">кабинеты и рабочие места</option><option value="студии">студии</option><option value="конференц-залы">конференц-залы</option><option value="фитнес и спорт">фитнес и спорт</option><option value="бани">бани</option><option value="гостиницы и зоны отдыха">гостиницы и зоны отдыха</option><option value="азс">АЗС</option><option value="автосервисы и автомойки">автосервисы и автомойки</option><option value="сельское хозяйство">сельское хозяйство</option></select>
+    <input class="num" id="amin" placeholder="площадь от, м²" inputmode="decimal">
+    <input class="num" id="amax" placeholder="площадь до, м²" inputmode="decimal">
+    <input class="num" id="fmin" placeholder="этаж от" inputmode="numeric" style="width:80px">
+    <input class="num" id="fmax" placeholder="этаж до" inputmode="numeric" style="width:80px">
+    <input class="num" id="ymin" placeholder="год от" inputmode="numeric" title="год постройки от; квартиры с неизвестным годом остаются" style="width:80px">
+    <label id="nfirstl" class="mut"><input type="checkbox" id="nfirst"> не первый</label>
+    <label id="nlastl" class="mut"><input type="checkbox" id="nlast"> не последний</label>
+    <input class="num" id="pmin" placeholder="цена от, ₸" inputmode="numeric">
+    <input class="num" id="pmax" placeholder="цена до, ₸" inputmode="numeric">
+  </div>
+  <!-- что случилось с объявлением и что с ним уже делали -->
+  <div class="grp"><span class="gl">События</span>
+    <select id="hours"><option value="24">за сутки</option><option value="72" selected>за 3 дня</option><option value="168">за неделю</option><option value="720">за месяц</option></select>
+    <select id="signal"><option value="all">любой сигнал</option><option value="new">новые</option><option value="bump">подняли</option><option value="price">снизили цену</option><option value="back">вернули из архива</option><option value="expiring">истекает сегодня/завтра</option><option value="expired">истекло, не вернули</option><option value="relist">продлевают по кругу</option></select>
+    <select id="status"><option value="open">не обзвонены</option><option value="called">звонил</option><option value="callback">перезвонить</option><option value="work">в работе</option><option value="meeting">встреча</option><option value="deal">договор</option><option value="deposit">задаток</option><option value="closed">сделка</option><option value="refused">отказ</option><option value="all">все</option></select>
+    <label class="mut" title="только объявления с сердечком — без ограничения по периоду, сигналу и статусу"><input type="checkbox" id="favonly"> ♥ избранное</label>
+  </div>
+  <!-- сохранённые фильтры, порядок, вид -->
+  <div class="tools">
+    <span class="tg"><span class="gl">Мои фильтры</span><span class="presets"><select id="preset" title="сохранённые фильтры"><option value="">мои фильтры…</option></select><button id="psave" type="button" title="сохранить текущие фильтры под именем">сохранить</button><button id="pdel" type="button" style="display:none" title="удалить выбранный фильтр">удалить</button></span></span>
+    <span class="tg"><span class="gl">Порядок</span><select id="sort" title="порядок списка"><option value="new">сначала новые объявления</option><option value="sig">по последнему событию (подняли, снизили…)</option><option value="prio">кому звонить первым</option></select></span>
+    <button id="go" class="on">Найти</button>
+    <span class="tg tv"><span class="gl">Вид</span><span class="view"><button id="vlist" class="on">Списком</button><button id="vswipe">Свайпы</button><button id="vmap">На карте</button></span></span>
+  </div>
 </div>
 <div id="list"></div>
 <div id="pager" class="pager"></div>
@@ -1939,8 +1956,10 @@ var API = U ? "/api/krisha/leads?u=" + encodeURIComponent(U) : "/api/krisha/lead
 // Риэлтор (?u=…): номер скрыт до «Показать номер» — каждое нажатие в журнал.
 function phLinks(arr,sep){return (arr||[]).map(function(n){return "<a href='tel:+"+esc(n)+"'>"+esc(pretty(n))+"</a>";}).join(sep||"");}
 // Номера ещё нет (плагин его не получил) — ссылка на объявление: номер можно посмотреть в приложении Крыши.
-function phHtml(x,sep){if(x.ph_hidden)return "<button class='reveal' onclick='reveal("+x.id+",this)'>Показать номер</button>";if(!(x.phones||[]).length)return "<a class=mut target=_blank href='https://krisha.kz/a/show/"+x.id+"'>номер — на Крыше</a>";return phLinks(x.phones,sep);}
-function reveal(id,btn){btn.disabled=true;btn.textContent="…";fetch(API+"&reveal="+id).then(function(r){return r.json();}).then(function(j){if(!j.ok){btn.disabled=false;btn.textContent="Показать номер";alert(j.error||"не получилось");return;}var s=document.createElement("span");s.innerHTML=phLinks(j.phones," ");btn.replaceWith(s);}).catch(function(e){btn.disabled=false;btn.textContent="Показать номер";alert(e.message);});}
+// Номер скрыт до нажатия на трубку — каждое нажатие в журнал (лимит в сутки).
+var PHONE_ICO="<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z'/></svg>";
+function phHtml(x,sep){if(x.ph_hidden)return "<button class='reveal' title='показать номер' aria-label='показать номер' onclick='reveal("+x.id+",this)'>"+PHONE_ICO+"</button>";if(!(x.phones||[]).length)return "<a class=mut target=_blank href='https://krisha.kz/a/show/"+x.id+"'>номер — на Крыше</a>";return phLinks(x.phones,sep);}
+function reveal(id,btn){btn.disabled=true;btn.textContent="…";fetch(API+"&reveal="+id).then(function(r){return r.json();}).then(function(j){if(!j.ok){btn.disabled=false;btn.innerHTML=PHONE_ICO;alert(j.error||"не получилось");return;}var s=document.createElement("span");s.innerHTML=phLinks(j.phones," ");btn.replaceWith(s);}).catch(function(e){btn.disabled=false;btn.innerHTML=PHONE_ICO;alert(e.message);});}
 // Доступ риэлтора: в фильтрах только его города, сделки и типы.
 if(window.PORTAL){[["city",PORTAL.cities],["deal",PORTAL.deals],["prop",PORTAL.props]].forEach(function(z){var el=document.getElementById(z[0]);if(!el)return;Array.prototype.slice.call(el.options).forEach(function(o){if(z[1].indexOf(o.value)<0)o.remove();});});
   var hdr=document.querySelector("h1");if(hdr)hdr.insertAdjacentHTML("beforeend"," <span class=mut style='font-weight:400;font-size:13px'>· "+esc(PORTAL.name)+" · номеров в сутки: "+PORTAL.limit+"</span>");}
@@ -1989,7 +2008,9 @@ function openHist(id){
     var h=res[0]||{}, it=h.item||{}, ev=h.events||[], copies=Array.isArray(res[1])?res[1]:[];
     // Копия — только совпавшая по фото (или подтверждённая человеком); похожие по параметрам — отдельно.
     var cpOk=function(cp){return (cp.human_ok===true||cp.human_ok===1)||((cp.photo_match===true||cp.photo_match===1)&&!(cp.human_ok===false||cp.human_ok===0));};
+    var ownDups=copies.filter(function(cp){return cp.kind==="owner";});copies=copies.filter(function(cp){return cp.kind!=="owner";});
     var okCopies=copies.filter(cpOk), likeCopies=copies.filter(function(cp){return cp.photo_match==null&&cp.human_ok==null;}); // по фото ещё не сравнивали; «не та квартира» не показываем
+    var odRow=function(cp){return "<tr><td><a target=_blank href='https://krisha.kz/a/show/"+cp.agent_id+"'>"+cp.agent_id+"</a> <span class=mut>"+esc(cp.title||"")+(cp.owner_name?" · "+esc(cp.owner_name):"")+"</span></td><td>"+money(cp.price)+"</td><td>"+(cp.storage==="live"?"<span style='color:var(--ok)'>на сайте</span>":"<span class=mut>в архиве</span>")+"</td><td class=mut>"+dmT2(cp.first_seen)+"</td></tr>";};
     var cpRow=function(cp){return "<tr><td><a target=_blank href='https://krisha.kz/a/show/"+cp.agent_id+"'>"+cp.agent_id+"</a> <span class=mut>"+esc(cp.title||"")+(cp.owner_name?" · "+esc(cp.owner_name):"")+"</span></td><td>"+money(cp.price)+"</td><td>"+(cp.photo_match?"<span style='color:var(--ok)'>совпали "+Math.round((cp.photo_conf||0)*100)+"%</span>":"<span class=mut>нет</span>")+(cp.human_ok===true||cp.human_ok===1?" ✓":cp.human_ok===false||cp.human_ok===0?" ✗":"")+"</td><td class=mut>"+dmT2(cp.found_at)+"</td></tr>";};
     var first=ev.filter(function(e){return e.kind==="new"||e.kind==="price";})[0];
     var startPrice=first&&first.kind==="new"?Number(first.new_price):(ev.filter(function(e){return e.kind==="price";})[0]?Number(ev.filter(function(e){return e.kind==="price";})[0].old_price):Number(it.price));
@@ -2027,7 +2048,8 @@ function openHist(id){
       "<h3>Хронология</h3><table><tr><th>когда (Алматы)</th><th>событие</th></tr>"+
       rows.map(function(e){return "<tr><td>"+dmT2(e.at)+"</td><td>"+lab(e)+"</td></tr>";}).join("")+"</table>"+
       (okCopies.length?"<h3>Агентские копии <span class=mut style='font-weight:400;font-size:12px'>— та же квартира, подтверждено по фото</span></h3><table><tr><th>объявление</th><th>цена</th><th>фото</th><th>найдено</th></tr>"+okCopies.map(cpRow).join("")+"</table>":"")+
-      (likeCopies.length?"<h3>Похожие по параметрам <span class=mut style='font-weight:400;font-size:12px'>— по фото ещё не сравнивали: может быть та же квартира, а может просто похожая</span> <button id='pcheck' onclick='photoCheck("+id+",this)'>Найти копии</button></h3><table class=mut><tr><th>объявление</th><th>цена</th><th>фото</th><th>найдено</th></tr>"+likeCopies.map(cpRow).join("")+"</table>":"");
+      (likeCopies.length?"<h3>Похожие по параметрам <span class=mut style='font-weight:400;font-size:12px'>— по фото ещё не сравнивали: может быть та же квартира, а может просто похожая</span> <button id='pcheck' onclick='photoCheck("+id+",this)'>Найти копии</button></h3><table class=mut><tr><th>объявление</th><th>цена</th><th>фото</th><th>найдено</th></tr>"+likeCopies.map(cpRow).join("")+"</table>":"")+
+      (ownDups.length?"<h3>Другие объявления хозяев с теми же параметрами <span class=mut style='font-weight:400;font-size:12px'>— тот же ЖК или рядом, те же комнаты, этаж и площадь: возможно, хозяин перевыложил</span></h3><table class=mut><tr><th>объявление</th><th>цена</th><th>сейчас</th><th>появилось</th></tr>"+ownDups.map(odRow).join("")+"</table>":"");
     c.innerHTML=html;
   }).catch(function(e){c.innerHTML="<div class=empty>не удалось загрузить: "+esc(e.message)+"</div>";});
 }

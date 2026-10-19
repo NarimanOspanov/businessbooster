@@ -2210,6 +2210,36 @@ END
 -- укладывался в 15 секунд (3,4 млн событий, 12.10.2026).
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klev_id_kind' AND object_id = OBJECT_ID('dbo.krisha_list_events'))
   CREATE INDEX IX_klev_id_kind ON dbo.krisha_list_events (id, kind, at) INCLUDE (old_price, new_price) WITH (ONLINE = ON);
+-- Последние события объявления — прямо в строке krisha_list (ev_*): список лидов
+-- фильтрует и сортирует по ним, а не пересчитывает 4 млн событий на каждый запрос
+-- (было 20–40 с). Держит их в актуальном виде триггер на вставку события;
+-- старые строки заполнены разово (listEvDenormBackfill).
+IF COL_LENGTH('dbo.krisha_list', 'ev_bump_at') IS NULL
+  ALTER TABLE dbo.krisha_list ADD ev_bump_at DATETIME2(0) NULL, ev_price_at DATETIME2(0) NULL, ev_old_price BIGINT NULL, ev_new_price BIGINT NULL,
+    ev_back_at DATETIME2(0) NULL, ev_arch_at DATETIME2(0) NULL, backs_all INT NULL;
+-- Индекс под список лидов: город/сделка/тип/хозяин и всё, по чему фильтруем и
+-- сортируем, — без чтения всей таблицы (было 180 тыс. страниц на запрос).
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_leads3' AND object_id = OBJECT_ID('dbo.krisha_list'))
+  EXEC(N'CREATE INDEX IX_klist_leads3 ON dbo.krisha_list (city, deal, prop, user_type) INCLUDE (storage, first_seen, bumped_on, price, rooms, area, floor, floors, district, build_year, year_src, ev_bump_at, ev_price_at, ev_old_price, ev_new_price, ev_back_at, ev_arch_at, backs_all) WITH (ONLINE = ON)');
+IF OBJECT_ID('dbo.trg_klev_denorm', 'TR') IS NULL EXEC(N'
+CREATE TRIGGER dbo.trg_klev_denorm ON dbo.krisha_list_events AFTER INSERT AS
+BEGIN
+  SET NOCOUNT ON;
+  UPDATE l SET
+    ev_bump_at  = CASE WHEN a.bump_at IS NOT NULL AND (l.ev_bump_at IS NULL OR a.bump_at > l.ev_bump_at) THEN a.bump_at ELSE l.ev_bump_at END,
+    ev_back_at  = CASE WHEN a.back_at IS NOT NULL AND (l.ev_back_at IS NULL OR a.back_at > l.ev_back_at) THEN a.back_at ELSE l.ev_back_at END,
+    ev_arch_at  = CASE WHEN a.arch_at IS NOT NULL AND (l.ev_arch_at IS NULL OR a.arch_at > l.ev_arch_at) THEN a.arch_at ELSE l.ev_arch_at END,
+    backs_all   = ISNULL(l.backs_all, 0) + a.backs,
+    ev_old_price = CASE WHEN p.at IS NOT NULL AND (l.ev_price_at IS NULL OR p.at >= l.ev_price_at) THEN p.old_price ELSE l.ev_old_price END,
+    ev_new_price = CASE WHEN p.at IS NOT NULL AND (l.ev_price_at IS NULL OR p.at >= l.ev_price_at) THEN p.new_price ELSE l.ev_new_price END,
+    ev_price_at = CASE WHEN p.at IS NOT NULL AND (l.ev_price_at IS NULL OR p.at >= l.ev_price_at) THEN p.at ELSE l.ev_price_at END
+  FROM dbo.krisha_list l
+  JOIN (SELECT id,
+          MAX(CASE WHEN kind = ''bump'' THEN at END) AS bump_at, MAX(CASE WHEN kind = ''back'' THEN at END) AS back_at,
+          MAX(CASE WHEN kind = ''archived'' THEN at END) AS arch_at, SUM(CASE WHEN kind = ''back'' THEN 1 ELSE 0 END) AS backs
+        FROM inserted GROUP BY id) a ON a.id = l.id
+  OUTER APPLY (SELECT TOP (1) i.at, i.old_price, i.new_price FROM inserted i WHERE i.id = l.id AND i.kind = ''price'' ORDER BY i.at DESC, i.ev_id DESC) p;
+END');
 -- Риэлторы с ограниченным доступом к лидам: своя ссылка (token), города,
 -- сделки и типы объектов, дневной лимит открытых номеров.
 IF OBJECT_ID('dbo.portal_users', 'U') IS NULL
@@ -2540,6 +2570,25 @@ IF OBJECT_ID('dbo.krisha_lead_hides', 'U') IS NULL
 
 // «Продлевает по кругу» — сколько возвратов из архива считать признаком.
 const LEAD_RELIST_MIN = 2;
+// Разово: заполнить ev_* у строк, где их ещё нет, порциями по id (возвращает,
+// сколько строк прошли; 0 — всё). Дальше колонки ведёт триггер trg_klev_denorm.
+async function listEvDenormBackfill(afterId, batch) {
+  const pool = await getPool();
+  await ensureList(pool);
+  const r = pool.request({ requestTimeout: 300000 }).input("after", sql.BigInt, Number(afterId) || 0).input("n", sql.Int, Number(batch) || 20000);
+  const res = await r.query(`
+    DECLARE @ids TABLE (id BIGINT PRIMARY KEY);
+    INSERT INTO @ids SELECT TOP (@n) id FROM dbo.krisha_list WHERE id > @after ORDER BY id;
+    UPDATE l SET ev_bump_at = a.bump_at, ev_back_at = a.back_at, ev_arch_at = a.arch_at, backs_all = a.backs,
+      ev_price_at = p.at, ev_old_price = p.old_price, ev_new_price = p.new_price
+    FROM dbo.krisha_list l JOIN @ids k ON k.id = l.id
+    OUTER APPLY (SELECT MAX(CASE WHEN kind = 'bump' THEN at END) AS bump_at, MAX(CASE WHEN kind = 'back' THEN at END) AS back_at,
+        MAX(CASE WHEN kind = 'archived' THEN at END) AS arch_at, SUM(CASE WHEN kind = 'back' THEN 1 ELSE 0 END) AS backs
+      FROM dbo.krisha_list_events e WHERE e.id = l.id) a
+    OUTER APPLY (SELECT TOP (1) at, old_price, new_price FROM dbo.krisha_list_events e WHERE e.id = l.id AND e.kind = 'price' ORDER BY at DESC, ev_id DESC) p;
+    SELECT COUNT(*) AS n, MAX(id) AS last FROM @ids;`);
+  return res.recordset[0];
+}
 async function leadsList(f) {
   const pool = await getPool();
   await ensureList(pool);
@@ -2604,9 +2653,9 @@ async function leadsList(f) {
   dl.forEach((d, i) => r.input("dd" + i, sql.NVarChar(40), d));
   // Первый запрос после паузы читает события с диска (~14 с), следующие — 2 с; общий лимит 15 с мал.
   return (await r.query(`
-    SELECT COUNT(*) OVER () AS total, l.id, l.deal, l.prop, l.city, l.district, l.price, l.build_year, l.year_src, l.rooms, l.area, l.floor, l.floors, l.title, l.addr, l.owner_name,
-      l.lat, l.lon, l.photos_c, l.photos_json, l.first_seen, l.bumped_on, l.phones, l.phones_at,
-      ev.last_bump, ev.bumps, pr.last_price_at, pr.old_price, pr.new_price, bk.last_back,
+    WITH page AS (SELECT COUNT(*) OVER () AS total, l.id, l.deal, l.prop, l.city, l.district, l.price, l.build_year, l.year_src, l.rooms, l.area, l.floor, l.floors,
+      l.first_seen, l.bumped_on,
+      ev.last_bump, pr.last_price_at, pr.old_price, pr.new_price, bk.last_back,
       l.storage, x.exp_in, CASE WHEN x.expired = 1 THEN ar.last_archived END AS expired_at, ba.backs_all, ba.last_back_all,
       ag.agents, pp.prio, CASE WHEN fv.id IS NULL THEN 0 ELSE 1 END AS fav,
       s.status, s.note, s.updated_at AS status_at,
@@ -2615,18 +2664,20 @@ async function leadsList(f) {
         (CASE WHEN x.expired = 1 THEN ar.last_archived END),
         (CASE WHEN ba.backs_all >= @relist THEN ba.last_back_all END)) AS t(v)) AS sig
     FROM dbo.krisha_list l
-    OUTER APPLY (SELECT MAX(at) AS last_bump, COUNT(*) AS bumps FROM dbo.krisha_list_events e WHERE e.id = l.id AND e.kind = 'bump' AND e.at >= @since) ev
-    OUTER APPLY (SELECT TOP (1) at AS last_price_at, old_price, new_price FROM dbo.krisha_list_events e WHERE e.id = l.id AND e.kind = 'price' AND e.at >= @since ORDER BY at DESC) pr
-    OUTER APPLY (SELECT MAX(at) AS last_back FROM dbo.krisha_list_events e WHERE e.id = l.id AND e.kind = 'back' AND e.at >= @since) bk
+    -- События — из колонок строки (ev_*, их ведёт триггер); «за период» — если последнее не раньше @since.
+    CROSS APPLY (SELECT CASE WHEN l.ev_bump_at >= @since THEN l.ev_bump_at END AS last_bump) ev
+    CROSS APPLY (SELECT CASE WHEN l.ev_price_at >= @since THEN l.ev_price_at END AS last_price_at,
+      CASE WHEN l.ev_price_at >= @since THEN l.ev_old_price END AS old_price, CASE WHEN l.ev_price_at >= @since THEN l.ev_new_price END AS new_price) pr
+    CROSS APPLY (SELECT CASE WHEN l.ev_back_at >= @since THEN l.ev_back_at END AS last_back) bk
     -- Срок: бесплатное объявление, которое не поднимали и не продлевали, уходит
     -- в архив через 7 дней после даты на карточке (bumped_on, по Алматы). Так
     -- видно по нашей истории: у живых дата не старше 7 дней, а в архив больше
     -- всего уходят ровно на седьмой день. exp_in — сколько дней осталось
     -- (0 — истекает сегодня). expired — ушло в архив по сроку (7–8 дней от
     -- даты), а не снято хозяином раньше, и с тех пор не вернулось.
-    OUTER APPLY (SELECT MAX(at) AS last_archived FROM dbo.krisha_list_events e WHERE e.id = l.id AND e.kind = 'archived' AND e.at >= @since) ar
+    CROSS APPLY (SELECT CASE WHEN l.ev_arch_at >= @since THEN l.ev_arch_at END AS last_archived) ar
     -- По кругу: сколько раз объявление возвращалось из архива за всю историю.
-    OUTER APPLY (SELECT COUNT(*) AS backs_all, MAX(at) AS last_back_all FROM dbo.krisha_list_events e WHERE e.id = l.id AND e.kind = 'back') ba
+    CROSS APPLY (SELECT ISNULL(l.backs_all, 0) AS backs_all, l.ev_back_at AS last_back_all) ba
     CROSS APPLY (SELECT
       CASE WHEN l.storage = 'live' AND l.bumped_on IS NOT NULL
         THEN 7 - DATEDIFF(day, l.bumped_on, CAST(DATEADD(hour, 5, SYSUTCDATETIME()) AS date)) END AS exp_in,
@@ -2661,14 +2712,21 @@ async function leadsList(f) {
       AND (@favonly = 0 OR fv.id IS NOT NULL)
       AND (@ymin IS NULL OR l.build_year IS NULL OR l.build_year >= @ymin)
       AND (@favonly = 1 OR NOT EXISTS (SELECT 1 FROM dbo.krisha_lead_hides h WHERE h.user_id = @fu AND h.scope = @hs AND h.id = l.id))
-      AND (@favonly = 1 OR l.first_seen >= @since OR EXISTS (SELECT 1 FROM dbo.krisha_list_events e WHERE e.id = l.id AND e.at >= @since AND e.kind IN ('bump','price','back'))
+      AND (@favonly = 1 OR l.first_seen >= @since OR l.ev_bump_at >= @since OR l.ev_price_at >= @since OR l.ev_back_at >= @since
         OR x.exp_in BETWEEN 0 AND 1 OR x.expired = 1 OR (l.storage = 'live' AND ba.backs_all >= @relist))
       ${f.favonly === "1" ? "" : signalSql}
       AND (@pn IS NULL OR l.id % @pn = @pk)
       ${f.favonly === "1" ? "" : statusSql}
     -- sig — по последнему событию (поднятие, снижение, возврат, новое); new — по дате появления объявления; prio — кому звонить первым.
     ORDER BY CASE WHEN @sort = 'prio' THEN pp.prio END DESC, CASE WHEN @sort = 'new' THEN l.first_seen END DESC, sig DESC, l.id DESC
-    OFFSET @off ROWS FETCH NEXT @n ROWS ONLY
+    OFFSET @off ROWS FETCH NEXT @n ROWS ONLY)
+    -- Сколько раз подняли за период — только для строк этой страницы.
+    -- Широкие колонки (фото, адрес, номер) — только для строк страницы: сортировать
+    -- 16 тыс. строк вместе со ссылками на фото было основной тратой (20 с).
+    SELECT page.*, w.title, w.addr, w.owner_name, w.lat, w.lon, w.photos_c, w.photos_json, w.phones, w.phones_at, eb.bumps FROM page
+    JOIN dbo.krisha_list w ON w.id = page.id
+    OUTER APPLY (SELECT COUNT(*) AS bumps FROM dbo.krisha_list_events e WHERE e.id = page.id AND e.kind = 'bump' AND e.at >= @since) eb
+    ORDER BY CASE WHEN @sort = 'prio' THEN page.prio END DESC, CASE WHEN @sort = 'new' THEN page.first_seen END DESC, page.sig DESC, page.id DESC
     OPTION (RECOMPILE)`)).recordset.map((x) => {
     const o = Object.assign({}, x, { photos: listPhotoUrls(x.photos_c, x.photos_json).slice(0, 30), phones: rawList(x.phones) });
     delete o.photos_c; delete o.photos_json;
@@ -2712,7 +2770,17 @@ async function leadCopies(ownerId) {
     LEFT JOIN dbo.krisha_list a ON a.id = m.agent_id
     WHERE m.owner_id = @id
     ORDER BY m.photo_match DESC, m.photo_conf DESC, m.found_at DESC`);
-  return r.recordset;
+  // Хозяйские объявления с теми же комнатами, этажом/этажностью и площадью (±1,5 м²)
+  // в том же ЖК или рядом (~300 м) — хозяин мог снять и выложить заново (kind 'owner').
+  const own = await pool.request({ requestTimeout: 60000 }).input("id", sql.BigInt, Number(ownerId)).query(`
+    SELECT TOP (10) 'owner' AS kind, o.id AS agent_id, o.first_seen AS found_at, o.price, o.title, o.user_type, o.owner_name, o.first_seen, o.storage
+    FROM dbo.krisha_list b
+    JOIN dbo.krisha_list o ON o.city = b.city AND o.deal = b.deal AND o.prop = b.prop AND o.user_type = 'owner' AND o.id <> b.id
+      AND o.rooms = b.rooms AND o.floor = b.floor AND o.floors = b.floors AND ABS(o.area - b.area) <= 1.5
+      AND ((b.complex_id IS NOT NULL AND o.complex_id = b.complex_id) OR (ABS(o.lat - b.lat) < 0.003 AND ABS(o.lon - b.lon) < 0.004))
+    WHERE b.id = @id
+    ORDER BY o.first_seen DESC`);
+  return r.recordset.concat(own.recordset);
 }
 
 // Этапы лида: звонил / перезвонить / отказ, дальше встреча → договор (deal) →
@@ -5393,7 +5461,7 @@ async function objectStats() {
 module.exports = { portalUserByToken, portalUsers, portalUserSave, portalNewToken, portalLog, portalReveals, portalAudit, consultAdd, consultGet, consultSet, phoneSharedCount, stickyFirstPhone, listPhoneRetryLater, instaPostForReel, instaPostReel, instaCommentAnswered, instaPostItemsSet, instaPostItems, instaCommentEventNeedFollow, instaCommentEventsToRemind, instaCommentEventReminded, instaSimilarPosts, instaHookLogAdd, instaCommentEventGet, instaCommentEventIgsid, instaCommentEventAsked, instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, listLastNew, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
-  saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadSetFav, leadSetHide, leadPresets, leadPresetSave, leadPresetDel, listYearSources, listYearTodo, listYearSave, leadCopies, leadUncheckedCopies, leadSetCopyPhoto, dropKnownSticky, cleanStickyPhones,
+  saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadSetFav, leadSetHide, listEvDenormBackfill, leadPresets, leadPresetSave, leadPresetDel, listYearSources, listYearTodo, listYearSave, leadCopies, leadUncheckedCopies, leadSetCopyPhoto, dropKnownSticky, cleanStickyPhones,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
   listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, instaCandidates, instaListing, instaPostReserve, instaPostFinish, instaPostByCode, instaPhotoScoresGet, instaPhotoScoreSave, instaPlacesGet, instaPlaceSave, configGet, configSet, instaNextCode, listTextSave, listTextStats, mortgageFlagSave, mortgageFlagStats, instaAccounts, instaAccountSet, instaPostAdd, instaPosts, instaPostedSince, instaPostByMedia, instaRecentMedia, instaRecentListings, instaDmAdd, instaDmMedia, instaDmStats, instaDmPrune, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
