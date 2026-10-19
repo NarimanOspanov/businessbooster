@@ -2601,7 +2601,9 @@ async function leadsList(f) {
   const pool = await getPool();
   await ensureList(pool);
   await ensureLeads(pool);
-  const hours = Math.max(1, Math.min(24 * 30, Number(f.hours) || 72));
+  // hours = 0 — сигналы за всё время: окно не ограничивает список, события показываем за месяц.
+  const noWin = String(f.hours) === "0";
+  const hours = noWin ? 24 * 30 : Math.max(1, Math.min(24 * 30, Number(f.hours) || 72));
   const since = new Date(Date.now() - hours * 3600e3);
   const nul = (v) => (v == null || v === "" || v === "any" ? null : v);
   const r = pool.request({ requestTimeout: 60000 })
@@ -2625,6 +2627,9 @@ async function leadsList(f) {
     .input("hs", sql.NVarChar(60), String(f.scope || "").slice(0, 60))
     // Год от: неизвестный год не отсекаем (его просто нет в данных).
     .input("ymin", sql.Int, Number(f.ymin) >= 1900 && Number(f.ymin) <= 2035 ? Number(f.ymin) : null)
+    // Опубликовано за N дней (по дате появления объявления у нас), независимо от сигналов.
+    .input("pub", sql.DateTime2, Number(f.pub) >= 1 && Number(f.pub) <= 365 ? new Date(Date.now() - Number(f.pub) * 864e5) : null)
+    .input("nowin", sql.Bit, noWin ? 1 : 0)
     // Доля потока: риэлтору видны только объявления с id % N = K (делим район между двумя-тремя).
     .input("pn", sql.Int, Number(f.part_n) >= 2 ? Number(f.part_n) : null)
     .input("pk", sql.Int, Number(f.part_n) >= 2 ? Math.max(0, Number(f.part_k) || 0) % Number(f.part_n) : 0)
@@ -2720,7 +2725,8 @@ async function leadsList(f) {
       AND (@favonly = 0 OR fv.id IS NOT NULL)
       AND (@ymin IS NULL OR l.build_year IS NULL OR l.build_year >= @ymin)
       AND (@favonly = 1 OR NOT EXISTS (SELECT 1 FROM dbo.krisha_lead_hides h WHERE h.user_id = @fu AND h.scope = @hs AND h.id = l.id))
-      AND (@favonly = 1 OR l.first_seen >= @since OR l.ev_bump_at >= @since OR l.ev_price_at >= @since OR l.ev_back_at >= @since
+      AND (@pub IS NULL OR l.first_seen >= @pub)
+      AND (@favonly = 1 OR @nowin = 1 OR l.first_seen >= @since OR l.ev_bump_at >= @since OR l.ev_price_at >= @since OR l.ev_back_at >= @since
         OR x.exp_in BETWEEN 0 AND 1 OR x.expired = 1 OR (l.storage = 'live' AND ba.backs_all >= @relist))
       ${f.favonly === "1" ? "" : signalSql}
       AND (@pn IS NULL OR l.id % @pn = @pk)

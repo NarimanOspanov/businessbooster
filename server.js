@@ -1918,6 +1918,7 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   <div class="grp"><span class="gl">Поиск</span>
     <select id="city"><option value="almaty">Алматы</option><option value="astana">Астана</option><option value="shymkent">Шымкент</option><option value="any">все города</option></select>
     <input type="hidden" id="district" value="any"><details id="distdd" class="dd"><summary>район: любой</summary><div></div></details>
+    <select id="pub" title="когда объявление появилось на Крыше (по нашим данным — с 18.09.2026)"><option value="any">опубликовано: когда угодно</option><option value="1">опубликовано за сутки</option><option value="3">за 3 дня</option><option value="7">за неделю</option><option value="30">за месяц</option></select>
     <select id="deal"><option value="sale">продажа</option><option value="rent">аренда</option><option value="any">любая</option></select>
     <select id="prop"><option value="flat">квартиры</option><option value="house">дома</option><option value="commercial">коммерция</option><option value="land">участки</option><option value="any">всё</option></select>
     <select id="rooms"><option value="any">комнат: любые</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4+</option></select>
@@ -1933,7 +1934,7 @@ const KRISHA_LEADS_HTML = `<!doctype html>
     <input class="num" id="pmax" placeholder="цена до, ₸" inputmode="numeric">
   </div>
   <div class="grp"><span class="gl">Сигналы</span>
-    <select id="hours"><option value="24">за сутки</option><option value="72" selected>за 3 дня</option><option value="168">за неделю</option><option value="720">за месяц</option></select>
+    <select id="hours" title="за какой период смотреть сигналы"><option value="0">за всё время</option><option value="24">за сутки</option><option value="72" selected>за 3 дня</option><option value="168">за неделю</option><option value="720">за месяц</option></select>
     <select id="signal"><option value="all">любой сигнал</option><option value="new">новые</option><option value="bump">подняли</option><option value="price">снизили цену</option><option value="back">вернули из архива</option><option value="expiring">истекает сегодня/завтра</option><option value="expired">истекло, не вернули</option><option value="relist">продлевают по кругу</option></select>
   </div>
   <div class="grp"><span class="gl">Статусы</span>
@@ -2065,7 +2066,7 @@ function dmT(v){if(!v)return "";var d=new Date(new Date(v).getTime()+5*3600e3);i
 function ago(v){if(!v)return "";var m=Math.round((Date.now()-new Date(v).getTime())/60000);if(m<60)return m+" мин назад";var h=Math.round(m/60);if(h<48)return h+" ч назад";return Math.round(h/24)+" дн назад";}
 function pretty(n){n=String(n);return n.length===11?"+"+n[0]+" "+n.slice(1,4)+" "+n.slice(4,7)+" "+n.slice(7,9)+" "+n.slice(9):n;}
 function days(v){return Math.max(0,Math.round((Date.now()-new Date(v).getTime())/864e5));}
-var F=["city","district","deal","prop","rooms","use","amin","amax","fmin","fmax","ymin","pmin","pmax","hours","signal","status","sort"];
+var F=["city","district","pub","deal","prop","rooms","use","amin","amax","fmin","fmax","ymin","pmin","pmax","hours","signal","status","sort"];
 // Районы выбранного города (window.DISTRICTS — с сервера; у риэлтора только разрешённые).
 var DN={};(window.DISTRICTS||[]).forEach(function(d){DN[d.slug]=d.name;});
 // Районы: несколько галочками; в скрытом поле district — через запятую (any — все).
@@ -4946,7 +4947,7 @@ async function portalLeads(req, res, parsed) {
   }
   if (q.get("data")) {
     const f = {};
-    for (const k of ["city", "deal", "prop", "rooms", "pmin", "pmax", "amin", "amax", "fmin", "fmax", "nfirst", "nlast", "use", "hours", "signal", "status", "sort", "favonly", "scope", "ymin", "limit", "offset"]) f[k] = q.get(k);
+    for (const k of ["city", "deal", "prop", "rooms", "pmin", "pmax", "amin", "amax", "fmin", "fmax", "nfirst", "nlast", "use", "hours", "signal", "status", "sort", "favonly", "scope", "ymin", "pub", "limit", "offset"]) f[k] = q.get(k);
     // Только своё: город, сделка и тип — из доступа (чужое или «любые» → первое разрешённое).
     if (!u.cities.includes(String(f.city))) f.city = u.cities[0];
     if (!u.deals.includes(String(f.deal))) f.deal = u.deals[0];
@@ -10628,7 +10629,7 @@ http
       }
       if (q.get("data")) {
         const f = {};
-        for (const k of ["city", "deal", "prop", "rooms", "pmin", "pmax", "amin", "amax", "fmin", "fmax", "nfirst", "nlast", "use", "hours", "signal", "status", "sort", "favonly", "scope", "ymin", "limit", "offset"]) f[k] = q.get(k);
+        for (const k of ["city", "deal", "prop", "rooms", "pmin", "pmax", "amin", "amax", "fmin", "fmax", "nfirst", "nlast", "use", "hours", "signal", "status", "sort", "favonly", "scope", "ymin", "pub", "limit", "offset"]) f[k] = q.get(k);
         const dl = String(q.get("district") || "").split(",").filter((d) => /^[a-z0-9-]{3,40}$/.test(d));
         if (dl.length) f.districts = dl;
         db.leadsList(f).then((rows) => sendJ(200, rows))
