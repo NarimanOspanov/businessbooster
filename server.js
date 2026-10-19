@@ -1935,7 +1935,8 @@ var U = new URLSearchParams(location.search).get("u") || "";
 var API = U ? "/api/krisha/leads?u=" + encodeURIComponent(U) : "/api/krisha/leads?key=" + encodeURIComponent(KEY);
 // Риэлтор (?u=…): номер скрыт до «Показать номер» — каждое нажатие в журнал.
 function phLinks(arr,sep){return (arr||[]).map(function(n){return "<a href='tel:+"+esc(n)+"'>"+esc(pretty(n))+"</a>";}).join(sep||"");}
-function phHtml(x,sep){if(x.ph_hidden)return "<button class='reveal' onclick='reveal("+x.id+",this)'>Показать номер</button>";return phLinks(x.phones,sep);}
+// Номера ещё нет (плагин его не получил) — ссылка на объявление: номер можно посмотреть в приложении Крыши.
+function phHtml(x,sep){if(x.ph_hidden)return "<button class='reveal' onclick='reveal("+x.id+",this)'>Показать номер</button>";if(!(x.phones||[]).length)return "<a class=mut target=_blank href='https://krisha.kz/a/show/"+x.id+"'>номер — на Крыше</a>";return phLinks(x.phones,sep);}
 function reveal(id,btn){btn.disabled=true;btn.textContent="…";fetch(API+"&reveal="+id).then(function(r){return r.json();}).then(function(j){if(!j.ok){btn.disabled=false;btn.textContent="Показать номер";alert(j.error||"не получилось");return;}var s=document.createElement("span");s.innerHTML=phLinks(j.phones," ");btn.replaceWith(s);}).catch(function(e){btn.disabled=false;btn.textContent="Показать номер";alert(e.message);});}
 // Доступ риэлтора: в фильтрах только его города, сделки и типы.
 if(window.PORTAL){[["city",PORTAL.cities],["deal",PORTAL.deals],["prop",PORTAL.props]].forEach(function(z){var el=document.getElementById(z[0]);if(!el)return;Array.prototype.slice.call(el.options).forEach(function(o){if(z[1].indexOf(o.value)<0)o.remove();});});

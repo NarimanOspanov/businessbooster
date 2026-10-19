@@ -2649,7 +2649,8 @@ async function leadsList(f) {
       + (CASE WHEN ag.agents = 0 THEN 10 ELSE -15 END) AS prio) pp
     LEFT JOIN dbo.krisha_leads s ON s.id = l.id
     LEFT JOIN dbo.krisha_lead_favs fv ON fv.user_id = @fu AND fv.id = l.id
-    WHERE l.user_type = 'owner' AND (l.storage = 'live' OR x.expired = 1) AND l.phones IS NOT NULL
+    -- Номер не обязателен: плагин собирает номера отдельно, без него — ссылка на Крышу.
+    WHERE l.user_type = 'owner' AND (l.storage = 'live' OR x.expired = 1)
       AND (@city IS NULL OR l.city = @city) AND (@deal IS NULL OR l.deal = @deal) AND (@prop IS NULL OR l.prop = @prop)
       ${roomsSql} AND (@pmin IS NULL OR l.price >= @pmin) AND (@pmax IS NULL OR l.price <= @pmax)
       AND (@amin IS NULL OR l.area >= @amin) AND (@amax IS NULL OR l.area <= @amax)
