@@ -1785,11 +1785,10 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 14px}
   /* группы фильтров: подпись слева, поля в ряд; на телефоне подпись над полями */
   .bar .grp{display:flex;flex-wrap:wrap;gap:8px;align-items:center;width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.02)}
-  .bar .gl{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;min-width:64px}
+  .bar .gl{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;min-width:96px}
   .bar .tools{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;width:100%;padding:2px 2px 0}
   .bar .tg{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-  .bar .tv{margin-left:auto}
-  @media(max-width:640px){.bar .grp>.gl{width:100%}.bar .tv{margin-left:0}}
+  @media(max-width:640px){.bar .grp>.gl{width:100%}}
   select,input{border:1px solid var(--line);background:#12161c;color:var(--fg);border-radius:8px;padding:7px 10px;font:inherit}
   input.num{width:110px}
   /* лайк и «не интересно» — справа на карточке, рядом */
@@ -1911,8 +1910,7 @@ const KRISHA_LEADS_HTML = `<!doctype html>
 </style></head><body>
 <h1>Крыша · лиды хозяев <span id="cnt" class="mut"></span></h1>
 <div class="bar">
-  <!-- что ищем -->
-  <div class="grp"><span class="gl">Объект</span>
+  <div class="grp"><span class="gl">Поиск</span>
     <select id="city"><option value="almaty">Алматы</option><option value="astana">Астана</option><option value="shymkent">Шымкент</option><option value="any">все города</option></select>
     <input type="hidden" id="district" value="any"><details id="distdd" class="dd"><summary>район: любой</summary><div></div></details>
     <select id="deal"><option value="sale">продажа</option><option value="rent">аренда</option><option value="any">любая</option></select>
@@ -1929,19 +1927,23 @@ const KRISHA_LEADS_HTML = `<!doctype html>
     <input class="num" id="pmin" placeholder="цена от, ₸" inputmode="numeric">
     <input class="num" id="pmax" placeholder="цена до, ₸" inputmode="numeric">
   </div>
-  <!-- что случилось с объявлением и что с ним уже делали -->
-  <div class="grp"><span class="gl">События</span>
+  <div class="grp"><span class="gl">Сигналы</span>
     <select id="hours"><option value="24">за сутки</option><option value="72" selected>за 3 дня</option><option value="168">за неделю</option><option value="720">за месяц</option></select>
     <select id="signal"><option value="all">любой сигнал</option><option value="new">новые</option><option value="bump">подняли</option><option value="price">снизили цену</option><option value="back">вернули из архива</option><option value="expiring">истекает сегодня/завтра</option><option value="expired">истекло, не вернули</option><option value="relist">продлевают по кругу</option></select>
+  </div>
+  <div class="grp"><span class="gl">Статусы</span>
     <select id="status"><option value="open">не обзвонены</option><option value="called">звонил</option><option value="callback">перезвонить</option><option value="work">в работе</option><option value="meeting">встреча</option><option value="deal">договор</option><option value="deposit">задаток</option><option value="closed">сделка</option><option value="refused">отказ</option><option value="all">все</option></select>
     <label class="mut" title="только объявления с сердечком — без ограничения по периоду, сигналу и статусу"><input type="checkbox" id="favonly"> ♥ избранное</label>
   </div>
-  <!-- сохранённые фильтры, порядок, вид -->
-  <div class="tools">
-    <span class="tg"><span class="gl">Мои фильтры</span><span class="presets"><select id="preset" title="сохранённые фильтры"><option value="">мои фильтры…</option></select><button id="psave" type="button" title="сохранить текущие фильтры под именем">сохранить</button><button id="pdel" type="button" style="display:none" title="удалить выбранный фильтр">удалить</button></span></span>
-    <span class="tg"><span class="gl">Порядок</span><select id="sort" title="порядок списка"><option value="new">сначала новые объявления</option><option value="sig">по последнему событию (подняли, снизили…)</option><option value="prio">кому звонить первым</option></select></span>
+  <div class="grp"><span class="gl">Мои фильтры</span>
+    <span class="presets"><select id="preset" title="сохранённые фильтры"><option value="">мои фильтры…</option></select><button id="psave" type="button" title="сохранить текущие фильтры под именем">сохранить</button><button id="pdel" type="button" style="display:none" title="удалить выбранный фильтр">удалить</button></span>
+  </div>
+  <div class="grp"><span class="gl">Сортировка</span>
+    <select id="sort" title="порядок списка"><option value="new">сначала новые объявления</option><option value="sig">по последнему событию (подняли, снизили…)</option><option value="prio">кому звонить первым</option></select>
     <button id="go" class="on">Найти</button>
-    <span class="tg tv"><span class="gl">Вид</span><span class="view"><button id="vlist" class="on">Списком</button><button id="vswipe">Свайпы</button><button id="vmap">На карте</button></span></span>
+  </div>
+  <div class="grp"><span class="gl">Вид</span>
+    <span class="view"><button id="vlist" class="on">Списком</button><button id="vswipe">Свайпы</button><button id="vmap">На карте</button></span>
   </div>
 </div>
 <div id="list"></div>
