@@ -1934,7 +1934,7 @@ const KRISHA_LEADS_HTML = `<!doctype html>
     <input class="num" id="pmax" placeholder="цена до, ₸" inputmode="numeric">
   </div>
   <div class="grp"><span class="gl">Сигналы</span>
-    <select id="hours" title="за какой период смотреть сигналы"><option value="0">за всё время</option><option value="24">за сутки</option><option value="72" selected>за 3 дня</option><option value="168">за неделю</option><option value="720">за месяц</option></select>
+    <input type="hidden" id="hours" value="0"><!-- сигналы всегда за всё время -->
     <select id="signal"><option value="all">любой сигнал</option><option value="new">новые</option><option value="bump">подняли</option><option value="price">снизили цену</option><option value="back">вернули из архива</option><option value="expiring">истекает сегодня/завтра</option><option value="expired">истекло, не вернули</option><option value="relist">продлевают по кругу</option></select>
   </div>
   <div class="grp"><span class="gl">Статусы</span>
@@ -2066,7 +2066,7 @@ function dmT(v){if(!v)return "";var d=new Date(new Date(v).getTime()+5*3600e3);i
 function ago(v){if(!v)return "";var m=Math.round((Date.now()-new Date(v).getTime())/60000);if(m<60)return m+" мин назад";var h=Math.round(m/60);if(h<48)return h+" ч назад";return Math.round(h/24)+" дн назад";}
 function pretty(n){n=String(n);return n.length===11?"+"+n[0]+" "+n.slice(1,4)+" "+n.slice(4,7)+" "+n.slice(7,9)+" "+n.slice(9):n;}
 function days(v){return Math.max(0,Math.round((Date.now()-new Date(v).getTime())/864e5));}
-var F=["city","district","pub","deal","prop","rooms","use","amin","amax","fmin","fmax","ymin","pmin","pmax","hours","signal","status","sort"];
+var F=["city","district","pub","deal","prop","rooms","use","amin","amax","fmin","fmax","ymin","pmin","pmax","signal","status","sort"];
 // Районы выбранного города (window.DISTRICTS — с сервера; у риэлтора только разрешённые).
 var DN={};(window.DISTRICTS||[]).forEach(function(d){DN[d.slug]=d.name;});
 // Районы: несколько галочками; в скрытом поле district — через запятую (any — все).
@@ -2090,7 +2090,7 @@ function fillDistricts(){var c=document.getElementById("city").value,cur=distVal
   document.addEventListener("click",function(e){if(dd.open&&!dd.contains(e.target))dd.removeAttribute("open");});})();
 // Цена — число в тенге; пробелы и знак ₸ не мешают (700 000 = 700000).
 function priceVal(v){var t="";String(v).split("").forEach(function(c){if(c>="0"&&c<="9")t+=c;});var n=Number(t);return t&&n>0?n:null;}
-function qs(){var p=["scope="+encodeURIComponent(scopeName())];["nfirst","nlast","favonly"].forEach(function(k){var el=document.getElementById(k);if(el&&el.checked&&el.offsetParent!==null)p.push(k+"=1");});F.forEach(function(k){var v=document.getElementById(k).value;if(v!==""&&v!=="any"){if(k==="pmin"||k==="pmax"){v=priceVal(v);if(v==null)return;}p.push(k+"="+encodeURIComponent(v));}});return p.join("&");}
+function qs(){var p=["scope="+encodeURIComponent(scopeName()),"hours=0"];["nfirst","nlast","favonly"].forEach(function(k){var el=document.getElementById(k);if(el&&el.checked&&el.offsetParent!==null)p.push(k+"=1");});F.forEach(function(k){var v=document.getElementById(k).value;if(v!==""&&v!=="any"){if(k==="pmin"||k==="pmax"){v=priceVal(v);if(v==null)return;}p.push(k+"="+encodeURIComponent(v));}});return p.join("&");}
 // Постранично по 200: просим на одну строку больше — по ней видно, есть ли
 // следующая страница, без отдельного подсчёта.
 var PAGE=200, OFF=0, MORE=false, LOADSEQ=0, TOTAL=null;
