@@ -5438,6 +5438,9 @@ function buildGoogleFeed(slug, origin) {
 // Картинки для Instagram отдаём сами по одноразовой ссылке: API берёт их
 // по URL, пока собирает контейнеры, после этого они не нужны.
 const INSTA = require("./scripts/insta.js");
+// Публичный ответ под комментарием, когда написали в директ: сообщение от незнакомого
+// аккаунта часто лежит в «Запросах» — подсказываем, где искать (текст выбрал владелец).
+const INSTA_DM_SENT = "Ответили в директ 📩 Если сообщения нет — проверьте папку «Запросы»";
 const INSTA_ACCS = ["almaty", "astana"];
 const instaImgs = new Map();      // токен ссылки → { at, slides }
 // Картинки ещё и на диск: на Azure бывает несколько экземпляров сервера, а
@@ -6256,7 +6259,7 @@ async function instaHookComment(e, v, accs, cfg, verified) {
   const post = mediaId ? await db.instaPostByMedia(mediaId).catch(() => null) : null;
   const acct = post ? accs.find((x) => x.acc === post.acc) : accs.find((x) => String(x.ig_user_id) === String(e.id));
   if (!acct) return;
-  // Свои ответы («Отправили в директ») не обрабатываем.
+  // Свои ответы (INSTA_DM_SENT) не обрабатываем — узнаём по имени аккаунта.
   if (uname && acct.username && String(uname).toLowerCase() === String(acct.username).toLowerCase()) return;
   const fresh = await db.instaCommentEventAdd({ commentId: cid, acc: acct.acc, mediaId: mediaId, username: uname, text: text, status: "seen" }).catch(() => false);
   if (!fresh) return; // повтор события — уже обработали
@@ -6273,7 +6276,7 @@ async function instaHookComment(e, v, accs, cfg, verified) {
   const plus = INSTA.isPlus(text) || (items.length > 0 && /^\s*\d{1,2}\s*$/.test(text));
   // Любой другой комментарий под нашим постом («где адрес?», «подвал?»,
   // «дорого») — тоже в директ: отвечаем там тем же путём к номеру хозяина
-  // (все вопросы — ему), а в комментарии «Отправили в директ». Одному
+  // (все вопросы — ему), а в комментарии INSTA_DM_SENT («Ответили в директ…»). Одному
   // человеку под одним постом — один раз, на остальные его реплики молчим.
   const question = !plus && !!text.trim();
   if (!plus && !question) { await db.instaCommentEventSet(cid, "skipped", "не «+»").catch(() => {}); return; }
@@ -6304,7 +6307,7 @@ async function instaHookComment(e, v, accs, cfg, verified) {
       .catch((err) => { console.log("[insta-hook] кнопка не прошла: " + err.message);
         return INSTA.privateReply(acct.ig_user_id, acct.token, cid, head + "Номер хозяина пришлём сюда. Чтобы его получить, подпишитесь на @" + handle + " и ответьте на это сообщение словом «номер»."); });
     if (r.recipient_id) await db.instaCommentEventIgsid(cid, r.recipient_id);
-    await INSTA.replyComment(cid, acct.token, "Отправили в директ 📩").catch((err) => console.log("[insta-hook] public reply: " + err.message));
+    await INSTA.replyComment(cid, acct.token, INSTA_DM_SENT).catch((err) => console.log("[insta-hook] public reply: " + err.message));
     await db.instaCommentEventSet(cid, "asked", null, listingId);
   } catch (err) {
     await db.instaCommentEventSet(cid, "error", err.message, listingId).catch(() => {});
@@ -6328,7 +6331,7 @@ async function instaHookPick(acct, cid, post, items) {
     const buttons = rows.map((r) => ({ title: r.n + " · " + (Math.round(r.f.price / 1e5) / 10).toString().replace(".", ",") + " млн", payload: "PHONE:" + cid + ":" + r.n }));
     const r = await INSTA.privateReply(acct.ig_user_id, acct.token, cid, text.slice(0, 1000), buttons);
     if (r.recipient_id) await db.instaCommentEventIgsid(cid, r.recipient_id);
-    await INSTA.replyComment(cid, acct.token, "Отправили в директ 📩").catch(() => {});
+    await INSTA.replyComment(cid, acct.token, INSTA_DM_SENT).catch(() => {});
     await db.instaCommentEventSet(cid, "asked", "выбор квартиры из подборки");
   } catch (err) {
     await db.instaCommentEventSet(cid, "error", err.message).catch(() => {});
@@ -6421,7 +6424,7 @@ async function instaHookConsult(acct, cid, uname, mediaId, text) {
       .catch((err) => { console.log("[insta-hook] консультация, кнопка: " + err.message);
         return INSTA.privateReply(acct.ig_user_id, acct.token, cid, CONSULT_INTRO + "\n\nЧтобы записаться, подпишитесь на @" + handle + " и пришлите сюда номер телефона — мы с вами свяжемся."); });
     if (r && r.recipient_id) await db.consultSet(id, { igsid: r.recipient_id });
-    await INSTA.replyComment(cid, acct.token, "Отправили в директ 📩").catch(() => {});
+    await INSTA.replyComment(cid, acct.token, INSTA_DM_SENT).catch(() => {});
     await db.instaCommentEventSet(cid, "asked", "консультация").catch(() => {});
   } catch (err) {
     await db.instaCommentEventSet(cid, "error", "консультация: " + err.message).catch(() => {});

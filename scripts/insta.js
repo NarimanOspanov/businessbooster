@@ -533,7 +533,7 @@ async function userFollows(igsid, token) {
   const j = await ig("GET", "/" + igsid, { fields: "username,is_user_follow_business" }, token);
   return { follows: !!j.is_user_follow_business, username: j.username || null };
 }
-// Публичный ответ под комментарием («Отправили в директ 📩»).
+// Публичный ответ под комментарием (текст — INSTA_DM_SENT в server.js).
 async function replyComment(commentId, token, text) { return ig("POST", "/" + commentId + "/replies", { message: text }, token); }
 const isPlus = (t) => /^\s*(\+|➕|плюс)/i.test(String(t || ""));
 
