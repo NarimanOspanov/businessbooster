@@ -1785,10 +1785,13 @@ const KRISHA_LEADS_HTML = `<!doctype html>
   .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 14px}
   select,input{border:1px solid var(--line);background:#12161c;color:var(--fg);border-radius:8px;padding:7px 10px;font:inherit}
   input.num{width:110px}
-  button.fav{background:none;border:0;padding:0 8px 0 0;font-size:20px;line-height:1;color:var(--mut);cursor:pointer;vertical-align:-2px}
+  /* лайк и «не интересно» — справа на карточке, рядом */
+  .acts{float:right;display:flex;gap:8px;margin:0 0 6px 10px}
+  .acts button{width:38px;height:38px;border-radius:50%;padding:0;display:flex;align-items:center;justify-content:center;border:1px solid var(--line);background:#12161c;cursor:pointer;line-height:1}
+  button.fav{font-size:20px;color:var(--mut)}
   button.fav:hover{color:#ff6b81} button.fav.on{color:#ff4d6d}
   .yr{color:var(--warn);font-weight:600;white-space:nowrap}
-  button.hide{background:none;border:0;padding:0 0 0 8px;font-size:15px;color:var(--mut);cursor:pointer;float:right} button.hide:hover{color:var(--no)}
+  button.hide{font-size:16px;color:var(--mut)} button.hide:hover{color:var(--no);border-color:var(--no)} button.fav:hover{border-color:#ff6b81}
   .swipe{display:none}
   /* на весь экран поверх страницы; высота — видимая (dvh), с учётом «чёлки» */
   .swipe.on{display:flex;flex-direction:column;position:fixed;inset:0;z-index:50;background:var(--bg);
@@ -2134,7 +2137,7 @@ function cardHtml(x){
     return "<div class=card data-id='"+x.id+"'>"+
       "<div class=photos>"+(x.photos&&x.photos.length?(PH[x.id]=x.photos,"")+"<img loading=lazy src='"+esc(x.photos[0])+"' onclick='gal("+x.id+",0)'>"+(x.photos.length>1?"<span class=pcnt>"+x.photos.length+" фото</span>":""):"<div class=mut>нет фото</div>")+"</div>"+
       "<div>"+
-        "<div><button class=hide title='скрыть в этом фильтре' onclick='hideCard("+x.id+",this)'>✕</button><button class='fav"+(x.fav?" on":"")+"' title='в избранное' onclick='favToggle("+x.id+",this)'>"+(x.fav?"♥":"♡")+"</button><span class=title>"+esc(x.title||par)+yearHtml(x)+"</span><span class=price>"+money(x.price)+"</span></div>"+
+        "<div><span class=acts><button class='fav"+(x.fav?" on":"")+"' title='в избранное' onclick='favToggle("+x.id+",this)'>"+(x.fav?"♥":"♡")+"</button><button class=hide title='не интересно — скрыть в этом фильтре' onclick='hideCard("+x.id+",this)'>✕</button></span><span class=title>"+esc(x.title||par)+yearHtml(x)+"</span><span class=price>"+money(x.price)+"</span></div>"+
         "<div class=row>"+tags(x)+"</div>"+
         "<div class='row mut'>"+esc(x.addr||"")+(x.addr?" · ":"")+esc(x.city||"")+(x.district&&DN[x.district]?" · "+esc(DN[x.district]):"")+" · на рынке "+days(x.first_seen)+" дн · <a target=_blank href='https://krisha.kz/a/show/"+x.id+"'>на Крыше</a>"+(x.lat!=null?" · <a href='#' onclick='setView(&quot;map&quot;);focusPin("+x.id+");return false'>на карте</a>":"")+"</div>"+
         "<div class='row phones'>"+(x.owner_name?"<span class=mut>"+esc(x.owner_name)+" · </span>":"")+ph+"</div>"+
