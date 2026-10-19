@@ -2110,6 +2110,9 @@ IF COL_LENGTH('dbo.krisha_list', 'district')      IS NULL ALTER TABLE dbo.krisha
 IF COL_LENGTH('dbo.krisha_list', 'searched_at')   IS NULL ALTER TABLE dbo.krisha_list ADD searched_at DATETIME2(0) NULL;
 IF COL_LENGTH('dbo.krisha_list', 'match_count')   IS NULL ALTER TABLE dbo.krisha_list ADD match_count INT NULL;
 IF COL_LENGTH('dbo.krisha_list', 'match_top')     IS NULL ALTER TABLE dbo.krisha_list ADD match_top BIGINT NULL;
+-- Год постройки (в списке Крыши его нет): из ЖК (year_src 'cx') или соседнего
+-- объявления в том же доме ('nb', ≈). year_at — когда проверяли (см. build-year.js).
+IF COL_LENGTH('dbo.krisha_list', 'build_year')    IS NULL ALTER TABLE dbo.krisha_list ADD build_year SMALLINT NULL, year_src VARCHAR(2) NULL, year_at DATETIME2(0) NULL;
 -- EXEC: индексы на колонки, добавленные ALTER'ом в этом же батче.
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_nophone2' AND object_id = OBJECT_ID('dbo.krisha_list'))
   EXEC('CREATE INDEX IX_klist_nophone2 ON dbo.krisha_list (first_seen DESC)
@@ -2519,6 +2522,12 @@ IF OBJECT_ID('dbo.krisha_lead_favs', 'U') IS NULL
     user_id INT NOT NULL, id BIGINT NOT NULL,
     at DATETIME2(0) NOT NULL CONSTRAINT DF_kfav_at DEFAULT SYSUTCDATETIME(),
     CONSTRAINT PK_krisha_lead_favs PRIMARY KEY (user_id, id));
+-- Сохранённые фильтры страницы лидов («мои фильтры»): имя → JSON полей.
+IF OBJECT_ID('dbo.krisha_lead_presets', 'U') IS NULL
+  CREATE TABLE dbo.krisha_lead_presets (
+    user_id INT NOT NULL, name NVARCHAR(60) NOT NULL, data NVARCHAR(4000) NOT NULL,
+    at DATETIME2(0) NOT NULL CONSTRAINT DF_kpreset_at DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT PK_krisha_lead_presets PRIMARY KEY (user_id, name));
 -- Скрытые («дизлайк»): не показывать это объявление этому пользователю в этом
 -- фильтре (scope — имя сохранённого фильтра, '' — без фильтра).
 IF OBJECT_ID('dbo.krisha_lead_hides', 'U') IS NULL
@@ -2538,7 +2547,7 @@ async function leadsList(f) {
   const hours = Math.max(1, Math.min(24 * 30, Number(f.hours) || 72));
   const since = new Date(Date.now() - hours * 3600e3);
   const nul = (v) => (v == null || v === "" || v === "any" ? null : v);
-  const r = pool.request()
+  const r = pool.request({ requestTimeout: 60000 })
     .input("since", sql.DateTime2, since)
     .input("n", sql.Int, Math.max(1, Math.min(500, Number(f.limit) || 200)))
     // offset — сколько пропустить: страница лидов листает по 200.
@@ -2557,6 +2566,8 @@ async function leadsList(f) {
     .input("fu", sql.Int, Number.isInteger(Number(f.fav_user)) ? Number(f.fav_user) : 0)
     .input("favonly", sql.Bit, f.favonly === "1" ? 1 : 0)
     .input("hs", sql.NVarChar(60), String(f.scope || "").slice(0, 60))
+    // Год от: неизвестный год не отсекаем (его просто нет в данных).
+    .input("ymin", sql.Int, Number(f.ymin) >= 1900 && Number(f.ymin) <= 2035 ? Number(f.ymin) : null)
     // Доля потока: риэлтору видны только объявления с id % N = K (делим район между двумя-тремя).
     .input("pn", sql.Int, Number(f.part_n) >= 2 ? Number(f.part_n) : null)
     .input("pk", sql.Int, Number(f.part_n) >= 2 ? Math.max(0, Number(f.part_k) || 0) % Number(f.part_n) : 0)
@@ -2592,9 +2603,8 @@ async function leadsList(f) {
   const dl = (Array.isArray(f.districts) ? f.districts : []).map(String).filter((x) => /^[a-z0-9-]{3,40}$/.test(x)).slice(0, 30);
   dl.forEach((d, i) => r.input("dd" + i, sql.NVarChar(40), d));
   // Первый запрос после паузы читает события с диска (~14 с), следующие — 2 с; общий лимит 15 с мал.
-  r.timeout = 60000;
   return (await r.query(`
-    SELECT COUNT(*) OVER () AS total, l.id, l.deal, l.prop, l.city, l.district, l.price, l.rooms, l.area, l.floor, l.floors, l.title, l.addr, l.owner_name,
+    SELECT COUNT(*) OVER () AS total, l.id, l.deal, l.prop, l.city, l.district, l.price, l.build_year, l.year_src, l.rooms, l.area, l.floor, l.floors, l.title, l.addr, l.owner_name,
       l.lat, l.lon, l.photos_c, l.photos_json, l.first_seen, l.bumped_on, l.phones, l.phones_at,
       ev.last_bump, ev.bumps, pr.last_price_at, pr.old_price, pr.new_price, bk.last_back,
       l.storage, x.exp_in, CASE WHEN x.expired = 1 THEN ar.last_archived END AS expired_at, ba.backs_all, ba.last_back_all,
@@ -2648,6 +2658,7 @@ async function leadsList(f) {
       AND (@use IS NULL OR l.title LIKE N'%' + @use + N'%')
       ${dl.length ? "AND l.district IN (" + dl.map((_, i) => "@dd" + i).join(",") + ")" : ""}
       AND (@favonly = 0 OR fv.id IS NOT NULL)
+      AND (@ymin IS NULL OR l.build_year IS NULL OR l.build_year >= @ymin)
       AND (@favonly = 1 OR NOT EXISTS (SELECT 1 FROM dbo.krisha_lead_hides h WHERE h.user_id = @fu AND h.scope = @hs AND h.id = l.id))
       AND (@favonly = 1 OR l.first_seen >= @since OR EXISTS (SELECT 1 FROM dbo.krisha_list_events e WHERE e.id = l.id AND e.at >= @since AND e.kind IN ('bump','price','back'))
         OR x.exp_in BETWEEN 0 AND 1 OR x.expired = 1 OR (l.storage = 'live' AND ba.backs_all >= @relist))
@@ -2705,10 +2716,68 @@ async function leadCopies(ownerId) {
 // Этапы лида: звонил / перезвонить / отказ, дальше встреча → договор (deal) →
 // задаток → сделка (closed, с комиссией). userId — риэлтор портала (null — админ).
 const LEAD_STATUSES = ["called", "callback", "refused", "meeting", "deal", "deposit", "closed"];
+// Короткие запросы страницы лидов могут ждать, пока идёт тяжёлый leadsList (10 DTU) — даём 60 с, а не 15.
+// Таймаут на запрос в mssql 12 — только через request({ requestTimeout }); свойство r.timeout он не читает.
+function reqT(pool) { return pool.request({ requestTimeout: 60000 }); }
+// «Мои фильтры»: список {имя: поля}; сохранить (заменяет) и удалить.
+async function leadPresets(userId) {
+  const pool = await getPool();
+  await ensureLeads(pool);
+  const out = {};
+  for (const r of (await reqT(pool).input("u", sql.Int, Number(userId) || 0).query("SELECT name, data FROM dbo.krisha_lead_presets WHERE user_id = @u")).recordset) {
+    try { out[r.name] = JSON.parse(r.data); } catch { /* битая запись — пропускаем */ }
+  }
+  return out;
+}
+async function leadPresetSave(userId, name, data) {
+  const n = String(name || "").trim().slice(0, 60), d = JSON.stringify(data || {});
+  if (!n || d.length > 4000) throw new Error(!n ? "нет названия" : "слишком большой фильтр");
+  const pool = await getPool();
+  await ensureLeads(pool);
+  await reqT(pool).input("u", sql.Int, Number(userId) || 0).input("n", sql.NVarChar(60), n).input("d", sql.NVarChar(4000), d).query(`
+    MERGE dbo.krisha_lead_presets AS t USING (SELECT @u AS user_id, @n AS name) AS s ON t.user_id = s.user_id AND t.name = s.name
+    WHEN MATCHED THEN UPDATE SET data = @d, at = SYSUTCDATETIME()
+    WHEN NOT MATCHED THEN INSERT (user_id, name, data) VALUES (@u, @n, @d);`);
+}
+async function leadPresetDel(userId, name) {
+  const pool = await getPool();
+  await ensureLeads(pool);
+  await reqT(pool).input("u", sql.Int, Number(userId) || 0).input("n", sql.NVarChar(60), String(name || "").slice(0, 60))
+    .query("DELETE FROM dbo.krisha_lead_presets WHERE user_id = @u AND name = @n");
+}
+// Год постройки: источники — разобранные объявления с годом и координатами.
+async function listYearSources() {
+  const pool = await getPool();
+  await ensureList(pool);
+  const r = pool.request({ requestTimeout: 120000 });
+  return (await r.query("SELECT CAST(lat AS FLOAT) AS lat, CAST(lon AS FLOAT) AS lon, build_year AS y, complex_id AS cx FROM dbo.krisha_objects WHERE build_year BETWEEN 1900 AND 2035 AND lat IS NOT NULL AND lon IS NOT NULL")).recordset;
+}
+// Хозяйские квартиры без проверки года; неизвестные — перепроверяем раз в 3 дня
+// (источников со временем больше).
+async function listYearTodo(limit) {
+  const pool = await getPool();
+  await ensureList(pool);
+  const r = pool.request({ requestTimeout: 120000 }).input("n", sql.Int, Math.max(1, Math.min(50000, Number(limit) || 20000)));
+  return (await r.query(`SELECT TOP (@n) id, CAST(lat AS FLOAT) AS lat, CAST(lon AS FLOAT) AS lon, complex_id AS cx FROM dbo.krisha_list
+    WHERE user_type = 'owner' AND prop = 'flat' AND storage = 'live'
+      AND (year_at IS NULL OR (build_year IS NULL AND year_at < DATEADD(day, -3, SYSUTCDATETIME())))
+    ORDER BY id DESC`)).recordset;
+}
+async function listYearSave(rows) {
+  const pool = await getPool();
+  const ok = (rows || []).filter((x) => Number.isSafeInteger(Number(x.id)));
+  for (let i = 0; i < ok.length; i += 800) {
+    const vals = ok.slice(i, i + 800).map((x) => "(" + Number(x.id) + "," + (Number(x.y) >= 1900 && Number(x.y) <= 2035 ? Number(x.y) : "NULL") + "," +
+      (x.src === "cx" || x.src === "nb" ? "'" + x.src + "'" : "NULL") + ")").join(",");
+    const r = pool.request({ requestTimeout: 120000 });
+    await r.query("UPDATE l SET build_year = v.y, year_src = v.s, year_at = SYSUTCDATETIME() FROM dbo.krisha_list l JOIN (VALUES " + vals + ") v(id, y, s) ON v.id = l.id");
+  }
+  return ok.length;
+}
 async function leadSetHide(userId, scope, id, on) {
   const pool = await getPool();
   await ensureLeads(pool);
-  const rq = pool.request().input("u", sql.Int, Number(userId) || 0).input("s", sql.NVarChar(60), String(scope || "").slice(0, 60)).input("id", sql.BigInt, Number(id));
+  const rq = reqT(pool).input("u", sql.Int, Number(userId) || 0).input("s", sql.NVarChar(60), String(scope || "").slice(0, 60)).input("id", sql.BigInt, Number(id));
   await rq.query(on
     ? "IF NOT EXISTS (SELECT 1 FROM dbo.krisha_lead_hides WHERE user_id = @u AND scope = @s AND id = @id) INSERT INTO dbo.krisha_lead_hides (user_id, scope, id) VALUES (@u, @s, @id)"
     : "DELETE FROM dbo.krisha_lead_hides WHERE user_id = @u AND scope = @s AND id = @id");
@@ -2717,7 +2786,7 @@ async function leadSetHide(userId, scope, id, on) {
 async function leadSetFav(userId, id, on) {
   const pool = await getPool();
   await ensureLeads(pool);
-  const rq = pool.request().input("u", sql.Int, Number(userId) || 0).input("id", sql.BigInt, Number(id));
+  const rq = reqT(pool).input("u", sql.Int, Number(userId) || 0).input("id", sql.BigInt, Number(id));
   await rq.query(on
     ? "IF NOT EXISTS (SELECT 1 FROM dbo.krisha_lead_favs WHERE user_id = @u AND id = @id) INSERT INTO dbo.krisha_lead_favs (user_id, id) VALUES (@u, @id)"
     : "DELETE FROM dbo.krisha_lead_favs WHERE user_id = @u AND id = @id");
@@ -5322,7 +5391,7 @@ async function objectStats() {
 module.exports = { portalUserByToken, portalUsers, portalUserSave, portalNewToken, portalLog, portalReveals, portalAudit, consultAdd, consultGet, consultSet, phoneSharedCount, stickyFirstPhone, listPhoneRetryLater, instaPostForReel, instaPostReel, instaCommentAnswered, instaPostItemsSet, instaPostItems, instaCommentEventNeedFollow, instaCommentEventsToRemind, instaCommentEventReminded, instaSimilarPosts, instaHookLogAdd, instaCommentEventGet, instaCommentEventIgsid, instaCommentEventAsked, instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, listLastNew, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
-  saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadSetFav, leadSetHide, leadCopies, leadUncheckedCopies, leadSetCopyPhoto, dropKnownSticky, cleanStickyPhones,
+  saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadSetFav, leadSetHide, leadPresets, leadPresetSave, leadPresetDel, listYearSources, listYearTodo, listYearSave, leadCopies, leadUncheckedCopies, leadSetCopyPhoto, dropKnownSticky, cleanStickyPhones,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
   listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, instaCandidates, instaListing, instaPostReserve, instaPostFinish, instaPostByCode, instaPhotoScoresGet, instaPhotoScoreSave, instaPlacesGet, instaPlaceSave, configGet, configSet, instaNextCode, listTextSave, listTextStats, mortgageFlagSave, mortgageFlagStats, instaAccounts, instaAccountSet, instaPostAdd, instaPosts, instaPostedSince, instaPostByMedia, instaRecentMedia, instaRecentListings, instaDmAdd, instaDmMedia, instaDmStats, instaDmPrune, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
