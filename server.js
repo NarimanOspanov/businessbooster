@@ -5850,15 +5850,27 @@ async function instaPublish(acc, f) {
 // музыка; идёт и в ленту/сетку профиля (share_to_feed=true, с 14.10: в одном
 // Reels охват был в 4–7 раз ниже карусели). media_id ролика пишем к посту: «+» под ним — тот же номер.
 // Сбой — уведомление админам, карусель от него не зависит.
+// Без голоса ролик не выкладываем (18–19.10 так вышли 6 роликов с одной
+// музыкой): ждём час и пробуем снова, до 3 раз, потом — уведомление админам.
 let instaReelBusy = false;
-async function instaReelAfter(a, fc, slides, tok, code, tell) {
+async function instaReelAfter(a, fc, slides, tok, code, tell, attempt) {
+  attempt = attempt || 1;
   if (instaReelBusy) { console.log("[insta] reel " + code + ": предыдущий ролик ещё собирается — пропускаем"); return; }
   instaReelBusy = true;
   try {
     const REEL = require("./scripts/insta-reel.js");
     const voiceName = (await db.configGet(["insta.reel_voice"]).catch(() => ({})))["insta.reel_voice"] || "Kore";
-    const voice = await REEL.reelVoice(fc, voiceName).catch((e) => { console.log("[insta] reel voice: " + e.message); return { wav: null }; });
+    const voice = await REEL.reelVoice(fc, voiceName).catch((e) => { console.log("[insta] reel voice: " + e.message); return { wav: null, why: e.message }; });
     if (voice.text) console.log("[insta] reel " + code + " текст: " + voice.text + (voice.wav ? "" : " (без голоса)"));
+    if (!voice.wav) {
+      if (attempt < 3) {
+        console.log("[insta] reel " + code + ": нет голоса (" + (voice.why || "?") + "), повтор через час, попытка " + (attempt + 1));
+        setTimeout(() => { instaReelAfter(a, fc, slides, tok, code, tell, attempt + 1).catch(() => {}); }, 3600e3);
+      } else {
+        notifyTelegram("🎬 Instagram: ролик к посту № " + code + " не вышел — нет голоса после 3 попыток (карусель вышла): " + String(voice.why || "").slice(0, 150));
+      }
+      return;
+    }
     // Без обложки (на ней цена); карта — предпоследним кадром, но без цены.
     // Карты в карусели нет (не загрузилась) — пробуем нарисовать её для ролика.
     let reelSlides = slides.filter((_, i) => i !== 0);
@@ -5870,7 +5882,7 @@ async function instaReelAfter(a, fc, slides, tok, code, tell) {
     // Первый кадр — главное фото с обложки (без плашек и цены): иначе ролик
     // открывался вторым фото объявления, бывало — планировкой (№ 88).
     if (slides.coverPhoto) reelSlides.unshift(INSTA.rawSlides([slides.coverPhoto])[0]);
-    const mp4 = await REEL.renderReel(reelSlides, { hook: REEL.reelHook(fc), top: REEL.TOP, voice: voice.wav });
+    const mp4 = await REEL.renderReel(reelSlides, { hook: REEL.reelHook(fc), top: REEL.TOP, voice: voice.wav, subs: voice.text });
     const hit = instaImgs.get(tok) || { at: Date.now(), slides: [] };
     hit.at = Date.now(); hit.video = mp4; instaImgs.set(tok, hit);
     try { fs.mkdirSync(path.join(INSTA_IMG_DIR, tok), { recursive: true }); fs.writeFileSync(path.join(INSTA_IMG_DIR, tok, "reel.mp4"), mp4); } catch { /* из памяти тоже отдадим */ }

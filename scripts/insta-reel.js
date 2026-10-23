@@ -4,7 +4,8 @@
 // Звук: закадровый голос (текст по фактам квартиры пишет Gemini, озвучивает
 // Gemini TTS) поверх тихой музыки из assets/reel-music (сгенерирована Lyria —
 // музыку из библиотеки Instagram через API не добавить). Длина ролика — по
-// голосу. Голос не вышел — ролик с одной музыкой. Кодируем ffmpeg-static.
+// голосу, субтитры по центру — тот же текст. Голос не вышел — сервер ролик
+// не публикует, а повторяет позже. Кодируем ffmpeg-static.
 
 const fs = require("fs");
 const os = require("os");
@@ -113,8 +114,24 @@ async function renderReel(slides, opts) {
       mix.push("[ma]"); ai++;
     }
     if (mix.length) f.push(`${mix.join("")}amix=inputs=${mix.length}:duration=longest:normalize=0,atrim=0:${total.toFixed(2)}[aout]`);
+    // Субтитры по центру под голос: фразы по 2–4 слова, время каждой — по
+    // доле букв в тексте (голос идёт ровно, без долгих пауз).
+    let vmap = "vout";
+    if (o.voice && o.subs) {
+      const chunks = subChunks(o.subs);
+      const letters = chunks.reduce((a, c) => a + c.length, 0);
+      let t0 = 0.3;
+      chunks.forEach((c, k) => {
+        const d = voiceLen * c.length / letters;
+        const tf = path.join(dir, "s" + k + ".txt");
+        fs.writeFileSync(tf, c);
+        const size = Math.min(64, Math.floor(940 / (c.length * 0.62)));
+        f.push(`[${vmap}]drawtext=fontfile='${ffEsc(FONTS[2])}':textfile='${ffEsc(tf)}':fontsize=${size}:fontcolor=white:borderw=6:bordercolor=black@0.85:x=(w-text_w)/2:y=h*0.62-text_h/2:enable='between(t,${t0.toFixed(2)},${(t0 + d).toFixed(2)})'[sub${k}]`);
+        vmap = "sub" + k; t0 += d;
+      });
+    }
     const outFile = path.join(dir, "reel.mp4");
-    args.push("-filter_complex", f.join(";"), "-map", "[vout]");
+    args.push("-filter_complex", f.join(";"), "-map", "[" + vmap + "]");
     if (mix.length) args.push("-map", "[aout]", "-c:a", "aac", "-b:a", "128k");
     args.push(
       "-c:v", "libx264", "-preset", "medium", "-crf", "21", "-profile:v", "high", "-pix_fmt", "yuv420p",
@@ -125,6 +142,19 @@ async function renderReel(slides, opts) {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 }
+
+// Текст субтитров — короткими фразами: перенос после 14 знаков или на знаке препинания.
+function subChunks(text) {
+  const out = []; let cur = [];
+  for (const w of String(text).replace(/\s+—\s+/g, ", ").split(/\s+/).filter(Boolean)) {
+    cur.push(w);
+    if (cur.join(" ").length >= 14 || /[.,:;!?]$/.test(w)) { out.push(cur.join(" ")); cur = []; }
+  }
+  if (cur.length) out.push(cur.join(" "));
+  return out;
+}
+// Путь для фильтров ffmpeg: прямые слэши, двоеточие (диск Windows) экранируем.
+const ffEsc = (p) => String(p).replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "");
 
 // Зацеп первого кадра (до 15 слов): что, за сколько и почему смотреть —
 // цена крупно, вторая строка — довод: дешевле соседей или «от хозяина».
@@ -296,18 +326,24 @@ async function voiceOk(wav, f) {
   // Цены в ролике нет — проверяем, что голос её и не выдумал, и что призыв прозвучал.
   return !/миллион|тенге|\b(say|tone|pace)\b|прочитай/i.test(t) && /плюс/i.test(t);
 }
-// Текст + голос для ролика; до двух попыток озвучки с проверкой. Не вышло —
-// wav: null (ролик выйдет с одной музыкой).
+// Текст + голос для ролика; до 4 попыток озвучки с проверкой и паузами между
+// ними: 18–19.10 TTS сбоил часами, и 6 роликов подряд вышли с одной музыкой.
+// Не вышло — wav: null и причина в why (такой ролик сервер не публикует).
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function reelVoice(f, voice) {
   const text = await reelScript(f);
-  for (let i = 0; i < 2; i++) {
+  let why = "";
+  const waits = [20000, 60000, 120000];
+  for (let i = 0; i < 4; i++) {
+    if (i) await sleep(waits[i - 1]);
     try {
       const wav = await tts(text, voice);
       if (await voiceOk(wav, f).catch(() => true)) return { text: text, wav: wav };
-      console.log("[reel] озвучка не прошла проверку, попытка " + (i + 1));
-    } catch (e) { console.log("[reel] голос: " + e.message); }
+      why = "озвучка не прошла проверку";
+      console.log("[reel] " + why + ", попытка " + (i + 1));
+    } catch (e) { why = e.message; console.log("[reel] голос, попытка " + (i + 1) + ": " + e.message); }
   }
-  return { text: text, wav: null };
+  return { text: text, wav: null, why: why };
 }
 
 // Подпись ролика — коротко и тем же голосом, что за кадром: без цены и номера
