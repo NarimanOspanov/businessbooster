@@ -3972,15 +3972,35 @@ function instaScore(x, city, peers) {
   return { score: s, why: why, below: below != null && below >= 3 && below <= 10 ? below : null, belowWhere: pc ? "complex" : "near" };
 }
 
+// Балл премиума: больше фото, свежее, просторнее; цена не штрафуется.
+function premiumScore(x) {
+  const why = [];
+  let s = 0;
+  const add = (pts, text) => { pts = Math.round(pts); if (pts) { s += pts; why.push(text + " " + (pts > 0 ? "+" : "") + pts); } };
+  add(Math.min(Number(x.photos) || 0, 20) / 20 * 20, (x.photos || 0) + " фото");
+  const age = Math.floor((Date.now() - new Date(x.first_seen).getTime()) / 86400e3);
+  add(Math.max(0, 15 - age), age <= 0 ? "сегодня" : age + " дн. назад");
+  if (Number(x.area) >= 100) add(5, Math.round(x.area) + " м²");
+  if (x.floor && x.floors && x.floor === x.floors) add(4, "последний этаж");
+  const a = String(x.addr || "").split(" — ")[0];
+  if (!/[А-Яа-яЁёӘәҒғҚқҢңӨөҰұҮүҺһІі]{3}/.test(a)) add(-5, "адрес без улицы");
+  return { score: s, why: why, below: null, belowWhere: null };
+}
+
 // Центр города и радиус: в «центральный» район Крыша относит и далёкие
 // посёлки (мкр Алатау/ИЯФ — Медеуский, ~20 км), их отсекаем по расстоянию.
 const INSTA_CENTER = { almaty: { lat: 43.2383, lon: 76.9456, km: 12 }, astana: { lat: 51.128, lon: 71.43, km: 15 } };
-async function instaCandidates(city, limit, districts) {
+// opts.premium — рубрика «Премиум от хозяина»: от insta.premium_min (100 млн),
+// без условия «можно в ипотеку» (такие квартиры её обычно не предлагают),
+// свежие за insta.premium_days (30 дней), в том же радиусе от центра.
+async function instaCandidates(city, limit, districts, opts) {
+  const premium = !!(opts && opts.premium);
   const pool = await getPool();
   await ensureList(pool);
   await ensureInsta();
   const n = Math.min(40, Math.max(1, Number(limit) || 12));
-  const peers = await complexPeers(city).catch(() => ({}));
+  // Соседи по ЖК нужны только для «ниже рынка» — премиуму не нужны.
+  const peers = premium ? {} : await complexPeers(city).catch(() => ({}));
   const dl = (districts || []).map(String).filter(Boolean);
   const ctr = INSTA_CENTER[city] || null;
   // Свежесть — сколько дней назад квартира впервые попала в нашу базу
@@ -3988,7 +4008,10 @@ async function instaCandidates(city, limit, districts) {
   // всё, что уже висело на Крыше, получило first_seen около этой даты.
   const fdCfg = await configGet(["insta.fresh_days"]).catch(() => ({}));
   const freshDays = Math.max(1, Math.min(90, Number(fdCfg["insta.fresh_days"]) || 14));
-  const rq = pool.request().input("city", sql.NVarChar(40), city).input("n", sql.Int, 400).input("fd", sql.Int, freshDays)
+  const pCfg = premium ? await configGet(["insta.premium_min", "insta.premium_days"]).catch(() => ({})) : {};
+  const pMin = Number(pCfg["insta.premium_min"]) || 100e6;
+  const pDays = Math.max(1, Math.min(90, Number(pCfg["insta.premium_days"]) || 30));
+  const rq = pool.request().input("city", sql.NVarChar(40), city).input("n", sql.Int, 400).input("fd", sql.Int, premium ? pDays : freshDays).input("pmin", sql.BigInt, pMin)
     .input("lat", sql.Float, ctr ? ctr.lat : null).input("lon", sql.Float, ctr ? ctr.lon : null).input("km", sql.Float, ctr ? ctr.km : null);
   dl.forEach((d, i) => rq.input("d" + i, sql.NVarChar(40), d));
   const rows = (await rq.query(`
@@ -3996,16 +4019,16 @@ async function instaCandidates(city, limit, districts) {
            c.floor, c.floors, c.first_seen, c.lat, c.lon, t.programs, t.quote
     FROM dbo.krisha_list c
     LEFT JOIN dbo.krisha_list_text t ON t.id = c.id
-    WHERE c.id IN (SELECT id FROM dbo.krisha_mortgage WHERE seen_at >= DATEADD(day, -2, SYSUTCDATETIME())
-                     ${dl.length ? "AND district IN (" + dl.map((_, i) => "@d" + i).join(",") + ")" : ""})
+    WHERE ${premium ? "c.price >= @pmin AND c.photos >= 10" : `c.id IN (SELECT id FROM dbo.krisha_mortgage WHERE seen_at >= DATEADD(day, -2, SYSUTCDATETIME())
+                     ${dl.length ? "AND district IN (" + dl.map((_, i) => "@d" + i).join(",") + ")" : ""})`}
       AND (@lat IS NULL OR (c.lat IS NOT NULL AND
            SQRT(POWER((c.lat - @lat) * 111.0, 2) + POWER((c.lon - @lon) * 111.0 * COS(RADIANS(@lat)), 2)) <= @km))
       -- Описание ещё не читали (t.id IS NULL) или хозяин явно за ипотеку; «нет» и
       -- молчание после проверки карточки — из кандидатов вон.
-      AND (t.id IS NULL OR t.mortgage = 'yes')
+      ${premium ? "" : `AND (t.id IS NULL OR t.mortgage = 'yes')
       -- Дом старше 1980 года банки в залог не берут (mortgage-text.js MIN_YEAR);
       -- год тут — если квартира уже есть в базе объектов, иначе его проверит карточка.
-      AND NOT EXISTS (SELECT 1 FROM dbo.krisha_flats kf WHERE kf.id = c.id AND kf.build_year < 1980)
+      AND NOT EXISTS (SELECT 1 FROM dbo.krisha_flats kf WHERE kf.id = c.id AND kf.build_year < 1980)`}
       AND c.user_type = 'owner' AND c.deal = 'sale' AND c.prop = 'flat' AND c.storage = 'live' AND c.city = @city
       AND c.area >= 20 AND c.price >= c.area * 150000 AND c.phones IS NOT NULL AND c.photos >= 5
       AND c.first_seen >= DATEADD(day, -@fd, SYSUTCDATETIME())
@@ -4014,7 +4037,7 @@ async function instaCandidates(city, limit, districts) {
     ORDER BY c.first_seen DESC`)).recordset;
   // Сначала балл, потом проверка номеров на посредника — только для верхушки:
   // поиск номера по базе дорогой, на 400 номерах он был бы полным сканом много раз.
-  rows.forEach((x) => { x.sc = instaScore(x, city, peers); });
+  rows.forEach((x) => { x.sc = premium ? premiumScore(x) : instaScore(x, city, peers); });
   rows.sort((a, b) => b.sc.score - a.sc.score);
   const top = rows.slice(0, n * 3);
   const busy = await listingsByPhones(top.flatMap((x) => String(x.phones || "").split(",")));
@@ -4027,7 +4050,7 @@ async function instaCandidates(city, limit, districts) {
       lat: x.lat == null ? null : Number(x.lat), lon: x.lon == null ? null : Number(x.lon),
       id: String(x.id), city: city, rooms: x.rooms, area: x.area == null ? null : Number(x.area), floor: x.floor, floors: x.floors,
       price: Number(x.price), addr: x.addr || null, isNew: x.complex_id != null,
-      mortgage: true, programs: x.programs ? String(x.programs).split(",") : [], quote: x.quote || null,
+      mortgage: !premium, premium: premium, programs: x.programs ? String(x.programs).split(",") : [], quote: x.quote || null,
       photos: listPhotoUrls(x.photos_c, x.photos_json).map((u) => u.replace(/-560x350\.jpg$/, "-full.jpg")),
     }));
 }

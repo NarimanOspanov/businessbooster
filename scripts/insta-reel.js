@@ -161,7 +161,7 @@ const ffEsc = (p) => String(p).replace(/\\/g, "/").replace(/:/g, "\\:").replace(
 function reelHook(f) {
   const r = ROOMS_NOM[f.rooms];
   const what = "Продаю " + (r ? r + "-комнатную" : "квартиру") + " · " + placeOf(f).replace(/^(в микрорайоне|на улице) /, "");
-  const why = belowMarket(f) ? "Ниже рынка" + (f.mortgage ? " · можно в ипотеку" : " · от хозяина")
+  const why = f.premium ? "Премиум · от хозяина" : belowMarket(f) ? "Ниже рынка" + (f.mortgage ? " · можно в ипотеку" : " · от хозяина")
     : f.mortgage ? "От хозяина · можно в ипотеку" : "От хозяина";
   return [what, why];
 }
@@ -349,7 +349,7 @@ async function reelVoice(f, voice) {
 // Подпись ролика — коротко и тем же голосом, что за кадром: без цены и номера
 // объявления; рубрика, одна строка о квартире, призыв, хэштеги.
 function reelCaption(f, tags) {
-  const rubric = "🔑 От хозяина" + (f.mortgage ? " · можно в ипотеку" : "") + (belowMarket(f) ? " · ниже рынка" : "");
+  const rubric = f.premium ? "💎 Премиум от хозяина" : "🔑 От хозяина" + (f.mortgage ? " · можно в ипотеку" : "") + (belowMarket(f) ? " · ниже рынка" : "");
   const what = opening(f);
   return [rubric, "", what, "", "👉 " + CTA(f).replace("ставьте плюс", "ставьте «+»"), "", tags || ""].join("\n").trim();
 }

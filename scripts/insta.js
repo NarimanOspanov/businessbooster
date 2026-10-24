@@ -98,16 +98,17 @@ function coverSvg(f, photo, acc, fx) {
   const PH = 810;
   // Плашка слева сверху: «от хозяина · можно в ипотеку» одной строкой.
   // Ширина — по измеренному тексту (заглавные с разрядкой: +1 px на знак).
-  const pillLines = f.mortgage ? ["ОТ ХОЗЯИНА · МОЖНО В ИПОТЕКУ"] : ["ОТ ХОЗЯИНА"];
+  // Премиум (рубрика от 100 млн): цену не показываем — её присылаем после «+».
+  const pillLines = f.premium ? ["ПРЕМИУМ · ОТ ХОЗЯИНА"] : f.mortgage ? ["ОТ ХОЗЯИНА · МОЖНО В ИПОТЕКУ"] : ["ОТ ХОЗЯИНА"];
   const pw = Math.max(...pillLines.map((t) => measure(t, 26, 700) + t.length)) + 64;
   const ph = pillLines.length === 2 ? 100 : 64;
-  const pillSvg = `<rect x="40" y="40" width="${pw.toFixed(0)}" height="${ph}" rx="${ph === 64 ? 32 : 28}" fill="#1e8422"/>` +
+  const pillSvg = `<rect x="40" y="40" width="${pw.toFixed(0)}" height="${ph}" rx="${ph === 64 ? 32 : 28}" fill="${f.premium ? "#a87b16" : "#1e8422"}"/>` +
     pillLines.map((t, i) => `<text x="${(40 + pw / 2).toFixed(0)}" y="${pillLines.length === 2 ? 80 + i * 38 : 82}" text-anchor="middle" font-size="26" font-weight="700" fill="#fff" letter-spacing="1">${t}</text>`).join("");
-  const ppm = f.area ? Math.round(f.price / f.area / 1000) : null;
+  const ppm = f.area && !f.premium ? Math.round(f.price / f.area / 1000) : null;
   // Ниже рынка — строкой прямо под ценой: наша оценка (3–10%) или оценка
   // Крыши из карточки. Остальные строки сдвигаются вниз на dy.
   const c = f.card || {};
-  const belowText = f.below ? "Метр на " + f.below + "% дешевле похожих " + (f.belowWhere === "near" ? "поблизости" : "в этом ЖК")
+  const belowText = f.premium ? null : f.below ? "Метр на " + f.below + "% дешевле похожих " + (f.belowWhere === "near" ? "поблизости" : "в этом ЖК")
     : c.price ? c.price : null;
   const dy = belowText ? 58 : 0;
   let badge = "";
@@ -124,7 +125,7 @@ function coverSvg(f, photo, acc, fx) {
   ${pillSvg}
   ${f.below ? belowPill(f.below, 40 + ph + 12) : ""}
   ${badge}
-  <text x="56" y="${PH + 170}" font-size="96" font-weight="800" fill="#fff">${esc(money(f.price))} ₸</text>
+  ${f.premium ? `<text x="56" y="${PH + 160}" font-size="64" font-weight="800" fill="#fff">Цена — поставьте «+»</text>` : `<text x="56" y="${PH + 170}" font-size="96" font-weight="800" fill="#fff">${esc(money(f.price))} ₸</text>`}
   ${belowText ? `<path d="M56 ${PH + 206} h30 l-15 22 z" fill="#4cc35a"/><text x="100" y="${PH + 228}" font-size="34" font-weight="700" fill="#4cc35a">${esc(fit(belowText, 34, 700, W - 100 - 56))}</text>` : ""}
   <text x="56" y="${PH + 250 + dy}" font-size="42" font-weight="700" fill="#e9f2ec">${esc(paramsLine(f))}</text>
   <text x="56" y="${PH + 318 + dy}" font-size="36" font-weight="500" fill="#a9c2b3">${esc(A.city + ", " + cleanAddr(f.addr))}</text>
@@ -320,7 +321,7 @@ async function renderCarousel(f, acc, opts) {
   slides.coverPhoto = got[0];
   const facts = photoFacts(f);
   inner.forEach((b, k) => slides.push(toJpeg(photoSvg(b, acc, k + 2, n, f, fx[k + 1], facts[k]))));
-  const map = await mapSlide(f, acc).catch((e) => { console.log("[insta] map: " + e.message); return null; });
+  const map = await mapSlide(f, acc, !!f.premium).catch((e) => { console.log("[insta] map: " + e.message); return null; });
   // Где карта — Reels её пропускает (в ролике она не читается).
   if (map) { slides.mapAt = slides.length; slides.push(map); }
   slides.push(toJpeg(ctaSvg(f, got[0], acc)));
@@ -374,14 +375,14 @@ function caption(f, acc) {
   const kind = (f.rooms ? f.rooms + "-комнатная квартира" : "Квартира") + (f.area ? " " + String(f.area).replace(".", ",") + " м²" : "");
   const lines = [
     // «Можно в ипотеку» — только если это так (у своих объявлений — галочка в форме).
-    "🔑 От хозяина" + (f.mortgage ? " · можно в ипотеку" : "") + (f.below ? " · ниже рынка" : ""), "",
+    (f.premium ? "💎 Премиум от хозяина" : "🔑 От хозяина" + (f.mortgage ? " · можно в ипотеку" : "") + (f.below ? " · ниже рынка" : "")), "",
     kind + " в " + (acc === "astana" ? "Астане" : "Алматы") + (f.isNew ? ", новостройка" : "") + " — продаёт сам хозяин. Без посредников", "",
-    "💰 " + money(f.price) + " ₸",
+    f.premium ? "💰 Цену пришлю в личку — поставьте «+»" : "💰 " + money(f.price) + " ₸",
     "📍 " + A.city + ", " + cleanAddr(f.addr),
     f.floor ? "🏠 Этаж " + f.floor + (f.floors ? " из " + f.floors : "") : null,
   ].filter((x) => x != null);
   if (f.below) lines.push("💚 Метр на " + f.below + "% дешевле похожих квартир " + (f.belowWhere === "near" ? "поблизости" : "в этом ЖК"));
-  else if (c.price) lines.push("📉 " + c.price);
+  else if (c.price && !f.premium) lines.push("📉 " + c.price);
 
   const why = c.desc || [];
   if (why.length) lines.push("", "Почему стоит посмотреть:", ...why.map((t) => "✔️ " + t));

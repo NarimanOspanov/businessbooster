@@ -5469,14 +5469,15 @@ function instaGc() {
   for (const [k, v] of instaPreview) if (now - v.at > 1800e3) instaPreview.delete(k);
   for (const [k, v] of instaComments) if (now - v.at > 600e3) instaComments.delete(k);
 }
-async function instaCandidates(acc, fresh) {
-  const c = instaCand[acc];
+async function instaCandidates(acc, fresh, premium) {
+  const key = acc + (premium ? ":premium" : "");
+  const c = instaCand[key];
   if (!fresh && c && Date.now() - c.at < 20 * 60e3) return c.rows;
-  let rows = await db.instaCandidates(acc, 24, await instaDistricts(acc));
+  let rows = await db.instaCandidates(acc, 24, await instaDistricts(acc), { premium: !!premium });
   rows = await instaApplyPhotoScores(rows).catch((e) => { console.log("[insta] photo score: " + e.message); return rows; });
   rows = rows.slice(0, 12);
   await instaApplyPlaces(rows).catch((e) => console.log("[insta] places: " + e.message));
-  instaCand[acc] = { at: Date.now(), rows: rows };
+  instaCand[key] = { at: Date.now(), rows: rows };
   return rows;
 }
 // «Что рядом» (scripts/places.js): одна фраза для обложки и подписи. Только
@@ -5597,9 +5598,11 @@ async function instaApplyPhotoScores(rows) {
 }
 // Квартира для превью и публикации: из кандидатов (там есть повод поста), иначе из базы.
 async function instaFlat(acc, id) {
-  const c = instaCand[acc];
-  const hit = c && c.rows.find((x) => x.id === String(id));
-  if (hit) return hit;
+  for (const k of [acc, acc + ":premium"]) {
+    const c = instaCand[k];
+    const hit = c && c.rows.find((x) => x.id === String(id));
+    if (hit) return hit;
+  }
   const f = await db.instaListing(id);
   if (!f || f.city !== acc) return null;
   // Те же условия, что в подборе: без номера хозяина на «+» нечего прислать,
@@ -5629,7 +5632,7 @@ const instaCardRetryAt = new Map();
 // Когда последний раз сообщали, что автопостинг всех пропустил (раз в 3 часа).
 const instaSkipAlertAt = {};
 function instaDropCandidate(acc, id) {
-  if (instaCand[acc]) instaCand[acc].rows = instaCand[acc].rows.filter((x) => x.id !== String(id));
+  for (const k of [acc, acc + ":premium"]) if (instaCand[k]) instaCand[k].rows = instaCand[k].rows.filter((x) => x.id !== String(id));
 }
 // Полировка фото перед постом: включена ли и промпт — в dbo.app_config
 // (правятся на странице «Контент-завод»).
@@ -5783,7 +5786,7 @@ async function instaPublish(acc, f) {
   try {
     const a = (await db.instaAccounts()).find((x) => x.acc === acc);
     if (!a || !a.token || !a.ig_user_id) throw new Error("аккаунт не подключён");
-    const reason = f.mortgage ? "mortgage" : null;
+    const reason = f.premium ? "premium" : f.mortgage ? "mortgage" : null;
     // Код поста — его номер в insta_posts; строку заводим заранее, чтобы код
     // попал на обложку, последний слайд и в подпись.
     if ((!f.near || !f.chips) && f.lat && f.lon) {
@@ -5798,7 +5801,8 @@ async function instaPublish(acc, f) {
     // e.skip — квартира не подошла, а не сбой: автопостинг берёт следующую.
     const skip = (msg) => Object.assign(new Error(msg), { skip: true });
     if (!f.card) { instaCardRetryAt.set(String(f.id), Date.now() + 3600e3); throw skip("не открылась карточка объявления — проверить залог и ипотеку не вышло, повторите позже"); }
-    if (f.card.mortgageNo) {
+    // Премиум публикуем без условия «можно в ипотеку»: про неё в посте ни слова.
+    if (f.card.mortgageNo && !f.premium) {
       instaDropCandidate(acc, f.id);
       throw skip("под ипотеку не публикуем: " + f.card.mortgageNo);
     }
@@ -5950,7 +5954,23 @@ async function instaTick() {
     const gapCfg = await db.configGet(["insta.gap_min"]).catch(() => ({}));
     const gap = Math.max(20, Number(gapCfg["insta.gap_min"]) || 45);
     if (st.last_at && now.getTime() - new Date(st.last_at).getTime() < gap * 60e3) continue;
-    const rows = (await instaCandidates(a.acc, true).catch(() => [])).filter((f) => (instaCardRetryAt.get(String(f.id)) || 0) <= Date.now());
+    // Рубрика «Премиум от хозяина»: один из дневных слотов (app_config
+    // insta.premium_slot — номер поста за день с нуля; по умолчанию
+    // предпоследний, при 4 в день — 19:00; insta.premium_slot=-1 выключает).
+    // Премиум-кандидатов нет — слот берёт обычная квартира.
+    const psCfg = await db.configGet(["insta.premium_slot"]).catch(() => ({}));
+    const pSlot = psCfg["insta.premium_slot"] != null && psCfg["insta.premium_slot"] !== "" ? Number(psCfg["insta.premium_slot"]) : Math.max(0, slots.length - 2);
+    let rows = [];
+    if (pSlot >= 0 && st.n === pSlot) rows = (await instaCandidates(a.acc, true, true).catch(() => [])).filter((f) => (instaCardRetryAt.get(String(f.id)) || 0) <= Date.now());
+    if (!rows.length) {
+      rows = (await instaCandidates(a.acc, true).catch(() => [])).filter((f) => (instaCardRetryAt.get(String(f.id)) || 0) <= Date.now());
+      // Сегменты дня: первый пост — недорогая (до insta.cheap_max, 35 млн),
+      // остальные — средние; нужного сегмента нет — берём любую.
+      const cCfg = await db.configGet(["insta.cheap_max"]).catch(() => ({}));
+      const cheapMax = Number(cCfg["insta.cheap_max"]) || 35e6;
+      const seg = rows.filter((f) => (st.n === 0 ? f.price <= cheapMax : f.price > cheapMax));
+      if (seg.length) rows = seg.concat(rows.filter((f) => !seg.includes(f)));
+    }
     if (!rows.length) continue;
     // Разнообразие: не тот же ЖК, что в постах за 3 дня, и не те же комнаты,
     // что в прошлом посте, — если среди лучших пяти есть такой вариант.
@@ -10379,6 +10399,19 @@ http
               if (b.action === "disconnect") {
                 await db.instaAccountSet(A, { token: null, auto: 0 });
                 return send(200, { ok: true });
+              }
+              // «Премиум сейчас»: лучший премиум-кандидат, не подошёл — следующий (до 5).
+              if (b.action === "publish_premium") {
+                const rows = await instaCandidates(A, true, true);
+                if (!rows.length) return send(404, { ok: false, error: "премиум-кандидатов нет" });
+                const why = [];
+                for (const f of rows.slice(0, 5)) {
+                  try {
+                    const r = await instaPublish(A, f);
+                    return send(200, { ok: true, id: f.id, mediaId: r.mediaId, permalink: r.permalink });
+                  } catch (e) { if (!e.skip) throw e; why.push(f.id + ": " + e.message); }
+                }
+                return send(409, { ok: false, error: "все кандидаты пропущены — " + why.join("; ").slice(0, 400) });
               }
               if (b.action === "publish") {
                 const f = await instaFlat(A, b.id);
