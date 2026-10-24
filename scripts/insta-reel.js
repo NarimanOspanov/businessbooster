@@ -165,7 +165,7 @@ function reelHook(f) {
     : f.mortgage ? "От хозяина · можно в ипотеку" : "От хозяина";
   return [what, why];
 }
-const TOP = "Поставьте «+», чтобы получить контакты";
+const TOP = "Поставьте лайк и «+», чтобы получить контакты";
 
 // --- Звук ------------------------------------------------------------------
 function pickMusic() {
@@ -199,7 +199,7 @@ async function gemini(model, body) {
 // Цену в ролике не называем — её получают вместе с номером после «+».
 // Призыв — слово в слово, как попросили; про ипотеку — только у ипотечных.
 const CTA = (f) => "Чтобы получить контакты, узнать стоимость, подробности" + (f && f.mortgage ? " и дополнительную информацию о вариантах ипотеки" : "") +
-  ", ставьте плюс в комментариях к этому посту — отправлю в личку.";
+  ", ставьте лайк и плюс в комментариях к этому посту — отправлю в личку.";
 const ROOMS_NOM = { 1: "1", 2: "2", 3: "3", 4: "4", 5: "5" };
 // Ниже рынка — если метр дешевле похожих (своя оценка или карточка).
 const belowMarket = (f) => (Number(f.below) || 0) >= 3 || /дешевле/i.test(String((f.card || {}).price || ""));
@@ -351,7 +351,7 @@ async function reelVoice(f, voice) {
 function reelCaption(f, tags) {
   const rubric = f.premium ? "💎 Премиум от хозяина" : "🔑 От хозяина" + (f.mortgage ? " · можно в ипотеку" : "") + (belowMarket(f) ? " · ниже рынка" : "");
   const what = opening(f);
-  return [rubric, "", what, "", "👉 " + CTA(f).replace("ставьте плюс", "ставьте «+»"), "", tags || ""].join("\n").trim();
+  return [rubric, "", what, "", "👉 " + CTA(f).replace("лайк и плюс", "лайк и «+»"), "", tags || ""].join("\n").trim();
 }
 
 module.exports = { renderReel, reelHook, reelVoice, reelScript, reelCaption, priceWords, tts, TOP };
