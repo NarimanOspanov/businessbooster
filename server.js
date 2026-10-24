@@ -10418,7 +10418,9 @@ http
               }
               // «Премиум сейчас»: лучший премиум-кандидат, не подошёл — следующий (до 5).
               if (b.action === "publish_premium") {
-                const rows = await instaCandidates(A, true, true);
+                // Без ожидания оценки фото (иначе таймаут запроса): сначала уже оценённые.
+                const all = await instaCandidates(A, true, true, true);
+                const rows = all.filter((f) => f.photoNote != null).concat(all.filter((f) => f.photoNote == null));
                 if (!rows.length) return send(404, { ok: false, error: "премиум-кандидатов нет" });
                 const why = [];
                 for (const f of rows.slice(0, 5)) {
