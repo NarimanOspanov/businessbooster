@@ -5469,12 +5469,14 @@ function instaGc() {
   for (const [k, v] of instaPreview) if (now - v.at > 1800e3) instaPreview.delete(k);
   for (const [k, v] of instaComments) if (now - v.at > 600e3) instaComments.delete(k);
 }
-async function instaCandidates(acc, fresh, premium) {
+// noWait — для страницы: фото без оценки досчитываются в фоне, ответ не ждёт
+// (новые кандидаты оценивались минутами, и страница упиралась в таймаут Azure).
+async function instaCandidates(acc, fresh, premium, noWait) {
   const key = acc + (premium ? ":premium" : "");
   const c = instaCand[key];
   if (!fresh && c && Date.now() - c.at < 20 * 60e3) return c.rows;
   let rows = await db.instaCandidates(acc, 24, await instaDistricts(acc), { premium: !!premium });
-  rows = await instaApplyPhotoScores(rows).catch((e) => { console.log("[insta] photo score: " + e.message); return rows; });
+  rows = await instaApplyPhotoScores(rows, noWait).catch((e) => { console.log("[insta] photo score: " + e.message); return rows; });
   rows = rows.slice(0, 12);
   await instaApplyPlaces(rows).catch((e) => console.log("[insta] places: " + e.message));
   instaCand[key] = { at: Date.now(), rows: rows };
@@ -5565,19 +5567,25 @@ async function instaLoadCard(f) {
 // Оценка сохраняется в базе: модель зовём один раз на квартиру.
 const PHOTO_SCORE = require("./scripts/photo-score.js");
 const instaPhotoRejected = {}; // acc → сколько отсеяли по фото в последний подбор
-async function instaApplyPhotoScores(rows) {
+const instaScoring = new Set();
+async function instaApplyPhotoScores(rows, noWait) {
   if (!PHOTO_SCORE.available() || !rows.length) return rows;
   const have = await db.instaPhotoScoresGet(rows.map((r) => r.id));
-  const todo = rows.filter((r) => !have[r.id]);
-  for (let i = 0; i < todo.length; i += 4) {
-    await Promise.all(todo.slice(i, i + 4).map(async (r) => {
-      try {
-        const s = await PHOTO_SCORE.scorePhotos(r.photos);
-        await db.instaPhotoScoreSave(r.id, s);
-        have[r.id] = s;
-      } catch (e) { console.log("[insta] photo score " + r.id + ": " + e.message); }
-    }));
-  }
+  const todo = rows.filter((r) => !have[r.id] && !instaScoring.has(r.id));
+  const run = async () => {
+    for (let i = 0; i < todo.length; i += 4) {
+      await Promise.all(todo.slice(i, i + 4).map(async (r) => {
+        instaScoring.add(r.id);
+        try {
+          const s = await PHOTO_SCORE.scorePhotos(r.photos);
+          await db.instaPhotoScoreSave(r.id, s);
+          have[r.id] = s;
+        } catch (e) { console.log("[insta] photo score " + r.id + ": " + e.message); }
+        finally { instaScoring.delete(r.id); }
+      }));
+    }
+  };
+  if (noWait) run().catch(() => {}); else await run();
   const out = [];
   let rejected = 0;
   for (const r of rows) {
@@ -10522,7 +10530,7 @@ http
               out.push({ acc: A, handle: INSTA.ACCOUNTS[A].handle, connected: !!a.token, username: a.username || null, token_exp: a.token_exp || null,
                 auto: !!a.auto, per_day: a.per_day || 4, today: st.n, paused_until: instaPauseUntil[A] || null });
             }
-            const cands = await instaCandidates(acc, q.get("fresh") === "1");
+            const cands = await instaCandidates(acc, q.get("fresh") === "1", false, true);
             const posts = await db.instaPosts(acc, 60);
             const dms = await db.instaDmStats(7);
             const texts = await db.listTextStats().catch(() => null);
