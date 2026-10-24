@@ -1105,6 +1105,27 @@ async function listingsByPhones(numbers) {
   return out;
 }
 
+// Сколько живых объявлений на каждом номере — для отсева посредников в Instagram.
+// Поиск по подстроке «phones LIKE %номер%» сканировал ~940 тыс. строк и под
+// нагрузкой шёл 20+ секунд (таймаут запроса — 15): с 23.10 подбор кандидатов
+// падал и автопостинг молчал. Раз в 30 минут читаем номера живых объявлений
+// (~165 тыс. строк, секунды) и считаем в памяти.
+let livePhones = { at: 0, map: null, p: null };
+async function livePhoneCounts() {
+  if (livePhones.map && Date.now() - livePhones.at < 30 * 60e3) return livePhones.map;
+  if (!livePhones.p) {
+    livePhones.p = (async () => {
+      const pool = await ddlPool();
+      const rows = (await pool.request().query("SELECT phones FROM dbo.krisha_list WITH (NOLOCK) WHERE phones IS NOT NULL AND storage = 'live'")).recordset;
+      const m = new Map();
+      for (const r of rows) for (const n of String(r.phones).split(",")) { const d = n.replace(/\D/g, ""); if (d.length === 11) m.set(d, (m.get(d) || 0) + 1); }
+      livePhones = { at: Date.now(), map: m, p: null };
+      return m;
+    })().catch((e) => { livePhones.p = null; throw e; });
+  }
+  return livePhones.p;
+}
+
 // Последняя отправка по каждому номеру (страница звонков): номер → строка.
 async function outreachByPhones(numbers) {
   const nums = [...new Set((numbers || []).map((x) => String(x || "").replace(/\D/g, "")).filter((x) => x.length === 11))];
@@ -4040,8 +4061,8 @@ async function instaCandidates(city, limit, districts, opts) {
   rows.forEach((x) => { x.sc = premium ? premiumScore(x) : instaScore(x, city, peers); });
   rows.sort((a, b) => b.sc.score - a.sc.score);
   const top = rows.slice(0, n * 3);
-  const busy = await listingsByPhones(top.flatMap((x) => String(x.phones || "").split(",")));
-  const live = (num) => (busy[String(num).replace(/\D/g, "")] || []).filter((l) => l.storage === "live").length;
+  const counts = await livePhoneCounts();
+  const live = (num) => counts.get(String(num).replace(/\D/g, "")) || 0;
   return top
     .filter((x) => String(x.phones).split(",").every((num) => live(num) < 3))
     .slice(0, n)
