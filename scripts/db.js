@@ -2147,6 +2147,13 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_nophone3' AND ob
   EXEC('CREATE INDEX IX_klist_nophone3 ON dbo.krisha_list (first_seen DESC)
         INCLUDE (storage, deal, prop, city, phone_tries, phone_state, phone_next_at)
         WHERE phones IS NULL AND user_type = ''owner''');
+-- Выдача заданий телефонам по городу и типу (24.10.2026): с city/deal/prop
+-- впереди и phone_lease_until в индексе — 45 чтений вместо ~2 000 (без него
+-- на каждую строку шёл поиск в таблице; запрос идёт ~20 раз в минуту).
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_nophone4' AND object_id = OBJECT_ID('dbo.krisha_list'))
+  EXEC('CREATE INDEX IX_klist_nophone4 ON dbo.krisha_list (city, deal, prop, first_seen DESC)
+        INCLUDE (storage, phone_tries, phone_state, phone_next_at, phone_lease_until)
+        WHERE phones IS NULL AND user_type = ''owner''');
 IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_nophone3' AND object_id = OBJECT_ID('dbo.krisha_list'))
    AND EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_nophone2' AND object_id = OBJECT_ID('dbo.krisha_list'))
   DROP INDEX IX_klist_nophone2 ON dbo.krisha_list;
@@ -3179,7 +3186,17 @@ async function findListOwners(q, limit) {
     .input("lon", sql.Decimal(11, 7), q.lon == null ? null : Number(q.lon))
     .input("exid", sql.BigInt, q.id ? Number(q.id) : null)
     .input("n", sql.Int, Number(limit) || 6)
+    // Кандидаты — двумя поисками по индексам (тот же ЖК; прямоугольник вокруг
+    // точки), потом прежние условия на этих строках. Раньше «ЖК ИЛИ ABS(lat -
+    // @lat) < …» не давало базе взять ни один индекс — шёл скан таблицы, ~15 000
+    // чтений на запрос и треть процессора базы (24.10.2026).
     .query(`
+      WITH ids AS (
+        SELECT id FROM dbo.krisha_list WHERE @cxid IS NOT NULL AND complex_id = @cxid AND user_type = 'owner'
+        UNION
+        SELECT id FROM dbo.krisha_list WHERE @lat IS NOT NULL AND user_type = 'owner'
+          AND lat BETWEEN @lat - 0.0011 AND @lat + 0.0011 AND lon BETWEEN @lon - 0.0014 AND @lon + 0.0014
+      )
       SELECT TOP (@n) f.id, f.deal, f.prop, f.user_type, f.city, f.area, f.rooms, f.floor, f.floors,
         f.complex_id, f.lat, f.lon, f.price, f.title, f.addr, f.storage, f.first_seen, f.bumped_on,
         f.phones, f.photos_c, f.photos_json, arch.at AS archived_at,
@@ -3198,7 +3215,8 @@ async function findListOwners(q, limit) {
           AND ((@cxid IS NOT NULL AND f.complex_id = @cxid)
             OR (@lat IS NOT NULL AND f.lat IS NOT NULL
                 AND ABS(f.lat - @lat) < 0.0006 AND ABS(f.lon - @lon) < 0.0008)), 1, 0) AS strict
-      FROM dbo.krisha_list f
+      FROM ids
+      JOIN dbo.krisha_list f ON f.id = ids.id
       OUTER APPLY (SELECT MAX(e.at) AS at FROM dbo.krisha_list_events e WHERE e.id = f.id AND e.kind = 'archived') arch
       WHERE f.user_type = 'owner'
         AND (f.phones IS NULL OR NOT EXISTS (SELECT 1 FROM dbo.agent_phones ap WHERE ap.phone = ${FIRST_PHONE("f.phones")}))
