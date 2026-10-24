@@ -6544,7 +6544,7 @@ async function instaHookMore(acct, igsid, ev) {
   }
   const dist = (km) => km < 1 ? Math.max(50, Math.round(km * 1000 / 50) * 50) + " м" : String(Math.round(km * 10) / 10).replace(".", ",") + " км";
   const text = "Ещё квартиры от хозяев рядом:\n\n" + list.map((x) => "🏠 Пост № " + x.code + " · " + instaFlatLine(x) + " · " + dist(x.km) + "\n" + x.permalink).join("\n\n") +
-    "\n\nЧтобы получить номер, поставьте «+» под постом.";
+    "\n\nЧтобы получить номер, поставьте лайк и «+» под постом.";
   await INSTA.sendMessage(acct.ig_user_id, acct.token, igsid, text);
 }
 

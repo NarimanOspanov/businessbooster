@@ -125,7 +125,7 @@ function coverSvg(f, photo, acc, fx) {
   ${pillSvg}
   ${f.below ? belowPill(f.below, 40 + ph + 12) : ""}
   ${badge}
-  ${f.premium ? `<text x="56" y="${PH + 160}" font-size="64" font-weight="800" fill="#fff">Цена — поставьте «+»</text>` : `<text x="56" y="${PH + 170}" font-size="96" font-weight="800" fill="#fff">${esc(money(f.price))} ₸</text>`}
+  ${f.premium ? `<text x="56" y="${PH + 160}" font-size="64" font-weight="800" fill="#fff">Цена — лайк и «+»</text>` : `<text x="56" y="${PH + 170}" font-size="96" font-weight="800" fill="#fff">${esc(money(f.price))} ₸</text>`}
   ${belowText ? `<path d="M56 ${PH + 206} h30 l-15 22 z" fill="#4cc35a"/><text x="100" y="${PH + 228}" font-size="34" font-weight="700" fill="#4cc35a">${esc(fit(belowText, 34, 700, W - 100 - 56))}</text>` : ""}
   <text x="56" y="${PH + 250 + dy}" font-size="42" font-weight="700" fill="#e9f2ec">${esc(paramsLine(f))}</text>
   <text x="56" y="${PH + 318 + dy}" font-size="36" font-weight="500" fill="#a9c2b3">${esc(A.city + ", " + cleanAddr(f.addr))}</text>
@@ -189,7 +189,7 @@ function ctaSvg(f, photo, acc) {
   <text x="${W / 2}" y="425" text-anchor="middle" font-size="76" font-weight="800" fill="#fff">и получить</text>
   <text x="${W / 2}" y="520" text-anchor="middle" font-size="76" font-weight="800" fill="#ffd166">контакты</text>
   <rect x="140" y="660" width="${W - 280}" height="240" rx="48" fill="#fff"/>
-  <text x="${W / 2}" y="790" text-anchor="middle" font-size="64" font-weight="800" fill="#1e8422">Поставьте «+»</text>
+  <text x="${W / 2}" y="790" text-anchor="middle" font-size="64" font-weight="800" fill="#1e8422">Поставьте лайк и «+»</text>
   <text x="${W / 2}" y="852" text-anchor="middle" font-size="36" font-weight="600" fill="#2f5d3c">в комментариях</text>
   <text x="${W / 2}" y="${H - 70}" text-anchor="middle" font-size="30" font-weight="600" fill="#d5ecd9">@${esc(A.handle)}</text>
 </svg>`;
@@ -377,7 +377,7 @@ function caption(f, acc) {
     // «Можно в ипотеку» — только если это так (у своих объявлений — галочка в форме).
     (f.premium ? "💎 Премиум от хозяина" : "🔑 От хозяина" + (f.mortgage ? " · можно в ипотеку" : "") + (f.below ? " · ниже рынка" : "")), "",
     kind + " в " + (acc === "astana" ? "Астане" : "Алматы") + (f.isNew ? ", новостройка" : "") + " — продаёт сам хозяин. Без посредников", "",
-    f.premium ? "💰 Цену пришлю в личку — поставьте «+»" : "💰 " + money(f.price) + " ₸",
+    f.premium ? "💰 Цену пришлю в личку — поставьте лайк и «+»" : "💰 " + money(f.price) + " ₸",
     "📍 " + A.city + ", " + cleanAddr(f.addr),
     f.floor ? "🏠 Этаж " + f.floor + (f.floors ? " из " + f.floors : "") : null,
   ].filter((x) => x != null);
@@ -399,7 +399,7 @@ function caption(f, acc) {
   // Свои объявления: строки от себя (условия сделки, срочность) — перед призывом.
   if (f.extra) lines.push("", ...String(f.extra).split(/\r?\n/).map((x) => x.trim()).filter(Boolean));
   lines.push("", "✅ Договариваетесь напрямую с хозяином.", "",
-    "👉 Хотите узнать больше и получить номер хозяина? Подпишитесь на @" + A.handle + " и поставьте «+» в комментариях к этому посту — пришлём номер в директ." +
+    "👉 Хотите узнать больше и получить номер хозяина? Подпишитесь на @" + A.handle + " и поставьте лайк и «+» в комментариях к этому посту — пришлём номер в директ." +
       (f.code ? " Это объявление № " + f.code + ", ищите его в списке." : ""),
     "", hashtags(f, acc));
   // Instagram режет подпись после 2200 знаков: лишнее убираем из середины,
