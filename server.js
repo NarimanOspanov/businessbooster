@@ -5806,6 +5806,14 @@ async function instaPublish(acc, f) {
       instaDropCandidate(acc, f.id);
       throw skip("под ипотеку не публикуем: " + f.card.mortgageNo);
     }
+    // Без ремонта не постим (24.10, пост № 127): «черновая отделка», «свободная
+    // планировка» (на Крыше это то же — без отделки), «предчистовая».
+    const lt = await db.listTextGet(f.id).catch(() => null);
+    const stateLine = (String((lt && lt.params) || "").match(/Состояние[^:\n]*:\s*([^\n]+)/i) || [])[1] || "";
+    if (/черновая|свободная планировка|предчистов|без отделки/i.test(stateLine)) {
+      instaDropCandidate(acc, f.id);
+      throw skip("без ремонта — " + stateLine.trim());
+    }
     // Номер хозяина стоит у многих объявлений — чужой или агент: на «+» пришлём не тот номер.
     const shared = await db.phoneSharedCount(f.id).catch(() => ({ n: 0 }));
     if (shared.n > 3) {
