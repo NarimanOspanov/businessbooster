@@ -3817,6 +3817,9 @@ IF COL_LENGTH('dbo.insta_comment_events', 'reminded') IS NULL ALTER TABLE dbo.in
 -- Reels к посту: ролик той же квартиры — свой media_id; «+» под ним ищет пост по нему.
 IF COL_LENGTH('dbo.insta_posts', 'reel_media_id') IS NULL ALTER TABLE dbo.insta_posts ADD reel_media_id NVARCHAR(40) NULL;
 IF COL_LENGTH('dbo.insta_posts', 'reel_permalink') IS NULL ALTER TABLE dbo.insta_posts ADD reel_permalink NVARCHAR(300) NULL;
+-- Казахская пара ролика (insta.reel_kk=1): свой media_id, «+» под ним — тот же пост.
+IF COL_LENGTH('dbo.insta_posts', 'reel_kk_media_id') IS NULL ALTER TABLE dbo.insta_posts ADD reel_kk_media_id NVARCHAR(40) NULL;
+IF COL_LENGTH('dbo.insta_posts', 'reel_kk_permalink') IS NULL ALTER TABLE dbo.insta_posts ADD reel_kk_permalink NVARCHAR(300) NULL;
 -- Подборка: один пост — несколько квартир. n — номер квартиры в подборке
 -- (как «3/7» на слайде); «+3» под постом — номер хозяина квартиры № 3.
 -- Заявки на бесплатную консультацию из Instagram: комментарий «консультация»
@@ -4541,6 +4544,13 @@ async function instaCommentEventAsked(igsid) {
     "SELECT TOP 1 comment_id FROM dbo.insta_comment_events WHERE igsid = @g AND status IN ('asked', 'need_follow') ORDER BY at DESC")).recordset[0] || null;
 }
 // Нажал кнопку, но не подписан — ждём подписки, через ~20 ч напомним раз.
+// Нажатие кнопки под первым сообщением — у всех, подписан человек или нет (для воронки).
+async function instaCommentEventTap(commentId) {
+  const pool = await getPool();
+  await ensureInsta();
+  await pool.request().input("cid", sql.NVarChar(40), String(commentId))
+    .query("UPDATE dbo.insta_comment_events SET tap_at = COALESCE(tap_at, SYSUTCDATETIME()) WHERE comment_id = @cid");
+}
 async function instaCommentEventNeedFollow(commentId) {
   const pool = await getPool();
   await ensureInsta();
@@ -4589,7 +4599,16 @@ async function instaCommentEventStats(acc) {
     FROM dbo.insta_comment_events WHERE acc = @acc AND at >= DATEADD(day, -1, SYSUTCDATETIME())`);
   const last = await pool.request().input("acc", sql.NVarChar(20), acc).query(
     "SELECT TOP 5 username, text, status, note, at FROM dbo.insta_comment_events WHERE acc = @acc ORDER BY at DESC");
-  return Object.assign({}, r.recordset[0], { recent: last.recordset });
+  // Воронка за 7 и 30 дней: комментарии → сообщение в директ → нажали кнопку → получили номер.
+  const fun = await pool.request().input("acc", sql.NVarChar(20), acc).query(`
+    SELECT d.days, COUNT(e.comment_id) AS comments,
+      SUM(CASE WHEN e.status IN ('asked','need_follow','replied') THEN 1 ELSE 0 END) AS dm,
+      SUM(CASE WHEN e.tap_at IS NOT NULL OR e.status = 'replied' THEN 1 ELSE 0 END) AS tapped,
+      SUM(CASE WHEN e.status = 'replied' THEN 1 ELSE 0 END) AS phone
+    FROM (VALUES (7), (30)) d(days)
+    LEFT JOIN dbo.insta_comment_events e ON e.acc = @acc AND e.at >= DATEADD(day, -d.days, SYSUTCDATETIME()) AND e.status <> 'skipped'
+    GROUP BY d.days ORDER BY d.days`);
+  return Object.assign({}, r.recordset[0], { recent: last.recordset, funnel: fun.recordset });
 }
 async function instaPostItemsSet(postId, listingIds) {
   const pool = await getPool();
@@ -4610,7 +4629,7 @@ async function instaPostByMedia(mediaId) {
   const pool = await getPool();
   await ensureInsta();
   return (await pool.request().input("mid", sql.NVarChar(40), String(mediaId)).query(
-    "SELECT TOP 1 acc, post_id, CAST(listing_id AS NVARCHAR(20)) AS listing_id, media_id FROM dbo.insta_posts WHERE media_id = @mid OR reel_media_id = @mid")).recordset[0] || null;
+    "SELECT TOP 1 acc, post_id, CAST(listing_id AS NVARCHAR(20)) AS listing_id, media_id FROM dbo.insta_posts WHERE media_id = @mid OR reel_media_id = @mid OR reel_kk_media_id = @mid")).recordset[0] || null;
 }
 // Пост для ролика вручную: названный или последний вышедший без ролика.
 async function instaPostForReel(acc, postId) {
@@ -4627,6 +4646,12 @@ async function instaPostReel(postId, mediaId, permalink) {
   await ensureInsta();
   await pool.request().input("id", sql.Int, postId).input("mid", sql.NVarChar(40), mediaId || null).input("link", sql.NVarChar(300), permalink || null)
     .query("UPDATE dbo.insta_posts SET reel_media_id = @mid, reel_permalink = @link WHERE post_id = @id");
+}
+async function instaPostReelKk(postId, mediaId, permalink) {
+  const pool = await getPool();
+  await ensureInsta();
+  await pool.request().input("id", sql.Int, postId).input("mid", sql.NVarChar(40), mediaId || null).input("link", sql.NVarChar(300), permalink || null)
+    .query("UPDATE dbo.insta_posts SET reel_kk_media_id = @mid, reel_kk_permalink = @link WHERE post_id = @id");
 }
 async function instaRecentMedia(acc, n) {
   const pool = await getPool();
@@ -5542,7 +5567,7 @@ async function objectStats() {
   return r.recordset[0];
 }
 
-module.exports = { listTextGet, portalUserByToken, portalUsers, portalUserSave, portalNewToken, portalLog, portalReveals, portalAudit, consultAdd, consultGet, consultSet, phoneSharedCount, stickyFirstPhone, listPhoneRetryLater, instaPostForReel, instaPostReel, instaCommentAnswered, instaPostItemsSet, instaPostItems, instaCommentEventNeedFollow, instaCommentEventsToRemind, instaCommentEventReminded, instaSimilarPosts, instaHookLogAdd, instaCommentEventGet, instaCommentEventIgsid, instaCommentEventAsked, instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, listLastNew, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
+module.exports = { listTextGet, portalUserByToken, portalUsers, portalUserSave, portalNewToken, portalLog, portalReveals, portalAudit, consultAdd, consultGet, consultSet, phoneSharedCount, stickyFirstPhone, listPhoneRetryLater, instaPostForReel, instaPostReel, instaCommentAnswered, instaPostItemsSet, instaPostItems, instaCommentEventNeedFollow, instaCommentEventsToRemind, instaCommentEventReminded, instaSimilarPosts, instaHookLogAdd, instaCommentEventGet, instaCommentEventIgsid, instaCommentEventAsked, instaCommentEventAdd, instaCommentEventSet, instaCommentEventStats, instaPostReelKk, instaCommentEventTap, instaManualList, instaManualUpdate, instaManualPhotosClear, instaManualPhotoSet, instaManualPhotos, instaManualListing, instaManualAdd, instaManualPending, mortgageFlagsReset, listPhoneFlow, listLastNew, instaCardFactsGet, instaCardFactsSave, saveFlat, saveFlats, knownIds, flatsWithoutCard, deepenLeft, markCardMiss, places, facets, backfillMkr, flatsWithoutMkr, flatsWithoutStreet, backfillStreet, flatsNeedingPhoto, setFlatPhoto, photoStats, saveFlatPhones, replaceFlatPhones, normPhone, flatPhones, flatsWithoutPhone, markPhoneMiss,
   saveCard, card, candidatePhotoUrls, flat, findFlats, krishaStats, markPending, clearPending, pendingFlats,
   maxKnownId, saveObject, knownObjectIds, objectStats, findObjects, agentsToMatch, recordSearched, matchStats,
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadSetFav, leadSetHide, listEvDenormBackfill, leadPresets, leadPresetSave, leadPresetDel, listYearSources, listYearTodo, listYearSave, leadCopies, leadUncheckedCopies, leadSetCopyPhoto, dropKnownSticky, cleanStickyPhones,

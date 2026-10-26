@@ -28,7 +28,7 @@ function ffmpegPath() {
 const fitSize = (t, max) => Math.max(30, Math.min(max, Math.floor(880 / (String(t).length * 0.66))));
 const esc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 function frameSvg(slide, top, big) {
-  const uri = "data:image/jpeg;base64," + slide.toString("base64");
+  const uri = "data:image/" + (slide[0] === 0x89 ? "png" : "jpeg") + ";base64," + slide.toString("base64");
   const y = Math.round((H - SH) / 2);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Montserrat">
   <defs><filter id="b" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="40"/></filter></defs>
@@ -59,13 +59,18 @@ function run(bin, args) {
 // opts.hook — крупный зацеп над первым слайдом (строка или две, до 15 слов):
 // решают первые 1–2 секунды. opts.top — мелкая надпись над остальными.
 // opts.tops / opts.big — свои надписи по кадрам (общие ролики о странице).
+// opts.knock — фирменное начало «Тук-тук»: стук в дверь (assets/sfx/knock.mp3)
+// и крупное «ТУК → ТУК-ТУК» с дрожью на первом кадре; голос — после стука.
+const KNOCK = path.join(__dirname, "..", "assets", "sfx", "knock.mp3");
+const KNOCK_LEN = 1.25, KNOCK_STEP = 0.26; // длина звука и шаг между ударами, с
 async function renderReel(slides, opts) {
   const o = opts || {};
   const list = (slides || []).filter(Boolean);
   if (list.length < 2) throw new Error("мало слайдов для Reels");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "reel-"));
   try {
-    const dur = list.map((_, i) => (i === list.length - 1 ? 3.5 : i === 0 ? 2.6 : 2.0));
+    const intro = o.knock && fs.existsSync(KNOCK) ? KNOCK_LEN : 0;
+    const dur = list.map((_, i) => (i === list.length - 1 ? 3.5 : i === 0 ? 2.6 + intro : 2.0));
     const fade = 0.35;
     // Голос начинается через 0,3 с; ролик — на секунду длиннее голоса:
     // недостающее время раздаём фото посередине.
@@ -73,7 +78,7 @@ async function renderReel(slides, opts) {
     // фиксированные и длинные, а ролик должен укладываться в ~25 секунд.
     const tempo = o.tempo || 1.12;
     const voiceLen = o.voice ? wavSeconds(o.voice) / tempo : 0;
-    const need = voiceLen ? voiceLen + 1.3 : 0;
+    const need = voiceLen ? voiceLen + 1.3 + intro : 0;
     const have = dur.reduce((a, b) => a + b, 0);
     if (need > have && list.length > 2) {
       const add = (need - have) / (list.length - 2);
@@ -104,8 +109,14 @@ async function renderReel(slides, opts) {
     if (o.voice) {
       fs.writeFileSync(path.join(dir, "voice.wav"), o.voice);
       args.push("-i", path.join(dir, "voice.wav"));
-      f.push(`[${ai}:a]atempo=${tempo},adelay=300|300,aformat=sample_rates=44100:channel_layouts=stereo[va]`);
+      const vd = Math.round(300 + intro * 1000);
+      f.push(`[${ai}:a]atempo=${tempo},adelay=${vd}|${vd},aformat=sample_rates=44100:channel_layouts=stereo[va]`);
       mix.push("[va]"); ai++;
+    }
+    if (intro) {
+      args.push("-i", KNOCK);
+      f.push(`[${ai}:a]aformat=sample_rates=44100:channel_layouts=stereo,volume=1.4[ka]`);
+      mix.push("[ka]"); ai++;
     }
     if (music) {
       args.push("-i", music);
@@ -117,10 +128,21 @@ async function renderReel(slides, opts) {
     // Субтитры по центру под голос: фразы по 2–4 слова, время каждой — по
     // доле букв в тексте (голос идёт ровно, без долгих пауз).
     let vmap = "vout";
+    if (intro) {
+      // «ТУК» на первом ударе, «ТУК-ТУК» — со второго; дрожит на каждом ударе и затухает.
+      const words = o.knockText || ["ТУК", "ТУК-ТУК"];
+      words.forEach((w, k) => {
+        const tf = path.join(dir, "k" + k + ".txt");
+        fs.writeFileSync(tf, w);
+        const from = k ? KNOCK_STEP : 0.02, to = k ? intro + 0.1 : KNOCK_STEP;
+        f.push(`[${vmap}]drawtext=fontfile='${ffEsc(FONTS[2])}':textfile='${ffEsc(tf)}':fontsize=170:fontcolor=0xffd166:borderw=10:bordercolor=black@0.9:x='(w-text_w)/2+18*sin(t*90)*exp(-mod(t,${KNOCK_STEP})*10)':y=h*0.42-text_h/2:enable='between(t,${from.toFixed(2)},${to.toFixed(2)})'[kn${k}]`);
+        vmap = "kn" + k;
+      });
+    }
     if (o.voice && o.subs) {
       const chunks = subChunks(o.subs);
       const letters = chunks.reduce((a, c) => a + c.length, 0);
-      let t0 = 0.3;
+      let t0 = 0.3 + intro;
       chunks.forEach((c, k) => {
         const d = voiceLen * c.length / letters;
         const tf = path.join(dir, "s" + k + ".txt");
@@ -166,6 +188,49 @@ function reelHook(f) {
   return [what, why];
 }
 const TOP = "Поставьте лайк и «+», чтобы получить контакты";
+
+// --- Казахская пара ролика (insta.reel_kk=1) --------------------------------
+// Тот же ролик на казахском: начало и призыв — наши, слово в слово, середину
+// пишет Gemini по тем же фактам. Голос — Gemini Kore (по-казахски без акцента, проверено 26.10).
+const ROOMS_KK = { 1: "бір бөлмелі", 2: "екі бөлмелі", 3: "үш бөлмелі", 4: "төрт бөлмелі", 5: "бес бөлмелі" };
+// «Самал-1 шағын ауданындағы», «Розыбакиева көшесіндегі».
+function placeKk(f) {
+  const a = String(f.addr || "").split(" — ")[0].split(",")[0].trim();
+  const name = (t) => t.split(/\s+(?=\d)/)[0].trim();
+  if (!a) return "Алматыдағы";
+  const m = a.match(/^мкр\.?\s*(.+)$/i);
+  if (m) return name(m[1]) + " шағын ауданындағы";
+  return name(a.replace(/^(ул\.?|улица|пр\.?|проспект)\s*/i, "")) + " көшесіндегі";
+}
+function openingKk(f) {
+  const pct = belowPct(f);
+  return placeKk(f) + " " + (ROOMS_KK[f.rooms] ? ROOMS_KK[f.rooms] + " " : "") + "пәтерімді сатамын" +
+    (pct ? " — нарықтық бағадан " + pct + " пайызға арзан" : belowMarket(f) ? " — нарықтық бағадан арзан" : "") + "." +
+    " Делдалсыз, риэлторсыз." +
+    (f.mortgage ? " Отбасы банк пен басқа да екінші деңгейлі банктердің ипотекасына өтеді." : "");
+}
+const CTA_KK = (f) => "Байланыс, баға, толық ақпарат" + (f && f.mortgage ? " және ипотека нұсқалары туралы мәлімет" : "") +
+  " алу үшін осы постқа лайк басып, пікірге плюс қойыңыз — жеке хабарламаға жіберемін.";
+function reelHookKk(f) {
+  const r = ROOMS_KK[f.rooms];
+  const what = (r ? r[0].toUpperCase() + r.slice(1) + " пәтер" : "Пәтер") + " · " + placeKk(f).replace(/ (шағын ауданындағы|көшесіндегі)$/, "").replace(/^Алматыдағы$/, "Алматы");
+  const why = f.premium ? "Премиум · иесінен" : belowMarket(f) ? "Нарықтан арзан" + (f.mortgage ? " · ипотекаға болады" : " · иесінен")
+    : f.mortgage ? "Иесінен · ипотекаға болады" : "Иесінен";
+  return [what, why];
+}
+const TOP_KK = "Байланыс алу үшін лайк басып, «+» қойыңыз";
+// Последний кадр карусели — русский призыв; в казахском ролике — свой (PNG 1080×1350).
+// Текст выше середины: ниже, на 0,62 высоты ролика, идут субтитры.
+function ctaSlideKk() {
+  return toPng(`<svg xmlns="http://www.w3.org/2000/svg" width="${SW}" height="${SH}" viewBox="0 0 ${SW} ${SH}" font-family="Montserrat">
+  <rect width="${SW}" height="${SH}" fill="#0f1b2d"/>
+  <circle cx="${SW / 2}" cy="330" r="170" fill="#ffd166"/>
+  <text x="${SW / 2}" y="415" text-anchor="middle" font-size="250" font-weight="800" fill="#0f1b2d">+</text>
+  <text x="${SW / 2}" y="620" text-anchor="middle" font-size="64" font-weight="800" fill="#fff">Лайк басып, «+» қойыңыз</text>
+  <text x="${SW / 2}" y="700" text-anchor="middle" font-size="44" font-weight="700" fill="#c9d3e6">иесінің нөмірі мен бағасын</text>
+  <text x="${SW / 2}" y="760" text-anchor="middle" font-size="44" font-weight="700" fill="#c9d3e6">жеке хабарламаға жіберемін</text>
+</svg>`);
+}
 
 // --- Звук ------------------------------------------------------------------
 function pickMusic() {
@@ -257,7 +322,37 @@ function fallbackScript(f) {
   const near = (f.chips || []).slice(0, 1).map((t) => t.replace(/ — .*$/, "")).join(", ");
   return opening(f) + (plus ? " " + plus + "." : "") + (near ? " Рядом: " + near + "." : "") + " " + CTA(f);
 }
-async function reelScript(f) {
+async function reelScriptKk(f) {
+  const fallback = () => openingKk(f) + " " + CTA_KK(f);
+  try {
+    const j = await gemini(process.env.GEMINI_MODEL || "gemini-3.7-flash", {
+      contents: [{ role: "user", parts: [{ text: "Факты о квартире:\n- " + factsOf(f).join("\n- ") }] }],
+      system_instruction: { parts: [{ text:
+        "Ты пишешь середину текста за кадром для Reels НА КАЗАХСКОМ ЯЗЫКЕ: говорит сам продавец квартиры в Алматы, от первого лица, живо и просто, естественным разговорным казахским, как говорят в Алматы. " +
+        "Начало («…пәтерімді сатамын…») и призыв в конце уже есть — их НЕ пиши. Напиши 2 коротких предложения, всего 10–16 слов: " +
+        "1) 2 главных плюса квартиры и 1–2 места рядом с минутами пешком; 2) кому подходит: отбасымен тұруға немесе жалға беруге. " +
+        "ЦЕНУ НЕ НАЗЫВАЙ — ни сумм, ни миллионов, ни теңге, ни процентов. Используй ТОЛЬКО факты из списка, ничего не придумывай. Названия улиц, ЖК и мест оставь как есть. Не повторяй улицу, район и число комнат — они уже в начале. " +
+        "Не говори «делдал», «агент», не называй сайты, не пиши «плюс». Без эмодзи, хэштегов, кавычек и списков. Ответь только казахским текстом." }] },
+      generationConfig: { temperature: 0.6, maxOutputTokens: 4000 },
+    });
+    const c = ((j.candidates || [])[0] || {}).content;
+    let t = c && c.parts ? c.parts.map((p) => p.text || "").join("").trim() : "";
+    t = t.replace(/[«»"*#]/g, "").replace(/^\s*[-•\d.)]+\s*/gm, "").replace(/\s+/g, " ").trim();
+    if (t.split(" ").length > 20) {
+      let cut = "";
+      for (const sent of t.match(/[^.!?]+[.!?]+/g) || [t]) { if ((cut + sent).trim().split(" ").length > 20) break; cut += sent; }
+      t = cut.trim();
+    }
+    // Не по-казахски (нет ә, ө, ү, ұ, қ, ғ, ң, і), цена или посторонние слова — без середины.
+    if (!t || t.split(" ").length < 6 || !/[әөүұқғңі]/i.test(t) || /делдал|krisha|агент|миллион|теңге|тенге|₸|%|плюс|сатамын/i.test(t)) return fallback();
+    return openingKk(f) + " " + t + " " + CTA_KK(f);
+  } catch (e) {
+    console.log("[reel kk] текст: " + e.message);
+    return fallback();
+  }
+}
+async function reelScript(f, lang) {
+  if (lang === "kk") return reelScriptKk(f);
   // Модель пишет только середину: плюсы, кому подходит, что рядом. Начало
   // (opening) и призыв (CTA) — наши, слово в слово.
   try {
@@ -316,7 +411,7 @@ async function tts(text, voice) {
 }
 // Проверка озвучки: расшифровываем и смотрим, что призыв прозвучал, цены нет
 // и нет посторонних слов (служебной подводки) в начале.
-async function voiceOk(wav, f) {
+async function voiceOk(wav, f, lang) {
   const j = await gemini(process.env.GEMINI_MODEL || "gemini-3.7-flash", {
     contents: [{ parts: [{ inlineData: { mimeType: "audio/wav", data: wav.toString("base64") } }, { text: "Дословно расшифруй речь, числа цифрами. Только текст." }] }],
     generationConfig: { temperature: 0, maxOutputTokens: 3000 },
@@ -324,21 +419,21 @@ async function voiceOk(wav, f) {
   const c = ((j.candidates || [])[0] || {}).content;
   const t = (c && c.parts ? c.parts.map((p) => p.text || "").join("") : "").replace(/\s+/g, " ");
   // Цены в ролике нет — проверяем, что голос её и не выдумал, и что призыв прозвучал.
-  return !/миллион|тенге|\b(say|tone|pace)\b|прочитай/i.test(t) && /плюс/i.test(t);
+  return !/миллион|тенге|теңге|\b(say|tone|pace)\b|прочитай/i.test(t) && /плюс/i.test(t) && (lang !== "kk" || /[әөүұқғңі]/i.test(t));
 }
 // Текст + голос для ролика; до 4 попыток озвучки с проверкой и паузами между
 // ними: 18–19.10 TTS сбоил часами, и 6 роликов подряд вышли с одной музыкой.
 // Не вышло — wav: null и причина в why (такой ролик сервер не публикует).
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-async function reelVoice(f, voice) {
-  const text = await reelScript(f);
+async function reelVoice(f, voice, lang) {
+  const text = await reelScript(f, lang);
   let why = "";
   const waits = [20000, 60000, 120000];
   for (let i = 0; i < 4; i++) {
     if (i) await sleep(waits[i - 1]);
     try {
       const wav = await tts(text, voice);
-      if (await voiceOk(wav, f).catch(() => true)) return { text: text, wav: wav };
+      if (await voiceOk(wav, f, lang).catch(() => true)) return { text: text, wav: wav };
       why = "озвучка не прошла проверку";
       console.log("[reel] " + why + ", попытка " + (i + 1));
     } catch (e) { why = e.message; console.log("[reel] голос, попытка " + (i + 1) + ": " + e.message); }
@@ -348,10 +443,14 @@ async function reelVoice(f, voice) {
 
 // Подпись ролика — коротко и тем же голосом, что за кадром: без цены и номера
 // объявления; рубрика, одна строка о квартире, призыв, хэштеги.
-function reelCaption(f, tags) {
+function reelCaption(f, tags, lang) {
+  if (lang === "kk") {
+    const rubric = f.premium ? "💎 Премиум · иесінен" : "🔑 Иесінен" + (f.mortgage ? " · ипотекаға болады" : "") + (belowMarket(f) ? " · нарықтан арзан" : "");
+    return [rubric, "", openingKk(f), "", "👉 " + CTA_KK(f).replace("плюс", "«+»"), "", tags || ""].join("\n").trim();
+  }
   const rubric = f.premium ? "💎 Премиум от хозяина" : "🔑 От хозяина" + (f.mortgage ? " · можно в ипотеку" : "") + (belowMarket(f) ? " · ниже рынка" : "");
   const what = opening(f);
   return [rubric, "", what, "", "👉 " + CTA(f).replace("лайк и плюс", "лайк и «+»"), "", tags || ""].join("\n").trim();
 }
 
-module.exports = { renderReel, reelHook, reelVoice, reelScript, reelCaption, priceWords, tts, TOP };
+module.exports = { renderReel, reelHook, reelHookKk, reelVoice, reelScript, reelCaption, priceWords, tts, TOP, TOP_KK, ctaSlideKk };

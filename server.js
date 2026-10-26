@@ -5759,7 +5759,8 @@ async function instaOwnPublish(acc, id, caption) {
     if (!f.phones) throw new Error("нет номера хозяина");
     const c = await instaOwnCode(acc, id);
     const code = c.reserved ? c.code : await db.instaPostReserve(acc, id, "manual");
-    const fc = Object.assign({}, f, { code: code });
+    // Цена — награда за «+» (insta.hide_price, по умолчанию да, с 26.10): в посте и ролике её нет, только в директе после кнопки.
+    const fc = Object.assign({}, f, { code: code, hidePrice: await instaHidePrice(), year: await instaYear(f.id) });
     const cap = String(caption || "").trim() || INSTA.caption(fc, acc);
     try {
       const hit = instaOwnPreview.get(String(id));
@@ -5829,7 +5830,8 @@ async function instaPublish(acc, f) {
       throw skip("номер " + shared.p + " стоит у " + shared.n + " объявлений «от хозяина» — не публикуем");
     }
     const code = await db.instaPostReserve(acc, f.id, reason);
-    const fc = Object.assign({}, f, { code: code });
+    // Цена — награда за «+» (insta.hide_price, по умолчанию да, с 26.10): в посте и ролике её нет, только в директе после кнопки.
+    const fc = Object.assign({}, f, { code: code, hidePrice: await instaHidePrice(), year: await instaYear(f.id) });
     const cap = INSTA.caption(fc, acc);
     try {
       const slides = await INSTA.renderCarousel(fc, acc, { polish: await instaPolish() });
@@ -5864,6 +5866,14 @@ async function instaPublish(acc, f) {
       throw e;
     }
   } finally { instaBusy = false; }
+}
+// Год постройки из параметров объявления — для обложки без цены.
+async function instaYear(id) {
+  const lt = await db.listTextGet(id).catch(() => null);
+  return (String((lt && lt.params) || "").match(/Год постройки[^:\n]*:\s*(\d{4})/i) || [])[1] || null;
+}
+async function instaHidePrice() {
+  return String((await db.configGet(["insta.hide_price"]).catch(() => ({})))["insta.hide_price"] || "1") !== "0";
 }
 // Ролик той же квартиры после карусели: слайды без обложки (на ней цена),
 // карта без цены, голос продавца (Gemini — текст, Gemini TTS — озвучка с проверкой),
@@ -5901,8 +5911,14 @@ async function instaReelAfter(a, fc, slides, tok, code, tell, attempt) {
     }
     // Первый кадр — главное фото с обложки (без плашек и цены): иначе ролик
     // открывался вторым фото объявления, бывало — планировкой (№ 88).
-    if (slides.coverPhoto) reelSlides.unshift(INSTA.rawSlides([slides.coverPhoto])[0]);
-    const mp4 = await REEL.renderReel(reelSlides, { hook: REEL.reelHook(fc), top: REEL.TOP, voice: voice.wav, subs: voice.text });
+    // С 26.10 на обложке нет цены (hidePrice) — ролик открывается самой обложкой:
+    // комнаты · метраж · этаж, адрес, год сразу видны. Казахскому ролику — фото
+    // без надписей (обложка русская).
+    const rawFirst = slides.coverPhoto ? INSTA.rawSlides([slides.coverPhoto])[0] : null;
+    const kkSlides = rawFirst ? [rawFirst].concat(reelSlides) : reelSlides;
+    if (fc.hidePrice && !fc.premium && slides[0]) reelSlides.unshift(slides[0]);
+    else if (rawFirst) reelSlides.unshift(rawFirst);
+    const mp4 = await REEL.renderReel(reelSlides, { hook: REEL.reelHook(fc), top: REEL.TOP, voice: voice.wav, subs: voice.text, knock: true });
     const hit = instaImgs.get(tok) || { at: Date.now(), slides: [] };
     hit.at = Date.now(); hit.video = mp4; instaImgs.set(tok, hit);
     try { fs.mkdirSync(path.join(INSTA_IMG_DIR, tok), { recursive: true }); fs.writeFileSync(path.join(INSTA_IMG_DIR, tok, "reel.mp4"), mp4); } catch { /* из памяти тоже отдадим */ }
@@ -5911,10 +5927,38 @@ async function instaReelAfter(a, fc, slides, tok, code, tell, attempt) {
     await db.instaPostReel(code, r.mediaId, r.permalink);
     console.log("[insta] reel " + code + " → " + (r.permalink || r.mediaId));
     if (tell) notifyTelegram("🎬 Instagram: ролик к посту № " + code + " вышел" + (r.permalink ? "\n" + r.permalink : ""));
+    await instaReelKk(a, fc, kkSlides, code, tell);
   } catch (e) {
     console.log("[insta] reel " + code + ": " + e.message);
     notifyTelegram("🎬 Instagram: ролик к посту № " + code + " не вышел (карусель вышла): " + String(e.message).slice(0, 200));
   } finally { instaReelBusy = false; }
+}
+// Казахская пара ролика (app_config insta.reel_kk=1): те же кадры, последний —
+// казахский призыв; голос insta.reel_voice_kk (по умолчанию Kore — без акцента),
+// текст и подпись на казахском. media_id — к тому же посту: «+» даёт тот же номер.
+// Сбой — уведомление админам, русский ролик и карусель от него не зависят.
+async function instaReelKk(a, fc, reelSlides, code, tell) {
+  const cfg = await db.configGet(["insta.reel_kk", "insta.reel_voice_kk"]).catch(() => ({}));
+  if (String(cfg["insta.reel_kk"] || "") !== "1") return;
+  try {
+    const REEL = require("./scripts/insta-reel.js");
+    const voice = await REEL.reelVoice(fc, cfg["insta.reel_voice_kk"] || "Kore", "kk");
+    if (voice.text) console.log("[insta] reel kk " + code + " текст: " + voice.text + (voice.wav ? "" : " (без голоса)"));
+    if (!voice.wav) { notifyTelegram("🎬 Instagram: казахский ролик к посту № " + code + " не вышел — нет голоса: " + String(voice.why || "").slice(0, 150)); return; }
+    const slides = reelSlides.slice(0, -1).concat([REEL.ctaSlideKk()]);
+    const mp4 = await REEL.renderReel(slides, { hook: REEL.reelHookKk(fc), top: REEL.TOP_KK, voice: voice.wav, subs: voice.text, knock: true });
+    const tok = crypto.randomBytes(12).toString("hex");
+    instaImgs.set(tok, { at: Date.now(), slides: [], video: mp4 });
+    try { fs.mkdirSync(path.join(INSTA_IMG_DIR, tok), { recursive: true }); fs.writeFileSync(path.join(INSTA_IMG_DIR, tok, "reel.mp4"), mp4); } catch { /* из памяти тоже отдадим */ }
+    const cap = REEL.reelCaption(fc, INSTA.hashtags(fc, a.acc), "kk");
+    const r = await INSTA.publishReel(a.ig_user_id, a.token, PUBLIC_URL + "/api/insta/vid/" + tok + ".mp4", cap, true);
+    await db.instaPostReelKk(code, r.mediaId, r.permalink);
+    console.log("[insta] reel kk " + code + " → " + (r.permalink || r.mediaId));
+    if (tell) notifyTelegram("🎬 Instagram: казахский ролик к посту № " + code + " вышел" + (r.permalink ? "\n" + r.permalink : ""));
+  } catch (e) {
+    console.log("[insta] reel kk " + code + ": " + e.message);
+    notifyTelegram("🎬 Instagram: казахский ролик к посту № " + code + " не вышел (русский вышел): " + String(e.message).slice(0, 200));
+  }
 }
 // Полночь по Алматы (UTC+5) в UTC — начало «сегодня» для дневного лимита.
 function almatyDayStart(now) {
@@ -6243,9 +6287,24 @@ if (process.env.WEBSITE_SITE_NAME) {
 
 // Текст ответа с номером хозяина — общий для ManyChat и вебхука.
 // Квартира одной строкой: «3-комн · 89,6 м² · Талды 63 · 99 млн ₸».
-function instaFlatLine(f) {
+function instaFlatLine(f, noPrice) {
   return [f.rooms ? f.rooms + "-комн" : null, f.area ? String(f.area).replace(".", ",") + " м²" : null, INSTA.cleanAddr(f.addr),
-    Math.round(f.price / 1e5) / 10 + " млн ₸"].filter(Boolean).join(" · ").replace(/(\d)\.(\d)/, "$1,$2");
+    noPrice ? null : Math.round(f.price / 1e5) / 10 + " млн ₸"].filter(Boolean).join(" · ").replace(/(\d)\.(\d)/, "$1,$2");
+}
+// Ответ на вопрос из комментария («этаж? год постройки? квадратура?») —
+// из объявления. Цену не называем: она вместе с номером по кнопке (26.10:
+// цена в первом сообщении закрывала интерес, и кнопку не нажимали).
+async function instaAnswerLines(f, text) {
+  const q = String(text || "").toLowerCase(), out = [];
+  if (!f || !q.trim() || INSTA.isPlus(q) && q.trim().length <= 2) return out;
+  const lt = await db.listTextGet(f.id).catch(() => null);
+  const param = (re) => ((String((lt && lt.params) || "").match(re) || [])[1] || "").trim();
+  if (/этаж|қабат|кабат/.test(q) && f.floor) out.push("🏢 Этаж: " + f.floor + (f.floors ? " из " + f.floors : ""));
+  if (/год|жыл|построй|салын/.test(q)) { const y = param(/Год постройки[^:\n]*:\s*([^\n]+)/i); if (y) out.push("📅 Год постройки: " + y); }
+  if (/площад|квадрат|кв\.?\s*м|метр|ауданы|шаршы/.test(q) && f.area) out.push("📐 Площадь: " + String(f.area).replace(".", ",") + " м²");
+  if (/ремонт|состоян|жөндеу|жондеу/.test(q)) { const s = param(/Состояние[^:\n]*:\s*([^\n]+)/i); if (s) out.push("🛠 Состояние: " + s); }
+  if (/адрес|где|қай жер|кай жер|район/.test(q) && f.addr) out.push("📍 Адрес: " + INSTA.cleanAddr(f.addr));
+  return out;
 }
 // Как назвать квартиру в сообщении: «Пост № 62» или «Подборка № 70, квартира 3».
 async function instaPostLabel(post, listingId) {
@@ -6346,14 +6405,18 @@ async function instaHookComment(e, v, accs, cfg, verified) {
     // Первое сообщение сразу показывает квартиру, о которой речь (человек мог
     // поставить «+» под несколькими постами), и что нужно для номера.
     const f = await db.instaListing(listingId).catch(() => null);
-    const head = (question ? "Здравствуйте! Ответим здесь 🙂 Все вопросы по квартире лучше задать напрямую хозяину.\n\n" : "") +
-      (f ? "🏠 " + label + ":\n" + instaFlatLine(f) + "\n\n" : "");
+    // Первое сообщение (26.10): квартира без цены, ответ на вопрос из комментария,
+    // одна кнопка «Цена и номер». «Подпишитесь» здесь больше не пишем — подписку
+    // проверяем после нажатия (тест: раньше два действия сразу, и не нажимали).
+    const ans = await instaAnswerLines(f, text).catch(() => []);
+    const head = (question ? "Здравствуйте! 🙂\n\n" : "") + (f ? "🏠 " + label + ":\n" + instaFlatLine(f, true) + "\n\n" : "") +
+      (ans.length ? ans.join("\n") + "\n\n" : "");
     // Кнопку в приватном ответе Instagram может не принять — тогда без неё:
     // человек ответит словом «номер», это тоже засчитывается как нажатие.
     const r = await INSTA.privateReply(acct.ig_user_id, acct.token, cid,
-      head + "Номер хозяина пришлём сюда. Чтобы его получить, подпишитесь на @" + handle + " и нажмите кнопку 👇\nУже подписаны — просто нажмите.", "PHONE:" + cid)
+      head + "💰 Цену и номер хозяина пришлём сюда — нажмите кнопку 👇", "PHONE:" + cid, "💰 Цена и номер")
       .catch((err) => { console.log("[insta-hook] кнопка не прошла: " + err.message);
-        return INSTA.privateReply(acct.ig_user_id, acct.token, cid, head + "Номер хозяина пришлём сюда. Чтобы его получить, подпишитесь на @" + handle + " и ответьте на это сообщение словом «номер»."); });
+        return INSTA.privateReply(acct.ig_user_id, acct.token, cid, head + "💰 Цену и номер хозяина пришлём сюда — ответьте на это сообщение словом «номер»."); });
     if (r.recipient_id) await db.instaCommentEventIgsid(cid, r.recipient_id);
     await INSTA.replyComment(cid, acct.token, INSTA_DM_SENT).catch((err) => console.log("[insta-hook] public reply: " + err.message));
     await db.instaCommentEventSet(cid, "asked", null, listingId);
@@ -6422,6 +6485,7 @@ async function instaHookMessage(e, m, accs, cfg, verified) {
   const acct = accs.find((x) => x.acc === ev.acc);
   if (!acct || !acct.token) return;
   const handle = (INSTA.ACCOUNTS[acct.acc] || {}).handle || acct.username;
+  await db.instaCommentEventTap(cid).catch(() => {});
   let follows = false;
   try { follows = (await INSTA.userFollows(igsid, acct.token)).follows; }
   catch (err) { console.log("[insta-hook] подписка " + igsid + ": " + err.message); }

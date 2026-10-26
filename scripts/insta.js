@@ -104,7 +104,7 @@ function coverSvg(f, photo, acc, fx) {
   const ph = pillLines.length === 2 ? 100 : 64;
   const pillSvg = `<rect x="40" y="40" width="${pw.toFixed(0)}" height="${ph}" rx="${ph === 64 ? 32 : 28}" fill="${f.premium ? "#a87b16" : "#1e8422"}"/>` +
     pillLines.map((t, i) => `<text x="${(40 + pw / 2).toFixed(0)}" y="${pillLines.length === 2 ? 80 + i * 38 : 82}" text-anchor="middle" font-size="26" font-weight="700" fill="#fff" letter-spacing="1">${t}</text>`).join("");
-  const ppm = f.area && !f.premium ? Math.round(f.price / f.area / 1000) : null;
+  const ppm = f.area && !noPrice(f) ? Math.round(f.price / f.area / 1000) : null;
   // Ниже рынка — строкой прямо под ценой: наша оценка (3–10%) или оценка
   // Крыши из карточки. Остальные строки сдвигаются вниз на dy.
   const c = f.card || {};
@@ -118,6 +118,31 @@ function coverSvg(f, photo, acc, fx) {
       <text x="${40 + bw / 2}" y="${PH + 12}" text-anchor="middle" font-size="34" font-weight="800" fill="#fff">${esc(h.badge)}</text>`;
   }
   const img = photo ? `<image href="${dataUri(photo)}" x="0" y="0" width="${W}" height="${PH}" preserveAspectRatio="xMidYMid slice"${fx ? ' filter="url(#fx)"' : ""}/>` : "";
+  // Без цены (26.10): крупно — комнаты · метраж · этаж; ниже — «дешевле похожих»,
+  // адрес, год постройки, что рядом; внизу жёлтым — «Цена — лайк и «+»».
+  if (noPrice(f) && !f.premium) {
+    const big = paramsLine(f);
+    let bs = 84;
+    while (bs > 52 && measure(big, bs, 800) > W - 112) bs -= 2;
+    const sub = [f.year ? f.year + " год постройки" : null, f.isNew ? "новостройка" : null].filter(Boolean).join(" · ");
+    let y = PH + 128;
+    const rows = [`<text x="56" y="${y}" font-size="${bs}" font-weight="800" fill="#fff">${esc(big)}</text>`];
+    if (belowText) { y += 62; rows.push(`<path d="M56 ${y - 22} h30 l-15 22 z" fill="#4cc35a"/><text x="100" y="${y}" font-size="34" font-weight="700" fill="#4cc35a">${esc(fit(belowText, 34, 700, W - 100 - 56))}</text>`); }
+    y += 66; rows.push(`<text x="56" y="${y}" font-size="40" font-weight="700" fill="#e9f2ec">${esc(fit(A.city + ", " + cleanAddr(f.addr), 40, 700, W - 112))}</text>`);
+    if (sub) { y += 54; rows.push(`<text x="56" y="${y}" font-size="32" font-weight="500" fill="#a9c2b3">${esc(sub)}</text>`); }
+    if (f.near) { y += 54; rows.push(pinIcon(70, y - 14, 20, "#4cc35a") + `<text x="100" y="${y}" font-size="28" font-weight="500" fill="#9fc3ad">${esc(fit(f.near, 28, 500, W - 100 - 56))}</text>`); }
+    rows.push(`<text x="56" y="${H - 44}" font-size="38" font-weight="800" fill="#ffd166">Цена — лайк и «+»</text>`);
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Montserrat">
+  ${fx ? "<defs>" + POLISH.filterSvg("fx", fx) + "</defs>" : ""}
+  <rect width="${W}" height="${H}" fill="#12211a"/>
+  ${img}
+  ${pillSvg}
+  ${f.below ? belowPill(f.below, 40 + ph + 12) : ""}
+  ${badge}
+  ${rows.join("\n  ")}
+  <text x="${W - 56}" y="${H - 44}" text-anchor="end" font-size="26" font-weight="500" fill="#6f8a7b">листайте →</text>
+</svg>`;
+  }
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Montserrat">
   ${fx ? "<defs>" + POLISH.filterSvg("fx", fx) + "</defs>" : ""}
   <rect width="${W}" height="${H}" fill="#12211a"/>
@@ -125,7 +150,7 @@ function coverSvg(f, photo, acc, fx) {
   ${pillSvg}
   ${f.below ? belowPill(f.below, 40 + ph + 12) : ""}
   ${badge}
-  ${f.premium ? `<text x="56" y="${PH + 160}" font-size="64" font-weight="800" fill="#fff">Цена — лайк и «+»</text>` : `<text x="56" y="${PH + 170}" font-size="96" font-weight="800" fill="#fff">${esc(money(f.price))} ₸</text>`}
+  ${noPrice(f) ? `<text x="56" y="${PH + 160}" font-size="64" font-weight="800" fill="#fff">Цена — лайк и «+»</text>` : `<text x="56" y="${PH + 170}" font-size="96" font-weight="800" fill="#fff">${esc(money(f.price))} ₸</text>`}
   ${belowText ? `<path d="M56 ${PH + 206} h30 l-15 22 z" fill="#4cc35a"/><text x="100" y="${PH + 228}" font-size="34" font-weight="700" fill="#4cc35a">${esc(fit(belowText, 34, 700, W - 100 - 56))}</text>` : ""}
   <text x="56" y="${PH + 250 + dy}" font-size="42" font-weight="700" fill="#e9f2ec">${esc(paramsLine(f))}</text>
   <text x="56" y="${PH + 318 + dy}" font-size="36" font-weight="500" fill="#a9c2b3">${esc(A.city + ", " + cleanAddr(f.addr))}</text>
@@ -321,7 +346,7 @@ async function renderCarousel(f, acc, opts) {
   slides.coverPhoto = got[0];
   const facts = photoFacts(f);
   inner.forEach((b, k) => slides.push(toJpeg(photoSvg(b, acc, k + 2, n, f, fx[k + 1], facts[k]))));
-  const map = await mapSlide(f, acc, !!f.premium).catch((e) => { console.log("[insta] map: " + e.message); return null; });
+  const map = await mapSlide(f, acc, noPrice(f)).catch((e) => { console.log("[insta] map: " + e.message); return null; });
   // Где карта — Reels её пропускает (в ролике она не читается).
   if (map) { slides.mapAt = slides.length; slides.push(map); }
   slides.push(toJpeg(ctaSvg(f, got[0], acc)));
@@ -368,6 +393,9 @@ function hashtags(f, acc) {
 // Подпись поста: сверху то, по чему решают (цена, где, сколько метров), потом
 // почему эта квартира, что в доме, что рядом, ипотека, как получить номер.
 // Всё — из объявления и карт, ничего от себя: доводы — слова хозяина.
+// Цену не показываем: у премиума всегда, у остальных — если hidePrice (insta.hide_price).
+// Она — награда за «+»: приходит в директ вместе с номером.
+function noPrice(f) { return !!(f && (f.premium || f.hidePrice)); }
 function caption(f, acc) {
   const A = ACCOUNTS[acc] || ACCOUNTS.almaty;
   const h = hook(f);
@@ -377,7 +405,7 @@ function caption(f, acc) {
     // «Можно в ипотеку» — только если это так (у своих объявлений — галочка в форме).
     (f.premium ? "💎 Премиум от хозяина" : "🔑 От хозяина" + (f.mortgage ? " · можно в ипотеку" : "") + (f.below ? " · ниже рынка" : "")), "",
     kind + " в " + (acc === "astana" ? "Астане" : "Алматы") + (f.isNew ? ", новостройка" : "") + " — продаёт сам хозяин. Без посредников", "",
-    f.premium ? "💰 Цену пришлю в личку — поставьте лайк и «+»" : "💰 " + money(f.price) + " ₸",
+    noPrice(f) ? "💰 Цену пришлю в личку — поставьте лайк и «+»" : "💰 " + money(f.price) + " ₸",
     "📍 " + A.city + ", " + cleanAddr(f.addr),
     f.floor ? "🏠 Этаж " + f.floor + (f.floors ? " из " + f.floors : "") : null,
   ].filter((x) => x != null);
@@ -521,8 +549,8 @@ async function igMessage(userId, token, recipient, text, buttonPayload, buttonTi
 }
 // Приватный ответ на комментарий — первое сообщение в директ автору
 // (Instagram разрешает в течение 7 дней после комментария, один раз).
-function privateReply(userId, token, commentId, text, buttonPayload) {
-  return igMessage(userId, token, { comment_id: String(commentId) }, text, buttonPayload);
+function privateReply(userId, token, commentId, text, buttonPayload, buttonTitle) {
+  return igMessage(userId, token, { comment_id: String(commentId) }, text, buttonPayload, buttonTitle);
 }
 // Сообщение в уже начатую переписку (после нажатия кнопки человеком).
 function sendMessage(userId, token, igsid, text, buttonPayload, buttonTitle) {
