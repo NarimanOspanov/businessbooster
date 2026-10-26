@@ -6418,7 +6418,10 @@ async function instaHookComment(e, v, accs, cfg, verified) {
       .catch((err) => { console.log("[insta-hook] кнопка не прошла: " + err.message);
         return INSTA.privateReply(acct.ig_user_id, acct.token, cid, head + "💰 Цену и номер хозяина пришлём сюда — ответьте на это сообщение словом «номер»."); });
     if (r.recipient_id) await db.instaCommentEventIgsid(cid, r.recipient_id);
-    await INSTA.replyComment(cid, acct.token, INSTA_DM_SENT).catch((err) => console.log("[insta-hook] public reply: " + err.message));
+    // Вопрос под постом — отвечаем и публично (кроме цены: она — награда за «+» и подписку):
+    // ответы видят и другие, под постом живая переписка.
+    const pub = ans.length ? ans.join("\n") + "\nЦену и номер хозяина отправили в директ 📩 Если сообщения нет — проверьте папку «Запросы»" : INSTA_DM_SENT;
+    await INSTA.replyComment(cid, acct.token, pub).catch((err) => console.log("[insta-hook] public reply: " + err.message));
     await db.instaCommentEventSet(cid, "asked", null, listingId);
   } catch (err) {
     await db.instaCommentEventSet(cid, "error", err.message, listingId).catch(() => {});

@@ -118,20 +118,21 @@ function coverSvg(f, photo, acc, fx) {
       <text x="${40 + bw / 2}" y="${PH + 12}" text-anchor="middle" font-size="34" font-weight="800" fill="#fff">${esc(h.badge)}</text>`;
   }
   const img = photo ? `<image href="${dataUri(photo)}" x="0" y="0" width="${W}" height="${PH}" preserveAspectRatio="xMidYMid slice"${fx ? ' filter="url(#fx)"' : ""}/>` : "";
-  // Без цены (26.10): крупно — комнаты · метраж · этаж; ниже — «дешевле похожих»,
-  // адрес, год постройки, что рядом; внизу жёлтым — «Цена — лайк и «+»».
-  if (noPrice(f) && !f.premium) {
-    const big = paramsLine(f);
-    let bs = 84;
+  // Без цены (26.10, и у премиума): про цену на обложке ни слова — человек листает,
+  // а на последнем слайде «чтобы узнать цену… поставьте «+»». Крупно — «3-комнатная
+  // квартира», ниже — метраж · этаж · год, «дешевле похожих», адрес, что рядом.
+  if (noPrice(f)) {
+    const big = f.rooms ? f.rooms + "-комнатная квартира" : "Квартира";
+    let bs = 80;
     while (bs > 52 && measure(big, bs, 800) > W - 112) bs -= 2;
-    const sub = [f.year ? f.year + " год постройки" : null, f.isNew ? "новостройка" : null].filter(Boolean).join(" · ");
-    let y = PH + 128;
+    const sub = [f.area ? String(f.area).replace(".", ",") + " м²" : null, f.floor ? f.floor + (f.floors ? "/" + f.floors : "") + " этаж" : null,
+      f.year ? f.year + " год" : f.isNew ? "новостройка" : null].filter(Boolean).join(" · ");
+    let y = PH + 118;
     const rows = [`<text x="56" y="${y}" font-size="${bs}" font-weight="800" fill="#fff">${esc(big)}</text>`];
+    if (sub) { y += 66; rows.push(`<text x="56" y="${y}" font-size="46" font-weight="700" fill="#e9f2ec">${esc(fit(sub, 46, 700, W - 112))}</text>`); }
     if (belowText) { y += 62; rows.push(`<path d="M56 ${y - 22} h30 l-15 22 z" fill="#4cc35a"/><text x="100" y="${y}" font-size="34" font-weight="700" fill="#4cc35a">${esc(fit(belowText, 34, 700, W - 100 - 56))}</text>`); }
-    y += 66; rows.push(`<text x="56" y="${y}" font-size="40" font-weight="700" fill="#e9f2ec">${esc(fit(A.city + ", " + cleanAddr(f.addr), 40, 700, W - 112))}</text>`);
-    if (sub) { y += 54; rows.push(`<text x="56" y="${y}" font-size="32" font-weight="500" fill="#a9c2b3">${esc(sub)}</text>`); }
+    y += 62; rows.push(`<text x="56" y="${y}" font-size="38" font-weight="600" fill="#a9c2b3">${esc(fit(A.city + ", " + cleanAddr(f.addr), 38, 600, W - 112))}</text>`);
     if (f.near) { y += 54; rows.push(pinIcon(70, y - 14, 20, "#4cc35a") + `<text x="100" y="${y}" font-size="28" font-weight="500" fill="#9fc3ad">${esc(fit(f.near, 28, 500, W - 100 - 56))}</text>`); }
-    rows.push(`<text x="56" y="${H - 44}" font-size="38" font-weight="800" fill="#ffd166">Цена — лайк и «+»</text>`);
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Montserrat">
   ${fx ? "<defs>" + POLISH.filterSvg("fx", fx) + "</defs>" : ""}
   <rect width="${W}" height="${H}" fill="#12211a"/>
@@ -210,9 +211,9 @@ function ctaSvg(f, photo, acc) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Montserrat">
   <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0f4d24"/><stop offset="1" stop-color="#1e8422"/></linearGradient></defs>
   <rect width="${W}" height="${H}" fill="url(#g)"/>
-  <text x="${W / 2}" y="330" text-anchor="middle" font-size="76" font-weight="800" fill="#fff">Чтобы узнать больше</text>
-  <text x="${W / 2}" y="425" text-anchor="middle" font-size="76" font-weight="800" fill="#fff">и получить</text>
-  <text x="${W / 2}" y="520" text-anchor="middle" font-size="76" font-weight="800" fill="#ffd166">контакты</text>
+  <text x="${W / 2}" y="330" text-anchor="middle" font-size="76" font-weight="800" fill="#fff">Чтобы узнать</text>
+  <text x="${W / 2}" y="425" text-anchor="middle" font-size="76" font-weight="800" fill="#ffd166">цену, контакты</text>
+  <text x="${W / 2}" y="520" text-anchor="middle" font-size="76" font-weight="800" fill="#fff">и подробности</text>
   <rect x="140" y="660" width="${W - 280}" height="240" rx="48" fill="#fff"/>
   <text x="${W / 2}" y="790" text-anchor="middle" font-size="64" font-weight="800" fill="#1e8422">Поставьте лайк и «+»</text>
   <text x="${W / 2}" y="852" text-anchor="middle" font-size="36" font-weight="600" fill="#2f5d3c">в комментариях</text>
@@ -405,7 +406,7 @@ function caption(f, acc) {
     // «Можно в ипотеку» — только если это так (у своих объявлений — галочка в форме).
     (f.premium ? "💎 Премиум от хозяина" : "🔑 От хозяина" + (f.mortgage ? " · можно в ипотеку" : "") + (f.below ? " · ниже рынка" : "")), "",
     kind + " в " + (acc === "astana" ? "Астане" : "Алматы") + (f.isNew ? ", новостройка" : "") + " — продаёт сам хозяин. Без посредников", "",
-    noPrice(f) ? "💰 Цену пришлю в личку — поставьте лайк и «+»" : "💰 " + money(f.price) + " ₸",
+    noPrice(f) ? null : "💰 " + money(f.price) + " ₸",
     "📍 " + A.city + ", " + cleanAddr(f.addr),
     f.floor ? "🏠 Этаж " + f.floor + (f.floors ? " из " + f.floors : "") : null,
   ].filter((x) => x != null);
@@ -427,7 +428,8 @@ function caption(f, acc) {
   // Свои объявления: строки от себя (условия сделки, срочность) — перед призывом.
   if (f.extra) lines.push("", ...String(f.extra).split(/\r?\n/).map((x) => x.trim()).filter(Boolean));
   lines.push("", "✅ Договариваетесь напрямую с хозяином.", "",
-    "👉 Хотите узнать больше и получить номер хозяина? Подпишитесь на @" + A.handle + " и поставьте лайк и «+» в комментариях к этому посту — пришлём номер в директ." +
+    (noPrice(f) ? "👉 Чтобы узнать цену, получить номер хозяина и подробности, подпишитесь на @" + A.handle + " и поставьте лайк и «+» в комментариях к этому посту — пришлём в директ."
+      : "👉 Хотите узнать больше и получить номер хозяина? Подпишитесь на @" + A.handle + " и поставьте лайк и «+» в комментариях к этому посту — пришлём номер в директ.") +
       (f.code ? " Это объявление № " + f.code + ", ищите его в списке." : ""),
     "", hashtags(f, acc));
   // Instagram режет подпись после 2200 знаков: лишнее убираем из середины,
