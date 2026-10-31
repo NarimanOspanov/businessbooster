@@ -2332,6 +2332,17 @@ IF OBJECT_ID('dbo.agent_phones', 'U') IS NULL
     reason    NVARCHAR(60) NULL,
     marked_at DATETIME2(0) NOT NULL DEFAULT SYSUTCDATETIME()
   );
+-- Отметки обхода списка (31.10.2026): «видели в круге N» и отпечаток того, что
+-- пришло со страницы. Совпал отпечаток — объявление не менялось, и обход
+-- трогает только эту узкую таблицу (она вся в памяти базы), а не строку
+-- krisha_list в 1,5 ГБ: на S1 эти чтения упирали диск в 100%.
+IF OBJECT_ID('dbo.krisha_list_seen', 'U') IS NULL
+  CREATE TABLE dbo.krisha_list_seen (
+    id       BIGINT       NOT NULL PRIMARY KEY,
+    sig      INT          NOT NULL,
+    sweep_no INT          NULL,
+    seen_at  DATETIME2(0) NOT NULL CONSTRAINT DF_klseen_at DEFAULT SYSUTCDATETIME()
+  );
 -- Копия номеров перед чисткой (сбойные номера плагина) — чтобы можно было вернуть.
 IF OBJECT_ID('dbo.krisha_list_phone_backup', 'U') IS NULL
   CREATE TABLE dbo.krisha_list_phone_backup (
@@ -3013,10 +3024,15 @@ async function archiveMissingList(sweepNo) {
   for (let i = 0; i < 60; i++) {
     const r = await pool.request().input("c", sql.Int, cutoff).input("s", sql.Int, Number(sweepNo)).query(`
       DECLARE @ids TABLE (id BIGINT);
-      UPDATE TOP (5000) dbo.krisha_list SET storage = 'archived'
+      -- Неизменившиеся объявления отмечаются только в krisha_list_seen
+      -- (см. saveListAdverts): «не видели» — когда старо и там, и там.
+      UPDATE TOP (5000) l SET storage = 'archived'
         OUTPUT inserted.id INTO @ids
-        WHERE storage = 'live' AND (sweep_no IS NULL OR sweep_no < @c)
-          AND last_seen < DATEADD(hour, -4, SYSUTCDATETIME());
+        FROM dbo.krisha_list l LEFT JOIN dbo.krisha_list_seen s ON s.id = l.id
+        WHERE l.storage = 'live' AND (l.sweep_no IS NULL OR l.sweep_no < @c)
+          AND l.last_seen < DATEADD(hour, -4, SYSUTCDATETIME())
+          AND (s.id IS NULL OR ((s.sweep_no IS NULL OR s.sweep_no < @c) AND s.seen_at < DATEADD(hour, -4, SYSUTCDATETIME())));
+      DELETE s FROM dbo.krisha_list_seen s JOIN @ids i ON i.id = s.id;
       INSERT INTO dbo.krisha_list_events (id, kind, sweep_no) SELECT id, 'archived', @s FROM @ids;
       SELECT COUNT(*) AS n FROM @ids`);
     const n = r.recordset[0].n || 0;
@@ -3036,6 +3052,8 @@ async function markListPhoneMiss(id, reason) {
     await pool.request().input("id", sql.BigInt, Number(id)).query(`
       DECLARE @ids TABLE (id BIGINT);
       UPDATE dbo.krisha_list SET storage = 'archived' OUTPUT inserted.id INTO @ids WHERE id = @id AND storage = 'live';
+      -- Отпечаток долой: вернётся в выдачу — обход запишет его целиком (событие back).
+      DELETE s FROM dbo.krisha_list_seen s JOIN @ids i ON i.id = s.id;
       INSERT INTO dbo.krisha_list_events (id, kind) SELECT id, 'archived' FROM @ids`).catch(() => {});
   }
   const r = await pool.request()
@@ -4935,17 +4953,48 @@ async function migrateListPhotos(batch, afterId) {
 // Страница списка одним запросом: MERGE по VALUES из всех строк и один INSERT
 // событий. На 10 DTU двадцать отдельных MERGE на страницу были главным
 // потребителем базы; так — один обмен вместо двадцати с лишним.
+// Отпечаток объявления со страницы: FNV-1a по всем полям, которые пишет MERGE.
+function listSig(fields) {
+  const s = JSON.stringify(fields);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return h | 0;
+}
+// Неизменившиеся объявления (отпечаток тот же, что в прошлый раз) — только
+// отметка «видели» в узкой krisha_list_seen; MERGE в krisha_list — для новых и
+// изменившихся. Обход 440 тыс. живых объявлений иначе каждый круг читал и
+// переписывал всю таблицу ради одной отметки (31.10.2026).
 async function saveListAdverts(rows, sweepNo) {
-  const list = (rows || []).filter((o) => o && o.id);
-  if (!list.length) return [];
+  const all = (rows || []).filter((o) => o && o.id);
+  if (!all.length) return [];
+  const uniq = [...new Map(all.map((o) => [String(o.id), o])).values()];
   const pool = await getPool();
   await ensureList(pool);
   const L = require("./krisha-list.js");
   const DIST = require("./districts.js");
   const cut = (v, n) => (v == null || v === "" ? null : String(v).slice(0, n));
-  const req = pool.request().input("sweep", sql.Int, sweepNo == null ? null : Number(sweepNo));
+  const sweep = sweepNo == null ? null : Number(sweepNo);
+  const sigs = new Map();
+  for (const o of all) {
+    sigs.set(String(o.id), listSig([o.deal, o.prop, o.userType, o.city, o.price, o.rooms, o.area, o.floor, o.floors, o.complexId,
+      o.lat, o.lon, cut(o.title, 300), cut(o.addr, 300), cut(o.ownerName, 120), o.photos, cut(o.photo1, 300), o.storage,
+      o.bumpedOn || null, L.packPhotos(o.photoUrls), DIST.districtFor(o.city, o.lat, o.lon)]));
+  }
+  const sr = pool.request().input("sweep", sql.Int, sweep);
+  uniq.forEach((o, k) => sr.input("i" + k, sql.BigInt, Number(o.id)).input("g" + k, sql.Int, sigs.get(String(o.id))));
+  const same = new Set((await sr.query(`
+    DECLARE @t TABLE (id BIGINT PRIMARY KEY, sig INT NOT NULL);
+    INSERT INTO @t (id, sig) VALUES ${uniq.map((_, k) => "(@i" + k + ",@g" + k + ")").join(",")};
+    UPDATE s SET sweep_no = @sweep, seen_at = SYSUTCDATETIME()
+      OUTPUT inserted.id
+      FROM dbo.krisha_list_seen s JOIN @t t ON t.id = s.id AND t.sig = s.sig;`)).recordset.map((x) => String(x.id)));
+  const list = uniq.filter((o) => !same.has(String(o.id)));
+  const quiet = (o) => ({ id: o.id, added: false, price: false, archived: false, back: false, bump: false });
+  if (!list.length) return all.map(quiet);
+  const req = pool.request().input("sweep", sql.Int, sweep);
   const vals = [];
   list.forEach((o, k) => {
+    req.input("g" + k, sql.Int, sigs.get(String(o.id)));
     req.input("id" + k, sql.BigInt, Number(o.id))
       .input("deal" + k, sql.NVarChar(10), cut(o.deal, 10))
       .input("prop" + k, sql.NVarChar(20), cut(o.prop, 20))
@@ -4991,12 +5040,17 @@ async function saveListAdverts(rows, sweepNo) {
       VALUES (s.id, s.deal, s.prop, s.user_type, s.city, s.price, s.rooms, s.area, s.floor, s.floors, s.complex_id, s.lat, s.lon, s.district,
        s.title, s.addr, s.owner_name, s.photos, s.photo1, s.storage, s.bumped_on, s.photos_c, @sweep)
     OUTPUT $action AS act, inserted.id AS id, deleted.price AS old_price, deleted.storage AS old_storage,
-           deleted.bumped_on AS old_bumped;`);
+           deleted.bumped_on AS old_bumped;
+    MERGE dbo.krisha_list_seen AS t
+    USING (VALUES ${list.map((_, k) => "(@id" + k + ",@g" + k + ")").join(",")}) AS s (id, sig) ON t.id = s.id
+    WHEN MATCHED THEN UPDATE SET sig = s.sig, sweep_no = @sweep, seen_at = SYSUTCDATETIME()
+    WHEN NOT MATCHED THEN INSERT (id, sig, sweep_no) VALUES (s.id, s.sig, @sweep);`);
   const byId = {};
   for (const row of r.recordset) byId[String(row.id)] = row;
   const out = [];
   const events = [];
-  for (const o of list) {
+  for (const o of all) {
+    if (same.has(String(o.id))) { out.push(quiet(o)); continue; }
     const row = byId[String(o.id)] || {};
     const res = { id: o.id, added: row.act === "INSERT", price: false, archived: false, back: false, bump: false };
     if (res.added) events.push([o.id, "new", null, o.price]);

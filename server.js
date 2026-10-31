@@ -9473,13 +9473,13 @@ http
         KW.list = { section: 0, page: 1, sweepNo: ((KW.list && KW.list.sweepNo) || 0) + 1,
                     startedAt: null, pages: 0, adverts: 0, lastSweep: (KW.list && KW.list.lastSweep) || null };
       }
-      // Новый круг — не чаще раза в KRISHA_LIST_EVERY_H часов (по умолчанию 3)
-      // от начала прошлого (31.10.2026). Круг по ~440 тыс. живых объявлений шёл
-      // без перерыва, каждые ~75 минут, и давал 60% нагрузки базы, хотя почти
-      // все строки не меняются. Новое читает /api/krisha/fresh, ему пауза не мешает;
-      // снятые отмечаются позже (через три круга), цены — при следующем круге.
+      // Новый круг — не чаще раза в KRISHA_LIST_EVERY_H часов (по умолчанию 1)
+      // от начала прошлого (31.10.2026). Круг по ~440 тыс. живых объявлений
+      // переписывал всю таблицу и давал 60% нагрузки базы; теперь неизменившиеся
+      // пишутся только отметкой (saveListAdverts), и круг идёт почти без паузы —
+      // снятые отмечаются быстро. Переменная — рычаг, если база снова упрётся.
       // ?force=1 — начать сразу.
-      const everyH = Math.max(0, Number(process.env.KRISHA_LIST_EVERY_H || 3));
+      const everyH = Math.max(0, Number(process.env.KRISHA_LIST_EVERY_H || 1));
       const lastStart = KW.list.lastSweep && Date.parse(KW.list.lastSweep.startedAt);
       if (!KW.list.startedAt && everyH && lastStart && Date.now() - lastStart < everyH * 3600e3 && q.get("force") !== "1") {
         // Пауза задумана — сторож обхода не должен считать её остановкой.
