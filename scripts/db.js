@@ -2154,6 +2154,13 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_nophone4' AND ob
   EXEC('CREATE INDEX IX_klist_nophone4 ON dbo.krisha_list (city, deal, prop, first_seen DESC)
         INCLUDE (storage, phone_tries, phone_state, phone_next_at, phone_lease_until)
         WHERE phones IS NULL AND user_type = ''owner''');
+-- Ступень «остальные города» (без города, 31.10.2026): шла по IX_klist_nophone3
+-- без phone_lease_until и за каждой строкой ходила в таблицу — до 2 000 чтений
+-- на выдачу, ~1 000 выдач в час, когда свои города пусты.
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_nophone5' AND object_id = OBJECT_ID('dbo.krisha_list'))
+  EXEC('CREATE INDEX IX_klist_nophone5 ON dbo.krisha_list (deal, prop, first_seen DESC)
+        INCLUDE (storage, city, phone_tries, phone_state, phone_next_at, phone_lease_until)
+        WHERE phones IS NULL AND user_type = ''owner'' WITH (ONLINE = ON)');
 IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_nophone3' AND object_id = OBJECT_ID('dbo.krisha_list'))
    AND EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_nophone2' AND object_id = OBJECT_ID('dbo.krisha_list'))
   DROP INDEX IX_klist_nophone2 ON dbo.krisha_list;
