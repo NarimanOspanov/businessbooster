@@ -2163,6 +2163,17 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_withphone' AND o
   EXEC('CREATE INDEX IX_klist_withphone ON dbo.krisha_list (phones_at)
         INCLUDE (user_type, storage, deal, prop, city)
         WHERE phones IS NOT NULL');
+-- Номера по значению (31.10.2026): «сколько объявлений с тем же первым номером»
+-- (LIKE 'номер%') и выгрузки всех номеров читали всю таблицу — 1,5 ГБ на
+-- вызов. Этот индекс — около 120 тысяч строк с номером.
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_phones' AND object_id = OBJECT_ID('dbo.krisha_list'))
+  EXEC('CREATE INDEX IX_klist_phones ON dbo.krisha_list (phones) INCLUDE (user_type, storage)
+        WHERE phones IS NOT NULL WITH (ONLINE = ON)');
+-- Ни одного чтения за 5 суток, а обход списка обновляет их на каждой странице.
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_cat' AND object_id = OBJECT_ID('dbo.krisha_list'))
+  DROP INDEX IX_klist_cat ON dbo.krisha_list;
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_first' AND object_id = OBJECT_ID('dbo.krisha_list'))
+  DROP INDEX IX_klist_first ON dbo.krisha_list;
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_phonemiss' AND object_id = OBJECT_ID('dbo.krisha_list'))
   EXEC('CREATE INDEX IX_klist_phonemiss ON dbo.krisha_list (phone_state)
         WHERE phones IS NULL AND phone_state IS NOT NULL');
@@ -3074,7 +3085,8 @@ async function phoneSharedCount(id) {
     DECLARE @p NVARCHAR(300) = (SELECT phones FROM dbo.krisha_list WHERE id = @id);
     IF @p IS NULL OR @p = '' SELECT 0 AS n, NULL AS p ELSE BEGIN
       DECLARE @f NVARCHAR(40) = LEFT(@p, ISNULL(NULLIF(CHARINDEX(',', @p), 0) - 1, LEN(@p)));
-      SELECT COUNT(*) AS n, @f AS p FROM dbo.krisha_list WHERE user_type = 'owner' AND phones LIKE @f + '%';
+      SELECT COUNT(*) AS n, @f AS p FROM dbo.krisha_list WITH (INDEX(IX_klist_phones))
+      WHERE phones IS NOT NULL AND user_type = 'owner' AND phones LIKE @f + '%';
     END`);
   return r.recordset[0] || { n: 0, p: null };
 }
@@ -3258,7 +3270,16 @@ async function logListMatch(m) {
             VALUES (@a, @o, @ps, @pm, @pc, @pw, @ar)`);
 }
 
+// Два подсчёта по всей таблице; зовут каждые 10 минут (конец поиска, монитор),
+// а цифры за 10 минут почти не меняются.
+let matchStatsCache = { at: 0, v: null };
 async function listMatchStats() {
+  if (matchStatsCache.v && Date.now() - matchStatsCache.at < 10 * 60e3) return matchStatsCache.v;
+  const v = await listMatchStatsRead();
+  matchStatsCache = { at: Date.now(), v: v };
+  return v;
+}
+async function listMatchStatsRead() {
   const pool = await getPool();
   await ensureList(pool);
   const t = (await pool.request().query(`
