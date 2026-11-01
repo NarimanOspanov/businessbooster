@@ -2135,10 +2135,9 @@ IF COL_LENGTH('dbo.krisha_list', 'match_top')     IS NULL ALTER TABLE dbo.krisha
 -- объявления в том же доме ('nb', ≈). year_at — когда проверяли (см. build-year.js).
 IF COL_LENGTH('dbo.krisha_list', 'build_year')    IS NULL ALTER TABLE dbo.krisha_list ADD build_year SMALLINT NULL, year_src VARCHAR(2) NULL, year_at DATETIME2(0) NULL;
 -- EXEC: индексы на колонки, добавленные ALTER'ом в этом же батче.
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_nophone2' AND object_id = OBJECT_ID('dbo.krisha_list'))
-  EXEC('CREATE INDEX IX_klist_nophone2 ON dbo.krisha_list (first_seen DESC)
-        INCLUDE (storage, deal, prop, phone_tries, phone_state, phone_next_at)
-        WHERE phones IS NULL AND user_type = ''owner''');
+-- IX_klist_nophone2 здесь больше не создаётся: его сменил nophone3, а создание
+-- с удалением ниже шло на каждом старте — полное чтение таблицы с блокировкой
+-- записи (на S0 01.11.2026 — минуты 100% диска).
 IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_nophone' AND object_id = OBJECT_ID('dbo.krisha_list'))
   DROP INDEX IX_klist_nophone ON dbo.krisha_list;
 -- Очередь фильтруется ещё и по городу: город в покрытие, чтобы подсчёт
