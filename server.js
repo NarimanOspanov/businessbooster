@@ -9479,6 +9479,13 @@ http
       // пишутся только отметкой (saveListAdverts), и круг идёт почти без паузы —
       // снятые отмечаются быстро. Переменная — рычаг, если база снова упрётся.
       // ?force=1 — начать сразу.
+      // Пауза полного обхода (01.11.2026, база на S0): свежее (/api/krisha/fresh) и
+      // номера идут как обычно; цены, поднятия и снятые старых объявлений не
+      // обновляются. Включить обход — KRISHA_LIST_PAUSE=0 или ?force=1.
+      if ((process.env.KRISHA_LIST_PAUSE || "1") !== "0" && q.get("force") !== "1") {
+        listWatch.lastRunAt = Date.now(); listWatch.lastOkAt = Date.now(); listWatch.emptyRuns = 0;
+        return send(200, { ok: true, paused: true, cursor: { sweepNo: KW.list.sweepNo } });
+      }
       const everyH = Math.max(0, Number(process.env.KRISHA_LIST_EVERY_H || 1));
       const lastStart = KW.list.lastSweep && Date.parse(KW.list.lastSweep.startedAt);
       if (!KW.list.startedAt && everyH && lastStart && Date.now() - lastStart < everyH * 3600e3 && q.get("force") !== "1") {

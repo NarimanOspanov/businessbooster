@@ -2213,6 +2213,11 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_research' AND ob
         WHERE match_count = 0');
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_owner_geo' AND object_id = OBJECT_ID('dbo.krisha_list'))
   EXEC('CREATE INDEX IX_klist_owner_geo ON dbo.krisha_list (lat, lon) INCLUDE (deal, prop, area, rooms, floor, floors) WHERE user_type = ''owner''');
+-- Год постройки (build-year.js, раз в 2 ч) без индекса читал всю таблицу —
+-- на S0 (01.11.2026) час 100% чтения диска. Только хозяйские живые квартиры без года.
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_yeartodo' AND object_id = OBJECT_ID('dbo.krisha_list'))
+  EXEC(N'CREATE INDEX IX_klist_yeartodo ON dbo.krisha_list (id DESC) INCLUDE (lat, lon, complex_id, year_at)
+        WHERE user_type = ''owner'' AND prop = ''flat'' AND storage = ''live'' AND build_year IS NULL WITH (ONLINE = ON)');
 -- Поиск портала ипотеки (/ipoteka): живые объявления хозяев о продаже квартир.
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_portal' AND object_id = OBJECT_ID('dbo.krisha_list'))
   EXEC('CREATE INDEX IX_klist_portal ON dbo.krisha_list (city, first_seen DESC) INCLUDE (rooms, price, area, complex_id)
@@ -2902,8 +2907,8 @@ async function listYearTodo(limit) {
   await ensureList(pool);
   const r = pool.request({ requestTimeout: 120000 }).input("n", sql.Int, Math.max(1, Math.min(50000, Number(limit) || 20000)));
   return (await r.query(`SELECT TOP (@n) id, CAST(lat AS FLOAT) AS lat, CAST(lon AS FLOAT) AS lon, complex_id AS cx FROM dbo.krisha_list
-    WHERE user_type = 'owner' AND prop = 'flat' AND storage = 'live'
-      AND (year_at IS NULL OR (build_year IS NULL AND year_at < DATEADD(day, -3, SYSUTCDATETIME())))
+    WHERE user_type = 'owner' AND prop = 'flat' AND storage = 'live' AND build_year IS NULL
+      AND (year_at IS NULL OR year_at < DATEADD(day, -3, SYSUTCDATETIME()))
     ORDER BY id DESC`)).recordset;
 }
 async function listYearSave(rows) {
