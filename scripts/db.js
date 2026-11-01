@@ -2905,7 +2905,7 @@ async function listYearTodo(limit) {
   const pool = await getPool();
   await ensureList(pool);
   const r = pool.request({ requestTimeout: 120000 }).input("n", sql.Int, Math.max(1, Math.min(50000, Number(limit) || 20000)));
-  return (await r.query(`SELECT TOP (@n) id, CAST(lat AS FLOAT) AS lat, CAST(lon AS FLOAT) AS lon, complex_id AS cx FROM dbo.krisha_list
+  return (await r.query(`SELECT TOP (@n) id, CAST(lat AS FLOAT) AS lat, CAST(lon AS FLOAT) AS lon, complex_id AS cx FROM dbo.krisha_list WITH (INDEX(IX_klist_yeartodo))
     WHERE user_type = 'owner' AND prop = 'flat' AND storage = 'live' AND build_year IS NULL
       AND (year_at IS NULL OR year_at < DATEADD(day, -3, SYSUTCDATETIME()))
     ORDER BY id DESC`)).recordset;
