@@ -6155,22 +6155,22 @@ function phoneWatchSend(text) {
     .then((all) => { phoneWatch.sent = { at: new Date().toISOString(), text: text.slice(0, 80), to: all }; });
 }
 // Прилипший номер (приложение Крыши показывает номер прошлого объявления) —
-// админам в бот: первый раз сразу, дальше по этому номеру не чаще раза в
-// 30 минут, со счётчиком отброшенных за это время. Мимо общего лимита, как
-// и сторож: сигнал редкий, а пропустить его нельзя.
+// админам в бот, только когда телефон застрял: один и тот же номер пришёл
+// STICKY_ALERT_N раз (по умолчанию 10) за 30 минут. Единичные прилипания
+// сервер и так отбрасывает, сообщение о каждом было шумом (02.11.2026).
+// Дальше по этому номеру — не чаще раза в час. Мимо общего лимита, как и сторож.
 const objphoneSticky = new Map(); // номер → { n, sentAt, first }
 function objphoneStickyAlert(phone, id, other, src) {
   const now = Date.now();
   let x = objphoneSticky.get(phone);
-  if (!x) { x = { n: 0, sentAt: 0, first: now }; objphoneSticky.set(phone, x); }
+  if (!x || now - x.first > 30 * 60e3) { x = { n: 0, sentAt: x ? x.sentAt : 0, first: now }; objphoneSticky.set(phone, x); }
   x.n++;
-  if (now - x.sentAt < 30 * 60e3) return;
+  if (x.n < Math.max(2, Number(process.env.STICKY_ALERT_N) || 10) || now - x.sentAt < 3600e3) return;
   const hhmm = new Date(now + 5 * 3600e3).toISOString().slice(11, 16);
-  phoneWatchSend("⚠️ Плагин номеров: приложение Крыши показывает старый номер +" + phone + " (" + hhmm + ").\n" +
-    "Он уже записан к https://krisha.kz/a/show/" + other + ", а пришёл для https://krisha.kz/a/show/" + id + ".\n" +
-    "Не записали: " + x.n + (x.sentAt ? " за последние 30 мин" : "") + ". Объявления попробуем снова через 30 мин.\n" +
-    "Источник: " + src + ". Если повторяется — перезапустите приложение/вкладку плагина.");
-  x.sentAt = now; x.n = 0;
+  phoneWatchSend("⚠️ Плагин номеров застрял: приложение Крыши показывает один и тот же номер +" + phone + " (" + hhmm + ").\n" +
+    "Он записан к https://krisha.kz/a/show/" + other + ", а пришёл уже для " + x.n + " других объявлений за 30 мин, последнее https://krisha.kz/a/show/" + id + ".\n" +
+    "Источник: " + src + ". Перезапустите приложение Крыши на этом телефоне.");
+  x.sentAt = now; x.n = 0; x.first = now;
   if (objphoneSticky.size > 200) objphoneSticky.delete(objphoneSticky.keys().next().value);
 }
 async function phoneWatchTick() {
@@ -9939,7 +9939,9 @@ http
       }
       if (matchListRunning) return send(409, { ok: false, running: true, error: "поиск по списку уже идёт" });
       const batch = Math.max(1, Math.min(1000, Number(parsed.searchParams.get("batch")) || 200));
-      const notify = parsed.searchParams.get("notify") !== "0";
+      // Находки в бот — только по явному notify=1: их много, и в чате они
+      // потеряли смысл (02.11.2026). Всё и так видно в портале риэлторов.
+      const notify = parsed.searchParams.get("notify") === "1";
       // Через сколько дней перепроверять агентские без находок (KRISHA_RESEARCH_DAYS).
       const researchDays = Math.max(1, Number(parsed.searchParams.get("researchDays") || process.env.KRISHA_RESEARCH_DAYS || 3));
       matchListRunning = true;
