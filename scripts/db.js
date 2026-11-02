@@ -2206,10 +2206,20 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_tosearch2' AND o
 IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_tosearch' AND object_id = OBJECT_ID('dbo.krisha_list'))
   DROP INDEX IX_klist_tosearch ON dbo.krisha_list;
 -- Перепроверка: агентские без находок, по давности проверки.
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_research' AND object_id = OBJECT_ID('dbo.krisha_list'))
-  EXEC('CREATE INDEX IX_klist_research ON dbo.krisha_list (searched_at)
-        INCLUDE (user_type, storage, area, complex_id, lat)
-        WHERE match_count = 0');
+-- storage ушёл из INCLUDE в фильтр (02.11.2026). В research архивные оставались
+-- навсегда: перепроверка берёт только live, значит архивным searched_at больше
+-- никто не двигает — и они копились в самом начале индекса, отсортированного по
+-- searched_at ASC. Скан каждые 3 часа перешагивал это кладбище с начала, оно
+-- только росло, и запрос перестал укладываться в 15 секунд. Сам упавший проход
+-- при этом не перештамповывал ни одной строки, так что назад он бы не вернулся:
+-- matchlist падал на каждом запуске. С фильтром по storage строка уходит из
+-- индекса сама, как только объявление архивируют, и начало индекса не зарастает.
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_research2' AND object_id = OBJECT_ID('dbo.krisha_list'))
+  EXEC('CREATE INDEX IX_klist_research2 ON dbo.krisha_list (searched_at)
+        INCLUDE (user_type, area, complex_id, lat)
+        WHERE match_count = 0 AND storage = ''live'' WITH (ONLINE = ON)');
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_research' AND object_id = OBJECT_ID('dbo.krisha_list'))
+  DROP INDEX IX_klist_research ON dbo.krisha_list;
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_klist_owner_geo' AND object_id = OBJECT_ID('dbo.krisha_list'))
   EXEC('CREATE INDEX IX_klist_owner_geo ON dbo.krisha_list (lat, lon) INCLUDE (deal, prop, area, rooms, floor, floors) WHERE user_type = ''owner''');
 -- Год постройки (build-year.js, раз в 2 ч) без индекса читал всю таблицу —
@@ -3166,13 +3176,17 @@ async function setListPhones(id, phones) {
 // перепроверкой: живые агентские без находок, проверенные раньше, чем
 // researchDays назад. База растёт, и то, что не нашлось вчера по половине
 // базы, сегодня может найтись.
+// Запросы прохода — через reqT (60 с), а не на дефолтных 15: на 15 секундах
+// matchlist падал целиком, и падал на первом же запросе, то есть не искал
+// вообще ничего (02.11.2026). IX_klist_research2 вернул их в миллисекунды, а таймаут
+// здесь — чтобы следующее замедление отняло у прохода проход, а не неделю.
 async function agentsToMatchList(limit, researchDays) {
   const pool = await getPool();
   await ensureList(pool);
   const n = Number(limit) || 100;
   const cols = `id, deal, prop, city, area, rooms, floor, floors, complex_id, lat, lon,
       price, title, addr, user_type, first_seen, bumped_on, photos_c, photos_json, searched_at`;
-  const fresh = (await pool.request().input("n", sql.Int, n).query(`
+  const fresh = (await reqT(pool).input("n", sql.Int, n).query(`
     SELECT TOP (@n) ${cols}
     FROM dbo.krisha_list
     WHERE searched_at IS NULL
@@ -3181,7 +3195,7 @@ async function agentsToMatchList(limit, researchDays) {
       AND (complex_id IS NOT NULL OR lat IS NOT NULL)
     ORDER BY first_seen DESC`)).recordset;
   if (fresh.length >= n) return fresh;
-  const again = (await pool.request().input("n", sql.Int, n - fresh.length)
+  const again = (await reqT(pool).input("n", sql.Int, n - fresh.length)
     .input("d", sql.Int, Math.max(1, Number(researchDays) || 3)).query(`
     SELECT TOP (@n) ${cols}
     FROM dbo.krisha_list
@@ -3212,7 +3226,7 @@ async function findListOwners(q, limit) {
   if (!area) return [];
   const tol = Math.max(1.5, area * 0.06);
   const near = Math.max(1, area * 0.03);
-  const r = await pool.request()
+  const r = await reqT(pool)
     .input("deal", sql.NVarChar(10), q.deal || null)
     .input("prop", sql.NVarChar(20), q.prop || null)
     .input("lo", sql.Decimal(9, 2), area - tol)
@@ -3280,7 +3294,7 @@ async function findListOwners(q, limit) {
 
 async function recordListSearched(id, count, topId) {
   const pool = await getPool();
-  await pool.request()
+  await reqT(pool)
     .input("id", sql.BigInt, Number(id)).input("n", sql.Int, Number(count) || 0)
     .input("top", sql.BigInt, topId == null ? null : Number(topId))
     .query("UPDATE dbo.krisha_list SET searched_at = SYSUTCDATETIME(), match_count = @n, match_top = @top WHERE id = @id");
@@ -3288,7 +3302,7 @@ async function recordListSearched(id, count, topId) {
 
 async function logListMatch(m) {
   const pool = await getPool();
-  await pool.request()
+  await reqT(pool)
     .input("a", sql.BigInt, Number(m.agentId)).input("o", sql.BigInt, Number(m.ownerId))
     .input("ps", sql.Int, m.paramScore == null ? null : Number(m.paramScore))
     .input("pm", sql.Bit, m.photoMatch == null ? null : (m.photoMatch ? 1 : 0))
@@ -3311,11 +3325,11 @@ async function listMatchStats() {
 async function listMatchStatsRead() {
   const pool = await getPool();
   await ensureList(pool);
-  const t = (await pool.request().query(`
+  const t = (await reqT(pool).query(`
     SELECT COUNT(*) AS searched,
       SUM(CASE WHEN match_count > 0 THEN 1 ELSE 0 END) AS matched
     FROM dbo.krisha_list WHERE searched_at IS NOT NULL`)).recordset[0];
-  const p = (await pool.request().query(`
+  const p = (await reqT(pool).query(`
     SELECT COUNT(*) AS candidates,
       SUM(CASE WHEN photo_match = 1 AND photo_conf >= 0.7 THEN 1 ELSE 0 END) AS photo_confirmed,
       SUM(CASE WHEN archived_at IS NOT NULL THEN 1 ELSE 0 END) AS owner_archived,
