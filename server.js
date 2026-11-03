@@ -6159,8 +6159,11 @@ function phoneWatchSend(text) {
 // STICKY_ALERT_N раз (по умолчанию 10) за 30 минут. Единичные прилипания
 // сервер и так отбрасывает, сообщение о каждом было шумом (02.11.2026).
 // Дальше по этому номеру — не чаще раза в час. Мимо общего лимита, как и сторож.
+// С 03.11.2026 выключено и в таком виде (просили не присылать); включить —
+// STICKY_ALERT=1. Прилипшие номера видно в консоли номеров.
 const objphoneSticky = new Map(); // номер → { n, sentAt, first }
 function objphoneStickyAlert(phone, id, other, src) {
+  if (process.env.STICKY_ALERT !== "1") return;
   const now = Date.now();
   let x = objphoneSticky.get(phone);
   if (!x || now - x.first > 30 * 60e3) { x = { n: 0, sentAt: x ? x.sentAt : 0, first: now }; objphoneSticky.set(phone, x); }
