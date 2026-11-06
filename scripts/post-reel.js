@@ -134,6 +134,27 @@ async function drawAll(shots, onStep) {
 let voiceCache = null;
 
 /**
+ * Список голосов аккаунта.
+ *
+ * Через v2, а не v1: v1 отдаёт усечённый список без пагинации, и клон, который
+ * в кабинете прекрасно виден, в ответ просто не попадал — в логе были одни
+ * стоковые голоса. У v2 есть и поиск по имени, так что сначала спрашиваем
+ * конкретно нужный, и только если не вышло — тянем страницу целиком.
+ * На старых ключах v2 может быть недоступен, поэтому v1 остаётся запасным.
+ */
+async function listVoices(name) {
+  const get = async (path) => {
+    const r = await fetch(ELEVEN + path, { headers: { "xi-api-key": elevenKey() } });
+    if (!r.ok) return null;
+    const j = await r.json().catch(() => null);
+    return j && Array.isArray(j.voices) ? j.voices : null;
+  };
+  const found = name ? await get("/v2/voices?page_size=100&search=" + encodeURIComponent(name)) : null;
+  if (found && found.length) return found;
+  return (await get("/v2/voices?page_size=100")) || (await get("/voices")) || [];
+}
+
+/**
  * Голос по имени — не придираясь к написанию.
  *
  * Клон в кабинете может называться «Нариман», «Nariman» или «Нариман (ru)», и
@@ -148,9 +169,7 @@ async function voiceId(name) {
   // Идентификатор ElevenLabs — двадцать с лишним знаков без пробелов.
   if (/^[A-Za-z0-9]{18,}$/.test(raw)) { voiceCache = { name: want, id: raw }; return raw; }
 
-  const r = await fetch(ELEVEN + "/voices", { headers: { "xi-api-key": elevenKey() } });
-  if (!r.ok) throw new Error("ElevenLabs /voices: " + r.status);
-  const list = ((await r.json()) || {}).voices || [];
+  const list = await listVoices(raw);
   const nameOf = (v) => String(v.name || "").trim().toLowerCase();
   const hit = list.find((v) => nameOf(v) === want)
     || list.find((v) => nameOf(v).includes(want) || want.includes(nameOf(v)));
@@ -159,8 +178,10 @@ async function voiceId(name) {
     // списке они вытесняли именно то, что нужно было увидеть.
     const mine = list.filter((v) => v.category && v.category !== "premade").map((v) => v.name);
     const rest = list.filter((v) => !v.category || v.category === "premade").map((v) => v.name);
-    throw new Error(`в аккаунте ElevenLabs нет голоса «${raw}». Свои голоса: ${mine.join(", ") || "нет ни одного"}. `
-      + `Стоковые: ${rest.join(", ").slice(0, 120)}…`);
+    // Сколько всего вернулось — половина диагноза: «ни одного своего из 21» это
+    // чужой кабинет у ключа, а «ни одного вообще» — что ключ не тот или не те права.
+    throw new Error(`в аккаунте ElevenLabs нет голоса «${raw}» (всего голосов ${list.length}). `
+      + `Свои: ${mine.join(", ") || "нет ни одного"}. Стоковые: ${rest.join(", ").slice(0, 100)}…`);
   }
   voiceCache = { name: want, id: hit.voice_id };
   return hit.voice_id;
