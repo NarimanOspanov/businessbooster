@@ -3303,6 +3303,11 @@ let photosRunning = false;
 let deepenRunning = false;
 let scanRunning = false;
 let listRunning = false;
+// Задания на ролики: рендер идёт минутами, и ответ приходится отдавать не им,
+// а квитанцией. В памяти, потому что готовый ролик нужен один раз — его забирают
+// и отправляют в канал; переживать перезапуск ему незачем.
+const reelJobs = new Map();
+const REEL_TTL = 30 * 60e3;
 // Номера агента для фильтра уведомлений о звонках: {at, set}.
 const agentDidsCache = { at: 0, set: null };
 // Кэш счётчиков очереди телефонов: ключ «since|deal|prop» -> {at, left, waiting}.
@@ -9327,6 +9332,57 @@ http
     // порядку и останавливаемся на первой, где нет ни одного нового для базы
     // объявления (дальше только уже известные поднятия). Потолок — ?pages
     // (10, максимум 20). Своя блокировка: круг scanlist ему не мешает.
+    // Ролик-обзор по посту канала. Долгая работа: Gemini пишет текст и рисует
+    // шесть кадров, ElevenLabs читает, ffmpeg собирает — минуты. Azure рвёт
+    // висящий запрос примерно через четыре, поэтому POST ставит задание и сразу
+    // отдаёт квитанцию, а GET показывает состояние и, когда готово, сам файл.
+    if (urlPath === "/api/reel/post") {
+      const send = (code, obj) => {
+        res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+        res.end(JSON.stringify(obj, null, 2));
+      };
+      const want = process.env.REEL_KEY || KRISHA_JOB_KEY;
+      if (!want || parsed.searchParams.get("key") !== want) return send(403, { ok: false, error: "bad_key" });
+      for (const [k, v] of reelJobs) if (Date.now() - v.at > REEL_TTL) reelJobs.delete(k);
+
+      if (req.method !== "POST") {
+        const job = reelJobs.get(String(parsed.searchParams.get("id") || ""));
+        if (!job) return send(404, { ok: false, error: "нет такого задания" });
+        if (parsed.searchParams.get("file") === "1") {
+          if (!job.mp4) return send(409, { ok: false, state: job.state, error: "ролик ещё не готов" });
+          res.writeHead(200, { "Content-Type": "video/mp4", "Content-Length": job.mp4.length, "Cache-Control": "no-store" });
+          return res.end(job.mp4);
+        }
+        return send(200, { ok: true, id: job.id, state: job.state, step: job.step, seconds: Math.round((Date.now() - job.at) / 1000),
+                           bytes: job.mp4 ? job.mp4.length : 0, script: job.script || null, error: job.error || null });
+      }
+
+      (async () => {
+        let b = {};
+        try { b = JSON.parse(await readBody(req)) || {}; } catch { /* пусто */ }
+        if (!String(b.body || "").trim()) return send(400, { ok: false, error: "нужен текст поста (body)" });
+        const id = Math.random().toString(36).slice(2, 10);
+        const job = { id: id, at: Date.now(), state: "работает", step: "plan", mp4: null, script: null, error: null };
+        reelJobs.set(id, job);
+        // Отвечаем ДО рендера: вызывающий получает квитанцию и уходит опрашивать.
+        send(202, { ok: true, id: id, state: job.state });
+        try {
+          const { postReel } = require("./scripts/post-reel.js");
+          const r = await postReel({
+            headline: b.headline, body: b.body, channel: b.channel,
+            voiceName: b.voice, shots: b.shots, music: b.music !== false,
+            onStep: (st, d) => { job.step = st; console.log("[reel " + id + "] " + st + (d ? " " + JSON.stringify(d) : "")); },
+          });
+          job.mp4 = r.mp4; job.script = r.script; job.state = "готово";
+          console.log("[reel " + id + "] готов: " + (r.mp4.length / 1048576).toFixed(1) + " МБ за " + Math.round((Date.now() - job.at) / 1000) + " с");
+        } catch (e) {
+          job.state = "ошибка"; job.error = String((e && e.message) || e).slice(0, 300);
+          console.log("[reel " + id + "] ошибка: " + job.error);
+        }
+      })().catch(() => { /* ответ уже отправлен */ });
+      return;
+    }
+
     if (urlPath === "/api/krisha/fresh") {
       const send = (code, obj) => {
         res.writeHead(code, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
