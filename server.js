@@ -5975,6 +5975,20 @@ function almatyDayStart(now) {
 // Раз в 10 минут смотрим, не наступил ли очередной час, за который ещё не постили. После ошибки аккаунт молчит час, а
 // админам уходит уведомление. Токен продлеваем за 10 дней до конца.
 const INSTA_SLOTS = { 1: [19], 2: [10, 19], 3: [9, 14, 20], 4: [9, 11, 19, 21], 5: [9, 12, 15, 18, 21], 6: [9, 11, 14, 17, 19, 21] };
+
+// Автопостинг квартир выключен целиком — и карусели, и ролики (06.11).
+// Каждый такой пост стоит дорого не Instagram'ом, а тем, что по дороге
+// собирается: разбор карточки, текст подписи, текст для голоса, озвучка и
+// кадры ролика — всё это запросы к моделям, и они идут даже у поста, который
+// потом не выйдет (не та отделка, залог, чужой номер). Приоритет у этой
+// рубрики сейчас низкий, поэтому платить за неё каждый день не нужно.
+//
+// Выключен именно шаг публикации, а не весь тик: продление токена Instagram и
+// привязка постов, выложенных руками, стоят ноль и должны идти дальше —
+// токен иначе просто умрёт через 60 дней, и включать будет нечего.
+// Ручная публикация через /api/insta/publish работает как раньше.
+const INSTA_AUTOPOST = false;
+
 let instaPrunedAt = 0;
 async function instaTick() {
   instaGc();
@@ -6009,7 +6023,7 @@ async function instaTick() {
         console.log("[insta] manual post № " + m.post_id + " linked → " + media.id);
       }
     } catch (e) { console.log("[insta] manual link " + a.acc + ": " + e.message); }
-    if (!a.auto || hour < 9 || hour >= 22) continue;
+    if (!INSTA_AUTOPOST || !a.auto || hour < 9 || hour >= 22) continue;
     if (instaPauseUntil[a.acc] && Date.now() < instaPauseUntil[a.acc]) continue;
     const per = Math.max(1, Math.min(20, Number(a.per_day) || 4));
     const st = await db.instaPostedSince(a.acc, almatyDayStart(now));
@@ -6140,10 +6154,19 @@ async function instaMortgageSweep() {
 if (process.env.WEBSITE_SITE_NAME || process.env.INSTA_AUTO === "1") {
   setTimeout(() => instaTick().catch((e) => console.log("[insta] tick: " + e.message)), 120e3).unref();
   setInterval(() => instaTick().catch((e) => console.log("[insta] tick: " + e.message)), 10 * 60e3).unref();
-  // Напоминания «номер ждёт» тем, кто нажал кнопку, но не подписался.
+  // Напоминания «номер ждёт» тем, кто нажал кнопку, но не подписался. Это про
+  // людей, которые пришли с уже вышедших постов, — оставляем включённым, даже
+  // когда новых постов нет: заявки от старых продолжают приходить.
   setInterval(() => instaHookRemind().catch((e) => console.log("[insta-hook] remind: " + e.message)), 10 * 60e3).unref();
-  setTimeout(() => instaMortgageSweep().catch((e) => console.log("[insta] mortgage: " + e.message)), 60e3).unref();
-  setInterval(() => instaMortgageSweep().catch((e) => console.log("[insta] mortgage: " + e.message)), 3 * 3600e3).unref();
+  // Обход «можно в ипотеку» существует только затем, чтобы у автопостинга были
+  // кандидаты. Постинга нет — и обходить незачем: это две сотни страниц Крыши
+  // на каждый район каждые три часа, то есть лишние отказы от неё впустую.
+  if (INSTA_AUTOPOST) {
+    setTimeout(() => instaMortgageSweep().catch((e) => console.log("[insta] mortgage: " + e.message)), 60e3).unref();
+    setInterval(() => instaMortgageSweep().catch((e) => console.log("[insta] mortgage: " + e.message)), 3 * 3600e3).unref();
+  } else {
+    console.log("[insta] автопостинг выключен (INSTA_AUTOPOST=false) — ни карусели, ни ролики не выходят сами; токен продлевается, ручная публикация работает");
+  }
 }
 // Сторож номеров: раз в 5 минут смотрим, когда в krisha_list пришёл последний
 // номер (то же, что last_at в /api/krisha/objphone/count). Тишина дольше
@@ -10689,7 +10712,10 @@ http
               const a = accs.find((x) => x.acc === A) || {};
               const st = a.token ? await db.instaPostedSince(A, almatyDayStart(now)) : { n: 0 };
               out.push({ acc: A, handle: INSTA.ACCOUNTS[A].handle, connected: !!a.token, username: a.username || null, token_exp: a.token_exp || null,
-                auto: !!a.auto, per_day: a.per_day || 4, today: st.n, paused_until: instaPauseUntil[A] || null });
+                // autopost — выключатель всей рубрики в коде. Без него галочка
+                // «Автопостинг» показывала бы включённое состояние службе,
+                // которая ничего не публикует.
+                auto: !!a.auto, autopost: INSTA_AUTOPOST, per_day: a.per_day || 4, today: st.n, paused_until: instaPauseUntil[A] || null });
             }
             const cands = await instaCandidates(acc, q.get("fresh") === "1", false, true);
             const posts = await db.instaPosts(acc, 60);
