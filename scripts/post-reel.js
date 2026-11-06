@@ -132,14 +132,36 @@ async function drawAll(shots, onStep) {
 /* ---------------- голос ---------------- */
 
 let voiceCache = null;
+
+/**
+ * Голос по имени — не придираясь к написанию.
+ *
+ * Клон в кабинете может называться «Нариман», «Nariman» или «Нариман (ru)», и
+ * ронять ролик из-за скобки глупо. Поэтому: точное совпадение, иначе вхождение
+ * подстроки, иначе — если в переменной лежит не имя, а сам идентификатор —
+ * берём его как есть. Своих голосов в аккаунте единицы, спутать не с чем.
+ */
 async function voiceId(name) {
-  const want = String(name || VOICE_NAME).trim().toLowerCase();
+  const raw = String(name || VOICE_NAME).trim();
+  const want = raw.toLowerCase();
   if (voiceCache && voiceCache.name === want) return voiceCache.id;
+  // Идентификатор ElevenLabs — двадцать с лишним знаков без пробелов.
+  if (/^[A-Za-z0-9]{18,}$/.test(raw)) { voiceCache = { name: want, id: raw }; return raw; }
+
   const r = await fetch(ELEVEN + "/voices", { headers: { "xi-api-key": elevenKey() } });
   if (!r.ok) throw new Error("ElevenLabs /voices: " + r.status);
   const list = ((await r.json()) || {}).voices || [];
-  const hit = list.find((v) => String(v.name || "").trim().toLowerCase() === want);
-  if (!hit) throw new Error(`в аккаунте ElevenLabs нет голоса «${name || VOICE_NAME}» (есть: ${list.map((v) => v.name).join(", ").slice(0, 160)})`);
+  const nameOf = (v) => String(v.name || "").trim().toLowerCase();
+  const hit = list.find((v) => nameOf(v) === want)
+    || list.find((v) => nameOf(v).includes(want) || want.includes(nameOf(v)));
+  if (!hit) {
+    // Сначала СВОИ голоса: стоковых в любом аккаунте два десятка, и в обрезанном
+    // списке они вытесняли именно то, что нужно было увидеть.
+    const mine = list.filter((v) => v.category && v.category !== "premade").map((v) => v.name);
+    const rest = list.filter((v) => !v.category || v.category === "premade").map((v) => v.name);
+    throw new Error(`в аккаунте ElevenLabs нет голоса «${raw}». Свои голоса: ${mine.join(", ") || "нет ни одного"}. `
+      + `Стоковые: ${rest.join(", ").slice(0, 120)}…`);
+  }
   voiceCache = { name: want, id: hit.voice_id };
   return hit.voice_id;
 }
