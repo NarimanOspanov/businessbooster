@@ -23,7 +23,7 @@ const GEMINI = "https://generativelanguage.googleapis.com/v1beta/models/";
 // Клон живёт в личном кабинете ElevenLabs. Ищем его ПО ИМЕНИ, а не по зашитому
 // id: голос можно пересоздать, и тогда id меняется, а имя остаётся — зашитый id
 // тихо превратился бы в чужой голос в эфире.
-const VOICE_NAME = process.env.REEL_VOICE_NAME || "Нариман";
+const VOICE_NAME = process.env.REEL_VOICE_NAME || "Nariman Ospanov";
 const TTS_MODEL = process.env.ELEVEN_TTS_MODEL || "eleven_multilingual_v2";
 const TEXT_MODEL = process.env.GEMINI_MODEL || "gemini-flash-latest";
 const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image";
