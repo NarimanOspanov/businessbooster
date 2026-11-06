@@ -5576,7 +5576,12 @@ const instaScoring = new Set();
 async function instaApplyPhotoScores(rows, noWait) {
   if (!PHOTO_SCORE.available() || !rows.length) return rows;
   const have = await db.instaPhotoScoresGet(rows.map((r) => r.id));
-  const todo = rows.filter((r) => !have[r.id] && !instaScoring.has(r.id));
+  // Оценка фотографий — вызов модели на каждую квартиру, и страница кандидатов
+  // просит её в фоне (noWait) при каждом обновлении, то есть раз в минуту,
+  // пока открыта вкладка. Пока рубрика выключена, это плата за оценку
+  // квартир, которые никто не опубликует: новых не считаем, уже посчитанные
+  // берём из базы — страница по-прежнему показывает баллы и порядок.
+  const todo = INSTA_AUTOPOST ? rows.filter((r) => !have[r.id] && !instaScoring.has(r.id)) : [];
   const run = async () => {
     for (let i = 0; i < todo.length; i += 4) {
       await Promise.all(todo.slice(i, i + 4).map(async (r) => {
