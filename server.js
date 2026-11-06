@@ -9354,7 +9354,7 @@ http
         const load = await db.dbLoad().catch(() => null);
         const hot = load ? Math.max(load.cpu, load.io, load.log) : 0;
         const depth = hot > 85 ? Math.max(minPages, Math.min(cap, 2)) : hot > 70 ? Math.max(minPages, Math.min(cap, 4)) : cap;
-        let pages = 0, adverts = 0, added = 0, bumped = 0, priceChanged = 0, errors = 0;
+        let pages = 0, adverts = 0, added = 0, bumped = 0, priceChanged = 0, errors = 0, lastErr = null;
         const parts = [];
         // Части — по три параллельно; внутри части страницы по порядку, потому
         // что решение «читать дальше» зависит от предыдущей страницы.
@@ -9364,7 +9364,7 @@ http
             if (Date.now() - t0 > budgetMs) break;
             let res;
             try { res = await L.fetchListPage(sec, p, 1, { proxy: viaProxy }); }
-            catch { errors++; break; }
+            catch (e) { errors++; lastErr = String((e && e.message) || e).slice(0, 120); break; }
             if (res.empty) break;
             const rows = res.adverts.map((a) => L.parseAdvert(a, sec.path, res.dates)).filter((o) => o.id);
             const outs = await db.saveListAdverts(rows, sweepNo);
@@ -9382,6 +9382,10 @@ http
         for (let i = 0; i < L.SECTIONS.length; i += 3) {
           await Promise.all(L.SECTIONS.slice(i, i + 3).map(onePart));
         }
+        // Итог вызова в файл состояния, как у полного обхода (06.11.2026).
+        KW.freshRuns = (KW.freshRuns || []).concat([{ at: new Date(t0).toISOString(), sec: Math.round((Date.now() - t0) / 1000),
+          depth: depth, pages: pages, adverts: adverts, added: added, errors: errors, err: lastErr }]).slice(-30);
+        saveKrisha();
         freshRunning = false;
         send(200, {
           ok: true, seconds: Math.round((Date.now() - t0) / 100) / 10,
@@ -9504,7 +9508,7 @@ http
         await L.loadRegions().catch(() => { /* город останется пустым */ });
         const st = KW.list;
         if (!st.startedAt) st.startedAt = new Date().toISOString();
-        let pages = 0, adverts = 0, added = 0, priceChanged = 0, archived = 0, back = 0, bumped = 0, cityNull = 0, errors = 0;
+        let pages = 0, adverts = 0, added = 0, priceChanged = 0, archived = 0, back = 0, bumped = 0, cityNull = 0, errors = 0, lastErr = null;
         // Перенос фото старых строк в компактный вид — первым делом, пока
         // есть что переносить: идём по id с сохранённого места, каждая пачка
         // возвращает базе место.
@@ -9596,7 +9600,7 @@ http
           let ended = false;
           for (let k = 0; k < win.length; k++) {
             const g = got[k];
-            if (!g.ok) { errors++; break; }            // с этой страницы продолжит следующий вызов
+            if (!g.ok) { errors++; lastErr = String((g.e && g.e.message) || g.e).slice(0, 120); break; } // с этой страницы продолжит следующий вызов
             pages++; st.pages++;
             if (g.r.empty) { ended = true; break; }
             await store(g.r, section);
@@ -9622,6 +9626,12 @@ http
             .catch((e) => { KW.list.lastArchive = { sweepNo: doneNo, at: new Date().toISOString(), error: String(e.message).slice(0, 120) };
                             console.log("[scanlist] пометка снятых не удалась: " + String(e.message).slice(0, 120)); });
         }
+        // Итог вызова — в файл состояния (06.11.2026): круг 562 шёл пять дней,
+        // а снаружи было не видно, почему — сторож считал прогон удачным, если
+        // прочитана хоть одна страница. Последние 30 вызовов: сколько страниц,
+        // сколько сбоев и текст последней ошибки Крыши (HTTP-код, таймаут).
+        st.runs = (st.runs || []).concat([{ at: new Date(t0).toISOString(), sec: Math.round((Date.now() - t0) / 1000), pages: pages,
+          adverts: adverts, added: added, errors: errors, err: lastErr, conc: conc, dbSlow: !!st.dbSlow }]).slice(-30);
         KW.list = st;
         saveKrisha();
         listRunning = false;
