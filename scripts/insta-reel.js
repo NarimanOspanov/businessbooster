@@ -27,13 +27,21 @@ function ffmpegPath() {
 // У Montserrat ExtraBold средний знак ≈ 0,66 кегля.
 const fitSize = (t, max) => Math.max(30, Math.min(max, Math.floor(880 / (String(t).length * 0.66))));
 const esc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-function frameSvg(slide, top, big) {
+// `o.scrim` — насколько гасится размытая подложка, `o.headroom` — на сколько
+// опустить слайд. Значения по умолчанию те же, что были, поэтому рилсы по
+// квартирам не меняются; новостной ролик просит себе поля посветлее и запас
+// сверху — там заголовок в две строки, и у самой кромки он лезет под интерфейс
+// Reels, а под затемнением в 35% подложка читается как чёрная полоса.
+// Отступ заголовка отдельной ручкой не нужен: он считается ОТ слайда, так что
+// опускается вместе с ним и сохраняет свой зазор.
+function frameSvg(slide, top, big, o) {
   const uri = "data:image/" + (slide[0] === 0x89 ? "png" : "jpeg") + ";base64," + slide.toString("base64");
-  const y = Math.round((H - SH) / 2);
+  const scrim = o && o.scrim != null ? o.scrim : 0.35;
+  const y = Math.round((H - SH) / 2) + ((o && o.headroom) || 0);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Montserrat">
   <defs><filter id="b" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="40"/></filter></defs>
   <image href="${uri}" x="-200" y="-100" width="${W + 400}" height="${H + 200}" preserveAspectRatio="xMidYMid slice" filter="url(#b)"/>
-  <rect width="${W}" height="${H}" fill="#000" opacity=".35"/>
+  <rect width="${W}" height="${H}" fill="#000" opacity="${scrim}"/>
   <image href="${uri}" x="0" y="${y}" width="${SW}" height="${SH}" preserveAspectRatio="xMidYMid slice"/>
   ${(Array.isArray(top) ? top : top ? [top] : []).slice(0, 2).map((t, k, a) => `<text x="${W / 2}" y="${y - (a.length === 2 ? (k ? 60 : 135) : 85)}" text-anchor="middle" font-size="${fitSize(t, big ? 58 : 44)}" font-weight="800" fill="${k && big ? "#ffd166" : "#fff"}">${esc(t)}</text>`).join("")}
 </svg>`;
@@ -86,7 +94,7 @@ async function renderReel(slides, opts) {
     }
     const total = dur.reduce((a, b) => a + b, 0);
     const music = o.music === false ? null : pickMusic();
-    list.forEach((b, i) => fs.writeFileSync(path.join(dir, i + ".png"), toPng(frameSvg(b, o.tops ? o.tops[i] : i === 0 ? o.hook : i === list.length - 1 ? null : o.top, o.tops ? !!(o.big && o.big[i]) : i === 0))));
+    list.forEach((b, i) => fs.writeFileSync(path.join(dir, i + ".png"), toPng(frameSvg(b, o.tops ? o.tops[i] : i === 0 ? o.hook : i === list.length - 1 ? null : o.top, o.tops ? !!(o.big && o.big[i]) : i === 0, o.frame))));
     const args = ["-y", "-loglevel", "error"];
     // Каждый кадр — одна картинка: zoompan сам растягивает её на d кадров
     // (с -loop он делал бы d кадров из каждого повтора — в сотни раз дольше).

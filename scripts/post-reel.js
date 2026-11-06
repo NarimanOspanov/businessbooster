@@ -221,6 +221,10 @@ async function postReel({ headline, body, channel, voiceName, music, shots, onSt
     big: frames.map((_, i) => i === 0),
     music: music !== false,
     tempo: 1.06,
+    // Новость смотрят в ленте, где верх кадра занят интерфейсом: слайд уходит
+    // ниже, заголовок вместе с ним. Подложку гасим слабее — при 0.35 поля над
+    // и под кадром читались как чёрные полосы, а не как продолжение картинки.
+    frame: { scrim: 0.22, headroom: 70 },
   });
   step("done", { bytes: mp4.length });
   return { mp4, script: p.script, shots: p.shots };
