@@ -3999,6 +3999,20 @@ const KRISHA_SWEEP_BUDGET_MIN = Number(process.env.KRISHA_SWEEP_BUDGET_MIN || 35
 // статус остаются рабочими, просто не наступают сами по будильнику.
 const KRISHA_WATCH_SCHEDULED = false;
 
+// Сверка фото при обходе агентских объявлений (Gemini на каждое объявление,
+// до шести кандидатов к каждому) раньше включалась только значением
+// list.photo_match в app_config. Это самая дорогая строка во всей службе:
+// внешний планировщик вызывает обход восемь раз в сутки, и при включённом
+// флаге это ~$25–30 в день — ради пометки «та же квартира или нет», на
+// которую никто не смотрит. Находка по параметрам пишется в журнал и без
+// фото, а точное сравнение остаётся там, где оно действительно нужно: когда
+// человек присылает конкретное объявление.
+//
+// Выключатель стоит в коде намеренно, а не в базе: значение в app_config
+// меняется руками и его легко забыть, а здесь оно видно при любом чтении
+// кода. Пока здесь false, значение list.photo_match силы не имеет.
+const KRISHA_PHOTO_MATCH = false;
+
 if (KRISHA_ON && KRISHA_WATCH_SCHEDULED) {
   setTimeout(krishaTick, 45000).unref();                       // let the app finish booting
   setInterval(krishaTick, KRISHA_EVERY_H * 3600e3).unref();
@@ -10062,7 +10076,8 @@ http
           if (x.phones) p.push("номер есть");
           return p.length ? "📅 " + p.join(" · ") : null;
         };
-        const sweepPhotoOn = String((await db.configGet(["list.photo_match"]).catch(() => ({})))["list.photo_match"] || "") === "1";
+        const sweepPhotoOn = KRISHA_PHOTO_MATCH
+          && String((await db.configGet(["list.photo_match"]).catch(() => ({})))["list.photo_match"] || "") === "1";
         const PhotoMatch = require("./scripts/photo-match.js");
         const agents = await db.agentsToMatchList(batch, researchDays);
         let searched = 0, matched = 0, photoConfirmed = 0, archivedOwners = 0, researched = 0, researchedFound = 0;
@@ -10191,7 +10206,8 @@ http
           if (dmT(x.first_seen)) p.push("в базе с " + dmT(x.first_seen));
           return p.length ? "📅 " + p.join(" · ") : null;
         };
-        const sweepPhotoOn = String((await db.configGet(["list.photo_match"]).catch(() => ({})))["list.photo_match"] || "") === "1";
+        const sweepPhotoOn = KRISHA_PHOTO_MATCH
+          && String((await db.configGet(["list.photo_match"]).catch(() => ({})))["list.photo_match"] || "") === "1";
         const PhotoMatch = require("./scripts/photo-match.js");
         const agents = await db.agentsToMatch(batch);
         let searched = 0, matched = 0, photoConfirmed = 0;
