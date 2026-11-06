@@ -77,7 +77,12 @@ const PLAN = `Ты режиссёр коротких вертикальных р
    без логотипов и узнаваемых брендов, без узнаваемых реальных людей.
    Кадр показывает СМЫСЛ фразы, а не иллюстрирует слово буквально.
 
-Ответь строго JSON: {"script": "…", "shots": ["…", …]}`;
+3) "mood" — тон новости одним словом: "serious" (увольнения, запреты, утечки,
+   беда), "calm" (разбор, инструкция, спокойная находка) или "upbeat" (запуск,
+   успех, что-то бесплатное и полезное). По нему подбирается музыка, и бодрая
+   подложка под плохую новость слышна как фальшь.
+
+Ответь строго JSON: {"script": "…", "shots": ["…", …], "mood": "…"}`;
 
 async function plan(headline, body, { shots = SHOTS, chars = 520 } = {}) {
   const text = PLAN.replace("__LEN__", String(chars)).replace("__N__", String(shots));
@@ -93,7 +98,9 @@ async function plan(headline, body, { shots = SHOTS, chars = 520 } = {}) {
   const list = (Array.isArray(out.shots) ? out.shots : []).map((s) => String(s || "").trim()).filter(Boolean);
   if (script.length < 80) throw new Error("раскадровка: слишком короткий текст");
   if (list.length < 2) throw new Error("раскадровка: меньше двух кадров");
-  return { script, shots: list.slice(0, shots) };
+  const mood = ["serious", "calm", "upbeat"].includes(String(out.mood || "").toLowerCase())
+    ? String(out.mood).toLowerCase() : "calm";
+  return { script, shots: list.slice(0, shots), mood };
 }
 
 /* ---------------- кадры ---------------- */
@@ -254,7 +261,7 @@ async function postReel({ headline, body, channel, voiceName, music, shots, onSt
   const frames = await drawAll(p.shots, (i, n, err) => step("drawn", { i, n, err }));
   step("speak", { chars: p.script.length });
   const voice = await speak(p.script, { name: voiceName });
-  step("render", { frames: frames.length });
+  step("render", { frames: frames.length, mood: p.mood });
   const tail = channel ? "Подробнее в " + String(channel).replace(/^@?/, "@") : null;
   const tops = frames.map((_, i) => (i === 0 ? twoLines(headline) : i === frames.length - 1 ? tail : null));
   const mp4 = await renderReel(frames, {
@@ -263,6 +270,7 @@ async function postReel({ headline, body, channel, voiceName, music, shots, onSt
     tops: tops,
     big: frames.map((_, i) => i === 0),
     music: music !== false,
+    mood: p.mood,
     tempo: 1.06,
     // Новость смотрят в ленте, где верх кадра занят интерфейсом: слайд уходит
     // ниже, заголовок вместе с ним. Подложку гасим слабее — при 0.35 поля над
@@ -270,7 +278,7 @@ async function postReel({ headline, body, channel, voiceName, music, shots, onSt
     frame: { scrim: 0.22, headroom: 70 },
   });
   step("done", { bytes: mp4.length });
-  return { mp4, script: p.script, shots: p.shots };
+  return { mp4, script: p.script, shots: p.shots, mood: p.mood };
 }
 
 module.exports = { postReel, plan, draw, drawAll, speak, voiceId, twoLines };

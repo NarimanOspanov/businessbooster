@@ -93,7 +93,7 @@ async function renderReel(slides, opts) {
       for (let i = 1; i < list.length - 1; i++) dur[i] += add;
     }
     const total = dur.reduce((a, b) => a + b, 0);
-    const music = o.music === false ? null : pickMusic();
+    const music = o.music === false ? null : pickMusic(o.mood);
     list.forEach((b, i) => fs.writeFileSync(path.join(dir, i + ".png"), toPng(frameSvg(b, o.tops ? o.tops[i] : i === 0 ? o.hook : i === list.length - 1 ? null : o.top, o.tops ? !!(o.big && o.big[i]) : i === 0, o.frame))));
     const args = ["-y", "-loglevel", "error"];
     // Каждый кадр — одна картинка: zoompan сам растягивает её на d кадров
@@ -241,10 +241,31 @@ function ctaSlideKk() {
 }
 
 // --- Звук ------------------------------------------------------------------
-function pickMusic() {
+// Настроение подложки по ключевым словам в имени файла. Новость об увольнениях
+// под «warm-pop» звучит фальшиво, и это слышно сразу — музыка должна идти за
+// тоном новости, а не выпадать случайно.
+const MOODS = {
+  serious: /(serious|tense|dark|news|grim|cold)/i,
+  calm: /(calm|lofi|ambient|soft|slow|quiet)/i,
+  upbeat: /(bright|pop|corporate|upbeat|energetic|fast)/i,
+};
+let lastMusic = "";
+
+function pickMusic(mood) {
   try {
     const all = fs.readdirSync(MUSIC_DIR).filter((x) => /\.mp3$/i.test(x));
-    return all.length ? path.join(MUSIC_DIR, all[Math.floor(Math.random() * all.length)]) : null;
+    if (!all.length) return null;
+    const want = MOODS[String(mood || "").toLowerCase()];
+    // Сначала подходящие по настроению; если таких нет — берём все, чтобы ролик
+    // вышел с музыкой не того оттенка, а не без музыки вовсе.
+    let pool = want ? all.filter((f) => want.test(f)) : [];
+    if (!pool.length) pool = all;
+    // Два ролика подряд под одну и ту же дорожку читаются как шаблон, поэтому
+    // прошлую исключаем — но только если есть из чего выбрать.
+    const fresh = pool.filter((f) => f !== lastMusic);
+    const list = fresh.length ? fresh : pool;
+    lastMusic = list[Math.floor(Math.random() * list.length)];
+    return path.join(MUSIC_DIR, lastMusic);
   } catch { return null; }
 }
 // Длина WAV (PCM) в секундах — по заголовку.
