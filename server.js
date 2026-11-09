@@ -3683,6 +3683,17 @@ async function handleTelegramUpdate(u) {
   if (bot.isBalanceCmd(text)) { await showBalance(chat); return; }
   if (bot.isHistoryCmd(text)) { await showHistory(chat); return; }
 
+  // /admin — только для админов: панель публикатора (telegrampostpublisher) как
+  // Mini App. Кнопка «Открыть» в сообщении и в меню слева от поля ввода — меню
+  // ставится только в этом чате, покупатели его не видят (09.11.2026).
+  if (/^\/admin(?:@\w+)?\s*$/i.test(text) && TG_ADMINS.includes(String(uid))) {
+    const url = process.env.PANEL_MINIAPP_URL || "https://tgpostreaderhr-e2grcmebcug4c4bg.northeurope-01.azurewebsites.net/admin";
+    await bot.api(TG_TOKEN, "setChatMenuButton", { chat_id: chat, menu_button: { type: "web_app", text: "Открыть", web_app: { url } } }).catch(() => {});
+    await bot.api(TG_TOKEN, "sendMessage", { chat_id: chat, text: "Панель публикаций",
+      reply_markup: { inline_keyboard: [[{ text: "Открыть", web_app: { url } }]] } });
+    return;
+  }
+
   // Скрытые команды админа. /remove_user <telegram id> или me — удалить
   // пользователя целиком (запись и журнал), чтобы прогнать сценарий «новый
   // пользователь» заново. /refund <charge id> — вернуть оплату звёздами.
