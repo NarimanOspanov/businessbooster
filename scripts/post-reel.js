@@ -67,8 +67,10 @@ const PLAN = `Ты режиссёр коротких вертикальных р
 Из новости ниже сделай:
 1) "script" — закадровый текст ПО-РУССКИ. Разговорно, по делу, без канцелярита
    и без эмодзи. Первая фраза — зацеп, не пересказ заголовка. Дальше суть:
-   что случилось, цифры, что это значит для читателя. Последняя фраза — вывод
-   или вопрос, без призыва подписаться. __LEN__ знаков, это примерно полминуты речи.
+   что случилось, цифры, что это значит для читателя. Последняя фраза — вывод,
+   утверждением. НЕ вопрос: ролик кончается точкой, а не вопросительным знаком —
+   вопрос в конце звучит как чужая интонация поверх ровного рассказа. И без
+   призыва подписаться. __LEN__ знаков, это примерно полминуты речи.
    Только то, что есть в новости: ничего не придумывай и не достраивай.
 2) "shots" — ровно __N__ описаний кадров ПО-АНГЛИЙСКИ, по порядку текста: первый
    кадр иллюстрирует начало, последний — конец. Каждое описание — одна фраза
@@ -84,6 +86,19 @@ const PLAN = `Ты режиссёр коротких вертикальных р
 
 Ответь строго JSON: {"script": "…", "shots": ["…", …], "mood": "…"}`;
 
+// Просьбы «не вопросом» модель слушается почти всегда — почти. Остаток снимаем
+// руками: последнюю фразу, если она вопрос, выбрасываем. Выбрасываем только
+// когда без неё остаётся связный текст (две трети длины и ещё хотя бы одна
+// фраза) — иначе вопрос и есть весь вывод, и ролик кончится ничем.
+function dropTrailingQuestion(script) {
+  const s = String(script || "").trim();
+  if (!s.endsWith("?")) return s;
+  const parts = s.match(/[^.!?]+[.!?]+/g);
+  if (!parts || parts.length < 2) return s;
+  const kept = parts.slice(0, -1).join("").trim();
+  return kept.length >= s.length * 0.66 ? kept : s;
+}
+
 async function plan(headline, body, { shots = SHOTS, chars = 520 } = {}) {
   const text = PLAN.replace("__LEN__", String(chars)).replace("__N__", String(shots));
   const news = [String(headline || "").trim(), String(body || "").trim()].filter(Boolean).join("\n\n");
@@ -94,7 +109,7 @@ async function plan(headline, body, { shots = SHOTS, chars = 520 } = {}) {
   const raw = ((((j.candidates || [])[0] || {}).content || {}).parts || []).map((p) => p.text).join("");
   let out;
   try { out = JSON.parse(raw); } catch { throw new Error("раскадровка: модель вернула не JSON"); }
-  const script = String(out.script || "").replace(/\s+/g, " ").trim();
+  const script = dropTrailingQuestion(String(out.script || "").replace(/\s+/g, " ").trim());
   const list = (Array.isArray(out.shots) ? out.shots : []).map((s) => String(s || "").trim()).filter(Boolean);
   if (script.length < 80) throw new Error("раскадровка: слишком короткий текст");
   if (list.length < 2) throw new Error("раскадровка: меньше двух кадров");
@@ -271,6 +286,10 @@ async function postReel({ headline, body, channel, voiceName, music, shots, onSt
     big: frames.map((_, i) => i === 0),
     music: music !== false,
     mood: p.mood,
+    // Тише обычного: здесь закадровый текст плотный и идёт без пауз, и на
+    // штатных 0,13 музыка слышна поверх голоса, а не под ним. 0,09 — это на
+    // три децибела ниже: подложка остаётся, спорить с голосом перестаёт.
+    musicVolume: 0.09,
     tempo: 1.06,
     // Новость смотрят в ленте, где верх кадра занят интерфейсом: слайд уходит
     // ниже, заголовок вместе с ним. Подложку гасим слабее — при 0.35 поля над

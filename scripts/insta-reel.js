@@ -129,7 +129,11 @@ async function renderReel(slides, opts) {
     if (music) {
       args.push("-i", music);
       // Под голосом музыка тихо, без голоса — заметнее; в конце затухает.
-      f.push(`[${ai}:a]atrim=0:${total.toFixed(2)},aformat=sample_rates=44100:channel_layouts=stereo,volume=${o.voice ? 0.13 : 0.5},afade=t=in:d=0.5,afade=t=out:st=${(total - 1.5).toFixed(2)}:d=1.5[ma]`);
+      // Уровень под голосом задаётся роликом (musicVolume): дикция и плотность
+      // текста у разных роликов разные, и то, что под одним голосом лежит
+      // подложкой, под другим лезет вперёд. Без указания — как было, 0,13.
+      const bed = o.voice ? (o.musicVolume == null ? 0.13 : Number(o.musicVolume)) : 0.5;
+      f.push(`[${ai}:a]atrim=0:${total.toFixed(2)},aformat=sample_rates=44100:channel_layouts=stereo,volume=${bed},afade=t=in:d=0.5,afade=t=out:st=${(total - 1.5).toFixed(2)}:d=1.5[ma]`);
       mix.push("[ma]"); ai++;
     }
     if (mix.length) f.push(`${mix.join("")}amix=inputs=${mix.length}:duration=longest:normalize=0,atrim=0:${total.toFixed(2)}[aout]`);
