@@ -163,7 +163,23 @@ function cityFromCaption(a) {
   const p = a.photos && a.photos[0];
   const t = p ? String(p.title || p.alt || "") : "";
   const m = t.match(/ в ([^:]+):/);
-  return m ? KB.citySlugOf(m[1]) : null;
+  return m ? citySlugLoc(m[1]) : null;
+}
+// В подписи город в предложном падеже: «в Астане», «в Караганде», «в Шымкенте».
+// Словарь KB знает только именительный, и до 13.11.2026 так находилась почти
+// одна Алматы (не склоняется): Астана и другие города оставались без города.
+const CITY_STEMS = [
+  ["астан", "astana"], ["шымкент", "shymkent"], ["караганд", "karaganda"], ["актобе", "aktobe"], ["атырау", "atyrau"],
+  ["тараз", "taraz"], ["павлодар", "pavlodar"], ["усть-каменогорск", "ust-kamenogorsk"], ["семе", "semey"],
+  ["костана", "kostanay"], ["кызылорд", "kyzylorda"], ["актау", "aktau"], ["уральск", "uralsk"], ["кокшетау", "kokshetau"],
+  ["петропавловск", "petropavlovsk"], ["темиртау", "temirtau"], ["туркестан", "turkestan"], ["талдыкорган", "taldykorgan"],
+  ["экибастуз", "ekibastuz"], ["алматы", "almaty"],
+];
+function citySlugLoc(name) {
+  const t = String(name || "").toLowerCase().trim();
+  if (/обл\.?|област|р-н|район/.test(t)) return null; // «в Алматинской обл.» — это не город
+  for (const [stem, slug] of CITY_STEMS) if (t === stem || (t.startsWith(stem) && t.length - stem.length <= 2)) return slug;
+  return KB.citySlugOf(t);
 }
 
 // Площадь из заголовка: «Свободное назначение · 62 м²» → 62, «Участок · 5.58 соток» → 5.58 (сотки).
@@ -270,4 +286,66 @@ async function checkAdvert(id, opts) {
   }
 }
 
-module.exports = { areaFromTitle, SECTIONS, fetchListPage, parseAdvert, loadRegions, cityOf, dealOf, propOf, bumpDate, packPhotos, unpackPhotos, checkAdvert };
+// --- обход по номерам (13.11.2026) -------------------------------------------
+// Новые объявления встают в список не наверх: Крыша сортирует только по дню
+// поднятия, а внутри дня — вперемешку (новое за сегодня видели и на 1-й, и на
+// 800-й странице). Поэтому fresh ловил ~10% новых. Номера же Крыша выдаёт
+// подряд, и карточка карты ajax-map-object?id= отдаёт по одному номеру всё
+// нужное для очереди номеров: раздел, тип продавца, цену, заголовок, адрес,
+// город (в подписи фото) и первое фото. Координат и всех фото в ней нет —
+// их потом допишет полный обход списка.
+// Категории Крыши (data-cat-id) → раздел списка. Прочее (ЖК, гаражи…) не берём.
+const CAT_SECTIONS = {
+  1: "/prodazha/kvartiry/", 2: "/arenda/kvartiry/",
+  62: "/prodazha/doma-dachi/", 65: "/arenda/doma-dachi/",
+  59: "/prodazha/kommercheskaya-nedvizhimost/", 60: "/arenda/kommercheskaya-nedvizhimost/",
+  14: "/prodazha/uchastkov/",
+};
+function unescapeHtml(s) {
+  return String(s == null ? "" : s).replace(/&nbsp;/g, " ").replace(/&quot;/g, '"').replace(/&#0?39;/g, "'")
+    .replace(/&laquo;/g, "«").replace(/&raquo;/g, "»").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ").trim();
+}
+// html карточки карты → строка для krisha_list (как parseAdvert) или null.
+function parseMapObject(id, html) {
+  const h = String(html || "");
+  const storage = (h.match(/data-storage="([a-z]+)"/) || [])[1] || null;
+  const section = CAT_SECTIONS[Number((h.match(/data-cat-id="(\d+)"/) || [])[1])];
+  if (!section) return null;
+  const title = unescapeHtml((h.match(/class="a-map-sidebar-item__title"[^>]*>([^<]*)</) || [])[1])
+    .replace(/(\d+)-комн\.\s*квартира/, "$1-комнатная квартира");
+  const caption = unescapeHtml((h.match(/<img\s+alt="[^"]*"\s+title="([^"]*)"/) || [])[1]);
+  const priceDigits = ((h.match(/a-map-sidebar-item__price">([\s\S]*?)<span/) || [])[1] || "").replace(/\D/g, "");
+  const addr = unescapeHtml((h.match(/a-map-sidebar-item__address">([^<]*)</) || [])[1]);
+  const nb = Number((h.match(/data-nb="(\d+)"/) || [])[1]) || 0;
+  const full = (h.match(/data-full-src="(https:\/\/krisha-photos[^"]+)"/) || [])[1] || null;
+  const ownerAt = h.indexOf("a-map-sidebar-item__owner");
+  const owner = unescapeHtml(ownerAt < 0 ? "" : h.slice(ownerAt, ownerAt + 1500).replace(/<[^>]+>/g, " "));
+  const userType = /Хозяин недвижимости/.test(owner) ? "owner" : /Специалист/.test(owner) ? "specialist"
+    : /компани|Агентств/i.test(owner) ? "company" : /Новостройка|застройщик/i.test(owner) ? "complex" : null;
+  const date = (owner.match(/(сегодня|вчера|\d{1,2}\s+[а-яё]+)/i) || [])[1] || null;
+  const rm = title.match(/(\d+)-комнатн/) || title.match(/(\d+)\s+комнат/);
+  const a = {
+    id: Number(id), title: title, price: priceDigits ? Number(priceDigits) : null,
+    rooms: rm ? Number(rm[1]) : null, addressTitle: addr || null, userType: userType, storage: storage,
+    photos: full ? [{ src: full, title: caption }] : [],
+  };
+  const row = parseAdvert(a, section, { [String(id)]: date });
+  row.photos = nb || row.photos; // в карточке одно фото, но data-nb — сколько их всего
+  return row;
+}
+// Один номер: { status: live|archived|not_found|unknown, row }.
+async function fetchMapObject(id, opts) {
+  try {
+    const j = await fetchJson("https://krisha.kz/a/ajax-map-object?id=" + encodeURIComponent(String(id)), (opts && opts.timeoutMs) || 8000, opts);
+    const html = String((j && j.html) || "");
+    const st = (/data-storage="([a-z]+)"/.exec(html) || [])[1];
+    if (!st) return { status: "unknown", why: "no data-storage" };
+    return { status: st === "live" ? "live" : "archived", row: st === "live" ? parseMapObject(id, html) : null };
+  } catch (e) {
+    if (e && e.status === 404) return { status: "not_found" };
+    return { status: "unknown", why: String((e && e.message) || e).slice(0, 80) };
+  }
+}
+
+module.exports = { areaFromTitle, SECTIONS, fetchListPage, parseAdvert, loadRegions, cityOf, dealOf, propOf, bumpDate, packPhotos, unpackPhotos, checkAdvert, parseMapObject, fetchMapObject };

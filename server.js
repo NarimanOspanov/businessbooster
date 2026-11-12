@@ -3340,6 +3340,110 @@ function listEventFrom(row, r, src) {
 }
 const listDashCache = { at: 0, body: null };
 let freshRunning = false;
+
+// Обход по номерам внутри /api/krisha/fresh (13.11.2026). Номера на Крыше идут
+// подряд; карточка карты по номеру (L.fetchMapObject) говорит, живое ли
+// объявление, и даёт поля для очереди номеров. Состояние в KW.ids:
+//   next  — следующий номер вперёд; top — самый большой живой номер;
+//   retry — [[id, попытка, когда]]: «нет такого» между живыми номерами —
+//           похоже на модерацию, перепроверяем через 30 мин, 3 ч и 12 ч.
+// Серия из IDW_STOP_STREAK «нет такого» выше всех живых номеров — это край:
+// дальше номеров ещё нет, следующий прогон начнёт с начала серии.
+const IDW_RETRY_AFTER = [30 * 60e3, 3 * 3600e3, 12 * 3600e3];
+const IDW_STOP_STREAK = 60;
+const IDW_RETRY_MAX = 20000;
+// Не чаще IDW_RATE запросов в секунду: сотня в секунду с одного IP Крыше не понравится.
+const IDW_RATE = Number(process.env.KRISHA_IDS_RATE || 10);
+async function freshIdWalk(L, sweepNo, listMaxSeen, deadline, conc) {
+  const st = KW.ids = KW.ids || {};
+  if (!st.next) {
+    const mx = await db.listMaxId();
+    if (!mx) return { checked: 0 };
+    // Первый запуск: ~1.3 суток назад (40 тыс. номеров) — добрать пропущенное.
+    st.next = mx - Number(process.env.KRISHA_IDS_BACKFILL || 40000);
+    st.top = mx; st.retry = [];
+  }
+  st.retry = st.retry || [];
+  const frontier = () => Math.max(st.top || 0, listMaxSeen || 0);
+  const out = { checked: 0, live: 0, notFound: 0, unknown: 0, retried: 0, added: 0 };
+  const found = new Map();
+  const pace = async (since, n) => { const ms = n * 1000 / IDW_RATE - (Date.now() - since); if (ms > 0) await new Promise((r) => setTimeout(r, ms)); };
+  const check = async (id) => {
+    out.checked++;
+    const r = await L.fetchMapObject(id);
+    if (r.status === "live" || r.status === "archived") { if (id > (st.top || 0)) st.top = id; }
+    if (r.status === "live") { out.live++; if (r.row) found.set(String(id), r.row); }
+    else if (r.status === "not_found") out.notFound++;
+    else if (r.status === "unknown") { out.unknown++; out.why = r.why; }
+    return r.status;
+  };
+  const walkEnd = deadline - 6000; // запас на запись в базу
+  // 1. Созревшие перепроверки, не больше 100 за прогон.
+  const now = Date.now();
+  const due = [], keep = [];
+  for (const x of st.retry) (x[2] <= now && due.length < 100 ? due : keep).push(x);
+  st.retry = keep;
+  let di = 0;
+  for (; di < due.length && Date.now() < walkEnd; di += conc) {
+    const chunk = due.slice(di, di + conc);
+    const c0 = Date.now();
+    const rs = await Promise.all(chunk.map((x) => check(x[0])));
+    await pace(c0, chunk.length);
+    chunk.forEach((x, k) => {
+      out.retried++;
+      if (rs[k] === "not_found" && x[1] + 1 < IDW_RETRY_AFTER.length) st.retry.push([x[0], x[1] + 1, Date.now() + IDW_RETRY_AFTER[x[1] + 1]]);
+      else if (rs[k] === "unknown") st.retry.push([x[0], x[1], Date.now() + 10 * 60e3]);
+    });
+    if (rs.includes("unknown")) break; // Крыша отбивает — не долбим дальше
+  }
+  for (let k = di; k < due.length; k++) st.retry.push(due[k]); // не успели — в следующий раз
+  // 2. Вперёд от курсора.
+  let streak = [], stop = out.unknown > 0;
+  while (!stop && Date.now() < walkEnd) {
+    const base = st.next;
+    const chunk = [];
+    for (let k = 0; k < conc; k++) chunk.push(base + k);
+    const c0 = Date.now();
+    const rs = await Promise.all(chunk.map((id) => check(id)));
+    await pace(c0, chunk.length);
+    let consumed = 0;
+    for (let k = 0; k < chunk.length; k++) {
+      if (rs[k] === "unknown") { stop = true; break; } // сеть/468 — начнём с этого номера
+      consumed = k + 1;
+      if (rs[k] === "not_found") {
+        streak.push(chunk[k]);
+        if (streak.length >= IDW_STOP_STREAK && streak[0] > frontier()) { stop = true; break; }
+      } else {
+        for (const g of streak) st.retry.push([g, 0, Date.now() + IDW_RETRY_AFTER[0]]);
+        streak = [];
+      }
+    }
+    st.next = base + consumed;
+  }
+  // Хвост серии: выше края — вернуть курсор к её началу (номера ещё не выданы),
+  // ниже — это пропуски между живыми, их в перепроверку.
+  if (streak.length) {
+    const fr = frontier();
+    const above = streak.filter((g) => g > fr);
+    for (const g of streak) if (g <= fr) st.retry.push([g, 0, Date.now() + IDW_RETRY_AFTER[0]]);
+    if (above.length) st.next = Math.min(st.next, above[0]);
+  }
+  if (st.retry.length > IDW_RETRY_MAX) st.retry = st.retry.slice(-IDW_RETRY_MAX);
+  // 3. Новые для базы — записать. Уже известные не трогаем: в карточке карты
+  // нет координат, и запись затёрла бы их у строки из списка.
+  const rows = [...found.values()];
+  if (rows.length) {
+    const have = await db.knownListIds(rows.map((r) => r.id));
+    const fresh = rows.filter((r) => !have.has(String(r.id)));
+    for (let i = 0; i < fresh.length; i += 50) {
+      const part = fresh.slice(i, i + 50);
+      const outs = await db.saveListAdverts(part, sweepNo);
+      outs.forEach((o, k) => { if (o.added) out.added++; if (part[k]) listEventFrom(part[k], o, "ids"); });
+    }
+  }
+  out.next = st.next; out.top = st.top; out.queue = st.retry.length;
+  return out;
+}
 let matchListRunning = false;
 let matchRunning = false;
 // Подтверждённые 404 скана: id → когда. Пока курсор стоит у фронтира, каждый
@@ -9465,6 +9569,7 @@ http
         const hot = load ? Math.max(load.cpu, load.io, load.log) : 0;
         const depth = hot > 85 ? Math.max(minPages, Math.min(cap, 2)) : hot > 70 ? Math.max(minPages, Math.min(cap, 4)) : cap;
         let pages = 0, adverts = 0, added = 0, bumped = 0, priceChanged = 0, errors = 0, lastErr = null;
+        let listMaxSeen = 0;
         const parts = [];
         // Части — по три параллельно; внутри части страницы по порядку, потому
         // что решение «читать дальше» зависит от предыдущей страницы.
@@ -9477,6 +9582,7 @@ http
             catch (e) { errors++; lastErr = String((e && e.message) || e).slice(0, 120); break; }
             if (res.empty) break;
             const rows = res.adverts.map((a) => L.parseAdvert(a, sec.path, res.dates)).filter((o) => o.id);
+            for (const o of rows) if (o.id > listMaxSeen) listMaxSeen = o.id;
             const outs = await db.saveListAdverts(rows, sweepNo);
             let newHere = 0;
             for (let k = 0; k < outs.length; k++) {
@@ -9492,16 +9598,22 @@ http
         for (let i = 0; i < L.SECTIONS.length; i += 3) {
           await Promise.all(L.SECTIONS.slice(i, i + 3).map(onePart));
         }
+        // Обход по номерам (13.11.2026): то, что встало в список не наверх,
+        // fresh не видит — а это ~90% новых. ?ids=0 — выключить.
+        const ids = q.get("ids") === "0" ? null
+          : await freshIdWalk(L, sweepNo, listMaxSeen, t0 + budgetMs, Math.max(1, Math.min(12, Number(q.get("idConc") || 6))))
+            .catch((e) => ({ error: String((e && e.message) || e).slice(0, 120) }));
         // Итог вызова в файл состояния, как у полного обхода (06.11.2026).
         KW.freshRuns = (KW.freshRuns || []).concat([{ at: new Date(t0).toISOString(), sec: Math.round((Date.now() - t0) / 1000),
-          depth: depth, pages: pages, adverts: adverts, added: added, errors: errors, err: lastErr }]).slice(-30);
+          depth: depth, pages: pages, adverts: adverts, added: added, errors: errors, err: lastErr,
+          ids: ids ? { checked: ids.checked, live: ids.live, added: ids.added, retried: ids.retried, next: ids.next, queue: ids.queue, err: ids.error || null } : null }]).slice(-30);
         saveKrisha();
         freshRunning = false;
         send(200, {
           ok: true, seconds: Math.round((Date.now() - t0) / 100) / 10,
           depth: depth, minPages: minPages, dbLoad: load,
           pages: pages, adverts: adverts, added: added, bumped: bumped, priceChanged: priceChanged, errors: errors,
-          parts: parts,
+          parts: parts, ids: ids,
         });
       })().catch((e) => {
         freshRunning = false;

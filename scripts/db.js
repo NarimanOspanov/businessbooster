@@ -4777,6 +4777,14 @@ async function usersCount() {
 }
 
 // Какие из этих id есть в krisha_list — для сверки по номерам объявлений.
+// Самый большой номер объявления в списке — старт обхода по номерам.
+async function listMaxId() {
+  const pool = await getPool();
+  await ensureList(pool);
+  const r = await pool.request().query("SELECT MAX(id) AS id FROM dbo.krisha_list");
+  return r.recordset[0] && r.recordset[0].id != null ? Number(r.recordset[0].id) : null;
+}
+
 async function knownListIds(ids) {
   const list = (ids || []).map((x) => Number(x)).filter(Boolean);
   if (!list.length) return new Set();
@@ -5673,7 +5681,7 @@ module.exports = { listTextGet, portalUserByToken, portalUsers, portalUserSave, 
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadSetFav, leadSetHide, listEvDenormBackfill, leadPresets, leadPresetSave, leadPresetDel, listYearSources, listYearTodo, listYearSave, leadCopies, leadUncheckedCopies, leadSetCopyPhoto, dropKnownSticky, cleanStickyPhones,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
-  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, instaCandidates, instaListing, instaPostReserve, instaPostFinish, instaPostByCode, instaPhotoScoresGet, instaPhotoScoreSave, instaPlacesGet, instaPlaceSave, configGet, configSet, instaNextCode, listTextSave, listTextStats, mortgageFlagSave, mortgageFlagStats, instaAccounts, instaAccountSet, instaPostAdd, instaPosts, instaPostedSince, instaPostByMedia, instaRecentMedia, instaRecentListings, instaDmAdd, instaDmMedia, instaDmStats, instaDmPrune, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
+  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listMaxId, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, instaCandidates, instaListing, instaPostReserve, instaPostFinish, instaPostByCode, instaPhotoScoresGet, instaPhotoScoreSave, instaPlacesGet, instaPlaceSave, configGet, configSet, instaNextCode, listTextSave, listTextStats, mortgageFlagSave, mortgageFlagStats, instaAccounts, instaAccountSet, instaPostAdd, instaPosts, instaPostedSince, instaPostByMedia, instaRecentMedia, instaRecentListings, instaDmAdd, instaDmMedia, instaDmStats, instaDmPrune, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,
