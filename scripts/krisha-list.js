@@ -131,10 +131,31 @@ function inside(poly, lat, lon) {
   }
   return ok;
 }
+// Запас, когда полигонов нет: на странице карты больше нет dGisRegions
+// (проверено 13.11.2026), и город по координатам не находился вовсе.
+// Центр города и радиус в км — с запасом на пригороды, но без соседних городов.
+const CITY_CENTERS = [
+  ["almaty", 43.250, 76.900, 20], ["astana", 51.140, 71.440, 20], ["shymkent", 42.320, 69.600, 20],
+  ["karaganda", 49.810, 73.090, 18], ["aktobe", 50.290, 57.170, 16], ["atyrau", 47.110, 51.900, 15],
+  ["taraz", 42.900, 71.370, 14], ["pavlodar", 52.290, 76.970, 15], ["ust-kamenogorsk", 49.950, 82.620, 16],
+  ["semey", 50.420, 80.250, 14], ["kostanay", 53.210, 63.630, 13], ["kyzylorda", 44.840, 65.500, 14],
+  ["aktau", 43.650, 51.170, 15], ["uralsk", 51.230, 51.370, 14], ["kokshetau", 53.290, 69.390, 12],
+  ["petropavlovsk", 54.870, 69.150, 12], ["temirtau", 50.060, 72.960, 10], ["turkestan", 43.300, 68.250, 12],
+  ["taldykorgan", 45.020, 78.380, 12], ["ekibastuz", 51.730, 75.320, 10],
+];
+function cityByCenter(lat, lon) {
+  let best = null, bestD = Infinity;
+  for (const [slug, clat, clon, r] of CITY_CENTERS) {
+    const dy = (lat - clat) * 111.2, dx = (lon - clon) * 111.2 * Math.cos(clat * Math.PI / 180);
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d <= r && d < bestD) { best = slug; bestD = d; }
+  }
+  return best;
+}
 function cityOf(lat, lon) {
-  if (!regions || lat == null || lon == null) return null;
-  for (const r of regions) if (inside(r.poly, lat, lon)) return r.slug;
-  return null;
+  if (lat == null || lon == null) return null;
+  if (regions && regions.length) for (const r of regions) if (inside(r.poly, lat, lon)) return r.slug;
+  return cityByCenter(Number(lat), Number(lon));
 }
 
 // «18 сентября» / «сегодня» / «вчера» -> YYYY-MM-DD (по Алматы, UTC+5).
@@ -348,4 +369,28 @@ async function fetchMapObject(id, opts) {
   }
 }
 
-module.exports = { areaFromTitle, SECTIONS, fetchListPage, parseAdvert, loadRegions, cityOf, dealOf, propOf, bumpDate, packPhotos, unpackPhotos, checkAdvert, parseMapObject, fetchMapObject };
+// Карточка по номеру без координат и с одним фото. Полную строку берём из
+// списка карты с узким фильтром (цена, комнаты, площадь, город): объявление
+// попадает в первые 2–20 результатов, а там координаты, ЖК и все фото.
+// null — не нашлось (тогда остаётся строка из карточки, полный обход допишет).
+async function locateFull(row, opts) {
+  const sec = Object.values(CAT_SECTIONS).find((p) => dealOf(p) === row.deal && propOf(p) === row.prop);
+  if (!sec || row.price == null) return null;
+  const q = ["das[price][from]=" + row.price, "das[price][to]=" + row.price];
+  if (row.prop === "flat" && row.rooms) q.push("das[live.rooms][]=" + row.rooms);
+  if (row.prop === "flat" && row.area) q.push("das[live.square][from]=" + Math.floor(row.area), "das[live.square][to]=" + Math.ceil(row.area));
+  // Без города выдача по всему Казахстану шире — смотрим до трёх страниц.
+  let res = null, hit = null;
+  for (let page = 1; page <= (row.city ? 1 : 3) && !hit; page++) {
+    res = await fetchListPage({ path: sec + (row.city ? row.city + "/" : ""), q: q.join("&") }, page, 1, opts);
+    hit = res.adverts.find((a) => String(a.id) === String(row.id));
+    if (res.adverts.length < 20) break;
+  }
+  if (!hit) return null;
+  const full = parseAdvert(hit, sec, res.dates);
+  if (!full.city) full.city = row.city;
+  if (!full.bumpedOn) full.bumpedOn = row.bumpedOn;
+  return full;
+}
+
+module.exports = { areaFromTitle, SECTIONS, fetchListPage, parseAdvert, loadRegions, cityOf, dealOf, propOf, bumpDate, packPhotos, unpackPhotos, checkAdvert, parseMapObject, fetchMapObject, locateFull };

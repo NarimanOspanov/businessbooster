@@ -3377,7 +3377,9 @@ async function freshIdWalk(L, sweepNo, listMaxSeen, deadline, conc) {
     else if (r.status === "unknown") { out.unknown++; out.why = r.why; }
     return r.status;
   };
-  const walkEnd = deadline - 6000; // запас на запись в базу
+  // Время: ~55% на номера, остальное — дочитать новые из списка (координаты,
+  // фото) и записать. У края номера кончаются быстро, и остаток весь на дочитку.
+  const walkEnd = Date.now() + Math.max(0, deadline - Date.now() - 6000) * 0.55;
   // 1. Созревшие перепроверки, не больше 100 за прогон.
   const now = Date.now();
   const due = [], keep = [];
@@ -3435,6 +3437,15 @@ async function freshIdWalk(L, sweepNo, listMaxSeen, deadline, conc) {
   if (rows.length) {
     const have = await db.knownListIds(rows.map((r) => r.id));
     const fresh = rows.filter((r) => !have.has(String(r.id)));
+    out.full = 0;
+    for (let i = 0; i < fresh.length && Date.now() < deadline - 4000; i += conc) {
+      const c0 = Date.now();
+      const idx = [];
+      for (let k = i; k < Math.min(fresh.length, i + conc); k++) idx.push(k);
+      const got = await Promise.all(idx.map((k) => L.locateFull(fresh[k]).catch(() => null)));
+      idx.forEach((k, n) => { if (got[n]) { fresh[k] = got[n]; out.full++; } });
+      await pace(c0, idx.length);
+    }
     for (let i = 0; i < fresh.length; i += 50) {
       const part = fresh.slice(i, i + 50);
       const outs = await db.saveListAdverts(part, sweepNo);
@@ -9606,7 +9617,7 @@ http
         // Итог вызова в файл состояния, как у полного обхода (06.11.2026).
         KW.freshRuns = (KW.freshRuns || []).concat([{ at: new Date(t0).toISOString(), sec: Math.round((Date.now() - t0) / 1000),
           depth: depth, pages: pages, adverts: adverts, added: added, errors: errors, err: lastErr,
-          ids: ids ? { checked: ids.checked, live: ids.live, added: ids.added, retried: ids.retried, next: ids.next, queue: ids.queue, err: ids.error || null } : null }]).slice(-30);
+          ids: ids ? { checked: ids.checked, live: ids.live, added: ids.added, full: ids.full, retried: ids.retried, next: ids.next, queue: ids.queue, err: ids.error || null } : null }]).slice(-30);
         saveKrisha();
         freshRunning = false;
         send(200, {
