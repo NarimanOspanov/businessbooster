@@ -1,0 +1,916 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по физике, 8 класс: электризация тел, проводники и диэлектрики, электрическое поле точечного заряда.">
+<title>Электрический заряд</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene [data-click]{cursor:pointer}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.meter .lr .ok{color:var(--ok)}
+.meter .lr .bad{color:var(--warn)}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button.rec{color:var(--force)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M7 31C12 31 13 20 19 20S26 11 31 9" fill="none" stroke="var(--force)" stroke-width="2" stroke-dasharray="3 3" stroke-linecap="round"/><path d="M7 31L29 11" stroke="var(--arm)" stroke-width="2.2" stroke-linecap="round"/><path d="M33 8l-7 1.5 4.5 4.5z" fill="var(--arm)"/><circle cx="7" cy="31" r="3" fill="var(--fg)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Физика · Электрический заряд</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/">Карта</a><a href="/physics/">Физика</a><a href="/labs/phys-charge/" aria-current="page">Заряд</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Заряд</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Опытная площадка">
+    <svg class="scene" id="scene" role="img" aria-label="Площадка для опытов с электрическими зарядами. Ткань, перемычку и пробный заряд можно перетаскивать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const sg = x => (x > 0 ? '+' : '') + fmt(x, 2);
+const big = x => String(Math.round(x)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ').replace('-', '−');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const UNIT = 0.16; // one drawn sign = 10⁹ electrons = 0,16 нКл
+
+const LESSONS = [
+  { id: 'rub', title: 'Электризация трением',
+    text: ['Все тела состоят из атомов. В центре атома — положительно заряженное ядро, вокруг движутся отрицательно заряженные электроны. Обычно плюсов и минусов поровну, и тело нейтрально.',
+           'При трении тела плотно соприкасаются, и часть электронов переходит с одного тела на другое. Кто получил лишние электроны, заряжается отрицательно, кто потерял — положительно. Эбонит, потёртый о мех, получает заряд «−», стекло, потёртое о шёлк, — заряд «+». Заряжаются оба тела, и их заряды равны по модулю: заряд не возникает из ничего. Это закон сохранения заряда.',
+           'Зарядов два вида. Одноимённые заряды отталкиваются, разноимённые притягиваются. Заряд измеряют в кулонах (Кл). Самый маленький заряд у электрона: e = 1,6·10⁻¹⁹ Кл.'],
+    why: 'На заводах металлоконструкций и в автосервисах детали красят порошком: заряженная краска сама летит к детали, и её почти не теряют. Лазерный принтер и ксерокс печатают благодаря заряженному барабану. На нефтебазах Атырау и Павлодара цистерны заземляют: искра статического электричества может поджечь пары бензина. А мастера по ремонту телефонов надевают антистатический браслет: искра от свитера убивает микросхему.',
+    task: 'Наэлектризуйте обе палочки: эбонит мехом, стекло шёлком — хотя бы по 8 зарядов на каждой. Потом по поведению гильзы определите знак её заряда.',
+    hint: 'Тяните ткань вдоль палочки туда-обратно. Палочку меняет кнопка внизу. Вспомните, какие заряды притягиваются, а какие отталкиваются.',
+    safe: 'На заправке статический заряд опасен: искра может поджечь пары бензина. Прежде чем взять пистолет, коснитесь металлического корпуса машины.',
+    stage: 'Тяните ткань вдоль палочки туда-обратно.',
+    max: 16, need: 8, per: 55,
+    check: m => m.eb <= -8 && m.gl >= 8 && m.ans },
+  { id: 'cond', title: 'Проводники и диэлектрики',
+    text: ['В металлах есть свободные электроны. Они не привязаны к своим атомам и легко перемещаются по всему куску металла. Поэтому по металлу заряд быстро растекается. Такие вещества называют проводниками: металлы, графит, растворы солей, тело человека, земля.',
+           'В диэлектриках (изоляторах) свободных зарядов почти нет: электроны держатся в своих атомах. Заряд остаётся там, где его поместили. Диэлектрики: стекло, пластмасса, резина, фарфор, сухой воздух.',
+           'Проверять удобно электроскопом. Заряд растекается по стержню и листочкам, одноимённые заряды на листочках отталкиваются, и они расходятся. Чем больше заряд, тем больше угол. Соедините заряженный электроскоп с пустым: если перемычка — проводник, листочки второго разойдутся.'],
+    why: 'Электромонтёры каждый день выбирают проводники и изоляторы: медь и алюминий — для жил провода, ПВХ и резина — для оболочки, фарфор и стекло — для изоляторов на опорах ЛЭП. Диэлектрические перчатки и коврики спасают жизнь. Электриков в Казахстане ищут стройки, заводы и KEGOC, а хороший мастер-электрик зарабатывает больше многих офисных работников.',
+    task: 'Проверьте все 6 материалов: соедините ими электроскопы и посмотрите на листочки электроскопа B. Отнесите каждый материал к проводникам или диэлектрикам.',
+    hint: 'Перетащите перемычку вверх, на шарики электроскопов, или нажмите «Соединить». Материал меняет кнопка «Материал». При смене материала электроскопы заряжаются заново.',
+    safe: 'Вода из-под крана и тело человека тоже проводники. Не трогайте провода с повреждённой изоляцией и не берите электроприборы мокрыми руками.',
+    stage: 'Перетащите перемычку вверх, на шарики.',
+    q0: -12,
+    check: m => m.sorted === 6 },
+  { id: 'field', title: 'Электрическое поле',
+    text: ['Как заряды действуют друг на друга, не касаясь? Вокруг каждого заряженного тела есть электрическое поле. Это особый вид материи. Поле одного заряда действует с силой на другие заряды.',
+           'Чтобы изучить поле, в него вносят маленький положительный пробный заряд q. Сила, делённая на этот заряд, называется напряжённостью поля: E = F / q, в ньютонах на кулон (Н/Кл). У точечного заряда Q на расстоянии r: E = k·|Q| / r², где k = 9·10⁹ Н·м²/Кл². В 2 раза дальше — поле в 4 раза слабее.',
+           'Поле рисуют силовыми линиями. Они выходят из положительных зарядов и входят в отрицательные. Линия показывает, куда поле толкает положительный заряд. Где линии гуще, там поле сильнее.'],
+    why: 'На ТЭЦ Экибастуза, Павлодара и Алматы стоят электрофильтры: сильное поле заряжает частички золы и притягивает их к пластинам, и в воздух уходит гораздо меньше пыли. Сенсорный экран телефона замечает, как палец меняет электрическое поле. Инженеры-высоковольтники рассчитывают поле вокруг проводов ЛЭП, чтобы под ними было безопасно.',
+    task: 'Сделайте заряд шара отрицательным и поставьте пробный заряд в точку, где напряжённость поля 900 Н/Кл (допуск 5 %).',
+    hint: 'Пробный заряд можно тащить пальцем, кнопки «Ближе» и «Дальше» двигают его точнее. Посмотрите, как меняется E при удалении от шара. На каком r выполняется k·|Q| / r² = 900?',
+    stage: 'Тащите пробный заряд «+» по полю.',
+    Q0: 2, target: 900, tol: 0.05, qt: 0.1,
+    check: m => m.Q < 0 && Math.abs(m.E - 900) <= 45 },
+];
+
+const LS_KEY = 'luch-phys-charge';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+let drag = null, dirty = true, lastUpd = 0;
+
+const PAIRS = {
+  eb: { stick: 'эбонитовая палочка', short: 'эбонит', cloth: 'мех', s: -1, body: '#2b2f3a', edge: '#6b7590', cl: '#8a6a48', cle: '#b48c62' },
+  gl: { stick: 'стеклянная палочка', short: 'стекло', cloth: 'шёлк', s: 1, body: 'rgba(169,214,228,.22)', edge: '#a9d6e4', cl: '#a796cf', cle: '#cbbdf0' },
+};
+const MATS = {
+  cu: { name: 'медь', cond: true, col: '#d08a52' },
+  gl: { name: 'стекло', cond: false, col: '#a9d6e4' },
+  st: { name: 'сталь', cond: true, col: '#a9b4c9' },
+  pl: { name: 'пластмасса', cond: false, col: '#e6c14a' },
+  gr: { name: 'графит', cond: true, col: '#6f7a92' },
+  rb: { name: 'резина', cond: false, col: '#4a4552' },
+};
+const MKEYS = Object.keys(MATS);
+
+// ---------- geometry (SVG units; scene 520 × 405) ----------
+const G1 = { sy: 240, x0: 70, xh: 130, x1: 310, px: 400, py: 110, len: 130, rest: [140, 366] };
+const G2 = { ax: 130, bx: 390, by: 150, hy: 286, leaf: 60, rodUp: 150, rodDown: 372 };
+const G3 = { sx: 150, sy: 250, ppc: 10 };
+
+function resetState() {
+  Object.assign(S, {
+    // lesson 1
+    pair: 'eb', q: { eb: 0, gl: 0 }, cx: G1.rest[0], cy: G1.rest[1], trav: 0, th: 0, ans: null, ansOk: false, maxT: false, rubs: 0, sparkT: -1e9,
+    // lesson 2
+    mat: 'cu', qA: L().q0 || -12, qB: 0, rodY: G2.rodDown, bridged: false, bt: 0, tested: {}, sorted: {},
+    // lesson 3
+    Qs: 1, Qm: L().Q0 || 2, px: G3.sx + 80, py: G3.sy,
+    hl: null,
+  });
+}
+
+// ---------- lesson 1: rubbing ----------
+const sleeveTarget = () => clamp(-1.6 * S.q[S.pair], -24, 24); // sleeve is negative: repelled by "−", attracted by "+"
+const sleevePos = () => { const a = S.th * Math.PI / 180; return [G1.px + G1.len * Math.sin(a), G1.py + G1.len * Math.cos(a)]; };
+const sleeveWord = () => { const q = S.q[S.pair]; return q === 0 ? 'висит прямо' : q < 0 ? 'отталкивается' : 'притягивается'; };
+function transfer() {
+  const P = PAIRS[S.pair], Ls = L();
+  if (Math.abs(S.q[S.pair]) >= Ls.max) {
+    if (!S.maxT) toast('Больше заряд не растёт: часть его сразу стекает в воздух. Этого уже хватает для опыта.');
+    S.maxT = true; return;
+  }
+  S.q[S.pair] += P.s; S.rubs++; S.sparkT = performance.now(); dirty = true;
+  if (Math.abs(S.q[S.pair]) === 1) toast(P.s < 0 ? 'Электроны переходят с меха на эбонит: палочка заряжается «−», мех «+».' : 'Электроны переходят со стекла на шёлк: палочка заряжается «+», шёлк «−».');
+}
+function answer(sign) {
+  if (S.q.eb === 0 && S.q.gl === 0) { toast('Сначала зарядите палочку и посмотрите, как ведёт себя гильза.'); return; }
+  if (sign < 0) { S.ans = '−'; S.ansOk = true; toast('Верно: гильза отталкивается от эбонита (−) и притягивается к стеклу (+). Значит, её заряд отрицательный.'); }
+  else { S.ans = '+'; toast('Проверьте ещё раз. Какой знак у палочки, к которой гильза тянется? А у той, от которой уходит?'); }
+  update();
+}
+
+// ---------- lesson 2: electroscopes ----------
+const leafAng = q => Math.min(46, 3.8 * Math.abs(q));
+const sortedN = () => MKEYS.filter(k => S.sorted[k] && (S.sorted[k] === 'c') === MATS[k].cond).length;
+function recharge() { S.qA = L().q0; S.qB = 0; S.bt = 0; dirty = true; }
+function setMat(k) { S.mat = k; recharge(); S.rodY = G2.rodDown; S.bridged = false; renderTools(); update(); }
+function setBridge(on) { S.rodY = on ? G2.rodUp : G2.rodDown; S.bridged = on; S.bt = 0; renderTools(); update(); }
+function stepCond(dt) {
+  if (!S.bridged) return;
+  const m = MATS[S.mat];
+  if (m.cond) {
+    const avg = (S.qA + S.qB) / 2, k = reduce ? 1 : Math.min(1, dt * 2.5);
+    S.qA += (avg - S.qA) * k; S.qB += (avg - S.qB) * k;
+    if (Math.abs(S.qA - S.qB) < 0.02) { S.qA = S.qB = avg; }
+  }
+  const before = S.bt; S.bt += dt;
+  if (before < 0.9 && S.bt >= 0.9) {
+    S.tested[S.mat] = true;
+    toast(m.cond ? `${cap(m.name)}: листочки B разошлись — заряд прошёл по перемычке.` : `${cap(m.name)}: листочки B не шелохнулись — заряд по перемычке не идёт.`);
+    renderTools(); update();
+  }
+}
+const cap = s => s[0].toUpperCase() + s.slice(1);
+function sortAs(kind) {
+  const m = MATS[S.mat];
+  if (!S.tested[S.mat]) { toast('Сначала проверьте этот материал: соедините им электроскопы и подождите секунду.'); return; }
+  if ((kind === 'c') !== m.cond) { toast('Посмотрите ещё раз на листочки электроскопа B: пришёл ли к ним заряд?'); return; }
+  S.sorted[S.mat] = kind;
+  const n = sortedN();
+  toast(`${cap(m.name)} — ${m.cond ? 'проводник' : 'диэлектрик'}. Разобрано ${n} из 6.`);
+  const next = MKEYS.find(k => !S.sorted[k]);
+  if (next) setMat(next); else update();
+}
+
+// ---------- lesson 3: field of a point charge ----------
+const rUnits = () => Math.hypot(S.px - G3.sx, S.py - G3.sy);
+const rCm = () => rUnits() / G3.ppc;
+const Qn = () => S.Qs * S.Qm; // нКл
+const Efield = () => 9 * S.Qm / (rCm() / 100) ** 2; // 9·10⁹ · Q·10⁻⁹ / r²
+const Fmicro = () => L().qt * 1e-9 * Efield() * 1e6;
+function setProbe(x, y) {
+  let dx = x - G3.sx, dy = y - G3.sy, d = Math.hypot(dx, dy);
+  if (d < 1e-6) { dx = 1; dy = 0; d = 1; }
+  const r = clamp(d, 30, 300);
+  S.px = clamp(G3.sx + dx / d * r, -40, 560); S.py = clamp(G3.sy + dy / d * r, 40, 400);
+  dirty = true;
+}
+function setR(cm) { const d = rUnits() || 1; const ux = (S.px - G3.sx) / d, uy = (S.py - G3.sy) / d; setProbe(G3.sx + ux * cm * G3.ppc, G3.sy + uy * cm * G3.ppc); }
+function setQm(v) { S.Qm = clamp(Math.round(v * 2) / 2, 1, 5); renderTools(); update(); }
+
+function model() {
+  const id = LID();
+  if (id === 'rub') return { kind: id, eb: S.q.eb, gl: S.q.gl, ans: S.ansOk };
+  if (id === 'cond') return { kind: id, sorted: sortedN(), qA: S.qA, qB: S.qB };
+  return { kind: id, Q: Qn(), E: Efield(), r: rCm() };
+}
+
+// ---------- drawing helpers ----------
+const T = (x, y, s, fill, txt, anchor = 'middle', extra = '') => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${s}" fill="${fill}" text-anchor="${anchor}" ${extra}>${txt}</text>`;
+const halo = `paint-order="stroke" stroke="${INK}" stroke-width="3"`;
+const NEG = '#7fc4ff', POS = '#ff8a73';
+const sgn = (x, y, s, plus, size = 11) => T(x, y + size * 0.36, size, plus ? POS : NEG, plus ? '+' : '−', 'middle', 'font-weight="500"');
+function bg() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern>
+    <pattern id="hatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0V10" stroke="#2e3b57" stroke-width="3"/></pattern>
+    <radialGradient id="ballP" cx=".35" cy=".35"><stop offset="0" stop-color="#ffd2c8"/><stop offset="1" stop-color="#c85a46"/></radialGradient>
+    <radialGradient id="ballN" cx=".35" cy=".35"><stop offset="0" stop-color="#d8eeff"/><stop offset="1" stop-color="#3d7fb8"/></radialGradient>
+    <radialGradient id="metal" cx=".35" cy=".35"><stop offset="0" stop-color="#f2f5fa"/><stop offset="1" stop-color="#7d889e"/></radialGradient>
+    ${[['B', NEG], ['R', POS], ['O', '#ffb547'], ['E', '#86e0a8']].map(([k, c]) => `<marker id="ar${k}" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="${c}"/></marker>`).join('')}</defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+const ground = y => `<rect x="-2000" y="${y}" width="4520" height="1200" fill="#151e2e"/><rect x="-2000" y="${y}" width="4520" height="12" fill="url(#hatch)"/><path d="M-2000 ${y}H2520" stroke="#3a4762" stroke-width="2"/>`;
+
+// ---------- lesson 1 scene ----------
+function stickSVG(P, q, x0, xh, x1, y, h) {
+  let s = `<rect x="${x0}" y="${y - h / 2 - 1}" width="${xh - x0 + 6}" height="${h + 2}" rx="${h / 2}" fill="#5d6a86" stroke="${INK}" stroke-width="1.2"/>
+    <rect x="${xh}" y="${y - h / 2}" width="${x1 - xh}" height="${h}" rx="${h / 2}" fill="${P.body}" stroke="${P.edge}" stroke-width="1.6"/>`;
+  if (P.s > 0) s += `<path d="M${xh + 8} ${y - h / 2 + 3}H${x1 - 8}" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>`;
+  const n = Math.abs(q), cols = Math.ceil(n / 2), span = x1 - xh - 24;
+  for (let i = 0; i < n; i++) {
+    const c = Math.floor(i / 2), r = i % 2;
+    const x = xh + 12 + (cols > 1 ? c * span / Math.max(cols - 1, 1) : span / 2);
+    s += sgn(x, y + (r ? 3.5 : -3.5) * h / 14, 0, q > 0, h * 0.8);
+  }
+  return s;
+}
+function rubScene(tm) {
+  const g = G1, P = PAIRS[S.pair], q = S.q[S.pair];
+  let h = ground(392);
+  // stand with hanging sleeve
+  h += `<rect x="440" y="384" width="62" height="8" rx="2" fill="#3a4762"/><path d="M471 386V100H${g.px}" fill="none" stroke="#5d6a86" stroke-width="5" stroke-linejoin="round"/>`;
+  const [sx, sy] = sleevePos();
+  h += `<g data-click="sleeve"><path d="M${g.px} ${g.py}L${sx.toFixed(1)} ${sy.toFixed(1)}" stroke="#c8d0dd" stroke-width="1.2"/>
+    <circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="20" fill="transparent"/>
+    <ellipse cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" rx="9" ry="11" fill="#d9cfa6" stroke="${INK}" stroke-width="1.2"/>
+    <path d="M${(sx - 5).toFixed(1)} ${(sy - 6).toFixed(1)}q3 -3 7 0" stroke="#fff6d6" stroke-width="1.5" fill="none"/></g>`;
+  h += T(g.px + 34, g.py + 30, 9.5, '#c8d0dd', 'гильза', 'start', halo) + T(g.px + 34, g.py + 42, 9.5, '#8b96ad', 'заряд: ?', 'start', halo);
+  if (Math.abs(S.th) > 2) {
+    const dir = Math.sign(S.th), L0 = 10 + Math.abs(S.th) * 1.2;
+    h += `<path d="M${(sx + dir * 12).toFixed(1)} ${sy.toFixed(1)}h${(dir * L0).toFixed(1)}" stroke="#ffb547" stroke-width="2.5" marker-end="url(#arO)"/>`;
+  }
+  // spare stick lying on the table
+  const k2 = S.pair === 'eb' ? 'gl' : 'eb', P2 = PAIRS[k2];
+  h += `<g data-click="swap"><rect x="230" y="364" width="190" height="28" fill="transparent"/>${stickSVG(P2, S.q[k2], 240, 268, 410, 381, 10)}</g>` +
+    T(325, 404, 9, '#8b96ad', `${P2.short} · ${sg(S.q[k2] * UNIT)} нКл · нажмите, чтобы взять`, 'middle', halo);
+  // active stick
+  h += stickSVG(P, q, g.x0, g.xh, g.x1, g.sy, 15);
+  h += T((g.xh + g.x1) / 2, g.sy - 18, 10, '#e8ecf4', P.stick, 'middle', halo) + T(g.x0 + 24, g.sy + 22, 9, '#8b96ad', 'ручка', 'middle', halo);
+  // cloth
+  const on = Math.abs(S.cy - g.sy) < 2;
+  const cx = S.cx, cy = S.cy;
+  h += `<g data-drag="cloth"><rect x="${(cx - 40).toFixed(1)}" y="${(cy - 32).toFixed(1)}" width="80" height="64" fill="transparent"/>
+    <rect x="${(cx - 30).toFixed(1)}" y="${(cy - 24).toFixed(1)}" width="60" height="48" rx="10" fill="${P.cl}" stroke="${P.cle}" stroke-width="1.5" opacity="${on ? 0.92 : 1}"/>`;
+  if (S.pair === 'eb') for (let i = 0; i < 9; i++) { const x = cx - 24 + i * 6; h += `<path d="M${x.toFixed(1)} ${(cy - 20).toFixed(1)}l2 6M${(x + 2).toFixed(1)} ${(cy + 8).toFixed(1)}l2 6" stroke="#5a4330" stroke-width="1.4"/>`; }
+  else h += `<path d="M${(cx - 26).toFixed(1)} ${(cy - 12).toFixed(1)}q26 -8 52 0M${(cx - 26).toFixed(1)} ${(cy + 12).toFixed(1)}q26 8 52 0" stroke="#e4dcff" stroke-width="1.2" fill="none" opacity=".7"/>`;
+  const nc = Math.abs(q);
+  for (let i = 0; i < nc; i++) { const c = i % 6, r = Math.floor(i / 6); h += sgn(cx - 20 + c * 8, cy - 12 + r * 12, 0, q < 0, 10); }
+  h += `</g>` + T(cx, cy + 36, 9.5, '#c8d0dd', P.cloth, 'middle', halo);
+  if (!S.rubs && !drag) h += T(cx, cy - 34, 9.5, '#ffb547', 'тяните ткань на палочку ↑', 'middle', halo);
+  if (performance.now() - S.sparkT < 160 && !reduce) h += `<circle cx="${cx.toFixed(1)}" cy="${g.sy}" r="26" fill="none" stroke="#ffe696" stroke-width="1.5" opacity=".6"/>`;
+  return h;
+}
+
+// ---------- lesson 2 scene ----------
+function scopeSVG(x, q, name) {
+  const g = G2, a = leafAng(q) * Math.PI / 180, L0 = g.leaf;
+  let h = `<rect x="${x - 58}" y="372" width="116" height="20" rx="3" fill="#3a4762"/>
+    <rect x="${x - 50}" y="200" width="100" height="174" rx="16" fill="rgba(169,214,228,.06)" stroke="#5f7d92" stroke-width="2"/>`;
+  for (let d = -40; d <= 40; d += 10) { const r = d * Math.PI / 180; h += `<path d="M${(x + 70 * Math.sin(r)).toFixed(1)} ${(g.hy + 70 * Math.cos(r)).toFixed(1)}l${(5 * Math.sin(r)).toFixed(1)} ${(5 * Math.cos(r)).toFixed(1)}" stroke="#3a4762" stroke-width="1.5"/>`; }
+  h += `<path d="M${x} ${g.by + 10}V${g.hy}" stroke="#c8d0dd" stroke-width="4"/><rect x="${x - 12}" y="192" width="24" height="14" rx="3" fill="#5d6a86"/>`;
+  const e1 = [x - L0 * Math.sin(a), g.hy + L0 * Math.cos(a)], e2 = [x + L0 * Math.sin(a), g.hy + L0 * Math.cos(a)];
+  h += `<path d="M${x} ${g.hy}L${e1[0].toFixed(1)} ${e1[1].toFixed(1)}M${x} ${g.hy}L${e2[0].toFixed(1)} ${e2[1].toFixed(1)}" stroke="#e6c14a" stroke-width="5" stroke-linecap="round"/>`;
+  h += `<circle cx="${x}" cy="${g.by}" r="15" fill="url(#metal)" stroke="${INK}" stroke-width="1.2"/>`;
+  const n = Math.round(Math.abs(q)), plus = q > 0;
+  for (let i = 0; i < Math.min(n, 4); i++) { const an = (-60 + i * 40) * Math.PI / 180; h += sgn(x + 22 * Math.sin(an), g.by - 22 * Math.cos(an) + 2, 0, plus, 10); }
+  for (let j = 0; j < n - 4; j++) {
+    const side = j % 2 ? 1 : -1, t = 0.3 + 0.16 * Math.floor(j / 2), sx = x + side * L0 * t * Math.sin(a), sy = g.hy + L0 * t * Math.cos(a);
+    h += sgn(sx + side * 9, sy, 0, plus, 10);
+  }
+  h += T(x, g.by - 32, 10, '#e8ecf4', name, 'middle', halo);
+  return h;
+}
+function condScene(tm) {
+  const g = G2, m = MATS[S.mat];
+  let h = ground(392);
+  h += scopeSVG(g.ax, S.qA, 'электроскоп A') + scopeSVG(g.bx, S.qB, 'электроскоп B');
+  const y = S.rodY, xa = g.ax - 18, xb = g.bx + 18;
+  h += `<g data-drag="rod"><rect x="${xa}" y="${(y - 22).toFixed(1)}" width="${xb - xa}" height="44" fill="transparent"/>
+    <rect x="${xa}" y="${(y - 5).toFixed(1)}" width="${xb - xa}" height="10" rx="5" fill="${m.col}" stroke="${INK}" stroke-width="1.2"/>
+    <rect x="247" y="${(y - 11).toFixed(1)}" width="26" height="22" rx="5" fill="#26324a" stroke="#8b96ad" stroke-width="1.5"/>
+    <path d="M253 ${(y - 6).toFixed(1)}v12M260 ${(y - 6).toFixed(1)}v12M267 ${(y - 6).toFixed(1)}v12" stroke="#3a4762" stroke-width="2"/></g>`;
+  h += T(260, y + 26, 10, '#e8ecf4', `перемычка: ${m.name}`, 'middle', halo);
+  if (!S.bridged && y > 300) h += T(260, y - 20, 9.5, '#ffb547', 'тяните вверх ↑', 'middle', halo);
+  if (S.bridged && m.cond && Math.abs(S.qA - S.qB) > 0.15) {
+    for (let k = 0; k < 6; k++) {
+      const ph = reduce ? k / 6 : ((tm / 700 + k / 6) % 1), x = g.ax + 10 + ph * (g.bx - g.ax - 20);
+      if (x > 244 && x < 276) continue;
+      h += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.4" fill="${NEG}" stroke="${INK}" stroke-width=".8"/>`;
+    }
+    h += T(260, y - 18, 9.5, NEG, 'электроны идут к B →', 'middle', halo);
+  }
+  if (S.bridged && !m.cond && S.bt > 0.9) h += T(260, y - 18, 9.5, '#8b96ad', 'заряд не проходит', 'middle', halo);
+  return h;
+}
+
+// ---------- lesson 3 scene ----------
+function fieldScene(tm) {
+  const g = G3, pos = S.Qs > 0, col = pos ? POS : NEG;
+  let h = '';
+  for (let c = 5; c <= 30; c += 5) h += `<circle cx="${g.sx}" cy="${g.sy}" r="${c * g.ppc}" fill="none" stroke="rgba(160,185,230,.12)" stroke-dasharray="3 5"/>` + T(g.sx + c * g.ppc * 0.7071 + 3, g.sy + c * g.ppc * 0.7071 + 10, 8.5, '#5d6a86', `${c} см`, 'start');
+  const nl = 8 + 4 * Math.round(S.Qm);
+  for (let i = 0; i < nl; i++) {
+    const a = i / nl * 2 * Math.PI + 0.13, ux = Math.cos(a), uy = Math.sin(a);
+    h += `<path d="M${(g.sx + 26 * ux).toFixed(1)} ${(g.sy + 26 * uy).toFixed(1)}L${(g.sx + 640 * ux).toFixed(1)} ${(g.sy + 640 * uy).toFixed(1)}" stroke="${col}" stroke-width="1.2" opacity=".38"/>`;
+    for (const r of [70, 160, 250]) {
+      const x = g.sx + r * ux, y = g.sy + r * uy, d = pos ? 1 : -1, tx = x + d * 6 * ux, ty = y + d * 6 * uy;
+      h += `<path d="M${tx.toFixed(1)} ${ty.toFixed(1)}L${(x - d * 3 * ux - 4 * uy).toFixed(1)} ${(y - d * 3 * uy + 4 * ux).toFixed(1)}L${(x - d * 3 * ux + 4 * uy).toFixed(1)} ${(y - d * 3 * uy - 4 * ux).toFixed(1)}z" fill="${col}" opacity=".6"/>`;
+    }
+  }
+  h += `<g data-click="src"><circle cx="${g.sx}" cy="${g.sy}" r="22" fill="url(#${pos ? 'ballP' : 'ballN'})" stroke="${INK}" stroke-width="1.5"/>` + T(g.sx, g.sy + 7, 20, INK, pos ? '+' : '−', 'middle', 'font-weight="500"') + `</g>`;
+  h += T(g.sx, g.sy - 32, 10.5, '#e8ecf4', `Q = ${pos ? '+' : '−'}${fmt(S.Qm, 1)} нКл`, 'middle', halo);
+  // probe
+  const px = S.px, py = S.py, d = rUnits(), ux = (px - g.sx) / d, uy = (py - g.sy) / d;
+  h += `<path d="M${(g.sx + 24 * ux).toFixed(1)} ${(g.sy + 24 * uy).toFixed(1)}L${(px - 11 * ux).toFixed(1)} ${(py - 11 * uy).toFixed(1)}" stroke="#e8ecf4" stroke-width="1.2" stroke-dasharray="4 4" opacity=".7"/>`;
+  const mx = (g.sx + px) / 2, my = (g.sy + py) / 2;
+  h += T(mx - 14 * uy, my + 14 * ux + 4, 10, '#e8ecf4', `r = ${fmt(rCm(), 1)} см`, 'middle', halo);
+  const E = Efield(), len = clamp(16 + 26 * Math.log10(E / 50), 12, 90), dir = pos ? 1 : -1;
+  h += `<path d="M${(px + dir * 12 * ux).toFixed(1)} ${(py + dir * 12 * uy).toFixed(1)}l${(dir * len * ux).toFixed(1)} ${(dir * len * uy).toFixed(1)}" stroke="#ffb547" stroke-width="3" marker-end="url(#arO)"/>`;
+  const am = 12 + len / 2, lx = px + dir * am * ux + 13 * uy, ly = py + dir * am * uy - 13 * ux;
+  h += T(lx, ly + 4, 10.5, '#ffb547', 'F', 'middle', halo);
+  h += `<g data-drag="probe"><circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="24" fill="transparent"/>
+    <circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="10" fill="url(#ballP)" stroke="${INK}" stroke-width="1.2"/>` + T(px, py + 4.5, 13, INK, '+', 'middle', 'font-weight="500"') + `</g>`;
+  h += T(px, py + 26, 9.5, '#c8d0dd', `E = ${big(E)} Н/Кл`, 'middle', halo);
+  return h;
+}
+
+function hlBox(id) {
+  const lid = LID();
+  if (lid === 'rub') {
+    const [sx, sy] = sleevePos();
+    return ({ stick: [G1.xh - 6, G1.sy - 14, G1.x1 - G1.xh + 12, 28], handle: [G1.x0 - 6, G1.sy - 14, G1.xh - G1.x0 + 12, 28], cloth: [S.cx - 36, S.cy - 30, 72, 60], sleeve: [sx - 18, sy - 18, 36, 36], thread: [Math.min(G1.px, sx) - 10, G1.py - 6, Math.abs(sx - G1.px) + 20, sy - G1.py], stand: [396, 92, 112, 304], spare: [232, 366, 186, 30] })[id];
+  }
+  if (lid === 'cond') return ({ ball: [G2.ax - 22, G2.by - 22, 44, 44], stem: [G2.ax - 16, G2.by + 8, 32, G2.hy - G2.by], leaves: [G2.ax - 54, G2.hy - 8, 108, 72], jar: [G2.ax - 56, 194, 112, 202], scopeB: [G2.bx - 60, 128, 120, 268], rod: [G2.ax - 24, S.rodY - 16, G2.bx - G2.ax + 48, 32], handle: [242, S.rodY - 16, 36, 32] })[id];
+  const d = rUnits(), ux = (S.px - G3.sx) / d, uy = (S.py - G3.sy) / d, E = Efield(), len = clamp(16 + 26 * Math.log10(E / 50), 12, 90), dir = S.Qs;
+  const ex = S.px + dir * (len + 12) * ux, ey = S.py + dir * (len + 12) * uy;
+  return ({ src: [G3.sx - 28, G3.sy - 28, 56, 56], probe: [S.px - 16, S.py - 16, 32, 32], lines: [G3.sx - 90, G3.sy - 90, 180, 180], force: [Math.min(S.px, ex) - 14, Math.min(S.py, ey) - 14, Math.abs(ex - S.px) + 28, Math.abs(ey - S.py) + 28], ruler: [G3.sx - 2, G3.sy - 12, 160, 24], rings: [G3.sx - 150, G3.sy - 150, 300, 300] })[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = bg();
+  if (id === 'rub') h += rubScene(t);
+  else if (id === 'cond') h += condScene(t);
+  else h += fieldScene(t);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 520, hh / 440, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 430 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer ----------
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+const throttled = () => { const n = performance.now(); if (n - lastUpd > 120) { lastUpd = n; update(); } };
+scene.addEventListener('pointerdown', e => {
+  const cl = e.target.closest('[data-click]');
+  if (cl) { act(cl.dataset.click); return; }
+  const el = e.target.closest('[data-drag]');
+  const p = toSvg(e);
+  if (!el && LID() !== 'field') return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  const id = el ? el.dataset.drag : 'probe';
+  if (id === 'cloth') drag = { id, dx: p.x - S.cx, dy: p.y - S.cy };
+  else if (id === 'rod') { drag = { id, dy: p.y - S.rodY }; S.bridged = false; S.bt = 0; }
+  else { drag = { id: 'probe', dx: el ? p.x - S.px : 0, dy: el ? p.y - S.py : 0 }; if (!el) { setProbe(p.x, p.y); update(); } }
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const p = toSvg(e), g = G1;
+  if (drag.id === 'cloth') {
+    const nx = clamp(p.x - drag.dx, 30, 490);
+    let ny = clamp(p.y - drag.dy, 60, G1.rest[1]);
+    const onStick = Math.abs(ny - g.sy) < 30 && nx >= g.xh + 10 && nx <= g.x1 - 10;
+    if (onStick) {
+      ny = g.sy;
+      if (Math.abs(S.cy - g.sy) < 1) { S.trav += Math.abs(nx - S.cx); while (S.trav >= L().per) { S.trav -= L().per; transfer(); } }
+    } else S.trav = 0;
+    S.cx = nx; S.cy = ny; dirty = true; throttled();
+  } else if (drag.id === 'rod') {
+    S.rodY = clamp(p.y - drag.dy, G2.rodUp, G2.rodDown); dirty = true;
+  } else if (drag.id === 'probe') { setProbe(p.x - drag.dx, p.y - drag.dy); throttled(); }
+});
+const endDrag = () => {
+  if (!drag) return;
+  const id = drag.id; drag = null; scene.classList.remove('grabbing');
+  if (id === 'cloth') { S.cx = G1.rest[0]; S.cy = G1.rest[1]; S.trav = 0; }
+  if (id === 'rod') { setBridge(S.rodY < 240); return; }
+  update();
+};
+scene.addEventListener('pointerup', endDrag);
+scene.addEventListener('pointercancel', endDrag);
+
+let last = performance.now(), acc = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  const id = LID();
+  if (id === 'rub') {
+    const tg = sleeveTarget();
+    if (Math.abs(S.th - tg) > 0.05) { S.th = reduce ? tg : S.th + (tg - S.th) * Math.min(1, dt * 4); dirty = true; }
+    if (performance.now() - S.sparkT < 300) dirty = true;
+  }
+  if (id === 'cond') {
+    const q0 = S.qB; stepCond(dt);
+    if (S.bridged && MATS[S.mat].cond) dirty = true;
+    if (Math.abs(S.qB - q0) > 1e-4) { acc += dt; if (acc > 0.25) { acc = 0; update(); } }
+  }
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3600); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, cls, dis) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}${cls ? ` class="${cls}"` : ''}${dis ? ' disabled' : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  let h = '';
+  if (id === 'rub') h = B('swap', 'Палочка: ' + PAIRS[S.pair].short) + B('rubOnce', 'Потереть', undefined, 'rec') + B('ground', 'Разрядить') + sep + B('ans+', 'Гильза «+»', S.ans === '+') + B('ans-', 'Гильза «−»', S.ans === '−');
+  if (id === 'cond') h = B('mat', 'Материал: ' + MATS[S.mat].name) + B('bridge', S.bridged ? 'Убрать' : 'Соединить', S.bridged, 'rec') + sep + B('sc', 'Проводник', S.sorted[S.mat] === 'c') + B('sd', 'Диэлектрик', S.sorted[S.mat] === 'd') + sep + B('recharge', 'Зарядить заново');
+  if (id === 'field') h = B('qsign', 'Шар: ' + (S.Qs > 0 ? '+' : '−')) + B('q-', '|Q| −') + B('q+', '|Q| +') + sep + B('near', 'Ближе') + B('far', 'Дальше') + sep + B('reset', 'Сброс');
+  tb.innerHTML = h;
+}
+function act(a) {
+  const id = LID();
+  if (a === 'swap') { S.pair = S.pair === 'eb' ? 'gl' : 'eb'; S.cx = G1.rest[0]; S.cy = G1.rest[1]; S.maxT = false; renderTools(); buildScheme(); update(); return; }
+  if (/^pair-/.test(a)) { const k = a.slice(5); if (k !== S.pair) act('swap'); return; }
+  if (a === 'rubOnce') { for (let i = 0; i < 2; i++) transfer(); update(); return; }
+  if (a === 'ground') { if (S.q[S.pair]) toast('Рука и тело — проводники: заряд палочки ушёл через вас в землю.'); S.q[S.pair] = 0; S.maxT = false; buildScheme(); update(); return; }
+  if (a === 'sleeve') { toast('Лёгкая гильза из фольги заряжена заранее. Знак её заряда узнайте по опыту.'); return; }
+  if (a === 'ans+') return answer(1);
+  if (a === 'ans-') return answer(-1);
+  if (a === 'mat') { setMat(MKEYS[(MKEYS.indexOf(S.mat) + 1) % MKEYS.length]); buildScheme(); return; }
+  if (/^mat-/.test(a)) { setMat(a.slice(4)); buildScheme(); return; }
+  if (a === 'bridge') { setBridge(!S.bridged); buildScheme(); return; }
+  if (a === 'sc' || a === 'sd') { sortAs(a[1]); renderTools(); buildScheme(); return; }
+  if (a === 'recharge') { recharge(); setBridge(false); buildScheme(); return; }
+  if (a === 'qsign' || a === 'src') { S.Qs = -S.Qs; renderTools(); buildScheme(); update(); return; }
+  if (/^sign/.test(a)) { S.Qs = a === 'signP' ? 1 : -1; renderTools(); buildScheme(); update(); return; }
+  if (a === 'q-' || a === 'q+') { setQm(S.Qm + (a === 'q+' ? 0.5 : -0.5)); buildScheme(); return; }
+  if (a === 'near' || a === 'far') { setR(Math.round((rCm() + (a === 'far' ? 0.5 : -0.5)) * 10) / 10); update(); return; }
+  if (a === 'reset') { S.Qs = 1; S.Qm = L().Q0; S.px = G3.sx + 80; S.py = G3.sy; renderTools(); buildScheme(); update(); return; }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.disabled) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  stick: IC('<rect x="3" y="13" width="28" height="8" rx="4" fill="#2b2f3a" stroke="#6b7590"/><text x="12" y="20" font-size="8" fill="#7fc4ff">− −</text>'),
+  handle: IC('<rect x="3" y="13" width="14" height="8" rx="4" fill="#5d6a86"/><rect x="15" y="13" width="16" height="8" rx="4" fill="#2b2f3a" stroke="#6b7590"/>'),
+  cloth: IC('<rect x="5" y="7" width="24" height="20" rx="5" fill="#8a6a48" stroke="#b48c62"/><path d="M9 10l1 4M14 10l1 4M19 10l1 4M24 10l1 4" stroke="#5a4330"/>'),
+  sleeve: IC('<path d="M17 2V18" stroke="#c8d0dd"/><ellipse cx="17" cy="23" rx="6" ry="8" fill="#d9cfa6"/>'),
+  stand: IC('<path d="M26 31V5H12" stroke="#5d6a86" stroke-width="3" fill="none"/><rect x="18" y="29" width="14" height="3" fill="#3a4762"/>'),
+  spare: IC('<rect x="3" y="15" width="28" height="6" rx="3" fill="rgba(169,214,228,.3)" stroke="#a9d6e4"/><path d="M3 26h28" stroke="#3a4762" stroke-width="2"/>'),
+  ball: IC('<circle cx="17" cy="15" r="9" fill="#c8d0dd"/><path d="M17 24v8" stroke="#c8d0dd" stroke-width="3"/>'),
+  stem: IC('<path d="M17 3v24" stroke="#c8d0dd" stroke-width="4"/><rect x="11" y="10" width="12" height="6" fill="#5d6a86"/>'),
+  leaves: IC('<path d="M17 8L8 28M17 8l9 20" stroke="#e6c14a" stroke-width="3" stroke-linecap="round"/>'),
+  jar: IC('<rect x="5" y="6" width="24" height="24" rx="6" fill="rgba(169,214,228,.08)" stroke="#5f7d92" stroke-width="2"/>'),
+  scope: IC('<circle cx="17" cy="6" r="4" fill="#c8d0dd"/><rect x="7" y="11" width="20" height="20" rx="5" fill="none" stroke="#5f7d92" stroke-width="2"/><path d="M17 10v8l-5 8M17 18l5 8" stroke="#e6c14a" stroke-width="2"/>'),
+  rod: IC('<rect x="2" y="14" width="30" height="6" rx="3" fill="#d08a52"/><rect x="13" y="11" width="8" height="12" rx="2" fill="#26324a" stroke="#8b96ad"/>'),
+  hand: IC('<rect x="11" y="9" width="12" height="16" rx="3" fill="#26324a" stroke="#8b96ad" stroke-width="1.5"/><path d="M14 12v10M17 12v10M20 12v10" stroke="#3a4762" stroke-width="1.5"/>'),
+  src: IC('<circle cx="17" cy="17" r="11" fill="#c85a46"/><text x="17" y="22" font-size="14" text-anchor="middle" fill="#04070d">+</text>'),
+  probe: IC('<circle cx="17" cy="17" r="7" fill="#ff8a73"/><text x="17" y="21" font-size="10" text-anchor="middle" fill="#04070d">+</text>'),
+  lines: IC('<path d="M17 17L3 3M17 17L31 3M17 17L3 31M17 17L31 31M17 17H2M17 17H32" stroke="#ff8a73" stroke-width="1.5" opacity=".7"/><circle cx="17" cy="17" r="4" fill="#c85a46"/>'),
+  force: IC('<path d="M4 17h20" stroke="#ffb547" stroke-width="3"/><path d="M23 11l8 6-8 6z" fill="#ffb547"/>'),
+  rings: IC('<circle cx="17" cy="17" r="6" fill="none" stroke="#5d6a86" stroke-dasharray="2 2"/><circle cx="17" cy="17" r="13" fill="none" stroke="#5d6a86" stroke-dasharray="2 2"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  const t = (ok, s) => `${s} ${ok ? '✓' : '—'}`;
+  if (id === 'rub') return [t(S.q.eb <= -L().need, `эбонит ${Math.abs(S.q.eb)}/${L().need}`), t(S.q.gl >= L().need, `стекло ${Math.max(0, S.q.gl)}/${L().need}`), t(S.ansOk, 'гильза')].join(' · ');
+  if (id === 'cond') return `проверено ${MKEYS.filter(k => S.tested[k]).length}/6 · разобрано ${sortedN()}/6`;
+  return `шар ${S.Qs > 0 ? '+' : '−'} · E = ${big(Efield())} Н/Кл · цель 900 ± 45`;
+}
+
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+const chips = (pre, keys, names, cur) => `<div class="chips">${keys.map(k => `<button data-a="${pre}${k}" aria-pressed="${cur === k}">${names(k)}</button>`).join('')}</div>`;
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'rub') h = `<h2>Палочка, ткань и гильза</h2><div class="ctl"><div class="lbl">Пара тел</div>${chips('pair-', ['eb', 'gl'], k => `${PAIRS[k].short} + ${PAIRS[k].cloth}`, S.pair)}</div>
+      <dl class="reads"><div><dt>палочка</dt><dd id="r1"></dd></div><div><dt>ткань</dt><dd id="r2"></dd></div><div><dt>гильза</dt><dd id="r3"></dd></div></dl>
+      <div class="row"><button class="ghostbtn" data-a="rubOnce">Потереть</button><button class="ghostbtn" data-a="ground">Разрядить рукой</button></div>
+      <div class="ctl"><div class="lbl">Знак заряда гильзы</div><div class="chips"><button data-a="ans+" aria-pressed="${S.ans === '+'}">«+»</button><button data-a="ans-" aria-pressed="${S.ans === '−'}">«−»</button></div></div>
+      <p class="note" style="margin-top:12px">Один знак «+» или «−» на рисунке — это миллиард (10⁹) элементарных зарядов, то есть 0,16 нКл. Настоящая палочка после трения несёт несколько нанокулон.</p>`;
+  if (id === 'cond') h = `<h2>Два электроскопа и перемычка</h2><div class="ctl"><div class="lbl">Материал перемычки</div>${chips('mat-', MKEYS, k => MATS[k].name + (S.sorted[k] ? ' ✓' : ''), S.mat)}</div>
+      <dl class="reads"><div><dt>заряд A</dt><dd id="r1"></dd></div><div><dt>заряд B</dt><dd id="r2"></dd></div><div><dt>сумма</dt><dd id="r3"></dd></div></dl>
+      <div class="row"><button class="ghostbtn" data-a="bridge">${S.bridged ? 'Убрать перемычку' : 'Соединить'}</button><button class="ghostbtn" data-a="recharge">Зарядить заново</button></div>
+      <div class="ctl"><div class="lbl">Этот материал —</div><div class="chips"><button data-a="sc" aria-pressed="${S.sorted[S.mat] === 'c'}">проводник</button><button data-a="sd" aria-pressed="${S.sorted[S.mat] === 'd'}">диэлектрик</button></div></div>
+      <h3>Разобрано</h3><div class="steps">${step('проводники', MKEYS.filter(k => S.sorted[k] === 'c').map(k => MATS[k].name).join(', ') || '—')}${step('диэлектрики', MKEYS.filter(k => S.sorted[k] === 'd').map(k => MATS[k].name).join(', ') || '—')}</div>
+      <p class="note" style="margin-top:12px">Перемычку держат за изолирующую ручку посередине. Если взять металл голой рукой, заряд уйдёт через тело в землю.</p>`;
+  if (id === 'field') h = `<h2>Поле точечного заряда</h2><div class="ctl"><div class="lbl">Знак заряда шара</div><div class="chips"><button data-a="signP" aria-pressed="${S.Qs > 0}">+</button><button data-a="signN" aria-pressed="${S.Qs < 0}">−</button></div></div>` +
+      slider('inQ', 'Модуль заряда |Q|, нКл', 1, 5, 0.5, S.Qm) + slider('inR', 'Расстояние r, см', 3, 30, 0.1, Math.round(rCm() * 10) / 10) +
+      `<dl class="reads"><div><dt>E</dt><dd id="r1"></dd></div><div><dt>F на q</dt><dd id="r2"></dd></div><div><dt>r</dt><dd id="r3"></dd></div></dl>
+      <div class="row"><button class="ghostbtn" data-a="reset">Сброс</button></div>
+      <p class="note" style="margin-top:12px">Пробный заряд q = +${fmt(L().qt, 1)} нКл — маленький, чтобы не искажать поле шара. Пунктирные круги — расстояния 5, 10, 15… см.</p>`;
+  el.innerHTML = h;
+  const on = (sel, fn2) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn2); };
+  on('#inQ', e => setQm(+e.target.value));
+  on('#inR', e => { setR(+e.target.value); update(); });
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => { act(b.dataset.a); buildScheme(); });
+  updateScheme(model());
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (id === 'rub') { const q = S.q[S.pair]; set('#r1', `${sg(q * UNIT)} нКл`); set('#r2', `${sg(-q * UNIT)} нКл`); set('#r3', sleeveWord()); }
+  if (id === 'cond') { set('#r1', `${sg(S.qA * UNIT)} нКл`); set('#r2', `${sg(S.qB * UNIT)} нКл`); set('#r3', `${sg((S.qA + S.qB) * UNIT)} нКл`); }
+  if (id === 'field') { set('#inQO', fmt(S.Qm, 1)); val('#inQ', S.Qm); set('#inRO', fmt(rCm(), 1)); val('#inR', Math.round(rCm() * 10) / 10); set('#r1', `${big(Efield())} Н/Кл`); set('#r2', `${fmt(Fmicro(), 3)} мкН`); set('#r3', `${fmt(rCm(), 1)} см`); }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'rub') return [
+    { id: 'stick', icon: ICON.stick, name: 'Палочка', spec: 'Эбонит или стекло — диэлектрики. Заряд остаётся там, где его натёрли.' },
+    { id: 'handle', icon: ICON.handle, name: 'Ручка', spec: 'За неё держат палочку. Если коснуться заряженной части рукой, заряд уйдёт в землю.' },
+    { id: 'cloth', icon: ICON.cloth, name: 'Мех или шёлк', spec: 'При трении обменивается электронами с палочкой и получает такой же по модулю заряд противоположного знака.' },
+    { id: 'sleeve', icon: ICON.sleeve, name: 'Гильза', spec: 'Лёгкий цилиндрик из фольги на нитке. Заряжен заранее, знак скрыт.' },
+    { id: 'thread', icon: ICON.sleeve, name: 'Шёлковая нить', spec: 'Диэлектрик: не даёт заряду гильзы стечь на штатив. По углу нити видно, куда тянет сила.' },
+    { id: 'stand', icon: ICON.stand, name: 'Штатив', spec: 'Держит нить с гильзой.' },
+    { id: 'spare', icon: ICON.spare, name: 'Вторая палочка', spec: 'Лежит на столе и хранит свой заряд. Нажмите на неё, чтобы взять в руку.' }];
+  if (id === 'cond') return [
+    { id: 'ball', icon: ICON.ball, name: 'Шарик электроскопа', spec: 'К нему подносят или прикасаются заряженным телом.' },
+    { id: 'stem', icon: ICON.stem, name: 'Металлический стержень', spec: 'Проводник. Заряд по нему стекает к листочкам. В пробке-изоляторе закреплён в корпусе.' },
+    { id: 'leaves', icon: ICON.leaves, name: 'Листочки', spec: 'Получают заряд одного знака и отталкиваются. Угол между ними показывает величину заряда.' },
+    { id: 'jar', icon: ICON.jar, name: 'Корпус со шкалой', spec: 'Защищает листочки от сквозняка. По шкале сравнивают углы.' },
+    { id: 'scopeB', icon: ICON.scope, name: 'Электроскоп B', spec: 'Сначала не заряжен. Если его листочки разошлись, заряд пришёл по перемычке.' },
+    { id: 'rod', icon: ICON.rod, name: 'Перемычка', spec: 'Стержень из проверяемого материала. Соединяет шарики A и B.' },
+    { id: 'handle', icon: ICON.hand, name: 'Изолирующая ручка', spec: 'Чтобы заряд не ушёл через руку в землю.' }];
+  return [
+    { id: 'src', icon: ICON.src, name: 'Заряженный шар Q', spec: 'Источник поля. Нажмите на него, чтобы поменять знак заряда.' },
+    { id: 'probe', icon: ICON.probe, name: 'Пробный заряд q', spec: 'Маленький положительный заряд. Его можно перетаскивать по полю.' },
+    { id: 'lines', icon: ICON.lines, name: 'Силовые линии', spec: 'Выходят из «+», входят в «−». Чем ближе к шару, тем они гуще и поле сильнее.' },
+    { id: 'force', icon: ICON.force, name: 'Сила F = q·E', spec: 'Оранжевая стрелка: куда и как сильно поле толкает пробный заряд. Длина стрелки растёт медленнее силы, иначе она не поместится.' },
+    { id: 'ruler', icon: ICON.rings, name: 'Расстояние r', spec: 'От центра шара до пробного заряда.' },
+    { id: 'rings', icon: ICON.rings, name: 'Пунктирные круги', spec: 'Расстояния 5, 10, 15… см от центра шара.' }];
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      (Ls.safe ? `<div class="safe"><b>Безопасность</b>${Ls.safe}</div>` : '') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Что на площадке</h2><p class="note">Нажмите на деталь, чтобы найти её на площадке.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID(), Ls = L();
+  if (id === 'rub') {
+    const P = PAIRS[S.pair], q = S.q[S.pair], n = Math.abs(q);
+    return `<h2>Сколько электронов перешло</h2><div class="formula">q = N · e</div><p class="note">N — число электронов, которые перешли с одного тела на другое, e = 1,6·10⁻¹⁹ Кл — заряд электрона (элементарный заряд).</p>
+      <h3>${cap(P.short)} + ${P.cloth}</h3><div class="steps">` +
+      step('куда идут электроны', P.s < 0 ? 'с меха на эбонит' : 'со стекла на шёлк') +
+      step('перешло электронов N', n ? `${n}·10⁹` : '0') +
+      step('|q| = N·e', n ? `${n}·10⁹ · 1,6·10⁻¹⁹ = ${fmt(n * UNIT, 2)}·10⁻⁹ Кл` : '0 Кл') +
+      step('заряд палочки', `${sg(q * UNIT)} нКл`) + step('заряд ткани', `${sg(-q * UNIT)} нКл`) +
+      step('сумма', `${fmt(0, 2)} нКл — заряд сохранился`, 'sum') + `</div>
+      <h3>Гильза рядом с палочкой</h3><div class="steps">` +
+      step('палочка', q === 0 ? 'не заряжена' : q < 0 ? 'заряд «−»' : 'заряд «+»') + step('гильза', sleeveWord()) +
+      step('правило', 'одноимённые отталкиваются, разноимённые притягиваются', 'sum') + `</div>
+      <p class="note" style="margin-top:10px">1 нКл = 10⁻⁹ Кл. Даже такой маленький заряд — это миллиарды электронов: заряд одного электрона очень мал.</p>`;
+  }
+  if (id === 'cond') {
+    const M = MATS[S.mat], tot = S.qA + S.qB, q0 = Ls.q0;
+    return `<h2>Куда делся заряд</h2><div class="formula">q<sub>A</sub> + q<sub>B</sub> = const</div>
+      <h3>Было</h3><div class="steps">` + step('электроскоп A', `${sg(q0 * UNIT)} нКл`) + step('электроскоп B', '0 нКл') + step('сумма', `${sg(q0 * UNIT)} нКл`, 'sum') + `</div>
+      <h3>Сейчас · перемычка: ${M.name}</h3><div class="steps">` + step('перемычка', S.bridged ? 'соединяет шарики' : 'не соединяет') +
+      step('электроскоп A', `${sg(S.qA * UNIT)} нКл`) + step('электроскоп B', `${sg(S.qB * UNIT)} нКл`) + step('сумма', `${sg(tot * UNIT)} нКл`, 'sum') + `</div>
+      <h3>Если перемычка — проводник</h3><div class="steps">` +
+      step('электроскопы одинаковые', 'заряд делится поровну') + step('q = (q<sub>A</sub> + q<sub>B</sub>) / 2', `${sg(q0 * UNIT)} / 2 = ${sg(q0 * UNIT / 2)} нКл`) +
+      step('перейдёт электронов', `${Math.abs(q0 / 2)}·10⁹`) + step('если диэлектрик', 'заряды не меняются', 'sum') + `</div>
+      <p class="note" style="margin-top:10px">Угол листочков тем больше, чем больше заряд. Заряд не исчезает: сколько ушло из A, столько пришло в B.</p>`;
+  }
+  const E = Efield(), r = rCm(), rm = r / 100, F = Fmicro();
+  return `<h2>Напряжённость поля</h2><div class="formula">E = k·|Q| / r²</div><p class="note">k = 9·10⁹ Н·м²/Кл², Q — заряд шара, r — расстояние от центра шара в метрах.</p>
+    <h3>Сейчас</h3><div class="steps">` + step('Q', `${S.Qs > 0 ? '+' : '−'}${fmt(S.Qm, 1)} нКл = ${S.Qs > 0 ? '' : '−'}${fmt(S.Qm, 1)}·10⁻⁹ Кл`) +
+    step('r', `${fmt(r, 1)} см = ${fmt(rm, 3)} м`) + step('r²', `${fmt(rm * rm, 5)} м²`) +
+    step('E = k·|Q| / r²', `9·10⁹ · ${fmt(S.Qm, 1)}·10⁻⁹ / ${fmt(rm * rm, 5)} = ${big(E)} Н/Кл`, 'sum') + `</div>
+    <h3>Сила на пробный заряд</h3><div class="steps">` + step('q', `+${fmt(Ls.qt, 1)} нКл = ${fmt(Ls.qt, 1)}·10⁻⁹ Кл`) +
+    step('F = q·E', `${fmt(Ls.qt, 1)}·10⁻⁹ · ${big(E)} = ${fmt(F * 1e-6 * 1e9, 1)}·10⁻⁹ Н`) +
+    step('направление', S.Qs > 0 ? 'от шара: «+» отталкивает «+»' : 'к шару: «−» притягивает «+»', 'sum') + `</div>
+    <h3>Как поле зависит от расстояния</h3><div class="steps">` + step(`r в 2 раза больше (${fmt(2 * r, 1)} см)`, `E = ${big(E / 4)} Н/Кл, в 4 раза меньше`) +
+    step(`r в 2 раза меньше (${fmt(r / 2, 1)} см)`, `E = ${big(E * 4)} Н/Кл, в 4 раза больше`) + `</div>`;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter');
+  if (id === 'rub') {
+    const q = S.q[S.pair];
+    el.innerHTML = `<div class="k">Палочка: ${PAIRS[S.pair].short}</div><div class="v ${Math.abs(q) >= L().need ? 'ok' : ''}">${sg(q * UNIT)} нКл</div>` +
+      `<div class="lr"><span>${PAIRS[S.pair].cloth}</span><span>${sg(-q * UNIT)}</span></div><div class="lr"><span>гильза</span><span>${q === 0 ? 'прямо' : q < 0 ? 'от палочки' : 'к палочке'}</span></div>`;
+  } else if (id === 'cond') {
+    el.innerHTML = `<div class="k">Перемычка</div><div class="v">${MATS[S.mat].name}</div>` +
+      `<div class="lr"><span>A</span><span>${sg(S.qA * UNIT)} нКл</span></div><div class="lr"><span>B</span><span class="${Math.abs(S.qB) > 0.1 ? 'ok' : ''}">${sg(S.qB * UNIT)} нКл</span></div><div class="lr"><span>разобрано</span><span>${sortedN()}/6</span></div>`;
+  } else {
+    const E = Efield();
+    el.innerHTML = `<div class="k">Напряжённость</div><div class="v ${S.done.field ? 'ok' : ''}">${big(E)} Н/Кл</div>` +
+      `<div class="lr"><span>r</span><span>${fmt(rCm(), 1)} см</span></div><div class="lr"><span>Q</span><span>${S.Qs > 0 ? '+' : '−'}${fmt(S.Qm, 1)} нКл</span></div><div class="lr"><span>F</span><span>${fmt(Fmicro(), 3)} мкН</span></div>`;
+  }
+}
+
+function update() {
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Теперь вы умеете заряжать тела и видеть их поле!'), 1800);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  rub: '<rect x="4" y="11" width="44" height="8" rx="4" fill="#2b2f3a" stroke="#6b7590"/><text x="18" y="18" font-size="7" fill="#7fc4ff">− − −</text><rect x="26" y="6" width="16" height="18" rx="4" fill="#8a6a48" opacity=".85"/><path d="M58 2v14" stroke="#c8d0dd"/><ellipse cx="60" cy="19" rx="3.5" ry="4.5" fill="#d9cfa6"/>',
+  cond: '<circle cx="12" cy="7" r="4" fill="#c8d0dd"/><circle cx="54" cy="7" r="4" fill="#c8d0dd"/><path d="M12 7H54" stroke="#d08a52" stroke-width="3"/><path d="M12 11v8l-5 8M12 19l5 8M54 11v8l-4 8M54 19l4 8" stroke="#e6c14a" stroke-width="1.6"/>',
+  field: '<path d="M33 15L33 1M33 15L33 29M33 15L19 15M33 15L47 15M33 15L23 5M33 15L43 25M33 15L43 5M33 15L23 25" stroke="#ff8a73" stroke-width="1.2" opacity=".7"/><circle cx="33" cy="15" r="5" fill="#c85a46"/><circle cx="56" cy="15" r="3" fill="#ffb547"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Lx, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Lx.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Lx.title}</span></span>
+      ${S.done[Lx.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  S.lesson = i; drag = null;
+  resetState(); save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L().task;
+  $('#hint').textContent = L().stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '';
+  if (id === 'rub') { const P = PAIRS[S.pair], q = S.q[S.pair]; now = `В руке ${P.stick}, ткань — ${P.cloth}. Заряд палочки ${sg(q * UNIT)} нКл (${Math.abs(q)} знаков на рисунке, каждый — 10⁹ элементарных зарядов), заряд ткани ${sg(-q * UNIT)} нКл. Эбонитовая палочка: ${sg(S.q.eb * UNIT)} нКл, стеклянная: ${sg(S.q.gl * UNIT)} нКл. Рядом на шёлковой нити висит заряженная гильза, знак её заряда скрыт; сейчас она ${sleeveWord()} (угол нити ${fmt(S.th, 0)}°). Ответ ученика о знаке гильзы: ${S.ans ? `«${S.ans}» — ${S.ansOk ? 'верно' : 'неверно'}` : 'ещё не дан'}. Знак гильзы не называй — наведи вопросами: какой знак у эбонита после меха и у стекла после шёлка, и что значит «отталкивается» и «притягивается».`; }
+  if (id === 'cond') { const M = MATS[S.mat]; now = `Два электроскопа: A заряжен (${sg(S.qA * UNIT)} нКл), B ${Math.abs(S.qB) > 0.05 ? `имеет ${sg(S.qB * UNIT)} нКл` : 'не заряжен'}. Перемычка из материала «${M.name}» ${S.bridged ? 'соединяет шарики' : 'лежит внизу и не соединяет их'}. Проверены материалы: ${MKEYS.filter(k => S.tested[k]).map(k => MATS[k].name).join(', ') || 'пока ни одного'}. Верно разобрано ${sortedN()} из 6. Не говори сразу, проводник ли материал, — попроси ученика посмотреть на листочки B и объяснить, есть ли в материале свободные электроны.`; }
+  if (id === 'field') now = `Заряженный шар Q = ${S.Qs > 0 ? '+' : '−'}${fmt(S.Qm, 1)} нКл, силовые линии ${S.Qs > 0 ? 'выходят из шара' : 'входят в шар'}. Пробный заряд +${fmt(Ls.qt, 1)} нКл на расстоянии r = ${fmt(rCm(), 1)} см. Напряжённость E = ${big(Efield())} Н/Кл, сила F = ${fmt(Fmicro(), 3)} мкН, направлена ${S.Qs > 0 ? 'от шара' : 'к шару'}. Цель: шар отрицательный и E = 900 ± 45 Н/Кл. Нужное расстояние не называй — наведи на формулу E = k·|Q|/r² и на то, что поле ослабевает с расстоянием.`;
+  return [
+    `Раздел: физика, 8 класс, тема «Электрический заряд». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'} (${taskState(m)}).`,
+    `Сейчас на площадке: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Помогай наводящими вопросами, готовые ответы не выдавай.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { rub: 'Почему при трении заряжаются оба тела?', cond: 'Почему металл проводит заряд, а стекло нет?', field: 'Почему поле слабеет так быстро при удалении?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
