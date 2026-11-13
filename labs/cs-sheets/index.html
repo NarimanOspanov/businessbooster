@@ -1,0 +1,1172 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по информатике, 7 класс: электронные таблицы — формулы, ссылки на ячейки, диаграммы, сортировка и фильтр.">
+<title>Электронные таблицы</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. SVG stage on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-cell]{cursor:cell}
+.scene.grabbing,.scene.grabbing [data-cell]{cursor:crosshair}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none;z-index:3}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none;z-index:3}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.meter .v.ok{color:var(--ok)}
+.meter .v.bad{color:var(--warn)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--arm);transition:width .2s}
+.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%,40%{box-shadow:0 0 0 3px var(--arm)}100%{box-shadow:0 0 0 0 transparent}}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px);z-index:3}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.tools button:hover{color:var(--fg)}
+.tools button.go{background:var(--fg);color:var(--bg);font-weight:600}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg);box-shadow:inset 0 0 0 1px var(--force)}
+.tools button:disabled{opacity:.35;cursor:default}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.tools .val{font:500 12px var(--font-mono);color:var(--force);padding:0 4px;white-space:nowrap;min-width:34px;text-align:center}
+.tools input{width:170px;flex:none;background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:5px 8px;font:500 13px/1.2 var(--font-mono);color:var(--fg)}
+.tools input:focus{border-color:var(--force);outline:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:22%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.ctl .row{display:flex;gap:8px;margin-top:8px}
+.ctl .row input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font:500 13px var(--font-mono)}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--fg)}
+.chips button:hover{border-color:var(--muted)}
+.chips button[aria-pressed="true"]{border-color:var(--force)}
+.chips button:disabled{opacity:.35;cursor:default}
+.listing{font:500 13px/1.6 var(--font-mono);padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);margin-top:10px;overflow-wrap:anywhere}
+.listing .cur{color:var(--force)}
+.listing .bad{color:var(--warn)}
+.listing .dim{color:var(--muted)}
+
+.formula{font:500 16px/1.35 var(--font-mono);text-align:center;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px;overflow-wrap:anywhere}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+.step.okk span{color:var(--ok)}
+.step.badd span{color:var(--warn)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1760px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:520px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .tools input{width:118px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 380px);min-height:0}
+  .stage.tall{height:calc(80vw + 470px)}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><rect x="8" y="9" width="24" height="22" rx="2" fill="none" stroke="var(--fg)" stroke-width="2"/><path d="M8 16h24M8 23.5h24M16 9v22M24 9v22" stroke="var(--fg)" stroke-width="1.5"/><rect x="24" y="23.5" width="8" height="7.5" fill="var(--force)"/><path d="M11 13.5l2-2" stroke="var(--arm)" stroke-width="2"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Информатика · Электронные таблицы</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#cs">Карта</a><a href="/physics/#cs">Информатика</a><a href="/labs/cs-sheets/" aria-current="page">Таблицы</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Таблицы</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Рабочий стол лаборатории">
+    <svg class="scene" id="scene" role="img" aria-label="Электронная таблица: нажмите на ячейку, чтобы выбрать её"></svg>
+    <div class="task" id="taskBox" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Строка формул и команды" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const LESSONS = [
+  { id: 'formulas', title: 'Формулы',
+    text: ['Электронная таблица — это сетка из ячеек. Столбцы обозначают латинскими буквами, строки — числами. Адрес ячейки — буква столбца и номер строки: B2, D5. Так устроены Microsoft Excel, Google Таблицы и LibreOffice Calc.',
+           'В ячейке может быть текст, число или формула. Формула всегда начинается со знака «=». В ней пишут числа, адреса ячеек, знаки + − * / ^ и функции. Например, СУММ(D2:D4) складывает все ячейки от D2 до D4.',
+           'В ячейке с формулой видно не саму формулу, а результат. Формулу показывает строка формул. Поменяйте число в ячейке — и все формулы, которые на неё ссылаются, пересчитаются сами.'],
+    why: 'Бухгалтер, экономист, менеджер магазина считают в таблицах каждый день: выручку, зарплаты, остатки на складе. Владелец маленькой кофейни или магазина на Kaspi ведёт в таблице приход и расход и видит, есть ли прибыль. Дома таблица поможет посчитать покупки к школе или семейный бюджет. Умение работать в Excel просят почти в каждой офисной вакансии на hh.kz.',
+    task: 'Посчитайте покупки к школе: в D2 введите формулу стоимости тетрадей, а в D5 — формулу общей суммы.',
+    hint: 'Стоимость = цена × количество. Пишите не готовое число, а адреса ячеек — тогда таблица пересчитает сама. Нажмите на ячейку, наберите формулу в строке внизу и нажмите Enter или ✓.',
+    stage: 'Нажмите на ячейку и наберите формулу в строке внизу.',
+    sheetName: 'Покупки', cols: 4, rows: 5, ww: [112, 74, 64, 100], wn: [80, 60, 52, 82], bold: [0, 4], sel0: 'D2',
+    cells: { A1: 'Товар', B1: 'Цена, ₸', C1: 'Кол-во', D1: 'Стоимость, ₸', A2: 'Тетрадь', B2: '250', C2: '4', A3: 'Ручка', B3: '180', C3: '3', D3: '=B3*C3', A4: 'Альбом', B4: '900', C4: '1', D4: '=B4*C4', A5: 'Итого' },
+    check: m => m.d2 && m.d5 },
+  { id: 'refs', title: 'Ссылки на ячейки',
+    text: ['Адрес ячейки внутри формулы называют ссылкой. Когда формулу копируют вниз, ссылки сдвигаются вместе с ней: в C3 было =B3*2, а в C4 станет =B4*2. Такая ссылка — относительная.',
+           'Иногда сдвигать ссылку нельзя. Курс доллара записан в одной ячейке B1, и все строки должны брать его именно оттуда. Тогда ставят знак $: $B$1 — абсолютная ссылка, она не меняется при копировании.',
+           'Бывают и смешанные ссылки: B$1 закрепляет только строку, $B1 — только столбец. В Excel знак $ ставится клавишей F4, у нас — кнопкой «$».'],
+    why: 'Менеджер интернет-магазина пересчитывает сотни цен из долларов в тенге по одному курсу: меняет курс в одной ячейке — и обновляется весь прайс. Так же работают сметчики на стройке, логисты и бухгалтеры: ставку налога или тариф держат в одной ячейке и ссылаются на неё через $. Неверная ссылка — частая причина ошибок в счетах, и найти её может только тот, кто понимает, как копируются ссылки.',
+    task: 'Переведите цены в тенге: в C3 напишите формулу со ссылкой на курс, заполните её вниз до C7. Все пять цен должны быть верными.',
+    hint: 'Попробуйте сначала без $ и посмотрите, что станет в C4 после заполнения. Какая ссылка должна сдвигаться, а какая — нет? Знак $ ставит кнопка «$»: курсор должен стоять сразу после адреса.',
+    stage: 'Выберите C3, введите формулу, потом «Заполнить ↓».',
+    sheetName: 'Прайс', cols: 3, rows: 7, ww: [130, 88, 120], wn: [100, 72, 104], bold: [1], sel0: 'C3', fillTo: 7,
+    cells: { A1: 'Курс $, ₸', B1: '480', A2: 'Товар', B2: 'Цена, $', C2: 'Цена, ₸', A3: 'Наушники', B3: '25', A4: 'Мышь', B4: '12', A5: 'Клавиатура', B5: '40', A6: 'Флешка', B6: '8', A7: 'Колонка', B7: '55' },
+    check: m => m.okRows === 5 },
+  { id: 'charts', title: 'Диаграммы',
+    text: ['Диаграмма — это рисунок по числам из таблицы. Глаз сразу видит, что больше, что меньше и как всё меняется. Чтобы построить диаграмму, выделяют диапазон ячеек: подписи и числа.',
+           'Тип выбирают по смыслу. Гистограмма (столбики) — чтобы сравнить величины. График (линия) — чтобы показать, как величина меняется со временем. Круговая — чтобы показать доли одного целого: какая часть приходится на каждую статью из 100%.',
+           'Диаграмма связана с таблицей. Поменяйте число в ячейке — и столбик или сектор сразу изменится.'],
+    why: 'Аналитики банков и маркетологи каждый день показывают руководителям диаграммы: продажи по месяцам, доли рынка. Агроном строит график урожайности, врач — график температуры пациента. Хорошая диаграмма в презентации или школьном проекте убеждает лучше страницы цифр. А дома круговая диаграмма расходов сразу показывает, куда уходят деньги семьи.',
+    task: 'Постройте диаграмму, которая покажет, какую долю семейного бюджета занимает каждая статья расходов.',
+    hint: 'Протяните пальцем или мышью по ячейкам, чтобы выделить диапазон: нужны и названия, и суммы. Подумайте, нужна ли в диаграмме строка «Итого». Потом выберите тип диаграммы.',
+    stage: 'Выделите диапазон протягиванием, потом выберите тип диаграммы.',
+    sheetName: 'Бюджет', cols: 2, rows: 7, ww: [110, 106], wn: [136, 120], bold: [0, 6], sel0: 'A1',
+    cells: { A1: 'Статья', B1: 'Сумма, тыс. ₸', A2: 'Продукты', B2: '180', A3: 'Коммуналка', B3: '60', A4: 'Проезд', B4: '40', A5: 'Одежда', B5: '50', A6: 'Кружки, отдых', B6: '70', A7: 'Итого', B7: '=СУММ(B2:B6)' },
+    check: m => m.chartOk },
+  { id: 'sort', title: 'Сортировка и фильтр',
+    text: ['Сортировка расставляет строки по порядку: числа — по возрастанию или убыванию, текст — по алфавиту. Строка переезжает целиком, поэтому имя остаётся рядом со своим результатом.',
+           'Фильтр ничего не удаляет. Он временно прячет строки, которые не подходят под условие. Номера спрятанных строк пропадают, а номера оставшихся подсвечиваются — так видно, что фильтр включён.',
+           'Сортировку и фильтр сочетают: сначала оставляют нужную группу, потом упорядочивают. Так в большой таблице быстро находят лучших, отстающих или нужных людей.'],
+    why: 'Учитель физкультуры сортирует результаты нормативов, кадровик фильтрует резюме по опыту, кладовщик ищет товары, которых осталось меньше десяти. На Kaspi.kz или Krisha.kz ты тоже нажимаешь «сначала дешёвые» и ставишь фильтры по цене и району — это та же сортировка и фильтр, только над большой таблицей на сервере.',
+    task: 'Оставьте в таблице только учеников 7Б и расставьте их от самого быстрого к самому медленному.',
+    hint: 'Кто быстрее — у того меньше или больше секунд? Нажмите на ячейку нужного столбца, потом выберите сортировку. Фильтр по классу — кнопками внизу.',
+    stage: 'Нажмите на ячейку столбца, потом сортировку или фильтр.',
+    sheetName: 'Бег 60 м', cols: 3, rows: 11, ww: [124, 74, 100], wn: [110, 64, 96], bold: [0], sel0: 'C1',
+    cells: { A1: 'Имя', B1: 'Класс', C1: 'Время, с', A2: 'Айгерим', B2: '7А', C2: '9,8', A3: 'Ерлан', B3: '7Б', C3: '9,0', A4: 'Данияр', B4: '7А', C4: '8,9', A5: 'Софья', B5: '7Б', C5: '9,9', A6: 'Мадина', B6: '7А', C6: '10,2', A7: 'Арман', B7: '7Б', C7: '8,7', A8: 'Тимур', B8: '7А', C8: '9,1', A9: 'Дана', B9: '7Б', C9: '10,4', A10: 'Алия', B10: '7А', C10: '10,6', A11: 'Нурлан', B11: '7Б', C11: '9,3' },
+    check: m => m.filt === '7Б' && m.asc },
+];
+
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+const KEY = 'luch-cs-sheets';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null,
+            sheet: {}, sel: { c: 0, r: 0 }, range: null, draft: null, caret: null, showF: false, edits: 0,
+            chart: null, filt: 'all', sortBy: null };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+
+// ---------- spreadsheet engine ----------
+const COLS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const A = (c, r) => COLS[c] + (r + 1);
+const parseA = s => { const m = /^\$?([A-Z])\$?(\d+)$/.exec(s); return m && +m[2] > 0 ? { c: COLS.indexOf(m[1]), r: +m[2] - 1 } : null; };
+const isF = raw => typeof raw === 'string' && raw.startsWith('=');
+const numOf = raw => { const t = String(raw).trim().replace(/[\s ]/g, ''); return /^-?\d+([.,]\d+)?$/.test(t) ? parseFloat(t.replace(',', '.')) : null; };
+const isErr = v => !!(v && typeof v === 'object' && v.e);
+const fmt = v => { if (isErr(v)) return v.e; if (typeof v === 'number') return v.toLocaleString('ru-RU', { maximumFractionDigits: 2 }); return v == null ? '' : String(v); };
+const FN = {
+  'СУММ': v => v.reduce((a, b) => a + b, 0), 'SUM': v => v.reduce((a, b) => a + b, 0),
+  'СРЗНАЧ': v => { if (!v.length) throw { e: '#ДЕЛ/0!' }; return v.reduce((a, b) => a + b, 0) / v.length; },
+  'МИН': v => v.length ? Math.min(...v) : 0, 'МАКС': v => v.length ? Math.max(...v) : 0,
+  'СЧЁТ': v => v.length, 'СЧЕТ': v => v.length, 'COUNT': v => v.length };
+FN.AVERAGE = FN['СРЗНАЧ']; FN.MIN = FN['МИН']; FN.MAX = FN['МАКС'];
+const ERRS = {
+  '#ЗНАЧ!': '#ЗНАЧ! — в вычислении участвует текст, а не число. Посмотрите, на какие ячейки ссылается формула.',
+  '#ДЕЛ/0!': '#ДЕЛ/0! — деление на ноль или на пустую ячейку.',
+  '#ИМЯ?': '#ИМЯ? — неизвестное имя. Функции: СУММ, СРЗНАЧ, МИН, МАКС, СЧЁТ. Адреса — латинскими буквами.',
+  '#ЧИСЛО!': '#ЧИСЛО! — получилось слишком большое или неверное число.' };
+
+function tokenize(s) {
+  const out = []; let i = 0;
+  while (i < s.length) {
+    const r = s.slice(i); let m;
+    if ((m = /^\s+/.exec(r))) { i += m[0].length; continue; }
+    if ((m = /^(\$?[A-Z]\$?\d+)(?::(\$?[A-Z]\$?\d+))?(?![A-ZА-ЯЁ0-9(])/.exec(r))) {
+      const a = parseA(m[1]), b = m[2] ? parseA(m[2]) : null;
+      if (!a || (m[2] && !b)) throw 0;
+      out.push(b ? { t: 'range', a, b, s: m[0] } : { t: 'ref', a: A(a.c, a.r), s: m[0] }); i += m[0].length; continue;
+    }
+    if ((m = /^\d+(?:[.,]\d+)?/.exec(r))) { out.push({ t: 'num', n: parseFloat(m[0].replace(',', '.')) }); i += m[0].length; continue; }
+    if ((m = /^[A-ZА-ЯЁ][A-ZА-ЯЁ0-9]*/.exec(r))) { out.push({ t: /^\s*\(/.test(r.slice(m[0].length)) ? 'fn' : 'name', v: m[0] }); i += m[0].length; continue; }
+    if ('+-*/^();,'.includes(r[0])) { out.push({ t: 'op', v: r[0] }); i++; continue; }
+    throw 0;
+  }
+  return out;
+}
+const rangeList = t => { const out = []; const c0 = Math.min(t.a.c, t.b.c), c1 = Math.max(t.a.c, t.b.c), r0 = Math.min(t.a.r, t.b.r), r1 = Math.max(t.a.r, t.b.r);
+  for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) out.push(A(c, r)); return out; };
+
+function makeEval(cells) {
+  const memo = {};
+  function get(a, stack) {
+    if (a in memo) return memo[a];
+    if (stack.includes(a)) return { e: '#ЦИКЛ!' };
+    const raw = cells[a] == null ? '' : String(cells[a]); let v;
+    if (isF(raw)) v = evalF(raw.slice(1), stack.concat(a));
+    else if (raw.trim() === '') v = '';
+    else { const n = numOf(raw); v = n == null ? raw : n; }
+    memo[a] = v; return v;
+  }
+  function evalF(src, stack) {
+    let toks; try { toks = tokenize(src); } catch (e) { return { e: '#ОШИБКА!' }; }
+    if (!toks.length) return { e: '#ОШИБКА!' };
+    if (toks.length === 1 && toks[0].t === 'ref') { const v = get(toks[0].a, stack); return v === '' ? 0 : v; }
+    let i = 0;
+    const peek = () => toks[i], next = () => toks[i++], isOp = v => peek() && peek().t === 'op' && peek().v === v;
+    const err = e => { throw { e }; };
+    const numv = v => { if (isErr(v)) throw v; if (v === '') return 0; if (typeof v === 'number') return v; return err('#ЗНАЧ!'); };
+    function expr() { let a = term(); while (isOp('+') || isOp('-')) { const o = next().v, b = term(); a = o === '+' ? a + b : a - b; } return a; }
+    function term() { let a = pw(); while (isOp('*') || isOp('/')) { const o = next().v, b = pw(); if (o === '/' && b === 0) err('#ДЕЛ/0!'); a = o === '*' ? a * b : a / b; } return a; }
+    function pw() { let a = un(); while (isOp('^')) { next(); a = Math.pow(a, un()); } return a; }
+    function un() { if (isOp('-')) { next(); return -un(); } if (isOp('+')) { next(); return un(); } return prim(); }
+    function prim() {
+      const t = next(); if (!t) err('#ОШИБКА!');
+      if (t.t === 'num') return t.n;
+      if (t.t === 'ref') return numv(get(t.a, stack));
+      if (t.t === 'range') err('#ЗНАЧ!');
+      if (t.t === 'name') err('#ИМЯ?');
+      if (t.t === 'fn') {
+        next(); const f = FN[t.v]; const vals = [];
+        if (isOp(')')) next();
+        else for (;;) {
+          const a = peek(), nx = toks[i + 1], argEnd = nx && nx.t === 'op' && (nx.v === ';' || nx.v === ',' || nx.v === ')');
+          if (a && a.t === 'range' && argEnd) { next(); for (const ad of rangeList(a)) { const v = get(ad, stack); if (isErr(v)) throw v; if (typeof v === 'number') vals.push(v); } }
+          else if (a && a.t === 'ref' && argEnd) { next(); const v = get(a.a, stack); if (isErr(v)) throw v; if (typeof v === 'number') vals.push(v); }
+          else vals.push(expr());
+          const s = next(); if (!s || s.t !== 'op') err('#ОШИБКА!');
+          if (s.v === ')') break;
+          if (s.v !== ';' && s.v !== ',') err('#ОШИБКА!');
+        }
+        if (!f) err('#ИМЯ?');
+        return f(vals);
+      }
+      if (t.t === 'op' && t.v === '(') { const v = expr(); const c = next(); if (!c || c.v !== ')') err('#ОШИБКА!'); return v; }
+      return err('#ОШИБКА!');
+    }
+    try { const v = expr(); if (i < toks.length) err('#ОШИБКА!'); if (!isFinite(v)) err('#ЧИСЛО!'); return Math.round(v * 1e9) / 1e9; }
+    catch (e) { return isErr(e) ? e : { e: '#ОШИБКА!' }; }
+  }
+  return a => get(a, []);
+}
+let EV = null;
+const ev = () => EV || (EV = makeEval(S.sheet));
+const val = a => ev()(a);
+const num = v => typeof v === 'number' ? v : 0;
+const setCell = (a, raw) => { if (raw === '' || raw == null) delete S.sheet[a]; else S.sheet[a] = raw; EV = null; };
+// check a formula cell under the current numbers and two other sets of numbers: a typed constant fails
+function robust(target, expect, vary) {
+  if (!isF(S.sheet[target])) return false;
+  for (let k = 0; k < 3; k++) {
+    const cells = Object.assign({}, S.sheet);
+    if (k) vary.forEach((a, j) => { cells[a] = String(3 + ((k * 7 + j * 5) % 13)); });
+    const g = makeEval(cells), got = g(target), exp = expect(a => num(g(a)));
+    if (typeof got !== 'number' || Math.abs(got - exp) > 1e-6) return false;
+  }
+  return true;
+}
+// copy a formula: relative parts of each reference move, parts with $ stay
+const shiftF = (raw, dr, dc) => raw.replace(/(?<![A-ZА-ЯЁ])(\$?)([A-Z])(\$?)(\d+)/g, (m, d1, col, d2, row) =>
+  (d1 ? '$' + col : COLS[clamp(COLS.indexOf(col) + dc, 0, 25)]) + (d2 ? '$' + row : String(Math.max(1, +row + dr))));
+// refs and ranges inside a formula, with their position (for colouring)
+function refsIn(raw) {
+  const out = []; if (!isF(raw)) return out;
+  const re = /(?<![A-ZА-ЯЁ])(\$?[A-Z]\$?\d+)(?::(\$?[A-Z]\$?\d+))?(?![A-ZА-ЯЁ0-9(])/g; let m;
+  while ((m = re.exec(raw))) {
+    const a = parseA(m[1]), b = m[2] ? parseA(m[2]) : a; if (!a || !b) continue;
+    out.push({ s: m[0], i: m.index, c0: Math.min(a.c, b.c), c1: Math.max(a.c, b.c), r0: Math.min(a.r, b.r), r1: Math.max(a.r, b.r) });
+  }
+  return out;
+}
+// "=B2*C2" → "250 · 4"
+function subst(raw) {
+  if (!isF(raw)) return '';
+  let s = raw.slice(1).replace(/(?<![A-ZА-ЯЁ])(\$?[A-Z]\$?\d+):(\$?[A-Z]\$?\d+)(?![A-ZА-ЯЁ0-9(])/g, (m, p, q) => {
+    const a = parseA(p), b = parseA(q); if (!a || !b) return m;
+    const vs = rangeList({ a, b }).map(x => val(x)).filter(v => v !== '').map(fmt);
+    return (vs.length > 7 ? vs.slice(0, 6).concat('…') : vs).join('; ');
+  });
+  s = s.replace(/(?<![A-ZА-ЯЁ])\$?([A-Z])\$?(\d+)(?![A-ZА-ЯЁ0-9(])/g, (m, c, r) => { const v = val(c + r); return v === '' ? '0' : typeof v === 'number' ? fmt(v) : '«' + fmt(v) + '»'; });
+  return s.replace(/\*/g, ' · ').replace(/\//g, ' : ').replace(/\s+/g, ' ').trim();
+}
+const LOOK = { 'А': 'A', 'В': 'B', 'С': 'C', 'Е': 'E' };
+function normInput(v) {
+  v = String(v).trim();
+  if (!v.startsWith('=')) return v;
+  v = v.toUpperCase().replace(/[×х]/g, '*');
+  const fixed = v.replace(/(^|[^A-ZА-ЯЁ$])(\$?)([АВСЕ])(\$?\d)/g, (m, p, d, ch, rest) => p + d + LOOK[ch] + rest);
+  if (fixed !== v) setTimeout(() => toast('Буквы столбцов пишутся латиницей — мы исправили русские буквы в адресах.'), 900);
+  return fixed;
+}
+
+// ---------- lesson 4: rows, filter, sort ----------
+function dispRows() {
+  const out = [];
+  for (let r = 0; r < L().rows; r++) {
+    if (LID() === 'sort' && r > 0 && S.filt !== 'all' && val(A(1, r)) !== S.filt) continue;
+    out.push(r);
+  }
+  return out;
+}
+function sortBy(c, dir) {
+  const Ls = L(), rows = [];
+  for (let r = 1; r < Ls.rows; r++) rows.push([0, 1, 2].map(k => S.sheet[A(k, r)]));
+  const key = x => { const n = numOf(x == null ? '' : x); return n == null ? String(x || '') : n; };
+  rows.sort((p, q) => { const a = key(p[c]), b = key(q[c]); const d = typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b), 'ru'); return dir * d; });
+  rows.forEach((row, k) => row.forEach((x, j) => setCell(A(j, k + 1), x)));
+  S.sortBy = { c, dir };
+}
+const sortName = () => S.sortBy ? `${val(A(S.sortBy.c, 0))} ${S.sortBy.dir > 0 ? '↑' : '↓'}` : 'нет';
+
+// ---------- model ----------
+const selA = () => A(S.sel.c, S.sel.r);
+const normR = g => g ? { c0: Math.min(g.a.c, g.b.c), c1: Math.max(g.a.c, g.b.c), r0: Math.min(g.a.r, g.b.r), r1: Math.max(g.a.r, g.b.r) } : null;
+const rStr = q => q ? (q.c0 === q.c1 && q.r0 === q.r1 ? A(q.c0, q.r0) : `${A(q.c0, q.r0)}:${A(q.c1, q.r1)}`) : '—';
+const TYPES = { col: 'Гистограмма', line: 'График', pie: 'Круговая' };
+function chartData(ch) {
+  const pts = []; let title = '';
+  for (let r = ch.r0; r <= ch.r1; r++) {
+    const v = val(A(ch.c1, r)), lab = ch.c0 < ch.c1 ? fmt(val(A(ch.c0, r))) : String(r + 1);
+    if (typeof v !== 'number') { if (r === ch.r0) title = fmt(v); continue; }
+    pts.push({ lab, v, r });
+  }
+  return { pts, title };
+}
+function model() {
+  const id = LID(), a = selA(), raw = S.sheet[a] || '', v = val(a);
+  const base = { kind: id, a, raw, v, range: normR(S.range) };
+  if (id === 'formulas') {
+    base.d2 = robust('D2', g => g('B2') * g('C2'), ['B2', 'C2']);
+    base.d5 = robust('D5', g => g('B2') * g('C2') + g('B3') * g('C3') + g('B4') * g('C4'), ['B2', 'C2', 'B3', 'C3', 'B4', 'C4']);
+    return base;
+  }
+  if (id === 'refs') {
+    base.rowOk = [3, 4, 5, 6, 7].map(i => robust('C' + i, g => g('B' + i) * g('B1'), ['B1', 'B' + i]));
+    base.okRows = base.rowOk.filter(Boolean).length;
+    base.abs = [3, 4, 5, 6, 7].some(i => /\$/.test(S.sheet['C' + i] || ''));
+    return base;
+  }
+  if (id === 'charts') {
+    const ch = S.chart;
+    base.chart = ch;
+    base.chartOk = !!ch && ch.type === 'pie' && ch.c0 === 0 && ch.c1 === 1 && ch.r1 === 5 && ch.r0 <= 1;
+    return base;
+  }
+  const rows = dispRows().slice(1), times = rows.map(r => val(A(2, r)));
+  base.filt = S.filt; base.shown = rows.length; base.rows = rows;
+  base.asc = times.every((t, k) => k === 0 || (typeof t === 'number' && typeof times[k - 1] === 'number' && times[k - 1] <= t));
+  return base;
+}
+
+// ---------- geometry (SVG units). Wide stage: content in x 8…516. Narrow (phone): x 0…302. ----------
+let NAR = false;
+function LAY() {
+  const Ls = L(), w = NAR ? Ls.wn : Ls.ww, rh = NAR ? 25 : 27, hh = 18, rw = 22, gw = rw + w.reduce((p, q) => p + q, 0), id = Ls.id;
+  const x0 = NAR ? Math.max(0, (302 - gw) / 2) : (id === 'charts' || id === 'sort') ? 8 : (524 - gw) / 2;
+  const y0 = 100, gb = y0 + hh + Ls.rows * rh;
+  const o = { w, rh, hh, rw, gw, x0, y0, gb, card: null, chart: null, side: null };
+  if (id === 'formulas' || id === 'refs') o.card = NAR ? { x: 2, y: gb + 14, w: 298, h: 64 } : { x: 8, y: gb + 16, w: 508, h: 64 };
+  if (id === 'charts') {
+    if (NAR) o.chart = { x: 2, y: gb + 14, w: 298, h: 214 };
+    else { o.chart = { x: x0 + gw + 14, y: y0, w: 516 - (x0 + gw + 14), h: 250 }; o.card = { x: x0, y: gb + 14, w: gw, h: 64 }; }
+  }
+  if (id === 'sort' && !NAR) o.side = { x: x0 + gw + 18, y: y0, w: 516 - (x0 + gw + 18), h: 178 };
+  o.y1 = Math.max(gb, o.card ? o.card.y + o.card.h : 0, o.chart ? o.chart.y + o.chart.h : 0, o.side ? o.side.y + o.side.h : 0) + 4;
+  return o;
+}
+const colX = (G, c) => { let x = G.x0 + G.rw; for (let k = 0; k < c; k++) x += G.w[k]; return x; };
+function cellBox(G, c, r) { const k = dispRows().indexOf(r); if (k < 0) return null; return { x: colX(G, c), y: G.y0 + G.hh + k * G.rh, w: G.w[c], h: G.rh }; }
+function rangeBox(G, q) {
+  const ks = dispRows().map((r, k) => ({ r, k })).filter(o => o.r >= q.r0 && o.r <= q.r1); if (!ks.length) return null;
+  const x = colX(G, q.c0), x1 = colX(G, q.c1) + G.w[q.c1];
+  return { x, y: G.y0 + G.hh + ks[0].k * G.rh, w: x1 - x, h: (ks[ks.length - 1].k - ks[0].k + 1) * G.rh };
+}
+
+// ---------- drawing ----------
+const scene = $('#scene');
+const PAL = ['#72d4e8', '#ffb547', '#c3a6ff', '#86e0a8', '#ff8a73', '#5fb4d9', '#e8ecf4'];
+function bg() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern>
+    ${PAL.map((c, i) => `<marker id="ar${i}" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L6 3L0 6z" fill="${c}"/></marker>`).join('')}</defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+const fit1 = (s, w, fs) => { s = String(s); const n = Math.max(1, Math.floor((w - 8) / (fs * 0.6))); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
+const curRaw = () => S.draft != null ? S.draft : (S.sheet[selA()] || '');
+function drawGrid(G) {
+  const Ls = L(), fs = NAR ? 10 : 11, rows = dispRows(), id = Ls.id, filtOn = id === 'sort' && S.filt !== 'all';
+  let h = `<text x="${G.x0}" y="91" font-size="9" fill="#8b96ad" letter-spacing="1">ЛИСТ «${Ls.sheetName.toUpperCase()}»${S.showF ? ' · ПОКАЗАНЫ ФОРМУЛЫ' : ''}</text>`;
+  const gw = G.gw, gh = G.hh + rows.length * G.rh;
+  h += `<rect x="${G.x0}" y="${G.y0}" width="${gw}" height="${gh}" fill="#0e1520" stroke="#3a4762" stroke-width="1.4" data-part="sheet"/>`;
+  // column letters
+  for (let c = 0; c < Ls.cols; c++) {
+    const x = colX(G, c), on = S.sel.c === c || (S.range && normR(S.range).c0 <= c && c <= normR(S.range).c1);
+    h += `<rect x="${x}" y="${G.y0}" width="${G.w[c]}" height="${G.hh}" fill="${on ? '#26324a' : '#162032'}" stroke="#2f3b55"/><text x="${x + G.w[c] / 2}" y="${G.y0 + 12.5}" font-size="9.5" fill="${on ? '#e8ecf4' : '#8b96ad'}" text-anchor="middle">${COLS[c]}</text>`;
+  }
+  h += `<rect x="${G.x0}" y="${G.y0}" width="${G.rw}" height="${G.hh}" fill="#162032" stroke="#2f3b55"/>`;
+  rows.forEach((r, k) => {
+    const y = G.y0 + G.hh + k * G.rh, on = S.sel.r === r;
+    h += `<rect x="${G.x0}" y="${y}" width="${G.rw}" height="${G.rh}" fill="${on ? '#26324a' : '#162032'}" stroke="#2f3b55"/><text x="${G.x0 + G.rw / 2}" y="${y + G.rh / 2 + 3.5}" font-size="9" fill="${filtOn && r > 0 ? '#72d4e8' : on ? '#e8ecf4' : '#8b96ad'}" text-anchor="middle">${r + 1}</text>`;
+    if (filtOn && k < rows.length - 1 && rows[k + 1] !== r + 1) h += `<path d="M${G.x0} ${y + G.rh}h${G.rw}" stroke="#72d4e8" stroke-width="2"/>`;
+    for (let c = 0; c < Ls.cols; c++) {
+      const x = colX(G, c), a = A(c, r), raw = S.sheet[a] || '', v = val(a), bold = Ls.bold.includes(r);
+      h += `<rect data-cell="${a}" x="${x}" y="${y}" width="${G.w[c]}" height="${G.rh}" fill="${bold ? '#141d2e' : 'rgba(18,26,40,.6)'}" stroke="#26324a"/>`;
+      let txt, col = '#e8ecf4', right = false;
+      if (S.showF && isF(raw)) { txt = raw; col = '#ffb547'; }
+      else { txt = fmt(v); right = typeof v === 'number'; if (isErr(v)) { col = '#ff8a73'; right = false; } else if (isF(raw)) col = '#cfe9f0'; }
+      if (txt !== '') h += `<text x="${right ? x + G.w[c] - 5 : x + 5}" y="${y + G.rh / 2 + 4}" font-size="${fs}" fill="${col}"${right ? ' text-anchor="end"' : ''}${bold ? ' font-weight="500"' : ''} pointer-events="none">${esc(fit1(txt, G.w[c], fs))}</text>`;
+      if (id === 'sort' && r === 0) {
+        const ic = S.sortBy && S.sortBy.c === c ? (S.sortBy.dir > 0 ? '↑' : '↓') : c === 1 && filtOn ? '▼' : '';
+        if (ic) h += `<text x="${x + G.w[c] - 6}" y="${y + G.rh / 2 + 4}" font-size="10" fill="#72d4e8" text-anchor="end" pointer-events="none">${ic}</text>`;
+      }
+    }
+  });
+  // references of the current formula, coloured like in Excel, with arrows to the cell
+  const sb = cellBox(G, S.sel.c, S.sel.r);
+  if (id !== 'sort') refsIn(curRaw()).forEach((q, i) => {
+    const b = rangeBox(G, q); if (!b) return; const col = PAL[i % 5];
+    h += `<rect x="${b.x + 1.5}" y="${b.y + 1.5}" width="${b.w - 3}" height="${b.h - 3}" fill="${col}" fill-opacity=".08" stroke="${col}" stroke-width="1.8" stroke-dasharray="4 3" pointer-events="none"/>`;
+    if (sb && !(q.c0 <= S.sel.c && S.sel.c <= q.c1 && q.r0 <= S.sel.r && S.sel.r <= q.r1)) {
+      const ax = b.x + b.w / 2, ay = b.y + b.h / 2, bx = sb.x + sb.w / 2, by = sb.y + sb.h / 2, mx = (ax + bx) / 2, my = (ay + by) / 2 - 16;
+      h += `<path d="M${ax} ${ay}Q${mx} ${my} ${bx - Math.sign(bx - ax) * 8} ${by}" fill="none" stroke="${col}" stroke-width="1.3" opacity=".85" marker-end="url(#ar${i % 5})" pointer-events="none"/><circle cx="${ax}" cy="${ay}" r="2.4" fill="${col}" pointer-events="none"/>`;
+    }
+  });
+  if (S.range) { const b = rangeBox(G, normR(S.range)); if (b) h += `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="rgba(114,212,232,.13)" stroke="#72d4e8" stroke-width="2" pointer-events="none"/>`; }
+  if (sb) h += `<rect x="${sb.x}" y="${sb.y}" width="${sb.w}" height="${sb.h}" fill="none" stroke="#ffb547" stroke-width="2.4" pointer-events="none"/><rect x="${sb.x + sb.w - 3.5}" y="${sb.y + sb.h - 3.5}" width="6" height="6" fill="#ffb547" stroke="#0b1019" pointer-events="none"/>`;
+  return h;
+}
+function drawCard(G) {
+  const B = G.card; if (!B) return '';
+  const a = selA(), raw = curRaw(), v = val(a), fs = NAR ? 10.5 : 11.5, n = Math.floor((B.w - 20) / (fs * 0.6));
+  let h = `<g data-part="card"><rect x="${B.x}" y="${B.y}" width="${B.w}" height="${B.h}" rx="10" fill="rgba(18,26,40,.85)" stroke="#3a4762"/>`;
+  h += `<text x="${B.x + 10}" y="${B.y + 15}" font-size="8.5" fill="#8b96ad" letter-spacing="1">СТРОКА ФОРМУЛ · ${a}${S.draft != null ? ' · ВВОД…' : ''}</text>`;
+  if (isF(raw)) {
+    const refs = refsIn(raw); let parts = '', p = 0;
+    refs.forEach((q, i) => { parts += esc(raw.slice(p, q.i)) + `<tspan fill="${PAL[i % 5]}">${esc(q.s)}</tspan>`; p = q.i + q.s.length; });
+    parts += esc(raw.slice(p));
+    h += `<text x="${B.x + 10}" y="${B.y + 34}" font-size="${fs}" fill="#e8ecf4">${raw.length > n ? esc(fit1(raw, B.w - 12, fs)) : parts}</text>`;
+    const sub = S.draft == null ? `= ${subst(raw)} = ${fmt(v)}` : '';
+    h += `<text x="${B.x + 10}" y="${B.y + 53}" font-size="${fs - 1}" fill="${isErr(v) && S.draft == null ? '#ff8a73' : '#86e0a8'}">${esc(fit1(S.draft == null ? sub : 'Enter или ✓ — записать в ячейку', B.w - 12, fs - 1))}</text>`;
+  } else {
+    const t = raw === '' ? 'пустая ячейка' : numOf(raw) != null ? `число ${fmt(numOf(raw))}` : `текст «${raw}»`;
+    h += `<text x="${B.x + 10}" y="${B.y + 34}" font-size="${fs}" fill="#e8ecf4">${esc(fit1(raw === '' ? '—' : raw, B.w - 12, fs))}</text><text x="${B.x + 10}" y="${B.y + 53}" font-size="${fs - 1}" fill="#8b96ad">${esc(fit1(t + ' · формула начинается с «=»', B.w - 12, fs - 1))}</text>`;
+  }
+  return h + '</g>';
+}
+function niceMax(m) { if (m <= 0) return 1; const p = Math.pow(10, Math.floor(Math.log10(m))); for (const k of [1, 2, 2.5, 5, 10]) if (k * p >= m) return k * p; return 10 * p; }
+const pct = (v, t) => (Math.round(v / t * 1000) / 10).toLocaleString('ru-RU');
+function drawChart(G) {
+  const B = G.chart; if (!B) return '';
+  let h = `<g data-part="chart"><rect x="${B.x}" y="${B.y}" width="${B.w}" height="${B.h}" rx="10" fill="rgba(18,26,40,.85)" stroke="#3a4762"/>`;
+  const ch = S.chart;
+  if (!ch) {
+    return h + `<text x="${B.x + B.w / 2}" y="${B.y + B.h / 2 - 8}" font-size="10.5" fill="#8b96ad" text-anchor="middle">Диаграммы пока нет</text><text x="${B.x + B.w / 2}" y="${B.y + B.h / 2 + 10}" font-size="9" fill="#56627d" text-anchor="middle">1) выделите диапазон  2) выберите тип</text></g>`;
+  }
+  const { pts, title } = chartData(ch);
+  h += `<text x="${B.x + 10}" y="${B.y + 16}" font-size="9" fill="#8b96ad" letter-spacing=".5">${esc(fit1((TYPES[ch.type] + ' · ' + rStr(ch)).toUpperCase(), B.w - 16, 9))}</text>`;
+  if (title) h += `<text x="${B.x + B.w / 2}" y="${B.y + 32}" font-size="10" fill="#e8ecf4" text-anchor="middle">${esc(fit1(title, B.w - 16, 10))}</text>`;
+  if (!pts.length) return h + `<text x="${B.x + B.w / 2}" y="${B.y + B.h / 2}" font-size="10" fill="#ff8a73" text-anchor="middle">В диапазоне нет чисел</text></g>`;
+  if (ch.type === 'pie') {
+    const tot = pts.reduce((p, q) => p + Math.max(0, q.v), 0) || 1, R = Math.min(54, B.h / 2 - 34), cx = B.x + R + 16, cy = B.y + 40 + R + (B.h - 60 - 2 * R) / 2;
+    let a0 = -Math.PI / 2;
+    pts.forEach((p, i) => {
+      const f = Math.max(0, p.v) / tot, a1 = a0 + f * 2 * Math.PI, col = PAL[i % PAL.length];
+      if (f >= 0.9999) h += `<circle cx="${cx}" cy="${cy}" r="${R}" fill="${col}" stroke="#0b1019" stroke-width="1.5"/>`;
+      else if (f > 0) h += `<path d="M${cx} ${cy}L${(cx + R * Math.cos(a0)).toFixed(1)} ${(cy + R * Math.sin(a0)).toFixed(1)}A${R} ${R} 0 ${f > 0.5 ? 1 : 0} 1 ${(cx + R * Math.cos(a1)).toFixed(1)} ${(cy + R * Math.sin(a1)).toFixed(1)}z" fill="${col}" stroke="#0b1019" stroke-width="1.5"/>`;
+      if (f > 0.07) { const am = (a0 + a1) / 2; h += `<text x="${(cx + R * 0.62 * Math.cos(am)).toFixed(1)}" y="${(cy + R * 0.62 * Math.sin(am) + 3).toFixed(1)}" font-size="8.5" fill="#0b1019" text-anchor="middle" font-weight="500">${pct(p.v, tot)}%</text>`; }
+      a0 = a1;
+    });
+    const lx = cx + R + 14, lw = B.x + B.w - lx - 6;
+    pts.slice(0, 8).forEach((p, i) => { const y = B.y + 48 + i * 17; h += `<rect x="${lx}" y="${y - 8}" width="9" height="9" rx="2" fill="${PAL[i % PAL.length]}"/><text x="${lx + 13}" y="${y}" font-size="8" fill="#e8ecf4">${esc(fit1(p.lab, lw - 34, 8))}</text><text x="${lx + lw}" y="${y}" font-size="8" fill="#8b96ad" text-anchor="end">${pct(p.v, tot)}%</text>`; });
+    return h + '</g>';
+  }
+  const px = B.x + 34, py = B.y + 42, pw = B.w - 46, ph = B.h - 96, max = niceMax(Math.max(...pts.map(p => p.v))), n = pts.length, step = pw / n;
+  for (const k of [0, 0.5, 1]) { const y = py + ph - k * ph; h += `<path d="M${px} ${y}H${px + pw}" stroke="#26324a"/><text x="${px - 4}" y="${y + 3}" font-size="8" fill="#8b96ad" text-anchor="end">${fmt(max * k)}</text>`; }
+  h += `<path d="M${px} ${py}V${py + ph}H${px + pw}" fill="none" stroke="#56627d" stroke-width="1.2"/>`;
+  const Y = v => py + ph - clamp(v / max, 0, 1) * ph;
+  if (ch.type === 'col') pts.forEach((p, i) => { const bw = step * 0.6, x = px + i * step + step * 0.2; h += `<rect x="${x.toFixed(1)}" y="${Y(p.v).toFixed(1)}" width="${bw.toFixed(1)}" height="${(py + ph - Y(p.v)).toFixed(1)}" fill="${PAL[0]}" rx="2"/><text x="${(x + bw / 2).toFixed(1)}" y="${(Y(p.v) - 3).toFixed(1)}" font-size="8" fill="#e8ecf4" text-anchor="middle">${fmt(p.v)}</text>`; });
+  else {
+    h += `<path d="M${pts.map((p, i) => `${(px + (i + 0.5) * step).toFixed(1)} ${Y(p.v).toFixed(1)}`).join('L')}" fill="none" stroke="${PAL[1]}" stroke-width="2"/>`;
+    pts.forEach((p, i) => { const x = px + (i + 0.5) * step; h += `<circle cx="${x.toFixed(1)}" cy="${Y(p.v).toFixed(1)}" r="3" fill="${PAL[1]}"/><text x="${x.toFixed(1)}" y="${(Y(p.v) - 6).toFixed(1)}" font-size="8" fill="#e8ecf4" text-anchor="middle">${fmt(p.v)}</text>`; });
+  }
+  pts.forEach((p, i) => { const x = px + (i + 0.5) * step, y = py + ph + 10; h += `<text x="${x.toFixed(1)}" y="${y}" font-size="8" fill="#8b96ad" text-anchor="end" transform="rotate(-35 ${x.toFixed(1)} ${y})">${esc(fit1(p.lab, 70, 8))}</text>`; });
+  return h + '</g>';
+}
+function drawSide(G) {
+  const B = G.side; if (!B) return '';
+  const m = model(), hidden = [];
+  for (let r = 1; r < L().rows; r++) if (!m.rows.includes(r)) hidden.push(r + 1);
+  const ln = (y, k, v, c) => `<text x="${B.x + 12}" y="${y}" font-size="8.5" fill="#8b96ad" letter-spacing=".5">${k}</text><text x="${B.x + 12}" y="${y + 15}" font-size="11" fill="${c || '#e8ecf4'}">${esc(fit1(v, B.w - 20, 11))}</text>`;
+  return `<g data-part="side"><rect x="${B.x}" y="${B.y}" width="${B.w}" height="${B.h}" rx="10" fill="rgba(18,26,40,.85)" stroke="#3a4762"/>` +
+    ln(B.y + 20, 'ФИЛЬТР', S.filt === 'all' ? 'выключен' : 'Класс = ' + S.filt, S.filt === 'all' ? '#8b96ad' : '#72d4e8') +
+    ln(B.y + 58, 'СОРТИРОВКА', S.sortBy ? sortName() : 'нет', S.sortBy ? '#ffb547' : '#8b96ad') +
+    ln(B.y + 96, 'ПОКАЗАНО СТРОК', `${m.shown} из ${L().rows - 1}`) +
+    ln(B.y + 134, 'СКРЫТЫ СТРОКИ', hidden.length ? hidden.join(', ') : 'нет', '#8b96ad') + '</g>';
+}
+
+function hlBoxes(id) {
+  const G = LAY(), id0 = LID(), rb = q => { const b = rangeBox(G, q); return b ? [[b.x - 3, b.y - 3, b.w + 6, b.h + 6]] : []; };
+  const cb = (c, r) => { const b = cellBox(G, c, r); return b ? [[b.x - 3, b.y - 3, b.w + 6, b.h + 6]] : []; };
+  if (id === 'cell') return cb(S.sel.c, S.sel.r);
+  if (id === 'addr') return [[G.x0 - 2, G.y0 - 2, G.gw + 4, G.hh + 4], [G.x0 - 2, G.y0 - 2, G.rw + 4, G.hh + dispRows().length * G.rh + 4]];
+  if (id === 'card' && G.card) return [[G.card.x - 3, G.card.y - 3, G.card.w + 6, G.card.h + 6]];
+  if (id === 'chart' && G.chart) return [[G.chart.x - 3, G.chart.y - 3, G.chart.w + 6, G.chart.h + 6]];
+  if (id0 === 'formulas' && id === 'formula') return cb(3, 2).concat(cb(3, 3));
+  if (id0 === 'refs') {
+    if (id === 'rel') return rb({ c0: 1, c1: 1, r0: 2, r1: 6 });
+    if (id === 'abs') return cb(1, 0);
+    if (id === 'fill') return rb({ c0: 2, c1: 2, r0: 2, r1: 6 });
+    if (id === 'err') { const out = []; for (let r = 0; r < 7; r++) for (let c = 0; c < 3; c++) if (isErr(val(A(c, r)))) out.push(...cb(c, r)); return out; }
+  }
+  if (id0 === 'charts') {
+    if (id === 'range') return S.range ? rb(normR(S.range)) : S.chart ? rb(S.chart) : [];
+    if (id === 'data') return rb({ c0: 0, c1: 1, r0: 1, r1: 5 });
+    if (id === 'total') return rb({ c0: 0, c1: 1, r0: 6, r1: 6 });
+    if (id === 'title') return rb({ c0: 0, c1: 1, r0: 0, r1: 0 });
+  }
+  if (id0 === 'sort') {
+    if (id === 'head') return rb({ c0: 0, c1: 2, r0: 0, r1: 0 });
+    if (id === 'sortcol') return rb({ c0: 2, c1: 2, r0: 0, r1: 10 });
+    if (id === 'filtcol') return rb({ c0: 1, c1: 1, r0: 0, r1: 10 });
+    if (id === 'nums') return [[G.x0 - 2, G.y0 + G.hh - 2, G.rw + 4, dispRows().length * G.rh + 4]];
+    if (id === 'side' && G.side) return [[G.side.x - 3, G.side.y - 3, G.side.w + 6, G.side.h + 6]];
+  }
+  return [];
+}
+
+function drawScene(t) {
+  const G = LAY();
+  let h = bg() + drawGrid(G) + drawCard(G) + drawChart(G) + drawSide(G);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1);
+    if (k === 0) S.hl = null;
+    else for (const b of hlBoxes(S.hl.id)) h += `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="6" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// fit the scene under the task box when there is room
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  NAR = w < 560;
+  const B = { x0: NAR ? 0 : 8, x1: NAR ? 302 : 516, y1: LAY().y1 }, cw = B.x1 - B.x0 + 8, ch = B.y1 - 80 + 4;
+  const tb = $('#taskBox').getBoundingClientRect(), mt = $('#meter').getBoundingClientRect();
+  const topPx = Math.max(tb.bottom, mt.bottom) - rc.top + 8;
+  const s = Math.min(w / cw, Math.max((hh - topPx) / ch, hh / (ch * 1.6)), 1.5);
+  VB = { w: w / s, h: hh / s }; VB.x = (B.x0 + B.x1) / 2 - VB.w / 2;
+  VB.y = 80 - topPx / s;
+  const slack = VB.y + VB.h - (B.y1 + 2);
+  VB.y = slack < 0 ? B.y1 + 2 - VB.h : VB.y - slack / 2;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer: select cells and ranges; while typing a formula, a tap inserts the address ----------
+let dirty = true, drag = null;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+function hit(p, loose) {
+  const G = LAY(), rows = dispRows(), Ls = L();
+  let c = -1; for (let k = 0; k < Ls.cols; k++) { const x = colX(G, k); if (p.x >= x && p.x < x + G.w[k]) c = k; }
+  if (c < 0) { if (!loose) return null; c = p.x < colX(G, 0) ? 0 : Ls.cols - 1; }
+  const y0 = G.y0 + G.hh;
+  if (p.y >= G.y0 && p.y < y0) return LID() === 'sort' || loose ? { c, r: loose ? rows[0] : 0 } : null;
+  let k = Math.floor((p.y - y0) / G.rh);
+  if (k < 0 || k >= rows.length) { if (!loose) return null; k = clamp(k, 0, rows.length - 1); }
+  return { c, r: rows[k] };
+}
+const insMode = () => S.draft != null && isF(S.draft) && /[=+\-*/^(;:,]$/.test(S.draft);
+scene.addEventListener('pointerdown', e => {
+  const p = toSvg(e), h = hit(p, false); if (!h) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  const ins = insMode();
+  if (!ins && S.draft != null && S.draft !== (S.sheet[selA()] || '')) { if (!commit(false)) return; }
+  const same = !ins && S.sel.c === h.c && S.sel.r === h.r && !S.range;
+  drag = { a: h, b: h, ins, same, moved: false };
+  if (!ins) { S.sel = h; S.range = null; S.draft = null; S.caret = null; syncFx(true); }
+  scene.classList.add('grabbing'); dirty = true; if (!ins) lite();
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const h = hit(toSvg(e), true); if (!h || (h.c === drag.b.c && h.r === drag.b.r)) return;
+  drag.b = h; drag.moved = true;
+  if (!drag.ins) S.range = (h.c === drag.a.c && h.r === drag.a.r) ? null : { a: drag.a, b: h };
+  dirty = true; lite();
+});
+const endDrag = cancel => {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing'); dirty = true;
+  if (cancel) return;
+  if (d.ins) {
+    const q = normR({ a: d.a, b: d.b });
+    S.draft += rStr(q); S.caret = S.draft.length; syncFx(true); focusFx(); update(); return;
+  }
+  if (d.same && !d.moved && LID() !== 'sort') focusFx();
+  update();
+};
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+// ---------- formula bar ----------
+const fxEl = () => $('#fx');
+function syncFx(force) {
+  const f = fxEl(); if (!f) return;
+  if (force || document.activeElement !== f) f.value = curRaw();
+  const ad = $('#fxAddr'); if (ad) ad.textContent = S.range ? rStr(normR(S.range)) : selA();
+}
+function focusFx() { const f = fxEl(); if (!f) return; f.focus({ preventScroll: true }); const c = S.caret != null ? S.caret : f.value.length; try { f.setSelectionRange(c, c); } catch (e) {} }
+function commit(move) {
+  if (LID() === 'sort') return true;
+  const a = selA(), f = fxEl();
+  const v = normInput(S.draft != null ? S.draft : f ? f.value : '');
+  const old = S.sheet[a] || '';
+  S.draft = null; S.caret = null;
+  if (v === old) { syncFx(true); update(); return true; }
+  setCell(a, v);
+  const r = val(a);
+  if (isErr(r) && (r.e === '#ОШИБКА!' || r.e === '#ЦИКЛ!')) {
+    setCell(a, old); S.draft = v; syncFx(true);
+    toast(r.e === '#ЦИКЛ!' ? `Циклическая ссылка: формула в ${a} в итоге ссылается сама на себя. Так считать нельзя.` : 'В формуле ошибка записи: проверьте скобки, знаки и адреса. Формула не записана.');
+    update(); return false;
+  }
+  S.edits++;
+  if (isErr(r)) toast(ERRS[r.e] || r.e);
+  else if (isF(v)) toast(`${a} = ${fmt(r)}`);
+  if (move && S.sel.r < L().rows - 1) S.sel = { c: S.sel.c, r: S.sel.r + 1 };
+  syncFx(true); update(); return true;
+}
+function insertAt(txt) {
+  if (S.draft == null) S.draft = S.sheet[selA()] || '';
+  if (S.draft === '') S.draft = '=';
+  const c = S.caret != null ? clamp(S.caret, 0, S.draft.length) : S.draft.length;
+  S.draft = S.draft.slice(0, c) + txt + S.draft.slice(c); S.caret = c + txt.length;
+  syncFx(true); focusFx(); dirty = true; lite();
+}
+function toggleAbs() {
+  const f = fxEl();
+  if (S.draft == null) S.draft = f ? f.value : S.sheet[selA()] || '';
+  const caret = S.caret != null ? S.caret : S.draft.length;
+  const re = /(?<![A-ZА-ЯЁ])(\$?)([A-Z])(\$?)(\d+)/g; let m, hitm = null;
+  while ((m = re.exec(S.draft))) if (m.index <= caret && caret <= m.index + m[0].length) hitm = m;
+  if (!hitm) { toast('Поставьте курсор в строке формул сразу после адреса, например после B1, и нажмите «$».'); return; }
+  const [all, d1, col, d2, row] = hitm, st = (d1 ? 2 : 0) + (d2 ? 1 : 0);
+  const nx = { 0: ['$', '$'], 3: ['', '$'], 1: ['$', ''], 2: ['', ''] }[st];
+  const rep = nx[0] + col + nx[1] + row;
+  S.draft = S.draft.slice(0, hitm.index) + rep + S.draft.slice(hitm.index + all.length);
+  S.caret = hitm.index + rep.length; syncFx(true); focusFx(); dirty = true; lite();
+}
+function fillDown() {
+  if (S.draft != null && !commit(false)) return;
+  const a = selA(), raw = S.sheet[a] || '', last = (L().fillTo || L().rows) - 1;
+  if (!isF(raw)) { toast('В выбранной ячейке нет формулы — копировать нечего.'); return; }
+  if (S.sel.r >= last) { toast('Ниже заполнять некуда: это последняя строка таблицы.'); return; }
+  for (let r = S.sel.r + 1; r <= last; r++) setCell(A(S.sel.c, r), shiftF(raw, r - S.sel.r, 0));
+  S.edits++;
+  S.range = { a: { c: S.sel.c, r: S.sel.r }, b: { c: S.sel.c, r: last } };
+  const bad = []; for (let r = S.sel.r + 1; r <= last; r++) if (isErr(val(A(S.sel.c, r)))) bad.push(A(S.sel.c, r));
+  toast(bad.length ? `Скопировано до ${A(S.sel.c, last)}, но в ${bad.join(', ')} ошибка. Нажмите на ${bad[0]} и посмотрите, куда теперь смотрят ссылки.` : `Формула скопирована до ${A(S.sel.c, last)}. Нажмите на любую ячейку и посмотрите на её формулу.`);
+  update();
+}
+function makeChart(type) {
+  if (S.draft != null && !commit(false)) return;
+  const q = normR(S.range || { a: S.sel, b: S.sel });
+  if (q.r0 === q.r1 && q.c0 === q.c1) { toast('Сначала выделите диапазон: протяните по ячейкам с подписями и числами.'); return; }
+  S.chart = Object.assign({ type }, q);
+  const { pts } = chartData(S.chart);
+  if (!pts.length) toast('В выделенном диапазоне нет чисел — рисовать нечего.');
+  else if (q.c0 === q.c1) toast('Выделены только числа — у диаграммы нет названий статей.');
+  else if (q.r1 >= 6 && type === 'pie') toast('Сектор «Итого» занял половину круга. Это ещё одна статья расходов или всё целое?');
+  else if (type === 'col') toast('Гистограмма хорошо сравнивает статьи. Но видно ли по ней, какая часть от всего бюджета?');
+  else if (type === 'line') toast('График показывает изменение во времени. Статьи бюджета — это моменты времени?');
+  update();
+}
+
+let last = performance.now();
+function loop(t) {
+  requestAnimationFrame(loop);
+  last = t;
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3400); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, aria, cls) => `<button data-a="${k}"${aria ? ` aria-label="${aria}"` : ''}${cls ? ` class="${cls}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  const fx = `<span class="val" id="fxAddr"></span><input id="fx" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Строка формул" placeholder="=…">` + B('ok', '✓', 'Записать в ячейку', 'go');
+  if (id === 'formulas') tb.innerHTML = fx + sep + B('sum', 'СУММ(', 'Вставить функцию СУММ') + B('showf', 'Формулы', 'Показать формулы в ячейках') + B('reset', 'Заново');
+  else if (id === 'refs') tb.innerHTML = fx + sep + B('abs', '$', 'Закрепить ссылку знаком доллара') + B('fill', 'Заполнить ↓', 'Заполнить формулу вниз') + B('showf', 'Формулы', 'Показать формулы в ячейках') + B('reset', 'Заново');
+  else if (id === 'charts') tb.innerHTML = fx + sep + B('col', 'Гистограмма') + B('line', 'График') + B('pie', 'Круговая') + sep + B('reset', 'Заново');
+  else tb.innerHTML = '<span class="val" id="fxAddr"></span>' + B('asc', '↑ По возр.', 'Сортировать по возрастанию') + B('desc', '↓ По убыв.', 'Сортировать по убыванию') + sep +
+    B('f-all', 'Все') + B('f-7А', '7А', 'Фильтр: только 7А') + B('f-7Б', '7Б', 'Фильтр: только 7Б') + sep + B('reset', 'Заново');
+  const f = fxEl();
+  if (f) {
+    f.addEventListener('input', () => { S.draft = f.value; S.caret = f.selectionStart; dirty = true; lite(); });
+    const car = () => { S.caret = f.selectionStart; };
+    f.addEventListener('keyup', car); f.addEventListener('click', car); f.addEventListener('select', car);
+    f.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); commit(true); }
+      if (e.key === 'Escape') { S.draft = null; S.caret = null; syncFx(true); dirty = true; lite(); }
+      if (e.key === 'F4') { e.preventDefault(); S.caret = f.selectionStart; toggleAbs(); }
+    });
+  }
+}
+function updateTools() {
+  syncFx(false);
+  const id = LID(), tb = $('#tools'), pr = (k, on) => { const b = tb.querySelector(`[data-a="${k}"]`); if (b) b.setAttribute('aria-pressed', on ? 'true' : 'false'); };
+  if (id === 'formulas' || id === 'refs') pr('showf', S.showF);
+  if (id === 'charts') for (const k of ['col', 'line', 'pie']) pr(k, S.chart && S.chart.type === k);
+  if (id === 'sort') {
+    $('#fxAddr').textContent = 'столбец ' + COLS[S.sel.c];
+    pr('asc', S.sortBy && S.sortBy.dir > 0); pr('desc', S.sortBy && S.sortBy.dir < 0);
+    for (const k of ['all', '7А', '7Б']) pr('f-' + k, S.filt === k);
+  }
+}
+function resetLesson() {
+  const Ls = L();
+  S.sheet = Object.assign({}, Ls.cells); EV = null;
+  const p = parseA(Ls.sel0); S.sel = { c: p.c, r: p.r };
+  S.range = null; S.draft = null; S.caret = null; S.showF = false; S.edits = 0; S.chart = null; S.filt = 'all'; S.sortBy = null;
+}
+function act(a) {
+  const id = LID();
+  if (a === 'reset') { resetLesson(); syncFx(true); update(); return; }
+  if (a === 'ok') { commit(true); return; }
+  if (a === 'showf') { S.showF = !S.showF; update(); return; }
+  if (a === 'sum') { insertAt('СУММ('); return; }
+  if (a === 'abs') { toggleAbs(); return; }
+  if (a === 'fill') { fillDown(); return; }
+  if (a === 'col' || a === 'line' || a === 'pie') { makeChart(a); return; }
+  if (id === 'sort') {
+    if (a === 'asc' || a === 'desc') { sortBy(S.sel.c, a === 'asc' ? 1 : -1); toast(`Строки отсортированы: ${sortName()}. Каждая строка переехала целиком.`); update(); return; }
+    if (a.startsWith('f-')) {
+      S.filt = a.slice(2);
+      if (S.sel.r > 0 && !dispRows().includes(S.sel.r)) S.sel = { c: S.sel.c, r: 0 };
+      toast(S.filt === 'all' ? 'Фильтр снят: снова видны все строки.' : `Фильтр: Класс = ${S.filt}. Остальные строки спрятаны, но не удалены.`);
+      fit(); update(); return;
+    }
+  }
+}
+const tb0 = $('#tools');
+tb0.addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); });
+tb0.addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.disabled) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+
+function taskState(m) {
+  if (S.done[LID()]) return '✓ Выполнено';
+  if (m.kind === 'formulas') return `D2: ${m.d2 ? 'верно' : 'ещё нет'} · D5: ${m.d5 ? 'верно' : 'ещё нет'}`;
+  if (m.kind === 'refs') return `Верных цен: ${m.okRows} из 5`;
+  if (m.kind === 'charts') return m.chart ? `${TYPES[m.chart.type]} по ${rStr(m.chart)} — пока не то` : `Выделено: ${m.range ? rStr(m.range) : m.a} · диаграммы нет`;
+  return `Фильтр: ${m.filt === 'all' ? 'нет' : m.filt} · сортировка: ${sortName()}`;
+}
+
+// Scheme tab: built once per lesson, values refreshed on update
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  const fnChips = `<div class="ctl"><div class="lbl">Вставить в формулу</div><div class="chips"><button data-ins="СУММ(">СУММ(</button><button data-ins="СРЗНАЧ(">СРЗНАЧ(</button><button data-ins="МАКС(">МАКС(</button><button data-ins="МИН(">МИН(</button><button data-ins="*">×</button><button data-ins="+">+</button><button data-ins=":">:</button><button data-ins=")">)</button></div></div>`;
+  if (id === 'formulas') h = `<h2>Строка формул</h2><p class="note">Выберите ячейку на листе. Пока вы набираете формулу и последний знак — «=», «+», «*» или «(», нажатие на ячейку вставит её адрес.</p>
+    <dl class="reads"><div><dt>Ячейка</dt><dd id="r1"></dd></div><div><dt>Содержимое</dt><dd id="r2"></dd></div><div><dt>Значение</dt><dd id="r3"></dd></div></dl>${fnChips}
+    <div class="ctl"><div class="chips"><button data-a="showf">Показать формулы</button><button data-a="reset">Заново</button></div></div>
+    <h3>Все ячейки с данными</h3><div class="listing" id="lst"></div>`;
+  if (id === 'refs') h = `<h2>Ссылки и копирование</h2><p class="note">«$» перед буквой закрепляет столбец, перед числом — строку. «Заполнить ↓» копирует формулу выбранной ячейки до строки 7.</p>
+    <dl class="reads"><div><dt>Ячейка</dt><dd id="r1"></dd></div><div><dt>Формула</dt><dd id="r2"></dd></div><div><dt>Верных</dt><dd id="r3"></dd></div></dl>${fnChips}
+    <div class="ctl"><div class="chips"><button data-a="abs">$ закрепить</button><button data-a="fill">Заполнить ↓</button><button data-a="showf">Показать формулы</button><button data-a="reset">Заново</button></div></div>
+    <h3>Столбец C</h3><div class="listing" id="lst"></div>`;
+  if (id === 'charts') h = `<h2>Построить диаграмму</h2><p class="note">Выделите диапазон на листе протягиванием или впишите его здесь, например A1:B3. Потом выберите тип.</p>
+    <dl class="reads"><div><dt>Выделено</dt><dd id="r1"></dd></div><div><dt>Тип</dt><dd id="r2"></dd></div><div><dt>Диапазон</dt><dd id="r3"></dd></div></dl>
+    <div class="ctl"><label for="rngIn">Диапазон</label><div class="row"><input id="rngIn" type="text" autocomplete="off" spellcheck="false" placeholder="A1:B3"><button class="ghostbtn" id="rngGo">Выделить</button></div></div>
+    <div class="ctl"><div class="lbl">Тип диаграммы</div><div class="chips"><button data-a="col">Гистограмма</button><button data-a="line">График</button><button data-a="pie">Круговая</button><button data-a="reset">Заново</button></div></div>
+    <h3>Данные диаграммы</h3><div class="listing" id="lst"></div>`;
+  if (id === 'sort') h = `<h2>Сортировка и фильтр</h2><p class="note">Сортировка работает по столбцу выбранной ячейки. Фильтр — по столбцу «Класс».</p>
+    <dl class="reads"><div><dt>Столбец</dt><dd id="r1"></dd></div><div><dt>Показано</dt><dd id="r2"></dd></div><div><dt>Фильтр</dt><dd id="r3"></dd></div></dl>
+    <div class="ctl"><div class="lbl">Столбец для сортировки</div><div class="chips"><button data-col="0">A · Имя</button><button data-col="1">B · Класс</button><button data-col="2">C · Время</button></div></div>
+    <div class="ctl"><div class="chips"><button data-a="asc">↑ По возрастанию</button><button data-a="desc">↓ По убыванию</button></div></div>
+    <div class="ctl"><div class="lbl">Фильтр по классу</div><div class="chips"><button data-a="f-all">Все</button><button data-a="f-7А">7А</button><button data-a="f-7Б">7Б</button><button data-a="reset">Заново</button></div></div>
+    <h3>Видимые строки</h3><div class="listing" id="lst"></div>`;
+  el.innerHTML = h;
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+  el.querySelectorAll('[data-ins]').forEach(b => b.onclick = () => insertAt(b.dataset.ins));
+  el.querySelectorAll('[data-col]').forEach(b => b.onclick = () => { S.sel = { c: +b.dataset.col, r: 0 }; S.range = null; update(); });
+  const go = el.querySelector('#rngGo'), ri = el.querySelector('#rngIn');
+  if (go) {
+    const apply = () => {
+      const m = /^\s*([A-Za-z]\d+)\s*(?::\s*([A-Za-z]\d+))?\s*$/.exec(ri.value || ''); const a = m && parseA(m[1].toUpperCase()), b = m && (m[2] ? parseA(m[2].toUpperCase()) : a);
+      if (!a || !b || a.c >= L().cols || b.c >= L().cols || a.r >= L().rows || b.r >= L().rows) { toast('Не понял диапазон. Пример: A1:B3 — столбцы A–B, строки 1–3.'); return; }
+      S.sel = a; S.range = (a.c === b.c && a.r === b.r) ? null : { a, b }; update();
+    };
+    go.onclick = apply; ri.addEventListener('keydown', e => { if (e.key === 'Enter') apply(); });
+  }
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; };
+  const pr = (sel, on) => el.querySelectorAll(sel).forEach(b => b.setAttribute('aria-pressed', on ? 'true' : 'false'));
+  const lst = el.querySelector('#lst'), Ls = L();
+  if (m.kind === 'formulas' || m.kind === 'refs') {
+    set('#r1', m.a); set('#r2', m.raw || '—'); set('#r3', m.kind === 'refs' ? `${m.okRows}/5` : (fmt(m.v) || '—'));
+    pr('[data-a="showf"]', S.showF);
+    const cells = [];
+    for (let r = 0; r < Ls.rows; r++) for (let c = 0; c < Ls.cols; c++) {
+      if (m.kind === 'refs' && c !== 2) continue;
+      const a = A(c, r), raw = S.sheet[a]; if (raw == null) { if (m.kind === 'refs' && r >= 2) cells.push(`<div class="dim">${a}: пусто</div>`); continue; }
+      const v = val(a), cls = a === m.a ? 'cur' : isErr(v) ? 'bad' : '';
+      cells.push(`<div class="${cls}">${a}: ${esc(raw)}${isF(raw) ? ' → ' + esc(fmt(v)) : ''}</div>`);
+    }
+    if (lst) lst.innerHTML = cells.join('');
+  } else if (m.kind === 'charts') {
+    set('#r1', m.range ? rStr(m.range) : m.a); set('#r2', m.chart ? TYPES[m.chart.type] : 'нет'); set('#r3', m.chart ? rStr(m.chart) : '—');
+    for (const k of ['col', 'line', 'pie']) pr(`[data-a="${k}"]`, m.chart && m.chart.type === k);
+    if (lst) lst.innerHTML = m.chart ? (() => { const d = chartData(m.chart); return (d.title ? `<div class="dim">заголовок: ${esc(d.title)}</div>` : '') + (d.pts.map(p => `<div>${esc(p.lab)}: ${fmt(p.v)}</div>`).join('') || '<span class="note">чисел нет</span>'); })() : '<span class="note">Диаграмма ещё не построена.</span>';
+  } else {
+    set('#r1', `${COLS[S.sel.c]} · ${fmt(val(A(S.sel.c, 0)))}`); set('#r2', `${m.shown} из 10`); set('#r3', m.filt === 'all' ? 'нет' : m.filt);
+    el.querySelectorAll('[data-col]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.col === S.sel.c ? 'true' : 'false'));
+    pr('[data-a="asc"]', S.sortBy && S.sortBy.dir > 0); pr('[data-a="desc"]', S.sortBy && S.sortBy.dir < 0);
+    for (const k of ['all', '7А', '7Б']) pr(`[data-a="f-${k}"]`, S.filt === k);
+    if (lst) lst.innerHTML = m.rows.map(r => `<div>${r + 1}. ${esc(fmt(val(A(0, r))))} · ${esc(fmt(val(A(1, r))))} · ${esc(fmt(val(A(2, r))))} с</div>`).join('');
+  }
+}
+
+function partsList() {
+  const id = LID();
+  const cellIc = IC('<rect x="3" y="7" width="28" height="20" fill="none" stroke="var(--muted)" stroke-width="1.4"/><path d="M3 17h28M12 7v20M21 7v20" stroke="var(--muted)" stroke-width="1.2"/><rect x="12" y="17" width="9" height="10" fill="none" stroke="var(--force)" stroke-width="2.2"/>');
+  if (id === 'formulas') return [
+    { id: 'cell', icon: cellIc, name: 'Ячейка', spec: 'Пересечение столбца и строки. Выбранная ячейка обведена жёлтой рамкой.' },
+    { id: 'addr', icon: IC('<text x="6" y="14" font-size="10" fill="var(--fg)" font-family="monospace">A B</text><text x="4" y="28" font-size="10" fill="var(--force)" font-family="monospace">1 2</text>'), name: 'Адрес', spec: 'Буква столбца + номер строки: D2. Буквы — над листом, номера — слева.' },
+    { id: 'fx', icon: IC('<rect x="2" y="10" width="30" height="14" rx="3" fill="none" stroke="var(--fg)" stroke-width="1.6"/><text x="6" y="21" font-size="9" fill="var(--force)" font-family="monospace">=B2</text>'), name: 'Строка формул', spec: 'Поле внизу сцены. Здесь видно и меняется содержимое выбранной ячейки.' },
+    { id: 'card', icon: IC('<text x="3" y="15" font-size="9" fill="var(--arm)" font-family="monospace">=B*C</text><text x="3" y="28" font-size="9" fill="var(--ok)" font-family="monospace">=250·4</text>'), name: 'Как считается формула', spec: 'Под листом: формула с цветными ссылками и подстановка чисел. Цвет ссылки совпадает с рамкой ячейки.' },
+    { id: 'formula', icon: IC('<text x="2" y="22" font-size="13" fill="var(--force)" font-family="monospace">=fx</text>'), name: 'Формула', spec: 'Начинается с «=». В D3 и D4 уже стоят готовые формулы — посмотрите, как они устроены.' }];
+  if (id === 'refs') return [
+    { id: 'rel', icon: IC('<text x="5" y="22" font-size="13" fill="var(--arm)" font-family="monospace">B3</text>'), name: 'Относительная ссылка', spec: 'B3, B4… При копировании вниз номер строки растёт вместе с формулой. Для цен это и нужно.' },
+    { id: 'abs', icon: IC('<text x="1" y="22" font-size="12" fill="var(--force)" font-family="monospace">$B$1</text>'), name: 'Абсолютная ссылка', spec: '$B$1 — курс. При копировании не меняется: все строки берут курс из одной ячейки.' },
+    { id: 'fill', icon: IC('<rect x="9" y="3" width="16" height="8" fill="none" stroke="var(--force)" stroke-width="1.8"/><path d="M17 13v15M12 23l5 6 5-6" fill="none" stroke="var(--fg)" stroke-width="1.8"/>'), name: 'Заполнить вниз', spec: 'Копирует формулу в ячейки ниже. В Excel так же работает квадратик в углу рамки — маркер заполнения.' },
+    { id: 'err', icon: IC('<text x="1" y="22" font-size="9.5" fill="var(--warn)" font-family="monospace">#ЗНАЧ!</text>'), name: 'Ошибки', spec: '#ЗНАЧ! появляется, когда формула умножает текст — например, если ссылка «съехала» на заголовок.' }];
+  if (id === 'charts') return [
+    { id: 'range', icon: IC('<rect x="5" y="5" width="24" height="24" fill="rgba(114,212,232,.15)" stroke="var(--arm)" stroke-width="2"/>'), name: 'Диапазон', spec: 'Прямоугольник ячеек, например A1:B6: от левой верхней до правой нижней.' },
+    { id: 'data', icon: cellIc, name: 'Данные', spec: 'Названия статей (столбец A) станут подписями, суммы (столбец B) — размерами столбиков или секторов.' },
+    { id: 'title', icon: IC('<path d="M5 12h24" stroke="var(--fg)" stroke-width="2.4"/><path d="M8 20h18M8 26h12" stroke="var(--muted)" stroke-width="1.6"/>'), name: 'Заголовки', spec: 'Строка 1. Если она попала в диапазон, её текст станет названием диаграммы.' },
+    { id: 'total', icon: IC('<text x="3" y="22" font-size="11" fill="var(--force)" font-family="monospace">Σ=400</text>'), name: 'Итого', spec: 'Сумма всех статей формулой СУММ. Это целое, а не одна из его частей.' },
+    { id: 'chart', icon: IC('<circle cx="17" cy="17" r="12" fill="var(--arm)"/><path d="M17 17V5A12 12 0 0 1 29 17z" fill="var(--force)"/>'), name: 'Область диаграммы', spec: 'Рисунок связан с ячейками: поменяйте число — диаграмма перерисуется.' }];
+  return [
+    { id: 'head', icon: IC('<rect x="3" y="8" width="28" height="8" fill="var(--surface-2)" stroke="var(--fg)" stroke-width="1.4"/><path d="M3 20h28M3 26h28" stroke="var(--muted)" stroke-width="1.2"/>'), name: 'Строка заголовков', spec: 'Строка 1 никогда не сортируется и не прячется: она подписывает столбцы.' },
+    { id: 'sortcol', icon: IC('<path d="M10 5v24M5 24l5 6 5-6" fill="none" stroke="var(--force)" stroke-width="2"/><path d="M19 9h10M19 17h7M19 25h4" stroke="var(--fg)" stroke-width="2"/>'), name: 'Ключ сортировки', spec: 'Столбец, по которому сравнивают строки. Здесь время: чем меньше секунд, тем быстрее.' },
+    { id: 'filtcol', icon: IC('<path d="M5 6h24l-9 11v10l-6 3V17z" fill="none" stroke="var(--arm)" stroke-width="2" stroke-linejoin="round"/>'), name: 'Условие фильтра', spec: 'Столбец «Класс»: фильтр оставляет только строки с выбранным значением.' },
+    { id: 'nums', icon: IC('<text x="7" y="14" font-size="10" fill="var(--arm)" font-family="monospace">3</text><text x="7" y="28" font-size="10" fill="var(--arm)" font-family="monospace">6</text><path d="M4 18h16" stroke="var(--arm)" stroke-width="2"/>'), name: 'Номера строк', spec: 'При фильтре номера идут с пропусками и подсвечены. Чёрточка показывает, где спрятаны строки.' },
+    { id: 'side', icon: IC('<rect x="5" y="4" width="24" height="26" rx="3" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M10 11h14M10 17h10M10 23h12" stroke="var(--muted)" stroke-width="1.6"/>'), name: 'Состояние таблицы', spec: 'Какие сейчас включены фильтр и сортировка. На телефоне то же видно в окне справа вверху.' }];
+}
+function flashEl(sel) { const el = $(sel); if (!el) return; el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    const head = { formulas: 'Из чего состоит таблица', refs: 'Виды ссылок', charts: 'Части диаграммы', sort: 'Инструменты порядка' }[Ls.id];
+    $('#pane-parts').innerHTML = `<h2>${head}</h2><p class="note">Нажмите на пункт, чтобы найти его на сцене.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => {
+      if (b.dataset.id === 'fx') flashEl('#tools');
+      else { if (b.dataset.id === 'side' && NAR) flashEl('#meter'); S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; }
+    });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function cellCalc(m) {
+  const raw = curRaw();
+  if (!isF(raw)) return `<h2>Ячейка ${m.a}</h2><div class="formula">${raw ? esc(raw) : '—'}</div><p class="note">${raw === '' ? 'Ячейка пустая. В формулах она считается нулём.' : numOf(raw) != null ? 'Здесь число. Его можно использовать в формулах по адресу ' + m.a + '.' : 'Здесь текст. В вычислениях текст даёт ошибку #ЗНАЧ!.'}</p>`;
+  if (S.draft != null) return `<h2>Ячейка ${m.a}: ввод</h2><div class="formula">${esc(raw)}</div><p class="note">Формула ещё не записана. Нажмите Enter или ✓ — и здесь появится расчёт по шагам.</p>`;
+  return `<h2>Как считает ячейка ${m.a}</h2><div class="formula">${esc(raw)}</div><div class="steps">` +
+    step('1. подставляем значения', esc(subst(raw))) + step('2. результат', esc(fmt(m.v)), isErr(m.v) ? 'badd sum' : 'sum') + `</div>`;
+}
+function calcHTML(m) {
+  const g = a => num(val(a)), F = a => fmt(val(a)) || 'пусто';
+  if (m.kind === 'formulas') {
+    const p2 = g('B2') * g('C2'), tot = p2 + g('B3') * g('C3') + g('B4') * g('C4');
+    let h = cellCalc(m) + `<h3>Проверка задания</h3><div class="formula">стоимость = цена · количество</div><div class="steps">`;
+    h += step('тетради', `${F('B2')} · ${F('C2')} = ${fmt(p2)}`);
+    h += step('в D2 сейчас', S.sheet.D2 ? `${esc(S.sheet.D2)} → ${esc(F('D2'))}` : 'пусто', m.d2 ? 'okk' : S.sheet.D2 ? 'badd' : '');
+    h += step('всего', `${fmt(p2)} + ${F('D3')} + ${F('D4')} = ${fmt(tot)}`);
+    h += step('в D5 сейчас', S.sheet.D5 ? `${esc(S.sheet.D5)} → ${esc(F('D5'))}` : 'пусто', m.d5 ? 'okk' : S.sheet.D5 ? 'badd' : '') + `</div>`;
+    if ((S.sheet.D2 && !isF(S.sheet.D2)) || (S.sheet.D5 && !isF(S.sheet.D5))) h += `<p class="note" style="margin-top:10px">Число, набранное вручную, не пересчитается, если поменять цену. Нужна формула.</p>`;
+    return h;
+  }
+  if (m.kind === 'refs') {
+    let h = cellCalc(m) + `<h3>Проверка столбца C</h3><div class="formula">цена в ₸ = цена в $ · курс</div><div class="steps">`;
+    for (let i = 3; i <= 7; i++) {
+      const raw = S.sheet['C' + i];
+      h += step(`C${i}: ${F('B' + i)} · ${F('B1')} = ${fmt(g('B' + i) * g('B1'))}`, raw ? `${esc(raw)} → ${esc(F('C' + i))}` : 'пусто', m.rowOk[i - 3] ? 'okk' : raw ? 'badd' : '');
+    }
+    h += step('верных', `${m.okRows} из 5`, 'sum') + `</div>`;
+    return h + `<p class="note" style="margin-top:10px">Формула засчитывается, только если она пересчитается при любом курсе и любой цене.</p>`;
+  }
+  if (m.kind === 'charts') {
+    const items = []; for (let r = 1; r <= 5; r++) items.push({ lab: fmt(val(A(0, r))), v: g(A(1, r)) });
+    const tot = items.reduce((p, q) => p + q.v, 0) || 1;
+    let h = `<h2>Доли бюджета</h2><div class="formula">доля = часть : целое · 100%</div><p class="note">Целое — сумма всех статей: ${items.map(i => fmt(i.v)).join(' + ')} = ${fmt(tot)} тыс. ₸. Сектор круга: доля · 360°.</p><div class="steps">`;
+    items.forEach(i => { h += step(esc(i.lab), `${fmt(i.v)} : ${fmt(tot)} · 100% = ${pct(i.v, tot)}% → ${Math.round(i.v / tot * 360)}°`); });
+    h += step('вместе', '100% → 360°', 'sum') + `</div>`;
+    h += `<h3>Ваша диаграмма</h3><div class="steps">` + step('тип', m.chart ? TYPES[m.chart.type] : 'не построена') + step('диапазон', m.chart ? rStr(m.chart) : '—') + step('задание', m.chartOk ? 'выполнено' : 'пока нет', m.chartOk ? 'okk' : '') + `</div>`;
+    return h;
+  }
+  const t = m.rows.map(r => ({ n: fmt(val(A(0, r))), v: val(A(2, r)) }));
+  let h = `<h2>Как таблица наводит порядок</h2><div class="steps">` + step('1. фильтр', m.filt === 'all' ? 'выключен: видны все 10 строк' : `Класс = ${m.filt}: осталось ${m.shown} из 10`) +
+    step('2. сортировка', S.sortBy ? sortName() : 'не применялась') + `</div><h3>Проверка порядка (время, с)</h3><div class="steps">`;
+  for (let k = 1; k < t.length; k++) { const ok = t[k - 1].v <= t[k].v; h += step(`${esc(t[k - 1].n)} → ${esc(t[k].n)}`, `${fmt(t[k - 1].v)} ${ok ? '≤' : '>'} ${fmt(t[k].v)}`, ok ? 'okk' : 'badd'); }
+  h += step('итог', m.asc ? 'от быстрого к медленному' : 'порядок нарушен', m.asc ? 'okk sum' : 'badd sum') + `</div>`;
+  return h + `<p class="note" style="margin-top:10px">Меньше секунд — быстрее бегун. Поэтому «от самого быстрого» значит по возрастанию времени.</p>`;
+}
+
+function renderMeter(m) {
+  const el = $('#meter'), ok = !!S.done[LID()];
+  if (m.kind === 'formulas') el.innerHTML = `<div class="k">Ячейка ${m.a}</div><div class="v ${isErr(m.v) ? 'bad' : ok ? 'ok' : ''}">${esc(fmt(m.v) || '—')}</div><div class="lr"><span>D2</span><span>${m.d2 ? '✓' : '—'}</span></div><div class="lr"><span>D5</span><span>${m.d5 ? '✓' : '—'}</span></div>`;
+  else if (m.kind === 'refs') el.innerHTML = `<div class="k">Верных цен</div><div class="v ${ok ? 'ok' : ''}">${m.okRows} / 5</div><div class="gauge"><b style="width:${m.okRows * 20}%"></b></div><div class="lr"><span>курс B1</span><span>${esc(fmt(val('B1')))}</span></div><div class="lr"><span>ячейка</span><span>${m.a}</span></div>`;
+  else if (m.kind === 'charts') el.innerHTML = `<div class="k">Диаграмма</div><div class="v ${ok ? 'ok' : ''}">${m.chart ? TYPES[m.chart.type] : 'нет'}</div><div class="lr"><span>диапазон</span><span>${m.chart ? rStr(m.chart) : '—'}</span></div><div class="lr"><span>выделено</span><span>${m.range ? rStr(m.range) : m.a}</span></div>`;
+  else el.innerHTML = `<div class="k">Показано строк</div><div class="v ${ok ? 'ok' : ''}">${m.shown} из 10</div><div class="lr"><span>фильтр</span><span>${m.filt === 'all' ? 'нет' : m.filt}</span></div><div class="lr"><span>сорт.</span><span>${S.sortBy ? COLS[S.sortBy.c] + (S.sortBy.dir > 0 ? ' ↑' : ' ↓') : 'нет'}</span></div>`;
+}
+
+// light refresh while dragging or typing: no check, no pane rebuild
+function lite() { const m = model(); renderMeter(m); updateTools(); if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m); if (S.tab === 'scheme') updateScheme(m); dirty = true; }
+function update() {
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Теперь таблица работает на вас!'), 1300);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  updateTools();
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  formulas: '<rect x="4" y="5" width="58" height="20" rx="3" fill="none" stroke="#3a4762"/><text x="9" y="19" font-size="10" fill="#ffb547" font-family="monospace">=B2*C2</text>',
+  refs: '<text x="5" y="19" font-size="11" fill="#72d4e8" font-family="monospace">B3*</text><text x="30" y="19" font-size="11" fill="#ffb547" font-family="monospace">$B$1</text>',
+  charts: '<path d="M6 26h54" stroke="#56627d"/><rect x="10" y="12" width="8" height="14" fill="#72d4e8"/><rect x="22" y="6" width="8" height="20" fill="#72d4e8"/><circle cx="48" cy="15" r="9" fill="#72d4e8"/><path d="M48 15V6A9 9 0 0 1 57 15z" fill="#ffb547"/>',
+  sort: '<path d="M10 5v20M6 21l4 5 4-5" fill="none" stroke="#ffb547" stroke-width="1.5"/><path d="M22 8h12M22 15h20M22 22h28" stroke="#e8ecf4" stroke-width="2"/><path d="M48 4h12l-4 6v6l-4 2v-8z" fill="none" stroke="#72d4e8" stroke-width="1.3"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Lx, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Lx.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Lx.title}</span></span>
+      ${S.done[Lx.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const Ls = LESSONS[i];
+  S.lesson = i; S.hl = null; drag = null;
+  resetLesson();
+  save();
+  $('#stage').classList.toggle('tall', Ls.id !== 'formulas');
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = Ls.task;
+  $('#hint').textContent = Ls.stage;
+  renderTools(); renderStrip(); buildScheme(); syncFx(true); update();
+  requestAnimationFrame(fit);
+  const cur = $('#lessons .lesson[aria-current="true"]'), ls = $('#lessons'); if (cur) { const dx = cur.getBoundingClientRect().left - ls.getBoundingClientRect().left; if (dx < 0 || dx + cur.offsetWidth > ls.clientWidth) ls.scrollLeft += dx - 8; }
+}
+window.addEventListener('resize', () => requestAnimationFrame(fit));
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  const dump = () => { const out = []; for (let r = 0; r < Ls.rows; r++) for (let c = 0; c < Ls.cols; c++) { const a = A(c, r), raw = S.sheet[a]; if (raw != null) out.push(isF(raw) ? `${a}: ${raw} → ${fmt(val(a))}` : `${a}: ${raw}`); } return out.join('; '); };
+  let now = '';
+  if (id === 'formulas') now = `Лист «Покупки»: столбцы Товар, Цена ₸, Кол-во, Стоимость ₸. Ячейки: ${dump()}. Выбрана ${m.a}${S.draft != null ? `, в строке формул набирается «${S.draft}»` : ''}. D2 ${m.d2 ? 'заполнена верной формулой' : 'ещё не содержит верной формулы'}, D5 ${m.d5 ? 'заполнена верной формулой' : 'ещё не содержит верной формулы'}. Засчитывается только формула со ссылками на ячейки (проверяется пересчётом при других числах), а не набранное число. Не диктуй готовые формулы — спрашивай, из каких ячеек берутся цена и количество, и как в D3 устроена готовая формула.`;
+  if (id === 'refs') now = `Лист «Прайс»: курс доллара в B1, цены в $ в B3:B7, нужно получить цены в ₸ в C3:C7 формулой и кнопкой «Заполнить ↓». Ячейки: ${dump()}. Выбрана ${m.a}. Верных цен: ${m.okRows} из 5; знак $ в столбце C ${m.abs ? 'используется' : 'не используется'}. Не называй готовую формулу — наводи вопросами: какая ссылка должна сдвигаться при копировании вниз, а какая всегда указывать на курс; что стало в формуле C4 после копирования.`;
+  if (id === 'charts') now = `Лист «Бюджет» семьи на месяц (тыс. ₸): ${dump()}. Выделено: ${m.range ? rStr(m.range) : m.a}. Диаграмма: ${m.chart ? `${TYPES[m.chart.type]} по диапазону ${rStr(m.chart)}` : 'не построена'}. Задание ${m.chartOk ? 'выполнено' : 'не выполнено'}. Не говори прямо тип и диапазон — спрашивай: что показывает каждый тип диаграммы, является ли «Итого» частью бюджета или целым, нужны ли подписи статей.`;
+  if (id === 'sort') now = `Лист «Бег 60 м»: имя, класс (7А/7Б), время в секундах. Видимые строки сверху вниз: ${m.rows.map(r => `${fmt(val(A(0, r)))} ${fmt(val(A(1, r)))} ${fmt(val(A(2, r)))} с`).join('; ')}. Фильтр: ${m.filt === 'all' ? 'выключен' : 'Класс = ' + m.filt}. Последняя сортировка: ${sortName()}. Выбран столбец ${COLS[S.sel.c]}. Порядок по времени ${m.asc ? 'возрастающий' : 'не возрастающий'}. Не называй кнопки по порядку — спрашивай, у кого меньше секунд: у быстрого или медленного, и как оставить только один класс.`;
+  return [
+    `Раздел: информатика, 7 класс, тема «Электронные таблицы». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { formulas: 'Чем формула лучше готового числа в ячейке?', refs: 'Чем $B$1 отличается от B1?', charts: 'Как выбрать тип диаграммы?', sort: 'Чем фильтр отличается от удаления строк?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
