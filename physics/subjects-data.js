@@ -22,7 +22,7 @@ window.LUCH_SUBJECTS = {
       { id: 'poly', b: 'alg', g: 7, t: 'Многочлены', items: ['Степень с натуральным показателем', 'Одночлены и многочлены', 'Формулы сокращённого умножения', 'Разложение на множители'], req: ['expr'], status: 'done', href: '/labs/math-poly/', lessons: 4, doneItems: 4 },
       { id: 'systems', b: 'alg', g: 7, t: 'Системы уравнений', items: ['Уравнение с двумя переменными', 'Способ подстановки', 'Способ сложения', 'Графический способ'], req: ['expr'], status: 'done', href: '/labs/math-systems/', lessons: 4, doneItems: 4 },
       { id: 'roots', b: 'alg', g: 8, t: 'Квадратные корни', items: ['Иррациональные числа', 'Свойства корней', 'Преобразования с корнями'], req: ['poly'], status: 'done', href: '/labs/math-roots/', lessons: 3, doneItems: 3 },
-      { id: 'quad', b: 'alg', g: 8, t: 'Квадратные уравнения', items: ['Дискриминант', 'Теорема Виета', 'Дробно-рациональные уравнения', 'Задачи на движение и работу'], req: ['roots'] },
+      { id: 'quad', b: 'alg', g: 8, t: 'Квадратные уравнения', items: ['Дискриминант', 'Теорема Виета', 'Дробно-рациональные уравнения', 'Задачи на движение и работу'], req: ['roots'], status: 'done', href: '/labs/math-quad/', lessons: 4, doneItems: 4 },
       { id: 'ineq', b: 'alg', g: 9, t: 'Неравенства', items: ['Линейные неравенства', 'Квадратные неравенства', 'Метод интервалов', 'Системы неравенств'], req: ['quad'] },
       { id: 'seq', b: 'alg', g: 9, t: 'Прогрессии', items: ['Числовые последовательности', 'Арифметическая прогрессия', 'Геометрическая прогрессия', 'Сложные проценты и вклады'], req: ['expr'] },
       { id: 'explog', b: 'alg', g: 11, t: 'Степени и логарифмы', items: ['Корень n-й степени', 'Показательная функция', 'Логарифмы', 'Показательные и логарифмические уравнения'], req: ['ineq', 'fquad'] },
@@ -71,7 +71,7 @@ window.LUCH_SUBJECTS = {
       { id: 'atomst', b: 'struct', g: 8, t: 'Строение атома', items: ['Протоны, нейтроны, электроны', 'Изотопы', 'Электронные оболочки'], req: ['atoms'], status: 'done', href: '/labs/chem-atomst/', lessons: 3, doneItems: 3 },
       { id: 'table', b: 'struct', g: 8, t: 'Периодическая система', items: ['Закон Менделеева', 'Периоды и группы', 'Металлы и неметаллы', 'Как предсказать свойства'], req: ['atomst'], status: 'done', href: '/labs/chem-table/', lessons: 4, doneItems: 4 },
       { id: 'bonds', b: 'struct', g: 8, t: 'Химическая связь', items: ['Ковалентная связь', 'Ионная связь', 'Металлическая связь', 'Кристаллические решётки'], req: ['table'], status: 'done', href: '/labs/chem-bonds/', lessons: 4, doneItems: 4 },
-      { id: 'redox', b: 'struct', g: 9, t: 'Окислительно-восстановительные реакции', items: ['Степень окисления', 'Окислитель и восстановитель', 'Электронный баланс'], req: ['bonds', 'equations'] },
+      { id: 'redox', b: 'struct', g: 9, t: 'Окислительно-восстановительные реакции', items: ['Степень окисления', 'Окислитель и восстановитель', 'Электронный баланс'], req: ['bonds', 'equations'], status: 'done', href: '/labs/chem-redox/', lessons: 3, doneItems: 3 },
 
       { id: 'equations', b: 'react', g: 8, t: 'Химические реакции', items: ['Признаки реакций', 'Уравнения реакций', 'Закон сохранения массы', 'Типы реакций'], req: ['valence', 'subst'], status: 'done', href: '/labs/chem-equations/', lessons: 4, doneItems: 4 },
       { id: 'mole', b: 'react', g: 8, t: 'Количество вещества', items: ['Моль и число Авогадро', 'Молярная масса', 'Молярный объём газов', 'Расчёты по уравнениям'], req: ['equations'], status: 'done', href: '/labs/chem-mole/', lessons: 4, doneItems: 4 },
@@ -126,7 +126,7 @@ window.LUCH_SUBJECTS = {
       { id: 'inverts', b: 'div', g: 8, t: 'Беспозвоночные', items: ['Простейшие', 'Черви', 'Моллюски', 'Членистоногие и насекомые'], req: ['tissues'], status: 'done', href: '/labs/bio-inverts/', lessons: 4, doneItems: 4 },
       { id: 'verts', b: 'div', g: 8, t: 'Позвоночные', items: ['Рыбы', 'Земноводные и пресмыкающиеся', 'Птицы', 'Млекопитающие'], req: ['inverts'], status: 'done', href: '/labs/bio-verts/', lessons: 4, doneItems: 4 },
 
-      { id: 'body', b: 'human', g: 9, t: 'Опора и движение', items: ['Скелет', 'Мышцы', 'Осанка и травмы'], req: ['verts'] },
+      { id: 'body', b: 'human', g: 9, t: 'Опора и движение', items: ['Скелет', 'Мышцы', 'Осанка и травмы'], req: ['verts'], status: 'done', href: '/labs/bio-body/', lessons: 3, doneItems: 3 },
       { id: 'blood', b: 'human', g: 9, t: 'Кровь и сердце', items: ['Состав крови', 'Сердце', 'Сосуды и давление', 'Иммунитет и прививки'], req: ['body'] },
       { id: 'digest', b: 'human', g: 9, t: 'Дыхание и питание', items: ['Лёгкие и дыхание', 'Пищеварение', 'Питание и витамины', 'Выделение'], req: ['blood'] },
       { id: 'nerves', b: 'human', g: 9, t: 'Мозг и чувства', items: ['Нейрон и рефлекс', 'Головной мозг', 'Зрение и слух', 'Сон и память'], req: ['body'] },
@@ -175,7 +175,7 @@ window.LUCH_SUBJECTS = {
       { id: 'analysis', b: 'data', g: 10, t: 'Анализ данных', items: ['Сбор и очистка данных', 'Визуализация', 'Python для данных'], req: ['db', 'func'] },
 
       { id: 'safe', b: 'net', g: 5, t: 'Интернет и безопасность', items: ['Поиск информации', 'Надёжные пароли', 'Цифровой след', 'Как распознать фейк'], req: ['pc'], status: 'done', href: '/labs/cs-safe/', lessons: 4, doneItems: 4 },
-      { id: 'networks', b: 'net', g: 8, t: 'Компьютерные сети', items: ['Как устроен интернет', 'IP-адреса и DNS', 'Протоколы'], req: ['binary', 'safe'] },
+      { id: 'networks', b: 'net', g: 8, t: 'Компьютерные сети', items: ['Как устроен интернет', 'IP-адреса и DNS', 'Протоколы'], req: ['binary', 'safe'], status: 'done', href: '/labs/cs-networks/', lessons: 3, doneItems: 3 },
       { id: 'web', b: 'net', g: 9, t: 'Создание сайтов', items: ['HTML', 'CSS', 'Основы JavaScript', 'Публикация сайта'], req: ['networks', 'python'] },
       { id: 'cyber', b: 'net', g: 10, t: 'Кибербезопасность', items: ['Шифрование', 'Атаки и защита', 'Этичный хакинг'], req: ['networks', 'logic'] },
 

@@ -1,0 +1,941 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по химии, 9 класс: степень окисления на весах зарядов, перенос электронов между окислителем и восстановителем, коэффициенты методом электронного баланса.">
+<title>Окислительно-восстановительные реакции</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /mechanics and /chemistry. Lab bench (SVG) on the left, lesson notebook on the right, lesson strip under the bench. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--liq);transition:width .2s}
+.gauge i{position:absolute;top:-4px;width:2px;height:14px;background:var(--force);transform:translateX(-50%)}
+.swatch{height:12px;border-radius:4px;margin-top:9px;border:1px solid rgba(255,255,255,.15)}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.meter .big{font:700 30px/1 var(--font-display);margin-top:8px;letter-spacing:.02em}
+.meter .big small{font:500 12px/1 var(--font-body);color:var(--muted);letter-spacing:0;margin-left:6px}
+.pairs{display:grid;gap:6px;margin-top:10px}
+.pairs label{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface-2);border-radius:9px;padding:7px 10px;font-size:13.5px}
+.pairs select{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:7px;padding:5px 8px;font:500 13px var(--font-mono)}
+.pairs select:disabled{color:var(--ok);opacity:1}
+.cnt{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;margin-top:10px}
+.cnt div{display:flex;align-items:center;justify-content:space-between;gap:6px;background:var(--surface-2);border-radius:9px;padding:6px 8px;font-size:13px}
+.cnt b{font:500 14px var(--font-mono)}
+.cnt button{width:30px;height:30px;border-radius:7px;background:var(--bg);border:1px solid var(--line);cursor:pointer;font:500 15px/1 var(--font-mono)}
+.vtab{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}
+.vtab span{background:var(--surface-2);border-radius:8px;padding:7px 4px;text-align:center;font:500 12px/1.3 var(--font-mono);color:var(--muted)}
+.vtab span b{display:block;color:var(--fg);font-size:15px}
+.vtab span.on{outline:2px solid var(--ok);color:var(--fg)}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><ellipse cx="20" cy="20" rx="14" ry="5.5" fill="none" stroke="var(--arm)" stroke-width="1.6"/><ellipse cx="20" cy="20" rx="14" ry="5.5" fill="none" stroke="var(--arm)" stroke-width="1.6" transform="rotate(60 20 20)"/><ellipse cx="20" cy="20" rx="14" ry="5.5" fill="none" stroke="var(--arm)" stroke-width="1.6" transform="rotate(-60 20 20)"/><circle cx="20" cy="20" r="3.2" fill="var(--force)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Химия · ОВР</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#chem">Карта</a><a href="/physics/#chem">Химия</a><a href="/labs/chem-redox/" aria-current="page">ОВР</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>ОВР</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Лабораторный стол">
+    <svg class="scene" id="scene" role="img" aria-label="Модели атомов, весы зарядов и полоски электронного баланса. Предметы можно перетаскивать и нажимать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const KEY = 'luch-chem-redox';
+const SUBD = { '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉' };
+const low = s => String(s).replace(/\d/g, d => SUBD[d]);
+const ox = n => n > 0 ? '+' + n : n < 0 ? '−' + (-n) : '0';
+const gcd = (a, b) => b ? gcd(b, a % b) : a;
+const lcm = (a, b) => a / gcd(a, b) * b;
+const cap = s => s[0].toUpperCase() + s.slice(1);
+const ROLE = { ox: 'окислитель', red: 'восстановитель' };
+
+// colours of atoms (school model colours where they exist)
+const ATOM = {
+  H: { c: '#eef2f8', t: '#0b1019', name: 'водород' }, O: { c: '#e5533f', t: '#fff', name: 'кислород' },
+  N: { c: '#4d7cf0', t: '#fff', name: 'азот' }, C: { c: '#4f586d', t: '#fff', name: 'углерод' },
+  S: { c: '#e6c63a', t: '#0b1019', name: 'сера' }, Cl: { c: '#5fc46a', t: '#0b1019', name: 'хлор' },
+  Na: { c: '#b88cf0', t: '#0b1019', name: 'натрий' }, K: { c: '#d58cf0', t: '#0b1019', name: 'калий' },
+  Mn: { c: '#a06ad0', t: '#fff', name: 'марганец' }, Fe: { c: '#c58a5c', t: '#0b1019', name: 'железо' },
+  Zn: { c: '#9aa7bd', t: '#0b1019', name: 'цинк' }, Cu: { c: '#d9895b', t: '#0b1019', name: 'медь' },
+  Al: { c: '#b5c0d3', t: '#0b1019', name: 'алюминий' },
+};
+
+// ---------- lesson 1: oxidation state by the zero-sum rule ----------
+const CMP = [
+  { f: 'Cl2', name: 'хлор', u: 'Cl', ans: 0, parts: [{ s: 'Cl', n: 2, x: true }] },
+  { f: 'NH3', name: 'аммиак', u: 'N', ans: -3, parts: [{ s: 'N', n: 1, x: true }, { s: 'H', n: 3, o: 1 }] },
+  { f: 'H2SO4', name: 'серная кислота', u: 'S', ans: 6, parts: [{ s: 'H', n: 2, o: 1 }, { s: 'S', n: 1, x: true }, { s: 'O', n: 4, o: -2 }] },
+  { f: 'KMnO4', name: 'перманганат калия, марганцовка', u: 'Mn', ans: 7, parts: [{ s: 'K', n: 1, o: 1 }, { s: 'Mn', n: 1, x: true }, { s: 'O', n: 4, o: -2 }] },
+  { f: 'Fe2O3', name: 'оксид железа(III)', u: 'Fe', ans: 3, parts: [{ s: 'Fe', n: 2, x: true }, { s: 'O', n: 3, o: -2 }] },
+];
+const sums = (c, x) => { let pos = 0, neg = 0; c.parts.forEach(p => { const v = (p.x ? x : p.o) * p.n; if (v > 0) pos += v; else neg -= v; }); return { pos, neg, sum: pos - neg }; };
+
+// ---------- lesson 2: electron transfer, oxidant and reductant ----------
+const RX = [
+  { eq: 'Zn⁰ + Cu⁺²SO₄ → Zn⁺²SO₄ + Cu⁰', plain: 'Zn + CuSO₄ → ZnSO₄ + Cu', tab: 'Zn + CuSO₄',
+    g: [{ s: 'Zn', n: 1, from: 0, to: 2, role: 'red', sp: 'Zn' }, { s: 'Cu', n: 1, from: 2, to: 0, role: 'ox', sp: 'CuSO₄' }] },
+  { eq: '2Na⁰ + Cl₂⁰ → 2Na⁺¹Cl⁻¹', plain: '2Na + Cl₂ → 2NaCl', tab: 'Na + Cl₂',
+    g: [{ s: 'Na', n: 2, from: 0, to: 1, role: 'red', sp: 'Na' }, { s: 'Cl', n: 2, from: 0, to: -1, role: 'ox', sp: 'Cl₂' }] },
+  { eq: 'Cu⁺²O + H₂⁰ → Cu⁰ + H₂⁺¹O', plain: 'CuO + H₂ → Cu + H₂O', tab: 'CuO + H₂',
+    g: [{ s: 'Cu', n: 1, from: 2, to: 0, role: 'ox', sp: 'CuO' }, { s: 'H', n: 2, from: 0, to: 1, role: 'red', sp: 'H₂' }] },
+];
+const atomsRx = r => r.g.flatMap((g, gi) => Array.from({ length: g.n }, (_, i) => ({ gi, s: g.s, i })));
+
+// ---------- lesson 3: electron balance ----------
+const EQ = [
+  { sk: 'Al + O₂ → Al₂O₃', fin: '4Al + 3O₂ → 2Al₂O₃', tab: 'Al + O₂',
+    red: { s: 'Al', e: 3, lab: 'Al⁰ − 3e⁻ → Al⁺³' }, ox: { s: 'O₂', e: 4, lab: 'O₂⁰ + 4e⁻ → 2O⁻²' },
+    note: 'Множители 4 и 3 ставим перед Al и O₂. Справа 4 атома Al — значит, Al₂O₃ нужно 2. Проверка кислорода: 3 · 2 = 2 · 3 = 6.' },
+  { sk: 'Fe₂O₃ + CO → Fe + CO₂', fin: 'Fe₂O₃ + 3CO → 2Fe + 3CO₂', tab: 'Fe₂O₃ + CO',
+    red: { s: 'C', e: 2, lab: 'C⁺² − 2e⁻ → C⁺⁴' }, ox: { s: '2Fe', e: 6, lab: '2Fe⁺³ + 6e⁻ → 2Fe⁰' },
+    note: 'Множитель 3 — перед CO и CO₂ (атомы углерода). Множитель 1 относится к паре атомов железа: одна Fe₂O₃ и 2Fe. Кислород: слева 3 + 3 = 6, справа 3 · 2 = 6.' },
+  { sk: 'CuO + NH₃ → Cu + N₂ + H₂O', fin: '3CuO + 2NH₃ → 3Cu + N₂ + 3H₂O', tab: 'CuO + NH₃',
+    red: { s: '2N', e: 6, lab: '2N⁻³ − 6e⁻ → N₂⁰' }, ox: { s: 'Cu', e: 2, lab: 'Cu⁺² + 2e⁻ → Cu⁰' },
+    note: 'Множитель 3 — перед CuO и Cu. Множитель 1 у пары атомов азота: 2NH₃ и одна N₂. Водород: 2 · 3 = 6 атомов, значит 3H₂O. Кислород: 3 = 3.' },
+];
+const XMAX = 6;
+
+const LESSONS = [
+  { id: 'oxstate', title: 'Степень окисления',
+    text: ['Степень окисления — условный заряд атома в веществе. Его считают так, будто все связи ионные: общие электроны целиком ушли к более электроотрицательному атому. Пишут арабской цифрой со знаком над элементом: Na⁺¹, O⁻².',
+           'Опорные правила. В простом веществе степень окисления 0 (Fe, O₂). Водород в соединениях обычно +1, кислород −2. Металлы IA группы +1, IIA группы +2. Сумма степеней окисления всех атомов в молекуле равна нулю.',
+           'Отсюда способ: неизвестную степень окисления обозначьте x, умножьте каждую на число атомов и сложите. Например, SO₂: x + 2 · (−2) = 0, значит у серы +4.'],
+    why: 'По степени окисления химик заранее видит, будет вещество отдавать или забирать электроны. Аналитики заводских лабораторий в Темиртау, Усть-Каменогорске и Павлодаре так проверяют формулы руды и продуктов. Провизор знает, что в марганцовке у марганца высшая степень окисления, поэтому она сильный окислитель и обеззараживает. Это база для всех задач на ОВР в ЕНТ.',
+    safe: 'Марганцовка KMnO₄ — сильный окислитель. Кристаллы не берут руками и не смешивают с глицерином или концентрированной кислотой: может вспыхнуть. Для ран годится только бледно-розовый раствор.',
+    task: 'Найдите степень окисления выделенного элемента в пяти веществах: Cl₂, NH₃, H₂SO₄, KMnO₄, Fe₂O₃.',
+    hint: 'Двигайте x по шкале, пока весы не выровняются: сумма плюсов равна сумме минусов. Потом нажмите «Записать x». Вещество меняйте кнопками внизу.',
+    stage: 'Тащите оранжевый маркер по шкале или нажимайте на деление. Весы показывают сумму зарядов.',
+    init: { cmp: 0, x: 0 },
+    check: m => CMP.every((c, i) => m.found1[i]) },
+  { id: 'roles', title: 'Окислитель и восстановитель',
+    text: ['Окислительно-восстановительные реакции (ОВР) — реакции, в которых атомы меняют степени окисления. Причина — электроны переходят от одних атомов к другим.',
+           'Восстановитель отдаёт электроны: его степень окисления растёт, сам он окисляется. Окислитель принимает электроны: его степень окисления понижается, сам он восстанавливается.',
+           'Электрон несёт заряд −1. Отдал атом один e⁻ — его степень окисления выросла на 1. Сколько электронов отдал восстановитель, ровно столько принял окислитель.'],
+    why: 'На ОВР работает всё, что даёт ток: батарейка, аккумулятор телефона и машины. Автоэлектрик понимает, почему окисляются клеммы. Оцинкованная кровля и трубы служат дольше: цинк отдаёт электроны раньше железа и ржавеет вместо него. На водоканалах воду обеззараживают хлором — сильным окислителем. Медь в Балхаше и Жезказгане получают тоже через ОВР.',
+    safe: 'Хлор Cl₂ ядовит, натрий бурно реагирует с водой — такие опыты делает только учитель под тягой. Дома нельзя смешивать хлорный отбеливатель с кислотными средствами для туалета: выделяется хлор.',
+    task: 'В трёх реакциях перенесите электроны так, чтобы степени окисления стали как в продуктах, и назовите окислитель и восстановитель.',
+    hint: 'Перетащите атом на атом другого элемента — перейдёт один e⁻. У кого степень окисления должна вырасти, тот отдаёт. Потом перетащите ярлык роли к веществу.',
+    stage: 'Атом → атом: передать 1 электрон (или нажмите два атома по очереди). Ярлыки ролей тащите к веществу.',
+    init: { rx: 0 },
+    check: m => RX.every((r, i) => m.found2[i]) },
+  { id: 'balance', title: 'Электронный баланс',
+    text: ['Коэффициенты в ОВР расставляют методом электронного баланса. Находят элементы, которые меняют степень окисления, и пишут для них схемы, например: Zn⁰ − 2e⁻ → Zn⁺².',
+           'Главное правило: сколько электронов отдал восстановитель, столько принял окислитель. Находят НОК отданных и принятых электронов и делят его на каждое число — получают множители.',
+           'Множители переносят в уравнение как коэффициенты, остальные атомы (часто водород и кислород) уравнивают подбором. Проверка: атомов каждого элемента слева и справа поровну.'],
+    why: 'Металлург на комбинате в Темиртау рассчитывает, сколько кокса нужно на тонну руды: в домне железо из оксида восстанавливает угарный газ, и весь расчёт держится на электронном балансе. Ошибка в коэффициенте — лишние тонны сырья и деньги. Тот же метод нужен химику-технологу, лаборанту и на ЕНТ по химии.',
+    safe: 'Угарный газ CO без цвета и запаха и смертельно ядовит. В домах с печным отоплением заслонку закрывают только когда угли прогорели. Датчик угарного газа стоит недорого и спасает жизни.',
+    task: 'Уравняйте электроны и получите коэффициенты в трёх реакциях: Al + O₂, Fe₂O₃ + CO, CuO + NH₃.',
+    hint: 'Верхняя полоска — электроны, которые отдаёт восстановитель, нижняя — которые принимает окислитель. Добавляйте блоки, пока полоски не сравняются. Множители должны быть наименьшими.',
+    stage: 'Тащите блоки из лотков на полоски или нажимайте на лоток. Лишний блок — нажмите на него.',
+    init: { eq: 0 },
+    check: m => EQ.every((e, i) => m.found3[i]) },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null,
+            cmp: 0, x: 0, found1: {}, wrong1: 0, rx: 0, st: [], roles: {}, found2: {}, wrong2: 0, sel: null, eq: 0, a: 1, b: 1, found3: {} };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+function model() {
+  const id = LID();
+  if (id === 'oxstate') { const c = CMP[S.cmp]; return Object.assign({ kind: 'ox', c, x: S.x, found: !!S.found1[S.cmp], found1: S.found1 }, sums(c, S.x)); }
+  if (id === 'roles') {
+    const r = RX[S.rx], A = atomsRx(r);
+    const ready = A.every((a, k) => S.st[k] === r.g[a.gi].to);
+    const d = r.g.map((g, gi) => A.reduce((s, a, k) => s + (a.gi === gi ? S.st[k] - g.from : 0), 0));
+    return { kind: 'rx', r, A, st: S.st, ready, d, moved: Math.max(0, ...d), found: !!S.found2[S.rx], found2: S.found2 };
+  }
+  const E = EQ[S.eq], A = S.a * E.red.e, B = S.b * E.ox.e, eq = A === B, min = gcd(S.a, S.b) === 1;
+  return { kind: 'bal', E, a: S.a, b: S.b, A, B, eq, min, ok: eq && min, found3: S.found3 };
+}
+
+// ---------- scene geometry (SVG units; the bench top is y = 360) ----------
+const ROW1 = { y: 192 }, BEAM = { x: 260, y: 262, L: 150 }, NL = { x0: 70, x1: 450, y: 340, lo: -4, hi: 8 }, REC = { x: 212, y: 303, w: 96, h: 22 };
+const nlx = v => NL.x0 + (v - NL.lo) / (NL.hi - NL.lo) * (NL.x1 - NL.x0);
+const nlv = x => clamp(Math.round(NL.lo + (x - NL.x0) / (NL.x1 - NL.x0) * (NL.hi - NL.lo)), NL.lo, NL.hi);
+const GX = [150, 370], AY = 206, SLOT = { y: 280, w: 170, h: 26 }, TAG = { y: 320, w: 150, h: 26, xs: { ox: 175, red: 345 } };
+const L3 = { cx: 260, W: 420, top: 140, h: 40, gap: 46 };
+L3.bot = L3.top + L3.h + L3.gap;
+const BIN3 = { a: { x: 64, y: 316 }, b: { x: 456, y: 316 } };
+const COL = { a: '#72d4e8', b: '#ffb547' };
+
+const f1 = v => v.toFixed(1);
+const ball = (x, y, r, c, label, tc, fs) => `<circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(r + 1.3)}" fill="${INK}"/><circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(r)}" fill="${c}"/><circle cx="${f1(x - r * 0.35)}" cy="${f1(y - r * 0.38)}" r="${f1(r * 0.3)}" fill="#fff" opacity=".28"/>` +
+  (label ? `<text x="${f1(x)}" y="${f1(y + fs * 0.36)}" font-size="${f1(fs)}" fill="${tc}" text-anchor="middle" font-weight="500">${label}</text>` : '');
+const bAtom = (s, x, y, r) => ball(x, y, r, ATOM[s].c, s, ATOM[s].t, r * (s.length > 1 ? 0.78 : 0.92));
+
+function bench() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern>
+    <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#72d4e8"/></marker></defs>
+    <rect x="-2000" y="-2000" width="4520" height="2360" fill="url(#tile)"/>
+    <rect x="-2000" y="360" width="4520" height="1200" fill="#1a2232"/>
+    <rect x="-2000" y="358" width="4520" height="4" fill="#2c3954"/>
+    <rect x="-2000" y="362" width="4520" height="2" fill="${INK}" opacity=".6"/>`;
+}
+
+// ----- lesson 1: atoms, charge balance, number line -----
+function oxAtoms(c) { return c.parts.flatMap(p => Array.from({ length: p.n }, () => p)); }
+function oxSVG(m) {
+  const c = m.c, A = oxAtoms(c);
+  let h = `<text x="260" y="128" font-size="26" fill="${m.found ? '#86e0a8' : '#e8ecf4'}" text-anchor="middle" font-weight="500">${low(c.f)}</text>`;
+  h += `<text x="260" y="146" font-size="10" fill="#8b96ad" text-anchor="middle">${c.name} · ищем x у ${c.u}</text>`;
+  const sp = Math.min(54, 380 / A.length), x0 = 260 - (A.length - 1) * sp / 2, r = Math.min(18, sp * 0.36);
+  A.forEach((p, i) => {
+    const x = x0 + i * sp, v = p.x ? m.x : p.o;
+    if (p.x) h += `<circle cx="${f1(x)}" cy="${ROW1.y}" r="${r + 5}" fill="none" stroke="${m.found ? '#86e0a8' : '#ffb547'}" stroke-width="1.6" stroke-dasharray="${m.found ? 'none' : '3 4'}"/>`;
+    h += bAtom(p.s, x, ROW1.y, r);
+    h += `<text x="${f1(x)}" y="${ROW1.y - r - 10}" font-size="12" fill="${p.x ? (m.found ? '#86e0a8' : '#ffb547') : '#c8d1e2'}" text-anchor="middle" font-weight="500">${ox(v)}</text>`;
+    if (p.x) h += `<text x="${f1(x)}" y="${ROW1.y + r + 15}" font-size="9" fill="#ffb547" text-anchor="middle">x</text>`;
+  });
+  // charge balance: plus pan on the left, minus pan on the right
+  const ang = -clamp(m.sum, -10, 10) * Math.PI / 180, ca = Math.cos(ang), sa = Math.sin(ang);
+  const ends = [-1, 1].map(k => ({ x: BEAM.x + k * BEAM.L * ca, y: BEAM.y + k * BEAM.L * sa }));
+  h += `<text x="260" y="244" font-size="12" fill="${m.sum === 0 ? '#86e0a8' : '#e8ecf4'}" text-anchor="middle" font-weight="500">Σ = ${ox(m.sum)}</text>`;
+  h += `<path d="M${BEAM.x} ${BEAM.y}L${BEAM.x - 16} 300H${BEAM.x + 16}Z" fill="#3a4762"/>`;
+  h += `<path d="M${f1(ends[0].x)} ${f1(ends[0].y)}L${f1(ends[1].x)} ${f1(ends[1].y)}" stroke="${m.sum === 0 ? '#86e0a8' : '#c8d1e2'}" stroke-width="5" stroke-linecap="round"/><circle cx="${BEAM.x}" cy="${BEAM.y}" r="4" fill="${INK}"/>`;
+  ends.forEach((e, k) => {
+    const val = k ? m.neg : m.pos, col = k ? '#ff8a73' : '#72d4e8', x = e.x, y = e.y;
+    h += `<path d="M${f1(x)} ${f1(y)}V${f1(y + 14)}" stroke="#8b96ad" stroke-width="1.5"/>` +
+      `<path d="M${f1(x - 34)} ${f1(y + 14)}H${f1(x + 34)}Q${f1(x + 30)} ${f1(y + 38)} ${f1(x)} ${f1(y + 38)}Q${f1(x - 30)} ${f1(y + 38)} ${f1(x - 34)} ${f1(y + 14)}Z" fill="#121a28" stroke="${col}" stroke-width="1.5"/>` +
+      `<text x="${f1(x)}" y="${f1(y + 31)}" font-size="13" fill="${col}" text-anchor="middle" font-weight="500">${val ? (k ? '−' : '+') + val : '0'}</text>` +
+      `<text x="${f1(x)}" y="${f1(y - 8)}" font-size="8.5" fill="#8b96ad" text-anchor="middle">${k ? 'минусы' : 'плюсы'}</text>`;
+  });
+  h += `<g data-drag="rec"><rect x="${REC.x}" y="${REC.y}" width="${REC.w}" height="${REC.h}" rx="7" fill="#121a28" stroke="${m.found ? '#86e0a8' : '#ffb547'}" stroke-width="1.5"/><text x="${REC.x + REC.w / 2}" y="${REC.y + 15}" font-size="10" fill="${m.found ? '#86e0a8' : '#ffb547'}" text-anchor="middle" font-weight="500">${m.found ? 'ЗАПИСАНО ✓' : 'ЗАПИСАТЬ x'}</text></g>`;
+  // number line
+  h += `<path d="M${NL.x0} ${NL.y}H${NL.x1}" stroke="#3a4762" stroke-width="2"/>`;
+  for (let v = NL.lo; v <= NL.hi; v++) {
+    const x = nlx(v);
+    h += `<g data-drag="tick:${v}"><rect x="${f1(x - 13)}" y="${NL.y - 12}" width="26" height="28" fill="#000" fill-opacity="0"/><path d="M${f1(x)} ${NL.y - 5}v10" stroke="#3a4762" stroke-width="1.5"/><text x="${f1(x)}" y="${NL.y + 16}" font-size="9" fill="${v === 0 ? '#e8ecf4' : '#8b96ad'}" text-anchor="middle">${v === m.x ? '' : ox(v)}</text></g>`;
+  }
+  const mx = nlx(m.x);
+  h += `<g data-drag="dial"><circle cx="${f1(mx)}" cy="${NL.y}" r="16" fill="#000" fill-opacity="0"/><circle cx="${f1(mx)}" cy="${NL.y}" r="11" fill="${m.found ? '#86e0a8' : '#ffb547'}" stroke="${INK}" stroke-width="1.5"/><text x="${f1(mx)}" y="${NL.y + 3.5}" font-size="9.5" fill="#0b1019" text-anchor="middle" font-weight="500">${ox(m.x)}</text></g>`;
+  return h;
+}
+
+// ----- lesson 2: atoms swapping electrons -----
+function atomPos(r, k) { const A = atomsRx(r), a = A[k], n = r.g[a.gi].n; return { x: GX[a.gi] + (a.i - (n - 1) / 2) * 62, y: AY }; }
+function atomAt(r, p) { let best = null, bd = 36; atomsRx(r).forEach((a, k) => { const q = atomPos(r, k), d = Math.hypot(p.x - q.x, p.y - q.y); if (d < bd) { bd = d; best = k; } }); return best; }
+const gAt = p => p.y > 140 && p.y < 312 ? (p.x < 260 ? 0 : 1) : null;
+function tagSVG(k, x, y, ghost) {
+  const c = k === 'ox' ? '#ffb547' : '#72d4e8';
+  return `<rect x="${f1(x - TAG.w / 2)}" y="${f1(y)}" width="${TAG.w}" height="${TAG.h}" rx="8" fill="${ghost ? '#1a2438' : '#121a28'}" stroke="${c}" stroke-width="1.5"/><text x="${f1(x)}" y="${f1(y + 17)}" font-size="10" fill="${c}" text-anchor="middle" font-weight="500" letter-spacing=".5">${ROLE[k].toUpperCase()}</text>`;
+}
+function rxSVG(m) {
+  const r = m.r;
+  let h = `<text x="260" y="126" font-size="17" fill="${m.found ? '#86e0a8' : '#e8ecf4'}" text-anchor="middle" font-weight="500">${r.eq}</text>`;
+  const don = m.d.findIndex(v => v > 0), acc = m.d.findIndex(v => v < 0);
+  if (don >= 0 && acc >= 0) {
+    const s = don < acc ? 1 : -1, x1 = GX[don] + s * 40, x2 = GX[acc] - s * 40;
+    h += `<path d="M${x1} 242Q260 286 ${x2} 242" fill="none" stroke="#72d4e8" stroke-width="2" marker-end="url(#ah)"/><text x="260" y="257" font-size="12" fill="#72d4e8" text-anchor="middle" font-weight="500">${m.d[don]}e⁻</text>`;
+  }
+  const target = drag && drag.moved && drag.id.startsWith('at-') ? atomAt(r, drag.p) : null;
+  m.A.forEach((a, k) => {
+    const p = atomPos(r, k), g = r.g[a.gi], v = m.st[k], at = v === g.to;
+    if (S.sel === k || target === k) h += `<circle cx="${p.x}" cy="${p.y}" r="31" fill="rgba(114,212,232,.08)" stroke="#72d4e8" stroke-width="1.6" stroke-dasharray="4 4"/>`;
+    h += `<g data-drag="at-${k}">${bAtom(a.s, p.x, p.y, 24)}</g>`;
+    h += `<text x="${p.x}" y="155" font-size="8.5" fill="#8b96ad" text-anchor="middle">было ${ox(g.from)}</text>`;
+    h += `<rect x="${p.x - 18}" y="161" width="36" height="18" rx="6" fill="#0b1019" stroke="${at && v !== g.from ? '#86e0a8' : v !== g.from ? '#ffb547' : '#3a4762'}"/><text x="${p.x}" y="174" font-size="12" fill="${at && v !== g.from ? '#86e0a8' : '#e8ecf4'}" text-anchor="middle" font-weight="500">${ox(v)}</text>`;
+  });
+  const hot = drag && drag.moved && drag.id.startsWith('tag-') ? gAt(drag.p) : null;
+  r.g.forEach((g, gi) => {
+    const role = S.roles[gi], x = GX[gi];
+    h += `<g data-drag="slot-${gi}"><rect x="${x - SLOT.w / 2}" y="${SLOT.y}" width="${SLOT.w}" height="${SLOT.h}" rx="8" fill="${hot === gi ? 'rgba(114,212,232,.1)' : '#121a28'}" stroke="${role ? '#86e0a8' : hot === gi ? '#72d4e8' : '#3a4762'}" stroke-width="1.4" stroke-dasharray="${role ? 'none' : '4 4'}"/>` +
+      `<text x="${x}" y="${SLOT.y + 17}" font-size="11" fill="${role ? '#86e0a8' : '#8b96ad'}" text-anchor="middle" font-weight="500">${g.sp} — ${role ? ROLE[role] : 'роль?'}</text></g>`;
+  });
+  for (const k of ['ox', 'red']) if (!(drag && drag.moved && drag.id === 'tag-' + k)) h += `<g data-drag="tag-${k}">${tagSVG(k, TAG.xs[k], TAG.y)}</g>`;
+  return h;
+}
+
+// ----- lesson 3: electron balance strips -----
+function laneGeo(m) { const units = Math.max(m.A, m.B, 1), u = Math.min(36, L3.W / units); return { u, x0: L3.cx - units * u / 2 }; }
+function blockSVG(kind, E, x, y, w, i) {
+  const c = COL[kind], d = kind === 'a' ? E.red : E.ox, sg = kind === 'a' ? '−' : '+';
+  const lab = w >= 66 ? `${d.s} ${sg}${d.e}e⁻` : w >= 34 ? `${sg}${d.e}e⁻` : w >= 18 ? sg + d.e : '';
+  return `<g data-drag="${kind === 'a' ? 'la' : 'lb'}-${i}"><rect x="${f1(x + 2)}" y="${y}" width="${f1(w - 4)}" height="${L3.h}" rx="9" fill="${c}" fill-opacity=".16" stroke="${c}" stroke-width="1.6"/>` +
+    (lab ? `<text x="${f1(x + w / 2)}" y="${y + 24}" font-size="${w >= 40 ? 11 : 9}" fill="#e8ecf4" text-anchor="middle" font-weight="500">${lab}</text>` : '') + '</g>';
+}
+const inLanes = p => p.x > L3.cx - L3.W / 2 - 16 && p.x < L3.cx + L3.W / 2 + 16 && p.y > L3.top - 16 && p.y < L3.bot + L3.h + 16;
+function balSVG(m) {
+  const E = m.E, { u, x0 } = laneGeo(m);
+  const hot = drag && drag.moved && (drag.id === 'binA' || drag.id === 'binB') && inLanes(drag.p);
+  let h = `<rect x="${L3.cx - L3.W / 2 - 10}" y="${L3.top - 10}" width="${L3.W + 20}" height="${L3.bot + L3.h - L3.top + 20}" rx="14" fill="${hot ? 'rgba(114,212,232,.07)' : 'rgba(18,26,40,.45)'}" stroke="${hot ? '#72d4e8' : '#26324a'}" stroke-dasharray="6 6"/>`;
+  const both = Math.min(m.A, m.B);
+  for (let k = 0; k < Math.max(m.A, m.B); k++) {
+    const x = x0 + (k + 0.5) * u, ym = (L3.top + L3.h + L3.bot) / 2;
+    if (k < both) h += `<path d="M${f1(x)} ${L3.top + L3.h}V${L3.bot}" stroke="${m.eq ? '#86e0a8' : '#c8d1e2'}" stroke-width="2" stroke-linecap="round"/><circle cx="${f1(x)}" cy="${ym}" r="3.4" fill="${m.eq ? '#86e0a8' : '#72d4e8'}"/>`;
+    else if (k < m.A) h += `<path d="M${f1(x)} ${L3.top + L3.h}v14" stroke="#ff8a73" stroke-width="2" stroke-linecap="round"/><circle cx="${f1(x)}" cy="${L3.top + L3.h + 19}" r="3" fill="#ff8a73"/>`;
+    else h += `<path d="M${f1(x)} ${L3.bot}v-14" stroke="#ff8a73" stroke-width="2" stroke-linecap="round"/><circle cx="${f1(x)}" cy="${L3.bot - 19}" r="3" fill="#ff8a73"/>`;
+  }
+  for (let i = 0; i < m.a; i++) if (!(drag && drag.moved && drag.id === 'la-' + i)) h += blockSVG('a', E, x0 + i * E.red.e * u, L3.top, E.red.e * u, i);
+  for (let i = 0; i < m.b; i++) if (!(drag && drag.moved && drag.id === 'lb-' + i)) h += blockSVG('b', E, x0 + i * E.ox.e * u, L3.bot, E.ox.e * u, i);
+  h += `<text x="${L3.cx}" y="${L3.top - 16}" font-size="10" fill="#72d4e8" text-anchor="middle">отдаёт: ${E.red.lab} · ${m.a} × ${E.red.e} = ${m.A} e⁻</text>`;
+  h += `<text x="${L3.cx}" y="${L3.bot + L3.h + 22}" font-size="10" fill="#ffb547" text-anchor="middle">принимает: ${E.ox.lab} · ${m.b} × ${E.ox.e} = ${m.B} e⁻</text>`;
+  h += `<text x="260" y="322" font-size="15" fill="${m.ok ? '#86e0a8' : '#e8ecf4'}" text-anchor="middle" font-weight="500">${m.ok ? E.fin : E.sk}</text>`;
+  h += `<text x="260" y="340" font-size="10" fill="${m.ok ? '#86e0a8' : m.eq ? '#ffb547' : '#8b96ad'}" text-anchor="middle">${m.ok ? 'коэффициенты расставлены' : m.eq ? 'электроны равны, но множители можно сократить' : `отдано ${m.A} ≠ принято ${m.B}`}</text>`;
+  for (const [k, b] of Object.entries(BIN3)) {
+    const d = k === 'a' ? E.red : E.ox, c = COL[k];
+    h += `<g data-drag="${k === 'a' ? 'binA' : 'binB'}"><rect x="${b.x - 34}" y="${b.y - 34}" width="68" height="76" rx="12" fill="#121a28" stroke="#26324a" stroke-width="1.5"/>` +
+      `<rect x="${b.x - 24}" y="${b.y - 24}" width="48" height="26" rx="7" fill="${c}" fill-opacity=".16" stroke="${c}" stroke-width="1.4"/><text x="${b.x}" y="${b.y - 7}" font-size="10" fill="#e8ecf4" text-anchor="middle" font-weight="500">${k === 'a' ? '−' : '+'}${d.e}e⁻</text>` +
+      `<text x="${b.x}" y="${b.y + 20}" font-size="11" fill="#e8ecf4" text-anchor="middle">${d.s}</text><text x="${b.x}" y="${b.y + 34}" font-size="7" fill="#8b96ad" text-anchor="middle">${k === 'a' ? 'восстановитель' : 'окислитель'}</text></g>`;
+  }
+  return h;
+}
+
+function hlBox(id) {
+  const m = LID() === 'balance' ? model() : null, g = m ? laneGeo(m) : null;
+  return {
+    formula: [170, 104, 180, 50], atoms: [40, ROW1.y - 44, 440, 74], beam: [72, 224, 376, 110], rec: [REC.x - 6, REC.y - 6, REC.w + 12, REC.h + 12], nl: [NL.x0 - 18, NL.y - 18, NL.x1 - NL.x0 + 36, 38],
+    eq: [30, 104, 460, 32], ratoms: [50, 142, 420, 96], arrow: [130, 234, 260, 46], slots: [56, SLOT.y - 5, 408, SLOT.h + 10], tags: [92, TAG.y - 5, 336, TAG.h + 10],
+    laneA: [L3.cx - L3.W / 2 - 8, L3.top - 6, L3.W + 16, L3.h + 12], laneB: [L3.cx - L3.W / 2 - 8, L3.bot - 6, L3.W + 16, L3.h + 12],
+    cols: g ? [g.x0 - 6, L3.top + L3.h - 4, Math.max(m.A, m.B) * g.u + 12, L3.gap + 8] : null,
+    bins: [BIN3.a.x - 40, BIN3.a.y - 40, BIN3.b.x - BIN3.a.x + 80, 88], beq: [100, 302, 320, 46],
+  }[id];
+}
+
+function ghostSVG(d) {
+  const p = d.p, id = d.id;
+  if (id.startsWith('at-')) return `<circle cx="${f1(p.x)}" cy="${f1(p.y)}" r="11" fill="#72d4e8" stroke="${INK}" stroke-width="1.5"/><text x="${f1(p.x)}" y="${f1(p.y + 3.5)}" font-size="10" fill="#0b1019" text-anchor="middle" font-weight="500">e⁻</text>`;
+  if (id.startsWith('tag-')) return tagSVG(id.slice(4), p.x, p.y - TAG.h / 2, true);
+  if (id === 'binA' || id.startsWith('la-') || id === 'binB' || id.startsWith('lb-')) {
+    const k = id === 'binA' || id.startsWith('la-') ? 'a' : 'b', c = COL[k], E = EQ[S.eq], d = k === 'a' ? E.red : E.ox;
+    return `<rect x="${f1(p.x - 26)}" y="${f1(p.y - 14)}" width="52" height="28" rx="8" fill="${c}" fill-opacity=".3" stroke="${c}" stroke-width="1.6"/><text x="${f1(p.x)}" y="${f1(p.y + 4)}" font-size="10" fill="#e8ecf4" text-anchor="middle">${k === 'a' ? '−' : '+'}${d.e}e⁻</text>`;
+  }
+  return '';
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID(), m = model();
+  let h = bench();
+  if (id === 'oxstate') h += oxSVG(m);
+  else if (id === 'roles') h += rxSVG(m);
+  else h += balSVG(m);
+  if (drag && drag.moved) h += `<g opacity=".92" pointer-events="none">${ghostSVG(drag)}</g>`;
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${f1(b[0])}" y="${f1(b[1])}" width="${f1(b[2])}" height="${f1(b[3])}" rx="10" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// fit the scene: 520 × 405 units, centred, bench at the bottom
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 500, hh / 410, 1.7);
+  const vw = w / s, vh = hh / s;
+  scene.setAttribute('viewBox', `${(260 - vw / 2).toFixed(1)} ${(405 - vh).toFixed(1)} ${vw.toFixed(1)} ${vh.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- dragging and tapping ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+const live = id => id === 'dial' || id.startsWith('tick:');
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  drag = { id: el.dataset.drag, x: e.clientX, y: e.clientY, p: toSvg(e), moved: false };
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 6 && !drag.id.startsWith('slot-') && drag.id !== 'rec') drag.moved = true;
+  drag.p = toSvg(e);
+  if (drag.moved && live(drag.id)) { const v = nlv(drag.p.x); if (v !== S.x) setX(v); return; }
+  if (drag.moved) dirty = true;
+});
+const endDrag = cancel => {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing'); dirty = true;
+  if (cancel) return;
+  if (d.moved) drop(d.id, d.p); else tap(d.id);
+};
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+function tap(id) {
+  if (id.startsWith('tick:')) return setX(+id.slice(5));
+  if (id === 'rec') return record();
+  if (id.startsWith('at-')) {
+    const k = +id.slice(3);
+    if (S.sel === null) { S.sel = k; update(); return; }
+    if (S.sel === k) { S.sel = null; update(); return; }
+    const f = S.sel; S.sel = null; transfer(f, k); update(); return;
+  }
+  if (id.startsWith('slot-')) { const gi = +id.slice(5), cur = S.roles[gi]; return setRole(gi, cur === 'red' ? 'ox' : 'red'); }
+  if (id === 'binA') return addM('a', 1);
+  if (id === 'binB') return addM('b', 1);
+  if (id.startsWith('la-')) return addM('a', -1);
+  if (id.startsWith('lb-')) return addM('b', -1);
+}
+function drop(id, p) {
+  if (id.startsWith('at-')) { const j = atomAt(RX[S.rx], p); S.sel = null; if (j !== null) transfer(+id.slice(3), j); update(); return; }
+  if (id.startsWith('tag-')) { const gi = gAt(p); if (gi !== null) setRole(gi, id.slice(4)); return; }
+  if (id === 'binA') { if (inLanes(p)) addM('a', 1); return; }
+  if (id === 'binB') { if (inLanes(p)) addM('b', 1); return; }
+  if (id.startsWith('la-')) { if (!inLanes(p)) addM('a', -1); return; }
+  if (id.startsWith('lb-')) { if (!inLanes(p)) addM('b', -1); return; }
+}
+
+// lesson 1 actions
+function setX(v) { S.x = clamp(v, NL.lo, NL.hi); update(); return true; }
+function setCmp(i) { S.cmp = (i + CMP.length) % CMP.length; S.x = 0; renderTools(); buildScheme(); update(); }
+function record() {
+  const c = CMP[S.cmp], s = sums(c, S.x);
+  if (S.found1[S.cmp]) { toast(`Уже записано: у ${c.u} в ${low(c.f)} степень окисления ${ox(c.ans)}.`); return true; }
+  if (s.sum !== 0) { S.wrong1++; toast(`Сумма ${ox(s.sum)}, а в молекуле должна быть 0. ${s.sum > 0 ? 'Плюсов больше — уменьшите x.' : 'Минусов больше — увеличьте x.'}`); update(); return false; }
+  S.found1[S.cmp] = true;
+  const next = CMP.findIndex((x, i) => !S.found1[i]);
+  toast(`Верно: в ${low(c.f)} у ${c.u} степень окисления ${ox(S.x)}.${next >= 0 ? ` Дальше — ${low(CMP[next].f)}.` : ''}`);
+  update(); return true;
+}
+
+// lesson 2 actions
+function resetRx() { const r = RX[S.rx]; S.st = atomsRx(r).map(a => r.g[a.gi].from); S.roles = {}; S.sel = null; }
+function setRx(i) { S.rx = (i + RX.length) % RX.length; resetRx(); renderTools(); buildScheme(); update(); }
+function transfer(i, j) {
+  const r = RX[S.rx], A = atomsRx(r);
+  if (i === j || !A[i] || !A[j]) return false;
+  if (S.found2[S.rx]) { toast('Эта реакция уже разобрана. Выберите другую или нажмите «Сбросить».'); return false; }
+  if (A[i].gi === A[j].gi) { toast('Электроны переходят между атомами разных элементов.'); return false; }
+  if (S.st[i] + 1 > 7 || S.st[j] - 1 < -4) { toast('Так далеко степень окисления в этой реакции не меняется.'); return false; }
+  S.st[i]++; S.st[j]--;
+  const wasRoles = Object.keys(S.roles).length; if (wasRoles) S.roles = {};
+  const ready = A.every((a, k) => S.st[k] === r.g[a.gi].to);
+  if (ready) toast('Степени окисления как в продуктах. Теперь назовите окислитель и восстановитель.');
+  return true;
+}
+function setRole(gi, role) {
+  const r = RX[S.rx], m = model(), g = r.g[gi];
+  if (!g) return false;
+  if (!m.ready) { toast('Сначала перенесите электроны: роль видна по тому, кто их отдаёт.'); return false; }
+  if (g.role !== role) {
+    S.wrong2++;
+    toast(role === 'ox' ? `У ${g.sp} степень окисления растёт (${ox(g.from)} → ${ox(g.to)}): электроны он отдаёт. Окислитель же их принимает.`
+                        : `У ${g.sp} степень окисления понижается (${ox(g.from)} → ${ox(g.to)}): электроны он принимает. Восстановитель же их отдаёт.`);
+    update(); return false;
+  }
+  S.roles[gi] = role;
+  if (r.g.every((x, k) => S.roles[k] === x.role) && !S.found2[S.rx]) {
+    S.found2[S.rx] = true;
+    const red = r.g.find(x => x.role === 'red'), oxi = r.g.find(x => x.role === 'ox');
+    toast(`Верно: ${red.sp} — восстановитель, ${oxi.sp} — окислитель.`);
+  }
+  update(); return true;
+}
+
+// lesson 3 actions
+function setEq(i) { S.eq = (i + EQ.length) % EQ.length; S.a = 1; S.b = 1; renderTools(); buildScheme(); update(); }
+function addM(k, d) {
+  const v = S[k] + d;
+  if (v < 1) { toast('Множитель не может быть меньше единицы.'); return false; }
+  if (v > XMAX) { toast('Больше шести не нужно: множители здесь маленькие.'); return false; }
+  S[k] = v; update(); return true;
+}
+
+let last = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  if (dirty || S.hl) { drawScene(t); dirty = false; last = t; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3200); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  const E = EQ[S.eq];
+  tb.innerHTML = {
+    oxstate: CMP.map((c, i) => B('c-' + i, low(c.f), S.cmp === i)).join('') + sep + B('x-', '−1') + B('x+', '+1') + B('rec', 'Записать'),
+    roles: RX.map((r, i) => B('r-' + i, r.tab, S.rx === i)).join('') + sep + B('reset', 'Сбросить'),
+    balance: EQ.map((e, i) => B('e-' + i, e.tab, S.eq === i)).join('') + sep + B('a-', '−' + E.red.s) + B('a+', '+' + E.red.s) + sep + B('b-', '−' + E.ox.s) + B('b+', '+' + E.ox.s),
+  }[id];
+}
+function act(a) {
+  if (a.startsWith('c-')) return setCmp(+a.slice(2));
+  if (a === 'x-' || a === 'x+') return setX(S.x + (a === 'x+' ? 1 : -1));
+  if (a === 'rec') return record();
+  if (a.startsWith('r-')) return setRx(+a.slice(2));
+  if (a === 'reset') { resetRx(); buildScheme(); update(); return; }
+  if (a.startsWith('e-')) return setEq(+a.slice(2));
+  if (/^[ab][+-]$/.test(a)) return addM(a[0], a[1] === '+' ? 1 : -1);
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  formula: IC('<text x="17" y="21" font-size="10" text-anchor="middle" fill="var(--fg)" font-family="IBM Plex Mono">NH₃</text>'),
+  atoms: IC('<circle cx="10" cy="20" r="6" fill="#4d7cf0"/><circle cx="24" cy="20" r="5" fill="#eef2f8"/><text x="10" y="10" font-size="8" text-anchor="middle" fill="#ffb547">x</text><text x="24" y="10" font-size="8" text-anchor="middle" fill="#c8d1e2">+1</text>'),
+  beam: IC('<path d="M4 13L30 19" stroke="#c8d1e2" stroke-width="2.4"/><path d="M17 16L13 27H21Z" fill="#3a4762"/>'),
+  rec: IC('<rect x="4" y="11" width="26" height="12" rx="4" fill="none" stroke="#ffb547"/><path d="M12 17l3 3 6-6" stroke="#ffb547" fill="none" stroke-width="1.6"/>'),
+  nl: IC('<path d="M3 19H31" stroke="#8b96ad" stroke-width="1.5"/><path d="M8 16v6M14 16v6M20 16v6M26 16v6" stroke="#8b96ad"/><circle cx="20" cy="19" r="4.5" fill="#ffb547"/>'),
+  eq: IC('<text x="17" y="21" font-size="9" text-anchor="middle" fill="var(--fg)" font-family="IBM Plex Mono">A→B</text>'),
+  ratoms: IC('<circle cx="11" cy="20" r="7" fill="#9aa7bd"/><circle cx="25" cy="20" r="7" fill="#d9895b"/><rect x="5" y="4" width="12" height="7" rx="2" fill="none" stroke="#86e0a8"/>'),
+  arrow: IC('<path d="M5 14Q17 28 29 14" fill="none" stroke="#72d4e8" stroke-width="2"/><path d="M29 14l-6 1 3 4z" fill="#72d4e8"/>'),
+  slots: IC('<rect x="3" y="11" width="28" height="12" rx="4" fill="none" stroke="var(--muted)" stroke-dasharray="3 3"/>'),
+  tags: IC('<rect x="3" y="7" width="28" height="9" rx="3" fill="none" stroke="#ffb547"/><rect x="3" y="19" width="28" height="9" rx="3" fill="none" stroke="#72d4e8"/>'),
+  laneA: IC('<rect x="3" y="11" width="13" height="12" rx="3" fill="#72d4e8" fill-opacity=".3" stroke="#72d4e8"/><rect x="18" y="11" width="13" height="12" rx="3" fill="#72d4e8" fill-opacity=".3" stroke="#72d4e8"/>'),
+  laneB: IC('<rect x="3" y="11" width="28" height="12" rx="3" fill="#ffb547" fill-opacity=".3" stroke="#ffb547"/>'),
+  cols: IC('<path d="M8 6v22M14 6v22M20 6v22" stroke="#86e0a8" stroke-width="2"/><circle cx="8" cy="17" r="2.4" fill="#86e0a8"/><circle cx="14" cy="17" r="2.4" fill="#86e0a8"/><circle cx="20" cy="17" r="2.4" fill="#86e0a8"/><path d="M26 6v9" stroke="#ff8a73" stroke-width="2"/>'),
+  bins: IC('<rect x="3" y="9" width="12" height="16" rx="3" fill="none" stroke="var(--muted)"/><rect x="19" y="9" width="12" height="16" rx="3" fill="none" stroke="var(--muted)"/><rect x="5" y="13" width="8" height="5" rx="1" fill="#72d4e8"/><rect x="21" y="13" width="8" height="5" rx="1" fill="#ffb547"/>'),
+  beq: IC('<text x="17" y="21" font-size="8.5" text-anchor="middle" fill="var(--fg)" font-family="IBM Plex Mono">4Al+3</text>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (L.id === 'oxstate') return `Найдено ${CMP.filter((c, i) => S.found1[i]).length} из ${CMP.length} · ${low(m.c.f)}: x = ${ox(m.x)}, Σ = ${ox(m.sum)}`;
+  if (L.id === 'roles') return `Разобрано ${RX.filter((r, i) => S.found2[i]).length} из ${RX.length} · перенесено ${m.moved} e⁻${m.ready ? ', степени как в продуктах' : ''}`;
+  return `Уравнено ${EQ.filter((e, i) => S.found3[i]).length} из ${EQ.length} · ${m.A} e⁻ : ${m.B} e⁻`;
+}
+
+// Scheme tab: built once per lesson, then values refreshed
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'oxstate') h = `<h2>Сумма зарядов</h2>
+      <dl class="reads"><div><dt>Вещество</dt><dd id="r1"></dd></div><div><dt>x</dt><dd id="r2"></dd></div><div><dt>Сумма</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Вещество</div><div class="chips" id="cChips">${CMP.map((c, i) => `<button data-i="${i}" aria-pressed="${i === S.cmp}">${low(c.f)}</button>`).join('')}</div></div>
+      <div class="ctl"><label for="xR">Степень окисления x <output id="xO"></output></label><input type="range" id="xR" min="${NL.lo}" max="${NL.hi}" step="1"></div>
+      <div class="row"><button class="ghostbtn" id="recB">Записать x</button></div>
+      <h3>Найдено</h3><div class="vtab" id="vTab">${CMP.map((c, i) => `<span data-i="${i}"><b>${c.u}</b><i>?</i></span>`).join('')}</div>`;
+  if (id === 'roles') {
+    const r = RX[S.rx], A = atomsRx(r), opt = A.map((a, k) => `<option value="${k}">${a.s}${r.g[a.gi].n > 1 ? ' №' + (a.i + 1) : ''}</option>`).join('');
+    h = `<h2>Перенос электронов</h2>
+      <dl class="reads"><div><dt>Реакция</dt><dd id="r1"></dd></div><div><dt>Перенесено</dt><dd id="r2"></dd></div><div><dt>Как в продуктах</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Реакция</div><div class="chips" id="rChips">${RX.map((x, i) => `<button data-i="${i}" aria-pressed="${i === S.rx}">${x.tab}</button>`).join('')}</div></div>
+      <div class="pairs"><label>Отдаёт 1 e⁻<select id="sFrom">${opt}</select></label><label>Принимает<select id="sTo">${opt}</select></label></div>
+      <div class="row"><button class="ghostbtn" id="doT">Передать 1 e⁻</button><button class="ghostbtn" id="doR">Сбросить</button></div>
+      <h3>Роли</h3><div class="pairs">${r.g.map((g, gi) => `<label>${g.sp}<select data-g="${gi}"><option value="">—</option><option value="red">восстановитель</option><option value="ox">окислитель</option></select></label>`).join('')}</div>`;
+  }
+  if (id === 'balance') h = `<h2>Электронный баланс</h2>
+      <dl class="reads"><div><dt>Отдано</dt><dd id="r1"></dd></div><div><dt>Принято</dt><dd id="r2"></dd></div><div><dt>Баланс</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Реакция</div><div class="chips" id="eChips">${EQ.map((e, i) => `<button data-i="${i}" aria-pressed="${i === S.eq}">${e.tab}</button>`).join('')}</div></div>
+      <div class="cnt"><div><span id="la"></span><span><button data-k="a" data-d="-1" aria-label="Уменьшить множитель восстановителя">−</button> <b id="ca"></b> <button data-k="a" data-d="1" aria-label="Увеличить множитель восстановителя">+</button></span></div>
+      <div><span id="lb"></span><span><button data-k="b" data-d="-1" aria-label="Уменьшить множитель окислителя">−</button> <b id="cb"></b> <button data-k="b" data-d="1" aria-label="Увеличить множитель окислителя">+</button></span></div></div>
+      <p class="note" style="margin-top:12px">Длина блока — число электронов в одной схеме. Полоски равны — сколько отдано, столько принято.</p>`;
+  el.innerHTML = h;
+  el.querySelectorAll('#cChips button').forEach(b => b.onclick = () => setCmp(+b.dataset.i));
+  const xr = el.querySelector('#xR'); if (xr) xr.oninput = () => setX(+xr.value);
+  const rb = el.querySelector('#recB'); if (rb) rb.onclick = record;
+  el.querySelectorAll('#rChips button').forEach(b => b.onclick = () => setRx(+b.dataset.i));
+  const sf = el.querySelector('#sFrom'), stt = el.querySelector('#sTo');
+  if (stt && stt.options.length > 1) stt.value = String(stt.options.length - 1);
+  const dt = el.querySelector('#doT'); if (dt) dt.onclick = () => { transfer(+sf.value, +stt.value); update(); };
+  const dr = el.querySelector('#doR'); if (dr) dr.onclick = () => { resetRx(); update(); };
+  el.querySelectorAll('select[data-g]').forEach(s => s.onchange = () => { if (!s.value) return; if (!setRole(+s.dataset.g, s.value)) s.value = S.roles[s.dataset.g] || ''; });
+  el.querySelectorAll('#eChips button').forEach(b => b.onclick = () => setEq(+b.dataset.i));
+  el.querySelectorAll('.cnt button[data-k]').forEach(b => b.onclick = () => addM(b.dataset.k, +b.dataset.d));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; };
+  if (m.kind === 'ox') {
+    set('#r1', low(m.c.f)); set('#r2', ox(m.x)); set('#r3', ox(m.sum)); set('#xO', ox(m.x));
+    const xr = el.querySelector('#xR'); if (xr && +xr.value !== m.x) xr.value = m.x;
+    el.querySelectorAll('#cChips button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.i === S.cmp));
+    el.querySelectorAll('#vTab span').forEach(s => { const i = +s.dataset.i, on = !!S.found1[i]; s.classList.toggle('on', on); s.querySelector('i').textContent = on ? ox(CMP[i].ans) : '?'; });
+  } else if (m.kind === 'rx') {
+    set('#r1', m.r.tab); set('#r2', `${m.moved} e⁻`); set('#r3', m.ready ? 'да' : 'нет');
+    el.querySelectorAll('select[data-g]').forEach(s => { s.value = S.roles[s.dataset.g] || ''; });
+  } else {
+    set('#r1', `${m.A} e⁻`); set('#r2', `${m.B} e⁻`); set('#r3', m.ok ? 'сошёлся' : m.eq ? 'сократить' : 'нет');
+    set('#la', `отдаёт ${m.E.red.s} (−${m.E.red.e}e⁻)`); set('#lb', `принимает ${m.E.ox.s} (+${m.E.ox.e}e⁻)`); set('#ca', String(m.a)); set('#cb', String(m.b));
+    el.querySelectorAll('#eChips button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.i === S.eq));
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'oxstate') return [
+    { id: 'formula', icon: ICON.formula, name: 'Формула вещества', spec: 'Индекс показывает число атомов. Его умножают на степень окисления атома.' },
+    { id: 'atoms', icon: ICON.atoms, name: 'Атомы и их заряды', spec: 'Над каждым атомом — степень окисления. Известные: H +1, O −2, K +1. Оранжевый — неизвестный x.' },
+    { id: 'beam', icon: ICON.beam, name: 'Весы зарядов', spec: 'Слева сумма всех плюсов, справа сумма минусов. Молекула нейтральна, поэтому весы должны стоять ровно.' },
+    { id: 'nl', icon: ICON.nl, name: 'Шкала x', spec: 'Степени окисления от −4 до +8. Высшая степень окисления обычно равна номеру группы.' },
+    { id: 'rec', icon: ICON.rec, name: 'Кнопка «Записать»', spec: 'Записывает ответ, если сумма равна нулю.' }];
+  if (id === 'roles') return [
+    { id: 'eq', icon: ICON.eq, name: 'Уравнение со степенями окисления', spec: 'Цифры над элементами: слева — до реакции, справа — после. По ним видно, у кого что меняется.' },
+    { id: 'ratoms', icon: ICON.ratoms, name: 'Атомы', spec: 'Сверху «было» и текущая степень окисления. Зелёная — стала как в продуктах.' },
+    { id: 'arrow', icon: ICON.arrow, name: 'Стрелка переноса', spec: 'Показывает, от кого к кому ушли электроны, и сколько.' },
+    { id: 'slots', icon: ICON.slots, name: 'Места для ролей', spec: 'Сюда кладут ярлык. Нажатие на место меняет роль.' },
+    { id: 'tags', icon: ICON.tags, name: 'Ярлыки ролей', spec: 'Окислитель принимает электроны, восстановитель отдаёт.' }];
+  return [
+    { id: 'laneA', icon: ICON.laneA, name: 'Полоска восстановителя', spec: 'Каждый блок — одна схема окисления. Длина блока — сколько электронов она отдаёт.' },
+    { id: 'laneB', icon: ICON.laneB, name: 'Полоска окислителя', spec: 'Каждый блок — одна схема восстановления. Длина — сколько электронов принимает.' },
+    { id: 'cols', icon: ICON.cols, name: 'Электроны', spec: 'Точка между полосками — электрон, который перешёл. Красный хвостик — электрону некуда деться, так не бывает.' },
+    { id: 'bins', icon: ICON.bins, name: 'Лотки со схемами', spec: 'Число взятых блоков — это множитель, будущий коэффициент.' },
+    { id: 'beq', icon: ICON.beq, name: 'Уравнение', spec: 'Когда баланс сойдётся с наименьшими множителями, здесь появятся коэффициенты.' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      (L.safe ? `<div class="safe"><b>Безопасность</b>${L.safe}</div>` : '') +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Детали модели</h2><p class="note">Нажмите на деталь, чтобы найти её на столе.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  if (m.kind === 'ox') {
+    const c = m.c, known = c.parts.filter(p => !p.x), xp = c.parts.find(p => p.x), K = known.reduce((s, p) => s + p.n * p.o, 0);
+    const eqs = c.parts.map(p => p.x ? (p.n > 1 ? p.n + 'x' : 'x') : `${p.n}·(${ox(p.o)})`).join(' + ') + ' = 0';
+    let h = `<h2>${cap(c.name)} ${low(c.f)}</h2><div class="formula">Σ (атомов × с. о.) = 0</div><h3>Сейчас x = ${ox(m.x)}</h3><div class="steps">` +
+      c.parts.map(p => step(`${p.s}: ${p.n} × ${p.x ? 'x' : ox(p.o)}`, `${p.n} × ${ox(p.x ? m.x : p.o)} = ${ox(p.n * (p.x ? m.x : p.o))}`)).join('') +
+      step('сумма', ox(m.sum) + (m.sum === 0 ? ' ✓' : ' — должна быть 0'), 'sum') + `</div>`;
+    h += `<h3>Уравнение</h3><div class="formula">${eqs}</div>`;
+    if (m.found) h += `<div class="steps">${step('известные атомы', ox(K))}${step(`${xp.n > 1 ? xp.n + 'x' : 'x'} = 0 − (${ox(K)})`, ox(-K))}${step('x', `${ox(c.ans)} ✓`, 'sum')}</div>`;
+    else h += `<p class="note">Решение откроется, когда ответ будет записан. Подсказка: сложите заряды известных атомов.</p>`;
+    h += `<h3>Найдено</h3><div class="steps">${CMP.map((x, i) => step(`${x.u} в ${low(x.f)}`, S.found1[i] ? ox(x.ans) + ' ✓' : '?')).join('')}</div>`;
+    return h;
+  }
+  if (m.kind === 'rx') {
+    const r = m.r;
+    let h = `<h2>${r.plain}</h2><div class="formula">${r.eq}</div><h3>Что меняется</h3><div class="steps">` +
+      r.g.map((g, gi) => step(`${g.sp}: ${ox(g.from)} → ${ox(g.to)}`, m.d[gi] > 0 ? `отдано ${m.d[gi]} e⁻` : m.d[gi] < 0 ? `принято ${-m.d[gi]} e⁻` : 'пока без изменений')).join('') +
+      step('отдано = принято?', m.d[0] + m.d[1] === 0 ? 'да, всегда' : '—') + step('как в продуктах', m.ready ? 'да ✓' : 'ещё нет', 'sum') + `</div>`;
+    h += `<h3>Правило</h3><div class="steps">${step('отдаёт e⁻, с. о. растёт', 'окисляется → восстановитель')}${step('принимает e⁻, с. о. падает', 'восстанавливается → окислитель')}</div>`;
+    if (m.found) {
+      h += `<h3>Схемы</h3><div class="steps">` + r.g.map(g => { const n = g.n > 1 ? g.n : '', e = Math.abs(g.to - g.from) * g.n; return step(g.role === 'red' ? 'окисление' : 'восстановление', `${n}${g.s}${ox(g.from)} ${g.role === 'red' ? '−' : '+'} ${e}e⁻ → ${n}${g.s}${ox(g.to)}`); }).join('') +
+        r.g.map(g => step(g.sp, ROLE[g.role] + ' ✓')).join('') + `</div>`;
+    } else h += `<p class="note">Схемы окисления и восстановления появятся, когда роли будут названы верно.</p>`;
+    h += `<h3>Реакции</h3><div class="steps">${RX.map((x, i) => step(x.plain, S.found2[i] ? 'разобрана ✓' : 'ещё нет')).join('')}</div>`;
+    return h;
+  }
+  const E = m.E, L = lcm(E.red.e, E.ox.e), show = m.ok || m.found3[S.eq];
+  let h = `<h2>${E.sk}</h2><div class="formula">отдано e⁻ = принято e⁻</div><h3>Схемы</h3><div class="steps">` +
+    step('окисление', E.red.lab) + step('восстановление', E.ox.lab) + `</div><h3>Ваши множители</h3><div class="steps">` +
+    step(`отдано: ${m.a} × ${E.red.e}`, `${m.A} e⁻`) + step(`принято: ${m.b} × ${E.ox.e}`, `${m.B} e⁻`) +
+    step('сравнение', m.eq ? `${m.A} = ${m.B} ✓` : `${m.A} ≠ ${m.B}`) +
+    (m.eq ? step('наименьшие?', m.min ? 'да ✓' : `нет: оба делятся на ${gcd(m.a, m.b)}`) : '') + `</div>`;
+  h += `<h3>Через НОК</h3><div class="steps">` +
+    step(`НОК(${E.red.e}, ${E.ox.e})`, show ? String(L) : '?') +
+    step(`множитель восстановителя = НОК : ${E.red.e}`, show ? `${L / E.red.e}` : '?') +
+    step(`множитель окислителя = НОК : ${E.ox.e}`, show ? `${L / E.ox.e}` : '?') +
+    step('уравнение', show ? E.fin : '?', 'sum') + `</div>`;
+  if (show) h += `<p class="note" style="margin-top:10px">${E.note}</p>`;
+  h += `<h3>Задание</h3><div class="steps">${EQ.map((e, i) => step(e.sk, S.found3[i] ? 'уравнено ✓' : 'ещё нет')).join('')}</div>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const el = $('#meter');
+  if (m.kind === 'ox') {
+    el.innerHTML = `<div class="k">Сумма зарядов</div><div class="v ${m.sum === 0 ? 'ok' : ''}">Σ = ${ox(m.sum)}</div><div class="lr"><span>плюсы</span><span>${ox(m.pos)}</span></div><div class="lr"><span>минусы</span><span>${ox(-m.neg)}</span></div><div class="lr"><span>найдено</span><span>${CMP.filter((c, i) => S.found1[i]).length} из ${CMP.length}</span></div>`;
+  } else if (m.kind === 'rx') {
+    el.innerHTML = `<div class="k">Электроны</div><div class="v ${m.ready ? 'ok' : ''}">${m.moved} e⁻</div><div class="lr"><span>как в продуктах</span><span>${m.ready ? 'да' : 'нет'}</span></div><div class="lr"><span>реакций</span><span>${RX.filter((r, i) => S.found2[i]).length} из ${RX.length}</span></div>`;
+  } else {
+    el.innerHTML = `<div class="k">Баланс e⁻</div><div class="v ${m.ok ? 'ok' : ''}">${m.A} : ${m.B}</div><div class="lr"><span>отдано</span><span>${m.A}</span></div><div class="lr"><span>принято</span><span>${m.B}</span></div><div class="gauge"><b style="width:${(Math.min(m.A, m.B) / Math.max(m.A, m.B) * 100).toFixed(1)}%;background:${m.eq ? 'var(--ok)' : 'var(--liq)'}"></b></div>`;
+  }
+}
+
+function update() {
+  const m = model(), L = LESSONS[S.lesson];
+  if (m.kind === 'bal' && m.ok && !S.found3[S.eq]) { S.found3[S.eq] = true; toast(`Баланс сошёлся: ${m.E.fin}`); }
+  else if (m.kind === 'bal' && m.eq && !m.min) toast(`Электроны равны, но множители ${m.a} и ${m.b} можно сократить на ${gcd(m.a, m.b)}.`);
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. ОВР освоены!'), 1600);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  oxstate: '<path d="M10 11L56 17" stroke="#c8d1e2" stroke-width="2"/><path d="M33 14L28 26H38Z" fill="#3a4762"/><text x="12" y="25" font-size="9" fill="#72d4e8" font-family="IBM Plex Mono">+</text><text x="49" y="27" font-size="9" fill="#ff8a73" font-family="IBM Plex Mono">−</text>',
+  roles: '<circle cx="14" cy="15" r="7" fill="#9aa7bd"/><circle cx="52" cy="15" r="7" fill="#d9895b"/><path d="M23 15H41" stroke="#72d4e8" stroke-width="1.6"/><path d="M40 11L46 15L40 19Z" fill="#72d4e8"/>',
+  balance: '<rect x="9" y="5" width="15" height="8" rx="2" fill="#72d4e8" fill-opacity=".4" stroke="#72d4e8"/><rect x="26" y="5" width="15" height="8" rx="2" fill="#72d4e8" fill-opacity=".4" stroke="#72d4e8"/><rect x="43" y="5" width="15" height="8" rx="2" fill="#72d4e8" fill-opacity=".4" stroke="#72d4e8"/><rect x="9" y="18" width="23" height="8" rx="2" fill="#ffb547" fill-opacity=".4" stroke="#ffb547"/><rect x="35" y="18" width="23" height="8" rx="2" fill="#ffb547" fill-opacity=".4" stroke="#ffb547"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i], init = JSON.parse(JSON.stringify(L.init || {}));
+  S.lesson = i; S.hl = null; drag = null;
+  S.cmp = 0; S.x = 0; S.found1 = {}; S.wrong1 = 0; S.rx = 0; S.roles = {}; S.found2 = {}; S.wrong2 = 0; S.sel = null; S.eq = 0; S.a = 1; S.b = 1; S.found3 = {};
+  Object.assign(S, init);
+  resetRx();
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '';
+  if (id === 'oxstate') now = `Модель «весы зарядов». Вещество ${m.c.f} (${m.c.name}), ищем степень окисления ${m.c.u} (x). Известные степени окисления: ${m.c.parts.filter(p => !p.x).map(p => `${p.s} ${ox(p.o)} × ${p.n}`).join(', ') || 'нет, это простое вещество'}. Ученик поставил x = ${ox(m.x)}; сумма плюсов +${m.pos}, минусов −${m.neg}, итог ${ox(m.sum)} (нужно 0). ${m.found ? 'Ответ для этого вещества уже записан верно.' : 'Ответ ещё не записан.'} Найдено: ${CMP.filter((c, i) => S.found1[i]).map(c => `${c.u} в ${c.f} = ${ox(c.ans)}`).join(', ') || 'ничего'}. Ошибочных записей: ${S.wrong1}. Не называй x для ненайденных веществ — пусть ученик составит уравнение суммы.`;
+  if (id === 'roles') now = `Реакция ${m.r.plain} (над элементами степени окисления до и после). Ученик переносит электроны между атомами: сейчас степени окисления ${m.A.map((a, k) => `${a.s}${m.r.g[a.gi].n > 1 ? a.i + 1 : ''} ${ox(m.st[k])}`).join(', ')}; перенесено ${m.moved} e⁻; ${m.ready ? 'всё как в продуктах' : 'пока не как в продуктах'}. Роли назначены: ${Object.keys(S.roles).map(gi => `${m.r.g[gi].sp} — ${ROLE[S.roles[gi]]}`).join(', ') || 'нет'}. ${m.found ? 'Эта реакция разобрана верно.' : 'Не говори прямо, кто окислитель, — спроси, у кого степень окисления растёт.'} Разобрано реакций: ${RX.filter((r, i) => S.found2[i]).length} из 3. Ошибок в ролях: ${S.wrong2}.`;
+  if (id === 'balance') now = `Метод электронного баланса для ${m.E.sk}. Схемы: ${m.E.red.lab} (восстановитель), ${m.E.ox.lab} (окислитель). Ученик взял множители ${m.a} и ${m.b}: отдано ${m.A} e⁻, принято ${m.B} e⁻. ${m.ok ? `Баланс сошёлся: ${m.E.fin}.` : m.eq ? 'Электроны равны, но множители можно сократить.' : 'Электроны не равны.'} Уравнено: ${EQ.filter((e, i) => S.found3[i]).map(e => e.tab).join(', ') || 'ничего'} из трёх. ${m.ok || S.found3[S.eq] ? '' : 'Не называй множители — подведи к НОК вопросами.'}`;
+  return [
+    `Предмет: химия, 9 класс. Тема «Окислительно-восстановительные реакции». Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Веди ученика наводящими вопросами, а не готовыми ответами.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = { oxstate: 'Почему сумма степеней окисления в молекуле равна нулю?', roles: 'Почему восстановитель сам окисляется?', balance: 'Зачем искать НОК отданных и принятых электронов?' }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

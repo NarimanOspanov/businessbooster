@@ -1,0 +1,960 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по информатике, 8 класс: как устроен интернет, IP-адреса и DNS, сетевые протоколы.">
+<title>Компьютерные сети</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag],.scene [data-hit]{cursor:pointer}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+.scene .sans{font-family:var(--font-body)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--arm);transition:width .2s}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button.big{font:600 15px/1 var(--font-mono);color:var(--fg);min-width:34px}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:22%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.chips button:disabled{opacity:.35;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.mtab{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:8px}
+.mtab span{background:var(--surface-2);border-radius:7px;padding:6px 7px;font:500 12.5px/1.2 var(--font-mono);display:flex;justify-content:space-between;gap:4px;min-width:0}
+.mtab span b{font-weight:600;color:var(--fg)}
+.mtab span i{font-style:normal;color:var(--force);letter-spacing:.06em}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:470px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mtab{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(100vw + 180px);min-height:0}
+}
+@keyframes pulse{from{opacity:.35}to{opacity:1}}
+.scene .pulse{animation:pulse 1.1s ease-in-out infinite alternate}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><circle cx="11" cy="20" r="3" fill="var(--force)"/><rect x="17" y="18" width="12" height="4" rx="2" fill="var(--arm)"/><circle cx="34" cy="20" r="1.6" fill="var(--fg)"/><path d="M8 11h24M8 29h24" stroke="var(--fg)" stroke-width="2" stroke-linecap="round" opacity=".5"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Информатика · Компьютерные сети</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#cs">Карта</a><a href="/physics/#cs">Информатика</a><a href="/labs/cs-networks/" aria-current="page">Сети</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Сети</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Рабочий стол лаборатории">
+    <svg class="scene" id="scene" role="img" aria-label="Интерактивная сцена: узлы сети, DNS-серверы и пакеты можно нажимать и перетаскивать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c; };
+const INK = '#04070d';
+
+const LESSONS = [
+  { id: 'net', title: 'Как устроен интернет: путь пакета',
+    text: ['Компьютерная сеть — это устройства, соединённые каналами связи, чтобы обмениваться данными. Дома телефон и ноутбук связаны через роутер — это локальная сеть (LAN). Сети городов и стран, соединённые между собой, образуют глобальную сеть (WAN). Самая большая из них — интернет, «сеть сетей».',
+           'Из дома данные идут к провайдеру — компании, которая подключает к интернету. Дальше — по магистральным оптическим кабелям через узлы-маршрутизаторы к серверу, где хранится сайт. Сервер отдаёт данные, клиент (твой браузер) их получает.',
+           'Данные путешествуют небольшими порциями — пакетами. Каждый маршрутизатор решает, куда отправить пакет дальше. Между узлами обычно есть несколько путей, поэтому обрыв одного кабеля не «выключает» интернет: пакеты идут в обход.'],
+    why: 'Сетевой инженер и системный администратор строят и чинят такие сети в банках, школах, у провайдеров и операторов связи — это одни из самых востребованных IT-профессий в Казахстане. Монтажники оптоволокна прокладывают магистрали между городами. А дома это знание помогает самому разобраться, почему «нет интернета»: виноват Wi-Fi, роутер или провайдер.',
+    task: 'Доставьте пакет с ноутбука на сервер сайта. Потом перережьте ножницами кабель на этом пути и доставьте пакет в обход.',
+    hint: 'Нажимайте узлы по очереди от ноутбука — так строится маршрут по проводам. Затем «Отправить пакет». Режим «Ножницы» режет и чинит кабели.',
+    stage: 'Нажимайте узлы — маршрут растёт. «Ножницы» режут кабель.',
+    start: 'laptop', target: 'server',
+    check: m => m.detour },
+  { id: 'dns', title: 'IP-адрес и DNS',
+    text: ['У каждого устройства в сети есть IP-адрес — как номер дома, куда приходят письма. В версии IPv4 адрес состоит из 4 чисел через точку, например 203.0.113.75. Каждое число — один байт, 8 бит, поэтому оно бывает от 0 до 255.',
+           'Людям удобнее имена: luch.kz, а не цифры. Перевод имени в IP-адрес делает DNS — система доменных имён, «телефонная книга» интернета. Имя читается справа налево: kz — домен верхнего уровня (Казахстан), luch — домен второго уровня.',
+           'DNS-сервер провайдера ищет адрес по цепочке: корневой сервер знает, кто отвечает за зону .kz, сервер зоны .kz знает DNS-сервер сайта, а тот сообщает IP. Ответ запоминается (кэшируется), и в следующий раз всё быстрее.'],
+    why: 'Системные администраторы и DevOps-инженеры настраивают DNS и IP-адреса для сайтов и офисных сетей: ошибка в одной записи — и сайт магазина «пропал», а он теряет заказы и деньги. Специалисты по кибербезопасности по IP и DNS ищут мошеннические сайты-двойники, похожие на сайты банков и eGov. А дома это помогает настроить роутер и понять, почему сайт не открывается.',
+    task: 'Узнайте IP-адрес сайта luch.kz, пройдя цепочку DNS-серверов, наберите его в двоичном виде переключателями и откройте сайт.',
+    hint: 'Нажимайте DNS-серверы по порядку, кто кого посылает. Потом выберите число адреса и включайте биты: 128, 64, 32… — их сумма даёт число.',
+    stage: 'Нажимайте DNS-серверы по порядку, потом биты адреса.',
+    domain: 'luch.kz', ip: [203, 0, 113, 75],
+    check: m => m.opened },
+  { id: 'proto', title: 'Протоколы: пакеты и TCP',
+    text: ['Протокол — это набор правил, по которым устройства обмениваются данными. Как правила этикета в разговоре: кто начинает, в каком порядке говорить, что делать, если не расслышал. Без общих правил компьютеры разных фирм не поняли бы друг друга.',
+           'Протокол IP доставляет пакеты по адресам, но не обещает порядок: пакеты идут разными путями, приходят вперемешку, а иногда теряются. Протокол TCP нумерует пакеты, собирает их по номерам и просит прислать заново потерянный.',
+           'Поверх TCP/IP работают протоколы приложений: HTTP и защищённый HTTPS — для сайтов, SMTP — для отправки почты, FTP — для передачи файлов. Буква S в HTTPS значит, что данные зашифрованы.'],
+    why: 'Программисты сетевых приложений, разработчики игр и мессенджеров каждый день решают, какой протокол выбрать: TCP — когда важна каждая буква (банковский перевод, Kaspi, сообщение в чате), или более быстрый UDP — когда потеря кадра не страшна (видеозвонок, онлайн-игра). А в жизни правило простое: вводи пароли и данные карты только на сайтах с HTTPS.',
+    task: 'Вы — протокол TCP. Соберите сообщение из пакетов по номерам и запросите повтор потерянного пакета.',
+    hint: 'Нажмите «Отправить». Перетащите каждый пакет в ячейку с его номером (или нажмите пакет, потом ячейку). Если номера не хватает — нажмите пустую ячейку: это запрос повтора.',
+    stage: 'Тащите пакет в ячейку с его номером. Пустая ячейка — запрос повтора.',
+    chunks: ['ВСТР', 'ЕЧА ', 'В 15', ':00 ', 'У ШК', 'ОЛЫ!'],
+    check: m => m.placed === m.total },
+];
+
+const KEY = 'luch-cs-networks';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null,
+            route: ['laptop'], cut: {}, scissors: false, pkt: null, delivered: 0, used: {}, detour: false, lastDelay: 0,
+            dns: 0, ans: -1, ip: [0, 0, 0, 0], oct: 0, opened: false,
+            sent: false, inbox: [], lost: -1, resent: false, slots: {}, sel: null, miss: 0, lastBad: null };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+
+// ---------- lesson 1: network map ----------
+const NODES = {
+  phone: { x: 36, y: 236, name: 'Телефон', kind: 'phone' },
+  laptop: { x: 36, y: 344, name: 'Ноутбук', kind: 'laptop' },
+  router: { x: 100, y: 290, name: 'Роутер', kind: 'router' },
+  isp: { x: 168, y: 290, name: 'Провайдер', kind: 'isp' },
+  n1: { x: 236, y: 196, name: 'Узел Алматы', kind: 'node' },
+  n2: { x: 236, y: 372, name: 'Узел Астана', kind: 'node' },
+  n3: { x: 312, y: 152, name: 'Узел Европа', kind: 'node' },
+  server: { x: 322, y: 296, name: 'Сервер сайта', kind: 'server' },
+};
+const EDGES = [ // a, b, delay in ms, kind
+  ['phone', 'router', 3, 'wifi'], ['laptop', 'router', 3, 'wifi'], ['router', 'isp', 4, 'cable'],
+  ['isp', 'n1', 2, 'fiber'], ['isp', 'n2', 8, 'fiber'], ['n1', 'n2', 14, 'fiber'],
+  ['n1', 'n3', 38, 'fiber'], ['n3', 'server', 6, 'fiber'], ['n2', 'server', 52, 'fiber']];
+const ek = (a, b) => a < b ? a + '-' + b : b + '-' + a;
+const edgeOf = (a, b) => EDGES.find(e => ek(e[0], e[1]) === ek(a, b));
+const nbrs = id => EDGES.filter(e => e[0] === id || e[1] === id).map(e => e[0] === id ? e[1] : e[0]);
+const routeEdges = r => r.slice(1).map((id, i) => edgeOf(r[i], id));
+const routeDelay = r => routeEdges(r).reduce((s, e) => s + e[2], 0);
+const KIND = { wifi: 'Wi-Fi (радио)', cable: 'кабель', fiber: 'оптоволокно' };
+const short = id => NODES[id].name.replace('Узел ', '');
+
+// ---------- lesson 2: DNS + IP ----------
+const DNS = [
+  { id: 'res', name: 'Резолвер', sub: 'у провайдера', ans: ['В кэше luch.kz нет.', 'Ищу по цепочке, начну с корня.'] },
+  { id: 'root', name: 'Корневой', sub: 'сервер «.»', ans: ['Я знаю серверы зон.', 'Про .kz спроси сервер зоны .kz.'] },
+  { id: 'kz', name: 'Зона .kz', sub: 'сервер .kz', ans: ['luch.kz обслуживает', 'ns1.luch.kz — спроси его.'] },
+  { id: 'auth', name: 'DNS сайта', sub: 'ns1.luch.kz', ans: ['luch.kz → 203.0.113.75', 'Запомни ответ на час.'] }];
+const DORDER = ['kz', 'res', 'auth', 'root']; // on-screen order is shuffled: the learner must know the chain
+const dnsX = i => 8 + DORDER.indexOf(DNS[i].id) * 87;
+const DNS_HINT = ['Браузер сначала спрашивает DNS-сервер своего провайдера.', 'Цепочка начинается с вершины — с корневого сервера.',
+  'Корневой сервер отправил к серверу зоны .kz.', 'Сервер .kz назвал DNS-сервер самого сайта.'];
+const W8 = [128, 64, 32, 16, 8, 4, 2, 1];
+const bin8 = v => v.toString(2).padStart(8, '0');
+
+// ---------- lesson 3: packets ----------
+const CARD = { w: 110, h: 46 };
+const inHome = k => ({ x: 8 + (k % 3) * 116, y: 116 + Math.floor(k / 3) * 54 });
+const slotPos = k => ({ x: 8 + (k % 3) * 116, y: 262 + Math.floor(k / 3) * 54 });
+const vis = s => s.replace(/ /g, '␣');
+
+function model() {
+  const id = LID();
+  if (id === 'net') {
+    const r = S.route, last = r[r.length - 1];
+    return { kind: 'net', route: r, hops: r.length - 1, delay: routeDelay(r), atServer: last === 'server', cuts: Object.keys(S.cut).length, delivered: S.delivered, detour: S.detour, flying: !!S.pkt };
+  }
+  if (id === 'dns') {
+    const ip = S.ip.join('.'), tgt = L().ip.join('.');
+    return { kind: 'dns', step: S.dns, ip, ok: ip === tgt, known: S.dns >= 4, opened: S.opened };
+  }
+  const ch = L().chunks, placed = Object.keys(S.slots).length;
+  const text = ch.map((c, k) => S.slots[k] !== undefined ? c : '_'.repeat(c.length)).join('');
+  return { kind: 'pkt', sent: S.sent, total: ch.length, placed, arrived: S.inbox.length, inbox: S.inbox.filter(p => !Object.values(S.slots).includes(p)), lostKnown: S.resent, miss: S.miss, text };
+}
+
+// ---------- drawing ----------
+const ol = (d, fill, stroke, w = 2.2, extra = '') => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${w + 2.6}" stroke-linejoin="round" stroke-linecap="round"/><path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round" ${extra}/>`;
+
+function nodeIcon(kind, x, y, col) {
+  if (kind === 'laptop') return `<rect x="${x - 13}" y="${y - 12}" width="26" height="17" rx="2" fill="#1d2940" stroke="${col}" stroke-width="2"/><rect x="${x - 10}" y="${y - 9}" width="20" height="11" fill="#2f4466"/><path d="M${x - 17} ${y + 7}h34l-3 4h-28z" fill="${col}"/>`;
+  if (kind === 'phone') return `<rect x="${x - 8}" y="${y - 14}" width="16" height="28" rx="3" fill="#1d2940" stroke="${col}" stroke-width="2"/><rect x="${x - 5}" y="${y - 10}" width="10" height="17" fill="#2f4466"/><circle cx="${x}" cy="${y + 10}" r="1.4" fill="${col}"/>`;
+  if (kind === 'router') return `<rect x="${x - 15}" y="${y - 4}" width="30" height="13" rx="3" fill="#1d2940" stroke="${col}" stroke-width="2"/><path d="M${x - 9} ${y - 4}l-4 -12M${x + 9} ${y - 4}l4 -12" stroke="${col}" stroke-width="2" stroke-linecap="round"/><circle cx="${x - 7}" cy="${y + 2.5}" r="1.6" fill="#86e0a8"/><circle cx="${x - 1}" cy="${y + 2.5}" r="1.6" fill="#86e0a8"/><circle cx="${x + 5}" cy="${y + 2.5}" r="1.6" fill="#ffb547"/>`;
+  if (kind === 'isp') return `<path d="M${x - 14} ${y + 13}V${y - 7}l14 -8 14 8V${y + 13}z" fill="#1d2940" stroke="${col}" stroke-width="2" stroke-linejoin="round"/><path d="M${x - 8} ${y - 3}h5M${x + 3} ${y - 3}h5M${x - 8} ${y + 3}h5M${x + 3} ${y + 3}h5" stroke="#72d4e8" stroke-width="2"/><rect x="${x - 3}" y="${y + 6}" width="6" height="7" fill="${col}"/>`;
+  if (kind === 'server') return `<rect x="${x - 12}" y="${y - 16}" width="24" height="32" rx="3" fill="#1d2940" stroke="${col}" stroke-width="2"/><path d="M${x - 12} ${y - 5}h24M${x - 12} ${y + 5}h24" stroke="${col}" stroke-width="1.4"/><circle cx="${x + 6}" cy="${y - 10.5}" r="1.6" fill="#86e0a8"/><circle cx="${x + 6}" cy="${y}" r="1.6" fill="#86e0a8"/><circle cx="${x + 6}" cy="${y + 10.5}" r="1.6" fill="#ffb547"/>`;
+  return `<circle cx="${x}" cy="${y}" r="13" fill="#1d2940" stroke="${col}" stroke-width="2"/><path d="M${x - 7} ${y}h14M${x} ${y - 7}v14M${x + 4} ${y - 3}l3 3-3 3M${x - 4} ${y - 3}l-3 3 3 3" fill="none" stroke="#72d4e8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+
+function pktPos(t) {
+  const p = S.pkt; if (!p) return null;
+  const segs = p.path.length - 1, f = clamp((t - p.t0) / p.dur, 0, 1) * segs, i = Math.min(segs - 1, Math.floor(f)), k = f - i;
+  const a = NODES[p.path[i]], b = NODES[p.path[i + 1]];
+  return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k, done: f >= segs };
+}
+
+function drawNet(t) {
+  const r = S.route, last = r[r.length - 1], inR = {};
+  routeEdges(r).forEach(e => { inR[ek(e[0], e[1])] = true; });
+  let h = '';
+  h += `<rect x="6" y="196" width="124" height="202" rx="12" fill="rgba(114,212,232,.035)" stroke="#26324a" stroke-dasharray="5 4"/><text x="12" y="209" font-size="8.5" fill="#8b96ad">домашняя сеть (LAN)</text>`;
+  h += `<text x="250" y="104" font-size="8.5" fill="#8b96ad" text-anchor="middle">интернет — сеть сетей (WAN)</text>`;
+  for (const e of EDGES) {
+    const a = NODES[e[0]], b = NODES[e[1]], k = ek(e[0], e[1]), cut = S.cut[k], on = inR[k];
+    const col = cut ? '#ff8a73' : on ? '#ffb547' : e[3] === 'wifi' ? '#56627d' : '#3d5274';
+    const dash = cut ? 'stroke-dasharray="4 5"' : e[3] === 'wifi' ? 'stroke-dasharray="2 4"' : '';
+    h += `<g${S.scissors ? ` data-hit="edge:${k}"` : ''}><line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="transparent" stroke-width="18"/>`;
+    h += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${col}" stroke-width="${on ? 4 : e[3] === 'fiber' ? 3 : 2}" stroke-linecap="round" ${dash}/>`;
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    if (cut) h += `<circle cx="${mx}" cy="${my}" r="8" fill="#2a1a1a" stroke="#ff8a73" stroke-width="1.4"/><path d="M${mx - 4} ${my - 4}l8 8M${mx + 4} ${my - 4}l-8 8" stroke="#ff8a73" stroke-width="1.8" stroke-linecap="round"/>`;
+    else if (e[3] !== 'wifi') h += `<rect x="${mx - 12}" y="${my - 7}" width="24" height="13" rx="4" fill="#0e1520" stroke="${S.scissors ? '#ff8a73' : '#26324a'}" stroke-width="1"/><text x="${mx}" y="${my + 3}" font-size="7.5" fill="${on ? '#ffb547' : '#8b96ad'}" text-anchor="middle">${e[2]}мс</text>`;
+    h += `</g>`;
+  }
+  const next = S.pkt || last === 'server' ? [] : nbrs(last).filter(n => !r.includes(n) && n !== 'phone' && !S.cut[ek(last, n)]);
+  for (const [id, n] of Object.entries(NODES)) {
+    const inRoute = r.includes(id), isNext = next.includes(id);
+    const col = inRoute ? '#ffb547' : '#e8ecf4';
+    h += `<g data-hit="node:${id}"><circle cx="${n.x}" cy="${n.y}" r="22" fill="transparent"/>`;
+    if (isNext) h += `<circle cx="${n.x}" cy="${n.y}" r="21" fill="none" stroke="#72d4e8" stroke-width="1.6" stroke-dasharray="4 3" class="pulse"/>`;
+    if (inRoute) h += `<circle cx="${n.x}" cy="${n.y}" r="20" fill="rgba(255,181,71,.10)"/>`;
+    h += nodeIcon(n.kind, n.x, n.y, col);
+    const below = n.y > 180 || id === 'n3';
+    const side = id === 'n2', ly = side ? n.y + 4 : n.y + 30;
+    h += `<text x="${side ? n.x - 24 : clamp(n.x, 30, 330)}" y="${below ? ly : n.y - 24}" font-size="9" fill="${inRoute ? '#ffb547' : '#e8ecf4'}" text-anchor="${side ? 'end' : 'middle'}" class="sans" font-weight="600">${n.name}</text>`;
+    if (inRoute) h += `<circle cx="${n.x + 15}" cy="${n.y - 15}" r="7" fill="#ffb547"/><text x="${n.x + 15}" y="${n.y - 12}" font-size="8" fill="#0b1019" text-anchor="middle" font-weight="600">${r.indexOf(id) + 1}</text>`;
+    h += `</g>`;
+  }
+  const p = pktPos(t);
+  if (p) h += `<g pointer-events="none"><rect x="${p.x - 9}" y="${p.y - 7}" width="18" height="14" rx="3" fill="#ffb547" stroke="${INK}" stroke-width="1.6"/><path d="M${p.x - 9} ${p.y - 7}l9 7 9-7" fill="none" stroke="${INK}" stroke-width="1.2"/></g>`;
+  if (S.scissors) h += `<text x="180" y="122" font-size="9" fill="#ff8a73" text-anchor="middle">режим «Ножницы»: нажмите кабель, чтобы перерезать или починить</text>`;
+  return h;
+}
+
+function drawDns(t) {
+  const m = model(), Ls = L();
+  let h = '';
+  // browser bar
+  h += `<g data-hit="bar">` + ol('M14 90H346Q352 90 352 96V114Q352 120 346 120H14Q8 120 8 114V96Q8 90 14 90Z', '#141d2e', m.opened ? '#86e0a8' : '#56627d', 1.4);
+  h += `<circle cx="22" cy="105" r="4" fill="${m.opened ? '#86e0a8' : '#56627d'}"/>`;
+  h += `<text x="34" y="109" font-size="12" fill="#e8ecf4">${Ls.domain}</text>`;
+  h += `<text x="342" y="109" font-size="9.5" fill="${m.opened ? '#86e0a8' : '#8b96ad'}" text-anchor="end">${m.opened ? 'сайт открыт ✓' : m.known ? 'IP известен' : 'где этот сайт?'}</text></g>`;
+  // DNS chain
+  DNS.forEach((d, i) => {
+    const x = dnsX(i), y = 138, done = i < S.dns, cur = i === S.ans;
+    h += `<g data-hit="dns:${i}"><rect x="${x}" y="${y}" width="82" height="52" rx="8" fill="${done ? '#1f3a2f' : '#141d2e'}" stroke="${cur ? '#ffb547' : done ? '#86e0a8' : '#3a4762'}" stroke-width="1.5"/>`;
+    h += `<rect x="${x + 8}" y="${y + 8}" width="14" height="18" rx="2" fill="none" stroke="${done ? '#86e0a8' : '#8b96ad'}" stroke-width="1.4"/><path d="M${x + 8} ${y + 14}h14M${x + 8} ${y + 20}h14" stroke="${done ? '#86e0a8' : '#8b96ad'}" stroke-width="1"/>`;
+    h += `<text x="${x + 27}" y="${y + 16}" font-size="8.6" fill="#e8ecf4" class="sans" font-weight="600">${d.name}</text>`;
+    h += `<text x="${x + 27}" y="${y + 28}" font-size="7" fill="#8b96ad">${d.sub}</text>`;
+    h += `<text x="${x + 41}" y="${y + 45}" font-size="7.6" fill="${done ? '#86e0a8' : '#56627d'}" text-anchor="middle">${done ? 'шаг ' + (i + 1) + ' ✓' : 'спросить?'}</text></g>`;
+  });
+  h += `<text x="180" y="132" font-size="8.5" fill="#8b96ad" text-anchor="middle">цепочка DNS: кого спросить по порядку?</text>`;
+  // answer bubble
+  const a = S.ans >= 0 ? DNS[S.ans] : null;
+  h += `<rect x="8" y="198" width="344" height="36" rx="8" fill="#0e1520" stroke="#26324a"/>`;
+  if (a) h += `<text x="18" y="213" font-size="9.5" fill="#ffb547" class="sans">${a.name}: ${a.ans[0]}</text><text x="18" y="227" font-size="9.5" fill="#e8ecf4" class="sans">${a.ans[1]}</text>`;
+  else h += `<text x="180" y="220" font-size="9.5" fill="#56627d" text-anchor="middle" class="sans">здесь появится ответ сервера</text>`;
+  // IP address
+  h += `<text x="180" y="250" font-size="8.5" fill="#8b96ad" text-anchor="middle">IP-адрес для браузера (4 байта) — нажмите число</text>`;
+  S.ip.forEach((v, i) => {
+    const x = 14 + i * 87, sel = i === S.oct;
+    h += `<g data-hit="oct:${i}"><rect x="${x}" y="256" width="72" height="38" rx="8" fill="${sel ? '#2a3a56' : '#1d2940'}" stroke="${sel ? '#ffb547' : '#56627d'}" stroke-width="1.6"/>`;
+    h += `<text x="${x + 36}" y="281" font-size="17" fill="#e8ecf4" text-anchor="middle" font-weight="500">${v}</text></g>`;
+    if (i < 3) h += `<text x="${x + 79.5}" y="284" font-size="18" fill="#8b96ad" text-anchor="middle">.</text>`;
+  });
+  // bits of selected octet
+  const v = S.ip[S.oct];
+  W8.forEach((w, b) => {
+    const x = 8 + b * 43.5, on = (v >> (7 - b)) & 1;
+    h += `<text x="${x + 20}" y="314" font-size="8" fill="#8b96ad" text-anchor="middle">${w}</text>`;
+    h += `<g data-hit="bit:${b}"><rect x="${x}" y="318" width="40" height="32" rx="6" fill="${on ? '#ffd27a' : '#141d2e'}" stroke="${on ? '#ffd27a' : '#3a4762'}" stroke-width="1.4"/>`;
+    h += `<text x="${x + 20}" y="339" font-size="14" fill="${on ? '#0b1019' : '#8b96ad'}" text-anchor="middle" font-weight="500">${on}</text></g>`;
+  });
+  const parts = W8.filter((w, b) => (v >> (7 - b)) & 1);
+  h += `<text x="180" y="370" font-size="10" fill="#e8ecf4" text-anchor="middle">число ${S.oct + 1}: ${bin8(v)}₂ = ${parts.length ? parts.join('+') : '0'} = ${v}</text>`;
+  h += `<text x="180" y="390" font-size="9" fill="${m.opened ? '#86e0a8' : '#8b96ad'}" text-anchor="middle">адрес: ${m.ip}</text>`;
+  return h;
+}
+
+function cardSVG(pi, x, y, mode) { // mode: inbox | sel | slot
+  const ch = L().chunks[pi];
+  const fill = mode === 'slot' ? '#1f3a2f' : mode === 'sel' ? '#2a3a56' : '#1d2940', st = mode === 'slot' ? '#86e0a8' : mode === 'sel' ? '#ffb547' : '#56627d';
+  let h = ol(`M7 0H${CARD.w - 7}Q${CARD.w} 0 ${CARD.w} 7V${CARD.h - 7}Q${CARD.w} ${CARD.h} ${CARD.w - 7} ${CARD.h}H7Q0 ${CARD.h} 0 ${CARD.h - 7}V7Q0 0 7 0Z`, fill, st, 1.5);
+  h += `<rect x="0" y="0" width="34" height="${CARD.h}" rx="7" fill="${mode === 'slot' ? '#2b5240' : '#2f4466'}"/><path d="M34 2V${CARD.h - 2}" stroke="${INK}" stroke-width="1"/>`;
+  h += `<text x="17" y="15" font-size="7.5" fill="#8b96ad" text-anchor="middle" class="sans">№</text><text x="17" y="34" font-size="16" fill="#ffb547" text-anchor="middle" font-weight="600">${pi + 1}</text>`;
+  h += `<text x="40" y="13" font-size="6.6" fill="#8b96ad">TCP · ${pi + 1} из 6</text>`;
+  h += `<text x="40" y="35" font-size="14" fill="#e8ecf4">«${vis(ch)}»</text>`;
+  return h;
+}
+
+function drawPkt(t) {
+  const m = model();
+  let h = '';
+  h += `<text x="180" y="96" font-size="8.5" fill="#8b96ad" text-anchor="middle">отправитель 203.0.113.75 → получатель 192.168.1.5 (вы)</text>`;
+  h += `<text x="180" y="110" font-size="8.5" fill="#8b96ad" text-anchor="middle">пришло из сети (вперемешку)</text>`;
+  for (let k = 0; k < 6; k++) { const p = inHome(k); h += `<rect x="${p.x}" y="${p.y}" width="${CARD.w}" height="${CARD.h}" rx="7" fill="none" stroke="#26324a" stroke-dasharray="4 4"/>`; }
+  if (!S.sent) h += `<text x="180" y="170" font-size="11" fill="#8b96ad" text-anchor="middle" class="sans">Нажмите «Отправить», чтобы пакеты полетели</text>`;
+  h += `<text x="180" y="256" font-size="8.5" fill="#8b96ad" text-anchor="middle">сборка по номерам (TCP)</text>`;
+  for (let k = 0; k < 6; k++) {
+    const p = slotPos(k), pi = S.slots[k];
+    const bad = S.lastBad && S.lastBad.k === k && t - S.lastBad.t < 700;
+    if (pi !== undefined) { h += `<g transform="translate(${p.x} ${p.y})">${cardSVG(pi, 0, 0, 'slot')}</g>`; continue; }
+    h += `<g data-hit="slot:${k}"><rect x="${p.x}" y="${p.y}" width="${CARD.w}" height="${CARD.h}" rx="7" fill="${bad ? 'rgba(255,138,115,.14)' : '#141d2e'}" stroke="${bad ? '#ff8a73' : S.sel !== null ? '#72d4e8' : '#3a4762'}" stroke-width="1.5" ${S.sel !== null && !bad ? 'stroke-dasharray="5 4"' : ''}/>`;
+    h += `<text x="${p.x + CARD.w / 2}" y="${p.y + 29}" font-size="15" fill="#56627d" text-anchor="middle" font-weight="600" class="sans">№ ${k + 1}</text></g>`;
+  }
+  const order = m.inbox.slice().sort((a, b) => (drag && drag.id === 'p' + a ? 1 : 0) - (drag && drag.id === 'p' + b ? 1 : 0));
+  for (const pi of order) {
+    const o = P['p' + pi]; if (!o) continue;
+    h += `<g transform="translate(${o.x.toFixed(1)} ${o.y.toFixed(1)})" data-drag="p${pi}">${cardSVG(pi, 0, 0, S.sel === pi ? 'sel' : 'inbox')}</g>`;
+  }
+  h += `<rect x="8" y="372" width="344" height="26" rx="6" fill="#0e1520" stroke="${m.placed === m.total ? '#86e0a8' : '#26324a'}"/>`;
+  h += `<text x="16" y="389" font-size="11" fill="${m.placed === m.total ? '#86e0a8' : '#e8ecf4'}">${m.text}</text>`;
+  return h;
+}
+
+function hlBox(id) {
+  const lid = LID();
+  if (lid === 'net') {
+    if (id === 'devices') return [8, 210, 56, 186];
+    if (id === 'lan') return [4, 194, 128, 206];
+    if (id === 'nodes') return [212, 130, 124, 270];
+    if (id === 'cables') return [140, 180, 200, 140];
+    if (NODES[id]) { const n = NODES[id]; return [n.x - 26, n.y - 26, 52, 52]; }
+  }
+  if (lid === 'dns') { const i = DNS.findIndex(d => d.id === id); if (i >= 0) return [dnsX(i) - 4, 134, 90, 60]; return { bar: [4, 86, 352, 38], ans: [4, 194, 352, 44], octs: [8, 252, 344, 46], bits: [4, 304, 352, 72] }[id]; }
+  if (lid === 'proto') return { head: [4, 86, 352, 14], inbox: [4, 112, 352, 112], slots: [4, 258, 352, 110], text: [4, 368, 352, 34] }[id];
+  return null;
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4360" height="4405" fill="url(#tile)"/>`;
+  if (id === 'net') h += drawNet(t);
+  else if (id === 'dns') h += drawDns(t);
+  else h += drawPkt(t);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 360, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 372, hh / 412, 1.8);
+  VB = { w: w / s, h: hh / s }; VB.x = 180 - VB.w / 2; VB.y = 404 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- interaction ----------
+let P = {}, drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+const slotAt = p => { for (let k = 0; k < 6; k++) { const s = slotPos(k); if (p.x >= s.x - 6 && p.x <= s.x + CARD.w + 6 && p.y >= s.y - 6 && p.y <= s.y + CARD.h + 6) return k; } return null; };
+
+scene.addEventListener('pointerdown', e => {
+  const d = e.target.closest('[data-drag]'), hit = e.target.closest('[data-hit]');
+  if (!d && !hit) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  if (d) {
+    const id = d.dataset.drag, o = P[id], p = toSvg(e);
+    drag = { id, dx: o.x - p.x, dy: o.y - p.y, x: e.clientX, y: e.clientY, moved: false };
+    scene.classList.add('grabbing'); dirty = true; return;
+  }
+  drag = { id: 'hit', h: hit.dataset.hit };
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag || !P[drag.id]) return;
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 5) drag.moved = true;
+  if (!drag.moved) return;
+  const p = toSvg(e), o = P[drag.id];
+  o.x = clamp(p.x + drag.dx, VB.x - CARD.w / 2, VB.x + VB.w - CARD.w / 2); o.y = clamp(p.y + drag.dy, VB.y, 390);
+  dirty = true;
+});
+function endDrag(e, cancel) {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing'); dirty = true;
+  if (cancel) return;
+  if (d.id === 'hit') { onHit(d.h); return; }
+  const pi = +d.id.slice(1);
+  if (!d.moved) { S.sel = S.sel === pi ? null : pi; update(); return; }
+  const k = slotAt(toSvg(e));
+  if (k !== null) tryPlace(pi, k);
+}
+scene.addEventListener('pointerup', e => endDrag(e, false));
+scene.addEventListener('pointercancel', e => endDrag(e, true));
+
+function onHit(h) {
+  const [k, v] = h.split(':');
+  if (k === 'node') tapNode(v);
+  if (k === 'edge') toggleCut(v);
+  if (k === 'dns') tapDns(+v);
+  if (k === 'oct') { S.oct = +v; update(); }
+  if (k === 'bit') { S.ip[S.oct] ^= 1 << (7 - +v); S.opened = false; update(); }
+  if (k === 'bar') act('open');
+  if (k === 'slot') tapSlot(+v);
+}
+
+// lesson 1
+function tapNode(id) {
+  if (S.scissors) { toast('Сейчас включены «Ножницы». Выключите их, чтобы строить маршрут.'); return; }
+  if (S.pkt) return;
+  const r = S.route, i = r.indexOf(id);
+  if (i >= 0) { S.route = r.slice(0, i + 1); update(); return; }
+  const last = r[r.length - 1];
+  if (last === 'server') { toast('Маршрут уже дошёл до сервера. Нажмите «Отправить пакет».'); return; }
+  if (id === 'phone') { toast('Телефон — конечное устройство: чужие пакеты он дальше не пересылает.'); return; }
+  const e = edgeOf(last, id);
+  if (!e) { toast(`«${NODES[id].name}» не соединён напрямую с «${NODES[last].name}». Пакет идёт только по каналам связи.`); return; }
+  if (S.cut[ek(last, id)]) { toast('Этот кабель перерезан. Ищите обход через другой узел.'); return; }
+  S.route.push(id); update();
+}
+function toggleCut(k) {
+  const e = EDGES.find(x => ek(x[0], x[1]) === k); if (!e) return;
+  if (e[3] === 'wifi') { toast('Wi-Fi — радиосвязь, её ножницами не перережешь.'); return; }
+  if (S.pkt) return;
+  if (S.cut[k]) { delete S.cut[k]; toast(`Кабель ${short(e[0])} — ${short(e[1])} починили.`); }
+  else {
+    S.cut[k] = true;
+    const r = S.route, j = r.findIndex((id, i) => i > 0 && ek(r[i - 1], id) === k);
+    if (j > 0) S.route = r.slice(0, j);
+    toast(e[0] === 'router' ? 'Кабель до провайдера — единственный. Без него дома нет интернета, обхода нет.' : `Кабель ${short(e[0])} — ${short(e[1])} перерезан.${j > 0 ? ' Маршрут оборвался — постройте обход.' : ''}`);
+  }
+  update();
+}
+function sendPacket() {
+  if (S.pkt) return;
+  const r = S.route;
+  if (r[r.length - 1] !== 'server') { toast('Маршрут ещё не доходит до сервера сайта. Достройте его.'); return; }
+  S.pkt = { path: r.slice(), t0: performance.now(), dur: (r.length - 1) * 380 };
+  if (reduce) finishPacket(); else update();
+}
+function finishPacket() {
+  const r = S.pkt.path; S.pkt = null;
+  const es = routeEdges(r).map(e => ek(e[0], e[1]));
+  if (Object.keys(S.cut).some(k => S.used[k])) S.detour = true;
+  es.forEach(k => { S.used[k] = true; });
+  S.delivered++; S.lastDelay = routeDelay(r);
+  toast(S.detour ? `Пакет пришёл в обход за ${S.lastDelay} мс! Интернет пережил обрыв кабеля.` : `Пакет доставлен за ${S.lastDelay} мс через ${r.length - 2} ${plural(r.length - 2, 'узел', 'узла', 'узлов')}.`);
+  update();
+}
+
+// lesson 2
+function tapDns(i) {
+  if (i < S.dns) { S.ans = i; toast('Этот сервер уже ответил.'); update(); return; }
+  if (i > S.dns) { toast(DNS_HINT[S.dns]); return; }
+  S.dns++; S.ans = i; update();
+}
+
+// lesson 3
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function land(pi, k) { const hm = inHome(k); P['p' + pi] = { x: hm.x, y: reduce ? hm.y : hm.y - 70, rx: hm.x, ry: hm.y }; }
+function sendMsg() {
+  const n = L().chunks.length; S.lost = 1 + Math.floor(Math.random() * (n - 2));
+  S.inbox = shuffle([...Array(n).keys()].filter(i => i !== S.lost)); S.resent = false; S.slots = {}; S.sel = null; S.miss = 0; S.sent = true; P = {};
+  S.inbox.forEach((pi, k) => land(pi, k));
+  toast(`Пришло ${S.inbox.length} пакетов из ${n}. Соберите их по номерам.`);
+  update();
+}
+function tapSlot(k) {
+  if (S.slots[k] !== undefined) return;
+  if (S.sel !== null) { tryPlace(S.sel, k); return; }
+  if (!S.sent) { toast('Сначала нажмите «Отправить».'); return; }
+  if (S.inbox.includes(k)) { toast(`Пакет № ${k + 1} уже пришёл — найдите его среди пришедших.`); return; }
+  S.inbox.push(k); S.resent = true; land(k, S.inbox.length - 1);
+  toast(`Запрос повтора: «пришли пакет № ${k + 1}». Отправитель прислал его снова.`);
+  update();
+}
+function tryPlace(pi, k) {
+  if (S.slots[k] !== undefined || Object.values(S.slots).includes(pi)) return;
+  if (pi === k) { S.slots[k] = pi; S.sel = null; delete P['p' + pi]; }
+  else { S.miss++; S.lastBad = { k, t: performance.now() }; toast(`Это пакет № ${pi + 1}, а ячейка № ${k + 1}. Смотрите на номер в заголовке.`); }
+  update();
+}
+
+let last = performance.now();
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  let anim = false;
+  for (const [k, o] of Object.entries(P)) {
+    if (drag && drag.id === k) continue;
+    const nx = reduce ? o.rx : o.x + (o.rx - o.x) * Math.min(1, dt * 12), ny = reduce ? o.ry : o.y + (o.ry - o.y) * Math.min(1, dt * 12);
+    if (Math.abs(o.rx - nx) + Math.abs(o.ry - ny) > 0.3) { o.x = nx; o.y = ny; anim = true; } else if (o.x !== o.rx || o.y !== o.ry) { o.x = o.rx; o.y = o.ry; anim = true; }
+  }
+  if (S.pkt) { anim = true; const p = pktPos(t); if (p && p.done) finishPacket(); }
+  if (S.hl || (S.lastBad && t - S.lastBad.t < 800)) anim = true;
+  if (dirty || anim) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3000); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    net: B('sendP', 'Отправить пакет') + B('clearR', 'Новый маршрут') + sep + B('scissors', '✂ Ножницы', S.scissors) + B('repair', 'Починить всё'),
+    dns: B('prevO', '‹ число') + B('nextO', 'число ›') + B('zero', 'Обнулить') + sep + B('open', 'Открыть сайт') + B('flush', 'Очистить кэш'),
+    proto: B('send', 'Отправить') + B('restart', 'Начать заново'),
+  }[id];
+}
+function act(a) {
+  if (a === 'sendP') return sendPacket();
+  if (a === 'clearR') { if (!S.pkt) { S.route = ['laptop']; update(); } return; }
+  if (a === 'scissors') { S.scissors = !S.scissors; renderTools(); update(); return; }
+  if (a === 'repair') { if (!S.pkt) { S.cut = {}; update(); } return; }
+  if (a === 'prevO') { S.oct = (S.oct + 3) % 4; update(); return; }
+  if (a === 'nextO') { S.oct = (S.oct + 1) % 4; update(); return; }
+  if (a === 'zero') { S.ip = [0, 0, 0, 0]; S.opened = false; update(); return; }
+  if (a === 'flush') { S.dns = 0; S.ans = -1; S.opened = false; update(); return; }
+  if (a === 'open') {
+    const m = model();
+    if (!m.known) { toast('Браузер пока не знает IP-адреса. Спросите DNS-серверы по цепочке.'); return; }
+    if (!m.ok) { toast(`По адресу ${m.ip} сайт luch.kz не отвечает. Сверьте каждое число с ответом DNS.`); return; }
+    S.opened = true; toast('Браузер подключился к 203.0.113.75 — сайт открыт!'); update(); return;
+  }
+  if (a === 'send') return sendMsg();
+  if (a === 'restart') { S.sent = false; S.inbox = []; S.slots = {}; S.sel = null; S.miss = 0; S.resent = false; P = {}; update(); return; }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const nodeIC = kind => IC(nodeIcon(kind, 17, 17, '#e8ecf4'));
+const ICON = {
+  lan: IC('<rect x="3" y="5" width="28" height="24" rx="5" fill="none" stroke="var(--muted)" stroke-dasharray="3 2"/><circle cx="10" cy="13" r="2.5" fill="var(--arm)"/><circle cx="10" cy="22" r="2.5" fill="var(--arm)"/><rect x="18" y="15" width="9" height="5" rx="1.5" fill="var(--fg)"/><path d="M12 13l6 4M12 22l6-3" stroke="var(--muted)" stroke-dasharray="1.5 1.5"/>'),
+  cables: IC('<path d="M3 24L14 10L31 18" fill="none" stroke="#3d5274" stroke-width="3"/><rect x="15" y="20" width="14" height="8" rx="2" fill="#0e1520" stroke="var(--line)"/><text x="22" y="26.5" font-size="5.5" fill="var(--muted)" text-anchor="middle" font-family="monospace">мс</text>'),
+  packet: IC('<rect x="7" y="10" width="20" height="15" rx="3" fill="#ffb547"/><path d="M7 10l10 8 10-8" fill="none" stroke="#04070d" stroke-width="1.4"/>'),
+  bar: IC('<rect x="2" y="11" width="30" height="12" rx="4" fill="none" stroke="var(--fg)" stroke-width="1.5"/><circle cx="7" cy="17" r="2" fill="var(--ok)"/><path d="M12 17h15" stroke="var(--muted)" stroke-width="2"/>'),
+  dnsS: IC('<rect x="9" y="5" width="16" height="24" rx="3" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M9 13h16M9 21h16" stroke="var(--fg)" stroke-width="1.2"/><circle cx="20" cy="9" r="1.4" fill="var(--ok)"/>'),
+  ans: IC('<path d="M4 7h26v15H14l-6 5v-5H4z" fill="none" stroke="var(--force)" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 13h16M9 17h10" stroke="var(--fg)" stroke-width="1.4"/>'),
+  octs: IC('<text x="17" y="21" font-size="8" fill="var(--fg)" text-anchor="middle" font-family="monospace">203.0.…</text>'),
+  bits: IC('<rect x="3" y="11" width="6" height="12" rx="1.5" fill="#ffd27a"/><rect x="10" y="11" width="6" height="12" rx="1.5" fill="#ffd27a"/><rect x="17" y="11" width="6" height="12" rx="1.5" fill="none" stroke="var(--muted)"/><rect x="24" y="11" width="6" height="12" rx="1.5" fill="none" stroke="var(--muted)"/>'),
+  head: IC('<rect x="3" y="8" width="28" height="18" rx="3" fill="#1d2940" stroke="var(--muted)"/><rect x="3" y="8" width="10" height="18" rx="3" fill="#2f4466"/><text x="8" y="21" font-size="8" fill="#ffb547" text-anchor="middle" font-family="monospace">3</text>'),
+  inbox: IC('<rect x="4" y="6" width="12" height="9" rx="2" fill="#1d2940" stroke="var(--muted)"/><rect x="18" y="10" width="12" height="9" rx="2" fill="#1d2940" stroke="var(--muted)"/><rect x="8" y="19" width="12" height="9" rx="2" fill="#1d2940" stroke="var(--muted)"/>'),
+  slots: IC('<rect x="3" y="8" width="8" height="18" rx="2" fill="#1f3a2f" stroke="var(--ok)"/><rect x="13" y="8" width="8" height="18" rx="2" fill="#1f3a2f" stroke="var(--ok)"/><rect x="23" y="8" width="8" height="18" rx="2" fill="none" stroke="var(--muted)" stroke-dasharray="2 2"/>'),
+  text: IC('<rect x="2" y="11" width="30" height="12" rx="3" fill="none" stroke="var(--ok)"/><path d="M6 17h9M18 17h4M25 17h4" stroke="var(--fg)" stroke-width="2"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  if (id === 'net') return `Маршрут: ${m.hops} ${plural(m.hops, 'шаг', 'шага', 'шагов')}, ${m.delay} мс · доставлено ${m.delivered}` + (m.cuts ? ` · обрывов ${m.cuts}` : '') + (m.delivered && !m.cuts ? ' · теперь перережьте кабель на пути' : '');
+  if (id === 'dns') return `DNS: шаг ${m.step} из 4 · адрес ${m.ip}`;
+  if (!m.sent) return 'Пакеты ещё не отправлены';
+  return `Собрано ${m.placed} из ${m.total}` + (m.miss ? ` · ошибок ${m.miss}` : '') + (S.resent ? ' · повтор запрошен' : '');
+}
+
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'net') h = `<h2>Маршрут пакета</h2>
+      <dl class="reads"><div><dt>Шагов</dt><dd id="r1"></dd></div><div><dt>Задержка</dt><dd id="r2"></dd></div><div><dt>Обрывы</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Следующий узел маршрута</div><div class="chips" id="nextChips"></div></div>
+      <div class="ctl"><div class="lbl">Кабели (нажмите, чтобы перерезать или починить)</div><div class="chips" id="cutChips"></div></div>
+      <div class="row"><button class="ghostbtn" data-a="sendP">Отправить пакет</button><button class="ghostbtn" data-a="clearR">Новый маршрут</button><button class="ghostbtn" data-a="repair">Починить всё</button></div>`;
+  if (id === 'dns') h = `<h2>DNS и адрес</h2>
+      <dl class="reads"><div><dt>Шаг DNS</dt><dd id="r1"></dd></div><div><dt>Число</dt><dd id="r2"></dd></div><div><dt>Двоично</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Спросить DNS-сервер</div><div class="chips" id="dnsChips">${DORDER.map(k => DNS.findIndex(d => d.id === k)).map(i => `<button data-d="${i}">${DNS[i].name}</button>`).join('')}</div></div>` +
+      [0, 1, 2, 3].map(i => slider('inO' + i, `Число ${i + 1} адреса`, 0, 255, 1, S.ip[i])).join('') +
+      `<div class="row"><button class="ghostbtn" data-a="open">Открыть сайт</button><button class="ghostbtn" data-a="zero">Обнулить</button><button class="ghostbtn" data-a="flush">Очистить кэш</button></div>`;
+  if (id === 'proto') h = `<h2>Приём пакетов</h2>
+      <dl class="reads"><div><dt>Пришло</dt><dd id="r1"></dd></div><div><dt>Собрано</dt><dd id="r2"></dd></div><div><dt>Ошибки</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">1. Выберите пакет</div><div class="chips" id="pktChips"></div></div>
+      <div class="ctl"><div class="lbl">2. Ячейка (пустая без пакета — запрос повтора)</div><div class="chips" id="slotChips"></div></div>
+      <div class="row"><button class="ghostbtn" data-a="send">Отправить</button><button class="ghostbtn" data-a="restart">Начать заново</button></div>`;
+  el.innerHTML = h;
+  el.querySelectorAll('.row [data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+  el.querySelectorAll('#dnsChips button').forEach(b => b.onclick = () => tapDns(+b.dataset.d));
+  [0, 1, 2, 3].forEach(i => { const x = el.querySelector('#inO' + i); if (x) x.addEventListener('input', e => { S.ip[i] = +e.target.value; S.oct = i; S.opened = false; update(); }); });
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (id === 'net') {
+    set('#r1', String(m.hops)); set('#r2', m.delay + ' мс'); set('#r3', String(m.cuts));
+    const last = S.route[S.route.length - 1];
+    const nx = last === 'server' ? [] : nbrs(last).filter(n => !S.route.includes(n) && n !== 'phone');
+    const nc = el.querySelector('#nextChips');
+    if (nc) {
+      nc.innerHTML = nx.length ? nx.map(n => `<button data-n="${n}" ${S.cut[ek(last, n)] ? 'disabled' : ''}>${NODES[n].name}</button>`).join('') : `<span class="note">${last === 'server' ? 'Маршрут дошёл до сервера.' : 'Дальше идти некуда — начните новый маршрут.'}</span>`;
+      nc.querySelectorAll('button').forEach(b => b.onclick = () => { const sc = S.scissors; S.scissors = false; tapNode(b.dataset.n); S.scissors = sc; });
+    }
+    const cc = el.querySelector('#cutChips');
+    if (cc) {
+      cc.innerHTML = EDGES.filter(e => e[3] !== 'wifi').map(e => `<button data-e="${ek(e[0], e[1])}" aria-pressed="${!!S.cut[ek(e[0], e[1])]}">${short(e[0])}–${short(e[1])}</button>`).join('');
+      cc.querySelectorAll('button').forEach(b => b.onclick = () => toggleCut(b.dataset.e));
+    }
+  } else if (id === 'dns') {
+    set('#r1', `${m.step}/4`); set('#r2', String(S.ip[S.oct])); set('#r3', bin8(S.ip[S.oct]));
+    [0, 1, 2, 3].forEach(i => { set(`#inO${i}O`, String(S.ip[i])); val('#inO' + i, S.ip[i]); });
+  } else {
+    set('#r1', `${m.arrived}/${m.total}`); set('#r2', `${m.placed}/${m.total}`); set('#r3', String(m.miss));
+    const pc = el.querySelector('#pktChips');
+    if (pc) {
+      pc.innerHTML = m.inbox.length ? m.inbox.map(pi => `<button data-p="${pi}" aria-pressed="${S.sel === pi}">№ ${pi + 1} «${vis(L().chunks[pi])}»</button>`).join('') : `<span class="note">${S.sent ? 'Свободных пакетов нет.' : 'Сначала нажмите «Отправить».'}</span>`;
+      pc.querySelectorAll('button').forEach(b => b.onclick = () => { const p = +b.dataset.p; S.sel = S.sel === p ? null : p; update(); });
+    }
+    const sc = el.querySelector('#slotChips');
+    if (sc) {
+      sc.innerHTML = L().chunks.map((c, k) => `<button data-k="${k}" ${S.slots[k] !== undefined ? 'disabled' : ''}>№ ${k + 1}</button>`).join('');
+      sc.querySelectorAll('button').forEach(b => b.onclick = () => tapSlot(+b.dataset.k));
+    }
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'net') return [
+    { id: 'devices', icon: nodeIC('laptop'), name: 'Клиенты: ноутбук и телефон', spec: 'Конечные устройства. Они запрашивают данные и показывают их человеку.' },
+    { id: 'lan', icon: ICON.lan, name: 'Локальная сеть (LAN)', spec: 'Устройства в одной квартире, классе или офисе, связанные через роутер.' },
+    { id: 'router', icon: nodeIC('router'), name: 'Роутер', spec: 'Соединяет домашнюю сеть с сетью провайдера и раздаёт Wi-Fi.' },
+    { id: 'isp', icon: nodeIC('isp'), name: 'Провайдер', spec: 'Компания, которая подключает дома и школы к интернету и ведёт трафик дальше.' },
+    { id: 'nodes', icon: nodeIC('node'), name: 'Магистральные узлы', spec: 'Мощные маршрутизаторы в городах. Каждый решает, куда отправить пакет дальше.' },
+    { id: 'cables', icon: ICON.cables, name: 'Каналы связи', spec: 'Wi-Fi (радио), медный кабель, оптоволокно. Число на кабеле — задержка в миллисекундах.' },
+    { id: 'server', icon: nodeIC('server'), name: 'Сервер', spec: 'Компьютер, который круглосуточно хранит сайт и отдаёт его по запросу.' }];
+  if (id === 'dns') return [
+    { id: 'bar', icon: ICON.bar, name: 'Адресная строка', spec: 'Сюда человек вводит имя сайта. Браузеру же нужен IP-адрес.' },
+    { id: 'res', icon: ICON.dnsS, name: 'DNS провайдера (резолвер)', spec: 'Ищет адрес по поручению браузера и запоминает ответ в кэше.' },
+    { id: 'root', icon: ICON.dnsS, name: 'Корневой сервер', spec: 'Вершина системы DNS. Знает серверы всех доменов верхнего уровня: .kz, .com, .ru…' },
+    { id: 'kz', icon: ICON.dnsS, name: 'Сервер зоны .kz', spec: 'Знает, какой DNS-сервер обслуживает каждый сайт в зоне .kz.' },
+    { id: 'auth', icon: ICON.dnsS, name: 'DNS-сервер сайта', spec: 'Хранит точную запись «имя → IP-адрес» для своего домена.' },
+    { id: 'ans', icon: ICON.ans, name: 'Ответ сервера', spec: 'Что сказал последний опрошенный сервер.' },
+    { id: 'octs', icon: ICON.octs, name: 'IP-адрес из 4 чисел', spec: 'IPv4: 4 байта через точку. Каждое число — от 0 до 255.' },
+    { id: 'bits', icon: ICON.bits, name: 'Биты числа', spec: '8 переключателей с весами 128, 64, 32, 16, 8, 4, 2, 1. Сумма включённых — число.' }];
+  return [
+    { id: 'head', icon: ICON.packet, name: 'Адреса отправителя и получателя', spec: 'Их пишет протокол IP в каждый пакет, чтобы маршрутизаторы знали, куда его везти.' },
+    { id: 'inbox', icon: ICON.inbox, name: 'Пришедшие пакеты', spec: 'Пакеты шли разными путями, поэтому пришли не по порядку, а один потерялся.' },
+    { id: 'slots', icon: ICON.head, name: 'Номер в заголовке (TCP)', spec: 'TCP пишет в каждый пакет порядковый номер. По нему получатель собирает данные и видит пропуски.' },
+    { id: 'text', icon: ICON.text, name: 'Собранное сообщение', spec: 'Получится целым, только когда все пакеты стоят на своих местах.' }];
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Из чего состоит опыт</h2><p class="note">Нажмите на деталь, чтобы найти её на сцене.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'net') {
+    const es = routeEdges(S.route);
+    let h = `<h2>Время в пути</h2><div class="formula">t = t₁ + t₂ + … + tₙ</div><p class="note">Задержка пути — сумма задержек всех каналов. Маршрутизаторы обычно выбирают путь быстрее.</p><h3>Текущий маршрут</h3>`;
+    h += es.length ? `<div class="steps">` + es.map((e, i) => step(`${short(S.route[i])} → ${short(S.route[i + 1])}`, `${KIND[e[3]]} · ${e[2]} мс`)).join('') +
+      step('итого', `${es.map(e => e[2]).join(' + ')} = ${m.delay} мс`, 'sum') + `</div>` : `<p class="note">Маршрут пока из одного ноутбука. Нажмите на роутер.</p>`;
+    h += `<h3>Пересадки</h3><div class="steps">` + step('каналов на пути', String(m.hops)) + step('промежуточных узлов', String(Math.max(0, m.hops - 1))) + `</div>`;
+    h += `<p class="note" style="margin-top:10px">${m.cuts ? `Перерезано кабелей: ${m.cuts}. ${m.atServer ? 'Обход найден.' : 'Ищите путь в обход обрыва.'}` : 'Все кабели целы.'} ${m.delivered ? `Последняя доставка: ${S.lastDelay} мс.` : ''}</p>`;
+    return h;
+  }
+  if (id === 'dns') {
+    let h = `<h2>Имя → адрес</h2><div class="formula">luch.kz → ? → IP</div><h3>Цепочка DNS</h3><div class="steps">`;
+    h += DNS.map((d, i) => step(`${i + 1}. ${d.name}`, i < S.dns ? 'ответил' : '—')).join('') + `</div>`;
+    h += `<h3>Двоичный вид адреса</h3><div class="steps">` + S.ip.map((v, i) => { const pr = W8.filter((w, b) => (v >> (7 - b)) & 1); return step(`число ${i + 1}`, `${bin8(v)} = ${pr.length ? pr.join('+') : '0'} = ${v}`, i === S.oct ? 'sum' : ''); }).join('') + `</div>`;
+    h += `<h3>Сколько всего адресов</h3><div class="steps">` + step('IPv4', '4 байта = 32 бита') + step('адресов', '2³² = 4 294 967 296') + step('IPv6', '128 бит → 2¹²⁸ адресов') + `</div>`;
+    h += `<p class="note" style="margin-top:10px">Адресов IPv4 (≈ 4,3 млрд) меньше, чем устройств на Земле. Поэтому дома у всех устройств «внутренние» адреса вида 192.168.x.x, а роутер выходит в интернет под одним общим адресом. На смену IPv4 приходит IPv6.</p>`;
+    return h;
+  }
+  const ch = L().chunks;
+  let h = `<h2>Разбиение на пакеты</h2><div class="formula">сообщение = пакет 1 + … + пакет ${ch.length}</div><div class="steps">` +
+    step('длина сообщения', `${ch.join('').length} символов`) + step('данных в пакете', `${ch[0].length} символа`) + step('пакетов', `${ch.join('').length} / ${ch[0].length} = ${ch.length}`, 'sum') + `</div>`;
+  h += `<h3>Приём</h3><div class="steps">` + step('пришло', S.sent ? `${m.arrived} из ${m.total}` : '—') + step('порядок прихода', S.sent ? S.inbox.map(p => p + 1).join(', ') : '—') + step('собрано', `${m.placed} из ${m.total}`, 'sum') + `</div>`;
+  h += `<h3>Слои протоколов</h3><div class="steps">` + step('приложение', 'HTTP(S), SMTP, FTP') + step('транспорт', 'TCP (или UDP)') + step('сеть', 'IP — адреса и маршрут') + step('канал', 'Wi-Fi, Ethernet, оптика') + `</div>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const el = $('#meter'), ok = !!S.done[LID()];
+  if (m.kind === 'net') el.innerHTML = `<div class="k">Задержка</div><div class="v ${ok ? 'ok' : ''}">${m.delay} мс</div><div class="gauge"><b style="width:${clamp(m.delay / 120 * 100, 0, 100).toFixed(1)}%;background:${m.atServer ? 'var(--ok)' : 'var(--arm)'}"></b></div><div class="lr"><span>${m.atServer ? 'до сервера' : 'путь не готов'}</span><span>${m.hops} шаг.</span></div>`;
+  else if (m.kind === 'dns') el.innerHTML = `<div class="k">IP-адрес</div><div class="v ${ok ? 'ok' : ''}">${m.ip}</div><div class="gauge"><b style="width:${(m.step / 4 * 100).toFixed(1)}%"></b></div><div class="lr"><span>DNS</span><span>${m.step}/4</span></div>`;
+  else el.innerHTML = `<div class="k">Собрано</div><div class="v ${ok ? 'ok' : ''}">${m.placed} из ${m.total}</div><div class="gauge"><b style="width:${(m.placed / m.total * 100).toFixed(1)}%"></b></div><div class="lr"><span>пришло</span><span>${m.arrived}</span></div>`;
+}
+
+function update() {
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Отличная работа!');
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  net: '<path d="M8 22L22 15L38 8L58 15M22 15L38 23L58 15" fill="none" stroke="#3d5274" stroke-width="2"/><path d="M8 22L22 15L38 8L58 15" fill="none" stroke="#ffb547" stroke-width="2"/><circle cx="8" cy="22" r="3" fill="#e8ecf4"/><circle cx="22" cy="15" r="3" fill="#e8ecf4"/><circle cx="38" cy="8" r="3" fill="#72d4e8"/><circle cx="38" cy="23" r="3" fill="#72d4e8"/><rect x="55" y="10" width="7" height="10" rx="1.5" fill="#e8ecf4"/>',
+  dns: '<rect x="4" y="5" width="58" height="9" rx="3" fill="none" stroke="#56627d"/><text x="8" y="12" font-size="6.5" fill="#e8ecf4" font-family="monospace">luch.kz</text><text x="33" y="26" font-size="7" fill="#ffb547" text-anchor="middle" font-family="monospace">203.0.113.75</text>',
+  proto: [2, 0, 1].map((p, i) => `<rect x="${4 + i * 21}" y="8" width="18" height="15" rx="2.5" fill="#1d2940" stroke="#56627d"/><text x="${13 + i * 21}" y="19" font-size="8" fill="#ffb547" text-anchor="middle" font-family="monospace">${p + 1}</text>`).join(''),
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Ls, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Ls.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Ls.title}</span></span>
+      ${S.done[Ls.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const Ls = LESSONS[i];
+  S.lesson = i; S.hl = null;
+  S.route = [Ls.start || 'laptop']; S.cut = {}; S.scissors = false; S.pkt = null; S.delivered = 0; S.used = {}; S.detour = false; S.lastDelay = 0;
+  S.dns = 0; S.ans = -1; S.ip = [0, 0, 0, 0]; S.oct = 0; S.opened = false;
+  S.sent = false; S.inbox = []; S.lost = -1; S.resent = false; S.slots = {}; S.sel = null; S.miss = 0; S.lastBad = null;
+  drag = null; P = {};
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = Ls.task;
+  $('#hint').textContent = Ls.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '', guide = '';
+  if (id === 'net') {
+    const cuts = Object.keys(S.cut).map(k => k.split('-').map(short).join('–'));
+    now = `Карта сети: ноутбук и телефон в домашней сети (LAN) через Wi-Fi подключены к роутеру, роутер кабелем — к провайдеру, провайдер оптоволокном — к узлам Алматы и Астана; Алматы связан с Астаной и с узлом Европа; к серверу сайта ведут каналы от узла Европа (6 мс) и от узла Астана (52 мс). Задержки: провайдер–Алматы 2 мс, провайдер–Астана 8 мс, Алматы–Астана 14 мс, Алматы–Европа 38 мс. Текущий маршрут: ${S.route.map(short).join(' → ')} (${m.delay} мс). Перерезаны кабели: ${cuts.join(', ') || 'нет'}. Режим ножниц: ${S.scissors ? 'включён' : 'выключен'}. Доставлено пакетов: ${m.delivered}${m.delivered ? `, последняя доставка ${S.lastDelay} мс` : ''}. Обход обрыва ${m.detour ? 'выполнен' : 'ещё не выполнен'}.`;
+    guide = 'Не прокладывай маршрут за ученика: спрашивай, с какими узлами соединён текущий узел и какой путь остаётся, если кабель перерезан.';
+  }
+  if (id === 'dns') {
+    now = `Ученик узнаёт IP сайта luch.kz через DNS. Цепочка: DNS провайдера (резолвер) → корневой сервер → сервер зоны .kz → DNS-сервер сайта ns1.luch.kz. Пройдено шагов: ${m.step} из 4.${S.ans >= 0 ? ` Последний ответ (${DNS[S.ans].name}): «${DNS[S.ans].ans.join(' ')}».` : ''} В адресной строке набран IP ${m.ip}; выбрано число № ${S.oct + 1} = ${S.ip[S.oct]} (двоично ${bin8(S.ip[S.oct])}). Биты задаются переключателями с весами 128…1. Сайт ${m.opened ? 'открыт' : 'ещё не открыт'}.`;
+    guide = m.known ? 'IP уже виден ученику в ответе DNS. Помоги перевести каждое число в двоичный вид разложением по степеням двойки (128, 64, 32…), но не называй готовые цепочки битов.' : 'Не говори, какой сервер спросить следующим: спроси, кто в DNS знает про зону .kz, а кто — про конкретный сайт.';
+  }
+  if (id === 'proto') {
+    const missing = S.sent ? L().chunks.map((c, k) => k).filter(k => !S.inbox.includes(k)) : [];
+    now = S.sent ? `Отправитель 203.0.113.75 прислал сообщение из 6 пакетов, пронумерованных протоколом TCP. Пришли в порядке: ${S.inbox.map(p => p + 1).join(', ')}. ${missing.length ? 'Один пакет потерялся и ещё не запрошен повторно.' : S.resent ? 'Потерянный пакет запрошен повторно и пришёл.' : ''} Собрано по ячейкам: ${m.placed} из ${m.total}, ошибок ${m.miss}. Собранный текст: «${m.text}».` : 'Пакеты ещё не отправлены: нужно нажать «Отправить».';
+    guide = 'Не называй номер потерянного пакета: спроси, какого номера не хватает среди пришедших и что TCP делает в этом случае.';
+  }
+  return [
+    `Раздел: информатика, 8 класс, тема «Компьютерные сети». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    S.done[id] ? 'Задание уже выполнено — можно обсуждать свободно.' : guide,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = {
+    net: 'Почему обрыв одного кабеля не выключает весь интернет?',
+    dns: 'Почему число в IP-адресе не может быть больше 255?',
+    proto: 'Чем TCP отличается от UDP и где нужен каждый?',
+  }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
