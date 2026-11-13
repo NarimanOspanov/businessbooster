@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Карта школьной физики: все разделы и темы от 7 до 11 класса, от простого к сложному, с интерактивными опытами.">
-<title>Карта физики</title>
+<meta name="description" content="Карта школьных предметов: физика, математика, химия, биология и информатика — все темы по классам, от простого к сложному.">
+<title>Карта предметов</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
@@ -173,23 +173,24 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px 20
   <div class="list" id="list"></div>
 </div>
 
+<script src="/physics/subjects-data.js"></script>
 <script>
 (() => {
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c; };
 
-const BRANCHES = [
+const PHYS_BRANCHES = [
   { id: 'mech', name: 'Механика', c: 'var(--c-mech)' },
   { id: 'heat', name: 'Тепловые явления', c: 'var(--c-heat)' },
   { id: 'elec', name: 'Электричество и магнетизм', c: 'var(--c-elec)' },
   { id: 'opt', name: 'Оптика', c: 'var(--c-opt)' },
   { id: 'mod', name: 'Атом и Вселенная', c: 'var(--c-mod)' },
 ];
-const GRADES = [7, 8, 9, 10, 11];
+const PHYS_GRADES = [7, 8, 9, 10, 11];
 
 // status: done = опыты готовы, part = часть тем готова, soon = в планах
-const TOPICS = [
+const PHYS_TOPICS = [
   { id: 'measure', b: 'base', g: 7, t: 'Измерения и единицы', items: ['Длина, время, масса', 'Цена деления прибора', 'Погрешность измерений', 'Система единиц СИ'], req: [] },
   { id: 'matter', b: 'base', g: 7, t: 'Строение вещества', items: ['Молекулы и атомы', 'Диффузия', 'Твёрдое, жидкое, газ'], req: [] },
 
@@ -232,60 +233,61 @@ const TOPICS = [
   { id: 'quant', b: 'mod', g: 11, t: 'Кванты и свет', items: ['Фотоэффект', 'Фотон', 'Лазер', 'Волны и частицы'], req: ['wave', 'atom'] },
   { id: 'astro', b: 'mod', g: 11, t: 'Астрофизика', items: ['Солнечная система', 'Звёзды', 'Галактики', 'Расширение Вселенной'], req: ['nucleus', 'newton'] },
 ];
-const T = Object.fromEntries(TOPICS.map(t => [t.id, Object.assign(t, { status: t.status || 'soon' })]));
+const STATUS = { done: 'опыты готовы', part: 'часть опытов готова', soon: 'скоро' };
+
+// Предметы: у физики уже есть опыты, у остальных пока программа обучения (physics/subjects-data.js).
+const EXTRA = window.LUCH_SUBJECTS || {};
+const SUBJECTS = [
+  { id: 'phys', name: 'Физика', live: true, title: 'Физика от простого к сложному',
+    intro: 'Вся школьная физика с 7 по 11 класс на одной карте. Сверху основы, ниже ветки разделов: чем ниже тема, тем она сложнее. Нажмите на тему, чтобы увидеть, что в ней и что стоит пройти до неё.',
+    grades: PHYS_GRADES, branches: PHYS_BRANCHES, topics: PHYS_TOPICS },
+  { id: 'math', name: 'Математика', ...EXTRA.math },
+  { id: 'chem', name: 'Химия', ...EXTRA.chem },
+  { id: 'bio', name: 'Биология', ...EXTRA.bio },
+  { id: 'cs', name: 'Информатика', ...EXTRA.cs },
+].filter(s => s.topics);
+
+let SUBJ, BRANCHES, GRADES, TOPICS, T = {};
 const deps = id => TOPICS.filter(t => t.req.includes(id)).map(t => t.id);
 const color = b => b === 'base' ? 'var(--c-base)' : BRANCHES.find(x => x.id === b).c;
 const bname = b => b === 'base' ? 'Основы' : BRANCHES.find(x => x.id === b).name;
-const STATUS = { done: 'опыты готовы', part: 'часть опытов готова', soon: 'скоро' };
+const lessonWord = n => `${n} ${plural(n, 'урок', 'урока', 'уроков')}`;
 
-const SUBJECTS = [
-  { id: 'phys', name: 'Физика', live: true },
-  { id: 'math', name: 'Математика', plan: 'Геометрия и графики, которые можно двигать руками: углы, площади, функции, вероятности.' },
-  { id: 'chem', name: 'Химия', plan: 'Лаборатория без риска: реакции, растворы, строение молекул и таблица Менделеева в 3D.' },
-  { id: 'bio', name: 'Биология', plan: 'Живые модели: клетка, органы человека, наследственность, экосистемы.' },
-  { id: 'cs', name: 'Информатика', plan: 'Алгоритмы, которые видно: сортировки, графы, логические схемы, первые программы.' },
-];
-
-// ---------- stats ----------
-const doneN = TOPICS.filter(t => t.status !== 'soon').length;
-const lessonsN = TOPICS.reduce((a, t) => a + (t.lessons || 0), 0);
-$('#stats').innerHTML = [
-  [BRANCHES.length, plural(BRANCHES.length, 'раздел', 'раздела', 'разделов')],
-  [TOPICS.length, plural(TOPICS.length, 'тема', 'темы', 'тем')],
-  [doneN, 'уже с опытами'],
-  [lessonsN, plural(lessonsN, 'урок', 'урока', 'уроков')],
-].map(([n, l]) => `<div class="stat"><b>${n}</b><span>${l}</span></div>`).join('');
-
-$('#subjects').innerHTML = SUBJECTS.map(s => `<button class="subj" data-s="${s.id}" aria-pressed="${!!s.live}">${s.name}${s.live ? '' : '<em>скоро</em>'}</button>`).join('');
+$('#subjects').innerHTML = SUBJECTS.map(s => `<button class="subj" data-s="${s.id}" aria-pressed="false">${s.name}${s.live ? '' : '<em>программа</em>'}</button>`).join('');
 $('#subjects').addEventListener('click', e => {
-  const b = e.target.closest('.subj'); if (!b) return;
-  const s = SUBJECTS.find(x => x.id === b.dataset.s);
-  if (s.live) { select(null); return; }
-  showPlan(s);
+  const b = e.target.closest('.subj'); if (!b || b.dataset.s === SUBJ.id) return;
+  useSubject(b.dataset.s);
+  history.replaceState(null, '', b.dataset.s === 'phys' ? location.pathname : '#' + b.dataset.s);
 });
 
 // ---------- tree ----------
 const tree = $('#tree');
 const nodeHTML = t => {
-  const meta = t.status === 'soon' ? `${t.g} класс · скоро` : `${t.g} класс · ${t.lessons} ${plural(t.lessons, 'урок', 'урока', 'уроков')}`;
+  const meta = t.status === 'soon' ? `${t.g} класс · ${SUBJ.live ? 'скоро' : t.items.length + ' ' + plural(t.items.length, 'подтема', 'подтемы', 'подтем')}` : `${t.g} класс · ${lessonWord(t.lessons)}`;
   return `<button class="node ${t.status}" data-id="${t.id}" style="--c:${color(t.b)}" aria-pressed="false"><span class="nt">${esc(t.t)}</span><span class="nm"><i class="st"></i>${meta}</span></button>`;
 };
-let html = `<div class="trunk" style="grid-row:1">${TOPICS.filter(t => t.b === 'base').map(nodeHTML).join('')}</div>`;
-BRANCHES.forEach((b, i) => { html += `<div class="bh" data-b="${b.id}" style="grid-row:2;grid-column:${i + 2};--c:${b.c}"><i></i>${b.name}</div>`; });
-GRADES.forEach((g, r) => {
-  const row = r + 3;
-  html += `<div class="band ${r % 2 ? 'alt' : ''}" style="grid-row:${row}"></div>`;
-  html += `<div class="lvl" style="grid-row:${row}"><b>${g}</b>класс</div>`;
-  BRANCHES.forEach((b, i) => {
-    const list = TOPICS.filter(t => t.b === b.id && t.g === g);
-    html += `<div class="cell" data-b="${b.id}" style="grid-row:${row};grid-column:${i + 2}">${list.map(nodeHTML).join('')}</div>`;
+let edges;
+function buildTree() {
+  tree.style.gridTemplateColumns = `70px repeat(${BRANCHES.length},minmax(186px,1fr))`;
+  tree.style.minWidth = (100 + BRANCHES.length * 198) + 'px';
+  let html = `<div class="trunk" style="grid-row:1">${TOPICS.filter(t => t.b === 'base').map(nodeHTML).join('')}</div>`;
+  BRANCHES.forEach((b, i) => { html += `<div class="bh" data-b="${b.id}" style="grid-row:2;grid-column:${i + 2};--c:${b.c}"><i></i>${b.name}</div>`; });
+  GRADES.forEach((g, r) => {
+    const row = r + 3;
+    html += `<div class="band ${r % 2 ? 'alt' : ''}" style="grid-row:${row}"></div>`;
+    html += `<div class="lvl" style="grid-row:${row}"><b>${g}</b>класс</div>`;
+    BRANCHES.forEach((b, i) => {
+      const list = TOPICS.filter(t => t.b === b.id && t.g === g);
+      html += `<div class="cell" data-b="${b.id}" style="grid-row:${row};grid-column:${i + 2}">${list.map(nodeHTML).join('')}</div>`;
+    });
   });
-});
-tree.innerHTML = html + '<svg class="edges" id="edges" aria-hidden="true"></svg>';
-const edges = $('#edges');
+  tree.innerHTML = html + '<svg class="edges" id="edges" aria-hidden="true"></svg>';
+  edges = $('#edges');
+}
 
 let selected = null;
 function draw() {
+  if (!edges) return;
   const box = tree.getBoundingClientRect();
   const W = tree.scrollWidth, H = tree.scrollHeight;
   edges.setAttribute('width', W); edges.setAttribute('height', H); edges.setAttribute('viewBox', `0 0 ${W} ${H}`);
@@ -293,6 +295,7 @@ function draw() {
   let s = '';
   const trunkNodes = [...tree.querySelectorAll('.trunk .node')].map(r);
   const heads = [...tree.querySelectorAll('.bh')].map(h => ({ b: h.dataset.b, ...r(h) }));
+  if (!trunkNodes.length || !heads.length) return;
   const busY = Math.max(...trunkNodes.map(n => n.bt)) + 16;
   const railX = h => h.l + 8;
   // trunk → bus → branch heads
@@ -301,7 +304,7 @@ function draw() {
   heads.forEach(h => { s += `<path d="M${railX(h)} ${busY} V${h.cy - 7}" stroke="var(--c-base)" stroke-width="2" fill="none" opacity=".55"/>`; });
   // rails with stations
   heads.forEach(h => {
-    const c = BRANCHES.find(x => x.id === h.b).c, x = railX(h) + (tree.querySelector(`.cell[data-b="${h.b}"]`) ? 0 : 0);
+    const c = BRANCHES.find(x => x.id === h.b).c;
     const nodes = [...tree.querySelectorAll(`.cell[data-b="${h.b}"] .node`)].map(n => ({ id: n.dataset.id, ...r(n) }));
     if (!nodes.length) return;
     const cellL = r(tree.querySelector(`.cell[data-b="${h.b}"]`)).l + 9;
@@ -314,21 +317,11 @@ function draw() {
   });
   // links of the selected topic
   if (selected) {
-    const sel = tree.querySelector(`.node[data-id="${selected}"]`), S = r(sel);
-    const link = (fromId, toRect, dashed, c) => {
-      const el = tree.querySelector(`.node[data-id="${fromId}"]`); if (!el) return;
-      const P = r(el); let d;
-      if (Math.abs(P.cx - toRect.cx) < 20) { const x = Math.max(P.r, toRect.r) + 34; d = `M${P.r} ${P.cy} C${x} ${P.cy} ${x} ${toRect.cy} ${toRect.r} ${toRect.cy}`; }
-      else if (toRect.cx > P.cx) d = `M${P.r} ${P.cy} C${P.r + 70} ${P.cy} ${toRect.l - 70} ${toRect.cy} ${toRect.l} ${toRect.cy}`;
-      else d = `M${P.l} ${P.cy} C${P.l - 70} ${P.cy} ${toRect.r + 70} ${toRect.cy} ${toRect.r} ${toRect.cy}`;
-      s += `<path d="${d}" stroke="${c}" stroke-width="2.2" fill="none" ${dashed ? 'stroke-dasharray="5 5" opacity=".7"' : ''}/>`;
-    };
-    T[selected].req.forEach(p => link(p, S, false, color(T[p].b)));
-    deps(selected).forEach(dId => { const el = tree.querySelector(`.node[data-id="${dId}"]`); const D = r(el); const P = S;
-      let d; if (Math.abs(P.cx - D.cx) < 20) { const x = Math.max(P.r, D.r) + 34; d = `M${P.r} ${P.cy} C${x} ${P.cy} ${x} ${D.cy} ${D.r} ${D.cy}`; }
-      else if (D.cx > P.cx) d = `M${P.r} ${P.cy} C${P.r + 70} ${P.cy} ${D.l - 70} ${D.cy} ${D.l} ${D.cy}`;
-      else d = `M${P.l} ${P.cy} C${P.l - 70} ${P.cy} ${D.r + 70} ${D.cy} ${D.r} ${D.cy}`;
-      s += `<path d="${d}" stroke="${color(T[selected].b)}" stroke-width="1.8" fill="none" stroke-dasharray="5 5" opacity=".75"/>`; });
+    const S = r(tree.querySelector(`.node[data-id="${selected}"]`));
+    const curve = (P, D) => Math.abs(P.cx - D.cx) < 20 ? (x => `M${P.r} ${P.cy} C${x} ${P.cy} ${x} ${D.cy} ${D.r} ${D.cy}`)(Math.max(P.r, D.r) + 34)
+      : D.cx > P.cx ? `M${P.r} ${P.cy} C${P.r + 70} ${P.cy} ${D.l - 70} ${D.cy} ${D.l} ${D.cy}` : `M${P.l} ${P.cy} C${P.l - 70} ${P.cy} ${D.r + 70} ${D.cy} ${D.r} ${D.cy}`;
+    T[selected].req.forEach(p => { const el = tree.querySelector(`.node[data-id="${p}"]`); if (el) s += `<path d="${curve(r(el), S)}" stroke="${color(T[p].b)}" stroke-width="2.2" fill="none"/>`; });
+    deps(selected).forEach(d => { const el = tree.querySelector(`.node[data-id="${d}"]`); if (el) s += `<path d="${curve(S, r(el))}" stroke="${color(T[selected].b)}" stroke-width="1.8" fill="none" stroke-dasharray="5 5" opacity=".75"/>`; });
   }
   edges.innerHTML = s;
 }
@@ -342,44 +335,29 @@ function itemsHTML(t) {
   return `<ul class="items">${t.items.map((x, i) => { const ok = t.doneItems && i < t.doneItems; return `<li class="${ok ? 'ok' : ''}"><span>${esc(x)}</span>${ok ? '<em>готово</em>' : ''}</li>`; }).join('')}</ul>`;
 }
 function ctaHTML(t) {
-  return t.status === 'soon'
-    ? `<div class="soonbox">Опыты по этой теме скоро добавим.</div>`
-    : `<a class="cta" href="${t.href}">Открыть опыты · ${t.lessons} ${plural(t.lessons, 'урок', 'урока', 'уроков')} ›</a>${t.status === 'part' ? '<div class="soonbox">Остальные темы раздела скоро добавим.</div>' : ''}`;
-}
-function plansHTML() {
-  return `<h4>Другие предметы</h4><div class="plans">${SUBJECTS.filter(s => !s.live).map(s => `<div class="plan"><b>${s.name}<em>скоро</em></b><span>${s.plan}</span></div>`).join('')}</div>`;
+  if (t.status === 'soon') return `<div class="soonbox">${SUBJ.live ? 'Опыты по этой теме скоро добавим.' : 'Интерактивные уроки и ролики по этой теме скоро добавим. Вопросы по ней уже можно задать ИИ-репетитору.'}</div>`;
+  return `<a class="cta" href="${t.href}">Открыть опыты · ${lessonWord(t.lessons)} ›</a>${t.status === 'part' ? '<div class="soonbox">Остальные темы раздела скоро добавим.</div>' : ''}`;
 }
 function defaultSide() {
-  side.classList.remove('plansonly');
+  const n = BRANCHES.length, ready = TOPICS.filter(t => t.status !== 'soon');
   side.innerHTML = `<h3>Как читать карту</h3>
-    <p>Сверху основы, без которых не обойтись ни в одном разделе. От них расходятся пять веток. В каждой ветке темы идут сверху вниз: от 7 класса к 11, от простого к сложному.</p>
-    <p>Нажмите на тему: появятся её связи. Сплошные линии ведут от того, что нужно знать заранее, пунктир — к темам, которые она открывает.</p>
+    <p>Сверху основы, без которых не обойтись ни в одном разделе. От них расходятся ${n === 4 ? 'четыре ветки' : n === 5 ? 'пять веток' : n + ' веток'}. В каждой ветке темы идут сверху вниз: от ${GRADES[0]} класса к ${GRADES[GRADES.length - 1]}, от простого к сложному.</p>
+    <p>Нажмите на тему: появятся её связи и что в ней изучают. Сплошные линии ведут от того, что нужно знать заранее, пунктир — к темам, которые она открывает.</p>
     <h4>Обозначения</h4>
-    <div class="legend"><div><i class="st ok"></i>Опыты готовы, можно заниматься</div><div><i class="st half"></i>Часть опытов готова</div><div><i class="st"></i>Скоро добавим</div></div>
-    <h4>Уже можно открыть</h4><div class="chips">${TOPICS.filter(t => t.status !== 'soon').map(t => chip(t.id)).join('')}</div>
-    ${plansHTML()}`;
+    <div class="legend"><div><i class="st ok"></i>Опыты готовы, можно заниматься</div><div><i class="st half"></i>Часть опытов готова</div><div><i class="st"></i>${SUBJ.live ? 'Скоро добавим' : 'В программе, уроки скоро'}</div></div>
+    ${ready.length ? `<h4>Уже можно открыть</h4><div class="chips">${ready.map(t => chip(t.id)).join('')}</div>` : `<h4>Программа по классам</h4><div class="plans">${GRADES.map(g => { const l = TOPICS.filter(t => t.g === g && t.b !== 'base'); return l.length ? `<div class="plan"><b>${g} класс<em>${l.length} ${plural(l.length, 'тема', 'темы', 'тем')}</em></b><span>${l.map(t => esc(t.t)).join(' · ')}</span></div>` : ''; }).join('')}</div>`}`;
 }
 function topicSide(t) {
-  side.classList.remove('plansonly');
   const req = t.req, nx = deps(t.id);
   side.innerHTML = `<button class="close" id="closeSide" aria-label="Закрыть">✕</button>
-    <div class="kicker" style="--c:${color(t.b)}"><i></i>${bname(t.b)} · ${t.g} класс</div>
+    <div class="kicker" style="--c:${color(t.b)}"><i></i>${SUBJ.name} · ${bname(t.b)} · ${t.g} класс</div>
     <h3>${esc(t.t)}</h3>
-    <p class="note" style="color:var(--muted)">${t.status === 'soon' ? 'В планах' : STATUS[t.status]}</p>
-    <h4>Что внутри</h4>${itemsHTML(t)}
+    <p class="note" style="color:var(--muted)">${t.status === 'soon' ? 'В программе' : STATUS[t.status]}</p>
+    <h4>Что изучаем</h4>${itemsHTML(t)}
     ${req.length ? `<h4>Сначала стоит пройти</h4><div class="chips">${req.map(chip).join('')}</div>` : '<h4>С чего начать</h4><p>Это стартовая тема, знаний заранее не нужно.</p>'}
     ${nx.length ? `<h4>Дальше откроется</h4><div class="chips">${nx.map(chip).join('')}</div>` : ''}
     ${ctaHTML(t)}`;
   $('#closeSide').onclick = () => select(null);
-}
-function showPlan(s) {
-  select(null, true);
-  document.querySelectorAll('.subj').forEach(b => b.setAttribute('aria-pressed', b.dataset.s === s.id));
-  side.classList.add('plansonly');
-  side.innerHTML = `<button class="close" id="closeSide" aria-label="Закрыть">✕</button><div class="kicker" style="--c:var(--muted)"><i></i>Скоро</div><h3>${s.name}</h3><p>${s.plan}</p>
-    <p class="note" style="color:var(--muted)">Карта и опыты появятся здесь так же, как у физики: темы от простого к сложному и интерактивные уроки.</p>${plansHTML()}`;
-  $('#closeSide').onclick = () => select(null);
-  if (matchMedia('(max-width:1180px)').matches) side.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 side.addEventListener('click', e => { const c = e.target.closest('[data-go]'); if (c) { select(c.dataset.go); if (matchMedia('(max-width:760px)').matches) openInList(c.dataset.go); } });
 
@@ -388,44 +366,65 @@ function related(id) {
   T[id].req.forEach(x => set.add(x)); deps(id).forEach(x => set.add(x));
   return set;
 }
-function select(id, keepSubjects) {
+function select(id) {
   selected = id;
-  if (!keepSubjects) document.querySelectorAll('.subj').forEach(b => b.setAttribute('aria-pressed', b.dataset.s === 'phys'));
   tree.classList.toggle('focus', !!id);
   const rel = id ? related(id) : new Set();
   tree.querySelectorAll('.node').forEach(n => { n.setAttribute('aria-pressed', n.dataset.id === id); n.classList.toggle('rel', rel.has(n.dataset.id)); });
-  if (!keepSubjects) id ? topicSide(T[id]) : defaultSide();
+  id ? topicSide(T[id]) : defaultSide();
   draw();
 }
 
 // ---------- list view (phones) ----------
 const list = $('#list');
-const groups = [{ id: 'base', name: 'Основы', c: 'var(--c-base)' }, ...BRANCHES];
-list.innerHTML = groups.map(gp => `<section class="lb" style="--c:${gp.c}"><h3><i></i>${gp.name}</h3>` +
-  TOPICS.filter(t => t.b === gp.id).map(t => `<details data-id="${t.id}"><summary><span class="g">${t.g} кл</span><span class="t">${esc(t.t)}</span><span class="node ${t.status}" style="all:unset;display:flex"><i class="st" style="${t.status === 'done' ? 'background:var(--ok);border-color:var(--ok)' : t.status === 'part' ? 'background:linear-gradient(90deg,var(--ok) 50%,transparent 50%);border-color:var(--ok)' : ''}"></i></span></summary>
-    <div class="body">${itemsHTML(t)}${t.req.length ? `<p class="note" style="margin:10px 0 0;font-size:13px;color:var(--muted)">Сначала: ${t.req.map(x => esc(T[x].t)).join(', ')}</p>` : ''}${ctaHTML(t)}</div></details>`).join('') + `</section>`).join('') +
-  `<section class="lb" style="--c:var(--muted)"><h3><i></i>Другие предметы</h3><div style="padding:12px 14px">${SUBJECTS.filter(s => !s.live).map(s => `<div class="plan" style="margin-bottom:8px"><b>${s.name}<em>скоро</em></b><span>${s.plan}</span></div>`).join('')}</div></section>`;
+const dot = t => `<span class="node ${t.status}" style="all:unset;display:flex"><i class="st" style="${t.status === 'done' ? 'background:var(--ok);border-color:var(--ok)' : t.status === 'part' ? 'background:linear-gradient(90deg,var(--ok) 50%,transparent 50%);border-color:var(--ok)' : ''}"></i></span>`;
+function buildList() {
+  const groups = [{ id: 'base', name: 'Основы', c: 'var(--c-base)' }, ...BRANCHES];
+  list.innerHTML = groups.map(gp => `<section class="lb" style="--c:${gp.c}"><h3><i></i>${gp.name}</h3>` +
+    TOPICS.filter(t => t.b === gp.id).map(t => `<details data-id="${t.id}"><summary><span class="g">${t.g} кл</span><span class="t">${esc(t.t)}</span>${dot(t)}</summary>
+      <div class="body">${itemsHTML(t)}${t.req.length ? `<p class="note" style="margin:10px 0 0;font-size:13px;color:var(--muted)">Сначала: ${t.req.map(x => esc(T[x].t)).join(', ')}</p>` : ''}${ctaHTML(t)}</div></details>`).join('') + `</section>`).join('');
+}
 function openInList(id) { const d = list.querySelector(`details[data-id="${id}"]`); if (d) { d.open = true; d.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }
+
+function useSubject(id) {
+  SUBJ = SUBJECTS.find(s => s.id === id) || SUBJECTS[0];
+  BRANCHES = SUBJ.branches; GRADES = SUBJ.grades; TOPICS = SUBJ.topics;
+  T = Object.fromEntries(TOPICS.map(t => [t.id, Object.assign(t, { status: t.status || 'soon' })]));
+  selected = null;
+  document.querySelectorAll('.subj').forEach(b => b.setAttribute('aria-pressed', b.dataset.s === SUBJ.id));
+  $('.intro h2').textContent = SUBJ.title;
+  $('.intro p').textContent = SUBJ.intro;
+  const doneN = TOPICS.filter(t => t.status !== 'soon').length, lessonsN = TOPICS.reduce((a, t) => a + (t.lessons || 0), 0);
+  const subN = TOPICS.reduce((a, t) => a + t.items.length, 0);
+  $('#stats').innerHTML = [
+    [BRANCHES.length, plural(BRANCHES.length, 'раздел', 'раздела', 'разделов')],
+    [TOPICS.length, plural(TOPICS.length, 'тема', 'темы', 'тем')],
+    ...(SUBJ.live ? [[doneN, 'уже с опытами'], [lessonsN, plural(lessonsN, 'урок', 'урока', 'уроков')]] : [[subN, plural(subN, 'подтема', 'подтемы', 'подтем')], [`${GRADES[0]}–${GRADES[GRADES.length - 1]}`, 'классы']]),
+  ].map(([n, l]) => `<div class="stat"><b>${n}</b><span>${l}</span></div>`).join('');
+  document.title = `Карта: ${SUBJ.name.toLowerCase()}`;
+  buildTree(); buildList(); defaultSide(); draw();
+}
 
 // for the AI tutor: what is on the screen right now
 window.LUCH_CONTEXT = () => {
-  const lines = ['Страница: карта школьной физики с 7 по 11 класс. Основы: «Измерения и единицы», «Строение вещества». Ветки: ' + BRANCHES.map(b => b.name).join(', ') + '.',
-    'Опыты уже готовы: ' + TOPICS.filter(t => t.status !== 'soon').map(t => `«${t.t}» (${t.href})`).join(', ') + '. Остальные темы скоро.'];
+  const lines = [`Страница: карта предметов «Луч», открыт предмет «${SUBJ.name}» (${GRADES[0]}–${GRADES[GRADES.length - 1]} класс). Основы: ${TOPICS.filter(t => t.b === 'base').map(t => `«${t.t}»`).join(', ')}. Ветки: ` + BRANCHES.map(b => b.name).join(', ') + '.',
+    SUBJ.live ? 'Опыты уже готовы: ' + TOPICS.filter(t => t.status !== 'soon').map(t => `«${t.t}» (${t.href})`).join(', ') + '. Остальные темы скоро.' : 'По этому предмету пока есть программа обучения, интерактивные уроки скоро; объяснять темы можно уже сейчас.'];
   if (selected) {
     const t = T[selected];
     lines.push(`Ученик открыл тему «${t.t}» (${bname(t.b)}, ${t.g} класс): ${t.items.join(', ')}. Сначала стоит пройти: ${t.req.map(x => T[x].t).join(', ') || 'ничего'}. Дальше откроется: ${deps(t.id).map(x => T[x].t).join(', ') || 'ничего'}. Статус: ${STATUS[t.status]}.`);
   }
   lines.push('Все темы: ' + TOPICS.map(t => `${t.t} (${t.g} кл)`).join('; ') + '.');
+  lines.push('Другие предметы на карте: ' + SUBJECTS.filter(s => s !== SUBJ).map(s => s.name).join(', ') + '.');
   return lines.join('\n');
 };
 window.LUCH_SUGGEST = () => selected
   ? [`Расскажи коротко про тему «${T[selected].t}»`, 'Что нужно знать перед этой темой?', 'Зачем это в жизни?']
-  : ['С чего начать изучать физику?', 'Что мне подойдёт, если я в 8 классе?', 'Как связаны оптика и волны?'];
+  : [`С чего начать изучать ${({ phys: 'физику', math: 'математику', chem: 'химию', bio: 'биологию', cs: 'информатику' })[SUBJ.id]}?`, 'Что мне подойдёт, если я в 8 классе?', 'Как связаны темы на этой карте?'];
 
-defaultSide();
+useSubject(location.hash.slice(1));
+addEventListener('hashchange', () => { const id = location.hash.slice(1) || 'phys'; if (!SUBJ || SUBJ.id !== id) useSubject(id); });
 new ResizeObserver(() => draw()).observe(tree);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(draw);
-draw();
 })();
 </script>
 <script src="/luch/tutor.js" defer></script>
