@@ -29,6 +29,9 @@
   .lr-f{align-self:center;margin:auto 0;font:500 clamp(22px,3.8vh,34px)/1.2 "IBM Plex Mono",monospace;background:#e8ecf4;color:#0b1019;border-radius:14px;padding:12px 18px;text-align:center;box-shadow:0 12px 40px -10px rgba(255,181,71,.45);transition:opacity .35s,transform .35s}
   .lr-f.in{opacity:0;transform:scale(.92)}
   .lr-sub{margin-top:auto;font:600 clamp(17px,2.7vh,23px)/1.4 "Golos Text",sans-serif;color:rgba(232,236,244,.38)}
+  .lr-sub.long{font-size:clamp(15px,2.3vh,19px)}
+  .lr-icons.compact div{padding:8px 6px 7px;gap:5px}
+  .lr-icons.compact svg{width:clamp(30px,4.6vh,42px)}
   .lr-sub span{transition:color .15s}
   .lr-sub span.on{color:#e8ecf4}
   .lr-zone{position:absolute;top:70px;bottom:0;z-index:2;cursor:pointer}
@@ -95,6 +98,13 @@
     jack: I('<path d="M6 40h36M14 40l10-18 10 18M24 22V12M16 12h16M34 40l9-6"/>'),
     wheelbarrow: I('<path d="M5 17h28l-4 15H10z"/><circle cx="13" cy="38" r="5"/><path d="M33 17l10 12M29 32l2 8"/>'),
     ramp: I('<path d="M4 40h40V16z"/><rect x="22" y="22" width="9" height="9" rx="1" transform="rotate(-29 26 26)"/>'),
+    robot: I('<rect x="11" y="15" width="26" height="20" rx="4"/><circle cx="19" cy="25" r="2.5"/><circle cx="29" cy="25" r="2.5"/><path d="M24 15V8M21 8h6M6 23v6M42 23v6M18 35v6M30 35v6"/>'),
+    helmet: I('<path d="M6 34h36M9 34a15 15 0 0 1 30 0"/><path d="M20 20v-6h8v6M24 14v6"/>'),
+    car: I('<path d="M6 32v-7l5-9h22l7 9h2v7z"/><circle cx="14" cy="33" r="4"/><circle cx="34" cy="33" r="4"/><path d="M12 25h26"/>'),
+    dumbbell: I('<path d="M14 24h20"/><rect x="7" y="15" width="7" height="18" rx="2"/><rect x="34" y="15" width="7" height="18" rx="2"/><path d="M4 20v8M44 20v8"/>'),
+    vr: I('<rect x="5" y="15" width="38" height="20" rx="6"/><circle cx="16" cy="25" r="4"/><circle cx="32" cy="25" r="4"/><path d="M21 35l3-4 3 4"/>'),
+    gear: I('<circle cx="24" cy="24" r="7"/><path d="M24 5v6M24 37v6M5 24h6M37 24h6M10.6 10.6l4.2 4.2M33.2 33.2l4.2 4.2M10.6 37.4l4.2-4.2M33.2 14.8l4.2-4.2"/>'),
+    bike: I('<circle cx="11" cy="32" r="7"/><circle cx="37" cy="32" r="7"/><path d="M11 32l8-14h12l6 14M19 18l5 14h-13M28 12h5"/>'),
   };
   let cfg = null, durations = {};
 
@@ -138,6 +148,7 @@
         iEl.innerHTML = sc.icons.map(([ic, t], k) => `<div style="animation-delay:${0.25 + k * 0.35}s">${ICONS[ic] || ''}<span>${esc(t)}</span></div>`).join(''); }
       stage.classList.remove('pulse'); void stage.offsetWidth; stage.classList.add('pulse');
       fEl.hidden = !sc.formula; if (sc.formula) { fEl.textContent = sc.formula; if (!opts.render) { fEl.classList.add('in'); setTimeout(() => fEl.classList.remove('in'), 250); } }
+      subEl.classList.toggle('long', words(sc.say).length > 20); iEl.classList.toggle('compact', words(sc.say).length > 20);
       subEl.innerHTML = words(sc.say).map(w => `<span>${esc(w)}</span> `).join('');
       dur = durations[`${id}-${idx}`] || guess(sc.say); acc = 0; t0 = performance.now();
       if (opts.render) return;
