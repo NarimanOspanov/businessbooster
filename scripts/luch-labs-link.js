@@ -32,9 +32,11 @@ function setTopic(file, id, n) {
   return true;
 }
 
+// LUCH_DONE=файл со списком готовых лабораторий (по одной в строке) — незаконченные не трогаем.
+const READY = process.env.LUCH_DONE ? new Set(fs.readFileSync(process.env.LUCH_DONE, 'utf8').split(/\s+/).filter(Boolean)) : null;
 const done = [];
 for (const dir of fs.existsSync(LABS) ? fs.readdirSync(LABS) : []) {
-  const m = /^(phys|math|chem|bio|cs)-(\w+)$/.exec(dir); if (!m) continue;
+  const m = /^(phys|math|chem|bio|cs)-(\w+)$/.exec(dir); if (!m || (READY && !READY.has(dir))) continue;
   const f = path.join(LABS, dir, "index.html"); if (!fs.existsSync(f)) continue;
   const L = lessonsOf(f);
   if (!L || !L.length) { console.warn("пропуск", dir, "— LESSONS не читаются"); continue; }

@@ -1,0 +1,949 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по информатике, 5 класс: исполнители, последовательность команд, блок-схемы.">
+<title>Алгоритмы</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. SVG stage on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:pointer}
+.scene [data-drag^="c-"]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none;z-index:3}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none;z-index:3}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.meter .v.ok{color:var(--ok)}
+.meter .v.bad{color:var(--warn)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--arm);transition:width .2s}
+.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%,40%{box-shadow:0 0 0 3px var(--arm)}100%{box-shadow:0 0 0 0 transparent}}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px);z-index:3}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.tools button:hover{color:var(--fg)}
+.tools button.go{background:var(--fg);color:var(--bg);font-weight:600}
+.tools button:disabled{opacity:.35;cursor:default}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.tools .val{font:500 12px var(--font-mono);color:var(--fg);padding:0 4px;white-space:nowrap}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:22%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--fg)}
+.chips button:hover{border-color:var(--muted)}
+.chips button:disabled{opacity:.35;cursor:default}
+.listing{font:500 13px/1.6 var(--font-mono);padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);margin-top:10px;overflow-wrap:anywhere}
+.listing .cur{color:var(--force)}
+.listing .bad{color:var(--warn)}
+
+.formula{font:500 16px/1.35 var(--font-mono);text-align:center;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+.step.okk span{color:var(--ok)}
+.step.badd span{color:var(--warn)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:470px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 340px);min-height:0}
+  .stage.tall{height:calc(80vw + 430px)}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><rect x="13" y="6" width="14" height="6" rx="3" fill="none" stroke="var(--fg)" stroke-width="2"/><path d="M20 12v4M20 23v4" stroke="var(--fg)" stroke-width="2"/><rect x="12" y="16" width="16" height="7" rx="1" fill="var(--force)"/><path d="M14 27h14l-2 6H12z" fill="none" stroke="var(--arm)" stroke-width="2" stroke-linejoin="round"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Информатика · Алгоритмы</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#cs">Карта</a><a href="/physics/#cs">Информатика</a><a href="/labs/cs-algo/" aria-current="page">Алгоритмы</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Алгоритмы</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Рабочий стол лаборатории">
+    <svg class="scene" id="scene" role="img" aria-label="Интерактивная сцена с исполнителем"></svg>
+    <div class="task" id="taskBox" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Команды" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+
+const LESSONS = [
+  { id: 'exec', title: 'Исполнители',
+    text: ['Исполнитель — тот, кто выполняет команды. Это может быть человек, животное, робот или программа. Ты нажимаешь кнопку — и стиральная машина начинает стирку: она тоже исполнитель.',
+           'У каждого исполнителя свой набор команд — система команд исполнителя (СКИ). Других команд он не понимает. Наш Кузнечик живёт на числовой прямой от 0 до 20 и знает всего две команды: «вперёд 3» и «назад 2».',
+           'Место, где работает исполнитель, называют средой. Если команда выводит его за пределы среды, он её не выполняет. Это называется «отказ».'],
+    why: 'Инженер-робототехник на заводе — например, на автозаводе в Костанае — задаёт роботу-сварщику точный набор движений. Оператор станка с ЧПУ управляет станком, который понимает только свои коды команд. Даже голосовой помощник в телефоне — исполнитель: он делает только то, что умеет. Кто понимает, как устроен исполнитель, быстро осваивает любую новую технику.',
+    task: 'Приведите Кузнечика из точки 0 в точку 7. Можно использовать не больше 5 команд.',
+    hint: 'Кузнечик не умеет прыгать на 1. Сначала проскочите 7 прыжками вперёд, потом вернитесь назад. Ошиблись — нажмите «Заново».',
+    stage: 'Нажимайте команды внизу — Кузнечик выполнит их сразу.',
+    start: 0, goal: 7, maxCmd: 5, lineMax: 20, fwd: 3, back: 2,
+    check: m => m.pos === m.goal && m.n <= m.max },
+  { id: 'seq', title: 'Последовательность команд',
+    text: ['Алгоритм — это точная последовательность команд для исполнителя, которая приводит к результату. Рецепт пирога, инструкция к шкафу, маршрут до школы — всё это алгоритмы.',
+           'Если команды выполняются одна за другой, по порядку, алгоритм называют линейным. Порядок важен: «надеть носки, потом ботинки» — совсем не то, что наоборот.',
+           'Программу сначала составляют целиком, а потом запускают. Исполнитель выполняет её сам, без подсказок. Одна неверная команда — и Робот упрётся в камень.'],
+    why: 'Программист работает именно так: продумывает каждую команду заранее, а компьютер выполняет их без подсказок. Программисты — одни из самых высокооплачиваемых специалистов в Казахстане, а технопарк Astana Hub помогает IT-компаниям расти. Логист на складе интернет-магазина составляет маршрут сборщика заказов, повар готовит по технологической карте — это тоже последовательности шагов.',
+    task: 'Составьте программу, которая приведёт Робота к флажку в обход камней, и запустите её.',
+    hint: 'Сначала проложите путь глазами и посчитайте клетки. Камни стоят двумя стенками — в каждой есть проход. Нажмите на команду в программе, чтобы удалить её.',
+    stage: 'Добавляйте команды стрелками, потом нажмите «Пуск».',
+    cols: 7, rows: 5, start: [0, 4], goal: [6, 0], rocks: [[2, 2], [2, 3], [2, 4], [4, 0], [4, 1]], maxProg: 20,
+    check: m => m.success },
+  { id: 'flow', title: 'Блок-схемы',
+    text: ['Алгоритм можно записать словами, а можно нарисовать. Блок-схема — это рисунок алгоритма: каждый шаг в своей фигуре, а стрелки показывают порядок.',
+           'У каждой фигуры свой смысл. Овал — начало и конец. Параллелограмм — ввод данных и вывод результата. Прямоугольник — действие или вычисление. Ромб — проверка условия, у него два выхода: «да» и «нет».',
+           'Блок-схему читают сверху вниз, по стрелкам. Её поймёт любой человек, даже если он не знает языка программирования.'],
+    why: 'Программисты и системные аналитики рисуют блок-схемы до того, как писать код: ошибку видно ещё на бумаге. В банках схемами описывают, как одобряют кредит, а инженеры — как работает автоматическая линия на заводе. В жизни схема помогает разобраться в любой инструкции: что за чем делать и что проверить.',
+    task: 'Соберите блок-схему «Площадь прямоугольника» и выполните её для комнаты 6 × 4 м.',
+    hint: 'Подумайте, что нужно сначала: считать или узнать числа? Одна фигура здесь лишняя. Длину a и ширину b меняйте кнопками внизу.',
+    stage: 'Тащите фигуры в цепочку. Можно нажать на фигуру, а потом на место.',
+    order: ['start', 'in', 'calc', 'out', 'end'], a0: 5, b0: 3, ta: 6, tb: 4,
+    check: m => m.built && m.ranOk },
+];
+
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+const KEY = 'luch-cs-algo';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null,
+            // lesson 1
+            pos: 0, hist: [], ref: 0, jump: null, bad: null,
+            // lesson 2
+            prog: [], rob: [0, 4], trail: [], run: null, fail: null, success: false, ran: false,
+            // lesson 3
+            slot: [], sel: null, miss: 0, a: 5, b: 3, exec: null, lastRun: null, lastBad: null };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+
+// ---------- lesson 2: robot ----------
+const DIRS = { U: { dx: 0, dy: -1, w: 'вверх', a: '↑' }, D: { dx: 0, dy: 1, w: 'вниз', a: '↓' }, L: { dx: -1, dy: 0, w: 'влево', a: '←' }, R: { dx: 1, dy: 0, w: 'вправо', a: '→' } };
+const SEQ = () => LESSONS[1];
+const isRock = (x, y) => SEQ().rocks.some(r => r[0] === x && r[1] === y);
+const cellName = c => `(${c[0] + 1}; ${c[1] + 1})`;
+function simulate(prog) {
+  const Ls = SEQ(); let p = Ls.start.slice(); const steps = [];
+  for (const c of prog) {
+    const d = DIRS[c], q = [p[0] + d.dx, p[1] + d.dy];
+    const out = q[0] < 0 || q[1] < 0 || q[0] >= Ls.cols || q[1] >= Ls.rows;
+    if (out || isRock(q[0], q[1])) { steps.push({ c, from: p, to: q, fail: out ? 'край поля' : 'камень' }); return { steps, end: p, fail: steps.length }; }
+    steps.push({ c, from: p, to: q }); p = q;
+  }
+  return { steps, end: p, fail: 0 };
+}
+
+// ---------- lesson 3: flowchart ----------
+const BLOCKS = {
+  start: { shape: 'oval', t: 'Начало' }, in: { shape: 'para', t: 'Ввод a, b' }, calc: { shape: 'rect', t: 'S = a · b' },
+  out: { shape: 'para', t: 'Вывод S' }, end: { shape: 'oval', t: 'Конец' }, cond: { shape: 'rhomb', t: 'a > b ?' } };
+const POOL_ORDER = ['calc', 'end', 'in', 'cond', 'start', 'out'];
+const SHC = { oval: '#86e0a8', para: '#72d4e8', rect: '#ffb547', rhomb: '#c3a6ff' };
+const SHN = { oval: 'овал', para: 'параллелограмм', rect: 'прямоугольник', rhomb: 'ромб' };
+const GQ = { // guiding questions after a wrong drop (no direct answer)
+  start: 'С какого блока начинается любая схема?',
+  end: '«Конец» ставят туда, где алгоритм заканчивается. Это какое место?',
+  in: 'Можно ли считать площадь, пока числа a и b ещё никто не ввёл?',
+  calc: 'Считать можно, когда числа уже есть. А показывать ответ — когда он готов. Где место вычисления?',
+  out: 'Можно ли вывести S, пока её ещё не посчитали?',
+  cond: 'Ромб — это проверка условия с выходами «да» и «нет». Нужно ли в нашем алгоритме что-то проверять?',
+};
+const built = () => S.slot.length === 5 && S.slot.every((c, k) => c === LESSONS[2].order[k]);
+
+function model() {
+  const id = LID();
+  if (id === 'exec') {
+    const Ls = L();
+    return { kind: 'exec', pos: S.pos, n: S.hist.length, max: Ls.maxCmd, goal: Ls.goal, ref: S.ref,
+             f: S.hist.filter(h => h.d > 0).length, b: S.hist.filter(h => h.d < 0).length };
+  }
+  if (id === 'seq') {
+    const tr = simulate(S.prog);
+    return { kind: 'seq', n: S.prog.length, tr, success: S.success, ran: S.ran, running: !!S.run, fail: S.fail, rob: S.rob };
+  }
+  const placed = S.slot.filter(Boolean).length, lr = S.lastRun;
+  return { kind: 'flow', placed, built: built(), a: S.a, b: S.b, s: S.a * S.b, miss: S.miss, lastRun: lr,
+           ranOk: !!lr && lr.a === LESSONS[2].ta && lr.b === LESSONS[2].tb, running: !!S.exec };
+}
+
+// ---------- geometry (SVG units). Wide stage: content in x 8…516, y 80…406. Narrow (phone): x 0…302, taller. ----------
+let NAR = false;
+const BOUNDS = () => {
+  if (!NAR) return { x0: 8, x1: 516, y1: 406 };
+  return { x0: 0, x1: 302, y1: { exec: 396, seq: 448, flow: 494 }[LID()] };
+};
+// lesson 1
+const LX = n => NAR ? 14 + n * 13.7 : 40 + n * 22.5;
+const LY = () => NAR ? 236 : 252;
+const LOGC = i => NAR ? { x: 4 + (i % 4) * 75, y: 290 + Math.floor(i / 4) * 30, w: 70, h: 24 } : { x: 40 + (i % 6) * 76, y: 318 + Math.floor(i / 6) * 32, w: 70, h: 24 };
+// lesson 2
+const GCELL = () => NAR ? 40 : 42;
+const GX = () => NAR ? 12 : 22, GY = () => NAR ? 100 : 108;
+const CC = c => ({ x: GX() + (c[0] + 0.5) * GCELL(), y: GY() + (c[1] + 0.5) * GCELL() });
+const PROGBOX = () => NAR ? { x: 2, y: 316, w: 298, h: 130 } : { x: 330, y: 98, w: 186, h: 306 };
+const PCHIP = i => NAR ? { x: 7 + (i % 5) * 58, y: 336 + Math.floor(i / 5) * 27, w: 54, h: 23 } : { x: 338 + (i % 2) * 88, y: 120 + Math.floor(i / 2) * 28, w: 82, h: 23 };
+// lesson 3
+const CARD = () => NAR ? { w: 146, h: 34 } : { w: 150, h: 38 };
+const POOLP = i => NAR ? { x: 2 + (i % 2) * 154, y: 100 + Math.floor(i / 2) * 42 } : { x: 22, y: 104 + i * 48 };
+const SLOT = k => NAR ? { x: 26, y: 244 + k * 50, w: 170, h: 36 } : { x: 262, y: 104 + k * 58, w: 160, h: 38 };
+const inR = (p, r, pad = 0) => p.x >= r.x - pad && p.x <= r.x + r.w + pad && p.y >= r.y - pad && p.y <= r.y + r.h + pad;
+
+// ---------- drawing ----------
+const scene = $('#scene');
+function bg() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern>
+    <marker id="ar" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L6 3L0 6z" fill="#8b96ad"/></marker></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+function hopper(x, y, s, bad) {
+  const c = bad ? '#ff8a73' : '#86e0a8';
+  return `<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(${s})">
+    <path d="M-4 -12L-13 -27L-17 -1" fill="none" stroke="${c}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="M3 -8L5 0M8 -9L11 0" stroke="${c}" stroke-width="1.8" stroke-linecap="round"/>
+    <ellipse cx="0" cy="-13" rx="13" ry="6" fill="${c}" stroke="${INK}" stroke-width="1.3"/>
+    <circle cx="12" cy="-16" r="5.5" fill="${c}" stroke="${INK}" stroke-width="1.3"/><circle cx="13.6" cy="-17.4" r="1.6" fill="${INK}"/>
+    <path d="M14 -21q5 -10 13 -9" fill="none" stroke="${c}" stroke-width="1.3" stroke-linecap="round"/></g>`;
+}
+function drawExec(t) {
+  const Ls = L(), y = LY(), fs = NAR ? 7.5 : 9;
+  let h = `<text x="${LX(0) - 6}" y="91" font-size="9" fill="#8b96ad" letter-spacing="1">СРЕДА: ЧИСЛОВАЯ ПРЯМАЯ 0…${Ls.lineMax}</text>`;
+  h += `<path d="M${LX(0) - 8} ${y}H${LX(Ls.lineMax) + 8}" stroke="#56627d" stroke-width="2"/>`;
+  for (let n = 0; n <= Ls.lineMax; n++) {
+    const x = LX(n), here = n === S.pos;
+    h += `<path d="M${x} ${y - 5}V${y + 5}" stroke="${n === Ls.goal ? '#ffb547' : '#56627d'}" stroke-width="1.5"/>`;
+    h += `<text x="${x}" y="${y + 18}" font-size="${fs}" fill="${here ? '#e8ecf4' : n === Ls.goal ? '#ffb547' : '#8b96ad'}" text-anchor="middle"${here ? ' font-weight="500"' : ''}>${n}</text>`;
+  }
+  // walls of the environment
+  for (const x of [LX(0) - 10, LX(Ls.lineMax) + 10]) h += `<path d="M${x} ${y - 30}V${y + 8}" stroke="#ff8a73" stroke-opacity=".5" stroke-width="2" stroke-dasharray="3 3"/>`;
+  // goal flag
+  const gx = LX(Ls.goal);
+  h += `<path d="M${gx} ${y}V${y - 46}" stroke="#ffb547" stroke-width="1.6"/><path d="M${gx} ${y - 46}h16l-4 6 4 6h-16z" fill="#ffb547"/>`;
+  // jump arcs already made
+  S.hist.forEach((j, i) => {
+    if (S.jump && i === S.hist.length - 1) return;
+    const a = LX(j.from), b = LX(j.to), up = j.d > 0 ? 34 : 22;
+    h += `<path d="M${a} ${y - 6}Q${(a + b) / 2} ${y - 6 - up * 2} ${b} ${y - 6}" fill="none" stroke="${j.d > 0 ? '#ffb547' : '#72d4e8'}" stroke-width="1.5" stroke-dasharray="4 3" opacity=".7" marker-end="url(#ar)"/>`;
+  });
+  // the grasshopper (mid-jump if animating)
+  let x = LX(S.pos), yy = y - 4;
+  if (S.jump) {
+    const k = clamp((t - S.jump.t) / 420, 0, 1);
+    if (k >= 1) S.jump = null;
+    else { x = LX(S.jump.from) + (LX(S.jump.to) - LX(S.jump.from)) * k; yy -= Math.sin(Math.PI * k) * 40; }
+  }
+  const bad = S.bad && t - S.bad.t < 900;
+  if (S.bad && !bad) S.bad = null;
+  h += `<g data-part="actor">${hopper(x, yy, NAR ? 0.85 : 1, bad)}</g>`;
+  if (bad) h += `<text x="${x}" y="${y - 52}" font-size="11" fill="#ff8a73" text-anchor="middle" font-weight="500">ОТКАЗ</text>`;
+  // command log
+  h += `<text x="${LOGC(0).x}" y="${LOGC(0).y - 8}" font-size="9" fill="#8b96ad" letter-spacing="1">ВЫПОЛНЕННЫЕ КОМАНДЫ · ${S.hist.length}</text>`;
+  if (!S.hist.length) h += `<text x="${LOGC(0).x}" y="${LOGC(0).y + 16}" font-size="10" fill="#56627d">пока ни одной</text>`;
+  const shown = S.hist.slice(0, NAR ? 12 : 12);
+  shown.forEach((j, i) => {
+    const c = LOGC(i), over = i >= Ls.maxCmd;
+    h += `<rect x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}" rx="6" fill="#1a2438" stroke="${over ? '#ff8a73' : j.d > 0 ? '#ffb547' : '#72d4e8'}" stroke-width="1.3"/><text x="${c.x + 6}" y="${c.y + 15.5}" font-size="${NAR ? 9 : 9.5}" fill="#e8ecf4">${i + 1} ${j.d > 0 ? 'вперёд 3' : 'назад 2'}</text>`;
+  });
+  return h;
+}
+function robot(x, y, s, bad) {
+  const c = bad ? '#ff8a73' : '#72d4e8';
+  return `<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(${s})"><path d="M0 -15V-19" stroke="#e8ecf4" stroke-width="1.5"/><circle cx="0" cy="-20" r="2" fill="#ffb547"/>
+    <rect x="-12" y="-14" width="24" height="20" rx="5" fill="${c}" stroke="${INK}" stroke-width="1.4"/><circle cx="-5" cy="-5" r="2.6" fill="${INK}"/><circle cx="5" cy="-5" r="2.6" fill="${INK}"/><path d="M-5 1h10" stroke="${INK}" stroke-width="1.4" stroke-linecap="round"/>
+    <rect x="-9" y="6" width="5" height="6" rx="1.5" fill="#8b96ad"/><rect x="4" y="6" width="5" height="6" rx="1.5" fill="#8b96ad"/></g>`;
+}
+let rvis = null;
+function drawSeq() {
+  const Ls = L(), c = GCELL(), gx = GX(), gy = GY();
+  let h = `<text x="${gx}" y="91" font-size="9" fill="#8b96ad" letter-spacing="1">ПОЛЕ РОБОТА ${Ls.cols} × ${Ls.rows}</text>`;
+  for (let j = 0; j < Ls.rows; j++) for (let i = 0; i < Ls.cols; i++)
+    h += `<rect x="${gx + i * c}" y="${gy + j * c}" width="${c}" height="${c}" fill="${(i + j) % 2 ? 'rgba(26,36,56,.75)' : 'rgba(22,32,50,.75)'}" stroke="#2f3b55"/>`;
+  h += `<rect x="${gx}" y="${gy}" width="${Ls.cols * c}" height="${Ls.rows * c}" fill="none" stroke="#56627d" stroke-width="2"/>`;
+  for (let i = 0; i < Ls.cols; i++) h += `<text x="${gx + (i + 0.5) * c}" y="${gy + Ls.rows * c + 12}" font-size="8" fill="#56627d" text-anchor="middle">${i + 1}</text>`;
+  for (let j = 0; j < Ls.rows; j++) h += `<text x="${gx - 5}" y="${gy + (j + 0.5) * c + 3}" font-size="8" fill="#56627d" text-anchor="end">${j + 1}</text>`;
+  for (const r of Ls.rocks) {
+    const p = CC(r), s = c * 0.36;
+    h += `<path d="M${p.x - s} ${p.y + s * 0.7}L${p.x - s * 0.8} ${p.y - s * 0.3}L${p.x - s * 0.2} ${p.y - s * 0.85}L${p.x + s * 0.6} ${p.y - s * 0.6}L${p.x + s} ${p.y + s * 0.1}L${p.x + s * 0.8} ${p.y + s * 0.7}z" fill="#56627d" stroke="${INK}" stroke-width="1.2"/><path d="M${p.x - s * 0.4} ${p.y - s * 0.3}l${s * 0.5} ${s * 0.2}" stroke="#8b96ad" stroke-width="1.2"/>`;
+  }
+  const st = CC(Ls.start), g = CC(Ls.goal);
+  h += `<rect x="${st.x - c / 2 + 3}" y="${st.y - c / 2 + 3}" width="${c - 6}" height="${c - 6}" rx="5" fill="none" stroke="#72d4e8" stroke-opacity=".4" stroke-dasharray="3 3"/><text x="${st.x}" y="${st.y + c / 2 - 5}" font-size="7" fill="#72d4e8" fill-opacity=".7" text-anchor="middle">старт</text>`;
+  h += `<path d="M${g.x - 6} ${g.y + 13}V${g.y - 14}" stroke="#ffb547" stroke-width="1.8"/><path d="M${g.x - 6} ${g.y - 14}h15l-4 5 4 5h-15z" fill="#ffb547"/>`;
+  if (S.trail.length > 1) h += `<path d="M${S.trail.map(p => { const q = CC(p); return q.x.toFixed(1) + ' ' + q.y.toFixed(1); }).join('L')}" fill="none" stroke="#ffb547" stroke-width="2" stroke-dasharray="4 4" opacity=".75"/>`;
+  if (S.fail) { const q = CC(S.fail.to); h += `<path d="M${q.x - 9} ${q.y - 9}l18 18M${q.x + 9} ${q.y - 9}l-18 18" stroke="#ff8a73" stroke-width="3" stroke-linecap="round"/>`; }
+  const tg = CC(S.rob); if (!rvis || reduce) rvis = { x: tg.x, y: tg.y };
+  h += robot(rvis.x, rvis.y + 3, NAR ? 0.9 : 1, !!S.fail && !S.run);
+  // program panel
+  const B = PROGBOX(), cur = S.run ? S.run.i : -1;
+  h += `<g data-part="prog"><rect x="${B.x}" y="${B.y}" width="${B.w}" height="${B.h}" rx="12" fill="rgba(18,26,40,.82)" stroke="#3a4762" stroke-width="1.4"/>`;
+  h += `<text x="${B.x + 10}" y="${B.y + 15}" font-size="9" fill="#8b96ad" letter-spacing="1">ПРОГРАММА · ${S.prog.length}/${Ls.maxProg}</text></g>`;
+  if (!S.prog.length) h += `<text x="${B.x + 10}" y="${B.y + 40}" font-size="10" fill="#56627d">Пусто. Добавьте команды</text><text x="${B.x + 10}" y="${B.y + 54}" font-size="10" fill="#56627d">кнопками со стрелками.</text>`;
+  S.prog.forEach((cm, i) => {
+    const p = PCHIP(i), bad = S.fail && S.fail.i === i, now = i === cur;
+    h += `<g data-drag="p-${i}"><rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="6" fill="${now ? '#3a3220' : '#1a2438'}" stroke="${bad ? '#ff8a73' : now ? '#ffb547' : '#3a4762'}" stroke-width="${bad || now ? 2 : 1.2}"/>`;
+    h += `<text x="${p.x + 6}" y="${p.y + 15.5}" font-size="${NAR ? 10 : 9.5}" fill="#e8ecf4"><tspan fill="#8b96ad">${i + 1}</tspan> ${NAR ? DIRS[cm].a : DIRS[cm].a + ' ' + DIRS[cm].w}</text></g>`;
+  });
+  return h;
+}
+function shapePath(sh, x, y, w, hh) {
+  if (sh === 'oval') return `<rect x="${x}" y="${y}" width="${w}" height="${hh}" rx="${hh / 2}"`;
+  if (sh === 'rect') return `<rect x="${x}" y="${y}" width="${w}" height="${hh}" rx="3"`;
+  if (sh === 'para') { const o = 12; return `<path d="M${x + o} ${y}H${x + w}L${x + w - o} ${y + hh}H${x}z"`; }
+  return `<path d="M${x + w / 2} ${y - 3}L${x + w - 8} ${y + hh / 2}L${x + w / 2} ${y + hh + 3}L${x + 8} ${y + hh / 2}z"`;
+}
+function block(id, x, y, w, hh, extra) {
+  const b = BLOCKS[id], col = SHC[b.shape], sel = S.sel === id, bad = S.lastBad && S.lastBad.id === id && performance.now() - S.lastBad.t < 700;
+  return shapePath(b.shape, x, y, w, hh) + ` fill="${extra && extra.lit ? '#3a3220' : '#1a2438'}" stroke="${bad ? '#ff8a73' : sel ? '#ffffff' : extra && extra.lit ? '#ffb547' : col}" stroke-width="${sel || bad || (extra && extra.lit) ? 2.4 : 1.6}"/>` +
+    `<text x="${x + w / 2}" y="${y + hh / 2 + 4}" font-size="${NAR ? 11 : 11.5}" fill="#e8ecf4" text-anchor="middle">${esc(b.t)}</text>`;
+}
+let cdrag = null;
+function drawFlow(t) {
+  const Ls = L(), C = CARD();
+  let h = `<text x="${POOLP(0).x}" y="91" font-size="9" fill="#8b96ad" letter-spacing="1">ФИГУРЫ</text><text x="${SLOT(0).x}" y="${NAR ? 234 : 91}" font-size="9" fill="#8b96ad" letter-spacing="1">БЛОК-СХЕМА «ПЛОЩАДЬ»</text>`;
+  // chain: arrows then slots
+  for (let k = 0; k < 4; k++) { const a = SLOT(k), b = SLOT(k + 1); h += `<path d="M${a.x + a.w / 2} ${a.y + a.h + 2}V${b.y - 4}" stroke="#8b96ad" stroke-width="1.5" marker-end="url(#ar)" data-part="arrow"/>`; }
+  const k0 = S.exec ? S.exec.k : -1, lr = S.lastRun && S.lastRun.a === S.a && S.lastRun.b === S.b ? S.lastRun : null;
+  for (let k = 0; k < 5; k++) {
+    const r = SLOT(k), c = S.slot[k];
+    const over = cdrag && cdrag.moved && inR({ x: cdrag.sx, y: cdrag.sy }, r, 6);
+    if (c) h += `<g>${block(c, r.x, r.y, r.w, r.h, { lit: k === k0 })}</g>`;
+    else h += `<g data-drag="z-${k}"><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="8" fill="${over ? 'rgba(114,212,232,.14)' : S.sel ? 'rgba(255,181,71,.06)' : 'rgba(26,36,56,.4)'}" stroke="${over ? '#72d4e8' : '#3a4762'}" stroke-width="1.4" stroke-dasharray="5 4"/><text x="${r.x + r.w / 2}" y="${r.y + r.h / 2 + 4}" font-size="10" fill="#56627d" text-anchor="middle">шаг ${k + 1}</text></g>`;
+    // values beside the running/finished blocks
+    const vx = r.x + r.w + 10, vy = r.y + r.h / 2 + 4, show = q => (S.exec && k0 >= q) || (!S.exec && lr);
+    if (k === 1 && c && show(1)) h += `<text x="${vx}" y="${vy - 6}" font-size="10" fill="#72d4e8">a = ${S.a}</text><text x="${vx}" y="${vy + 8}" font-size="10" fill="#72d4e8">b = ${S.b}</text>`;
+    if (k === 2 && c && show(2)) h += `<text x="${vx}" y="${vy}" font-size="10" fill="#ffb547">S = ${S.a * S.b}</text>`;
+    if (k === 3 && c && show(3)) h += `<rect x="${vx - 4}" y="${vy - 14}" width="${NAR ? 76 : 76}" height="20" rx="5" fill="#86e0a8"/><text x="${vx + 34}" y="${vy}" font-size="10" fill="#0b1019" text-anchor="middle" font-weight="500">${S.a * S.b} м²</text>`;
+  }
+  // the pool
+  POOL_ORDER.forEach((id, i) => {
+    if (S.slot.includes(id)) return;
+    const p = POOLP(i);
+    if (cdrag && cdrag.moved && cdrag.id === id) { h += `<rect x="${p.x}" y="${p.y}" width="${C.w}" height="${C.h}" rx="8" fill="none" stroke="#3a4762" stroke-dasharray="3 4"/>`; return; }
+    h += `<g data-drag="c-${id}">${block(id, p.x, p.y, C.w, C.h)}</g>`;
+  });
+  if (cdrag && cdrag.moved) h += `<g opacity=".92" pointer-events="none">${block(cdrag.id, cdrag.sx - C.w / 2, cdrag.sy - C.h / 2, C.w, C.h)}</g>`;
+  return h;
+}
+
+function hlBoxes(id) {
+  const id0 = LID();
+  if (id0 === 'exec') {
+    const y = LY();
+    if (id === 'actor') return [[LX(S.pos) - 22, y - 34, 44, 40]];
+    if (id === 'env') return [[LX(0) - 12, y - 12, LX(L().lineMax) - LX(0) + 24, 36]];
+    if (id === 'fail') return [[LX(0) - 18, y - 34, 16, 46], [LX(L().lineMax) + 2, y - 34, 16, 46]];
+    if (id === 'goal') return [[LX(L().goal) - 8, y - 50, 30, 60]];
+    return [];
+  }
+  if (id0 === 'seq') {
+    const c = GCELL(), cell = p => { const q = CC(p); return [q.x - c / 2, q.y - c / 2, c, c]; };
+    if (id === 'robot') return [cell(S.rob)];
+    if (id === 'field') return [[GX(), GY(), L().cols * c, L().rows * c]];
+    if (id === 'rock') return L().rocks.map(cell);
+    if (id === 'goal') return [cell(L().goal)];
+    if (id === 'prog') { const B = PROGBOX(); return [[B.x, B.y, B.w, B.h]]; }
+    return [];
+  }
+  const C = CARD(), out = [];
+  if (id === 'arrow') { const a = SLOT(0), b = SLOT(4); return [[a.x - 6, a.y - 6, a.w + 12, b.y + b.h - a.y + 12]]; }
+  POOL_ORDER.forEach((b, i) => { if (BLOCKS[b].shape === id && !S.slot.includes(b)) { const p = POOLP(i); out.push([p.x - 4, p.y - 6, C.w + 8, C.h + 12]); } });
+  S.slot.forEach((b, k) => { if (b && BLOCKS[b].shape === id) { const r = SLOT(k); out.push([r.x - 4, r.y - 6, r.w + 8, r.h + 12]); } });
+  return out;
+}
+
+function drawScene(t) {
+  const id = LID();
+  let h = bg() + (id === 'exec' ? drawExec(t) : id === 'seq' ? drawSeq() : drawFlow(t));
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1);
+    if (k === 0) S.hl = null;
+    else for (const b of hlBoxes(S.hl.id)) h += `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// fit the scene under the task box when there is room
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const nar = w < 560; if (nar !== NAR) { NAR = nar; rvis = null; }
+  const B = BOUNDS(), cw = B.x1 - B.x0 + 8, ch = B.y1 - 80 + 4;
+  const tb = $('#taskBox').getBoundingClientRect(), mt = $('#meter').getBoundingClientRect();
+  const topPx = Math.max(tb.bottom, mt.bottom) - rc.top + 8;
+  const s = Math.min(w / cw, Math.max((hh - topPx) / ch, hh / (ch * 1.6)), 1.5);
+  VB = { w: w / s, h: hh / s }; VB.x = (B.x0 + B.x1) / 2 - VB.w / 2;
+  VB.y = 80 - topPx / s;
+  const slack = VB.y + VB.h - (B.y1 + 2);
+  VB.y = slack < 0 ? B.y1 + 2 - VB.h : VB.y - slack / 2;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer: drag blocks (lesson 3), tap program commands (lesson 2) and slots ----------
+let dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  const id = el.dataset.drag; e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  const p = toSvg(e);
+  cdrag = { tag: id, id: id.slice(2), x: e.clientX, y: e.clientY, moved: false, sx: p.x, sy: p.y };
+});
+scene.addEventListener('pointermove', e => {
+  if (!cdrag) return;
+  if (!cdrag.moved && cdrag.tag.startsWith('c-') && Math.hypot(e.clientX - cdrag.x, e.clientY - cdrag.y) > 6) { cdrag.moved = true; scene.classList.add('grabbing'); }
+  if (!cdrag.moved) return;
+  const p = toSvg(e);
+  cdrag.sx = clamp(p.x, VB.x + 4, VB.x + VB.w - 4); cdrag.sy = clamp(p.y, VB.y + 4, VB.y + VB.h - 4);
+  dirty = true;
+});
+const endDrag = cancel => {
+  if (!cdrag) return;
+  const d = cdrag; cdrag = null; scene.classList.remove('grabbing'); dirty = true;
+  if (cancel) return;
+  const kind = d.tag.slice(0, 2);
+  if (kind === 'p-') { delCmd(+d.id); return; }
+  if (!d.moved) {
+    if (kind === 'z-') { if (S.sel) place(S.sel, +d.id); else toast('Сначала выберите фигуру слева.'); }
+    else if (kind === 'c-') { S.sel = S.sel === d.id ? null : d.id; update(); }
+    return;
+  }
+  const k = [0, 1, 2, 3, 4].find(i => !S.slot[i] && inR({ x: d.sx, y: d.sy }, SLOT(i), 8));
+  if (k !== undefined) place(d.id, k);
+};
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+// ---------- actions ----------
+function hop(d) {
+  const Ls = L(), to = S.pos + d;
+  if (S.jump) return;
+  if (to < 0 || to > Ls.lineMax) {
+    S.ref++; S.bad = { t: performance.now() };
+    toast(`Отказ! Из точки ${S.pos} команда «${d > 0 ? 'вперёд 3' : 'назад 2'}» уведёт за пределы среды (${to}).`);
+    update(); return;
+  }
+  S.hist.push({ d, from: S.pos, to }); S.jump = { from: S.pos, to, t: performance.now() }; S.pos = to;
+  if (S.hist.length === Ls.maxCmd + 1) toast('Команд уже больше 5. Нажмите «Заново» и подумайте, как короче.');
+  update();
+}
+function addCmd(c) {
+  if (S.run) return;
+  if (S.prog.length >= L().maxProg) { toast(`В программе не больше ${L().maxProg} команд.`); return; }
+  S.prog.push(c); resetRobot(); update();
+}
+function delCmd(i) {
+  if (S.run || i < 0 || i >= S.prog.length) return;
+  const c = S.prog.splice(i, 1)[0]; resetRobot(); toast(`Удалена команда ${i + 1}: ${DIRS[c].w}`); update();
+}
+function resetRobot() { S.rob = L().start.slice(); S.trail = [S.rob]; S.fail = null; S.success = false; S.ran = false; rvis = null; }
+function runProg() {
+  if (S.run) return;
+  if (!S.prog.length) { toast('Программа пуста. Добавьте команды.'); return; }
+  resetRobot(); S.run = { i: 0, t: performance.now() }; update();
+}
+const STEP = () => reduce ? 140 : 420;
+function tickRun(t) {
+  if (!S.run || t - S.run.t < STEP()) return;
+  const tr = simulate(S.prog), st = tr.steps[S.run.i];
+  S.run.t = t;
+  if (st.fail) {
+    S.fail = { i: S.run.i, to: st.to }; S.run = null; S.ran = true;
+    toast(`Отказ на команде ${S.fail.i + 1} «${DIRS[st.c].w}»: впереди ${st.fail}. Исправьте программу.`); update(); return;
+  }
+  S.rob = st.to; S.trail.push(st.to); S.run.i++;
+  if (S.run.i >= S.prog.length) {
+    S.run = null; S.ran = true;
+    const g = L().goal; S.success = S.rob[0] === g[0] && S.rob[1] === g[1];
+    toast(S.success ? `Робот у флажка! Программа из ${S.prog.length} команд сработала.` : `Программа закончилась, а Робот в клетке ${cellName(S.rob)}, не у флажка.`);
+  }
+  update();
+}
+function place(id, k) {
+  if (S.exec) return;
+  const order = LESSONS[2].order;
+  if (S.slot[k]) { toast('Это место уже занято.'); return; }
+  if (order[k] !== id) {
+    S.miss++; S.lastBad = { id, t: performance.now() }; S.sel = null;
+    toast(`Не сюда. ${GQ[id]}`); setTimeout(() => { dirty = true; }, 750); update(); return;
+  }
+  S.slot[k] = id; S.sel = null;
+  toast(`${BLOCKS[id].t} — ${SHN[BLOCKS[id].shape]}, шаг ${k + 1}. Верно!`);
+  if (built()) setTimeout(() => toast('Схема собрана. Задайте a и b и нажмите «Выполнить».'), 1400);
+  update();
+}
+function runFlow() {
+  if (S.exec) return;
+  if (!built()) { toast('Сначала соберите схему целиком — все 5 шагов.'); return; }
+  S.exec = { k: 0, t: performance.now() }; update();
+}
+const FSTEP = () => reduce ? 200 : 700;
+function tickFlow(t) {
+  if (!S.exec || t - S.exec.t < FSTEP()) return;
+  S.exec.k++; S.exec.t = t;
+  if (S.exec.k > 4) {
+    S.exec = null; S.lastRun = { a: S.a, b: S.b, s: S.a * S.b };
+    toast(`Схема выполнена: S = ${S.a} · ${S.b} = ${S.a * S.b} м²`);
+  }
+  update();
+}
+function setAB(k, v) { if (S.exec) return; S[k] = clamp(v, 1, 20); update(); }
+
+let last = performance.now();
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  let anim = false;
+  const id = LID();
+  if (id === 'exec') { if (S.jump || S.bad) anim = true; }
+  if (id === 'seq') {
+    tickRun(t);
+    const tg = CC(S.rob);
+    if (rvis && (Math.abs(tg.x - rvis.x) + Math.abs(tg.y - rvis.y) > 0.3)) { const k = Math.min(1, dt * 12); rvis.x += (tg.x - rvis.x) * k; rvis.y += (tg.y - rvis.y) * k; anim = true; }
+    else if (rvis) { rvis.x = tg.x; rvis.y = tg.y; }
+  }
+  if (id === 'flow') { tickFlow(t); if (S.exec) anim = true; if (S.lastBad && performance.now() - S.lastBad.t > 800) { S.lastBad = null; anim = true; } }
+  if (S.hl) anim = true;
+  if (dirty || anim) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3000); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, aria, cls, dis) => `<button data-a="${k}"${aria ? ` aria-label="${aria}"` : ''}${cls ? ` class="${cls}"` : ''}${dis ? ' disabled' : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  if (id === 'exec') tb.innerHTML = B('fwd', 'вперёд 3') + B('back', 'назад 2') + sep + B('reset', 'Заново');
+  else if (id === 'seq') tb.innerHTML = B('U', '↑', 'Команда вверх') + B('D', '↓', 'Команда вниз') + B('L', '←', 'Команда влево') + B('R', '→', 'Команда вправо') + sep +
+    B('del', '⌫', 'Удалить последнюю команду') + B('clear', 'Очистить') + sep + B('run', 'Пуск', 'Запустить программу', 'go', !!S.run);
+  else tb.innerHTML = B('a-', 'a−', 'Уменьшить a') + `<span class="val">a = ${S.a}</span>` + B('a+', 'a+', 'Увеличить a') + sep +
+    B('b-', 'b−', 'Уменьшить b') + `<span class="val">b = ${S.b}</span>` + B('b+', 'b+', 'Увеличить b') + sep + B('run', 'Выполнить', '', 'go', !!S.exec) + B('reset', 'Заново');
+}
+function act(a) {
+  const id = LID();
+  if (id === 'exec') {
+    if (a === 'fwd') hop(L().fwd);
+    if (a === 'back') hop(-L().back);
+    if (a === 'reset') { S.pos = L().start; S.hist = []; S.ref = 0; S.jump = null; S.bad = null; update(); }
+    return;
+  }
+  if (id === 'seq') {
+    if (DIRS[a]) addCmd(a);
+    if (a === 'del') delCmd(S.prog.length - 1);
+    if (a === 'clear' && !S.run) { S.prog = []; resetRobot(); update(); }
+    if (a === 'run') runProg();
+    return;
+  }
+  if (a === 'a-' || a === 'a+') setAB('a', S.a + (a === 'a+' ? 1 : -1));
+  if (a === 'b-' || a === 'b+') setAB('b', S.b + (a === 'b+' ? 1 : -1));
+  if (a === 'run') runFlow();
+  if (a === 'reset' && !S.exec) { S.slot = []; S.sel = null; S.miss = 0; S.lastRun = null; update(); }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.disabled) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+
+function taskState(m) {
+  if (S.done[LID()]) return '✓ Выполнено';
+  if (m.kind === 'exec') return `Точка ${m.pos} · команд ${m.n} из ${m.max}` + (m.n > m.max ? ' — много, «Заново»' : '');
+  if (m.kind === 'seq') {
+    if (m.running) return `Выполняется команда ${S.run.i + 1} из ${m.n}`;
+    if (m.fail) return `Отказ на команде ${m.fail.i + 1} · команд ${m.n}`;
+    if (m.ran && !m.success) return `Робот не дошёл до флажка · команд ${m.n}`;
+    return `Команд в программе: ${m.n}`;
+  }
+  if (m.running) return `Выполняется шаг ${S.exec.k + 1} из 5`;
+  if (!m.built) return `Собрано ${m.placed} из 5` + (m.miss ? ` · промахов ${m.miss}` : '');
+  return m.lastRun ? `Схема собрана · выполнена для ${m.lastRun.a} × ${m.lastRun.b}` : 'Схема собрана · нажмите «Выполнить»';
+}
+
+// Scheme tab: built once per lesson, values refreshed on update
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'exec') h = `<h2>Пульт Кузнечика</h2><p class="note">СКИ Кузнечика: всего две команды. Других он не знает.</p>
+    <dl class="reads"><div><dt>Точка</dt><dd id="r1"></dd></div><div><dt>Команд</dt><dd id="r2"></dd></div><div><dt>Отказов</dt><dd id="r3"></dd></div></dl>
+    <div class="ctl"><div class="lbl">Команды</div><div class="chips"><button data-a="fwd">вперёд 3</button><button data-a="back">назад 2</button><button data-a="reset">Заново</button></div></div>
+    <h3>Протокол</h3><div class="listing" id="lst"></div>`;
+  if (id === 'seq') h = `<h2>Программа Робота</h2><p class="note">Команды добавляются в конец программы. Робот выполнит их по порядку, сверху вниз.</p>
+    <dl class="reads"><div><dt>Команд</dt><dd id="r1"></dd></div><div><dt>Робот</dt><dd id="r2"></dd></div><div><dt>Итог</dt><dd id="r3"></dd></div></dl>
+    <div class="ctl"><div class="lbl">Добавить команду</div><div class="chips"><button data-a="U">↑ вверх</button><button data-a="D">↓ вниз</button><button data-a="L">← влево</button><button data-a="R">→ вправо</button></div></div>
+    <div class="ctl"><div class="chips"><button data-a="del">⌫ Удалить последнюю</button><button data-a="clear">Очистить</button><button data-a="run">Пуск</button></div></div>
+    <h3>Текст программы</h3><div class="listing" id="lst"></div>`;
+  if (id === 'flow') h = `<h2>Данные для схемы</h2><p class="note">Длина и ширина прямоугольника в метрах. Блок «Ввод» возьмёт эти числа.</p>
+    <dl class="reads"><div><dt>a, м</dt><dd id="r1"></dd></div><div><dt>b, м</dt><dd id="r2"></dd></div><div><dt>S, м²</dt><dd id="r3"></dd></div></dl>
+    <div class="ctl"><label for="inA">Длина a <output id="inAO"></output></label><input type="range" id="inA" min="1" max="20" step="1"></div>
+    <div class="ctl"><label for="inB">Ширина b <output id="inBO"></output></label><input type="range" id="inB" min="1" max="20" step="1"></div>
+    <div class="row" style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button class="ghostbtn" data-a="run">Выполнить</button><button class="ghostbtn" data-a="reset">Заново</button></div>
+    <h3>Тот же алгоритм словами</h3><div class="listing" id="lst"></div>`;
+  el.innerHTML = h;
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+  const ia = el.querySelector('#inA'), ib = el.querySelector('#inB');
+  if (ia) { ia.value = S.a; ia.addEventListener('input', e => setAB('a', +e.target.value)); }
+  if (ib) { ib.value = S.b; ib.addEventListener('input', e => setAB('b', +e.target.value)); }
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; };
+  const lst = el.querySelector('#lst');
+  if (m.kind === 'exec') {
+    set('#r1', String(m.pos)); set('#r2', `${m.n}/${m.max}`); set('#r3', String(m.ref));
+    if (lst) lst.innerHTML = S.hist.length ? S.hist.map((j, i) => `<div${i >= m.max ? ' class="bad"' : ''}>${i + 1}. ${j.d > 0 ? 'вперёд 3' : 'назад 2'} &nbsp;${j.from} → ${j.to}</div>`).join('') : '<span class="note">Команд пока нет.</span>';
+  } else if (m.kind === 'seq') {
+    set('#r1', `${m.n}/${L().maxProg}`); set('#r2', cellName(S.rob)); set('#r3', m.running ? 'идёт' : m.fail ? 'отказ' : m.success ? 'у флажка' : m.ran ? 'мимо' : '—');
+    const cur = S.run ? S.run.i : -1;
+    if (lst) lst.innerHTML = S.prog.length ? S.prog.map((c, i) => `<div class="${i === cur ? 'cur' : m.fail && m.fail.i === i ? 'bad' : ''}">${i + 1}. ${DIRS[c].w}</div>`).join('') : '<span class="note">Программа пуста.</span>';
+    el.querySelectorAll('[data-a]').forEach(b => b.disabled = !!S.run);
+  } else {
+    set('#r1', String(S.a)); set('#r2', String(S.b)); set('#r3', String(S.a * S.b));
+    set('#inAO', S.a + ' м'); set('#inBO', S.b + ' м');
+    const ia = el.querySelector('#inA'), ib = el.querySelector('#inB');
+    if (ia && document.activeElement !== ia) ia.value = S.a;
+    if (ib && document.activeElement !== ib) ib.value = S.b;
+    if (lst) lst.innerHTML = ['Начало.', 'Ввести длину a и ширину b.', 'Вычислить S = a · b.', 'Вывести S.', 'Конец.']
+      .map((s, i) => `<div class="${S.exec && S.exec.k === i ? 'cur' : ''}">${i + 1}. ${s}</div>`).join('');
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'exec') return [
+    { id: 'actor', icon: IC('<g transform="translate(14 26) scale(.75)">' + hopper(0, 0, 1, false) + '</g>'), name: 'Исполнитель', spec: 'Кузнечик. Выполняет команды, но сам ничего не решает.' },
+    { id: 'env', icon: IC('<path d="M3 20h28" stroke="var(--muted)" stroke-width="2"/><path d="M5 16v8M12 16v8M19 16v8M26 16v8" stroke="var(--muted)" stroke-width="1.5"/>'), name: 'Среда', spec: 'Числовая прямая от 0 до 20. Здесь живёт и работает Кузнечик.' },
+    { id: 'ski', icon: IC('<rect x="3" y="9" width="13" height="16" rx="3" fill="none" stroke="var(--force)" stroke-width="1.8"/><rect x="18" y="9" width="13" height="16" rx="3" fill="none" stroke="var(--arm)" stroke-width="1.8"/>'), name: 'Система команд (СКИ)', spec: 'Все команды, которые понимает исполнитель: «вперёд 3» и «назад 2». Кнопки внизу сцены — это и есть СКИ.' },
+    { id: 'fail', icon: IC('<path d="M9 9l16 16M25 9L9 25" stroke="var(--warn)" stroke-width="3" stroke-linecap="round"/>'), name: 'Отказ', spec: 'Команда понятна, но выполнить её нельзя: Кузнечик выпрыгнул бы за 0 или за 20.' },
+    { id: 'goal', icon: IC('<path d="M10 30V5" stroke="var(--force)" stroke-width="2"/><path d="M10 5h16l-4 5 4 5H10z" fill="var(--force)"/>'), name: 'Цель', spec: 'Точка, куда нужно привести исполнителя. Путь к ней и есть алгоритм.' }];
+  if (id === 'seq') return [
+    { id: 'robot', icon: IC('<g transform="translate(17 20)">' + robot(0, 0, 0.9, false) + '</g>'), name: 'Робот', spec: 'Исполнитель. СКИ: вверх, вниз, влево, вправо — на одну клетку.' },
+    { id: 'field', icon: IC('<path d="M3 3h28v28H3zM3 12h28M3 21h28M12 3v28M21 3v28" fill="none" stroke="var(--muted)" stroke-width="1.4"/>'), name: 'Поле', spec: 'Среда Робота: 7 столбцов и 5 строк. Клетку называют так: (столбец; строка).' },
+    { id: 'rock', icon: IC('<path d="M5 25L7 14L14 8L24 10L29 18L26 25z" fill="#56627d" stroke="var(--fg)" stroke-width="1"/>'), name: 'Камни', spec: 'Препятствия. Команда, которая ведёт на камень или за край поля, вызывает отказ.' },
+    { id: 'goal', icon: IC('<path d="M10 30V5" stroke="var(--force)" stroke-width="2"/><path d="M10 5h16l-4 5 4 5H10z" fill="var(--force)"/>'), name: 'Флажок', spec: 'Цель: клетка (7; 1), правый верхний угол поля.' },
+    { id: 'prog', icon: IC('<rect x="5" y="3" width="24" height="28" rx="3" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M10 10h14M10 16h14M10 22h9" stroke="var(--force)" stroke-width="1.8"/>'), name: 'Программа', spec: 'Линейный алгоритм: список команд. Выполняется строго по порядку, от первой до последней.' }];
+  return [
+    { id: 'oval', icon: IC(shapePath('oval', 3, 11, 28, 12) + ' fill="none" stroke="#86e0a8" stroke-width="1.8"/>'), name: 'Овал', spec: 'Начало и конец алгоритма. В каждой схеме ровно одно начало.' },
+    { id: 'para', icon: IC(shapePath('para', 3, 11, 28, 12) + ' fill="none" stroke="#72d4e8" stroke-width="1.8"/>'), name: 'Параллелограмм', spec: 'Ввод данных (что исполнитель получает) и вывод результата (что он сообщает).' },
+    { id: 'rect', icon: IC(shapePath('rect', 3, 11, 28, 12) + ' fill="none" stroke="#ffb547" stroke-width="1.8"/>'), name: 'Прямоугольник', spec: 'Действие или вычисление, например S = a · b.' },
+    { id: 'rhomb', icon: IC(shapePath('rhomb', 1, 10, 32, 14) + ' fill="none" stroke="#c3a6ff" stroke-width="1.8"/>'), name: 'Ромб', spec: 'Проверка условия. Из ромба два выхода: «да» и «нет». В линейном алгоритме он не нужен.' },
+    { id: 'arrow', icon: IC('<path d="M17 4v22" stroke="var(--muted)" stroke-width="2"/><path d="M11 22l6 8 6-8z" fill="var(--muted)"/>'), name: 'Стрелки', spec: 'Показывают порядок шагов. Схему читают сверху вниз.' }];
+}
+function flashEl(sel) { const el = $(sel); if (!el) return; el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    const head = { exec: ['Кто и где выполняет команды', 'Нажмите на пункт, чтобы найти его на сцене.'], seq: ['Из чего состоит задача Робота', 'Нажмите на пункт, чтобы найти его на сцене.'], flow: ['Фигуры блок-схемы', 'Нажмите на фигуру, чтобы найти такие на сцене.'] }[Ls.id];
+    $('#pane-parts').innerHTML = `<h2>${head[0]}</h2><p class="note">${head[1]}</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => {
+      if (b.dataset.id === 'ski') flashEl('#tools');
+      else { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; }
+    });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  if (m.kind === 'exec') {
+    let h = `<h2>Где окажется Кузнечик</h2><div class="formula">точка = 0 + 3 · x − 2 · y</div><p class="note">x — сколько раз выполнили «вперёд 3», y — сколько раз «назад 2».</p><div class="steps">`;
+    h += step('старт', '0');
+    S.hist.forEach((j, i) => { h += step(`${i + 1}. ${j.d > 0 ? 'вперёд 3' : 'назад 2'}`, `${j.from} ${j.d > 0 ? '+ 3' : '− 2'} = ${j.to}`, i >= m.max ? 'badd' : ''); });
+    h += step('итого', `0 + 3 · ${m.f} − 2 · ${m.b} = ${m.pos}`, 'sum') + `</div>`;
+    h += `<h3>Проверка задания</h3><div class="steps">` + step('цель — точка 7', m.pos === m.goal ? 'да' : `нет, сейчас ${m.pos}`, m.pos === m.goal ? 'okk' : '') +
+      step('команд не больше 5', m.n <= m.max ? `да, ${m.n}` : `нет, ${m.n}`, m.n <= m.max ? 'okk' : 'badd') + step('отказов', String(m.ref)) + `</div>`;
+    return h;
+  }
+  if (m.kind === 'seq') {
+    let h = `<h2>Трассировка программы</h2><div class="formula">клетка = (столбец; строка)</div><p class="note">Так программист «прогоняет» программу в уме: после каждой команды записывает, где исполнитель. Старт — ${cellName(L().start)}, флажок — ${cellName(L().goal)}.</p>`;
+    if (!m.n) return h + `<p class="note">Программа пуста — нечего проверять. Добавьте команды.</p>`;
+    h += `<div class="steps">` + m.tr.steps.map((s, i) => step(`${i + 1}. ${DIRS[s.c].w}`, s.fail ? `${cellName(s.from)} → отказ: ${s.fail}` : `${cellName(s.from)} → ${cellName(s.to)}`, s.fail ? 'badd' : '')).join('');
+    const atGoal = !m.tr.fail && m.tr.end[0] === L().goal[0] && m.tr.end[1] === L().goal[1];
+    if (m.tr.fail && m.tr.fail < m.n) h += step('дальше', `команды ${m.tr.fail + 1}–${m.n} не выполнятся`, 'badd');
+    h += step('итог', m.tr.fail ? `отказ на команде ${m.tr.fail}` : atGoal ? `${cellName(m.tr.end)} — флажок` : `${cellName(m.tr.end)} — не флажок`, m.tr.fail ? 'badd' : atGoal ? 'okk sum' : 'sum') + `</div>`;
+    return h + `<p class="note" style="margin-top:10px">Трассировка считает программу заранее. Чтобы задание засчиталось, нажмите «Пуск».</p>`;
+  }
+  const lr = m.lastRun;
+  let h = `<h2>Выполнение схемы</h2><div class="formula">S = a · b</div><div class="steps">` +
+    step('1. Начало', '—') + step('2. Ввод', `a = ${m.a} м, b = ${m.b} м`) + step('3. Вычисление', `S = ${m.a} · ${m.b} = ${m.s}`) + step('4. Вывод', `${m.s} м²`, 'sum') + step('5. Конец', '—') + `</div>`;
+  h += `<p class="note" style="margin-top:10px">Площадь показывает, сколько квадратов 1 × 1 м помещается в прямоугольник: ${m.a} рядов по ${m.b} квадратов.</p>`;
+  h += `<h3>Проверка задания</h3><div class="steps">` + step('схема собрана', m.built ? 'да' : `${m.placed} из 5`, m.built ? 'okk' : '') +
+    step('последний запуск', lr ? `${lr.a} × ${lr.b} → ${lr.s} м²` : 'ещё не было', lr && m.ranOk ? 'okk' : '') + `</div>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const el = $('#meter'), ok = !!S.done[LID()];
+  if (m.kind === 'exec') el.innerHTML = `<div class="k">Кузнечик в точке</div><div class="v ${ok ? 'ok' : ''}">${m.pos}</div><div class="gauge"><b style="width:${(m.pos / L().lineMax * 100).toFixed(1)}%"></b></div><div class="lr"><span>команд</span><span>${m.n}/${m.max}</span></div><div class="lr"><span>отказов</span><span>${m.ref}</span></div>`;
+  else if (m.kind === 'seq') el.innerHTML = `<div class="k">Робот</div><div class="v ${m.fail ? 'bad' : ok || m.success ? 'ok' : ''}">${cellName(S.rob)}</div><div class="lr"><span>команд</span><span>${m.n}/${L().maxProg}</span></div><div class="lr"><span>статус</span><span>${m.running ? 'идёт' : m.fail ? 'отказ' : m.success ? 'флажок' : m.ran ? 'мимо' : 'ждёт'}</span></div>`;
+  else el.innerHTML = `<div class="k">Блок-схема</div><div class="v ${ok ? 'ok' : ''}">${m.placed} / 5</div><div class="gauge"><b style="width:${(m.placed / 5 * 100).toFixed(1)}%"></b></div><div class="lr"><span>S = a · b</span><span>${m.a}·${m.b}</span></div><div class="lr"><span>вывод</span><span>${m.lastRun && m.lastRun.a === m.a && m.lastRun.b === m.b ? m.lastRun.s + ' м²' : '—'}</span></div>`;
+}
+
+function update() {
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Теперь вы умеете составлять алгоритмы!'), 1200);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderTools();
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  exec: '<path d="M6 22h54" stroke="#56627d" stroke-width="1.5"/><path d="M14 20q10-16 20 0" fill="none" stroke="#ffb547" stroke-width="1.3" stroke-dasharray="2 2"/><g transform="translate(40 21) scale(.5)">' + hopper(0, 0, 1, false) + '</g>',
+  seq: '<path d="M4 4h26v22H4zM4 15h26M17 4v22" fill="none" stroke="#3a4762" stroke-width="1"/><path d="M10 21V10h14" fill="none" stroke="#ffb547" stroke-width="1.5" stroke-dasharray="2 2"/><rect x="36" y="5" width="24" height="6" rx="2" fill="#1a2438" stroke="#72d4e8"/><rect x="36" y="13" width="24" height="6" rx="2" fill="#1a2438" stroke="#72d4e8"/><rect x="36" y="21" width="24" height="6" rx="2" fill="#1a2438" stroke="#ffb547"/>',
+  flow: '<rect x="22" y="2" width="22" height="6" rx="3" fill="none" stroke="#86e0a8" stroke-width="1.2"/><path d="M26 11h18l-4 6H22z" fill="none" stroke="#72d4e8" stroke-width="1.2"/><rect x="22" y="20" width="22" height="7" rx="1" fill="none" stroke="#ffb547" stroke-width="1.2"/><path d="M33 8v3M33 17v3" stroke="#8b96ad"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Lx, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Lx.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Lx.title}</span></span>
+      ${S.done[Lx.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const Ls = LESSONS[i];
+  S.lesson = i; S.hl = null; cdrag = null;
+  S.pos = LESSONS[0].start; S.hist = []; S.ref = 0; S.jump = null; S.bad = null;
+  S.prog = []; S.run = null; S.rob = LESSONS[1].start.slice(); S.trail = [S.rob]; S.fail = null; S.success = false; S.ran = false; rvis = null;
+  S.slot = []; S.sel = null; S.miss = 0; S.a = LESSONS[2].a0; S.b = LESSONS[2].b0; S.exec = null; S.lastRun = null; S.lastBad = null;
+  save();
+  $('#stage').classList.toggle('tall', Ls.id !== 'exec');
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = Ls.task;
+  $('#hint').textContent = Ls.stage;
+  renderStrip(); buildScheme(); update();
+  requestAnimationFrame(fit);
+  const cur = $('#lessons .lesson[aria-current="true"]'), ls = $('#lessons'); if (cur) { const dx = cur.getBoundingClientRect().left - ls.getBoundingClientRect().left; if (dx < 0 || dx + cur.offsetWidth > ls.clientWidth) ls.scrollLeft += dx - 8; }
+}
+window.addEventListener('resize', () => requestAnimationFrame(fit));
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '';
+  if (id === 'exec') {
+    now = `Исполнитель Кузнечик на числовой прямой 0…20 (среда). СКИ: «вперёд 3» и «назад 2»; выход за 0 или 20 — отказ. Цель — точка ${Ls.goal}, не больше ${Ls.maxCmd} команд. Сейчас Кузнечик в точке ${m.pos}. Выполненные команды: ${S.hist.map(j => (j.d > 0 ? 'вперёд 3' : 'назад 2')).join(', ') || 'пока нет'} (всего ${m.n}). Отказов: ${m.ref}. Не называй готовую последовательность команд — наводи вопросами («сколько раз нужно прыгнуть вперёд, чтобы оказаться дальше 7?», «на сколько потом вернуться?»).`;
+  }
+  if (id === 'seq') {
+    now = `Исполнитель Робот на поле ${Ls.cols}×${Ls.rows} клеток; клетки обозначены (столбец; строка), строки считаются сверху. СКИ: вверх, вниз, влево, вправо на одну клетку. Старт ${cellName(Ls.start)}, флажок ${cellName(Ls.goal)}. Камни в клетках: ${Ls.rocks.map(cellName).join(', ')} — они образуют две стенки, в каждой есть проход. Ученик составляет линейную программу и запускает её кнопкой «Пуск». Текущая программа (${m.n} команд): ${S.prog.map(c => DIRS[c].w).join(', ') || 'пуста'}. Если её выполнить: ${m.tr.fail ? `отказ на команде ${m.tr.fail} (${m.tr.steps[m.tr.fail - 1].fail})` : `Робот окажется в ${cellName(m.tr.end)}`}. Робот сейчас в ${cellName(S.rob)}; ${m.running ? 'программа выполняется' : m.success ? 'последний запуск дошёл до флажка' : m.ran ? 'последний запуск не дошёл до флажка' : 'программу ещё не запускали'}. Не диктуй готовую программу — помогай найти проходы в стенках и проверять программу по шагам (трассировка).`;
+  }
+  if (id === 'flow') {
+    now = `Ученик собирает блок-схему «Площадь прямоугольника» из фигур: овал «Начало», параллелограмм «Ввод a, b», прямоугольник «S = a · b», параллелограмм «Вывод S», овал «Конец» и лишний ромб «a > b ?». Пять мест в цепочке сверху вниз. Уже поставлено: ${S.slot.map((c, k) => c ? `шаг ${k + 1} — ${BLOCKS[c].t}` : null).filter(Boolean).join('; ') || 'ничего'}. Промахов: ${m.miss}. Данные: a = ${m.a} м, b = ${m.b} м, S = ${m.s} м². Последний запуск схемы: ${m.lastRun ? `${m.lastRun.a} × ${m.lastRun.b} = ${m.lastRun.s} м²` : 'не было'}. Цель — собрать схему и выполнить её при a = 6, b = 4. Не говори, какая фигура на каком месте, — спрашивай, что нужно сделать раньше: узнать числа, посчитать или показать ответ.`;
+  }
+  return [
+    `Раздел: информатика, 5 класс, тема «Алгоритмы». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { exec: 'Что такое система команд исполнителя?', seq: 'Почему в алгоритме важен порядок команд?', flow: 'Зачем в блок-схеме ромб?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

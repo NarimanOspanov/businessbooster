@@ -58,7 +58,7 @@ header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-be
 .stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
 .scene{position:absolute;left:0;top:120px;width:100%;height:calc(100% - 174px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
 .scene [data-drag]{cursor:pointer}
-.scene [data-drag^="b"],.scene [data-drag="knob"],.scene [data-drag="track"]{cursor:grab}
+.scene [data-drag="knob"],.scene [data-drag="corner"],.scene [data-drag="pencil"],.scene [data-drag^="h"]{cursor:grab}
 .scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
 .scene text{font-family:var(--font-mono)}
 
@@ -170,3 +170,662 @@ input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M7 31A13 13 0 0 1 33 31Z" fill="none" stroke="var(--arm)" stroke-width="1.8" stroke-linejoin="round"/><path d="M20 31L29 15" stroke="var(--force)" stroke-width="2" stroke-linecap="round"/><circle cx="20" cy="31" r="2" fill="var(--fg)"/><rect x="9" y="8" width="8" height="8" rx="1" fill="none" stroke="var(--ok)" stroke-width="1.6"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Математика · Наглядная геометрия</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#math">Карта</a><a href="/physics/#math">Математика</a><a href="./" aria-current="page">Наглядная геометрия</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Фигуры</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Рабочее поле">
+    <svg class="scene" id="scene" role="img" aria-label="Интерактивное поле с геометрическими фигурами. Ручки можно перетаскивать."></svg>
+    <div class="task" id="taskBox" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const KEY = 'luch-math-shapes';
+const fmt = v => String(Math.round(v * 100) / 100).replace('.', ',');
+const RAD = Math.PI / 180;
+
+const TARGETS = [40, 90, 130];
+const angType = d => d < 90 ? 'острый' : d === 90 ? 'прямой' : d < 180 ? 'тупой' : 'развёрнутый';
+const NB = 72;
+
+const LESSONS = [
+  { id: 'angle', title: 'Углы и транспортир',
+    text: ['Угол — это фигура из двух лучей, которые выходят из одной точки. Точка — вершина угла, лучи — его стороны. Угол на поле записывают так: ∠AOB. Вершина O всегда стоит в середине.',
+           'Углы измеряют в градусах транспортиром. Центр транспортира ставят в вершину угла, одну сторону кладут на ноль шкалы. Градусы читают по той шкале, где у этой стороны стоит 0.',
+           'Угол меньше 90° — острый, ровно 90° — прямой, больше 90°, но меньше 180° — тупой. Если стороны лежат на одной прямой, угол развёрнутый: 180°.'],
+    why: 'Плотник и мебельщик выставляют на пиле угол 45°, чтобы рамка сошлась без щелей. Геодезист меряет углы, когда размечает участок под дом, штурман задаёт курс самолёта в градусах. Дизайнер в Figma поворачивает объекты на точный угол, а футболист и бильярдист «чувствуют» угол отскока мяча.',
+    task: 'Постройте по очереди три угла: 40°, 90° и 130°. Отпускайте луч OB точно на нужном делении.',
+    hint: 'Луч OA лежит на нуле внешней, голубой шкалы. Значит, считайте по голубым числам. Кнопки ±1° помогают попасть точно.',
+    stage: 'Тащите оранжевую ручку луча OB по транспортиру.',
+    ang: 25,
+    check: m => m.hits === 3 },
+  { id: 'area', title: 'Периметр и площадь',
+    text: ['Периметр — длина всей границы фигуры. У прямоугольника две пары равных сторон, поэтому P = 2 · (a + b). Периметр измеряют в единицах длины: метрах, сантиметрах.',
+           'Площадь показывает, сколько места занимает фигура. Её меряют квадратиками: 1 м² — квадрат со стороной 1 м. У прямоугольника b рядов по a квадратиков, поэтому S = a · b.',
+           'Периметр и площадь — разные величины. Прямоугольники с одинаковым периметром могут иметь совсем разную площадь.'],
+    why: 'Строитель по периметру покупает забор, плинтус и бордюр, а по площади — ламинат, плитку и краску. Риелтор и покупатель сравнивают квартиры по квадратным метрам: в Астане и Алматы цену часто называют за 1 м². Фермер по площади поля считает, сколько нужно семян и удобрений.',
+    task: 'У вас 20 м сетки. Огородите прямоугольный загон для кур с самой большой площадью.',
+    hint: 'Сначала сделайте периметр ровно 20 м. Потом сравните площади разных вариантов — все они собираются на вкладке «Расчёты».',
+    stage: 'Тащите оранжевый угол прямоугольника по клеткам.',
+    a: 4, b: 3,
+    check: m => m.p === 20 && m.s === 25 },
+  { id: 'volume', title: 'Объём параллелепипеда',
+    text: ['Прямоугольный параллелепипед — это «коробка». У него 6 граней-прямоугольников, 12 рёбер и 8 вершин. Его размеры — длина a, ширина b и высота c. Если все рёбра равны, это куб.',
+           'Объём показывает, сколько места внутри. Его меряют кубиками: 1 дм³ — куб с ребром 1 дм. В нижнем слое a · b кубиков, а таких слоёв c. Поэтому V = a · b · c.',
+           '1 дм³ — это ровно 1 литр. Кубик 10 × 10 × 10 см вмещает столько же воды, сколько литровая бутылка.'],
+    why: 'Логист считает объём груза, чтобы плотно заполнить фуру или контейнер, — от этого зависит цена доставки. Строитель заказывает бетон для фундамента в кубометрах: ошибся — переплатил или остановил стройку. Продавец аквариумов и сантехник переводят литры в кубические дециметры, когда подбирают бак.',
+    task: 'Соберите аквариум объёмом ровно 60 литров. Каждое ребро — от 1 до 6 дм.',
+    hint: '1 л = 1 дм³, значит, нужен объём 60 дм³. Подберите три числа не больше 6, произведение которых равно 60.',
+    stage: 'Тащите цветные ручки: длину a, ширину b и высоту c.',
+    a: 3, b: 2, c: 2,
+    check: m => m.v === 60 },
+  { id: 'circle', title: 'Окружность и круг',
+    text: ['Окружность — линия, все точки которой находятся на одном расстоянии от центра. Это расстояние — радиус r. Окружность вместе с частью плоскости внутри неё — круг.',
+           'Отрезок между двумя точками окружности — хорда. Хорда через центр — диаметр, самая длинная хорда. Диаметр равен двум радиусам: d = 2 · r. Две точки делят окружность на две дуги.',
+           'Окружность чертят циркулем. Иглу ставят в центр, раствор циркуля делают равным радиусу и, не меняя его, ведут грифель по кругу.'],
+    why: 'Инженер и токарь задают детали — трубы, шестерни, подшипники — через диаметр, на чертеже его обозначают знаком ⌀. Ландшафтный дизайнер размечает круглую клумбу верёвкой и колышком — это тот же циркуль. А пиццу и колёса велосипеда выбирают по диаметру.',
+    task: 'Начертите циркулем окружность диаметром 8 см: выставьте раствор и обведите полный круг.',
+    hint: 'Раствор циркуля равен радиусу. Как радиус связан с диаметром? В режиме «Раствор» тащите грифель от центра, в режиме «Чертить» — по кругу.',
+    stage: 'Режим «Раствор» — тащите грифель от центра. «Чертить» — ведите его по кругу.',
+    r: 2.5,
+    check: m => m.full && m.r === 4 },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null,
+            ang: 25, tgt: 0,
+            a: 4, b: 3, tried: {},
+            va: 3, vb: 2, vc: 2,
+            r: 2.5, th: -0.5, bins: [], mode: 'open', fullSaid: false };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+// ---------- lesson 1: protractor ----------
+const PV = { x: 260, y: 262 }, PR = 200;
+const pol = (r, d) => ({ x: PV.x + r * Math.cos(d * RAD), y: PV.y - r * Math.sin(d * RAD) });
+function setAng(d) { d = clamp(Math.round(d), 1, 180); if (d !== S.ang) { S.ang = d; update(); } }
+function angFromPt(p) {
+  let d = Math.atan2(PV.y - p.y, p.x - PV.x) / RAD;
+  if (d < 0) d = p.x < PV.x ? 180 : 1;
+  setAng(d);
+}
+function tryHit() {
+  if (LID() !== 'angle' || S.tgt >= TARGETS.length) return;
+  const T = TARGETS[S.tgt];
+  if (S.ang === T) {
+    S.tgt++;
+    toast(S.tgt < TARGETS.length ? `Верно: ${T}° — ${angType(T)} угол. Теперь ${TARGETS[S.tgt]}°.` : `Верно: ${T}° — ${angType(T)} угол. Все три угла построены!`);
+    update();
+  } else if (S.ang === 180 - T) toast(`Здесь ${T}° по внутренней шкале. Но луч OA стоит на нуле внешней — считайте по ней.`);
+}
+
+// ---------- lesson 2: rectangle on grid ----------
+const GX = 50, GB = 272, GC = 30, GCOLS = 14, GROWS = 8;
+function setRect(a, b) {
+  a = clamp(Math.round(a), 1, GCOLS); b = clamp(Math.round(b), 1, GROWS);
+  if (a === S.a && b === S.b) return;
+  S.a = a; S.b = b;
+  if (2 * (a + b) === 20) S.tried[Math.min(a, b) + '×' + Math.max(a, b)] = a * b;
+  update();
+}
+
+// ---------- lesson 3: box (oblique drawing) ----------
+const VO = { x: 140, y: 292 }, VU = 30, VK = 0.55, VA = 40 * RAD;
+const EX = { x: VU, y: 0 }, EY = { x: VU * VK * Math.cos(VA), y: -VU * VK * Math.sin(VA) }, EZ = { x: 0, y: -VU };
+const P3 = (x, y, z) => ({ x: VO.x + x * EX.x + y * EY.x + z * EZ.x, y: VO.y + x * EX.y + y * EY.y + z * EZ.y });
+const VCOL = { a: '#ffb547', b: '#86e0a8', c: '#c39bff' };
+function setBox(k, v) { v = clamp(Math.round(v), 1, 6); if (S['v' + k] !== v) { S['v' + k] = v; update(); } }
+function solveHandle(id, p) {
+  const k = id[1], base = k === 'b' ? P3(S.va, 0, 0) : P3(0, 0, 0), dir = k === 'a' ? EX : k === 'b' ? EY : EZ;
+  setBox(k, ((p.x - base.x) * dir.x + (p.y - base.y) * dir.y) / (dir.x * dir.x + dir.y * dir.y));
+}
+
+// ---------- lesson 4: compass ----------
+const CC = { x: 260, y: 165 }, K = 22, LEG = 120;
+const cpt = (r, a) => ({ x: CC.x + r * Math.cos(a), y: CC.y + r * Math.sin(a) });
+const binOf = a => Math.floor((((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) / (2 * Math.PI) * NB) % NB;
+function clearBins() { S.bins = new Array(NB).fill(false); S.fullSaid = false; }
+function setR(v) { v = clamp(Math.round(v * 2) / 2, 0.5, 6); if (v !== S.r) { S.r = v; clearBins(); update(); } }
+function markArc(a0, a1) {
+  let d = a1 - a0; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+  const n = Math.ceil(Math.abs(d) / (Math.PI / 144)) + 1;
+  for (let i = 0; i <= n; i++) S.bins[binOf(a0 + d * i / n)] = true;
+}
+function circleAt(p, down) {
+  const dx = p.x - CC.x, dy = p.y - CC.y, th = Math.atan2(dy, dx);
+  if (S.mode === 'open') { S.th = th; const before = S.r; setR(Math.hypot(dx, dy) / K); if (before === S.r) dirty = true; return; }
+  if (!down) markArc(S.th, th);
+  S.th = th;
+  const m = model();
+  if (m.full && !S.fullSaid) { S.fullSaid = true; if (!(LESSONS[S.lesson].check(m) && !S.done.circle)) toast(`Окружность замкнулась: r = ${fmt(m.r)} см, d = ${fmt(m.d)} см.`); }
+  update();
+}
+
+// ---------- model ----------
+function model() {
+  const id = LID();
+  if (id === 'angle') return { kind: 'angle', ang: S.ang, type: angType(S.ang), inner: 180 - S.ang, hits: S.tgt, tgt: TARGETS[S.tgt] || null };
+  if (id === 'area') return { kind: 'area', a: S.a, b: S.b, p: 2 * (S.a + S.b), s: S.a * S.b, sq: S.a === S.b };
+  if (id === 'volume') { const a = S.va, b = S.vb, c = S.vc; return { kind: 'volume', a, b, c, layer: a * b, v: a * b * c, sa: 2 * (a * b + b * c + a * c), cube: a === b && b === c }; }
+  const cov = S.bins.filter(Boolean).length;
+  return { kind: 'circle', r: S.r, d: 2 * S.r, cov, full: cov === NB, mode: S.mode };
+}
+
+// ---------- drawing ----------
+const DIM = { angle: [520, 300], area: [520, 300], volume: [520, 320], circle: [520, 330] };
+const scene = $('#scene');
+const f1 = v => v.toFixed(1);
+const txt = (x, y, s, fs, fill, extra = '') => `<text x="${f1(x)}" y="${f1(y)}" font-size="${fs}" fill="${fill}" text-anchor="middle" ${extra}>${s}</text>`;
+const cap = (x, y, s) => `<text x="${x}" y="${y}" font-size="11" fill="#8b96ad" text-anchor="middle" font-family="Golos Text,sans-serif" letter-spacing=".5">${s}</text>`;
+const line = (p, q, st, w, extra = '') => `<path d="M${f1(p.x)} ${f1(p.y)}L${f1(q.x)} ${f1(q.y)}" stroke="${st}" stroke-width="${w}" ${extra}/>`;
+const poly = pts => 'M' + pts.map(p => f1(p.x) + ' ' + f1(p.y)).join('L') + 'Z';
+
+function drawAngle() {
+  const m = model(), A = m.ang;
+  const L = pol(PR, 180), R = pol(PR, 0);
+  let h = `<g data-drag="ray" data-part="body"><path d="M${L.x} ${PV.y}A${PR} ${PR} 0 0 1 ${R.x} ${PV.y}Z" fill="rgba(114,212,232,.06)" stroke="#3c6f80" stroke-width="1.5"/>`;
+  h += `<path d="M${PV.x - 120} ${PV.y}A120 120 0 0 1 ${PV.x + 120} ${PV.y}" fill="none" stroke="#26324a"/>`;
+  let tk = '';
+  for (let d = 0; d <= 180; d++) { const len = d % 10 ? (d % 5 ? 5 : 9) : 15; tk += `M${f1(pol(PR, d).x)} ${f1(pol(PR, d).y)}L${f1(pol(PR - len, d).x)} ${f1(pol(PR - len, d).y)}`; }
+  h += `<path d="${tk}" stroke="#56627d" stroke-width="1"/></g>`;
+  h += '<g data-part="outer" pointer-events="none">';
+  for (let d = 0; d <= 180; d += 10) { const p = pol(PR - 27, clamp(d, 4, 176)); h += txt(p.x, p.y + 4, d, 10.5, '#72d4e8'); }
+  h += '</g><g data-part="inner" pointer-events="none">';
+  for (let d = 0; d <= 180; d += 10) { const p = pol(PR - 46, clamp(d, 5, 175)); h += txt(p.x, p.y + 3.5, 180 - d, 9, '#c9a46a'); }
+  h += '</g>';
+  h += line({ x: PV.x - PR - 14, y: PV.y }, { x: PV.x + PR + 14, y: PV.y }, '#3c6f80', 1.5, 'pointer-events="none"');
+  // angle mark
+  if (A === 90) { const a = pol(20, 0), b = pol(20 * Math.SQRT2, 45), c = pol(20, 90); h += `<path data-part="amark" d="M${f1(a.x)} ${f1(a.y)}L${f1(b.x)} ${f1(b.y)}L${f1(c.x)} ${f1(c.y)}" fill="rgba(255,181,71,.18)" stroke="#ffb547" stroke-width="1.6" pointer-events="none"/>`; }
+  else { const a = pol(36, 0), b = pol(36, A); h += `<path data-part="amark" d="M${PV.x} ${PV.y}L${f1(a.x)} ${f1(a.y)}A36 36 0 0 0 ${f1(b.x)} ${f1(b.y)}Z" fill="rgba(255,181,71,.18)" stroke="#ffb547" stroke-width="1.6" pointer-events="none"/>`; }
+  const lp = pol(A < 20 ? 78 : 60, A / 2);
+  h += txt(lp.x, lp.y + 5, A + '°', 15, '#ffb547', 'font-weight="500" data-part="amark" pointer-events="none"');
+  // rays
+  const ea = pol(PR + 26, 0), eb = pol(PR + 26, A), kb = pol(PR + 12, A);
+  h += `<g data-part="rays" pointer-events="none">${line(PV, ea, '#e8ecf4', 2.4, 'stroke-linecap="round"')}${line(PV, eb, '#ffb547', 2.4, 'stroke-linecap="round"')}` +
+       txt(ea.x - 4, ea.y + 20, 'A', 14, '#e8ecf4', 'font-weight="600"');
+  const lb = pol(PR + 30, A + (A > 170 ? -4 : 4));
+  h += txt(lb.x, lb.y + 5, 'B', 14, '#ffb547', 'font-weight="600"') + '</g>';
+  h += `<g data-part="vertex" pointer-events="none"><circle cx="${PV.x}" cy="${PV.y}" r="4.5" fill="#e8ecf4" stroke="${INK}" stroke-width="1.5"/>${txt(PV.x, PV.y + 22, 'O', 14, '#e8ecf4', 'font-weight="600"')}</g>`;
+  h += `<g data-drag="knob" data-part="rays"><circle cx="${f1(kb.x)}" cy="${f1(kb.y)}" r="22" fill="transparent"/><circle cx="${f1(kb.x)}" cy="${f1(kb.y)}" r="10" fill="#ffb547" stroke="${INK}" stroke-width="2"/></g>`;
+  // targets
+  TARGETS.forEach((T, i) => {
+    const x = 16 + i * 62, y = 274, done = i < S.tgt, cur = i === S.tgt;
+    h += `<g pointer-events="none"><rect x="${x}" y="${y}" width="56" height="22" rx="7" fill="${done ? 'rgba(134,224,168,.14)' : '#141d2d'}" stroke="${done ? '#86e0a8' : cur ? '#ffb547' : '#26324a'}" stroke-width="1.4"/>${txt(x + 28, y + 15.5, (done ? '✓ ' : '') + T + '°', 12, done ? '#86e0a8' : cur ? '#ffb547' : '#8b96ad', 'font-weight="500"')}</g>`;
+  });
+  return h;
+}
+
+function drawArea() {
+  const m = model(), top = GB - GROWS * GC, x1 = GX + m.a * GC, y1 = GB - m.b * GC;
+  let h = cap(260, 16, 'ОДНА КЛЕТКА — 1 м × 1 м = 1 м²');
+  h += `<g data-drag="grid"><rect x="${GX}" y="${top}" width="${GCOLS * GC}" height="${GROWS * GC}" fill="#101826"/>`;
+  h += `<rect data-part="cells" x="${GX}" y="${y1}" width="${m.a * GC}" height="${m.b * GC}" fill="rgba(134,224,168,.16)"/>`;
+  let g = '';
+  for (let i = 0; i <= GCOLS; i++) g += `M${GX + i * GC} ${top}V${GB}`;
+  for (let j = 0; j <= GROWS; j++) g += `M${GX} ${top + j * GC}H${GX + GCOLS * GC}`;
+  h += `<path d="${g}" stroke="#26324a" stroke-width="1"/>`;
+  if (m.s <= 40) { let n = 0; for (let j = 0; j < m.b; j++) for (let i = 0; i < m.a; i++) { n++; h += txt(GX + i * GC + GC / 2, GB - j * GC - GC / 2 + 4, n, 10, '#5d8f70', 'data-part="cells"'); } }
+  h += '</g>';
+  h += `<rect data-part="perim" x="${GX}" y="${y1}" width="${m.a * GC}" height="${m.b * GC}" fill="none" stroke="#ffb547" stroke-width="3" stroke-linejoin="round" pointer-events="none"/>`;
+  h += `<g data-part="sides" pointer-events="none">${txt(GX + m.a * GC / 2, GB + 18, `a = ${m.a} м`, 12.5, '#e8ecf4', 'font-weight="500"')}` +
+       `<text x="${GX - 7}" y="${f1(GB - m.b * GC / 2 + 4)}" font-size="12.5" fill="#e8ecf4" text-anchor="end" font-weight="500">${m.b} м</text></g>`;
+  h += `<g data-drag="corner" data-part="corner"><circle cx="${x1}" cy="${y1}" r="22" fill="transparent"/><circle cx="${x1}" cy="${y1}" r="10" fill="#ffb547" stroke="${INK}" stroke-width="2"/></g>`;
+  return h;
+}
+
+function drawVolume() {
+  const m = model(), { a, b, c } = m;
+  const fill = (k, pts, col, part, lines) => `<g data-part="${part}" pointer-events="none"><path d="${poly(pts)}" fill="${col}" stroke="#72d4e8" stroke-width="1.6" stroke-linejoin="round"/><path d="${lines}" stroke="rgba(114,212,232,.38)" stroke-width="1"/></g>`;
+  const seg = (p, q) => `M${f1(p.x)} ${f1(p.y)}L${f1(q.x)} ${f1(q.y)}`;
+  let fl = '', tl = '', rl = '';
+  for (let i = 1; i < a; i++) { fl += seg(P3(i, 0, 0), P3(i, 0, c)); tl += seg(P3(i, 0, c), P3(i, b, c)); }
+  for (let j = 1; j < c; j++) { fl += seg(P3(0, 0, j), P3(a, 0, j)); rl += seg(P3(a, 0, j), P3(a, b, j)); }
+  for (let k = 1; k < b; k++) { tl += seg(P3(0, k, c), P3(a, k, c)); rl += seg(P3(a, k, 0), P3(a, k, c)); }
+  let h = cap(260, 14, 'ОДИН КУБИК — 1 дм³ = 1 литр');
+  // ghost of the largest box
+  h += `<path d="${poly([P3(0, 0, 0), P3(6, 0, 0), P3(6, 6, 0), P3(6, 6, 6), P3(0, 6, 6), P3(0, 0, 6)])}" fill="none" stroke="#26324a" stroke-dasharray="3 4" pointer-events="none"/>`;
+  h += fill('f', [P3(0, 0, 0), P3(a, 0, 0), P3(a, 0, c), P3(0, 0, c)], '#1d3d4f', 'vfront', fl);
+  h += fill('r', [P3(a, 0, 0), P3(a, b, 0), P3(a, b, c), P3(a, 0, c)], '#152f3d', 'vright', rl);
+  h += fill('t', [P3(0, 0, c), P3(a, 0, c), P3(a, b, c), P3(0, b, c)], '#2a5c70', 'layer', tl);
+  h += `<path data-part="layer" d="${poly([P3(0, 0, c - 1), P3(a, 0, c - 1), P3(a, 0, c), P3(0, 0, c)])}" fill="rgba(255,181,71,.12)" stroke="none" pointer-events="none"/>`;
+  const ma = P3(a / 2, 0, 0), mb = P3(a, b / 2, 0), mc = P3(0, 0, c / 2);
+  h += `<g data-part="vedges" pointer-events="none">${txt(ma.x, VO.y + 20, `a = ${a} дм`, 12.5, VCOL.a, 'font-weight="500"')}` +
+       `<text x="${f1(mb.x + 12)}" y="${f1(mb.y + 14)}" font-size="12.5" fill="${VCOL.b}" font-weight="500">b = ${b} дм</text>` +
+       `<text x="${f1(VO.x - 12)}" y="${f1(mc.y + 4)}" font-size="12.5" fill="${VCOL.c}" font-weight="500" text-anchor="end">c = ${c} дм</text></g>`;
+  for (const [k, p] of [['a', P3(a, 0, 0)], ['b', P3(a, b, 0)], ['c', P3(0, 0, c)]])
+    h += `<g data-drag="h${k}" data-part="vedges handles"><circle cx="${f1(p.x)}" cy="${f1(p.y)}" r="22" fill="transparent"/><circle cx="${f1(p.x)}" cy="${f1(p.y)}" r="9" fill="${VCOL[k]}" stroke="${INK}" stroke-width="2"/></g>`;
+  return h;
+}
+
+function drawCircle() {
+  const m = model(), rK = m.r * K, pen = cpt(rK, S.th);
+  let h = `<g data-drag="field"><rect x="${CC.x - 230}" y="${CC.y - 160}" width="460" height="320" rx="10" fill="#101826"/>`;
+  let g = '';
+  for (let i = -10; i <= 10; i++) g += `M${CC.x + i * K} ${CC.y - 154}V${CC.y + 154}`;
+  for (let j = -7; j <= 7; j++) g += `M${CC.x - 220} ${CC.y + j * K}H${CC.x + 220}`;
+  h += `<path d="${g}" stroke="#1c2638" stroke-width="1"/></g>`;
+  h += `<g pointer-events="none">`;
+  if (m.full) {
+    h += `<circle data-part="disk" cx="${CC.x}" cy="${CC.y}" r="${f1(rK)}" fill="rgba(114,212,232,.1)"/>`;
+    h += `<circle cx="${CC.x}" cy="${CC.y}" r="${f1(rK)}" fill="none" stroke="#e8ecf4" stroke-width="2.2"/>`;
+    const d1 = cpt(rK, 2.75), d2 = cpt(rK, 2.75 + Math.PI), c1 = cpt(rK, 0.55), c2 = cpt(rK, 2.0);
+    h += `<g data-part="diam">${line(d1, d2, '#86e0a8', 2)}${txt((d1.x + CC.x) / 2 - 4, (d1.y + CC.y) / 2 - 8, 'd', 13, '#86e0a8', 'font-weight="600"')}</g>`;
+    h += `<g data-part="arc"><path d="M${f1(c1.x)} ${f1(c1.y)}A${f1(rK)} ${f1(rK)} 0 0 1 ${f1(c2.x)} ${f1(c2.y)}" fill="none" stroke="#c39bff" stroke-width="4" stroke-linecap="round"/></g>`;
+    h += `<g data-part="chord">${line(c1, c2, '#c39bff', 2, 'stroke-dasharray="5 3"')}${txt((c1.x + c2.x) / 2, (c1.y + c2.y) / 2 - 7, 'хорда', 11, '#c39bff')}</g>`;
+  } else {
+    let tr = '';
+    for (let i = 0; i < NB; i++) if (S.bins[i]) { const p = cpt(rK, i / NB * 2 * Math.PI), q = cpt(rK, (i + 1) / NB * 2 * Math.PI); tr += `M${f1(p.x)} ${f1(p.y)}A${f1(rK)} ${f1(rK)} 0 0 1 ${f1(q.x)} ${f1(q.y)}`; }
+    if (tr) h += `<path d="${tr}" fill="none" stroke="#e8ecf4" stroke-width="2.2" stroke-linecap="round"/>`;
+    h += `<circle cx="${CC.x}" cy="${CC.y}" r="${f1(rK)}" fill="none" stroke="#3a4762" stroke-dasharray="2 6"/>`;
+  }
+  // radius
+  const mr = cpt(rK / 2, S.th), nx = -Math.sin(S.th), ny = Math.cos(S.th);
+  h += `<g data-part="radius">${line(CC, pen, '#ffb547', 1.6, 'stroke-dasharray="4 3"')}${txt(mr.x + nx * 14, mr.y + ny * 14 + 4, 'r = ' + fmt(m.r) + ' см', 12, '#ffb547', 'font-weight="500"')}</g>`;
+  h += `<g data-part="center"><circle cx="${CC.x}" cy="${CC.y}" r="3.5" fill="#e8ecf4"/>${txt(CC.x - 10, CC.y - 8, 'O', 13, '#e8ecf4', 'font-weight="600"')}</g>`;
+  // compass: needle in the centre, pencil on the circle, hinge above the midpoint
+  const mid = cpt(rK / 2, S.th), hh = Math.sqrt(Math.max(0, LEG * LEG - rK * rK / 4)), hx = mid.x + Math.sin(S.th) * hh, hy = mid.y - Math.cos(S.th) * hh;
+  const hinge = { x: hx, y: hy };
+  h += `<g data-part="compass" opacity=".92">${line(hinge, CC, '#8b96ad', 4, 'stroke-linecap="round"')}${line(hinge, pen, '#8b96ad', 4, 'stroke-linecap="round"')}` +
+       `<circle cx="${f1(hx)}" cy="${f1(hy)}" r="7" fill="#1a2438" stroke="#8b96ad" stroke-width="2"/>` +
+       `${line({ x: hx + (hx - mid.x) / hh * 4, y: hy + (hy - mid.y) / hh * 4 }, { x: hx + (hx - mid.x) / hh * 18, y: hy + (hy - mid.y) / hh * 18 }, '#8b96ad', 5, 'stroke-linecap="round"')}</g>`;
+  h += `</g>`;
+  h += `<g data-drag="pencil" data-part="compass"><circle cx="${f1(pen.x)}" cy="${f1(pen.y)}" r="24" fill="transparent"/><circle cx="${f1(pen.x)}" cy="${f1(pen.y)}" r="8" fill="${S.mode === 'open' ? '#ffb547' : '#e8ecf4'}" stroke="${INK}" stroke-width="2"/></g>`;
+  return h;
+}
+
+function drawScene(t) {
+  const id = LID();
+  scene.innerHTML = id === 'angle' ? drawAngle() : id === 'area' ? drawArea() : id === 'volume' ? drawVolume() : drawCircle();
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1);
+    if (k === 0) { S.hl = null; return; }
+    let bb = null;
+    scene.querySelectorAll(`[data-part~="${S.hl.id}"]`).forEach(el => {
+      const b = el.getBBox(); if (!b.width && !b.height) return;
+      bb = bb ? { x0: Math.min(bb.x0, b.x), y0: Math.min(bb.y0, b.y), x1: Math.max(bb.x1, b.x + b.width), y1: Math.max(bb.y1, b.y + b.height) } : { x0: b.x, y0: b.y, x1: b.x + b.width, y1: b.y + b.height };
+    });
+    if (bb) scene.insertAdjacentHTML('beforeend', `<rect x="${f1(bb.x0 - 6)}" y="${f1(bb.y0 - 6)}" width="${f1(bb.x1 - bb.x0 + 12)}" height="${f1(bb.y1 - bb.y0 + 12)}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`);
+    else { S.hl = null; toast('Это появится на поле, когда окружность замкнётся.'); }
+  }
+}
+
+let VB = { x: 0, y: 0, w: 520, h: 320 }, dirty = true;
+function fit() {
+  const st = $('#stage'), W0 = st.clientWidth, H0 = st.clientHeight; if (!W0 || !H0) return;
+  const top = Math.max($('#taskBox').offsetHeight, $('#meter').offsetHeight) + 24, hh = Math.max(140, H0 - top - 54);
+  scene.style.top = top + 'px'; scene.style.height = hh + 'px';
+  const D = DIM[LID()], s = Math.min(W0 / (D[0] + 16), hh / (D[1] + 8), 1.8);
+  VB = { w: W0 / s, h: hh / s }; VB.x = D[0] / 2 - VB.w / 2; VB.y = D[1] / 2 - VB.h / 2;
+  scene.setAttribute('viewBox', `${f1(VB.x)} ${f1(VB.y)} ${f1(VB.w)} ${f1(VB.h)}`);
+  dirty = true;
+}
+const ro = new ResizeObserver(fit);
+ro.observe($('#stage')); ro.observe($('#taskBox')); ro.observe($('#meter'));
+
+// ---------- pointer ----------
+let drag = null;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+function dragTo(id, p, down) {
+  if (id === 'ray' || id === 'knob') angFromPt(p);
+  else if (id === 'grid' || id === 'corner') setRect((p.x - GX) / GC, (GB - p.y) / GC);
+  else if (/^h[abc]$/.test(id)) { if (!down) solveHandle(id, p); }
+  else if (id === 'pencil' || id === 'field') circleAt(p, down);
+}
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  drag = { id: el.dataset.drag };
+  scene.classList.add('grabbing');
+  dragTo(drag.id, toSvg(e), true);
+});
+scene.addEventListener('pointermove', e => { if (drag) dragTo(drag.id, toSvg(e), false); });
+const endDrag = () => {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing');
+  if (d.id === 'ray' || d.id === 'knob') tryHit();
+  dirty = true;
+};
+scene.addEventListener('pointerup', endDrag);
+scene.addEventListener('pointercancel', endDrag);
+
+function loop(t) {
+  requestAnimationFrame(loop);
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2800); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    angle: B('ang-10', '−10°') + B('ang-1', '−1°') + B('ang+1', '+1°') + B('ang+10', '+10°') + sep + B('ang-reset', 'Заново'),
+    area: B('ra-', '−a') + B('ra+', '+a') + sep + B('rb-', '−b') + B('rb+', '+b'),
+    volume: B('va-', '−a') + B('va+', '+a') + sep + B('vb-', '−b') + B('vb+', '+b') + sep + B('vc-', '−c') + B('vc+', '+c'),
+    circle: B('m-open', 'Раствор', S.mode === 'open') + B('m-draw', 'Чертить', S.mode === 'draw') + sep + B('r-', '−0,5') + B('r+', '+0,5') + sep + B('erase', 'Стереть'),
+  }[id];
+}
+function setMode(md) { S.mode = md; renderTools(); buildScheme(); update(); toast(md === 'open' ? 'Режим «Раствор»: тащите грифель от центра или к центру.' : 'Режим «Чертить»: ведите грифель по кругу.'); }
+function act(a) {
+  let mm;
+  if ((mm = a.match(/^ang([+-]\d+)$/))) { setAng(S.ang + +mm[1]); tryHit(); return; }
+  if (a === 'ang-reset') { S.tgt = 0; S.ang = LESSONS[0].ang; update(); return; }
+  if ((mm = a.match(/^r([ab])([+-])$/))) { const d = mm[2] === '+' ? 1 : -1; mm[1] === 'a' ? setRect(S.a + d, S.b) : setRect(S.a, S.b + d); return; }
+  if ((mm = a.match(/^v([abc])([+-])$/))) { setBox(mm[1], S['v' + mm[1]] + (mm[2] === '+' ? 1 : -1)); return; }
+  if (a === 'm-open') { setMode('open'); return; }
+  if (a === 'm-draw') { setMode('draw'); return; }
+  if (a === 'r-') { setR(S.r - 0.5); return; }
+  if (a === 'r+') { setR(S.r + 0.5); return; }
+  if (a === 'erase') { clearBins(); update(); return; }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  vertex: IC('<path d="M6 26H30M6 26L24 8" stroke="var(--muted)" stroke-width="1.8" fill="none"/><circle cx="6" cy="26" r="3.2" fill="var(--fg)"/>'),
+  rays: IC('<path d="M6 26H30" stroke="var(--fg)" stroke-width="2" stroke-linecap="round"/><path d="M6 26L24 8" stroke="var(--force)" stroke-width="2" stroke-linecap="round"/><circle cx="24" cy="8" r="3" fill="var(--force)"/>'),
+  outer: IC('<path d="M3 28A14 14 0 0 1 31 28" fill="none" stroke="var(--arm)" stroke-width="1.6"/><text x="17" y="22" font-size="9" fill="var(--arm)" text-anchor="middle" font-family="monospace">0…180</text>'),
+  inner: IC('<path d="M7 28A10 10 0 0 1 27 28" fill="none" stroke="#c9a46a" stroke-width="1.6"/><text x="17" y="24" font-size="8" fill="#c9a46a" text-anchor="middle" font-family="monospace">180…0</text>'),
+  amark: IC('<path d="M6 26L18 26A12 12 0 0 0 14.5 17.5Z" fill="rgba(255,181,71,.25)" stroke="var(--force)" stroke-width="1.6"/><path d="M6 26H30M6 26L24 8" stroke="var(--muted)" stroke-width="1.4"/>'),
+  cells: IC('<path d="M5 5h24v24H5zM13 5v24M21 5v24M5 13h24M5 21h24" fill="rgba(134,224,168,.18)" stroke="var(--ok)" stroke-width="1"/>'),
+  sides: IC('<path d="M5 26h24M5 26V10" stroke="var(--fg)" stroke-width="2"/><text x="17" y="22" font-size="9" fill="var(--fg)" text-anchor="middle" font-family="monospace">a</text><text x="11" y="17" font-size="9" fill="var(--fg)" text-anchor="middle" font-family="monospace">b</text>'),
+  perim: IC('<rect x="5" y="9" width="24" height="16" fill="none" stroke="var(--force)" stroke-width="3"/>'),
+  corner: IC('<path d="M5 9h20v16" fill="none" stroke="var(--muted)" stroke-width="1.6"/><circle cx="25" cy="9" r="5" fill="var(--force)"/>'),
+  vfront: IC('<rect x="5" y="11" width="18" height="18" fill="#1d3d4f" stroke="var(--arm)" stroke-width="1.6"/><path d="M5 11l6-6h18v18l-6 6" fill="none" stroke="var(--muted)" stroke-width="1"/>'),
+  layer: IC('<path d="M5 11l6-6h18l-6 6z" fill="#2a5c70" stroke="var(--arm)" stroke-width="1.4"/><rect x="5" y="11" width="18" height="6" fill="rgba(255,181,71,.25)" stroke="var(--force)" stroke-width="1"/><rect x="5" y="17" width="18" height="12" fill="none" stroke="var(--muted)" stroke-width="1"/>'),
+  vright: IC('<path d="M23 11l6-6v18l-6 6z" fill="#152f3d" stroke="var(--arm)" stroke-width="1.6"/><rect x="5" y="11" width="18" height="18" fill="none" stroke="var(--muted)" stroke-width="1"/>'),
+  vedges: IC('<path d="M5 29h18" stroke="#ffb547" stroke-width="2.4"/><path d="M23 29l6-6" stroke="#86e0a8" stroke-width="2.4"/><path d="M5 29V11" stroke="#c39bff" stroke-width="2.4"/>'),
+  center: IC('<circle cx="17" cy="17" r="12" fill="none" stroke="var(--muted)" stroke-width="1.2"/><circle cx="17" cy="17" r="3" fill="var(--fg)"/>'),
+  radius: IC('<circle cx="17" cy="17" r="12" fill="none" stroke="var(--muted)" stroke-width="1.2"/><path d="M17 17L28 12" stroke="var(--force)" stroke-width="2" stroke-dasharray="3 2"/>'),
+  diam: IC('<circle cx="17" cy="17" r="12" fill="none" stroke="var(--muted)" stroke-width="1.2"/><path d="M6 21L28 13" stroke="var(--ok)" stroke-width="2"/>'),
+  chord: IC('<circle cx="17" cy="17" r="12" fill="none" stroke="var(--muted)" stroke-width="1.2"/><path d="M8 25L27 24" stroke="#c39bff" stroke-width="2" stroke-dasharray="3 2"/>'),
+  arc: IC('<circle cx="17" cy="17" r="12" fill="none" stroke="var(--muted)" stroke-width="1.2"/><path d="M27 24A12 12 0 0 1 8 25" fill="none" stroke="#c39bff" stroke-width="3.4"/>'),
+  disk: IC('<circle cx="17" cy="17" r="12" fill="rgba(114,212,232,.3)" stroke="var(--fg)" stroke-width="1.6"/>'),
+  compass: IC('<path d="M17 5L9 29M17 5L25 29" stroke="var(--muted)" stroke-width="2.4" stroke-linecap="round"/><circle cx="17" cy="6" r="3" fill="var(--surface-2)" stroke="var(--muted)" stroke-width="1.6"/><circle cx="25" cy="29" r="2.4" fill="var(--force)"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+const yn = v => v ? '<span class="yes">да</span>' : '<span class="no">нет</span>';
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (m.kind === 'angle') return `∠AOB = ${m.ang}° · построено ${m.hits} из 3`;
+  if (m.kind === 'area') return `P = ${m.p} м · S = ${m.s} м²`;
+  if (m.kind === 'volume') return `V = ${m.a} · ${m.b} · ${m.c} = ${m.v} л`;
+  return `r = ${fmt(m.r)} см · обведено ${Math.round(m.cov / NB * 100)}%`;
+}
+
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'angle') h = `<h2>Транспортир</h2><dl class="reads"><div><dt>Угол</dt><dd id="r1"></dd></div><div><dt>Вид</dt><dd id="r2"></dd></div><div><dt>Внутр. шкала</dt><dd id="r3"></dd></div></dl>
+      ${slider('inAng', 'Угол AOB', 1, 180, 1, S.ang)}
+      <h3>Виды углов</h3><div class="steps">${step('острый', 'меньше 90°')}${step('прямой', '90°')}${step('тупой', 'от 90° до 180°')}${step('развёрнутый', '180°')}</div>`;
+  if (id === 'area') h = `<h2>Прямоугольник</h2><dl class="reads"><div><dt>Периметр</dt><dd id="r1"></dd></div><div><dt>Площадь</dt><dd id="r2"></dd></div><div><dt>Фигура</dt><dd id="r3"></dd></div></dl>
+      ${slider('inA', 'Длина a, м', 1, GCOLS, 1, S.a)}${slider('inB', 'Ширина b, м', 1, GROWS, 1, S.b)}`;
+  if (id === 'volume') h = `<h2>Коробка из кубиков</h2><dl class="reads"><div><dt>Объём</dt><dd id="r1"></dd></div><div><dt>Слой</dt><dd id="r2"></dd></div><div><dt>Поверхность</dt><dd id="r3"></dd></div></dl>
+      ${slider('inVa', 'Длина a, дм', 1, 6, 1, S.va)}${slider('inVb', 'Ширина b, дм', 1, 6, 1, S.vb)}${slider('inVc', 'Высота c, дм', 1, 6, 1, S.vc)}`;
+  if (id === 'circle') h = `<h2>Циркуль</h2><dl class="reads"><div><dt>Радиус</dt><dd id="r1"></dd></div><div><dt>Диаметр</dt><dd id="r2"></dd></div><div><dt>Обведено</dt><dd id="r3"></dd></div></dl>
+      ${slider('inR', 'Раствор циркуля, см', 0.5, 6, 0.5, S.r)}
+      <div class="ctl"><div class="lbl">Режим</div><div class="chips" id="modeChips"><button data-m="open">Раствор</button><button data-m="draw">Чертить</button></div></div>
+      <div class="row"><button class="ghostbtn" data-a="erase">Стереть обводку</button></div>`;
+  el.innerHTML = h;
+  const on = (sel, fn, ev = 'input') => { const x = el.querySelector(sel); if (x) x.addEventListener(ev, fn); };
+  on('#inAng', e => setAng(+e.target.value));
+  on('#inAng', () => tryHit(), 'change');
+  on('#inA', e => setRect(+e.target.value, S.b));
+  on('#inB', e => setRect(S.a, +e.target.value));
+  on('#inVa', e => setBox('a', +e.target.value));
+  on('#inVb', e => setBox('b', +e.target.value));
+  on('#inVc', e => setBox('c', +e.target.value));
+  on('#inR', e => setR(+e.target.value));
+  el.querySelectorAll('#modeChips button').forEach(b => b.onclick = () => setMode(b.dataset.m));
+  el.querySelectorAll('.row [data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.innerHTML = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (m.kind === 'angle') { set('#r1', m.ang + '°'); set('#r2', m.type); set('#r3', m.inner + '°'); set('#inAngO', m.ang + '°'); val('#inAng', m.ang); }
+  if (m.kind === 'area') { set('#r1', m.p + ' м'); set('#r2', m.s + ' м²'); set('#r3', m.sq ? 'квадрат' : 'прямоуг.'); set('#inAO', String(m.a)); set('#inBO', String(m.b)); val('#inA', m.a); val('#inB', m.b); }
+  if (m.kind === 'volume') { set('#r1', m.v + ' дм³'); set('#r2', m.layer + ' шт.'); set('#r3', m.sa + ' дм²'); set('#inVaO', String(m.a)); set('#inVbO', String(m.b)); set('#inVcO', String(m.c)); val('#inVa', m.a); val('#inVb', m.b); val('#inVc', m.c); }
+  if (m.kind === 'circle') {
+    set('#r1', fmt(m.r) + ' см'); set('#r2', fmt(m.d) + ' см'); set('#r3', Math.round(m.cov / NB * 100) + '%'); set('#inRO', fmt(m.r) + ' см'); val('#inR', m.r);
+    el.querySelectorAll('#modeChips button').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === S.mode));
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'angle') return [
+    { id: 'vertex', name: 'Вершина O', spec: 'Общее начало двух лучей. Центр транспортира всегда ставят точно в вершину.' },
+    { id: 'rays', name: 'Стороны угла', spec: 'Лучи OA и OB. Белый луч OA неподвижен и лежит на нуле. Оранжевый OB можно тащить.' },
+    { id: 'outer', name: 'Внешняя шкала', spec: 'Голубые числа: отсчёт от правого края. Наш угол читаем по ней — у луча OA здесь 0.' },
+    { id: 'inner', name: 'Внутренняя шкала', spec: 'Отсчёт от левого края. Нужна, когда первая сторона угла лежит слева.' },
+    { id: 'amark', name: 'Дужка угла', spec: 'Показывает, какой именно угол мы меряем. Прямой угол отмечают квадратиком.' }];
+  if (id === 'area') return [
+    { id: 'cells', name: 'Единичные квадраты', spec: 'Каждая клетка — 1 м². Сколько клеток внутри, такова и площадь.' },
+    { id: 'sides', name: 'Длина и ширина', spec: 'Стороны a и b. Противоположные стороны прямоугольника равны.' },
+    { id: 'perim', name: 'Периметр — забор', spec: 'Оранжевая граница: её длина P = a + b + a + b.' },
+    { id: 'corner', name: 'Ручка-угол', spec: 'Тащите её, чтобы менять длину и ширину по целым метрам.' }];
+  if (id === 'volume') return [
+    { id: 'vfront', name: 'Передняя грань', spec: 'Прямоугольник a × c. У параллелепипеда 6 граней, противоположные равны.' },
+    { id: 'layer', name: 'Верхний слой', spec: 'В каждом слое a · b кубиков. Слоёв столько, какова высота c.' },
+    { id: 'vright', name: 'Боковая грань', spec: 'Прямоугольник b × c.' },
+    { id: 'vedges', name: 'Рёбра a, b, c', spec: 'Длина, ширина и высота. У коробки 12 рёбер: по 4 каждой длины.' }];
+  return [
+    { id: 'center', name: 'Центр O', spec: 'Сюда ставят иглу циркуля. Все точки окружности на одном расстоянии от него.' },
+    { id: 'radius', name: 'Радиус r', spec: 'Отрезок от центра до точки окружности. Равен раствору циркуля.' },
+    { id: 'diam', name: 'Диаметр d', spec: 'Хорда через центр, d = 2 · r. Появится, когда окружность замкнётся.' },
+    { id: 'chord', name: 'Хорда', spec: 'Отрезок между двумя точками окружности. Всегда не длиннее диаметра.' },
+    { id: 'arc', name: 'Дуга', spec: 'Часть окружности между двумя её точками.' },
+    { id: 'disk', name: 'Круг', spec: 'Окружность вместе со всей плоскостью внутри неё.' },
+    { id: 'compass', name: 'Циркуль', spec: 'Игла в центре, грифель на окружности. Раствор не меняют, пока чертят.' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Что на поле</h2><p class="note">Нажмите на пункт, чтобы найти его на поле.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${ICON[p.id]}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  if (m.kind === 'angle') {
+    let h = `<h2>Как читать транспортир</h2><div class="formula">∠AOB = ${m.ang}°</div><div class="steps">` +
+      step('1. центр транспортира', 'в вершине O') + step('2. луч OA', 'на 0 внешней шкалы') +
+      step('3. против луча OB', `${m.ang} по внешней`) + step('по внутренней там же', `${m.inner} — не наш отсчёт`) +
+      step('вид угла', m.type, 'sum') + `</div><h3>Сравнение</h3><div class="steps">`;
+    if (m.ang < 90) h += step('до прямого не хватает', `90 − ${m.ang} = ${90 - m.ang}°`);
+    else if (m.ang > 90) h += step('больше прямого на', `${m.ang} − 90 = ${m.ang - 90}°`);
+    else h += step('стороны', 'перпендикулярны');
+    h += step('до развёрнутого', `180 − ${m.ang} = ${180 - m.ang}°`) + `</div>`;
+    h += `<h3>Задание</h3><div class="steps">` + TARGETS.map((T, i) => step(`угол ${i + 1}`, i < m.hits ? `<span class="yes">${T}° ✓</span>` : `${T}°`)).join('') + `</div>`;
+    return h;
+  }
+  if (m.kind === 'area') {
+    let h = `<h2>Периметр и площадь</h2><div class="formula">P = 2·(a + b)   S = a·b</div><div class="steps">` +
+      step('периметр', `2 · (${m.a} + ${m.b}) = ${m.p} м`) + step('площадь', `${m.a} · ${m.b} = ${m.s} м²`) + `</div>`;
+    h += `<p class="note" style="margin-top:10px">Сетки хватит на периметр 20 м? ${m.p === 20 ? '<span class="yes">ровно 20 м</span>' : m.p < 20 ? `останется ${20 - m.p} м` : `<span class="no">не хватит ${m.p - 20} м</span>`}</p>`;
+    const T = Object.entries(S.tried).sort((x, y) => parseInt(x[0]) - parseInt(y[0]));
+    h += `<h3>Загоны с периметром 20 м, которые вы пробовали</h3>`;
+    h += T.length ? `<div class="steps">` + T.map(([k, s]) => step(k.replace('×', ' × ') + ' м', `S = ${s} м²`)).join('') + `</div><p class="note" style="margin-top:8px">У какого из них площадь больше всех? Какой формы этот прямоугольник?</p>` : `<p class="note">Пока ни одного. Соберите прямоугольник с периметром ровно 20 м.</p>`;
+    return h;
+  }
+  if (m.kind === 'volume') {
+    return `<h2>Объём коробки</h2><div class="formula">V = a · b · c</div><div class="steps">` +
+      step('кубиков в одном слое', `${m.a} · ${m.b} = ${m.layer}`) + step('слоёв', String(m.c)) +
+      step('объём', `${m.layer} · ${m.c} = ${m.v} дм³`) + step('в литрах', `${m.v} л`, 'sum') + `</div>` +
+      `<h3>Площадь поверхности — сколько стекла</h3><div class="steps">` +
+      step('грани a·b, b·c, a·c', `${m.a * m.b}, ${m.b * m.c}, ${m.a * m.c} дм²`) +
+      step('S = 2·(ab + bc + ac)', `2 · ${m.a * m.b + m.b * m.c + m.a * m.c} = ${m.sa} дм²`) + `</div>` +
+      `<p class="note" style="margin-top:10px">1 дм = 10 см, поэтому 1 дм³ = 10 · 10 · 10 = 1000 см³ = 1 л.${m.cube ? ' Сейчас все рёбра равны — это куб: V = a³.' : ''}</p>`;
+  }
+  return `<h2>Радиус и диаметр</h2><div class="formula">d = 2 · r</div><div class="steps">` +
+    step('радиус (раствор)', fmt(m.r) + ' см') + step('диаметр', `2 · ${fmt(m.r)} = ${fmt(m.d)} см`, 'sum') +
+    step('обведено', `${m.cov} из ${NB} кусочков`) + `</div>` +
+    `<p class="note" style="margin-top:10px">Обратно: r = d : 2. Задание просит диаметр 8 см — какой тогда нужен раствор?</p>` +
+    `<h3>Проверка свойства</h3><p class="note">Любая точка окружности отстоит от центра ровно на ${fmt(m.r)} см. Точки ближе — внутри круга, дальше — снаружи.</p>`;
+}
+
+function renderMeter(m) {
+  const el = $('#meter'), ok = !!S.done[LID()];
+  if (m.kind === 'angle') el.innerHTML = `<div class="k">Угол AOB</div><div class="v ${ok ? 'ok' : ''}">${m.ang}°</div><div class="lr"><span>вид</span><span>${m.type}</span></div><div class="gauge"><b style="width:${(m.hits / 3 * 100).toFixed(0)}%"></b></div>`;
+  else if (m.kind === 'area') el.innerHTML = `<div class="k">Загон ${m.a} × ${m.b} м</div><div class="v ${ok ? 'ok' : ''}">S = ${m.s} м²</div><div class="lr"><span>периметр</span><span>${m.p} м</span></div><div class="gauge"><b style="width:${Math.min(100, m.p / 20 * 100).toFixed(0)}%;background:${m.p > 20 ? 'var(--warn)' : 'var(--arm)'}"></b></div>`;
+  else if (m.kind === 'volume') el.innerHTML = `<div class="k">Аквариум</div><div class="v ${ok ? 'ok' : ''}">${m.v} л</div><div class="lr"><span>слой</span><span>${m.layer} шт.</span></div><div class="lr"><span>слоёв</span><span>${m.c}</span></div>`;
+  else el.innerHTML = `<div class="k">Циркуль</div><div class="v ${ok ? 'ok' : ''}">r = ${fmt(m.r)} см</div><div class="lr"><span>режим</span><span>${m.mode === 'open' ? 'раствор' : 'чертить'}</span></div><div class="gauge"><b style="width:${(m.cov / NB * 100).toFixed(0)}%"></b></div>`;
+}
+
+function update() {
+  const m = model(), L = LESSONS[S.lesson];
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Отличная работа!');
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  angle: '<path d="M14 25H58M14 25L42 7" stroke="#e8ecf4" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M26 25A12 12 0 0 0 24.1 18.5" stroke="#ffb547" fill="none" stroke-width="1.5"/>',
+  area: '<rect x="12" y="7" width="40" height="17" fill="rgba(134,224,168,.2)"/><path d="M22 7v17M32 7v17M42 7v17M12 15.5h40" stroke="#3a4762" stroke-width=".8"/><rect x="12" y="7" width="40" height="17" fill="none" stroke="#ffb547" stroke-width="1.5"/>',
+  volume: '<path d="M20 10h20v16H20z" fill="#1d3d4f" stroke="#72d4e8" stroke-width="1.1"/><path d="M20 10l7-5h20l-7 5z" fill="#2a5c70" stroke="#72d4e8" stroke-width="1.1"/><path d="M40 10l7-5v16l-7 5z" fill="#152f3d" stroke="#72d4e8" stroke-width="1.1"/>',
+  circle: '<circle cx="33" cy="15" r="11" fill="rgba(114,212,232,.12)" stroke="#e8ecf4" stroke-width="1.3"/><path d="M33 15L43 11" stroke="#ffb547" stroke-width="1.3"/><circle cx="33" cy="15" r="1.6" fill="#e8ecf4"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i];
+  S.lesson = i; S.hl = null; drag = null;
+  if (L.id === 'angle') { S.ang = L.ang; S.tgt = 0; }
+  if (L.id === 'area') { S.a = L.a; S.b = L.b; S.tried = {}; }
+  if (L.id === 'volume') { S.va = L.a; S.vb = L.b; S.vc = L.c; }
+  if (L.id === 'circle') { S.r = L.r; S.th = -0.5; S.mode = 'open'; clearBins(); }
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update(); fit();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '';
+  if (id === 'angle') now = `Транспортир, вершина O в центре. Луч OA лежит на 0 внешней шкалы, луч OB ученик двигает. Сейчас ∠AOB = ${m.ang}° (${m.type}); по внутренней шкале против OB стоит ${m.inner}. Нужно по очереди построить 40°, 90°, 130°; построено ${m.hits} из 3${m.tgt ? `, сейчас нужен угол ${m.tgt}°` : ''}. Если ученик путает шкалы, наводи вопросом, где у луча OA стоит ноль.`;
+  if (id === 'area') now = `Клетчатое поле, клетка 1 м × 1 м. Прямоугольник ${m.a} м × ${m.b} м: периметр 2 · (${m.a} + ${m.b}) = ${m.p} м, площадь ${m.a} · ${m.b} = ${m.s} м². Задание: с 20 м сетки огородить прямоугольник наибольшей площади. Уже пробовал с периметром 20 м: ${Object.entries(S.tried).map(([k, s]) => `${k} → ${s} м²`).join(', ') || 'ничего'}. Не называй готовые размеры — пусть сравнит варианты сам.`;
+  if (id === 'volume') now = `Прямоугольный параллелепипед из кубиков 1 дм³: a = ${m.a} дм, b = ${m.b} дм, c = ${m.c} дм. В слое ${m.layer} кубиков, слоёв ${m.c}, объём ${m.v} дм³ = ${m.v} л, площадь поверхности ${m.sa} дм². Задание: собрать аквариум ровно 60 л, рёбра от 1 до 6 дм. Не называй готовые размеры — помоги разложить 60 на множители вопросами.`;
+  if (id === 'circle') now = `Клетчатая бумага, клетка 1 см. Циркуль: игла в центре O, раствор (радиус) ${fmt(m.r)} см, значит, диаметр ${fmt(m.d)} см. Режим: ${m.mode === 'open' ? '«Раствор» (меняет радиус)' : '«Чертить» (ведёт грифель по кругу)'}. Обведено ${Math.round(m.cov / NB * 100)}% окружности${m.full ? ', окружность замкнута' : ''}. Задание: окружность диаметром 8 см. Не называй нужный радиус сразу — спроси, как связаны радиус и диаметр.`;
+  return [
+    `Раздел: математика, 5 класс, тема «Наглядная геометрия». Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = {
+    angle: 'Зачем у транспортира две шкалы?', area: 'Почему у одинаковых заборов разная площадь?',
+    volume: 'Почему 1 дм³ — это ровно 1 литр?', circle: 'Чем окружность отличается от круга?',
+  }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
