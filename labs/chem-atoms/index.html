@@ -1,0 +1,1037 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по химии, 7 класс: собираем атом из протонов, нейтронов и электронов, учим знаки элементов, строим молекулы по формулам и взвешиваем их на весах.">
+<title>Атомы и молекулы</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /mechanics and /optics. Lab bench (SVG) on the left, lesson notebook on the right, lesson strip under the bench. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--liq);transition:width .2s}
+.gauge i{position:absolute;top:-4px;width:2px;height:14px;background:var(--force);transform:translateX(-50%)}
+.swatch{height:12px;border-radius:4px;margin-top:9px;border:1px solid rgba(255,255,255,.15)}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.meter .big{font:700 30px/1 var(--font-display);margin-top:8px;letter-spacing:.02em}
+.meter .big small{font:500 12px/1 var(--font-body);color:var(--muted);letter-spacing:0;margin-left:6px}
+.pairs{display:grid;gap:6px;margin-top:10px}
+.pairs label{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface-2);border-radius:9px;padding:7px 10px;font-size:13.5px}
+.pairs select{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:7px;padding:5px 8px;font:500 13px var(--font-mono)}
+.pairs select:disabled{color:var(--ok);opacity:1}
+.cnt{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;margin-top:10px}
+.cnt div{display:flex;align-items:center;justify-content:space-between;gap:6px;background:var(--surface-2);border-radius:9px;padding:6px 8px;font-size:13px}
+.cnt b{font:500 14px var(--font-mono)}
+.cnt button{width:30px;height:30px;border-radius:7px;background:var(--bg);border:1px solid var(--line);cursor:pointer;font:500 15px/1 var(--font-mono)}
+.eltab{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin-top:10px}
+.eltab span{background:var(--surface-2);border-radius:6px;padding:5px 2px;text-align:center;font:500 12px/1.2 var(--font-mono);color:var(--muted)}
+.eltab span b{display:block;color:var(--fg);font-size:14px}
+.eltab span.on{outline:2px solid var(--force);color:var(--fg)}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><ellipse cx="20" cy="20" rx="14" ry="5.5" fill="none" stroke="var(--arm)" stroke-width="1.6"/><ellipse cx="20" cy="20" rx="14" ry="5.5" fill="none" stroke="var(--arm)" stroke-width="1.6" transform="rotate(60 20 20)"/><ellipse cx="20" cy="20" rx="14" ry="5.5" fill="none" stroke="var(--arm)" stroke-width="1.6" transform="rotate(-60 20 20)"/><circle cx="20" cy="20" r="3.2" fill="var(--force)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Химия · Атомы и молекулы</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#chem">Карта</a><a href="/physics/#chem">Химия</a><a href="/labs/chem-atoms/" aria-current="page">Атомы</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Атомы</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Лабораторный стол">
+    <svg class="scene" id="scene" role="img" aria-label="Модель атомов и молекул. Предметы можно перетаскивать и нажимать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const num = x => Number.isInteger(x) ? String(x) : fmt(x, 1);
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const KEY = 'luch-chem-atoms';
+const SUBD = { '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉' };
+const SUPD = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '+': '⁺', '-': '⁻' };
+const low = s => String(s).replace(/\d/g, d => SUBD[d]);
+const sup = s => String(s).split('').map(c => SUPD[c] || c).join('');
+const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c; };
+
+// ---------- lesson 1: elements Z = 1…20 ----------
+// знак, название, Ar (школьное округление), числа нейтронов у устойчивых природных изотопов, как читается знак
+const EL = [
+  ['H', 'Водород', 1, [0, 1], 'аш'], ['He', 'Гелий', 4, [1, 2], 'гелий'], ['Li', 'Литий', 7, [3, 4], 'литий'], ['Be', 'Бериллий', 9, [5], 'бериллий'],
+  ['B', 'Бор', 11, [5, 6], 'бор'], ['C', 'Углерод', 12, [6, 7], 'цэ'], ['N', 'Азот', 14, [7, 8], 'эн'], ['O', 'Кислород', 16, [8, 9, 10], 'о'],
+  ['F', 'Фтор', 19, [10], 'фтор'], ['Ne', 'Неон', 20, [10, 11, 12], 'неон'], ['Na', 'Натрий', 23, [12], 'натрий'], ['Mg', 'Магний', 24, [12, 13, 14], 'магний'],
+  ['Al', 'Алюминий', 27, [14], 'алюминий'], ['Si', 'Кремний', 28, [14, 15, 16], 'силициум'], ['P', 'Фосфор', 31, [16], 'пэ'], ['S', 'Сера', 32, [16, 17, 18, 20], 'эс'],
+  ['Cl', 'Хлор', 35.5, [18, 20], 'хлор'], ['Ar', 'Аргон', 40, [18, 20, 22], 'аргон'], ['K', 'Калий', 39, [20, 22], 'калий'], ['Ca', 'Кальций', 40, [20, 22, 23, 24, 26], 'кальций'],
+].map(([s, name, ar, st, pr], i) => ({ z: i + 1, s, name, ar, st, pr }));
+const LIM = { p: 20, n: 26, e: 20 };
+const SHELL = [2, 8, 8, 2];
+const shells = e => { const r = []; let left = e; for (const c of SHELL) { if (left <= 0) break; r.push(Math.min(c, left)); left -= c; } return r; };
+const ionName = (el, q) => el ? el.s + (q === 0 ? '' : sup((Math.abs(q) > 1 ? Math.abs(q) : '') + (q > 0 ? '+' : '-'))) : '';
+
+// ---------- lesson 2: symbols ----------
+const SYM = [
+  { s: 'Fe', name: 'Железо', lat: 'ferrum', pr: 'феррум', kz: 'Руду добывают под Рудным, сталь выплавляют в Темиртау.' },
+  { s: 'Cu', name: 'Медь', lat: 'cuprum', pr: 'купрум', kz: 'Медь выплавляют в Жезказгане и Балхаше.' },
+  { s: 'Ag', name: 'Серебро', lat: 'argentum', pr: 'аргентум', kz: 'Его получают попутно из медных и полиметаллических руд.' },
+  { s: 'Au', name: 'Золото', lat: 'aurum', pr: 'аурум', kz: 'Золото добывают, например, на Васильковском месторождении под Кокшетау.' },
+  { s: 'Hg', name: 'Ртуть', lat: 'hydrargyrum', pr: 'гидраргирум', kz: 'Единственный жидкий металл. Раньше был в каждом градуснике.' },
+  { s: 'Pb', name: 'Свинец', lat: 'plumbum', pr: 'плюмбум', kz: 'Свинец и цинк выпускают в Усть-Каменогорске.' },
+  { s: 'Zn', name: 'Цинк', lat: 'zincum', pr: 'цинк', kz: 'Цинком покрывают стальные листы, чтобы они не ржавели.' },
+  { s: 'Al', name: 'Алюминий', lat: 'aluminium', pr: 'алюминий', kz: 'Алюминий выплавляют в Павлодаре.' },
+];
+const TILE_ORDER = ['Au', 'Zn', 'Fe', 'Hg', 'Al', 'Cu', 'Pb', 'Ag'];
+
+// ---------- lesson 3: molecules ----------
+const ATOM = {
+  H: { r: 13, c: '#eef2f8', t: '#0b1019', name: 'водород' }, C: { r: 19, c: '#4f586d', t: '#fff', name: 'углерод' },
+  N: { r: 18, c: '#4d7cf0', t: '#fff', name: 'азот' }, O: { r: 18, c: '#e5533f', t: '#fff', name: 'кислород' },
+  S: { r: 21, c: '#e6c63a', t: '#0b1019', name: 'сера' }, Fe: { r: 21, c: '#c58a5c', t: '#0b1019', name: 'железо' },
+};
+const BUILD = ['H', 'C', 'N', 'O'];
+const MAXA = { H: 8, C: 2, N: 2, O: 4 };
+const MOLS = [
+  { key: 'H2', name: 'водород', a: [['H', -22, 0], ['H', 22, 0]], b: [[0, 1, 1]] },
+  { key: 'O2', name: 'кислород', a: [['O', -26, 0], ['O', 26, 0]], b: [[0, 1, 2]] },
+  { key: 'N2', name: 'азот', a: [['N', -26, 0], ['N', 26, 0]], b: [[0, 1, 3]] },
+  { key: 'O3', name: 'озон', a: [['O', -40, 16], ['O', 0, -12], ['O', 40, 16]], b: [[0, 1, 2], [1, 2, 1]] },
+  { key: 'H2O', name: 'вода', a: [['O', 0, -10], ['H', -36, 16], ['H', 36, 16]], b: [[0, 1, 1], [0, 2, 1]] },
+  { key: 'H2O2', name: 'пероксид водорода', a: [['H', -58, -22], ['O', -22, -4], ['O', 22, 4], ['H', 58, 22]], b: [[0, 1, 1], [1, 2, 1], [2, 3, 1]] },
+  { key: 'CO', name: 'угарный газ', a: [['C', -27, 0], ['O', 27, 0]], b: [[0, 1, 3]] },
+  { key: 'CO2', name: 'углекислый газ', a: [['O', -54, 0], ['C', 0, 0], ['O', 54, 0]], b: [[0, 1, 2], [1, 2, 2]] },
+  { key: 'CH4', name: 'метан', a: [['C', 0, 0], ['H', 0, -46], ['H', 46, 0], ['H', 0, 46], ['H', -46, 0]], b: [[0, 1, 1], [0, 2, 1], [0, 3, 1], [0, 4, 1]] },
+  { key: 'NH3', name: 'аммиак', a: [['N', 0, -8], ['H', -40, 18], ['H', 40, 18], ['H', 0, 40]], b: [[0, 1, 1], [0, 2, 1], [0, 3, 1]] },
+];
+const countKey = c => BUILD.map(x => x + (c[x] || 0)).join('');
+MOLS.forEach(M => { const c = {}; M.a.forEach(([s]) => c[s] = (c[s] || 0) + 1); M.count = c; M.ck = countKey(c); });
+// formula in the usual school order: known molecules as written, otherwise C, H, then the rest
+function formulaOf(c) {
+  const known = MOLS.find(M => M.ck === countKey(c));
+  if (known) return known.key;
+  const order = c.C ? ['C', 'H', 'N', 'O'] : ['H', 'N', 'O', 'C'];
+  return order.filter(x => c[x]).map(x => x + (c[x] > 1 ? c[x] : '')).join('');
+}
+
+// ---------- lesson 4: relative mass ----------
+const AR = { H: 1, C: 12, N: 14, O: 16, S: 32, Fe: 56 };
+const SUBS = [
+  { id: 'O', name: 'атом кислорода', atoms: { O: 1 } },
+  { id: 'Fe', name: 'атом железа', atoms: { Fe: 1 } },
+  { id: 'H2O', name: 'вода', atoms: { H: 2, O: 1 } },
+  { id: 'O2', name: 'кислород', atoms: { O: 2 } },
+  { id: 'CH4', name: 'метан', atoms: { C: 1, H: 4 } },
+  { id: 'NH3', name: 'аммиак', atoms: { N: 1, H: 3 } },
+  { id: 'CO2', name: 'углекислый газ', atoms: { C: 1, O: 2 } },
+  { id: 'H2SO4', name: 'серная кислота', atoms: { H: 2, S: 1, O: 4 } },
+];
+const massOf = sb => Object.entries(sb.atoms).reduce((a, [k, n]) => a + AR[k] * n, 0);
+const WT = [1, 2, 5, 10, 20, 50];
+const WMAX = 12;
+
+const LESSONS = [
+  { id: 'element', title: 'Химический элемент',
+    text: ['Всё вокруг состоит из атомов. В центре атома — крошечное ядро из протонов (заряд +1) и нейтронов (заряда нет). Вокруг ядра движутся электроны (заряд −1).',
+           'Химический элемент — это вид атомов с одинаковым числом протонов. 8 протонов — всегда кислород, 6 — всегда углерод. Это число — порядковый номер элемента Z в таблице Менделеева.',
+           'Нейтронов у атомов одного элемента бывает разное число: это изотопы, элемент от этого не меняется. А если электронов не столько же, сколько протонов, атом становится заряженным — ионом.'],
+    why: 'Казахстан добывает больше всего урана в мире, и инженеры «Казатомпрома» каждый день работают с изотопами: уран-235 и уран-238 — один элемент, но с разным числом нейтронов. Врач-радиолог ставит диагноз с помощью радиоактивных изотопов, их выпускают в Институте ядерной физики в Алматы. Археолог по изотопу углерода-14 узнаёт возраст находки.',
+    task: 'Соберите нейтральный атом кислорода с устойчивым ядром.',
+    hint: 'Элемент задают протоны: какой номер у кислорода? Чтобы атом был нейтральным, электронов нужно столько же, сколько протонов. Нейтронов у кислорода бывает 8, 9 или 10.',
+    stage: 'Тащите частицы из лотков в атом или нажимайте на лоток. Убрать — кнопки «−» внизу.',
+    init: { p: 1, n: 0, e: 1 },
+    check: m => m.p === 8 && m.e === 8 && m.n >= 8 && m.n <= 10 },
+  { id: 'symbols', title: 'Знаки элементов',
+    text: ['У каждого элемента есть знак (символ) — одна или две латинские буквы. Первая буква всегда заглавная, вторая — строчная: Co — кобальт, а CO — уже два элемента, углерод и кислород.',
+           'Знак берут из латинского названия элемента: железо по-латыни ferrum — отсюда Fe. Поэтому знаки одинаковы во всём мире, на каком бы языке ни говорили химики.',
+           'Читают знаки по-особому: Fe — «феррум», Cu — «купрум», H — «аш», O — «о».'],
+    why: 'Знаки — международный язык. Геолог пишет в отчёте «Cu 1,2 %», и его поймут и в Жезказгане, и в Чили. Металлург читает состав стали по знакам. На упаковке витаминов в аптеке стоит «Zn, Fe, Mg» — и ты сам поймёшь, что внутри цинк, железо и магний.',
+    safe: 'Ртуть Hg ядовита. Разбился ртутный градусник — не трогайте шарики руками и не пылесосьте их, откройте окно, выйдите из комнаты и позвоните 112.',
+    task: 'Разложите все восемь знаков по карточкам элементов.',
+    hint: 'Вспомните латинские названия: aurum — золото, plumbum — свинец, hydrargyrum — ртуть. Ошиблись — знак вернётся на место. Без перетаскивания — на вкладке «Схема».',
+    stage: 'Перетащите плитку со знаком на карточку элемента.',
+    init: {},
+    check: m => m.placed === SYM.length },
+  { id: 'formula', title: 'Химическая формула',
+    text: ['Молекула — это группа атомов, связанных вместе. Химическая формула показывает, из каких атомов и сколько их: H₂O — два атома водорода и один атом кислорода.',
+           'Маленькая цифра справа внизу — индекс: сколько атомов этого элемента в одной молекуле. Единицу не пишут. Большая цифра перед формулой — коэффициент: сколько молекул. 2H₂O — это две молекулы воды, в них 4 атома водорода и 2 атома кислорода.',
+           'Читают формулу по знакам и цифрам: H₂O — «аш-два-о», CO₂ — «цэ-о-два».'],
+    why: 'Провизор в аптеке и технолог на заводе по формуле узнают, что за вещество перед ними. Медсестра по формуле на ампуле отличит одно лекарство от другого. Зимой в домах с печами важно отличать CO от CO₂: угарный газ CO — смертельный яд без запаха, поэтому газовщики ставят датчики угарного газа.',
+    safe: 'Угарный газ CO не видно и не слышно. Если в доме с печью болит голова и тошнит — сразу на свежий воздух и звонить 112. Заслонку печи не закрывают, пока угли не прогорели.',
+    task: 'Соберите молекулы воды H₂O, углекислого газа CO₂ и метана CH₄. Потом покажите две молекулы воды — 2H₂O.',
+    hint: 'Перетащите атомы из лотков в поле сборки. Лишний атом — нажмите на него в поле. Коэффициент ×2 — кнопкой внизу, когда в поле собрана молекула.',
+    stage: 'Тащите атомы в поле сборки, лишние — нажатием убирайте. Коэффициент — кнопки ×1, ×2, ×3.',
+    init: { atoms: { H: 0, C: 0, N: 0, O: 0 }, k: 1 },
+    check: m => !!(m.built.H2O && m.built.CO2 && m.built.CH4) && m.key === 'H2O' && m.k === 2 },
+  { id: 'mass', title: 'Относительная масса',
+    text: ['Атомы очень лёгкие: атом водорода весит около 0,000 000 000 000 000 000 000 001 7 г. Считать в граммах неудобно, поэтому массу атома сравнивают с эталоном — 1/12 массы атома углерода. Это число — относительная атомная масса Ar. Она есть в таблице Менделеева.',
+           'Относительная молекулярная масса Mr — сумма Ar всех атомов молекулы с учётом индексов: Mr(H₂O) = 2 · Ar(H) + Ar(O) = 2 · 1 + 16 = 18. Ar и Mr — числа без единиц: они показывают, во сколько раз частица тяжелее эталона.'],
+    why: 'Агроном по Mr считает, сколько азота в мешке удобрения: аммиачную селитру выпускают, например, в Актау. Провизор и лаборант по Mr рассчитывают, сколько вещества взвесить для лекарства или анализа. Инженер-металлург считает, сколько железа можно получить из тонны руды.',
+    safe: 'На настоящих аналитических весах гирьки берут пинцетом, а не пальцами: следы пота и жира меняют их массу.',
+    task: 'Найдите на весах Mr воды H₂O, углекислого газа CO₂ и серной кислоты H₂SO₄.',
+    hint: 'Каждая гирька — это сколько-то эталонных единиц. Сначала посчитайте Mr по формуле на вкладке «Расчёты», потом подберите гирьки. Вещество меняется кнопками ‹ ›.',
+    stage: 'Тащите гирьки на правую чашку или нажимайте на них. Гирьку на чашке можно снять нажатием.',
+    init: { sub: 'H2O' },
+    check: m => !!(m.found.H2O && m.found.CO2 && m.found.H2SO4) },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null,
+            p: 1, n: 0, e: 1, placed: {}, wrong: 0, atoms: { H: 0, C: 0, N: 0, O: 0 }, k: 1, built: {}, sub: 'H2O', w: [], found: {}, ang: 0 };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+const subNow = () => SUBS.find(x => x.id === S.sub) || SUBS[2];
+
+function model() {
+  const id = LID();
+  if (id === 'element') {
+    const el = S.p > 0 ? EL[S.p - 1] : null, q = S.p - S.e;
+    return { kind: 'atom', p: S.p, n: S.n, e: S.e, el, A: S.p + S.n, q, sh: shells(S.e), stable: el ? el.st.includes(S.n) : false };
+  }
+  if (id === 'symbols') return { kind: 'sym', placed: Object.keys(S.placed).length };
+  if (id === 'formula') {
+    const c = S.atoms, tot = BUILD.reduce((a, x) => a + c[x], 0), mol = MOLS.find(M => M.ck === countKey(c)) || null;
+    return { kind: 'mol', c, tot, mol, key: mol ? mol.key : null, k: S.k, f: tot ? formulaOf(c) : '', built: S.built };
+  }
+  const sb = subNow(), Mr = massOf(sb), sum = S.w.reduce((a, b) => a + b, 0);
+  return { kind: 'mass', sb, Mr, sum, diff: Mr - sum, bal: sum === Mr, found: S.found };
+}
+
+// ---------- scene geometry (SVG units; the bench top is y = 360) ----------
+const AC = { x: 260, y: 218 }, SR = [56, 84, 112, 140];
+const BINS1 = { p: { x: 52, y: 168, c: '#ff7a66', t: 'p⁺', n: 'протоны' }, n: { x: 52, y: 292, c: '#a9b4c9', t: 'n⁰', n: 'нейтроны' }, e: { x: 468, y: 230, c: '#72d4e8', t: 'e⁻', n: 'электроны' } };
+const CARD = { w: 112, h: 54, xs: [74, 198, 322, 446], ys: [100, 166] };
+const cardPos = i => ({ x: CARD.xs[i % 4], y: CARD.ys[i >> 2] });
+const TILE = { s: 52, xs: [110, 210, 310, 410], ys: [270, 330] };
+const tilePos = i => ({ x: TILE.xs[i % 4], y: TILE.ys[i >> 2] });
+const AREA = { x: 60, y: 92, w: 400, h: 214 };
+const BINX = { H: 140, C: 220, N: 300, O: 380 }, BINY = 342;
+const PV = { x: 260, y: 150 }, ARM = 150, HANG = 92;
+const TRAY = [[60, 356], [104, 356], [150, 356], [362, 356], [414, 356], [470, 356]];
+const WSZ = { 1: [14, 14], 2: [16, 17], 5: [20, 22], 10: [24, 26], 20: [28, 31], 50: [34, 38] };
+
+const ol = (d, fill, stroke, w = 2.2, extra = '') => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${w + 2.6}" stroke-linejoin="round" stroke-linecap="round"/><path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round" ${extra}/>`;
+const ball = (x, y, r, c, label, tc, fs) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r + 1.3).toFixed(1)}" fill="${INK}"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="${c}"/><circle cx="${(x - r * 0.35).toFixed(1)}" cy="${(y - r * 0.38).toFixed(1)}" r="${(r * 0.3).toFixed(1)}" fill="#fff" opacity=".28"/>` +
+  (label ? `<text x="${x.toFixed(1)}" y="${(y + (fs || r * 0.8) * 0.36).toFixed(1)}" font-size="${(fs || r * 0.8).toFixed(1)}" fill="${tc}" text-anchor="middle" font-weight="500">${label}</text>` : '');
+const atomBall = (s, x, y, sc = 1) => { const a = ATOM[s]; return ball(x, y, a.r * sc, a.c, s, a.t, a.r * sc * (s.length > 1 ? 0.8 : 0.95)); };
+
+function bench() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="2360" fill="url(#tile)"/>
+    <rect x="-2000" y="360" width="4520" height="1200" fill="#1a2232"/>
+    <rect x="-2000" y="358" width="4520" height="4" fill="#2c3954"/>
+    <rect x="-2000" y="362" width="4520" height="2" fill="${INK}" opacity=".6"/>`;
+}
+
+// ----- lesson 1: atom -----
+function nucleus(p, n, t) {
+  const N = p + n; if (!N) return '';
+  const pts = [];
+  for (let i = 0; i < N; i++) {
+    const isP = Math.floor((i + 1) * p / N) > Math.floor(i * p / N);
+    const r = N === 1 ? 0 : 6.4 * Math.sqrt(i + 0.5), a = i * 2.39996;
+    const j = reduce ? 0 : Math.sin(t / 260 + i * 1.7) * 0.7;
+    pts.push({ x: AC.x + Math.cos(a) * r + j, y: AC.y + Math.sin(a) * r + j * 0.6, isP });
+  }
+  let h = '';
+  for (let i = pts.length - 1; i >= 0; i--) { const q = pts[i]; h += ball(q.x, q.y, 6.2, q.isP ? '#ff7a66' : '#a9b4c9', '', '', 0); }
+  return h;
+}
+function atomSVG(m, t) {
+  let h = '';
+  const over = drag && drag.moved && LID() === 'element' && drag.id.startsWith('bin') && Math.hypot(drag.p.x - AC.x, drag.p.y - AC.y) < 150;
+  h += `<circle cx="${AC.x}" cy="${AC.y}" r="150" fill="${over ? 'rgba(114,212,232,.08)' : 'rgba(114,212,232,.025)'}" stroke="${over ? '#72d4e8' : 'rgba(114,212,232,.15)'}" stroke-dasharray="4 6"/>`;
+  m.sh.forEach((c, k) => { h += `<circle cx="${AC.x}" cy="${AC.y}" r="${SR[k]}" fill="none" stroke="#72d4e8" stroke-opacity=".35" stroke-width="1.3"/>`; });
+  h += nucleus(m.p, m.n, t);
+  m.sh.forEach((c, k) => {
+    const w = reduce ? 0 : t / 1000 * (0.9 / (k + 1)) * (k % 2 ? -1 : 1);
+    for (let j = 0; j < c; j++) { const a = w + j * Math.PI * 2 / c - Math.PI / 2; h += ball(AC.x + Math.cos(a) * SR[k], AC.y + Math.sin(a) * SR[k], 4.6, '#72d4e8', '', '', 0); }
+  });
+  if (m.el) h += `<text x="${AC.x}" y="${AC.y + (SR[Math.max(0, m.sh.length - 1)] || 50) + 20}" font-size="12" fill="#8b96ad" text-anchor="middle">${m.el.name}${m.q ? ' · ион' : ''}</text>`;
+  for (const [k, b] of Object.entries(BINS1)) {
+    h += `<g data-drag="bin-${k}"><rect x="${b.x - 34}" y="${b.y - 34}" width="68" height="78" rx="12" fill="#121a28" stroke="#26324a" stroke-width="1.5"/>`;
+    for (let i = 0; i < 5; i++) { const a = i * 2.4, r = i ? 9 : 0; h += ball(b.x + Math.cos(a) * r, b.y - 6 + Math.sin(a) * r * 0.8, k === 'e' ? 5 : 7, b.c, '', '', 0); }
+    h += `<text x="${b.x}" y="${b.y + 26}" font-size="11" fill="#e8ecf4" text-anchor="middle">${b.t}</text><text x="${b.x}" y="${b.y + 38}" font-size="8" fill="#8b96ad" text-anchor="middle">${b.n}</text></g>`;
+  }
+  return h;
+}
+
+// ----- lesson 2: symbols -----
+function symSVG() {
+  let h = '';
+  const hot = drag && drag.moved && drag.id.startsWith('tile-') ? cardAt(drag.p) : -1;
+  SYM.forEach((x, i) => {
+    const c = cardPos(i), ok = S.placed[x.s], X = c.x - CARD.w / 2, Y = c.y;
+    h += `<rect x="${X}" y="${Y}" width="${CARD.w}" height="${CARD.h}" rx="10" fill="${ok ? '#16261f' : hot === i ? '#1d2a40' : '#121a28'}" stroke="${ok ? '#86e0a8' : hot === i ? '#72d4e8' : '#26324a'}" stroke-width="1.6"/>`;
+    if (ok) h += `<text x="${X + 12}" y="${Y + 34}" font-size="24" fill="#e8ecf4" font-weight="500">${x.s}</text><text x="${X + CARD.w - 10}" y="${Y + 22}" font-size="10.5" fill="#86e0a8" text-anchor="end">${x.name}</text><text x="${X + CARD.w - 10}" y="${Y + 38}" font-size="9.5" fill="#8b96ad" text-anchor="end">«${x.pr}»</text>`;
+    else h += `<text x="${c.x}" y="${Y + 23}" font-size="12" fill="#e8ecf4" text-anchor="middle">${x.name}</text><rect x="${c.x - 16}" y="${Y + 30}" width="32" height="17" rx="4" fill="none" stroke="#56627d" stroke-dasharray="3 3"/>`;
+  });
+  TILE_ORDER.forEach((s, i) => {
+    if (S.placed[s] || (drag && drag.moved && drag.id === 'tile-' + s)) return;
+    const p = tilePos(i);
+    h += `<g data-drag="tile-${s}">${tileSVG(s, p.x, p.y)}</g>`;
+  });
+  return h;
+}
+const tileSVG = (s, x, y) => { const a = TILE.s / 2; return `<rect x="${x - a - 1.3}" y="${y - a - 1.3}" width="${TILE.s + 2.6}" height="${TILE.s + 2.6}" rx="10" fill="${INK}"/><rect x="${x - a}" y="${y - a}" width="${TILE.s}" height="${TILE.s}" rx="9" fill="#e8ecf4"/><text x="${x}" y="${y + 8}" font-size="23" fill="#0b1019" text-anchor="middle" font-weight="500">${s}</text>`; };
+function cardAt(p) {
+  for (let i = 0; i < SYM.length; i++) { const c = cardPos(i); if (Math.abs(p.x - c.x) < CARD.w / 2 + 6 && p.y > c.y - 6 && p.y < c.y + CARD.h + 6) return i; }
+  return -1;
+}
+
+// ----- lesson 3: molecules -----
+function bondSVG(x1, y1, x2, y2, order) {
+  const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
+  const offs = order === 1 ? [0] : order === 2 ? [-3.6, 3.6] : [-5.2, 0, 5.2];
+  return offs.map(o => `<path d="M${(x1 + nx * o).toFixed(1)} ${(y1 + ny * o).toFixed(1)}L${(x2 + nx * o).toFixed(1)} ${(y2 + ny * o).toFixed(1)}" stroke="#c8d1e2" stroke-width="2.6" stroke-linecap="round"/>`).join('');
+}
+function molSVG(M, cx, cy, sc) {
+  let h = '';
+  for (const [i, j, o] of M.b) { const A = M.a[i], B = M.a[j]; h += bondSVG(cx + A[1] * sc, cy + A[2] * sc, cx + B[1] * sc, cy + B[2] * sc, o); }
+  M.a.forEach(([s, x, y]) => { h += `<g data-drag="in-${s}">${atomBall(s, cx + x * sc, cy + y * sc, sc)}</g>`; });
+  return h;
+}
+function molWidth(M) { const xs = M.a.map(a => a[1]); return Math.max(...xs) - Math.min(...xs) + 40; }
+function formulaSVG(m, t) {
+  let h = '';
+  const over = drag && drag.moved && drag.id.startsWith('atom-') && inArea(drag.p);
+  h += `<rect x="${AREA.x}" y="${AREA.y}" width="${AREA.w}" height="${AREA.h}" rx="16" fill="${over ? 'rgba(114,212,232,.07)' : 'rgba(18,26,40,.6)'}" stroke="${over ? '#72d4e8' : '#26324a'}" stroke-width="1.6" stroke-dasharray="6 6"/>`;
+  h += `<text x="${AREA.x + 14}" y="${AREA.y + 20}" font-size="9" fill="#8b96ad">ПОЛЕ СБОРКИ</text>`;
+  const cy = AREA.y + AREA.h / 2 - 8;
+  if (m.mol) {
+    const k = m.k, w = molWidth(m.mol), gap = 34, total = k * w + (k - 1) * gap, sc = Math.min(1.25, (AREA.w - 50) / total);
+    let x = AREA.x + AREA.w / 2 - total * sc / 2 + w * sc / 2;
+    for (let i = 0; i < k; i++) { h += molSVG(m.mol, x, cy + (reduce ? 0 : Math.sin(t / 900 + i) * 2), sc); x += (w + gap) * sc; }
+  } else if (m.tot) {
+    let i = 0;
+    for (const s of BUILD) for (let j = 0; j < m.c[s]; j++, i++) {
+      const col = i % 6, row = Math.floor(i / 6);
+      const x = AREA.x + 70 + col * 52 + (row % 2) * 20, y = AREA.y + 52 + row * 52;
+      const bx = reduce ? 0 : Math.sin(t / 700 + i * 2.1) * 3, by = reduce ? 0 : Math.cos(t / 820 + i * 1.3) * 3;
+      h += `<g data-drag="in-${s}">${atomBall(s, x + bx, y + by)}</g>`;
+    }
+  } else h += `<text x="${AREA.x + AREA.w / 2}" y="${cy + 4}" font-size="12" fill="#56627d" text-anchor="middle">перетащите сюда атомы</text>`;
+  if (m.tot) h += `<text x="${AREA.x + AREA.w / 2}" y="${AREA.y + AREA.h - 14}" font-size="17" fill="${m.mol ? '#86e0a8' : '#e8ecf4'}" text-anchor="middle" font-weight="500">${m.mol && m.k > 1 ? m.k : ''}${low(m.f)}${m.mol ? ' — ' + m.mol.name : ''}</text>`;
+  for (const s of BUILD) {
+    const x = BINX[s], left = MAXA[s] - m.c[s];
+    h += `<g data-drag="atom-${s}"><rect x="${x - 32}" y="${BINY - 30}" width="64" height="62" rx="12" fill="#121a28" stroke="#26324a" stroke-width="1.5"/>${atomBall(s, x, BINY - 4)}<text x="${x}" y="${BINY + 26}" font-size="8.5" fill="#8b96ad" text-anchor="middle">осталось ${left}</text></g>`;
+  }
+  return h;
+}
+const inArea = p => p.x > AREA.x && p.x < AREA.x + AREA.w && p.y > AREA.y && p.y < AREA.y + AREA.h;
+
+// ----- lesson 4: balance -----
+function weightSVG(v, x, base) {
+  const [w, hh] = WSZ[v], t = base - hh;
+  return `<path d="M${x - w / 2} ${base}V${t + 5}Q${x - w / 2} ${t} ${x - w / 2 + 5} ${t}H${x + w / 2 - 5}Q${x + w / 2} ${t} ${x + w / 2} ${t + 5}V${base}Z" fill="${INK}" stroke="${INK}" stroke-width="2.6"/>` +
+    `<path d="M${x - w / 2} ${base}V${t + 5}Q${x - w / 2} ${t} ${x - w / 2 + 5} ${t}H${x + w / 2 - 5}Q${x + w / 2} ${t} ${x + w / 2} ${t + 5}V${base}Z" fill="#c9a24a"/>` +
+    `<rect x="${x - 3.5}" y="${t - 5}" width="7" height="6" rx="2" fill="#c9a24a" stroke="${INK}" stroke-width="1.2"/><rect x="${x - w / 2 + 3}" y="${t + 3}" width="3" height="${hh - 6}" fill="#fff" opacity=".22"/>` +
+    `<text x="${x}" y="${base - hh / 2 + 3.5}" font-size="${v >= 10 ? 10 : 9}" fill="#2a1d05" text-anchor="middle" font-weight="500">${v}</text>`;
+}
+function panEnds() {
+  const a = S.ang * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+  return { L: { x: PV.x - ARM * c, y: PV.y - ARM * s }, R: { x: PV.x + ARM * c, y: PV.y + ARM * s } };
+}
+function panLayout(list, cx, base, sizeOf, maxW = 108) {
+  const rows = [[]]; let wsum = 0;
+  for (const it of list) { const w = sizeOf(it)[0] + 3; if (wsum + w > maxW && rows[rows.length - 1].length) { rows.push([]); wsum = 0; } rows[rows.length - 1].push(it); wsum += w; }
+  const out = []; let y = base;
+  for (const r of rows) {
+    const W = r.reduce((a, it) => a + sizeOf(it)[0] + 3, -3); let x = cx - W / 2;
+    let hmax = 0;
+    for (const it of r) { const [w, hh] = sizeOf(it); out.push({ it, x: x + w / 2, base: y }); x += w + 3; hmax = Math.max(hmax, hh); }
+    y -= hmax + 1;
+  }
+  return out;
+}
+function balanceSVG(m) {
+  let h = '';
+  const E = panEnds();
+  // column and base
+  h += ol('M222 352h76v8h-76z', '#2a3348', '#3a4762', 1.6);
+  h += ol(`M260 352V${PV.y + 6}`, 'none', '#8a96b0', 6);
+  // scale for the needle
+  for (let a = -10; a <= 10; a += 2.5) { const r = a * Math.PI / 180, x1 = PV.x + Math.sin(r) * 62, y1 = PV.y - Math.cos(r) * 62, L = a === 0 ? 9 : 5; h += `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${(PV.x + Math.sin(r) * (62 + L)).toFixed(1)} ${(PV.y - Math.cos(r) * (62 + L)).toFixed(1)}" stroke="${a === 0 ? '#86e0a8' : '#56627d'}" stroke-width="1.5"/>`; }
+  // pans (strings + plates)
+  for (const side of ['L', 'R']) {
+    const e = E[side], py = e.y + HANG, hot = side === 'R' && drag && drag.moved && drag.id.startsWith('w') && nearPanR(drag.p);
+    h += `<path d="M${e.x.toFixed(1)} ${e.y.toFixed(1)}L${(e.x - 52).toFixed(1)} ${py.toFixed(1)}M${e.x.toFixed(1)} ${e.y.toFixed(1)}L${(e.x + 52).toFixed(1)} ${py.toFixed(1)}" stroke="#8b96ad" stroke-width="1.2"/>`;
+    h += ol(`M${(e.x - 62).toFixed(1)} ${py.toFixed(1)}h124q-8 12-26 12h-72q-18 0-26-12z`, hot ? '#3a5170' : '#56627d', hot ? '#72d4e8' : '#8a96b0', 1.6);
+  }
+  // beam and needle
+  h += `<g transform="rotate(${S.ang.toFixed(2)} ${PV.x} ${PV.y})">` + ol(`M${PV.x - ARM} ${PV.y}H${PV.x + ARM}`, 'none', '#a9b4c9', 5) + ol(`M${PV.x} ${PV.y}V${PV.y - 60}`, 'none', m.bal ? '#86e0a8' : '#ffb547', 2.4) + `</g>`;
+  h += `<circle cx="${PV.x}" cy="${PV.y}" r="6" fill="#3a4762" stroke="${INK}" stroke-width="2"/>`;
+  // left pan: the particle
+  const atoms = []; for (const [k, n] of Object.entries(m.sb.atoms)) for (let i = 0; i < n; i++) atoms.push(k);
+  const sc = 0.62, la = panLayout(atoms, E.L.x, E.L.y + HANG, s => [ATOM[s].r * 2 * sc, ATOM[s].r * 2 * sc], 112);
+  for (const q of la) { const r = ATOM[q.it].r * sc; h += atomBall(q.it, q.x, q.base - r, sc); }
+  const lt = m.found[m.sb.id] || m.bal ? `Mr = ${m.Mr}` : 'Mr = ?';
+  h += `<text x="${E.L.x.toFixed(1)}" y="${(E.L.y + HANG + 26).toFixed(1)}" font-size="12" fill="#e8ecf4" text-anchor="middle" font-weight="500">${low(m.sb.id)}</text><text x="${E.L.x.toFixed(1)}" y="${(E.L.y + HANG + 40).toFixed(1)}" font-size="10" fill="${m.bal ? '#86e0a8' : '#8b96ad'}" text-anchor="middle">${m.sb.id.length <= 2 && !/\d/.test(m.sb.id) ? lt.replace('Mr', 'Ar') : lt}</text>`;
+  // right pan: weights
+  const ra = panLayout(S.w.map((v, i) => ({ v, i })), E.R.x, E.R.y + HANG, it => WSZ[it.v], 112);
+  for (const q of ra) if (!(drag && drag.moved && drag.id === 'pw-' + q.it.i)) h += `<g data-drag="pw-${q.it.i}">${weightSVG(q.it.v, q.x, q.base)}</g>`;
+  h += `<text x="${E.R.x.toFixed(1)}" y="${(E.R.y + HANG + 26).toFixed(1)}" font-size="12" fill="#e8ecf4" text-anchor="middle" font-weight="500">${m.sum}</text>`;
+  // weight tray
+  h += `<rect x="34" y="${TRAY[0][1] - 44}" width="142" height="48" rx="10" fill="#121a28" stroke="#26324a"/><rect x="336" y="${TRAY[0][1] - 44}" width="160" height="48" rx="10" fill="#121a28" stroke="#26324a"/>`;
+  WT.forEach((v, i) => { const [x, y] = TRAY[i]; h += `<g data-drag="w-${v}"><rect x="${x - 22}" y="${y - 44}" width="44" height="48" fill="transparent"/>${weightSVG(v, x, y - 2)}</g>`; });
+  return h;
+}
+const nearPanR = p => { const E = panEnds(); return Math.abs(p.x - E.R.x) < 80 && p.y > E.R.y + HANG - 110 && p.y < E.R.y + HANG + 40; };
+
+function hlBox(id) {
+  const E = LID() === 'mass' ? panEnds() : null;
+  return {
+    nucleus: [AC.x - 46, AC.y - 46, 92, 92], shells: [AC.x - 146, AC.y - 146, 292, 292],
+    p: [BINS1.p.x - 38, BINS1.p.y - 38, 76, 86], n: [BINS1.n.x - 38, BINS1.n.y - 38, 76, 86], e: [BINS1.e.x - 38, BINS1.e.y - 38, 76, 86],
+    cards: [12, 92, 496, 136], tiles: [76, 236, 368, 128],
+    area: [AREA.x - 4, AREA.y - 4, AREA.w + 8, AREA.h + 8], H: [BINX.H - 36, BINY - 34, 72, 70], C: [BINX.C - 36, BINY - 34, 72, 70], N: [BINX.N - 36, BINY - 34, 72, 70], O: [BINX.O - 36, BINY - 34, 72, 70],
+    beam: [PV.x - ARM - 8, PV.y - 40, ARM * 2 + 16, 80], needle: [PV.x - 30, PV.y - 80, 60, 90],
+    panL: E ? [E.L.x - 68, E.L.y + HANG - 70, 136, 112] : null, panR: E ? [E.R.x - 68, E.R.y + HANG - 70, 136, 112] : null,
+    tray: [30, TRAY[0][1] - 48, 470, 56],
+  }[id];
+}
+
+function ghostSVG(d) {
+  const p = d.p, id = d.id;
+  if (id.startsWith('bin-')) { const b = BINS1[id.slice(4)]; return ball(p.x, p.y, id === 'bin-e' ? 5 : 7.5, b.c, '', '', 0); }
+  if (id.startsWith('tile-')) return tileSVG(id.slice(5), p.x, p.y);
+  if (id.startsWith('atom-') || id.startsWith('in-')) return atomBall(id.slice(id.indexOf('-') + 1), p.x, p.y);
+  if (id.startsWith('w-')) { const v = +id.slice(2); return weightSVG(v, p.x, p.y + WSZ[v][1] / 2); }
+  if (id.startsWith('pw-')) { const v = S.w[+id.slice(3)]; return v ? weightSVG(v, p.x, p.y + WSZ[v][1] / 2) : ''; }
+  return '';
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID(), m = model();
+  let h = bench();
+  if (id === 'element') h += atomSVG(m, t);
+  else if (id === 'symbols') h += symSVG();
+  else if (id === 'formula') h += formulaSVG(m, t);
+  else h += balanceSVG(m);
+  if (drag && drag.moved) h += `<g opacity=".92" pointer-events="none">${ghostSVG(drag)}</g>`;
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2]}" height="${b[3]}" rx="10" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// fit the scene: 520 × 405 units, centred, bench at the bottom
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 500, hh / 410, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 405 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- dragging and tapping ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  drag = { id: el.dataset.drag, x: e.clientX, y: e.clientY, p: toSvg(e), moved: false };
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 6) drag.moved = true;
+  drag.p = toSvg(e); if (drag.moved) dirty = true;
+});
+const endDrag = cancel => {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing'); dirty = true;
+  if (cancel) return;
+  if (d.moved) drop(d.id, d.p); else tap(d.id);
+};
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+function tap(id) {
+  if (id.startsWith('bin-')) return addP(id.slice(4), 1);
+  if (id.startsWith('tile-')) return toast('Перетащите знак на карточку элемента.');
+  if (id.startsWith('atom-')) return addAtom(id.slice(5), 1);
+  if (id.startsWith('in-')) return addAtom(id.slice(3), -1);
+  if (id.startsWith('w-')) return addW(+id.slice(2));
+  if (id.startsWith('pw-')) return remW(+id.slice(3));
+}
+function drop(id, p) {
+  if (id.startsWith('bin-')) { if (Math.hypot(p.x - AC.x, p.y - AC.y) < 150) addP(id.slice(4), 1); return; }
+  if (id.startsWith('tile-')) { const i = cardAt(p); if (i >= 0) place(id.slice(5), i); return; }
+  if (id.startsWith('atom-')) { if (inArea(p)) addAtom(id.slice(5), 1); return; }
+  if (id.startsWith('in-')) { if (!inArea(p)) addAtom(id.slice(3), -1); return; }
+  if (id.startsWith('w-')) { if (nearPanR(p)) addW(+id.slice(2)); return; }
+  if (id.startsWith('pw-')) { if (!nearPanR(p)) remW(+id.slice(3)); }
+}
+
+function addP(k, d) {
+  const v = S[k] + d;
+  if (v < 0) return false;
+  if (v > LIM[k]) { toast(k === 'p' ? 'В этой модели — элементы с 1 по 20.' : k === 'n' ? 'Хватит нейтронов: такое ядро сразу развалится.' : 'Больше 20 электронов в этой модели не помещается.'); return false; }
+  S[k] = v; update(); return true;
+}
+function place(s, i) {
+  const x = SYM[i];
+  if (S.placed[x.s]) { toast(`Карточка «${x.name}» уже заполнена.`); return false; }
+  if (x.s !== s) {
+    S.wrong++;
+    const right = SYM.find(y => y.s === s);
+    toast(`Нет: ${s} — от латинского ${right.lat}. Это не ${x.name.toLowerCase()}.`);
+    update(); return false;
+  }
+  S.placed[s] = true; toast(`Верно: ${s} — «${x.pr}», от латинского ${x.lat}.`); update(); return true;
+}
+function addAtom(s, d) {
+  const v = S.atoms[s] + d;
+  if (v < 0) return false;
+  if (v > MAXA[s]) { toast(`Атомов ${ATOM[s].name}а в лотке больше нет.`); return false; }
+  S.atoms[s] = v; update(); return true;
+}
+function addW(v) {
+  if (S.w.length >= WMAX) { toast('На чашке больше нет места. Возьмите гирьки покрупнее.'); return false; }
+  S.w.push(v); S.w.sort((a, b) => b - a); update(); return true;
+}
+function remW(i) { if (i < 0 || i >= S.w.length) return false; S.w.splice(i, 1); update(); return true; }
+function setSub(id) { S.sub = id; S.w = []; renderTools(); buildScheme(); update(); }
+
+let last = performance.now(), lastDraw = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  let anim = false;
+  if (LID() === 'mass') {
+    const m = model(), target = -9 * Math.tanh(m.diff / 6);
+    const na = reduce ? target : S.ang + (target - S.ang) * Math.min(1, dt * 5);
+    if (Math.abs(na - S.ang) > 0.01) { anim = true; S.ang = na; } else S.ang = target;
+  }
+  if (S.hl) anim = true;
+  const drift = !reduce && (LID() === 'element' || LID() === 'formula') && t - lastDraw > 50;
+  if (dirty || anim || drift) { drawScene(t); dirty = false; lastDraw = t; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    element: B('p+', '+p') + B('p-', '−p') + sep + B('n+', '+n') + B('n-', '−n') + sep + B('e+', '+e') + B('e-', '−e') + sep + B('reset', 'Заново'),
+    symbols: B('reset', 'Начать заново'),
+    formula: B('k1', '×1', S.k === 1) + B('k2', '×2', S.k === 2) + B('k3', '×3', S.k === 3) + sep + B('clear', 'Очистить'),
+    mass: B('prev', '‹') + B('cur', low(S.sub)) + B('next', '›') + sep + B('wclear', 'Снять гирьки'),
+  }[id];
+}
+function act(a) {
+  if (/^[pne][+-]$/.test(a)) return addP(a[0], a[1] === '+' ? 1 : -1);
+  if (a === 'reset') {
+    if (LID() === 'element') { S.p = 1; S.n = 0; S.e = 1; }
+    else { S.placed = {}; S.wrong = 0; buildScheme(); }
+    update(); return;
+  }
+  if (/^k\d$/.test(a)) { S.k = +a[1]; if (!model().mol) toast('Коэффициент относится к целой молекуле — сначала соберите её.'); renderTools(); buildScheme(); update(); return; }
+  if (a === 'clear') { S.atoms = { H: 0, C: 0, N: 0, O: 0 }; update(); return; }
+  if (a === 'prev' || a === 'next') { const i = SUBS.findIndex(x => x.id === S.sub); setSub(SUBS[(i + (a === 'next' ? 1 : -1) + SUBS.length) % SUBS.length].id); return; }
+  if (a === 'cur') { toast(`На левой чашке: ${subNow().name} ${low(S.sub)}`); return; }
+  if (a === 'wclear') { S.w = []; update(); return; }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  p: IC('<circle cx="17" cy="17" r="9" fill="#ff7a66"/><path d="M13 17h8M17 13v8" stroke="#0b1019" stroke-width="2"/>'),
+  n: IC('<circle cx="17" cy="17" r="9" fill="#a9b4c9"/>'),
+  e: IC('<circle cx="17" cy="17" r="5" fill="#72d4e8"/><path d="M14 17h6" stroke="#0b1019" stroke-width="1.8"/>'),
+  nucleus: IC('<circle cx="14" cy="15" r="5" fill="#ff7a66"/><circle cx="20" cy="15" r="5" fill="#a9b4c9"/><circle cx="17" cy="20" r="5" fill="#ff7a66"/>'),
+  shells: IC('<circle cx="17" cy="17" r="6" fill="none" stroke="#72d4e8"/><circle cx="17" cy="17" r="12" fill="none" stroke="#72d4e8"/><circle cx="17" cy="5" r="2" fill="#72d4e8"/><circle cx="23" cy="17" r="2" fill="#72d4e8"/><circle cx="17" cy="17" r="2.4" fill="#ff7a66"/>'),
+  cards: IC('<rect x="4" y="8" width="26" height="18" rx="3" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M8 14h12M8 19h8" stroke="var(--muted)" stroke-width="1.6"/>'),
+  tiles: IC('<rect x="6" y="6" width="22" height="22" rx="4" fill="#e8ecf4"/><text x="17" y="22" font-size="12" fill="#0b1019" text-anchor="middle" font-family="IBM Plex Mono">Fe</text>'),
+  area: IC('<rect x="3" y="6" width="28" height="22" rx="5" fill="none" stroke="var(--muted)" stroke-dasharray="3 3"/><circle cx="14" cy="17" r="5" fill="#e5533f"/><circle cx="22" cy="20" r="3" fill="#eef2f8"/>'),
+  H: IC('<circle cx="17" cy="17" r="9" fill="#eef2f8"/><text x="17" y="21" font-size="11" text-anchor="middle" fill="#0b1019" font-family="IBM Plex Mono">H</text>'),
+  C: IC('<circle cx="17" cy="17" r="11" fill="#4f586d"/><text x="17" y="21" font-size="11" text-anchor="middle" fill="#fff" font-family="IBM Plex Mono">C</text>'),
+  N: IC('<circle cx="17" cy="17" r="11" fill="#4d7cf0"/><text x="17" y="21" font-size="11" text-anchor="middle" fill="#fff" font-family="IBM Plex Mono">N</text>'),
+  O: IC('<circle cx="17" cy="17" r="11" fill="#e5533f"/><text x="17" y="21" font-size="11" text-anchor="middle" fill="#fff" font-family="IBM Plex Mono">O</text>'),
+  beam: IC('<path d="M4 13h26" stroke="var(--fg)" stroke-width="2.4"/><path d="M17 13v16M11 30h12" stroke="var(--muted)" stroke-width="2"/>'),
+  needle: IC('<path d="M17 28V8" stroke="#ffb547" stroke-width="2"/><path d="M9 10q8-6 16 0" fill="none" stroke="var(--muted)"/>'),
+  panL: IC('<path d="M5 22h24q-3 5-8 5h-8q-5 0-8-5z" fill="#56627d"/><circle cx="17" cy="17" r="4.5" fill="#e5533f"/>'),
+  panR: IC('<path d="M5 22h24q-3 5-8 5h-8q-5 0-8-5z" fill="#56627d"/><rect x="13" y="12" width="8" height="10" rx="2" fill="#c9a24a"/>'),
+  tray: IC('<rect x="5" y="16" width="7" height="10" rx="2" fill="#c9a24a"/><rect x="14" y="12" width="8" height="14" rx="2" fill="#c9a24a"/><rect x="24" y="8" width="7" height="18" rx="2" fill="#c9a24a"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (L.id === 'element') return m.el ? `${m.el.name}: p ${m.p}, n ${m.n}, e ${m.e}` + (m.q ? ` · заряд ${m.q > 0 ? '+' : '−'}${Math.abs(m.q)}` : ' · нейтральный') : 'Протонов нет — это ещё не атом';
+  if (L.id === 'symbols') return `Разложено ${m.placed} из ${SYM.length}`;
+  if (L.id === 'formula') {
+    const got = ['H2O', 'CO2', 'CH4'].filter(k => m.built[k]);
+    return `Собрано: ${got.length ? got.map(low).join(', ') : 'пока ничего'}` + (got.length === 3 ? ' · теперь 2H₂O' : '');
+  }
+  const got = ['H2O', 'CO2', 'H2SO4'].filter(k => m.found[k]);
+  return `Найдено: ${got.length ? got.map(low).join(', ') : 'пока ничего'} · ${m.bal ? 'равновесие' : m.diff > 0 ? 'тяжелее слева' : 'тяжелее справа'}`;
+}
+
+// Scheme tab: built once per lesson, then values refreshed (sliders keep focus while dragging)
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'element') h = `<h2>Состав атома</h2>
+      <dl class="reads"><div><dt>Элемент</dt><dd id="r1"></dd></div><div><dt>A = p + n</dt><dd id="r2"></dd></div><div><dt>Заряд</dt><dd id="r3"></dd></div></dl>` +
+      slider('inP', 'Протоны p⁺', 0, LIM.p, 1, S.p) + slider('inN', 'Нейтроны n⁰', 0, LIM.n, 1, S.n) + slider('inE', 'Электроны e⁻', 0, LIM.e, 1, S.e) +
+      `<h3>Элементы 1–20</h3><div class="eltab" id="elTab">${EL.map(x => `<span data-z="${x.z}">${x.z}<b>${x.s}</b></span>`).join('')}</div>
+      <p class="note" style="margin-top:8px">Номер в таблице = число протонов. Подсвечен элемент, который сейчас собран.</p>`;
+  if (id === 'symbols') h = `<h2>Знак — элемент</h2><p class="note">Выберите знак для каждой карточки. Правильный ответ закрепится.</p>
+      <div class="pairs">${SYM.map((x, i) => `<label>${x.name}<select data-i="${i}" ${S.placed[x.s] ? 'disabled' : ''}><option value="">—</option>${TILE_ORDER.map(s => `<option value="${s}" ${S.placed[x.s] && s === x.s ? 'selected' : ''}>${s}</option>`).join('')}</select></label>`).join('')}</div>
+      <dl class="reads"><div><dt>Верно</dt><dd id="r1"></dd></div><div><dt>Ошибок</dt><dd id="r2"></dd></div><div><dt>Осталось</dt><dd id="r3"></dd></div></dl>`;
+  if (id === 'formula') h = `<h2>Сборка молекулы</h2>
+      <dl class="reads"><div><dt>Формула</dt><dd id="r1"></dd></div><div><dt>Атомов</dt><dd id="r2"></dd></div><div><dt>Вещество</dt><dd id="r3"></dd></div></dl>
+      <div class="cnt">${BUILD.map(s => `<div><span>${s} · ${ATOM[s].name}</span><span><button data-s="${s}" data-d="-1" aria-label="Убрать ${s}">−</button> <b id="c${s}"></b> <button data-s="${s}" data-d="1" aria-label="Добавить ${s}">+</button></span></div>`).join('')}</div>
+      <div class="ctl"><div class="lbl">Коэффициент (число молекул)</div><div class="chips" id="kChips">${[1, 2, 3].map(k => `<button data-k="${k}" aria-pressed="${S.k === k}">×${k}</button>`).join('')}</div></div>
+      <p class="note" style="margin-top:12px">Цвета атомов — как в школьных моделях: водород белый, углерод серый, азот синий, кислород красный.</p>`;
+  if (id === 'mass') h = `<h2>Весы</h2>
+      <dl class="reads"><div><dt>На чашке</dt><dd id="r1"></dd></div><div><dt>Гирьки</dt><dd id="r2"></dd></div><div><dt>Весы</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Что на левой чашке</div><div class="chips" id="subChips">${SUBS.map(x => `<button data-s="${x.id}" aria-pressed="${x.id === S.sub}">${low(x.id)}</button>`).join('')}</div></div>
+      <div class="ctl"><div class="lbl">Положить гирьку</div><div class="chips" id="wChips">${WT.map(v => `<button data-w="${v}">+${v}</button>`).join('')}<button data-w="0">Снять все</button></div></div>
+      <h3>Ar нужных элементов</h3><div class="steps">${Object.entries(AR).map(([k, v]) => step(`Ar(${k}) · ${ATOM[k].name}`, String(v))).join('')}</div>
+      <p class="note" style="margin-top:10px">Гирька «1» — эталон: 1/12 массы атома углерода.</p>`;
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn); };
+  on('#inP', e => { S.p = +e.target.value; update(); });
+  on('#inN', e => { S.n = +e.target.value; update(); });
+  on('#inE', e => { S.e = +e.target.value; update(); });
+  el.querySelectorAll('.pairs select').forEach(s => s.onchange = () => { if (!s.value) return; const ok = place(s.value, +s.dataset.i); if (ok) s.disabled = true; else s.value = ''; });
+  el.querySelectorAll('.cnt button').forEach(b => b.onclick = () => addAtom(b.dataset.s, +b.dataset.d));
+  el.querySelectorAll('#kChips button').forEach(b => b.onclick = () => act('k' + b.dataset.k));
+  el.querySelectorAll('#subChips button').forEach(b => b.onclick = () => setSub(b.dataset.s));
+  el.querySelectorAll('#wChips button').forEach(b => b.onclick = () => { const v = +b.dataset.w; if (v) addW(v); else act('wclear'); });
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (m.kind === 'atom') {
+    set('#r1', m.el ? `${m.el.s} · ${m.el.name}` : '—'); set('#r2', String(m.A)); set('#r3', m.q === 0 ? '0' : (m.q > 0 ? '+' : '−') + Math.abs(m.q));
+    set('#inPO', String(S.p)); set('#inNO', String(S.n)); set('#inEO', String(S.e)); val('#inP', S.p); val('#inN', S.n); val('#inE', S.e);
+    el.querySelectorAll('#elTab span').forEach(s => s.classList.toggle('on', +s.dataset.z === S.p));
+  } else if (m.kind === 'sym') {
+    set('#r1', String(m.placed)); set('#r2', String(S.wrong)); set('#r3', String(SYM.length - m.placed));
+  } else if (m.kind === 'mol') {
+    set('#r1', m.tot ? (m.mol && m.k > 1 ? m.k : '') + low(m.f) : '—'); set('#r2', String(m.tot * (m.mol ? m.k : 1))); set('#r3', m.mol ? m.mol.name : m.tot ? 'нет в справочнике' : '—');
+    BUILD.forEach(s => set('#c' + s, String(m.c[s])));
+    el.querySelectorAll('#kChips button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.k === S.k));
+  } else {
+    set('#r1', low(m.sb.id)); set('#r2', String(m.sum)); set('#r3', m.bal ? 'равновесие' : m.diff > 0 ? 'левая ниже' : 'правая ниже');
+    el.querySelectorAll('#subChips button').forEach(b => b.setAttribute('aria-pressed', b.dataset.s === S.sub));
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'element') return [
+    { id: 'p', icon: ICON.p, name: 'Протон p⁺', spec: 'Частица ядра с зарядом +1 и массой около 1. Число протонов определяет, какой это элемент.' },
+    { id: 'n', icon: ICON.n, name: 'Нейтрон n⁰', spec: 'Частица ядра без заряда, масса около 1. Склеивает ядро. От числа нейтронов зависит изотоп.' },
+    { id: 'e', icon: ICON.e, name: 'Электрон e⁻', spec: 'Заряд −1, масса почти в 2000 раз меньше, чем у протона. Именно электроны участвуют в химических реакциях.' },
+    { id: 'nucleus', icon: ICON.nucleus, name: 'Ядро', spec: 'Протоны и нейтроны вместе. На рисунке ядро огромное, а на самом деле оно в 100 000 раз меньше атома.' },
+    { id: 'shells', icon: ICON.shells, name: 'Электронные слои', spec: 'Упрощённая модель: на первом слое до 2 электронов, на втором до 8, на третьем до 8.' }];
+  if (id === 'symbols') return [
+    { id: 'cards', icon: ICON.cards, name: 'Карточки элементов', spec: 'Русские названия металлов. Почти все они добываются или выплавляются в Казахстане.' },
+    { id: 'tiles', icon: ICON.tiles, name: 'Знаки элементов', spec: 'Латинские буквы. Первая заглавная, вторая строчная.' }].concat(
+    SYM.filter(x => S.placed[x.s]).map(x => ({ id: 'cards', icon: ICON.tiles.replace('>Fe<', `>${x.s}<`), name: `${x.s} — ${x.name}, «${x.pr}»`, spec: x.kz })));
+  if (id === 'formula') return [
+    { id: 'area', icon: ICON.area, name: 'Поле сборки', spec: 'Здесь атомы соединяются в молекулу. Если такой молекулы нет в справочнике, атомы остаются россыпью.' },
+    { id: 'H', icon: ICON.H, name: 'Водород H', spec: 'Самый лёгкий атом. В молекулах образует одну связь.' },
+    { id: 'C', icon: ICON.C, name: 'Углерод C', spec: 'Основа всего живого. Образует четыре связи.' },
+    { id: 'N', icon: ICON.N, name: 'Азот N', spec: 'Его в воздухе 78 %. Обычно образует три связи.' },
+    { id: 'O', icon: ICON.O, name: 'Кислород O', spec: 'Им мы дышим. Обычно образует две связи.' }];
+  return [
+    { id: 'beam', icon: ICON.beam, name: 'Коромысло', spec: 'Равноплечий рычаг: весы в равновесии, когда массы на чашках равны.' },
+    { id: 'needle', icon: ICON.needle, name: 'Стрелка', spec: 'Стоит на зелёной метке, когда весы уравновешены.' },
+    { id: 'panL', icon: ICON.panL, name: 'Левая чашка', spec: 'На ней атом или молекула. Представьте, что весы умеют взвешивать отдельные частицы.' },
+    { id: 'panR', icon: ICON.panR, name: 'Правая чашка', spec: 'Сюда кладут гирьки. Их сумма — масса частицы в эталонных единицах.' },
+    { id: 'tray', icon: ICON.tray, name: 'Разновес', spec: 'Гирьки 1, 2, 5, 10, 20 и 50. Гирька 1 — это 1/12 массы атома углерода-12.' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      (L.safe ? `<div class="safe"><b>Безопасность</b>${L.safe}</div>` : '') +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Детали модели</h2><p class="note">Нажмите на деталь, чтобы найти её на столе.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'element') {
+    let h = `<h2>Какой это атом</h2><div class="formula">Z = p · A = p + n · заряд = p − e</div><h3>Сейчас</h3><div class="steps">` +
+      step('протонов p', String(m.p)) + step('порядковый номер Z', m.el ? `${m.p} → ${m.el.name} ${m.el.s} («${m.el.pr}»)` : '0 → элемента нет');
+    if (m.el) {
+      h += step('массовое число A = p + n', `${m.p} + ${m.n} = ${m.A}`) +
+        step('изотоп', `${m.el.name}-${m.A}: ${m.stable ? 'устойчивый' : 'неустойчивый или не существует'}`) +
+        step('заряд = p − e', `${m.p} − ${m.e} = ${m.q > 0 ? '+' : m.q < 0 ? '−' : ''}${Math.abs(m.q)}`) +
+        step('итог', m.q === 0 ? `нейтральный атом ${m.el.s}` : `${m.q > 0 ? 'положительный' : 'отрицательный'} ион ${ionName(m.el, m.q)}`, 'sum');
+      h += `</div><h3>Электронные слои</h3><div class="steps">` + (m.sh.length ? m.sh.map((c, k) => step(`${k + 1}-й слой`, `${c} ${plural(c, 'электрон', 'электрона', 'электронов')}`)).join('') : step('электронов нет', '—')) + `</div>`;
+      h += `<p class="note" style="margin-top:10px">Ar(${m.el.s}) в таблице — ${num(m.el.ar)}. Это среднее по природным изотопам, поэтому оно может быть не целым. Устойчивые ядра этого элемента: ${m.el.st.map(n => `${m.el.name.toLowerCase()}-${m.p + n}`).join(', ')}.</p>`;
+    } else h += `</div><p class="note" style="margin-top:10px">Без протонов ядра нет — добавьте хотя бы один.</p>`;
+    return h;
+  }
+  if (id === 'symbols') {
+    return `<h2>Откуда берутся знаки</h2><div class="formula">ferrum → Fe</div><p class="note">Берут первую букву латинского названия. Если она уже занята, добавляют одну из следующих: C — углерод (carboneum), Cu — медь (cuprum).</p><h3>Ваши карточки</h3><div class="steps">` +
+      SYM.map(x => S.placed[x.s] ? step(x.name, `${x.s} ← ${x.lat} · «${x.pr}»`) : step(x.name, '?')).join('') +
+      step('разложено', `${m.placed} из ${SYM.length}`, 'sum') + `</div>`;
+  }
+  if (id === 'formula') {
+    if (!m.tot) return `<h2>Читаем формулу</h2><div class="formula">2H₂O</div><div class="steps">${step('2 — коэффициент', 'две молекулы')}${step('₂ после H — индекс', '2 атома H в молекуле')}${step('O без индекса', '1 атом O')}${step('всего атомов', 'H: 2 × 2 = 4, O: 2 × 1 = 2', 'sum')}</div><p class="note" style="margin-top:10px">Соберите молекулу — здесь появится её разбор.</p>`;
+    const k = m.mol ? m.k : 1, F = (k > 1 ? k : '') + low(m.f);
+    let h = `<h2>Формула ${F}</h2><div class="formula">${F}</div><h3>Сколько атомов</h3><div class="steps">`;
+    for (const s of BUILD) if (m.c[s]) h += step(`${s} · ${ATOM[s].name}`, k > 1 ? `${k} × ${m.c[s]} = ${k * m.c[s]}` : `${m.c[s]}`);
+    h += step('всего атомов', k > 1 ? `${k} × ${m.tot} = ${k * m.tot}` : String(m.tot), 'sum') + `</div>`;
+    h += m.mol ? `<p class="note" style="margin-top:10px">${m.mol.name[0].toUpperCase() + m.mol.name.slice(1)}. Читается: «${readF(m.mol.key)}».${k > 1 ? ` Коэффициент ${k} стоит перед формулой и умножает все атомы.` : ''}</p>`
+      : `<p class="note" style="margin-top:10px">Такой молекулы нет в нашем справочнике. Здесь знакомые: H₂, O₂, N₂, O₃, H₂O, H₂O₂, CO, CO₂, CH₄, NH₃.</p>`;
+    const got = ['H2O', 'CO2', 'CH4'].map(x => step(low(x), m.built[x] ? 'собрана ✓' : 'ещё нет'));
+    return h + `<h3>Задание</h3><div class="steps">${got.join('')}</div>`;
+  }
+  const sb = m.sb, parts = Object.entries(sb.atoms), isAtom = parts.length === 1 && parts[0][1] === 1, shown = m.found[sb.id] || m.bal;
+  let h = `<h2>${isAtom ? 'Ar' : 'Mr'}(${low(sb.id)})</h2><div class="formula">${isAtom ? 'Ar — из таблицы Менделеева' : 'Mr = Σ Ar · индекс'}</div><h3>Расчёт</h3><div class="steps">`;
+  if (isAtom) h += step(`Ar(${sb.id})`, shown ? String(m.Mr) : '? — проверьте на весах');
+  else {
+    h += parts.map(([k, n]) => step(`${k} × ${n}`, `${n} · ${AR[k]} = ${n * AR[k]}`)).join('');
+    h += step(`Mr(${low(sb.id)})`, parts.map(([k, n]) => n * AR[k]).join(' + ') + ' = ' + (shown ? m.Mr : '?'), 'sum');
+  }
+  h += `</div><h3>Весы</h3><div class="steps">` + step('гирьки', S.w.length ? S.w.join(' + ') + ' = ' + m.sum : '0') +
+    step('состояние', m.bal ? 'равновесие ✓' : m.diff > 0 ? 'частица тяжелее — добавьте' : 'гирьки тяжелее — снимите', 'sum') + `</div>`;
+  h += `<h3>Найдено</h3><div class="steps">` + SUBS.filter(x => m.found[x.id]).map(x => step(`${low(x.id)} · ${x.name}`, `${x.atoms[x.id] === 1 ? 'Ar' : 'Mr'} = ${massOf(x)}`)).join('') + (Object.keys(m.found).length ? '' : step('пока ничего', '—')) + `</div>`;
+  return h;
+}
+const RD = { H: 'аш', C: 'цэ', N: 'эн', O: 'о', S: 'эс' };
+const readF = f => (f.match(/[A-Z][a-z]?\d*/g) || []).map(t => { const s = t.match(/[A-Z][a-z]?/)[0], n = t.slice(s.length); return RD[s] + (n ? '-' + ({ 2: 'два', 3: 'три', 4: 'четыре' }[n] || n) : ''); }).join('-');
+
+function renderMeter(m) {
+  const el = $('#meter');
+  if (m.kind === 'atom') {
+    el.innerHTML = `<div class="k">Элемент</div><div class="big">${m.el ? ionName(m.el, m.q) : '—'}<small>${m.el ? m.el.name : 'нет протонов'}</small></div>
+      <div class="lr"><span>Z ${m.p}</span><span>A ${m.A}</span><span>${m.q === 0 ? '0' : (m.q > 0 ? '+' : '−') + Math.abs(m.q)}</span></div>`;
+  } else if (m.kind === 'sym') {
+    el.innerHTML = `<div class="k">Знаки</div><div class="v ${m.placed === SYM.length ? 'ok' : ''}">${m.placed} из ${SYM.length}</div><div class="gauge"><b style="width:${(m.placed / SYM.length * 100).toFixed(1)}%"></b></div><div class="lr"><span>ошибок</span><span>${S.wrong}</span></div>`;
+  } else if (m.kind === 'mol') {
+    el.innerHTML = `<div class="k">Формула</div><div class="v ${m.mol ? 'ok' : ''}">${m.tot ? (m.mol && m.k > 1 ? m.k : '') + low(m.f) : '—'}</div><div class="lr"><span>${m.mol ? m.mol.name : m.tot ? 'не молекула' : 'пусто'}</span></div><div class="lr"><span>атомов</span><span>${m.tot * (m.mol ? m.k : 1)}</span></div>`;
+  } else {
+    el.innerHTML = `<div class="k">Весы</div><div class="v ${m.bal ? 'ok' : ''}">${m.bal ? 'равновесие' : m.diff > 0 ? 'слева тяжелее' : 'справа тяжелее'}</div><div class="lr"><span>${low(m.sb.id)}</span><span>гирьки ${m.sum}</span></div>`;
+  }
+}
+
+function update() {
+  const m = model(), L = LESSONS[S.lesson];
+  if (m.kind === 'mol' && m.mol && !S.built[m.mol.key]) { S.built[m.mol.key] = true; toast(`Получилась молекула: ${m.mol.name} ${low(m.mol.key)}`); }
+  if (m.kind === 'mass' && m.bal && !S.found[m.sb.id]) { S.found[m.sb.id] = true; toast(`Равновесие! ${Object.values(m.sb.atoms).reduce((a, b) => a + b, 0) === 1 ? 'Ar' : 'Mr'}(${low(m.sb.id)}) = ${m.Mr}`); }
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Атомы и молекулы освоены!');
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  element: '<circle cx="33" cy="15" r="11" fill="none" stroke="#72d4e8" stroke-opacity=".6"/><circle cx="31" cy="14" r="3" fill="#ff7a66"/><circle cx="35" cy="15" r="3" fill="#a9b4c9"/><circle cx="32" cy="17.5" r="3" fill="#ff7a66"/><circle cx="44" cy="15" r="2" fill="#72d4e8"/><circle cx="22" cy="15" r="2" fill="#72d4e8"/>',
+  symbols: '<rect x="10" y="5" width="20" height="20" rx="4" fill="#e8ecf4"/><text x="20" y="19.5" font-size="11" fill="#0b1019" text-anchor="middle" font-family="IBM Plex Mono">Fe</text><rect x="36" y="5" width="20" height="20" rx="4" fill="#e8ecf4"/><text x="46" y="19.5" font-size="11" fill="#0b1019" text-anchor="middle" font-family="IBM Plex Mono">Cu</text>',
+  formula: '<path d="M33 13L22 20M33 13L44 20" stroke="#c8d1e2" stroke-width="1.6"/><circle cx="33" cy="12" r="6" fill="#e5533f"/><circle cx="21" cy="20" r="4" fill="#eef2f8"/><circle cx="45" cy="20" r="4" fill="#eef2f8"/>',
+  mass: '<path d="M14 11H52" stroke="#a9b4c9" stroke-width="2"/><path d="M33 11v15M27 27h12" stroke="#8a96b0" stroke-width="1.6"/><path d="M8 20h12q-2 3-6 3t-6-3zM46 20h12q-2 3-6 3t-6-3z" fill="#56627d"/><circle cx="14" cy="17" r="3" fill="#e5533f"/><rect x="49" y="14" width="6" height="6" rx="1" fill="#c9a24a"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i], init = JSON.parse(JSON.stringify(L.init || {}));
+  S.lesson = i; S.hl = null; drag = null;
+  S.p = 1; S.n = 0; S.e = 1; S.placed = {}; S.wrong = 0; S.atoms = { H: 0, C: 0, N: 0, O: 0 }; S.k = 1; S.built = {}; S.sub = 'H2O'; S.w = []; S.found = {}; S.ang = 0;
+  Object.assign(S, init);
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '';
+  if (id === 'element') now = `Модель атома (ядро и электронные слои). Протонов ${m.p}, нейтронов ${m.n}, электронов ${m.e}. ${m.el ? `Это элемент №${m.p} ${m.el.name} (${m.el.s}), массовое число A = ${m.A}, изотоп ${m.stable ? 'устойчивый' : 'неустойчивый или не существует'}, заряд частицы ${m.q > 0 ? '+' : m.q < 0 ? '−' : ''}${Math.abs(m.q)} (${m.q === 0 ? 'нейтральный атом' : 'ион ' + ionName(m.el, m.q)}). Электроны по слоям: ${m.sh.join(', ') || 'нет'}.` : 'Протонов нет, элемента нет.'}`;
+  if (id === 'symbols') now = `Игра: разложить знаки Fe, Cu, Ag, Au, Hg, Pb, Zn, Al по карточкам с русскими названиями (железо, медь, серебро, золото, ртуть, свинец, цинк, алюминий). Уже правильно разложены: ${SYM.filter(x => S.placed[x.s]).map(x => `${x.s} — ${x.name}`).join(', ') || 'ничего'}. Ошибок: ${S.wrong}. Не называй ученику ответы для оставшихся карточек — подсказывай через латинские названия и наводящие вопросы.`;
+  if (id === 'formula') now = `Поле сборки молекул. В поле атомов: ${BUILD.map(s => `${s} ${m.c[s]}`).join(', ')}. ${m.mol ? `Получилась молекула ${m.mol.name} ${m.mol.key}, коэффициент ${m.k} (на экране ${m.k > 1 ? m.k : ''}${m.mol.key}).` : m.tot ? `Формула ${m.f}, такой молекулы в справочнике лаборатории нет (знакомые: H2, O2, N2, O3, H2O, H2O2, CO, CO2, CH4, NH3).` : 'Поле пустое.'} Уже собраны: ${Object.keys(S.built).join(', ') || 'ничего'}.`;
+  if (id === 'mass') now = `Рычажные весы. На левой чашке ${m.sb.name} ${m.sb.id}, на правой гирьки ${S.w.join(' + ') || 'нет'} = ${m.sum} эталонных единиц (1/12 массы атома углерода). Весы: ${m.bal ? 'в равновесии' : m.diff > 0 ? 'левая чашка тяжелее' : 'правая чашка тяжелее'}. Ar: H 1, C 12, N 14, O 16, S 32, Fe 56. Уже найдены: ${SUBS.filter(x => S.found[x.id]).map(x => `${x.id} = ${massOf(x)}`).join(', ') || 'ничего'}. ${m.bal || S.found[m.sb.id] ? '' : 'Не называй готовое значение Mr для текущего вещества — помоги посчитать вопросами.'}`;
+  return [
+    `Предмет: химия, 7 класс. Тема «Атомы и молекулы». Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Веди ученика наводящими вопросами, а не готовыми ответами.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = {
+    element: 'Почему число нейтронов не меняет элемент?', symbols: 'Почему у меди знак Cu, а не M?',
+    formula: 'Чем индекс отличается от коэффициента?', mass: 'Почему у Ar нет единиц измерения?',
+  }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

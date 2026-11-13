@@ -1,0 +1,1108 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по биологии: наблюдение и эксперимент, световой микроскоп и клетки лука, как поставить честный опыт.">
+<title>Как изучают жизнь</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Lab bench (SVG) on the left, lesson notebook on the right, lesson strip under the bench. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--liq);transition:width .2s}
+.gauge i{position:absolute;top:-4px;width:2px;height:14px;background:var(--force);transform:translateX(-50%)}
+.swatch{height:12px;border-radius:4px;margin-top:9px;border:1px solid rgba(255,255,255,.15)}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.tbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px}
+.tbl th,.tbl td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:left;font-variant-numeric:tabular-nums}
+.tbl th{font:600 10px/1.2 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.tbl td.m{font-family:var(--font-mono)}
+.tbl .ok{color:var(--ok)}
+.tbl .bad{color:var(--warn)}
+.dish-h{font:600 12px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:18px 0 0}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><circle cx="17" cy="17" r="8" fill="none" stroke="var(--fg)" stroke-width="2"/><path d="M23 23l9 9" stroke="var(--fg)" stroke-width="2.6" stroke-linecap="round"/><path d="M13 17q4-5 8 0q-4 5-8 0z" fill="var(--ok)"/><circle cx="17" cy="17" r="1.4" fill="var(--force)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Биология · Как изучают жизнь</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#bio">Карта</a><a href="/physics/#bio">Биология</a><a href="/labs/bio-methods/" aria-current="page">Методы</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Методы</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Лабораторный стол">
+    <svg class="scene" id="scene" role="img" aria-label="Лабораторный стол с опытом. Предметы можно нажимать и перетаскивать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c; };
+const INK = '#04070d';
+const KEY = 'luch-bio-methods';
+const hash = (a, b) => { let h = (a * 374761393 + b * 668265263 + 1013904223) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+
+// ---------- biology data ----------
+// Lesson 1: a goldfish; opercular (gill-cover) beats per minute rise with water temperature (simplified linear model)
+const rateOf = T => 60 + 5 * (T - 18);
+const TRIAL = 15, TMIN = 16, TMAX = 28, TOL_COUNT = 2;
+// Lesson 2: school light microscope. Eyepiece 10×, field number 18 mm → field of view = 18 / objective, mm
+const OCU = 10, FN = 18, OBJS = [4, 10, 40], F0 = 62.4;
+const DEPTH = { 4: 1.5, 10: 0.8, 40: 0.3 };      // how far from the sharp point the picture still looks sharp (knob units)
+const NEED = { 4: 0.2, 10: 0.35, 40: 0.6 };     // light needed: the bigger the objective, the more light
+const CELL = { L: 0.25, H: 0.06, r: 0.010 };    // onion epidermis cell ≈ 250 × 60 мкм, nucleus ≈ 20 мкм across
+const SPEC = { w: 3, h: 2 };                    // the piece of onion skin: 6 × 4 мм around the slide centre
+const BAR = { 4: 1, 10: 0.5, 40: 0.1 };         // scale bar, мм
+// Lesson 3: pea germination in 5 days (share of live seeds that sprout)
+const GERM = { wetWarm: 0.9, wetCold: 0.1, dry: 0 };
+const DAYS = 5;
+
+const LESSONS = [
+  { id: 'observe', title: 'Наблюдение и эксперимент',
+    text: ['Биологи изучают живое двумя главными способами. Наблюдение — смотрим и измеряем, ничего не меняя. Эксперимент, или опыт, — нарочно меняем одно условие и смотрим, что из-за этого изменится.',
+           'Рыба дышит жабрами: набирает воду ртом и выпускает её из-под жаберных крышек. Сосчитаем, сколько раз за 15 секунд поднимаются крышки, — это наблюдение. Потом изменим температуру воды и сосчитаем снова — это уже эксперимент.',
+           'Чтобы узнать число движений в минуту, счёт за 15 секунд умножают на 4. Так же медсестра считает пульс.'],
+    why: 'Рыбоводы в прудовых хозяйствах Алматинской области и на Балхаше следят, как дышит рыба: если она часто хватает воздух у поверхности, в воде мало кислорода. Пора включать аэраторы, иначе можно потерять всю рыбу в пруду. Медсестра и ветеринар так же считают дыхание и пульс за 15 секунд, а эколог годами наблюдает за птицами и сайгаками и замечает, когда что-то пошло не так.',
+    safe: 'Нагреватель аквариума работает от сети: руки в воду не опускают, пока он включён. В настоящем аквариуме воду греют медленно, на 1–2 °C в день, иначе рыба заболеет. В нашей модели — сразу.',
+    task: 'Сосчитайте движения жаберных крышек за 15 секунд при двух температурах воды, которые отличаются хотя бы на 4 °C. Ошибка — не больше 2.',
+    hint: 'Нажмите на секундомер и при каждом взмахе жаберной крышки нажимайте на рыбку или «+1». Потом смените температуру и посчитайте ещё раз.',
+    stage: 'Секундомер — старт. Нажатие на рыбку — плюс одно движение.',
+    T: 18,
+    check: m => m.pair },
+  { id: 'micro', title: 'Микроскоп',
+    text: ['Клетки так малы, что глазом их не видно. Световой микроскоп увеличивает их в десятки и сотни раз. Свет от лампы проходит через тонкий препарат, потом через объектив и окуляр и попадает в глаз.',
+           'Увеличение микроскопа = увеличение окуляра × увеличение объектива. Окуляр 10×, объектив 40× — всего в 400 раз.',
+           'Начинают с малого объектива: находят объект, ставят его в центр и только потом переходят на больший. На большом объективе резкость наводят только микровинтом. Изображение перевёрнуто: двигаете стекло вправо — картинка уходит влево.'],
+    why: 'Врач-лаборант в поликлинике смотрит в микроскоп на мазок крови и считает клетки: по этому анализу ставят диагноз. Агроном находит на листьях пшеницы грибок ржавчины раньше, чем болезнь съест урожай. Микроскоп нужен и криминалисту, и инженеру, который проверяет качество металла или микросхем.',
+    safe: 'Предметное стекло тонкое, его край режет. Йод пачкает одежду и щиплет глаза. Зеркало микроскопа никогда не направляют на солнце — можно обжечь глаз.',
+    task: 'Рассмотрите клетки кожицы лука при увеличении 400×: окрасьте препарат йодом, наведите резкость и нажмите на ядро клетки.',
+    hint: 'Начните с объектива 4×: включите свет, наведите резкость макровинтом и перетащите кожицу в центр круга. Потом 10× и 40×. На 40× света нужно больше — откройте диафрагму.',
+    stage: 'Картинку в круге можно тащить. Винты крутятся движением вверх-вниз, рычажок диафрагмы — вбок.',
+    obj: 4, lamp: false, dia: 0.4, coarse: 40, fine: 0, sx: -5, sy: 2.5,
+    check: m => m.found },
+  { id: 'plan', title: 'Как поставить опыт',
+    text: ['Хороший опыт начинается с вопроса и гипотезы — предположения, которое можно проверить. Например: «Семенам гороха для прорастания нужна вода».',
+           'Берут две одинаковые группы. В опытной меняют одно условие, контрольную оставляют как есть. Всё остальное — свет, тепло, число семян — должно быть одинаковым. Иначе непонятно, что повлияло на результат.',
+           'Одно семя может оказаться неживым, поэтому берут много семян, хотя бы 10. Потом сравнивают результаты и делают вывод: подтвердилась гипотеза или нет.'],
+    why: 'На опытных полях под Астаной и Костанаем агрономы годами сравнивают сорта пшеницы: одна делянка — опыт, соседняя — контроль. Так выбирают сорт, который даст больше зерна и денег. Новые лекарства проверяют на двух группах людей, и одна из них — контрольная. А дома ты так же проверишь, какое удобрение лучше для рассады на продажу.',
+    safe: 'Семена для посева бывают протравлены ядом от вредителей: их не пробуют на вкус, а после работы моют руки.',
+    task: 'Проверьте гипотезу «Семенам гороха для прорастания нужна вода»: поставьте честный опыт на 5 дней и сделайте вывод.',
+    hint: 'Чашки должны отличаться только одним условием — водой. Свет и температура одинаковые, семян поровну и не меньше 10 в каждой.',
+    stage: 'Нажимайте на значки под чашками, чтобы менять условия. Потом «Ждать 5 дней».',
+    dishes: [{ water: true, light: true, warm: true, n: 1 }, { water: true, light: true, warm: true, n: 1 }],
+    check: m => m.valid && m.finished && m.answer === 'yes' },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+// ---------- lesson 1: breathing clock ----------
+const phaseAt = t => S.ph0 + rateOf(S.T) / 60 * (t - S.phT) / 1000;
+function setTemp(T) {
+  T = clamp(Math.round(T), TMIN, TMAX);
+  if (T === S.T) return;
+  if (S.trial) { toast('Пока идёт счёт, температуру не меняем.'); return; }
+  const now = performance.now(); S.ph0 = phaseAt(now); S.phT = now; S.T = T; update();
+}
+function startTrial() {
+  if (S.trial) { toast('Счёт уже идёт — следите за жабрами.'); return; }
+  const t0 = performance.now();
+  S.trial = { t0, b0: Math.floor(phaseAt(t0)), taps: 0, T: S.T };
+  renderTools(); update();
+}
+function tapFish() {
+  if (!S.trial) { toast('Сначала запустите секундомер.'); return; }
+  S.trial.taps++; S.tapFx = performance.now(); update();
+}
+function finishTrial() {
+  const tr = S.trial; S.trial = null;
+  const real = Math.floor(phaseAt(tr.t0 + TRIAL * 1000)) - tr.b0, ok = Math.abs(tr.taps - real) <= TOL_COUNT;
+  S.trials.push({ T: tr.T, taps: tr.taps, real, ok }); if (S.trials.length > 8) S.trials.shift();
+  toast(ok ? `Насчитали ${tr.taps}, на самом деле ${real}. Точно!` : `Насчитали ${tr.taps}, а рыбка сделала ${real} движений. Попробуйте ещё раз.`);
+  renderTools(); update();
+}
+
+// ---------- lesson 3: seeds ----------
+const SEEDU = [0, 1].map(j => Array.from({ length: 20 }, (_, i) => hash(j * 31 + 7, i)));
+SEEDU[0][0] = 0.95; SEEDU[1][0] = 0.3;          // the very first seed in dish А is dead: one seed proves nothing
+const pGerm = d => !d.water ? GERM.dry : d.warm ? GERM.wetWarm : GERM.wetCold;
+const germDay = (j, i) => 1.2 + 2.3 * hash(j + 101, i);
+function dishResult(d, j) {
+  const p = pGerm(d); let k = 0, fin = 0;
+  for (let i = 0; i < d.n; i++) if (SEEDU[j][i] < p) { fin++; if (S.day >= germDay(j, i)) k++; }
+  return { n: d.n, k, fin, p };
+}
+function issuesOf(D) {
+  const [A, B] = D, out = [];
+  if (A.water === B.water) out.push(A.water ? 'вода есть в обеих чашках — сравнивать не с чем' : 'воды нет в обеих чашках — сравнивать не с чем');
+  if (A.light !== B.light) out.push('чашки отличаются ещё и светом');
+  if (A.warm !== B.warm) out.push('чашки отличаются ещё и температурой');
+  if (A.n !== B.n) out.push('в чашках разное число семян');
+  if (Math.min(A.n, B.n) < 10) out.push('семян слишком мало — нужно хотя бы 10 в каждой чашке');
+  if (!A.warm && !B.warm) out.push('обе чашки в холодильнике: в холоде горох почти не прорастает даже с водой, опыт ничего не покажет');
+  return out;
+}
+
+function model() {
+  const id = LID();
+  if (id === 'observe') {
+    const ok = S.trials.filter(t => t.ok); let pair = null;
+    for (const a of ok) for (const b of ok) if (b.T - a.T >= 4 && (!pair || b.T - a.T > pair[1].T - pair[0].T)) pair = [a, b];
+    const left = S.trial ? Math.max(0, TRIAL - (performance.now() - S.trial.t0) / 1000) : null;
+    return { kind: 'fish', T: S.T, trial: S.trial, left, okN: ok.length, pair: !!pair, pairT: pair };
+  }
+  if (id === 'micro') {
+    const mag = OCU * S.obj, fov = FN / S.obj, focus = S.coarse + S.fine, err = Math.abs(focus - F0), sharp = err < DEPTH[S.obj];
+    const bright = S.lamp ? S.dia : 0, lit = bright >= NEED[S.obj], cx = -S.sx, cy = -S.sy, centered = Math.abs(cx) < SPEC.w && Math.abs(cy) < SPEC.h;
+    return { kind: 'micro', mag, fov, focus, err, sharp, bright, lit, centered, stained: S.stained, found: S.found };
+  }
+  const res = S.dishes.map((d, j) => dishResult(d, j)), issues = issuesOf(S.dishes);
+  return { kind: 'seed', res, issues, valid: issues.length === 0, day: S.day, finished: S.day >= DAYS, answer: S.answer };
+}
+
+// ---------- scene ----------
+const AQ = { x: 60, y: 172, w: 350, h: 186, top: 192 };
+const WATCH = { x: 466, y: 316, r: 28 };
+const VC = { x: 385, y: 206, r: 112 };
+const AXIS = 140, SLIDE_K = 1.32;
+const DISH = [{ cx: 136 }, { cx: 384 }], DY = 296, DRX = 100, DRY = 38;
+const SEEDPOS = Array.from({ length: 20 }, (_, i) => { const r = Math.sqrt((i + 0.5) / 20) * 0.78, a = i * 2.39996 + 0.4; return [r * Math.cos(a), r * Math.sin(a)]; });
+
+const ol = (d, fill, stroke, w = 2.2, extra = '') => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${w + 2.6}" stroke-linejoin="round" stroke-linecap="round"/><path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round" ${extra}/>`;
+const GLASS = 'rgba(200,225,255,.08)', GLASS_S = '#9fb3d1';
+
+function bench() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="2360" fill="url(#tile)"/>
+    <rect x="-2000" y="360" width="4520" height="1200" fill="#1a2232"/>
+    <rect x="-2000" y="358" width="4520" height="4" fill="#2c3954"/>
+    <rect x="-2000" y="362" width="4520" height="2" fill="${INK}" opacity=".6"/>`;
+}
+
+// --- lesson 1: aquarium, goldfish, thermometer, heater, stopwatch ---
+function fishPos(t) {
+  if (reduce) return { x: 250, y: 268, dir: -1 };
+  const a = t / 5200, x = 238 + 92 * Math.sin(a), y = 266 + 14 * Math.sin(t / 3300);
+  return { x, y, dir: Math.cos(a) >= 0 ? 1 : -1 };
+}
+function fishSVG(t, m) {
+  const p = fishPos(t), ph = phaseAt(t), f = ph - Math.floor(ph);
+  const open = f < 0.45 ? Math.sin(f / 0.45 * Math.PI) : 0, mouth = f > 0.55 ? Math.sin((f - 0.55) / 0.45 * Math.PI) : 0;
+  const tail = reduce ? 0 : Math.sin(t / 260) * 5;
+  const pop = S.tapFx && t - S.tapFx < 260 ? 1 + 0.06 * Math.sin((t - S.tapFx) / 260 * Math.PI) : 1;
+  let h = `<g transform="translate(${p.x.toFixed(1)} ${p.y.toFixed(1)}) scale(${(p.dir * pop).toFixed(3)} ${pop.toFixed(3)})" data-drag="fish">`;
+  h += `<rect x="-70" y="-36" width="124" height="72" fill="transparent"/>`;
+  h += ol(`M-38 0L-64 ${(-20 + tail).toFixed(1)}Q-57 0 -64 ${(20 + tail).toFixed(1)}Z`, '#f08a2c', '#ffb36b', 1.6);
+  h += ol('M-14 -21Q-2 -38 14 -21Z', '#f08a2c', '#ffb36b', 1.4);
+  h += ol('M-42 0Q-22 -27 16 -23Q42 -17 47 0Q42 17 16 23Q-22 27 -42 0Z', '#f39a3c', '#ffc27e', 1.8);
+  h += `<path d="M-6 18Q2 30 10 20Z" fill="#e07a22"/>`;
+  // gill cover: the red gill shows while the cover is lifted
+  const gx = 14 - 9 * open;
+  if (open > 0.02) h += `<path d="M19 -15Q${gx.toFixed(1)} 0 19 15Q15 0 19 -15Z" fill="#d6283a" stroke="${INK}" stroke-width=".8"/>`;
+  h += `<path d="M20 -16Q${(13 - 7 * open).toFixed(1)} 0 20 16" fill="none" stroke="#a5521a" stroke-width="2.4" stroke-linecap="round"/>`;
+  h += `<circle cx="31" cy="-6" r="4.4" fill="#fff"/><circle cx="32" cy="-6" r="2.4" fill="${INK}"/>`;
+  h += `<ellipse cx="46" cy="1" rx="2" ry="${(0.8 + 2.4 * mouth).toFixed(2)}" fill="#5a2208"/>`;
+  return h + `</g>`;
+}
+function aquariumSVG(t, m) {
+  const A = AQ;
+  let h = '';
+  h += `<rect x="${A.x}" y="${A.top}" width="${A.w}" height="${A.y + A.h - A.top}" fill="#3a8fc0" opacity="${(0.16 + (m.T - TMIN) * 0.004).toFixed(3)}"/>`;
+  h += `<rect x="${A.x}" y="${A.top}" width="${A.w}" height="2" fill="#a8e2f5" opacity=".6"/>`;
+  // gravel and plants
+  let g = ''; for (let i = 0; i < 46; i++) { const x = A.x + 6 + hash(3, i) * (A.w - 12), y = A.y + A.h - 6 - hash(4, i) * 14; g += `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="${(3 + hash(5, i) * 3).toFixed(1)}" ry="2.6" fill="${['#6b6250', '#857a62', '#544c3e'][i % 3]}"/>`; }
+  h += `<rect x="${A.x + 2}" y="${A.y + A.h - 22}" width="${A.w - 4}" height="20" fill="#3f392e"/>` + g;
+  const sway = reduce ? 0 : Math.sin(t / 1400) * 4;
+  for (const [x, hh] of [[120, 110], [138, 84], [352, 120], [368, 90]]) h += `<path d="M${x} ${A.y + A.h - 14}Q${(x - 10 + sway).toFixed(1)} ${A.y + A.h - 14 - hh / 2} ${(x + sway).toFixed(1)} ${A.y + A.h - 14 - hh}" stroke="#3fae6a" stroke-width="5" fill="none" stroke-linecap="round" opacity=".85"/>`;
+  // heater
+  const hot = (m.T - TMIN) / (TMAX - TMIN);
+  h += `<g data-drag="heater">` + ol(`M78 200h12v118q0 6-6 6t-6-6z`, '#2a3348', '#56627d', 1.4) + `<rect x="80" y="230" width="8" height="80" rx="4" fill="#ff7a3c" opacity="${(0.15 + 0.7 * hot).toFixed(2)}"/><path d="M84 200V176" stroke="#56627d" stroke-width="3"/></g>`;
+  // bubbles from the heater when hot
+  if (!reduce && hot > 0.4) for (let i = 0; i < 4; i++) { const k = ((t / 1600 + i / 4) % 1), y = 300 - k * 100; h += `<circle cx="${(92 + Math.sin(t / 300 + i) * 2).toFixed(1)}" cy="${y.toFixed(1)}" r="${(1.5 + k).toFixed(1)}" fill="none" stroke="#cdeefa" stroke-width=".8" opacity="${(1 - k).toFixed(2)}"/>`; }
+  h += fishSVG(t, m);
+  // thermometer on the glass
+  const ty = y => 300 - (y - 10) * 4;
+  h += `<g data-drag="thermo">` + ol('M386 196h14v112a7 7 0 1 1-14 0z', '#e8ecf4', '#ffffff', 1.4);
+  h += `<rect x="391" y="${ty(m.T).toFixed(1)}" width="4" height="${(306 - ty(m.T)).toFixed(1)}" fill="#e2394b"/><circle cx="393" cy="309" r="5" fill="#e2394b"/>`;
+  for (let v = 12; v <= 30; v += 2) h += `<path d="M386 ${ty(v)}h${v % 4 === 0 ? 5 : 3}" stroke="#04070d" stroke-width=".8"/>`;
+  h += `</g><text x="380" y="190" font-size="11" fill="#e8ecf4" text-anchor="end">${m.T} °C</text>`;
+  // glass box
+  const d = `M${A.x} ${A.y}V${A.y + A.h}H${A.x + A.w}V${A.y}`;
+  h += `<path d="${d}Z" fill="${GLASS}"/>` + ol(d, 'none', GLASS_S, 2.4);
+  h += ol(`M${A.x - 4} ${A.y - 4}h${A.w + 8}v6h-${A.w + 8}z`, '#2a3348', '#3a4762', 1.4);
+  h += `<path d="M${A.x + 12} ${A.y + 14}V${A.y + A.h - 30}" stroke="#fff" stroke-opacity=".1" stroke-width="5" stroke-linecap="round"/>`;
+  // stopwatch
+  const W = WATCH, run = m.trial, frac = run ? 1 - m.left / TRIAL : 0;
+  h += `<g data-drag="watch"><rect x="${W.x - 36}" y="${W.y - 52}" width="72" height="92" fill="transparent"/>`;
+  h += ol(`M${W.x - 6} ${W.y - W.r - 12}h12v8h-12z`, run ? '#ffb547' : '#56627d', run ? '#ffd08a' : '#8b96ad', 1.4);
+  h += ol(`M${W.x} ${W.y - W.r}a${W.r} ${W.r} 0 1 1 0 ${2 * W.r}a${W.r} ${W.r} 0 1 1 0 -${2 * W.r}z`, '#e8ecf4', '#ffffff', 1.6);
+  if (run) { const a = frac * 2 * Math.PI, R = W.r - 4; h += `<path d="M${W.x} ${W.y}L${W.x} ${W.y - R}A${R} ${R} 0 ${frac > 0.5 ? 1 : 0} 1 ${(W.x + R * Math.sin(a)).toFixed(1)} ${(W.y - R * Math.cos(a)).toFixed(1)}Z" fill="#ffb547" opacity=".55"/>`; }
+  for (let i = 0; i < 12; i++) { const a = i / 12 * 2 * Math.PI; h += `<path d="M${(W.x + (W.r - 3) * Math.sin(a)).toFixed(1)} ${(W.y - (W.r - 3) * Math.cos(a)).toFixed(1)}L${(W.x + (W.r - 7) * Math.sin(a)).toFixed(1)} ${(W.y - (W.r - 7) * Math.cos(a)).toFixed(1)}" stroke="#04070d" stroke-width="1.2"/>`; }
+  const a = frac * 2 * Math.PI;
+  h += `<path d="M${W.x} ${W.y}L${(W.x + (W.r - 6) * Math.sin(a)).toFixed(1)} ${(W.y - (W.r - 6) * Math.cos(a)).toFixed(1)}" stroke="#d6283a" stroke-width="2" stroke-linecap="round"/><circle cx="${W.x}" cy="${W.y}" r="2.4" fill="#04070d"/>`;
+  h += `<text x="${W.x}" y="${W.y + W.r + 14}" font-size="10" fill="${run ? '#ffb547' : '#8b96ad'}" text-anchor="middle">${run ? '0:' + String(Math.ceil(m.left)).padStart(2, '0') : 'старт'}</text></g>`;
+  if (run) h += `<text x="235" y="${A.y - 14}" font-size="13" fill="#ffb547" text-anchor="middle">счёт: ${run.taps}</text>`;
+  return h;
+}
+
+// --- lesson 2: microscope and the field of view ---
+function microSVG(m) {
+  const dy = clamp(-(m.focus - F0) * 0.3, -14, 14), LEN = { 4: 30, 10: 42, 40: 56 };
+  let h = '';
+  // base, arm, stage
+  h += ol('M34 340h176q6 0 6 6v8q0 4-4 4H32q-4 0-4-4v-8q0-6 6-6z', '#2a3348', '#3a4762', 1.6);
+  h += ol('M58 340V262Q58 186 112 150L124 142V154L118 158Q82 186 82 262V340Z', '#2a3348', '#3a4762', 1.6);
+  // lamp + light cone
+  if (m.bright > 0) h += `<path d="M132 326L148 326L${(146 + m.bright * 6).toFixed(1)} 248L${(134 - m.bright * 6).toFixed(1)} 248Z" fill="#ffe08a" opacity="${(0.08 + m.bright * 0.22).toFixed(2)}"/>`;
+  h += `<g data-drag="lamp"><rect x="118" y="318" width="44" height="26" fill="transparent"/>` + ol('M126 334h28v6h-28z', '#3a4762', '#56627d', 1.2) + `<circle cx="140" cy="328" r="8" fill="${S.lamp ? '#ffe08a' : '#3a4762'}" stroke="${INK}" stroke-width="1.6"/></g>`;
+  // diaphragm with lever
+  const lx = 118 + S.dia * 44;
+  h += ol('M112 250h56v6h-56z', '#3a4762', '#56627d', 1.2);
+  h += `<g data-drag="dia"><rect x="${(lx - 12).toFixed(1)}" y="250" width="24" height="22" fill="transparent"/>` + ol(`M${lx.toFixed(1)} 256v10`, 'none', '#ffb547', 3) + `</g>`;
+  h += ol('M64 236h150v10H64z', '#3a4762', '#56627d', 1.6);
+  // slide with the onion skin, clips
+  const xc = AXIS + S.sx * SLIDE_K;
+  h += `<g data-drag="slide"><rect x="${(xc - 52).toFixed(1)}" y="220" width="104" height="18" fill="transparent"/>`;
+  h += `<rect x="${(xc - 50).toFixed(1)}" y="231" width="100" height="5" rx="1" fill="rgba(200,225,255,.35)" stroke="#c8d6ec" stroke-width=".8"/>`;
+  h += `<rect x="${(xc - SPEC.w * SLIDE_K).toFixed(1)}" y="229" width="${(2 * SPEC.w * SLIDE_K).toFixed(1)}" height="2.4" fill="${S.stain > 0.5 ? '#c99a3a' : '#e6e1cf'}"/></g>`;
+  h += ol('M88 232h22', 'none', '#a9b4c9', 2.4) + ol('M170 232h22', 'none', '#a9b4c9', 2.4);
+  // focus knobs (on the arm)
+  const ca = S.coarse * 14, fa = S.fine * 160;
+  h += `<g data-drag="coarse"><rect x="20" y="182" width="44" height="40" fill="transparent"/>` + ol('M40 188a14 14 0 1 1 0 28a14 14 0 1 1 0-28z', '#56627d', '#8a96b0', 1.6) +
+       `<path d="M40 202l${(12 * Math.cos(ca * Math.PI / 180)).toFixed(1)} ${(12 * Math.sin(ca * Math.PI / 180)).toFixed(1)}" stroke="#e8ecf4" stroke-width="2"/></g>`;
+  h += `<g data-drag="fine"><rect x="24" y="222" width="34" height="30" fill="transparent"/>` + ol('M40 229a8 8 0 1 1 0 16a8 8 0 1 1 0-16z', '#56627d', '#8a96b0', 1.4) +
+       `<path d="M40 237l${(6.5 * Math.cos(fa * Math.PI / 180)).toFixed(1)} ${(6.5 * Math.sin(fa * Math.PI / 180)).toFixed(1)}" stroke="#ffb547" stroke-width="1.8"/></g>`;
+  // head: eyepiece, tube, revolver, objectives (moves with the focus)
+  h += `<g transform="translate(0 ${dy.toFixed(1)})">`;
+  for (const o of OBJS) if (o !== S.obj) { const k = OBJS.indexOf(o) - OBJS.indexOf(S.obj); h += `<g transform="rotate(${(k > 0 ? -1 : 1) * (Math.abs(k) === 1 ? 32 : 58)} 140 160)">` + ol(`M134 166h12v${LEN[o] - 6}h-12z`, '#8a96b0', '#a9b4c9', 1.2) + `</g>`; }
+  h += ol('M112 150h56l-6 16h-44z', '#3a4762', '#56627d', 1.4);
+  const L = LEN[S.obj];
+  h += ol(`M132 166h16v${L - 8}l-3 8h-10l-3-8z`, '#c8d1e2', '#e8ecf4', 1.4) + `<rect x="132" y="${170 + L * 0.3}" width="16" height="3" fill="${{ 4: '#d6283a', 10: '#e9e21f', 40: '#2179bb' }[S.obj]}"/>`;
+  h += `<text x="152" y="${183 + L * 0.3}" font-size="9" fill="#e8ecf4">${S.obj}×</text>`;
+  h += ol('M130 122h20v28h-20z', '#2a3348', '#3a4762', 1.6);
+  h += ol('M126 96h28v26h-28z', '#3a4762', '#56627d', 1.6) + `<text x="140" y="113" font-size="9" fill="#e8ecf4" text-anchor="middle">10×</text>`;
+  h += `</g>`;
+  if (S.obj === 40 && m.focus < F0 - 3.5) h += `<text x="140" y="214" font-size="9" fill="#ff8a73" text-anchor="middle">близко к стеклу!</text>`;
+  // the optical path to the round view
+  h += `<path d="M156 ${(108 + dy).toFixed(1)}C210 ${(108 + dy).toFixed(1)} 230 110 ${VC.x - VC.r * 0.72} ${VC.y - VC.r * 0.7}" stroke="#8b96ad" stroke-width="1" stroke-dasharray="3 4" fill="none"/>`;
+  return h;
+}
+function viewSVG(m) {
+  const { x: X, y: Y, r: R } = VC, k = 2 * R / m.fov, st = S.stain;
+  const toS = (px, py) => [X - (px + S.sx) * k, Y - (py + S.sy) * k];
+  const tol = DEPTH[S.obj], blur = Math.min(9, Math.pow(m.err / tol, 1.2) * 0.7);
+  let h = `<defs><clipPath id="vClip"><circle cx="${X}" cy="${Y}" r="${R}"/></clipPath><filter id="vBlur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="${blur.toFixed(2)}"/></filter>`;
+  const L = CELL.L * k, H = CELL.H * k, [ox, oy] = toS(SPEC.w, SPEC.h);
+  const wall = st > 0.5 ? '#7a5a14' : 'rgba(80,92,112,.6)';
+  if (S.obj === 4) h += `<pattern id="cellPat" width="${L.toFixed(3)}" height="${(2 * H).toFixed(3)}" patternUnits="userSpaceOnUse" patternTransform="translate(${ox.toFixed(2)} ${oy.toFixed(2)})"><path d="M0 0H${L.toFixed(2)}M0 ${H.toFixed(2)}H${L.toFixed(2)}M0 0V${H.toFixed(2)}M${(L / 2).toFixed(2)} ${H.toFixed(2)}V${(2 * H).toFixed(2)}" stroke="${wall}" stroke-width=".7" fill="none"/></pattern>`;
+  h += `</defs>`;
+  h += `<circle cx="${X}" cy="${Y}" r="${R + 6}" fill="#05070b"/>`;
+  h += `<g clip-path="url(#vClip)"><circle cx="${X}" cy="${Y}" r="${R}" fill="#f1efe6"/><g filter="url(#vBlur)">`;
+  // air bubble on the slide
+  { const [bx, by] = toS(-5.2, 1.4), br = 0.35 * k; h += `<circle cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="${br.toFixed(1)}" fill="#fbfaf4" stroke="#2a2f3a" stroke-width="${Math.max(1.5, br * 0.14).toFixed(1)}"/>`; }
+  const [ax, ay] = toS(-SPEC.w, -SPEC.h), rx = Math.min(ax, ox), ry = Math.min(ay, oy), rw = Math.abs(ax - ox), rh = Math.abs(ay - oy);
+  const fill = `rgba(${Math.round(205 + 20 * st)},${Math.round(208 - 20 * st)},${Math.round(215 - 140 * st)},${(0.3 + 0.25 * st).toFixed(2)})`;
+  h += `<rect x="${rx.toFixed(1)}" y="${ry.toFixed(1)}" width="${rw.toFixed(1)}" height="${rh.toFixed(1)}" fill="${fill}"/>`;
+  if (S.obj === 4) h += `<rect x="${rx.toFixed(1)}" y="${ry.toFixed(1)}" width="${rw.toFixed(1)}" height="${rh.toFixed(1)}" fill="url(#cellPat)"/>`;
+  else {
+    const half = R / k, pxa = Math.max(-SPEC.w, -S.sx - half), pxb = Math.min(SPEC.w, -S.sx + half), pya = Math.max(-SPEC.h, -S.sy - half), pyb = Math.min(SPEC.h, -S.sy + half);
+    if (pxa < pxb && pya < pyb) {
+      const r0 = Math.floor((pya + SPEC.h) / CELL.H), r1 = Math.floor((pyb + SPEC.h) / CELL.H);
+      const nucA = (0.1 + 0.75 * st) * (S.obj === 40 ? 1 : 0.8), nucC = st > 0.5 ? '#6b3f0c' : '#7d8496';
+      for (let r = r0; r <= r1; r++) {
+        const y0 = -SPEC.h + r * CELL.H, y1 = Math.min(SPEC.h, y0 + CELL.H);
+        const i0 = Math.floor((pxa + SPEC.w) / CELL.L) - 1, i1 = Math.floor((pxb + SPEC.w) / CELL.L) + 1;
+        for (let i = i0; i <= i1; i++) {
+          const c = cellBox(r, i); if (!c || c.x1 < pxa - CELL.L || c.x0 > pxb + CELL.L) continue;
+          const [sa, sb] = toS(c.x0, y0), [sc, sd] = toS(c.x1, y1);
+          h += `<rect x="${Math.min(sa, sc).toFixed(1)}" y="${Math.min(sb, sd).toFixed(1)}" width="${Math.abs(sc - sa).toFixed(1)}" height="${Math.abs(sd - sb).toFixed(1)}" rx="${(H * 0.12).toFixed(1)}" fill="none" stroke="${wall}" stroke-width="${S.obj === 40 ? 1.6 : 0.9}"/>`;
+          const [nx, ny] = toS(c.nx, c.ny);
+          h += `<circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${(CELL.r * k).toFixed(1)}" fill="${nucC}" opacity="${nucA.toFixed(2)}"/>`;
+          if (S.obj === 40 && st > 0.5) h += `<circle cx="${(nx - CELL.r * k * 0.25).toFixed(1)}" cy="${(ny - CELL.r * k * 0.2).toFixed(1)}" r="${(CELL.r * k * 0.28).toFixed(1)}" fill="#3a2006" opacity=".7"/>`;
+        }
+      }
+    }
+  }
+  h += `</g>`;
+  // light: too little → dark; too much → washed out
+  if (!S.lamp) h += `<circle cx="${X}" cy="${Y}" r="${R}" fill="#05070b" opacity=".96"/>`;
+  else if (m.bright < NEED[S.obj]) h += `<circle cx="${X}" cy="${Y}" r="${R}" fill="#05070b" opacity="${((1 - m.bright / NEED[S.obj]) * 0.85).toFixed(2)}"/>`;
+  else if (m.bright > NEED[S.obj] + 0.45) h += `<circle cx="${X}" cy="${Y}" r="${R}" fill="#ffffff" opacity="${Math.min(0.55, (m.bright - NEED[S.obj] - 0.45) * 1.6).toFixed(2)}"/>`;
+  if (m.found && S.lastHit) { const [nx, ny] = toS(S.lastHit[0], S.lastHit[1]); h += `<circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${(CELL.r * k * 2.2).toFixed(1)}" fill="none" stroke="#33a84f" stroke-width="2.4"/>`; }
+  // scale bar
+  if (S.lamp) { const bl = BAR[S.obj] * k; h += `<path d="M${(X - bl / 2).toFixed(1)} ${Y + R - 20}h${bl.toFixed(1)}" stroke="#04070d" stroke-width="2.4"/><text x="${X}" y="${Y + R - 26}" font-size="9" fill="#04070d" text-anchor="middle">${fmt(BAR[S.obj], BAR[S.obj] < 1 ? 1 : 0)} мм</text>`; }
+  h += `</g>`;
+  h += `<circle cx="${X}" cy="${Y}" r="${R}" fill="transparent" stroke="#2c3954" stroke-width="7" data-drag="view"/>`;
+  h += `<circle cx="${X}" cy="${Y}" r="${R + 4}" fill="none" stroke="${INK}" stroke-width="2"/>`;
+  h += `<text x="${X}" y="${Y + R + 22}" font-size="11" fill="#e8ecf4" text-anchor="middle">поле зрения · ${m.mag}×</text>`;
+  return h;
+}
+function cellBox(r, i) {
+  const off = (r % 2) * 0.5, b = j => -SPEC.w + (j - off) * CELL.L + (hash(r, j) - 0.5) * 0.3 * CELL.L;
+  let x0 = b(i), x1 = b(i + 1);
+  if (x1 <= -SPEC.w || x0 >= SPEC.w) return null;
+  x0 = Math.max(-SPEC.w, x0); x1 = Math.min(SPEC.w, x1);
+  const y0 = -SPEC.h + r * CELL.H;
+  return { x0, x1, nx: x0 + (0.3 + 0.4 * hash(r + 500, i)) * (x1 - x0), ny: y0 + (0.38 + 0.24 * hash(r + 900, i)) * CELL.H };
+}
+// a click in the round view: is it a nucleus?
+function viewClick(p) {
+  const m = model(), k = 2 * VC.r / m.fov;
+  if (Math.hypot(p.x - VC.x, p.y - VC.y) > VC.r) return;
+  if (!S.lamp) { toast('Темно: сначала включите свет.'); return; }
+  const px = -(p.x - VC.x) / k - S.sx, py = -(p.y - VC.y) / k - S.sy;
+  if (Math.abs(px) > SPEC.w || Math.abs(py) > SPEC.h) { toast(Math.hypot(px + 5.2, py - 1.4) < 0.4 ? 'Это пузырёк воздуха, а не клетка.' : 'Здесь пустое стекло. Найдите кожицу лука.'); return; }
+  if (S.obj === 4) { toast('Клетки слишком мелкие. Поставьте объектив побольше.'); return; }
+  const r = Math.floor((py + SPEC.h) / CELL.H);
+  let hit = null;
+  for (let i = Math.floor((px + SPEC.w) / CELL.L) - 1; i <= Math.floor((px + SPEC.w) / CELL.L) + 1; i++) {
+    const c = cellBox(r, i); if (c && Math.hypot(c.nx - px, c.ny - py) * k < Math.max(11, CELL.r * k * 1.8)) hit = c;
+  }
+  if (!hit) { toast('Это клетка, но не ядро. Ядро — маленький тёмный кружок внутри клетки.'); return; }
+  const miss = [];
+  if (S.obj !== 40) miss.push('увеличение 400×');
+  if (!m.sharp) miss.push('резкость');
+  if (!m.lit) miss.push('больше света');
+  if (!S.stained) miss.push('окраска йодом');
+  if (miss.length) { toast('Похоже на ядро! Для задания нужно ещё: ' + miss.join(', ') + '.'); return; }
+  S.found = true; S.lastHit = [hit.nx, hit.ny]; toast('Да, это ядро клетки!'); update();
+}
+
+// --- lesson 3: two Petri dishes ---
+function dishesSVG(t, m) {
+  let h = '';
+  S.dishes.forEach((d, j) => {
+    const cx = DISH[j].cx, r = m.res[j];
+    h += `<text x="${cx}" y="${DY - DRY - 30}" font-size="12" fill="#e8ecf4" text-anchor="middle">Чашка ${'АБ'[j]} · ${d.n} ${plural(d.n, 'семя', 'семени', 'семян')}</text>`;
+    h += `<text x="${cx}" y="${DY - DRY - 15}" font-size="9.5" fill="#8b96ad" text-anchor="middle">${d.water ? 'мокрая бумага' : 'сухо'} · ${d.light ? 'на свету' : 'в темноте'} · ${d.warm ? '22 °C' : '4 °C'}</text>`;
+    h += `<ellipse cx="${cx}" cy="${DY + 6}" rx="${DRX + 4}" ry="${DRY + 4}" fill="${INK}" opacity=".5"/>`;
+    h += ol(`M${cx - DRX} ${DY}a${DRX} ${DRY} 0 1 0 ${2 * DRX} 0a${DRX} ${DRY} 0 1 0 -${2 * DRX} 0z`, GLASS, GLASS_S, 2);
+    h += `<ellipse cx="${cx}" cy="${DY + 2}" rx="${DRX - 8}" ry="${DRY - 5}" fill="${d.water ? '#7f9fbc' : '#d9cfb8'}" opacity="${d.water ? 0.55 : 0.75}"/>`;
+    if (!d.warm) h += `<ellipse cx="${cx}" cy="${DY + 2}" rx="${DRX - 8}" ry="${DRY - 5}" fill="#bfe6ff" opacity=".18"/>`;
+    for (let i = 0; i < d.n; i++) {
+      const [u, v] = SEEDPOS[i], x = cx + u * (DRX - 14), y = DY + 2 + v * (DRY - 9), live = SEEDU[j][i] < r.p, gd = germDay(j, i);
+      const sw = d.water && S.day > 0.4 ? 1.25 : 1, rs = 5.2 * sw;
+      if (live && S.day > gd) {
+        const g = clamp((S.day - gd) / 2.5, 0, 1), L = 6 + 22 * g;
+        h += `<path d="M${x.toFixed(1)} ${(y + 2).toFixed(1)}q${(4 + 3 * hash(j, i)).toFixed(1)} ${(L * 0.5).toFixed(1)} ${(L * 0.7).toFixed(1)} ${(L * 0.55).toFixed(1)}" stroke="#f4f0e2" stroke-width="2" fill="none" stroke-linecap="round"/>`;
+        if (g > 0.5) h += `<path d="M${x.toFixed(1)} ${(y - 3).toFixed(1)}q-2 ${(-10 * g).toFixed(1)} -6 ${(-14 * g).toFixed(1)}" stroke="#5fc46e" stroke-width="2.2" fill="none" stroke-linecap="round"/>`;
+      }
+      h += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rs.toFixed(1)}" fill="${d.water && S.day > 0.4 ? '#c9cf86' : '#b9b06a'}" stroke="${INK}" stroke-width="1.1"/><path d="M${(x - rs * 0.4).toFixed(1)} ${(y - rs * 0.35).toFixed(1)}a${(rs * 0.5).toFixed(1)} ${(rs * 0.4).toFixed(1)} 0 0 1 ${(rs * 0.6).toFixed(1)} -0.6" stroke="#fff" stroke-opacity=".45" stroke-width="1" fill="none"/>`;
+    }
+    if (!d.light) h += `<path d="M${cx - DRX - 8} ${DY + 4}V${DY - DRY - 6}Q${cx - DRX - 8} ${DY - DRY - 10} ${cx - DRX - 4} ${DY - DRY - 10}H${cx + DRX + 4}Q${cx + DRX + 8} ${DY - DRY - 10} ${cx + DRX + 8} ${DY - DRY - 6}V${DY + 4}" fill="#05070b" fill-opacity=".45" stroke="#56627d" stroke-width="1.4" stroke-dasharray="5 4"/>`;
+    if (S.day >= DAYS) h += `<text x="${cx}" y="${DY + DRY + 18}" font-size="11" fill="#86e0a8" text-anchor="middle">проросло ${r.k} из ${r.n}</text>`;
+    // condition toggles on the bench front
+    [['water', d.water ? 'вода' : 'сухо', d.water], ['light', d.light ? 'свет' : 'темно', d.light], ['warm', d.warm ? '22 °C' : '4 °C', d.warm]].forEach(([k, lab, on], q) => {
+      const bx = cx - 90 + q * 62;
+      h += `<g data-drag="tg-${j}-${k}"><rect x="${bx}" y="366" width="58" height="31" rx="8" fill="${on ? '#26324a' : '#121a28'}" stroke="${on ? '#72d4e8' : '#56627d'}" stroke-width="1.4"/>`;
+      h += `<text x="${bx + 29}" y="386" font-size="12" fill="${on ? '#e8ecf4' : '#8b96ad'}" text-anchor="middle">${lab}</text></g>`;
+    });
+  });
+  return h;
+}
+
+function hlBox(id) {
+  return {
+    aquarium: [AQ.x - 6, AQ.y - 8, AQ.w + 12, AQ.h + 12], fish: (() => { const p = fishPos(performance.now()); return [p.x - 68, p.y - 34, 136, 68]; })(),
+    thermo: [380, 186, 26, 132], heater: [72, 172, 24, 156], watch: [WATCH.x - 34, WATCH.y - 46, 68, 92],
+    eyepiece: [120, 90, 40, 36], tube: [124, 118, 32, 36], revolver: [100, 144, 80, 30], objective: [124, 162, 44, 66], stage: [60, 224, 158, 26],
+    coarse: [22, 184, 38, 36], fine: [28, 225, 24, 24], lamp: [118, 316, 44, 28], dia: [106, 246, 70, 26], arm: [24, 136, 104, 224], view: [VC.x - VC.r - 6, VC.y - VC.r - 6, 2 * VC.r + 12, 2 * VC.r + 12],
+    dishA: [DISH[0].cx - DRX - 10, DY - DRY - 44, 2 * DRX + 20, 2 * DRY + 60], dishB: [DISH[1].cx - DRX - 10, DY - DRY - 44, 2 * DRX + 20, 2 * DRY + 60],
+    toggles: [DISH[0].cx - 96, 362, DISH[1].cx - DISH[0].cx + 192, 38], seeds: [DISH[0].cx - 40, DY - 26, 80, 52],
+  }[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID(), m = model();
+  let h = bench();
+  if (id === 'observe') h += aquariumSVG(t, m);
+  else if (id === 'micro') h += microSVG(m) + viewSVG(m);
+  else h += dishesSVG(t, m);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}" pointer-events="none"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// fit the scene: 520 × 405 units, centred, bench at the bottom
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 500, hh / 410, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 405 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer: taps and drags ----------
+let drag = null, dirty = true, warned40 = false;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  const p = toSvg(e);
+  drag = { id: el.dataset.drag, x: e.clientX, y: e.clientY, p0: p, last: p, moved: false };
+  warned40 = false;
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 5) drag.moved = true;
+  if (!drag.moved) return;
+  const p = toSvg(e), dx = p.x - drag.last.x, dy = p.y - drag.last.y; drag.last = p;
+  const id = drag.id;
+  if (LID() !== 'micro') return;
+  const k = 2 * VC.r / (FN / S.obj);
+  if (id === 'view') { S.sx = clamp(S.sx - dx / k, -12, 12); S.sy = clamp(S.sy - dy / k, -8, 8); }
+  else if (id === 'slide') S.sx = clamp(S.sx + dx / SLIDE_K, -12, 12);
+  else if (id === 'coarse') { S.coarse = clamp(S.coarse - dy * 0.25, 0, 100); if (S.obj === 40 && !warned40) { warned40 = true; toast('На объективе 40× крутят только микровинт: так можно раздавить препарат.'); } }
+  else if (id === 'fine') S.fine = clamp(S.fine - dy * 0.01, -2, 2);
+  else if (id === 'dia') S.dia = clamp(S.dia + dx / 44, 0, 1);
+  else return;
+  update();
+});
+const endDrag = cancel => {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing');
+  if (cancel || d.moved) { dirty = true; return; }
+  const id = d.id;
+  if (id === 'fish') tapFish();
+  else if (id === 'watch') startTrial();
+  else if (id === 'heater' || id === 'thermo') toast(`Температура воды ${S.T} °C. Меняйте её кнопками «−1 °C» и «+1 °C».`);
+  else if (id === 'lamp') act('lamp');
+  else if (id === 'view') viewClick(d.p0);
+  else if (id === 'coarse' || id === 'fine') toast('Крутите винт: тащите его вверх или вниз.');
+  else if (id === 'dia') toast('Тащите рычажок вбок: так открывается и закрывается диафрагма.');
+  else if (id.startsWith('tg-')) { const [, j, k] = id.split('-'); toggleDish(+j, k); }
+  dirty = true;
+};
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+function toggleDish(j, k) {
+  if (S.day > 0) { toast('Опыт уже идёт. Нажмите «Новый опыт», чтобы поменять условия.'); return; }
+  S.dishes[j][k] = !S.dishes[j][k]; S.answer = null; update();
+}
+function setN(n, j) {
+  if (S.day > 0) { toast('Опыт уже идёт. Нажмите «Новый опыт», чтобы поменять условия.'); return; }
+  if (j === undefined) S.dishes.forEach(d => d.n = n); else S.dishes[j].n = n;
+  S.answer = null; renderTools(); buildScheme(); update();
+}
+function runDays() {
+  if (S.day > 0) return;
+  S.running = true; S.answer = null;
+  if (reduce) { S.day = DAYS; S.running = false; }
+  renderTools(); update();
+}
+function answer(a) {
+  const m = model(); if (!m.finished) { toast('Сначала подождите 5 дней.'); return; }
+  S.answer = a;
+  const wet = m.res[S.dishes[0].water ? 0 : 1], dry = m.res[S.dishes[0].water ? 1 : 0];
+  if (m.valid) {
+    if (a === 'yes') toast('Верно: гипотеза подтвердилась.');
+    else if (a === 'no') toast(`Посмотрите ещё раз: с водой проросло ${wet.k} из ${wet.n}, без воды — ${dry.k}. Что это значит?`);
+    else toast('Опыт честный: чашки отличаются только водой, семян поровну и достаточно.');
+  } else {
+    if (a === 'unfair') toast('Верно, по такому опыту вывод делать нельзя. Исправьте условия и повторите.');
+    else toast('Так вывод делать нельзя: ' + m.issues[0] + '.');
+  }
+  renderTools(); update();
+}
+
+let last = performance.now();
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  const id = LID();
+  let anim = false;
+  if (id === 'observe') { anim = true; if (S.trial && t - S.trial.t0 >= TRIAL * 1000) finishTrial(); else if (S.trial && Math.floor(t / 250) !== S.trialTick) { S.trialTick = Math.floor(t / 250); const mm = model(); renderMeter(mm); $('#taskState').textContent = taskState(mm); } }
+  if (id === 'micro') { const tg = S.stained ? 1 : 0; if (S.stain !== tg) { S.stain = reduce ? tg : clamp(S.stain + (tg - S.stain > 0 ? 1 : -1) * dt * 1.2, 0, 1); anim = true; } }
+  if (id === 'plan' && S.running) {
+    S.day = Math.min(DAYS, S.day + dt * 2); anim = true;
+    if (Math.floor(S.day * 4) !== S.dayTick) { S.dayTick = Math.floor(S.day * 4); renderMeter(model()); }
+    if (S.day >= DAYS) { S.running = false; renderTools(); update(); toast('Прошло 5 дней. Сравните чашки и сделайте вывод.'); }
+  }
+  if (S.hl) anim = true;
+  if (dirty || anim) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2800); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  if (id === 'observe') tb.innerHTML = B('start', S.trial ? 'Идёт счёт…' : 'Старт 15 с', !!S.trial) + B('tap', '+1 движение') + sep + B('cold', '−1 °C') + B('hot', '+1 °C') + sep + B('clear', 'Стереть записи');
+  else if (id === 'micro') tb.innerHTML = OBJS.map(o => B('o' + o, o + '×', S.obj === o)).join('') + sep + B('lamp', 'Свет', S.lamp) + B('iod', 'Йод', S.stained) + sep + B('cm', 'Макро −') + B('cp', 'Макро +') + B('fm', 'Микро −') + B('fp', 'Микро +');
+  else {
+    const n = S.dishes[0].n === S.dishes[1].n ? S.dishes[0].n : 0;
+    if (S.day >= DAYS) tb.innerHTML = B('a-yes', 'Вода нужна', S.answer === 'yes') + B('a-no', 'Не нужна', S.answer === 'no') + B('a-unfair', 'Опыт нечестный', S.answer === 'unfair') + sep + B('new', 'Новый опыт');
+    else tb.innerHTML = [1, 10, 20].map(k => B('n' + k, k + ' ' + plural(k, 'семя', 'семени', 'семян'), n === k)).join('') + sep + B('run', S.running ? 'Идут дни…' : 'Ждать 5 дней', S.running) + B('new', 'Новый опыт');
+  }
+}
+function act(a) {
+  const id = LID();
+  if (a === 'start') return startTrial();
+  if (a === 'tap') return tapFish();
+  if (a === 'cold') return setTemp(S.T - 1);
+  if (a === 'hot') return setTemp(S.T + 1);
+  if (a === 'clear') { if (S.trial) return toast('Дождитесь конца счёта.'); S.trials = []; update(); return; }
+  if (/^o\d+$/.test(a)) { const o = +a.slice(1); if (o !== S.obj) { if (o === 40 && !model().centered) toast('Сначала поставьте кожицу в центр на малом увеличении — на 40× её трудно найти.'); S.obj = o; renderTools(); buildScheme(); update(); } return; }
+  if (a === 'lamp') { S.lamp = !S.lamp; renderTools(); buildScheme(); update(); return; }
+  if (a === 'iod') { if (S.stained) return toast('Препарат уже окрашен.'); S.stained = true; toast('Капнули раствор йода: ядра стали заметнее.'); renderTools(); buildScheme(); update(); return; }
+  if (a === 'cm' || a === 'cp') { S.coarse = clamp(S.coarse + (a === 'cp' ? 2 : -2), 0, 100); if (S.obj === 40) toast('На 40× лучше крутить микровинт.'); update(); return; }
+  if (a === 'fm' || a === 'fp') { S.fine = clamp(Math.round((S.fine + (a === 'fp' ? 0.1 : -0.1)) * 100) / 100, -2, 2); update(); return; }
+  if (/^n\d+$/.test(a)) return setN(+a.slice(1));
+  if (a === 'run') return runDays();
+  if (a === 'new') { S.day = 0; S.running = false; S.answer = null; renderTools(); update(); return; }
+  if (a.startsWith('a-')) return answer(a.slice(2));
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  aquarium: IC('<rect x="4" y="8" width="26" height="20" fill="#3a8fc0" opacity=".35" stroke="var(--fg)" stroke-width="1.5"/><path d="M8 26q-2-8 1-14M26 26q2-7-1-12" stroke="#3fae6a" stroke-width="1.6" fill="none"/>'),
+  fish: IC('<path d="M5 17q7-8 16-6q6 2 8 6q-2 4-8 6q-9 2-16-6z" fill="#f39a3c"/><path d="M5 17l-3-5v10z" fill="#f08a2c"/><path d="M20 12q-2 5 0 10" stroke="#a5521a" stroke-width="1.6" fill="none"/><circle cx="25" cy="15" r="1.4" fill="#04070d"/>'),
+  thermo: IC('<path d="M14 4h6v19a5 5 0 1 1-6 0z" fill="none" stroke="var(--fg)" stroke-width="1.5"/><path d="M16 12h2v13h-2z" fill="#e2394b"/><circle cx="17" cy="27" r="3" fill="#e2394b"/>'),
+  heater: IC('<rect x="13" y="4" width="8" height="26" rx="4" fill="none" stroke="var(--fg)" stroke-width="1.5"/><rect x="15" y="11" width="4" height="15" rx="2" fill="#ff7a3c"/>'),
+  watch: IC('<circle cx="17" cy="19" r="11" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M14 4h6M17 19V12" stroke="var(--force)" stroke-width="1.8" stroke-linecap="round"/>'),
+  eyepiece: IC('<rect x="10" y="4" width="14" height="10" rx="1" fill="var(--muted)"/><rect x="13" y="14" width="8" height="16" fill="none" stroke="var(--fg)" stroke-width="1.4"/>'),
+  tube: IC('<rect x="12" y="3" width="10" height="28" fill="none" stroke="var(--fg)" stroke-width="1.5"/>'),
+  revolver: IC('<path d="M5 9h24l-4 7H9z" fill="var(--muted)"/><path d="M15 16h4v12h-4zM7 15l-3 9M27 15l3 9" stroke="var(--fg)" stroke-width="1.5"/>'),
+  objective: IC('<path d="M12 4h10v20l-2 5h-6l-2-5z" fill="none" stroke="var(--fg)" stroke-width="1.5"/><rect x="12" y="11" width="10" height="3" fill="#2179bb"/>'),
+  stage: IC('<rect x="3" y="16" width="28" height="5" fill="var(--muted)"/><rect x="9" y="13" width="16" height="2.4" fill="#c8d6ec"/><path d="M6 14h6M22 14h6" stroke="var(--fg)" stroke-width="1.6"/>'),
+  coarse: IC('<circle cx="17" cy="17" r="11" fill="none" stroke="var(--fg)" stroke-width="1.8"/><path d="M17 17l8-5" stroke="var(--fg)" stroke-width="1.8"/>'),
+  fine: IC('<circle cx="17" cy="17" r="6" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M17 17l4-3" stroke="var(--force)" stroke-width="1.6"/>'),
+  lamp: IC('<circle cx="17" cy="20" r="6" fill="#ffe08a"/><path d="M17 4v6M7 9l4 4M27 9l-4 4" stroke="#ffe08a" stroke-width="1.6"/>'),
+  dia: IC('<circle cx="17" cy="17" r="11" fill="none" stroke="var(--fg)" stroke-width="1.5"/><circle cx="17" cy="17" r="4" fill="#ffe08a"/><path d="M17 6l3 7M28 17l-7 3M17 28l-3-7M6 17l7-3" stroke="var(--muted)" stroke-width="1.3"/>'),
+  arm: IC('<path d="M8 30h20M12 30V18q0-9 9-13" stroke="var(--fg)" stroke-width="2.2" fill="none" stroke-linecap="round"/>'),
+  view: IC('<circle cx="17" cy="17" r="13" fill="#f1efe6"/><path d="M5 12h24M5 20h24M12 4v8M22 12v8M14 20v9" stroke="#7a5a14" stroke-width="1"/><circle cx="17" cy="16" r="2" fill="#6b3f0c"/>'),
+  dish: IC('<ellipse cx="17" cy="20" rx="14" ry="7" fill="none" stroke="var(--fg)" stroke-width="1.5"/><ellipse cx="17" cy="20" rx="11" ry="5" fill="#7f9fbc" opacity=".55"/><circle cx="13" cy="20" r="2" fill="#c9cf86"/><circle cx="20" cy="19" r="2" fill="#c9cf86"/>'),
+  seeds: IC('<circle cx="11" cy="20" r="4" fill="#c9cf86"/><path d="M11 23q2 5 7 6" stroke="#f4f0e2" stroke-width="1.6" fill="none"/><path d="M11 16q-1-6-4-8" stroke="#5fc46e" stroke-width="1.8" fill="none"/><circle cx="24" cy="21" r="4" fill="#b9b06a"/>'),
+  toggles: IC('<rect x="3" y="11" width="12" height="12" rx="3" fill="none" stroke="#72d4e8" stroke-width="1.4"/><rect x="19" y="11" width="12" height="12" rx="3" fill="none" stroke="var(--muted)" stroke-width="1.4"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (L.id === 'observe') {
+    if (m.trial) return `Идёт счёт: ${m.trial.taps} · осталось ${Math.ceil(m.left)} с`;
+    const temps = [...new Set(S.trials.filter(t => t.ok).map(t => t.T))];
+    return temps.length ? `Точных замеров: при ${temps.join(', ')} °C · нужен ещё один (разница ≥ 4 °C)` : `Вода ${m.T} °C · замеров пока нет`;
+  }
+  if (L.id === 'micro') {
+    if (!S.lamp) return 'Темно: включите свет';
+    if (!m.centered) return `${m.mag}× · в центре пустое стекло — найдите кожицу`;
+    if (!m.sharp) return `${m.mag}× · картинка размыта — крутите винты`;
+    if (!m.lit) return `${m.mag}× · темновато — откройте диафрагму`;
+    if (S.obj !== 40) return `${m.mag}× · резко. Нужно 400×`;
+    if (!S.stained) return '400× · резко. Ядра плохо видны — окрасьте йодом';
+    return '400× · резко, окрашено. Нажмите на ядро';
+  }
+  if (m.finished) return m.answer ? 'Вывод не тот — подумайте ещё' : 'Прошло 5 дней · сделайте вывод';
+  if (S.running) return `Идёт день ${Math.min(DAYS, Math.floor(m.day) + 1)} из ${DAYS}`;
+  return m.valid ? 'Опыт честный · можно ждать 5 дней' : `Пока: ${m.issues[0]}`;
+}
+
+// Scheme tab: built once per lesson, then values refreshed (sliders keep focus while dragging)
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'observe') h = `<h2>Дыхание и температура</h2><div id="sDiag"></div><p class="note" style="margin-top:8px">Точки — ваши замеры: число движений за 15 с × 4. Зелёные — точные (ошибка не больше 2).</p>
+      <dl class="reads"><div><dt>Вода</dt><dd id="r1"></dd></div><div><dt>Счёт</dt><dd id="r2"></dd></div><div><dt>Замеров</dt><dd id="r3"></dd></div></dl>` +
+      slider('inT', 'Температура воды', TMIN, TMAX, 1, S.T) +
+      `<div class="row"><button class="ghostbtn" data-a="start">Старт 15 с</button><button class="ghostbtn" data-a="tap">+1 движение</button></div>`;
+  if (id === 'micro') h = `<h2>Настройка микроскопа</h2>
+      <dl class="reads"><div><dt>Увеличение</dt><dd id="r1"></dd></div><div><dt>Поле зрения</dt><dd id="r2"></dd></div><div><dt>Резкость</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Объектив</div><div class="chips" id="objChips">${OBJS.map(o => `<button data-o="${o}" aria-pressed="${S.obj === o}">${o}×</button>`).join('')}</div></div>
+      <div class="ctl"><div class="lbl">Свет и окраска</div><div class="chips"><button data-a="lamp" aria-pressed="${S.lamp}">Лампа</button><button data-a="iod" aria-pressed="${S.stained}">Капнуть йод</button></div></div>` +
+      slider('inDia', 'Диафрагма', 0, 1, 0.01, S.dia) + slider('inCoarse', 'Макровинт', 0, 100, 0.5, S.coarse) + slider('inFine', 'Микровинт', -2, 2, 0.05, S.fine) +
+      slider('inSx', 'Стекло влево-вправо', -12, 12, 0.1, S.sx) + slider('inSy', 'Стекло вперёд-назад', -8, 8, 0.1, S.sy);
+  if (id === 'plan') {
+    h = `<h2>Условия опыта</h2><div id="sDiag"></div>`;
+    S.dishes.forEach((d, j) => {
+      h += `<div class="dish-h">Чашка ${'АБ'[j]}</div><div class="chips" data-d="${j}"><button data-k="water" aria-pressed="${d.water}">Вода</button><button data-k="light" aria-pressed="${d.light}">Свет</button><button data-k="warm" aria-pressed="${d.warm}">Тепло 22 °C</button></div>
+        <div class="chips" data-dn="${j}">${[1, 5, 10, 20].map(k => `<button data-n="${k}" aria-pressed="${d.n === k}">${k} ${plural(k, 'семя', 'семени', 'семян')}</button>`).join('')}</div>`;
+    });
+    h += `<div class="row"><button class="ghostbtn" data-a="run">Ждать 5 дней</button><button class="ghostbtn" data-a="new">Новый опыт</button></div>`;
+  }
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn); };
+  on('#inT', e => setTemp(+e.target.value));
+  on('#inDia', e => { S.dia = +e.target.value; update(); });
+  on('#inCoarse', e => { S.coarse = +e.target.value; update(); });
+  on('#inFine', e => { S.fine = +e.target.value; update(); });
+  on('#inSx', e => { S.sx = +e.target.value; update(); });
+  on('#inSy', e => { S.sy = +e.target.value; update(); });
+  el.querySelectorAll('#objChips button').forEach(b => b.onclick = () => act('o' + b.dataset.o));
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => { act(b.dataset.a); buildScheme(); renderPanes(model()); });
+  el.querySelectorAll('[data-d] button').forEach(b => b.onclick = () => { toggleDish(+b.parentNode.dataset.d, b.dataset.k); buildScheme(); renderPanes(model()); });
+  el.querySelectorAll('[data-dn] button').forEach(b => b.onclick = () => setN(+b.dataset.n, +b.parentNode.dataset.dn));
+}
+function chartSVG() {
+  const X = T => 14 + (T - 14) * 6.9, Y = r => 62 - r * 0.42;
+  let h = `<svg class="diag" viewBox="0 0 120 74" role="img" aria-label="Число движений жабр в минуту при разной температуре">`;
+  h += `<rect x="14" y="4" width="103" height="58" fill="none" stroke="#26324a" stroke-width=".5"/>`;
+  for (const r of [0, 60, 120]) h += `<text x="12" y="${Y(r) + 1.3}" font-size="3.4" fill="#8b96ad" text-anchor="end">${r}</text><path d="M14 ${Y(r)}H117" stroke="#26324a" stroke-width=".3"/>`;
+  for (const T of [16, 20, 24, 28]) h += `<text x="${X(T)}" y="67" font-size="3.4" fill="#8b96ad" text-anchor="middle">${T}</text>`;
+  h += `<text x="117" y="72" font-size="3.2" fill="#8b96ad" text-anchor="end">температура, °C</text><text x="16" y="8.5" font-size="3.2" fill="#8b96ad">в минуту</text>`;
+  S.trials.forEach(t => { h += `<circle cx="${X(t.T).toFixed(2)}" cy="${Y(t.taps * 4).toFixed(2)}" r="1.6" fill="${t.ok ? '#86e0a8' : '#ff8a73'}" stroke="#04070d" stroke-width=".3"/>`; });
+  h += `<path d="M${X(S.T)} 4V62" stroke="#ffb547" stroke-width=".5" stroke-dasharray="1.5 1.5"/>`;
+  return h + `</svg>`;
+}
+function seedBars(m) {
+  let h = `<svg class="diag" viewBox="0 0 120 34" role="img" aria-label="Сколько семян проросло в каждой чашке">`;
+  m.res.forEach((r, j) => {
+    const y = 6 + j * 14, w = r.n ? r.k / r.n * 70 : 0;
+    h += `<text x="2" y="${y + 5}" font-size="3.8" fill="#8b96ad">Чашка ${'АБ'[j]}</text><rect x="24" y="${y}" width="70" height="7" rx="1" fill="#1a2438"/><rect x="24" y="${y}" width="${w.toFixed(2)}" height="7" rx="1" fill="#5fc46e"/>`;
+    h += `<text x="97" y="${y + 5.2}" font-size="3.8" fill="#e8ecf4">${r.k} из ${r.n}</text>`;
+  });
+  return h + `</svg>`;
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (id === 'observe') {
+    const d = el.querySelector('#sDiag'); if (d) d.innerHTML = chartSVG();
+    set('#r1', S.T + ' °C'); set('#r2', m.trial ? String(m.trial.taps) : '—'); set('#r3', String(S.trials.length));
+    set('#inTO', S.T + ' °C'); val('#inT', S.T);
+  }
+  if (id === 'micro') {
+    set('#r1', m.mag + '×'); set('#r2', fmt(m.fov, 2) + ' мм'); set('#r3', m.sharp ? 'да' : 'нет');
+    set('#inDiaO', Math.round(S.dia * 100) + ' %'); set('#inCoarseO', fmt(S.coarse, 1)); set('#inFineO', (S.fine > 0 ? '+' : '') + fmt(S.fine, 2));
+    set('#inSxO', fmt(S.sx, 1) + ' мм'); set('#inSyO', fmt(S.sy, 1) + ' мм');
+    val('#inDia', S.dia); val('#inCoarse', S.coarse); val('#inFine', S.fine); val('#inSx', S.sx); val('#inSy', S.sy);
+  }
+  if (id === 'plan') { const d = el.querySelector('#sDiag'); if (d) d.innerHTML = seedBars(m) + `<p class="note" style="margin-top:8px">День ${fmt(Math.min(m.day, DAYS), 0)} из ${DAYS}. Результат появляется по мере прорастания.</p>`; }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'observe') return [
+    { id: 'aquarium', icon: ICON.aquarium, name: 'Аквариум', spec: 'Около 60 литров воды, грунт и растения. Рыбе в нём спокойно, поэтому она ведёт себя как обычно.' },
+    { id: 'fish', icon: ICON.fish, name: 'Золотая рыбка и жаберные крышки', spec: 'Вода входит через рот, омывает жабры и выходит из-под жаберных крышек. Одно поднятие крышки — одно «дыхание».' },
+    { id: 'thermo', icon: ICON.thermo, name: 'Термометр', spec: `Показывает температуру воды. Сейчас ${S.T} °C. Золотым рыбкам удобно от 16 до 24 °C.` },
+    { id: 'heater', icon: ICON.heater, name: 'Нагреватель', spec: 'Греет воду и держит заданную температуру. Чем теплее, тем ярче светится.' },
+    { id: 'watch', icon: ICON.watch, name: 'Секундомер', spec: 'Отсчитывает ровно 15 секунд. Без точного времени счёт ничего не значит.' }];
+  if (id === 'micro') return [
+    { id: 'eyepiece', icon: ICON.eyepiece, name: 'Окуляр', spec: 'Линза, в которую смотрят глазом. Увеличивает в 10 раз.' },
+    { id: 'tube', icon: ICON.tube, name: 'Тубус', spec: 'Трубка, которая держит окуляр и объективы на нужном расстоянии.' },
+    { id: 'revolver', icon: ICON.revolver, name: 'Револьвер', spec: 'Вращается, чтобы сменить объектив. Щелчок — объектив встал на место.' },
+    { id: 'objective', icon: ICON.objective, name: 'Объективы 4×, 10×, 40×', spec: 'Линзы над препаратом. Чем больше увеличение, тем длиннее объектив и тем ближе он к стеклу.' },
+    { id: 'stage', icon: ICON.stage, name: 'Предметный столик и зажимы', spec: 'На столик кладут предметное стекло с препаратом, зажимы держат его.' },
+    { id: 'coarse', icon: ICON.coarse, name: 'Макровинт', spec: 'Грубая наводка на резкость: быстро поднимает и опускает тубус.' },
+    { id: 'fine', icon: ICON.fine, name: 'Микровинт', spec: 'Точная наводка. На большом объективе пользуются только им.' },
+    { id: 'dia', icon: ICON.dia, name: 'Диафрагма', spec: 'Открывается и закрывается, как зрачок, и регулирует, сколько света идёт к препарату.' },
+    { id: 'lamp', icon: ICON.lamp, name: 'Осветитель', spec: 'Лампа под столиком. В старых микроскопах вместо неё зеркало, которое ловит свет из окна.' },
+    { id: 'arm', icon: ICON.arm, name: 'Штатив', spec: 'Основание и ручка. Микроскоп переносят двумя руками: одна держит штатив, другая — основание.' },
+    { id: 'view', icon: ICON.view, name: 'Поле зрения', spec: 'Круг, который видно в окуляр. Кожица лука: клетки похожи на кирпичики, в каждой — ядро.' }];
+  return [
+    { id: 'dishA', icon: ICON.dish, name: 'Чашка Петри А', spec: 'Плоская стеклянная чашка с фильтровальной бумагой. В ней раскладывают семена.' },
+    { id: 'dishB', icon: ICON.dish, name: 'Чашка Петри Б', spec: 'Вторая такая же чашка. Одна из двух станет контрольной.' },
+    { id: 'seeds', icon: ICON.seeds, name: 'Семена гороха', spec: 'Проросшее семя выпускает белый корешок, потом зелёный росток. Не каждое семя живое.' },
+    { id: 'toggles', icon: ICON.toggles, name: 'Условия', spec: 'Вода (мокрая или сухая бумага), свет (на окне или в коробке) и температура (комната 22 °C или холодильник 4 °C).' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      `<div class="safe"><b>Безопасность</b>${L.safe}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>${L.id === 'micro' ? 'Устройство микроскопа' : 'Оборудование'}</h2><p class="note">Нажмите на деталь, чтобы найти её на столе.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'observe') {
+    let h = `<h2>Считаем дыхание</h2><div class="formula">в минуту = за 15 с × 4</div><p class="note">15 секунд — это четверть минуты, поэтому счёт умножаем на 4.</p>`;
+    if (S.trials.length) {
+      h += `<h3>Ваши замеры</h3><table class="tbl"><tr><th>Вода</th><th>Насчитали</th><th>В минуту</th><th>Было</th></tr>` +
+        S.trials.map(t => `<tr><td class="m">${t.T} °C</td><td class="m">${t.taps}</td><td class="m">${t.taps} × 4 = ${t.taps * 4}</td><td class="m ${t.ok ? 'ok' : 'bad'}">${t.real}</td></tr>`).join('') + `</table>`;
+    } else h += `<p class="note">Запустите секундомер и считайте — здесь появится таблица замеров.</p>`;
+    if (m.pairT) {
+      const [a, b] = m.pairT;
+      h += `<h3>Сравнение</h3><div class="steps">` + step(`${a.T} °C`, `${a.taps * 4} в минуту`) + step(`${b.T} °C`, `${b.taps * 4} в минуту`) +
+        step('разница', `${b.taps * 4 - a.taps * 4 > 0 ? '+' : ''}${b.taps * 4 - a.taps * 4} в минуту`, 'sum') + `</div>
+        <p class="note" style="margin-top:10px">В тёплой воде меньше растворённого кислорода, а обмен веществ у рыбы идёт быстрее. Ей приходится чаще прокачивать воду через жабры.</p>`;
+    }
+    h += `<h3>Что мы делали</h3><div class="steps">` + step('Считали, ничего не меняя', 'наблюдение') + step('Меняли температуру и считали снова', 'эксперимент') +
+      step('Что меняли', 'температуру воды') + step('Что измеряли', 'частоту дыхания') + step('Всё остальное', 'та же рыба, тот же аквариум', 'sum') + `</div>`;
+    return h;
+  }
+  if (id === 'micro') {
+    const cells = m.fov / CELL.L;
+    return `<h2>Увеличение и размеры</h2><div class="formula">Увеличение = окуляр × объектив</div><h3>Сейчас</h3><div class="steps">` +
+      step('увеличение', `${OCU} × ${S.obj} = ${m.mag}×`) + step('поле зрения ≈ 18 мм / объектив', `18 / ${S.obj} = ${fmt(m.fov, 2)} мм`) +
+      step('клеток лука поперёк поля', `${fmt(m.fov, 2)} / 0,25 ≈ ${fmt(cells, 0)}`) + step('длина клетки', '≈ 0,25 мм = 250 мкм') +
+      step('в окуляре она кажется', `0,25 × ${m.mag} = ${fmt(0.25 * m.mag, 0)} мм`, 'sum') + `</div>
+      <p class="note" style="margin-top:10px">1 мм = 1000 мкм (микрометров). Ядро клетки лука — около 20 мкм, поэтому его видно только на большом увеличении.</p>
+      <h3>Порядок работы</h3><div class="steps">` +
+      step('1. Свет', S.lamp ? (m.lit ? 'хватает ✓' : 'мало — откройте диафрагму') : 'выключен') + step('2. Объект в центре', m.centered ? 'да ✓' : 'нет') +
+      step('3. Резкость', m.sharp ? 'да ✓' : 'нет — крутите винт') + step('4. Окраска йодом', S.stained ? 'да ✓' : 'нет') + step('5. Объектив', `${S.obj}× → нужен 40×`, 'sum') + `</div>`;
+  }
+  const lab = j => { const d = S.dishes[j]; return `${d.water ? 'вода' : 'сухо'}, ${d.light ? 'свет' : 'темно'}, ${d.warm ? '22 °C' : '4 °C'}, ${d.n} ${plural(d.n, 'семя', 'семени', 'семян')}`; };
+  let h = `<h2>Честный опыт</h2><div class="formula">всхожесть = проросло / всего × 100 %</div><h3>Условия</h3><div class="steps">` +
+    step('Чашка А', lab(0)) + step('Чашка Б', lab(1)) + `</div><h3>Проверка опыта</h3><div class="steps">`;
+  const [A, B] = S.dishes;
+  h += step('вода отличается', A.water !== B.water ? 'да ✓' : 'нет ✗') + step('свет одинаковый', A.light === B.light ? 'да ✓' : 'нет ✗') +
+    step('температура одинаковая', A.warm === B.warm ? 'да ✓' : 'нет ✗') + step('семян поровну и ≥ 10', A.n === B.n && A.n >= 10 ? 'да ✓' : 'нет ✗') +
+    step('итог', m.valid ? 'опыт честный' : 'опыт нечестный', 'sum') + `</div>`;
+  if (m.finished) {
+    h += `<h3>Результат через 5 дней</h3><div class="steps">` + m.res.map((r, j) => step(`Чашка ${'АБ'[j]}`, `${r.k} / ${r.n} × 100 % = ${fmt(r.n ? r.k / r.n * 100 : 0, 0)} %`)).join('') + `</div>
+      <p class="note" style="margin-top:10px">Сравните чашки. Если опыт честный, разница может быть только из-за того условия, которое меняли.</p>`;
+  } else h += `<p class="note" style="margin-top:10px">Результат появится, когда пройдут 5 дней.</p>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const el = $('#meter');
+  if (m.kind === 'fish') {
+    el.innerHTML = `<div class="k">Секундомер</div><div class="v ${m.trial ? '' : 'ok'}">${m.trial ? '0:' + String(Math.ceil(m.left)).padStart(2, '0') : '0:15'}</div>
+      <div class="lr"><span>счёт</span><span>${m.trial ? m.trial.taps : '—'}</span></div><div class="lr"><span>вода</span><span>${m.T} °C</span></div>`;
+  } else if (m.kind === 'micro') {
+    el.innerHTML = `<div class="k">Микроскоп</div><div class="v ${m.found ? 'ok' : ''}">${m.mag}×</div>
+      <div class="lr"><span>поле</span><span>${fmt(m.fov, 2)} мм</span></div><div class="lr"><span>резкость</span><span>${m.sharp ? 'да' : 'нет'}</span></div>
+      <div class="gauge"><b style="width:${(m.bright * 100).toFixed(0)}%;background:#ffe08a"></b><i style="left:${(NEED[S.obj] * 100).toFixed(0)}%"></i></div><div class="lr"><span>свет</span><span>${Math.round(m.bright * 100)} %</span></div>`;
+  } else {
+    el.innerHTML = `<div class="k">Опыт</div><div class="v ${m.finished ? 'ok' : ''}">день ${fmt(Math.min(m.day, DAYS), 0)} из ${DAYS}</div>` +
+      m.res.map((r, j) => `<div class="lr"><span>чашка ${'АБ'[j]}</span><span>${r.k}/${r.n}</span></div>`).join('');
+  }
+}
+
+function update() {
+  const m = model(), L = LESSONS[S.lesson];
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Вы настоящий исследователь!'), 1400);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  observe: '<rect x="8" y="5" width="50" height="22" fill="#3a8fc0" opacity=".3" stroke="#e8ecf4" stroke-width="1"/><path d="M22 16q6-6 14-4q4 2 6 4q-2 2-6 4q-8 2-14-4z" fill="#f39a3c"/><path d="M22 16l-4-4v8z" fill="#f08a2c"/><path d="M36 12q-2 4 0 8" stroke="#d6283a" stroke-width="1.2" fill="none"/>',
+  micro: '<path d="M14 26h18M18 26V16q0-7 6-9" stroke="#e8ecf4" stroke-width="1.6" fill="none"/><rect x="22" y="3" width="5" height="12" fill="#8b96ad"/><rect x="16" y="18" width="16" height="2" fill="#56627d"/><circle cx="48" cy="15" r="11" fill="#f1efe6"/><path d="M37 11h22M37 18h22M44 4v7M52 11v7" stroke="#7a5a14" stroke-width=".8"/><circle cx="47" cy="14.5" r="1.4" fill="#6b3f0c"/>',
+  plan: '<ellipse cx="18" cy="17" rx="13" ry="6" fill="#7f9fbc" opacity=".6" stroke="#e8ecf4" stroke-width="1"/><ellipse cx="48" cy="17" rx="13" ry="6" fill="#d9cfb8" opacity=".7" stroke="#e8ecf4" stroke-width="1"/><circle cx="15" cy="17" r="2" fill="#c9cf86"/><path d="M15 18q2 4 6 4" stroke="#f4f0e2" stroke-width="1" fill="none"/><circle cx="21" cy="16" r="2" fill="#c9cf86"/><circle cx="45" cy="17" r="2" fill="#b9b06a"/><circle cx="51" cy="16" r="2" fill="#b9b06a"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i];
+  S.lesson = i; S.hl = null; drag = null;
+  // lesson 1
+  S.T = LESSONS[0].T; S.ph0 = 0.3; S.phT = performance.now(); S.trial = null; S.trials = []; S.tapFx = 0;
+  // lesson 2
+  const M = LESSONS[1]; Object.assign(S, { obj: M.obj, lamp: M.lamp, dia: M.dia, coarse: M.coarse, fine: M.fine, sx: M.sx, sy: M.sy, stained: false, stain: 0, found: false, lastHit: null });
+  // lesson 3
+  S.dishes = LESSONS[2].dishes.map(d => Object.assign({}, d)); S.day = 0; S.running = false; S.answer = null;
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '', guide = '';
+  if (id === 'observe') {
+    now = `Аквариум с золотой рыбкой, температура воды ${S.T} °C (можно менять от ${TMIN} до ${TMAX} °C). Ученик запускает секундомер на 15 с и нажимает на рыбку при каждом подъёме жаберной крышки. ` +
+      (m.trial ? `Сейчас идёт счёт: насчитано ${m.trial.taps}, осталось ${Math.ceil(m.left)} с. ` : '') +
+      (S.trials.length ? 'Замеры: ' + S.trials.map(t => `${t.T} °C — насчитал ${t.taps} (×4 = ${t.taps * 4} в мин), на самом деле ${t.real}, ${t.ok ? 'точно' : 'неточно'}`).join('; ') + '.' : 'Замеров пока нет.') +
+      ' В модели частота растёт с температурой (в тёплой воде меньше кислорода, обмен веществ быстрее).';
+    guide = 'Помоги различить наблюдение (считаем без вмешательства) и эксперимент (меняем одно условие — температуру).';
+  }
+  if (id === 'micro') {
+    now = `Световой микроскоп, окуляр 10×, объектив ${S.obj}× (увеличение ${m.mag}×, поле зрения ${fmt(m.fov, 2)} мм). Препарат — кожица лука. Свет ${S.lamp ? 'включён' : 'выключен'}, диафрагма открыта на ${Math.round(S.dia * 100)} % (${m.lit ? 'света хватает' : 'света мало для этого объектива'}). ` +
+      `Резкость ${m.sharp ? 'наведена' : 'не наведена (картинка размыта)'}. Кожица ${m.centered ? 'в центре поля зрения' : 'не в центре — в центре пустое стекло'}. Йодом ${S.stained ? 'окрашено' : 'не окрашено'}. Ядро ${S.found ? 'найдено' : 'пока не найдено'}.`;
+    guide = 'Напоминай порядок: свет, малый объектив, объект в центр, резкость, потом больший объектив и микровинт.';
+  }
+  if (id === 'plan') {
+    const d = j => { const x = S.dishes[j]; return `${x.water ? 'мокрая бумага' : 'сухая бумага'}, ${x.light ? 'на свету' : 'в темноте'}, ${x.warm ? '22 °C' : '4 °C'}, ${x.n} семян`; };
+    now = `Гипотеза: «Семенам гороха для прорастания нужна вода». Чашка А: ${d(0)}. Чашка Б: ${d(1)}. Опыт ${m.valid ? 'поставлен честно' : 'пока нечестный: ' + m.issues.join('; ')}. ` +
+      (m.finished ? `Прошло 5 дней: проросло в А ${m.res[0].k} из ${m.res[0].n}, в Б ${m.res[1].k} из ${m.res[1].n}. ${S.answer ? 'Ученик выбрал вывод, но он неверный.' : 'Ученик ещё не выбрал вывод.'}` : S.running ? `Идёт день ${Math.floor(m.day) + 1}.` : 'Опыт ещё не запущен.');
+    guide = 'Не называй готовый вывод и правильные настройки прямо — веди вопросами: что отличается в чашках, почему мало одного семени, что считать контролем.';
+  }
+  return [
+    `Раздел: биология, 7 класс, тема «Как изучают жизнь». Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Как помогать: ${guide} Задавай наводящие вопросы, а не решай за ученика.`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = {
+    observe: 'Чем наблюдение отличается от эксперимента?', micro: 'Почему изображение в микроскопе перевёрнуто?', plan: 'Зачем нужна контрольная группа?',
+  }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, с чего начать задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

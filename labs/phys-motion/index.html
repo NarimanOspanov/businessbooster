@@ -1,0 +1,930 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по физике, 7 класс: путь и перемещение, скорость, график движения, средняя скорость.">
+<title>Механическое движение</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene [data-click]{cursor:pointer}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.meter .lr .ok{color:var(--ok)}
+.meter .lr .bad{color:var(--warn)}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button.rec{color:var(--force)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M7 31C12 31 13 20 19 20S26 11 31 9" fill="none" stroke="var(--force)" stroke-width="2" stroke-dasharray="3 3" stroke-linecap="round"/><path d="M7 31L29 11" stroke="var(--arm)" stroke-width="2.2" stroke-linecap="round"/><path d="M33 8l-7 1.5 4.5 4.5z" fill="var(--arm)"/><circle cx="7" cy="31" r="3" fill="var(--fg)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Физика · Движение</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/">Карта</a><a href="/physics/">Физика</a><a href="/labs/phys-motion/" aria-current="page">Движение</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Движение</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Опытная площадка">
+    <svg class="scene" id="scene" role="img" aria-label="Площадка для опытов с движением. Предметы можно тянуть и нажимать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const nf = x => fmt(x, Math.abs(x - Math.round(x)) < 1e-9 ? 0 : 1);
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+
+const LESSONS = [
+  { id: 'path', title: 'Путь и перемещение',
+    text: ['Тело движется, если со временем меняется его положение относительно другого тела — тела отсчёта. Линия, по которой движется тело, называется траекторией.',
+           'Путь s — это длина траектории. Его считают, складывая все пройденные отрезки. Путь не бывает отрицательным и со временем только растёт.',
+           'Перемещение — это направленный отрезок (вектор) от начальной точки до конечной. Его длина не больше пути. Если вернуться туда, откуда вышли, перемещение равно нулю, а путь — нет.'],
+    why: 'Таксометр в такси считает путь: платите за каждый проеханный километр, даже если машина петляла по пробкам. Дрон доставки или вертолёт санавиации летит почти по перемещению — прямо, и экономит время и топливо. Курьеры и логисты сравнивают путь по улицам с расстоянием «по прямой», чтобы строить выгодные маршруты.',
+    task: 'Дойдите от дома до школы по улицам самым коротким путём, а затем вернитесь домой.',
+    hint: 'Тяните человечка по улицам или жмите стрелки внизу. Одна клетка — 100 м. Следите, как растёт путь и как меняется голубая стрелка перемещения.',
+    stage: 'Тяните человечка по улицам. Одна клетка — 100 м.',
+    home: { c: 1, r: 4 }, school: { c: 5, r: 1 },
+    check: m => m.school && m.back },
+  { id: 'speed', title: 'Скорость',
+    text: ['Скорость показывает, какой путь тело проходит за единицу времени. При равномерном движении тело за любые равные промежутки времени проходит одинаковые пути.',
+           'Скорость находят делением пути на время: v = s / t. В СИ её измеряют в метрах в секунду (м/с), в жизни часто — в километрах в час (км/ч).',
+           'Перевод простой: 1 м/с = 3600 м / 3600 с = 3,6 км / 1 ч = 3,6 км/ч. Значит, чтобы перевести м/с в км/ч, умножаем на 3,6.'],
+    why: 'В городах Казахстана разрешено ехать не быстрее 60 км/ч, и камеры на дорогах сразу видят превышение — штраф приходит на телефон. Логист службы доставки делит расстояние на скорость, чтобы назвать клиенту время прибытия. Тренер по лёгкой атлетике считает скорость бегуна по отрезкам, чтобы построить план тренировок.',
+    task: 'Подберите скорость велосипедиста, чтобы он проехал 600 м ровно за 2 минуты. Проверьте заездом, потом переведите скорость в км/ч.',
+    hint: 'Сначала переведите 2 минуты в секунды. Меняйте скорость кнопками − и +, затем жмите «Старт». Время на площадке идёт в 20 раз быстрее.',
+    stage: 'Выберите скорость кнопками − и + и нажмите «Старт».',
+    dist: 600, need: 120, v0: 3, kmhOpts: [5, 18, 30, 300],
+    check: m => m.ride && m.kmh },
+  { id: 'graph', title: 'График движения',
+    text: ['Движение удобно показать графиком. По горизонтали откладывают время t, по вертикали — путь s. При равномерном движении график пути — прямая линия, выходящая из начала координат.',
+           'Чем больше скорость, тем круче идёт прямая: за то же время тело проходит больший путь. По любой точке графика скорость находят так: v = s / t.',
+           'График скорости при равномерном движении — горизонтальная линия. Площадь прямоугольника под ней (v × t) равна пройденному пути.'],
+    why: 'Диспетчеры железной дороги рисуют графики движения поездов: по ним видно, где два состава окажутся на одном пути, и их разводят заранее. Фитнес-браслет строит график твоей пробежки и считает темп. Аналитики такси и доставки по таким графикам находят, где машины теряют время в пробках.',
+    task: 'Подберите скорость своего бегуна, чтобы его график пути совпал с пунктиром, а потом найдите по графику путь за 6 с.',
+    hint: 'Меняйте скорость кнопками − и +. Чтобы прочитать график, тяните курсор времени прямо по графику или жмите «Пуск».',
+    stage: 'Меняйте скорость кнопками внизу, тяните курсор времени по графику.',
+    vTarget: 4, v0: 2, tRead: 6,
+    check: m => m.match && m.read },
+  { id: 'avg', title: 'Средняя скорость',
+    text: ['В жизни тела редко движутся равномерно: машина то разгоняется, то тормозит. Для такого движения находят среднюю скорость.',
+           'Средняя скорость — это весь путь, делённый на всё время движения: vср = (s₁ + s₂) / (t₁ + t₂).',
+           'Это не среднее арифметическое скоростей! На медленном участке тело едет дольше, поэтому он сильнее влияет на среднюю скорость.'],
+    why: 'Навигатор в телефоне считает время прибытия по средней скорости на участках дороги с учётом пробок. Водитель-дальнобойщик планирует рейс из Алматы в Астану по средней скорости, а не по цифре на спидометре. Пилоты и диспетчеры аэропортов так же оценивают время полёта.',
+    task: 'Автобус едет 120 км. Первую половину пути он проходит со скоростью 60 км/ч. С какой скоростью ехать на второй половине, чтобы средняя скорость была 80 км/ч? Проверьте поездкой.',
+    hint: 'Не спешите отвечать «100 км/ч». Найдите, сколько часов должна длиться вся поездка и сколько уже ушло на первую половину.',
+    stage: 'Выберите скорость на второй половине пути и нажмите «Поехали».',
+    S: 120, v1: 60, vNeed: 80, v20: 100,
+    check: m => m.ok },
+];
+
+const LS_KEY = 'luch-phys-motion';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+
+// ---------- geometry (SVG units; the scene is 520 × 405) ----------
+const G = { x0: 50, y0: 150, cell: 60, cols: 7, rows: 4 };          // lesson 1: street grid, 1 cell = 100 m
+const gx = c => G.x0 + c * G.cell, gy = r => G.y0 + r * G.cell;
+const RD = { x0: 40, x1: 480, y: 300 };                               // lesson 2: road 0…600 m
+const rdx = s => RD.x0 + (RD.x1 - RD.x0) * s / 600;
+const SPEEDUP = 20;
+const TR = { x0: 60, x1: 460, y: 132, max: 60 };                     // lesson 3: track 0…60 m
+const trx = s => TR.x0 + (TR.x1 - TR.x0) * s / TR.max;
+const sgx = t => 50 + 28 * t, sgy = s => 380 - 3 * s;                 // s(t) graph: 0…10 s, 0…60 m
+const vgx = t => 372 + 13 * t, vgy = v => 380 - 22.5 * v;             // v(t) graph: 0…10 s, 0…8 m/s
+const R4 = { x0: 60, x1: 460, y: 150 };                               // lesson 4: road A → B, 120 km
+const r4x = s => R4.x0 + (R4.x1 - R4.x0) * s / 120;
+const tgx = t => 60 + t * 400 / 3, tgy = s => 385 - 1.5 * s;          // s(t) graph: 0…3 h, 0…120 km
+const HPS = 0.5;                                                      // trip: hours per real second
+
+function resetState() {
+  const Ls = L();
+  Object.assign(S, {
+    pos: Ls.home ? { ...Ls.home } : { c: 0, r: 0 }, trail: Ls.home ? [{ ...Ls.home }] : [], path: 0, school: false, back: false,
+    v: Ls.v0 || 1, t: 0, run: false, ride: false, kmh: false, finT: null,
+    tc: 0, play: false, read: false,
+    v2: Ls.v20 || 100, tt: 0, drive: false, trip: null, ok: false, hl: null,
+  });
+}
+resetState();
+
+const disp = () => { const h = L().home; return 100 * Math.hypot(S.pos.c - h.c, S.pos.r - h.r); };
+const at = (p, q) => p.c === q.c && p.r === q.r;
+const sRun = () => Math.min(L().dist, S.v * S.t);
+const s3 = (v, t) => Math.min(TR.max, v * t);
+const tripT = v2 => 1 + 60 / v2;
+const s4 = (v2, t) => t <= 1 ? 60 * t : Math.min(120, 60 + v2 * (t - 1));
+const avgOf = v2 => 120 / tripT(v2);
+
+function model() {
+  const id = LID(), Ls = L();
+  if (id === 'path') return { kind: 'path', s: S.path, d: disp(), school: S.school, back: S.back, atHome: at(S.pos, Ls.home), atSchool: at(S.pos, Ls.school) };
+  if (id === 'speed') return { kind: 'speed', v: S.v, t: S.t, s: sRun(), ride: S.ride, kmh: S.kmh };
+  if (id === 'graph') return { kind: 'graph', v: S.v, tc: S.tc, s: s3(S.v, S.tc), match: S.v === Ls.vTarget, read: S.read };
+  return { kind: 'avg', v2: S.v2, tt: S.tt, s: s4(S.v2, S.tt), T: tripT(S.v2), avg: avgOf(S.v2), trip: S.trip, ok: S.ok };
+}
+
+// ---------- drawing helpers ----------
+const ol = (d, fill, stroke, w = 2.2, extra = '') => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${w + 2.6}" stroke-linejoin="round" stroke-linecap="round"/><path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round" ${extra}/>`;
+const T = (x, y, s, fill, txt, anchor = 'middle', extra = '') => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${s}" fill="${fill}" text-anchor="${anchor}" ${extra}>${txt}</text>`;
+function arrow(x1, y1, x2, y2, col, w = 3) {
+  const a = Math.atan2(y2 - y1, x2 - x1), L2 = Math.hypot(x2 - x1, y2 - y1); if (L2 < 1) return '';
+  const hx = x2 - 12 * Math.cos(a), hy = y2 - 12 * Math.sin(a);
+  const p1 = `${(hx + 6 * Math.sin(a)).toFixed(1)} ${(hy - 6 * Math.cos(a)).toFixed(1)}`, p2 = `${(hx - 6 * Math.sin(a)).toFixed(1)} ${(hy + 6 * Math.cos(a)).toFixed(1)}`;
+  return `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${hx.toFixed(1)} ${hy.toFixed(1)}" stroke="${INK}" stroke-width="${w + 2.6}" stroke-linecap="round"/><path d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${hx.toFixed(1)} ${hy.toFixed(1)}" stroke="${col}" stroke-width="${w}" stroke-linecap="round"/><path d="M${x2.toFixed(1)} ${y2.toFixed(1)}L${p1}L${p2}Z" fill="${col}" stroke="${INK}" stroke-width="1.2" stroke-linejoin="round"/>`;
+}
+function bg() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+function person(x, y, col) {
+  return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="13" fill="${col}" stroke="${INK}" stroke-width="2.4"/><circle cx="${x.toFixed(1)}" cy="${(y - 4).toFixed(1)}" r="3.6" fill="${INK}"/><path d="M${(x - 6).toFixed(1)} ${(y + 7).toFixed(1)}q6 -9 12 0" fill="${INK}"/>`;
+}
+
+// ---------- lesson 1: street map ----------
+function pathScene() {
+  const Ls = L(), H = Ls.home, Sc = Ls.school;
+  let h = `<rect x="${gx(0) - 16}" y="${gy(0) - 16}" width="${G.cols * G.cell + 32}" height="${G.rows * G.cell + 32}" rx="14" fill="#151e2e" stroke="#26324a" stroke-width="1.4"/>`;
+  const parks = { '2,2': 1, '6,3': 1, '0,0': 1, '3,0': 1 };
+  for (let c = 0; c < G.cols; c++) for (let r = 0; r < G.rows; r++) {
+    const pk = parks[c + ',' + r];
+    h += `<rect x="${gx(c) + 9}" y="${gy(r) + 9}" width="${G.cell - 18}" height="${G.cell - 18}" rx="6" fill="${pk ? '#1b3a2b' : '#222d44'}" stroke="${pk ? '#2c5a41' : '#2e3b57'}" stroke-width="1"/>`;
+    if (pk) h += `<circle cx="${gx(c) + 22}" cy="${gy(r) + 24}" r="7" fill="#2f6b4a"/><circle cx="${gx(c) + 38}" cy="${gy(r) + 36}" r="8" fill="#2f6b4a"/>`;
+  }
+  // street centre lines
+  for (let c = 0; c <= G.cols; c++) h += `<path d="M${gx(c)} ${gy(0)}V${gy(G.rows)}" stroke="#3a4762" stroke-width="1" stroke-dasharray="4 5"/>`;
+  for (let r = 0; r <= G.rows; r++) h += `<path d="M${gx(0)} ${gy(r)}H${gx(G.cols)}" stroke="#3a4762" stroke-width="1" stroke-dasharray="4 5"/>`;
+  // home and school
+  const hx = gx(H.c) - 30, hy = gy(H.r) - 30;
+  h += `<g><path d="M${hx - 13} ${hy + 2}L${hx} ${hy - 11}L${hx + 13} ${hy + 2}V${hy + 14}H${hx - 13}Z" fill="#ffb547" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/><rect x="${hx - 3}" y="${hy + 5}" width="6" height="9" fill="${INK}"/>${T(hx, hy + 26, 9, '#ffb547', 'дом')}</g>`;
+  const sx = gx(Sc.c) + 30, sy = gy(Sc.r) - 30;
+  h += `<g><rect x="${sx - 17}" y="${sy - 8}" width="34" height="22" fill="#72d4e8" stroke="${INK}" stroke-width="1.6"/><path d="M${sx - 19} ${sy - 8}L${sx} ${sy - 18}L${sx + 19} ${sy - 8}Z" fill="#4c9fb3" stroke="${INK}" stroke-width="1.4" stroke-linejoin="round"/><path d="M${sx - 11} ${sy - 2}h5v5h-5zM${sx + 6} ${sy - 2}h5v5h-5z" fill="${INK}"/><rect x="${sx - 3}" y="${sy + 5}" width="6" height="9" fill="${INK}"/>${T(sx, sy + 26, 9, '#72d4e8', 'школа')}</g>`;
+  h += `<circle cx="${gx(H.c)}" cy="${gy(H.r)}" r="6" fill="none" stroke="#ffb547" stroke-width="2"/><circle cx="${gx(Sc.c)}" cy="${gy(Sc.r)}" r="6" fill="none" stroke="#72d4e8" stroke-width="2"/>`;
+  // trajectory
+  if (S.trail.length > 1) h += `<polyline points="${S.trail.map(p => gx(p.c) + ',' + gy(p.r)).join(' ')}" fill="none" stroke="#ffb547" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" opacity=".8"/>`;
+  // displacement
+  const px = gx(S.pos.c), py = gy(S.pos.r);
+  if (!at(S.pos, H)) {
+    h += arrow(gx(H.c), gy(H.r), px, py, '#72d4e8', 3);
+    h += T((gx(H.c) + px) / 2 + 8, (gy(H.r) + py) / 2 - 8, 10, '#72d4e8', `${nf(disp())} м`, 'start', `paint-order="stroke" stroke="${INK}" stroke-width="3"`);
+  }
+  // walker
+  h += `<g data-drag="walker"><circle cx="${px}" cy="${py}" r="28" fill="transparent"/>${person(px, py, '#e8ecf4')}</g>`;
+  // scale bar
+  h += `<path d="M${gx(0)} ${gy(0) - 30}h${G.cell}" stroke="#e8ecf4" stroke-width="2"/><path d="M${gx(0)} ${gy(0) - 34}v8M${gx(1)} ${gy(0) - 34}v8" stroke="#e8ecf4" stroke-width="1.4"/>${T(gx(0) + G.cell + 8, gy(0) - 26, 10, '#8b96ad', '100 м', 'start')}`;
+  h += T(gx(G.cols), gy(0) - 26, 10, '#ffb547', `путь s = ${S.path} м`, 'end');
+  return h;
+}
+
+// ---------- lesson 2: road and bicycle ----------
+function bike(x, y) {
+  const w = 11;
+  return `<g><circle cx="${(x - 14).toFixed(1)}" cy="${y - w}" r="${w}" fill="none" stroke="#e8ecf4" stroke-width="2.4"/><circle cx="${(x + 14).toFixed(1)}" cy="${y - w}" r="${w}" fill="none" stroke="#e8ecf4" stroke-width="2.4"/>
+    <path d="M${(x - 14).toFixed(1)} ${y - w}L${(x - 3).toFixed(1)} ${y - 26}H${(x + 9).toFixed(1)}L${(x + 14).toFixed(1)} ${y - w}M${(x - 3).toFixed(1)} ${y - 26}L${x.toFixed(1)} ${y - w}L${(x + 9).toFixed(1)} ${y - 26}" fill="none" stroke="#ffb547" stroke-width="2.4" stroke-linejoin="round"/>
+    <path d="M${(x - 2).toFixed(1)} ${y - 27}L${(x + 3).toFixed(1)} ${y - 44}L${(x + 11).toFixed(1)} ${y - 34}" fill="none" stroke="#72d4e8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="${(x + 4).toFixed(1)}" cy="${y - 51}" r="6" fill="#f2c9a0" stroke="${INK}" stroke-width="1.4"/><path d="M${(x - 2).toFixed(1)} ${y - 53}q6 -8 12 0z" fill="#ff8a73" stroke="${INK}" stroke-width="1"/></g>`;
+}
+function speedScene() {
+  const Ls = L(), s = sRun(), x = rdx(s);
+  let h = `<rect x="-2000" y="${RD.y + 18}" width="4520" height="1200" fill="#1b2a22"/>`;
+  h += `<rect x="-2000" y="${RD.y - 22}" width="4520" height="40" fill="#2a3348"/><path d="M-2000 ${RD.y - 2}H2520" stroke="#e8ecf4" stroke-width="1.6" stroke-dasharray="14 12" opacity=".5"/>`;
+  for (let m = 0; m <= Ls.dist; m += 100) {
+    const xm = rdx(m);
+    h += `<path d="M${xm} ${RD.y + 18}v10" stroke="#8b96ad" stroke-width="1.4"/>` + T(xm, RD.y + 42, 10, '#8b96ad', m + (m === Ls.dist ? ' м' : ''));
+  }
+  // start / finish flags
+  h += `<path d="M${RD.x0} ${RD.y - 22}V${RD.y - 74}" stroke="#a9b4c9" stroke-width="2"/><path d="M${RD.x0} ${RD.y - 74}h22v12h-22z" fill="#86e0a8" stroke="${INK}"/>` + T(RD.x0 + 11, RD.y - 82, 9, '#86e0a8', 'старт');
+  h += `<path d="M${RD.x1} ${RD.y - 22}V${RD.y - 74}" stroke="#a9b4c9" stroke-width="2"/>`;
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 2; j++) h += `<rect x="${RD.x1 + i * 6}" y="${RD.y - 74 + j * 6}" width="6" height="6" fill="${(i + j) % 2 ? '#e8ecf4' : INK}"/>`;
+  h += T(RD.x1 + 12, RD.y - 82, 9, '#e8ecf4', 'финиш');
+  // marks every 10 s: equal distances in equal times
+  const n = Math.floor(S.t / 10 + 1e-9);
+  for (let k = 1; k <= n; k++) { const xm = rdx(Math.min(Ls.dist, S.v * 10 * k)); h += `<circle cx="${xm.toFixed(1)}" cy="${RD.y + 8}" r="3.5" fill="#72d4e8" stroke="${INK}"/>`; if (k <= 12 && (k % (n > 8 ? 2 : 1) === 0)) h += T(xm, RD.y + 60, 8.5, '#72d4e8', k * 10 + ' с'); }
+  h += bike(x, RD.y + 4);
+  h += T(x, RD.y - 62, 10, '#ffb547', `v = ${nf(S.v)} м/с`, 'middle', `paint-order="stroke" stroke="${INK}" stroke-width="3"`);
+  // stopwatch board
+  h += `<rect x="160" y="150" width="200" height="74" rx="10" fill="#121a28" stroke="#3a4762" stroke-width="1.6"/>`;
+  h += T(260, 182, 22, S.ride ? '#86e0a8' : '#e8ecf4', `t = ${fmt(S.t, 1)} с`, 'middle', 'font-weight="500"');
+  h += T(260, 208, 13, '#8b96ad', `s = ${fmt(s, 0)} м · время ×${SPEEDUP}`);
+  return h;
+}
+
+// ---------- lesson 3: track + graphs ----------
+function runner(x, y, col, lab) {
+  return `<g><circle cx="${x.toFixed(1)}" cy="${y - 22}" r="6" fill="${col}" stroke="${INK}" stroke-width="1.4"/><path d="M${x.toFixed(1)} ${y - 16}l-2 10M${(x - 2).toFixed(1)} ${y - 6}l-6 6M${(x - 2).toFixed(1)} ${y - 6}l5 6M${(x - 1).toFixed(1)} ${y - 13}l-7 3M${(x - 1).toFixed(1)} ${y - 13}l7 -1" stroke="${col}" stroke-width="2.6" stroke-linecap="round"/>${T(x, y - 32, 8.5, col, lab)}</g>`;
+}
+function graphScene() {
+  const Ls = L(), tc = S.tc, vT = Ls.vTarget;
+  let h = '';
+  // track
+  h += `<rect x="${TR.x0 - 10}" y="${TR.y}" width="${TR.x1 - TR.x0 + 20}" height="10" rx="3" fill="#7a3a2f"/>`;
+  for (let m = 0; m <= TR.max; m += 10) h += `<path d="M${trx(m)} ${TR.y}v10" stroke="#e8ecf4" stroke-width="1" opacity=".7"/>` + T(trx(m), TR.y + 22, 9, '#8b96ad', m + (m === TR.max ? ' м' : ''));
+  h += runner(trx(s3(vT, tc)), TR.y + 2, '#8b96ad', 'пунктир');
+  h += runner(trx(s3(S.v, tc)), TR.y + 2, '#ffb547', 'ваш');
+  // s(t) graph
+  h += `<g data-drag="cur"><rect x="40" y="180" width="472" height="222" fill="transparent"/>`;
+  for (let t = 0; t <= 10; t++) h += `<path d="M${sgx(t)} ${sgy(0)}V${sgy(60)}" stroke="#26324a" stroke-width="1"/>` + (t % 2 === 0 ? T(sgx(t), sgy(0) + 14, 9, '#8b96ad', t) : '');
+  for (let s = 0; s <= 60; s += 10) h += `<path d="M${sgx(0)} ${sgy(s)}H${sgx(10)}" stroke="#26324a" stroke-width="1"/>` + T(sgx(0) - 5, sgy(s) + 3, 9, '#8b96ad', s, 'end');
+  h += `<path d="M${sgx(0)} ${sgy(0)}H${sgx(10) + 6}M${sgx(0)} ${sgy(0)}V${sgy(60) - 8}" stroke="#a9b4c9" stroke-width="1.4"/>`;
+  h += T(sgx(10) + 4, sgy(0) - 6, 9, '#a9b4c9', 't, с', 'end') + T(sgx(0) + 6, sgy(60) - 10, 9, '#a9b4c9', 's, м', 'start');
+  h += `<path d="M${sgx(0)} ${sgy(0)}L${sgx(10)} ${sgy(vT * 10)}" stroke="#8b96ad" stroke-width="2" stroke-dasharray="6 5"/>`;
+  const tEnd = Math.min(10, TR.max / S.v);
+  h += `<path d="M${sgx(0)} ${sgy(0)}L${sgx(tEnd).toFixed(1)} ${sgy(s3(S.v, tEnd)).toFixed(1)}" stroke="#ffb547" stroke-width="2.6"/>`;
+  // cursor on s(t)
+  const sc = s3(S.v, tc);
+  h += `<path d="M${sgx(tc).toFixed(1)} ${sgy(0)}V${sgy(60) - 4}" stroke="#72d4e8" stroke-width="1.6"/><path d="M${sgx(0)} ${sgy(sc).toFixed(1)}H${sgx(tc).toFixed(1)}" stroke="#72d4e8" stroke-width="1" stroke-dasharray="3 3"/>`;
+  h += `<circle cx="${sgx(tc).toFixed(1)}" cy="${sgy(sc).toFixed(1)}" r="5" fill="#ffb547" stroke="${INK}" stroke-width="1.6"/>`;
+  h += `<rect x="${(sgx(tc) - 9).toFixed(1)}" y="${sgy(0) + 18}" width="18" height="12" rx="3" fill="#72d4e8"/>` + T(sgx(tc), sgy(0) + 27.5, 8.5, INK, nf(tc));
+  h += T(sgx(tc) + 8, sgy(sc) - 8, 10, '#ffb547', `${nf(sc)} м`, 'start', `paint-order="stroke" stroke="${INK}" stroke-width="3"`);
+  // v(t) graph
+  h += `<rect x="${vgx(0)}" y="${vgy(S.v).toFixed(1)}" width="${(vgx(tc) - vgx(0)).toFixed(1)}" height="${(vgy(0) - vgy(S.v)).toFixed(1)}" fill="rgba(255,181,71,.22)"/>`;
+  for (let v = 0; v <= 8; v += 2) h += `<path d="M${vgx(0)} ${vgy(v)}H${vgx(10)}" stroke="#26324a" stroke-width="1"/>` + T(vgx(0) - 5, vgy(v) + 3, 9, '#8b96ad', v, 'end');
+  h += `<path d="M${vgx(0)} ${vgy(0)}H${vgx(10) + 6}M${vgx(0)} ${vgy(0)}V${vgy(8) - 8}" stroke="#a9b4c9" stroke-width="1.4"/>`;
+  h += T(vgx(10) + 4, vgy(0) + 14, 9, '#a9b4c9', 't, с', 'end') + T(vgx(0) + 6, vgy(8) - 10, 9, '#a9b4c9', 'v, м/с', 'start');
+  h += `<path d="M${vgx(0)} ${vgy(vT)}H${vgx(10)}" stroke="#8b96ad" stroke-width="2" stroke-dasharray="6 5"/><path d="M${vgx(0)} ${vgy(S.v)}H${vgx(10)}" stroke="#ffb547" stroke-width="2.6"/>`;
+  h += `<path d="M${vgx(tc).toFixed(1)} ${vgy(0)}V${vgy(8) - 4}" stroke="#72d4e8" stroke-width="1.6"/>`;
+  h += T((vgx(0) + vgx(10)) / 2, vgy(0) + 14, 8.5, '#ffb547', 'площадь = путь') + `</g>`;
+  return h;
+}
+
+// ---------- lesson 4: trip A → B ----------
+function bus(x, y) {
+  return `<g><rect x="${(x - 24).toFixed(1)}" y="${y - 26}" width="48" height="20" rx="5" fill="#ffb547" stroke="${INK}" stroke-width="1.8"/><path d="M${(x - 19).toFixed(1)} ${y - 22}h9v7h-9zM${(x - 6).toFixed(1)} ${y - 22}h9v7h-9zM${(x + 7).toFixed(1)} ${y - 22}h12v7h-12z" fill="#2b3a55"/>
+    <circle cx="${(x - 13).toFixed(1)}" cy="${y - 5}" r="5" fill="#2a3348" stroke="${INK}" stroke-width="1.6"/><circle cx="${(x + 13).toFixed(1)}" cy="${y - 5}" r="5" fill="#2a3348" stroke="${INK}" stroke-width="1.6"/></g>`;
+}
+function avgScene() {
+  const Ls = L(), v2 = S.v2, Tt = tripT(v2), s = s4(v2, S.tt);
+  let h = '';
+  h += `<rect x="${R4.x0 - 14}" y="${R4.y}" width="${R4.x1 - R4.x0 + 28}" height="12" rx="4" fill="#2a3348"/><path d="M${R4.x0} ${R4.y + 6}H${R4.x1}" stroke="#e8ecf4" stroke-width="1" stroke-dasharray="8 7" opacity=".5"/>`;
+  h += `<path d="M${r4x(60)} ${R4.y - 8}v28" stroke="#72d4e8" stroke-width="1.4" stroke-dasharray="3 3"/>` + T(r4x(60), R4.y + 32, 9, '#72d4e8', 'середина · 60 км');
+  h += T(r4x(30), R4.y + 32, 9, '#8b96ad', `v₁ = ${Ls.v1} км/ч`) + T(r4x(90), R4.y + 32, 9, '#ffb547', `v₂ = ${v2} км/ч`);
+  h += `<circle cx="${R4.x0}" cy="${R4.y + 6}" r="7" fill="#86e0a8" stroke="${INK}" stroke-width="1.6"/>` + T(R4.x0, R4.y - 30, 11, '#86e0a8', 'A');
+  h += `<circle cx="${R4.x1}" cy="${R4.y + 6}" r="7" fill="#ff8a73" stroke="${INK}" stroke-width="1.6"/>` + T(R4.x1, R4.y - 30, 11, '#ff8a73', 'Б');
+  h += bus(r4x(s), R4.y + 2);
+  // graph
+  for (let t = 0; t <= 3; t += 0.5) h += `<path d="M${tgx(t)} ${tgy(0)}V${tgy(120)}" stroke="#26324a" stroke-width="1"/>` + T(tgx(t), tgy(0) + 14, 9, '#8b96ad', fmt(t, t % 1 ? 1 : 0));
+  for (let s2 = 0; s2 <= 120; s2 += 30) h += `<path d="M${tgx(0)} ${tgy(s2)}H${tgx(3)}" stroke="#26324a" stroke-width="1"/>` + T(tgx(0) - 5, tgy(s2) + 3, 9, '#8b96ad', s2, 'end');
+  h += `<path d="M${tgx(0)} ${tgy(0)}H${tgx(3) + 6}M${tgx(0)} ${tgy(0)}V${tgy(120) - 8}" stroke="#a9b4c9" stroke-width="1.4"/>`;
+  h += T(tgx(3) + 4, tgy(0) - 6, 9, '#a9b4c9', 't, ч', 'end') + T(tgx(0) + 6, tgy(120) - 10, 9, '#a9b4c9', 's, км', 'start');
+  // target average line
+  h += `<path d="M${tgx(0)} ${tgy(0)}L${tgx(120 / Ls.vNeed)} ${tgy(120)}" stroke="#86e0a8" stroke-width="1.6" stroke-dasharray="2 4"/>` + T(tgx(120 / Ls.vNeed) + 6, tgy(120) + 12, 9, '#86e0a8', `${Ls.vNeed} км/ч`, 'start');
+  // planned and travelled
+  const plan = `M${tgx(0)} ${tgy(0)}L${tgx(1)} ${tgy(60)}L${tgx(Tt).toFixed(1)} ${tgy(120)}`;
+  h += `<path d="${plan}" fill="none" stroke="#ffb547" stroke-width="1.4" stroke-dasharray="5 4" opacity=".55"/>`;
+  if (S.tt > 0) {
+    const t1 = Math.min(S.tt, 1);
+    let d = `M${tgx(0)} ${tgy(0)}L${tgx(t1).toFixed(1)} ${tgy(60 * t1).toFixed(1)}`;
+    if (S.tt > 1) d += `L${tgx(S.tt).toFixed(1)} ${tgy(s).toFixed(1)}`;
+    h += `<path d="${d}" fill="none" stroke="#ffb547" stroke-width="3" stroke-linejoin="round"/><circle cx="${tgx(S.tt).toFixed(1)}" cy="${tgy(s).toFixed(1)}" r="4.5" fill="#ffb547" stroke="${INK}" stroke-width="1.4"/>`;
+  }
+  if (S.trip) {
+    h += `<path d="M${tgx(0)} ${tgy(0)}L${tgx(S.trip.T).toFixed(1)} ${tgy(120)}" stroke="#72d4e8" stroke-width="2" stroke-dasharray="7 4"/>`;
+    h += T(tgx(S.trip.T / 2) + 10, tgy(60) + 16, 10, '#72d4e8', `vср = ${fmt(S.trip.avg, 1)} км/ч`, 'start', `paint-order="stroke" stroke="${INK}" stroke-width="3"`);
+  }
+  return h;
+}
+
+function hlBox(id) {
+  const lid = LID();
+  if (lid === 'path') {
+    const H = L().home, Sc = L().school, px = gx(S.pos.c), py = gy(S.pos.r);
+    return ({ map: [gx(0) - 18, gy(0) - 18, G.cols * G.cell + 36, G.rows * G.cell + 36], home: [gx(H.c) - 50, gy(H.r) - 50, 64, 64], school: [gx(Sc.c) - 10, gy(Sc.r) - 56, 64, 64],
+      walker: [px - 18, py - 18, 36, 36], trail: [gx(0) - 8, gy(0) - 8, G.cols * G.cell + 16, G.rows * G.cell + 16],
+      disp: [Math.min(px, gx(H.c)) - 10, Math.min(py, gy(H.r)) - 10, Math.abs(px - gx(H.c)) + 20, Math.abs(py - gy(H.r)) + 20], scale: [gx(0) - 6, gy(0) - 42, 120, 22] })[id];
+  }
+  if (lid === 'speed') { const x = rdx(sRun()); return ({ road: [RD.x0 - 10, RD.y - 24, RD.x1 - RD.x0 + 20, 74], bike: [x - 30, RD.y - 60, 60, 66], board: [156, 146, 208, 82], flags: [RD.x0 - 8, RD.y - 90, RD.x1 - RD.x0 + 46, 70], marks: [RD.x0 - 8, RD.y, RD.x1 - RD.x0 + 16, 66] })[id]; }
+  if (lid === 'graph') return ({ track: [TR.x0 - 16, TR.y - 50, TR.x1 - TR.x0 + 32, 86], sgraph: [20, 182, 320, 220], vgraph: [345, 182, 170, 220], target: [sgx(0), sgy(40) - 6, sgx(10) - sgx(0), sgy(0) - sgy(40) + 12], cursor: [sgx(S.tc) - 14, sgy(60) - 8, 28, 236] })[id];
+  return ({ road: [R4.x0 - 22, R4.y - 44, R4.x1 - R4.x0 + 44, 90], bus: [r4x(s4(S.v2, S.tt)) - 30, R4.y - 30, 60, 38], graph: [20, 190, 470, 214], mid: [r4x(60) - 50, R4.y - 12, 100, 54], chord: [tgx(0) - 6, tgy(120) - 6, tgx(3) - tgx(0) + 12, tgy(0) - tgy(120) + 12] })[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = bg();
+  if (id === 'path') h += pathScene();
+  else if (id === 'speed') h += speedScene();
+  else if (id === 'graph') h += graphScene();
+  else h += avgScene();
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// fit the scene: 520 × 405 units, centred, content at the bottom
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 520, hh / 410, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 405 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  drag = { id: el.dataset.drag };
+  if (drag.id === 'cur') setCursorFrom(toSvg(e));
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const p = toSvg(e);
+  if (drag.id === 'walker') walkToward((p.x - G.x0) / G.cell, (p.y - G.y0) / G.cell);
+  else if (drag.id === 'cur') setCursorFrom(p);
+});
+const endDrag = () => { if (!drag) return; drag = null; scene.classList.remove('grabbing'); dirty = true; };
+scene.addEventListener('pointerup', endDrag);
+scene.addEventListener('pointercancel', endDrag);
+
+// lesson 1: move along streets one block at a time
+function walkToward(fc, fr) {
+  const c = clamp(Math.round(fc), 0, G.cols), r = clamp(Math.round(fr), 0, G.rows);
+  for (let i = 0; i < 20 && !(c === S.pos.c && r === S.pos.r); i++) {
+    const dc = c - S.pos.c, dr = r - S.pos.r;
+    if (Math.abs(dc) >= Math.abs(dr)) stepWalk(Math.sign(dc), 0); else stepWalk(0, Math.sign(dr));
+  }
+}
+function stepWalk(dc, dr) {
+  const Ls = L(), c = S.pos.c + dc, r = S.pos.r + dr;
+  if (c < 0 || c > G.cols || r < 0 || r > G.rows) { toast('Дальше карта кончается.'); return; }
+  S.pos = { c, r }; S.trail.push({ c, r }); S.path += 100;
+  if (at(S.pos, Ls.school) && !S.school) {
+    if (S.path === 700) { S.school = true; toast('Вы у школы! Путь 700 м, а перемещение всего 500 м. Теперь домой.'); }
+    else toast(`До школы вы прошли ${S.path} м — можно короче. Нажмите «Сначала» и попробуйте ещё.`);
+  } else if (at(S.pos, Ls.home) && S.school && !S.back) {
+    S.back = true; toast(`Вы дома: путь ${S.path} м, а перемещение — 0.`);
+  }
+  update();
+}
+
+// lesson 3: time cursor
+function setCursorFrom(p) {
+  const t = p.x < 350 ? (p.x - 50) / 28 : (p.x - 372) / 13;
+  setTc(Math.round(clamp(t, 0, 10) * 2) / 2);
+}
+function setTc(t) {
+  t = clamp(t, 0, 10);
+  if (t === S.tc) return;
+  S.tc = t; checkRead(); update();
+}
+function checkRead() {
+  const Ls = L();
+  if (!S.read && S.v === Ls.vTarget && S.tc === Ls.tRead) { S.read = true; toast(`По графику: за ${Ls.tRead} с бегун пробегает ${nf(s3(S.v, S.tc))} м.`); }
+}
+
+let last = performance.now();
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  const id = LID();
+  if (id === 'speed' && S.run) {
+    S.t += reduce ? 1e9 : dt * SPEEDUP;
+    const tf = L().dist / S.v;
+    if (S.t >= tf) { S.t = tf; S.run = false; finishRide(); }
+    update();
+  }
+  if (id === 'graph' && S.play) {
+    let nt = reduce ? 10 : S.tc + dt * 2;
+    if (nt >= 10) { nt = 10; S.play = false; renderTools(); }
+    // pass through the reading point exactly so it can be noticed
+    const Ls = L();
+    if (S.tc < Ls.tRead && nt >= Ls.tRead && !S.read && S.v === Ls.vTarget) { nt = Ls.tRead; S.play = false; renderTools(); }
+    S.tc = nt; checkRead(); update();
+  }
+  if (id === 'avg' && S.drive) {
+    const Tt = tripT(S.v2);
+    S.tt += reduce ? 1e9 : dt * HPS;
+    if (S.tt >= Tt) { S.tt = Tt; S.drive = false; finishTrip(); }
+    update();
+  }
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+function finishRide() {
+  const Ls = L(), tf = Ls.dist / S.v; S.finT = tf;
+  if (Math.abs(tf - Ls.need) < 1e-9) { S.ride = true; toast('Финиш ровно за 120 с = 2 мин! Теперь переведите скорость в км/ч.'); }
+  else toast(`Финиш за ${fmt(tf, 1)} с, а нужно за 120 с. Ехать надо ${tf > Ls.need ? 'быстрее' : 'медленнее'}.`);
+  renderTools(); buildScheme();
+}
+function finishTrip() {
+  const Ls = L(), Tt = tripT(S.v2), a = avgOf(S.v2);
+  S.trip = { v2: S.v2, T: Tt, avg: a };
+  if (S.v2 * 1 === 120) { S.ok = true; toast(`Приехали за ${fmt(Tt, 1)} ч. Средняя скорость ровно ${Ls.vNeed} км/ч!`); }
+  else toast(`Поездка ${fmt(Tt, 2)} ч, средняя скорость ${fmt(a, 1)} км/ч. Нужно ${Ls.vNeed} км/ч.`);
+  renderTools();
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3200); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, cls) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}${cls ? ` class="${cls}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  let h = '';
+  if (id === 'path') h = B('w-l', '←') + B('w-u', '↑') + B('w-d', '↓') + B('w-r', '→') + sep + B('reset', 'Сначала');
+  if (id === 'speed') {
+    h = B('v-', '−') + B('v+', '+') + sep + B('go', S.run ? 'Едет…' : 'Старт', undefined, 'rec') + B('reset', 'Сброс');
+    if (S.ride && !S.kmh) h += sep + L().kmhOpts.map(k => B('kmh-' + k, k + ' км/ч')).join('');
+  }
+  if (id === 'graph') h = B('v-', '−') + B('v+', '+') + sep + B('play', S.play ? 'Пауза' : 'Пуск', undefined, 'rec') + B('t-', '◀ 0,5 с') + B('t+', '0,5 с ▶');
+  if (id === 'avg') h = B('v2-', '− 10') + B('v2+', '+ 10') + sep + B('drive', S.drive ? 'Едет…' : 'Поехали', undefined, 'rec') + B('reset', 'Сброс');
+  tb.innerHTML = h;
+}
+function setV(v) {
+  const id = LID();
+  if (id === 'speed') { v = clamp(Math.round(v * 2) / 2, 1, 15); if (v === S.v) return; S.v = v; S.t = 0; S.run = false; }
+  if (id === 'graph') { v = clamp(Math.round(v * 2) / 2, 1, 6); if (v === S.v) return; S.v = v; checkRead(); }
+  renderTools(); update();
+}
+function setV2(v) {
+  v = clamp(Math.round(v / 10) * 10, 30, 150); if (v === S.v2) return;
+  S.v2 = v; S.tt = 0; S.drive = false; S.trip = null; renderTools(); update();
+}
+function act(a) {
+  const id = LID();
+  if (a.startsWith('w-')) { const d = { l: [-1, 0], r: [1, 0], u: [0, -1], d: [0, 1] }[a[2]]; return stepWalk(d[0], d[1]); }
+  if (a === 'reset') {
+    if (id === 'path') { S.pos = { ...L().home }; S.trail = [{ ...L().home }]; S.path = 0; if (!S.back) S.school = false; }
+    if (id === 'speed') { S.t = 0; S.run = false; }
+    if (id === 'avg') { S.tt = 0; S.drive = false; S.trip = null; }
+    renderTools(); update(); return;
+  }
+  if (a === 'v-' || a === 'v+') return setV(S.v + (a === 'v-' ? -0.5 : 0.5));
+  if (a === 'go') { if (S.run) return; if (S.t >= L().dist / S.v - 1e-9) S.t = 0; S.run = true; renderTools(); return; }
+  if (a.startsWith('kmh-')) {
+    const k = +a.slice(4);
+    if (Math.abs(k - L().dist / L().need * 3.6) < 1e-9) { S.kmh = true; toast(`Верно: ${nf(L().dist / L().need)} м/с × 3,6 = ${nf(k)} км/ч.`); renderTools(); buildScheme(); update(); }
+    else toast('Нет. Вспомните: 1 м/с = 3,6 км/ч.');
+    return;
+  }
+  if (a === 'play') { if (!S.play && S.tc >= 10) S.tc = 0; S.play = !S.play; renderTools(); update(); return; }
+  if (a === 't-' || a === 't+') { S.play = false; renderTools(); return setTc(S.tc + (a === 't-' ? -0.5 : 0.5)); }
+  if (a === 'v2-' || a === 'v2+') return setV2(S.v2 + (a === 'v2-' ? -10 : 10));
+  if (a === 'drive') { if (S.drive) return; if (S.trip) { S.tt = 0; S.trip = null; } S.drive = true; renderTools(); return; }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  map: IC('<rect x="2" y="2" width="30" height="30" rx="4" fill="#151e2e"/><path d="M2 12h30M2 22h30M12 2v30M22 2v30" stroke="#3a4762" stroke-width="2"/>'),
+  home: IC('<path d="M5 17L17 6l12 11v12H5z" fill="#ffb547"/><rect x="14" y="21" width="6" height="8" fill="#0b1019"/>'),
+  school: IC('<path d="M3 13L17 5l14 8z" fill="#4c9fb3"/><rect x="5" y="13" width="24" height="16" fill="#72d4e8"/><rect x="14" y="21" width="6" height="8" fill="#0b1019"/>'),
+  walker: IC('<circle cx="17" cy="17" r="12" fill="#e8ecf4"/><circle cx="17" cy="13" r="3.5" fill="#0b1019"/><path d="M11 24q6-9 12 0" fill="#0b1019"/>'),
+  trail: IC('<path d="M4 28V18h10V8h16" fill="none" stroke="#ffb547" stroke-width="3" stroke-linejoin="round"/>'),
+  disp: IC('<path d="M5 29L25 9" stroke="#72d4e8" stroke-width="3"/><path d="M30 4l-11 3 8 8z" fill="#72d4e8"/>'),
+  scale: IC('<path d="M4 17h26M4 12v10M30 12v10" stroke="var(--fg)" stroke-width="2"/>'),
+  road: IC('<rect x="1" y="12" width="32" height="10" fill="#2a3348"/><path d="M2 17h30" stroke="#e8ecf4" stroke-dasharray="4 3"/>'),
+  bike: IC('<circle cx="9" cy="23" r="6" fill="none" stroke="var(--fg)" stroke-width="2"/><circle cx="26" cy="23" r="6" fill="none" stroke="var(--fg)" stroke-width="2"/><path d="M9 23l6-10h8l3 10M15 13l3 10l5-10" fill="none" stroke="#ffb547" stroke-width="2"/>'),
+  board: IC('<rect x="3" y="8" width="28" height="18" rx="4" fill="#121a28" stroke="var(--muted)"/><text x="17" y="21" font-size="9" fill="var(--fg)" text-anchor="middle" font-family="monospace">t=…</text>'),
+  flags: IC('<path d="M7 30V5M27 30V5" stroke="var(--muted)" stroke-width="2"/><path d="M7 5h10v7H7z" fill="#86e0a8"/><path d="M27 5h4v4h-4zM31 9h-4v4h4z" fill="var(--fg)"/>'),
+  marks: IC('<path d="M2 17h30" stroke="var(--muted)"/><circle cx="8" cy="17" r="3" fill="#72d4e8"/><circle cx="17" cy="17" r="3" fill="#72d4e8"/><circle cx="26" cy="17" r="3" fill="#72d4e8"/>'),
+  track: IC('<rect x="2" y="20" width="30" height="6" rx="2" fill="#7a3a2f"/><circle cx="12" cy="10" r="3" fill="#ffb547"/><path d="M12 13l-1 6" stroke="#ffb547" stroke-width="2"/>'),
+  sgraph: IC('<path d="M5 3v26h26" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M5 29L29 7" stroke="#ffb547" stroke-width="2.4"/>'),
+  vgraph: IC('<path d="M5 3v26h26" fill="none" stroke="var(--fg)" stroke-width="1.6"/><rect x="6" y="14" width="16" height="14" fill="rgba(255,181,71,.35)"/><path d="M5 14h26" stroke="#ffb547" stroke-width="2.4"/>'),
+  target: IC('<path d="M5 29L29 9" stroke="var(--muted)" stroke-width="2" stroke-dasharray="4 3"/>'),
+  cursor: IC('<path d="M17 3v28" stroke="#72d4e8" stroke-width="2"/><rect x="11" y="25" width="12" height="7" rx="2" fill="#72d4e8"/>'),
+  bus: IC('<rect x="3" y="9" width="28" height="14" rx="3" fill="#ffb547"/><path d="M6 12h6v5H6zM14 12h6v5h-6zM22 12h6v5h-6z" fill="#2b3a55"/><circle cx="10" cy="24" r="3.5" fill="#2a3348"/><circle cx="24" cy="24" r="3.5" fill="#2a3348"/>'),
+  mid: IC('<path d="M2 17h30" stroke="#2a3348" stroke-width="6"/><path d="M17 5v24" stroke="#72d4e8" stroke-width="2" stroke-dasharray="3 3"/>'),
+  graph: IC('<path d="M5 3v26h26" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M5 29l12-10l12-14" fill="none" stroke="#ffb547" stroke-width="2.4"/>'),
+  chord: IC('<path d="M5 29l12-10l12-14" fill="none" stroke="#ffb547" stroke-width="2"/><path d="M5 29L29 5" stroke="#72d4e8" stroke-width="2" stroke-dasharray="4 3"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  const t = (ok, s) => `${s} ${ok ? '✓' : '—'}`;
+  if (id === 'path') return [t(m.school, 'До школы кратчайшим путём'), t(m.back, 'Домой')].join(' · ');
+  if (id === 'speed') return [t(m.ride, '600 м за 2 мин'), t(m.kmh, 'км/ч')].join(' · ');
+  if (id === 'graph') return [t(m.match, 'График совпал'), t(m.read, 'Путь за 6 с')].join(' · ');
+  return S.trip ? `Последняя поездка: vср = ${fmt(S.trip.avg, 1)} км/ч` : 'Поездки ещё не было';
+}
+
+// Scheme tab: built once per lesson, then values refreshed (sliders keep focus while dragging)
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'path') h = `<h2>Карта района</h2><dl class="reads"><div><dt>путь s</dt><dd id="r1"></dd></div><div><dt>перемещение</dt><dd id="r2"></dd></div><div><dt>где</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Шаг на один квартал (100 м)</div><div class="row"><button class="ghostbtn" data-a="w-l">← запад</button><button class="ghostbtn" data-a="w-u">↑ север</button><button class="ghostbtn" data-a="w-d">↓ юг</button><button class="ghostbtn" data-a="w-r">→ восток</button></div></div>
+      <div class="row"><button class="ghostbtn" data-a="reset">Сначала</button></div>`;
+  if (id === 'speed') h = `<h2>Заезд на 600 м</h2>` + slider('inV', 'Скорость велосипедиста', 1, 15, 0.5, S.v) +
+      `<dl class="reads"><div><dt>время t</dt><dd id="r1"></dd></div><div><dt>путь s</dt><dd id="r2"></dd></div><div><dt>финиш</dt><dd id="r3"></dd></div></dl>
+      <div class="row"><button class="ghostbtn" data-a="go">Старт</button><button class="ghostbtn" data-a="reset">Сброс</button></div>` +
+      (S.ride ? `<div class="ctl"><div class="lbl">Сколько это в км/ч?</div><div class="chips" id="kmhChips">${L().kmhOpts.map(k => `<button data-a="kmh-${k}" aria-pressed="${S.kmh && Math.abs(k - L().dist / L().need * 3.6) < 1e-9}">${k} км/ч</button>`).join('')}</div></div>` : '') +
+      `<p class="note" style="margin-top:12px">Время на площадке идёт в ${SPEEDUP} раз быстрее настоящего. Голубые точки ставятся каждые 10 с.</p>`;
+  if (id === 'graph') h = `<h2>Бегун и график</h2>` + slider('inV', 'Скорость вашего бегуна', 1, 6, 0.5, S.v) + slider('inT', 'Курсор времени', 0, 10, 0.5, S.tc) +
+      `<dl class="reads"><div><dt>t</dt><dd id="r1"></dd></div><div><dt>ваш путь</dt><dd id="r2"></dd></div><div><dt>совпал?</dt><dd id="r3"></dd></div></dl>
+      <div class="row"><button class="ghostbtn" data-a="play">Пуск / пауза</button></div>`;
+  if (id === 'avg') h = `<h2>Поездка A → Б</h2>` + slider('inV2', 'Скорость на второй половине', 30, 150, 10, S.v2) +
+      `<dl class="reads"><div><dt>v₁</dt><dd>60 км/ч</dd></div><div><dt>в пути</dt><dd id="r1"></dd></div><div><dt>vср</dt><dd id="r2"></dd></div></dl>
+      <div class="row"><button class="ghostbtn" data-a="drive">Поехали</button><button class="ghostbtn" data-a="reset">Сброс</button></div>
+      <p class="note" style="margin-top:12px">Средняя скорость появится после поездки. Час пути на площадке длится 2 секунды.</p>`;
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn); };
+  on('#inV', e => setV(+e.target.value));
+  on('#inT', e => { S.play = false; renderTools(); setTc(+e.target.value); });
+  on('#inV2', e => setV2(+e.target.value));
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (id === 'path') { set('#r1', m.s + ' м'); set('#r2', nf(m.d) + ' м'); set('#r3', m.atHome ? 'дома' : m.atSchool ? 'у школы' : 'в пути'); }
+  if (id === 'speed') { set('#inVO', nf(S.v) + ' м/с'); val('#inV', S.v); set('#r1', fmt(m.t, 1) + ' с'); set('#r2', fmt(m.s, 0) + ' м'); set('#r3', S.finT != null && !S.run && m.s >= L().dist ? fmt(S.finT, 1) + ' с' : '—'); }
+  if (id === 'graph') { set('#inVO', nf(S.v) + ' м/с'); val('#inV', S.v); set('#inTO', nf(S.tc) + ' с'); val('#inT', S.tc); set('#r1', nf(m.tc) + ' с'); set('#r2', nf(m.s) + ' м'); set('#r3', m.match ? 'да' : 'нет'); }
+  if (id === 'avg') { set('#inV2O', S.v2 + ' км/ч'); val('#inV2', S.v2); set('#r1', fmt(S.tt, 2) + ' ч'); set('#r2', S.trip ? fmt(S.trip.avg, 1) + ' км/ч' : '—'); }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'path') return [
+    { id: 'map', icon: ICON.map, name: 'Карта района', spec: 'Ходить можно только по улицам. Сторона квартала — 100 м.' },
+    { id: 'home', icon: ICON.home, name: 'Дом', spec: 'Начальная точка. От неё отсчитываем и путь, и перемещение.' },
+    { id: 'school', icon: ICON.school, name: 'Школа', spec: 'Цель. Сдвинута на 4 квартала на восток и на 3 квартала на север.' },
+    { id: 'walker', icon: ICON.walker, name: 'Человечек', spec: 'Это тело, которое движется. Тело отсчёта — дома и улицы.' },
+    { id: 'trail', icon: ICON.trail, name: 'Траектория', spec: 'Оранжевая линия — всё, где вы прошли. Её длина — путь s.' },
+    { id: 'disp', icon: ICON.disp, name: 'Перемещение', spec: 'Голубая стрелка от дома до вас. У неё есть длина и направление.' },
+    { id: 'scale', icon: ICON.scale, name: 'Масштаб', spec: 'Отрезок на карте, равный 100 м на местности.' }];
+  if (id === 'speed') return [
+    { id: 'road', icon: ICON.road, name: 'Дорога', spec: 'Прямой участок 600 м, отметки через каждые 100 м.' },
+    { id: 'flags', icon: ICON.flags, name: 'Старт и финиш', spec: 'Время засекают на старте и останавливают на финише.' },
+    { id: 'bike', icon: ICON.bike, name: 'Велосипедист', spec: 'Едет равномерно: скорость всё время одна и та же.' },
+    { id: 'board', icon: ICON.board, name: 'Табло', spec: 'Показывает время с начала заезда и пройденный путь.' },
+    { id: 'marks', icon: ICON.marks, name: 'Метки каждые 10 с', spec: 'Расстояния между метками одинаковые — это и есть равномерное движение.' }];
+  if (id === 'graph') return [
+    { id: 'track', icon: ICON.track, name: 'Беговая дорожка', spec: 'Два бегуна: серый бежит «по пунктиру», оранжевый — ваш.' },
+    { id: 'sgraph', icon: ICON.sgraph, name: 'График пути s(t)', spec: 'По горизонтали — время, по вертикали — путь. Прямая — равномерное движение.' },
+    { id: 'target', icon: ICON.target, name: 'Пунктир', spec: 'График, с которым надо совместить ваш.' },
+    { id: 'vgraph', icon: ICON.vgraph, name: 'График скорости v(t)', spec: 'Горизонтальная линия. Закрашенная площадь равна пройденному пути.' },
+    { id: 'cursor', icon: ICON.cursor, name: 'Курсор времени', spec: 'Тяните его по графику — бегуны встанут туда, где были в этот момент.' }];
+  return [
+    { id: 'road', icon: ICON.road, name: 'Трасса A → Б', spec: '120 км. Первые 60 км автобус едет со скоростью 60 км/ч.' },
+    { id: 'mid', icon: ICON.mid, name: 'Середина пути', spec: 'После неё скорость меняется на ту, что вы выбрали.' },
+    { id: 'bus', icon: ICON.bus, name: 'Автобус', spec: 'На каждой половине пути едет равномерно.' },
+    { id: 'graph', icon: ICON.graph, name: 'График пути', spec: 'Ломаная из двух отрезков: круче — значит быстрее. Зелёный пунктир — 80 км/ч.' },
+    { id: 'chord', icon: ICON.chord, name: 'Линия средней скорости', spec: 'Голубой пунктир от начала до конца поездки. Его наклон — средняя скорость.' }];
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Что на площадке</h2><p class="note">Нажмите на деталь, чтобы найти её на площадке.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID(), Ls = L();
+  if (id === 'path') {
+    const dc = S.pos.c - Ls.home.c, dr = Ls.home.r - S.pos.r, a = Math.abs(dc) * 100, b = Math.abs(dr) * 100;
+    return `<h2>Путь и перемещение</h2><div class="formula">s = l₁ + l₂ + …</div><div class="formula">|перемещение| = √(a² + b²)</div>
+      <p class="note">a — сдвиг на восток или запад, b — на север или юг. Это теорема Пифагора: перемещение — гипотенуза прямоугольного треугольника.</p>
+      <h3>Сейчас</h3><div class="steps">` +
+      step('кварталов пройдено', `${S.trail.length - 1}`) + step('путь s', `${S.trail.length - 1} × 100 = ${m.s} м`, 'sum') +
+      step('a (восток–запад)', `${a} м`) + step('b (север–юг)', `${b} м`) +
+      step('перемещение', `√(${a}² + ${b}²) = ${nf(m.d)} м`, 'sum') +
+      step('сравнение', m.s === 0 ? 'пока стоим' : `s ${m.s > m.d + 1e-9 ? '>' : '='} перемещения`) + `</div>
+      <p class="note" style="margin-top:10px">Путь всегда больше перемещения или равен ему. Равны они, только когда тело идёт по прямой и не поворачивает назад.</p>`;
+  }
+  if (id === 'speed') {
+    const tf = Ls.dist / S.v;
+    return `<h2>Скорость</h2><div class="formula">v = s / t    t = s / v</div><p class="note">s — путь, t — время. В СИ: s в метрах, t в секундах, v в м/с.</p>
+      <h3>Нужно</h3><div class="steps">` + step('путь s', `${Ls.dist} м`) + step('время t', `2 мин = 2 × 60 = ${Ls.need} с`) + step('скорость', 'v = s / t = ?', 'sum') + `</div>
+      <h3>При вашей скорости</h3><div class="steps">` + step('v', `${nf(S.v)} м/с`) + step('время до финиша', `${Ls.dist} / ${nf(S.v)} = ${fmt(tf, 1)} с`, 'sum') +
+      step('сейчас', `s = ${nf(S.v)} × ${fmt(S.t, 1)} = ${fmt(sRun(), 0)} м`) + `</div>
+      <h3>Перевод в км/ч</h3><div class="steps">` + step('1 м/с', '3600 м / 3600 с = 3,6 км/ч') + step(`${nf(S.v)} м/с`, S.kmh ? `${nf(S.v)} × 3,6 = ${nf(S.v * 3.6)} км/ч` : `${nf(S.v)} × 3,6 = ?`, 'sum') + `</div>`;
+  }
+  if (id === 'graph') {
+    const sc = s3(S.v, S.tc);
+    return `<h2>Чтение графика</h2><div class="formula">s = v · t</div><p class="note">Чтобы найти скорость по графику, возьмите любую точку прямой и разделите путь на время.</p>
+      <h3>Пунктир</h3><div class="steps">` + step('точка на пунктире', `t = 10 с, s = ${Ls.vTarget * 10} м`) + step('его скорость', 'v = s / t = ?', 'sum') + `</div>
+      <h3>Ваш бегун</h3><div class="steps">` + step('v', `${nf(S.v)} м/с`) + step('курсор t', `${nf(S.tc)} с`) +
+      step('путь', `s = ${nf(S.v)} × ${nf(S.tc)} = ${nf(sc)} м`, 'sum') + step('площадь под v(t)', `${nf(S.v)} × ${nf(S.tc)} = ${nf(S.v * S.tc)}`) + `</div>
+      <p class="note" style="margin-top:10px">${m.match ? 'Графики совпали: у бегунов одинаковая скорость.' : S.v < Ls.vTarget ? 'Ваш график идёт положе пунктира: ваш бегун медленнее.' : 'Ваш график идёт круче пунктира: ваш бегун быстрее.'}</p>`;
+  }
+  const v2 = S.v2, t2 = 60 / v2, Tt = tripT(v2);
+  return `<h2>Средняя скорость</h2><div class="formula">vср = (s₁ + s₂) / (t₁ + t₂)</div><p class="note">Время каждого участка: t = s / v.</p>
+    <h3>При v₂ = ${v2} км/ч</h3><div class="steps">` +
+    step('t₁', `60 / 60 = 1 ч`) + step('t₂', `60 / ${v2} = ${fmt(t2, 2)} ч`) + step('всё время', `1 + ${fmt(t2, 2)} = ${fmt(Tt, 2)} ч`) +
+    step('vср', S.trip && S.trip.v2 === v2 ? `120 / ${fmt(Tt, 2)} = ${fmt(avgOf(v2), 1)} км/ч` : 'проверьте поездкой', 'sum') + `</div>
+    <h3>Подсказка к цели</h3><div class="steps">` + step('всё время при 80 км/ч', '120 / 80 = ? ч') + step('на вторую половину', 'всё время − 1 ч') + step('v₂', '60 км / это время', 'sum') + `</div>
+    <p class="note" style="margin-top:10px">Среднее арифметическое (60 + v₂) / 2 здесь не работает: на медленной половине автобус едет дольше.</p>`;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter');
+  if (id === 'path') el.innerHTML = `<div class="k">Путь</div><div class="v ${S.back ? 'ok' : ''}">s = ${m.s} м</div><div class="lr"><span>перемещение</span><span>${nf(m.d)} м</span></div>`;
+  else if (id === 'speed') el.innerHTML = `<div class="k">Велосипедист</div><div class="v ${S.ride ? 'ok' : ''}">v = ${nf(S.v)} м/с</div><div class="lr"><span>t</span><span>${fmt(m.t, 1)} с</span></div><div class="lr"><span>s</span><span>${fmt(m.s, 0)} м</span></div>`;
+  else if (id === 'graph') el.innerHTML = `<div class="k">Ваш бегун</div><div class="v ${m.match ? 'ok' : ''}">v = ${nf(S.v)} м/с</div><div class="lr"><span>t</span><span>${nf(m.tc)} с</span></div><div class="lr"><span>s</span><span>${nf(m.s)} м</span></div>`;
+  else el.innerHTML = `<div class="k">Автобус</div><div class="v ${S.ok ? 'ok' : ''}">v₂ = ${S.v2} км/ч</div><div class="lr"><span>t</span><span>${fmt(S.tt, 2)} ч</span></div><div class="lr"><span>vср</span><span class="${S.trip ? (S.ok ? 'ok' : 'bad') : ''}">${S.trip ? fmt(S.trip.avg, 1) : '—'}</span></div>`;
+}
+
+function update() {
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Теперь вы умеете описывать движение!'), 1600);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  path: '<path d="M8 25V15h14V6h14" fill="none" stroke="#ffb547" stroke-width="2" stroke-linejoin="round"/><path d="M8 25L34 7" stroke="#72d4e8" stroke-width="1.6"/><circle cx="8" cy="25" r="2.5" fill="#e8ecf4"/><path d="M44 10h16M44 16h16M44 22h16M48 6v20M56 6v20" stroke="#3a4762" stroke-width="1"/>',
+  speed: '<path d="M2 22h62" stroke="#2a3348" stroke-width="5"/><circle cx="24" cy="17" r="4" fill="none" stroke="#e8ecf4" stroke-width="1.2"/><circle cx="34" cy="17" r="4" fill="none" stroke="#e8ecf4" stroke-width="1.2"/><path d="M24 17l4-6h4l2 6" fill="none" stroke="#ffb547" stroke-width="1.2"/><circle cx="10" cy="27" r="1.5" fill="#72d4e8"/><circle cx="46" cy="27" r="1.5" fill="#72d4e8"/>',
+  graph: '<path d="M6 4v22h28" fill="none" stroke="#e8ecf4" stroke-width="1"/><path d="M6 26L32 8" stroke="#ffb547" stroke-width="1.6"/><path d="M6 26L32 16" stroke="#8b96ad" stroke-dasharray="2 2"/><path d="M40 4v22h22" fill="none" stroke="#e8ecf4" stroke-width="1"/><rect x="41" y="14" width="14" height="12" fill="rgba(255,181,71,.35)"/><path d="M40 14h22" stroke="#ffb547" stroke-width="1.6"/>',
+  avg: '<path d="M6 4v22h56" fill="none" stroke="#e8ecf4" stroke-width="1"/><path d="M6 26l22-10l18-12" fill="none" stroke="#ffb547" stroke-width="1.6"/><path d="M6 26L46 4" stroke="#72d4e8" stroke-dasharray="3 2"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Lx, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Lx.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Lx.title}</span></span>
+      ${S.done[Lx.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  S.lesson = i; drag = null;
+  resetState(); save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L().task;
+  $('#hint').textContent = L().stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '';
+  if (id === 'path') now = `Карта района, квартал 100 м. Школа на 4 квартала восточнее и 3 квартала севернее дома. Человечек ${m.atHome ? 'дома' : m.atSchool ? 'у школы' : 'в пути'}; пройденный путь ${m.s} м, модуль перемещения от дома ${nf(m.d)} м. До школы кратчайшим путём ${S.school ? 'дошёл' : 'ещё не дошёл'}, домой ${S.back ? 'вернулся' : 'ещё не вернулся'}.`;
+  if (id === 'speed') now = `Велосипедист на прямой 600 м, время на площадке ускорено в ${SPEEDUP} раз. Выбранная скорость ${nf(S.v)} м/с, время ${fmt(m.t, 1)} с, путь ${fmt(m.s, 0)} м${S.finT != null ? `, последний финиш за ${fmt(S.finT, 1)} с` : ''}. Заезд ровно за 120 с ${S.ride ? 'получился' : 'ещё не получился'}; перевод в км/ч ${S.kmh ? 'сделан' : 'не сделан'}. Нужную скорость и ответ в км/ч не называй — наводи вопросами (сколько секунд в 2 минутах, что значит v = s / t, сколько км/ч в 1 м/с).`;
+  if (id === 'graph') now = `Беговая дорожка 60 м, графики s(t) и v(t). Пунктир: прямая через точку t = 10 с, s = ${Ls.vTarget * 10} м. Скорость бегуна ученика ${nf(S.v)} м/с, ${m.match ? 'график совпал с пунктиром' : `график ${S.v < Ls.vTarget ? 'положе' : 'круче'} пунктира`}. Курсор времени на ${nf(S.tc)} с, путь в этот момент ${nf(m.s)} м. Путь за 6 с ${S.read ? 'найден' : 'ещё не найден'}. Скорость пунктира не называй — пусть ученик найдёт её как s / t по точке графика.`;
+  if (id === 'avg') now = `Автобус едет 120 км: первые 60 км со скоростью 60 км/ч, вторые 60 км — со скоростью v₂, которую выбирает ученик (сейчас ${S.v2} км/ч). Цель — средняя скорость 80 км/ч. ${S.trip ? `Последняя поездка: v₂ = ${S.trip.v2} км/ч, время ${fmt(S.trip.T, 2)} ч, средняя скорость ${fmt(S.trip.avg, 1)} км/ч.` : 'Поездки ещё не было.'} Задание ${S.ok ? 'выполнено' : 'не выполнено'}. Ответ (нужную v₂) не называй; частая ошибка — ответ 100 км/ч как среднее арифметическое. Наводи: сколько часов должна длиться вся поездка, сколько ушло на первую половину.`;
+  return [
+    `Раздел: физика, 7 класс, тема «Механическое движение». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'} (${taskState(m)}).`,
+    `Сейчас на площадке: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Помогай наводящими вопросами, готовые ответы не выдавай.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { path: 'Может ли перемещение быть больше пути?', speed: 'Почему 1 м/с — это 3,6 км/ч?', graph: 'Как по графику понять, кто быстрее?', avg: 'Почему средняя скорость — не среднее арифметическое?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

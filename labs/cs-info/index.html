@@ -1,0 +1,928 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по информатике, 5 класс: что такое информация, кодирование азбукой Морзе, биты и байты.">
+<title>Информация</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag],.scene [data-hit]{cursor:pointer}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+.scene .sans{font-family:var(--font-body)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--arm);transition:width .2s}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button.big{font:600 15px/1 var(--font-mono);color:var(--fg);min-width:34px}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:22%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.chips button:disabled{opacity:.35;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.mtab{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:8px}
+.mtab span{background:var(--surface-2);border-radius:7px;padding:6px 7px;font:500 12.5px/1.2 var(--font-mono);display:flex;justify-content:space-between;gap:4px;min-width:0}
+.mtab span b{font-weight:600;color:var(--fg)}
+.mtab span i{font-style:normal;color:var(--force);letter-spacing:.06em}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:470px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mtab{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(100vw + 180px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><circle cx="11" cy="20" r="3" fill="var(--force)"/><rect x="17" y="18" width="12" height="4" rx="2" fill="var(--arm)"/><circle cx="34" cy="20" r="1.6" fill="var(--fg)"/><path d="M8 11h24M8 29h24" stroke="var(--fg)" stroke-width="2" stroke-linecap="round" opacity=".5"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Информатика · Информация</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#cs">Карта</a><a href="/physics/#cs">Информатика</a><a href="/labs/cs-info/" aria-current="page">Информация</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Информация</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Рабочий стол лаборатории">
+    <svg class="scene" id="scene" role="img" aria-label="Интерактивная сцена: карточки можно перетаскивать, ключ и лампочки — нажимать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const big = n => Math.round(n).toLocaleString('ru-RU');
+const fmt = (x, n = 1) => (Math.round(x * 10 ** n) / 10 ** n).toFixed(n).replace('.', ',');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c; };
+const INK = '#04070d';
+
+const LESSONS = [
+  { id: 'what', title: 'Что такое информация',
+    text: ['Информация — это сведения о мире вокруг нас и о нас самих. Звонок на урок сообщает, что перемена кончилась. Запах дыма предупреждает об опасности. Даже вкус супа говорит, посолили его или нет.',
+           'Человек получает информацию органами чувств: глазами, ушами, носом, языком и кожей. По этому признаку её делят на зрительную, звуковую, обонятельную, вкусовую и тактильную (на ощупь). Больше всего сведений мы получаем глазами.',
+           'С информацией всегда что-то происходит: её собирают, хранят, передают и обрабатывают. Ты слушаешь учителя — получаешь, записываешь в тетрадь — сохраняешь, решаешь задачу — обрабатываешь.'],
+    why: 'Дизайнер приложений решает, что пользователь увидит на экране, а что услышит в звуковом сигнале, — от этого зависит, удобна ли программа. Звукорежиссёр работает со звуковой информацией, а технолог пищевого производства и дегустатор — со вкусом и запахом: в Казахстане такие люди нужны на каждом молочном и кондитерском заводе. А в жизни это помогает понимать сигналы вокруг: сирену, светофор, запах газа на кухне.',
+    task: 'Разложите все 8 карточек по органам чувств: чем человек получает эти сведения?',
+    hint: 'Про каждую карточку спросите себя: чем я это замечаю — вижу, слышу, нюхаю, пробую на вкус или трогаю? Перетащите карточку к органу чувств или нажмите на карточку, а потом на орган.',
+    stage: 'Тащите карточку к органу чувств. Неверно — карточка вернётся.',
+    cards: [
+      { id: 'light', name: 'Красный свет светофора', short: 'Светофор', g: 'eye' },
+      { id: 'bell', name: 'Звонок на урок', short: 'Звонок', g: 'ear' },
+      { id: 'smoke', name: 'Запах дыма', short: 'Дым', g: 'nose' },
+      { id: 'mug', name: 'Горячая кружка в руке', short: 'Кружка', g: 'hand' },
+      { id: 'lemon', name: 'Кислый вкус лимона', short: 'Лимон', g: 'tongue' },
+      { id: 'book', name: 'Буквы в учебнике', short: 'Учебник', g: 'eye' },
+      { id: 'bark', name: 'Шершавая кора дерева', short: 'Кора', g: 'hand' },
+      { id: 'dombra', name: 'Мелодия домбры', short: 'Домбра', g: 'ear' }],
+    check: m => m.placed === m.total },
+  { id: 'code', title: 'Кодирование: азбука Морзе',
+    text: ['Закодировать информацию — значит записать её условными знаками по договорённым правилам. Правила собирают в кодовую таблицу. Буквы, цифры, ноты, дорожные знаки и штрихкод на упаковке — всё это коды.',
+           'Азбука Морзе кодирует каждую букву всего двумя знаками: короткий сигнал — точка, длинный — тире. Например, А = «· −», Т = «−». Такие сигналы удобно передавать по проводу телеграфа, фонариком или по радио.',
+           'Компьютер тоже пользуется кодом из двух знаков — 0 и 1. Любой текст, картинка и звук внутри него превращаются в длинные цепочки нулей и единиц.'],
+    why: 'Программисты и специалисты по кибербезопасности каждый день работают с кодами: банковское приложение шифрует твои данные, чтобы их не украли, — это кодирование. Связисты, лётчики и моряки до сих пор знают азбуку Морзе: радиомаяки аэропортов передают свои позывные именно ею. А штрихкоды и QR-коды на кассе в магазине экономят продавцу часы работы.',
+    task: 'Передайте телеграфным ключом слово «ЛУЧ».',
+    hint: 'Найдите в кодовой таблице код каждой буквы. Короткое нажатие на ключ — точка, долгое — тире. Когда буква набрана, подождите секунду или нажмите «Буква ⏎».',
+    stage: 'Нажимайте ключ: коротко — точка, долго — тире. Пауза заканчивает букву.',
+    target: 'ЛУЧ',
+    check: m => m.text === 'ЛУЧ' },
+  { id: 'bits', title: 'Биты и байты',
+    text: ['Бит — самая маленькая порция информации: выбор из двух вариантов. Да или нет, 0 или 1, лампочка горит или не горит.',
+           'Каждый новый бит удваивает число вариантов. Одна лампочка даёт 2 сигнала, две — 4, три — 8. N лампочек дают 2ᴺ разных комбинаций.',
+           '8 бит называют байтом. В одном байте 256 комбинаций — этого хватает, чтобы закодировать одну букву, цифру или знак. Дальше идут килобайт (1 Кбайт = 1024 байта), мегабайт и гигабайт.'],
+    why: 'Сетевой инженер и программист считают биты и байты каждый день: сколько места займёт база данных, выдержит ли сеть. В жизни это помогает выбирать тариф: интернет на 100 Мбит/с качает около 12,5 Мбайт в секунду — делим на 8. Понимая гигабайты, ты не переплатишь за флешку или тариф мобильного интернета и прикинешь, сколько фото поместится в телефон.',
+    task: 'В классе 30 учеников. Найдите наименьшее число лампочек, чтобы у каждого был свой код, и нажмите «Хватит!».',
+    hint: 'Добавляйте лампочки по одной и следите, скольким ученикам хватает кодов. Каждая лампочка удваивает число комбинаций.',
+    stage: 'Нажмите на лампочку, чтобы включить её. Кнопки «+» и «−» меняют число лампочек.',
+    students: 30,
+    check: m => m.answer === 5 },
+];
+
+const KEY = 'luch-cs-info';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview',
+            place: {}, miss: 0, sel: null, lastBad: null,
+            letters: [], buf: '', dotMs: 250, sound: true, keyDown: false,
+            n: 1, bits: [], answer: null, hl: null };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+
+// ---------- lesson 1: senses ----------
+const SENSES = [
+  { id: 'eye', name: 'Зрение', organ: 'глаза', kind: 'зрительная' },
+  { id: 'ear', name: 'Слух', organ: 'уши', kind: 'звуковая' },
+  { id: 'nose', name: 'Обоняние', organ: 'нос', kind: 'обонятельная' },
+  { id: 'tongue', name: 'Вкус', organ: 'язык', kind: 'вкусовая' },
+  { id: 'hand', name: 'Осязание', organ: 'кожа', kind: 'тактильная' },
+];
+const GQ = { // guiding questions after a wrong drop (no answers)
+  light: 'Свет светофора можно услышать или потрогать? Чем ты замечаешь его цвет?',
+  bell: 'Звонок звенит в коридоре, а ты в классе. Как ты узнаёшь, что он прозвенел?',
+  smoke: 'Дым в соседней комнате ещё не видно. Чем ты его почувствуешь первым?',
+  mug: 'Горячая она или холодная, по виду не скажешь. Что подскажет — ладонь или глаза?',
+  lemon: 'Кислоту лимона нельзя увидеть. Когда ты её чувствуешь?',
+  book: 'Учебник молчит и не пахнет буквами. Как ты читаешь слова?',
+  bark: 'Шершавость — это про то, какая поверхность на ощупь. Чем ты её проверяешь?',
+  dombra: 'Мелодию можно сыграть в темноте, и ты её всё равно узнаешь. Почему?',
+};
+const CARD = { w: 168, h: 30 };
+const cardHome = i => ({ x: 8 + (i % 2) * 176, y: 92 + (i >> 1) * 36 });
+const ZONE = { y: 250, w: 66, h: 148 };
+const zoneX = i => 6 + i * 70;
+
+// ---------- lesson 2: Morse ----------
+const MORSE = { А: '·−', Б: '−···', В: '·−−', Г: '−−·', Д: '−··', Е: '·', Ж: '···−', З: '−−··', И: '··', Й: '·−−−', К: '−·−', Л: '·−··', М: '−−', Н: '−·',
+  О: '−−−', П: '·−−·', Р: '·−·', С: '···', Т: '−', У: '··−', Ф: '··−·', Х: '····', Ц: '−·−·', Ч: '−−−·', Ш: '−−−−', Щ: '−−·−', Ы: '−·−−', Ь: '−··−', Э: '··−··', Ю: '··−−', Я: '·−·−' };
+const REV = {}; for (const [k, v] of Object.entries(MORSE)) REV[v] = k;
+const CHEAT = ['А', 'Е', 'И', 'Л', 'О', 'С', 'У', 'Ч'];
+const decode = c => REV[c] || '?';
+
+// ---------- lesson 3: bits ----------
+const MAXN = 8;
+const bitsValue = () => { let v = 0; for (let i = 0; i < S.n; i++) v = v * 2 + (S.bits[i] ? 1 : 0); return v; };
+
+function model() {
+  const id = LID();
+  if (id === 'what') {
+    const cards = L().cards, placed = cards.filter(c => S.place[c.id]).length;
+    return { kind: 'sort', placed, total: cards.length, miss: S.miss };
+  }
+  if (id === 'code') {
+    const text = S.letters.map(decode).join('');
+    const signals = S.letters.join('').length + S.buf.length;
+    return { kind: 'morse', text, buf: S.buf, preview: S.buf ? (REV[S.buf] || '?') : '', signals };
+  }
+  const combos = 2 ** S.n, v = bitsValue();
+  return { kind: 'bits', n: S.n, combos, code: S.bits.slice(0, S.n).map(b => b ? 1 : 0).join(''), v, enough: combos >= L().students, answer: S.answer };
+}
+
+// ---------- drawing ----------
+const ol = (d, fill, stroke, w = 2.2, extra = '') => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${w + 2.6}" stroke-linejoin="round" stroke-linecap="round"/><path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round" ${extra}/>`;
+
+function senseIcon(id, col) {
+  const s = `fill="none" stroke="${col}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"`;
+  if (id === 'eye') return `<path d="M-15 0Q0 -13 15 0Q0 13 -15 0Z" ${s}/><circle r="5.5" fill="#72d4e8"/><circle r="2.3" fill="${INK}"/>`;
+  if (id === 'ear') return `<path d="M-5 12Q-9 6 -9 -2Q-9 -13 1 -13Q10 -13 10 -3Q10 3 4 6Q1 8 1 11Q0 15 -5 13" ${s}/><path d="M-3 -2Q-3 -7 1 -7Q5 -7 5 -3" ${s}/>`;
+  if (id === 'nose') return `<path d="M-1 -14Q-2 -1 -9 6Q-11 11 -5 11Q-2 14 1 11Q4 14 7 11Q11 9 7 5Q2 -1 2 -14" ${s}/>`;
+  if (id === 'tongue') return `<path d="M-14 -3Q0 -9 14 -3Q9 11 0 11Q-9 11 -14 -3Z" ${s}/><path d="M-6 0Q0 -2 6 0Q6 8 0 8Q-6 8 -6 0Z" fill="#ff8a9a"/>`;
+  return `<rect x="-9" y="-1" width="17" height="13" rx="5" fill="none" stroke="${col}" stroke-width="2"/><path d="M-6 -1V-10M-1.5 -1V-14M3 -1V-12M7.5 2V-6M-9 6L-14 0" ${s} stroke-width="2.6"/>`;
+}
+
+function drawSort(t) {
+  const Ls = L();
+  let h = '';
+  // sense zones
+  SENSES.forEach((z, i) => {
+    const x = zoneX(i), sel = S.sel !== null;
+    const bad = S.lastBad && S.lastBad.z === z.id && t - S.lastBad.t < 700;
+    h += `<g data-hit="zone:${z.id}"><rect x="${x}" y="${ZONE.y}" width="${ZONE.w}" height="${ZONE.h}" rx="10" fill="${bad ? 'rgba(255,138,115,.14)' : '#141d2e'}" stroke="${bad ? '#ff8a73' : sel ? '#72d4e8' : '#26324a'}" stroke-width="1.6" ${sel && !bad ? 'stroke-dasharray="5 4"' : ''}/>`;
+    h += `<g transform="translate(${x + ZONE.w / 2} ${ZONE.y + 26})">${senseIcon(z.id, '#e8ecf4')}</g>`;
+    h += `<text x="${x + ZONE.w / 2}" y="${ZONE.y + 60}" font-size="9.5" fill="#e8ecf4" text-anchor="middle" class="sans" font-weight="600">${z.name}</text>`;
+    let k = 0;
+    for (const c of Ls.cards) if (S.place[c.id] === z.id) {
+      const y = ZONE.y + 70 + k * 26; k++;
+      h += `<rect x="${x + 4}" y="${y}" width="${ZONE.w - 8}" height="22" rx="6" fill="#1f3a2f" stroke="#86e0a8" stroke-width="1.2"/><text x="${x + ZONE.w / 2}" y="${y + 14.5}" font-size="8.6" fill="#e8ecf4" text-anchor="middle" class="sans">${c.short}</text>`;
+    }
+    h += `</g>`;
+  });
+  // cards
+  Ls.cards.forEach((c, i) => {
+    if (S.place[c.id]) return;
+    const o = P[c.id], home = cardHome(i);
+    h += `<rect x="${home.x}" y="${home.y}" width="${CARD.w}" height="${CARD.h}" rx="8" fill="none" stroke="#26324a" stroke-dasharray="4 4"/>`;
+  });
+  const order = Ls.cards.filter(c => !S.place[c.id]).sort((a, b) => (drag && drag.id === a.id ? 1 : 0) - (drag && drag.id === b.id ? 1 : 0));
+  for (const c of order) {
+    const o = P[c.id], sel = S.sel === c.id;
+    h += `<g transform="translate(${o.x.toFixed(1)} ${o.y.toFixed(1)})" data-drag="${c.id}">`;
+    h += ol(`M8 0H${CARD.w - 8}Q${CARD.w} 0 ${CARD.w} 8V${CARD.h - 8}Q${CARD.w} ${CARD.h} ${CARD.w - 8} ${CARD.h}H8Q0 ${CARD.h} 0 ${CARD.h - 8}V8Q0 0 8 0Z`, sel ? '#2a3a56' : '#1d2940', sel ? '#ffb547' : '#56627d', 1.6);
+    h += `<circle cx="14" cy="${CARD.h / 2}" r="3" fill="${sel ? '#ffb547' : '#72d4e8'}"/>`;
+    h += `<text x="24" y="${CARD.h / 2 + 4}" font-size="11" fill="#e8ecf4" class="sans">${c.name}</text></g>`;
+  }
+  h += `<text x="180" y="82" font-size="9" fill="#8b96ad" text-anchor="middle">сведения</text>`;
+  h += `<text x="180" y="244" font-size="9" fill="#8b96ad" text-anchor="middle">органы чувств</text>`;
+  return h;
+}
+
+function symbolsSVG(code, x, y, col, k = 1) { // draws dots and dashes; returns [svg, width]
+  let h = '', cx = x;
+  for (const ch of code) {
+    if (ch === '·') { h += `<circle cx="${(cx + 3 * k).toFixed(1)}" cy="${y}" r="${3 * k}" fill="${col}"/>`; cx += 11 * k; }
+    else { h += `<rect x="${cx.toFixed(1)}" y="${y - 2.5 * k}" width="${14 * k}" height="${5 * k}" rx="${2.5 * k}" fill="${col}"/>`; cx += 19 * k; }
+  }
+  return [h, cx - x];
+}
+
+function drawMorse(t) {
+  const m = model();
+  let h = '';
+  // paper tape
+  h += `<rect x="6" y="94" width="348" height="34" rx="4" fill="#efe9da" stroke="${INK}" stroke-width="1.6"/>`;
+  let parts = [], w = 0;
+  S.letters.forEach(c => { const [s, ww] = symbolsSVG(c, 0, 0, '#0b1019'); parts.push({ c, ww, cur: false }); w += ww + 12; });
+  if (S.buf) { const [, ww] = symbolsSVG(S.buf, 0, 0, '#0b1019'); parts.push({ c: S.buf, ww, cur: true }); w += ww; }
+  let x = 14 + Math.min(0, 332 - w);
+  h += `<g clip-path="url(#tapeClip)">`;
+  for (const p of parts) { const [s] = symbolsSVG(p.c, x, 111, p.cur ? '#c2410c' : '#0b1019'); h += s; x += p.ww + 12; }
+  h += `</g><text x="350" y="90" font-size="9" fill="#8b96ad" text-anchor="end">лента телеграфа</text>`;
+  // decoded letters
+  const boxes = S.letters.map(c => ({ ch: decode(c), code: c, cur: false }));
+  if (S.buf) boxes.push({ ch: m.preview, code: S.buf, cur: true });
+  const bw = 38, gap = 6, maxB = 8, shown = boxes.slice(-maxB);
+  let bx = 180 - (Math.max(shown.length, 1) * (bw + gap) - gap) / 2;
+  if (!shown.length) h += `<rect x="${bx}" y="140" width="${bw}" height="42" rx="7" fill="none" stroke="#26324a" stroke-dasharray="4 4"/><text x="${bx + bw / 2}" y="167" font-size="16" fill="#56627d" text-anchor="middle">?</text>`;
+  for (const b of shown) {
+    const ok = !b.cur && b.ch !== '?';
+    h += `<rect x="${bx}" y="140" width="${bw}" height="42" rx="7" fill="${b.cur ? 'none' : ok ? '#1d2940' : 'rgba(255,138,115,.12)'}" stroke="${b.cur ? '#ffb547' : ok ? '#56627d' : '#ff8a73'}" stroke-width="1.4" ${b.cur ? 'stroke-dasharray="4 3"' : ''}/>`;
+    h += `<text x="${bx + bw / 2}" y="166" font-size="18" fill="${b.cur ? '#ffb547' : ok ? '#e8ecf4' : '#ff8a73'}" text-anchor="middle" class="sans" font-weight="600">${b.ch}</text>`;
+    h += `<text x="${bx + bw / 2}" y="178" font-size="6.5" fill="#8b96ad" text-anchor="middle">${b.code}</text>`;
+    bx += bw + gap;
+  }
+  h += `<text x="180" y="136" font-size="9" fill="#8b96ad" text-anchor="middle">расшифровка</text>`;
+  // cheat sheet (fragment of the code table)
+  h += `<text x="180" y="198" font-size="9" fill="#8b96ad" text-anchor="middle">кодовая таблица (часть) — вся таблица на вкладке «Схема»</text>`;
+  CHEAT.forEach((ch, i) => {
+    const cx = 8 + (i % 4) * 87, cy = 204 + (i >> 2) * 26;
+    h += `<rect x="${cx}" y="${cy}" width="82" height="22" rx="5" fill="#141d2e" stroke="#26324a"/><text x="${cx + 10}" y="${cy + 15}" font-size="11" fill="#e8ecf4" class="sans" font-weight="600">${ch}</text>`;
+    h += symbolsSVG(MORSE[ch], cx + 24, cy + 11, '#ffb547', 0.8)[0];
+  });
+  // telegraph key + lamp
+  const down = S.keyDown, dy = down ? 7 : 0;
+  h += `<g data-hit="key"><rect x="56" y="262" width="250" height="138" fill="transparent"/>`;
+  h += ol('M70 372h200v16q0 6-6 6H76q-6 0-6-6z', '#5a3a26', '#7a5236', 1.8);
+  h += `<rect x="236" y="352" width="18" height="22" rx="2" fill="#8a96b0" stroke="${INK}" stroke-width="1.4"/>`;
+  h += `<rect x="114" y="364" width="14" height="8" rx="1.5" fill="#c79b4a" stroke="${INK}" stroke-width="1.2"/>`;
+  h += ol(`M245 356L121 ${352 + dy}`, 'none', '#c79b4a', 5);
+  h += `<rect x="117" y="${353 + dy}" width="8" height="10" fill="#c79b4a" stroke="${INK}" stroke-width="1.2"/>`;
+  h += ol(`M100 ${334 + dy}h42v10q0 6-6 6h-30q-6 0-6-6z`, '#1a1a1a', '#3a3a3a', 1.6);
+  h += `<ellipse cx="121" cy="${334 + dy}" rx="21" ry="5" fill="#3a3a3a" stroke="${INK}" stroke-width="1.4"/>`;
+  h += `<text x="170" y="290" font-size="9" fill="#8b96ad" text-anchor="middle">телеграфный ключ</text></g>`;
+  h += `<path d="M254 380Q300 380 312 344" fill="none" stroke="#56627d" stroke-width="2"/>`;
+  if (down) h += `<circle cx="318" cy="324" r="30" fill="#ffd27a" opacity=".22"/>`;
+  h += `<circle cx="318" cy="324" r="15" fill="${down ? '#ffd27a' : '#2a3348'}" stroke="${INK}" stroke-width="2"/><rect x="310" y="338" width="16" height="8" rx="2" fill="#56627d" stroke="${INK}" stroke-width="1.2"/>`;
+  h += `<text x="318" y="362" font-size="9" fill="#8b96ad" text-anchor="middle">лампа</text>`;
+  return h;
+}
+
+function studentSVG(x, y, on, hi, n) {
+  const col = hi ? '#ffb547' : on ? '#72d4e8' : '#3a4762';
+  let h = `<g data-hit="kid:${n}"><rect x="${x - 15}" y="${y - 20}" width="30" height="40" fill="transparent"/>`;
+  h += `<circle cx="${x}" cy="${y - 9}" r="6" fill="${col}"/><path d="M${x - 10} ${y + 12}Q${x - 10} ${y} ${x} ${y}Q${x + 10} ${y} ${x + 10} ${y + 12}Z" fill="${col}"/>`;
+  if (!on) h += `<text x="${x}" y="${y + 10}" font-size="8" fill="#0b1019" text-anchor="middle">?</text>`;
+  if (hi) h += `<circle cx="${x}" cy="${y - 1}" r="17" fill="none" stroke="#ffb547" stroke-width="1.4"/>`;
+  return h + `</g>`;
+}
+
+function drawBits(t) {
+  const m = model(), N = L().students;
+  let h = '';
+  // lamps
+  const lw = 40, x0 = 180 - (MAXN * lw) / 2;
+  for (let i = 0; i < MAXN; i++) {
+    const cx = x0 + i * lw + lw / 2, cy = 112, act = i < S.n, on = act && S.bits[i];
+    if (!act) { h += `<g data-hit="add"><circle cx="${cx}" cy="${cy}" r="13" fill="none" stroke="#26324a" stroke-dasharray="3 3"/><text x="${cx}" y="${cy + 4}" font-size="12" fill="#3a4762" text-anchor="middle">+</text></g>`; continue; }
+    h += `<g data-hit="lamp:${i}"><rect x="${cx - 19}" y="${cy - 22}" width="38" height="58" fill="transparent"/>`;
+    if (on) h += `<circle cx="${cx}" cy="${cy}" r="21" fill="#ffd27a" opacity=".2"/>`;
+    h += `<circle cx="${cx}" cy="${cy}" r="13" fill="${on ? '#ffd27a' : '#2a3348'}" stroke="${INK}" stroke-width="2"/>`;
+    h += `<rect x="${cx - 6}" y="${cy + 12}" width="12" height="7" rx="1.5" fill="#56627d" stroke="${INK}" stroke-width="1.2"/>`;
+    h += `<text x="${cx}" y="${cy + 32}" font-size="11" fill="${on ? '#ffd27a' : '#8b96ad'}" text-anchor="middle">${on ? 1 : 0}</text></g>`;
+  }
+  h += `<text x="180" y="86" font-size="9" fill="#8b96ad" text-anchor="middle">лампочки — биты (нажмите, чтобы включить)</text>`;
+  // code readout
+  h += `<text x="180" y="166" font-size="11" fill="#e8ecf4" text-anchor="middle">код ${m.code} → комбинация № ${m.v + 1} из ${m.combos}</text>`;
+  // class
+  const cols = 10, sx = 18, sy = 196, dx = 36, dyy = 44;
+  for (let k = 0; k < N; k++) {
+    const x = sx + (k % cols) * dx, y = sy + Math.floor(k / cols) * dyy;
+    h += studentSVG(x, y, k < m.combos, k === m.v, k + 1);
+  }
+  h += `<text x="180" y="${sy - 18}" font-size="9" fill="#8b96ad" text-anchor="middle">класс: ${N} учеников · с кодом ${Math.min(m.combos, N)}${m.combos > N ? ` · ${m.combos - N} кодов в запасе` : ''}</text>`;
+  // byte bar
+  const by = 344;
+  h += `<text x="8" y="${by - 6}" font-size="9" fill="#8b96ad">байт = 8 бит</text><text x="352" y="${by - 6}" font-size="9" fill="#8b96ad" text-anchor="end">${S.n} ${plural(S.n, 'бит', 'бита', 'бит')} = ${fmt(S.n / 8, 3)} байта</text>`;
+  for (let i = 0; i < 8; i++) h += `<rect x="${8 + i * 43.5}" y="${by}" width="40" height="22" rx="4" fill="${i < S.n ? (S.bits[i] ? '#ffd27a' : '#2f4466') : '#141d2e'}" stroke="${i < S.n ? '#72d4e8' : '#26324a'}" stroke-width="1.2"/>` + (i < S.n ? `<text x="${28 + i * 43.5}" y="${by + 15}" font-size="11" fill="${S.bits[i] ? '#0b1019' : '#e8ecf4'}" text-anchor="middle">${S.bits[i] ? 1 : 0}</text>` : '');
+  h += `<text x="180" y="${by + 42}" font-size="10" fill="${m.enough ? '#86e0a8' : '#ff8a73'}" text-anchor="middle">2^${S.n} = ${m.combos} ${plural(m.combos, 'код', 'кода', 'кодов')} — ${m.enough ? 'хватает всем' : `не хватает ${N - m.combos} ученикам`}</text>`;
+  return h;
+}
+
+function hlBox(id) {
+  const lid = LID();
+  if (lid === 'what') {
+    const i = SENSES.findIndex(z => z.id === id);
+    if (i >= 0) return [zoneX(i) - 3, ZONE.y - 3, ZONE.w + 6, ZONE.h + 6];
+    if (id === 'cards') return [2, 86, 356, 150];
+  }
+  if (lid === 'code') return { tape: [2, 90, 356, 42], decoded: [2, 132, 356, 54], table: [2, 200, 356, 56], key: [62, 280, 200, 120], lamp: [296, 300, 46, 66] }[id];
+  if (lid === 'bits') return { lamps: [6, 92, 348, 60], codeL: [20, 152, 320, 20], kids: [0, 172, 360, 156], byte: [2, 330, 356, 40] }[id];
+  return null;
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern><clipPath id="tapeClip"><rect x="8" y="94" width="344" height="34"/></clipPath></defs>
+    <rect x="-2000" y="-2000" width="4360" height="4405" fill="url(#tile)"/>`;
+  if (id === 'what') h += drawSort(t);
+  else if (id === 'code') h += drawMorse(t);
+  else h += drawBits(t);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// fit the scene: 360 × 405 units, centred, content at the bottom
+let VB = { x: 0, y: 0, w: 360, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 372, hh / 412, 1.8);
+  VB = { w: w / s, h: hh / s }; VB.x = 180 - VB.w / 2; VB.y = 404 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- interaction ----------
+let P = {}, drag = null, dirty = true, keyT0 = 0, letterTimer = 0;
+const resetProps = () => { P = {}; if (LID() === 'what') L().cards.forEach((c, i) => { const p = cardHome(i); P[c.id] = { x: p.x, y: p.y, rx: p.x, ry: p.y }; }); };
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+const zoneAt = p => { if (p.y < ZONE.y - 10 || p.y > ZONE.y + ZONE.h + 6) return null; const i = SENSES.findIndex((z, k) => p.x >= zoneX(k) - 2 && p.x <= zoneX(k) + ZONE.w + 2); return i >= 0 ? SENSES[i].id : null; };
+
+scene.addEventListener('pointerdown', e => {
+  const d = e.target.closest('[data-drag]'), hit = e.target.closest('[data-hit]');
+  if (!d && !hit) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  if (d) {
+    const id = d.dataset.drag, o = P[id], p = toSvg(e);
+    drag = { id, dx: o.x - p.x, dy: o.y - p.y, x: e.clientX, y: e.clientY, moved: false };
+    scene.classList.add('grabbing'); dirty = true; return;
+  }
+  const h = hit.dataset.hit;
+  if (h === 'key') { drag = { id: 'key' }; keyPress(true, false, e.timeStamp); return; }
+  drag = { id: 'hit', h };
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag || !P[drag.id]) return;
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 5) drag.moved = true;
+  if (!drag.moved) return;
+  const p = toSvg(e), o = P[drag.id];
+  o.x = clamp(p.x + drag.dx, VB.x - CARD.w / 2, VB.x + VB.w - CARD.w / 2); o.y = clamp(p.y + drag.dy, VB.y, 390);
+  dirty = true;
+});
+function endDrag(e, cancel) {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing'); dirty = true;
+  if (d.id === 'key') { keyPress(false, cancel, e.timeStamp); return; }
+  if (cancel) return;
+  if (d.id === 'hit') { onHit(d.h); return; }
+  if (!d.moved) { S.sel = S.sel === d.id ? null : d.id; update(); return; }
+  const z = zoneAt(toSvg(e));
+  if (z) tryPlace(d.id, z);
+}
+scene.addEventListener('pointerup', e => endDrag(e, false));
+scene.addEventListener('pointercancel', e => endDrag(e, true));
+
+function onHit(h) {
+  const [k, v] = h.split(':');
+  if (k === 'zone') { if (S.sel) tryPlace(S.sel, v); else toast('Сначала выберите карточку.'); }
+  if (k === 'lamp') { S.bits[+v] = !S.bits[+v]; update(); }
+  if (k === 'add') act('plus');
+  if (k === 'kid') { const n = +v; if (n <= model().combos) setCode(n - 1); else toast(`Ученику № ${n} кода не хватило. Добавьте лампочку.`); }
+}
+
+function tryPlace(cid, zid) {
+  const c = L().cards.find(x => x.id === cid); if (!c || S.place[cid]) return;
+  if (c.g === zid) { S.place[cid] = zid; S.sel = null; toast(`${c.name} — ${SENSES.find(z => z.id === zid).kind} информация.`); }
+  else { S.miss++; S.lastBad = { z: zid, t: performance.now() }; toast(GQ[cid]); }
+  update();
+}
+
+// Morse key
+let audio = null, osc = null;
+function tone(on) {
+  if (!S.sound) return;
+  try {
+    if (on) {
+      if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+      if (audio.state === 'suspended') audio.resume();
+      const g = audio.createGain(); g.gain.value = 0.08; g.connect(audio.destination);
+      osc = audio.createOscillator(); osc.frequency.value = 700; osc.connect(g); osc.start();
+    } else if (osc) { osc.stop(); osc = null; }
+  } catch (e) { osc = null; }
+}
+function keyPress(down, cancel, ts) {
+  const now = ts || performance.now();
+  if (down) { S.keyDown = true; keyT0 = now; clearTimeout(letterTimer); tone(true); dirty = true; renderMeter(model()); return; }
+  if (!S.keyDown) return;
+  S.keyDown = false; tone(false);
+  if (cancel) { dirty = true; return; }
+  addSymbol(now - keyT0 < S.dotMs ? '·' : '−', true);
+}
+function addSymbol(ch, auto) {
+  if (S.buf.length >= 6) { toast('В русской азбуке Морзе в букве не больше 6 знаков. Завершите букву.'); return; }
+  S.buf += ch; clearTimeout(letterTimer);
+  if (auto) letterTimer = setTimeout(commitLetter, 1300);
+  update();
+}
+function commitLetter() {
+  clearTimeout(letterTimer);
+  if (!S.buf) return;
+  if (S.letters.length >= 12) { toast('Лента кончилась. Нажмите «Заново».'); S.buf = ''; update(); return; }
+  const ch = decode(S.buf);
+  S.letters.push(S.buf); S.buf = '';
+  if (ch === '?') toast('Такого кода нет в таблице. Сотрите букву кнопкой «⌫».');
+  update();
+}
+
+// bits
+function setCode(v) { for (let i = 0; i < S.n; i++) S.bits[i] = !!((v >> (S.n - 1 - i)) & 1); update(); }
+
+let last = performance.now();
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  let anim = false;
+  for (const [k, o] of Object.entries(P)) {
+    if (drag && drag.id === k) continue;
+    const nx = reduce ? o.rx : o.x + (o.rx - o.x) * Math.min(1, dt * 12), ny = reduce ? o.ry : o.y + (o.ry - o.y) * Math.min(1, dt * 12);
+    if (Math.abs(o.rx - nx) + Math.abs(o.ry - ny) > 0.3) { o.x = nx; o.y = ny; anim = true; } else if (o.x !== o.rx || o.y !== o.ry) { o.x = o.rx; o.y = o.ry; anim = true; }
+  }
+  if (S.hl || (S.lastBad && t - S.lastBad.t < 800)) anim = true;
+  if (dirty || anim) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2800); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, cls) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}${cls ? ` class="${cls}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    what: B('reshuffle', 'Начать заново'),
+    code: B('dot', '·', undefined, 'big') + B('dash', '−', undefined, 'big') + B('letter', 'Буква ⏎') + B('back', '⌫') + sep + B('clearM', 'Заново') + B('sound', 'Звук', S.sound),
+    bits: B('minus', '− лампа') + B('plus', '+ лампа') + B('off', 'Все выкл') + sep + B('enough', 'Хватит!'),
+  }[id];
+}
+function act(a) {
+  if (a === 'reshuffle') { S.place = {}; S.miss = 0; S.sel = null; resetProps(); update(); return; }
+  if (a === 'dot') return addSymbol('·', false);
+  if (a === 'dash') return addSymbol('−', false);
+  if (a === 'letter') return commitLetter();
+  if (a === 'back') { clearTimeout(letterTimer); if (S.buf) S.buf = S.buf.slice(0, -1); else S.letters.pop(); update(); return; }
+  if (a === 'clearM') { clearTimeout(letterTimer); S.letters = []; S.buf = ''; update(); return; }
+  if (a === 'sound') { S.sound = !S.sound; renderTools(); return; }
+  if (a === 'plus') { if (S.n >= MAXN) { toast(`Больше ${MAXN} лампочек (1 байт) здесь не помещается.`); return; } S.n++; S.bits[S.n - 1] = false; S.answer = null; update(); return; }
+  if (a === 'minus') { if (S.n <= 1) return; S.n--; S.bits.length = S.n; S.answer = null; update(); return; }
+  if (a === 'off') { S.bits = []; update(); return; }
+  if (a === 'enough') {
+    const m = model(), N = L().students;
+    S.answer = S.n;
+    if (m.combos < N) toast(`Не хватит: ${m.combos} ${plural(m.combos, 'код', 'кода', 'кодов')} на ${N} учеников.`);
+    else if (2 ** (S.n - 1) >= N) toast('Кодов хватает, но можно обойтись меньшим числом лампочек.');
+    update(); return;
+  }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+document.addEventListener('keydown', e => {
+  if (LID() !== 'code' || e.target.closest('input,textarea,button')) return;
+  if (e.code === 'Space' && !e.repeat) { e.preventDefault(); keyPress(true, false, e.timeStamp); }
+});
+document.addEventListener('keyup', e => { if (LID() === 'code' && e.code === 'Space' && S.keyDown) { e.preventDefault(); keyPress(false, false, e.timeStamp); } });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  cards: IC('<rect x="4" y="7" width="26" height="9" rx="3" fill="none" stroke="var(--fg)" stroke-width="1.6"/><rect x="4" y="19" width="26" height="9" rx="3" fill="none" stroke="var(--fg)" stroke-width="1.6"/><circle cx="9" cy="11.5" r="1.6" fill="var(--arm)"/><circle cx="9" cy="23.5" r="1.6" fill="var(--arm)"/>'),
+  tape: IC('<rect x="2" y="11" width="30" height="12" rx="2" fill="#efe9da"/><circle cx="8" cy="17" r="2" fill="#0b1019"/><rect x="13" y="15.5" width="8" height="3" rx="1.5" fill="#0b1019"/><circle cx="26" cy="17" r="2" fill="#0b1019"/>'),
+  decoded: IC('<rect x="3" y="8" width="13" height="18" rx="3" fill="none" stroke="var(--fg)" stroke-width="1.6"/><rect x="18" y="8" width="13" height="18" rx="3" fill="none" stroke="var(--force)" stroke-width="1.6" stroke-dasharray="3 2"/><path d="M7 21l2.5-9 2.5 9" fill="none" stroke="var(--fg)" stroke-width="1.6"/>'),
+  table: IC('<rect x="3" y="6" width="28" height="22" rx="3" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M3 13h28M3 20h28M14 6v22" stroke="var(--muted)" stroke-width="1.2"/><circle cx="19" cy="9.5" r="1.4" fill="var(--force)"/><rect x="22" y="15.8" width="6" height="2.4" rx="1.2" fill="var(--force)"/>'),
+  key: IC('<rect x="3" y="24" width="28" height="6" rx="2" fill="#7a5236"/><path d="M27 22L9 18" stroke="#c79b4a" stroke-width="2.4"/><rect x="5" y="12" width="10" height="5" rx="2" fill="#3a3a3a"/>'),
+  lamp: IC('<circle cx="17" cy="14" r="8" fill="#ffd27a"/><rect x="13" y="22" width="8" height="5" rx="1" fill="var(--muted)"/>'),
+  lamps: IC('<circle cx="8" cy="15" r="5" fill="#ffd27a"/><circle cx="17" cy="15" r="5" fill="#2a3348" stroke="var(--fg)" stroke-width="1"/><circle cx="26" cy="15" r="5" fill="#ffd27a"/><text x="17" y="30" font-size="7" fill="var(--muted)" text-anchor="middle" font-family="monospace">101</text>'),
+  codeL: IC('<text x="17" y="21" font-size="10" fill="var(--fg)" text-anchor="middle" font-family="monospace">0110</text>'),
+  kids: IC('<circle cx="10" cy="11" r="4" fill="var(--arm)"/><path d="M3 26q0-9 7-9t7 9z" fill="var(--arm)"/><circle cx="24" cy="11" r="4" fill="#3a4762"/><path d="M17 26q0-9 7-9t7 9z" fill="#3a4762"/>'),
+  byte: IC('<rect x="2" y="12" width="30" height="10" rx="2" fill="none" stroke="var(--arm)" stroke-width="1.4"/><path d="M5.75 12v10M9.5 12v10M13.25 12v10M17 12v10M20.75 12v10M24.5 12v10M28.25 12v10" stroke="var(--arm)" stroke-width=".8"/>'),
+};
+const senseIC = id => IC(`<g transform="translate(17 17) scale(.95)">${senseIcon(id, 'var(--fg)')}</g>`);
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  if (id === 'what') return `Разложено ${m.placed} из ${m.total}` + (m.miss ? ` · промахов ${m.miss}` : '');
+  if (id === 'code') return `Принято: ${m.text || '—'}` + (m.buf ? ` · набирается ${m.buf}` : '') + (m.text.length >= 3 && m.text !== 'ЛУЧ' ? ' · не то слово, сотрите лишнее' : '');
+  return `${S.n} ${plural(S.n, 'лампочка', 'лампочки', 'лампочек')} · ${m.combos} ${plural(m.combos, 'код', 'кода', 'кодов')}` + (m.answer !== null && m.answer !== undefined ? ` · ответ ${m.answer} не подошёл` : '');
+}
+
+// Scheme tab
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'what') h = `<h2>Сортировка сведений</h2>
+      <dl class="reads"><div><dt>Разложено</dt><dd id="r1"></dd></div><div><dt>Осталось</dt><dd id="r2"></dd></div><div><dt>Промахи</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">1. Выберите карточку</div><div class="chips" id="cardChips"></div></div>
+      <div class="ctl"><div class="lbl">2. Выберите орган чувств</div><div class="chips" id="zoneChips">${SENSES.map(z => `<button data-z="${z.id}">${z.name}</button>`).join('')}</div></div>
+      <div class="row"><button class="ghostbtn" data-a="reshuffle">Начать заново</button></div>`;
+  if (id === 'code') h = `<h2>Телеграф</h2>
+      <dl class="reads"><div><dt>Принято</dt><dd id="r1"></dd></div><div><dt>Набирается</dt><dd id="r2"></dd></div><div><dt>Сигналов</dt><dd id="r3"></dd></div></dl>
+      <div class="row"><button class="ghostbtn" data-a="dot">Точка ·</button><button class="ghostbtn" data-a="dash">Тире −</button><button class="ghostbtn" data-a="letter">Буква ⏎</button><button class="ghostbtn" data-a="back">⌫</button><button class="ghostbtn" data-a="clearM">Заново</button></div>` +
+      slider('inDot', 'Точка, если нажатие короче', 150, 450, 25, S.dotMs) +
+      `<p class="note" style="margin-top:8px">Ключ можно нажимать и пробелом на клавиатуре.</p>
+      <h3>Кодовая таблица</h3><div class="mtab">${Object.entries(MORSE).map(([k, v]) => `<span><b>${k}</b><i>${v}</i></span>`).join('')}</div>`;
+  if (id === 'bits') h = `<h2>Лампочки и коды</h2>
+      <dl class="reads"><div><dt>Бит</dt><dd id="r1"></dd></div><div><dt>Комбинаций</dt><dd id="r2"></dd></div><div><dt>Код</dt><dd id="r3"></dd></div></dl>` +
+      slider('inN', 'Число лампочек (бит)', 1, MAXN, 1, S.n) +
+      `<div class="ctl"><div class="lbl">Включить лампочку</div><div class="chips" id="lampChips"></div></div>
+      <div class="row"><button class="ghostbtn" data-a="off">Все выкл</button><button class="ghostbtn" data-a="enough">Хватит!</button></div>`;
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn); };
+  on('#inDot', e => { S.dotMs = +e.target.value; updateScheme(model()); });
+  on('#inN', e => { const n = +e.target.value; if (n !== S.n) { S.n = n; S.bits.length = n; S.answer = null; update(); } });
+  el.querySelectorAll('.row [data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+  el.querySelectorAll('#zoneChips button').forEach(b => b.onclick = () => { if (S.sel) tryPlace(S.sel, b.dataset.z); else toast('Сначала выберите карточку.'); });
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (id === 'what') {
+    set('#r1', `${m.placed}/${m.total}`); set('#r2', String(m.total - m.placed)); set('#r3', String(m.miss));
+    const cc = el.querySelector('#cardChips');
+    if (cc) {
+      const left = L().cards.filter(c => !S.place[c.id]);
+      cc.innerHTML = left.length ? left.map(c => `<button data-c="${c.id}" aria-pressed="${S.sel === c.id}">${c.name}</button>`).join('') : '<span class="note">Все карточки разложены.</span>';
+      cc.querySelectorAll('button').forEach(b => b.onclick = () => { S.sel = S.sel === b.dataset.c ? null : b.dataset.c; update(); });
+    }
+  } else if (id === 'code') {
+    set('#r1', m.text || '—'); set('#r2', m.buf ? `${m.buf} (${m.preview})` : '—'); set('#r3', String(m.signals));
+    set('#inDotO', S.dotMs + ' мс'); val('#inDot', S.dotMs);
+  } else {
+    set('#r1', String(m.n)); set('#r2', String(m.combos)); set('#r3', m.code);
+    set('#inNO', String(S.n)); val('#inN', S.n);
+    const lc = el.querySelector('#lampChips');
+    if (lc) {
+      lc.innerHTML = Array.from({ length: S.n }, (_, i) => `<button data-l="${i}" aria-pressed="${!!S.bits[i]}">${i + 1}</button>`).join('');
+      lc.querySelectorAll('button').forEach(b => b.onclick = () => { const i = +b.dataset.l; S.bits[i] = !S.bits[i]; update(); });
+    }
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'what') return [{ id: 'cards', icon: ICON.cards, name: 'Карточки-сведения', spec: 'Восемь случаев из жизни. В каждом человек что-то узнаёт о мире.' }]
+    .concat(SENSES.map(z => ({ id: z.id, icon: senseIC(z.id), name: `${z.name} — ${z.organ}`, spec: `Через этот орган приходит ${z.kind} информация.` })));
+  if (id === 'code') return [
+    { id: 'key', icon: ICON.key, name: 'Телеграфный ключ', spec: 'Рычаг с кнопкой. Пока его держат, контакт замкнут и по проводу идёт ток — сигнал. Коротко — точка, долго — тире.' },
+    { id: 'lamp', icon: ICON.lamp, name: 'Сигнальная лампа', spec: 'Горит, пока ключ нажат. Так же моряки передают Морзе прожектором.' },
+    { id: 'tape', icon: ICON.tape, name: 'Бумажная лента', spec: 'В старых телеграфах аппарат выдавливал точки и тире на ленте, а телеграфист потом расшифровывал.' },
+    { id: 'decoded', icon: ICON.decoded, name: 'Расшифровка', spec: 'Каждая группа знаков переводится в букву по таблице. Пунктирная рамка — буква, которая ещё набирается.' },
+    { id: 'table', icon: ICON.table, name: 'Кодовая таблица', spec: 'Правило «буква → код». Без общей таблицы отправитель и получатель не поймут друг друга.' }];
+  return [
+    { id: 'lamps', icon: ICON.lamps, name: 'Лампочки — биты', spec: 'Каждая лампочка хранит 1 бит: горит (1) или нет (0).' },
+    { id: 'codeL', icon: ICON.codeL, name: 'Код', spec: 'Цепочка нулей и единиц, которую сейчас показывают лампочки, и её номер среди всех комбинаций.' },
+    { id: 'kids', icon: ICON.kids, name: 'Класс', spec: 'Голубые ученики получили свой код, серые — пока нет. Нажмите на ученика, чтобы увидеть его код.' },
+    { id: 'byte', icon: ICON.byte, name: 'Байт', spec: '8 бит подряд. Один байт — 256 комбинаций, хватает на одну букву или цифру.' }];
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Из чего состоит опыт</h2><p class="note">Нажмите на деталь, чтобы найти её на сцене.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'what') {
+    let h = `<h2>Как рассуждать</h2><div class="formula">чем замечаю → вид информации</div><p class="note">Вид информации по способу восприятия определяется органом чувств, который её получает.</p><h3>Разложено</h3>`;
+    const placed = L().cards.filter(c => S.place[c.id]);
+    h += placed.length ? `<div class="steps">` + placed.map(c => { const z = SENSES.find(s => s.id === S.place[c.id]); return step(c.name, `${z.organ} → ${z.kind}`); }).join('') + `</div>` : `<p class="note">Пока ничего. Разложите первую карточку — здесь появится рассуждение.</p>`;
+    h += `<h3>Итог</h3><div class="steps">` + step('разложено', `${m.placed} из ${m.total}`) + step('промахов', String(m.miss)) +
+      step('точность', m.placed + m.miss ? `${m.placed} / ${m.placed + m.miss} = ${Math.round(m.placed / (m.placed + m.miss) * 100)} %` : '—', 'sum') + `</div>`;
+    return h;
+  }
+  if (id === 'code') {
+    let h = `<h2>Кодирование слова</h2><div class="formula">буква → код из · и −</div><h3>Передано</h3>`;
+    h += S.letters.length || S.buf ? `<div class="steps">` + S.letters.map(c => step(c, `→ ${decode(c)}`)).join('') + (S.buf ? step(`${S.buf} (набирается)`, `→ ${m.preview}`) : '') + `</div>` : `<p class="note">Лента пустая. Нажмите на ключ.</p>`;
+    const tgt = L().target.split('');
+    h += `<h3>Слово «${L().target}» по таблице</h3><div class="steps">` + tgt.map(ch => step(ch, `${MORSE[ch]} · ${MORSE[ch].length} ${plural(MORSE[ch].length, 'знак', 'знака', 'знаков')}`)).join('') +
+      step('всего сигналов', `${tgt.map(ch => MORSE[ch].length).join(' + ')} = ${tgt.reduce((s, ch) => s + MORSE[ch].length, 0)}`, 'sum') + `</div>`;
+    h += `<p class="note" style="margin-top:10px">Частые буквы (Е, Т, И, А) получили самые короткие коды, чтобы телеграмма шла быстрее.</p>`;
+    return h;
+  }
+  const N = L().students;
+  let h = `<h2>Сколько кодов дают N бит</h2><div class="formula">N бит → 2ᴺ комбинаций</div><h3>Удваиваем</h3><div class="steps">`;
+  for (let n = 1; n <= S.n; n++) { const c = 2 ** n; h += step(`${n} ${plural(n, 'бит', 'бита', 'бит')}`, `${n > 1 ? `${2 ** (n - 1)} × 2 = ` : ''}${c} ${c >= N ? '≥' : '<'} ${N}`, n === S.n ? 'sum' : ''); }
+  h += `</div><p class="note" style="margin-top:10px">${m.enough ? 'Кодов хватает. Проверьте: а если убрать одну лампочку?' : 'Кодов меньше, чем учеников. Добавьте лампочку.'}</p>`;
+  h += `<h3>Единицы</h3><div class="steps">` + step('сейчас', `${S.n} бит = ${S.n} / 8 = ${fmt(S.n / 8, 3)} байта`) + step('1 байт', '8 бит → 2⁸ = 256 комбинаций') + step('1 Кбайт', '1024 байта') + step('1 Мбайт', '1024 Кбайта') + step('1 Гбайт', '1024 Мбайта') + `</div>`;
+  h += `<h3>Сколько весит слово</h3><div class="steps">` + step('«ЛУЧ»', '3 символа × 1 байт') + step('объём', '3 байта = 3 × 8 = 24 бита', 'sum') + `</div><p class="note" style="margin-top:10px">Считаем, что один символ занимает 1 байт, как в простых кодировках.</p>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const el = $('#meter'), id = LID(), ok = !!S.done[id];
+  if (m.kind === 'sort') el.innerHTML = `<div class="k">Разложено</div><div class="v ${ok ? 'ok' : ''}">${m.placed} из ${m.total}</div><div class="gauge"><b style="width:${(m.placed / m.total * 100).toFixed(1)}%"></b></div><div class="lr"><span>промахи</span><span>${m.miss}</span></div>`;
+  else if (m.kind === 'morse') el.innerHTML = `<div class="k">Принято</div><div class="v ${ok ? 'ok' : ''}">${m.text || '—'}${m.buf ? `<span style="color:var(--force)">${m.preview}</span>` : ''}</div><div class="lr"><span>${S.keyDown ? 'сигнал…' : 'ключ'}</span><span>${m.buf || ' '}</span></div>`;
+  else el.innerHTML = `<div class="k">Кодов</div><div class="v ${ok ? 'ok' : ''}">2^${m.n} = ${m.combos}</div><div class="gauge"><b style="width:${clamp(m.combos / L().students * 100, 0, 100).toFixed(1)}%;background:${m.enough ? 'var(--ok)' : 'var(--arm)'}"></b></div><div class="lr"><span>учеников</span><span>${L().students}</span></div>`;
+}
+
+function update() {
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Отличная работа!');
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  what: '<path d="M6 15Q15 6 24 15Q15 24 6 15Z" fill="none" stroke="#e8ecf4" stroke-width="1.3"/><circle cx="15" cy="15" r="3" fill="#72d4e8"/><path d="M36 22Q33 18 33 13Q33 7 38 7Q43 7 43 12Q43 15 40 17Q39 18 39 20" fill="none" stroke="#e8ecf4" stroke-width="1.3"/><rect x="50" y="13" width="9" height="8" rx="3" fill="none" stroke="#e8ecf4" stroke-width="1.2"/><path d="M52 13V7M55 13V5M58 14V8" stroke="#e8ecf4" stroke-width="1.3" stroke-linecap="round"/>',
+  code: '<circle cx="10" cy="15" r="2.6" fill="#ffb547"/><rect x="16" y="13" width="11" height="4" rx="2" fill="#ffb547"/><circle cx="33" cy="15" r="2.6" fill="#ffb547"/><circle cx="40" cy="15" r="2.6" fill="#ffb547"/><rect x="48" y="13" width="11" height="4" rx="2" fill="#e8ecf4"/>',
+  bits: [0, 1, 0, 1, 1].map((b, i) => `<circle cx="${9 + i * 12}" cy="12" r="4.4" fill="${b ? '#ffd27a' : '#2a3348'}" stroke="#e8ecf4" stroke-width=".8"/><text x="${9 + i * 12}" y="26" font-size="6" fill="#8b96ad" text-anchor="middle" font-family="monospace">${b}</text>`).join(''),
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Ls, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Ls.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Ls.title}</span></span>
+      ${S.done[Ls.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const Ls = LESSONS[i];
+  clearTimeout(letterTimer); if (S.keyDown) { S.keyDown = false; tone(false); }
+  if (Ls.id === 'code' && !audio) { try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audio = null; } }
+  S.lesson = i; S.place = {}; S.miss = 0; S.sel = null; S.lastBad = null; S.letters = []; S.buf = ''; S.n = 1; S.bits = []; S.answer = null; S.hl = null;
+  drag = null;
+  save(); resetProps();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = Ls.task;
+  $('#hint').textContent = Ls.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '', guide = '';
+  if (id === 'what') {
+    const placed = Ls.cards.filter(c => S.place[c.id]).map(c => `«${c.name}» → ${SENSES.find(z => z.id === S.place[c.id]).name.toLowerCase()}`);
+    const left = Ls.cards.filter(c => !S.place[c.id]).map(c => `«${c.name}»`);
+    now = `Ученик раскладывает карточки со сведениями по органам чувств (зрение, слух, обоняние, вкус, осязание). Разложено верно ${m.placed} из ${m.total}: ${placed.join('; ') || 'пока ничего'}. Осталось: ${left.join(', ') || 'ничего'}. Промахов: ${m.miss}.${S.sel ? ` Сейчас выбрана карточка «${Ls.cards.find(c => c.id === S.sel).name}».` : ''}`;
+    guide = 'Не называй, куда положить оставшиеся карточки: наводящими вопросами помоги понять, каким органом чувств человек это замечает.';
+  }
+  if (id === 'code') {
+    now = `Ученик передаёт азбукой Морзе слово «${Ls.target}» телеграфным ключом (короткое нажатие — точка, длинное — тире, пауза или кнопка «Буква» завершает букву). На ленте: ${S.letters.length ? S.letters.map(c => `${c} (${decode(c)})`).join(', ') : 'пусто'}${S.buf ? `; набирается ${S.buf} (сейчас это «${m.preview}»)` : ''}. Принятый текст: «${m.text || ''}». Кодовая таблица русской азбуки Морзе открыта на вкладке «Схема», фрагмент — на сцене.`;
+    guide = 'Помоги найти коды букв в таблице и понять ошибку, если буква получилась не та; не диктуй всю последовательность сразу.';
+  }
+  if (id === 'bits') {
+    now = `На сцене ${S.n} ${plural(S.n, 'лампочка', 'лампочки', 'лампочек')} (бит), код на лампочках ${m.code}, это комбинация № ${m.v + 1}. Всего комбинаций 2^${S.n} = ${m.combos}. В классе ${Ls.students} учеников, кодов ${m.enough ? 'хватает' : 'не хватает'}. ${m.answer !== null && m.answer !== undefined ? `Ученик нажал «Хватит!» при ${m.answer} лампочках.` : 'Ответ ещё не дан.'}`;
+    guide = 'Не называй нужное число лампочек: спроси, сколько комбинаций даёт каждая следующая лампочка, и пусть ученик сам найдёт наименьшее подходящее.';
+  }
+  return [
+    `Раздел: информатика, 5 класс, тема «Информация». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    S.done[id] ? 'Задание уже выполнено — можно обсуждать свободно.' : guide,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = {
+    what: 'Почему больше всего информации мы получаем глазами?',
+    code: 'Зачем в азбуке Морзе у разных букв коды разной длины?',
+    bits: 'Почему каждая новая лампочка удваивает число кодов?',
+  }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

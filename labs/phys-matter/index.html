@@ -1,0 +1,992 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по физике, 7 класс: молекулы и атомы, диффузия, твёрдое, жидкое и газообразное состояние вещества.">
+<title>Строение вещества</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Bench (SVG) on the left, lesson notebook on the right, lesson strip under the bench. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene [data-click]{cursor:pointer}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.meter .lr .ok{color:var(--ok)}
+.meter .lr .bad{color:var(--warn)}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button.rec{color:var(--force)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><circle cx="20" cy="18" r="7" fill="#e5534b" stroke="var(--fg)" stroke-width="1.6"/><circle cx="12.5" cy="25" r="4.5" fill="#eef2f8" stroke="var(--fg)" stroke-width="1.4"/><circle cx="27.5" cy="25" r="4.5" fill="#eef2f8" stroke="var(--fg)" stroke-width="1.4"/><circle cx="31" cy="9" r="2" fill="var(--arm)"/><circle cx="8" cy="10" r="1.6" fill="var(--force)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Физика · Строение вещества</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/">Карта</a><a href="/physics/">Физика</a><a href="/labs/phys-matter/" aria-current="page">Вещество</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Вещество</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Лабораторный стол">
+    <svg class="scene" id="scene" role="img" aria-label="Лабораторный стол: модели молекул и опыты с веществом. Детали можно двигать и нажимать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const rnd = (a, b) => a + Math.random() * (b - a);
+const gauss = () => { let u = 0; while (!u) u = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * Math.random()); };
+const hash = (i, j, k) => { const s = Math.sin(i * 127.1 + j * 311.7 + k * 74.7) * 43758.5453; return s - Math.floor(s); };
+const tC = T => (T < 0 ? '−' + -T : String(T)) + ' °C';
+
+const LESSONS = [
+  { id: 'molecules', title: 'Молекулы и атомы',
+    text: ['Все вещества состоят из мельчайших частиц — молекул. Молекула — самая маленькая частица вещества, которая ещё сохраняет его свойства. Одна молекула воды — это всё ещё вода.',
+           'Молекулы очень малы. Молекула воды размером около 0,3 нм — это 0,0000000003 м. Даже в хороший микроскоп капля кажется сплошной. На самом деле между молекулами есть промежутки, а сами молекулы всё время движутся.',
+           'Молекулы состоят из атомов. Молекула воды H₂O — это два атома водорода H и один атом кислорода O. Видов атомов чуть больше сотни, а молекул из них получаются миллионы.'],
+    why: 'Химик-технолог на нефтеперерабатывающем заводе в Павлодаре или Атырау управляет тем, как молекулы нефти разбиваются на молекулы бензина. Фармацевт знает: лекарство работает, потому что его молекула подходит к молекуле в организме. А фильтр обратного осмоса на кухне пропускает молекулы воды и задерживает соли — поэтому из-под крана получается чистая вода.',
+    task: 'Увеличьте каплю воды, пока не станут видны атомы. Потом соберите из атомов молекулы воды H₂O, кислорода O₂ и углекислого газа CO₂.',
+    hint: 'Тяните ручку увеличения справа от окуляра вверх. Потом откройте «Конструктор»: нажимайте на атомы внизу, чтобы положить их на стол, и жмите «Соединить».',
+    stage: 'Ручка справа — увеличение. Кнопки внизу — увеличение и конструктор.',
+    zoomMax: 6.6, zoomGoal: 6.4,
+    targets: [{ id: 'h2o', f: 'H2O', name: 'вода', sub: 'H₂O' }, { id: 'o2', f: 'O2', name: 'кислород', sub: 'O₂' }, { id: 'co2', f: 'CO2', name: 'углекислый газ', sub: 'CO₂' }],
+    extras: [{ f: 'H2', name: 'водород', sub: 'H₂' }, { f: 'CH4', name: 'метан — природный газ из плиты', sub: 'CH₄' }],
+    check: m => m.zoomed && m.n === 3 },
+  { id: 'diffusion', title: 'Диффузия',
+    text: ['Капните марганцовку в стакан воды и не мешайте. Через какое-то время вся вода станет розовой. Проникновение молекул одного вещества в промежутки между молекулами другого называют диффузией.',
+           'Диффузия идёт сама, без помешивания. Причина — молекулы непрерывно и беспорядочно движутся, сталкиваются и понемногу перемешиваются.',
+           'Чем выше температура, тем быстрее движутся молекулы и тем быстрее идёт диффузия. В газах она идёт быстрее всего, в жидкостях медленнее, в твёрдых телах — очень медленно.'],
+    why: 'Повар маринует мясо для шашлыка: маринад проникает в мясо диффузией, и в тепле это идёт быстрее. Чай заваривают кипятком, а не холодной водой, по той же причине. Эколог следит, как выхлопы и дым от ТЭЦ расходятся в воздухе Алматы. А металлург насыщает поверхность стали углеродом при 900 °C — так делают прочные шестерни для машин.',
+    task: 'Проведите опыт дважды: в холодной воде (не выше 20 °C) и в горячей (не ниже 60 °C). Каждый раз уберите перегородку и дождитесь, пока справа окажется 40 % краски.',
+    hint: 'Температуру выбирайте до начала опыта: кнопки внизу или термометр справа. Потом нажмите на перегородку или «Убрать перегородку» и следите за счётчиком.',
+    stage: 'Нажмите на перегородку, чтобы убрать её. Термометр можно тянуть.',
+    temps: [10, 20, 40, 80], tCold: 20, tHot: 60, goal: 40, nDye: 140, nWater: 200,
+    check: m => m.cold && m.hot },
+  { id: 'states', title: 'Твёрдое, жидкое, газ',
+    text: ['Одно и то же вещество бывает твёрдым, жидким и газообразным. Вода бывает льдом, жидкой водой и паром. Молекулы во всех трёх случаях одинаковые — разное только то, как они расположены и как движутся.',
+           'В твёрдом теле молекулы стоят по порядку и только колеблются на месте. Поэтому тело держит и форму, и объём. В жидкости молекулы тоже вплотную, но перескакивают с места на место: жидкость течёт и принимает форму сосуда, а объём сохраняет.',
+           'В газе молекулы далеко друг от друга и летают во все стороны. Газ занимает весь сосуд и легко сжимается. При обычном давлении лёд тает при 0 °C, а вода кипит при 100 °C.'],
+    why: 'Мастер по холодильникам и кондиционерам работает с веществом, которое кипит и снова становится жидкостью внутри трубок, — так и получается холод. Газовщик знает, что в баллоне газ сжат во много раз. Сварщик плавит металл, а литейщик отливает из него детали. А зимой в Астане трубы утепляют: замерзая, вода расширяется и может разорвать трубу.',
+    task: 'Получите лёд, воду и пар. В каждом состоянии нажмите на поршень и перелейте вещество в другой сосуд.',
+    hint: 'Температуру меняйте термометром справа или кнопками. Поршень тяните вниз пальцем или кнопкой «Нажать». Кнопка «Сосуд» меняет узкий сосуд на широкий.',
+    stage: 'Тяните поршень и термометр. Внизу — сосуд и температура.',
+    temps: [-20, 20, 120], n: 42,
+    check: m => m.n === 6 },
+];
+
+const LS_KEY = 'luch-phys-matter';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+
+// ---------- lesson 1 geometry: the microscope view and the molecule builder ----------
+const VIEW = { x: 210, y: 196, r: 150 };
+const ZT = { x: 432, y0: 330, y1: 70 };
+const ZMAX = LESSONS[0].zoomMax;
+const zY = z => ZT.y0 - z / ZMAX * (ZT.y0 - ZT.y1);
+const fieldMM = z => 12 / 10 ** z;                 // width of the view, mm
+const ppnm = z => 2 * VIEW.r / (fieldMM(z) * 1e6); // px per nanometre
+const A_NM = 0.31;                                  // distance between water molecules in liquid, nm
+const ATOM = { H: { r: 11, fill: '#eef2f8', ink: '#1d2433', name: 'водород' }, O: { r: 17, fill: '#e5534b', ink: '#fff', name: 'кислород' }, C: { r: 15, fill: '#4a5468', ink: '#fff', name: 'углерод' } };
+const MOL = {
+  H2O: [['O', 0, -4], ['H', -16.6, 8.9], ['H', 16.6, 8.9]],
+  O2: [['O', -13, 0], ['O', 13, 0]],
+  CO2: [['O', -27, 0], ['O', 27, 0], ['C', 0, 0]],
+  H2: [['H', -8, 0], ['H', 8, 0]],
+  CH4: [['C', 0, 0], ['H', 0, -20], ['H', -20, 0], ['H', 20, 0], ['H', 0, 20]],
+};
+const BINS = { H: 150, O: 260, C: 370 };
+const formula = list => { const c = { C: 0, H: 0, O: 0 }; list.forEach(a => c[a]++); return ['C', 'H', 'O'].map(e => c[e] ? e + (c[e] > 1 ? c[e] : '') : '').join(''); };
+const subF = f => f.replace(/\d/g, d => '₀₁₂₃₄₅₆₇₈₉'[d]);
+
+// ---------- lesson 2 geometry: a tank with a partition ----------
+const BX0 = 30, BX1 = 430, BY0 = 80, BY1 = 330, MID = 230;
+const etaW = TK => 0.02939 * Math.exp(507.88 / (TK - 149.3)); // viscosity of water, mPa·s
+const D20 = 1134;                                            // model diffusion coefficient at 20 °C, units²/s (time is sped up)
+const Dof = T => D20 * ((T + 273.15) / 293.15) * (etaW(293.15) / etaW(T + 273.15));
+
+// ---------- lesson 3 geometry: a vessel with a piston ----------
+const V3 = { bot: 340, top: 90, r: 6.5 };
+const vessel = () => S.wide ? [110, 410] : [170, 350];
+const state3 = () => S.T3 < 0 ? 'solid' : S.T3 < 100 ? 'liquid' : 'gas';
+const SNAME = { solid: 'лёд', liquid: 'вода', gas: 'пар' };
+const SNAME2 = { solid: 'твёрдое', liquid: 'жидкое', gas: 'газообразное' };
+function site(i) { const [a, b] = vessel(), cx = (a + b) / 2, row = Math.floor(i / 7), col = i % 7; return { x: cx - 45.5 + col * 14 + (row % 2) * 7, y: V3.bot - V3.r - 1 - row * 12.12 }; }
+function pistonLimit() {
+  const s = state3(), [a, b] = vessel();
+  if (s === 'solid') return V3.bot - V3.r - 1 - 5 * 12.12 - V3.r - 2;
+  if (s === 'liquid') return V3.bot - L().n * 180 / (b - a - 4) - 5;
+  return V3.bot - 0.25 * (V3.bot - V3.top);
+}
+const gasRatio = () => (V3.bot - V3.top) / (V3.bot - S.py);
+
+const T3Y = { y0: 320, y1: 80 };
+
+function resetState() {
+  Object.assign(S, {
+    st: 'zoom', z: 0, got: {}, asm: [], built: {}, last: null, hl: null,
+    T2: 20, wall: true, t2: 0, mixed: false, runs: [], p2: [], cold: false, hot: false,
+    T3: 20, wide: false, py: V3.top, pyT: null, p3: [], press: {}, pour: {}, prev: null,
+  });
+  if (LID() === 'diffusion') initDiff();
+  if (LID() === 'states') initStates();
+}
+function initDiff() {
+  const Ls = L(); S.p2 = []; S.wall = true; S.t2 = 0; S.mixed = false;
+  for (let i = 0; i < Ls.nDye; i++) S.p2.push({ d: 1, x: rnd(BX0 + 4, MID - 4), y: rnd(BY0 + 4, BY1 - 4) });
+  for (let i = 0; i < Ls.nWater; i++) S.p2.push({ d: 0, x: i % 2 ? rnd(BX0 + 4, MID - 4) : rnd(MID + 4, BX1 - 4), y: rnd(BY0 + 4, BY1 - 4) });
+}
+function initStates() {
+  const [a] = vessel(); S.p3 = [];
+  for (let k = 0; k < L().n; k++) S.p3.push({ x: a + 10 + (k % 12) * 14.5, y: V3.bot - 8 - Math.floor(k / 12) * 13.5, vx: 0, vy: 0 });
+  S.prev = state3(); S.py = V3.top;
+}
+
+const dyeRight = () => S.p2.reduce((s, p) => s + (p.d && p.x > MID ? 1 : 0), 0) / L().nDye;
+
+function model() {
+  const id = LID();
+  if (id === 'molecules') return { kind: id, z: S.z, zoomed: !!S.got.zoom, n: Object.keys(S.built).length, f: formula(S.asm) };
+  if (id === 'diffusion') return { kind: id, frac: dyeRight(), T: S.T2, t: S.t2, cold: S.cold, hot: S.hot };
+  return { kind: id, s: state3(), T: S.T3, n: Object.keys(S.press).length + Object.keys(S.pour).length, ratio: gasRatio() };
+}
+
+// ---------- drawing ----------
+const ol = (d, fill, stroke, w = 2.2, extra = '') => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${w + 2.6}" stroke-linejoin="round" stroke-linecap="round"/><path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round" ${extra}/>`;
+const GLASS = 'rgba(200,225,255,.08)', GLASS_S = '#9fb3d1';
+function bench() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="2360" fill="url(#tile)"/>
+    <rect x="-2000" y="360" width="4520" height="1200" fill="#1a2232"/>
+    <rect x="-2000" y="358" width="4520" height="4" fill="#2c3954"/>
+    <rect x="-2000" y="362" width="4520" height="2" fill="${INK}" opacity=".6"/>`;
+}
+function atomSVG(e, x, y, k = 1, label = true) {
+  const A = ATOM[e], r = A.r * k;
+  return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${A.fill}" stroke="${INK}" stroke-width="${(1.6 * Math.min(1, k)).toFixed(2)}"/><circle cx="${(x - r * 0.35).toFixed(1)}" cy="${(y - r * 0.35).toFixed(1)}" r="${(r * 0.3).toFixed(1)}" fill="#fff" opacity=".35"/>` +
+    (label ? `<text x="${x.toFixed(1)}" y="${(y + 4 * k).toFixed(1)}" font-size="${(11 * k).toFixed(1)}" fill="${A.ink}" text-anchor="middle" font-weight="500">${e}</text>` : '');
+}
+const molSVG = (f, x, y, k = 1, label = true) => (MOL[f] || []).map(([e, dx, dy]) => atomSVG(e, x + dx * k, y + dy * k, k, label)).join('');
+
+function niceLen(mm) {
+  if (mm >= 1) return fmt(mm, 0) + ' мм';
+  if (mm >= 1e-3) return fmt(mm * 1e3, 0) + ' мкм';
+  return fmt(mm * 1e6, mm * 1e6 < 1 ? 1 : 0) + ' нм';
+}
+const big = x => { const e = Math.floor(Math.log10(x)) - 1, v = Math.round(x / 10 ** Math.max(0, e)) * 10 ** Math.max(0, e); return v.toLocaleString('ru-RU'); };
+const zoomLevel = z => { const sp = A_NM * ppnm(z); return z < 0.9 ? 'капля на стекле' : sp < 6 ? 'вода кажется сплошной' : z < LESSONS[0].zoomGoal ? 'появились молекулы' : 'видны атомы O и H'; };
+
+function zoomScene(t) {
+  const z = S.z, W = fieldMM(z), p = ppnm(z), sp = A_NM * p, { x: cx, y: cy, r: R } = VIEW;
+  let h = `<defs><clipPath id="vclip"><circle cx="${cx}" cy="${cy}" r="${R}"/></clipPath><radialGradient id="drop" cx=".38" cy=".35" r=".7"><stop offset="0" stop-color="#8fd3f0"/><stop offset="1" stop-color="#2e6f93"/></radialGradient></defs>`;
+  // microscope body behind the eyepiece
+  h += ol(`M${cx - 30} 360V${cy + R - 6}h60V360`, '#2a3348', '#3a4762', 1.6);
+  h += `<g clip-path="url(#vclip)"><rect x="${cx - R}" y="${cy - R}" width="${2 * R}" height="${2 * R}" fill="#121c2b"/>`;
+  const dropR = 50 * 10 ** z, mol = sp >= 6, a = clamp((sp - 6) / 6, 0, 1);
+  if (dropR < 4 * R) h += `<circle cx="${cx}" cy="${cy}" r="${dropR.toFixed(1)}" fill="url(#drop)" stroke="#a8e2f5" stroke-width="1.5" opacity=".95"/>${dropR < 2 * R ? `<ellipse cx="${(cx - dropR * 0.35).toFixed(1)}" cy="${(cy - dropR * 0.4).toFixed(1)}" rx="${(dropR * 0.22).toFixed(1)}" ry="${(dropR * 0.13).toFixed(1)}" fill="#fff" opacity=".35"/>` : ''}`;
+  else h += `<rect x="${cx - R}" y="${cy - R}" width="${2 * R}" height="${2 * R}" fill="#2e6f93" opacity="${(1 - a).toFixed(2)}"/>`;
+  if (mol) {
+    const half = R / p, n = Math.ceil(half / A_NM) + 1, rows = Math.ceil(half / (A_NM * 0.866)) + 1, live = sp >= 14 && !reduce;
+    const rO = 0.12 * p, rH = 0.085 * p, dOH = 0.1 * p, ang = 52.25 * Math.PI / 180, full = sp >= 9;
+    let g = '';
+    for (let j = -rows; j <= rows; j++) for (let i = -n; i <= n; i++) {
+      const h1 = hash(i, j, 1), h2 = hash(i, j, 2), h3 = hash(i, j, 3);
+      let x = (i + (j & 1) * 0.5) * A_NM + (h1 - 0.5) * 0.08, y = j * A_NM * 0.866 + (h2 - 0.5) * 0.08, th = h3 * 2 * Math.PI;
+      if (live) { x += 0.025 * Math.sin(t / 260 + h1 * 40); y += 0.025 * Math.cos(t / 300 + h2 * 40); th += 0.25 * Math.sin(t / 340 + h3 * 30); }
+      const X = cx + x * p, Y = cy + y * p;
+      if ((X - cx) ** 2 + (Y - cy) ** 2 > (R + rO * 2) ** 2) continue;
+      if (!full) { g += `<circle cx="${X.toFixed(1)}" cy="${Y.toFixed(1)}" r="${(rO * 1.15).toFixed(1)}" fill="#c9605a"/>`; continue; }
+      const ux = Math.sin(th), uy = Math.cos(th);
+      const hx = (s) => X + dOH * (s * Math.sin(ang) * uy + Math.cos(ang) * ux), hy = (s) => Y + dOH * (-s * Math.sin(ang) * ux + Math.cos(ang) * uy);
+      g += `<circle cx="${X.toFixed(1)}" cy="${Y.toFixed(1)}" r="${rO.toFixed(1)}" fill="#e5534b" stroke="${INK}" stroke-width="${Math.min(1.4, sp / 20).toFixed(2)}"/>`;
+      for (const s of [-1, 1]) g += `<circle cx="${hx(s).toFixed(1)}" cy="${hy(s).toFixed(1)}" r="${rH.toFixed(1)}" fill="#eef2f8" stroke="${INK}" stroke-width="${Math.min(1.2, sp / 24).toFixed(2)}"/>`;
+    }
+    h += `<g opacity="${a.toFixed(2)}">${g}</g>`;
+  }
+  h += `</g><circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="${INK}" stroke-width="9"/><circle cx="${cx}" cy="${cy}" r="${R + 1}" fill="none" stroke="#a9b4c9" stroke-width="3"/>`;
+  // scale bar
+  const tgt = W / 3, e = 10 ** Math.floor(Math.log10(tgt)), m = tgt / e, Lb = (m >= 5 ? 5 : m >= 2 ? 2 : 1) * e, bp = Lb * 2 * R / W;
+  h += `<g pointer-events="none"><rect x="${cx - bp / 2 - 8}" y="${cy + R - 44}" width="${bp + 16}" height="26" rx="6" fill="rgba(11,16,25,.8)"/><path d="M${(cx - bp / 2).toFixed(1)} ${cy + R - 26}h${bp.toFixed(1)}" stroke="#e8ecf4" stroke-width="2.4"/><path d="M${(cx - bp / 2).toFixed(1)} ${cy + R - 30}v8M${(cx + bp / 2).toFixed(1)} ${cy + R - 30}v8" stroke="#e8ecf4" stroke-width="1.4"/><text x="${cx}" y="${cy + R - 32}" font-size="9" fill="#e8ecf4" text-anchor="middle">${niceLen(Lb)}</text></g>`;
+  h += `<g pointer-events="none"><rect x="${cx - 70}" y="${cy + R - 72}" width="140" height="20" rx="6" fill="rgba(11,16,25,.8)"/><text x="${cx}" y="${cy + R - 58}" font-size="9.5" fill="${S.got.zoom ? '#86e0a8' : '#e8ecf4'}" text-anchor="middle">${zoomLevel(z)}</text></g>`;
+  // zoom track
+  h += `<g data-drag="zoom"><rect x="${ZT.x - 22}" y="${ZT.y1 - 16}" width="44" height="${ZT.y0 - ZT.y1 + 32}" fill="transparent"/><rect x="${ZT.x - 4}" y="${ZT.y1}" width="8" height="${ZT.y0 - ZT.y1}" rx="4" fill="#1a2438" stroke="#3a4762"/>`;
+  h += `<rect x="${ZT.x - 2}" y="${zY(z).toFixed(1)}" width="4" height="${(ZT.y0 - zY(z)).toFixed(1)}" rx="2" fill="#ffb547"/>`;
+  [[0, 'капля'], [3, '×6000'], [5.9, 'молекулы'], [ZMAX, 'атомы']].forEach(([zz, lab]) => { h += `<path d="M${ZT.x + 6} ${zY(zz).toFixed(1)}h6" stroke="#8b96ad"/><text x="${ZT.x + 15}" y="${(zY(zz) + 3).toFixed(1)}" font-size="8.5" fill="${zz === ZMAX && S.got.zoom ? '#86e0a8' : '#8b96ad'}">${lab}</text>`; });
+  h += `<circle cx="${ZT.x}" cy="${zY(z).toFixed(1)}" r="12" fill="#e8ecf4" stroke="${INK}" stroke-width="2.4"/><path d="M${ZT.x - 5} ${(zY(z) - 2).toFixed(1)}h10M${ZT.x - 5} ${(zY(z) + 2).toFixed(1)}h10" stroke="#5b6478" stroke-width="1.2"/></g>`;
+  h += `<text x="${ZT.x}" y="${ZT.y0 + 24}" font-size="8.5" fill="#8b96ad" text-anchor="middle">увеличение</text>`;
+  return h;
+}
+
+function buildScene() {
+  const Ls = L();
+  let h = '';
+  Ls.targets.forEach((T, i) => {
+    const x = 50 + i * 145, ok = S.built[T.id];
+    h += `<rect x="${x}" y="28" width="130" height="78" rx="12" fill="${ok ? 'rgba(134,224,168,.08)' : '#121a28'}" stroke="${ok ? '#86e0a8' : '#3a4762'}" stroke-width="1.6" ${ok ? '' : 'stroke-dasharray="5 4"'}/>`;
+    h += `<text x="${x + 10}" y="44" font-size="11" fill="${ok ? '#86e0a8' : '#e8ecf4'}" font-weight="500">${T.sub}${ok ? ' ✓' : ''}</text><text x="${x + 10}" y="98" font-size="8.5" fill="#8b96ad">${T.name}</text>`;
+    h += ok ? molSVG(T.f, x + 80, 70, 0.62, false) : `<text x="${x + 80}" y="74" font-size="16" fill="#3a4762" text-anchor="middle">?</text>`;
+  });
+  // work table
+  h += `<rect x="110" y="128" width="300" height="140" rx="14" fill="#121a28" stroke="#26324a" stroke-width="1.4"/><text x="120" y="144" font-size="8.5" fill="#8b96ad">стол сборки · нажмите на атом, чтобы убрать</text>`;
+  if (S.asm.length) {
+    const n = S.asm.length;
+    S.asm.forEach((e, k) => { const x = 260 + (k - (n - 1) / 2) * 44; h += `<g data-click="r${k}"><circle cx="${x}" cy="206" r="22" fill="transparent"/>${atomSVG(e, x, 206, 1.2)}</g>`; });
+    h += `<text x="260" y="258" font-size="11" fill="#ffb547" text-anchor="middle">на столе: ${subF(formula(S.asm))}</text>`;
+  } else if (S.last) {
+    h += molSVG(S.last.f, 260, 196, 1.5) + `<text x="260" y="258" font-size="11" fill="#86e0a8" text-anchor="middle">${S.last.sub} — ${S.last.name}</text>`;
+  } else h += `<text x="260" y="210" font-size="11" fill="#8b96ad" text-anchor="middle">стол пуст</text>`;
+  // atom bins
+  for (const e of ['H', 'O', 'C']) {
+    const x = BINS[e];
+    h += `<g data-click="a${e}"><rect x="${x - 44}" y="282" width="88" height="68" rx="12" fill="#1a2438" stroke="#3a4762" stroke-width="1.4"/>${atomSVG(e, x - 12, 310, 0.9)}${atomSVG(e, x + 14, 318, 0.9)}${atomSVG(e, x, 304, 1.1)}<text x="${x}" y="344" font-size="8.5" fill="#8b96ad" text-anchor="middle">${ATOM[e].name}</text></g>`;
+  }
+  return h;
+}
+
+function thermoSVG(x, T, Tmin, Tmax, id) {
+  const yOf = v => T3Y.y0 - (v - Tmin) / (Tmax - Tmin) * (T3Y.y0 - T3Y.y1);
+  let h = `<g data-drag="${id}"><rect x="${x - 24}" y="${T3Y.y1 - 18}" width="48" height="${T3Y.y0 - T3Y.y1 + 50}" fill="transparent"/><rect x="${x - 6}" y="${T3Y.y1 - 8}" width="12" height="${T3Y.y0 - T3Y.y1 + 16}" rx="6" fill="#f4f7fb" stroke="${INK}" stroke-width="1.4"/>`;
+  const step = Tmax - Tmin > 120 ? 30 : 10;
+  for (let v = Math.ceil(Tmin / step) * step; v <= Tmax; v += step) h += `<path d="M${x + 7} ${yOf(v).toFixed(1)}h5" stroke="#8b96ad"/><text x="${x + 14}" y="${(yOf(v) + 3).toFixed(1)}" font-size="7.5" fill="#8b96ad">${v < 0 ? '−' + -v : v}</text>`;
+  h += `<rect x="${x - 2.5}" y="${yOf(T).toFixed(1)}" width="5" height="${(T3Y.y0 + 6 - yOf(T)).toFixed(1)}" fill="#e2483b"/><circle cx="${x}" cy="${T3Y.y0 + 14}" r="11" fill="#e2483b" stroke="${INK}" stroke-width="1.6"/>`;
+  h += `<text x="${x}" y="${T3Y.y0 + 34}" font-size="10" fill="#e8ecf4" text-anchor="middle">${tC(T)}</text></g>`;
+  return h;
+}
+
+function diffScene() {
+  const f = dyeRight();
+  let h = `<rect x="${BX0}" y="${BY0}" width="${BX1 - BX0}" height="${BY1 - BY0}" fill="#5fb4d9" opacity=".1"/>`;
+  for (const p of S.p2) if (!p.d) h += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2.6" fill="#7fc4e6" opacity=".55"/>`;
+  for (const p of S.p2) if (p.d) h += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.6" fill="#c26be8" stroke="${INK}" stroke-width=".6"/>`;
+  h += ol(`M${BX0 - 6} ${BY0 - 14}L${BX0} ${BY0 - 8}V${BY1}H${BX1}V${BY0 - 8}L${BX1 + 6} ${BY0 - 14}`, 'none', GLASS_S, 2.4);
+  h += ol(`M${BX0 - 10} ${BY1}h${BX1 - BX0 + 20}v12q0 6-6 6H${BX0 - 4}q-6 0-6-6z`, '#3a4762', '#56627d', 1.6);
+  if (S.wall) h += `<g data-click="wall"><rect x="${MID - 16}" y="${BY0 - 30}" width="32" height="${BY1 - BY0 + 30}" fill="transparent"/><rect x="${MID - 3}" y="${BY0 - 22}" width="6" height="${BY1 - BY0 + 22}" rx="2" fill="#c8d1e2" stroke="${INK}" stroke-width="1.4"/><rect x="${MID - 12}" y="${BY0 - 30}" width="24" height="10" rx="4" fill="#ffb547" stroke="${INK}" stroke-width="1.4"/></g>`;
+  else h += `<path d="M${MID} ${BY0}V${BY1}" stroke="#8b96ad" stroke-width="1" stroke-dasharray="4 5" opacity=".7"/>`;
+  h += `<text x="${(BX0 + MID) / 2}" y="${BY1 - 8}" font-size="9" fill="#8b96ad" text-anchor="middle">левая половина</text><text x="${(MID + BX1) / 2}" y="${BY1 - 8}" font-size="9" fill="#8b96ad" text-anchor="middle">правая половина</text>`;
+  // the mixing gauge under the tank
+  const gx = 90, gw = 280, goal = L().goal / 100;
+  h += `<text x="${gx}" y="${BY1 + 38}" font-size="9" fill="#8b96ad">краска справа</text><rect x="${gx + 78}" y="${BY1 + 30}" width="${gw - 78}" height="9" rx="4" fill="#1a2438" stroke="#26324a"/>`;
+  h += `<rect x="${gx + 78}" y="${BY1 + 30}" width="${((gw - 78) * clamp(f / 0.5, 0, 1)).toFixed(1)}" height="9" rx="4" fill="${S.mixed ? '#86e0a8' : '#c26be8'}"/><path d="M${(gx + 78 + (gw - 78) * goal / 0.5).toFixed(1)} ${BY1 + 26}v17" stroke="#ffb547" stroke-width="1.6"/>`;
+  h += `<text x="${gx + gw + 8}" y="${BY1 + 38}" font-size="10" fill="#e8ecf4">${fmt(f * 100, 0)} %</text>`;
+  h += `<text x="${gx + gw + 52}" y="${BY1 + 38}" font-size="10" fill="#8b96ad">${S.wall ? '' : `t = ${fmt(S.t2, 1)} с`}</text>`;
+  h += thermoSVG(482, S.T2, 0, 100, 'temp2');
+  return h;
+}
+
+function statesScene() {
+  const [a, b] = vessel(), s = state3(), T = S.T3, r = V3.r;
+  let h = '';
+  // hot plate / cooler
+  const heat = clamp((T - 20) / 130, 0, 1), cold = clamp(-T / 30, 0, 1);
+  h += `<rect x="${a - 12}" y="${V3.bot + 2}" width="${b - a + 24}" height="14" rx="4" fill="#2a3348" stroke="${INK}" stroke-width="1.4"/>`;
+  if (heat > 0) h += `<rect x="${a - 6}" y="${V3.bot + 5}" width="${b - a + 12}" height="6" rx="3" fill="#ff8a3d" opacity="${(0.25 + 0.75 * heat).toFixed(2)}"/>`;
+  if (cold > 0) h += `<rect x="${a - 6}" y="${V3.bot + 5}" width="${b - a + 12}" height="6" rx="3" fill="#9fd8ff" opacity="${(0.3 + 0.7 * cold).toFixed(2)}"/>`;
+  // particles
+  if (s === 'solid') for (let i = 0; i < S.p3.length; i++) { const A = site(i); for (const j of [i + 1, i + 7]) { if (j >= S.p3.length || (j === i + 1 && j % 7 === 0)) continue; const B = site(j); h += `<path d="M${A.x.toFixed(1)} ${A.y.toFixed(1)}L${B.x.toFixed(1)} ${B.y.toFixed(1)}" stroke="#72d4e8" stroke-opacity=".25"/>`; } }
+  for (const p of S.p3) h += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${r}" fill="#5fb4d9" stroke="${INK}" stroke-width="1.4"/><circle cx="${(p.x - 2).toFixed(1)}" cy="${(p.y - 2).toFixed(1)}" r="1.8" fill="#fff" opacity=".45"/>`;
+  // vessel
+  h += `<path d="M${a} ${V3.top - 20}V${V3.bot}H${b}V${V3.top - 20}" fill="${GLASS}"/>` + ol(`M${a - 5} ${V3.top - 26}L${a} ${V3.top - 20}V${V3.bot}H${b}V${V3.top - 20}L${b + 5} ${V3.top - 26}`, 'none', GLASS_S, 2.4);
+  // piston
+  const py = S.py, cx = (a + b) / 2;
+  h += `<g data-drag="piston"><rect x="${cx - 30}" y="${V3.top - 74}" width="60" height="${py - V3.top + 74}" fill="transparent"/>`;
+  h += ol(`M${cx} ${py - 12}V${V3.top - 56}`, 'none', '#a9b4c9', 5);
+  h += `<rect x="${cx - 26}" y="${V3.top - 68}" width="52" height="14" rx="5" fill="#ffb547" stroke="${INK}" stroke-width="1.6"/>`;
+  h += `<rect x="${a + 2.5}" y="${(py - 12).toFixed(1)}" width="${b - a - 5}" height="12" rx="2" fill="#8a96b0" stroke="${INK}" stroke-width="1.6"/></g>`;
+  // labels
+  const lim = pistonLimit();
+  h += `<text x="${a - 16}" y="${V3.bot - 24}" font-size="13" fill="#e8ecf4" font-weight="500" text-anchor="end">${SNAME[s].toUpperCase()}</text><text x="${a - 16}" y="${V3.bot - 9}" font-size="9" fill="#8b96ad" text-anchor="end">${SNAME2[s]}</text>`;
+  if (py >= lim - 0.8 && s !== 'gas') h += `<text x="${cx}" y="${py - 20}" font-size="9" fill="#ff8a73" text-anchor="middle">дальше не сжимается</text>`;
+  if (s === 'gas' && py > V3.top + 2) h += `<text x="${cx + 40}" y="${py - 20}" font-size="9" fill="#86e0a8">сжат в ${fmt(gasRatio(), 1)} раза</text>`;
+  h += thermoSVG(482, T, -30, 150, 'temp3');
+  return h;
+}
+
+function hlBox(id) {
+  const lid = LID();
+  if (lid === 'molecules') return ({ view: [VIEW.x - VIEW.r - 6, VIEW.y - VIEW.r - 6, 2 * VIEW.r + 12, 2 * VIEW.r + 12], knob: [ZT.x - 24, ZT.y1 - 20, 76, ZT.y0 - ZT.y1 + 54], bar: [VIEW.x - 80, VIEW.y + VIEW.r - 50, 160, 36], mol: [VIEW.x - 50, VIEW.y - 50, 100, 100],
+    cards: [44, 22, 432, 90], table: [104, 122, 312, 152], bins: [100, 276, 320, 80] })[id];
+  if (lid === 'diffusion') return ({ tank: [BX0 - 8, BY0 - 32, BX1 - BX0 + 16, BY1 - BY0 + 52], wall: [MID - 16, BY0 - 34, 32, BY1 - BY0 + 38], dye: [BX0, BY0, MID - BX0, BY1 - BY0], gauge: [84, BY1 + 22, 330, 26], thermo: [460, 52, 50, 320] })[id];
+  const [a, b] = vessel();
+  return ({ vessel: [a - 10, V3.top - 30, b - a + 20, V3.bot - V3.top + 34], piston: [a, S.py - 16, b - a, 20], rod: [(a + b) / 2 - 30, V3.top - 72, 60, S.py - V3.top + 60], parts: [a, V3.bot - 120, b - a, 120], thermo: [460, 52, 50, 320], plate: [a - 16, V3.bot, b - a + 32, 20] })[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = bench();
+  if (id === 'molecules') h += S.st === 'zoom' ? zoomScene(t) : buildScene();
+  else if (id === 'diffusion') h += diffScene();
+  else h += statesScene();
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 510, hh / 410, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 405 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => {
+  const cl = e.target.closest('[data-click]');
+  if (cl) { e.preventDefault(); drag = { click: cl.dataset.click, x: e.clientX, y: e.clientY, moved: false }; return; }
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  const p = toSvg(e), id = el.dataset.drag;
+  drag = { id, dy: id === 'piston' ? S.py - p.y : 0 };
+  if (id !== 'piston') dragTo(p);
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (drag.click) { if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8) drag.moved = true; return; }
+  dragTo(toSvg(e));
+});
+function dragTo(p) {
+  if (drag.id === 'zoom') setZoom((ZT.y0 - p.y) / (ZT.y0 - ZT.y1) * ZMAX);
+  else if (drag.id === 'temp2') setT2(Math.round((T3Y.y0 - p.y) / (T3Y.y0 - T3Y.y1) * 100 / 5) * 5);
+  else if (drag.id === 'temp3') setT3(Math.round((-30 + (T3Y.y0 - p.y) / (T3Y.y0 - T3Y.y1) * 180) / 5) * 5);
+  else if (drag.id === 'piston') { S.pyT = null; S.py = clamp(p.y + drag.dy, V3.top, pistonLimit()); checkPress(); dirty = true; }
+}
+const endDrag = cancel => {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing');
+  if (!cancel && d.click && !d.moved) tap(d.click);
+  dirty = true;
+};
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+function setZoom(z) {
+  z = clamp(Math.round(z * 20) / 20, 0, ZMAX);
+  if (z === S.z) return;
+  S.z = z;
+  if (z >= L().zoomGoal && !S.got.zoom) { S.got.zoom = true; toast('Вот они, молекулы воды! Красный шарик — атом кислорода, белые — атомы водорода.'); }
+  update();
+}
+function setT2(T) {
+  T = clamp(T, 5, 90);
+  if (T === S.T2) return;
+  S.T2 = T; initDiff(); update();
+}
+function setT3(T) {
+  T = clamp(T, -30, 150);
+  if (T === S.T3) return;
+  const was = state3(); S.T3 = T;
+  const s = state3();
+  if (s !== was) toast({ solid: 'Вода замёрзла: молекулы встали по порядку.', liquid: was === 'solid' ? 'Лёд растаял: молекулы начали перескакивать с места на место.' : 'Пар превратился в воду: молекулы снова вплотную.', gas: 'Вода закипела: молекулы разлетелись по всему сосуду.' }[s]);
+  update();
+}
+function checkPress() {
+  const s = state3();
+  if (S.press[s]) return;
+  if (s === 'gas' ? gasRatio() >= 2 : S.py >= pistonLimit() - 0.8) {
+    S.press[s] = true;
+    toast({ solid: 'Лёд не сжимается: молекулы и так стоят вплотную.', liquid: 'Вода почти не сжимается: молекулы и так рядом друг с другом.', gas: 'Пар сжался больше чем в 2 раза: между молекулами газа много пустого места.' }[s]);
+    update();
+  }
+}
+
+function tap(id) {
+  if (id[0] === 'a' && id.length === 2) {
+    if (S.asm.length >= 6) { toast('На столе уже 6 атомов. Для наших молекул хватит меньше.'); return; }
+    S.asm.push(id[1]); S.last = null; update(); return;
+  }
+  if (id[0] === 'r') { S.asm.splice(+id.slice(1), 1); update(); return; }
+  if (id === 'wall') return act('open');
+}
+
+function stepDiff(dt) {
+  const s = Math.sqrt(2 * Dof(S.T2) * dt), lo = BX0 + 4, hi = BX1 - 4, top = BY0 + 4, bot = BY1 - 4;
+  for (const p of S.p2) {
+    const px = p.x;
+    let x = p.x + s * gauss(), y = p.y + s * gauss();
+    if (x < lo) x = 2 * lo - x; if (x > hi) x = 2 * hi - x;
+    if (y < top) y = 2 * top - y; if (y > bot) y = 2 * bot - y;
+    if (S.wall) { if (px < MID && x > MID - 4) x = 2 * (MID - 4) - x; else if (px > MID && x < MID + 4) x = 2 * (MID + 4) - x; }
+    p.x = clamp(x, lo, hi); p.y = clamp(y, top, bot);
+  }
+  if (!S.wall) {
+    S.t2 += dt;
+    if (!S.mixed && dyeRight() >= L().goal / 100) {
+      S.mixed = true;
+      const run = { T: S.T2, t: S.t2 }; S.runs.push(run); if (S.runs.length > 6) S.runs.shift();
+      if (S.T2 <= L().tCold) S.cold = true;
+      if (S.T2 >= L().tHot) S.hot = true;
+      toast(`При ${tC(S.T2)} краска перемешалась за ${fmt(S.t2, 1)} с.` + (S.T2 > L().tCold && S.T2 < L().tHot ? ' Для задания нужна холодная или горячая вода.' : ''));
+      update();
+    }
+  }
+}
+
+function stepStates(dt, t) {
+  const s = state3(), [a, b] = vessel(), r = V3.r, xl = a + 2.5 + r, xr = b - 2.5 - r, yb = V3.bot - r - 0.5, P = S.p3;
+  if (S.pyT != null) { S.py += (S.pyT - S.py) * Math.min(1, dt * (reduce ? 60 : 5)); if (Math.abs(S.pyT - S.py) < 0.5) { S.py = S.pyT; S.pyT = null; } checkPress(); }
+  S.py = clamp(S.py, V3.top, pistonLimit());
+  const yt = S.py + r + 1;
+  const v = 170 * Math.sqrt((S.T3 + 273) / 373);
+  if (s !== S.prev) {
+    if (s === 'gas') for (const p of P) { const a2 = rnd(0, 2 * Math.PI); p.vx = v * Math.cos(a2); p.vy = v * Math.sin(a2); }
+    S.prev = s;
+  }
+  if (s === 'solid') {
+    const A = 0.5 + (S.T3 + 30) / 16, k = Math.min(1, dt * 5);
+    P.forEach((p, i) => { const q = site(i), tx = q.x + (reduce ? 0 : A * Math.sin(t * 0.019 + i * 2.1)), ty = q.y + (reduce ? 0 : A * Math.cos(t * 0.023 + i * 1.3)); p.x += (tx - p.x) * k; p.y += (ty - p.y) * k; });
+    return;
+  }
+  if (s === 'liquid') {
+    const st = Math.sqrt(2 * (30 + 2.5 * S.T3) * dt);
+    for (const p of P) { p.x += st * gauss(); p.y += st * gauss() + 110 * dt; }
+    for (let it = 0; it < 3; it++) {
+      for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) {
+        const dx = P[j].x - P[i].x, dy = P[j].y - P[i].y, d = Math.hypot(dx, dy);
+        if (d < 13.6 && d > 1e-6) { const k = (13.6 - d) / d / 2; P[i].x -= dx * k; P[i].y -= dy * k; P[j].x += dx * k; P[j].y += dy * k; }
+      }
+      for (const p of P) { p.x = clamp(p.x, xl, xr); p.y = clamp(p.y, yt, yb); }
+    }
+    return;
+  }
+  for (const p of P) {
+    const sp = Math.hypot(p.vx, p.vy) || 1, turn = gauss() * 0.6 * Math.sqrt(dt), c = Math.cos(turn), sn = Math.sin(turn);
+    const vx = (p.vx * c - p.vy * sn) / sp * v, vy = (p.vx * sn + p.vy * c) / sp * v;
+    p.vx = vx; p.vy = vy; p.x += vx * dt; p.y += vy * dt;
+    if (p.x < xl) { p.x = 2 * xl - p.x; p.vx = Math.abs(p.vx); } if (p.x > xr) { p.x = 2 * xr - p.x; p.vx = -Math.abs(p.vx); }
+    if (p.y < yt) { p.y = yt + Math.min(yt - p.y, 4); p.vy = Math.abs(p.vy); } if (p.y > yb) { p.y = 2 * yb - p.y; p.vy = -Math.abs(p.vy); }
+    p.x = clamp(p.x, xl, xr); p.y = clamp(p.y, yt, yb);
+  }
+}
+
+let last = performance.now(), lastUi = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  const id = LID();
+  let anim = !!S.hl;
+  if (id === 'molecules' && S.st === 'zoom' && A_NM * ppnm(S.z) >= 14 && !reduce) anim = true;
+  if (id === 'diffusion') { stepDiff(dt); anim = true; }
+  if (id === 'states') { stepStates(dt, t); anim = true; }
+  if (id !== 'molecules' && t - lastUi > 200) { lastUi = t; const m = model(); renderMeter(m); if (S.tab === 'calc') renderPanes(m); if (S.tab === 'scheme') updateScheme(m); }
+  if (dirty || anim) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3000); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, cls) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}${cls ? ` class="${cls}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  let h = '';
+  if (id === 'molecules') {
+    h = B('st-zoom', 'Увеличение' + (S.got.zoom ? ' ✓' : ''), S.st === 'zoom') + B('st-build', 'Конструктор' + (Object.keys(S.built).length === 3 ? ' ✓' : ''), S.st === 'build') + sep;
+    if (S.st === 'zoom') h += B('z-', '− ×10') + B('z+', '+ ×10');
+    else h += B('add-H', '+H') + B('add-O', '+O') + B('add-C', '+C') + B('join', 'Соединить', undefined, 'rec') + B('clear', 'Очистить');
+  }
+  if (id === 'diffusion') h = L().temps.map(T => B('T2-' + T, tC(T), S.T2 === T)).join('') + sep + B('open', 'Убрать перегородку', undefined, 'rec') + B('again', 'Заново');
+  if (id === 'states') h = L().temps.map(T => B('T3-' + T, `${SNAME[T < 0 ? 'solid' : T < 100 ? 'liquid' : 'gas']} ${tC(T)}`, S.T3 === T)).join('') + sep + B('vessel', S.wide ? 'Сосуд: широкий' : 'Сосуд: узкий') + B('push', 'Нажать', undefined, 'rec') + B('lift', 'Отпустить');
+  tb.innerHTML = h;
+}
+function act(a) {
+  const id = LID();
+  if (a.startsWith('st-')) { S.st = a.slice(3); renderTools(); buildScheme(); update(); return; }
+  if (a === 'z-' || a === 'z+') { const z0 = S.z; setZoom(a === 'z+' ? Math.floor(S.z + 1e-6) + 1 : Math.ceil(S.z - 1e-6) - 1); if (S.z === z0 && a === 'z+') setZoom(ZMAX); return; }
+  if (a.startsWith('add-')) return tap('a' + a.slice(4));
+  if (a === 'clear') { S.asm = []; update(); return; }
+  if (a === 'join') {
+    const f = formula(S.asm), Ls = L();
+    if (!S.asm.length) { toast('Сначала положите атомы на стол.'); return; }
+    const T = Ls.targets.find(x => x.f === f), X = Ls.extras.find(x => x.f === f);
+    if (T) {
+      const again = S.built[T.id]; S.built[T.id] = true; S.asm = []; S.last = T;
+      toast(again ? `${T.sub} уже есть на полке.` : `Готово: ${T.sub} — молекула ${T.name === 'вода' ? 'воды' : T.name === 'кислород' ? 'кислорода' : 'углекислого газа'}.`);
+      renderTools(); update(); return;
+    }
+    if (X) { S.asm = []; S.last = X; toast(`Получилась ${X.sub} — ${X.name}. Настоящая молекула, но в задании её нет.`); update(); return; }
+    toast(`Из ${subF(f)} молекулы не получится. Сверьтесь с формулой: цифра внизу — сколько атомов этого вида.`); return;
+  }
+  if (a.startsWith('T2-')) { setT2(+a.slice(3)); renderTools(); return; }
+  if (a === 'open') {
+    if (!S.wall) { toast('Перегородки уже нет. Нажмите «Заново», чтобы повторить опыт.'); return; }
+    S.wall = false; S.t2 = 0; S.mixed = false; toast(`Перегородку убрали. Вода ${tC(S.T2)}.`); update(); return;
+  }
+  if (a === 'again') { initDiff(); update(); return; }
+  if (a.startsWith('T3-')) { setT3(+a.slice(3)); renderTools(); return; }
+  if (a === 'vessel') {
+    S.wide = !S.wide; const s = state3();
+    if (!S.pour[s]) { S.pour[s] = true; }
+    toast({ solid: 'Лёд в новом сосуде — та же форма и тот же объём.', liquid: 'Вода растеклась по дну: форма другая, а объём тот же.', gas: 'Пар сразу занял весь новый сосуд.' }[s]);
+    renderTools(); update(); return;
+  }
+  if (a === 'push') { S.pyT = pistonLimit(); dirty = true; return; }
+  if (a === 'lift') { S.pyT = V3.top; dirty = true; return; }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  view: IC('<circle cx="17" cy="17" r="13" fill="#2e6f93" stroke="#a9b4c9" stroke-width="2"/><circle cx="12" cy="13" r="3" fill="#e5534b"/><circle cx="21" cy="20" r="3" fill="#e5534b"/><circle cx="20" cy="11" r="2" fill="#eef2f8"/>'),
+  knob: IC('<rect x="14" y="3" width="6" height="28" rx="3" fill="#1a2438" stroke="#3a4762"/><rect x="15" y="14" width="4" height="17" rx="2" fill="#ffb547"/><circle cx="17" cy="14" r="5" fill="#e8ecf4"/>'),
+  bar: IC('<path d="M5 18h24M5 14v8M29 14v8" stroke="var(--fg)" stroke-width="2"/>'),
+  mol: IC('<circle cx="17" cy="15" r="8" fill="#e5534b"/><circle cx="9" cy="22" r="5" fill="#eef2f8"/><circle cx="25" cy="22" r="5" fill="#eef2f8"/>'),
+  cards: IC('<rect x="2" y="9" width="9" height="16" rx="2" fill="none" stroke="#86e0a8"/><rect x="12.5" y="9" width="9" height="16" rx="2" fill="none" stroke="var(--fg)" stroke-dasharray="2 2"/><rect x="23" y="9" width="9" height="16" rx="2" fill="none" stroke="var(--fg)" stroke-dasharray="2 2"/>'),
+  table: IC('<rect x="3" y="8" width="28" height="18" rx="4" fill="#121a28" stroke="var(--line)"/><circle cx="12" cy="17" r="4" fill="#e5534b"/><circle cx="22" cy="17" r="3" fill="#eef2f8"/>'),
+  bins: IC('<circle cx="8" cy="17" r="4" fill="#eef2f8"/><circle cx="17" cy="17" r="5" fill="#e5534b"/><circle cx="27" cy="17" r="4.5" fill="#4a5468" stroke="var(--fg)"/>'),
+  tank: IC('<path d="M4 5v24h26V5" fill="none" stroke="#9fb3d1" stroke-width="2"/><rect x="5" y="12" width="24" height="16" fill="#5fb4d9" opacity=".3"/>'),
+  wall: IC('<rect x="15" y="3" width="4" height="27" fill="#c8d1e2"/><rect x="12" y="2" width="10" height="4" rx="2" fill="#ffb547"/>'),
+  dye: IC('<circle cx="9" cy="10" r="3" fill="#c26be8"/><circle cx="18" cy="20" r="3" fill="#c26be8"/><circle cx="26" cy="12" r="2" fill="#7fc4e6"/><circle cx="12" cy="26" r="2" fill="#7fc4e6"/><circle cx="25" cy="26" r="2" fill="#7fc4e6"/>'),
+  gauge: IC('<rect x="3" y="14" width="28" height="7" rx="3" fill="#1a2438" stroke="var(--line)"/><rect x="3" y="14" width="17" height="7" rx="3" fill="#c26be8"/><path d="M23 11v13" stroke="#ffb547" stroke-width="1.6"/>'),
+  thermo: IC('<rect x="14" y="2" width="6" height="24" rx="3" fill="none" stroke="var(--fg)" stroke-width="1.5"/><circle cx="17" cy="27" r="5" fill="#e2483b"/><rect x="16" y="12" width="2" height="14" fill="#e2483b"/>'),
+  vessel: IC('<path d="M7 4v26h20V4" fill="none" stroke="#9fb3d1" stroke-width="2"/>'),
+  piston: IC('<rect x="7" y="13" width="20" height="5" fill="#8a96b0"/><path d="M17 13V3" stroke="#a9b4c9" stroke-width="3"/><rect x="11" y="2" width="12" height="4" rx="2" fill="#ffb547"/>'),
+  parts: IC('<circle cx="10" cy="24" r="4" fill="#5fb4d9"/><circle cx="18" cy="24" r="4" fill="#5fb4d9"/><circle cx="26" cy="24" r="4" fill="#5fb4d9"/><circle cx="14" cy="17" r="4" fill="#5fb4d9"/><circle cx="22" cy="17" r="4" fill="#5fb4d9"/>'),
+  plate: IC('<rect x="3" y="20" width="28" height="8" rx="2" fill="#2a3348"/><rect x="5" y="22" width="24" height="3" rx="1.5" fill="#ff8a3d"/>'),
+};
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  const t = (ok, s) => `${s} ${ok ? '✓' : '—'}`;
+  if (id === 'molecules') return [t(m.zoomed, 'Атомы видны'), ...L().targets.map(T => t(S.built[T.id], T.sub))].join(' · ');
+  if (id === 'diffusion') return [t(m.cold, 'Холодная'), t(m.hot, 'Горячая')].join(' · ');
+  return ['solid', 'liquid', 'gas'].map(s => `${SNAME[s]}: ${S.press[s] ? '✓' : '—'}${S.pour[s] ? '✓' : '—'}`).join(' · ');
+}
+
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'molecules') {
+    h = `<h2>Окуляр и конструктор</h2><div class="ctl"><div class="lbl">Режим</div><div class="chips" id="stChips"><button data-s="zoom">Увеличение</button><button data-s="build">Конструктор</button></div></div>`;
+    if (S.st === 'zoom') h += `<dl class="reads"><div><dt>поле зрения</dt><dd id="r1"></dd></div><div><dt>увеличение</dt><dd id="r2"></dd></div><div><dt>видно</dt><dd id="r3"></dd></div></dl>` + slider('inZoom', 'Увеличение', 0, ZMAX, 0.05, S.z);
+    else h += `<dl class="reads"><div><dt>на столе</dt><dd id="r1"></dd></div><div><dt>атомов</dt><dd id="r2"></dd></div><div><dt>собрано</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Положить атом</div><div class="chips"><button data-a="add-H">H · водород</button><button data-a="add-O">O · кислород</button><button data-a="add-C">C · углерод</button></div></div>
+      <div class="row"><button class="ghostbtn" data-a="join">Соединить</button><button class="ghostbtn" data-a="clear">Очистить</button></div>`;
+  }
+  if (id === 'diffusion') h = `<h2>Опыт с краской</h2><dl class="reads"><div><dt>вода</dt><dd id="r1"></dd></div><div><dt>справа</dt><dd id="r2"></dd></div><div><dt>время</dt><dd id="r3"></dd></div></dl>` +
+    slider('inT2', 'Температура воды', 5, 90, 5, S.T2) + `<div class="row"><button class="ghostbtn" data-a="open">Убрать перегородку</button><button class="ghostbtn" data-a="again">Заново</button></div>
+    <p class="note" style="margin-top:12px">Если поменять температуру, опыт начнётся заново: перегородка встанет на место.</p>`;
+  if (id === 'states') h = `<h2>Сосуд с поршнем</h2><dl class="reads"><div><dt>состояние</dt><dd id="r1"></dd></div><div><dt>объём</dt><dd id="r2"></dd></div><div><dt>форма</dt><dd id="r3"></dd></div></dl>` +
+    slider('inT3', 'Температура', -30, 150, 5, S.T3) + slider('inPy', 'Поршень опущен на', 0, 75, 1, Math.round((S.py - V3.top) / (V3.bot - V3.top) * 100)) +
+    `<div class="ctl"><div class="lbl">Сосуд</div><div class="chips" id="vChips"><button data-v="0">Узкий</button><button data-v="1">Широкий</button></div></div>`;
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn); };
+  on('#inZoom', e => setZoom(+e.target.value));
+  on('#inT2', e => { setT2(+e.target.value); renderTools(); });
+  on('#inT3', e => { setT3(+e.target.value); renderTools(); });
+  on('#inPy', e => { S.pyT = null; S.py = clamp(V3.top + +e.target.value / 100 * (V3.bot - V3.top), V3.top, pistonLimit()); checkPress(); dirty = true; });
+  el.querySelectorAll('#stChips button').forEach(b => b.onclick = () => act('st-' + b.dataset.s));
+  el.querySelectorAll('#vChips button').forEach(b => b.onclick = () => { if (S.wide !== (b.dataset.v === '1')) act('vessel'); });
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+  updateScheme(model());
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (id === 'molecules') {
+    el.querySelectorAll('#stChips button').forEach(b => b.setAttribute('aria-pressed', b.dataset.s === S.st));
+    if (S.st === 'zoom') { set('#r1', niceLen(fieldMM(S.z))); set('#r2', '×' + big(6 * 10 ** S.z)); set('#r3', zoomLevel(S.z)); set('#inZoomO', '×' + big(6 * 10 ** S.z)); val('#inZoom', S.z); }
+    else { set('#r1', S.asm.length ? subF(m.f) : '—'); set('#r2', String(S.asm.length)); set('#r3', `${m.n} / 3`); }
+  }
+  if (id === 'diffusion') { set('#r1', tC(S.T2)); set('#r2', fmt(m.frac * 100, 0) + ' %'); set('#r3', S.wall ? '—' : fmt(S.t2, 1) + ' с'); set('#inT2O', tC(S.T2)); val('#inT2', S.T2); }
+  if (id === 'states') {
+    const s = m.s; set('#r1', SNAME[s]); set('#r2', s === 'gas' ? 'весь сосуд' : 'постоянный'); set('#r3', s === 'solid' ? 'своя' : 'сосуда');
+    set('#inT3O', tC(S.T3)); val('#inT3', S.T3);
+    const pv = Math.round((S.py - V3.top) / (V3.bot - V3.top) * 100); set('#inPyO', pv + ' %'); val('#inPy', pv);
+    el.querySelectorAll('#vChips button').forEach(b => b.setAttribute('aria-pressed', (b.dataset.v === '1') === S.wide));
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'molecules') {
+    if (S.st === 'zoom') return [
+      { id: 'view', icon: ICON.view, name: 'Окуляр', spec: 'Что видно при выбранном увеличении. Капля воды диаметром 4 мм лежит на стекле.' },
+      { id: 'knob', icon: ICON.knob, name: 'Ручка увеличения', spec: 'Каждое деление — увеличение в 10 раз. Обычный школьный микроскоп даёт до ×1000, молекулы видны только в особые приборы — электронный и туннельный микроскопы.' },
+      { id: 'bar', icon: ICON.bar, name: 'Масштаб', spec: 'Отрезок показывает настоящую длину. По нему видно, какое крошечное расстояние сейчас в окуляре.' },
+      { id: 'mol', icon: ICON.mol, name: 'Молекула воды', spec: 'Атом кислорода (красный) и два атома водорода (белые). Угол между ними около 104,5°.' }];
+    return [
+      { id: 'cards', icon: ICON.cards, name: 'Карточки-цели', spec: 'Молекулы, которые надо собрать: H₂O, O₂, CO₂. Маленькая цифра в формуле — число атомов.' },
+      { id: 'table', icon: ICON.table, name: 'Стол сборки', spec: 'Сюда кладут атомы. Лишний атом можно убрать нажатием.' },
+      { id: 'bins', icon: ICON.bins, name: 'Запас атомов', spec: 'H — водород, самый лёгкий и маленький. O — кислород. C — углерод, из него состоит графит в карандаше.' }];
+  }
+  if (id === 'diffusion') return [
+    { id: 'tank', icon: ICON.tank, name: 'Сосуд с водой', spec: 'Голубые точки — молекулы воды. Они заполняют весь сосуд, но между ними есть промежутки.' },
+    { id: 'wall', icon: ICON.wall, name: 'Перегородка', spec: 'Пока она стоит, краска только слева. Нажмите на неё, чтобы убрать.' },
+    { id: 'dye', icon: ICON.dye, name: 'Краска', spec: 'Фиолетовые частицы — марганцовка. Никто их не мешает: двигаются они сами.' },
+    { id: 'gauge', icon: ICON.gauge, name: 'Счётчик', spec: 'Доля краски в правой половине. Полное перемешивание — 50 %, оранжевая черта — цель 40 %.' },
+    { id: 'thermo', icon: ICON.thermo, name: 'Термометр', spec: 'Тяните столбик, чтобы задать температуру воды до начала опыта.' }];
+  return [
+    { id: 'vessel', icon: ICON.vessel, name: 'Сосуд', spec: 'Узкий или широкий. Меняя сосуд, мы «переливаем» вещество и смотрим, меняется ли его форма.' },
+    { id: 'piston', icon: ICON.piston, name: 'Поршень', spec: 'Плотно прилегает к стенкам. Нажимая на него, проверяем, сжимается ли вещество.' },
+    { id: 'parts', icon: ICON.parts, name: 'Молекулы воды', spec: 'Одни и те же 42 молекулы во всех трёх состояниях. Меняется только порядок и скорость движения.' },
+    { id: 'thermo', icon: ICON.thermo, name: 'Термометр', spec: 'От −30 до 150 °C. Ниже 0 °C — лёд, от 0 до 100 °C — вода, выше 100 °C — пар.' },
+    { id: 'plate', icon: ICON.plate, name: 'Плитка', spec: 'Нагревает или охлаждает сосуд до выбранной температуры.' }];
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Что на столе</h2><p class="note">Нажмите на деталь, чтобы найти её на столе.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'molecules') {
+    if (S.st === 'zoom') {
+      const W = fieldMM(S.z), Wnm = W * 1e6;
+      return `<h2>Насколько мала молекула</h2><div class="formula">d ≈ 0,3 нм = 3 · 10⁻¹⁰ м</div><p class="note">1 нм (нанометр) = 0,000001 мм — в миллион раз меньше миллиметра.</p><h3>Сейчас в окуляре</h3><div class="steps">` +
+        step('поле зрения', niceLen(W)) + step('увеличение', '×' + big(6 * 10 ** S.z)) +
+        step('молекул поперёк поля', Wnm >= 1e4 ? `${fmt(Wnm, 0)} нм / 0,31 нм ≈ ${big(Wnm / A_NM)}` : `${fmt(Wnm, 1)} нм / 0,31 нм ≈ ${fmt(Wnm / A_NM, 0)}`, 'sum') + `</div>
+        <h3>Молекулы в ряд</h3><div class="steps">` + step('в 1 мм', '1 мм / 0,3 нм ≈ 3 300 000') + step('это как', 'больше, чем жителей в Алматы') + `</div>
+        <h3>Сколько молекул в капле</h3><div class="steps">` + step('масса капли', '0,05 г = 5 · 10⁻⁵ кг') + step('масса молекулы воды', '≈ 3 · 10⁻²⁶ кг') +
+        step('N = m / m₀', '5 · 10⁻⁵ / 3 · 10⁻²⁶ ≈ 1,7 · 10²¹', 'sum') + `</div><p class="note" style="margin-top:10px">Это 1 700 000 000 000 000 000 000 молекул в одной капле.</p>`;
+    }
+    const c = { C: 0, H: 0, O: 0 }; S.asm.forEach(a => c[a]++);
+    return `<h2>Читаем формулу</h2><div class="formula">H₂O = 2 · H + 1 · O</div><p class="note">Буква — вид атома. Цифра справа внизу — сколько таких атомов. Если цифры нет, атом один.</p>
+      <h3>На столе</h3><div class="steps">` + step('водород H', c.H) + step('кислород O', c.O) + step('углерод C', c.C) + step('формула', S.asm.length ? subF(m.f) : '—', 'sum') + `</div>
+      <h3>Цели</h3><div class="steps">` + step('H₂O — вода', `2 H + 1 O = 3 атома${S.built.h2o ? ' ✓' : ''}`) + step('O₂ — кислород', `2 O = 2 атома${S.built.o2 ? ' ✓' : ''}`) + step('CO₂ — углекислый газ', `1 C + 2 O = 3 атома${S.built.co2 ? ' ✓' : ''}`) + `</div>`;
+  }
+  if (id === 'diffusion') {
+    const nR = Math.round(m.frac * L().nDye), N = L().nDye;
+    let h = `<h2>Как идёт перемешивание</h2><div class="formula">доля = N справа / N всего</div><h3>Сейчас</h3><div class="steps">` +
+      step('температура воды', tC(S.T2)) + step('частиц краски справа', `${nR} из ${N}`) + step('доля', `${nR} / ${N} = ${fmt(m.frac * 100, 0)} %`) + step('время', S.wall ? 'опыт не начат' : fmt(S.t2, 1) + ' с', 'sum') + `</div><h3>Результаты</h3>`;
+    if (!S.runs.length) h += `<p class="note">Пока нет ни одного опыта до 40 %.</p>`;
+    else h += `<div class="steps">` + S.runs.map(r => step(tC(r.T), fmt(r.t, 1) + ' с')).join('') + `</div>`;
+    const c = S.runs.filter(r => r.T <= L().tCold).pop(), w = S.runs.filter(r => r.T >= L().tHot).pop();
+    if (c && w) h += `<h3>Сравнение</h3><div class="steps">` + step('холодная / горячая', `${fmt(c.t, 1)} / ${fmt(w.t, 1)} ≈ ${fmt(c.t / w.t, 1)}`, 'sum') + `</div><p class="note" style="margin-top:10px">В горячей воде краска перемешалась примерно в ${fmt(c.t / w.t, 1)} раза быстрее: молекулы движутся быстрее.</p>`;
+    return h + `<p class="note" style="margin-top:10px">В жизни марганцовка в стакане расходится за часы, в модели время ускорено. Каждый опыт немного отличается: движение молекул случайное.</p>`;
+  }
+  const s = m.s;
+  let h = `<h2>Какое состояние</h2><div class="formula">t &lt; 0 °C — лёд · 0…100 °C — вода · t ≥ 100 °C — пар</div><h3>Сейчас</h3><div class="steps">` +
+    step('температура', tC(S.T3)) + step('сравнение', S.T3 < 0 ? `${tC(S.T3)} < 0 °C` : S.T3 < 100 ? `0 °C ≤ ${tC(S.T3)} < 100 °C` : `${tC(S.T3)} ≥ 100 °C`) + step('состояние', `${SNAME[s]} (${SNAME2[s]})`, 'sum') + `</div>`;
+  if (s === 'gas') h += `<h3>Сжатие поршнем</h3><div class="steps">` + step('высота до поршня', `${fmt(V3.bot - S.py, 0)} из ${V3.bot - V3.top}`) + step('объём уменьшился', `${V3.bot - V3.top} / ${fmt(V3.bot - S.py, 0)} ≈ ${fmt(m.ratio, 1)} раза`, 'sum') + `</div>`;
+  h += `<h3>Как далеко молекулы</h3><div class="steps">` + step('лёд и вода', 'вплотную, ≈ 1 размер молекулы') + step('пар при 100 °C', 'объём в ≈ 1600 раз больше') + step('расстояние в паре', '∛1600 ≈ 12 размеров молекулы', 'sum') + `</div>
+    <p class="note" style="margin-top:10px">В модели молекулы пара нарисованы ближе, чем на самом деле, иначе в сосуде поместились бы всего одна-две.</p>
+    <h3>Проверки</h3><div class="steps">` + ['solid', 'liquid', 'gas'].map(x => step(SNAME[x], `сжать ${S.press[x] ? '✓' : '—'} · перелить ${S.pour[x] ? '✓' : '—'}`)).join('') + `</div>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter');
+  if (id === 'molecules' && S.st === 'zoom') el.innerHTML = `<div class="k">Увеличение</div><div class="v ${S.got.zoom ? 'ok' : ''}">×${big(6 * 10 ** S.z)}</div><div class="lr"><span>поле</span><span>${niceLen(fieldMM(S.z))}</span></div>`;
+  else if (id === 'molecules') el.innerHTML = `<div class="k">Собрано молекул</div><div class="v ${m.n === 3 ? 'ok' : ''}">${m.n} / 3</div><div class="lr"><span>на столе</span><span>${S.asm.length ? subF(m.f) : '—'}</span></div>`;
+  else if (id === 'diffusion') el.innerHTML = `<div class="k">Краска справа</div><div class="v ${S.mixed ? 'ok' : ''}">${fmt(m.frac * 100, 0)} %</div><div class="lr"><span>вода</span><span>${tC(S.T2)}</span></div><div class="lr"><span>время</span><span>${S.wall ? '—' : fmt(S.t2, 1) + ' с'}</span></div>`;
+  else el.innerHTML = `<div class="k">Вода сейчас</div><div class="v">${SNAME[m.s]}</div><div class="lr"><span>t</span><span>${tC(S.T3)}</span></div><div class="lr"><span>проверки</span><span class="${m.n === 6 ? 'ok' : ''}">${m.n}/6</span></div>`;
+}
+
+function update() {
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip(); renderTools();
+    toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Вы разобрались, из чего состоит вещество!');
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  molecules: '<circle cx="20" cy="13" r="7" fill="#e5534b"/><circle cx="13" cy="20" r="4.5" fill="#eef2f8"/><circle cx="27" cy="20" r="4.5" fill="#eef2f8"/><circle cx="46" cy="15" r="6" fill="#4a5468" stroke="#e8ecf4" stroke-width=".8"/><circle cx="36" cy="15" r="6" fill="#e5534b"/><circle cx="56" cy="15" r="6" fill="#e5534b"/>',
+  diffusion: '<path d="M4 4v23h58V4" fill="none" stroke="#9fb3d1" stroke-width="1.2"/><circle cx="10" cy="10" r="2" fill="#c26be8"/><circle cx="16" cy="20" r="2" fill="#c26be8"/><circle cx="24" cy="13" r="2" fill="#c26be8"/><circle cx="31" cy="22" r="2" fill="#c26be8"/><circle cx="40" cy="12" r="2" fill="#c26be8"/><circle cx="52" cy="20" r="2" fill="#c26be8"/><circle cx="46" cy="22" r="1.5" fill="#7fc4e6"/><circle cx="20" cy="24" r="1.5" fill="#7fc4e6"/><circle cx="56" cy="9" r="1.5" fill="#7fc4e6"/>',
+  states: '<g fill="#5fb4d9"><circle cx="7" cy="22" r="3"/><circle cx="13" cy="22" r="3"/><circle cx="10" cy="16" r="3"/><circle cx="7" cy="10" r="3"/><circle cx="13" cy="10" r="3"/><circle cx="27" cy="23" r="3"/><circle cx="33" cy="22" r="3"/><circle cx="39" cy="23" r="3"/><circle cx="30" cy="17" r="3"/><circle cx="36" cy="17" r="3"/><circle cx="50" cy="8" r="3"/><circle cx="60" cy="15" r="3"/><circle cx="53" cy="24" r="3"/></g>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Lx, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Lx.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Lx.title}</span></span>
+      ${S.done[Lx.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  S.lesson = i; drag = null;
+  resetState(); save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L().task;
+  $('#hint').textContent = L().stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '';
+  if (id === 'molecules') {
+    now = S.st === 'zoom'
+      ? `Режим «Увеличение»: капля воды под увеличением ×${big(6 * 10 ** S.z)}, поле зрения ${niceLen(fieldMM(S.z))}; в окуляре: ${zoomLevel(S.z)}. Атомы ${S.got.zoom ? 'уже увидены' : 'ещё не увидены (нужно увеличить сильнее)'}.`
+      : `Режим «Конструктор»: на столе атомы ${S.asm.length ? S.asm.join(', ') + ' (формула ' + m.f + ')' : 'не лежат'}.`;
+    now += ` Собраны молекулы: ${Ls.targets.filter(T => S.built[T.id]).map(T => T.f).join(', ') || 'ни одной'}; осталось: ${Ls.targets.filter(T => !S.built[T.id]).map(T => T.f).join(', ') || 'ничего'}.`;
+  }
+  if (id === 'diffusion') now = `Сосуд с водой при ${tC(S.T2)}, слева частицы краски (марганцовка). Перегородка ${S.wall ? 'стоит' : `убрана ${fmt(S.t2, 1)} с назад`}. Справа сейчас ${fmt(m.frac * 100, 0)} % краски (цель 40 %). Результаты: ${S.runs.map(r => `${tC(r.T)} — ${fmt(r.t, 1)} с`).join('; ') || 'пока нет'}. Опыт в холодной воде (≤ 20 °C) ${S.cold ? 'сделан' : 'не сделан'}, в горячей (≥ 60 °C) ${S.hot ? 'сделан' : 'не сделан'}. Время в модели ускорено.`;
+  if (id === 'states') now = `Сосуд с поршнем, ${S.wide ? 'широкий' : 'узкий'}; температура ${tC(S.T3)}, вода сейчас: ${SNAME[m.s]} (${SNAME2[m.s]} состояние). Поршень ${S.py > V3.top + 2 ? 'опущен' : 'поднят'}${m.s === 'gas' ? `, пар сжат в ${fmt(m.ratio, 1)} раза` : ''}. Проверки: ${['solid', 'liquid', 'gas'].map(x => `${SNAME[x]} — сжатие ${S.press[x] ? 'да' : 'нет'}, переливание ${S.pour[x] ? 'да' : 'нет'}`).join('; ')}.`;
+  return [
+    `Раздел: физика, 7 класс, тема «Строение вещества». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'} (${taskState(m)}).`,
+    `Сейчас на столе: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Помогай наводящими вопросами, готовые ответы не выдавай.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { molecules: 'Почему капля кажется сплошной, если в ней есть промежутки?', diffusion: 'Почему в горячей воде краска расходится быстрее?', states: 'Почему газ сжимается, а вода почти нет?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
