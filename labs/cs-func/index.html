@@ -1,0 +1,1835 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по информатике, 8 класс: функции и списки в Python — def и return, списки и индексы, строки и срезы, поиск ошибок. Редактор, пошаговое выполнение, кадры вызовов в памяти и автопроверка.">
+<title>Функции и списки</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. The stage is a tiny Python IDE: editor, console, memory with call frames and list cells; lesson notebook on the right. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --lh:22px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;min-width:0;display:flex;flex-direction:column;gap:10px;padding:12px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.top{display:flex;gap:10px;align-items:stretch;flex:none;min-width:0}
+.task{flex:1;min-width:0;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+.meter{flex:none;width:184px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.meter .v.ok{color:var(--ok)}
+.meter .v.bad{color:var(--warn)}
+.meter .v.run{color:var(--force)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--arm);transition:width .2s}
+.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%,40%{box-shadow:0 0 0 3px var(--arm)}100%{box-shadow:0 0 0 0 transparent}}
+.hl{outline:2px dashed var(--arm);outline-offset:2px}
+
+.work{flex:1;min-height:0;min-width:0;display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:10px}
+.box{display:flex;flex-direction:column;min-height:0;min-width:0;background:rgba(11,16,25,.74);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.bh{flex:none;display:flex;justify-content:space-between;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);font:600 10.5px/1.2 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.bh span:last-child{font:500 10.5px/1.2 var(--font-mono);letter-spacing:.04em;text-transform:none;text-align:right}
+.ed{flex:1;min-height:0;display:flex;position:relative;font:14px/var(--lh) var(--font-mono)}
+.gut{flex:none;width:56px;overflow:hidden;position:relative;border-right:1px solid var(--line);color:var(--muted);user-select:none;-webkit-user-select:none;background:rgba(18,26,40,.6)}
+.gut .in{position:absolute;left:0;right:0;top:0;padding-top:10px}
+.gut .gl{height:var(--lh);display:flex;justify-content:space-between;align-items:center;padding:0 6px 0 8px;font-size:12px}
+.gut .gl.cur{color:var(--fg)}
+.gut .c{font-size:10px;color:var(--force);font-variant-numeric:tabular-nums}
+.gut .gl.zero .c{color:#56627d}
+.edw{flex:1;min-width:0;position:relative;overflow:hidden}
+.curl{position:absolute;left:0;right:0;height:var(--lh);background:rgba(255,181,71,.14);border-left:3px solid var(--force);pointer-events:none}
+.curl.err{background:rgba(255,138,115,.18);border-left-color:var(--warn)}
+#code{position:absolute;inset:0;width:100%;height:100%;resize:none;border:0;outline:none;background:transparent;color:var(--fg);font:inherit;padding:10px 12px;margin:0;white-space:pre;overflow:auto;tab-size:4;-moz-tab-size:4;caret-color:var(--force);touch-action:pan-x pan-y}
+#code:focus-visible{outline:none}
+.edw:focus-within{box-shadow:inset 0 0 0 1px rgba(114,212,232,.35)}
+.snips{flex:none;display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;padding:7px 8px;border-top:1px solid var(--line)}
+.snips button{flex:none;background:var(--surface-2);border:1px solid var(--line);border-radius:7px;padding:5px 8px;font:500 12px/1 var(--font-mono);cursor:pointer;white-space:nowrap}
+.snips button:hover{border-color:var(--muted)}
+.side{display:grid;grid-template-rows:minmax(0,1.25fr) minmax(0,1fr);gap:10px;min-height:0;min-width:0}
+.con{flex:1;min-height:0;overflow:auto;padding:10px 12px;font:13.5px/1.5 var(--font-mono);white-space:pre-wrap;overflow-wrap:anywhere}
+.con .p{color:var(--muted)}
+.con .i{color:var(--arm)}
+.con .e{color:var(--warn)}
+.con .s{color:#56627d}
+.con .ex{display:block;color:var(--fg);font-family:var(--font-body);font-size:13px;line-height:1.45;background:rgba(255,138,115,.1);border-left:3px solid var(--warn);border-radius:6px;padding:7px 9px;margin-top:6px;white-space:normal}
+.con .empty{color:#56627d;font-family:var(--font-body);font-size:13px}
+.inrow{flex:none;display:flex;gap:6px;padding:7px 8px;border-top:1px solid var(--line);background:rgba(114,212,232,.06)}
+.inrow span{font:500 14px/34px var(--font-mono);color:var(--arm);padding-left:4px}
+.inrow input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--arm);border-radius:8px;padding:6px 10px;font:500 15px/1.3 var(--font-mono);outline:none}
+.inrow button{background:var(--arm);color:var(--bg);border:0;border-radius:8px;padding:0 12px;font-weight:600;font-size:13px;cursor:pointer}
+.mem{flex:1;min-height:0;overflow:auto;padding:10px;display:flex;flex-direction:column;gap:8px}
+.fr{border:1px dashed var(--line);border-radius:10px;padding:6px 8px 8px;min-width:0}
+.fr.call{border-style:solid;border-color:rgba(180,156,255,.55);background:rgba(180,156,255,.06)}
+.fh{font:500 11px/1.3 var(--font-mono);color:var(--muted);margin-bottom:6px;overflow-wrap:anywhere}
+.fr.call .fh{color:#b49cff}
+.cells{display:flex;flex-wrap:wrap;gap:8px;min-width:0}
+.arr{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px}
+.arr span{display:flex;flex-direction:column;align-items:center;min-width:24px;border:1px solid var(--line);border-radius:6px;background:var(--bg);padding:2px 4px 3px}
+.arr span i{font:500 9.5px/1 var(--font-mono);color:var(--muted);font-style:normal}
+.arr span b{font:500 13px/1.3 var(--font-mono);white-space:pre}
+.arr span.more{justify-content:center;color:var(--muted);font:500 11px/1 var(--font-mono)}
+.alias{font-size:11px;color:var(--force);margin-top:4px}
+.ret{font:500 12px/1.4 var(--font-mono);color:#b49cff;overflow-wrap:anywhere}
+.cell{min-width:84px;max-width:100%;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);padding:6px 9px 7px;transition:border-color .3s}
+.cell .n{display:flex;justify-content:space-between;gap:10px;font:500 11px/1.2 var(--font-mono);color:var(--muted)}
+.cell .n i{font-style:normal;font-size:10px;padding:1px 5px;border-radius:5px;background:var(--bg)}
+.cell .v{font:500 14.5px/1.3 var(--font-mono);margin-top:4px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.cell.chg{border-color:var(--force);box-shadow:0 0 0 1px var(--force)}
+.ty-int{color:#72d4e8}.ty-float{color:#b49cff}.ty-str{color:#86e0a8}.ty-bool{color:#ffb547}.ty-list{color:#ff8ad8}.ty-tuple{color:#ff8ad8}.ty-NoneType{color:#8b96ad}.ty-function{color:#b49cff}
+.mem .empty{color:#56627d;font-size:13px;padding:2px 4px}
+
+.tools{flex:none;align-self:center;display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:100%}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.tools button:hover{color:var(--fg)}
+.tools button.go{background:var(--fg);color:var(--bg);font-weight:600}
+.tools button:disabled{opacity:.35;cursor:default}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.pbody code{font:500 13px var(--font-mono);background:var(--surface-2);border-radius:5px;padding:1px 5px}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--fg)}
+.chips button:hover{border-color:var(--muted)}
+.chips button:disabled{opacity:.35;cursor:default}
+.chips.mono button{font-family:var(--font-mono);font-size:12.5px}
+
+.formula{font:500 15px/1.45 var(--font-mono);text-align:center;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px;overflow-wrap:anywhere}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted);min-width:0;overflow-wrap:anywhere}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;min-width:0}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+.step.okk span{color:var(--ok)}
+.step.badd span{color:var(--warn)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:auto}
+  .work{grid-template-columns:minmax(0,1fr)}
+  .ed{flex:none;height:264px}
+  .side{grid-template-rows:auto auto}
+  .con{flex:none;height:180px}
+  .mem{flex:none;min-height:70px;max-height:280px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .stage{padding:8px}
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{padding:9px 11px}
+  .task p{font-size:13px}
+  .ed{font-size:16px}
+  .inrow input{font-size:16px}
+  .gut{width:48px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M9 13l6 5-6 5" fill="none" stroke="var(--force)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 26h13" stroke="var(--arm)" stroke-width="2.6" stroke-linecap="round"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Информатика · Функции и списки</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#cs">Карта</a><a href="/physics/#cs">Информатика</a><a href="/labs/cs-func/" aria-current="page">Функции</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Функции</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Рабочий стол лаборатории: редактор Python, консоль, память и кадры вызовов">
+    <div class="top">
+      <div class="task" id="taskBox" aria-live="polite">
+        <div class="k" id="taskK">Задание</div>
+        <p id="taskText"></p>
+        <div class="state" id="taskState"></div>
+      </div>
+      <div class="meter" id="meter"></div>
+    </div>
+    <div class="work">
+      <div class="box" id="edPane">
+        <div class="bh"><span>Редактор · main.py</span><span id="edInfo"></span></div>
+        <div class="ed">
+          <div class="gut" id="gut"><div class="in" id="gutIn"></div></div>
+          <div class="edw"><div class="curl" id="curl" hidden></div><textarea id="code" spellcheck="false" wrap="off" autocapitalize="off" autocomplete="off" autocorrect="off" aria-label="Код программы на Python"></textarea></div>
+        </div>
+        <div class="snips" id="snips" aria-label="Вставить заготовку"></div>
+      </div>
+      <div class="side">
+        <div class="box" id="conPane">
+          <div class="bh"><span>Консоль</span><span id="conInfo"></span></div>
+          <div class="con" id="con" aria-live="polite"></div>
+          <form class="inrow" id="inRow" hidden><span>›</span><input id="inBox" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Ввод для input()"><button type="submit">Ввод</button></form>
+        </div>
+        <div class="box" id="memPane">
+          <div class="bh"><span>Память · переменные и вызовы</span><span id="memInfo"></span></div>
+          <div class="mem" id="mem"></div>
+        </div>
+      </div>
+    </div>
+    <div class="tools" role="toolbar" aria-label="Запуск программы" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+
+const LESSONS = [
+  { id: 'func', title: 'Функции: def и return', fn: 'discount',
+    text: ['Функция — это кусок программы с собственным именем. Его пишут один раз, а вызывают сколько угодно: discount(5000), discount(12000). Программа становится короче, а ошибку исправляют в одном месте.',
+           'Функцию объявляют словом def: def discount(price): — в скобках параметры, в конце двоеточие, тело — с отступом. Пока функцию не вызвали, её тело не выполняется. При вызове параметр получает значение аргумента: discount(12000) значит price = 12000.',
+           'return возвращает результат туда, откуда функцию вызвали, и сразу её завершает. Если return нет, функция возвращает None. Переменные внутри функции локальные: они живут в её «кадре» и исчезают после return.'],
+    why: 'Функции — главный способ не повторяться. В интернет-магазине формула скидки живёт в одной функции, и её вызывают корзина, чек и мобильное приложение. Сменилась акция — правят одну функцию, а не двадцать мест в коде. На собеседовании стажёра-разработчика в банке или маркетплейсе почти всегда просят написать небольшую функцию.',
+    task: 'Напишите функцию discount(price): от 10 000 тенге и дороже — скидка 10 %, дешевле — без скидки. Функция должна вернуть (return) цену к оплате. Пример: discount(12000) → 10800.',
+    hint: 'Внутри функции нужен if. Цена со скидкой 10 % — это price * 90 // 100. Проверка сама вызовет discount с разными ценами, в том числе ровно с 10000. Нажмите «Шаг» и посмотрите, как программа «заходит» в функцию и в памяти появляется её кадр.',
+    code: '# Объявили один раз — вызываем сколько угодно\ndef greet(name):\n    return "Сәлем, " + name + "!"\n\nprint(greet("Айгерим"))\nprint(greet("Нурлан"))\n\n# Ваша функция\ndef discount(price):\n    pass\n\nprint(discount(12000))\n',
+    snips: ['def |():', 'return ', 'if |:', 'else:', ' >= ', ' * 90 // 100', 'print(|)', '⇥'],
+    demos: [{ n: 'Без return — None', c: 'def area(a, b):\n    s = a * b\n    print("внутри:", s)\n\nresult = area(3, 4)\nprint("вернулось:", result)\n' },
+            { n: 'Локальная переменная', c: 'def double(x):\n    y = x * 2\n    return y\n\nprint(double(21))\nprint(y)\n' },
+            { n: 'Функция зовёт функцию', c: 'def square(x):\n    return x * x\n\ndef hypot2(a, b):\n    return square(a) + square(b)\n\nprint(hypot2(3, 4))\n' },
+            { n: 'Параметр по умолчанию', c: 'def price(base, vat=12):\n    return base + base * vat // 100\n\nprint(price(1000))\nprint(price(1000, 0))\n' }],
+    tests: [{ args: [5000], exp: 5000 }, { args: [9999], exp: 9999 }, { args: [10000], exp: 9000 }, { args: [12000], exp: 10800 }, { args: [25000], exp: 22500 }],
+    check: m => !!m.tests && m.tests.all },
+  { id: 'lists', title: 'Списки: индексы и перебор', fn: 'best_day',
+    text: ['Список хранит много значений под одним именем: temps = [3, 7, 5, 1]. Элементы пишут в квадратных скобках через запятую. len(temps) — сколько в нём элементов.',
+           'У каждого элемента есть номер — индекс. Счёт идёт с нуля: temps[0] — первый элемент, temps[3] — четвёртый, temps[-1] — последний. Индекс за краем списка даёт ошибку IndexError.',
+           'Список можно менять: temps[1] = 8 заменяет элемент, temps.append(4) добавляет в конец. Перебрать все элементы помогает for t in temps:, а если нужен и номер — for i in range(len(temps)):.'],
+    why: 'Список — это любой ряд данных: оценки в электронном журнале, цены товаров, показания датчика в теплице по часам. Аналитик берёт продажи кофейни за неделю и находит лучший день — от этого зависит, когда выводить больше бариста. Так устроены отчёты в банках, логистике и агрокомпаниях.',
+    task: 'Напишите функцию best_day(temps): она получает список температур за неделю и возвращает номер самого тёплого дня (дни считаем с 1). Если таких дней несколько — номер первого.',
+    hint: 'Индексы начинаются с 0, а дни — с 1. Можно перебирать индексы в цикле и запоминать лучший, а можно найти max(temps) и его индекс методом .index(). Не забудьте про +1.',
+    code: '# Температура за неделю, °C\ntemps = [3, 7, 5, 1, 0, 2, 4]\nprint("Понедельник:", temps[0])\nprint("Воскресенье:", temps[-1])\nprint("Всего дней:", len(temps))\n\ndef best_day(temps):\n    pass\n\nprint(best_day(temps))\n',
+    snips: ['[|]', 'len(|)', 'for i in range(len(|)):', '[i]', '.append(|)', 'max(|)', '.index(|)', 'return ', '⇥'],
+    demos: [{ n: 'Индексы и срезы', c: 'marks = [5, 4, 3, 5, 4]\nprint(marks[0], marks[2], marks[-1])\nprint(marks[1:3])\nprint(len(marks), sum(marks), max(marks))\n' },
+            { n: 'Менять и добавлять', c: 'cart = ["хлеб", "молоко"]\ncart.append("айран")\ncart[0] = "лепёшка"\nprint(cart)\nprint(len(cart))\n' },
+            { n: 'Два имени — один список', c: 'a = [1, 2, 3]\nb = a\nb.append(4)\nprint("a =", a)\nc = a.copy()\nc.append(5)\nprint("a =", a, "c =", c)\n' },
+            { n: 'IndexError', c: 'temps = [3, 7, 5]\nfor i in range(4):\n    print(i, temps[i])\n' }],
+    tests: [{ args: [[3, 7, 5, 1, 0, 2, 4]], exp: 2 }, { args: [[-5, -2, -8, -1, -3, -4, -6]], exp: 4 }, { args: [[10, 12, 12, 9, 8, 7, 6]], exp: 2 }, { args: [[1, 2, 3, 4, 5, 6, 9]], exp: 7 }, { args: [[15, 3, 4, 5, 6, 7, 8]], exp: 1 }],
+    check: m => !!m.tests && m.tests.all },
+  { id: 'str', title: 'Строки: символы, срезы, методы', fn: 'initials',
+    text: ['Строка — цепочка символов, и у каждого символа тоже есть индекс с нуля. Для s = "Астана": s[0] — "А", s[-1] — "а", len(s) — 6.',
+           'Срез берёт кусок строки: s[0:3] — "Аст" (правая граница не входит), s[2:] — от третьего символа до конца, s[::-1] — строка задом наперёд.',
+           'Строку нельзя изменить по индексу — можно только собрать новую. Помогают методы: s.upper(), s.lower(), s.replace("а", "о"). s.split() режет строку по пробелам в список слов, а " ".join(words) склеивает обратно.'],
+    why: 'Почти все данные приходят текстом: ФИО в анкете, номер телефона, адрес доставки, ИИН. Программа приводит их к одному виду: «+7 701 …» и «8701…» — один и тот же номер. Так работают банки, ЦОНы и службы доставки. Сотрудник, который за минуту приводит в порядок таблицу из тысячи ФИО, экономит отделу дни ручной работы.',
+    task: 'Напишите функцию initials(full): из «Ахметов Нурлан Серикович» она делает «Ахметов Н. С.» — фамилия целиком, затем первые буквы имени и отчества с точками.',
+    hint: 'full.split() даст список из трёх слов. Первая буква слова — word[0]. Собирайте ответ сложением строк и не забудьте пробелы после фамилии и после первой точки.',
+    code: '# Строка — цепочка символов\ncity = "Астана"\nprint(city[0], city[-1], len(city))\nprint(city[0:3], city[::-1])\n\ndef initials(full):\n    pass\n\nprint(initials("Ахметов Нурлан Серикович"))\n',
+    snips: ['.split()', '[0]', '[|:]', '[::-1]', ' + ". "', ' + "."', '.upper()', 'return ', '⇥'],
+    demos: [{ n: 'Срезы', c: 'word = "информатика"\nprint(word[:5])\nprint(word[5:])\nprint(word[::2])\nprint(word[::-1])\n' },
+            { n: 'Строку не изменить', c: 's = "кот"\ns[0] = "р"\nprint(s)\n' },
+            { n: 'Собрать новую строку', c: 's = "кот"\ns = "р" + s[1:]\nprint(s)\nprint("ала-тоо".upper().replace("-", " "))\n' },
+            { n: 'split и join', c: 'line = "Алматы Астана Шымкент"\ncities = line.split()\nprint(cities, len(cities))\nprint(" → ".join(cities))\n' },
+            { n: 'Считаем гласные', c: 'text = "Қазақстан Республикасы"\ncount = 0\nfor ch in text.lower():\n    if ch in "аәеиоөуұүыіэюя":\n        count += 1\nprint("Гласных:", count)\n' }],
+    tests: [{ args: ['Ахметов Нурлан Серикович'], exp: 'Ахметов Н. С.' }, { args: ['Ким Анна Викторовна'], exp: 'Ким А. В.' }, { args: ['Сулейменова Дана Маратовна'], exp: 'Сулейменова Д. М.' }, { args: ['Цой Виктор Робертович'], exp: 'Цой В. Р.' }],
+    check: m => !!m.tests && m.tests.all },
+  { id: 'debug', title: 'Поиск ошибок: отладка', fn: 'average',
+    text: ['Ошибки бывают трёх видов. Синтаксические — Python не понимает запись: нет двоеточия, не закрыта скобка. Ошибки выполнения — программа падает на ходу: TypeError, IndexError, NameError. Логические — программа работает, но ответ неверный.',
+           'Сообщение об ошибке подсказывает тип, текст и номер строки. Логическую ошибку так не найти. Тут помогают пошаговый запуск, print промежуточных значений и маленький пример, ответ к которому вы знаете заранее.',
+           'Исправляйте по одной ошибке и сразу запускайте снова. Отладка — обычная часть работы: программисты тратят на неё не меньше времени, чем на написание кода.'],
+    why: 'Тестировщики (QA-инженеры) получают зарплату именно за поиск ошибок: находят, описывают, проверяют исправление. Ошибка в кассовой программе — это неверные чеки, в банковском приложении — чужие деньги. Умение спокойно прочитать сообщение об ошибке и пройти код по шагам нужно всем, кто работает с таблицами, ботами и сайтами.',
+    task: 'Функция average(marks) должна возвращать средний балл, а программа — печатать «Средний балл: 4.0». В коде 4 ошибки: одна синтаксическая, две логические и одна ошибка выполнения. Найдите и исправьте все.',
+    hint: 'Начните с красного сообщения в консоли. Потом проверьте на [5, 4, 3]: сумма должна быть 12. Нажмите «Шаг» и следите за total и i в кадре average: с какого индекса начинается цикл? Сколько раз он успевает выполниться до return?',
+    code: '# Средний балл. В программе 4 ошибки\ndef average(marks)\n    total = 0\n    for i in range(1, len(marks)):\n        total = total + marks[i]\n        return total / len(marks)\n\nprint("Средний балл: " + average([5, 4, 3]))\n',
+    snips: ['print(|)', ':', 'range(len(|))', 'str(|)', ', ', '⇥'],
+    demos: [{ n: 'NameError: опечатка', c: 'total = 10\nprint(totl)\n' },
+            { n: 'IndexError: за краем', c: 'marks = [5, 4, 3]\nprint(marks[3])\n' },
+            { n: 'Ошибка на единицу', c: '# 1 + 2 + 3 + 4 + 5 должно быть 15\ns = 0\nfor i in range(1, 5):\n    s += i\nprint(s)\n' },
+            { n: 'UnboundLocalError', c: 'count = 0\n\ndef add():\n    count = count + 1\n\nadd()\nprint(count)\n' },
+            { n: 'Отладочный print', c: 'def mean(xs):\n    total = 0\n    for x in xs:\n        total += x\n        print("  x =", x, "total =", total)\n    return total / len(xs)\n\nprint(mean([5, 4, 3]))\n' }],
+    tests: [{ args: [[5, 4, 3]], exp: 4 }, { args: [[5, 5, 4, 4]], exp: 4.5 }, { args: [[3]], exp: 3 }, { args: [[2, 3, 4, 5, 5]], exp: 3.8 }],
+    check: m => !!m.tests && m.tests.all },
+];
+
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+const KEY = 'luch-cs-func';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, codes: saved.codes || {}, tab: 'overview',
+            backup: {}, run: null, X: null, con: [], conLen: 0, env: new Map(), changed: new Set(), counts: {}, trace: [], steps: 0,
+            curLine: 0, err: null, errLine: 0, status: 'ready', tests: null, speed: reduce ? 120 : 350 };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done, codes: S.codes })); } catch (e) {} };
+// =====================================================================
+// A small Python interpreter (a school subset): print, input, variables,
+// int/float/str/bool/list, arithmetic, comparisons, if/elif/else,
+// while, for … in range/str/list, break/continue, f-strings,
+// def/return with local frames, indexing, slices, item assignment.
+// =====================================================================
+class PyErr extends Error { constructor(type, msg, line) { super(msg); this.type = type; this.line = line; } }
+class F { constructor(v) { this.v = v; } }   // float
+const BRK = { brk: 1 }, CNT = { cnt: 1 };
+class Ret { constructor(v) { this.v = v; } }
+const E = (type, msg, line) => new PyErr(type, msg, line);
+
+const KW = new Set('if elif else while for in and or not True False None break continue pass def return import from class lambda try except finally with as global nonlocal is del yield raise assert async await'.split(' '));
+const OPS = ['**=', '//=', '**', '//', '==', '!=', '<=', '>=', '+=', '-=', '*=', '/=', '%=', '->', '+', '-', '*', '/', '%', '<', '>', '=', '(', ')', '[', ']', '{', '}', ',', ':', '.', ';'];
+const AUG = new Set(['+=', '-=', '*=', '/=', '//=', '%=', '**=']);
+
+function tokenize(s, no) {
+  const T = []; let i = 0;
+  while (i < s.length) {
+    const c = s[i];
+    if (c === ' ' || c === '\t' || c === ' ') { i++; continue; }
+    if (c === '#') break;
+    const rest = s.slice(i);
+    let m = /^([fFrR]{0,2})(["'])/.exec(rest);
+    if (m) {
+      const pre = m[1].toLowerCase(), q = m[2];
+      if (rest.slice(m[1].length, m[1].length + 3) === q + q + q) throw E('SyntaxError', 'тройные кавычки в этой лаборатории не поддерживаются', no);
+      let j = i + m[1].length + 1, buf = '';
+      while (j < s.length && s[j] !== q) {
+        if (s[j] === '\\' && !pre.includes('r') && j + 1 < s.length) {
+          const n = s[j + 1]; buf += n === 'n' ? '\n' : n === 't' ? '\t' : n === '\\' ? '\\' : n === "'" ? "'" : n === '"' ? '"' : '\\' + n; j += 2;
+        } else buf += s[j++];
+      }
+      if (j >= s.length) throw E('SyntaxError', `unterminated string literal (detected at line ${no})`, no);
+      T.push({ t: pre.includes('f') ? 'fstr' : 'str', v: buf });
+      i = j + 1; continue;
+    }
+    if ((m = /^(\d[\d_]*\.?[\d_]*([eE][+-]?\d+)?|\.\d+([eE][+-]?\d+)?)/.exec(rest))) {
+      const raw = m[0].replace(/_/g, '');
+      T.push({ t: 'num', v: /[.eE]/.test(raw) ? new F(parseFloat(raw)) : parseInt(raw, 10) });
+      i += m[0].length; continue;
+    }
+    if ((m = /^[\p{L}_][\p{L}\p{N}_]*/u.exec(rest))) {
+      T.push({ t: KW.has(m[0]) ? 'kw' : 'name', v: m[0] }); i += m[0].length; continue;
+    }
+    const op = OPS.find(o => rest.startsWith(o));
+    if (op) { T.push({ t: 'op', v: op }); i += op.length; continue; }
+    const code = 'U+' + c.codePointAt(0).toString(16).toUpperCase().padStart(4, '0');
+    if ('«»“”„‘’'.includes(c)) throw E('SyntaxError', `invalid character '${c}' (${code})`, no);
+    throw E('SyntaxError', `invalid character '${c}' (${code})`, no);
+  }
+  return T;
+}
+
+function mkP(toks, no) {
+  return { toks, p: 0, no,
+    peek(k) { return this.toks[this.p + (k || 0)] || { t: 'end', v: '' }; },
+    next() { return this.toks[this.p++] || { t: 'end', v: '' }; },
+    isOp(v) { const t = this.peek(); return t.t === 'op' && t.v === v; },
+    isKw(v) { const t = this.peek(); return t.t === 'kw' && t.v === v; },
+    atEnd() { return this.p >= this.toks.length; } };
+}
+function synErr(P, msg) { return E('SyntaxError', msg || 'invalid syntax', P.no); }
+
+function parseExpr(P) { return orTest(P); }
+function exprList(P) {
+  const first = parseExpr(P);
+  if (!P.isOp(',')) return first;
+  const items = [first];
+  while (P.isOp(',')) { P.next(); if (P.atEnd() || P.isOp(')') || P.isOp('=') || P.isOp(':')) break; items.push(parseExpr(P)); }
+  return { k: 'tuple', items };
+}
+function orTest(P) { let a = andTest(P); while (P.isKw('or')) { P.next(); a = { k: 'or', a, b: andTest(P) }; } return a; }
+function andTest(P) { let a = notTest(P); while (P.isKw('and')) { P.next(); a = { k: 'and', a, b: notTest(P) }; } return a; }
+function notTest(P) { if (P.isKw('not')) { P.next(); return { k: 'not', a: notTest(P) }; } return comparison(P); }
+const CMP = new Set(['<', '>', '==', '!=', '<=', '>=']);
+function comparison(P) {
+  const first = arith(P), ops = [], rest = [];
+  for (;;) {
+    const t = P.peek();
+    let op = null;
+    if (t.t === 'op' && CMP.has(t.v)) { op = t.v; P.next(); }
+    else if (t.t === 'kw' && t.v === 'in') { op = 'in'; P.next(); }
+    else if (t.t === 'kw' && t.v === 'not' && P.peek(1).t === 'kw' && P.peek(1).v === 'in') { op = 'not in'; P.p += 2; }
+    else if (t.t === 'kw' && t.v === 'is') { P.next(); if (P.isKw('not')) { P.next(); op = 'is not'; } else op = 'is'; }
+    else break;
+    ops.push(op); rest.push(arith(P));
+  }
+  return ops.length ? { k: 'cmp', first, ops, rest } : first;
+}
+function arith(P) { let a = term(P); while (P.isOp('+') || P.isOp('-')) { const op = P.next().v; a = { k: 'bin', op, a, b: term(P) }; } return a; }
+function term(P) { let a = factor(P); while (P.isOp('*') || P.isOp('/') || P.isOp('//') || P.isOp('%')) { const op = P.next().v; a = { k: 'bin', op, a, b: factor(P) }; } return a; }
+function factor(P) { if (P.isOp('-') || P.isOp('+')) { const op = P.next().v; return { k: 'un', op, a: factor(P) }; } return power(P); }
+function power(P) { const a = postfix(P); if (P.isOp('**')) { P.next(); return { k: 'bin', op: '**', a, b: factor(P) }; } return a; }
+function postfix(P) {
+  let a = atom(P);
+  for (;;) {
+    if (P.isOp('(')) {
+      P.next(); const args = [], kw = {};
+      while (!P.isOp(')')) {
+        if (P.atEnd()) throw synErr(P, "'(' was never closed");
+        if (P.peek().t === 'name' && P.peek(1).t === 'op' && P.peek(1).v === '=') { const k = P.next().v; P.next(); kw[k] = parseExpr(P); }
+        else { if (Object.keys(kw).length) throw synErr(P, 'positional argument follows keyword argument'); args.push(parseExpr(P)); }
+        if (P.isOp(',')) P.next();
+        else if (!P.isOp(')')) throw synErr(P, P.atEnd() ? "'(' was never closed" : 'invalid syntax. Perhaps you forgot a comma?');
+      }
+      P.next(); a = { k: 'call', f: a, args, kw };
+    } else if (P.isOp('[')) {
+      P.next();
+      const part = () => (P.isOp(':') || P.isOp(']') ? null : parseExpr(P));
+      const lo = part();
+      if (P.isOp(':')) {
+        P.next(); const hi = part(); let st = null;
+        if (P.isOp(':')) { P.next(); st = part(); }
+        if (!P.isOp(']')) throw synErr(P, P.atEnd() ? "'[' was never closed" : 'invalid syntax');
+        P.next(); a = { k: 'slice', a, lo, hi, st }; continue;
+      }
+      if (!lo) throw synErr(P, 'invalid syntax');
+      if (!P.isOp(']')) throw synErr(P, P.atEnd() ? "'[' was never closed" : 'invalid syntax');
+      P.next(); a = { k: 'index', a, idx: lo };
+    } else if (P.isOp('.')) {
+      P.next(); const t = P.next(); if (t.t !== 'name') throw synErr(P); a = { k: 'attr', a, name: t.v };
+    } else return a;
+  }
+}
+function atom(P) {
+  const t = P.next();
+  if (t.t === 'num') return { k: 'lit', v: t.v };
+  if (t.t === 'str' || t.t === 'fstr') {
+    let parts = [t.t === 'str' ? t.v : fparts(t.v, P.no)];
+    while (P.peek().t === 'str' || P.peek().t === 'fstr') { const u = P.next(); parts.push(u.t === 'str' ? u.v : fparts(u.v, P.no)); }
+    if (parts.every(x => typeof x === 'string')) return { k: 'lit', v: parts.join('') };
+    return { k: 'fstr', parts: parts.flatMap(x => typeof x === 'string' ? [x] : x.parts) };
+  }
+  if (t.t === 'name') return { k: 'name', v: t.v };
+  if (t.t === 'kw') {
+    if (t.v === 'True') return { k: 'lit', v: true };
+    if (t.v === 'False') return { k: 'lit', v: false };
+    if (t.v === 'None') return { k: 'lit', v: null };
+    throw synErr(P);
+  }
+  if (t.t === 'op' && t.v === '(') {
+    if (P.isOp(')')) { P.next(); const e = { k: 'tuple', items: [] }; return e; }
+    const e = exprList(P);
+    if (!P.isOp(')')) throw synErr(P, P.atEnd() ? "'(' was never closed" : 'invalid syntax. Perhaps you forgot a comma?');
+    P.next(); return e;
+  }
+  if (t.t === 'op' && t.v === '[') {
+    const items = [];
+    while (!P.isOp(']')) {
+      if (P.atEnd()) throw synErr(P, "'[' was never closed");
+      items.push(parseExpr(P));
+      if (P.isOp(',')) P.next(); else if (!P.isOp(']')) throw synErr(P, 'invalid syntax. Perhaps you forgot a comma?');
+    }
+    P.next(); return { k: 'list', items };
+  }
+  if (t.t === 'end') throw synErr(P, 'invalid syntax');
+  throw synErr(P);
+}
+function fparts(s, no) {
+  const parts = []; let i = 0, lit = '';
+  while (i < s.length) {
+    const c = s[i];
+    if (c === '{' && s[i + 1] === '{') { lit += '{'; i += 2; continue; }
+    if (c === '}' && s[i + 1] === '}') { lit += '}'; i += 2; continue; }
+    if (c === '{') {
+      const j = s.indexOf('}', i); if (j < 0) throw E('SyntaxError', "f-string: expecting '}'", no);
+      let inner = s.slice(i + 1, j), fmt = '';
+      const m = /:([^:'"]*)$/.exec(inner); if (m && /^[<>^]?\d*(\.\d+)?[fd%]?$/.test(m[1])) { fmt = m[1]; inner = inner.slice(0, m.index); }
+      const P = mkP(tokenize(inner, no), no);
+      if (P.atEnd()) throw E('SyntaxError', 'f-string: empty expression not allowed', no);
+      const e = parseExpr(P); if (!P.atEnd()) throw synErr(P);
+      if (lit) parts.push(lit); lit = '';
+      parts.push({ e, fmt }); i = j + 1; continue;
+    }
+    lit += c; i++;
+  }
+  if (lit) parts.push(lit);
+  return { parts };
+}
+
+function compile(src) {
+  const raw = src.replace(/\r/g, '').split('\n'), lines = [];
+  raw.forEach((s, idx) => {
+    let ind = 0, j = 0;
+    for (; j < s.length; j++) { if (s[j] === ' ' || s[j] === ' ') ind++; else if (s[j] === '\t') ind += 4; else break; }
+    const toks = tokenize(s.slice(j), idx + 1);
+    if (toks.length) lines.push({ no: idx + 1, ind, toks });
+  });
+  let i = 0, loopDepth = 0, funcDepth = 0;
+  const colon = P => {
+    if (P.isOp(':')) { P.next(); return; }
+    if (P.isOp('=')) throw synErr(P, "invalid syntax. Maybe you meant '==' or ':=' instead of '='?");
+    throw synErr(P, "expected ':'");
+  };
+  const endP = P => {
+    if (P.atEnd()) return;
+    if (P.isOp('=')) throw synErr(P, "invalid syntax. Maybe you meant '==' or ':=' instead of '='?");
+    if (P.isOp(';')) throw synErr(P, 'точка с запятой в этой лаборатории не поддерживается — пишите каждую команду с новой строки');
+    throw synErr(P, 'invalid syntax');
+  };
+  function block(ind) {
+    const out = []; let deeper = false;
+    while (i < lines.length) {
+      const ln = lines[i];
+      if (ln.ind < ind) break;
+      if (ln.ind > ind) throw E('IndentationError', deeper ? 'unindent does not match any outer indentation level' : 'unexpected indent', ln.no);
+      const st = stmt(); out.push(st); deeper = !!st.compound;
+    }
+    return out;
+  }
+  function suite(ln, P, what) {
+    if (!P.atEnd()) { const st = simple(P, ln.no); i++; return [st]; }
+    i++;
+    if (i >= lines.length || lines[i].ind <= ln.ind) throw E('IndentationError', what === 'def' ? `expected an indented block after function definition on line ${ln.no}` : `expected an indented block after '${what}' statement on line ${ln.no}`, (lines[i] || ln).no);
+    return block(lines[i].ind);
+  }
+  function stmt() {
+    const ln = lines[i], P = mkP(ln.toks, ln.no), t = P.peek();
+    if (t.t === 'kw') switch (t.v) {
+      case 'if': {
+        P.next(); const brs = []; const cond = parseExpr(P); colon(P);
+        brs.push({ cond, line: ln.no, body: suite(ln, P, 'if') });
+        let els = null, elsLine = 0;
+        while (i < lines.length && lines[i].ind === ln.ind && lines[i].toks[0].t === 'kw' && (lines[i].toks[0].v === 'elif' || lines[i].toks[0].v === 'else')) {
+          const l2 = lines[i], P2 = mkP(l2.toks, l2.no), kw = P2.next().v;
+          if (kw === 'elif') { const c = parseExpr(P2); colon(P2); brs.push({ cond: c, line: l2.no, body: suite(l2, P2, 'elif') }); }
+          else { colon(P2); elsLine = l2.no; els = suite(l2, P2, 'else'); break; }
+        }
+        return { k: 'if', brs, els, elsLine, line: ln.no, compound: true };
+      }
+      case 'while': {
+        P.next(); const cond = parseExpr(P); colon(P);
+        loopDepth++; const body = suite(ln, P, 'while'); loopDepth--;
+        return { k: 'while', cond, body, line: ln.no, compound: true };
+      }
+      case 'for': {
+        P.next(); const names = [];
+        for (;;) { const n = P.next(); if (n.t !== 'name') throw synErr(P); names.push(n.v); if (P.isOp(',')) { P.next(); continue; } break; }
+        if (!P.isKw('in')) throw synErr(P, "invalid syntax: после имени переменной нужно 'in'");
+        P.next(); const iter = exprList(P); colon(P);
+        loopDepth++; const body = suite(ln, P, 'for'); loopDepth--;
+        return { k: 'for', names, iter, body, line: ln.no, compound: true };
+      }
+      case 'def': {
+        P.next(); const nm = P.next();
+        if (nm.t !== 'name') throw synErr(P, nm.t === 'kw' ? `«${nm.v}» — служебное слово, функцию так назвать нельзя` : 'invalid syntax');
+        if (!P.isOp('(')) throw synErr(P, "expected '('");
+        P.next(); const params = [];
+        while (!P.isOp(')')) {
+          if (P.atEnd()) throw synErr(P, "'(' was never closed");
+          const pt = P.next(); if (pt.t !== 'name') throw synErr(P, 'invalid syntax');
+          if (params.some(x => x.n === pt.v)) throw synErr(P, `duplicate argument '${pt.v}' in function definition`);
+          let d = null;
+          if (P.isOp('=')) { P.next(); d = parseExpr(P); }
+          else if (params.some(x => x.d)) throw synErr(P, 'parameter without a default follows parameter with a default');
+          params.push({ n: pt.v, d });
+          if (P.isOp(',')) P.next(); else if (!P.isOp(')')) throw synErr(P, P.atEnd() ? "'(' was never closed" : 'invalid syntax');
+        }
+        P.next(); colon(P);
+        const sv = loopDepth; loopDepth = 0; funcDepth++;
+        const body = suite(ln, P, 'def');
+        funcDepth--; loopDepth = sv;
+        const locals = new Set(params.map(x => x.n)); collectLocals(body, locals);
+        return { k: 'def', name: nm.v, params, body, locals, line: ln.no, compound: true };
+      }
+      case 'return': break;
+      case 'elif': case 'else': throw synErr(P, 'invalid syntax');
+      case 'break': case 'continue': case 'pass': {
+        if (t.v !== 'pass' && !loopDepth) throw synErr(P, `'${t.v}' outside loop`);
+        P.next(); endP(P); i++; return { k: t.v, line: ln.no };
+      }
+      case 'True': case 'False': case 'None': case 'not': case 'lambda': break;
+      default: if (!['in', 'and', 'or', 'is'].includes(t.v)) throw E('SyntaxError', `«${t.v}» в этой лаборатории не нужен: здесь переменные, if, for, while, def и return`, ln.no);
+    }
+    const st = simple(P, ln.no); i++; return st;
+  }
+  function simple(P, no) {
+    if (P.isKw('break') || P.isKw('continue') || P.isKw('pass')) {
+      const v = P.next().v; if (v !== 'pass' && !loopDepth) throw synErr(P, `'${v}' outside loop`); endP(P); return { k: v, line: no };
+    }
+    if (P.isKw('return')) {
+      P.next(); if (!funcDepth) throw synErr(P, "'return' outside function");
+      const e = P.atEnd() ? null : exprList(P); endP(P); return { k: 'return', e, line: no };
+    }
+    let depth = 0, at = -1;
+    for (let j = P.p; j < P.toks.length; j++) {
+      const tk = P.toks[j]; if (tk.t !== 'op') continue;
+      if ('([{'.includes(tk.v)) depth++; else if (')]}'.includes(tk.v)) depth--;
+      else if (depth === 0 && (tk.v === '=' || AUG.has(tk.v))) { at = j; break; }
+    }
+    if (at < 0) { const e = exprList(P); endP(P); return { k: 'expr', e, line: no }; }
+    const tg = P.toks.slice(P.p, at), groups = [[]];
+    let dd = 0;
+    for (const tk of tg) {
+      if (tk.t === 'op' && '([{'.includes(tk.v)) dd++; else if (tk.t === 'op' && ')]}'.includes(tk.v)) dd--;
+      if (dd === 0 && tk.t === 'op' && tk.v === ',') groups.push([]); else groups[groups.length - 1].push(tk);
+    }
+    if (!groups[groups.length - 1].length && groups.length > 1) groups.pop();
+    const targets = groups.map(g => {
+      if (!g.length) throw E('SyntaxError', 'invalid syntax', no);
+      const Q = mkP(g, no); const n = parseExpr(Q);
+      if (!Q.atEnd()) throw E('SyntaxError', 'invalid syntax', no);
+      if (n.k === 'name' || n.k === 'index') return n;
+      if (n.k === 'lit') throw E('SyntaxError', "cannot assign to literal here. Maybe you meant '==' instead of '='?", no);
+      if (n.k === 'call') throw E('SyntaxError', "cannot assign to function call here. Maybe you meant '==' instead of '='?", no);
+      throw E('SyntaxError', 'cannot assign to expression here', no);
+    });
+    const op = P.toks[at].v;
+    if (op !== '=' && targets.length > 1) throw E('SyntaxError', "'tuple' is an illegal expression for augmented assignment", no);
+    P.p = at + 1;
+    if (P.atEnd()) throw E('SyntaxError', 'invalid syntax', no);
+    const e = exprList(P); endP(P);
+    return { k: 'assign', targets, op: op === '=' ? null : op.slice(0, -1), e, line: no };
+  }
+  const prog = block(0);
+  if (i < lines.length) throw E('IndentationError', 'unindent does not match any outer indentation level', lines[i].no);
+  return prog;
+}
+// names that a function body assigns to are local for the whole function (as in Python)
+function collectLocals(body, set) {
+  for (const st of body) {
+    if (st.k === 'assign') st.targets.forEach(t => { if (t.k === 'name') set.add(t.v); });
+    else if (st.k === 'for') { st.names.forEach(n => set.add(n)); collectLocals(st.body, set); }
+    else if (st.k === 'while') collectLocals(st.body, set);
+    else if (st.k === 'if') { st.brs.forEach(b => collectLocals(b.body, set)); if (st.els) collectLocals(st.els, set); }
+    else if (st.k === 'def') set.add(st.name);
+  }
+}
+
+// ---------- values ----------
+const isF = v => v instanceof F;
+const isNum = v => typeof v === 'number' || typeof v === 'boolean' || v instanceof F;
+const nv = v => typeof v === 'boolean' ? +v : v instanceof F ? v.v : v;
+const isRange = v => v && typeof v === 'object' && v.rng;
+function typeName(v) {
+  if (v === null || v === undefined) return 'NoneType';
+  if (typeof v === 'boolean') return 'bool';
+  if (typeof v === 'number') return 'int';
+  if (v instanceof F) return 'float';
+  if (typeof v === 'string') return 'str';
+  if (Array.isArray(v)) return v.tup ? 'tuple' : 'list';
+  if (isRange(v)) return 'range';
+  if (v.fn) return 'function';
+  if (v.cls) return 'type';
+  if (v.bi) return TYPES.has(v.bi) ? 'type' : 'builtin_function_or_method';
+  return 'object';
+}
+function floatRepr(x) {
+  if (!isFinite(x)) return isNaN(x) ? 'nan' : x > 0 ? 'inf' : '-inf';
+  if (Object.is(x, -0)) return '-0.0';
+  if (Number.isInteger(x) && Math.abs(x) < 1e16) return x.toFixed(1);
+  let s = Math.abs(x) >= 1e16 ? x.toExponential() : String(x);
+  return s.replace(/e([+-])(\d)$/, 'e$10$2');
+}
+function strRepr(s) {
+  const q = s.includes("'") && !s.includes('"') ? '"' : "'";
+  return q + s.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/\t/g, '\\t').replace(q === "'" ? /'/g : /"/g, '\\' + q) + q;
+}
+function repr(v) {
+  if (v === null || v === undefined) return 'None';
+  if (v === true) return 'True'; if (v === false) return 'False';
+  if (typeof v === 'number') return Number.isSafeInteger(v) || !isFinite(v) ? String(v) : BigInt(Math.round(v)).toString();
+  if (v instanceof F) return floatRepr(v.v);
+  if (typeof v === 'string') return strRepr(v);
+  if (Array.isArray(v)) return v.tup ? '(' + v.map(repr).join(', ') + (v.length === 1 ? ',' : '') + ')' : '[' + v.map(repr).join(', ') + ']';
+  if (isRange(v)) { const [a, b, s] = v.rng; return `range(${a}, ${b}${s !== 1 ? ', ' + s : ''})`; }
+  if (v.fn) return `<function ${v.fn.name}>`;
+  if (v.cls) return `<class '${v.cls}'>`;
+  if (v.bi) return TYPES.has(v.bi) ? `<class '${v.bi}'>` : `<built-in function ${v.bi}>`;
+  return '<object>';
+}
+const pyStr = v => typeof v === 'string' ? v : repr(v);
+function truthy(v) {
+  if (v === null || v === undefined) return false;
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'number') return v !== 0;
+  if (v instanceof F) return v.v !== 0;
+  if (typeof v === 'string' || Array.isArray(v)) return v.length > 0;
+  if (isRange(v)) return rangeLen(v) > 0;
+  return true;
+}
+const rangeLen = v => { const [a, b, s] = v.rng; return Math.max(0, Math.ceil((b - a) / s)); };
+const intLike = v => typeof v === 'number' || typeof v === 'boolean';
+const unsup = (op, a, b) => E('TypeError', `unsupported operand type(s) for ${op}: '${typeName(a)}' and '${typeName(b)}'`);
+function binop(op, a, b) {
+  if (op === '+') {
+    if (isNum(a) && isNum(b)) return isF(a) || isF(b) ? new F(nv(a) + nv(b)) : nv(a) + nv(b);
+    if (typeof a === 'string' && typeof b === 'string') return a + b;
+    if (Array.isArray(a) && Array.isArray(b) && !a.tup && !b.tup) return a.concat(b);
+    if (typeof a === 'string') throw E('TypeError', `can only concatenate str (not "${typeName(b)}") to str`);
+    throw unsup('+', a, b);
+  }
+  if (op === '*') {
+    if (isNum(a) && isNum(b)) return isF(a) || isF(b) ? new F(nv(a) * nv(b)) : nv(a) * nv(b);
+    const seq = x => typeof x === 'string' || (Array.isArray(x) && !x.tup);
+    if (seq(a) || seq(b)) {
+      const [s, n] = seq(a) ? [a, b] : [b, a];
+      if (!intLike(n)) throw E('TypeError', `can't multiply sequence by non-int of type '${typeName(n)}'`);
+      const k = Math.max(0, nv(n));
+      if (s.length * k > 100000) throw E('MemoryError', 'слишком длинная строка или список');
+      if (typeof s === 'string') return s.repeat(k);
+      let out = []; for (let i = 0; i < k; i++) out = out.concat(s); return out;
+    }
+    throw unsup('*', a, b);
+  }
+  if (!isNum(a) || !isNum(b)) throw unsup(op, a, b);
+  const x = nv(a), y = nv(b), fl = isF(a) || isF(b);
+  switch (op) {
+    case '-': return fl ? new F(x - y) : x - y;
+    case '/': if (y === 0) throw E('ZeroDivisionError', 'division by zero'); return new F(x / y);
+    case '//': if (y === 0) throw E('ZeroDivisionError', fl ? 'float floor division by zero' : 'integer division or modulo by zero'); return fl ? new F(Math.floor(x / y)) : Math.floor(x / y);
+    case '%': if (y === 0) throw E('ZeroDivisionError', fl ? 'float modulo' : 'integer modulo by zero'); { const r = x - y * Math.floor(x / y); return fl ? new F(r) : r; }
+    case '**': if (!fl && y >= 0) return Math.pow(x, y); if (x === 0 && y < 0) throw E('ZeroDivisionError', '0.0 cannot be raised to a negative power'); return new F(Math.pow(x, y));
+  }
+  throw unsup(op, a, b);
+}
+function eq(a, b) {
+  if (isNum(a) && isNum(b)) return nv(a) === nv(b);
+  if (typeof a === 'string' || typeof b === 'string') return a === b;
+  if (a === null || b === null) return a === b;
+  if (Array.isArray(a) && Array.isArray(b)) return !!a.tup === !!b.tup && a.length === b.length && a.every((x, i) => eq(x, b[i]));
+  const ta = a && (a.cls || a.bi), tb = b && (b.cls || b.bi);
+  if (ta && tb) return ta === tb;
+  return a === b;
+}
+function lt(a, b, op) {
+  if (isNum(a) && isNum(b)) return nv(a) < nv(b);
+  if (typeof a === 'string' && typeof b === 'string') return a < b;
+  throw E('TypeError', `'${op}' not supported between instances of '${typeName(a)}' and '${typeName(b)}'`);
+}
+function compare(op, a, b) {
+  switch (op) {
+    case '==': return eq(a, b);
+    case '!=': return !eq(a, b);
+    case '<': return lt(a, b, '<');
+    case '>': return lt(b, a, '>');
+    case '<=': return lt(a, b, '<=') || eq(a, b);
+    case '>=': return lt(b, a, '>=') || eq(a, b);
+    case 'is': return a === b || (a === null && b === null) || (typeof a === 'boolean' && a === b);
+    case 'is not': return !compare('is', a, b);
+    case 'in': case 'not in': {
+      let r;
+      if (typeof b === 'string') { if (typeof a !== 'string') throw E('TypeError', `'in <string>' requires string as left operand, not ${typeName(a)}`); r = b.includes(a); }
+      else if (Array.isArray(b)) r = b.some(x => eq(x, a));
+      else if (isRange(b)) { const [s0, s1, st] = b.rng, x = nv(a); r = intLike(a) && (st > 0 ? x >= s0 && x < s1 : x <= s0 && x > s1) && (x - s0) % st === 0; }
+      else throw E('TypeError', `argument of type '${typeName(b)}' is not iterable`);
+      return op === 'in' ? r : !r;
+    }
+  }
+}
+function* iterate(v) {
+  if (typeof v === 'string') { yield* Array.from(v); return; }
+  if (Array.isArray(v)) { yield* v.slice(); return; }
+  if (isRange(v)) { const [a, b, s] = v.rng; if (s > 0) for (let x = a; x < b; x += s) yield x; else for (let x = a; x > b; x += s) yield x; return; }
+  throw E('TypeError', `'${typeName(v)}' object is not iterable`);
+}
+const listOf = v => Array.from(iterate(v));
+const TYPES = new Set(['int', 'float', 'str', 'bool', 'list']);
+const BI = new Set(['print', 'input', 'int', 'float', 'str', 'bool', 'len', 'abs', 'round', 'min', 'max', 'sum', 'range', 'list', 'map', 'type', 'sorted', 'reversed', 'enumerate']);
+function toInt(v, base) {
+  if (typeof v === 'string') {
+    const s = v.trim().replace(/_/g, ''), b = base || 10;
+    const ok = b === 10 ? /^[+-]?\d+$/.test(s) : s.length > 0 && !isNaN(parseInt(s, b)) && /^[+-]?[0-9a-z]+$/i.test(s);
+    if (!ok) throw E('ValueError', `invalid literal for int() with base ${b}: ${strRepr(v)}`);
+    return parseInt(s, b);
+  }
+  if (isNum(v)) { const x = nv(v); if (!isFinite(x)) throw E(isNaN(x) ? 'ValueError' : 'OverflowError', 'cannot convert float to integer'); return Math.trunc(x); }
+  throw E('TypeError', `int() argument must be a string, a bytes-like object or a real number, not '${typeName(v)}'`);
+}
+function toFloat(v) {
+  if (typeof v === 'string') {
+    const s = v.trim().toLowerCase();
+    if (/^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/.test(s)) return new F(parseFloat(s));
+    if (/^[+-]?(inf|infinity)$/.test(s)) return new F(s[0] === '-' ? -Infinity : Infinity);
+    if (/^[+-]?nan$/.test(s)) return new F(NaN);
+    throw E('ValueError', `could not convert string to float: ${strRepr(v)}`);
+  }
+  if (isNum(v)) return new F(nv(v));
+  throw E('TypeError', `float() argument must be a string or a real number, not '${typeName(v)}'`);
+}
+function roundHalfEven(x) { const f = Math.floor(x), d = x - f; return d > 0.5 ? f + 1 : d < 0.5 ? f : (f % 2 === 0 ? f : f + 1); }
+function fmtSpec(v, spec) {
+  let m = /^([<>^]?)(\d*)(?:\.(\d+))?([fd%]?)$/.exec(spec); if (!m) return pyStr(v);
+  let s;
+  if (m[4] === 'f' || (m[3] && !m[4])) { if (!isNum(v)) throw E('ValueError', `Unknown format code 'f' for object of type '${typeName(v)}'`); s = nv(v).toFixed(m[3] ? +m[3] : 6); }
+  else if (m[4] === '%') s = (nv(v) * 100).toFixed(m[3] ? +m[3] : 6) + '%';
+  else if (m[4] === 'd') { if (!intLike(v)) throw E('ValueError', `Unknown format code 'd' for object of type '${typeName(v)}'`); s = String(nv(v)); }
+  else s = pyStr(v);
+  const w = +m[2] || 0;
+  if (s.length < w) { const al = m[1] || (isNum(v) ? '>' : '<'); const pad = w - s.length; s = al === '>' ? ' '.repeat(pad) + s : al === '^' ? ' '.repeat(pad >> 1) + s + ' '.repeat(pad - (pad >> 1)) : s + ' '.repeat(pad); }
+  return s;
+}
+function arity(name, args, a, b) { if (args.length < a || args.length > b) throw E('TypeError', `${name}() takes ${a === b ? a : `from ${a} to ${b}`} argument${b === 1 ? '' : 's'} (${args.length} given)`); }
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+function* callUserFn(fn, args, kw, X) {
+  const ps = fn.params, env = new Map();
+  if (args.length > ps.length) throw E('TypeError', `${fn.name}() takes ${plural(ps.length, 'positional argument')} but ${args.length} ${args.length === 1 ? 'was' : 'were'} given`);
+  ps.forEach((p, i) => { if (i < args.length) env.set(p.n, args[i]); });
+  for (const k of Object.keys(kw)) {
+    if (!ps.some(p => p.n === k)) throw E('TypeError', `${fn.name}() got an unexpected keyword argument '${k}'`);
+    if (env.has(k)) throw E('TypeError', `${fn.name}() got multiple values for argument '${k}'`);
+    env.set(k, kw[k]);
+  }
+  ps.forEach(p => { if (!env.has(p.n) && fn.defs.has(p.n)) env.set(p.n, fn.defs.get(p.n)); });
+  const miss = ps.filter(p => !env.has(p.n)).map(p => `'${p.n}'`);
+  if (miss.length) throw E('TypeError', `${fn.name}() missing ${plural(miss.length, 'required positional argument')}: ${miss.length > 1 ? miss.slice(0, -1).join(', ') + ' and ' + miss[miss.length - 1] : miss[0]}`);
+  if (X.frames.length >= 60) throw E('RecursionError', 'maximum recursion depth exceeded');
+  const rec = { name: fn.name, args: ps.map(p => `${p.n}=${repr(env.get(p.n))}`), ret: undefined, depth: X.frames.length };
+  if (X.calls.length < 300) X.calls.push(rec);
+  X.frames.push({ name: fn.name, env, fn, rec });
+  let ret = null;
+  try { yield* execBody(fn.body, X); }
+  catch (s) { if (s instanceof Ret) ret = s.v; else throw s; }
+  X.frames.pop();
+  rec.ret = repr(ret); X.lastRet = rec;
+  return ret;
+}
+function* callFn(f, args, kw, X) {
+  if (f && f.fn) return yield* callUserFn(f.fn, args, kw, X);
+  if (!f || !f.bi) throw E('TypeError', `'${typeName(f)}' object is not callable`);
+  const name = f.bi, kws = Object.keys(kw);
+  if (name !== 'print' && kws.length && !(name === 'sorted' && kws.every(k => k === 'reverse'))) throw E('TypeError', `'${kws[0]}' is an invalid keyword argument for ${name}()`);
+  switch (name) {
+    case 'print': {
+      for (const k of kws) if (k !== 'sep' && k !== 'end') throw E('TypeError', `'${k}' is an invalid keyword argument for print()`);
+      const sep = kw.sep === undefined || kw.sep === null ? ' ' : kw.sep, end = kw.end === undefined || kw.end === null ? '\n' : kw.end;
+      if (typeof sep !== 'string') throw E('TypeError', `sep must be None or a string, not ${typeName(sep)}`);
+      if (typeof end !== 'string') throw E('TypeError', `end must be None or a string, not ${typeName(end)}`);
+      X.io.write('out', args.map(pyStr).join(sep) + end); return null;
+    }
+    case 'input': {
+      arity('input', args, 0, 1);
+      const prompt = args.length ? pyStr(args[0]) : '';
+      if (prompt) X.io.write('prompt', prompt);
+      const v = yield { wait: 'input', prompt };
+      X.inputs++; X.io.write('in', v + '\n');
+      return v;
+    }
+    case 'int': arity('int', args, 0, 2); if (!args.length) return 0; return toInt(args[0], args.length > 1 ? nv(args[1]) : 0);
+    case 'float': arity('float', args, 0, 1); return args.length ? toFloat(args[0]) : new F(0);
+    case 'str': arity('str', args, 0, 1); return args.length ? pyStr(args[0]) : '';
+    case 'bool': arity('bool', args, 0, 1); return args.length ? truthy(args[0]) : false;
+    case 'len': {
+      arity('len', args, 1, 1); const v = args[0];
+      if (typeof v === 'string') return Array.from(v).length;
+      if (Array.isArray(v)) return v.length;
+      if (isRange(v)) return rangeLen(v);
+      throw E('TypeError', `object of type '${typeName(v)}' has no len()`);
+    }
+    case 'abs': arity('abs', args, 1, 1); if (!isNum(args[0])) throw E('TypeError', `bad operand type for abs(): '${typeName(args[0])}'`); return isF(args[0]) ? new F(Math.abs(args[0].v)) : Math.abs(nv(args[0]));
+    case 'round': {
+      arity('round', args, 1, 2); const v = args[0];
+      if (!isNum(v)) throw E('TypeError', `type ${typeName(v)} doesn't define __round__ method`);
+      if (args.length === 1 || args[1] === null) return isF(v) ? roundHalfEven(v.v) : nv(v);
+      const d = nv(args[1]); if (!isF(v)) return nv(v);
+      return new F(Number(v.v.toFixed(clamp(d, 0, 20))));
+    }
+    case 'min': case 'max': {
+      if (!args.length) throw E('TypeError', `${name} expected at least 1 argument, got 0`);
+      const xs = args.length === 1 ? listOf(args[0]) : args;
+      if (!xs.length) throw E('ValueError', `${name}() iterable argument is empty`);
+      let best = xs[0]; for (const x of xs.slice(1)) if (name === 'min' ? lt(x, best, '<') : lt(best, x, '>')) best = x;
+      return best;
+    }
+    case 'sum': {
+      arity('sum', args, 1, 2); let acc = args.length > 1 ? args[1] : 0;
+      for (const x of iterate(args[0])) acc = binop('+', acc, x);
+      return acc;
+    }
+    case 'range': {
+      arity('range', args, 1, 3);
+      for (const a of args) if (!intLike(a)) throw E('TypeError', `'${typeName(a)}' object cannot be interpreted as an integer`);
+      const n = args.map(nv);
+      const [a, b, s] = n.length === 1 ? [0, n[0], 1] : [n[0], n[1], n.length > 2 ? n[2] : 1];
+      if (s === 0) throw E('ValueError', 'range() arg 3 must not be zero');
+      return { rng: [a, b, s] };
+    }
+    case 'list': arity('list', args, 0, 1); return args.length ? listOf(args[0]) : [];
+    case 'map': {
+      if (args.length < 2) throw E('TypeError', 'map() must have at least two arguments.');
+      const out = []; for (const x of iterate(args[1])) out.push(yield* callFn(args[0], [x], {}, X)); return out;
+    }
+    case 'type': arity('type', args, 1, 1); return { cls: typeName(args[0]) };
+    case 'sorted': { arity('sorted', args, 1, 1); const a = listOf(args[0]); a.sort((x, y) => lt(x, y, '<') ? -1 : lt(y, x, '<') ? 1 : 0); if (kw.reverse && truthy(kw.reverse)) a.reverse(); return a; }
+    case 'reversed': arity('reversed', args, 1, 1); return listOf(args[0]).reverse();
+    case 'enumerate': { arity('enumerate', args, 1, 2); const st = args.length > 1 ? nv(args[1]) : 0; return listOf(args[0]).map((x, i) => { const t = [i + st, x]; t.tup = true; return t; }); }
+  }
+  throw E('TypeError', `'${typeName(f)}' object is not callable`);
+}
+function callMethod(o, name, args) {
+  const t = typeName(o);
+  const need = (a, b) => arity(name, args, a, b);
+  if (typeof o === 'string') {
+    switch (name) {
+      case 'upper': need(0, 0); return o.toUpperCase();
+      case 'lower': need(0, 0); return o.toLowerCase();
+      case 'strip': need(0, 0); return o.trim();
+      case 'lstrip': need(0, 0); return o.replace(/^\s+/, '');
+      case 'rstrip': need(0, 0); return o.replace(/\s+$/, '');
+      case 'capitalize': need(0, 0); return o ? o[0].toUpperCase() + o.slice(1).toLowerCase() : o;
+      case 'title': need(0, 0); return o.toLowerCase().replace(/(^|[^\p{L}])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
+      case 'isdigit': need(0, 0); return /^\d+$/.test(o);
+      case 'isalpha': need(0, 0); return /^\p{L}+$/u.test(o);
+      case 'split': need(0, 1); return args.length && args[0] !== null ? o.split(pyStr(args[0])) : o.trim().split(/\s+/).filter(Boolean);
+      case 'replace': need(2, 2); return o.split(pyStr(args[0])).join(pyStr(args[1]));
+      case 'count': need(1, 1); { const s = pyStr(args[0]); return s ? o.split(s).length - 1 : o.length + 1; }
+      case 'find': need(1, 1); return o.indexOf(pyStr(args[0]));
+      case 'index': need(1, 1); { const k = o.indexOf(pyStr(args[0])); if (k < 0) throw E('ValueError', 'substring not found'); return k; }
+      case 'isupper': need(0, 0); return /\p{Lu}/u.test(o) && o === o.toUpperCase();
+      case 'islower': need(0, 0); return /\p{Ll}/u.test(o) && o === o.toLowerCase();
+      case 'startswith': need(1, 1); return o.startsWith(pyStr(args[0]));
+      case 'endswith': need(1, 1); return o.endsWith(pyStr(args[0]));
+      case 'join': need(1, 1); return listOf(args[0]).map(x => { if (typeof x !== 'string') throw E('TypeError', `sequence item: expected str instance, ${typeName(x)} found`); return x; }).join(o);
+      case 'format': { let k = 0; return o.replace(/\{(\d*)\}/g, (m, d) => { const i = d === '' ? k++ : +d; if (i >= args.length) throw E('IndexError', 'Replacement index out of range for positional args tuple'); return pyStr(args[i]); }); }
+    }
+  }
+  if (Array.isArray(o) && !o.tup) {
+    switch (name) {
+      case 'append': need(1, 1); o.push(args[0]); return null;
+      case 'pop': need(0, 1); { if (!o.length) throw E('IndexError', 'pop from empty list'); const i = args.length ? nv(args[0]) : o.length - 1; return o.splice(i < 0 ? o.length + i : i, 1)[0]; }
+      case 'count': need(1, 1); return o.filter(x => eq(x, args[0])).length;
+      case 'index': need(1, 1); { const i = o.findIndex(x => eq(x, args[0])); if (i < 0) throw E('ValueError', `${repr(args[0])} is not in list`); return i; }
+      case 'sort': need(0, 0); o.sort((a, b) => lt(a, b, '<') ? -1 : lt(b, a, '<') ? 1 : 0); return null;
+      case 'reverse': need(0, 0); o.reverse(); return null;
+      case 'insert': need(2, 2); { let k = nv(args[0]); if (k < 0) k = Math.max(0, o.length + k); o.splice(Math.min(k, o.length), 0, args[1]); return null; }
+      case 'remove': need(1, 1); { const k = o.findIndex(x => eq(x, args[0])); if (k < 0) throw E('ValueError', 'list.remove(x): x not in list'); o.splice(k, 1); return null; }
+      case 'copy': need(0, 0); return o.slice();
+      case 'extend': need(1, 1); o.push(...listOf(args[0])); return null;
+      case 'clear': need(0, 0); o.length = 0; return null;
+    }
+  }
+  throw E('AttributeError', `'${t}' object has no attribute '${name}'`);
+}
+
+function* ev(n, X) {
+  switch (n.k) {
+    case 'lit': return n.v;
+    case 'fstr': { let s = ''; for (const p of n.parts) { if (typeof p === 'string') s += p; else { const v = yield* ev(p.e, X); s += p.fmt ? fmtSpec(v, p.fmt) : pyStr(v); } } return s; }
+    case 'name': return lookup(n.v, X);
+    case 'list': { const a = []; for (const e of n.items) a.push(yield* ev(e, X)); return a; }
+    case 'tuple': { const a = []; for (const e of n.items) a.push(yield* ev(e, X)); a.tup = true; return a; }
+    case 'un': {
+      const v = yield* ev(n.a, X);
+      if (!isNum(v)) throw E('TypeError', `bad operand type for unary ${n.op}: '${typeName(v)}'`);
+      if (n.op === '+') return isF(v) ? v : nv(v);
+      return isF(v) ? new F(-v.v) : -nv(v) || 0;
+    }
+    case 'not': return !truthy(yield* ev(n.a, X));
+    case 'and': { const a = yield* ev(n.a, X); return truthy(a) ? yield* ev(n.b, X) : a; }
+    case 'or': { const a = yield* ev(n.a, X); return truthy(a) ? a : yield* ev(n.b, X); }
+    case 'bin': { const a = yield* ev(n.a, X), b = yield* ev(n.b, X); return binop(n.op, a, b); }
+    case 'cmp': {
+      let a = yield* ev(n.first, X);
+      for (let i = 0; i < n.ops.length; i++) { const b = yield* ev(n.rest[i], X); if (!compare(n.ops[i], a, b)) return false; a = b; }
+      return true;
+    }
+    case 'index': {
+      const o = yield* ev(n.a, X), ix = yield* ev(n.idx, X);
+      if (typeof o === 'string' || Array.isArray(o)) {
+        if (!intLike(ix)) throw E('TypeError', `${typeName(o)} indices must be integers, not ${typeName(ix)}`);
+        const arr = typeof o === 'string' ? Array.from(o) : o, i = nv(ix) < 0 ? arr.length + nv(ix) : nv(ix);
+        if (i < 0 || i >= arr.length) throw E('IndexError', `${typeName(o) === 'str' ? 'string' : typeName(o)} index out of range`);
+        return arr[i];
+      }
+      throw E('TypeError', `'${typeName(o)}' object is not subscriptable`);
+    }
+    case 'slice': {
+      const o = yield* ev(n.a, X);
+      const num = function* (e) { if (!e) return null; const v = yield* ev(e, X); if (v === null) return null; if (!intLike(v)) throw E('TypeError', 'slice indices must be integers or None'); return nv(v); };
+      const lo = yield* num(n.lo), hi = yield* num(n.hi), st = yield* num(n.st);
+      if (typeof o !== 'string' && !Array.isArray(o)) throw E('TypeError', `'${typeName(o)}' object is not subscriptable`);
+      const arr = typeof o === 'string' ? Array.from(o) : o, out = sliceArr(arr, lo, hi, st);
+      if (typeof o === 'string') return out.join('');
+      if (o.tup) out.tup = true;
+      return out;
+    }
+    case 'call': {
+      if (n.f.k === 'attr') {
+        const o = yield* ev(n.f.a, X), args = [];
+        for (const a of n.args) args.push(yield* ev(a, X));
+        if (Object.keys(n.kw).length) throw E('TypeError', `${n.f.name}() takes no keyword arguments`);
+        return callMethod(o, n.f.name, args);
+      }
+      const f = yield* ev(n.f, X), args = [], kw = {};
+      for (const a of n.args) args.push(yield* ev(a, X));
+      for (const k of Object.keys(n.kw)) kw[k] = yield* ev(n.kw[k], X);
+      return yield* callFn(f, args, kw, X);
+    }
+    case 'attr': { const o = yield* ev(n.a, X); throw E('AttributeError', `'${typeName(o)}' object attribute '${n.name}' — здесь нужен вызов со скобками: .${n.name}()`); }
+  }
+  throw E('SyntaxError', 'invalid syntax');
+}
+function sliceArr(arr, lo, hi, st) {
+  const n = arr.length; st = st == null ? 1 : st;
+  if (st === 0) throw E('ValueError', 'slice step cannot be zero');
+  const out = [];
+  if (st > 0) {
+    lo = lo == null ? 0 : lo < 0 ? Math.max(0, n + lo) : Math.min(lo, n);
+    hi = hi == null ? n : hi < 0 ? Math.max(0, n + hi) : Math.min(hi, n);
+    for (let k = lo; k < hi; k += st) out.push(arr[k]);
+  } else {
+    lo = lo == null ? n - 1 : lo < 0 ? n + lo : Math.min(lo, n - 1);
+    hi = hi == null ? -1 : hi < 0 ? Math.max(-1, n + hi) : Math.min(hi, n - 1);
+    for (let k = lo; k > hi; k += st) out.push(arr[k]);
+  }
+  return out;
+}
+function lookup(nm, X) {
+  const f = X.frames[X.frames.length - 1];
+  if (f.fn) {
+    if (f.env.has(nm)) return f.env.get(nm);
+    if (f.fn.locals.has(nm)) throw E('UnboundLocalError', `cannot access local variable '${nm}' where it is not associated with a value`);
+  }
+  if (X.env.has(nm)) return X.env.get(nm);
+  if (BI.has(nm)) return { bi: nm };
+  throw E('NameError', `name '${nm}' is not defined`);
+}
+const curEnv = X => X.frames[X.frames.length - 1].env;
+function assign(names, v, X) {
+  const env = curEnv(X);
+  if (names.length === 1) { env.set(names[0], v); return; }
+  const items = unpack(v, names.length);
+  names.forEach((nm, i) => env.set(nm, items[i]));
+}
+function unpack(v, k) {
+  let items;
+  if (typeof v === 'string' || Array.isArray(v) || isRange(v)) items = listOf(v);
+  else throw E('TypeError', `cannot unpack non-iterable ${typeName(v)} object`);
+  if (items.length > k) throw E('ValueError', `too many values to unpack (expected ${k})`);
+  if (items.length < k) throw E('ValueError', `not enough values to unpack (expected ${k}, got ${items.length})`);
+  return items;
+}
+function* setTarget(t, v, X) {
+  if (t.k === 'name') { curEnv(X).set(t.v, v); return; }
+  const o = yield* ev(t.a, X), ix = yield* ev(t.idx, X);
+  if (Array.isArray(o) && !o.tup) {
+    if (!intLike(ix)) throw E('TypeError', `list indices must be integers or slices, not ${typeName(ix)}`);
+    const k = nv(ix) < 0 ? o.length + nv(ix) : nv(ix);
+    if (k < 0 || k >= o.length) throw E('IndexError', 'list assignment index out of range');
+    o[k] = v; return;
+  }
+  throw E('TypeError', `'${typeName(o)}' object does not support item assignment`);
+}
+function* execBody(body, X) { for (const st of body) yield* execStmt(st, X); }
+function* execStmt(st, X) {
+  try {
+    switch (st.k) {
+      case 'expr': yield { line: st.line }; yield* ev(st.e, X); return;
+      case 'pass': yield { line: st.line }; return;
+      case 'break': yield { line: st.line }; throw BRK;
+      case 'continue': yield { line: st.line }; throw CNT;
+      case 'assign': {
+        yield { line: st.line };
+        let v = yield* ev(st.e, X);
+        if (st.op) v = binop(st.op, yield* ev(st.targets[0], X), v);
+        if (st.targets.length === 1) { yield* setTarget(st.targets[0], v, X); return; }
+        const items = unpack(v, st.targets.length);
+        for (let k = 0; k < items.length; k++) yield* setTarget(st.targets[k], items[k], X);
+        return;
+      }
+      case 'def': {
+        yield { line: st.line };
+        const defs = new Map();
+        for (const p of st.params) if (p.d) defs.set(p.n, yield* ev(p.d, X));
+        curEnv(X).set(st.name, { fn: { name: st.name, params: st.params, body: st.body, locals: st.locals, defs, line: st.line } });
+        return;
+      }
+      case 'return': {
+        yield { line: st.line };
+        const v = st.e ? yield* ev(st.e, X) : null;
+        throw new Ret(v);
+      }
+      case 'if': {
+        for (const br of st.brs) {
+          yield { line: br.line };
+          if (truthy(yield* ev(br.cond, X))) { yield* execBody(br.body, X); return; }
+        }
+        if (st.els) { X.mark(st.elsLine); yield* execBody(st.els, X); }
+        return;
+      }
+      case 'while': {
+        for (;;) {
+          yield { line: st.line };
+          if (!truthy(yield* ev(st.cond, X))) break;
+          X.iters++;
+          try { yield* execBody(st.body, X); } catch (s) { if (s === BRK) break; if (s === CNT) continue; throw s; }
+        }
+        return;
+      }
+      case 'for': {
+        yield { line: st.line };
+        const it = iterate(yield* ev(st.iter, X));
+        let first = true;
+        for (const v of it) {
+          if (!first) yield { line: st.line };
+          first = false;
+          assign(st.names, v, X); X.iters++;
+          try { yield* execBody(st.body, X); } catch (s) { if (s === BRK) break; if (s === CNT) continue; throw s; }
+        }
+        return;
+      }
+    }
+  } catch (e) {
+    if (e instanceof PyErr && e.line == null) e.line = st.line;
+    throw e;
+  }
+}
+function newCtx(io) {
+  const env = new Map();
+  return { env, frames: [{ name: '<module>', env }], calls: [], lastRet: null, io, inputs: 0, iters: 0, mark: () => {} };
+}
+
+// Silent run for the autotest: feeds inputs, collects printed text.
+function runSilent(src, inputs, cap) {
+  let out = '', steps = 0, line = 0;
+  const q = inputs.slice();
+  const X = newCtx({ write(k, t) { if (k === 'out') { out += t; if (out.length > 20000) throw E('OutputLimit', 'слишком много вывода'); } } });
+  let err = null;
+  try {
+    const gen = execBody(compile(src), X);
+    let send;
+    for (;;) {
+      const r = gen.next(send); send = undefined;
+      if (r.done) break;
+      if (r.value.wait) { if (!q.length) throw E('EOFError', 'EOF when reading a line', line); send = q.shift(); continue; }
+      line = r.value.line;
+      if (++steps > (cap || 20000)) throw E('StepLimit', `больше ${cap || 20000} шагов — цикл, похоже, не заканчивается`, line);
+    }
+  } catch (e) { err = e instanceof PyErr ? e : E('InternalError', String(e && e.message || e), line); }
+  const lines = out.replace(/\n$/, '').split('\n').filter((l, i, a) => !(a.length === 1 && l === ''));
+  return { out, lines, err, steps, iters: X.iters, inputs: X.inputs, left: q.length, X };
+}
+// Call a user function from the finished program with test arguments.
+function callUser(X, name, args, cap) {
+  X.frames.length = 1; X.calls = [];
+  const f = X.env.get(name);
+  if (!f || !f.fn) return { err: E('NameError', `функция ${name} не найдена — проверьте имя после def`) };
+  let steps = 0, line = 0, out = '';
+  const io = X.io; X.io = { write(k, t) { if (k === 'out') { out += t; if (out.length > 20000) throw E('OutputLimit', 'слишком много вывода'); } } };
+  try {
+    const gen = callFn(f, args, {}, X);
+    for (;;) {
+      const r = gen.next();
+      if (r.done) return { val: r.value, out };
+      if (r.value.wait) throw E('EOFError', 'EOF when reading a line — функция не должна вызывать input()', line);
+      line = r.value.line;
+      if (++steps > (cap || 20000)) throw E('StepLimit', `больше ${cap || 20000} шагов — цикл, похоже, не заканчивается`, line);
+    }
+  } catch (e) { return { err: e instanceof PyErr ? e : E('InternalError', String(e && e.message || e), line), out }; }
+  finally { X.io = io; }
+}
+
+// ---------- error explanations ----------
+function explain(e) {
+  const m = e.message || '';
+  switch (e.type) {
+    case 'NameError': { const nm = (/'(.+)'/.exec(m) || [])[1] || ''; return `Python не знает имя «${esc(nm)}». Такой переменной ещё нет: проверьте написание (Python различает большие и маленькие буквы) и что ей присвоено значение выше. Если это текст — возьмите его в кавычки.`; }
+    case 'UnboundLocalError': return 'Внутри функции этой переменной присваивают значение, поэтому Python считает её локальной. Но читают её раньше, чем присвоили. Передайте значение в функцию параметром и верните результат через return.';
+    case 'RecursionError': return 'Функция вызывает сама себя без конца. Проверьте, что вызов внутри функции когда-нибудь прекращается.';
+    case 'TypeError':
+      if (/NoneType/.test(m)) return 'Одно из значений — None («ничего»). Обычно так бывает, когда функция ничего не вернула: проверьте, есть ли в ней return.';
+      if (/missing \d+ required/.test(m)) return 'При вызове функции передано меньше значений, чем у неё параметров. Сравните скобки в def и в вызове.';
+      if (/positional argument/.test(m)) return 'При вызове функции передано больше значений, чем у неё параметров.';
+      if (/does not support item assignment/.test(m)) return /'str'/.test(m) ? 'Строку нельзя менять по индексу. Соберите новую строку из кусочков: срезы и +.' : 'Этот объект нельзя менять по индексу.';
+      if (/not subscriptable/.test(m)) return 'Квадратные скобки [ ] работают со строками и списками, а здесь значение другого типа.';
+      if (/indices must be integers/.test(m)) return 'Индекс должен быть целым числом. Возможно, получилось дробное после деления / — используйте //.';
+      if (/concatenate str/.test(m)) return 'Строку и число нельзя склеить знаком +. Превратите число в строку через str(…) или передайте значения в print через запятую.';
+      if (/multiply sequence|unsupported operand.*'str'|'str' and/.test(m)) return 'Похоже, число осталось строкой: input() всегда возвращает str. Оберните ввод в int(…).';
+      if (/not supported between/.test(m)) return 'Сравнивается число со строкой. Не забыли превратить ввод в число: int(input())?';
+      if (/not callable/.test(m)) return 'После имени стоят скобки, но это не команда. Возможно, переменная названа так же, как команда (print, input, int).';
+      if (/cannot be interpreted as an integer/.test(m)) return 'range() принимает только целые числа. Возможно, нужен int(…).';
+      return 'Операция не подходит к типу значения. Посмотрите типы в «Памяти».';
+    case 'ValueError':
+      if (/int\(\)/.test(m)) return 'int() не смог превратить текст в целое число. Введите число цифрами, без букв и пробелов внутри.';
+      if (/float/.test(m)) return 'float() не смог превратить текст в число. Дробную часть пишут через точку: 2.5.';
+      if (/unpack/.test(m)) return 'Слева и справа от = разное количество значений.';
+      return 'Значение подходящего типа, но неподходящее по смыслу.';
+    case 'ZeroDivisionError': return 'Делить на ноль нельзя. Проверьте делитель.';
+    case 'IndentationError': return 'Ошибка отступа. Команды внутри if, elif, else, for, while сдвигают на 4 пробела; остальные пишут от левого края.';
+    case 'SyntaxError':
+      if (/'=='/.test(m)) return 'В условии нужно двойное == («равно ли?»). Одинарное = — это присваивание.';
+      if (/expected ':'/.test(m)) return 'В конце строки с if, elif, else, for или while нужно двоеточие :';
+      if (/never closed/.test(m)) return 'Скобка открыта, но не закрыта. Посчитайте ( и ).';
+      if (/unterminated string/.test(m)) return 'Кавычка открыта, но не закрыта. Текст должен быть с двух сторон в одинаковых кавычках.';
+      if (/invalid character '[«»“”„‘’]'/.test(m)) return 'Кавычки « » и “ ” Python не понимает. Используйте прямые: " или \'.';
+      if (/outside loop/.test(m)) return 'break и continue работают только внутри цикла.';
+      if (/outside function/.test(m)) return 'return пишут только внутри функции — в строках с отступом под def.';
+      if (/expected '\('/.test(m)) return 'После имени функции в def нужны скобки с параметрами: def f(x):';
+      if (/forgot a comma/.test(m)) return 'Между значениями в скобках нужна запятая.';
+      if (/literal/.test(m)) return 'Слева от = должно быть имя переменной, а не число или текст.';
+      return 'Python не смог понять строку. Проверьте скобки, кавычки, двоеточие и опечатки в командах.';
+    case 'EOFError': return 'Программа ждёт больше ввода, чем ей дали. Проверьте, сколько раз вызывается input().';
+    case 'StepLimit': return 'Похоже на бесконечный цикл: условие while всегда истинно. Внутри цикла должна меняться переменная из условия.';
+    case 'OutputLimit': return 'Программа печатает слишком много — возможно, бесконечный цикл.';
+    case 'IndexError': return 'Индекс выходит за край. Нумерация начинается с 0, поэтому у списка из 3 элементов последний индекс — 2.';
+    case 'AttributeError': return 'У этого типа значения нет такой команды-метода.';
+  }
+  return 'Что-то пошло не так. Проверьте строку с ошибкой.';
+}
+
+// ---------- autotest: call the student's function with test arguments ----------
+const numsIn = s => (String(s).match(/-?\d+(?:\.\d+)?/g) || []).map(Number);
+const toPy = v => { if (Array.isArray(v)) return v.map(toPy); return v; };
+const argsRepr = a => a.map(repr).join(', ');
+function judgeVal(t, c) {
+  if (c.err) return { ok: false, got: `${c.err.type}: ${c.err.message}` };
+  const v = c.val, got = repr(v);
+  if (v === null) return { ok: false, got, note: c.out ? 'функция печатает, но ничего не возвращает — нужен return' : 'функция ничего не вернула — нет return' };
+  if (typeof t.exp === 'number') {
+    if (typeof v === 'string') return { ok: false, got, note: 'вернулась строка, а нужно число' };
+    const ok = isNum(v) && typeof v !== 'boolean' && Math.abs(nv(v) - t.exp) < 1e-6;
+    return { ok, got };
+  }
+  const ok = v === t.exp;
+  const near = !ok && typeof v === 'string' && v.replace(/\s+/g, '') === t.exp.replace(/\s+/g, '');
+  return { ok, got, note: near ? 'почти: лишний или пропущенный пробел' : '' };
+}
+function runTests() {
+  const Ls = L(), src = $('#code').value, rows = [];
+  const r = runSilent(src, [], 20000);
+  const compileErr = r.err && (r.err.type === 'SyntaxError' || r.err.type === 'IndentationError');
+  if (Ls.id === 'debug') {
+    const ok = !r.err && r.lines.some(l => /балл/i.test(l) && numsIn(l).some(x => Math.abs(x - 4) < 1e-9));
+    rows.push({ label: 'вся программа · ждём «Средний балл: 4.0»', ok, got: r.err ? `${r.err.type}: ${r.err.message} (строка ${r.err.line || '?'})` : (r.lines.join(' ⏎ ') || '(пусто)') });
+  }
+  for (const t of Ls.tests) {
+    const label = `${Ls.fn}(${argsRepr(toPy(t.args))}) · ждём ${repr(t.exp)}`;
+    if (compileErr) { rows.push({ label, ok: false, got: `${r.err.type}: ${r.err.message}` }); continue; }
+    const c = callUser(r.X, Ls.fn, JSON.parse(JSON.stringify(t.args)), 20000);
+    rows.push({ label, ...judgeVal(t, c) });
+  }
+  const pass = rows.filter(x => x.ok).length;
+  S.tests = { lesson: Ls.id, rows, pass, total: rows.length, all: pass === rows.length, code: src };
+  return S.tests;
+}
+const testCount = () => L().tests.length + (LID() === 'debug' ? 1 : 0);
+
+// ---------- interactive run ----------
+const STEPCAP = 3000;
+const IO = { write(k, t) {
+  if (k === 'out' && S.run) S.run.stepOut += t;
+  const last = S.con[S.con.length - 1];
+  if (last && last.k === k) last.t += t; else S.con.push({ k, t });
+  S.conLen += t.length;
+  if (S.conLen > 15000) throw E('OutputLimit', 'слишком много вывода');
+} };
+function snapAll(X) {
+  const o = {};
+  X.frames.forEach((f, d) => f.env.forEach((v, k) => { o[`${d}:${f.name}:${k}`] = repr(v); }));
+  return o;
+}
+function resetOutput() {
+  S.con = []; S.conLen = 0; S.env = new Map(); S.X = null; S.changed = new Set(); S.counts = {}; S.trace = []; S.steps = 0;
+  S.curLine = 0; S.err = null; S.errLine = 0;
+}
+function startRun(paused) {
+  S.run = null; hideInput();
+  resetOutput();
+  let prog;
+  try { prog = compile($('#code').value); }
+  catch (e) { onError(e); return; }
+  const X = newCtx(IO);
+  X.mark = ln => { S.counts[ln] = (S.counts[ln] || 0) + 1; };
+  S.env = X.env; S.X = X;
+  S.run = { gen: execBody(prog, X), X, wait: false, paused, send: undefined, cur: 0, snap: {}, stepOut: '', t: 0 };
+  S.status = 'run';
+  advance();
+  if (S.run && paused && !S.run.wait) S.status = 'pause';
+  update();
+}
+function closeStep() {
+  const R = S.run; if (!R || !R.cur) return;
+  const now = snapAll(R.X), ch = [];
+  for (const k of Object.keys(now)) if (now[k] !== R.snap[k]) ch.push(k);
+  S.changed = new Set(ch);
+  const lab = k => { const [d, fn, nm] = k.split(':'); return (+d ? fn + ': ' : '') + nm + ' = ' + now[k]; };
+  if (S.trace.length < 400) S.trace.push({ line: R.cur, ch: ch.map(lab), out: R.stepOut });
+  R.snap = now; R.stepOut = '';
+}
+function advance() {
+  const R = S.run; if (!R || R.wait) return;
+  let r;
+  try { r = R.gen.next(R.send); R.send = undefined; }
+  catch (e) { closeStep(); onError(e); return; }
+  if (r.done) { closeStep(); finish(); return; }
+  const v = r.value;
+  if (v.wait) { R.wait = true; S.status = 'input'; showInput(); return; }
+  closeStep();
+  R.cur = v.line; S.curLine = v.line; S.counts[v.line] = (S.counts[v.line] || 0) + 1; S.steps++;
+  if (S.steps > STEPCAP) onError(E('StepLimit', `больше ${STEPCAP} шагов — цикл, похоже, не заканчивается`, v.line));
+}
+function finish() {
+  S.run = null; S.curLine = 0; S.status = 'done'; hideInput();
+  S.con.push({ k: 's', t: (S.con.length && !/\n$/.test(S.con[S.con.length - 1].t) ? '\n' : '') + '— программа завершена —' });
+  afterRun();
+}
+function onError(e) {
+  if (!(e instanceof PyErr)) e = E('InternalError', String(e && e.message || e), S.curLine || 0);
+  S.run = null; hideInput();
+  S.err = e; S.errLine = e.line || 0; S.curLine = 0; S.status = 'error';
+  afterRun();
+}
+function afterRun() {
+  const t = runTests();
+  if (S.err) toast(`Ошибка в строке ${S.errLine || '?'}: ${S.err.type}`);
+  else if (t.all) toast('Функция прошла все тесты!');
+  else toast(`Тесты: ${t.pass} из ${t.total}. Подробности — на вкладке «Расчёты».`);
+  update();
+}
+function stopRun() {
+  if (!S.run) return;
+  S.run = null; hideInput(); S.curLine = 0; S.status = 'stop';
+  S.con.push({ k: 's', t: '\n— остановлено —' });
+  update();
+}
+function showInput() { const f = $('#inRow'); f.hidden = false; const b = $('#inBox'); b.value = ''; setTimeout(() => { if (matchMedia('(pointer:fine)').matches || document.activeElement !== $('#code')) b.focus({ preventScroll: true }); }, 0); update(); }
+function hideInput() { $('#inRow').hidden = true; }
+function submitInput(v) {
+  const R = S.run; if (!R || !R.wait) return;
+  R.wait = false; R.send = v; hideInput();
+  S.status = R.paused ? 'pause' : 'run';
+  advance();
+  if (S.run && S.run.paused && !S.run.wait) S.status = 'pause';
+  update();
+}
+$('#inRow').addEventListener('submit', e => { e.preventDefault(); submitInput($('#inBox').value); });
+
+function doRun() {
+  if (S.run) { if (S.run.wait) { $('#inBox').focus(); return; } S.run.paused = false; S.status = 'run'; update(); return; }
+  startRun(false);
+}
+function doStep() {
+  if (!S.run) { startRun(true); return; }
+  if (S.run.wait) { $('#inBox').focus(); toast('Программа ждёт ввода в консоли.'); return; }
+  S.run.paused = true; S.status = 'pause';
+  advance();
+  if (S.run && !S.run.wait) S.status = 'pause';
+  update();
+}
+function doCheck() {
+  if (S.run) stopRun();
+  const t = runTests();
+  toast(t.all ? 'Все тесты пройдены!' : `Тесты: ${t.pass} из ${t.total}.`);
+  update();
+}
+
+function loop(t) {
+  requestAnimationFrame(loop);
+  const R = S.run;
+  if (!R || R.paused || R.wait) return;
+  if (S.speed === 0) { for (let k = 0; k < 400 && S.run && !S.run.wait && !S.run.paused; k++) advance(); update(); return; }
+  if (t - R.t < S.speed) return;
+  R.t = t; advance(); update();
+}
+
+// ---------- editor ----------
+const code = $('#code');
+let saveT = 0;
+function onCode() {
+  S.codes[LID()] = code.value;
+  clearTimeout(saveT); saveT = setTimeout(save, 400);
+  if (S.run) { S.run = null; hideInput(); S.status = 'stop'; S.curLine = 0; toast('Код изменён — запуск остановлен.'); }
+  if (S.err) { S.err = null; S.errLine = 0; }
+  S.counts = {}; S.tests = null;
+  update();
+}
+code.addEventListener('input', onCode);
+let edTouched = false;
+code.addEventListener('focus', () => { edTouched = true; });
+code.addEventListener('scroll', syncScroll);
+function insertText(txt) {
+  if (!edTouched) { code.selectionStart = code.selectionEnd = code.value.length; edTouched = true; }
+  const s = code.selectionStart, e = code.selectionEnd, v = code.value;
+  const ls = v.lastIndexOf('\n', s - 1) + 1, ind = (/^[ \t]*/.exec(v.slice(ls)) || [''])[0];
+  let caret = txt.indexOf('|'); txt = txt.replace('|', '');
+  txt = txt.replace(/\n/g, '\n' + ind);
+  if (caret >= 0) caret += (txt.slice(0, caret).match(/\n/g) || []).length * ind.length;
+  code.setRangeText(txt, s, e, 'end');
+  if (caret >= 0) code.selectionStart = code.selectionEnd = s + caret;
+  code.focus({ preventScroll: true });
+  onCode();
+}
+code.addEventListener('keydown', e => {
+  if (e.key === 'Tab' && !e.shiftKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); insertText('    '); }
+  else if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.isComposing) {
+    const s = code.selectionStart, v = code.value, ls = v.lastIndexOf('\n', s - 1) + 1, line = v.slice(ls, s);
+    let ind = (/^[ \t]*/.exec(line) || [''])[0];
+    if (/:\s*(#.*)?$/.test(line)) ind += '    ';
+    e.preventDefault(); code.setRangeText('\n' + ind, s, code.selectionEnd, 'end'); onCode();
+  }
+  else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); doRun(); }
+});
+function lineH() { return parseFloat(getComputedStyle(code).lineHeight) || 22; }
+function syncScroll() {
+  $('#gutIn').style.transform = `translateY(${-code.scrollTop}px)`;
+  placeCur();
+}
+function placeCur() {
+  const c = $('#curl'), ln = S.curLine || S.errLine;
+  if (!ln) { c.hidden = true; return; }
+  c.hidden = false; c.classList.toggle('err', !S.curLine && !!S.errLine);
+  c.style.top = (10 + (ln - 1) * lineH() - code.scrollTop) + 'px';
+}
+function scrollToLine(ln) {
+  if (!ln) return;
+  const h = lineH(), y = 10 + (ln - 1) * h;
+  if (y < code.scrollTop + 4 || y + h > code.scrollTop + code.clientHeight - 4) code.scrollTop = y - code.clientHeight / 2;
+}
+function renderGutter() {
+  const lines = code.value.split('\n'), n = lines.length, cnt = S.counts, any = Object.keys(cnt).length > 0;
+  let h = '';
+  for (let i = 1; i <= n; i++) {
+    const c = cnt[i] || 0, isCode = lines[i - 1] && lines[i - 1].trim() && !lines[i - 1].trim().startsWith('#');
+    h += `<div class="gl${i === S.curLine ? ' cur' : ''}${any && isCode && !c ? ' zero' : ''}"><span>${i}</span><span class="c">${any && isCode ? (c ? '×' + c : '·') : ''}</span></div>`;
+  }
+  $('#gutIn').innerHTML = h;
+  syncScroll();
+}
+
+// ---------- stage rendering ----------
+function renderConsole() {
+  const el = $('#con');
+  let h = S.con.map(s => `<span class="${{ out: '', prompt: 'p', in: 'i', s: 's' }[s.k] || ''}">${esc(s.t)}</span>`).join('');
+  if (S.err) {
+    const e = S.err;
+    h += `${h && !/\n$/.test(S.con.length ? S.con[S.con.length - 1].t : '\n') ? '\n' : ''}<span class="e">Ошибка в строке ${e.line || '?'}\n${esc(e.type)}: ${esc(e.message)}</span><span class="ex">${explain(e)}</span>`;
+  }
+  if (!h) h = '<span class="empty">Нажмите «▶ Запуск» — здесь появится то, что выводит программа.</span>';
+  el.innerHTML = h;
+  el.scrollTop = el.scrollHeight;
+  $('#conInfo').textContent = S.status === 'input' ? 'ждёт ввода…' : S.run ? 'выполняется' : '';
+}
+// every name that points to the same list object, across all frames
+function aliasesOf(obj, self, X) {
+  const out = [];
+  X.frames.forEach(f => f.env.forEach((v, k) => { if (v === obj && !(f.env === self.env && k === self.k)) out.push(f.fn ? `${k} в ${f.name}` : k); }));
+  return out;
+}
+function cellHTML(k, v, key, fr, X) {
+  const t = typeName(v), chg = S.changed.has(key);
+  let body;
+  if (t === 'function') body = `<div class="v ty-function">def ${esc(v.fn.name)}(${esc(v.fn.params.map(p => p.n).join(', '))})</div>`;
+  else if (t === 'list' || t === 'tuple' || (t === 'str' && LID() === 'str' && v.length > 0 && Array.from(v).length <= 30)) {
+    const arr = t === 'str' ? Array.from(v) : v, show = arr.slice(0, 20);
+    body = `<div class="arr">${show.map((x, i) => `<span><i>${i}</i><b class="ty-${t === 'str' ? 'str' : typeName(x)}">${esc(t === 'str' ? x : (r => r.length > 12 ? r.slice(0, 11) + '…' : r)(repr(x)))}</b></span>`).join('')}${arr.length > 20 ? `<span class="more">+${arr.length - 20}</span>` : ''}${!arr.length ? '<span class="more">пусто</span>' : ''}</div>`;
+    if (t === 'list') { const al = aliasesOf(v, { env: fr.env, k }, X); if (al.length) body += `<div class="alias">тот же список, что и ${esc(al.join(', '))}</div>`; }
+  } else { let r = repr(v); if (r.length > 60) r = r.slice(0, 57) + '…'; body = `<div class="v ty-${t}">${esc(r)}</div>`; }
+  const len = t === 'list' || t === 'str' || t === 'tuple' ? ` · ${t === 'str' ? Array.from(v).length : v.length}` : '';
+  return `<div class="cell${chg ? ' chg' : ''}"><div class="n"><span>${esc(k)}</span><i class="ty-${t}">${t}${len}</i></div>${body}</div>`;
+}
+function renderMem() {
+  const el = $('#mem'), X = S.X;
+  if (!X || (!X.env.size && X.frames.length < 2)) { el.innerHTML = '<span class="empty">Переменных пока нет. Они появятся, когда программа выполнит присваивание или def.</span>'; $('#memInfo').textContent = ''; return; }
+  let h = '';
+  X.frames.forEach((f, d) => {
+    const items = [];
+    f.env.forEach((v, k) => items.push(cellHTML(k, v, `${d}:${f.name}:${k}`, f, X)));
+    h += `<div class="fr${d ? ' call' : ''}"><div class="fh">${d ? `▸ кадр вызова ${esc(f.name)}(${esc(f.rec.args.join(', '))})` : 'Глобальные переменные'}</div><div class="cells">${items.join('') || '<span class="empty">пусто</span>'}</div></div>`;
+  });
+  if (X.lastRet) h += `<div class="ret">↩ ${esc(X.lastRet.name)}(${esc(X.lastRet.args.map(a => a.replace(/^[^=]+=/, '')).join(', '))}) вернула ${esc(X.lastRet.ret)}</div>`;
+  el.innerHTML = h;
+  $('#memInfo').textContent = X.frames.length > 1 ? `вызовов в стеке: ${X.frames.length - 1}` : `${X.env.size} шт.`;
+}
+const STATUS = { ready: ['Готов', ''], run: ['Выполняется', 'run'], pause: ['Пауза (шаг)', 'run'], input: ['Ждёт ввода', 'run'], done: ['Завершена', 'ok'], error: ['Ошибка', 'bad'], stop: ['Остановлена', ''] };
+function renderMeter() {
+  const st = STATUS[S.status] || STATUS.ready, t = S.tests && S.tests.lesson === LID() ? S.tests : null, ok = !!S.done[LID()];
+  const depth = S.X && S.run ? S.X.frames.length - 1 : 0;
+  $('#meter').innerHTML = `<div class="k">Программа</div><div class="v ${st[1]}">${st[0]}</div>
+    <div class="lr"><span>строка</span><span>${S.curLine || (S.errLine ? S.errLine + ' ✗' : '—')}</span></div>
+    <div class="lr"><span>${depth ? 'в функции' : 'шагов'}</span><span>${depth ? esc(S.X.frames[depth].name) : S.steps}</span></div>
+    <div class="lr"><span>тесты</span><span style="color:${ok || (t && t.all) ? 'var(--ok)' : 'inherit'}">${t ? t.pass + '/' + t.total : '—/' + testCount()}</span></div>
+    <div class="gauge"><b style="width:${t ? (t.pass / t.total * 100).toFixed(0) : 0}%"></b></div>`;
+}
+function renderTools() {
+  const run = !!S.run;
+  const B = (k, label, aria, cls, dis) => `<button data-a="${k}"${aria ? ` aria-label="${aria}"` : ''}${cls ? ` class="${cls}"` : ''}${dis ? ' disabled' : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  $('#tools').innerHTML = B('run', run && !S.run.paused ? '▶ Идёт…' : run ? '▶ Дальше' : '▶ Запуск', 'Запустить программу', 'go', run && !S.run.paused) +
+    B('step', '⏭ Шаг', 'Выполнить одну строку') + B('stop', '■ Стоп', 'Остановить программу', '', !run) + sep +
+    B('check', '✓ Проверить', 'Проверить функцию тестами') + sep + B('reset', '↺ Сброс', 'Вернуть код урока к началу');
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.disabled) act(b.dataset.a); });
+function act(a) {
+  if (a === 'run') doRun();
+  if (a === 'step') doStep();
+  if (a === 'stop') stopRun();
+  if (a === 'check') doCheck();
+  if (a === 'reset') { stopRun(); S.backup[LID()] = code.value; setCode(L().code); toast('Код урока сброшен. «↩ Мой код» на вкладке «Схема» вернёт прежний.'); }
+  if (a === 'mine' && S.backup[LID()] != null) { stopRun(); const b = S.backup[LID()]; S.backup[LID()] = null; setCode(b); toast('Ваш код возвращён.'); }
+  if (a.startsWith('demo')) {
+    stopRun(); const d = L().demos[+a.slice(4)];
+    if (S.backup[LID()] == null) S.backup[LID()] = code.value;
+    setCode(d.c); toast(`Опыт «${d.n}» в редакторе. Нажмите «▶ Запуск».`);
+  }
+}
+function setCode(v) {
+  code.value = v; S.codes[LID()] = v; save();
+  resetOutput(); S.status = 'ready'; S.tests = null;
+  code.scrollTop = 0; update(); if (S.tab === 'scheme') buildScheme();
+}
+function renderSnips() {
+  $('#snips').innerHTML = L().snips.map((s, i) => `<button data-i="${i}" aria-label="Вставить ${esc(s === '⇥' ? 'отступ 4 пробела' : s.replace('|', ''))}">${esc(s === '⇥' ? '⇥ отступ' : s.replace('|', '…'))}</button>`).join('');
+}
+$('#snips').addEventListener('pointerdown', e => { if (e.target.closest('button')) e.preventDefault(); });
+$('#snips').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; const s = L().snips[+b.dataset.i]; insertText(s === '⇥' ? '    ' : s); });
+
+// ---------- panes ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3000); }
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'overview') buildOverview();
+  if (t === 'scheme') buildScheme();
+  if (t === 'parts') buildParts();
+  renderPanes();
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+
+function taskState() {
+  if (S.done[LID()]) return '✓ Выполнено';
+  const t = S.tests && S.tests.lesson === LID() ? S.tests : null;
+  if (S.status === 'input') return 'Программа ждёт ввода в консоли';
+  if (S.run) return 'Программа выполняется…';
+  if (!t) return `Тестов: ${testCount()} · нажмите «✓ Проверить»`;
+  return `Тесты: ${t.pass} из ${t.total}`;
+}
+function buildOverview() {
+  const Ls = L();
+  $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+    Ls.text.map(p => `<p>${esc(p)}</p>`).join('') +
+    `<div class="life"><b>Зачем это в жизни</b>${esc(Ls.why)}</div>` +
+    `<div class="taskbox"><div class="k">Задание</div><p>${esc(Ls.task)}</p><div class="state" id="ovState"></div><p class="note">${esc(Ls.hint)}</p></div>` +
+    `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+  $('#goNext').onclick = () => setLesson(S.lesson + 1);
+}
+function buildScheme() {
+  const Ls = L(), el = $('#pane-scheme');
+  el.innerHTML = `<h2>Пульт программы</h2><p class="note">«Шаг» выполняет одну строку: подсвеченная строка — та, что выполнится следующей. При вызове функции шаг «заходит» внутрь, а в памяти появляется её кадр. Горячая клавиша запуска — Ctrl+Enter.</p>
+    <dl class="reads"><div><dt>Строк кода</dt><dd id="r1"></dd></div><div><dt>Шагов</dt><dd id="r2"></dd></div><div><dt>Вызовов</dt><dd id="r3"></dd></div></dl>
+    <div class="ctl"><label for="spd">Пауза между шагами <output id="spdO"></output></label><input type="range" id="spd" min="0" max="900" step="50" value="${S.speed}"></div>
+    <div class="ctl"><div class="chips"><button data-a="run">▶ Запуск</button><button data-a="step">⏭ Шаг</button><button data-a="stop">■ Стоп</button><button data-a="check">✓ Проверить</button><button data-a="reset">↺ Сброс кода</button>${S.backup[Ls.id] != null ? '<button data-a="mine">↩ Мой код</button>' : ''}</div></div>
+    <h3>Опыты</h3><p class="note">Готовые программы для экспериментов. Ваш код сохранится — его вернёт «↩ Мой код».</p>
+    <div class="chips">${Ls.demos.map((d, i) => `<button data-a="demo${i}">${esc(d.n)}</button>`).join('')}</div>
+    <h3>Заготовки</h3><div class="chips mono">${Ls.snips.map((s, i) => `<button data-s="${i}">${esc(s === '⇥' ? '⇥ отступ' : s.replace('|', '…'))}</button>`).join('')}</div>
+    <h3>Как проверяется функция</h3><div class="steps">${Ls.id === 'debug' ? step('запуск', 'вся программа без ошибок') : ''}${Ls.tests.map((t, i) => step(`Тест ${i + 1}`, esc(`${Ls.fn}(${argsRepr(toPy(t.args))})`))).join('')}</div>`;
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+  el.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { const s = Ls.snips[+b.dataset.s]; insertText(s === '⇥' ? '    ' : s); });
+  const sp = el.querySelector('#spd');
+  sp.addEventListener('input', () => { S.speed = +sp.value; updateScheme(); });
+  updateScheme();
+}
+function updateScheme() {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; };
+  set('#r1', code.value.split('\n').filter(l => l.trim() && !l.trim().startsWith('#')).length);
+  set('#r2', S.steps); set('#r3', S.X ? S.X.calls.length : 0);
+  set('#spdO', S.speed === 0 ? 'мгновенно' : S.speed + ' мс');
+  el.querySelectorAll('[data-a]').forEach(b => { const a = b.dataset.a; b.disabled = a === 'stop' ? !S.run : false; });
+}
+function partsList() {
+  const id = LID();
+  const P = (pid, el, icon, name, spec) => ({ id: pid, el, icon: IC(icon), name, spec });
+  const ed = P('ed', '#edPane', '<rect x="3" y="5" width="28" height="24" rx="3" fill="none" stroke="#8b96ad" stroke-width="1.6"/><path d="M8 12h12M8 17h16M12 22h10" stroke="#e8ecf4" stroke-width="1.8" stroke-linecap="round"/>', 'Редактор кода', 'Здесь пишут программу. Python выполняет строки сверху вниз, но тело функции — только когда её вызвали. Текст после # — комментарий.');
+  const gut = P('gut', '#gut', '<rect x="3" y="5" width="10" height="24" rx="2" fill="#1a2438"/><path d="M6 11h4M6 17h4M6 23h4" stroke="#8b96ad" stroke-width="1.6"/><path d="M17 11h12" stroke="#ffb547" stroke-width="2.4"/>', 'Номера строк и счётчик', 'Справа от номера — сколько раз строка выполнилась при последнем запуске. «·» — ни разу. Так видно, что тело функции работает только при вызове.');
+  const con = P('con', '#conPane', '<rect x="3" y="5" width="28" height="24" rx="3" fill="#0b1019" stroke="#8b96ad" stroke-width="1.4"/><path d="M8 13l4 3-4 3" fill="none" stroke="#72d4e8" stroke-width="1.8"/><path d="M14 21h9" stroke="#e8ecf4" stroke-width="1.8"/>', 'Консоль', 'Сюда print() выводит текст. Ошибки — красным, а под ними объяснение простыми словами.');
+  const frame = P('frame', '#memPane', '<rect x="3" y="4" width="28" height="10" rx="2" fill="none" stroke="#8b96ad" stroke-dasharray="2 2"/><rect x="6" y="17" width="25" height="13" rx="2" fill="rgba(180,156,255,.15)" stroke="#b49cff"/><path d="M10 23h10" stroke="#e8ecf4" stroke-width="1.6"/>', 'Кадр вызова', 'Когда функцию вызвали, в памяти появляется её кадр: параметры и локальные переменные. После return кадр исчезает, а внизу видно, что функция вернула.');
+  const glob = P('glob', '#memPane', '<rect x="3" y="7" width="13" height="10" rx="2" fill="#1a2438" stroke="#72d4e8"/><rect x="18" y="7" width="13" height="10" rx="2" fill="#1a2438" stroke="#b49cff"/><rect x="3" y="19" width="13" height="10" rx="2" fill="#1a2438" stroke="#ff8ad8"/>', 'Глобальные переменные', 'Переменные и функции, созданные вне def. Функция — тоже значение: её имя хранится в памяти рядом с числами и списками.');
+  const arr = P('arr', '#memPane', '<g fill="#0b1019" stroke="#ff8ad8"><rect x="2" y="11" width="7" height="12" rx="1.5"/><rect x="10" y="11" width="7" height="12" rx="1.5"/><rect x="18" y="11" width="7" height="12" rx="1.5"/><rect x="26" y="11" width="6" height="12" rx="1.5"/></g><path d="M5 8h1M13 8h1M21 8h1M28 8h1" stroke="#8b96ad" stroke-width="2"/>', 'Список в памяти', 'Ряд ячеек: маленькая цифра сверху — индекс, ниже — значение. Если два имени указывают на один и тот же список, это подписано.');
+  const strc = P('strc', '#memPane', '<g fill="#0b1019" stroke="#86e0a8"><rect x="2" y="11" width="7" height="12" rx="1.5"/><rect x="10" y="11" width="7" height="12" rx="1.5"/><rect x="18" y="11" width="7" height="12" rx="1.5"/><rect x="26" y="11" width="6" height="12" rx="1.5"/></g><path d="M4 17h3M12 17h3M20 17h3" stroke="#86e0a8" stroke-width="2"/>', 'Строка по символам', 'В этом уроке строки в памяти разложены на символы с индексами. Пробел — тоже символ со своим номером.');
+  const tests = P('tests', '#meter', '<circle cx="17" cy="17" r="12" fill="none" stroke="#86e0a8" stroke-width="2"/><path d="M11 17l4 4 8-8" fill="none" stroke="#86e0a8" stroke-width="2.4" stroke-linecap="round"/>', 'Автопроверка', 'Проверка сама вызывает вашу функцию с разными аргументами и сравнивает то, что она вернула, с правильным ответом. Так проверяют код в IT-компаниях — это называется юнит-тесты.');
+  const tools = P('tools', '#tools', '<path d="M8 8l10 9-10 9z" fill="#e8ecf4"/><path d="M22 8v18M27 8v18" stroke="#8b96ad" stroke-width="2"/>', 'Пульт', '«Запуск» выполняет программу целиком, «Шаг» — по одной строке, «Проверить» — запускает тесты.');
+  if (id === 'func') return [frame, glob, gut, ed, tests, tools];
+  if (id === 'lists') return [arr, glob, frame, con, tests, tools];
+  if (id === 'str') return [strc, arr, frame, con, tests, tools];
+  return [con, P('cur', '#edPane', '<rect x="3" y="12" width="28" height="10" rx="2" fill="rgba(255,138,115,.2)" stroke="#ff8a73"/><path d="M3 12v10" stroke="#ff8a73" stroke-width="3"/>', 'Строка с ошибкой', 'Красная полоса в редакторе показывает, где программа упала. Логическая ошибка подсветки не даёт — её ищут шагами и по памяти.'), gut, frame, tests, tools];
+}
+function buildParts() {
+  const head = { func: 'Как увидеть вызов функции', lists: 'Как устроен список', str: 'Как устроена строка', debug: 'Инструменты отладки' }[LID()];
+  const list = partsList();
+  $('#pane-parts').innerHTML = `<h2>${head}</h2><p class="note">Нажмите на пункт, чтобы найти его на рабочем столе.</p><div class="parts">` +
+    list.map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+  $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { const p = list.find(x => x.id === b.dataset.id); flashEl(p.el); });
+}
+function flashEl(sel) {
+  const el = $(sel); if (!el) return;
+  el.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+  el.classList.remove('flash', 'hl'); void el.offsetWidth; el.classList.add('flash', 'hl');
+  setTimeout(() => el.classList.remove('hl'), 1700);
+}
+
+function globalOf(test) { if (!S.X) return null; for (const [k, v] of S.X.env) if (test(v)) return [k, v]; return null; }
+function calcHTML() {
+  const Ls = L(), id = Ls.id, t = S.tests && S.tests.lesson === id ? S.tests : null;
+  let h = '';
+  if (id === 'func') {
+    const c = S.X && S.X.calls.filter(x => x.name === 'discount').pop();
+    const pm = c && /^price=(-?\d+)$/.exec(c.args[0] || ''), p = pm ? +pm[1] : 12000;
+    const yes = p >= 10000, res = yes ? Math.floor(p * 90 / 100) : p;
+    h += `<h2>Что должна сделать discount</h2><div class="formula">discount(price) = price · 90 // 100, если price ≥ 10000<br>иначе price</div><p class="note">${pm ? `Последний вызов из вашей программы: discount(${p}).` : 'Пример для price = 12000. Запустите программу — возьмём ваш вызов.'}</p><div class="steps">` +
+      step('вызов', `discount(${p})`) + step('в кадре функции', `price = ${p}`) +
+      step(`${p} >= 10000`, yes ? 'True — скидка' : 'False — без скидки', yes ? 'okk' : '') +
+      (yes ? step(`${p} * 90 // 100`, `${p * 90} // 100 = ${res}`) : '') +
+      step('по заданию вернуть', String(res), 'sum') + (c ? step('ваша функция вернула', esc(c.ret), c.ret === String(res) || (/^-?\d+\.0$/.test(c.ret) && parseFloat(c.ret) === res) ? 'okk' : 'badd') : '') + `</div>`;
+  }
+  if (id === 'lists') {
+    const g = globalOf(v => Array.isArray(v) && !v.tup && v.length && v.every(x => isNum(x) && typeof x !== 'boolean'));
+    const nm = g ? g[0] : 'temps', a = g ? g[1].map(nv) : [3, 7, 5, 1, 0, 2, 4];
+    h += `<h2>Поиск самого тёплого дня</h2><div class="formula">день = индекс + 1</div><p class="note">${g ? `Список из памяти: ${esc(nm)}.` : 'Пример для temps = [3, 7, 5, 1, 0, 2, 4].'}</p><div class="steps">`;
+    let bi = 0;
+    a.slice(0, 12).forEach((x, i) => { const nb = i === 0 || x > a[bi]; if (nb) bi = i; h += step(`i = ${i}: ${esc(nm)}[${i}] = ${x}`, nb ? `лучший пока: индекс ${i}` : `не больше ${a[bi]}`, nb ? 'okk' : ''); });
+    if (a.length > 12) { h += step('…', '…'); a.forEach((x, i) => { if (x > a[bi]) bi = i; }); }
+    h += step(`max = ${a[bi]}, первый индекс`, String(bi)) + step('номер дня', `${bi} + 1 = ${bi + 1}`, 'sum') + `</div><p class="note" style="margin-top:10px">Строгое «больше» (&gt;) оставляет первый из одинаковых максимумов. С «&gt;=» победил бы последний.</p>`;
+  }
+  if (id === 'str') {
+    const g = globalOf(v => typeof v === 'string' && v.trim().split(/\s+/).length >= 3);
+    const s = g ? g[1] : 'Ахметов Нурлан Серикович', w = s.trim().split(/\s+/);
+    h += `<h2>Как получить инициалы</h2><div class="formula">words[0] + " " + words[1][0] + ". " + words[2][0] + "."</div><p class="note">${g ? `Строка из памяти: ${esc(g[0])}.` : 'Пример для «Ахметов Нурлан Серикович».'}</p><div class="steps">` +
+      step('full', esc(strRepr(s))) + step('words = full.split()', esc(repr(w))) +
+      step('words[0]', esc(strRepr(w[0]))) + step('words[1][0]', esc(strRepr(Array.from(w[1])[0]))) + step('words[2][0]', esc(strRepr(Array.from(w[2])[0]))) +
+      step('результат', esc(strRepr(`${w[0]} ${Array.from(w[1])[0]}. ${Array.from(w[2])[0]}.`)), 'sum') + `</div>`;
+  }
+  if (id === 'debug') {
+    let syn = null; try { compile(code.value); } catch (e) { syn = e; }
+    const r = syn ? null : runSilent(code.value, [], 20000);
+    const c = r && !r.err || (r && r.X.env.get('average')) ? callUser(r.X, 'average', [[5, 4, 3]], 20000) : null;
+    h += `<h2>Отладка по шагам</h2><div class="formula">average([5, 4, 3]) = (5 + 4 + 3) / 3 = 12 / 3 = 4.0</div><div class="steps">` +
+      step('1. Python понимает запись?', syn ? `нет: ${esc(syn.type)}, строка ${syn.line}` : 'да', syn ? 'badd' : 'okk') +
+      step('2. Программа доходит до конца?', syn ? '—' : r.err ? `нет: ${esc(r.err.type)}, строка ${r.err.line || '?'}` : 'да', syn ? '' : r.err ? 'badd' : 'okk') +
+      step('3. average([5, 4, 3])', !c ? '—' : c.err ? esc(c.err.type) : esc(repr(c.val)), !c ? '' : !c.err && isNum(c.val) && Math.abs(nv(c.val) - 4) < 1e-9 ? 'okk' : 'badd') + `</div>
+      <p class="note" style="margin-top:10px">Подсказка для шага 3: проследите кнопкой «Шаг», чему равны i и total перед return. Сколько слагаемых попало в сумму?</p>`;
+  }
+  h += `<h3>Автопроверка</h3>`;
+  if (!t) h += '<p class="note">Нажмите «✓ Проверить» или запустите программу — здесь появятся результаты тестов.</p>';
+  else h += `<div class="steps">` + t.rows.map(x => step(esc(x.label), esc(x.got) + (x.note ? ` · ${esc(x.note)}` : ''), x.ok ? 'okk' : 'badd')).join('') + step('итог', `${t.pass} из ${t.total}`, 'sum') + `</div>`;
+  h += `<h3>Вызовы функций при последнем запуске</h3>`;
+  const calls = S.X ? S.X.calls : [];
+  if (!calls.length) h += '<p class="note">Запустите программу — здесь появится каждый вызов: с какими аргументами и что вернул.</p>';
+  else h += `<div class="steps">` + calls.slice(0, 25).map(c => step(`${'· '.repeat(Math.max(0, c.depth - 1))}${esc(c.name)}(${esc(c.args.join(', '))})`, c.ret === undefined ? 'не завершился' : '→ ' + esc(c.ret))).join('') + (calls.length > 25 ? step('…', `ещё ${calls.length - 25}`) : '') + `</div>`;
+  h += `<h3>Трасса последнего запуска</h3>`;
+  const tr = S.trace, src = code.value.split('\n');
+  if (!tr.length) h += '<p class="note">Запустите программу — по шагам появится, какая строка выполнилась и что изменилось в памяти.</p>';
+  else {
+    const show = tr.length > 60 ? tr.slice(0, 40).concat([null], tr.slice(-15)) : tr;
+    h += `<div class="steps">` + show.map(x => x ? step(`${tr.indexOf(x) + 1}. стр. ${x.line}: <code>${esc((src[x.line - 1] || '').trim().slice(0, 40))}</code>`, esc([...x.ch, x.out ? 'вывод: ' + x.out.replace(/\n$/, '').replace(/\n/g, ' ⏎ ') : ''].filter(Boolean).join(' · ') || '—')) : step('…', `пропущено ${tr.length - 55} шагов`)).join('') + `</div>`;
+  }
+  return h;
+}
+function renderPanes() {
+  if (S.tab === 'overview') { const o = $('#ovState'); if (o) { o.textContent = taskState(); o.classList.toggle('done', !!S.done[LID()]); } }
+  if (S.tab === 'scheme') updateScheme();
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML();
+}
+
+function update() {
+  const Ls = L(), m = { kind: Ls.id, tests: S.tests && S.tests.lesson === Ls.id && S.tests.code === code.value ? S.tests : null };
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Функции, списки и строки освоены!'), 1200);
+  }
+  renderMeter(); renderConsole(); renderMem(); renderGutter(); renderTools();
+  if (S.curLine) scrollToLine(S.curLine); else if (S.errLine) scrollToLine(S.errLine);
+  placeCur();
+  $('#edInfo').textContent = S.curLine ? `следующая: стр. ${S.curLine}` : S.errLine ? `ошибка: стр. ${S.errLine}` : '';
+  $('#taskState').textContent = taskState();
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes();
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+}
+
+const MINI = {
+  func: '<rect x="4" y="5" width="34" height="20" rx="4" fill="none" stroke="#b49cff" stroke-width="1.6"/><path d="M10 12h8M10 18h14" stroke="#e8ecf4" stroke-width="1.6"/><path d="M40 15h14" stroke="#ffb547" stroke-width="1.8"/><path d="M50 11l5 4-5 4" fill="none" stroke="#ffb547" stroke-width="1.8"/><circle cx="60" cy="15" r="3" fill="#86e0a8"/>',
+  lists: '<g fill="#0b1019" stroke="#ff8ad8"><rect x="4" y="10" width="11" height="14" rx="2"/><rect x="17" y="10" width="11" height="14" rx="2"/><rect x="30" y="10" width="11" height="14" rx="2" stroke="#ffb547"/><rect x="43" y="10" width="11" height="14" rx="2"/></g><path d="M8 6h3M21 6h3M34 6h3M47 6h3" stroke="#8b96ad" stroke-width="1.6"/><path d="M58 17h5" stroke="#8b96ad" stroke-width="1.6" stroke-dasharray="1 2"/>',
+  str: '<g fill="#0b1019" stroke="#86e0a8"><rect x="4" y="9" width="9" height="13" rx="2"/><rect x="14" y="9" width="9" height="13" rx="2"/><rect x="24" y="9" width="9" height="13" rx="2"/><rect x="34" y="9" width="9" height="13" rx="2"/><rect x="44" y="9" width="9" height="13" rx="2"/></g><path d="M3 26h31" stroke="#ffb547" stroke-width="1.8"/><path d="M56 15h7" stroke="#86e0a8" stroke-width="1.6"/>',
+  debug: '<ellipse cx="33" cy="17" rx="8" ry="10" fill="none" stroke="#ff8a73" stroke-width="1.8"/><path d="M33 8v18M25 13l-7-3M25 19h-8M25 24l-6 3M41 13l7-3M41 19h8M41 24l6 3" stroke="#ff8a73" stroke-width="1.5" stroke-linecap="round"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Lx, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Lx.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Lx.title}</span></span>
+      ${S.done[Lx.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const Ls = LESSONS[i];
+  S.run = null; hideInput();
+  S.lesson = i; S.tests = null; S.status = 'ready';
+  resetOutput();
+  code.value = typeof S.codes[Ls.id] === 'string' ? S.codes[Ls.id] : Ls.code;
+  code.scrollTop = 0;
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = Ls.task;
+  renderSnips(); renderStrip();
+  setTab(S.tab);
+  update();
+  const cur = $('#lessons .lesson[aria-current="true"]'), ls = $('#lessons'); if (cur) { const dx = cur.getBoundingClientRect().left - ls.getBoundingClientRect().left; if (dx < 0 || dx + cur.offsetWidth > ls.clientWidth) ls.scrollLeft += dx - 8; }
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const Ls = L(), id = Ls.id, t = S.tests && S.tests.lesson === id ? S.tests : null;
+  const src = code.value.split('\n').map((l, i) => `${String(i + 1).padStart(2, ' ')}| ${l}`).join('\n');
+  let out = S.con.map(s => s.t).join(''); if (out.length > 1500) out = '…' + out.slice(-1500);
+  const X = S.X;
+  const mem = X && X.env.size ? Array.from(X.env, ([k, v]) => `${k} = ${repr(v).slice(0, 120)} (${typeName(v)})`).join('; ') : 'пусто';
+  const frames = X && X.frames.length > 1 ? X.frames.slice(1).map(f => `${f.name}(${f.rec.args.join(', ')}) — локальные: ${Array.from(f.env, ([k, v]) => `${k} = ${repr(v).slice(0, 80)}`).join(', ') || 'нет'}`).join(' → ') : 'нет активных вызовов';
+  const calls = X && X.calls.length ? X.calls.slice(0, 10).map(c => `${c.name}(${c.args.join(', ')}) → ${c.ret === undefined ? 'не завершился' : c.ret}`).join('; ') : 'нет';
+  const st = (STATUS[S.status] || STATUS.ready)[0];
+  const tests = t ? `${t.pass} из ${t.total} пройдено` + t.rows.filter(x => !x.ok).slice(0, 3).map(x => `; не пройден ${x.label}: получено «${x.got}»${x.note ? ' (' + x.note + ')' : ''}`).join('') : 'ещё не запускались';
+  return [
+    `Раздел: информатика, 8 класс, тема «Функции и списки» (Python). Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `На экране: мини-среда Python (редактор, консоль, память с кадрами вызовов функций, пошаговый запуск, автопроверка, которая сама вызывает функцию ${Ls.fn} с тестовыми аргументами). Интерпретатор поддерживает школьное подмножество Python: print, input, if/elif/else, for/while, def/return, списки, строки, индексы, срезы и основные методы.`,
+    `Код ученика:\n${src}`,
+    `Состояние программы: ${st}${S.curLine ? ', следующая строка ' + S.curLine : ''}. Шагов выполнено: ${S.steps}.`,
+    `Консоль:\n${out || '(пусто)'}`,
+    S.err ? `Ошибка в строке ${S.errLine}: ${S.err.type}: ${S.err.message}. Подсказка на экране: ${explain(S.err).replace(/<[^>]+>/g, '')}` : 'Ошибок нет.',
+    `Глобальная память: ${mem}.`,
+    `Стек вызовов: ${frames}. Вызовы при последнем запуске: ${calls}.`,
+    `Автотесты: ${tests}.`,
+    id === 'debug' ? 'Это урок на поиск ошибок: не называй ученику все ошибки и не давай исправленный код. Помогай по одной: попроси прочитать сообщение об ошибке, пройти код кнопкой «Шаг», посчитать сумму на маленьком примере.' : 'Не пиши за ученика готовую функцию целиком. Наводи вопросами: что функция получает, что должна вернуть, какой индекс у первого элемента, что даёт split(). Можно показать маленький пример на другой задаче.',
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { func: 'Чем return отличается от print?', lists: 'Почему индексы списка начинаются с нуля?', str: 'Почему строку нельзя изменить по индексу?', debug: 'Как найти логическую ошибку, если Python молчит?' }[Ls.id];
+  return [S.err ? 'Что означает эта ошибка?' : done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где функции и списки пригодятся в профессии?'];
+};
+
+addEventListener('resize', () => { placeCur(); });
+setLesson(S.lesson);
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,1045 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по химии, 8 класс: оксиды, кислоты, основания и соли — сортируем, собираем формулы, проверяем индикаторами и проходим генетические ряды.">
+<title>Классы веществ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /mechanics and /chemistry. Lab bench (SVG) on the left, lesson notebook on the right, lesson strip under the bench. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--liq);transition:width .2s}
+.gauge i{position:absolute;top:-4px;width:2px;height:14px;background:var(--force);transform:translateX(-50%)}
+.swatch{height:12px;border-radius:4px;margin-top:9px;border:1px solid rgba(255,255,255,.15)}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.meter .big{font:700 30px/1 var(--font-display);margin-top:8px;letter-spacing:.02em}
+.meter .big small{font:500 12px/1 var(--font-body);color:var(--muted);letter-spacing:0;margin-left:6px}
+.pairs{display:grid;gap:6px;margin-top:10px}
+.pairs label{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface-2);border-radius:9px;padding:7px 10px;font-size:13.5px}
+.pairs select{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:7px;padding:5px 8px;font:500 13px var(--font-mono)}
+.pairs select:disabled{color:var(--ok);opacity:1}
+.cnt{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;margin-top:10px}
+.cnt div{display:flex;align-items:center;justify-content:space-between;gap:6px;background:var(--surface-2);border-radius:9px;padding:6px 8px;font-size:13px}
+.cnt b{font:500 14px var(--font-mono)}
+.cnt button{width:30px;height:30px;border-radius:7px;background:var(--bg);border:1px solid var(--line);cursor:pointer;font:500 15px/1 var(--font-mono)}
+.vtab{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}
+.vtab span{background:var(--surface-2);border-radius:8px;padding:7px 4px;text-align:center;font:500 12px/1.3 var(--font-mono);color:var(--muted)}
+.vtab span b{display:block;color:var(--fg);font-size:15px}
+.vtab span.on{outline:2px solid var(--ok);color:var(--fg)}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><ellipse cx="20" cy="20" rx="14" ry="5.5" fill="none" stroke="var(--arm)" stroke-width="1.6"/><ellipse cx="20" cy="20" rx="14" ry="5.5" fill="none" stroke="var(--arm)" stroke-width="1.6" transform="rotate(60 20 20)"/><ellipse cx="20" cy="20" rx="14" ry="5.5" fill="none" stroke="var(--arm)" stroke-width="1.6" transform="rotate(-60 20 20)"/><circle cx="20" cy="20" r="3.2" fill="var(--force)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Химия · Классы веществ</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#chem">Карта</a><a href="/physics/#chem">Химия</a><a href="/labs/chem-classes/" aria-current="page">Классы веществ</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Классы</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/5</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Лабораторный стол">
+    <svg class="scene" id="scene" role="img" aria-label="Лабораторный стол: карточки веществ, конструктор формул, пробирки с индикаторами и цепочки превращений. Предметы можно перетаскивать и нажимать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const KEY = 'luch-chem-classes';
+const SUBD = { '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉' };
+const low = s => String(s).replace(/\d/g, d => SUBD[d]);
+const ROM = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
+const gcd = (a, b) => b ? gcd(b, a % b) : a;
+const lcm = (a, b) => a / gcd(a, b) * b;
+const cap = s => s[0].toUpperCase() + s.slice(1);
+
+const ATOM = {
+  H: { r: 13, c: '#eef2f8', t: '#0b1019', name: 'водород' }, C: { r: 22, c: '#4f586d', t: '#fff', name: 'углерод' },
+  N: { r: 22, c: '#4d7cf0', t: '#fff', name: 'азот' }, O: { r: 21, c: '#e5533f', t: '#fff', name: 'кислород' },
+  Cl: { r: 24, c: '#5fc46a', t: '#0b1019', name: 'хлор' }, Na: { r: 24, c: '#b88cf0', t: '#0b1019', name: 'натрий' },
+  K: { r: 25, c: '#9b7ae0', t: '#0b1019', name: 'калий' }, Ca: { r: 24, c: '#9fd27a', t: '#0b1019', name: 'кальций' },
+  Al: { r: 23, c: '#b5c0d3', t: '#0b1019', name: 'алюминий' }, P: { r: 22, c: '#f09a3e', t: '#0b1019', name: 'фосфор' },
+  Fe: { r: 23, c: '#c58a5c', t: '#0b1019', name: 'железо' }, S: { r: 22, c: '#e6c63a', t: '#0b1019', name: 'сера' },
+  Mg: { r: 23, c: '#7ad1b5', t: '#0b1019', name: 'магний' }, Cu: { r: 23, c: '#d9895b', t: '#0b1019', name: 'медь' },
+};
+const METALS = ['Na', 'K', 'Ca', 'Mg', 'Al', 'Fe', 'Cu', 'Zn'];
+const elemsOf = f => [...new Set(f.match(/[A-Z][a-z]?/g) || [])];
+
+// ---------- lesson 1: oxides ----------
+const OX = [
+  { f: 'Na2O', name: 'оксид натрия', k: 'b' }, { f: 'CO2', name: 'углекислый газ', k: 'a' }, { f: 'NaOH', name: 'едкий натр', k: 'n' },
+  { f: 'CaO', name: 'оксид кальция', k: 'b' }, { f: 'SO3', name: 'оксид серы(VI)', k: 'a' }, { f: 'CaCO3', name: 'мел', k: 'n' },
+  { f: 'CuO', name: 'оксид меди(II)', k: 'b' }, { f: 'O2', name: 'кислород', k: 'n' }, { f: 'P2O5', name: 'оксид фосфора(V)', k: 'a' },
+  { f: 'H2SO4', name: 'серная кислота', k: 'n' },
+];
+const OXBOX = { b: 'основные оксиды', a: 'кислотные оксиды', n: 'не оксиды' };
+const OXHY = { Na2O: 'NaOH', CaO: 'Ca(OH)₂', CuO: 'Cu(OH)₂', CO2: 'H₂CO₃', SO3: 'H₂SO₄', P2O5: 'H₃PO₄' };
+
+// ---------- lessons 2 and 4: formula builder (cation + acid residue) ----------
+const CAT = [
+  { s: 'H', v: 1, gen: 'водорода' }, { s: 'Na', v: 1, gen: 'натрия' }, { s: 'K', v: 1, gen: 'калия' }, { s: 'Ca', v: 2, gen: 'кальция' },
+  { s: 'Mg', v: 2, gen: 'магния' }, { s: 'Cu', v: 2, gen: 'меди(II)' }, { s: 'Al', v: 3, gen: 'алюминия' }, { s: 'Fe', v: 3, gen: 'железа(III)' },
+];
+const RES = [
+  { s: 'Cl', v: 1, poly: false, salt: 'хлорид', acid: 'соляная (хлороводородная) кислота', c: '#5fc46a', o: false },
+  { s: 'NO3', v: 1, poly: true, salt: 'нитрат', acid: 'азотная кислота', c: '#6f95f2', o: true },
+  { s: 'SO4', v: 2, poly: true, salt: 'сульфат', acid: 'серная кислота', c: '#e6c63a', o: true },
+  { s: 'CO3', v: 2, poly: true, salt: 'карбонат', acid: 'угольная кислота', c: '#9aa3b8', o: true },
+  { s: 'PO4', v: 3, poly: true, salt: 'фосфат', acid: 'фосфорная кислота', c: '#f09a3e', o: true },
+  { s: 'S', v: 2, poly: false, salt: 'сульфид', acid: 'сероводородная кислота', c: '#d9c23a', o: false },
+];
+const XMAX = 6;
+const fmlOf = (C, R, x, y) => C.s + (x > 1 ? x : '') + (R.poly && y > 1 ? '(' + R.s + ')' + y : R.s + (y > 1 ? y : ''));
+const goodF = (C, R) => { const L = lcm(C.v, R.v); return fmlOf(C, R, L / C.v, L / R.v); };
+const nameOf = (C, R) => C.s === 'H' ? R.acid : R.salt + ' ' + C.gen;
+const noSalt = (C, R) => R.s === 'CO3' && (C.s === 'Al' || C.s === 'Fe');
+const TARGET_ACID = ['H2SO4', 'H3PO4', 'HNO3'];
+const TARGET_SALT = ['Al2(SO4)3', 'Ca3(PO4)2', 'Cu(NO3)2'];
+const TNAME = { H2SO4: 'серная кислота', H3PO4: 'фосфорная кислота', HNO3: 'азотная кислота', 'Al2(SO4)3': 'сульфат алюминия', 'Ca3(PO4)2': 'фосфат кальция', 'Cu(NO3)2': 'нитрат меди(II)' };
+
+// ---------- lesson 3: indicators ----------
+const IND = [
+  { k: 'lit', name: 'лакмус', stock: '#8a5cc8', c: { acid: '#e0464a', water: '#8a5cc8', alk: '#3b6fe0' }, cn: { acid: 'красный', water: 'фиолетовый', alk: 'синий' } },
+  { k: 'mo', name: 'метилоранж', stock: '#f08a2a', c: { acid: '#e8506a', water: '#f08a2a', alk: '#f2d23a' }, cn: { acid: 'розово-красный', water: 'оранжевый', alk: 'жёлтый' } },
+  { k: 'ph', name: 'фенолфталеин', stock: '#dfe8f2', c: { acid: null, water: null, alk: '#d8287a' }, cn: { acid: 'бесцветный', water: 'бесцветный', alk: 'малиновый' } },
+];
+const SAMPLE = { acid: 'кислота', alk: 'щёлочь', water: 'вода' };
+const LABS = [null, 'acid', 'alk', 'water'];
+const TUBE = { xs: [110, 210, 310], top: 150, bot: 290, w: 34, liq: 205 };
+const BOT = { x: 448, ys: [140, 212, 284] };
+const TL = ['А', 'Б', 'В'];
+const indOf = k => IND.find(i => i.k === k);
+
+// ---------- lesson 5: genetic series ----------
+const ROWS = [
+  { title: 'РЯД МЕТАЛЛА', nodes: [{ f: 'Ca', cl: 'металл' }, { f: 'CaO', cl: 'основный оксид' }, { f: 'Ca(OH)2', cl: 'основание' }, { f: 'CaCl2', cl: 'соль' }],
+    steps: [{ r: 'O2', eq: '2Ca + O₂ → 2CaO', need: 'металл превращают в оксид, сжигая его' },
+            { r: 'H2O', eq: 'CaO + H₂O → Ca(OH)₂', need: 'основный оксид активного металла с водой даёт щёлочь' },
+            { r: 'HCl', eq: 'Ca(OH)₂ + 2HCl → CaCl₂ + 2H₂O', need: 'основание с кислотой даёт соль и воду; хлорид — соль соляной кислоты' }] },
+  { title: 'РЯД НЕМЕТАЛЛА', nodes: [{ f: 'P', cl: 'неметалл' }, { f: 'P2O5', cl: 'кислотный оксид' }, { f: 'H3PO4', cl: 'кислота' }, { f: 'Na3PO4', cl: 'соль' }],
+    steps: [{ r: 'O2', eq: '4P + 5O₂ → 2P₂O₅', need: 'неметалл превращают в оксид, сжигая его' },
+            { r: 'H2O', eq: 'P₂O₅ + 3H₂O → 2H₃PO₄', need: 'кислотный оксид с водой даёт кислоту' },
+            { r: 'NaOH', eq: 'H₃PO₄ + 3NaOH → Na₃PO₄ + 3H₂O', need: 'кислота со щёлочью даёт соль и воду; в соли Na₃PO₄ есть натрий' }] },
+];
+const REAG = ['O2', 'H2O', 'HCl', 'NaOH', 'CO2', 'NaCl'];
+const RNAME = { O2: 'кислород', H2O: 'вода', HCl: 'соляная кислота', NaOH: 'щёлочь NaOH', CO2: 'углекислый газ', NaCl: 'поваренная соль' };
+const WRONG5 = {
+  'Ca|H2O': 'Кальций с водой реагирует: Ca + 2H₂O → Ca(OH)₂ + H₂↑. Но по цепочке сначала нужен оксид.',
+  'CaO|HCl': 'CaO + 2HCl → CaCl₂ + H₂O тоже идёт, но так мы перепрыгнем через основание. Нужен другой реактив.',
+  'CaO|CO2': 'CaO + CO₂ → CaCO₃ — это соль, а по цепочке нужно основание.',
+  'Ca(OH)2|CO2': 'Ca(OH)₂ + CO₂ → CaCO₃↓ + H₂O — так мутнеет известковая вода. Но нужен хлорид, а не карбонат.',
+  'P2O5|NaOH': 'P₂O₅ со щёлочью сразу даст соль, а по цепочке нужна кислота.',
+  'H3PO4|HCl': 'Кислота с кислотой не реагирует.',
+  'H3PO4|NaCl': 'Фосфорная кислота с NaCl в растворе не реагирует: ни газа, ни осадка, ни воды.',
+  'Ca(OH)2|NaOH': 'Основание с основанием не реагирует.',
+  'Ca(OH)2|NaCl': 'Ca(OH)₂ с NaCl не реагирует: ни газа, ни осадка, ни воды.',
+};
+const RX = [52, 135, 218, 301, 384, 467], RY = 318;
+const NX = [64, 196, 328, 460], NY = [130, 236], NW = 84, NH = 50;
+const ax = i => (NX[i] + NX[i + 1]) / 2;
+
+const LESSONS = [
+  { id: 'oxides', title: 'Оксиды: элемент + кислород',
+    text: ['Оксиды — сложные вещества из двух элементов, один из которых кислород с валентностью II. CaO, CO₂, P₂O₅ — оксиды. А NaOH и CaCO₃ — нет: в них три элемента. O₂ — тоже нет: это простое вещество.',
+           'Оксиды металлов обычно основные: им соответствуют основания. CaO → Ca(OH)₂, Na₂O → NaOH. Оксиды неметаллов — кислотные: им соответствуют кислоты. SO₃ → H₂SO₄, CO₂ → H₂CO₃. Есть и исключения — амфотерные оксиды, о них позже.',
+           'Название: «оксид» + элемент в родительном падеже. Если валентность переменная, её пишут в скобках: оксид меди(II) CuO, оксид серы(VI) SO₃.'],
+    why: 'Цементные заводы под Шымкентом и в Семее обжигают известняк и получают оксид кальция CaO — основу цемента. Экологи Экибастуза и Темиртау следят за выбросами SO₂ и CO₂ — кислотных оксидов, из-за которых бывают кислотные дожди. На медеплавильном заводе в Балхаше сернистый газ улавливают и делают из него серную кислоту.',
+    safe: 'Негашёная известь CaO с водой сильно разогревается и разъедает кожу. С ней работают в перчатках и очках.',
+    task: 'Разложите 10 веществ: основные оксиды, кислотные оксиды и вещества, которые оксидами не являются.',
+    hint: 'Сначала проверьте: ровно два элемента и один из них — O? Если да, посмотрите на второй элемент: металл или неметалл.',
+    stage: 'Перетащите карточку в ящик. Нажатие на карточку — разбор на вкладке «Расчёты».',
+    init: {},
+    check: m => m.placed === OX.length },
+  { id: 'acids', title: 'Кислоты: водород + остаток',
+    text: ['Кислоты — сложные вещества из атомов водорода и кислотного остатка: HCl, H₂SO₄, H₃PO₄. Водород в кислоте может замещаться на металл — так получаются соли.',
+           'Валентность кислотного остатка равна числу атомов водорода в кислоте: у Cl — I, у SO₄ — II, у PO₄ — III. Формулу собирают как по валентности: единиц у водорода столько же, сколько у остатка.',
+           'Растворы кислот меняют цвет индикаторов: лакмус краснеет, метилоранж становится розово-красным. Кислоты бывают кислородсодержащие (H₂SO₄, HNO₃) и бескислородные (HCl, H₂S).'],
+    why: 'Казатомпром добывает уран подземным выщелачиванием: в пласт закачивают раствор серной кислоты, и она растворяет урановую руду. Соляная кислота есть в желудке каждого человека — врач знает, что её избыток вызывает изжогу. Фосфорная кислота нужна для удобрений, а ещё её добавляют в колу.',
+    safe: 'Кислоты разъедают кожу и ткань, пробовать их на вкус нельзя. Разбавляя, кислоту льют в воду, а не воду в кислоту. Попала на кожу — смыть большим количеством воды.',
+    task: 'Соберите формулы серной, фосфорной и азотной кислот.',
+    hint: 'Остаток меняйте кнопками ‹ ›. Добавляйте атомы H, пока полоски не сравняются: оранжевых свободных связей не должно остаться.',
+    stage: 'Тащите H и остаток из лотков на полоски или нажимайте на лоток. Лишний — нажмите на него.',
+    init: { cat: 0, res: 2 },
+    check: m => TARGET_ACID.every(k => m.found[k]) },
+  { id: 'bases', title: 'Основания и индикаторы',
+    text: ['Основания — сложные вещества из атома металла и гидроксогрупп OH. Валентность группы OH — I, поэтому их столько, какова валентность металла: NaOH, Ca(OH)₂, Fe(OH)₃. Название — «гидроксид» + металл: гидроксид кальция.',
+           'Растворимые в воде основания называют щелочами: NaOH, KOH, Ca(OH)₂ (малорастворим). Cu(OH)₂ и Fe(OH)₃ в воде не растворяются.',
+           'Щёлочь узнают индикатором: фенолфталеин становится малиновым, лакмус — синим, метилоранж — жёлтым. В кислоте и в чистой воде фенолфталеин остаётся бесцветным.'],
+    why: 'Гидроксид натрия — каустическая сода — нужен для мыла, бумаги и очистки нефтепродуктов. Агроном проверяет кислотность почвы и решает, вносить ли известь. Технологи водоочистки и работники бассейнов каждый день измеряют кислотность воды.',
+    safe: 'Щёлочи разъедают кожу и особенно опасны для глаз. Работают только в очках и перчатках; попало — промыть большим количеством воды.',
+    task: 'Определите индикаторами, в какой пробирке кислота, в какой щёлочь, а в какой вода. Подпишите таблички и нажмите «Проверить».',
+    hint: 'Фенолфталеин сразу найдёт щёлочь, а лакмус отличит кислоту от воды. Перед новым индикатором промойте пробирки.',
+    stage: 'Перетащите склянку на пробирку (или нажмите склянку, потом пробирку). Нажатие на табличку меняет ответ.',
+    init: {},
+    check: m => m.verified },
+  { id: 'salts', title: 'Соли: металл + остаток',
+    text: ['Соли — сложные вещества из атомов металла и кислотного остатка: NaCl, CaCO₃, CuSO₄. Это как кислота, в которой водород заменили на металл.',
+           'Формулу соли составляют по валентности. Al(III) и SO₄(II): НОК = 6, алюминия 6 : 3 = 2, остатков 6 : 2 = 3 → Al₂(SO₄)₃. Если остаток из нескольких атомов и их больше одного, его берут в скобки.',
+           'Название: остаток + металл в родительном падеже. Cl — хлорид, NO₃ — нитрат, SO₄ — сульфат, CO₃ — карбонат, PO₄ — фосфат, S — сульфид. CuSO₄ — сульфат меди(II).'],
+    why: 'Под Аральском добывают поваренную соль NaCl. Из фосфоритов Каратау в Таразе делают фосфаты для удобрений. Садовод опрыскивает виноград медным купоросом — это сульфат меди(II), строитель работает с гипсом CaSO₄ и мелом CaCO₃. Агроном, фармацевт, технолог пищевого цеха читают составы по названиям солей.',
+    task: 'Соберите формулы сульфата алюминия, фосфата кальция и нитрата меди(II).',
+    hint: 'Металл и остаток меняйте кнопками ‹ ›. Уравняйте полоски, потом проверьте, нельзя ли сократить индексы.',
+    stage: 'Тащите атомы металла и остатки из лотков на полоски или нажимайте на лоток. Лишний — нажмите на него.',
+    init: { cat: 6, res: 2 },
+    check: m => TARGET_SALT.every(k => m.found[k]) },
+  { id: 'chains', title: 'Как классы превращаются друг в друга',
+    text: ['Классы веществ связаны. Из металла получают основный оксид, из него — основание, а основание с кислотой даёт соль. Это генетический ряд металла: Ca → CaO → Ca(OH)₂ → CaCl₂.',
+           'У неметалла свой ряд: неметалл → кислотный оксид → кислота → соль. P → P₂O₅ → H₃PO₄ → Na₃PO₄. Оба ряда сходятся на солях.',
+           'Главные переходы: простое вещество + кислород → оксид; оксид + вода → основание или кислота (если они растворимы); основание + кислота → соль + вода. Последняя реакция — нейтрализация.'],
+    why: 'Так устроено химическое производство. Фосфорный завод в Таразе получает из фосфоритов Каратау фосфор, из него — фосфорную кислоту и фосфаты. Инженер-технолог проектирует такие цепочки, лаборант проверяет каждую стадию. Строитель видит ряд кальция в извести: CaO гасят водой, а Ca(OH)₂ в штукатурке твердеет, поглощая CO₂ из воздуха.',
+    safe: 'Фосфор и кальций в школе сжигает только учитель, под тягой. Белый фосфор сам загорается на воздухе и оставляет тяжёлые ожоги.',
+    task: 'Пройдите оба генетических ряда: от кальция до соли и от фосфора до соли. Всего шесть превращений.',
+    hint: 'Спросите себя: из какого класса в какой идём? Получить оксид — нужен кислород. Из оксида основание или кислоту — вода. Соль — нужен партнёр противоположного класса.',
+    stage: 'Перетащите реактив на стрелку или нажмите реактив, потом стрелку.',
+    init: {},
+    check: m => m.prog[0] === 3 && m.prog[1] === 3 },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null,
+            place: {}, sel: null, wrong: 0, cat: 0, res: 2, x: 1, y: 1, found: {},
+            tubes: ['acid', 'alk', 'water'], ind: [null, null, null], lab: [null, null, null], selInd: null, verified: false, tries: 0, used: {},
+            prog: [0, 0], selR: null };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+const isBld = () => LID() === 'acids' || LID() === 'salts';
+
+function model() {
+  const id = LID();
+  if (id === 'oxides') return { kind: 'ox', placed: Object.keys(S.place).length, sel: S.sel };
+  if (id === 'acids' || id === 'salts') {
+    const C = CAT[S.cat], R = RES[S.res], A = S.x * C.v, B = S.y * R.v, eq = A === B, min = gcd(S.x, S.y) === 1;
+    return { kind: 'bld', acid: id === 'acids', C, R, x: S.x, y: S.y, A, B, eq, min, ok: eq && min, f: fmlOf(C, R, S.x, S.y), found: S.found, targets: id === 'acids' ? TARGET_ACID : TARGET_SALT };
+  }
+  if (id === 'bases') return { kind: 'ind', tubes: S.tubes, ind: S.ind, lab: S.lab, verified: S.verified };
+  return { kind: 'chain', prog: S.prog, selR: S.selR };
+}
+
+// ---------- scene ----------
+const ball = (x, y, r, c, label, tc, fs) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r + 1.3).toFixed(1)}" fill="${INK}"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${c}"/><circle cx="${(x - r * 0.35).toFixed(1)}" cy="${(y - r * 0.38).toFixed(1)}" r="${(r * 0.3).toFixed(1)}" fill="#fff" opacity=".28"/>` +
+  (label ? `<text x="${x.toFixed(1)}" y="${(y + fs * 0.36).toFixed(1)}" font-size="${fs.toFixed(1)}" fill="${tc}" text-anchor="middle" font-weight="500">${label}</text>` : '');
+const atomBall = (s, x, y, sc = 1) => { const a = ATOM[s]; const r = a.r * sc; return ball(x, y, r, a.c, s, a.t, r * (s.length > 1 ? 0.8 : 0.95)); };
+const resPill = (R, x, y, sc = 1) => { const w = (R.s.length > 1 ? 50 : 38) * sc, hh = 30 * sc; return `<rect x="${(x - w / 2 - 1.3).toFixed(1)}" y="${(y - hh / 2 - 1.3).toFixed(1)}" width="${(w + 2.6).toFixed(1)}" height="${(hh + 2.6).toFixed(1)}" rx="${(9 * sc).toFixed(1)}" fill="${INK}"/><rect x="${(x - w / 2).toFixed(1)}" y="${(y - hh / 2).toFixed(1)}" width="${w.toFixed(1)}" height="${hh.toFixed(1)}" rx="${(8 * sc).toFixed(1)}" fill="${R.c}"/><text x="${x.toFixed(1)}" y="${(y + 5 * sc).toFixed(1)}" font-size="${(14 * sc).toFixed(1)}" fill="#0b1019" text-anchor="middle" font-weight="500">${low(R.s)}</text>`; };
+
+function bench() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="2360" fill="url(#tile)"/>
+    <rect x="-2000" y="360" width="4520" height="1200" fill="#1a2232"/>
+    <rect x="-2000" y="358" width="4520" height="4" fill="#2c3954"/>
+    <rect x="-2000" y="362" width="4520" height="2" fill="${INK}" opacity=".6"/>`;
+}
+
+// ----- lesson 1: cards and three boxes -----
+const CARD = { w: 88, h: 48, xs: [68, 164, 260, 356, 452], ys: [92, 150] };
+const cardPos = i => ({ x: CARD.xs[i % 5], y: CARD.ys[Math.floor(i / 5)] });
+const BOX = { b: { x: 14, y: 222, w: 158, h: 132 }, a: { x: 181, y: 222, w: 158, h: 132 }, n: { x: 348, y: 222, w: 158, h: 132 } };
+function cardSVG(sb, x, y, w, hh, fs, sel) {
+  return `<rect x="${(x - w / 2 - 1.3).toFixed(1)}" y="${(y - 1.3).toFixed(1)}" width="${w + 2.6}" height="${hh + 2.6}" rx="10" fill="${INK}"/><rect x="${(x - w / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${w}" height="${hh}" rx="9" fill="${sel ? '#fff4dc' : '#e8ecf4'}"/>` +
+    `<text x="${x.toFixed(1)}" y="${(y + (hh > 30 ? hh * 0.5 : hh * 0.5 + fs * 0.36)).toFixed(1)}" font-size="${fs}" fill="#0b1019" text-anchor="middle" font-weight="500">${low(sb.f)}</text>` +
+    (hh > 30 ? `<text x="${x.toFixed(1)}" y="${(y + hh - 8).toFixed(1)}" font-size="8.5" fill="#4a556c" text-anchor="middle">${sb.name}</text>` : '');
+}
+function boxAt(p) {
+  for (const k of ['b', 'a', 'n']) { const b = BOX[k]; if (p.x > b.x - 4 && p.x < b.x + b.w + 4 && p.y > b.y - 10 && p.y < b.y + b.h + 6) return k; }
+  return null;
+}
+function oxSVG() {
+  let h = '';
+  const hot = drag && drag.moved && drag.id.startsWith('card-') ? boxAt(drag.p) : null;
+  for (const k of ['b', 'a', 'n']) {
+    const b = BOX[k];
+    h += `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="14" fill="${hot === k ? 'rgba(114,212,232,.08)' : 'rgba(18,26,40,.7)'}" stroke="${hot === k ? '#72d4e8' : '#26324a'}" stroke-width="1.6"/>`;
+    h += `<text x="${b.x + b.w / 2}" y="${b.y + 17}" font-size="9.5" fill="#e8ecf4" text-anchor="middle" font-weight="500">${OXBOX[k].toUpperCase()}</text>`;
+    h += `<text x="${b.x + b.w / 2}" y="${b.y + 29}" font-size="8" fill="#8b96ad" text-anchor="middle">${k === 'b' ? 'металл + O' : k === 'a' ? 'неметалл + O' : 'всё остальное'}</text>`;
+    OX.filter(sb => S.place[sb.f] === k).forEach((sb, i) => { const x = b.x + 41 + (i % 2) * 76, y = b.y + 38 + Math.floor(i / 2) * 32; h += `<g data-drag="card-${sb.f}">${cardSVG(sb, x, y, 68, 26, 13, S.sel === sb.f)}</g>`; });
+  }
+  OX.forEach((sb, i) => {
+    if (S.place[sb.f] || (drag && drag.moved && drag.id === 'card-' + sb.f)) return;
+    const c = cardPos(i);
+    h += `<g data-drag="card-${sb.f}">${cardSVG(sb, c.x, c.y, CARD.w, CARD.h, 17, S.sel === sb.f)}</g>`;
+  });
+  return h;
+}
+
+// ----- lessons 2 and 4: lanes -----
+const L2 = { cx: 260, W: 400, top: 132, h: 40, gap: 50 };
+L2.bot = L2.top + L2.h + L2.gap;
+const BIN2 = { a: { x: 50, y: 300 }, b: { x: 470, y: 300 } };
+function laneGeo(m) { const units = Math.max(m.A, m.B, 1), u = Math.min(36, L2.W / units); return { u, x0: L2.cx - units * u / 2 }; }
+const inLanes = p => p.x > L2.cx - L2.W / 2 - 16 && p.x < L2.cx + L2.W / 2 + 16 && p.y > L2.top - 16 && p.y < L2.bot + L2.h + 16;
+function bldSVG(m) {
+  let h = '';
+  const { u, x0 } = laneGeo(m), C = m.C, R = m.R;
+  const hot = drag && drag.moved && (drag.id === 'binA' || drag.id === 'binB') && inLanes(drag.p);
+  h += `<rect x="${L2.cx - L2.W / 2 - 10}" y="${L2.top - 10}" width="${L2.W + 20}" height="${L2.bot + L2.h - L2.top + 20}" rx="14" fill="${hot ? 'rgba(114,212,232,.07)' : 'rgba(18,26,40,.45)'}" stroke="${hot ? '#72d4e8' : '#26324a'}" stroke-dasharray="6 6"/>`;
+  const both = Math.min(m.A, m.B);
+  for (let k = 0; k < Math.max(m.A, m.B); k++) {
+    const x = x0 + (k + 0.5) * u;
+    if (k < both) h += `<path d="M${x.toFixed(1)} ${L2.top + L2.h}V${L2.bot}" stroke="${m.eq ? '#86e0a8' : '#c8d1e2'}" stroke-width="2.4" stroke-linecap="round"/>`;
+    else if (k < m.A) h += `<path d="M${x.toFixed(1)} ${L2.top + L2.h}v16" stroke="#ffb547" stroke-width="2.4" stroke-linecap="round"/><circle cx="${x.toFixed(1)}" cy="${L2.top + L2.h + 20}" r="2.6" fill="#ffb547"/>`;
+    else h += `<path d="M${x.toFixed(1)} ${L2.bot}v-16" stroke="#ffb547" stroke-width="2.4" stroke-linecap="round"/><circle cx="${x.toFixed(1)}" cy="${L2.bot - 20}" r="2.6" fill="#ffb547"/>`;
+  }
+  const a = ATOM[C.s];
+  for (let i = 0; i < m.x; i++) {
+    if (drag && drag.moved && drag.id === 'la-' + i) continue;
+    const x = x0 + i * C.v * u, w = C.v * u, r = Math.min(13, (w - 4) / 2 - 2);
+    h += `<g data-drag="la-${i}"><rect x="${(x + 2).toFixed(1)}" y="${L2.top}" width="${(w - 4).toFixed(1)}" height="${L2.h}" rx="9" fill="${a.c}" fill-opacity=".2" stroke="${a.c}" stroke-width="1.6"/>`;
+    if (r >= 4) h += ball(x + w / 2, L2.top + L2.h / 2, r, a.c, r >= 9 ? C.s : '', a.t, r * (C.s.length > 1 ? 0.8 : 0.95));
+    h += '</g>';
+  }
+  for (let i = 0; i < m.y; i++) {
+    if (drag && drag.moved && drag.id === 'lb-' + i) continue;
+    const x = x0 + i * R.v * u, w = R.v * u, fs = Math.min(13, (w - 8) / (R.s.length * 0.62));
+    h += `<g data-drag="lb-${i}"><rect x="${(x + 2).toFixed(1)}" y="${L2.bot}" width="${(w - 4).toFixed(1)}" height="${L2.h}" rx="9" fill="${R.c}" fill-opacity=".22" stroke="${R.c}" stroke-width="1.6"/>`;
+    if (fs >= 6) h += `<text x="${(x + w / 2).toFixed(1)}" y="${(L2.bot + L2.h / 2 + fs * 0.36).toFixed(1)}" font-size="${fs.toFixed(1)}" fill="${R.c}" text-anchor="middle" font-weight="500">${low(R.s)}</text>`;
+    h += '</g>';
+  }
+  const xe = x0 + Math.max(m.A, m.B) * u;
+  h += `<text x="${L2.cx}" y="${L2.top - 16}" font-size="10" fill="#8b96ad" text-anchor="middle">${C.s} (${ROM[C.v]}) · ${m.x} × ${C.v} = ${m.A}</text>`;
+  h += `<text x="${L2.cx}" y="${L2.bot + L2.h + 22}" font-size="10" fill="#8b96ad" text-anchor="middle">${low(R.s)} (${ROM[R.v]}) · ${m.y} × ${R.v} = ${m.B}</text>`;
+  if (m.eq) h += `<path d="M${xe.toFixed(1)} ${L2.top - 6}V${L2.bot + L2.h + 6}" stroke="#86e0a8" stroke-width="1.6" stroke-dasharray="4 4"/>`;
+  const bad = m.ok && !m.acid && noSalt(C, R);
+  h += `<text x="260" y="${L2.bot + L2.h + 52}" font-size="24" fill="${m.ok ? (bad ? '#ffb547' : '#86e0a8') : '#e8ecf4'}" text-anchor="middle" font-weight="500">${low(m.f)}</text>`;
+  h += `<text x="260" y="${L2.bot + L2.h + 70}" font-size="10" fill="${m.ok ? (bad ? '#ffb547' : '#86e0a8') : m.eq ? '#ffb547' : '#8b96ad'}" text-anchor="middle">${m.ok ? (bad ? nameOf(C, R) + ' — в воде не существует' : nameOf(C, R)) : m.eq ? 'уравнено, но индексы можно сократить' : 'есть свободные связи'}</text>`;
+  // trays
+  h += `<g data-drag="binA"><rect x="${BIN2.a.x - 34}" y="${BIN2.a.y - 34}" width="68" height="76" rx="12" fill="#121a28" stroke="#26324a" stroke-width="1.5"/>${atomBall(C.s, BIN2.a.x, BIN2.a.y - 6, 0.9)}<text x="${BIN2.a.x}" y="${BIN2.a.y + 32}" font-size="9" fill="#8b96ad" text-anchor="middle">${ATOM[C.s].name} · ${ROM[C.v]}</text></g>`;
+  h += `<g data-drag="binB"><rect x="${BIN2.b.x - 34}" y="${BIN2.b.y - 34}" width="68" height="76" rx="12" fill="#121a28" stroke="#26324a" stroke-width="1.5"/>${resPill(R, BIN2.b.x, BIN2.b.y - 6, 0.9)}<text x="${BIN2.b.x}" y="${BIN2.b.y + 32}" font-size="9" fill="#8b96ad" text-anchor="middle">остаток · ${ROM[R.v]}</text></g>`;
+  return h;
+}
+
+// ----- lesson 3: tubes -----
+function tubeColor(i) { const k = S.ind[i]; if (!k) return null; return indOf(k).c[S.tubes[i]]; }
+function indSVG(t) {
+  let h = '';
+  const hotT = drag && drag.moved && drag.id.startsWith('ind-') ? tubeAt(drag.p) : -1;
+  h += `<rect x="70" y="248" width="282" height="12" rx="4" fill="#2a3550" stroke="#3a4762"/><rect x="80" y="260" width="8" height="98" fill="#2a3550"/><rect x="334" y="260" width="8" height="98" fill="#2a3550"/>`;
+  TUBE.xs.forEach((cx, i) => {
+    const w = TUBE.w / 2, col = tubeColor(i), sel = S.selInd && hotT < 0;
+    h += `<g data-drag="tube-${i}">`;
+    h += `<rect x="${cx - 30}" y="${TUBE.top - 26}" width="60" height="${TUBE.bot - TUBE.top + 46}" fill="transparent"/>`;
+    if (hotT === i) h += `<rect x="${cx - 28}" y="${TUBE.top - 12}" width="56" height="${TUBE.bot - TUBE.top + 30}" rx="12" fill="rgba(114,212,232,.08)" stroke="#72d4e8" stroke-dasharray="4 4"/>`;
+    const liq = `M${cx - w + 2} ${TUBE.liq}V${TUBE.bot - w}a${w - 2} ${w - 2} 0 0 0 ${2 * w - 4} 0V${TUBE.liq}Z`;
+    h += `<path d="${liq}" fill="${col || '#bfe0ee'}" fill-opacity="${col ? 0.85 : 0.28}"/>`;
+    if (col && !reduce && S.splash && S.splash.i === i && t - S.splash.t < 700) { const k = (t - S.splash.t) / 700; h += `<circle cx="${cx}" cy="${TUBE.liq + 4}" r="${(3 + k * 12).toFixed(1)}" fill="none" stroke="${col}" stroke-opacity="${(1 - k).toFixed(2)}" stroke-width="2"/>`; }
+    h += `<path d="M${cx - w} ${TUBE.top}V${TUBE.bot - w}a${w} ${w} 0 0 0 ${2 * w} 0V${TUBE.top}" fill="rgba(200,220,240,.06)" stroke="#c8d1e2" stroke-opacity=".75" stroke-width="2"/>`;
+    h += `<rect x="${cx - w - 4}" y="${TUBE.top - 4}" width="${2 * w + 8}" height="6" rx="3" fill="#c8d1e2" fill-opacity=".75"/>`;
+    h += `<path d="M${cx - w + 6} ${TUBE.top + 14}V${TUBE.bot - 30}" stroke="#fff" stroke-opacity=".18" stroke-width="3" stroke-linecap="round"/>`;
+    h += `<text x="${cx}" y="${TUBE.top - 14}" font-size="15" fill="${sel ? '#72d4e8' : '#e8ecf4'}" text-anchor="middle" font-weight="500">${TL[i]}</text>`;
+    h += `</g>`;
+    if (S.ind[i]) h += `<text x="${cx}" y="347" font-size="9" fill="#8b96ad" text-anchor="middle">${indOf(S.ind[i]).name}</text>`;
+    const lb = S.lab[i], ok = S.verified;
+    h += `<g data-drag="tag-${i}"><rect x="${cx - 40}" y="${306}" width="80" height="26" rx="8" fill="${lb ? (ok ? '#16261f' : '#1a2438') : '#121a28'}" stroke="${ok ? '#86e0a8' : lb ? '#ffb547' : '#3a4762'}" stroke-width="1.4"/><text x="${cx}" y="${323}" font-size="11.5" fill="${ok ? '#86e0a8' : lb ? '#e8ecf4' : '#8b96ad'}" text-anchor="middle" font-weight="500">${lb ? SAMPLE[lb] : 'ответ ?'}</text></g>`;
+  });
+  IND.forEach((d, j) => {
+    const x = BOT.x, y = BOT.ys[j], on = S.selInd === d.k;
+    if (drag && drag.moved && drag.id === 'ind-' + d.k) { h += `<rect x="${x - 20}" y="${y - 26}" width="40" height="48" rx="8" fill="none" stroke="#3a4762" stroke-dasharray="4 4"/>`; return; }
+    h += `<g data-drag="ind-${d.k}">${bottleSVG(d, x, y, on)}</g>`;
+  });
+  h += `<text x="${BOT.x}" y="${BOT.ys[0] - 40}" font-size="8.5" fill="#8b96ad" text-anchor="middle">ИНДИКАТОРЫ</text>`;
+  return h;
+}
+function bottleSVG(d, x, y, on) {
+  return `<rect x="${x - 34}" y="${y - 32}" width="68" height="66" fill="transparent"/>` +
+    (on ? `<rect x="${x - 32}" y="${y - 32}" width="64" height="66" rx="10" fill="rgba(255,181,71,.08)" stroke="#ffb547" stroke-width="1.4"/>` : '') +
+    `<rect x="${x - 5}" y="${y - 28}" width="10" height="9" rx="2" fill="#4a556c"/><path d="M${x - 14} ${y - 18}h28v30a6 6 0 0 1 -6 6h-16a6 6 0 0 1 -6 -6Z" fill="rgba(200,220,240,.08)" stroke="#c8d1e2" stroke-opacity=".7" stroke-width="1.6"/>` +
+    `<path d="M${x - 12} ${y - 2}h24v14a5 5 0 0 1 -5 5h-14a5 5 0 0 1 -5 -5Z" fill="${d.stock}" fill-opacity="${d.k === 'ph' ? 0.35 : 0.85}"/>` +
+    `<text x="${x}" y="${y + 30}" font-size="8.5" fill="${on ? '#ffb547' : '#e8ecf4'}" text-anchor="middle">${d.name}</text>`;
+}
+function tubeAt(p) { for (let i = 0; i < 3; i++) if (Math.abs(p.x - TUBE.xs[i]) < 34 && p.y > TUBE.top - 40 && p.y < TUBE.bot + 20) return i; return -1; }
+
+// ----- lesson 5: chains -----
+function chainSVG() {
+  let h = '';
+  const hotA = drag && drag.moved && drag.id.startsWith('rg-') ? arrowAt(drag.p) : null;
+  ROWS.forEach((row, ri) => {
+    const y = NY[ri], pr = S.prog[ri];
+    h += `<text x="22" y="${y - NH / 2 - 9}" font-size="9" fill="#8b96ad">${row.title}</text>`;
+    row.nodes.forEach((n, i) => {
+      const x = NX[i], got = i <= pr, last = i === 3;
+      h += `<rect x="${x - NW / 2}" y="${y - NH / 2}" width="${NW}" height="${NH}" rx="11" fill="${got ? (last ? '#16261f' : '#1a2438') : 'rgba(18,26,40,.5)'}" stroke="${got ? (last ? '#86e0a8' : '#3a4762') : '#3a4762'}" stroke-width="1.5" ${got ? '' : 'stroke-dasharray="5 5"'}/>`;
+      h += `<text x="${x}" y="${y + 1}" font-size="16" fill="${got ? (last ? '#86e0a8' : '#e8ecf4') : '#4a556c'}" text-anchor="middle" font-weight="500">${got ? low(n.f) : '?'}</text>`;
+      h += `<text x="${x}" y="${y + 17}" font-size="8" fill="#8b96ad" text-anchor="middle">${n.cl}</text>`;
+    });
+    row.steps.forEach((st, i) => {
+      const x = ax(i), done = i < pr, act = i === pr, hot = hotA && hotA[0] === ri && hotA[1] === i;
+      h += `<path d="M${x - 22} ${y}H${x + 18}" stroke="${done ? '#86e0a8' : act ? '#c8d1e2' : '#3a4762'}" stroke-width="2"/><path d="M${x + 14} ${y - 5}L${x + 22} ${y}L${x + 14} ${y + 5}" fill="none" stroke="${done ? '#86e0a8' : act ? '#c8d1e2' : '#3a4762'}" stroke-width="2"/>`;
+      if (done) h += `<text x="${x}" y="${y - 8}" font-size="10.5" fill="#86e0a8" text-anchor="middle" font-weight="500">+${low(st.r)}</text>`;
+      else if (act) h += `<g data-drag="ar-${ri}-${i}"><circle cx="${x}" cy="${y - 16}" r="22" fill="transparent"/><circle cx="${x}" cy="${y - 16}" r="12" fill="${hot ? 'rgba(114,212,232,.2)' : '#121a28'}" stroke="${hot || S.selR ? '#72d4e8' : '#ffb547'}" stroke-width="1.6" stroke-dasharray="3 3"/><text x="${x}" y="${y - 12}" font-size="11" fill="${hot || S.selR ? '#72d4e8' : '#ffb547'}" text-anchor="middle">+</text></g>`;
+    });
+  });
+  h += `<text x="22" y="${RY - 26}" font-size="9" fill="#8b96ad">РЕАКТИВЫ</text>`;
+  REAG.forEach((r, i) => {
+    if (drag && drag.moved && drag.id === 'rg-' + r) { h += `<rect x="${RX[i] - 34}" y="${RY - 18}" width="68" height="36" rx="10" fill="none" stroke="#3a4762" stroke-dasharray="4 4"/>`; return; }
+    h += `<g data-drag="rg-${r}">${reagSVG(r, RX[i], RY, S.selR === r)}</g>`;
+  });
+  return h;
+}
+const reagSVG = (r, x, y, on) => `<rect x="${x - 35.3}" y="${y - 19.3}" width="70.6" height="38.6" rx="11" fill="${INK}"/><rect x="${x - 34}" y="${y - 18}" width="68" height="36" rx="10" fill="${on ? '#fff4dc' : '#e8ecf4'}"/><text x="${x}" y="${y + 1}" font-size="14" fill="#0b1019" text-anchor="middle" font-weight="500">${low(r)}</text><text x="${x}" y="${y + 13}" font-size="7" fill="#4a556c" text-anchor="middle">${RNAME[r].split(' ')[0]}</text>`;
+function arrowAt(p) {
+  for (let ri = 0; ri < 2; ri++) for (let i = 0; i < 3; i++) if (Math.hypot(p.x - ax(i), p.y - (NY[ri] - 10)) < 36) return [ri, i];
+  return null;
+}
+
+function hlBox(id) {
+  const m = isBld() ? model() : null, g = m ? laneGeo(m) : null;
+  return {
+    cards: [20, CARD.ys[0] - 6, 480, CARD.ys[1] + CARD.h - CARD.ys[0] + 12], boxB: [BOX.b.x - 4, BOX.b.y - 4, BOX.b.w + 8, BOX.b.h + 8], boxA: [BOX.a.x - 4, BOX.a.y - 4, BOX.a.w + 8, BOX.a.h + 8], boxN: [BOX.n.x - 4, BOX.n.y - 4, BOX.n.w + 8, BOX.n.h + 8],
+    laneA: [L2.cx - L2.W / 2 - 8, L2.top - 6, L2.W + 16, L2.h + 12], laneB: [L2.cx - L2.W / 2 - 8, L2.bot - 6, L2.W + 16, L2.h + 12],
+    cols: g ? [g.x0 - 6, L2.top + L2.h - 4, Math.max(m.A, m.B) * g.u + 12, L2.gap + 8] : null,
+    bins: [BIN2.a.x - 40, BIN2.a.y - 40, BIN2.b.x - BIN2.a.x + 80, 88], fml: [180, L2.bot + L2.h + 28, 160, 52],
+    tubes: [TUBE.xs[0] - 34, TUBE.top - 34, TUBE.xs[2] - TUBE.xs[0] + 68, TUBE.bot - TUBE.top + 44], bottles: [BOT.x - 38, BOT.ys[0] - 36, 76, BOT.ys[2] - BOT.ys[0] + 74], tags: [TUBE.xs[0] - 46, 300, TUBE.xs[2] - TUBE.xs[0] + 92, 38],
+    rowM: [14, NY[0] - NH / 2 - 22, 492, NH + 30], rowN: [14, NY[1] - NH / 2 - 22, 492, NH + 30], arrows: [ax(0) - 26, NY[0] - 34, ax(2) - ax(0) + 52, NY[1] - NY[0] + 50], reag: [14, RY - 24, 492, 48],
+  }[id];
+}
+
+function ghostSVG(d) {
+  const p = d.p, id = d.id;
+  if (id === 'binA' || id.startsWith('la-')) return atomBall(CAT[S.cat].s, p.x, p.y, 0.9);
+  if (id === 'binB' || id.startsWith('lb-')) return resPill(RES[S.res], p.x, p.y, 0.9);
+  if (id.startsWith('card-')) { const sb = OX.find(x => x.f === id.slice(5)); return sb ? cardSVG(sb, p.x, p.y - CARD.h / 2, CARD.w, CARD.h, 17, false) : ''; }
+  if (id.startsWith('ind-')) { const d2 = indOf(id.slice(4)); return d2 ? bottleSVG(d2, p.x, p.y, true) : ''; }
+  if (id.startsWith('rg-')) return reagSVG(id.slice(3), p.x, p.y, true);
+  return '';
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID(), m = model();
+  let h = bench();
+  if (id === 'oxides') h += oxSVG();
+  else if (id === 'bases') h += indSVG(t);
+  else if (id === 'chains') h += chainSVG();
+  else h += bldSVG(m);
+  if (drag && drag.moved) h += `<g opacity=".92" pointer-events="none">${ghostSVG(drag)}</g>`;
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="10" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 500, hh / 410, 1.7);
+  const vw = w / s, vh = hh / s;
+  scene.setAttribute('viewBox', `${(260 - vw / 2).toFixed(1)} ${(405 - vh).toFixed(1)} ${vw.toFixed(1)} ${vh.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- dragging and tapping ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+const NODRAG = id => id.startsWith('tag-') || id.startsWith('tube-') || id.startsWith('ar-');
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  drag = { id: el.dataset.drag, x: e.clientX, y: e.clientY, p: toSvg(e), moved: false };
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 6 && !NODRAG(drag.id)) drag.moved = true;
+  drag.p = toSvg(e); if (drag.moved) dirty = true;
+});
+const endDrag = cancel => {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing'); dirty = true;
+  if (cancel) return;
+  if (d.moved) drop(d.id, d.p); else tap(d.id);
+};
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+function tap(id) {
+  if (id === 'binA') return addX('x', 1);
+  if (id === 'binB') return addX('y', 1);
+  if (id.startsWith('la-')) return addX('x', -1);
+  if (id.startsWith('lb-')) return addX('y', -1);
+  if (id.startsWith('card-')) { S.sel = id.slice(5); update(); return; }
+  if (id.startsWith('ind-')) { const k = id.slice(4); S.selInd = S.selInd === k ? null : k; if (S.selInd) toast(`Взят ${indOf(k).name}. Нажмите на пробирку.`); update(); return; }
+  if (id.startsWith('tube-')) { const i = +id.slice(5); if (S.selInd) return addInd(i, S.selInd); toast('Сначала возьмите склянку с индикатором справа.'); return; }
+  if (id.startsWith('tag-')) return cycleLab(+id.slice(4));
+  if (id.startsWith('rg-')) { const r = id.slice(3); S.selR = S.selR === r ? null : r; if (S.selR) toast(`Взят реактив ${low(r)}. Нажмите на стрелку с «+».`); update(); return; }
+  if (id.startsWith('ar-')) { const [, ri, i] = id.split('-'); if (S.selR) return doStep(+ri, S.selR); toast('Сначала выберите реактив внизу.'); return; }
+}
+function drop(id, p) {
+  if (id === 'binA') { if (inLanes(p)) addX('x', 1); return; }
+  if (id === 'binB') { if (inLanes(p)) addX('y', 1); return; }
+  if (id.startsWith('la-')) { if (!inLanes(p)) addX('x', -1); return; }
+  if (id.startsWith('lb-')) { if (!inLanes(p)) addX('y', -1); return; }
+  if (id.startsWith('card-')) { const k = boxAt(p); if (k) placeOx(id.slice(5), k); return; }
+  if (id.startsWith('ind-')) { const i = tubeAt(p); if (i >= 0) addInd(i, id.slice(4)); return; }
+  if (id.startsWith('rg-')) { const a = arrowAt(p); if (a && a[1] === S.prog[a[0]]) doStep(a[0], id.slice(3)); else if (a) toast('Цепочку проходят по порядку: сначала предыдущая стрелка.'); }
+}
+
+// ----- actions -----
+function placeOx(f, k) {
+  const sb = OX.find(x => x.f === f); if (!sb) return false;
+  S.sel = f;
+  if (S.place[f] === sb.k) { update(); return true; }
+  if (k !== sb.k) {
+    S.wrong++;
+    const el = elemsOf(f);
+    let msg;
+    if (sb.k === 'n') msg = el.length === 1 ? `${low(f)} — простое вещество, в нём только кислород. Оксид — всегда два элемента.` : !el.includes('O') ? `В ${low(f)} нет кислорода.` : `В ${low(f)} ${el.length} элемента: ${el.join(', ')}. В оксиде их ровно два.`;
+    else if (k === 'n') msg = `Посчитайте элементы в ${low(f)}: ${el.join(' и ')}. Два, и один из них — кислород.`;
+    else msg = sb.k === 'b' ? `${el.find(e => e !== 'O')} — металл. Оксиды металлов обычно основные.` : `${el.find(e => e !== 'O')} — неметалл. Оксиды неметаллов кислотные.`;
+    toast('Нет. ' + msg); update(); return false;
+  }
+  S.place[f] = k; toast(`Верно: ${low(f)} — ${k === 'b' ? 'основный оксид' : k === 'a' ? 'кислотный оксид' : 'не оксид'}.`); update(); return true;
+}
+function addX(k, d) {
+  const v = S[k] + d;
+  if (v < 1) { toast('В формуле должна остаться хотя бы одна частица каждого вида.'); return false; }
+  if (v > XMAX) { toast('Больше шести не нужно: в этих формулах индексы маленькие.'); return false; }
+  S[k] = v; update(); return true;
+}
+function setRes(i) { S.res = (i + RES.length) % RES.length; S.x = 1; S.y = 1; renderTools(); buildScheme(); update(); }
+function setCat(i) { const n = CAT.length - 1; S.cat = ((i - 1 + n) % n) + 1; S.x = 1; S.y = 1; renderTools(); buildScheme(); update(); }
+function addInd(i, k) {
+  const d = indOf(k); if (!d) return false;
+  if (S.ind[i] === k) { toast(`В пробирке ${TL[i]} уже есть ${d.name}.`); return false; }
+  if (S.ind[i]) { toast('Сначала промойте пробирки: два индикатора смешают окраски.'); return false; }
+  S.ind[i] = k; S.used[k] = true; S.selInd = null; S.splash = { i, t: performance.now() };
+  toast(`Пробирка ${TL[i]}: ${d.name} — ${d.cn[S.tubes[i]]}.`); update(); return true;
+}
+function wash() { S.ind = [null, null, null]; S.selInd = null; toast('Пробирки промыты и снова налиты те же растворы.'); update(); }
+function cycleLab(i) { if (S.verified) { toast('Ответ уже верный.'); return; } const j = LABS.indexOf(S.lab[i]); S.lab[i] = LABS[(j + 1) % LABS.length]; update(); }
+function setLab(i, v) { if (S.verified) return; S.lab[i] = v || null; update(); }
+function verify() {
+  if (S.verified) { toast('Уже проверено: всё верно.'); return true; }
+  if (S.lab.some(x => !x)) { toast('Подпишите все три таблички: нажимайте на них.'); return false; }
+  if (!Object.keys(S.used).length) { toast('Сначала проведите опыт: капните индикатор в пробирки.'); return false; }
+  S.tries++;
+  const bad = S.lab.filter((x, i) => x !== S.tubes[i]).length;
+  if (bad) { toast(`Неверно подписано пробирок: ${bad}. Сравните окраску с таблицей на вкладке «Расчёты».`); update(); return false; }
+  S.verified = true; toast('Верно! Все растворы определены.'); update(); return true;
+}
+function doStep(ri, r) {
+  const row = ROWS[ri], i = S.prog[ri];
+  if (i >= 3) return false;
+  const st = row.steps[i], from = row.nodes[i].f, to = row.nodes[i + 1].f;
+  S.selR = null;
+  if (r !== st.r) { S.wrong++; toast(WRONG5[from + '|' + r] || `${low(r)} не превратит ${low(from)} в ${row.nodes[i + 1].cl}. Подумайте, какой класс нужен на этом шаге.`); update(); return false; }
+  S.prog[ri] = i + 1; toast(`${st.eq}`); update(); return true;
+}
+
+let last = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const anim = !!S.hl || (!reduce && S.splash && t - S.splash.t < 750 && LID() === 'bases');
+  if (dirty || anim) { drawScene(t); dirty = false; last = t; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3000); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  const C = CAT[S.cat], R = RES[S.res];
+  tb.innerHTML = {
+    oxides: B('reset', 'Начать заново'),
+    acids: B('rprev', '‹') + B('rcur', low(R.s)) + B('rnext', '›') + sep + B('x-', '−H') + B('x+', '+H') + sep + B('y-', '−' + low(R.s)) + B('y+', '+' + low(R.s)),
+    salts: B('cprev', '‹') + B('ccur', C.s) + B('cnext', '›') + sep + B('rprev', '‹') + B('rcur', low(R.s)) + B('rnext', '›') + sep + B('x-', '−' + C.s) + B('x+', '+' + C.s) + sep + B('y-', '−' + low(R.s)) + B('y+', '+' + low(R.s)),
+    bases: IND.map(d => B('i-' + d.k, d.name, S.selInd === d.k)).join('') + sep + B('wash', 'Промыть') + B('verify', 'Проверить'),
+    chains: B('reset', 'Начать заново'),
+  }[id];
+}
+function act(a) {
+  if (a === 'rprev' || a === 'rnext') return setRes(S.res + (a === 'rnext' ? 1 : -1));
+  if (a === 'cprev' || a === 'cnext') return setCat(S.cat + (a === 'cnext' ? 1 : -1));
+  if (a === 'rcur') { const R = RES[S.res]; toast(`Остаток ${low(R.s)}, валентность ${ROM[R.v]}: ${R.acid}, соли — ${R.salt}ы.`); return; }
+  if (a === 'ccur') { const C = CAT[S.cat]; toast(`${cap(ATOM[C.s].name)}, валентность ${ROM[C.v]}.`); return; }
+  if (/^[xy][+-]$/.test(a)) return addX(a[0], a[1] === '+' ? 1 : -1);
+  if (a.startsWith('i-')) { const k = a.slice(2); S.selInd = S.selInd === k ? null : k; if (S.selInd) toast(`Взят ${indOf(k).name}. Нажмите на пробирку.`); renderTools(); update(); return; }
+  if (a === 'wash') { wash(); renderTools(); return; }
+  if (a === 'verify') return verify();
+  if (a === 'reset') {
+    if (LID() === 'oxides') { S.place = {}; S.sel = null; S.wrong = 0; }
+    else { S.prog = [0, 0]; S.selR = null; S.wrong = 0; }
+    buildScheme(); update();
+  }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  cards: IC('<rect x="5" y="9" width="24" height="16" rx="3" fill="#e8ecf4"/><text x="17" y="21" font-size="9" fill="#0b1019" text-anchor="middle" font-family="IBM Plex Mono">CaO</text>'),
+  boxB: IC('<rect x="4" y="8" width="26" height="20" rx="4" fill="none" stroke="var(--muted)"/><circle cx="14" cy="18" r="5" fill="#9fd27a"/><circle cx="22" cy="18" r="4" fill="#e5533f"/>'),
+  boxA: IC('<rect x="4" y="8" width="26" height="20" rx="4" fill="none" stroke="var(--muted)"/><circle cx="17" cy="18" r="4.5" fill="#e6c63a"/><circle cx="10" cy="18" r="3.5" fill="#e5533f"/><circle cx="24" cy="18" r="3.5" fill="#e5533f"/>'),
+  boxN: IC('<rect x="4" y="8" width="26" height="20" rx="4" fill="none" stroke="var(--muted)"/><path d="M12 13l10 10M22 13l-10 10" stroke="var(--warn)" stroke-width="2"/>'),
+  laneA: IC('<rect x="3" y="11" width="13" height="12" rx="3" fill="#eef2f8" fill-opacity=".35" stroke="#eef2f8"/><rect x="18" y="11" width="13" height="12" rx="3" fill="#eef2f8" fill-opacity=".35" stroke="#eef2f8"/>'),
+  laneB: IC('<rect x="3" y="11" width="28" height="12" rx="3" fill="#e6c63a" fill-opacity=".3" stroke="#e6c63a"/><text x="17" y="21" font-size="8" text-anchor="middle" fill="#e6c63a" font-family="IBM Plex Mono">SO₄</text>'),
+  cols: IC('<path d="M8 6v22M14 6v22M20 6v22" stroke="#86e0a8" stroke-width="2"/><path d="M26 6v9" stroke="#ffb547" stroke-width="2"/><circle cx="26" cy="18" r="2" fill="#ffb547"/>'),
+  bins: IC('<rect x="3" y="9" width="12" height="16" rx="3" fill="none" stroke="var(--muted)"/><rect x="19" y="9" width="12" height="16" rx="3" fill="none" stroke="var(--muted)"/><circle cx="9" cy="17" r="3.5" fill="#b5c0d3"/><rect x="21" y="14" width="8" height="6" rx="2" fill="#e6c63a"/>'),
+  fml: IC('<text x="17" y="21" font-size="8.5" text-anchor="middle" fill="var(--fg)" font-family="IBM Plex Mono">H₂SO₄</text>'),
+  tubes: IC('<path d="M10 4v20a4 4 0 0 0 8 0V4" fill="none" stroke="#c8d1e2" stroke-width="1.5"/><path d="M11 15v9a3 3 0 0 0 6 0v-9z" fill="#d8287a"/><path d="M20 4v20a4 4 0 0 0 8 0V4" fill="none" stroke="#c8d1e2" stroke-width="1.5" opacity=".6"/>'),
+  bottles: IC('<rect x="14" y="4" width="6" height="5" rx="1" fill="#4a556c"/><path d="M9 9h16v17a3 3 0 0 1 -3 3h-10a3 3 0 0 1 -3 -3z" fill="none" stroke="#c8d1e2" stroke-width="1.5"/><path d="M10 18h14v8a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2z" fill="#8a5cc8"/>'),
+  tags: IC('<rect x="3" y="11" width="28" height="12" rx="4" fill="none" stroke="#ffb547"/><text x="17" y="20.5" font-size="7.5" text-anchor="middle" fill="var(--fg)" font-family="Golos Text">щёлочь</text>'),
+  rowM: IC('<rect x="2" y="12" width="8" height="10" rx="2" fill="#9fd27a"/><path d="M11 17h4" stroke="#c8d1e2"/><rect x="16" y="12" width="7" height="10" rx="2" fill="none" stroke="#c8d1e2"/><path d="M24 17h3" stroke="#c8d1e2"/><rect x="27" y="12" width="5" height="10" rx="2" fill="#86e0a8"/>'),
+  rowN: IC('<rect x="2" y="12" width="8" height="10" rx="2" fill="#f09a3e"/><path d="M11 17h4" stroke="#c8d1e2"/><rect x="16" y="12" width="7" height="10" rx="2" fill="none" stroke="#c8d1e2"/><path d="M24 17h3" stroke="#c8d1e2"/><rect x="27" y="12" width="5" height="10" rx="2" fill="#86e0a8"/>'),
+  arrows: IC('<path d="M5 20h22M22 15l5 5-5 5" fill="none" stroke="#c8d1e2" stroke-width="2"/><circle cx="16" cy="10" r="6" fill="none" stroke="#ffb547" stroke-dasharray="2 2"/>'),
+  reag: IC('<rect x="3" y="10" width="13" height="14" rx="3" fill="#e8ecf4"/><rect x="18" y="10" width="13" height="14" rx="3" fill="#e8ecf4"/><text x="9.5" y="20" font-size="6" text-anchor="middle" fill="#0b1019" font-family="IBM Plex Mono">O₂</text><text x="24.5" y="20" font-size="5.5" text-anchor="middle" fill="#0b1019" font-family="IBM Plex Mono">H₂O</text>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (m.kind === 'ox') return `Разложено ${m.placed} из ${OX.length} · ошибок ${S.wrong}`;
+  if (m.kind === 'bld') return `Собрано: ${m.targets.filter(k => m.found[k]).map(low).join(', ') || 'пока ничего'} · ${m.targets.filter(k => m.found[k]).length} из 3`;
+  if (m.kind === 'ind') return `Подписано ${S.lab.filter(Boolean).length} из 3 · проверок ${S.tries}`;
+  return `Превращений: ${m.prog[0] + m.prog[1]} из 6`;
+}
+
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'oxides') h = `<h2>Оксид или нет</h2><p class="note">Выберите ответ для каждого вещества. Верный ответ закрепится.</p>
+      <div class="pairs">${OX.map(sb => `<label>${low(sb.f)} · ${sb.name}<select data-f="${sb.f}" ${S.place[sb.f] ? 'disabled' : ''}><option value="">—</option>${['b', 'a', 'n'].map(k => `<option value="${k}" ${S.place[sb.f] === k ? 'selected' : ''}>${k === 'b' ? 'основный' : k === 'a' ? 'кислотный' : 'не оксид'}</option>`).join('')}</select></label>`).join('')}</div>
+      <dl class="reads"><div><dt>Верно</dt><dd id="r1"></dd></div><div><dt>Ошибок</dt><dd id="r2"></dd></div><div><dt>Осталось</dt><dd id="r3"></dd></div></dl>`;
+  if (id === 'acids' || id === 'salts') h = `<h2>${id === 'acids' ? 'Конструктор кислоты' : 'Конструктор соли'}</h2>
+      <dl class="reads"><div><dt>Формула</dt><dd id="r1"></dd></div><div><dt>${id === 'acids' ? 'Единиц H' : 'Единиц металла'}</dt><dd id="r2"></dd></div><div><dt>Единиц остатка</dt><dd id="r3"></dd></div></dl>
+      ${id === 'salts' ? `<div class="ctl"><div class="lbl">Металл</div><div class="chips" id="cChips">${CAT.slice(1).map((C, j) => `<button data-i="${j + 1}" aria-pressed="${j + 1 === S.cat}">${C.s}(${ROM[C.v]})</button>`).join('')}</div></div>` : ''}
+      <div class="ctl"><div class="lbl">Кислотный остаток</div><div class="chips" id="rChips">${RES.map((R, i) => `<button data-i="${i}" aria-pressed="${i === S.res}">${low(R.s)}(${ROM[R.v]})</button>`).join('')}</div></div>
+      <div class="cnt"><div><span id="lx"></span><span><button data-k="x" data-d="-1" aria-label="Меньше">−</button> <b id="cx"></b> <button data-k="x" data-d="1" aria-label="Больше">+</button></span></div>
+      <div><span id="ly"></span><span><button data-k="y" data-d="-1" aria-label="Меньше остатков">−</button> <b id="cy"></b> <button data-k="y" data-d="1" aria-label="Больше остатков">+</button></span></div></div>
+      <p class="note" style="margin-top:12px">Ширина блока = валентность. Полоски равны — все связи заняты.</p>`;
+  if (id === 'bases') h = `<h2>Пробирки</h2><p class="note">Капните индикатор и подпишите пробирку. Промывка очищает все три пробирки.</p>
+      <div class="pairs">${[0, 1, 2].map(i => `<label>Пробирка ${TL[i]} · индикатор<select data-ind="${i}"><option value="">—</option>${IND.map(d => `<option value="${d.k}">${d.name}</option>`).join('')}</select></label><label>Пробирка ${TL[i]} · ответ<select data-lab="${i}"><option value="">—</option>${['acid', 'alk', 'water'].map(k => `<option value="${k}">${SAMPLE[k]}</option>`).join('')}</select></label>`).join('')}</div>
+      <div class="row"><button class="ghostbtn" id="sWash">Промыть</button><button class="ghostbtn" id="sVer">Проверить</button></div>
+      <dl class="reads"><div><dt>Окраска А</dt><dd id="r1"></dd></div><div><dt>Окраска Б</dt><dd id="r2"></dd></div><div><dt>Окраска В</dt><dd id="r3"></dd></div></dl>`;
+  if (id === 'chains') h = `<h2>Генетические ряды</h2><p class="note">Для каждого ряда выберите реактив для следующего шага.</p>
+      ${ROWS.map((row, ri) => `<div class="ctl"><div class="lbl"><span>${row.title.toLowerCase()}</span><output id="o${ri}"></output></div><div class="chips" data-row="${ri}">${REAG.map(r => `<button data-r="${r}">${low(r)}</button>`).join('')}</div></div>`).join('')}
+      <dl class="reads"><div><dt>Металл</dt><dd id="r1"></dd></div><div><dt>Неметалл</dt><dd id="r2"></dd></div><div><dt>Ошибок</dt><dd id="r3"></dd></div></dl>`;
+  el.innerHTML = h;
+  el.querySelectorAll('.pairs select[data-f]').forEach(s => s.onchange = () => { if (!s.value) return; const ok = placeOx(s.dataset.f, s.value); if (ok) s.disabled = true; else s.value = ''; });
+  el.querySelectorAll('#cChips button').forEach(b => b.onclick = () => setCat(+b.dataset.i));
+  el.querySelectorAll('#rChips button').forEach(b => b.onclick = () => setRes(+b.dataset.i));
+  el.querySelectorAll('.cnt button[data-d]').forEach(b => b.onclick = () => addX(b.dataset.k, +b.dataset.d));
+  el.querySelectorAll('select[data-ind]').forEach(s => s.onchange = () => { if (s.value) addInd(+s.dataset.ind, s.value); });
+  el.querySelectorAll('select[data-lab]').forEach(s => s.onchange = () => setLab(+s.dataset.lab, s.value));
+  const w = el.querySelector('#sWash'); if (w) w.onclick = wash;
+  const v = el.querySelector('#sVer'); if (v) v.onclick = verify;
+  el.querySelectorAll('.chips[data-row] button').forEach(b => b.onclick = () => doStep(+b.parentNode.dataset.row, b.dataset.r));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; };
+  if (m.kind === 'ox') { set('#r1', String(m.placed)); set('#r2', String(S.wrong)); set('#r3', String(OX.length - m.placed)); }
+  else if (m.kind === 'bld') {
+    set('#r1', low(m.f)); set('#r2', `${m.x}·${m.C.v} = ${m.A}`); set('#r3', `${m.y}·${m.R.v} = ${m.B}`);
+    set('#lx', `${m.C.s} · ${ATOM[m.C.s].name} (${ROM[m.C.v]})`); set('#ly', `${low(m.R.s)} · остаток (${ROM[m.R.v]})`); set('#cx', String(m.x)); set('#cy', String(m.y));
+    el.querySelectorAll('#rChips button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.i === S.res));
+    el.querySelectorAll('#cChips button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.i === S.cat));
+  } else if (m.kind === 'ind') {
+    [0, 1, 2].forEach(i => { set('#r' + (i + 1), S.ind[i] ? indOf(S.ind[i]).cn[S.tubes[i]] : '—'); const a = el.querySelector(`select[data-ind="${i}"]`); if (a) a.value = S.ind[i] || ''; const b = el.querySelector(`select[data-lab="${i}"]`); if (b) { b.value = S.lab[i] || ''; b.disabled = S.verified; } });
+  } else {
+    ROWS.forEach((row, ri) => set('#o' + ri, S.prog[ri] < 3 ? `${low(row.nodes[S.prog[ri]].f)} → ${row.nodes[S.prog[ri] + 1].cl}` : 'готово ✓'));
+    set('#r1', `${S.prog[0]} из 3`); set('#r2', `${S.prog[1]} из 3`); set('#r3', String(S.wrong));
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'oxides') return [
+    { id: 'cards', icon: ICON.cards, name: 'Карточки веществ', spec: 'Формула и название. Нажмите на карточку — разбор появится на вкладке «Расчёты».' },
+    { id: 'boxB', icon: ICON.boxB, name: 'Основные оксиды', spec: 'Оксиды металлов: Na₂O, CaO, CuO. Им соответствуют основания.' },
+    { id: 'boxA', icon: ICON.boxA, name: 'Кислотные оксиды', spec: 'Оксиды неметаллов: CO₂, SO₃, P₂O₅. Им соответствуют кислоты.' },
+    { id: 'boxN', icon: ICON.boxN, name: 'Не оксиды', spec: 'Простые вещества, вещества без кислорода и вещества из трёх и более элементов.' }];
+  if (id === 'acids' || id === 'salts') return [
+    { id: 'laneA', icon: ICON.laneA, name: id === 'acids' ? 'Полоска водорода' : 'Полоска металла', spec: id === 'acids' ? 'Каждый блок — атом H, валентность I. Их число — индекс водорода.' : 'Каждый блок — атом металла. Ширина блока — его валентность: у Al(III) три деления.' },
+    { id: 'laneB', icon: ICON.laneB, name: 'Полоска кислотного остатка', spec: 'Остаток — часть кислоты без водорода. Его валентность равна числу H в кислоте: SO₄ — II, PO₄ — III.' },
+    { id: 'cols', icon: ICON.cols, name: 'Связи и свободные связи', spec: 'Зелёная линия — единицы валентности сошлись. Оранжевый хвостик — свободная связь, так не бывает.' },
+    { id: 'bins', icon: ICON.bins, name: 'Лотки', spec: 'Отсюда берём частицы. Нажатие на лоток добавляет одну частицу.' },
+    { id: 'fml', icon: ICON.fml, name: 'Формула и название', spec: 'Индекс 1 не пишут. Если сложных остатков больше одного, остаток берут в скобки.' }];
+  if (id === 'bases') return [
+    { id: 'tubes', icon: ICON.tubes, name: 'Пробирки А, Б, В', spec: 'В них бесцветные растворы: кислота, щёлочь и вода. На вид не отличить.' },
+    { id: 'bottles', icon: ICON.bottles, name: 'Склянки с индикаторами', spec: 'Индикатор — вещество, которое меняет цвет в кислой и щелочной среде.' },
+    { id: 'tags', icon: ICON.tags, name: 'Таблички-ответы', spec: 'Нажатие меняет надпись: кислота → щёлочь → вода.' }];
+  return [
+    { id: 'rowM', icon: ICON.rowM, name: 'Ряд металла', spec: 'Металл → основный оксид → основание → соль.' },
+    { id: 'rowN', icon: ICON.rowN, name: 'Ряд неметалла', spec: 'Неметалл → кислотный оксид → кислота → соль.' },
+    { id: 'arrows', icon: ICON.arrows, name: 'Стрелки-превращения', spec: 'Над стрелкой пишут второй реагент. Оранжевый «+» — сюда нужен реактив.' },
+    { id: 'reag', icon: ICON.reag, name: 'Реактивы', spec: 'Кислород, вода, кислота, щёлочь и два лишних вещества.' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      (L.safe ? `<div class="safe"><b>Безопасность</b>${L.safe}</div>` : '') +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Детали модели</h2><p class="note">Нажмите на деталь, чтобы найти её на столе.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  if (m.kind === 'ox') {
+    const sb = OX.find(x => x.f === m.sel);
+    if (!sb) return `<h2>Как решать</h2><div class="formula">Э<sub>x</sub>O<sub>y</sub>: два элемента, один — O(II)</div><div class="steps">${step('1. Сколько разных элементов?', 'должно быть 2')}${step('2. Есть ли кислород?', 'один из двух — O')}${step('3. Второй элемент', 'металл → основный', '')}${step('', 'неметалл → кислотный', 'sum')}</div><p class="note" style="margin-top:10px">Нажмите на карточку на столе — здесь появится её разбор.</p>`;
+    const el = elemsOf(sb.f), put = S.place[sb.f], other = el.find(e => e !== 'O'), two = el.length === 2 && el.includes('O');
+    let h = `<h2>${cap(sb.name)} ${low(sb.f)}</h2><div class="formula">${low(sb.f)}</div><h3>Разбор</h3><div class="steps">` +
+      step('элементы', el.join(', ')) + step('разных элементов', String(el.length) + (el.length === 2 ? ' ✓' : '')) + step('есть кислород', el.includes('O') ? 'да' : 'нет');
+    if (two) h += step(`${other} — это`, METALS.includes(other) ? 'металл' : 'неметалл');
+    h += step('вывод', put ? (put === 'b' ? 'основный оксид ✓' : put === 'a' ? 'кислотный оксид ✓' : 'не оксид ✓') : 'решите сами', 'sum') + `</div>`;
+    if (put && OXHY[sb.f]) h += `<p class="note" style="margin-top:10px">Ему соответствует ${put === 'b' ? 'основание' : 'кислота'} ${OXHY[sb.f]}.</p>`;
+    return h;
+  }
+  if (m.kind === 'bld') {
+    const C = m.C, R = m.R, L = lcm(C.v, R.v), show = m.ok || m.found[goodF(C, R)];
+    let h = `<h2>${C.s}(${ROM[C.v]}) + ${low(R.s)}(${ROM[R.v]})</h2><div class="formula">x · ${ROM[C.v]} = y · ${ROM[R.v]}</div><h3>Ваши индексы</h3><div class="steps">` +
+      step(`единиц у ${C.s}: x · ${C.v}`, `${m.x} · ${C.v} = ${m.A}`) + step(`единиц у ${low(R.s)}: y · ${R.v}`, `${m.y} · ${R.v} = ${m.B}`) +
+      step('сравнение', m.eq ? `${m.A} = ${m.B} ✓` : `${m.A} ≠ ${m.B}`) +
+      (m.eq ? step('наименьшие индексы?', m.min ? 'да ✓' : `нет: оба делятся на ${gcd(m.x, m.y)}`) : '') +
+      step('формула', low(m.f) + (m.ok ? ' ✓' : ''), 'sum') + `</div>`;
+    h += `<h3>Способ через НОК</h3><div class="steps">` +
+      step(`НОК(${C.v}, ${R.v})`, show ? String(L) : '?') +
+      step(`индекс ${C.s} = НОК : ${C.v}`, show ? `${L} : ${C.v} = ${L / C.v}` : '?') +
+      step(`индекс ${low(R.s)} = НОК : ${R.v}`, show ? `${L} : ${R.v} = ${L / R.v}` : '?') +
+      step('название', show ? nameOf(C, R) : '?', 'sum') + `</div>`;
+    if (show && !m.acid && noSalt(C, R)) h += `<p class="note" style="margin-top:10px">Формулу составить можно, но в водном растворе такая соль не образуется: она сразу разлагается водой.</p>`;
+    if (show && m.acid && R.s === 'CO3') h += `<p class="note" style="margin-top:10px">Угольная кислота неустойчива: в газировке она распадается на CO₂ и H₂O — поэтому пузырьки.</p>`;
+    h += `<h3>Задание</h3><div class="steps">${m.targets.map(k => step(TNAME[k], m.found[k] ? low(k) + ' ✓' : 'ещё нет')).join('')}</div>`;
+    return h;
+  }
+  if (m.kind === 'ind') {
+    let h = `<h2>Окраска индикаторов</h2><div class="steps">` +
+      IND.map(d => step(d.name, `кисл. ${d.cn.acid} · вода ${d.cn.water} · щёл. ${d.cn.alk}`)).join('') + `</div><h3>Ваши наблюдения</h3><div class="steps">` +
+      [0, 1, 2].map(i => step(`пробирка ${TL[i]}`, S.ind[i] ? `${indOf(S.ind[i]).name}: ${indOf(S.ind[i]).cn[S.tubes[i]]}` : 'индикатора нет')).join('') + `</div>`;
+    h += `<h3>Рассуждение</h3><div class="steps">${step('малиновый фенолфталеин', 'там щёлочь')}${step('бесцветный фенолфталеин', 'кислота или вода — нужен лакмус')}${step('красный лакмус', 'кислота')}${step('фиолетовый лакмус', 'нейтрально, вода', 'sum')}</div>`;
+    if (S.verified) h += `<p class="note" style="margin-top:10px">В щёлочи — гидроксид натрия NaOH, в кислоте — соляная кислота HCl.</p>`;
+    return h;
+  }
+  let h = `<h2>Генетическая связь</h2><div class="formula" style="font-size:13px">металл → осн. оксид → основание<br>↓ соль ↑<br>неметалл → кисл. оксид → кислота</div>`;
+  ROWS.forEach((row, ri) => {
+    h += `<h3>${row.title.toLowerCase()}</h3><div class="steps">` + row.steps.map((st, i) => step(`${i + 1}. ${row.nodes[i].cl} → ${row.nodes[i + 1].cl}`, i < S.prog[ri] ? st.eq : '?')).join('') + `</div>`;
+  });
+  return h;
+}
+
+function renderMeter(m) {
+  const el = $('#meter');
+  if (m.kind === 'ox') {
+    el.innerHTML = `<div class="k">Сортировка</div><div class="v ${m.placed === OX.length ? 'ok' : ''}">${m.placed} из ${OX.length}</div><div class="gauge"><b style="width:${(m.placed / OX.length * 100).toFixed(1)}%"></b></div><div class="lr"><span>ошибок</span><span>${S.wrong}</span></div>`;
+  } else if (m.kind === 'bld') {
+    el.innerHTML = `<div class="k">${m.acid ? 'Кислота' : 'Соль'}</div><div class="v ${m.ok ? 'ok' : ''}">${low(m.f)}</div><div class="lr"><span>${m.C.s}</span><span>${m.A}</span></div><div class="lr"><span>${low(m.R.s)}</span><span>${m.B}</span></div><div class="gauge"><b style="width:${(Math.min(m.A, m.B) / Math.max(m.A, m.B) * 100).toFixed(1)}%;background:${m.eq ? 'var(--ok)' : 'var(--liq)'}"></b></div>` +
+      (m.acid && m.ok ? `<div class="lr"><span>лакмус</span><span style="color:#e0464a">красный</span></div>` : '');
+  } else if (m.kind === 'ind') {
+    el.innerHTML = `<div class="k">Индикатор</div><div class="v">${S.selInd ? indOf(S.selInd).name : 'не выбран'}</div>` +
+      [0, 1, 2].map(i => { const c = tubeColor(i); return `<div class="lr"><span>${TL[i]}</span><span>${S.ind[i] ? `<i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${c || 'transparent'};border:1px solid #8b96ad;margin-right:4px"></i>${indOf(S.ind[i]).cn[S.tubes[i]]}` : '—'}</span></div>`; }).join('');
+  } else {
+    const n = m.prog[0] + m.prog[1];
+    el.innerHTML = `<div class="k">Превращения</div><div class="v ${n === 6 ? 'ok' : ''}">${n} из 6</div><div class="gauge"><b style="width:${(n / 6 * 100).toFixed(1)}%"></b></div><div class="lr"><span>реактив</span><span>${S.selR ? low(S.selR) : '—'}</span></div><div class="lr"><span>ошибок</span><span>${S.wrong}</span></div>`;
+  }
+}
+
+function update() {
+  const m = model(), L = LESSONS[S.lesson];
+  if (m.kind === 'bld' && m.ok && !S.found[m.f]) { S.found[m.f] = true; toast(`Формула собрана: ${low(m.f)} — ${nameOf(m.C, m.R)}.`); }
+  else if (m.kind === 'bld' && m.eq && !m.min) toast(`Связи уравнены, но индексы ${m.x} и ${m.y} можно сократить на ${gcd(m.x, m.y)}.`);
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Классы веществ освоены!');
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  if (LID() === 'bases') $('#tools').querySelectorAll('button[data-a^="i-"]').forEach(b => b.setAttribute('aria-pressed', b.dataset.a.slice(2) === S.selInd));
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  oxides: '<rect x="4" y="8" width="18" height="16" rx="3" fill="none" stroke="#8b96ad"/><rect x="24" y="8" width="18" height="16" rx="3" fill="none" stroke="#8b96ad"/><rect x="44" y="8" width="18" height="16" rx="3" fill="none" stroke="#8b96ad"/><circle cx="11" cy="16" r="3.5" fill="#9fd27a"/><circle cx="16" cy="16" r="2.6" fill="#e5533f"/><circle cx="31" cy="16" r="3" fill="#e6c63a"/><circle cx="36" cy="16" r="2.6" fill="#e5533f"/><path d="M49 12l8 8M57 12l-8 8" stroke="#ff8a73" stroke-width="1.4"/>',
+  acids: '<rect x="8" y="5" width="13" height="8" rx="2" fill="#eef2f8" fill-opacity=".4" stroke="#eef2f8"/><rect x="23" y="5" width="13" height="8" rx="2" fill="#eef2f8" fill-opacity=".4" stroke="#eef2f8"/><rect x="8" y="18" width="28" height="8" rx="2" fill="#e6c63a" fill-opacity=".4" stroke="#e6c63a"/><text x="51" y="20" font-size="8" fill="#e8ecf4" text-anchor="middle" font-family="IBM Plex Mono">H₂SO₄</text>',
+  bases: '<path d="M14 3v18a5 5 0 0 0 10 0V3" fill="none" stroke="#c8d1e2" stroke-width="1.3"/><path d="M15 12v9a4 4 0 0 0 8 0v-9z" fill="#e0464a"/><path d="M29 3v18a5 5 0 0 0 10 0V3" fill="none" stroke="#c8d1e2" stroke-width="1.3"/><path d="M30 12v9a4 4 0 0 0 8 0v-9z" fill="#d8287a"/><path d="M44 3v18a5 5 0 0 0 10 0V3" fill="none" stroke="#c8d1e2" stroke-width="1.3"/><path d="M45 12v9a4 4 0 0 0 8 0v-9z" fill="#8a5cc8"/>',
+  salts: '<rect x="6" y="5" width="16" height="8" rx="2" fill="#b5c0d3" fill-opacity=".5" stroke="#b5c0d3"/><rect x="24" y="5" width="16" height="8" rx="2" fill="#b5c0d3" fill-opacity=".5" stroke="#b5c0d3"/><rect x="6" y="18" width="10" height="8" rx="2" fill="#e6c63a" fill-opacity=".5" stroke="#e6c63a"/><rect x="18" y="18" width="10" height="8" rx="2" fill="#e6c63a" fill-opacity=".5" stroke="#e6c63a"/><rect x="30" y="18" width="10" height="8" rx="2" fill="#e6c63a" fill-opacity=".5" stroke="#e6c63a"/><text x="53" y="19" font-size="7" fill="#e8ecf4" text-anchor="middle" font-family="IBM Plex Mono">соль</text>',
+  chains: '<rect x="3" y="4" width="12" height="8" rx="2" fill="#9fd27a"/><rect x="27" y="4" width="12" height="8" rx="2" fill="none" stroke="#c8d1e2"/><rect x="51" y="4" width="12" height="8" rx="2" fill="#86e0a8"/><path d="M16 8h9M40 8h9" stroke="#c8d1e2" stroke-width="1.2"/><rect x="3" y="18" width="12" height="8" rx="2" fill="#f09a3e"/><rect x="27" y="18" width="12" height="8" rx="2" fill="none" stroke="#c8d1e2"/><rect x="51" y="18" width="12" height="8" rx="2" fill="#86e0a8"/><path d="M16 22h9M40 22h9" stroke="#c8d1e2" stroke-width="1.2"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i], init = JSON.parse(JSON.stringify(L.init || {}));
+  S.lesson = i; S.hl = null; drag = null;
+  S.place = {}; S.sel = null; S.wrong = 0; S.cat = 0; S.res = 2; S.x = 1; S.y = 1; S.found = {};
+  S.tubes = shuffle(['acid', 'alk', 'water']); S.ind = [null, null, null]; S.lab = [null, null, null]; S.selInd = null; S.verified = false; S.tries = 0; S.used = {}; S.splash = null;
+  S.prog = [0, 0]; S.selR = null;
+  Object.assign(S, init);
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '';
+  if (id === 'oxides') now = `Сортировка 10 веществ на основные оксиды, кислотные оксиды и не оксиды: ${OX.map(x => x.f).join(', ')}. Уже правильно разложены: ${OX.filter(x => S.place[x.f]).map(x => `${x.f} — ${OXBOX[S.place[x.f]]}`).join(', ') || 'ничего'}. Ошибок: ${S.wrong}. ${S.sel ? `Выбрана карточка ${S.sel}.` : ''} Не называй ответы для неразложенных веществ — спрашивай, сколько в формуле элементов, есть ли кислород и металл ли второй элемент.`;
+  if (id === 'acids' || id === 'salts') now = `Полосковый конструктор формулы ${m.acid ? 'кислоты' : 'соли'}. ${m.acid ? 'Водород' : 'Металл'} ${m.C.s} (валентность ${ROM[m.C.v]}), кислотный остаток ${m.R.s} (валентность ${ROM[m.R.v]}). Индексы ученика: ${m.x} и ${m.y}, формула на экране ${m.f}. Единиц валентности: ${m.A} и ${m.B}. ${m.ok ? `Формула верная: ${nameOf(m.C, m.R)}.` : m.eq ? 'Единицы равны, но индексы можно сократить.' : 'Единицы не равны — есть свободные связи.'} Нужно собрать ${m.targets.map(k => TNAME[k]).join(', ')}; уже собраны: ${m.targets.filter(k => S.found[k]).join(', ') || 'ничего'}. Не называй готовые индексы — помогай через валентность и НОК наводящими вопросами.`;
+  if (id === 'bases') now = `Три пробирки А, Б, В с бесцветными растворами: кислота, щёлочь и вода (что где — ученик должен определить сам, не называй). Индикаторы: лакмус, метилоранж, фенолфталеин. Сейчас в пробирках: ${[0, 1, 2].map(i => `${TL[i]} — ${S.ind[i] ? `${indOf(S.ind[i]).name}, окраска ${indOf(S.ind[i]).cn[S.tubes[i]]}` : 'без индикатора'}`).join('; ')}. Таблички ученика: ${[0, 1, 2].map(i => `${TL[i]} — ${S.lab[i] ? SAMPLE[S.lab[i]] : 'не подписана'}`).join('; ')}. ${S.verified ? 'Ответ проверен, всё верно.' : `Проверок: ${S.tries}.`} Помогай рассуждать по наблюдаемым окраскам, не выдавай ответ.`;
+  if (id === 'chains') now = `Два генетических ряда: Ca → CaO → Ca(OH)2 → CaCl2 и P → P2O5 → H3PO4 → Na3PO4. Реактивы: ${REAG.join(', ')}. Пройдено шагов в ряду металла: ${S.prog[0]} из 3, в ряду неметалла: ${S.prog[1]} из 3. ${S.selR ? `Выбран реактив ${S.selR}.` : ''} Ошибок: ${S.wrong}. Не называй реактив для текущего шага прямо — спрашивай, из какого класса в какой идёт превращение.`;
+  return [
+    `Предмет: химия, 8 класс. Тема «Классы веществ». Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Веди ученика наводящими вопросами, а не готовыми ответами.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = { oxides: 'Почему NaOH не оксид, хотя в нём есть кислород?', acids: 'Как по формуле кислоты узнать валентность остатка?', bases: 'Почему фенолфталеин не отличает кислоту от воды?', salts: 'Когда остаток в формуле берут в скобки?', chains: 'Почему оба ряда заканчиваются солью?' }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
