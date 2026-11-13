@@ -4785,16 +4785,18 @@ async function listMaxId() {
   return r.recordset[0] && r.recordset[0].id != null ? Number(r.recordset[0].id) : null;
 }
 
-// Записанные обходом по номерам без координат (13.11.2026): собственники
-// первыми, свежие раньше — их дочитывает fresh.
-async function listWithoutCoords(limit) {
+// Записанные обходом по номерам без координат (13.11.2026), свежие раньше —
+// их дочитывает fresh.
+// below — брать номера меньше этого (порциями сверху вниз, без повторов).
+async function listWithoutCoords(limit, below) {
   const pool = await getPool();
   await ensureList(pool);
-  const r = await pool.request().input("n", sql.Int, Number(limit) || 2000).query(`
+  const r = await pool.request().input("n", sql.Int, Number(limit) || 2000)
+    .input("below", sql.BigInt, Number(below) || 9e15).query(`
     SELECT TOP (@n) id, deal, prop, city, price, rooms, area, bumped_on
     FROM dbo.krisha_list
-    WHERE id > 1017200000 AND lat IS NULL AND storage = 'live' AND price IS NOT NULL
-    ORDER BY CASE WHEN user_type = 'owner' THEN 0 ELSE 1 END, id DESC`);
+    WHERE id > 1017200000 AND id < @below AND lat IS NULL AND storage = 'live' AND price IS NOT NULL
+    ORDER BY id DESC`);
   return r.recordset.map((x) => ({ id: Number(x.id), deal: x.deal, prop: x.prop, city: x.city, price: Number(x.price),
     rooms: x.rooms, area: x.area == null ? null : Number(x.area),
     bumpedOn: x.bumped_on ? new Date(x.bumped_on).toISOString().slice(0, 10) : null }));

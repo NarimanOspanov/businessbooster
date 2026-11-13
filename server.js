@@ -3381,14 +3381,20 @@ async function freshIdWalk(L, sweepNo, listMaxSeen, deadline, conc) {
   };
   // Время: ~55% на номера, остальное — дочитать новые из списка (координаты,
   // фото) и записать. У края номера кончаются быстро, и остаток весь на дочитку.
-  const walkEnd = Date.now() + Math.max(0, deadline - Date.now() - 6000) * 0.55;
   // 0. Локация важнее скорости (13.11.2026): то, что прошлые прогоны записали
   // без координат (не хватило времени или не нашлось в списке), дочитываем
   // первым делом — до трёх попыток на объявление.
   st.loc = st.loc || [];
-  if (!st.locSeeded) { // разово: ночная догонка записала ~10 тыс. без координат
-    st.locSeeded = true;
-    st.loc = st.loc.concat(await db.listWithoutCoords(IDW_LOC_MAX).catch(() => [])).slice(0, IDW_LOC_MAX);
+  // Ночная догонка 13.11 записала ~7 тыс. квартир без координат: когда очередь
+  // почти пуста, добираем следующую порцию сверху вниз (st.locBelow — где
+  // остановились), пока такие не кончатся.
+  if (st.loc.length < 100 && st.locBelow !== 0) {
+    const more = await db.listWithoutCoords(500, st.locBelow || (st.next || 0)).catch(() => null);
+    if (more) {
+      const inQ = new Set(st.loc.map((r) => String(r.id)));
+      st.loc = st.loc.concat(more.filter((r) => !inQ.has(String(r.id))));
+      st.locBelow = more.length ? more[more.length - 1].id : 0;
+    }
   }
   out.located = 0;
   const locEnd = Date.now() + Math.max(0, deadline - Date.now() - 6000) * 0.3;
@@ -3404,27 +3410,9 @@ async function freshIdWalk(L, sweepNo, listMaxSeen, deadline, conc) {
     if (ok.length) { await db.saveListAdverts(ok, sweepNo); out.located += ok.length; }
   }
   st.loc = locLeft;
-  // 1. Созревшие перепроверки, не больше 100 за прогон.
-  const now = Date.now();
-  const due = [], keep = [];
-  for (const x of st.retry) (x[2] <= now && due.length < 100 ? due : keep).push(x);
-  st.retry = keep;
-  let di = 0;
-  for (; di < due.length && Date.now() < walkEnd; di += conc) {
-    const chunk = due.slice(di, di + conc);
-    const c0 = Date.now();
-    const rs = await Promise.all(chunk.map((x) => check(x[0])));
-    await pace(c0, chunk.length);
-    chunk.forEach((x, k) => {
-      out.retried++;
-      if (rs[k] === "not_found" && x[1] + 1 < IDW_RETRY_AFTER.length) st.retry.push([x[0], x[1] + 1, Date.now() + IDW_RETRY_AFTER[x[1] + 1]]);
-      else if (rs[k] === "unknown") st.retry.push([x[0], x[1], Date.now() + 10 * 60e3]);
-    });
-    if (rs.includes("unknown")) break; // Крыша отбивает — не долбим дальше
-  }
-  for (let k = di; k < due.length; k++) st.retry.push(due[k]); // не успели — в следующий раз
-  // 2. Вперёд от курсора.
-  let streak = [], stop = out.unknown > 0;
+  const walkEnd = Date.now() + Math.max(0, deadline - Date.now() - 6000) * 0.55;
+  // 1. Вперёд от курсора — новое важнее перепроверок.
+  let streak = [], stop = false;
   while (!stop && Date.now() < walkEnd) {
     const base = st.next;
     const chunk = [];
@@ -3456,6 +3444,25 @@ async function freshIdWalk(L, sweepNo, listMaxSeen, deadline, conc) {
     for (const g of streak) if (g <= fr) st.retry.push([g, 0, Date.now() + IDW_RETRY_AFTER[0]]);
     if (above.length) st.next = Math.min(st.next, above[0]);
   }
+  // 2. Созревшие перепроверки, не больше 100 за прогон, — на остаток времени.
+  const now = Date.now();
+  const due = [], keep = [];
+  for (const x of st.retry) (x[2] <= now && due.length < 100 ? due : keep).push(x);
+  st.retry = keep;
+  let di = 0;
+  for (; di < due.length && out.unknown === 0 && found.size < IDW_FOUND_MAX && Date.now() < walkEnd; di += conc) {
+    const chunk = due.slice(di, di + conc);
+    const c0 = Date.now();
+    const rs = await Promise.all(chunk.map((x) => check(x[0])));
+    await pace(c0, chunk.length);
+    chunk.forEach((x, k) => {
+      out.retried++;
+      if (rs[k] === "not_found" && x[1] + 1 < IDW_RETRY_AFTER.length) st.retry.push([x[0], x[1] + 1, Date.now() + IDW_RETRY_AFTER[x[1] + 1]]);
+      else if (rs[k] === "unknown") st.retry.push([x[0], x[1], Date.now() + 10 * 60e3]);
+    });
+    if (rs.includes("unknown")) break; // Крыша отбивает — не долбим дальше
+  }
+  for (let k = di; k < due.length; k++) st.retry.push(due[k]); // не успели — в следующий раз
   if (st.retry.length > IDW_RETRY_MAX) st.retry = st.retry.slice(-IDW_RETRY_MAX);
   // 3. Новые для базы — записать. Уже известные не трогаем: в карточке карты
   // нет координат, и запись затёрла бы их у строки из списка.
