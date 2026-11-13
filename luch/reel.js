@@ -48,6 +48,15 @@
   .lr-stage svg{transform-origin:50% 50%;will-change:transform}
   .lr-stage.pulse{animation:lr-pulse .5s ease-out}
   @keyframes lr-pulse{0%{transform:scale(.97);border-color:#ffb547}100%{transform:none}}
+  .lr-rec{background:#0b1019;padding:0}
+  .lr-rec .lr-card{height:100vh;max-width:none;border-radius:0;border:0;padding:9vh 0 19vh;box-sizing:border-box}
+  .lr-rec .lr-ib,.lr-rec .lr-zone,.lr-rec .lr-end button{display:none}
+  .lr-rec .lr-cap,.lr-rec .lr-f{transition:none}
+  .lr-rec .lr-end{justify-content:center;align-items:center;text-align:center;gap:18px;padding:0 9%;background:#0b1019}
+  .lr-rec .lr-end b{font-size:32px;margin:0}
+  .lr-rec .lr-end p{margin:0;font:500 19px/1.4 "Golos Text",sans-serif;color:#c9d1e0}
+  .lr-rec .lr-end em{font:600 16px "IBM Plex Mono",monospace;font-style:normal;color:#0b1019;background:#ffb547;border-radius:12px;padding:12px 18px}
+  body.lr-recording>:not(.lr-wrap){visibility:hidden}
   .lr-wrap :focus-visible{outline:2px solid #72d4e8;outline-offset:2px}
   @media (prefers-reduced-motion:reduce){.lr-cap,.lr-f{transition:none}.lr-icons div,.lr-icons svg,.lr-stage.pulse{animation:none;opacity:1}}`;
   const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
@@ -110,7 +119,8 @@
       <div class="lr-body"><div class="lr-cap"></div><div class="lr-stage"><svg viewBox="${cfg.viewBox}" aria-hidden="true"></svg></div><div class="lr-icons" hidden></div><div class="lr-f" hidden></div><div class="lr-sub" aria-live="polite"></div></div>
       <div class="lr-zone l" data-a="prev"></div><div class="lr-zone c" data-a="pause"></div><div class="lr-zone r" data-a="next"></div>
       <div class="lr-paused" hidden><svg width="26" height="26" viewBox="0 0 12 12"><path d="M3 1.5v9l7.5-4.5z" fill="#0b1019"/></svg></div>
-      <div class="lr-end" hidden><b>Теперь попробуйте сами</b><button class="go" data-a="close">Перейти к опыту</button><button class="again" data-a="again">Смотреть ещё раз</button></div></div>`;
+      <div class="lr-end" hidden><b>Теперь попробуйте сами</b>${opts.render ? '<p>Интерактивный опыт и ИИ-репетитор — бесплатно</p><em>ссылка в профиле</em>' : ''}<button class="go" data-a="close">Перейти к опыту</button><button class="again" data-a="again">Смотреть ещё раз</button></div></div>`;
+    if (opts.render) { wrap.classList.add('lr-rec'); document.body.classList.add('lr-recording'); }
     document.body.appendChild(wrap);
     const q = s => wrap.querySelector(s);
     const capEl = q('.lr-cap'), stage = q('.lr-stage'), svg = q('.lr-stage svg'), iEl = q('.lr-icons'), fEl = q('.lr-f'), subEl = q('.lr-sub'), bars = [...wrap.querySelectorAll('.lr-bars b')];
@@ -122,14 +132,15 @@
       idx = clamp(i, 0, scenes.length - 1); ended = false; q('.lr-end').hidden = true;
       const sc = scenes[idx];
       bars.forEach((b, k) => { b.style.width = k < idx ? '100%' : '0'; });
-      capEl.textContent = sc.cap; capEl.classList.add('in'); requestAnimationFrame(() => capEl.classList.remove('in'));
+      capEl.textContent = sc.cap; if (!opts.render) { capEl.classList.add('in'); requestAnimationFrame(() => capEl.classList.remove('in')); }
       iEl.hidden = !sc.icons;
       if (sc.icons) { const n = sc.icons.length; iEl.style.gridTemplateColumns = `repeat(${n === 4 ? 2 : n},1fr)`;
         iEl.innerHTML = sc.icons.map(([ic, t], k) => `<div style="animation-delay:${0.25 + k * 0.35}s">${ICONS[ic] || ''}<span>${esc(t)}</span></div>`).join(''); }
       stage.classList.remove('pulse'); void stage.offsetWidth; stage.classList.add('pulse');
-      fEl.hidden = !sc.formula; if (sc.formula) { fEl.textContent = sc.formula; fEl.classList.add('in'); setTimeout(() => fEl.classList.remove('in'), 250); }
+      fEl.hidden = !sc.formula; if (sc.formula) { fEl.textContent = sc.formula; if (!opts.render) { fEl.classList.add('in'); setTimeout(() => fEl.classList.remove('in'), 250); } }
       subEl.innerHTML = words(sc.say).map(w => `<span>${esc(w)}</span> `).join('');
       dur = durations[`${id}-${idx}`] || guess(sc.say); acc = 0; t0 = performance.now();
+      if (opts.render) return;
       audio.src = cfg.base + `${id}-${idx}.mp3`; audio.muted = muted;
       if (playing) audio.play().catch(() => {});
       if (idx + 1 < scenes.length) next.src = cfg.base + `${id}-${idx + 1}.mp3`;
@@ -138,9 +149,8 @@
       if (audio.duration && isFinite(audio.duration) && !audio.error && audio.readyState > 1 && !muted) return clamp(audio.currentTime / audio.duration, 0, 1);
       return clamp((acc + (playing ? performance.now() - t0 : 0)) / 1000 / dur, 0, 1);
     }
-    function frame() {
-      raf = requestAnimationFrame(frame);
-      const sc = scenes[idx], p = progress();
+    function paint(p) {
+      const sc = scenes[idx];
       const k = ease(clamp(p / 0.85, 0, 1));
       const stt = lerpState(sc.from || sc.to, sc.to || sc.from, k);
       if (cfg.viewBoxOf) svg.setAttribute('viewBox', cfg.viewBoxOf(stt));
@@ -149,6 +159,10 @@
       bars[idx].style.width = (p * 100).toFixed(1) + '%';
       const sp = subEl.children, n = Math.ceil(p * 1.08 * sp.length);
       for (let i = 0; i < sp.length; i++) sp[i].classList.toggle('on', i < n);
+    }
+    function frame() {
+      raf = requestAnimationFrame(frame);
+      const p = progress(); paint(p);
       const done = (audio.ended && !muted) || p >= 1;
       if (done && playing && !ended) {
         if (!gap) gap = performance.now();
@@ -178,6 +192,24 @@
       else if (act === 'pause') setPlaying(!playing);
       else if (act === 'again') { playing = true; show(0); }
     });
+    if (opts.render) {
+      // Запись в mp4: время задаёт рендерер, кадр строится детерминированно (без звука и rAF).
+      const GAP = 0.35, OUTRO = 3, starts = []; let sum = 0;
+      scenes.forEach((sc, i) => { starts.push(sum); sum += (durations[`${id}-${i}`] || guess(sc.say)) + GAP; });
+      playing = false; show(0);
+      const card = q('.lr-card'), endEl = q('.lr-end');
+      return { starts, total: sum + OUTRO, at(t) {
+        let i = starts.length - 1; while (i > 0 && t < starts[i]) i--;
+        if (i !== idx) show(i);
+        const lt = t - starts[i], p = clamp(lt / (durations[`${id}-${i}`] || guess(scenes[i].say)), 0, 1);
+        paint(p);
+        const k = ease(clamp(lt / 0.35, 0, 1)), kf = ease(clamp((lt - 0.25) / 0.35, 0, 1));
+        capEl.style.opacity = k; capEl.style.transform = `translateY(${(1 - k) * 16}px) scale(${0.96 + 0.04 * k})`;
+        fEl.style.opacity = kf; fEl.style.transform = `scale(${0.92 + 0.08 * kf})`;
+        card.getAnimations({ subtree: true }).forEach(a => { a.pause(); a.currentTime = lt * 1000; });
+        endEl.hidden = t < sum; if (t >= sum) { const e = ease(clamp((t - sum) / 0.5, 0, 1)); endEl.style.opacity = e; endEl.style.transform = `translateY(${(1 - e) * 20}px)`; }
+      } };
+    }
     document.addEventListener('keydown', key);
     show(0); frame(); q('[data-a="close"]').focus();
   }
