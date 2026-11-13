@@ -1,0 +1,926 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по алгебре, 7 класс: уравнение с двумя переменными, системы линейных уравнений, способ подстановки, способ сложения, графический способ.">
+<title>Системы уравнений</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--liq);transition:width .2s}
+.gauge i{position:absolute;top:-4px;width:2px;height:14px;background:var(--force);transform:translateX(-50%)}
+.swatch{height:12px;border-radius:4px;margin-top:9px;border:1px solid rgba(255,255,255,.15)}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.fr{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1.05;font-size:.82em;margin:0 2px}
+.fr i{font-style:normal;padding:0 3px}
+.fr i:first-child{border-bottom:1.5px solid currentColor}
+.meter .v .fr{font-size:1.15em}
+.found{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 0}
+.found span{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-mono)}
+.found span.ok{border-color:var(--ok);color:var(--ok)}
+.signtab{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;text-align:center;margin:4px 0 0}
+.signtab div{background:var(--surface-2);border-radius:8px;padding:8px 4px;font:500 15px/1 var(--font-mono)}
+.signtab .h{background:none;color:var(--muted);font:600 10px/1.2 var(--font-body);letter-spacing:.08em;text-transform:uppercase;padding:8px 2px}
+.signtab .on{background:var(--force);color:var(--bg)}
+.tbl{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;text-align:center;margin:4px 0 0}
+.tbl div{background:var(--surface-2);border-radius:8px;padding:8px 2px;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.tbl .h{background:none;color:var(--muted);font:600 10px/1.2 var(--font-body);letter-spacing:.08em;text-transform:uppercase}
+.tbl .ok{color:var(--ok)}
+.signtab.q{grid-template-columns:repeat(3,minmax(0,1fr))}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M20 20V7A13 13 0 0 1 33 20Z" fill="var(--force)"/><path d="M20 20H33A13 13 0 1 1 20 7Z" fill="none" stroke="var(--fg)" stroke-width="2" stroke-linejoin="round"/><path d="M20 20L10.8 29.2" stroke="var(--fg)" stroke-width="2"/><path d="M20 20V33" stroke="var(--arm)" stroke-width="2"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Математика · Системы уравнений</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#math">Карта</a><a href="/physics/#math">Математика</a><a href="./" aria-current="page">Системы</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Алгебра</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Рабочее поле">
+    <svg class="scene" id="scene" role="img" aria-label="Рабочее поле: координатная плоскость, весы для подстановки, сложение уравнений с множителями, графики двух прямых. Узлы сетки можно нажимать, ползунок — перетаскивать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const ns = v => (v < 0 ? '−' : '') + String(Math.round(Math.abs(v) * 100) / 100).replace('.', ',');
+const par = v => v < 0 ? `(${ns(v)})` : ns(v);
+const pt = (x, y) => `(${ns(x)}; ${ns(y)})`;
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d', ORANGE = '#ffb547', BLUE = '#72d4e8', GREEN = '#86e0a8', RED = '#ff8a73', FG = '#e8ecf4', MUTED = '#8b96ad';
+// a·x + b·y written as text, e.g. term(2,'x',true) → "2x", term(-1,'y') → "− y"
+const term = (k, v, first) => {
+  const body = k === 0 ? '0·' + v : (Math.abs(k) === 1 ? '' : Math.abs(k)) + v;
+  if (first) return (k < 0 ? '−' : '') + body;
+  return (k < 0 ? '− ' : '+ ') + body;
+};
+const lin = (a, b, c) => `${term(a, 'x', true)} ${term(b, 'y')} = ${ns(c)}`;
+// "2·3 + (−2)" — the left side with numbers put in
+const subStr = (a, b, x, y) => `${a === 1 ? '' : a === -1 ? '−' : ns(a) + '·'}${par(x)} ${b < 0 ? '−' : '+'} ${Math.abs(b) === 1 ? '' : Math.abs(b) + '·'}${par(y)}`;
+// lesson 1: one equation
+const E1 = [2, 1, 4];
+// lesson 2: system x + y = 7, 2x − y = 5, four ways to start the substitution
+const SUB = {
+  y1: { label: 'y из (1)', expr: 'y = 7 − x', v: 'x', w: 'y', into: 2, sub: '2x − (7 − x) = 5', simp: '3x − 7 = 5', lhsTxt: v => `3·${par(v)} − 7`, lhs: v => 3 * v - 7, rhs: 5, root: 4,
+        steps: ['2x − 7 + x = 5', '3x = 5 + 7 = 12', 'x = 12 : 3 = 4'], back: 'y = 7 − 4 = 3' },
+  x1: { label: 'x из (1)', expr: 'x = 7 − y', v: 'y', w: 'x', into: 2, sub: '2(7 − y) − y = 5', simp: '14 − 3y = 5', lhsTxt: v => `14 − 3·${par(v)}`, lhs: v => 14 - 3 * v, rhs: 5, root: 3,
+        steps: ['14 − 2y − y = 5', '−3y = 5 − 14 = −9', 'y = −9 : (−3) = 3'], back: 'x = 7 − 3 = 4' },
+  y2: { label: 'y из (2)', expr: 'y = 2x − 5', v: 'x', w: 'y', into: 1, sub: 'x + (2x − 5) = 7', simp: '3x − 5 = 7', lhsTxt: v => `3·${par(v)} − 5`, lhs: v => 3 * v - 5, rhs: 7, root: 4,
+        steps: ['x + 2x − 5 = 7', '3x = 7 + 5 = 12', 'x = 12 : 3 = 4'], back: 'y = 2·4 − 5 = 3' },
+  x2: { label: 'x из (2)', expr: 'x = (5 + y) : 2', v: 'y', w: 'x', into: 1, sub: '(5 + y) : 2 + y = 7', simp: '(5 + y) : 2 + y = 7', lhsTxt: v => `(5 + ${par(v)}) : 2 + ${par(v)}`, lhs: v => (5 + v) / 2 + v, rhs: 7, root: 3,
+        steps: ['обе части × 2: 5 + y + 2y = 14', '3y = 14 − 5 = 9', 'y = 9 : 3 = 3'], back: 'x = (5 + 3) : 2 = 4' },
+};
+const SUBK = ['y1', 'x1', 'y2', 'x2'];
+// lesson 3: 2x + 3y = 13, 3x − y = 3 → (2; 3)
+const A1 = [2, 3, 13], A2 = [3, -1, 3];
+// lesson 4: x + y = 5, 2x − y = 4 → (3; 2)
+const G = [[1, 1, 5], [2, -1, 4]];
+const GCOL = [ORANGE, BLUE];
+const sat = (e, x, y) => e[0] * x + e[1] * y === e[2];
+
+const LESSONS = [
+  { id: 'eq2', title: 'Уравнение с двумя переменными',
+    text: ['Равенство с двумя неизвестными, например 2x + y = 4, называют уравнением с двумя переменными. Его решение — пара чисел (x; y), при которой равенство верно. Пара (1; 2) подходит: 2·1 + 2 = 4. А пара (2; 1) — нет: 2·2 + 1 = 5.',
+           'Решений у такого уравнения бесконечно много. Возьмите любое x и найдите y из равенства y = 4 − 2x.',
+           'Уравнение вида ax + by = c называют линейным уравнением с двумя переменными. Если отметить все его решения на координатной плоскости, они лягут на одну прямую — это график уравнения.'],
+    why: 'Так считают любые «комбинации под бюджет». Менеджер по закупкам решает, сколько ноутбуков и сколько мониторов взять на 4 миллиона тенге, — вариантов много, и каждый из них решение уравнения. Логист подбирает, сколько больших и малых машин загрузить на 20 тонн. Диетолог комбинирует продукты на заданные калории. Умение видеть все варианты, а не один, помогает выбрать самый выгодный.',
+    task: 'Найдите 4 разные пары (x; y), которые являются решениями уравнения 2x + y = 4.',
+    hint: 'Выберите x, например 0 или 3, и посчитайте y = 4 − 2x. Нажмите на этот узел сетки. Табло сразу покажет, чему равно 2x + y.',
+    stage: 'Нажмите или ведите пальцем по плоскости. Отпустите на узле — пара проверится.',
+    check: m => m.found.length >= 4 },
+  { id: 'subst', title: 'Способ подстановки',
+    text: ['Система уравнений — это несколько уравнений, для которых ищут общее решение: пару (x; y), которая подходит сразу в оба. Систему записывают с фигурной скобкой.',
+           'Способ подстановки: 1) из одного уравнения выразите одну переменную через другую; 2) подставьте это выражение во второе уравнение — в нём останется одна переменная; 3) решите его; 4) найдите вторую переменную по выражению из шага 1.',
+           'Выгоднее выражать ту переменную, перед которой стоит 1 или −1. Тогда не появятся дроби.'],
+    why: 'Подстановка — главный приём инженера и программиста: одну величину выражают через другую и «вставляют» в формулу. Так считают ток в цепи, расход материалов на стройке, цену заказа в интернет-магазине. Экономист банка, сравнивая два кредита, выражает платёж через срок и подставляет в формулу переплаты. Тот, кто уверенно подставляет, быстро решает задачи на работе и в Excel.',
+    task: 'Решите систему x + y = 7, 2x − y = 5 способом подстановки: выберите, что выразить, и найдите корень полученного уравнения.',
+    hint: 'Проще всего выразить переменную с коэффициентом 1. Потом двигайте ползунок, пока весы не уравновесятся: левая часть равна правой.',
+    stage: 'Кнопки внизу — что выразить. Ползунок под весами — значение переменной.',
+    check: m => m.solved },
+  { id: 'add', title: 'Способ сложения',
+    text: ['Если сложить левые части двух верных равенств и отдельно их правые части, снова получится верное равенство. На этом и держится способ сложения.',
+           'Умножим уравнения на такие числа, чтобы коэффициенты при одной переменной стали противоположными, например 3y и −3y. Умножать надо всё уравнение: каждый член слева и число справа. После сложения противоположные члены дают ноль — переменная исчезает.',
+           'Остаётся уравнение с одной переменной. Решите его, а найденное значение подставьте в любое из исходных уравнений.'],
+    why: 'Способ сложения — это начало метода Гаусса, которым компьютеры решают системы из тысяч уравнений: так рассчитывают нагрузки на мосты и каркасы высоток, прогноз погоды, маршруты такси. Бухгалтер по двум чекам находит цены: «2 самсы и 3 чая — 1300 ₸, 3 самсы и чай — 1250 ₸» — сколько стоит одна самса? Сложение с множителями отвечает за минуту.',
+    task: 'Подберите множители для уравнений 2x + 3y = 13 и 3x − y = 3 так, чтобы при сложении одна переменная исчезла, и получите решение системы.',
+    hint: 'Посмотрите на коэффициенты при y: 3 и −1. На что умножить второе уравнение, чтобы вместо −y стало −3y?',
+    stage: 'Кнопки «−» и «+» слева меняют множитель уравнения.',
+    check: m => m.solved },
+  { id: 'graph', title: 'Графический способ',
+    text: ['Каждое уравнение системы — прямая на координатной плоскости. Решение системы — точка, которая лежит на обеих прямых сразу, то есть точка их пересечения.',
+           'Для прямой хватит двух точек. Возьмите два удобных значения x, посчитайте y — и проведите прямую через получившиеся точки.',
+           'Пересекаются прямые — решение одно. Параллельны — решений нет. Совпадают — решений бесконечно много. Графический способ наглядный, но часто даёт ответ приближённо, поэтому найденную пару проверяют подстановкой.'],
+    why: 'Предприниматель рисует два графика — расходы и выручку — и в точке пересечения видит, с какого числа покупателей кофейня в Алматы начинает приносить прибыль. Экономист находит равновесную цену там, где пересекаются спрос и предложение. Сравнивая два тарифа такси или мобильной связи, по пересечению графиков видно, с какого пробега или трафика выгоднее другой тариф.',
+    task: 'Постройте прямые x + y = 5 и 2x − y = 4 по двум точкам каждую и отметьте точку их пересечения.',
+    hint: 'Выберите прямую кнопкой внизу и ставьте точки, которые подходят в её уравнение. Когда обе прямые готовы, включите «Пересечение» и нажмите на общую точку.',
+    stage: 'Выберите режим кнопкой, затем нажимайте на узлы сетки.',
+    mode: 0,
+    check: m => m.inter },
+];
+
+const KEY = 'luch-math-systems';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview',
+            p: null, found: [], path: null, val: 0, k1: 1, k2: 1, mode: 0, gp: [[], []], inter: false, hl: null };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+function model() {
+  const id = LID();
+  if (id === 'eq2') {
+    const p = S.p, v = p ? E1[0] * p[0] + E1[1] * p[1] : null;
+    return { kind: id, p: p ? p.slice() : null, v, ok: p ? v === E1[2] : false, found: S.found.map(f => f.slice()) };
+  }
+  if (id === 'subst') {
+    const P = S.path ? SUB[S.path] : null, L = P ? P.lhs(S.val) : null;
+    return { kind: id, path: S.path, P, val: S.val, L, R: P ? P.rhs : null, bal: P ? Math.abs(L - P.rhs) < 1e-9 : false, solved: !!P && S.val === P.root && !drag };
+  }
+  if (id === 'add') {
+    const k1 = S.k1, k2 = S.k2, sum = [0, 1, 2].map(i => k1 * A1[i] + k2 * A2[i]);
+    const elim = k1 && k2 ? (sum[0] === 0 ? 'x' : sum[1] === 0 ? 'y' : null) : null;
+    return { kind: id, k1, k2, r1: A1.map(c => c * k1), r2: A2.map(c => c * k2), sum, elim, solved: !!elim };
+  }
+  const lines = S.gp.map(a => a.length === 2);
+  return { kind: id, mode: S.mode, gp: S.gp.map(a => a.map(q => q.slice())), lines, p: S.p ? S.p.slice() : null, inter: S.inter };
+}
+
+// ---------- geometry (SVG units, 520 × 405) ----------
+const X1 = x => 260 + x * 22, Y1 = y => 200 - y * 22;   // plane −6…6
+const T = (x, y, s, txt, fill = MUTED, anchor = 'middle', extra = '') => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${s}" fill="${fill}" text-anchor="${anchor}" ${extra}>${txt}</text>`;
+const L = (x1, y1, x2, y2, col, w = 1, extra = '') => `<path d="M${(+x1).toFixed(1)} ${(+y1).toFixed(1)}L${(+x2).toFixed(1)} ${(+y2).toFixed(1)}" stroke="${col}" stroke-width="${w}" ${extra}/>`;
+const arrowHead = (x, y, dir) => dir === 'r' ? `<path d="M${x} ${y}l-8 -4.5v9z" fill="#a9b4c9"/>` : `<path d="M${x} ${y}l-4.5 8h9z" fill="#a9b4c9"/>`;
+const tag = (x, y, txt, col, w) => `<rect x="${(x - w / 2).toFixed(1)}" y="${(y - 12).toFixed(1)}" width="${w.toFixed(1)}" height="18" rx="6" fill="${col}" stroke="${INK}" stroke-width="1.4"/>` + T(x, y + 1, 11, txt, '#0b1019', 'middle', 'font-weight="500"');
+const B = 'font-weight="500"';
+function backdrop() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.05)" stroke-width="1.5"/></pattern>
+    <clipPath id="pclip"><rect x="${X1(-6)}" y="${Y1(6)}" width="264" height="264"/></clipPath></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+const onPlane = (x, y) => x >= X1(-6.5) && x <= X1(6.5) && y >= Y1(6.5) && y <= Y1(-6.5);
+const snap1 = (x, y) => [clamp(Math.round((x - 260) / 22), -6, 6), clamp(Math.round((200 - y) / 22), -6, 6)];
+function planeSVG() {
+  let h = `<rect x="${X1(-6)}" y="${Y1(6)}" width="264" height="264" fill="rgba(18,26,40,.55)"/>`;
+  for (let v = -6; v <= 6; v++) h += L(X1(v), Y1(6), X1(v), Y1(-6), 'rgba(160,185,230,.13)') + L(X1(-6), Y1(v), X1(6), Y1(v), 'rgba(160,185,230,.13)');
+  h += L(X1(-6.5), Y1(0), X1(6.6), Y1(0), '#a9b4c9', 2) + arrowHead(X1(6.6) + 6, Y1(0), 'r');
+  h += L(X1(0), Y1(-6.5), X1(0), Y1(6.6), '#a9b4c9', 2) + arrowHead(X1(0), Y1(6.6) - 6, 'u');
+  for (let v = -6; v <= 6; v++) {
+    if (!v) continue;
+    if (v % 2 === 0) h += T(X1(v), Y1(0) + 15, 9, ns(v)) + T(X1(0) - 7, Y1(v) + 3.5, 9, ns(v), MUTED, 'end');
+    h += L(X1(v), Y1(0) - 3, X1(v), Y1(0) + 3, '#a9b4c9') + L(X1(0) - 3, Y1(v), X1(0) + 3, Y1(v), '#a9b4c9');
+  }
+  h += T(X1(0) - 6, Y1(0) - 6, 10.5, 'O', FG, 'end') + T(X1(6.6) + 4, Y1(0) - 9, 12, 'x', FG) + T(X1(0) + 12, Y1(6.6) - 2, 12, 'y', FG);
+  return h;
+}
+// a full line through two lattice points, clipped to the plane
+function lineThrough(p, q, col, w, extra = '') {
+  const dx = q[0] - p[0], dy = q[1] - p[1], k = 30;
+  return `<g clip-path="url(#pclip)">` + L(X1(p[0] - k * dx), Y1(p[1] - k * dy), X1(p[0] + k * dx), Y1(p[1] + k * dy), col, w, extra) + `</g>`;
+}
+function probeSVG(p, col, sub) {
+  const x = X1(p[0]), y = Y1(p[1]);
+  let h = L(x, y, x, Y1(0), FG, 1.1, 'stroke-dasharray="3 3" opacity=".7"') + L(x, y, X1(0), y, FG, 1.1, 'stroke-dasharray="3 3" opacity=".7"');
+  h += `<circle cx="${x}" cy="${y}" r="10" fill="none" stroke="${col}" stroke-width="2"/><circle cx="${x}" cy="${y}" r="3.5" fill="${col}"/>`;
+  const lbl = sub ? `${pt(p[0], p[1])}: ${sub}` : pt(p[0], p[1]), w = lbl.length * 6.7 + 14;
+  const lx = clamp(p[0] < 0 ? x + w / 2 + 14 : x - w / 2 - 14, X1(-6) + w / 2 - 30, X1(6) - w / 2 + 30);
+  h += tag(lx, y - 14, lbl, col, w);
+  return h;
+}
+
+// ---------- lesson 1 ----------
+function eq2SVG(m) {
+  let h = planeSVG();
+  if (m.found.length >= 2) {
+    const [p, q] = m.found;
+    h += lineThrough(p, q, m.found.length >= 4 ? GREEN : 'rgba(134,224,168,.45)', m.found.length >= 4 ? 2.4 : 1.6, m.found.length >= 4 ? '' : 'stroke-dasharray="6 5"');
+  }
+  m.found.forEach(f => { h += `<circle cx="${X1(f[0])}" cy="${Y1(f[1])}" r="6.5" fill="${GREEN}" stroke="${INK}" stroke-width="2"/>`; });
+  if (m.p) h += probeSVG(m.p, m.ok ? GREEN : ORANGE, `2x + y = ${ns(m.v)}`);
+  // legend + found chips
+  h += `<rect x="70" y="352" width="380" height="44" rx="12" fill="rgba(26,36,56,.6)" stroke="#26324a" stroke-width="1.2"/>`;
+  h += T(84, 379, 14, '2x + y = 4', FG, 'start', B);
+  for (let i = 0; i < 4; i++) {
+    const f = m.found[i], x = 225 + i * 58;
+    h += `<rect x="${x - 26}" y="362" width="52" height="24" rx="7" fill="${f ? 'rgba(134,224,168,.14)' : 'none'}" stroke="${f ? GREEN : '#3a4762'}" stroke-width="1.2" ${f ? '' : 'stroke-dasharray="4 3"'}/>`;
+    h += T(x, 378, 10.5, f ? pt(f[0], f[1]) : '?', f ? GREEN : MUTED);
+  }
+  if (m.found.length >= 4) h += T(X1(3.4), Y1(5.3), 11, 'все решения — на прямой', GREEN);
+  return h;
+}
+
+// ---------- lesson 2 ----------
+const VMIN = -3, VMAX = 9, TX = v => 120 + (v - VMIN) * (280 / (VMAX - VMIN));
+function substSVG(m) {
+  let h = '';
+  // system
+  h += `<path d="M196 70q-8 0 -8 8v10q0 6 -6 7q6 1 6 7v10q0 8 8 8" fill="none" stroke="${FG}" stroke-width="1.6"/>`;
+  const hiE = m.P ? (m.P.into === 1 ? 2 : 1) : 0;
+  h += T(204, 89, 15, 'x + y = 7', hiE === 1 ? ORANGE : FG, 'start', B) + T(300, 89, 11, '(1)', MUTED, 'start');
+  h += T(204, 118, 15, '2x − y = 5', hiE === 2 ? ORANGE : FG, 'start', B) + T(300, 118, 11, '(2)', MUTED, 'start');
+  if (!m.P) {
+    h += T(260, 168, 13, 'Шаг 1. Что выразить? Выберите кнопкой внизу.', ORANGE);
+    h += T(260, 192, 11.5, 'Удобнее та переменная, у которой коэффициент 1 или −1.', MUTED);
+  } else {
+    h += T(76, 160, 11, '1. выразили', MUTED, 'start') + T(190, 160, 14, m.P.expr, ORANGE, 'start', B) + T(330, 160, 11, `из (${hiE})`, MUTED, 'start');
+    h += T(76, 186, 11, `2. в (${m.P.into})`, MUTED, 'start') + T(190, 186, 14, m.P.sub, FG, 'start', B);
+    h += T(76, 212, 11, `3. одна ${m.P.v}`, MUTED, 'start') + T(190, 212, 14, m.P.simp, FG, 'start', B);
+    // balance
+    const diff = m.L - m.R, ang = clamp(diff * 2.5, -10, 10), cx = 260, cy = 268, half = 120;
+    const rad = ang * Math.PI / 180, lx = cx - half * Math.cos(rad), ly = cy - half * Math.sin(rad), rx = cx + half * Math.cos(rad), ry = cy + half * Math.sin(rad);
+    h += `<path d="M${cx} ${cy}l-16 50h32z" fill="#1a2438" stroke="#3a4762" stroke-width="1.4"/><rect x="${cx - 46}" y="${cy + 50}" width="92" height="7" rx="3" fill="#26324a"/>`;
+    h += L(lx, ly, rx, ry, m.bal ? GREEN : '#a9b4c9', 4, 'stroke-linecap="round"') + `<circle cx="${cx}" cy="${cy}" r="4.5" fill="${FG}"/>`;
+    const pan = (x, y, col) => L(x, y, x - 30, y + 30, MUTED) + L(x, y, x + 30, y + 30, MUTED) +
+      `<path d="M${x - 38} ${y + 30}h76q-6 14 -38 14q-32 0 -38 -14z" fill="${col}" fill-opacity=".18" stroke="${col}" stroke-width="1.6"/>`;
+    const lc = m.bal ? GREEN : ORANGE, rc = m.bal ? GREEN : BLUE;
+    h += pan(lx, ly, lc) + pan(rx, ry, rc);
+    h += T(140, 232, 12, `${m.P.lhsTxt(m.val)} = ${ns(m.L)}`, lc, 'middle', B) + T(380, 232, 12, `правая часть = ${ns(m.R)}`, rc, 'middle', B);
+    if (m.bal) h += T(cx, 352, 12.5, m.solved ? `равновесие: ${m.P.v} = ${ns(m.val)}, тогда ${m.P.back.split(' = ')[0]} = ${m.P.back.split(' = ').pop()} → (4; 3)` : 'равновесие!', GREEN, 'middle', B);
+    else h += T(cx, 352, 11.5, diff > 0 ? 'левая часть тяжелее' : 'правая часть тяжелее', MUTED);
+    // track
+    const ty = 382;
+    h += L(TX(VMIN), ty, TX(VMAX), ty, '#3a4762', 3, 'stroke-linecap="round"');
+    for (let v = VMIN; v <= VMAX; v++) h += L(TX(v), ty - 4, TX(v), ty + 4, '#3a4762', 1) + T(TX(v), ty + 18, 9, ns(v));
+    h += T(TX(VMIN) - 14, ty + 4, 13, m.P.v, ORANGE, 'end', B);
+    h += `<g data-drag="val"><rect x="${TX(VMIN) - 10}" y="${ty - 20}" width="${TX(VMAX) - TX(VMIN) + 20}" height="40" fill="transparent"/><circle cx="${TX(m.val)}" cy="${ty}" r="10" fill="#2a3348" stroke="${m.bal ? GREEN : ORANGE}" stroke-width="2.4"/>` +
+      T(TX(m.val), ty + 4, 10, ns(m.val), FG, 'middle', B) + `</g>`;
+  }
+  return h;
+}
+
+// ---------- lesson 3 ----------
+const CX = 262, CY = 352, CEQ = 378, CR = 446;   // column right edges: x-term, y-term, "=", right side
+function rowSVG(y, r, cols, dim) {
+  const [a, b, c] = r;
+  return T(CX, y, 16, term(a, 'x', true), cols[0] || ORANGE, 'end', B) + T(CY, y, 16, term(b, 'y'), cols[1] || BLUE, 'end', B) +
+    T(CEQ, y, 16, '=', dim ? MUTED : FG, 'middle', B) + T(CR, y, 16, ns(c), cols[2] || FG, 'end', B);
+}
+function stepper(y, k, id) {
+  const btn = (x, s, a) => `<g data-act="${a}" style="cursor:pointer"><rect x="${x - 15}" y="${y - 21}" width="30" height="30" rx="8" fill="#1a2438" stroke="#3a4762" stroke-width="1.3"/>` + T(x, y + 0, 17, s, FG, 'middle', B) + `</g>`;
+  return btn(46, '−', id + '-') + T(84, y, 15, '×' + (k < 0 ? `(${ns(k)})` : ns(k)), k ? ORANGE : RED, 'middle', B) + btn(122, '+', id + '+');
+}
+function addSVG(m) {
+  let h = '';
+  h += T(300, 90, 10.5, 'уравнение после умножения', MUTED);
+  h += T(160, 112, 10.5, '(1)', MUTED, 'start') + T(160, 168, 10.5, '(2)', MUTED, 'start');
+  h += stepper(128, m.k1, 'k1') + rowSVG(128, m.r1, []) + T(CR + 10, 128, 10, `из ${lin(...A1)}`, MUTED, 'start');
+  h += stepper(184, m.k2, 'k2') + rowSVG(184, m.r2, []) + T(CR + 10, 184, 10, `из ${lin(...A2)}`, MUTED, 'start');
+  h += T(168, 214, 18, '+', FG, 'middle', B) + L(180, 205, CR + 6, 205, FG, 1.6);
+  const cols = [m.sum[0] === 0 ? GREEN : ORANGE, m.sum[1] === 0 ? GREEN : BLUE, FG];
+  if (m.elim) {
+    const cx = m.elim === 'x' ? CX - 26 : CY - 26;
+    h += `<rect x="${cx - 32}" y="${222}" width="64" height="30" rx="8" fill="rgba(134,224,168,.12)" stroke="${GREEN}" stroke-width="1.4"/>`;
+  }
+  h += rowSVG(243, m.sum, cols);
+  if (!m.elim) {
+    h += T(300, 292, 12.5, m.k1 && m.k2 ? 'Ни x, ни y не исчезли. Подберите другие множители.' : 'Множитель 0 стирает уравнение целиком — так нельзя.', MUTED);
+    h += T(300, 314, 11.5, `коэффициенты при x: ${ns(m.r1[0])} и ${ns(m.r2[0])}, при y: ${ns(m.r1[1])} и ${ns(m.r2[1])}`, MUTED);
+  } else {
+    const v = m.elim === 'x' ? 'y' : 'x', c = m.elim === 'x' ? m.sum[1] : m.sum[0], val = m.sum[2] / c;
+    const x = m.elim === 'y' ? val : (A1[2] - A1[1] * val) / A1[0], y = m.elim === 'x' ? val : (A1[2] - A1[0] * val) / A1[1];
+    h += T(300, 280, 12, `${m.elim} исчез!`, GREEN, 'middle', B);
+    h += T(300, 306, 14, `${ns(c)}${v} = ${ns(m.sum[2])}  →  ${v} = ${ns(m.sum[2])} : ${par(c)} = ${ns(val)}`, FG, 'middle', B);
+    const back = m.elim === 'y' ? `в (1): 2·${par(x)} + 3y = 13  →  3y = ${ns(13 - 2 * x)}  →  y = ${ns(y)}` : `в (1): 2x + 3·${par(y)} = 13  →  2x = ${ns(13 - 3 * y)}  →  x = ${ns(x)}`;
+    h += T(300, 332, 13, back, FG, 'middle');
+    h += `<rect x="220" y="350" width="160" height="30" rx="9" fill="rgba(134,224,168,.14)" stroke="${GREEN}" stroke-width="1.4"/>` + T(300, 370, 14, `ответ: ${pt(x, y)}`, GREEN, 'middle', B);
+  }
+  return h;
+}
+
+// ---------- lesson 4 ----------
+function graphSVG(m) {
+  let h = planeSVG();
+  m.gp.forEach((a, i) => { if (a.length === 2) h += lineThrough(a[0], a[1], GCOL[i], 2.4, 'stroke-linecap="round"'); });
+  m.gp.forEach((a, i) => a.forEach(q => { h += `<circle cx="${X1(q[0])}" cy="${Y1(q[1])}" r="6" fill="${GCOL[i]}" stroke="${INK}" stroke-width="2"/>`; }));
+  if (m.inter) h += `<circle cx="${X1(3)}" cy="${Y1(2)}" r="11" fill="none" stroke="${GREEN}" stroke-width="2.6"/>` + tag(X1(3) + 52, Y1(2) - 16, 'решение (3; 2)', GREEN, 104);
+  if (m.p && drag) {
+    const col = m.mode === 2 ? FG : GCOL[m.mode], e = G[m.mode];
+    h += probeSVG(m.p, col, m.mode === 2 ? '' : `${lin(e[0], e[1], e[2]).split(' = ')[0]} = ${ns(e[0] * m.p[0] + e[1] * m.p[1])}`);
+  }
+  // legend
+  h += `<rect x="40" y="352" width="440" height="44" rx="12" fill="rgba(26,36,56,.6)" stroke="#26324a" stroke-width="1.2"/>`;
+  G.forEach((e, i) => {
+    const x = 56 + i * 152, on = m.mode === i;
+    h += `<g data-act="mode${i}" style="cursor:pointer"><rect x="${x - 8}" y="360" width="144" height="28" rx="8" fill="${on ? 'rgba(255,255,255,.06)' : 'none'}" stroke="${on ? GCOL[i] : 'transparent'}" stroke-width="1.3"/>` +
+      `<circle cx="${x + 4}" cy="374" r="5" fill="${GCOL[i]}"/>` + T(x + 16, 378.5, 12.5, lin(...e), FG, 'start', B) + T(x + 128, 378.5, 10, m.gp[i].length + '/2', m.lines[i] ? GREEN : MUTED, 'end') + `</g>`;
+  });
+  const on = m.mode === 2;
+  h += `<g data-act="mode2" style="cursor:pointer"><rect x="356" y="360" width="116" height="28" rx="8" fill="${on ? 'rgba(255,255,255,.06)' : 'none'}" stroke="${on ? FG : 'transparent'}" stroke-width="1.3"/>` +
+    T(414, 378.5, 12, m.inter ? 'пересечение ✓' : '× пересечение', m.inter ? GREEN : FG, 'middle', B) + `</g>`;
+  return h;
+}
+
+function hlBox(id) {
+  const Bx = {
+    plane: [X1(-6.4), Y1(6.6), 290, 290], eqbox: [66, 348, 132, 52], chips: [190, 356, 244, 36], line: [X1(-6), Y1(6), 264, 264],
+    probe: S.p ? [X1(S.p[0]) - 16, Y1(S.p[1]) - 16, 32, 32] : [0, 0, 0, 0],
+    sys: [180, 66, 150, 66], expr: [70, 144, 380, 24], sub: [70, 170, 380, 50], balance: [60, 216, 400, 124], track: [96, 360, 330, 44],
+    steps: [28, 100, 116, 100], rows: [176, 104, 344, 96], sum: [176, 222, 300, 32], chain: [80, 266, 440, 120],
+    l1: [44, 356, 148, 36], l2: [196, 356, 148, 36], interb: [352, 356, 124, 36], pts: [X1(-6), Y1(6), 264, 264],
+  };
+  return Bx[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID(), m = model();
+  let h = backdrop();
+  if (id === 'eq2') h += eq2SVG(m);
+  else if (id === 'subst') h += substSVG(m);
+  else if (id === 'add') h += addSVG(m);
+  else h += graphSVG(m);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b && b[2] > 0) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="8" fill="rgba(114,212,232,.07)" stroke="${BLUE}" stroke-width="2" stroke-dasharray="6 5" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}" pointer-events="none"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 500, hh / 410, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 408 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- actions ----------
+let drag = null, dirty = true;
+function commitProbe() {
+  const p = S.p; if (!p) return;
+  const id = LID(), [x, y] = p;
+  if (id === 'eq2') {
+    const v = E1[0] * x + E1[1] * y;
+    if (v === E1[2]) {
+      if (S.found.some(f => f[0] === x && f[1] === y)) toast(`Пара ${pt(x, y)} уже найдена. Попробуйте другое x.`);
+      else { S.found.push([x, y]); toast(S.found.length < 4 ? `Да: 2·${par(x)} + ${par(y)} = 4. Решение ${S.found.length} из 4.` : 'Четыре решения! Видите, они на одной прямой?'); }
+    } else toast(`2·${par(x)} + ${par(y)} = ${ns(v)}, а нужно 4. Это не решение.`);
+  } else if (id === 'graph') {
+    if (S.mode < 2) {
+      const e = G[S.mode], a = S.gp[S.mode], i = S.mode + 1;
+      if (sat(e, x, y)) {
+        if (a.some(q => q[0] === x && q[1] === y)) toast('Эта точка уже стоит. Нужна другая.');
+        else {
+          a.push([x, y]); if (a.length > 2) a.shift();
+          if (a.length === 2) {
+            const other = S.gp[1 - S.mode].length < 2;
+            toast(`Прямая (${i}) построена.` + (other ? ' Теперь вторая прямая.' : ' Включите «Пересечение».'));
+            if (other) S.mode = 1 - S.mode;
+            else S.mode = 2;
+            renderTools(); if (S.tab === 'scheme') buildScheme();
+          } else toast(`${subStr(e[0], e[1], x, y)} = ${ns(e[2])} — точка на прямой (${i}). Нужна ещё одна.`);
+        }
+      } else toast(`${subStr(e[0], e[1], x, y)} = ${ns(e[0] * x + e[1] * y)}, а нужно ${ns(e[2])}. Точка не на прямой (${i}).`);
+    } else {
+      if (!(S.gp[0].length === 2 && S.gp[1].length === 2)) toast('Сначала постройте обе прямые — по две точки.');
+      else {
+        const s1 = sat(G[0], x, y), s2 = sat(G[1], x, y);
+        if (s1 && s2) { S.inter = true; toast(`Точка ${pt(x, y)} лежит на обеих прямых — это решение системы.`); }
+        else toast(`${pt(x, y)}: ${s1 ? 'на прямой (1)' : 'не на прямой (1)'}, ${s2 ? 'на прямой (2)' : 'не на прямой (2)'}. Нужна общая точка.`);
+      }
+    }
+  }
+  update();
+}
+function act(a) {
+  const id = LID();
+  if (SUB[a]) { S.path = a; S.val = 0; update(); if (S.tab === 'scheme') buildScheme(); renderTools(); return; }
+  if (a === 'v-1' || a === 'v+1') { if (!S.path) { toast('Сначала выберите, что выразить.'); return; } S.val = clamp(S.val + (a === 'v-1' ? -1 : 1), VMIN, VMAX); update(); return; }
+  if (/^k[12][+-]$/.test(a)) { const k = a.slice(0, 2); S[k] = clamp(S[k] + (a[2] === '+' ? 1 : -1), -4, 4); update(); return; }
+  if (a === 'kr') { S.k1 = 1; S.k2 = 1; update(); return; }
+  if (/^mode[012]$/.test(a)) { S.mode = +a[4]; renderTools(); if (S.tab === 'scheme') buildScheme(); update(); return; }
+  if (a === 'clr') { if (id === 'eq2') S.found = []; else { S.gp = [[], []]; S.inter = false; S.mode = 0; renderTools(); } S.p = null; update(); return; }
+}
+
+// ---------- pointer ----------
+const toSvg = e => { const p = scene.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; const c = scene.getScreenCTM(); return c ? p.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+const setVal = x => { const v = clamp(Math.round(VMIN + (x - TX(VMIN)) / (TX(1) - TX(0))), VMIN, VMAX); if (v !== S.val) { S.val = v; update(); } };
+scene.addEventListener('pointerdown', e => {
+  const id = LID(), p = toSvg(e);
+  const grab = () => { e.preventDefault(); try { scene.setPointerCapture(e.pointerId); } catch (er) {} scene.classList.add('grabbing'); };
+  const a = e.target.closest('[data-act]');
+  if (a) { e.preventDefault(); act(a.dataset.act); return; }
+  if (id === 'eq2' || id === 'graph') {
+    if (!onPlane(p.x, p.y)) return;
+    grab(); drag = { kind: 'probe' }; S.p = snap1(p.x, p.y); update(); return;
+  }
+  if (id === 'subst' && S.path && e.target.closest('[data-drag="val"]')) { grab(); drag = { kind: 'val' }; setVal(p.x); update(); }
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const p = toSvg(e);
+  if (drag.kind === 'val') return setVal(p.x);
+  if (drag.kind === 'probe') { const q = snap1(p.x, p.y); if (!S.p || q[0] !== S.p[0] || q[1] !== S.p[1]) { S.p = q; update(); } }
+});
+const endDrag = cancel => {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing');
+  if (d.kind === 'probe' && !cancel) { commitProbe(); return; }
+  update();
+};
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+function loop(t) {
+  requestAnimationFrame(loop);
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3000); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const Bt = (k, label, on) => `<button data-a="${k}"${on === undefined ? '' : ` aria-pressed="${on}"`}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    eq2: Bt('clr', 'Стереть найденные'),
+    subst: SUBK.map(k => Bt(k, SUB[k].label, S.path === k)).join('') + sep + Bt('v-1', '−1') + Bt('v+1', '+1'),
+    add: Bt('k1-', '(1) −') + Bt('k1+', '(1) +') + sep + Bt('k2-', '(2) −') + Bt('k2+', '(2) +') + sep + Bt('kr', 'Сброс'),
+    graph: Bt('mode0', 'Прямая (1)', S.mode === 0) + Bt('mode1', 'Прямая (2)', S.mode === 1) + Bt('mode2', 'Пересечение', S.mode === 2) + sep + Bt('clr', 'Сброс'),
+  }[id];
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const AX = '<path d="M4 24h26M10 30V4" stroke="var(--fg)" stroke-width="1.3"/>';
+const tx = (x, y, s, t, c = 'var(--fg)') => `<text x="${x}" y="${y}" font-size="${s}" fill="${c}" text-anchor="middle" font-family="monospace">${t}</text>`;
+const ICON = {
+  plane: IC('<path d="M3 17h28M17 3v28" stroke="var(--fg)" stroke-width="1.3"/><path d="M3 10h28M3 24h28M10 3v28M24 3v28" stroke="var(--line)" stroke-width="1"/>'),
+  eq: IC(tx(17, 21, 9, '2x+y')),
+  pts: IC(AX + '<circle cx="14" cy="10" r="2.6" fill="var(--ok)"/><circle cx="19" cy="16" r="2.6" fill="var(--ok)"/><circle cx="24" cy="22" r="2.6" fill="var(--ok)"/>'),
+  line: IC(AX + '<path d="M8 5L30 28" stroke="var(--ok)" stroke-width="2"/>'),
+  probe: IC('<circle cx="17" cy="17" r="8" fill="none" stroke="var(--force)" stroke-width="2"/><circle cx="17" cy="17" r="2.5" fill="var(--force)"/>'),
+  sys: IC('<path d="M9 6q-3 0 -3 3v5q0 3 -3 3q3 0 3 3v5q0 3 3 3" fill="none" stroke="var(--fg)" stroke-width="1.4"/>' + tx(21, 14, 7.5, 'x+y') + tx(21, 26, 7.5, '2x−y')),
+  expr: IC(tx(17, 21, 9, 'y=…', 'var(--force)')),
+  sub: IC('<path d="M6 12h14M14 7l6 5-6 5" fill="none" stroke="var(--force)" stroke-width="1.8"/>' + tx(17, 29, 8, '(…)')),
+  balance: IC('<path d="M17 10l-5 16h10z" fill="none" stroke="var(--fg)" stroke-width="1.3"/><path d="M4 10h26" stroke="var(--ok)" stroke-width="2"/><path d="M4 10v6M30 10v6" stroke="var(--muted)"/><path d="M1 16h7M26 16h7" stroke="var(--fg)" stroke-width="1.6"/>'),
+  track: IC('<path d="M3 17h28" stroke="var(--line)" stroke-width="3"/><circle cx="20" cy="17" r="5" fill="none" stroke="var(--force)" stroke-width="2"/>'),
+  steps: IC('<rect x="3" y="11" width="9" height="12" rx="3" fill="none" stroke="var(--fg)"/><rect x="22" y="11" width="9" height="12" rx="3" fill="none" stroke="var(--fg)"/>' + tx(7.5, 20, 9, '−') + tx(26.5, 20, 9, '+') + tx(17, 20, 7.5, '×3', 'var(--force)')),
+  rows: IC(tx(17, 13, 7.5, '6x+9y') + tx(17, 25, 7.5, '9x−3y')),
+  sum: IC('<path d="M4 14h26" stroke="var(--fg)" stroke-width="1.4"/>' + tx(17, 26, 8, '15x+0', 'var(--ok)')),
+  chain: IC(tx(17, 13, 8, 'x=2') + tx(17, 26, 8, 'y=3', 'var(--ok)')),
+  l1: IC(AX + '<path d="M8 5L30 27" stroke="var(--force)" stroke-width="2"/>'),
+  l2: IC(AX + '<path d="M8 28L30 6" stroke="var(--arm)" stroke-width="2"/>'),
+  interb: IC('<path d="M5 5L29 29M5 29L29 5" stroke="var(--fg)" stroke-width="1.4"/><circle cx="17" cy="17" r="5" fill="none" stroke="var(--ok)" stroke-width="2"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const Ls = LESSONS[S.lesson];
+  if (S.done[Ls.id]) return '✓ Выполнено';
+  if (Ls.id === 'eq2') return `Найдено решений: ${m.found.length} из 4`;
+  if (Ls.id === 'subst') return m.P ? `${m.P.v} = ${ns(m.val)} · ${m.bal ? 'равновесие' : 'весы не в равновесии'}` : 'Шаг 1: выберите, что выразить';
+  if (Ls.id === 'add') return `множители ${ns(m.k1)} и ${ns(m.k2)} · ${m.elim ? 'переменная исчезла' : 'пока обе переменные на месте'}`;
+  return `Прямая (1): ${m.gp[0].length}/2 · прямая (2): ${m.gp[1].length}/2 · пересечение ${m.inter ? '✓' : '—'}`;
+}
+
+// ---------- Scheme tab ----------
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  const pp = S.p || [0, 0];
+  if (id === 'eq2') h = `<h2>Проверка пары</h2><div class="formula">2x + y = 4</div>
+      <dl class="reads"><div><dt>Пара</dt><dd id="r1"></dd></div><div><dt>2x + y</dt><dd id="r2"></dd></div><div><dt>Найдено</dt><dd id="r3"></dd></div></dl>` +
+      slider('inX', 'x', -6, 6, 1, pp[0]) + slider('inY', 'y', -6, 6, 1, pp[1]) + `<div class="row"><button class="ghostbtn" id="doCheck">Проверить пару</button></div>`;
+  if (id === 'subst') h = `<h2>Подстановка</h2><div class="formula" id="sDiag"></div><div class="chips" id="pathChips">${SUBK.map(k => `<button data-k="${k}" aria-pressed="${S.path === k}">${SUB[k].label}</button>`).join('')}</div>
+      <dl class="reads"><div><dt>Перем.</dt><dd id="r1"></dd></div><div><dt>Левая</dt><dd id="r2"></dd></div><div><dt>Правая</dt><dd id="r3"></dd></div></dl>` +
+      slider('inV', 'Значение переменной', VMIN, VMAX, 1, S.val);
+  if (id === 'add') h = `<h2>Множители</h2><div class="formula" id="sDiag"></div>
+      <dl class="reads"><div><dt>k₁</dt><dd id="r1"></dd></div><div><dt>k₂</dt><dd id="r2"></dd></div><div><dt>Исчез</dt><dd id="r3"></dd></div></dl>` +
+      slider('inK1', 'Множитель для (1)', -4, 4, 1, S.k1) + slider('inK2', 'Множитель для (2)', -4, 4, 1, S.k2);
+  if (id === 'graph') h = `<h2>Построение прямых</h2><div class="chips" id="modeChips">${['Прямая (1)', 'Прямая (2)', 'Пересечение'].map((t, i) => `<button data-k="${i}" aria-pressed="${S.mode === i}">${t}</button>`).join('')}</div>
+      <dl class="reads"><div><dt>(1)</dt><dd id="r1"></dd></div><div><dt>(2)</dt><dd id="r2"></dd></div><div><dt>Точка</dt><dd id="r3"></dd></div></dl>` +
+      slider('inX', 'x', -6, 6, 1, pp[0]) + slider('inY', 'y', -6, 6, 1, pp[1]) + `<div class="row"><button class="ghostbtn" id="doCheck">Поставить точку</button></div>`;
+  el.innerHTML = h;
+  const on = (sel, ev, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener(ev, fn); };
+  const setXY = () => { S.p = [+el.querySelector('#inX').value, +el.querySelector('#inY').value]; update(); };
+  on('#inX', 'input', setXY); on('#inY', 'input', setXY);
+  on('#doCheck', 'click', () => { if (!S.p) S.p = [0, 0]; commitProbe(); });
+  el.querySelectorAll('#pathChips button').forEach(b => b.onclick = () => act(b.dataset.k));
+  el.querySelectorAll('#modeChips button').forEach(b => b.onclick = () => act('mode' + b.dataset.k));
+  on('#inV', 'input', e => { if (!S.path) { toast('Сначала выберите, что выразить.'); e.target.value = S.val; return; } S.val = +e.target.value; update(); });
+  on('#inK1', 'input', e => { S.k1 = +e.target.value; update(); });
+  on('#inK2', 'input', e => { S.k2 = +e.target.value; update(); });
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (m.kind === 'eq2') {
+    set('#r1', m.p ? pt(m.p[0], m.p[1]) : '—'); set('#r2', m.p ? ns(m.v) : '—'); set('#r3', `${m.found.length}/4`);
+    set('#inXO', m.p ? ns(m.p[0]) : '—'); set('#inYO', m.p ? ns(m.p[1]) : '—');
+    if (m.p) { val('#inX', m.p[0]); val('#inY', m.p[1]); }
+  } else if (m.kind === 'subst') {
+    set('#sDiag', m.P ? m.P.simp : 'выберите, что выразить');
+    set('#r1', m.P ? `${m.P.v} = ${ns(m.val)}` : '—'); set('#r2', m.P ? ns(m.L) : '—'); set('#r3', m.P ? ns(m.R) : '—');
+    set('#inVO', m.P ? `${m.P.v} = ${ns(m.val)}` : '—'); val('#inV', m.val);
+    el.querySelectorAll('#pathChips button').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === m.path));
+  } else if (m.kind === 'add') {
+    set('#sDiag', lin(...m.sum)); set('#r1', ns(m.k1)); set('#r2', ns(m.k2)); set('#r3', m.elim || '—');
+    set('#inK1O', ns(m.k1)); set('#inK2O', ns(m.k2)); val('#inK1', m.k1); val('#inK2', m.k2);
+  } else {
+    set('#r1', `${m.gp[0].length}/2`); set('#r2', `${m.gp[1].length}/2`); set('#r3', m.p ? pt(m.p[0], m.p[1]) : '—');
+    set('#inXO', m.p ? ns(m.p[0]) : '—'); set('#inYO', m.p ? ns(m.p[1]) : '—');
+    if (m.p) { val('#inX', m.p[0]); val('#inY', m.p[1]); }
+    el.querySelectorAll('#modeChips button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.k === m.mode));
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'eq2') return [
+    { id: 'eqbox', icon: ICON.eq, name: 'Уравнение', spec: '2x + y = 4 — линейное уравнение с двумя переменными x и y.' },
+    { id: 'plane', icon: ICON.plane, name: 'Координатная плоскость', spec: 'Каждый узел сетки — пара целых чисел (x; y). Её и проверяем.' },
+    { id: 'probe', icon: ICON.probe, name: 'Проверяемая пара', spec: 'Кольцо с табло: подставляет x и y и показывает, чему равно 2x + y.' },
+    { id: 'chips', icon: ICON.pts, name: 'Найденные решения', spec: 'Пары, при которых 2x + y = 4. Нужно четыре разные.' },
+    { id: 'line', icon: ICON.line, name: 'График уравнения', spec: 'Прямая, на которой лежат все решения. Появляется после двух находок.' }];
+  if (id === 'subst') return [
+    { id: 'sys', icon: ICON.sys, name: 'Система', spec: 'Два уравнения под фигурной скобкой. Ищем пару, подходящую в оба.' },
+    { id: 'expr', icon: ICON.expr, name: 'Выраженная переменная', spec: 'Шаг 1: одна переменная записана через другую.' },
+    { id: 'sub', icon: ICON.sub, name: 'Подстановка', spec: 'Шаг 2: выражение вставлено в другое уравнение. Осталась одна переменная.' },
+    { id: 'balance', icon: ICON.balance, name: 'Весы', spec: 'Слева — левая часть уравнения при текущем значении, справа — правая. Равновесие — корень.' },
+    { id: 'track', icon: ICON.track, name: 'Ползунок', spec: 'Меняет значение оставшейся переменной от −3 до 9.' }];
+  if (id === 'add') return [
+    { id: 'steps', icon: ICON.steps, name: 'Множители', spec: 'На это число умножается всё уравнение — и левая, и правая часть.' },
+    { id: 'rows', icon: ICON.rows, name: 'Уравнения после умножения', spec: 'Оранжевые — члены с x, голубые — с y. Справа мелко — исходное уравнение.' },
+    { id: 'sum', icon: ICON.sum, name: 'Сумма уравнений', spec: 'Складываем отдельно члены с x, с y и правые части.' },
+    { id: 'chain', icon: ICON.chain, name: 'Решение', spec: 'Когда переменная исчезла, решаем уравнение и подставляем ответ в (1).' }];
+  return [
+    { id: 'l1', icon: ICON.l1, name: 'Прямая (1): x + y = 5', spec: 'Оранжевая. Строится по двум точкам, подходящим в уравнение (1).' },
+    { id: 'l2', icon: ICON.l2, name: 'Прямая (2): 2x − y = 4', spec: 'Голубая. Строится по двум точкам уравнения (2).' },
+    { id: 'pts', icon: ICON.pts, name: 'Опорные точки', spec: 'По две на прямую. Третья точка заменит самую старую.' },
+    { id: 'interb', icon: ICON.interb, name: 'Пересечение', spec: 'Режим отметки общей точки прямых — решения системы.' }];
+}
+
+function renderPanes(m) {
+  const Ls = LESSONS[S.lesson], done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Модель</h2><p class="note">Из чего состоит рабочее поле. Нажмите на пункт, чтобы найти его.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'eq2') {
+    let h = `<h2>Проверяем пару</h2><div class="formula">2x + y = 4</div><h3>Текущая пара</h3><div class="steps">`;
+    if (!m.p) h += step('пара не выбрана', 'нажмите на узел сетки');
+    else h += step('подставим', `x = ${ns(m.p[0])}, y = ${ns(m.p[1])}`) + step('левая часть', `2·${par(m.p[0])} + ${par(m.p[1])} = ${ns(m.v)}`) +
+      step('сравним с 4', m.ok ? `${ns(m.v)} = 4 → решение` : `${ns(m.v)} ≠ 4 → не решение`, 'sum');
+    h += `</div><h3>Как искать решения</h3><div class="steps">` + step('выразим y', 'y = 4 − 2x') +
+      (m.p ? step(`при x = ${ns(m.p[0])}`, `y = 4 − 2·${par(m.p[0])} = ${ns(4 - 2 * m.p[0])}`) : '') + `</div>`;
+    if (m.found.length) h += `<h3>Найдено</h3><div class="found">${m.found.map(f => `<span class="ok">${pt(f[0], f[1])}</span>`).join('')}</div>`;
+    return h + `<p class="note" style="margin-top:12px">Решений бесконечно много: подходят и дробные пары, например (0,5; 3). На сетке видны только целые.</p>`;
+  }
+  if (id === 'subst') {
+    if (!m.P) return `<h2>Способ подстановки</h2><div class="formula">x + y = 7<br>2x − y = 5</div><div class="steps">` +
+      step('шаг 1', 'выразить одну переменную') + step('шаг 2', 'подставить в другое уравнение') + step('шаг 3', 'решить уравнение с одной переменной') + step('шаг 4', 'найти вторую переменную') + `</div><p class="note" style="margin-top:10px">Выберите, что выразить, — здесь появится расчёт.</p>`;
+    const P = m.P;
+    let h = `<h2>Подстановка: ${P.label}</h2><div class="formula">${P.simp}</div><div class="steps">` +
+      step('1. выразили', P.expr) + step(`2. подставили в (${P.into})`, P.sub) + step(`3. проверим ${P.v} = ${ns(m.val)}`, `${P.lhsTxt(m.val)} = ${ns(m.L)}`) +
+      step('сравним', m.bal ? `${ns(m.L)} = ${ns(m.R)} → корень` : `${ns(m.L)} ≠ ${ns(m.R)}`, 'sum') + `</div>`;
+    if (m.solved) h += `<h3>Решение алгебраически</h3><div class="steps">` + P.steps.map((s, i) => step(`${i + 1}`, s)).join('') + step('4. вторая переменная', P.back) +
+      step('проверка (1)', '4 + 3 = 7 ✓') + step('проверка (2)', '2·4 − 3 = 5 ✓') + step('ответ', '(4; 3)', 'sum') + `</div>`;
+    return h;
+  }
+  if (id === 'add') {
+    let h = `<h2>Способ сложения</h2><div class="formula">${ns(m.k1)}·(1) + ${par(m.k2)}·(2)</div><div class="steps">` +
+      step(`(1) × ${par(m.k1)}`, lin(...m.r1)) + step(`(2) × ${par(m.k2)}`, lin(...m.r2)) +
+      step('при x', `${ns(m.r1[0])} + ${par(m.r2[0])} = ${ns(m.sum[0])}`) + step('при y', `${ns(m.r1[1])} + ${par(m.r2[1])} = ${ns(m.sum[1])}`) +
+      step('справа', `${ns(m.r1[2])} + ${par(m.r2[2])} = ${ns(m.sum[2])}`) + step('сумма', lin(...m.sum), 'sum') + `</div>`;
+    if (m.elim) {
+      const v = m.elim === 'x' ? 'y' : 'x', c = m.elim === 'x' ? m.sum[1] : m.sum[0], val = m.sum[2] / c;
+      h += `<h3>Дальше</h3><div class="steps">` + step(`${m.elim} исчез`, `${ns(c)}${v} = ${ns(m.sum[2])}`) + step(v, `${ns(m.sum[2])} : ${par(c)} = ${ns(val)}`) +
+        (v === 'x' ? step('в (1)', `2·${par(val)} + 3y = 13 → y = ${ns((13 - 2 * val) / 3)}`) : step('в (1)', `2x + 3·${par(val)} = 13 → x = ${ns((13 - 3 * val) / 2)}`)) +
+        step('проверка (2)', '3·2 − 3 = 3 ✓') + step('ответ', '(2; 3)', 'sum') + `</div>`;
+    } else h += `<p class="note" style="margin-top:10px">Чтобы переменная исчезла, её коэффициенты после умножения должны стать противоположными числами: их сумма — ноль.</p>`;
+    return h;
+  }
+  let h = `<h2>Графический способ</h2><div class="formula">x + y = 5<br>2x − y = 4</div>`;
+  G.forEach((e, i) => {
+    h += `<h3>Прямая (${i + 1}): ${lin(...e)}</h3><div class="steps">` + step('выразим y', i === 0 ? 'y = 5 − x' : 'y = 2x − 4');
+    if (!m.gp[i].length) h += step('точки', 'ещё не поставлены');
+    m.gp[i].forEach(q => { h += step(pt(q[0], q[1]), `${subStr(e[0], e[1], q[0], q[1])} = ${ns(e[2])} ✓`); });
+    h += `</div>`;
+  });
+  if (m.inter) h += `<h3>Проверка подстановкой</h3><div class="steps">` + step('(1)', '3 + 2 = 5 ✓') + step('(2)', '2·3 − 2 = 4 ✓') +
+    step('сложением', '(x + y) + (2x − y) = 5 + 4 → 3x = 9 → x = 3') + step('ответ', '(3; 2)', 'sum') + `</div>`;
+  return h + `<p class="note" style="margin-top:10px">Если прямые параллельны (одинаковый наклон, разные уравнения), у системы нет решений. Если совпадают — решений бесконечно много.</p>`;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter'), ok = !!S.done[id];
+  if (id === 'eq2') el.innerHTML = `<div class="k">2x + y</div><div class="v ${m.ok ? 'ok' : ''}">${m.p ? ns(m.v) + (m.ok ? ' = 4' : ' ≠ 4') : '—'}</div><div class="lr"><span>пара</span><span>${m.p ? pt(m.p[0], m.p[1]) : '—'}</span></div><div class="gauge"><b style="width:${(Math.min(4, m.found.length) / 4 * 100).toFixed(1)}%;background:var(--ok)"></b></div>`;
+  else if (id === 'subst') el.innerHTML = `<div class="k">Весы</div><div class="v ${m.bal ? 'ok' : ''}">${m.P ? `${ns(m.L)} ${m.bal ? '=' : '≠'} ${ns(m.R)}` : '—'}</div><div class="lr"><span>${m.P ? m.P.v : 'перем.'}</span><span>${m.P ? ns(m.val) : '—'}</span></div>`;
+  else if (id === 'add') el.innerHTML = `<div class="k">Сумма</div><div class="v ${m.elim ? 'ok' : ''}">${m.elim ? m.elim + ' исчез' : 'x и y на месте'}</div><div class="lr"><span>множители</span><span>${ns(m.k1)} и ${ns(m.k2)}</span></div>`;
+  else el.innerHTML = `<div class="k">Режим</div><div class="v ${ok ? 'ok' : ''}">${['прямая (1)', 'прямая (2)', 'пересечение'][m.mode]}</div><div class="lr"><span>(1)</span><span>${m.gp[0].length}/2</span></div><div class="lr"><span>(2)</span><span>${m.gp[1].length}/2</span></div>`;
+}
+
+function update() {
+  const m = model(), Ls = LESSONS[S.lesson];
+  if (!drag && !S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Системы уравнений покорены!'), 900);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  eq2: '<path d="M8 16h52M30 2v27" stroke="#a9b4c9" stroke-width="1"/><path d="M16 2L48 29" stroke="#86e0a8" stroke-width="1.4" stroke-dasharray="3 2"/><circle cx="23" cy="8" r="2.4" fill="#86e0a8"/><circle cx="34.5" cy="17.5" r="2.4" fill="#86e0a8"/><circle cx="42" cy="24" r="2.4" fill="#86e0a8"/>',
+  subst: '<path d="M33 7l-10 0M33 7v18" stroke="none"/><path d="M33 13l-5 13h10z" fill="none" stroke="#a9b4c9"/><path d="M10 13h46" stroke="#86e0a8" stroke-width="2"/><path d="M6 19h10M50 19h10" stroke="#ffb547" stroke-width="2"/><text x="33" y="9" font-size="7" fill="#e8ecf4" text-anchor="middle" font-family="monospace">y=7−x</text>',
+  add: '<text x="33" y="10" font-size="7" fill="#ffb547" text-anchor="middle" font-family="monospace">2x+3y</text><text x="33" y="19" font-size="7" fill="#72d4e8" text-anchor="middle" font-family="monospace">9x−3y</text><path d="M14 21h38" stroke="#e8ecf4"/><text x="33" y="29" font-size="7" fill="#86e0a8" text-anchor="middle" font-family="monospace">11x</text>',
+  graph: '<path d="M6 22h56M20 2v27" stroke="#a9b4c9" stroke-width="1"/><path d="M8 3L56 28" stroke="#ffb547" stroke-width="1.6"/><path d="M14 29L50 2" stroke="#72d4e8" stroke-width="1.6"/><circle cx="33.5" cy="16" r="3" fill="none" stroke="#86e0a8" stroke-width="1.4"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Ls, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Ls.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Ls.title}</span></span>
+      ${S.done[Ls.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const Ls = LESSONS[i];
+  S.lesson = i; S.hl = null; drag = null;
+  S.p = null; S.found = []; S.path = null; S.val = 0; S.k1 = 1; S.k2 = 1;
+  S.mode = Ls.mode || 0; S.gp = [[], []]; S.inter = false;
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = Ls.task;
+  $('#hint').textContent = Ls.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = LESSONS[S.lesson], id = Ls.id;
+  let now = '';
+  if (id === 'eq2') now = `Координатная плоскость, x и y от −6 до 6. Уравнение 2x + y = 4. ${m.p ? `Ученик проверяет пару ${pt(m.p[0], m.p[1])}: 2x + y = ${ns(m.v)} (${m.ok ? 'решение' : 'не решение'}).` : 'Пара пока не выбрана.'} Найдено решений: ${m.found.length} из 4${m.found.length ? ': ' + m.found.map(f => pt(f[0], f[1])).join(', ') : ''}.`;
+  if (id === 'subst') now = `Система x + y = 7 (1), 2x − y = 5 (2). ${m.P ? `Ученик выбрал: ${m.P.label}, ${m.P.expr}; подставил в (${m.P.into}) и получил ${m.P.sub}. На весах ${m.P.v} = ${ns(m.val)}: левая часть ${ns(m.L)}, правая ${ns(m.R)} — ${m.bal ? 'равновесие' : 'не равны'}.` : 'Ученик ещё не выбрал, какую переменную выразить.'}`;
+  if (id === 'add') now = `Система 2x + 3y = 13 (1), 3x − y = 3 (2). Множители: (1) × ${ns(m.k1)}, (2) × ${ns(m.k2)}. После умножения: ${lin(...m.r1)} и ${lin(...m.r2)}. Сумма: ${lin(...m.sum)}. ${m.elim ? `Переменная ${m.elim} исчезла.` : 'Ни одна переменная пока не исчезла.'}`;
+  if (id === 'graph') now = `Система x + y = 5 (1), 2x − y = 4 (2), координатная плоскость −6…6. Режим: ${['точки прямой (1)', 'точки прямой (2)', 'отметка пересечения'][m.mode]}. Точки прямой (1): ${m.gp[0].map(q => pt(q[0], q[1])).join(', ') || 'нет'}; прямой (2): ${m.gp[1].map(q => pt(q[0], q[1])).join(', ') || 'нет'}. Пересечение ${m.inter ? 'отмечено' : 'ещё не отмечено'}.`;
+  return [
+    `Раздел: математика, 7 класс, алгебра, тема «Системы уравнений». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+    'Не называй готовый ответ (решения уравнения, корни, множители, точку пересечения): веди ученика наводящими вопросами и проверяй его рассуждения.',
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = LESSONS[S.lesson], done = S.done[Ls.id];
+  const q = {
+    eq2: 'Почему у уравнения с двумя переменными так много решений?', subst: 'Какую переменную удобнее выразить и почему?',
+    add: 'Как понять, на что умножить уравнение?', graph: 'Что значит, если прямые параллельны?',
+  }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

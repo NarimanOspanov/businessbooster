@@ -1,0 +1,1008 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по химии, 8 класс: моль и число Авогадро, молярная масса, молярный объём газов и расчёты по уравнениям реакций.">
+<title>Количество вещества</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /mechanics and /chemistry. Lab bench (SVG) on the left, lesson notebook on the right, lesson strip under the bench. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+.scene [data-drag] text{pointer-events:none}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--liq);transition:width .2s}
+.gauge i{position:absolute;top:-4px;width:2px;height:14px;background:var(--force);transform:translateX(-50%)}
+.swatch{height:12px;border-radius:4px;margin-top:9px;border:1px solid rgba(255,255,255,.15)}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.meter .big{font:700 30px/1 var(--font-display);margin-top:8px;letter-spacing:.02em}
+.meter .big small{font:500 12px/1 var(--font-body);color:var(--muted);letter-spacing:0;margin-left:6px}
+.pairs{display:grid;gap:6px;margin-top:10px}
+.pairs label{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface-2);border-radius:9px;padding:7px 10px;font-size:13.5px}
+.pairs select{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:7px;padding:5px 8px;font:500 13px var(--font-mono)}
+.pairs select:disabled{color:var(--ok);opacity:1}
+.cnt{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;margin-top:10px}
+.cnt div{display:flex;align-items:center;justify-content:space-between;gap:6px;background:var(--surface-2);border-radius:9px;padding:6px 8px;font-size:13px}
+.cnt b{font:500 14px var(--font-mono)}
+.cnt button{width:30px;height:30px;border-radius:7px;background:var(--bg);border:1px solid var(--line);cursor:pointer;font:500 15px/1 var(--font-mono)}
+.vtab{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}
+.vtab span{background:var(--surface-2);border-radius:8px;padding:7px 4px;text-align:center;font:500 12px/1.3 var(--font-mono);color:var(--muted)}
+.vtab span b{display:block;color:var(--fg);font-size:15px}
+.vtab span.on{outline:2px solid var(--ok);color:var(--fg)}
+.tgts{display:grid;gap:6px;margin-top:10px}
+.tgts div{display:flex;justify-content:space-between;gap:10px;background:var(--surface-2);border-radius:9px;padding:8px 10px;font-size:13px}
+.tgts div span:last-child{font:500 12.5px var(--font-mono);color:var(--muted);white-space:nowrap}
+.tgts div.on span:last-child{color:var(--ok)}
+.cnt.c2{grid-template-columns:repeat(2,minmax(0,1fr))}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><ellipse cx="20" cy="20" rx="14" ry="5.5" fill="none" stroke="var(--arm)" stroke-width="1.6"/><ellipse cx="20" cy="20" rx="14" ry="5.5" fill="none" stroke="var(--arm)" stroke-width="1.6" transform="rotate(60 20 20)"/><ellipse cx="20" cy="20" rx="14" ry="5.5" fill="none" stroke="var(--arm)" stroke-width="1.6" transform="rotate(-60 20 20)"/><circle cx="20" cy="20" r="3.2" fill="var(--force)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Химия · Количество вещества</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#chem">Карта</a><a href="/physics/#chem">Химия</a><a href="/labs/chem-mole/" aria-current="page">Моль</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Моль</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Лабораторный стол">
+    <svg class="scene" id="scene" role="img" aria-label="Модель порции вещества, весы, газовый цилиндр и столбики молей. Предметы можно перетаскивать и нажимать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const KEY = 'luch-chem-mole';
+const SUBD = { '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉' };
+const SUPD = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '-': '⁻' };
+const low = s => String(s).replace(/\d/g, d => SUBD[d]);
+const sup = s => String(s).replace(/[\d-]/g, d => SUPD[d]);
+const fmt = (x, d = 2) => String(+(+x).toFixed(d)).replace('.', ',');
+const near = (a, b) => Math.abs(a - b) < 1e-6;
+const cap = s => s[0].toUpperCase() + s.slice(1);
+const NA = 6.02;
+// number of particles for n mol, as "1,204·10²⁴"
+function sci(n) {
+  if (n <= 0) return '0';
+  let m = n * NA, e = 23;
+  while (m >= 10 - 1e-9) { m /= 10; e++; }
+  while (m < 1) { m *= 10; e--; }
+  return String(+m.toPrecision(4)).replace('.', ',') + '·10' + sup(e);
+}
+
+const ATOM = {
+  H: { r: 13, c: '#eef2f8', t: '#0b1019', name: 'водород' }, C: { r: 20, c: '#4f586d', t: '#fff', name: 'углерод' },
+  N: { r: 20, c: '#4d7cf0', t: '#fff', name: 'азот' }, O: { r: 19, c: '#e5533f', t: '#fff', name: 'кислород' },
+  Cl: { r: 22, c: '#5fc46a', t: '#0b1019', name: 'хлор' }, Na: { r: 22, c: '#b88cf0', t: '#0b1019', name: 'натрий' },
+  Ca: { r: 22, c: '#9fd27a', t: '#0b1019', name: 'кальций' }, S: { r: 21, c: '#e6c63a', t: '#0b1019', name: 'сера' },
+  Mg: { r: 21, c: '#7ad1b5', t: '#0b1019', name: 'магний' },
+};
+const AR = { H: 1, C: 12, N: 14, O: 16, Na: 23, Mg: 24, S: 32, Cl: 35.5, Ca: 40 };
+const atomsOf = f => (f.match(/[A-Z][a-z]?\d*/g) || []).reduce((a, t) => { const s = t.match(/[A-Z][a-z]?/)[0]; a[s] = (a[s] || 0) + (+t.slice(s.length) || 1); return a; }, {});
+const Mof = f => Object.entries(atomsOf(f)).reduce((s, [e, k]) => s + AR[e] * k, 0);
+const NAME = { O2: 'кислород', H2O: 'вода', CO2: 'углекислый газ', H2: 'водород', N2: 'азот', NaCl: 'хлорид натрия', H2SO4: 'серная кислота', CaCO3: 'карбонат кальция', CaO: 'оксид кальция' };
+const GAS_C = { H2: '#eef2f8', N2: '#4d7cf0', O2: '#e5533f', CO2: '#9aa6bd' };
+
+// ---------- lesson 1: mole and Avogadro ----------
+const SUB1 = ['O2', 'H2O', 'CO2'];
+const TARG1 = [
+  { f: 'O2', n: 2, txt: '1,204·10²⁴ молекул O₂' },
+  { f: 'H2O', n: 0.5, txt: '3,01·10²³ молекул H₂O' },
+  { f: 'CO2', n: 1.5, txt: 'CO₂ с 1,806·10²⁴ атомов O' },
+];
+const NMAX1 = 4;
+// ---------- lesson 2: molar mass ----------
+const SUB2 = ['H2O', 'CO2', 'NaCl', 'H2SO4', 'CaCO3'];
+const TARG2 = ['CO2', 'NaCl', 'H2SO4'];
+const WTS = ['H', 'C', 'O', 'Na', 'S', 'Cl', 'Ca'];
+const PANMAX = 8;
+// ---------- lesson 3: molar volume ----------
+const VM = 22.4;
+const GAS = ['H2', 'N2', 'O2', 'CO2'];
+const TARG3 = [
+  { g: 'H2', n: 2, txt: '44,8 л водорода' },
+  { g: 'O2', n: 0.25, txt: '5,6 л кислорода' },
+  { g: 'CO2', n: 0.5, txt: '22 г углекислого газа' },
+];
+const NMAX = 3;
+// ---------- lesson 4: calculations by equation ----------
+const PROB = [
+  { L: [[2, 'H2'], [1, 'O2']], R: [[2, 'H2O']], g: 'H2', gm: 4, s: 'H2O', ask: 'm',
+    q: 'Сколько граммов воды получится при сгорании 4 г водорода?', gN: 'водорода', sN: 'воды' },
+  { L: [[1, 'CaCO3']], R: [[1, 'CaO'], [1, 'CO2']], g: 'CaCO3', gm: 50, s: 'CO2', ask: 'V',
+    q: 'Какой объём CO₂ (н. у.) выделится при обжиге 50 г известняка CaCO₃?', gN: 'карбоната кальция', sN: 'углекислого газа' },
+  { L: [[2, 'H2O']], R: [[2, 'H2'], [1, 'O2']], g: 'H2O', gm: 9, s: 'O2', ask: 'V',
+    q: 'Какой объём кислорода (н. у.) получится при разложении 9 г воды?', gN: 'воды', sN: 'кислорода' },
+];
+const coefOf = (P, f) => (P.L.concat(P.R).find(x => x[1] === f) || [1])[0];
+const eqText = P => P.L.map(([k, f]) => (k > 1 ? k : '') + low(f)).join(' + ') + ' → ' + P.R.map(([k, f]) => (k > 1 ? k : '') + low(f)).join(' + ');
+
+const LESSONS = [
+  { id: 'mole', title: 'Моль и число Авогадро',
+    text: ['Атомы и молекулы очень малы: в одной капле воды их больше, чем звёзд в нашей Галактике. Считать их поштучно невозможно, поэтому химики считают «пачками». Такая пачка называется моль.',
+           '1 моль — это 6,02·10²³ частиц: атомов или молекул. Это число — постоянная Авогадро, Nₐ = 6,02·10²³ моль⁻¹. Количество вещества обозначают буквой n и измеряют в молях.',
+           'Связь простая: N = n · Nₐ и n = N : Nₐ. В молекуле H₂O два атома водорода, поэтому в 1 моль воды — 2 моль атомов H.'],
+    why: 'Анализ крови на сахар в любой лаборатории Казахстана приходит в ммоль/л: норма натощак примерно 3,3–5,5 ммоль/л. Врачи, лаборанты и провизоры фармзаводов (например, в Шымкенте) считают вещества в молях, а не штуках. Лаборанты водоканалов так же записывают жёсткость воды — её считают в ммоль/л.',
+    task: 'Наберите три порции: 1,204·10²⁴ молекул O₂; 3,01·10²³ молекул H₂O; CO₂, в котором 1,806·10²⁴ атомов кислорода.',
+    hint: 'Делите число частиц на 6,02·10²³ — получатся моли. В каждой молекуле CO₂ два атома кислорода.',
+    stage: 'Нажмите на ящик «1 моль» или «¼ моль» справа или перетащите его в порцию. Убрать ящик — нажмите на него.',
+    init: { sub1: 'O2', n1: 1 },
+    check: m => TARG1.every((x, i) => m.found[i]) },
+  { id: 'molar', title: 'Молярная масса',
+    text: ['Молярная масса M — это масса 1 моль вещества. Её единица — г/моль. Численно она равна относительной молекулярной массе Mr.',
+           'Mr считают по таблице Менделеева: складывают относительные атомные массы Ar всех атомов формулы. H₂O: 2 · 1 + 16 = 18, значит, M(H₂O) = 18 г/моль.',
+           'Зная M, массу порции находят так: m = n · M, а моли по массе — n = m : M. 1 моль воды весит всего 18 г — чуть больше столовой ложки.'],
+    why: 'Агрономы и технологи удобрений пересчитывают граммы в моли: по молярной массе видно, сколько азота в мешке аммиачной селитры NH₄NO₃ (M = 80 г/моль, азота — 35 %). Металлурги заводов цветных металлов в Усть-Каменогорске так же считают, сколько металла даст тонна концентрата. Без молярной массы не составить ни одной рецептуры — от лекарства до бетона.',
+    task: 'Уравновесьте весы гирьками-атомами и найдите молярные массы CO₂, NaCl и H₂SO₄.',
+    hint: 'Кладите по гирьке на каждый атом формулы: для H₂SO₄ — две H, одну S и четыре O. Ar(Cl) = 35,5.',
+    stage: 'Нажмите на гирьку внизу или перетащите её на правую чашу. Снять — нажмите на гирьку на чаше.',
+    init: { sub2: 'H2O', pan: [] },
+    check: m => TARG2.every(f => m.found[f]) },
+  { id: 'volume', title: 'Молярный объём газов',
+    text: ['Молекулы газа далеко друг от друга, и их собственный размер почти не влияет на объём. Поэтому 1 моль любого газа при одинаковых условиях занимает одинаковый объём. Это закон Авогадро.',
+           'При нормальных условиях (н. у.: 0 °C и 101,3 кПа) этот объём равен 22,4 л. Его называют молярным объёмом: Vm = 22,4 л/моль.',
+           'Формулы: V = n · Vm и n = V : Vm. Объёмы одинаковые, а массы разные: 22,4 л водорода весят 2 г, а 22,4 л углекислого газа — 44 г.'],
+    why: 'Газовики и инженеры котельных считают газ в кубометрах, а чтобы рассчитать горение в котле, переводят объём в моли. Сварщики знают: в стандартном 40-литровом баллоне под давлением около 6 м³ кислорода. Технологи пивоварен и заводов газировки по этим же формулам считают, сколько CO₂ уйдёт на партию.',
+    safe: 'Водород с воздухом даёт гремучую смесь, она взрывается от искры. Газовые баллоны держат вдали от огня и не роняют.',
+    task: 'Наберите в цилиндр 44,8 л водорода, 5,6 л кислорода и 22 г углекислого газа (н. у.).',
+    hint: 'n = V : 22,4. Для CO₂ сначала найдите моли по массе: n = m : M, M(CO₂) = 44 г/моль.',
+    stage: 'Тяните поршень вверх или вниз. Газ меняйте кнопками снизу.',
+    init: { gas: 'H2', n3: 1 },
+    check: m => TARG3.every((x, i) => m.found[i]) },
+  { id: 'calc', title: 'Расчёты по уравнениям',
+    text: ['Коэффициенты в уравнении показывают не только число молекул, но и число молей. 2H₂ + O₂ → 2H₂O значит: 2 моль водорода реагируют с 1 моль кислорода, получается 2 моль воды.',
+           'Алгоритм задачи: 1) по массе найдите моли данного вещества, n = m : M; 2) по коэффициентам найдите моли искомого; 3) переведите их в массу m = n · M или объём V = n · 22,4.',
+           'Сравнивают всегда моли, а не граммы: массы веществ относятся совсем не так, как коэффициенты.'],
+    why: 'Цементные заводы в Шымкенте и Семее обжигают известняк: CaCO₃ → CaO + CO₂. По уравнению технологи знают, сколько извести получат и сколько CO₂ уйдёт в воздух, а экологи пишут это в отчёты о выбросах. Инженеры «Казфосфата» в Таразе так же считают сырьё на тонну удобрений: ошибка в расчёте — это вагоны лишнего сырья.',
+    safe: 'При разложении воды током получаются водород и кислород, их смесь взрывоопасна. Такие опыты показывает только учитель.',
+    task: 'Решите три задачи: выставьте моли данного вещества и моли искомого.',
+    hint: 'Столбик «дано» тяните, пока его масса не совпадёт с условием. Потом искомый: n(иск) = n(дано) · коэф.(иск) : коэф.(дано).',
+    stage: 'Тяните верх столбиков. Задачу меняйте кнопками снизу.',
+    init: { pi: 0, nG: 1, nS: 1 },
+    check: m => PROB.every((x, i) => m.solved[i]) },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null,
+            sub1: 'O2', n1: 1, f1: {}, sub2: 'H2O', pan: [], f2: {}, tilt: 0, gas: 'H2', n3: 1, f3: {}, pi: 0, nG: 1, nS: 1, solved: {} };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+function model() {
+  const id = LID();
+  if (id === 'mole') {
+    const at = atomsOf(S.sub1), cnt = Object.values(at).reduce((a, b) => a + b, 0);
+    return { kind: 'mole', f: S.sub1, n: S.n1, at, cnt, found: S.f1 };
+  }
+  if (id === 'molar') {
+    const need = atomsOf(S.sub2), have = S.pan.reduce((a, e) => { a[e] = (a[e] || 0) + 1; return a; }, {});
+    const same = Object.keys(need).length === Object.keys(have).length && Object.entries(need).every(([e, k]) => have[e] === k);
+    const R = S.pan.reduce((s, e) => s + AR[e], 0), M = Mof(S.sub2);
+    return { kind: 'molar', f: S.sub2, M, R, need, have, same, bal: near(R, M), found: S.f2 };
+  }
+  if (id === 'volume') {
+    const M = Mof(S.gas);
+    return { kind: 'vol', g: S.gas, n: S.n3, V: S.n3 * VM, M, m: S.n3 * M, found: S.f3 };
+  }
+  const P = PROB[S.pi], Mg = Mof(P.g), Ms = Mof(P.s), cg = coefOf(P, P.g), cs = coefOf(P, P.s);
+  const mG = S.nG * Mg, okG = near(mG, P.gm), okS = okG && near(S.nS, S.nG * cs / cg);
+  return { kind: 'eq', P, Mg, Ms, cg, cs, nG: S.nG, nS: S.nS, mG, okG, okS, out: P.ask === 'm' ? S.nS * Ms : S.nS * VM, solved: S.solved };
+}
+
+// ---------- drawing helpers ----------
+const ball = (x, y, r, c, label, tc, fs) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r + 1.3).toFixed(1)}" fill="${INK}"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${c}"/><circle cx="${(x - r * 0.35).toFixed(1)}" cy="${(y - r * 0.38).toFixed(1)}" r="${(r * 0.3).toFixed(1)}" fill="#fff" opacity=".28"/>` +
+  (label ? `<text x="${x.toFixed(1)}" y="${(y + fs * 0.36).toFixed(1)}" font-size="${fs.toFixed(1)}" fill="${tc}" text-anchor="middle" font-weight="500">${label}</text>` : '');
+// small molecule picture: atoms in a row, the single atom in the middle (H–O–H, O=C=O)
+function molIcon(f, x, y, sc) {
+  const at = atomsOf(f), keys = Object.keys(at);
+  let list = [];
+  const single = keys.length > 1 ? keys.find(k => at[k] === 1) : null;
+  if (single && keys.length === 2) { const o = keys.find(k => k !== single), k = at[o]; for (let i = 0; i < k; i++) list.push(o); list.splice(Math.floor(k / 2), 0, single); }
+  else keys.forEach(k => { for (let i = 0; i < at[k]; i++) list.push(k); });
+  const rs = list.map(s => ATOM[s].r * sc), w = rs.reduce((a, r) => a + r * 1.55, 0) - rs[0] * 0.55;
+  let cx = x - w / 2 + rs[0] * 0.5, h = '';
+  list.forEach((s, i) => { if (i) cx += (rs[i - 1] + rs[i]) * 0.78; h += ball(cx, y, rs[i], ATOM[s].c, '', '', 0); });
+  return h;
+}
+
+function bench() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="2360" fill="url(#tile)"/>
+    <rect x="-2000" y="360" width="4520" height="1200" fill="#1a2232"/>
+    <rect x="-2000" y="358" width="4520" height="4" fill="#2c3954"/>
+    <rect x="-2000" y="362" width="4520" height="2" fill="${INK}" opacity=".6"/>`;
+}
+
+// ----- lesson 1: crates of particles -----
+const AREA1 = { x: 24, y: 128, w: 372, h: 196 }, TRAY1 = { fx: 410, fy: 150, qx: 428, qy: 262 };
+const full1 = () => Math.floor(S.n1 + 1e-9), quart1 = () => Math.round((S.n1 - full1()) * 4);
+const inArea1 = p => p.x > AREA1.x - 10 && p.x < AREA1.x + AREA1.w + 10 && p.y > AREA1.y - 10 && p.y < AREA1.y + AREA1.h + 10;
+function crate(x, y, w, h, f, big, id) {
+  let s = `<g data-drag="${id}"><rect x="${x + 1.5}" y="${y + 2.5}" width="${w}" height="${h}" rx="8" fill="${INK}"/><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" fill="#2a3550" stroke="#56688f" stroke-width="1.4"/>`;
+  if (big) {
+    s += `<path d="M${x + 6} ${y + 18}H${x + w - 6}" stroke="#56688f"/>` + `<text x="${x + w / 2}" y="${y + 13}" font-size="9.5" fill="#e8ecf4" text-anchor="middle" font-weight="500">1 моль</text>`;
+    s += molIcon(f, x + w / 2, y + 38, 0.4) + `<text x="${x + w / 2}" y="${y + h - 9}" font-size="8" fill="#8b96ad" text-anchor="middle">6,02·10²³</text>`;
+  } else {
+    s += molIcon(f, x + w / 2, y + h / 2 - 3, 0.24) + `<text x="${x + w / 2}" y="${y + h - 5}" font-size="8.5" fill="#e8ecf4" text-anchor="middle">¼</text>`;
+  }
+  return s + '</g>';
+}
+function moleSVG(m) {
+  let h = '';
+  const hot = drag && drag.moved && (drag.id === 'tf' || drag.id === 'tq') && inArea1(drag.p);
+  h += `<rect x="${AREA1.x}" y="${AREA1.y}" width="${AREA1.w}" height="${AREA1.h}" rx="16" fill="${hot ? 'rgba(114,212,232,.08)' : 'rgba(18,26,40,.55)'}" stroke="${hot ? '#72d4e8' : '#26324a'}" stroke-dasharray="6 6" stroke-width="1.5"/>`;
+  h += `<text x="${AREA1.x + 14}" y="${AREA1.y + 20}" font-size="10" fill="#8b96ad">ПОРЦИЯ · ${low(m.f)} · ${NAME[m.f]}</text>`;
+  h += `<text x="${AREA1.x + AREA1.w - 14}" y="${AREA1.y + 20}" font-size="12" fill="#ffb547" text-anchor="end" font-weight="500">n = ${fmt(m.n)} моль</text>`;
+  const F = full1(), Q = quart1();
+  for (let i = 0; i < F; i++) if (!(drag && drag.moved && drag.id === 'cf-' + i)) h += crate(AREA1.x + 14 + i * 88, AREA1.y + 34, 80, 78, m.f, true, 'cf-' + i);
+  for (let j = 0; j < Q; j++) if (!(drag && drag.moved && drag.id === 'cq-' + j)) h += crate(AREA1.x + 14 + j * 50, AREA1.y + 124, 42, 42, m.f, false, 'cq-' + j);
+  if (!F && !Q) h += `<text x="${AREA1.x + AREA1.w / 2}" y="${AREA1.y + 104}" font-size="12" fill="#8b96ad" text-anchor="middle">пусто — добавьте ящики справа</text>`;
+  // counts under the area
+  h += `<text x="${AREA1.x + 14}" y="${AREA1.y + AREA1.h - 12}" font-size="11.5" fill="#e8ecf4">N(молекул) = ${fmt(m.n)} · 6,02·10²³ = ${sci(m.n)}</text>`;
+  h += `<text x="210" y="346" font-size="10.5" fill="#8b96ad" text-anchor="middle">атомов: ${Object.entries(m.at).map(([e, k]) => `${e} — ${sci(m.n * k)}`).join(' · ')}</text>`;
+  // tray
+  h += `<text x="${TRAY1.fx + 40}" y="${TRAY1.fy - 10}" font-size="8.5" fill="#8b96ad" text-anchor="middle">СКЛАД</text>`;
+  h += crate(TRAY1.fx, TRAY1.fy, 80, 78, m.f, true, 'tf');
+  h += crate(TRAY1.qx + 2, TRAY1.qy, 42, 42, m.f, false, 'tq');
+  h += `<text x="${TRAY1.fx + 40}" y="${TRAY1.qy + 58}" font-size="8.5" fill="#8b96ad" text-anchor="middle">¼ моль = 1,505·10²³</text>`;
+  return h;
+}
+
+// ----- lesson 2: balance -----
+const BAL = { cx: 260, cy: 150, arm: 128, drop: 86 };
+const TRAY2 = { y: 312, x0: 62, dx: 66 };
+function balGeo(t) {
+  const a = t * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+  const L = { x: BAL.cx - BAL.arm * c, y: BAL.cy + BAL.arm * s }, R = { x: BAL.cx + BAL.arm * c, y: BAL.cy - BAL.arm * s };
+  return { L, R, lp: { x: L.x, y: L.y + BAL.drop }, rp: { x: R.x, y: R.y + BAL.drop } };
+}
+const tiltTarget = m => clamp((m.M - m.R) * 0.3, -12, 12);
+function weight(e, x, y, w, h, id) {
+  const a = ATOM[e];
+  return `<g data-drag="${id}"><path d="M${x + w * 0.3} ${y}h${w * 0.4}l2 -5h${-w * 0.4 - 4}z" fill="#3a4762"/><rect x="${x + 1}" y="${y + 1.5}" width="${w}" height="${h}" rx="5" fill="${INK}"/><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="5" fill="${a.c}"/>` +
+    `<text x="${x + w / 2}" y="${y + h * 0.52}" font-size="${h * 0.42}" fill="${a.t}" text-anchor="middle" font-weight="500">${e}</text><text x="${x + w / 2}" y="${y + h - 3}" font-size="${h * 0.3}" fill="${a.t}" text-anchor="middle" opacity=".8">${fmt(AR[e], 1)}</text></g>`;
+}
+const panSlot = (g, k) => ({ x: g.rp.x - 52 + (k % 4) * 26, y: g.rp.y - 26 - Math.floor(k / 4) * 27 });
+function molarSVG(m) {
+  let h = '';
+  const g = balGeo(S.tilt);
+  // stand
+  h += `<path d="M${BAL.cx - 46} 358h92l-10 -12h-72z" fill="#2a3550"/><rect x="${BAL.cx - 5}" y="${BAL.cy}" width="10" height="${346 - BAL.cy}" fill="#3a4762"/>`;
+  // needle and scale
+  h += `<path d="M${BAL.cx - 22} ${BAL.cy + 58}a24 24 0 0 1 44 0" fill="none" stroke="#56688f"/><path d="M${BAL.cx} ${BAL.cy + 34}v6" stroke="#86e0a8" stroke-width="2"/>`;
+  const na = S.tilt * Math.PI / 180;
+  h += `<path d="M${BAL.cx} ${BAL.cy}L${(BAL.cx + Math.sin(-na) * 36).toFixed(1)} ${(BAL.cy + Math.cos(na) * 36).toFixed(1)}" stroke="${m.bal ? '#86e0a8' : '#ffb547'}" stroke-width="2"/>`;
+  // beam
+  h += `<path d="M${g.L.x.toFixed(1)} ${g.L.y.toFixed(1)}L${g.R.x.toFixed(1)} ${g.R.y.toFixed(1)}" stroke="#c8d1e2" stroke-width="6" stroke-linecap="round"/><circle cx="${BAL.cx}" cy="${BAL.cy}" r="7" fill="#ffb547" stroke="${INK}" stroke-width="2"/>`;
+  // pans with strings
+  for (const p of [g.lp, g.rp]) {
+    const e = p === g.lp ? g.L : g.R;
+    h += `<path d="M${e.x.toFixed(1)} ${e.y.toFixed(1)}L${(p.x - 56).toFixed(1)} ${p.y.toFixed(1)}M${e.x.toFixed(1)} ${e.y.toFixed(1)}L${(p.x + 56).toFixed(1)} ${p.y.toFixed(1)}" stroke="#56688f" stroke-width="1.2"/>`;
+    h += `<path d="M${(p.x - 60).toFixed(1)} ${p.y.toFixed(1)}h120a60 12 0 0 1 -120 0z" fill="#3a4762" stroke="#56688f"/>`;
+  }
+  const hot = drag && drag.moved && drag.id.startsWith('w-') && Math.hypot(drag.p.x - g.rp.x, drag.p.y - (g.rp.y - 20)) < 90;
+  if (hot) h += `<ellipse cx="${g.rp.x.toFixed(1)}" cy="${(g.rp.y - 20).toFixed(1)}" rx="76" ry="48" fill="rgba(114,212,232,.08)" stroke="#72d4e8" stroke-dasharray="5 5"/>`;
+  // jar with 1 mol of the substance on the left pan
+  const jx = g.lp.x, jy = g.lp.y;
+  h += `<path d="M${(jx - 30).toFixed(1)} ${(jy - 62).toFixed(1)}h60v58a6 6 0 0 1 -6 6h-48a6 6 0 0 1 -6 -6z" fill="rgba(95,180,217,.16)" stroke="#8fb9d6" stroke-width="1.5"/><rect x="${(jx - 33).toFixed(1)}" y="${(jy - 70).toFixed(1)}" width="66" height="10" rx="3" fill="#56688f"/>`;
+  h += `<text x="${jx.toFixed(1)}" y="${(jy - 36).toFixed(1)}" font-size="15" fill="#e8ecf4" text-anchor="middle" font-weight="500">${low(m.f)}</text><text x="${jx.toFixed(1)}" y="${(jy - 18).toFixed(1)}" font-size="9" fill="#8b96ad" text-anchor="middle">1 моль</text>`;
+  h += `<text x="${jx.toFixed(1)}" y="${(jy + 28).toFixed(1)}" font-size="10" fill="#8b96ad" text-anchor="middle">${m.found[m.f] || m.f === 'H2O' && m.same ? `M = ${fmt(m.M, 1)} г/моль` : 'M = ?'}</text>`;
+  // weights on the right pan
+  S.pan.forEach((e, k) => { if (drag && drag.moved && drag.id === 'pw-' + k) return; const q = panSlot(g, k); h += weight(e, q.x, q.y, 24, 24, 'pw-' + k); });
+  h += `<text x="${g.rp.x.toFixed(1)}" y="${(g.rp.y + 28).toFixed(1)}" font-size="10" fill="${m.same ? '#86e0a8' : '#8b96ad'}" text-anchor="middle">Σ Ar = ${fmt(m.R, 1)}</text>`;
+  // tray of weights
+  h += `<rect x="20" y="${TRAY2.y - 12}" width="480" height="56" rx="12" fill="#121a28" stroke="#26324a"/>`;
+  WTS.forEach((e, i) => { h += weight(e, TRAY2.x0 + i * TRAY2.dx - 20, TRAY2.y, 40, 34, 'w-' + e); });
+  return h;
+}
+
+// ----- lesson 3: gas cylinder -----
+const CYL = { x: 70, w: 150, bot: 330, k: 70 };
+const pistonY = n => CYL.bot - n * CYL.k;
+const DOTS = Array.from({ length: 40 }, (_, i) => ({ u: ((i * 0.618034) % 1), v: ((i * 0.41421 + 0.13) % 1), ph: i * 1.7 }));
+function volSVG(m, t) {
+  let h = '';
+  const py = pistonY(m.n), top = pistonY(NMAX), gc = GAS_C[m.g];
+  // glass
+  h += `<rect x="${CYL.x}" y="${top - 14}" width="${CYL.w}" height="${CYL.bot - top + 14}" rx="6" fill="rgba(95,180,217,.06)" stroke="#8fb9d6" stroke-width="1.5"/>`;
+  // gas
+  if (m.n > 0) h += `<rect x="${CYL.x + 2}" y="${py.toFixed(1)}" width="${CYL.w - 4}" height="${(CYL.bot - py).toFixed(1)}" fill="${gc}" fill-opacity=".1"/>`;
+  const nd = Math.round(m.n * 12), hh = CYL.bot - py;
+  for (let i = 0; i < nd && i < DOTS.length; i++) {
+    const d = DOTS[i], j = reduce ? 0 : 1;
+    const x = CYL.x + 20 + d.u * (CYL.w - 40) + j * Math.sin(t / 380 + d.ph) * 4, y = py + 8 + d.v * Math.max(0, hh - 16) + j * Math.cos(t / 430 + d.ph) * 4;
+    h += molIcon(m.g, x, y, 0.22);
+  }
+  // scale
+  for (let k = 0; k <= NMAX * 2; k++) {
+    const y = pistonY(k / 2), major = k % 2 === 0;
+    h += `<path d="M${CYL.x + CYL.w} ${y}h${major ? 12 : 7}" stroke="#8fb9d6"/>`;
+    if (major) h += `<text x="${CYL.x + CYL.w + 16}" y="${y + 3.5}" font-size="9.5" fill="#8b96ad">${fmt(k / 2 * VM, 1)} л</text>`;
+  }
+  // piston, rod and grip
+  h += `<g data-drag="piston"><rect x="${CYL.x - 10}" y="${(py - 64).toFixed(1)}" width="${CYL.w + 20}" height="74" fill="transparent"/><rect x="${CYL.x + CYL.w / 2 - 4}" y="${(py - 52).toFixed(1)}" width="8" height="44" fill="#8b96ad"/>` +
+       `<rect x="${CYL.x + CYL.w / 2 - 30}" y="${(py - 62).toFixed(1)}" width="60" height="14" rx="7" fill="#ffb547" stroke="${INK}" stroke-width="1.5"/><path d="M${CYL.x + CYL.w / 2 - 12} ${(py - 55).toFixed(1)}h24" stroke="${INK}" stroke-width="1.5"/>` +
+       `<rect x="${CYL.x + 2}" y="${(py - 10).toFixed(1)}" width="${CYL.w - 4}" height="10" rx="2" fill="#56688f" stroke="#8fb9d6"/></g>`;
+  h += `<text x="${CYL.x + CYL.w / 2}" y="348" font-size="11" fill="#e8ecf4" text-anchor="middle">${low(m.g)} · V = ${fmt(m.V, 2)} л</text>`;
+  // mass at the same volume for every gas
+  const bx = 300, bw = 44, base = 300, kk = 1.05;
+  h += `<text x="${bx + 2 * bw}" y="${base - 166}" font-size="9" fill="#8b96ad" text-anchor="middle">МАССА ГАЗА ПРИ V = ${fmt(m.V, 2)} л</text>`;
+  GAS.forEach((g, i) => {
+    const mm = m.n * Mof(g), x = bx + i * bw, hgt = mm * kk, on = g === m.g;
+    h += `<rect x="${x + 8}" y="${(base - hgt).toFixed(1)}" width="${bw - 16}" height="${hgt.toFixed(1)}" rx="3" fill="${GAS_C[g]}" fill-opacity="${on ? 0.85 : 0.3}" stroke="${on ? '#ffb547' : 'none'}" stroke-width="1.5"/>`;
+    h += `<text x="${x + bw / 2}" y="${(base - hgt - 5).toFixed(1)}" font-size="9" fill="${on ? '#e8ecf4' : '#8b96ad'}" text-anchor="middle">${fmt(mm, 1)} г</text><text x="${x + bw / 2}" y="${base + 14}" font-size="10.5" fill="${on ? '#ffb547' : '#8b96ad'}" text-anchor="middle">${low(g)}</text>`;
+  });
+  h += `<path d="M${bx} ${base}h${bw * 4}" stroke="#56688f"/>`;
+  h += `<text x="${bx + 2 * bw}" y="${base + 32}" font-size="9.5" fill="#8b96ad" text-anchor="middle">n = ${fmt(m.n)} моль у всех</text>`;
+  return h;
+}
+
+// ----- lesson 4: bars of moles -----
+const BARS = { g: 165, s: 355, w: 66, base: 318, k: 52 };
+const barTop = n => BARS.base - n * BARS.k;
+function eqSVG(m) {
+  let h = '';
+  const P = m.P;
+  // equation with highlighted substances
+  const parts = side => side.map(([k, f]) => `<tspan fill="${f === P.g ? '#ffb547' : f === P.s ? '#72d4e8' : '#e8ecf4'}">${k > 1 ? k : ''}${low(f)}</tspan>`).join('<tspan fill="#8b96ad"> + </tspan>');
+  h += `<text x="260" y="114" font-size="21" text-anchor="middle" font-weight="500">${parts(P.L)}<tspan fill="#8b96ad"> → </tspan>${parts(P.R)}</text>`;
+  h += `<text x="260" y="132" font-size="10" fill="#8b96ad" text-anchor="middle">дано: m(${low(P.g)}) = ${P.gm} г · найти: ${P.ask}(${low(P.s)})${P.ask === 'V' ? ', н. у.' : ''}</text>`;
+  // grid
+  for (let k = 0; k <= NMAX * 2; k++) {
+    const y = barTop(k / 2);
+    h += `<path d="M110 ${y}H410" stroke="rgba(160,185,230,${k % 2 ? 0.06 : 0.13})"/>`;
+    if (k % 2 === 0) h += `<text x="102" y="${y + 3.5}" font-size="9" fill="#8b96ad" text-anchor="end">${k / 2}</text>`;
+  }
+  h += `<text x="102" y="${barTop(NMAX) - 12}" font-size="9" fill="#8b96ad" text-anchor="end">моль</text>`;
+  const bar = (id, cx, n, col, f, ok) => {
+    const y = barTop(n);
+    let s = `<g data-drag="${id}"><rect x="${cx - BARS.w / 2 - 8}" y="${(y - 24).toFixed(1)}" width="${BARS.w + 16}" height="${(BARS.base - y + 24).toFixed(1)}" fill="transparent"/>`;
+    s += `<rect x="${cx - BARS.w / 2}" y="${y.toFixed(1)}" width="${BARS.w}" height="${(BARS.base - y).toFixed(1)}" rx="4" fill="${col}" fill-opacity=".28" stroke="${ok ? '#86e0a8' : col}" stroke-width="1.6"/>`;
+    s += `<rect x="${cx - 22}" y="${(y - 9).toFixed(1)}" width="44" height="14" rx="7" fill="${col}" stroke="${INK}" stroke-width="1.5"/><path d="M${cx - 9} ${(y - 4).toFixed(1)}h18M${cx - 9} ${(y).toFixed(1)}h18" stroke="${INK}" stroke-width="1.2"/></g>`;
+    s += `<text x="${cx}" y="${(y - 15).toFixed(1)}" pointer-events="none" font-size="11" fill="${ok ? '#86e0a8' : '#e8ecf4'}" text-anchor="middle" font-weight="500">${fmt(n)} моль</text>`;
+    s += `<text x="${cx}" y="${BARS.base + 15}" font-size="11.5" fill="${col}" text-anchor="middle" font-weight="500">n(${low(f)})</text>`;
+    return s;
+  };
+  h += bar('barG', BARS.g, m.nG, '#ffb547', m.P.g, m.okG);
+  h += bar('barS', BARS.s, m.nS, '#72d4e8', m.P.s, m.okS);
+  h += `<path d="M110 ${BARS.base}H410" stroke="#8b96ad"/>`;
+  h += `<text x="${BARS.g}" y="${BARS.base + 31}" font-size="10" fill="${m.okG ? '#86e0a8' : '#8b96ad'}" text-anchor="middle">m = ${fmt(m.nG)}·${m.Mg} = ${fmt(m.mG, 1)} г ${m.okG ? '✓' : '≠ ' + P.gm + ' г'}</text>`;
+  h += `<text x="${BARS.s}" y="${BARS.base + 31}" font-size="10" fill="${m.okS ? '#86e0a8' : '#8b96ad'}" text-anchor="middle">${P.ask === 'm' ? `m = ${fmt(m.out, 1)} г` : `V = ${fmt(m.out, 2)} л`}${m.okS ? ' ✓' : ''}</text>`;
+  // ratio box between the bars
+  h += `<rect x="212" y="162" width="96" height="58" rx="10" fill="#121a28" stroke="${m.okS ? '#86e0a8' : '#26324a'}"/>`;
+  h += `<text x="260" y="178" font-size="8.5" fill="#8b96ad" text-anchor="middle">КОЭФФИЦИЕНТЫ</text><text x="260" y="193" font-size="12" fill="#e8ecf4" text-anchor="middle">${m.cg} : ${m.cs}</text>`;
+  h += `<text x="260" y="211" font-size="9.5" fill="${m.okS ? '#86e0a8' : '#8b96ad'}" text-anchor="middle">n: ${fmt(m.nG)} : ${fmt(m.nS)}</text>`;
+  if (m.solved[S.pi]) h += `<text x="260" y="242" font-size="12" fill="#86e0a8" text-anchor="middle" font-weight="500">Ответ: ${P.ask}(${low(P.s)}) = ${P.ask === 'm' ? fmt(m.out, 1) + ' г' : fmt(m.out, 2) + ' л'}</text>`;
+  return h;
+}
+
+function hlBox(id) {
+  const g = balGeo(S.tilt);
+  return {
+    area: [AREA1.x - 4, AREA1.y - 4, AREA1.w + 8, AREA1.h + 8], crate: [AREA1.x + 8, AREA1.y + 28, 92, 90], tray: [TRAY1.fx - 8, TRAY1.fy - 22, 96, 196], count: [AREA1.x + 6, AREA1.y + AREA1.h - 28, 370, 52],
+    jar: [g.lp.x - 64, g.lp.y - 78, 128, 120], rpan: [g.rp.x - 64, g.rp.y - 62, 128, 104], beam: [BAL.cx - BAL.arm - 10, BAL.cy - 30, BAL.arm * 2 + 20, 100], wtray: [16, TRAY2.y - 16, 488, 64],
+    cyl: [CYL.x - 6, pistonY(NMAX) - 20, CYL.w + 12, CYL.bot - pistonY(NMAX) + 26], piston: [CYL.x - 12, pistonY(S.n3) - 68, CYL.w + 24, 82], ticks: [CYL.x + CYL.w - 4, pistonY(NMAX) - 10, 70, CYL.bot - pistonY(NMAX) + 20], masses: [290, 120, 200, 220],
+    eqn: [90, 92, 340, 48], barG: [BARS.g - 50, barTop(NMAX) - 30, 100, BARS.base - barTop(NMAX) + 70], barS: [BARS.s - 50, barTop(NMAX) - 30, 100, BARS.base - barTop(NMAX) + 70], ratio: [206, 156, 108, 70],
+  }[id];
+}
+
+function ghostSVG(d) {
+  const p = d.p, id = d.id;
+  if (id === 'tf' || id.startsWith('cf-')) return crate(p.x - 40, p.y - 39, 80, 78, S.sub1, true, 'ghost');
+  if (id === 'tq' || id.startsWith('cq-')) return crate(p.x - 21, p.y - 21, 42, 42, S.sub1, false, 'ghost');
+  if (id.startsWith('w-')) return weight(id.slice(2), p.x - 15, p.y - 14, 30, 28, 'ghost');
+  if (id.startsWith('pw-')) { const e = S.pan[+id.slice(3)]; return e ? weight(e, p.x - 15, p.y - 14, 30, 28, 'ghost') : ''; }
+  return '';
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID(), m = model();
+  let h = bench();
+  if (id === 'mole') h += moleSVG(m);
+  else if (id === 'molar') h += molarSVG(m);
+  else if (id === 'volume') h += volSVG(m, t);
+  else h += eqSVG(m);
+  if (drag && drag.moved && !LIVE.has(drag.id)) h += `<g opacity=".92" pointer-events="none">${ghostSVG(drag)}</g>`;
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="10" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 500, hh / 410, 1.7);
+  const vw = w / s, vh = hh / s;
+  scene.setAttribute('viewBox', `${(260 - vw / 2).toFixed(1)} ${(405 - vh).toFixed(1)} ${vw.toFixed(1)} ${vh.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- dragging and tapping ----------
+const LIVE = new Set(['piston', 'barG', 'barS']);
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+const snap = v => clamp(Math.round(v * 20) / 20, 0, NMAX);
+function liveSet(d) {
+  const y = d.p.y + d.off;
+  if (d.id === 'piston') { const n = snap((CYL.bot - y) / CYL.k); if (n !== S.n3) { S.n3 = n; update(true); } }
+  else { const n = snap((BARS.base - y) / BARS.k), k = d.id === 'barG' ? 'nG' : 'nS'; if (n !== S[k]) { S[k] = n; update(true); } }
+}
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  drag = { id: el.dataset.drag, x: e.clientX, y: e.clientY, p: toSvg(e), moved: false, off: 0 };
+  if (LIVE.has(drag.id)) {
+    const top = drag.id === 'piston' ? pistonY(S.n3) : barTop(drag.id === 'barG' ? S.nG : S.nS);
+    drag.off = top - drag.p.y;
+  }
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 6) drag.moved = true;
+  drag.p = toSvg(e);
+  if (LIVE.has(drag.id)) { if (drag.moved) liveSet(drag); return; }
+  if (drag.moved) dirty = true;
+});
+const endDrag = cancel => {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing'); dirty = true;
+  if (LIVE.has(d.id)) { update(); return; }
+  if (cancel) return;
+  if (d.moved) drop(d.id, d.p); else tap(d.id);
+};
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+function tap(id) {
+  if (id === 'tf') return addN1(1);
+  if (id === 'tq') return addN1(0.25);
+  if (id.startsWith('cf-')) return addN1(-1);
+  if (id.startsWith('cq-')) return addN1(-0.25);
+  if (id.startsWith('w-')) return addW(id.slice(2));
+  if (id.startsWith('pw-')) return remW(+id.slice(3));
+}
+function drop(id, p) {
+  if (id === 'tf' || id === 'tq') { if (inArea1(p)) addN1(id === 'tf' ? 1 : 0.25); return; }
+  if (id.startsWith('cf-') || id.startsWith('cq-')) { if (!inArea1(p)) addN1(id.startsWith('cf-') ? -1 : -0.25); return; }
+  const g = balGeo(S.tilt);
+  if (id.startsWith('w-')) { if (Math.hypot(p.x - g.rp.x, p.y - (g.rp.y - 20)) < 90) addW(id.slice(2)); return; }
+  if (id.startsWith('pw-')) { if (Math.hypot(p.x - g.rp.x, p.y - (g.rp.y - 20)) > 80) remW(+id.slice(3)); }
+}
+
+function addN1(d) {
+  const v = Math.round((S.n1 + d) * 4) / 4;
+  if (v < 0) { toast('Порция уже пустая.'); return false; }
+  if (v > NMAX1) { toast('На столе помещается не больше 4 моль. Уберите лишнее.'); return false; }
+  S.n1 = v; update(); return true;
+}
+function setSub1(f) { S.sub1 = f; S.n1 = 0; renderTools(); buildScheme(); update(); }
+function addW(e) {
+  if (S.pan.length >= PANMAX) { toast('На чаше места нет: в наших формулах не больше 8 атомов. Снимите лишние гирьки.'); return false; }
+  S.pan.push(e); update(); return true;
+}
+function remW(k) {
+  if (k < 0 || k >= S.pan.length) return false;
+  S.pan.splice(k, 1); update(); return true;
+}
+function remEl(e) { const k = S.pan.lastIndexOf(e); if (k < 0) return false; return remW(k); }
+function setSub2(f) { S.sub2 = f; S.pan = []; renderTools(); buildScheme(); update(); }
+function setN3(n) { S.n3 = snap(n); update(); }
+function setGas(g) { S.gas = g; renderTools(); buildScheme(); update(); }
+function setNb(k, n) { S[k] = snap(n); update(); }
+function setProb(i) { S.pi = (i + PROB.length) % PROB.length; S.nG = 1; S.nS = 1; renderTools(); buildScheme(); update(); }
+
+let last = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  let anim = !!S.hl;
+  if (LID() === 'molar') {
+    const tt = tiltTarget(model());
+    if (Math.abs(S.tilt - tt) > 0.02) { S.tilt = reduce ? tt : S.tilt + (tt - S.tilt) * 0.12; anim = true; } else if (S.tilt !== tt) { S.tilt = tt; anim = true; }
+  }
+  const jig = !reduce && LID() === 'volume' && S.n3 > 0 && t - last > 50;
+  if (dirty || anim || jig) { drawScene(t); dirty = false; last = t; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2800); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    mole: SUB1.map(f => B('s1-' + f, low(f), S.sub1 === f)).join('') + sep + B('n-', '−¼') + B('n+', '+¼') + B('n1', '+1'),
+    molar: SUB2.map(f => B('s2-' + f, low(f), S.sub2 === f)).join('') + sep + B('clr', 'Снять всё'),
+    volume: GAS.map(g => B('g-' + g, low(g), S.gas === g)).join('') + sep + B('v-', '−') + B('v+', '+'),
+    calc: PROB.map((P, i) => B('p-' + i, 'Задача ' + (i + 1) + (S.solved[i] ? ' ✓' : ''), S.pi === i)).join(''),
+  }[id];
+}
+function act(a) {
+  if (a.startsWith('s1-')) return setSub1(a.slice(3));
+  if (a === 'n-') return addN1(-0.25);
+  if (a === 'n+') return addN1(0.25);
+  if (a === 'n1') return addN1(1);
+  if (a.startsWith('s2-')) return setSub2(a.slice(3));
+  if (a === 'clr') { S.pan = []; update(); return; }
+  if (a.startsWith('g-')) return setGas(a.slice(2));
+  if (a === 'v-') return setN3(S.n3 - 0.05);
+  if (a === 'v+') return setN3(S.n3 + 0.05);
+  if (a.startsWith('p-')) return setProb(+a.slice(2));
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  area: IC('<rect x="3" y="7" width="28" height="20" rx="4" fill="none" stroke="var(--muted)" stroke-dasharray="3 3"/><rect x="7" y="11" width="9" height="9" rx="2" fill="#2a3550" stroke="#56688f"/><rect x="18" y="11" width="9" height="9" rx="2" fill="#2a3550" stroke="#56688f"/>'),
+  crate: IC('<rect x="5" y="6" width="24" height="22" rx="4" fill="#2a3550" stroke="#56688f"/><circle cx="13" cy="18" r="4" fill="#e5533f"/><circle cx="21" cy="18" r="4" fill="#e5533f"/>'),
+  tray: IC('<rect x="9" y="3" width="16" height="15" rx="3" fill="#2a3550" stroke="#56688f"/><rect x="12" y="21" width="10" height="10" rx="2" fill="#2a3550" stroke="#56688f"/>'),
+  count: IC('<text x="17" y="21" font-size="10" text-anchor="middle" fill="var(--fg)" font-family="IBM Plex Mono">Nₐ</text>'),
+  jar: IC('<path d="M10 9h14v18a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2z" fill="rgba(95,180,217,.25)" stroke="#8fb9d6"/><rect x="9" y="6" width="16" height="4" rx="1" fill="#56688f"/>'),
+  rpan: IC('<rect x="7" y="13" width="9" height="9" rx="2" fill="#e5533f"/><rect x="18" y="13" width="9" height="9" rx="2" fill="#eef2f8"/><path d="M4 24h26a13 4 0 0 1 -26 0z" fill="#3a4762"/>'),
+  beam: IC('<path d="M4 12h26" stroke="#c8d1e2" stroke-width="3"/><circle cx="17" cy="12" r="3" fill="#ffb547"/><path d="M17 15v15" stroke="#3a4762" stroke-width="3"/>'),
+  wtray: IC('<rect x="3" y="12" width="8" height="10" rx="2" fill="#eef2f8"/><rect x="13" y="12" width="8" height="10" rx="2" fill="#4f586d"/><rect x="23" y="12" width="8" height="10" rx="2" fill="#e5533f"/>'),
+  cyl: IC('<rect x="9" y="4" width="16" height="26" rx="3" fill="rgba(95,180,217,.12)" stroke="#8fb9d6"/><rect x="10" y="14" width="14" height="15" fill="rgba(229,83,63,.25)"/>'),
+  piston: IC('<rect x="8" y="17" width="18" height="4" fill="#56688f"/><rect x="16" y="7" width="3" height="10" fill="#8b96ad"/><rect x="11" y="4" width="12" height="5" rx="2.5" fill="#ffb547"/>'),
+  ticks: IC('<path d="M10 6h8M10 13h5M10 20h8M10 27h5" stroke="#8fb9d6"/><text x="22" y="9" font-size="6" fill="var(--muted)" font-family="IBM Plex Mono">л</text>'),
+  masses: IC('<rect x="4" y="26" width="5" height="3" fill="#eef2f8"/><rect x="11" y="10" width="5" height="19" fill="#4d7cf0"/><rect x="18" y="8" width="5" height="21" fill="#e5533f"/><rect x="25" y="4" width="5" height="25" fill="#9aa6bd"/>'),
+  eqn: IC('<text x="17" y="20" font-size="8" text-anchor="middle" fill="var(--fg)" font-family="IBM Plex Mono">2H₂+O₂</text>'),
+  barG: IC('<rect x="11" y="12" width="12" height="18" rx="2" fill="#ffb547" fill-opacity=".35" stroke="#ffb547"/><rect x="10" y="9" width="14" height="4" rx="2" fill="#ffb547"/>'),
+  barS: IC('<rect x="11" y="16" width="12" height="14" rx="2" fill="#72d4e8" fill-opacity=".35" stroke="#72d4e8"/><rect x="10" y="13" width="14" height="4" rx="2" fill="#72d4e8"/>'),
+  ratio: IC('<rect x="4" y="9" width="26" height="16" rx="4" fill="none" stroke="var(--muted)"/><text x="17" y="21" font-size="9" text-anchor="middle" fill="var(--fg)" font-family="IBM Plex Mono">2:1</text>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+const tg = (a, b, on) => `<div class="${on ? 'on' : ''}"><span>${a}</span><span>${b}</span></div>`;
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (m.kind === 'mole') return `Набрано порций: ${TARG1.filter((x, i) => m.found[i]).length} из 3 · сейчас ${low(m.f)}, ${fmt(m.n)} моль`;
+  if (m.kind === 'molar') return `Найдено: ${TARG2.filter(f => m.found[f]).map(low).join(', ') || 'пока ничего'} из 3`;
+  if (m.kind === 'vol') return `Набрано: ${TARG3.filter((x, i) => m.found[i]).length} из 3 · ${low(m.g)}, ${fmt(m.V, 2)} л`;
+  return `Решено задач: ${PROB.filter((x, i) => m.solved[i]).length} из 3`;
+}
+
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'mole') h = `<h2>Порция вещества</h2>
+      <dl class="reads"><div><dt>n, моль</dt><dd id="r1"></dd></div><div><dt>Молекул</dt><dd id="r2"></dd></div><div><dt>Атомов</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Вещество</div><div class="chips" id="sChips">${SUB1.map(f => `<button data-f="${f}" aria-pressed="${f === S.sub1}">${low(f)} · ${NAME[f]}</button>`).join('')}</div></div>
+      <div class="cnt c2"><div><span>¼ моль</span><span><button data-d="-0.25" aria-label="Убрать четверть моля">−</button> <button data-d="0.25" aria-label="Добавить четверть моля">+</button></span></div><div><span>1 моль</span><span><button data-d="-1" aria-label="Убрать один моль">−</button> <button data-d="1" aria-label="Добавить один моль">+</button></span></div></div>
+      <h3>Порции из задания</h3><div class="tgts" id="tg"></div>`;
+  if (id === 'molar') h = `<h2>Весы молярной массы</h2>
+      <dl class="reads"><div><dt>Вещество</dt><dd id="r1"></dd></div><div><dt>Σ Ar</dt><dd id="r2"></dd></div><div><dt>Весы</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Вещество на левой чаше</div><div class="chips" id="sChips">${SUB2.map(f => `<button data-f="${f}" aria-pressed="${f === S.sub2}">${low(f)}</button>`).join('')}</div></div>
+      <div class="ctl"><div class="lbl">Гирьки на правой чаше</div></div>
+      <div class="cnt c2">${WTS.map(e => `<div><span>${e} · ${fmt(AR[e], 1)}</span><span><button data-e="${e}" data-d="-1" aria-label="Снять гирьку ${e}">−</button> <b data-c="${e}">0</b> <button data-e="${e}" data-d="1" aria-label="Положить гирьку ${e}">+</button></span></div>`).join('')}</div>
+      <h3>Найдено</h3><div class="tgts" id="tg"></div>`;
+  if (id === 'volume') h = `<h2>Газ в цилиндре (н. у.)</h2>
+      <dl class="reads"><div><dt>V, л</dt><dd id="r1"></dd></div><div><dt>n, моль</dt><dd id="r2"></dd></div><div><dt>m, г</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Газ</div><div class="chips" id="sChips">${GAS.map(g => `<button data-f="${g}" aria-pressed="${g === S.gas}">${low(g)} · ${NAME[g]}</button>`).join('')}</div></div>
+      <div class="ctl"><label for="nR">Количество вещества <output id="nO"></output></label><input type="range" id="nR" min="0" max="${NMAX}" step="0.05"></div>
+      <h3>Порции из задания</h3><div class="tgts" id="tg"></div>`;
+  if (id === 'calc') h = `<h2>Задача ${S.pi + 1}</h2><p>${PROB[S.pi].q}</p>
+      <div class="ctl"><div class="lbl">Задача</div><div class="chips" id="sChips">${PROB.map((P, i) => `<button data-f="${i}" aria-pressed="${i === S.pi}">${i + 1}</button>`).join('')}</div></div>
+      <div class="ctl"><label for="gR">n(${low(PROB[S.pi].g)}) — дано <output id="gO"></output></label><input type="range" id="gR" min="0" max="${NMAX}" step="0.05"></div>
+      <div class="ctl"><label for="sR">n(${low(PROB[S.pi].s)}) — искомое <output id="sO"></output></label><input type="range" id="sR" min="0" max="${NMAX}" step="0.05"></div>
+      <dl class="reads"><div><dt>m дано, г</dt><dd id="r1"></dd></div><div><dt>Отношение</dt><dd id="r2"></dd></div><div><dt>Ответ</dt><dd id="r3"></dd></div></dl>`;
+  el.innerHTML = h;
+  el.querySelectorAll('#sChips button').forEach(b => b.onclick = () => id === 'mole' ? setSub1(b.dataset.f) : id === 'molar' ? setSub2(b.dataset.f) : id === 'volume' ? setGas(b.dataset.f) : setProb(+b.dataset.f));
+  el.querySelectorAll('.cnt button[data-d]').forEach(b => b.onclick = () => b.dataset.e ? (+b.dataset.d > 0 ? addW(b.dataset.e) : remEl(b.dataset.e)) : addN1(+b.dataset.d));
+  const rng = (sel, fn) => { const r = el.querySelector(sel); if (r) { r.oninput = () => fn(+r.value, true); r.onchange = () => fn(+r.value, false); } };
+  rng('#nR', (v, live) => { S.n3 = snap(v); update(live); });
+  rng('#gR', (v, live) => { S.nG = snap(v); update(live); });
+  rng('#sR', (v, live) => { S.nS = snap(v); update(live); });
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; };
+  const val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  el.querySelectorAll('#sChips button').forEach(b => b.setAttribute('aria-pressed', m.kind === 'mole' ? b.dataset.f === S.sub1 : m.kind === 'molar' ? b.dataset.f === S.sub2 : m.kind === 'vol' ? b.dataset.f === S.gas : +b.dataset.f === S.pi));
+  const tgEl = el.querySelector('#tg');
+  if (m.kind === 'mole') {
+    set('#r1', fmt(m.n)); set('#r2', sci(m.n)); set('#r3', sci(m.n * m.cnt));
+    if (tgEl) tgEl.innerHTML = TARG1.map((x, i) => tg(x.txt, m.found[i] ? fmt(x.n) + ' моль ✓' : '?', m.found[i])).join('');
+  } else if (m.kind === 'molar') {
+    set('#r1', low(m.f)); set('#r2', fmt(m.R, 1)); set('#r3', m.bal ? 'равновесие' : m.R < m.M ? 'мало' : 'много');
+    WTS.forEach(e => set(`[data-c="${e}"]`, String(m.have[e] || 0)));
+    if (tgEl) tgEl.innerHTML = TARG2.map(f => tg('M(' + low(f) + ')', m.found[f] ? fmt(Mof(f), 1) + ' г/моль ✓' : '?', m.found[f])).join('');
+  } else if (m.kind === 'vol') {
+    set('#r1', fmt(m.V, 2)); set('#r2', fmt(m.n)); set('#r3', fmt(m.m, 1)); set('#nO', fmt(m.n) + ' моль'); val('#nR', m.n);
+    if (tgEl) tgEl.innerHTML = TARG3.map((x, i) => tg(x.txt, m.found[i] ? fmt(x.n) + ' моль ✓' : '?', m.found[i])).join('');
+  } else {
+    set('#gO', fmt(m.nG) + ' моль'); set('#sO', fmt(m.nS) + ' моль'); val('#gR', m.nG); val('#sR', m.nS);
+    set('#r1', fmt(m.mG, 1) + (m.okG ? ' ✓' : '')); set('#r2', `${fmt(m.nG)} : ${fmt(m.nS)}`); set('#r3', m.solved[S.pi] ? (m.P.ask === 'm' ? fmt(m.out, 1) + ' г' : fmt(m.out, 2) + ' л') : '?');
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'mole') return [
+    { id: 'area', icon: ICON.area, name: 'Порция вещества', spec: 'Всё, что лежит в пунктирной рамке. Сверху — сколько в ней молей, n.' },
+    { id: 'crate', icon: ICON.crate, name: 'Ящик «1 моль»', spec: 'Условная «пачка» из 6,02·10²³ молекул. Нарисованная молекула — только образец, настоящих там невообразимо много.' },
+    { id: 'tray', icon: ICON.tray, name: 'Склад ящиков', spec: 'Ящики по 1 моль и по ¼ моль. Четверть моля — 1,505·10²³ частиц.' },
+    { id: 'count', icon: ICON.count, name: 'Счётчик частиц', spec: 'N = n · Nₐ. Нижняя строка считает атомы каждого элемента: их в молекуле может быть несколько.' }];
+  if (id === 'molar') return [
+    { id: 'jar', icon: ICON.jar, name: 'Банка с 1 моль вещества', spec: 'На левой чаше всегда ровно 1 моль. Её масса в граммах и есть молярная масса M.' },
+    { id: 'rpan', icon: ICON.rpan, name: 'Правая чаша с гирьками', spec: 'Каждая гирька — один атом, на ней знак и Ar. Сумма Ar — относительная молекулярная масса Mr.' },
+    { id: 'beam', icon: ICON.beam, name: 'Коромысло и стрелка', spec: 'Перевешивает тяжёлая сторона. Стрелка зелёная — массы равны.' },
+    { id: 'wtray', icon: ICON.wtray, name: 'Набор гирек', spec: 'Ar из таблицы Менделеева, округлённые, как в школьных задачах: H 1, C 12, O 16, Cl 35,5.' }];
+  if (id === 'volume') return [
+    { id: 'cyl', icon: ICON.cyl, name: 'Цилиндр с газом', spec: 'Условия нормальные: 0 °C и 101,3 кПа. Точки — молекулы; их число растёт с n, но не зависит от сорта газа.' },
+    { id: 'piston', icon: ICON.piston, name: 'Поршень', spec: 'Тяните ручку: меняется объём, а с ним — сколько газа помещается при н. у.' },
+    { id: 'ticks', icon: ICON.ticks, name: 'Шкала объёма', spec: 'Крупные деления — через 22,4 л, то есть через 1 моль.' },
+    { id: 'masses', icon: ICON.masses, name: 'Массы газов', spec: 'Тот же объём и то же n для четырёх газов. Объём одинаковый, а масса разная — всё решает M.' }];
+  return [
+    { id: 'eqn', icon: ICON.eqn, name: 'Уравнение реакции', spec: 'Оранжевым — данное вещество, голубым — искомое. Коэффициенты — это соотношение молей.' },
+    { id: 'barG', icon: ICON.barG, name: 'Столбик «дано»', spec: 'Высота — моли данного вещества. Под ним масса m = n · M: она должна совпасть с условием.' },
+    { id: 'barS', icon: ICON.barS, name: 'Столбик «найти»', spec: 'Моли искомого вещества. Под ним — масса или объём, которые получатся.' },
+    { id: 'ratio', icon: ICON.ratio, name: 'Окно соотношения', spec: 'Сравнивает ваше отношение молей с коэффициентами. Совпало — рамка зелёная.' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      (L.safe ? `<div class="safe"><b>Безопасность</b>${L.safe}</div>` : '') +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Детали модели</h2><p class="note">Нажмите на деталь, чтобы найти её на столе.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  if (m.kind === 'mole') {
+    let h = `<h2>Сколько частиц в ${fmt(m.n)} моль ${low(m.f)}</h2><div class="formula">N = n · Nₐ</div><h3>Молекулы</h3><div class="steps">` +
+      step('Nₐ', '6,02·10²³ моль⁻¹') + step('n', fmt(m.n) + ' моль') + step('N(' + low(m.f) + ')', `${fmt(m.n)} · 6,02·10²³ = ${sci(m.n)}`, 'sum') + `</div><h3>Атомы</h3><div class="steps">` +
+      Object.entries(m.at).map(([e, k]) => step(`${e}: ${k} в молекуле`, `n(${e}) = ${k} · ${fmt(m.n)} = ${fmt(k * m.n)} моль → ${sci(k * m.n)}`)).join('') + `</div>`;
+    h += `<h3>Обратная задача</h3><div class="formula">n = N : Nₐ</div><p class="note">Пример: 9,03·10²³ : 6,02·10²³ = 1,5 моль. Мантиссы делим, степени десяти вычитаем.</p>`;
+    return h;
+  }
+  if (m.kind === 'molar') {
+    const show = m.found[m.f] || (m.f === 'H2O' && m.same);
+    let h = `<h2>M(${low(m.f)})</h2><div class="formula">M = Σ Ar · индекс  (г/моль)</div><h3>На правой чаше</h3><div class="steps">` +
+      (S.pan.length ? Object.entries(m.have).map(([e, k]) => step(`${e} × ${k}`, `${k} · ${fmt(AR[e], 1)} = ${fmt(k * AR[e], 1)}`)).join('') : step('гирек нет', '0')) +
+      step('Σ Ar', fmt(m.R, 1), 'sum') + `</div>`;
+    h += `<h3>Сравнение</h3><div class="steps">` + step('состав совпадает с формулой?', m.same ? 'да ✓' : 'нет') + step('M(' + low(m.f) + ')', show ? fmt(m.M, 1) + ' г/моль' : '? — уравновесьте весы', 'sum') + `</div>`;
+    if (show) h += `<h3>Масса порции</h3><div class="steps">${step('m = n · M, n = 2 моль', `2 · ${fmt(m.M, 1)} = ${fmt(2 * m.M, 1)} г`)}${step('n = m : M, m = 100 г', `100 : ${fmt(m.M, 1)} ≈ ${fmt(100 / m.M, 2)} моль`)}</div>`;
+    return h;
+  }
+  if (m.kind === 'vol') {
+    return `<h2>${cap(NAME[m.g])} ${low(m.g)}, н. у.</h2><div class="formula">V = n · Vm,  Vm = 22,4 л/моль</div><h3>Сейчас</h3><div class="steps">` +
+      step('n', fmt(m.n) + ' моль') + step('V = n · 22,4', `${fmt(m.n)} · 22,4 = ${fmt(m.V, 2)} л`) +
+      step('M(' + low(m.g) + ')', m.M + ' г/моль') + step('m = n · M', `${fmt(m.n)} · ${m.M} = ${fmt(m.m, 1)} г`) +
+      step('N = n · Nₐ', sci(m.n) + ' молекул', 'sum') + `</div><h3>Обратно</h3><div class="steps">` +
+      step('n = V : 22,4', 'объём в литрах делим на 22,4') + step('n = m : M', 'массу делим на молярную массу') + `</div>` +
+      `<p class="note" style="margin-top:10px">При комнатной температуре 1 моль газа занимает около 24 л — газ расширяется при нагревании. Поэтому в задачах всегда пишут «н. у.».</p>`;
+  }
+  const P = m.P, sol = m.solved[S.pi];
+  let h = `<h2>Задача ${S.pi + 1}</h2><p>${P.q}</p><div class="formula">${eqText(P)}</div><h3>1. Моли данного</h3><div class="steps">` +
+    step(`M(${low(P.g)})`, m.Mg + ' г/моль') + step(`ваше n(${low(P.g)})`, fmt(m.nG) + ' моль') +
+    step('m = n · M', `${fmt(m.nG)} · ${m.Mg} = ${fmt(m.mG, 1)} г ${m.okG ? '= ' + P.gm + ' г ✓' : '≠ ' + P.gm + ' г'}`, 'sum') + `</div>` +
+    `<h3>2. Моли искомого</h3><div class="steps">` + step(`коэффициенты ${low(P.g)} : ${low(P.s)}`, `${m.cg} : ${m.cs}`) +
+    step(`ваше n(${low(P.s)})`, fmt(m.nS) + ' моль') + step(`n(${low(P.s)}) = n(${low(P.g)}) · ${m.cs} : ${m.cg}`, m.okS ? `${fmt(m.nG)} · ${m.cs} : ${m.cg} = ${fmt(m.nS)} ✓` : m.okG ? 'посчитайте и подвиньте столбик' : 'сначала шаг 1', 'sum') + `</div>` +
+    `<h3>3. Ответ</h3><div class="steps">` + (P.ask === 'm' ? step(`M(${low(P.s)})`, m.Ms + ' г/моль') + step('m = n · M', sol ? `${fmt(m.nS)} · ${m.Ms} = ${fmt(m.out, 1)} г` : '?', 'sum') : step('Vm', '22,4 л/моль') + step('V = n · Vm', sol ? `${fmt(m.nS)} · 22,4 = ${fmt(m.out, 2)} л` : '?', 'sum')) + `</div>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const el = $('#meter');
+  if (m.kind === 'mole') el.innerHTML = `<div class="k">Порция ${low(m.f)}</div><div class="v">${fmt(m.n)} моль</div><div class="lr"><span>N</span><span>${sci(m.n)}</span></div><div class="lr"><span>цели</span><span>${TARG1.filter((x, i) => m.found[i]).length} из 3</span></div>`;
+  else if (m.kind === 'molar') el.innerHTML = `<div class="k">Весы · ${low(m.f)}</div><div class="v ${m.same ? 'ok' : ''}">Σ Ar = ${fmt(m.R, 1)}</div><div class="lr"><span>${m.bal ? 'равновесие' : m.R < m.M ? 'перевес слева' : 'перевес справа'}</span></div><div class="lr"><span>найдено</span><span>${TARG2.filter(f => m.found[f]).length} из 3</span></div>`;
+  else if (m.kind === 'vol') el.innerHTML = `<div class="k">Цилиндр · ${low(m.g)}</div><div class="v">${fmt(m.V, 2)} л</div><div class="lr"><span>n</span><span>${fmt(m.n)} моль</span></div><div class="lr"><span>m</span><span>${fmt(m.m, 1)} г</span></div><div class="gauge"><b style="width:${(m.n / NMAX * 100).toFixed(1)}%"></b></div>`;
+  else el.innerHTML = `<div class="k">Задача ${S.pi + 1}</div><div class="v ${m.solved[S.pi] ? 'ok' : ''}">${m.solved[S.pi] ? 'решена' : m.okG ? 'шаг 2' : 'шаг 1'}</div><div class="lr"><span>n дано</span><span>${fmt(m.nG)}</span></div><div class="lr"><span>n найти</span><span>${fmt(m.nS)}</span></div><div class="lr"><span>решено</span><span>${PROB.filter((x, i) => m.solved[i]).length} из 3</span></div>`;
+}
+
+function update(live) {
+  let m = model();
+  const L = LESSONS[S.lesson];
+  if (!live) {
+    if (m.kind === 'mole') TARG1.forEach((x, i) => { if (!S.f1[i] && x.f === m.f && near(x.n, m.n)) { S.f1[i] = true; toast(`Есть порция: ${x.txt} — это ${fmt(x.n)} моль.`); } });
+    if (m.kind === 'molar' && m.same && TARG2.includes(m.f) && !S.f2[m.f]) { S.f2[m.f] = true; toast(`Весы в равновесии: M(${low(m.f)}) = ${fmt(m.M, 1)} г/моль.`); }
+    else if (m.kind === 'molar' && m.bal && !m.same) toast('Массы равны, но набор атомов не совпадает с формулой. Проверьте состав.');
+    else if (m.kind === 'molar' && m.same && m.f === 'H2O') toast('Верно: M(H₂O) = 18 г/моль. Теперь вещества из задания.');
+    if (m.kind === 'vol') TARG3.forEach((x, i) => { if (!S.f3[i] && x.g === m.g && near(x.n, m.n)) { S.f3[i] = true; toast(`Есть: ${x.txt} — это ${fmt(x.n)} моль, ${fmt(x.n * VM, 2)} л.`); } });
+    if (m.kind === 'eq' && m.okS && !S.solved[S.pi]) { S.solved[S.pi] = true; renderTools(); toast(`Задача ${S.pi + 1} решена: ${m.P.ask}(${low(m.P.s)}) = ${m.P.ask === 'm' ? fmt(m.out, 1) + ' г' : fmt(m.out, 2) + ' л'}.`); }
+    m = model();
+    if (!S.done[L.id] && L.check(m)) {
+      S.done[L.id] = true; save(); renderStrip();
+      toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Количество вещества освоено!');
+    }
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  mole: '<rect x="6" y="6" width="17" height="18" rx="3" fill="#2a3550" stroke="#56688f"/><rect x="26" y="6" width="17" height="18" rx="3" fill="#2a3550" stroke="#56688f"/><rect x="46" y="13" width="11" height="11" rx="2" fill="#2a3550" stroke="#56688f"/><circle cx="12" cy="15" r="2.6" fill="#e5533f"/><circle cx="17" cy="15" r="2.6" fill="#e5533f"/><circle cx="32" cy="15" r="2.6" fill="#e5533f"/><circle cx="37" cy="15" r="2.6" fill="#e5533f"/>',
+  molar: '<path d="M13 10h40" stroke="#c8d1e2" stroke-width="2"/><path d="M33 10v16" stroke="#3a4762" stroke-width="2.4"/><circle cx="33" cy="10" r="2.4" fill="#ffb547"/><path d="M5 20h16a8 3 0 0 1 -16 0zM45 20h16a8 3 0 0 1 -16 0z" fill="#3a4762"/><rect x="9" y="12" width="8" height="8" rx="1.5" fill="rgba(95,180,217,.4)"/><rect x="47" y="14" width="5" height="6" rx="1" fill="#e5533f"/><rect x="53" y="14" width="5" height="6" rx="1" fill="#4f586d"/>',
+  volume: '<rect x="12" y="3" width="20" height="25" rx="2" fill="rgba(95,180,217,.12)" stroke="#8fb9d6"/><rect x="13" y="12" width="18" height="15" fill="rgba(229,83,63,.25)"/><rect x="13" y="10" width="18" height="2.5" fill="#56688f"/><rect x="40" y="20" width="4" height="7" fill="#eef2f8"/><rect x="46" y="9" width="4" height="18" fill="#e5533f"/><rect x="52" y="6" width="4" height="21" fill="#9aa6bd"/>',
+  calc: '<path d="M6 27h54" stroke="#8b96ad"/><rect x="14" y="9" width="12" height="18" rx="2" fill="#ffb547" fill-opacity=".35" stroke="#ffb547"/><rect x="40" y="17" width="12" height="10" rx="2" fill="#72d4e8" fill-opacity=".35" stroke="#72d4e8"/><text x="33" y="9" font-size="7" fill="#e8ecf4" text-anchor="middle" font-family="IBM Plex Mono">2:1</text>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i], init = JSON.parse(JSON.stringify(L.init || {}));
+  S.lesson = i; S.hl = null; drag = null;
+  S.sub1 = 'O2'; S.n1 = 1; S.f1 = {}; S.sub2 = 'H2O'; S.pan = []; S.f2 = {}; S.gas = 'H2'; S.n3 = 1; S.f3 = {}; S.pi = 0; S.nG = 1; S.nS = 1; S.solved = {};
+  Object.assign(S, init);
+  S.tilt = i === 1 ? tiltTarget(model()) : 0;
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '';
+  if (id === 'mole') now = `Модель «ящиков»: каждый ящик — 1 моль (6,02·10^23 частиц), маленький — 1/4 моль. Вещество ${m.f} (${NAME[m.f]}), в порции n = ${fmt(m.n)} моль, это ${sci(m.n)} молекул; атомов: ${Object.entries(m.at).map(([e, k]) => `${e} — ${fmt(k * m.n)} моль`).join(', ')}. Цели: ${TARG1.map((x, i) => `${x.txt} — ${S.f1[i] ? 'набрано' : 'ещё нет'}`).join('; ')}. Не называй нужное число молей для ненабранных целей — спроси, как перейти от числа частиц к молям (n = N : NA) и сколько атомов O в молекуле CO2.`;
+  if (id === 'molar') now = `Весы: на левой чаше 1 моль ${m.f} (${NAME[m.f]}), на правой — гирьки-атомы: ${S.pan.join(', ') || 'пусто'}, сумма Ar = ${fmt(m.R, 1)}. ${m.same ? 'Состав совпадает с формулой, весы в равновесии.' : m.bal ? 'Массы равны, но набор атомов не тот.' : 'Весы не в равновесии.'} Нужно найти молярные массы CO2, NaCl, H2SO4; уже найдены: ${TARG2.filter(f => S.f2[f]).join(', ') || 'ничего'}. Не называй готовые молярные массы ненайденных веществ — спрашивай, какие атомы и сколько их в формуле, и какие у них Ar.`;
+  if (id === 'volume') now = `Газовый цилиндр при н. у. Газ ${m.g} (${NAME[m.g]}), n = ${fmt(m.n)} моль, V = ${fmt(m.V, 2)} л, m = ${fmt(m.m, 1)} г. Справа — массы четырёх газов при том же объёме. Цели: ${TARG3.map((x, i) => `${x.txt} — ${S.f3[i] ? 'набрано' : 'ещё нет'}`).join('; ')}. Не называй нужные моли — подводи к формулам n = V : 22,4 и n = m : M.`;
+  if (id === 'calc') now = `Задача ${S.pi + 1}: ${m.P.q} Уравнение ${eqText(m.P)}. Ученик выставил n(${m.P.g}) = ${fmt(m.nG)} моль (это ${fmt(m.mG, 1)} г, ${m.okG ? 'совпадает с условием' : 'не совпадает с условием ' + m.P.gm + ' г'}), n(${m.P.s}) = ${fmt(m.nS)} моль (${m.okS ? 'соотношение верное' : 'соотношение пока неверное'}). Решено задач: ${PROB.filter((x, i) => S.solved[i]).length} из 3. Не называй ответ — веди по шагам: моли данного, соотношение по коэффициентам, перевод в массу или объём.`;
+  return [
+    `Предмет: химия, 8 класс. Тема «Количество вещества». Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Веди ученика наводящими вопросами, а не готовыми ответами.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = { mole: 'Почему химики считают молями, а не штуками?', molar: 'Чем молярная масса отличается от массы вещества?', volume: 'Почему 1 моль любого газа занимает одинаковый объём?', calc: 'Почему нельзя сравнивать граммы по коэффициентам?' }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
