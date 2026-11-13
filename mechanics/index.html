@@ -231,14 +231,14 @@ input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
 
   <aside class="panel">
     <div class="tabs" role="tablist">
-      <button role="tab" id="tab-overview" aria-selected="false">Обзор</button>
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
       <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
-      <button role="tab" id="tab-scheme" aria-selected="true">Схема</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
       <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
     </div>
-    <div class="pbody" id="pane-overview" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
     <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
-    <div class="pbody" id="pane-scheme" role="tabpanel">
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden>
       <h2>Схема рычага</h2>
       <svg id="diagram" viewBox="-60 -32 120 54" role="img" aria-label="Схема рычага с грузами. Нажмите на деление, чтобы повесить или снять груз."></svg>
       <dl class="reads">
@@ -272,6 +272,8 @@ input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
 <div class="toast" id="toast" role="status"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="/luch/reel.js"></script>
+<script src="/mechanics/reel-scenes.js"></script>
 <script>
 (() => {
 const $ = s => document.querySelector(s);
@@ -325,7 +327,7 @@ const LESSONS = [
 let saved = {};
 try { saved = JSON.parse(localStorage.getItem('luch-lever') || '{}') || {}; } catch (e) {}
 const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), w: {}, dyn: null, lift: 0, mode: 'add',
-            forces: true, arms: true, done: saved.done || {}, tab: 'scheme' };
+            forces: true, arms: true, done: saved.done || {}, tab: 'overview' };
 const save = () => { try { localStorage.setItem('luch-lever', JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
 
 const total = () => Object.values(S.w).reduce((a, b) => a + b, 0);
@@ -745,7 +747,7 @@ function taskState(m) {
 function renderPanes(m) {
   const L = LESSONS[S.lesson], done = !!S.done[L.id];
   if (S.tab === 'overview') {
-    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` + (window.LuchReel ? LuchReel.coverHTML(L.id) : '') +
       L.text.map(p => `<p>${p}</p>`).join('') +
       `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
       `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
@@ -867,6 +869,23 @@ window.LUCH_SUGGEST = () => {
     m.balanced ? 'Почему рычаг сейчас стоит ровно?' : 'Почему рычаг наклонился?',
     'Где рычаг встречается в жизни?'];
 };
+
+// explainer reels in the Overview tab (/luch/reel.js)
+let reelTheta = 0;
+if (window.LuchReel && window.LUCH_REEL_SCENES) LuchReel.setup({
+  scenes: window.LUCH_REEL_SCENES, base: "/mechanics/reels/", viewBox: "-60 -32 120 54",
+  titleOf: id => { const L = LESSONS.find(l => l.id === id); return L ? `Механика · ` + L.title : "Механика"; },
+  draw: (st, idx, p) => {
+    const ent = Object.entries(st.w || {}).map(([h, c]) => [+h, c]).filter(e => e[1] > 0).sort((a, b) => a[0] - b[0]);
+    const mu = ent.reduce((a, [h, c]) => a + h * c, 0);
+    let T = 0; if (st.dyn) { const req = mu / st.dyn; if (req > 0) T = Math.min(req, DYN_MAX); }
+    const net = mu - (st.dyn ? T * st.dyn : 0);
+    const target = st.dyn && (st.lift || 0) > 0 && T > 0 ? Math.sign(st.dyn) * Math.asin(Math.min(1, st.lift / (SP * Math.abs(st.dyn)))) * 180 / Math.PI : clamp(-net * DEG_PER_UNIT, -MAX_TILT, MAX_TILT);
+    reelTheta = p === undefined || reduce ? target : reelTheta + (target - reelTheta) * 0.1;
+    return diagramSVG({ entries: ent, dyn: st.dyn, T, theta: p === undefined ? target : reelTheta, forces: true }, false);
+  },
+  onReady: () => renderPanes(model()),
+});
 
 setLesson(S.lesson);
 })();

@@ -230,14 +230,14 @@ input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--ray)}
 
   <aside class="panel">
     <div class="tabs" role="tablist">
-      <button role="tab" id="tab-overview" aria-selected="false">Обзор</button>
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
       <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
-      <button role="tab" id="tab-scheme" aria-selected="true">Схема</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
       <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
     </div>
-    <div class="pbody" id="pane-overview" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
     <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
-    <div class="pbody" id="pane-scheme" role="tabpanel">
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden>
       <h2>Ход лучей</h2>
       <svg id="diagram" viewBox="-64 -24 128 46" role="img" aria-label="Схема хода лучей через линзу"></svg>
       <dl class="reads">
@@ -272,6 +272,8 @@ input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--ray)}
 <div class="toast" id="toast" role="status"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="/luch/reel.js"></script>
+<script src="/optics/reel-scenes.js"></script>
 <script>
 (() => {
 const $ = s => document.querySelector(s);
@@ -325,7 +327,7 @@ const LESSONS = [
 let saved = {};
 try { saved = JSON.parse(localStorage.getItem('luch-optics') || '{}') || {}; } catch (e) {}
 const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), F: 10, d: 30, s: 24, travel: 0,
-            rays: true, ghost: true, foci: true, done: saved.done || {}, tab: 'scheme' };
+            rays: true, ghost: true, foci: true, done: saved.done || {}, tab: 'overview' };
 const save = () => { try { localStorage.setItem('luch-optics', JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
 
 // ---------- physics ----------
@@ -753,7 +755,7 @@ const step = (a, b) => `<div class="step"><b>${a}</b><span>${b}</span></div>`;
 function renderPanes(o) {
   const L = LESSONS[S.lesson], done = !!S.done[L.id];
   if (S.tab === 'overview') {
-    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` + (window.LuchReel ? LuchReel.coverHTML(L.id) : '') +
       L.text.map(p => `<p>${p}</p>`).join('') +
       `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(o)}</div><p class="note">${L.hint}</p></div>` +
       `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
@@ -878,6 +880,24 @@ window.LUCH_SUGGEST = () => {
   q.push(S.lesson === 0 ? 'Объясни формулу тонкой линзы' : 'Где это встречается в жизни?');
   return q;
 };
+
+// explainer reels in the Overview tab (/luch/reel.js)
+if (window.LuchReel && window.LUCH_REEL_SCENES) LuchReel.setup({
+  scenes: window.LUCH_REEL_SCENES, base: "/optics/reels/", viewBox: "-64 -24 128 46",
+  titleOf: id => { const L = LESSONS.find(l => l.id === id); return L ? `Оптика · ` + L.title : "Оптика"; },
+  draw: st => { let s = st.s; if (s === "auto") { const f = imageDist(st.F, st.d); s = isFinite(f) && f > 0 ? clamp(f, 5, 62) : 40; } return diagramSVG(st.F, st.d, s, false); },
+  viewBoxOf: st => {
+    let s = st.s; const f = imageDist(st.F, st.d);
+    if (s === "auto") s = isFinite(f) && f > 0 ? clamp(f, 5, 62) : 40;
+    const fin = isFinite(f) && Math.abs(f) < 62, yQ = fin ? Math.abs(H * f / st.d) : 0;
+    const lo = Math.min(-st.d, fin ? f : 0) - 8, hi = Math.max(s, Math.abs(st.F) * 2, fin ? f : 0, 12) + 8;
+    const half = Math.min(Math.max(yQ, H, 10) + 5, 30);
+    let w = clamp(Math.max(hi - lo, 70, half * 2 * 128 / 46), 70, 128); const h = w * 46 / 128;
+    const cx = clamp((lo + hi) / 2, -64 + w / 2, 64 - w / 2), top = fin && f < 0 ? -h * 0.7 : -h * 0.5;
+    return `${(cx - w / 2).toFixed(2)} ${top.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)}`;
+  },
+  onReady: () => renderPanes(optics()),
+});
 
 setLesson(S.lesson);
 })();
