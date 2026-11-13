@@ -1,0 +1,967 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по математике, 5 класс: порядок действий, делимость и её признаки, простые числа и решето Эратосфена, НОД и НОК.">
+<title>Натуральные числа</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:120px;width:100%;height:calc(100% - 174px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:pointer}
+.scene [data-drag^="b"],.scene [data-drag="knob"],.scene [data-drag="track"]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--arm);transition:width .2s}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+.yes{color:var(--ok)}.no{color:var(--warn)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:70vh;min-height:520px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(100vw + 250px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><circle cx="11" cy="12" r="2.6" fill="var(--arm)"/><circle cx="20" cy="12" r="2.6" fill="var(--arm)"/><circle cx="29" cy="12" r="2.6" fill="var(--arm)"/><circle cx="11" cy="21" r="2.6" fill="var(--arm)"/><circle cx="20" cy="21" r="2.6" fill="var(--arm)"/><circle cx="29" cy="21" r="2.6" fill="var(--arm)"/><circle cx="11" cy="30" r="2.6" fill="var(--force)"/><path d="M17 27l6 6M23 27l-6 6" stroke="var(--fg)" stroke-width="1.8" stroke-linecap="round"/><path d="M26 27l6 6M32 27l-6 6" stroke="var(--fg)" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Математика · Натуральные числа</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#math">Карта</a><a href="/physics/#math">Математика</a><a href="./" aria-current="page">Натуральные числа</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Числа</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Рабочее поле">
+    <svg class="scene" id="scene" role="img" aria-label="Интерактивное поле с числами. На элементы можно нажимать и перетаскивать их."></svg>
+    <div class="task" id="taskBox" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c; };
+const INK = '#04070d';
+const KEY = 'luch-math-num';
+
+// ---------- number helpers ----------
+const isPrime = n => { if (n < 2) return false; for (let d = 2; d * d <= n; d++) if (n % d === 0) return false; return true; };
+const factor = n => { const f = []; let d = 2; while (n > 1) { while (n % d === 0) { f.push(d); n /= d; } d++; } return f; };
+const gcd = (a, b) => b ? gcd(b, a % b) : a;
+const digitSum = n => String(n).split('').reduce((s, c) => s + +c, 0);
+const divisors = n => { const r = []; for (let d = 1; d <= n; d++) if (n % d === 0) r.push(d); return r; };
+const commonOf = (a, b) => { const fb = factor(b), c = []; for (const p of factor(a)) { const i = fb.indexOf(p); if (i >= 0) { c.push(p); fb.splice(i, 1); } } return c; };
+const prod = arr => arr.reduce((s, x) => s * x, 1);
+const dotJoin = arr => arr.length ? arr.join(' · ') : '1';
+const PCOL = { 2: '#72d4e8', 3: '#ffb547', 5: '#86e0a8', 7: '#c39bff' };
+const pcol = p => PCOL[p] || '#ff8a73';
+
+const EXPRS = ['48 − 6 · (3 + 5) : 4', '120 : (15 − 7) + 3 · 9', '(72 − 12) : 5 · 2 − 4', '100 − (25 + 35) : (4 · 3)', '7 + 3 · (40 − 8 : 2)'];
+const DIVS = [2, 3, 4, 5, 6, 9, 10];
+const NMAX = 150;
+const PAIRS = [[24, 36], [12, 18], [30, 45], [16, 40], [60, 84]];
+
+const LESSONS = [
+  { id: 'order', title: 'Порядок действий',
+    text: ['В выражении бывает несколько действий. Чтобы у всех получился один и тот же ответ, договорились о порядке. Первым делом считают то, что в скобках.',
+           'Потом выполняют умножение и деление, а уже затем сложение и вычитание. Действия одной ступени идут по порядку, слева направо.',
+           'Перед тем как считать, расставьте над знаками номера действий. Так ошибиться гораздо труднее.'],
+    why: 'Кассир и бухгалтер считают чек: 3 · 450 тг + 2 · 1200 тг. Сначала умножение, потом сложение, иначе сумма выйдет неверной. Программист знает, что калькулятор, компьютер и формулы в Excel считают по тем же правилам. Ошибся в порядке действий — ошибся в деньгах.',
+    task: 'Вычислите выражение: каждый раз нажимайте на действие, которое по правилам выполняется следующим.',
+    hint: 'Есть скобки — начните с них. И в скобках, и без них сначала «·» и «:», потом «+» и «−», слева направо.',
+    stage: 'Нажимайте на знаки действий по порядку. Над примером появятся номера действий.',
+    ex: 0,
+    check: m => m.done },
+  { id: 'div', title: 'Делимость',
+    text: ['Число a делится на b, если a предметов можно разложить в кучки по b штук без остатка. 24 : 3 = 8, остаток 0 — значит, 24 делится на 3. А 25 на 3 не делится: одна точка останется лишней.',
+           'Делить каждый раз не обязательно — есть признаки делимости. На 2 делятся числа, которые оканчиваются чётной цифрой. На 5 — цифрой 0 или 5. На 10 — цифрой 0.',
+           'На 3 делится число, у которого сумма цифр делится на 3. На 9 — если сумма цифр делится на 9. Например, у 117 сумма цифр 1 + 1 + 7 = 9, поэтому 117 делится и на 3, и на 9.'],
+    why: 'Менеджер склада раскладывает товар по коробкам по 6 или по 12 штук и сразу видит, останутся ли лишние. Организатор делит класс на команды поровну, повар — тесто на равные порции. А признаки делимости помогают проверить ответ за секунду, без калькулятора.',
+    task: 'Найдите число больше 50, которое делится и на 2, и на 3, и на 5.',
+    hint: 'На что оканчиваются числа, которые делятся и на 2, и на 5? Найдите такое число, а потом сложите его цифры.',
+    stage: 'Тащите ползунок по числовому лучу, делитель выбирайте сверху. Оранжевые точки — остаток.',
+    n: 24, k: 3,
+    check: m => m.n > 50 && m.n % 30 === 0 },
+  { id: 'prime', title: 'Простые числа',
+    text: ['У простого числа ровно два делителя: 1 и само это число. Например, 7 делится только на 1 и на 7. У составного числа делителей больше двух: 12 делится на 1, 2, 3, 4, 6 и 12.',
+           'Число 1 особое. У него всего один делитель, поэтому оно ни простое, ни составное.',
+           'Найти все простые числа до 100 помогает решето Эратосфена. Берём самое маленькое невычеркнутое число — оно простое — и вычёркиваем все числа, кратные ему. Потом повторяем.'],
+    why: 'На простых числах держится шифрование. Когда вы платите картой или пишете в мессенджере, данные защищают ключи, построенные из огромных простых чисел. Этим занимаются специалисты по кибербезопасности, их ищут банки и IT-компании Казахстана. А в школе простые множители помогают сокращать дроби и находить НОД.',
+    task: 'Просейте решето: вычеркните все составные числа до 100.',
+    hint: 'Нажмите 2 — вычеркнутся все чётные числа, кроме самой двойки. Потом нажимайте самое маленькое число, которое осталось невычеркнутым.',
+    stage: 'Нажмите на число: если оно простое, все кратные ему числа вычеркнутся.',
+    check: m => m.left === 0 },
+  { id: 'gcd', title: 'НОД и НОК',
+    text: ['НОД — наибольший общий делитель: самое большое число, на которое делятся оба числа. НОК — наименьшее общее кратное: самое маленькое число, которое делится на оба.',
+           'Разложим числа на простые множители: 12 = 2 · 2 · 3, 18 = 2 · 3 · 3. Общие множители — 2 и 3. Их произведение и есть НОД: НОД(12, 18) = 2 · 3 = 6.',
+           'Для НОК берём все множители обоих чисел, но общие — только один раз: НОК(12, 18) = 2 · 3 · 2 · 3 = 36.'],
+    why: 'Диспетчер автопарка по НОК узнаёт, когда два маршрута снова одновременно окажутся на остановке. Плиточник по НОД выбирает самую крупную квадратную плитку, которая ляжет на пол без обрезков. Флорист делит 24 розы и 36 тюльпанов на наибольшее число одинаковых букетов — это тоже НОД.',
+    task: 'Перетащите в середину все общие простые множители двух чисел — узнайте их НОД и НОК.',
+    hint: 'Возьмите шарик из левого круга и бросьте в общую часть. Если такой же шарик есть в правом круге, они станут одним общим. Нажатие на шарик тоже переносит его.',
+    stage: 'Перетаскивайте шарики-множители в общую часть кругов.',
+    a: 24, b: 36,
+    check: m => m.complete && m.common.length > 0 },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null,
+            ex: 0, orig: [], tk: [], steps: [], mist: 0, bad: null,
+            n: 24, k: 3,
+            pr: {}, cross: {}, crossT: {}, last: null, probe: 12, flash: null,
+            a: 24, b: 36, balls: [], bid: 0 };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+// ---------- lesson 1: expressions ----------
+const HI = o => o === '·' || o === ':';
+function parseExpr(s) {
+  let id = 0;
+  return (s.match(/\d+|[−+·:()]/g) || []).map(x => /\d/.test(x) ? { t: 'n', v: +x } : x === '(' || x === ')' ? { t: x } : { t: 'o', o: x, id: id++ });
+}
+function groups(tk) {
+  const segs = []; let open = -1;
+  tk.forEach((t, i) => { if (t.t === '(') open = i; else if (t.t === ')') { if (open >= 0) segs.push([open + 1, i]); open = -1; } });
+  return segs.length ? segs : [[0, tk.length]];
+}
+function allowed(tk) {
+  const ok = new Set();
+  for (const [a, b] of groups(tk)) {
+    const ops = tk.slice(a, b).filter(t => t.t === 'o'); if (!ops.length) continue;
+    ok.add((ops.find(t => HI(t.o)) || ops[0]).id);
+  }
+  return ok;
+}
+function whyWrong(tk, id) {
+  const i = tk.findIndex(t => t.id === id), seg = groups(tk).find(([a, b]) => i >= a && i < b);
+  if (!seg) return 'Сначала выполняются действия в скобках.';
+  const ops = tk.slice(seg[0], seg[1]).filter(t => t.t === 'o');
+  if (!HI(tk[i].o) && ops.some(t => HI(t.o))) return 'Умножение и деление выполняются раньше сложения и вычитания.';
+  return 'Действия одной ступени выполняются по порядку, слева направо.';
+}
+const calc = (a, o, b) => o === '+' ? a + b : o === '−' ? a - b : o === '·' ? a * b : a / b;
+function clickOp(id) {
+  if (S.tk.length === 1) return;
+  if (!allowed(S.tk).has(id)) { S.mist++; S.bad = { id, t: performance.now() }; toast(whyWrong(S.tk, id)); update(); return; }
+  const i = S.tk.findIndex(t => t.id === id), a = S.tk[i - 1].v, o = S.tk[i].o, b = S.tk[i + 1].v, r = calc(a, o, b);
+  S.tk.splice(i - 1, 3, { t: 'n', v: r, fresh: performance.now() });
+  let j; while ((j = S.tk.findIndex((t, k) => t.t === '(' && S.tk[k + 2] && S.tk[k + 2].t === ')' && S.tk[k + 1].t === 'n')) >= 0) S.tk.splice(j, 3, S.tk[j + 1]);
+  S.steps.push({ id, a, o, b, r });
+  update();
+}
+function setExpr(i) { S.ex = (i + EXPRS.length) % EXPRS.length; S.orig = parseExpr(EXPRS[S.ex]); S.tk = parseExpr(EXPRS[S.ex]); S.steps = []; S.mist = 0; S.bad = null; }
+
+// ---------- lesson 3: sieve ----------
+function tapCell(n) {
+  S.probe = n;
+  if (n === 1) { toast('1 — ни простое, ни составное: у него всего один делитель.'); update(); return; }
+  if (S.cross[n]) { const p = S.cross[n]; toast(`${n} уже вычеркнуто: ${n} = ${p} · ${n / p}. Это составное число.`); update(); return; }
+  if (S.pr[n]) { toast(`${n} уже отмечено как простое.`); update(); return; }
+  if (!isPrime(n)) { const p = factor(n)[0]; S.flash = { n: p, t: performance.now() }; toast(`${n} делится на ${p}, значит, оно составное. Сначала нажмите ${p}.`); update(); return; }
+  S.pr[n] = true; S.last = n;
+  const now = performance.now(); let c = 0;
+  for (let m = 2 * n; m <= 100; m += n) if (!S.cross[m]) { S.cross[m] = n; S.crossT[m] = now + (reduce ? 0 : c * 30); c++; }
+  toast(c ? `${n} — простое. Вычеркнули ${c} ${plural(c, 'число', 'числа', 'чисел')}, кратных ${n}.` : `${n} — простое. Кратных ему до 100 уже не осталось.`);
+  update();
+}
+const nextPrimeToTap = () => { for (let n = 2; n <= 100; n++) if (!S.cross[n] && !S.pr[n]) return n; return null; };
+
+// ---------- lesson 4: factor balls ----------
+// two circles side by side; on a tall narrow stage they stack vertically
+const GEO = {
+  wide: { A: { x: 180, y: 150 }, B: { x: 340, y: 150 }, R: 125, W: 520, H: 340, tall: false },
+  tall: { A: { x: 140, y: 145 }, B: { x: 140, y: 280 }, R: 105, W: 280, H: 476, tall: true },
+};
+let G = GEO.wide;
+const gAxes = () => { const dx = G.B.x - G.A.x, dy = G.B.y - G.A.y, d = Math.hypot(dx, dy), u = { x: dx / d, y: dy / d };
+  return { u, v: { x: -u.y, y: u.x }, mid: { x: (G.A.x + G.B.x) / 2, y: (G.A.y + G.B.y) / 2 }, half: Math.sqrt(G.R * G.R - d * d / 4) }; };
+function buildBalls() {
+  S.balls = []; S.bid = 0;
+  for (const p of factor(S.a)) S.balls.push({ id: S.bid++, p, side: 'A', x: null, y: null });
+  for (const p of factor(S.b)) S.balls.push({ id: S.bid++, p, side: 'B', x: null, y: null });
+}
+function zoneAt(x, y) {
+  const inA = Math.hypot(x - G.A.x, y - G.A.y) < G.R, inB = Math.hypot(x - G.B.x, y - G.B.y) < G.R;
+  return inA && inB ? 'M' : inA ? 'A' : inB ? 'B' : null;
+}
+function slots() {
+  const pos = {}, { u, v, mid } = gAxes();
+  for (const side of ['A', 'M', 'B']) {
+    const list = S.balls.filter(b => b.side === side).sort((x, y) => x.p - y.p || x.id - y.id), n = list.length;
+    const cols = n > 4 ? 2 : 1, per = Math.ceil(n / cols);
+    list.forEach((b, i) => {
+      const c = Math.floor(i / per), r = i % per, rows = Math.min(per, n - c * per), off = (r - (rows - 1) / 2) * 36;
+      let base, along;
+      if (side === 'M') { base = mid; along = cols === 2 ? (c ? 16 : -16) : 0; }
+      else if (side === 'A') { base = G.A; along = -20 - c * 40; }
+      else { base = G.B; along = 20 + c * 40; }
+      pos[b.id] = { x: base.x + u.x * along + v.x * off, y: base.y + u.y * along + v.y * off };
+    });
+  }
+  return pos;
+}
+function moveBall(ball, zone) {
+  if (!zone || zone === ball.side) return false;
+  if (zone === 'M') {
+    const other = ball.side === 'A' ? 'B' : 'A', mate = S.balls.find(b => b.side === other && b.p === ball.p);
+    if (!mate) { const num = other === 'A' ? S.a : S.b; toast(num % ball.p ? `В разложении числа ${num} нет множителя ${ball.p}. Он не общий.` : `Все множители ${ball.p} числа ${num} уже в середине. Этот — лишний.`); return false; }
+    S.balls.splice(S.balls.indexOf(mate), 1); ball.side = 'M';
+    update(); return true;
+  }
+  if (ball.side === 'M') {
+    S.balls.push({ id: S.bid++, p: ball.p, side: zone === 'A' ? 'B' : 'A', x: ball.x, y: ball.y });
+    ball.side = zone; update(); return true;
+  }
+  toast('Множитель одного числа нельзя переложить в другое. Общие кладите в середину.');
+  return false;
+}
+function tapBall(ball) { if (ball.side === 'M') moveBall(ball, 'A'); else moveBall(ball, 'M'); }
+function setPair(a, b) { S.a = a; S.b = b; buildBalls(); }
+
+// ---------- model ----------
+function model() {
+  const id = LID();
+  if (id === 'order') {
+    const ops = S.tk.filter(t => t.t === 'o').length;
+    return { kind: 'order', done: S.tk.length === 1, value: S.tk.length === 1 ? S.tk[0].v : null, step: S.steps.length, total: S.steps.length + ops, mist: S.mist };
+  }
+  if (id === 'div') return { kind: 'div', n: S.n, k: S.k, q: Math.floor(S.n / S.k), r: S.n % S.k, ds: digitSum(S.n), last: S.n % 10 };
+  if (id === 'prime') {
+    let comp = 0, crossed = 0;
+    for (let n = 4; n <= 100; n++) if (!isPrime(n)) { comp++; if (S.cross[n]) crossed++; }
+    return { kind: 'prime', primes: Object.keys(S.pr).length, crossed, comp, left: comp - crossed };
+  }
+  const by = s => S.balls.filter(b => b.side === s).map(b => b.p).sort((x, y) => x - y);
+  const A = by('A'), B = by('B'), M = by('M'), common = commonOf(S.a, S.b), g = gcd(S.a, S.b);
+  return { kind: 'gcd', a: S.a, b: S.b, A, B, M, common, complete: M.length === common.length, g, l: S.a * S.b / g };
+}
+
+// ---------- drawing ----------
+const DIM = { order: [520, 320], div: [520, 330], prime: [400, 400], gcd: [520, 340] };
+const scene = $('#scene');
+const txt = (x, y, s, fs, fill, extra = '') => `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="${fs.toFixed(1)}" fill="${fill}" text-anchor="middle" ${extra}>${s}</text>`;
+const cap = (x, y, s) => `<text x="${x}" y="${y}" font-size="11" fill="#8b96ad" text-anchor="middle" font-family="Golos Text,sans-serif" letter-spacing=".5">${s}</text>`;
+
+function tokW(t, fs) { const cw = fs * 0.6; return t.t === 'n' ? String(t.v).length * cw : t.t === 'o' ? fs * 1.15 : cw * 0.8; }
+function layoutTok(tk, fs, maxW, W) {
+  let gap = fs * 0.3, tot = tk.reduce((s, t) => s + tokW(t, fs), 0) + gap * (tk.length - 1);
+  if (tot > maxW) { const k = maxW / tot; fs *= k; gap *= k; tot = maxW; }
+  let x = (W - tot) / 2; const out = [];
+  for (const t of tk) { const w = tokW(t, fs); out.push({ t, x, w, cx: x + w / 2 }); x += w + gap; }
+  return { fs, out };
+}
+
+function drawOrder(t) {
+  const W = DIM.order[0], m = model();
+  let h = cap(W / 2, 12, 'ПРИМЕР · НОМЕРА НАД ЗНАКАМИ — ПОРЯДОК ДЕЙСТВИЙ');
+  const L0 = layoutTok(S.orig, 24, 480, W);
+  for (const o of L0.out) {
+    const k = o.t;
+    if (k.t === 'n') h += txt(o.cx, 66, k.v, L0.fs, '#e8ecf4');
+    else if (k.t === 'o') {
+      const si = S.steps.findIndex(s => s.id === k.id);
+      h += txt(o.cx, 66, k.o, L0.fs, si >= 0 ? '#e8ecf4' : '#8b96ad', `font-weight="600" data-part="${HI(k.o) ? 'hi' : 'lo'}"`);
+      if (si >= 0) h += `<g data-part="order"><circle cx="${o.cx.toFixed(1)}" cy="34" r="10" fill="none" stroke="#ffb547" stroke-width="1.6"/>${txt(o.cx, 38.5, si + 1, 12, '#ffb547')}</g>`;
+    } else h += txt(o.cx, 66, k.t, L0.fs, '#8b96ad', 'data-part="paren"');
+  }
+  h += `<path d="M30 92H490" stroke="#26324a" stroke-width="1"/>`;
+  h += cap(W / 2, 116, m.done ? 'ГОТОВО: ВСЕ ДЕЙСТВИЯ ВЫПОЛНЕНЫ' : 'СЕЙЧАС · НАЖМИТЕ ДЕЙСТВИЕ, КОТОРОЕ ВЫПОЛНЯЕТСЯ ПЕРВЫМ');
+  if (m.done) {
+    h += txt(W / 2, 176, '= ' + m.value, 46, '#86e0a8', 'font-weight="500" data-part="answer"');
+  } else {
+    const L = layoutTok(S.tk, 36, 490, W), fs = L.fs, by = 172;
+    for (const o of L.out) {
+      const k = o.t;
+      if (k.t === 'n') { const fresh = k.fresh && t - k.fresh < 1300; h += txt(o.cx, by, k.v, fs, fresh ? '#ffb547' : '#e8ecf4', 'font-weight="500"'); }
+      else if (k.t === 'o') {
+        const bad = S.bad && S.bad.id === k.id && t - S.bad.t < 700;
+        h += `<g data-drag="op${k.id}" data-part="${HI(k.o) ? 'hi' : 'lo'}"><rect x="${(o.x - 2).toFixed(1)}" y="${(by - fs * 0.86).toFixed(1)}" width="${(o.w + 4).toFixed(1)}" height="${(fs * 1.16).toFixed(1)}" rx="9" fill="${bad ? 'rgba(255,138,115,.18)' : '#1a2438'}" stroke="${bad ? '#ff8a73' : '#3a4762'}" stroke-width="2"/>` +
+             txt(o.cx, by, k.o, fs, '#e8ecf4', 'font-weight="600"') + `</g>`;
+      } else h += txt(o.cx, by, k.t, fs, '#8b96ad', 'data-part="paren"');
+    }
+  }
+  h += `<path d="M30 206H490" stroke="#26324a" stroke-width="1"/>`;
+  h += cap(W / 2, 228, 'ШАГИ');
+  if (!S.steps.length) h += txt(W / 2, 262, 'пока ни одного', 14, '#56627d');
+  S.steps.forEach((s, i) => {
+    const col = i < 3 ? 0 : 1, x = col ? 290 : 60, y = 256 + (i % 3) * 30;
+    h += `<g data-part="steps"><circle cx="${x + 10}" cy="${y - 5}" r="10" fill="none" stroke="#ffb547" stroke-width="1.4"/>${txt(x + 10, y - 1, i + 1, 11, '#ffb547')}` +
+         `<text x="${x + 30}" y="${y}" font-size="17" fill="#e8ecf4">${s.a} ${s.o} ${s.b} = <tspan fill="#86e0a8">${s.r}</tspan></text></g>`;
+  });
+  return h;
+}
+
+const RUL = { x0: 30, x1: 490, y: 296 };
+const nToX = n => RUL.x0 + (n - 1) / (NMAX - 1) * (RUL.x1 - RUL.x0);
+const xToN = x => clamp(Math.round(1 + (x - RUL.x0) / (RUL.x1 - RUL.x0) * (NMAX - 1)), 1, NMAX);
+function drawDiv() {
+  const m = model();
+  let h = '';
+  const cw = 58, gap = 8, x0 = (520 - (DIVS.length * cw + (DIVS.length - 1) * gap)) / 2;
+  DIVS.forEach((k, i) => {
+    const x = x0 + i * (cw + gap), on = k === S.k;
+    h += `<g data-drag="k${k}" data-part="chips"><rect x="${x}" y="4" width="${cw}" height="30" rx="8" fill="${on ? '#e8ecf4' : '#1a2438'}" stroke="${on ? '#e8ecf4' : '#3a4762'}" stroke-width="1.4"/>${txt(x + cw / 2, 24, 'на ' + k, 13, on ? '#0b1019' : '#8b96ad', 'font-weight="500"')}</g>`;
+  });
+  h += txt(260, 74, `${m.n} : ${m.k} = ${m.q}` + (m.r ? ` (ост. ${m.r})` : ''), 25, m.r ? '#e8ecf4' : '#86e0a8', 'font-weight="500"');
+  // groups of k dots
+  const cols = m.k <= 5 ? m.k : Math.ceil(m.k / 2), rows = m.k <= 5 ? 1 : 2, sp = 8;
+  const bw = cols * sp + 7, bh = rows * sp + 7, gp = 5, X0 = 20, X1 = 500;
+  let x = X0, y = 98;
+  const place = () => { if (x + bw > X1) { x = X0; y += bh + gp; } const p = { x, y }; x += bw + gp; return p; };
+  for (let g = 0; g < m.q; g++) {
+    const p = place();
+    h += `<g data-part="groups"><rect x="${p.x}" y="${p.y}" width="${bw}" height="${bh}" rx="4" fill="${m.r ? 'rgba(114,212,232,.08)' : 'rgba(134,224,168,.1)'}" stroke="${m.r ? '#3c6f80' : '#4f8a66'}" stroke-width="1"/>`;
+    for (let d = 0; d < m.k; d++) h += `<circle cx="${p.x + 7.5 + (d % cols) * sp}" cy="${p.y + 7.5 + Math.floor(d / cols) * sp}" r="2.7" fill="${m.r ? '#72d4e8' : '#86e0a8'}"/>`;
+    h += `</g>`;
+  }
+  if (m.r) {
+    if (x > X0) { x += 6; }
+    const p = place();
+    h += `<g data-part="rest"><rect x="${p.x}" y="${p.y}" width="${bw}" height="${bh}" rx="4" fill="rgba(255,181,71,.1)" stroke="#ffb547" stroke-width="1.2" stroke-dasharray="3 2"/>`;
+    for (let d = 0; d < m.r; d++) h += `<circle cx="${p.x + 7.5 + (d % cols) * sp}" cy="${p.y + 7.5 + Math.floor(d / cols) * sp}" r="2.7" fill="#ffb547"/>`;
+    h += `</g>`;
+  }
+  const yb = y + bh + 16;
+  h += `<text x="20" y="${Math.min(yb, 262)}" font-size="11" fill="#8b96ad">${m.q} ${plural(m.q, 'кучка', 'кучки', 'кучек')} по ${m.k}${m.r ? ` и остаток ${m.r}` : ', остатка нет'}</text>`;
+  // number line
+  h += `<g data-drag="track" data-part="ruler"><rect x="${RUL.x0 - 14}" y="${RUL.y - 26}" width="${RUL.x1 - RUL.x0 + 28}" height="52" fill="transparent"/>`;
+  h += `<path d="M${RUL.x0} ${RUL.y}H${RUL.x1}" stroke="#3a4762" stroke-width="4" stroke-linecap="round"/>`;
+  h += `<path d="M${RUL.x0} ${RUL.y}H${nToX(m.n).toFixed(1)}" stroke="#72d4e8" stroke-width="4" stroke-linecap="round"/>`;
+  for (let v = 10; v <= NMAX; v += 10) h += `<path d="M${nToX(v).toFixed(1)} ${RUL.y + 5}v${v % 50 ? 4 : 8}" stroke="#56627d" stroke-width="1.2"/>`;
+  for (const v of [1, 50, 100, 150]) h += txt(nToX(v), RUL.y + 24, v, 10, '#8b96ad');
+  h += `</g>`;
+  const kx = nToX(m.n);
+  h += `<g data-drag="knob" data-part="ruler"><circle cx="${kx.toFixed(1)}" cy="${RUL.y}" r="20" fill="transparent"/><circle cx="${kx.toFixed(1)}" cy="${RUL.y}" r="11" fill="#ffb547" stroke="${INK}" stroke-width="2"/>${txt(kx, RUL.y - 18, m.n, 12, '#ffb547', 'font-weight="500"')}</g>`;
+  return h;
+}
+
+function drawPrime(t) {
+  const C = 38, X = 10, Y = 10, m = model(), all = m.left === 0;
+  let h = '<g data-part="grid">';
+  for (let n = 1; n <= 100; n++) {
+    const c = (n - 1) % 10, r = Math.floor((n - 1) / 10), x = X + c * C, y = Y + r * C, cx = x + C / 2, cy = y + C / 2;
+    const cr = S.cross[n] && t >= S.crossT[n], pr = S.pr[n] || (all && isPrime(n));
+    const part = n === 1 ? 'one' : cr ? 'cross' : pr ? 'prime' : '';
+    const flash = S.flash && S.flash.n === n && t - S.flash.t < 1600;
+    const lastP = S.last === n;
+    h += `<g data-drag="c${n}"${part ? ` data-part="${part}"` : ''}><rect x="${x + 1.5}" y="${y + 1.5}" width="${C - 3}" height="${C - 3}" rx="6" fill="${lastP ? 'rgba(255,181,71,.16)' : flash ? 'rgba(114,212,232,.18)' : '#141d2d'}" stroke="${flash ? '#72d4e8' : '#26324a'}" stroke-width="${flash ? 2 : 1}"${n === 1 ? ' stroke-dasharray="3 3"' : ''}/>`;
+    if (pr) h += `<circle cx="${cx}" cy="${cy}" r="14" fill="none" stroke="${pcol(n)}" stroke-width="${S.pr[n] ? 2.4 : 1.6}"${S.pr[n] ? '' : ' stroke-dasharray="3 2"'}/>`;
+    h += txt(cx, cy + 5, n, 14, cr ? '#56627d' : n === 1 ? '#8b96ad' : '#e8ecf4', pr ? 'font-weight="600"' : '');
+    if (cr) {
+      const k = reduce ? 1 : clamp((t - S.crossT[n]) / 180, 0, 1), col = pcol(S.cross[n]);
+      h += `<path d="M${x + 8} ${y + C - 8}L${(x + 8 + (C - 16) * k).toFixed(1)} ${(y + C - 8 - (C - 16) * k).toFixed(1)}" stroke="${col}" stroke-width="2.2" stroke-linecap="round"/>`;
+    }
+    h += `</g>`;
+  }
+  return h + '</g>';
+}
+
+function drawGcd() {
+  const m = model(), pos = slots();
+  const { v, mid, half } = gAxes(), p1 = { x: mid.x - v.x * half, y: mid.y - v.y * half }, p2 = { x: mid.x + v.x * half, y: mid.y + v.y * half };
+  let h = `<g data-part="circA"><circle cx="${G.A.x}" cy="${G.A.y}" r="${G.R}" fill="rgba(255,181,71,.05)" stroke="#ffb547" stroke-width="1.8"/></g>`;
+  h += `<g data-part="circB"><circle cx="${G.B.x}" cy="${G.B.y}" r="${G.R}" fill="rgba(114,212,232,.05)" stroke="#72d4e8" stroke-width="1.8"/></g>`;
+  h += `<g data-part="mid"><path d="M${p1.x.toFixed(1)} ${p1.y.toFixed(1)}A${G.R} ${G.R} 0 0 1 ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}A${G.R} ${G.R} 0 0 1 ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}Z" fill="rgba(134,224,168,${m.complete ? .12 : .06})" stroke="#86e0a8" stroke-width="1" stroke-dasharray="4 3"/></g>`;
+  if (G.tall) {
+    h += `<g data-part="circA">${txt(G.W / 2, 22, `<tspan font-weight="500">${m.a}</tspan> = ${dotJoin(factor(m.a))}`, 15, '#ffb547')}</g>`;
+    h += `<g data-part="circB">${txt(G.W / 2, G.B.y + G.R + 24, `<tspan font-weight="500">${m.b}</tspan> = ${dotJoin(factor(m.b))}`, 15, '#72d4e8')}</g>`;
+  } else {
+    h += `<g data-part="circA"><text x="12" y="20" font-size="22" fill="#ffb547" font-weight="500">${m.a}</text><text x="12" y="37" font-size="11" fill="#8b96ad">= ${dotJoin(factor(m.a))}</text></g>`;
+    h += `<g data-part="circB"><text x="508" y="20" font-size="22" fill="#72d4e8" font-weight="500" text-anchor="end">${m.b}</text><text x="508" y="37" font-size="11" fill="#8b96ad" text-anchor="end">= ${dotJoin(factor(m.b))}</text></g>`;
+    h += cap(260, 18, 'ОБЩИЕ');
+  }
+  for (const b of S.balls) {
+    const p = pos[b.id]; if (b.x === null) { b.x = p.x; b.y = p.y; }
+    const parts = (b.side === 'M' ? 'mid ' : b.side === 'A' ? 'circA ' : 'circB ') + 'all';
+    h += `<g data-drag="b${b.id}" data-part="${parts}"><circle cx="${b.x.toFixed(1)}" cy="${b.y.toFixed(1)}" r="22" fill="transparent"/><circle cx="${b.x.toFixed(1)}" cy="${b.y.toFixed(1)}" r="15" fill="${pcol(b.p)}" stroke="${INK}" stroke-width="2"/>${txt(b.x, b.y + 5, b.p, 14, '#0b1019', 'font-weight="600"')}</g>`;
+  }
+  if (m.complete && m.common.length) {
+    h += `<text x="${G.W / 2}" y="${G.H - 32}" font-size="15" fill="#86e0a8" text-anchor="middle" data-part="mid">НОД = ${dotJoin(m.M)} = ${m.g}</text>`;
+    h += `<text x="${G.W / 2}" y="${G.H - 8}" font-size="15" fill="#e8ecf4" text-anchor="middle" data-part="all">НОК = ${dotJoin(m.A.concat(m.M, m.B))} = ${m.l}</text>`;
+  } else if (!m.common.length) {
+    h += `<text x="${G.W / 2}" y="${G.H - 22}" font-size="${G.tall ? 11 : 13}" fill="#8b96ad" text-anchor="middle">У чисел нет общих простых множителей: НОД = 1</text>`;
+  } else {
+    h += `<text x="${G.W / 2}" y="${G.H - 22}" font-size="${G.tall ? 11 : 13}" fill="#8b96ad" text-anchor="middle">В середине: ${m.M.length ? dotJoin(m.M) : 'пусто'}. Все ли общие тут?</text>`;
+  }
+  return h;
+}
+
+function drawScene(t) {
+  const id = LID();
+  scene.innerHTML = id === 'order' ? drawOrder(t) : id === 'div' ? drawDiv() : id === 'prime' ? drawPrime(t) : drawGcd();
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1);
+    if (k === 0) { S.hl = null; return; }
+    let bb = null;
+    scene.querySelectorAll(`[data-part~="${S.hl.id}"]`).forEach(el => {
+      const b = el.getBBox(); if (!b.width && !b.height) return;
+      bb = bb ? { x0: Math.min(bb.x0, b.x), y0: Math.min(bb.y0, b.y), x1: Math.max(bb.x1, b.x + b.width), y1: Math.max(bb.y1, b.y + b.height) } : { x0: b.x, y0: b.y, x1: b.x + b.width, y1: b.y + b.height };
+    });
+    if (bb) scene.insertAdjacentHTML('beforeend', `<rect x="${(bb.x0 - 6).toFixed(1)}" y="${(bb.y0 - 6).toFixed(1)}" width="${(bb.x1 - bb.x0 + 12).toFixed(1)}" height="${(bb.y1 - bb.y0 + 12).toFixed(1)}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`);
+    else toast('Сейчас этого на поле нет.');
+  }
+}
+
+// fit the content box of the current lesson below the task card
+let VB = { x: 0, y: 0, w: 520, h: 330 }, dirty = true;
+function fit() {
+  const st = $('#stage'), W0 = st.clientWidth, H0 = st.clientHeight; if (!W0 || !H0) return;
+  const top = Math.max($('#taskBox').offsetHeight, $('#meter').offsetHeight) + 24, hh = Math.max(140, H0 - top - 54);
+  scene.style.top = top + 'px'; scene.style.height = hh + 'px';
+  G = W0 < 600 && hh > W0 * 1.05 ? GEO.tall : GEO.wide; DIM.gcd = [G.W, G.H];
+  const D = DIM[LID()], s = Math.min(W0 / (D[0] + 16), hh / (D[1] + 8), 1.8);
+  VB = { w: W0 / s, h: hh / s }; VB.x = D[0] / 2 - VB.w / 2; VB.y = D[1] / 2 - VB.h / 2;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+const ro = new ResizeObserver(fit);
+ro.observe($('#stage')); ro.observe($('#taskBox')); ro.observe($('#meter'));
+
+// ---------- pointer: taps and drags ----------
+let drag = null;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+const ballOf = id => S.balls.find(b => 'b' + b.id === id);
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  const id = el.dataset.drag; e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  drag = { id, x: e.clientX, y: e.clientY, moved: false };
+  const p = toSvg(e);
+  if (id === 'knob' || id === 'track') { scene.classList.add('grabbing'); setN(xToN(p.x)); drag.moved = true; }
+  const b = ballOf(id); if (b) { scene.classList.add('grabbing'); drag.dx = b.x - p.x; drag.dy = b.y - p.y; }
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 6) drag.moved = true;
+  if (!drag.moved) return;
+  const p = toSvg(e);
+  if (drag.id === 'knob' || drag.id === 'track') { setN(xToN(p.x)); return; }
+  const b = ballOf(drag.id); if (b) { b.x = clamp(p.x + drag.dx, VB.x + 12, VB.x + VB.w - 12); b.y = clamp(p.y + drag.dy, VB.y + 12, VB.y + VB.h - 12); dirty = true; }
+});
+const endDrag = cancel => {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing');
+  if (cancel) { dirty = true; return; }
+  const b = ballOf(d.id);
+  if (!d.moved) {
+    if (d.id.startsWith('op')) clickOp(+d.id.slice(2));
+    else if (/^k\d/.test(d.id)) setK(+d.id.slice(1));
+    else if (/^c\d/.test(d.id)) tapCell(+d.id.slice(1));
+    else if (b) tapBall(b);
+  } else if (b) moveBall(b, zoneAt(b.x, b.y));
+  dirty = true;
+};
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+function setN(n) { n = clamp(Math.round(n), 1, NMAX); if (n !== S.n) { S.n = n; update(); } }
+function setK(k) { if (k !== S.k) { S.k = k; update(); } }
+
+let last = performance.now();
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  let anim = false;
+  const id = LID();
+  if (id === 'gcd') {
+    const pos = slots();
+    for (const b of S.balls) {
+      if (drag && drag.id === 'b' + b.id && drag.moved) continue;
+      const p = pos[b.id]; if (b.x === null) { b.x = p.x; b.y = p.y; }
+      const k = reduce ? 1 : Math.min(1, dt * 10), nx = b.x + (p.x - b.x) * k, ny = b.y + (p.y - b.y) * k;
+      if (Math.abs(nx - b.x) + Math.abs(ny - b.y) > 0.05) anim = true;
+      b.x = Math.abs(p.x - nx) < 0.05 ? p.x : nx; b.y = Math.abs(p.y - ny) < 0.05 ? p.y : ny;
+    }
+  }
+  if (id === 'prime') for (const n in S.crossT) if (t - S.crossT[n] < 200) { anim = true; break; }
+  if (id === 'order' && ((S.bad && t - S.bad.t < 800) || S.tk.some(k => k.fresh && t - k.fresh < 1400))) anim = true;
+  if (id === 'prime' && S.flash && t - S.flash.t < 1700) anim = true;
+  if (S.hl) anim = true;
+  if (dirty || anim) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2800); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    order: B('ex-next', 'Другой пример') + sep + B('ex-reset', 'Заново'),
+    div: B('n-10', '−10') + B('n-1', '−1') + B('n+1', '+1') + B('n+10', '+10'),
+    prime: B('sieve-hint', 'Что нажать?') + sep + B('sieve-reset', 'Заново'),
+    gcd: PAIRS.map(([a, b]) => B(`pair-${a}-${b}`, `${a} и ${b}`, S.a === a && S.b === b)).join('') + sep + B('split', 'Разъединить'),
+  }[id];
+}
+function act(a) {
+  if (a === 'ex-next') { setExpr(S.ex + 1); update(); return; }
+  if (a === 'ex-reset') { setExpr(S.ex); update(); return; }
+  if (a.startsWith('ex-')) { setExpr(+a.slice(3)); update(); return; }
+  if (/^n[+-]\d+$/.test(a)) { setN(S.n + +a.slice(1)); return; }
+  if (a === 'sieve-reset') { S.pr = {}; S.cross = {}; S.crossT = {}; S.last = null; update(); return; }
+  if (a === 'sieve-hint') { const n = nextPrimeToTap(); if (n) { S.flash = { n, t: performance.now() }; toast(`Самое маленькое невычеркнутое число — ${n}. Нажмите на него.`); dirty = true; } else toast('Решето просеяно: все составные числа вычеркнуты.'); return; }
+  if (a.startsWith('pair-')) { const [, x, y] = a.split('-'); setPair(+x, +y); renderTools(); buildScheme(); update(); return; }
+  if (a === 'split') { buildBalls(); update(); return; }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  paren: IC('<path d="M11 5q-6 12 0 24M23 5q6 12 0 24" fill="none" stroke="var(--fg)" stroke-width="2" stroke-linecap="round"/>'),
+  hi: IC('<rect x="3" y="7" width="12" height="20" rx="4" fill="var(--surface)" stroke="var(--muted)"/><circle cx="9" cy="17" r="2" fill="var(--fg)"/><rect x="19" y="7" width="12" height="20" rx="4" fill="var(--surface)" stroke="var(--muted)"/><circle cx="25" cy="13" r="1.6" fill="var(--fg)"/><circle cx="25" cy="21" r="1.6" fill="var(--fg)"/>'),
+  lo: IC('<rect x="3" y="7" width="12" height="20" rx="4" fill="var(--surface)" stroke="var(--muted)"/><path d="M9 13v8M5 17h8" stroke="var(--fg)" stroke-width="1.8"/><rect x="19" y="7" width="12" height="20" rx="4" fill="var(--surface)" stroke="var(--muted)"/><path d="M21 17h8" stroke="var(--fg)" stroke-width="1.8"/>'),
+  order: IC('<circle cx="10" cy="11" r="7" fill="none" stroke="var(--force)" stroke-width="1.6"/><text x="10" y="15" font-size="10" fill="var(--force)" text-anchor="middle" font-family="monospace">1</text><circle cx="24" cy="23" r="7" fill="none" stroke="var(--force)" stroke-width="1.6"/><text x="24" y="27" font-size="10" fill="var(--force)" text-anchor="middle" font-family="monospace">2</text>'),
+  steps: IC('<path d="M5 9h24M5 17h18M5 25h21" stroke="var(--fg)" stroke-width="2" stroke-linecap="round"/><path d="M24 17h5" stroke="var(--ok)" stroke-width="2" stroke-linecap="round"/>'),
+  chips: IC('<rect x="2" y="10" width="14" height="14" rx="3" fill="var(--fg)"/><rect x="18" y="10" width="14" height="14" rx="3" fill="none" stroke="var(--muted)"/><text x="9" y="21" font-size="10" fill="var(--bg)" text-anchor="middle" font-family="monospace">3</text>'),
+  groups: IC('<rect x="3" y="9" width="13" height="7" rx="2" fill="none" stroke="var(--ok)"/><rect x="18" y="9" width="13" height="7" rx="2" fill="none" stroke="var(--ok)"/><rect x="3" y="19" width="13" height="7" rx="2" fill="none" stroke="var(--ok)"/><circle cx="6.5" cy="12.5" r="1.5" fill="var(--ok)"/><circle cx="12.5" cy="12.5" r="1.5" fill="var(--ok)"/><circle cx="21.5" cy="12.5" r="1.5" fill="var(--ok)"/><circle cx="27.5" cy="12.5" r="1.5" fill="var(--ok)"/><circle cx="6.5" cy="22.5" r="1.5" fill="var(--ok)"/><circle cx="12.5" cy="22.5" r="1.5" fill="var(--ok)"/>'),
+  rest: IC('<rect x="8" y="11" width="18" height="12" rx="3" fill="none" stroke="var(--force)" stroke-dasharray="3 2"/><circle cx="14" cy="17" r="2" fill="var(--force)"/>'),
+  ruler: IC('<path d="M3 20h28" stroke="var(--muted)" stroke-width="3" stroke-linecap="round"/><path d="M3 20h14" stroke="var(--arm)" stroke-width="3" stroke-linecap="round"/><circle cx="17" cy="20" r="5" fill="var(--force)"/>'),
+  grid: IC('<path d="M4 4h26v26H4zM4 12.7h26M4 21.3h26M12.7 4v26M21.3 4v26" fill="none" stroke="var(--muted)"/>'),
+  one: IC('<rect x="7" y="7" width="20" height="20" rx="4" fill="none" stroke="var(--muted)" stroke-dasharray="3 3"/><text x="17" y="22" font-size="13" fill="var(--muted)" text-anchor="middle" font-family="monospace">1</text>'),
+  prime: IC('<circle cx="17" cy="17" r="11" fill="none" stroke="var(--arm)" stroke-width="2"/><text x="17" y="22" font-size="13" fill="var(--fg)" text-anchor="middle" font-family="monospace">7</text>'),
+  cross: IC('<text x="17" y="22" font-size="13" fill="var(--muted)" text-anchor="middle" font-family="monospace">9</text><path d="M8 26L26 8" stroke="var(--force)" stroke-width="2.2" stroke-linecap="round"/>'),
+  circA: IC('<circle cx="15" cy="17" r="11" fill="none" stroke="var(--force)" stroke-width="2"/>'),
+  circB: IC('<circle cx="19" cy="17" r="11" fill="none" stroke="var(--arm)" stroke-width="2"/>'),
+  mid: IC('<circle cx="12" cy="17" r="10" fill="none" stroke="var(--force)" stroke-width="1.4"/><circle cx="22" cy="17" r="10" fill="none" stroke="var(--arm)" stroke-width="1.4"/><circle cx="17" cy="17" r="3.4" fill="var(--ok)"/>'),
+  all: IC('<circle cx="8" cy="17" r="4" fill="#72d4e8"/><circle cx="17" cy="17" r="4" fill="#ffb547"/><circle cx="26" cy="17" r="4" fill="#86e0a8"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+const yn = v => v ? '<span class="yes">да</span>' : '<span class="no">нет</span>';
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (m.kind === 'order') return m.done ? `Ответ ${m.value}` : `Шаг ${m.step + 1} из ${m.total} · ошибок ${m.mist}`;
+  if (m.kind === 'div') return `Число ${m.n} · на 2: ${m.n % 2 ? 'нет' : 'да'}, на 3: ${m.n % 3 ? 'нет' : 'да'}, на 5: ${m.n % 5 ? 'нет' : 'да'}`;
+  if (m.kind === 'prime') return `Вычеркнуто ${m.crossed} из ${m.comp} составных`;
+  return m.common.length ? `В середине ${m.M.length ? dotJoin(m.M) : 'пока пусто'}` : 'Нет общих множителей — выберите другую пару';
+}
+
+// Scheme tab: built once per lesson, then values refreshed (sliders keep focus while dragging)
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'order') h = `<h2>Порядок действий</h2><div class="steps">${step('1. Скобки', '( … )')}${step('2. Умножение и деление', '· и : слева направо')}${step('3. Сложение и вычитание', '+ и − слева направо')}</div>
+      <dl class="reads"><div><dt>Шаг</dt><dd id="r1"></dd></div><div><dt>Ошибок</dt><dd id="r2"></dd></div><div><dt>Ответ</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Пример</div><div class="chips" id="exChips">${EXPRS.map((e, i) => `<button data-i="${i}">${e}</button>`).join('')}</div></div>
+      <div class="row"><button class="ghostbtn" data-a="ex-reset">Начать заново</button></div>`;
+  if (id === 'div') h = `<h2>Признаки делимости</h2><dl class="reads"><div><dt>Частное</dt><dd id="r1"></dd></div><div><dt>Остаток</dt><dd id="r2"></dd></div><div><dt>Сумма цифр</dt><dd id="r3"></dd></div></dl>
+      ${slider('inN', 'Число', 1, NMAX, 1, S.n)}
+      <div class="ctl"><div class="lbl">Делитель</div><div class="chips" id="kChips">${DIVS.map(k => `<button data-k="${k}">${k}</button>`).join('')}</div></div>
+      <h3>Проверка по признакам</h3><div class="steps" id="signs"></div>`;
+  if (id === 'prime') h = `<h2>Решето Эратосфена</h2><dl class="reads"><div><dt>Простых</dt><dd id="r1"></dd></div><div><dt>Вычеркнуто</dt><dd id="r2"></dd></div><div><dt>Осталось</dt><dd id="r3"></dd></div></dl>
+      ${slider('inP', 'Проверить число', 1, 100, 1, S.probe)}<div class="steps" id="probe" style="margin-top:10px"></div>
+      <div class="row"><button class="ghostbtn" data-a="sieve-hint">Что нажать?</button><button class="ghostbtn" data-a="sieve-reset">Заново</button></div>`;
+  if (id === 'gcd') h = `<h2>Два числа</h2><dl class="reads"><div><dt>НОД</dt><dd id="r1"></dd></div><div><dt>НОК</dt><dd id="r2"></dd></div><div><dt>Общих</dt><dd id="r3"></dd></div></dl>
+      ${slider('inA', 'Первое число', 2, 100, 1, S.a)}${slider('inB', 'Второе число', 2, 100, 1, S.b)}
+      <p class="note" style="margin-top:10px">Новое число — шарики раскладываются заново.</p>
+      <div class="ctl"><div class="lbl">Готовые пары</div><div class="chips" id="pairChips">${PAIRS.map(([a, b]) => `<button data-p="${a}-${b}">${a} и ${b}</button>`).join('')}</div></div>`;
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn); };
+  on('#inN', e => setN(+e.target.value));
+  on('#inP', e => { S.probe = +e.target.value; update(); });
+  on('#inA', e => { setPair(+e.target.value, S.b); renderTools(); update(); });
+  on('#inB', e => { setPair(S.a, +e.target.value); renderTools(); update(); });
+  el.querySelectorAll('#exChips button').forEach(b => b.onclick = () => act('ex-' + b.dataset.i));
+  el.querySelectorAll('#kChips button').forEach(b => b.onclick = () => setK(+b.dataset.k));
+  el.querySelectorAll('#pairChips button').forEach(b => b.onclick = () => act('pair-' + b.dataset.p));
+  el.querySelectorAll('.row [data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.innerHTML = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (m.kind === 'order') {
+    set('#r1', m.done ? 'все' : `${m.step + 1} / ${m.total}`); set('#r2', String(m.mist)); set('#r3', m.done ? String(m.value) : '—');
+    el.querySelectorAll('#exChips button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.i === S.ex));
+  }
+  if (m.kind === 'div') {
+    set('#r1', String(m.q)); set('#r2', String(m.r)); set('#r3', String(m.ds));
+    set('#inNO', String(m.n)); val('#inN', m.n);
+    el.querySelectorAll('#kChips button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.k === S.k));
+    set('#signs', signsHTML(m.n));
+  }
+  if (m.kind === 'prime') {
+    set('#r1', String(m.primes)); set('#r2', `${m.crossed}/${m.comp}`); set('#r3', String(m.left));
+    set('#inPO', String(S.probe)); val('#inP', S.probe);
+    const n = S.probe, d = divisors(n);
+    set('#probe', step('делители', d.join(', ')) + step('сколько делителей', String(d.length)) + step('вывод', n === 1 ? 'ни простое, ни составное' : d.length === 2 ? 'простое' : `составное: ${dotJoin(factor(n))}`, 'sum'));
+  }
+  if (m.kind === 'gcd') {
+    set('#r1', m.complete && m.common.length ? String(m.g) : m.common.length ? '?' : '1'); set('#r2', m.complete ? String(m.l) : '?'); set('#r3', `${m.M.length}`);
+    set('#inAO', String(m.a)); set('#inBO', String(m.b)); val('#inA', m.a); val('#inB', m.b);
+    el.querySelectorAll('#pairChips button').forEach(b => b.setAttribute('aria-pressed', b.dataset.p === `${m.a}-${m.b}`));
+  }
+}
+function signsHTML(n) {
+  const l = n % 10, s = digitSum(n), sum = String(n).split('').join(' + ');
+  return step('на 2: последняя цифра ' + l, (l % 2 ? 'нечётная → ' : 'чётная → ') + yn(n % 2 === 0)) +
+    step('на 5: последняя цифра ' + l, (l === 0 || l === 5 ? '0 или 5 → ' : 'не 0 и не 5 → ') + yn(n % 5 === 0)) +
+    step('на 10: последняя цифра ' + l, yn(n % 10 === 0)) +
+    step(`на 3: ${sum} = ${s}`, `${s} : 3 → ` + yn(n % 3 === 0)) +
+    step(`на 9: сумма цифр ${s}`, `${s} : 9 → ` + yn(n % 9 === 0));
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'order') return [
+    { id: 'paren', name: 'Скобки', spec: 'Действия в скобках выполняются первыми. Когда в скобках остаётся одно число, скобки убираются.' },
+    { id: 'hi', name: 'Умножение и деление', spec: 'Действия второй ступени. Выполняются раньше сложения и вычитания, между собой — слева направо.' },
+    { id: 'lo', name: 'Сложение и вычитание', spec: 'Действия первой ступени. Выполняются последними, слева направо.' },
+    { id: 'order', name: 'Номера действий', spec: 'Кружки над знаками примера: в каком порядке вы выполнили действия.' },
+    { id: 'steps', name: 'Запись по шагам', spec: 'Каждое действие отдельной строкой — так решение легко проверить.' }];
+  if (id === 'div') return [
+    { id: 'chips', name: 'Делитель', spec: 'На какое число делим. По столько точек собирается в одну кучку.' },
+    { id: 'groups', name: 'Равные кучки', spec: 'Сколько получилось полных кучек — это частное. Зелёные — деление нацело.' },
+    { id: 'rest', name: 'Остаток', spec: 'Точки, которым не хватило места в полной кучке. Остаток всегда меньше делителя.' },
+    { id: 'ruler', name: 'Числовой луч', spec: `Числа от 1 до ${NMAX}. Тащите оранжевый ползунок или нажмите на луч.` }];
+  if (id === 'prime') return [
+    { id: 'grid', name: 'Таблица чисел 1–100', spec: 'По 10 чисел в строке. Кратные одного числа выстраиваются в столбики и диагонали.' },
+    { id: 'one', name: 'Число 1', spec: 'Один делитель — ни простое, ни составное. В решете его пропускают.' },
+    { id: 'prime', name: 'Простые числа', spec: 'Обведены кружком. Цвет кружка совпадает с цветом линий, которыми вычеркнуты их кратные.' },
+    { id: 'cross', name: 'Составные числа', spec: 'Перечёркнуты. Цвет линии показывает простое число, на которое они делятся.' }];
+  return [
+    { id: 'circA', name: 'Первое число', spec: 'Оранжевый круг: простые множители первого числа.' },
+    { id: 'circB', name: 'Второе число', spec: 'Голубой круг: простые множители второго числа.' },
+    { id: 'mid', name: 'Общая часть — НОД', spec: 'Множители, которые есть в обоих числах. Их произведение — наибольший общий делитель.' },
+    { id: 'all', name: 'Все шарики — НОК', spec: 'Произведение всех шариков на поле: общие считаются один раз. Это наименьшее общее кратное.' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Что на поле</h2><p class="note">Нажмите на пункт, чтобы найти его на поле.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${ICON[p.id]}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  if (m.kind === 'order') {
+    let h = `<h2>Вычисление по шагам</h2><div class="formula">( ) → · : → + −</div><p class="note">Сначала скобки, потом умножение и деление, потом сложение и вычитание. Внутри одной ступени — слева направо.</p><h3>Пример</h3><div class="steps">${step('выражение', EXPRS[S.ex])}</div><h3>Сделано</h3>`;
+    h += S.steps.length ? `<div class="steps">` + S.steps.map((s, i) => step(`действие ${i + 1}`, `${s.a} ${s.o} ${s.b} = ${s.r}`)).join('') + (m.done ? step('ответ', String(m.value), 'sum') : '') + `</div>` : `<p class="note">Пока ничего. Какое действие здесь выполняется первым?</p>`;
+    if (!m.done) h += `<p class="note" style="margin-top:10px">Осталось действий: ${m.total - m.step}. Какое из них по правилам идёт следующим — решите сами.</p>`;
+    else h += `<p class="note" style="margin-top:10px">Ошибок по ходу: ${m.mist}. ${m.mist ? 'Попробуйте другой пример без единой ошибки.' : 'Чисто сработано!'}</p>`;
+    return h;
+  }
+  if (m.kind === 'div') {
+    return `<h2>Деление с остатком</h2><div class="formula">a = b · q + r,  r &lt; b</div><p class="note">a — делимое, b — делитель, q — неполное частное, r — остаток. Если r = 0, то a делится на b.</p><h3>Сейчас</h3><div class="steps">` +
+      step(`${m.n} : ${m.k}`, `${m.q} (ост. ${m.r})`) + step('проверка', `${m.k} · ${m.q} + ${m.r} = ${m.k * m.q + m.r}`) +
+      step(`${m.n} делится на ${m.k}?`, yn(m.r === 0), 'sum') + `</div><h3>Признаки делимости</h3><div class="steps">` + signsHTML(m.n) + `</div>` +
+      `<p class="note" style="margin-top:10px">На 6 делится число, которое делится и на 2, и на 3. На 4 — если число из двух последних цифр делится на 4.</p>`;
+  }
+  if (m.kind === 'prime') {
+    const n = S.probe, d = divisors(n);
+    let h = `<h2>Почему решето работает</h2><div class="formula">простое: делители 1 и p</div><p class="note">Самое маленькое невычеркнутое число не делится ни на одно меньшее, кроме 1. Значит, оно простое.</p>`;
+    h += `<h3>Когда можно остановиться</h3><div class="steps">` + step('у составного n ≤ 100 есть делитель', 'не больше 10') + step('почему', 'если n = a · b и a, b > 10, то n > 100') + step('простые до 10', '2, 3, 5, 7', 'sum') + `</div>`;
+    h += `<p class="note" style="margin-top:10px">Поэтому после 2, 3, 5 и 7 всё, что не вычеркнуто, — простые числа. До 100 их 25.</p>`;
+    h += `<h3>Число ${n}</h3><div class="steps">` + step('делители', d.join(', ')) + step('вывод', n === 1 ? 'ни простое, ни составное' : d.length === 2 ? 'простое' : `${n} = ${dotJoin(factor(n))}`, 'sum') + `</div><p class="note" style="margin-top:8px">Нажмите на число в таблице или возьмите ползунок на вкладке «Схема».</p>`;
+    return h;
+  }
+  let h = `<h2>НОД и НОК</h2><div class="formula">НОД · НОК = a · b</div><h3>Разложение</h3><div class="steps">` +
+    step(String(m.a), dotJoin(factor(m.a))) + step(String(m.b), dotJoin(factor(m.b))) + `</div>`;
+  if (!m.common.length) return h + `<p class="note" style="margin-top:10px">Общих простых множителей нет, такие числа называют взаимно простыми: НОД = 1, НОК = ${m.a} · ${m.b} = ${m.l}.</p>`;
+  if (!m.complete) return h + `<p class="note" style="margin-top:10px">Соберите в середину все общие множители — тогда здесь появится расчёт НОД и НОК.</p>`;
+  h += `<h3>Ответ</h3><div class="steps">` + step('общие множители', dotJoin(m.M)) + step('НОД', `${dotJoin(m.M)} = ${m.g}`, 'sum') +
+    step('НОК', `${dotJoin(m.A.concat(m.M, m.B))} = ${m.l}`, 'sum') + step('проверка', `${m.g} · ${m.l} = ${m.g * m.l} = ${m.a} · ${m.b}`) + `</div>`;
+  h += `<h3>Задачи</h3><p class="note">Есть ${m.a} конфет и ${m.b} мандаринов. Наибольшее число одинаковых подарков без остатка — ${m.g}: в каждом ${m.a / m.g} конфет и ${m.b / m.g} мандаринов.</p>`;
+  h += `<p class="note">Один автобус приходит на остановку каждые ${m.a} минут, другой — каждые ${m.b}. Если они пришли вместе, то снова встретятся через ${m.l} минут.</p>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const el = $('#meter'), ok = !!S.done[LID()];
+  if (m.kind === 'order') el.innerHTML = `<div class="k">Выражение</div><div class="v ${m.done ? 'ok' : ''}">${m.done ? 'Ответ: ' + m.value : `Шаг ${m.step + 1} из ${m.total}`}</div><div class="gauge"><b style="width:${(m.step / Math.max(1, m.total) * 100).toFixed(0)}%"></b></div><div class="lr"><span>ошибок</span><span>${m.mist}</span></div>`;
+  else if (m.kind === 'div') el.innerHTML = `<div class="k">Деление</div><div class="v ${m.r ? '' : 'ok'}">${m.n} : ${m.k} = ${m.q}</div><div class="lr"><span>остаток</span><span>${m.r}</span></div><div class="lr"><span>сумма цифр</span><span>${m.ds}</span></div>`;
+  else if (m.kind === 'prime') el.innerHTML = `<div class="k">Решето</div><div class="v ${ok ? 'ok' : ''}">простых: ${m.primes}</div><div class="gauge"><b style="width:${(m.crossed / m.comp * 100).toFixed(1)}%"></b></div><div class="lr"><span>вычеркнуто</span><span>${m.crossed}/${m.comp}</span></div>`;
+  else el.innerHTML = `<div class="k">НОД и НОК</div><div class="v ${m.complete && m.common.length ? 'ok' : ''}">${m.complete && m.common.length ? `НОД ${m.g}<br>НОК ${m.l}` : `общих: ${m.M.length}`}</div><div class="lr"><span>${m.a} и ${m.b}</span><span></span></div>`;
+}
+
+function update() {
+  const m = model(), L = LESSONS[S.lesson];
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Отличная работа!');
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  order: '<text x="33" y="20" font-size="11" fill="#e8ecf4" text-anchor="middle" font-family="monospace">(2+3)·4</text><circle cx="21" cy="5" r="3.5" fill="none" stroke="#ffb547"/><circle cx="45" cy="5" r="3.5" fill="none" stroke="#ffb547"/>',
+  div: [0, 1, 2, 3].map(g => `<rect x="${5 + g * 14}" y="9" width="12" height="7" rx="1.5" fill="none" stroke="#86e0a8" stroke-width=".8"/><circle cx="${8 + g * 14}" cy="12.5" r="1.4" fill="#86e0a8"/><circle cx="${12 + g * 14}" cy="12.5" r="1.4" fill="#86e0a8"/>`).join('') + '<circle cx="8" cy="23" r="1.4" fill="#ffb547"/><path d="M5 27h56" stroke="#3a4762" stroke-width="1.5"/>',
+  prime: [2, 3, 4, 5, 6, 7, 8, 9].map((n, i) => `<text x="${6 + i * 7.6}" y="19" font-size="7" fill="${[4, 6, 8, 9].includes(n) ? '#56627d' : '#e8ecf4'}" text-anchor="middle" font-family="monospace">${n}</text>${[4, 6, 8, 9].includes(n) ? `<path d="M${3 + i * 7.6} 21l6-8" stroke="#ffb547" stroke-width=".9"/>` : ''}`).join(''),
+  gcd: '<circle cx="26" cy="15" r="11" fill="none" stroke="#ffb547"/><circle cx="40" cy="15" r="11" fill="none" stroke="#72d4e8"/><circle cx="33" cy="15" r="3" fill="#86e0a8"/><circle cx="20" cy="15" r="2.4" fill="#72d4e8"/><circle cx="46" cy="15" r="2.4" fill="#ffb547"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i];
+  S.lesson = i; S.hl = null; drag = null;
+  if (L.id === 'order') setExpr(L.ex);
+  if (L.id === 'div') { S.n = L.n; S.k = L.k; }
+  if (L.id === 'prime') { S.pr = {}; S.cross = {}; S.crossT = {}; S.last = null; S.flash = null; S.probe = 12; }
+  if (L.id === 'gcd') setPair(L.a, L.b);
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update(); fit();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '';
+  if (id === 'order') now = `Пример: ${EXPRS[S.ex]}. Сейчас выражение выглядит так: ${S.tk.map(t => t.t === 'n' ? t.v : t.t === 'o' ? t.o : t.t).join(' ')}. Выполнено действий: ${m.step} из ${m.total}: ${S.steps.map((s, i) => `${i + 1}) ${s.a} ${s.o} ${s.b} = ${s.r}`).join('; ') || 'пока ни одного'}. Ошибок в порядке: ${m.mist}.${m.done ? ` Ответ: ${m.value}.` : ' Не называй ученику следующее действие и ответ — наводи вопросами про правила порядка действий.'}`;
+  if (id === 'div') now = `Выбрано число ${m.n}, делитель ${m.k}. ${m.n} : ${m.k} = ${m.q}, остаток ${m.r}: на поле ${m.q} кучек по ${m.k} точек${m.r ? ` и ${m.r} лишних` : ''}. Последняя цифра ${m.last}, сумма цифр ${m.ds}. Задание: найти число больше 50, делящееся на 2, 3 и 5 (подходят числа, кратные 30). Не называй готовое число — помоги рассуждать через признаки делимости.`;
+  if (id === 'prime') now = `Таблица чисел от 1 до 100, решето Эратосфена. Отмечены как простые: ${Object.keys(S.pr).join(', ') || 'пока ни одного'}. Вычеркнуто ${m.crossed} из ${m.comp} составных чисел, осталось ${m.left}. Ученик проверяет число ${S.probe}: делители ${divisors(S.probe).join(', ')}. Наводи вопросами, какое число нажать следующим, а не называй сразу.`;
+  if (id === 'gcd') now = `Числа ${m.a} = ${dotJoin(factor(m.a))} и ${m.b} = ${dotJoin(factor(m.b))}. В общей части кругов: ${m.M.length ? dotJoin(m.M) : 'пусто'}. Только в первом: ${dotJoin(m.A)}, только во втором: ${dotJoin(m.B)}. ${m.complete && m.common.length ? `Все общие множители собраны: НОД = ${m.g}, НОК = ${m.l}.` : m.common.length ? 'Общие множители собраны не все. Не называй НОД и НОК — помоги найти общие множители вопросами.' : 'Общих множителей нет, числа взаимно простые.'}`;
+  return [
+    `Раздел: математика, 5 класс, тема «Натуральные числа». Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = {
+    order: 'Почему умножение выполняют раньше сложения?', div: 'Почему признак делимости на 3 работает через сумму цифр?',
+    prime: 'Почему 1 не простое число?', gcd: 'Чем НОД отличается от НОК?',
+  }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

@@ -202,7 +202,11 @@ function loadContent() {
     return { ...m, sort: i + 1, ...d };
   });
   const labs = [];
-  for (const lab of LABS) {
+  // плюс лаборатории по темам: labs/<предмет>-<тема>/index.html
+  const labsDir = path.join(ROOT, "labs");
+  const auto = fs.existsSync(labsDir) ? fs.readdirSync(labsDir).map((d) => /^(phys|math|chem|bio|cs)-(\w+)$/.exec(d)).filter(Boolean)
+    .map((m) => ({ dir: `labs/${m[0]}`, subject: m[1], topic: m[2] })) : [];
+  for (const lab of [...LABS, ...auto]) {
     const file = `${lab.dir}/index.html`;
     if (!fs.existsSync(path.join(ROOT, file))) continue;
     let L = null;

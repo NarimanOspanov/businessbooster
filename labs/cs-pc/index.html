@@ -1,0 +1,983 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по информатике, 5 класс: устройства компьютера, файлы и папки, оформление текста.">
+<title>Компьютер и файлы</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG desk, or the text editor in lesson 3) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --paper:#eef1f6;
+  --ink:#0b1019;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none;z-index:3}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none;z-index:3}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.meter .v.ok{color:var(--ok)}
+.meter .v.sm{font-size:12px;line-height:1.35}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--arm);transition:width .2s}
+.meter.flash,.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%,40%{box-shadow:0 0 0 3px var(--arm)}100%{box-shadow:0 0 0 0 transparent}}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px);z-index:3}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button svg{width:16px;height:16px}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.tools .val{font:500 12px var(--font-mono);color:var(--fg);padding:0 4px;white-space:nowrap}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:22%;pointer-events:none}
+
+/* lesson 3: the text editor sits on the stage instead of the SVG */
+.docwrap{position:absolute;left:14px;right:14px;top:150px;bottom:62px;display:flex;flex-direction:column;gap:8px;min-height:0}
+.find{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:end;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:8px 10px}
+.find label{display:flex;flex-direction:column;gap:3px;font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);flex:1 1 120px;min-width:0}
+.find input{width:100%;min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:6px 8px;font:500 14px var(--font-mono);text-transform:none;letter-spacing:0;color:var(--fg)}
+.find button{flex:none}
+.page{flex:1;min-height:0;overflow:auto;background:var(--paper);color:var(--ink);border-radius:8px;padding:18px 20px;box-shadow:0 8px 30px -10px rgba(0,0,0,.6)}
+.page p{margin:0 0 6px;padding:3px 6px;border-radius:5px;border:1.5px dashed transparent;cursor:pointer;line-height:1.3;overflow-wrap:anywhere;font-family:var(--font-body)}
+.page p:hover{border-color:rgba(11,16,25,.18)}
+.page p.sel{border-color:#d07a00;background:rgba(255,181,71,.16)}
+.page mark{background:#ffd27a;color:inherit;border-radius:2px}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.chips button:disabled{opacity:.35;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 16px/1.35 var(--font-mono);text-align:center;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+.step.okk span{color:var(--ok)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:470px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .meter .v.sm{font-size:11px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 340px);min-height:0}
+  .stage.docmode{height:calc(80vw + 380px)}
+  .stage.tall{height:calc(80vw + 430px)}
+  .docwrap{left:10px;right:10px}
+  .page{padding:12px 12px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><rect x="8" y="9" width="24" height="16" rx="2" fill="none" stroke="var(--fg)" stroke-width="2"/><path d="M16 31h8M20 25v6" stroke="var(--fg)" stroke-width="2" stroke-linecap="round"/><rect x="12" y="13" width="9" height="2.4" rx="1" fill="var(--arm)"/><rect x="12" y="17.5" width="14" height="2.4" rx="1" fill="var(--force)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Информатика · Компьютер и файлы</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#cs">Карта</a><a href="/physics/#cs">Информатика</a><a href="/labs/cs-pc/" aria-current="page">Компьютер</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Компьютер</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Рабочий стол лаборатории">
+    <svg class="scene" id="scene" role="img" aria-label="Интерактивная сцена. Карточки можно перетаскивать или выбирать нажатием."></svg>
+    <div class="docwrap" id="docwrap" hidden>
+      <div class="find" id="findBar">
+        <label>Найти<input id="fFind" autocomplete="off" spellcheck="false"></label>
+        <label>Заменить на<input id="fRepl" autocomplete="off" spellcheck="false"></label>
+        <button class="ghostbtn" id="fGo">Заменить всё</button>
+      </div>
+      <div class="page" id="page" aria-label="Документ: нажмите на абзац, чтобы выделить его"></div>
+    </div>
+    <div class="task" id="taskBox" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const big = n => Math.round(n).toLocaleString('ru-RU');
+const fmt = (x, n = 1) => (Math.round(x * 10 ** n) / 10 ** n).toFixed(n).replace('.', ',');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+
+const LESSONS = [
+  { id: 'hw', title: 'Устройство компьютера',
+    text: ['Компьютер работает с информацией в четыре шага: получает её, обрабатывает, запоминает и выдаёт человеку. За каждый шаг отвечают свои устройства.',
+           'Устройства ввода передают информацию в компьютер: нажатие клавиши, движение руки, звук голоса. Процессор её обрабатывает — выполняет миллиарды простых действий в секунду. Память хранит. Устройства вывода показывают результат: картинкой, звуком, на бумаге.',
+           'Память бывает двух видов. Оперативная (ОЗУ) хранит то, с чем ты работаешь прямо сейчас, и пустеет при выключении. Долговременная — SSD-диск, флешка — хранит файлы годами, даже без электричества.'],
+    why: 'Системный администратор в школе, банке или на заводе собирает компьютеры, меняет детали и находит поломки — это востребованная работа в любом городе Казахстана. Мастер сервисного центра зарабатывает тем, что понимает, какая деталь «сломала» ноутбук. А тебе это поможет выбрать компьютер по характеристикам и не переплатить за то, что не нужно.',
+    safe: 'Корпус компьютера открывают только взрослые и только когда он отключён от розетки. Не ставь напитки рядом с клавиатурой и не трогай вилки и провода мокрыми руками.',
+    task: 'Разложите все 9 устройств по группам: ввод, обработка, память, вывод.',
+    hint: 'Спросите себя про каждое устройство: оно передаёт информацию в компьютер, считает, хранит или показывает результат человеку? Перетащите карточку в группу или нажмите на карточку, а потом на группу.',
+    stage: 'Тащите карточку в нужную группу. Неверно — карточка вернётся с подсказкой.',
+    groups: [{ id: 'in', name: 'Ввод' }, { id: 'cpu', name: 'Обработка' }, { id: 'mem', name: 'Память' }, { id: 'out', name: 'Вывод' }],
+    devices: [
+      { id: 'kbd', name: 'Клавиатура', g: 'in' }, { id: 'screen', name: 'Монитор', g: 'out' }, { id: 'ram', name: 'ОЗУ', g: 'mem' },
+      { id: 'mouse', name: 'Мышь', g: 'in' }, { id: 'cpu', name: 'Процессор', g: 'cpu' }, { id: 'spk', name: 'Колонки', g: 'out' },
+      { id: 'ssd', name: 'SSD-диск', g: 'mem' }, { id: 'mic', name: 'Микрофон', g: 'in' }, { id: 'flash', name: 'Флешка', g: 'mem' }],
+    check: m => m.correct === m.total },
+  { id: 'files', title: 'Файлы и папки',
+    text: ['Всё, что хранится на диске, хранится в файлах: фото, песня, доклад. У файла есть имя и расширение — буквы после точки. Расширение подсказывает тип файла: .jpg и .png — картинки, .mp3 и .wav — звук, .docx, .txt и .pdf — документы.',
+           'Чтобы файлы не превратились в кучу, их раскладывают по папкам. Папки могут лежать внутри других папок, как коробки в шкафу.',
+           'Адрес файла называют путём: D:\\Фото\\море.jpg. Он читается как «на диске D, в папке Фото, файл море.jpg».'],
+    why: 'Офис-менеджер, бухгалтер и юрист каждый день работают с сотнями документов: если всё разложено по папкам, нужный договор находится за секунды, а не за час. Фотограф после съёмки сортирует тысячи кадров по папкам заказчиков, а программист держит проект из сотен файлов в строгом порядке. Дома ты быстро найдёшь фото для презентации и отправишь учителю тот самый файл.',
+    task: 'Наведите порядок: разложите 8 файлов с рабочего стола по папкам Фото, Музыка и Документы.',
+    hint: 'Смотрите не на имя, а на расширение — буквы после точки. Имя файл может носить любое, а тип определяет расширение.',
+    stage: 'Тащите файл в папку. Нажмите на файл — внизу появится его путь и размер.',
+    folders: [{ id: 'photo', name: 'Фото' }, { id: 'music', name: 'Музыка' }, { id: 'docs', name: 'Документы' }],
+    files: [
+      { id: 'f1', name: 'море', ext: 'jpg', kb: 2340 }, { id: 'f2', name: 'гимн', ext: 'mp3', kb: 3840 }, { id: 'f3', name: 'доклад', ext: 'docx', kb: 48 },
+      { id: 'f4', name: 'ноты', ext: 'png', kb: 860 }, { id: 'f5', name: 'стих', ext: 'txt', kb: 2 }, { id: 'f6', name: 'домбра', ext: 'wav', kb: 31500 },
+      { id: 'f7', name: 'класс', ext: 'jpg', kb: 3120 }, { id: 'f8', name: 'план', ext: 'pdf', kb: 310 }],
+    check: m => m.inRight === m.total },
+  { id: 'text', title: 'Работа с текстом',
+    text: ['Текстовый редактор умеет не только печатать. В нём можно исправлять ошибки и оформлять текст: менять начертание (жирный, курсив, подчёркнутый), размер шрифта и выравнивание.',
+           'Размер шрифта измеряют в пунктах (пт). Обычный текст — 12–14 пт, заголовок — крупнее. Заголовок часто ставят по центру и делают жирным, чтобы его было видно издалека.',
+           'Если одна и та же ошибка встречается много раз, не надо искать её глазами. Команда «Найти и заменить» исправит все места сразу.'],
+    why: 'Секретарь, журналист, юрист и копирайтер зарабатывают текстами: аккуратно оформленный договор или статья выглядят профессионально, а неряшливый текст отпугивает заказчика. «Найти и заменить» экономит часы, когда в длинном документе нужно поменять имя или дату. Тебе это пригодится для доклада, объявления и, позже, резюме для первой работы.',
+    task: 'Оформите объявление: исправьте «ярморка» на «ярмарка» во всём тексте, заголовок сделайте жирным, 24 пт, по центру, а последнюю строку — курсивом.',
+    hint: 'Ошибка стоит в двух местах и в разных падежах. Подумайте, какую часть слова достаточно найти, чтобы исправить обе сразу. Чтобы оформить абзац, сначала нажмите на него.',
+    stage: 'Нажмите на абзац, чтобы выделить его, и оформляйте кнопками внизу.',
+    paras: [
+      { text: 'Школьная ярморка', b: false, i: false, u: false, size: 14, align: 'left' },
+      { text: 'Когда: 20 ноября, в 14:00', b: false, i: false, u: false, size: 14, align: 'left' },
+      { text: 'Где: актовый зал', b: false, i: false, u: false, size: 14, align: 'left' },
+      { text: 'На ярморке будут поделки, выпечка и игры. Все деньги пойдут на новые книги для библиотеки.', b: false, i: false, u: false, size: 14, align: 'left' },
+      { text: 'Приходите всей семьёй!', b: false, i: false, u: false, size: 14, align: 'left' }],
+    check: m => m.textOk && m.headOk && m.tailOk },
+];
+
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+const KEY = 'luch-cs-pc';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview',
+            place: {}, order: {}, seq: 0, miss: 0, sel: null, loc: {}, paras: [], psel: 0, hl: null, flow: 0, lastBad: null };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+
+const TYPE = {
+  jpg: { kind: 'Рисунок', f: 'photo', col: '#86e0a8' }, png: { kind: 'Рисунок', f: 'photo', col: '#86e0a8' },
+  mp3: { kind: 'Звук', f: 'music', col: '#c3a6ff' }, wav: { kind: 'Звук', f: 'music', col: '#c3a6ff' },
+  docx: { kind: 'Документ', f: 'docs', col: '#72d4e8' }, txt: { kind: 'Текст', f: 'docs', col: '#72d4e8' }, pdf: { kind: 'Документ', f: 'docs', col: '#72d4e8' },
+};
+const GQ = { // guiding questions after a wrong drop (do not give the answer away)
+  kbd: 'Клавиатура что-то показывает тебе или ты через неё что-то сообщаешь компьютеру?',
+  mouse: 'Когда ты двигаешь мышь, информация идёт в компьютер или из него?',
+  mic: 'Микрофон ловит твой голос. Куда он его передаёт?',
+  cpu: 'Процессор ничего не показывает и не хранит долго. Что же он делает с информацией?',
+  ram: 'В ОЗУ лежит то, с чем ты работаешь прямо сейчас. Это вычисление или хранение?',
+  ssd: 'На SSD лежат твои файлы годами. Какая это функция?',
+  flash: 'На флешку записывают файлы, чтобы унести их с собой. Что она с ними делает?',
+  screen: 'Монитор получает картинку от компьютера и показывает её человеку. Какая это группа?',
+  spk: 'Колонки выдают звук человеку. Он идёт в компьютер или из компьютера?',
+};
+const fullName = f => `${f.name}.${f.ext}`;
+const fileById = id => LESSONS[1].files.find(f => f.id === id);
+const folderName = id => id === 'desk' ? 'Рабочий стол' : LESSONS[1].folders.find(f => f.id === id).name;
+const pathOf = f => S.loc[f.id] === 'desk' ? `C:\\Рабочий стол\\${fullName(f)}` : `D:\\${folderName(S.loc[f.id])}\\${fullName(f)}`;
+const sizeStr = kb => kb >= 1024 ? `${fmt(kb / 1024, 1)} МБ` : `${big(kb)} КБ`;
+
+function textModel(paras) {
+  const all = paras.map(p => p.text).join(' ');
+  const cyr = (all.match(/[а-яё]/gi) || []).length;
+  const bytes = new TextEncoder().encode(all).length;
+  return {
+    chars: all.length, noSp: all.replace(/\s/g, '').length,
+    words: all.split(/\s+/).filter(w => /[\p{L}\d]/u.test(w)).length, cyr, other: all.length - cyr, bytes,
+    typos: (all.match(/ярмор/gi) || []).length,
+  };
+}
+function model() {
+  const id = LID();
+  if (id === 'hw') {
+    const D = LESSONS[0].devices, placed = D.filter(d => S.place[d.id]).length;
+    return { kind: 'hw', placed, correct: D.filter(d => S.place[d.id] === d.g).length, total: D.length, miss: S.miss };
+  }
+  if (id === 'files') {
+    const F = LESSONS[1].files, sel = S.sel ? fileById(S.sel) : null, sizes = {};
+    for (const f of F) sizes[S.loc[f.id]] = (sizes[S.loc[f.id]] || 0) + f.kb;
+    return { kind: 'files', total: F.length, inRight: F.filter(f => S.loc[f.id] === TYPE[f.ext].f).length,
+             onDesk: F.filter(f => S.loc[f.id] === 'desk').length, sel, sizes };
+  }
+  const P = S.paras, t = textModel(P), goal = LESSONS[2].paras.map(p => p.text.replace(/ярмор/g, 'ярмар'));
+  return Object.assign({ kind: 'text', paras: P,
+    textOk: P.every((p, i) => p.text === goal[i]),
+    headOk: P[0].b && P[0].size === 24 && P[0].align === 'center',
+    tailOk: P[4].i }, t);
+}
+
+// ---------- scene geometry (SVG units). Wide stage: content in x 8…516, y 80…406. Narrow (phone): x 0…302, taller. ----------
+let NAR = false;
+const ZONE = k => NAR ? { x: 2 + (k % 2) * 152, y: 226 + Math.floor(k / 2) * 156, w: 146, h: 150 } : { x: 14 + k * 125, y: 236, w: 118, h: 164 };
+const POOL = i => NAR ? { x: (i % 3) * 101, y: 98 + Math.floor(i / 3) * 40 } : { x: 18 + (i % 4) * 124, y: 98 + Math.floor(i / 4) * 42 };
+const CH = 32, CWD = () => NAR ? 100 : 112;
+const FB = k => NAR ? { x: 2, y: 98 + k * 86, w: 298, h: 80 } : { x: 10, y: 98 + k * 103, w: 232, h: 96 };
+const DESKR = () => NAR ? { x: 2, y: 358, w: 298, h: 218 } : { x: 252, y: 98, w: 262, h: 302 };
+const DSLOT = i => { const D = DESKR(); return NAR ? { x: D.x + 6 + (i % 4) * 73, y: D.y + 26 + Math.floor(i / 4) * 94 } : { x: D.x + 6 + (i % 4) * 64, y: D.y + 30 + Math.floor(i / 4) * 128 }; };
+const CHIP = (k, j) => { const b = FB(k); return NAR ? { x: b.x + 5 + (j % 3) * 98, y: b.y + 24 + Math.floor(j / 3) * 17, w: 94, h: 15 } : { x: b.x + 6 + (j % 2) * 112, y: b.y + 26 + Math.floor(j / 2) * 17, w: 106, h: 15 }; };
+const BOUNDS = () => NAR ? { x0: 0, x1: 302, y1: LID() === 'hw' ? 380 + 156 : 580 } : { x0: 8, x1: 516, y1: 406 };
+const inR = (p, r) => p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
+
+// ---------- device icons (22 × 22) ----------
+const DI = {
+  kbd: '<rect x="1" y="6" width="20" height="11" rx="2" fill="none" stroke="#e8ecf4" stroke-width="1.5"/><path d="M4 9.5h2M8 9.5h2M12 9.5h2M16 9.5h2M5 13h12" stroke="#ffb547" stroke-width="1.5" stroke-linecap="round"/>',
+  mouse: '<rect x="5" y="2" width="12" height="18" rx="6" fill="none" stroke="#e8ecf4" stroke-width="1.5"/><path d="M11 2v6" stroke="#e8ecf4" stroke-width="1.3"/><rect x="10" y="4" width="2" height="3" rx="1" fill="#ffb547"/>',
+  mic: '<rect x="8" y="1" width="6" height="11" rx="3" fill="#ffb547"/><path d="M5 9q0 6 6 6t6-6M11 15v5M7 20h8" fill="none" stroke="#e8ecf4" stroke-width="1.5" stroke-linecap="round"/>',
+  cpu: '<rect x="5" y="5" width="12" height="12" rx="1.5" fill="none" stroke="#e8ecf4" stroke-width="1.5"/><rect x="8" y="8" width="6" height="6" fill="#ffb547"/><path d="M8 1v3M11 1v3M14 1v3M8 18v3M11 18v3M14 18v3M1 8h3M1 11h3M1 14h3M18 8h3M18 11h3M18 14h3" stroke="#8b96ad" stroke-width="1.2"/>',
+  ram: '<rect x="1" y="6" width="20" height="9" rx="1" fill="none" stroke="#e8ecf4" stroke-width="1.5"/><rect x="3.5" y="8.5" width="3.5" height="4" fill="#72d4e8"/><rect x="9.25" y="8.5" width="3.5" height="4" fill="#72d4e8"/><rect x="15" y="8.5" width="3.5" height="4" fill="#72d4e8"/><path d="M3 15v3M7 15v3M11 15v3M15 15v3M19 15v3" stroke="#ffb547" stroke-width="1.2"/>',
+  ssd: '<rect x="2" y="4" width="18" height="14" rx="2" fill="none" stroke="#e8ecf4" stroke-width="1.5"/><rect x="5" y="7" width="8" height="3" fill="#72d4e8"/><path d="M5 13h12" stroke="#8b96ad" stroke-width="1.3"/><circle cx="16.5" cy="8.5" r="1.2" fill="#86e0a8"/>',
+  flash: '<rect x="7" y="1.5" width="8" height="6" fill="none" stroke="#8b96ad" stroke-width="1.3"/><rect x="5" y="7.5" width="12" height="13" rx="2" fill="none" stroke="#e8ecf4" stroke-width="1.5"/><rect x="8" y="11" width="6" height="3" fill="#72d4e8"/>',
+  screen: '<rect x="1" y="2" width="20" height="13" rx="1.5" fill="none" stroke="#e8ecf4" stroke-width="1.5"/><rect x="3.5" y="4.5" width="15" height="8" fill="#5fb4d9" opacity=".55"/><path d="M11 15v4M7 20h8" stroke="#e8ecf4" stroke-width="1.5" stroke-linecap="round"/>',
+  spk: '<rect x="5" y="1" width="12" height="20" rx="2" fill="none" stroke="#e8ecf4" stroke-width="1.5"/><circle cx="11" cy="6" r="2" fill="#8b96ad"/><circle cx="11" cy="14" r="4" fill="none" stroke="#ffb547" stroke-width="1.5"/>',
+};
+const GC = { in: '#ffb547', cpu: '#ff8a73', mem: '#72d4e8', out: '#86e0a8' };
+
+function fileIcon(f, x, y, s = 1, dim = false) {
+  const t = TYPE[f.ext], c = t.col;
+  let h = `<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(${s})"${dim ? ' opacity=".35"' : ''}>`;
+  h += `<path d="M10 0h20l10 10v36q0 3-3 3H10q-3 0-3-3V3q0-3 3-3z" fill="#e8ecf4" stroke="${INK}" stroke-width="1.5"/><path d="M30 0v10h10" fill="#c8d1e2" stroke="${INK}" stroke-width="1.2"/>`;
+  if (t.f === 'photo') h += `<rect x="12" y="16" width="24" height="18" rx="1" fill="${c}" opacity=".45"/><path d="M12 34l8-10 6 6 4-4 6 8z" fill="#2c8a55"/><circle cx="31" cy="20" r="2.4" fill="#ffb547"/>`;
+  else if (t.f === 'music') h += `<path d="M20 34V18l12-3v15" fill="none" stroke="#6a4bc4" stroke-width="2.2"/><circle cx="17.5" cy="34" r="3.2" fill="#6a4bc4"/><circle cx="29.5" cy="30" r="3.2" fill="#6a4bc4"/>`;
+  else h += `<path d="M13 17h20M13 22h20M13 27h20M13 32h13" stroke="#2179bb" stroke-width="2" stroke-linecap="round"/>`;
+  h += `<rect x="4" y="38" width="${8 + f.ext.length * 6}" height="11" rx="2" fill="${c}" stroke="${INK}" stroke-width="1"/><text x="${8 + f.ext.length * 3}" y="46.5" font-size="8" fill="#0b1019" text-anchor="middle" font-weight="500">.${f.ext}</text>`;
+  return h + '</g>';
+}
+const folderGlyph = (x, y, c) => `<path d="M${x} ${y + 3}q0-3 3-3h5l2 3h9q3 0 3 3v8q0 3-3 3H${x + 3}q-3 0-3-3z" fill="${c}" stroke="${INK}" stroke-width="1.2"/>`;
+
+// ---------- drawing ----------
+const scene = $('#scene');
+let vis = {};   // displayed card positions (eased)
+function bg() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+function cardTarget(d, i) {
+  const g = S.place[d.id];
+  if (g) {
+    const k = L().groups.findIndex(x => x.id === g), z = ZONE(k);
+    const j = L().devices.filter(x => S.place[x.id] === g).sort((a, b) => S.order[a.id] - S.order[b.id]).findIndex(x => x.id === d.id);
+    return { x: z.x + (z.w - CWD()) / 2, y: z.y + 28 + j * (NAR ? 40 : 42) };
+  }
+  return POOL(i);
+}
+function card(d, x, y) {
+  const placed = !!S.place[d.id], sel = S.sel === d.id, bad = S.lastBad && S.lastBad.id === d.id && performance.now() - S.lastBad.t < 700;
+  let h = `<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)})" data-drag="d-${d.id}">`;
+  h += `<rect width="${CWD()}" height="${CH}" rx="8" fill="${placed ? '#16263a' : '#1a2438'}" stroke="${bad ? '#ff8a73' : sel ? '#ffb547' : placed ? GC[S.place[d.id]] : '#3a4762'}" stroke-width="${sel || bad ? 2.2 : 1.4}"/>`;
+  h += `<g transform="translate(6 5)">${DI[d.id]}</g><text x="31" y="${NAR ? 21 : 20.5}" font-size="${NAR ? 11 : 10}" fill="#e8ecf4">${d.name}</text>`;
+  return h + '</g>';
+}
+function drawHW(t) {
+  const Ls = L();
+  let h = `<defs><marker id="ar" viewBox="0 0 6 6" refX="3" refY="3" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L6 3L0 6z" fill="#56627d"/></marker></defs>`;
+  h += `<text x="${POOL(0).x}" y="91" font-size="9" fill="#8b96ad" letter-spacing="1">УСТРОЙСТВА</text>`;
+  Ls.groups.forEach((g, k) => {
+    const z = ZONE(k), n = Ls.devices.filter(d => S.place[d.id] === g.id).length;
+    h += `<g data-drag="z-${g.id}"><rect x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}" rx="11" fill="rgba(26,36,56,.55)" stroke="${GC[g.id]}" stroke-opacity=".55" stroke-width="1.5" stroke-dasharray="${n ? '0' : '5 4'}"/>`;
+    h += `<rect x="${z.x}" y="${z.y}" width="${z.w}" height="22" rx="11" fill="${GC[g.id]}" opacity=".16"/><text x="${z.x + z.w / 2}" y="${z.y + 15}" font-size="10.5" fill="${GC[g.id]}" text-anchor="middle" font-weight="500">${g.name.toUpperCase()}</text></g>`;
+  });
+  // arrows between groups: input → processing ⇄ memory, processing → output (drawn under the cards)
+  if (!NAR) {
+    const ay = 228, zx = k => ZONE(k).x + ZONE(k).w / 2;
+    h += `<path d="M${zx(0)} ${ay + 7}V${ay}H${zx(1) - 6}V${ay + 4}" fill="none" stroke="#56627d" stroke-width="1.4" marker-end="url(#ar)"/>`;
+    h += `<path d="M${zx(1) + 2} ${ay + 7}V${ay - 5}H${zx(2)}V${ay + 4}" fill="none" stroke="#56627d" stroke-width="1.4" marker-end="url(#ar)"/>`;
+    h += `<path d="M${zx(1) + 8} ${ay + 7}V${ay - 10}H${zx(3)}V${ay + 4}" fill="none" stroke="#56627d" stroke-width="1.4" marker-end="url(#ar)"/>`;
+  }
+  let top = '';
+  Ls.devices.forEach((d, i) => {
+    const tg = cardTarget(d, i), v = vis[d.id] || (vis[d.id] = { x: tg.x, y: tg.y });
+    if (drag && drag.id === 'd-' + d.id && drag.moved) { top = card(d, drag.px, drag.py); return; }
+    h += card(d, v.x, v.y);
+  });
+  // signal path: key press → processor → RAM → processor → monitor
+  if (S.flow) {
+    const k = (t - S.flow) / 4200;
+    if (k >= 1) S.flow = 0;
+    else {
+      const c = id => { const i = Ls.devices.findIndex(d => d.id === id), v = vis[id] || cardTarget(Ls.devices[i], i); return { x: v.x + CWD() / 2, y: v.y + CH / 2 }; };
+      const pts = [c('kbd'), c('cpu'), c('ram'), c('cpu'), c('screen')], seg = (pts.length - 1) * (reduce ? 1 : k);
+      h += `<path d="M${pts.map(p => p.x.toFixed(1) + ' ' + p.y.toFixed(1)).join('L')}" fill="none" stroke="#ffb547" stroke-width="2" stroke-dasharray="4 4" opacity=".75"/>`;
+      if (!reduce) { const i = Math.min(pts.length - 2, Math.floor(seg)), f = seg - i, p = { x: pts[i].x + (pts[i + 1].x - pts[i].x) * f, y: pts[i].y + (pts[i + 1].y - pts[i].y) * f }; h += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="6" fill="#ffb547" stroke="${INK}" stroke-width="1.5"/>`; }
+    }
+  }
+  return h + top;
+}
+function drawFiles() {
+  const Ls = L(), DESK = DESKR(), fs = NAR ? 10 : 8.5;
+  let h = `<text x="12" y="91" font-size="9" fill="#8b96ad" letter-spacing="1">ДИСК D:</text>`;
+  Ls.folders.forEach((fo, k) => {
+    const b = FB(k), list = Ls.files.filter(f => S.loc[f.id] === fo.id).sort((a, c) => S.order[a.id] - S.order[c.id]);
+    const over = drag && drag.moved && drag.id.startsWith('f-') && inR({ x: drag.sx, y: drag.sy }, b);
+    h += `<g data-drag="z-${fo.id}"><rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="10" fill="${over ? 'rgba(114,212,232,.12)' : 'rgba(26,36,56,.6)'}" stroke="${over ? '#72d4e8' : '#3a4762'}" stroke-width="1.5"/>`;
+    h += folderGlyph(b.x + 8, b.y + 5, '#ffcf6b') + `<text x="${b.x + 36}" y="${b.y + 17}" font-size="11" fill="#e8ecf4" font-weight="500">${fo.name}</text><text x="${b.x + b.w - 8}" y="${b.y + 17}" font-size="9" fill="#8b96ad" text-anchor="end">${list.length ? list.length + ' · ' + sizeStr(list.reduce((s, f) => s + f.kb, 0)) : 'пусто'}</text></g>`;
+    list.forEach((f, j) => {
+      if (drag && drag.moved && drag.id === 'f-' + f.id) return;
+      const c = CHIP(k, j), sel = S.sel === f.id;
+      h += `<g data-drag="f-${f.id}"><rect x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}" rx="4" fill="${sel ? '#2a3a55' : '#1a2438'}" stroke="${sel ? '#ffb547' : '#3a4762'}" stroke-width="1.2"/><rect x="${c.x + 4}" y="${c.y + 4}" width="7" height="7" rx="1.5" fill="${TYPE[f.ext].col}"/><text x="${c.x + 15}" y="${c.y + 11}" font-size="${NAR ? 9.5 : 8.5}" fill="#e8ecf4">${fullName(f)}</text></g>`;
+    });
+  });
+  const overD = drag && drag.moved && drag.id.startsWith('f-') && inR({ x: drag.sx, y: drag.sy }, DESK);
+  h += `<g data-drag="z-desk"><rect x="${DESK.x}" y="${DESK.y}" width="${DESK.w}" height="${DESK.h}" rx="12" fill="${overD ? 'rgba(114,212,232,.08)' : 'rgba(18,32,52,.7)'}" stroke="#3a4762" stroke-width="1.5"/><text x="${DESK.x + 10}" y="${DESK.y + 17}" font-size="9" fill="#8b96ad" letter-spacing="1">РАБОЧИЙ СТОЛ</text></g>`;
+  Ls.files.forEach((f, i) => {
+    if (S.loc[f.id] !== 'desk' || (drag && drag.moved && drag.id === 'f-' + f.id)) return;
+    const s = DSLOT(i), sel = S.sel === f.id;
+    h += `<g data-drag="f-${f.id}"><rect x="${s.x}" y="${s.y - 4}" width="60" height="84" rx="8" fill="${sel ? 'rgba(255,181,71,.14)' : 'transparent'}" stroke="${sel ? '#ffb547' : 'none'}" stroke-width="1.4"/>${fileIcon(f, s.x + 8, s.y)}<text x="${s.x + 30}" y="${s.y + 63}" font-size="${fs}" fill="#e8ecf4" text-anchor="middle">${f.name}</text><text x="${s.x + 30}" y="${s.y + 74}" font-size="${fs - 1}" fill="#8b96ad" text-anchor="middle">${sizeStr(f.kb)}</text></g>`;
+  });
+  if (drag && drag.moved && drag.id.startsWith('f-')) { const f = fileById(drag.id.slice(2)); h += `<g opacity=".92">${fileIcon(f, drag.sx - 22, drag.sy - 24)}</g>`; }
+  return h;
+}
+
+function hlBox(id) {
+  const id0 = LID();
+  if (id0 === 'hw') { const k = L().groups.findIndex(g => g.id === id); if (k >= 0) { const z = ZONE(k); return [z.x - 4, z.y - 4, z.w + 8, z.h + 8]; } return null; }
+  if (id0 === 'files') {
+    if (id === 'disk') return NAR ? [-2, 80, 306, 274] : [4, 80, 244, 324];
+    if (id === 'folder') { const b = FB(0); return [b.x - 4, b.y - 4, b.w + 8, b.h + 8]; }
+    if (id === 'file' || id === 'ext') {
+      const f = S.sel ? fileById(S.sel) : L().files.find(x => S.loc[x.id] === 'desk');
+      if (f && S.loc[f.id] === 'desk') { const s = DSLOT(L().files.indexOf(f)); return id === 'ext' ? [s.x + 8, s.y + 34, 46, 18] : [s.x - 2, s.y - 6, 64, 88]; }
+      { const D = DESKR(); return [D.x, D.y, D.w, D.h]; }
+    }
+  }
+  return null;
+}
+
+function drawScene(t) {
+  const id = LID();
+  if (id === 'text') return;
+  let h = bg() + (id === 'hw' ? drawHW(t) : drawFiles());
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="10" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// fit the scene: content 506 × 320 units, kept right under the task box when there is room
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  placeDoc();
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const nar = w < 560; if (nar !== NAR) { NAR = nar; vis = {}; }
+  const B = BOUNDS(), cw = B.x1 - B.x0 + 8, ch = B.y1 - 80 + 4;
+  const tb = $('#taskBox').getBoundingClientRect(), mt = $('#meter').getBoundingClientRect();
+  const topPx = Math.max(tb.bottom, mt.bottom) - rc.top + 8;
+  const s = Math.min(w / cw, Math.max((hh - topPx) / ch, hh / (ch * 1.6)), 1.5);
+  VB = { w: w / s, h: hh / s }; VB.x = (B.x0 + B.x1) / 2 - VB.w / 2;
+  VB.y = 80 - topPx / s;
+  const slack = VB.y + VB.h - (B.y1 + 2);
+  VB.y = slack < 0 ? B.y1 + 2 - VB.h : VB.y - slack / 2;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+function placeDoc() {
+  const dw = $('#docwrap'); if (dw.hidden) return;
+  const st = $('#stage').getBoundingClientRect(), tb = $('#taskBox').getBoundingClientRect(), mt = $('#meter').getBoundingClientRect();
+  dw.style.top = Math.round(Math.max(tb.bottom, mt.bottom) - st.top + 10) + 'px';
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- dragging and tapping ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  const id = el.dataset.drag; e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  const p = toSvg(e);
+  drag = { id, x: e.clientX, y: e.clientY, moved: false, sx: p.x, sy: p.y };
+  if (id.startsWith('d-')) { const v = vis[id.slice(2)]; drag.dx = v.x - p.x; drag.dy = v.y - p.y; drag.px = v.x; drag.py = v.y; }
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 6 && !drag.id.startsWith('z-')) { drag.moved = true; scene.classList.add('grabbing'); }
+  if (!drag.moved) return;
+  const p = toSvg(e);
+  drag.sx = clamp(p.x, VB.x + 4, VB.x + VB.w - 4); drag.sy = clamp(p.y, VB.y + 4, VB.y + VB.h - 4);
+  if (drag.id.startsWith('d-')) { drag.px = drag.sx + drag.dx; drag.py = drag.sy + drag.dy; }
+  dirty = true;
+});
+const endDrag = cancel => {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing'); dirty = true;
+  if (cancel) return;
+  const kind = d.id.slice(0, 2), key = d.id.slice(2);
+  if (!d.moved) {                              // a tap: select, or put the selected thing where you tapped
+    if (kind === 'z-') { if (S.sel) moveTo(S.sel, key); }
+    else { S.sel = S.sel === key ? null : key; if (LID() === 'files' && S.sel) { const f = fileById(S.sel); toast(`${pathOf(f)} · ${sizeStr(f.kb)}`); } update(); }
+    return;
+  }
+  const p = { x: d.sx, y: d.sy };
+  if (LID() === 'hw') {
+    const c = { x: d.px + CWD() / 2, y: d.py + CH / 2 };
+    const k = L().groups.findIndex((g, i) => inR(c, ZONE(i)));
+    if (k >= 0) { vis[key] = { x: d.px, y: d.py }; moveTo(key, L().groups[k].id); }
+    else { vis[key] = { x: d.px, y: d.py }; if (S.place[key]) { delete S.place[key]; update(); } }
+  } else {
+    const k = L().folders.findIndex((f, i) => inR(p, FB(i)));
+    if (k >= 0) moveTo(key, L().folders[k].id);
+    else if (inR(p, DESKR())) moveTo(key, 'desk');
+  }
+};
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+function moveTo(item, where) {
+  if (LID() === 'hw') {
+    const d = L().devices.find(x => x.id === item), g = L().groups.find(x => x.id === where);
+    if (!d || !g) return;
+    if (d.g !== where) {
+      S.miss++; S.lastBad = { id: item, t: performance.now() };
+      if (S.place[item]) delete S.place[item];
+      toast(`Не «${g.name}». ${GQ[item]}`);
+      setTimeout(() => { dirty = true; }, 750);
+    } else { if (S.place[item] !== where) { S.place[item] = where; S.order[item] = ++S.seq; } toast(`${d.name} → ${g.name}. Верно!`); }
+    S.sel = null; update(); return;
+  }
+  if (LID() === 'files') {
+    const f = fileById(item); if (!f) return;
+    if (S.loc[item] !== where) { S.loc[item] = where; S.order[item] = ++S.seq; }
+    S.sel = item; toast(`${fullName(f)} → ${folderName(where)}`); update();
+  }
+}
+
+let last = performance.now();
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  let anim = false;
+  if (LID() === 'hw') {
+    L().devices.forEach((d, i) => {
+      if (drag && drag.id === 'd-' + d.id && drag.moved) return;
+      const tg = cardTarget(d, i), v = vis[d.id] || (vis[d.id] = { x: tg.x, y: tg.y });
+      if (reduce || Math.abs(tg.x - v.x) + Math.abs(tg.y - v.y) < 0.3) { v.x = tg.x; v.y = tg.y; return; }
+      const k = Math.min(1, dt * 10); v.x += (tg.x - v.x) * k; v.y += (tg.y - v.y) * k; anim = true;
+    });
+    if (S.flow || S.lastBad) anim = true;
+    if (S.lastBad && performance.now() - S.lastBad.t > 800) S.lastBad = null;
+  }
+  if (S.hl) anim = true;
+  if (dirty || anim) { drawScene(t); dirty = false; }
+}
+
+// ---------- lesson 3: the editor ----------
+function renderDoc() {
+  const pg = $('#page'), q = $('#fFind').value;
+  pg.innerHTML = S.paras.map((p, i) => {
+    let tx = esc(p.text);
+    if (q) tx = tx.split(esc(q)).join(`<mark>${esc(q)}</mark>`);
+    const st = `font-size:${(p.size * 1.15).toFixed(1)}px;text-align:${p.align};font-weight:${p.b ? 700 : 400};font-style:${p.i ? 'italic' : 'normal'};text-decoration:${p.u ? 'underline' : 'none'}`;
+    return `<p data-i="${i}" tabindex="0" role="button" aria-pressed="${S.psel === i}" class="${S.psel === i ? 'sel' : ''}" style="${st}">${tx}</p>`;
+  }).join('');
+}
+$('#page').addEventListener('click', e => { const p = e.target.closest('p[data-i]'); if (p) { S.psel = +p.dataset.i; update(); } });
+$('#page').addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.dataset.i) { e.preventDefault(); S.psel = +e.target.dataset.i; update(); } });
+$('#fFind').addEventListener('input', () => renderDoc());
+function replaceAll(a, b) {
+  if (!a) { toast('Впишите, что найти.'); return 0; }
+  let n = 0;
+  for (const p of S.paras) { const parts = p.text.split(a); n += parts.length - 1; p.text = parts.join(b); }
+  toast(n ? `Заменено: ${n}` : `«${a}» в тексте не найдено.`);
+  update(); return n;
+}
+$('#fGo').addEventListener('click', () => replaceAll($('#fFind').value, $('#fRepl').value));
+$('#fRepl').addEventListener('keydown', e => { if (e.key === 'Enter') replaceAll($('#fFind').value, $('#fRepl').value); });
+$('#fFind').addEventListener('keydown', e => { if (e.key === 'Enter') $('#fRepl').focus(); });
+function fmtPara(k, v) {
+  const p = S.paras[S.psel]; if (!p) return;
+  if (k === 'b' || k === 'i' || k === 'u') p[k] = !p[k];
+  if (k === 'size') p.size = clamp(v, 8, 36);
+  if (k === 'align') p.align = v;
+  update();
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2800); }
+
+const ALG = {
+  left: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M2 6.5h8M2 10h12M2 13.5h8" stroke="currentColor" stroke-width="1.6"/></svg>',
+  center: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M4 6.5h8M2 10h12M4 13.5h8" stroke="currentColor" stroke-width="1.6"/></svg>',
+  right: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M6 6.5h8M2 10h12M6 13.5h8" stroke="currentColor" stroke-width="1.6"/></svg>',
+};
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, aria) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}${aria ? ` aria-label="${aria}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  if (id === 'hw') tb.innerHTML = B('flow', 'Путь сигнала') + sep + B('reset', 'Заново');
+  else if (id === 'files') tb.innerHTML = B('back', 'Всё на рабочий стол');
+  else {
+    const p = S.paras[S.psel] || {};
+    tb.innerHTML = B('b', '<b>Ж</b>', !!p.b, 'Жирный') + B('i', '<i>К</i>', !!p.i, 'Курсив') + B('u', '<u>Ч</u>', !!p.u, 'Подчёркнутый') + sep +
+      B('sz-', 'A−', undefined, 'Меньше шрифт') + `<span class="val" id="szv">${p.size} пт</span>` + B('sz+', 'A+', undefined, 'Больше шрифт') + sep +
+      B('al-left', ALG.left, p.align === 'left', 'По левому краю') + B('al-center', ALG.center, p.align === 'center', 'По центру') + B('al-right', ALG.right, p.align === 'right', 'По правому краю') + sep + B('reset', 'Заново');
+  }
+}
+function act(a) {
+  const id = LID();
+  if (a === 'flow') { if (L().devices.some(d => !S.place[d.id])) { toast('Сначала разложите все устройства — тогда будет видно, куда идёт сигнал.'); return; } S.flow = performance.now() || 1; toast('Нажали клавишу: клавиатура → процессор → ОЗУ → процессор → монитор'); return; }
+  if (a === 'reset' && id === 'hw') { S.place = {}; S.order = {}; S.miss = 0; S.sel = null; S.flow = 0; update(); return; }
+  if (a === 'back') { for (const f of L().files) S.loc[f.id] = 'desk'; S.sel = null; update(); return; }
+  if (a === 'reset' && id === 'text') { S.paras = L().paras.map(p => Object.assign({}, p)); S.psel = 0; $('#fFind').value = ''; $('#fRepl').value = ''; update(); return; }
+  if (a === 'b' || a === 'i' || a === 'u') return fmtPara(a);
+  if (a === 'sz-' || a === 'sz+') { const p = S.paras[S.psel]; return fmtPara('size', p.size + (a === 'sz+' ? 2 : -2)); }
+  if (a.startsWith('al-')) return fmtPara('align', a.slice(3));
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const dIcon = id => `<svg viewBox="-6 -6 34 34" aria-hidden="true">${DI[id]}</svg>`;
+
+function taskState(m) {
+  if (S.done[LID()]) return '✓ Выполнено';
+  if (m.kind === 'hw') return `Разложено ${m.placed} из ${m.total}` + (m.miss ? ` · промахов ${m.miss}` : '');
+  if (m.kind === 'files') return `В нужных папках ${m.inRight} из ${m.total}`;
+  const n = [m.textOk, m.headOk, m.tailOk].filter(Boolean).length;
+  return `Сделано ${n} из 3` + (m.typos ? ` · «ярмор…» в тексте: ${m.typos}` : '');
+}
+
+// Scheme tab: built once per lesson, values refreshed on update
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'hw') h = `<h2>Схема компьютера</h2><div id="sDiag"></div><p class="note" style="margin-top:8px">Стрелки показывают, куда идёт информация. Под блоком — устройства, которые вы уже туда поставили.</p>
+    <dl class="reads"><div><dt>Разложено</dt><dd id="r1"></dd></div><div><dt>Осталось</dt><dd id="r2"></dd></div><div><dt>Промахов</dt><dd id="r3"></dd></div></dl>
+    <div class="ctl"><div class="lbl">1. Выберите устройство</div><div class="chips" id="devChips"></div></div>
+    <div class="ctl"><div class="lbl">2. Поставьте в группу</div><div class="chips" id="grpChips">${L().groups.map(g => `<button data-g="${g.id}">${g.name}</button>`).join('')}</div></div>
+    <div class="row"><button class="ghostbtn" data-a="flow">Путь сигнала</button><button class="ghostbtn" data-a="reset">Заново</button></div>`;
+  if (id === 'files') h = `<h2>Дерево папок</h2><div id="sDiag"></div>
+    <dl class="reads"><div><dt>В нужных</dt><dd id="r1"></dd></div><div><dt>На столе</dt><dd id="r2"></dd></div><div><dt>Выбран</dt><dd id="r3"></dd></div></dl>
+    <div class="ctl"><div class="lbl">1. Выберите файл</div><div class="chips" id="fileChips"></div></div>
+    <div class="ctl"><div class="lbl">2. Переместите в</div><div class="chips" id="foldChips"><button data-f="desk">Рабочий стол</button>${L().folders.map(f => `<button data-f="${f.id}">${f.name}</button>`).join('')}</div></div>`;
+  if (id === 'text') h = `<h2>Оформление абзаца</h2>
+    <dl class="reads"><div><dt>Слов</dt><dd id="r1"></dd></div><div><dt>Символов</dt><dd id="r2"></dd></div><div><dt>Абзац</dt><dd id="r3"></dd></div></dl>
+    <div class="ctl"><div class="lbl">Абзац</div><div class="chips" id="parChips">${S.paras.map((p, i) => `<button data-p="${i}">${i + 1}</button>`).join('')}</div></div>
+    <div class="ctl"><div class="lbl">Начертание</div><div class="chips" id="faceChips"><button data-k="b"><b>Жирный</b></button><button data-k="i"><i>Курсив</i></button><button data-k="u"><u>Подчёркнутый</u></button></div></div>
+    <div class="ctl"><label for="inSize">Размер шрифта <output id="inSizeO"></output></label><input type="range" id="inSize" min="8" max="36" step="1" value="14"></div>
+    <div class="ctl"><div class="lbl">Выравнивание</div><div class="chips" id="alChips"><button data-al="left">Слева</button><button data-al="center">По центру</button><button data-al="right">Справа</button></div></div>`;
+  el.innerHTML = h;
+  el.querySelectorAll('#grpChips button').forEach(b => b.onclick = () => { if (!S.sel) { toast('Сначала выберите устройство.'); return; } moveTo(S.sel, b.dataset.g); });
+  el.querySelectorAll('#foldChips button').forEach(b => b.onclick = () => { if (!S.sel) { toast('Сначала выберите файл.'); return; } moveTo(S.sel, b.dataset.f); });
+  el.querySelectorAll('.row [data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+  el.querySelectorAll('#parChips button').forEach(b => b.onclick = () => { S.psel = +b.dataset.p; update(); });
+  el.querySelectorAll('#faceChips button').forEach(b => b.onclick = () => fmtPara(b.dataset.k));
+  el.querySelectorAll('#alChips button').forEach(b => b.onclick = () => fmtPara('align', b.dataset.al));
+  const sz = el.querySelector('#inSize'); if (sz) sz.addEventListener('input', e => fmtPara('size', +e.target.value));
+}
+function hwDiag() {
+  const Ls = L(), box = [[6, 30, 'in'], [44, 30, 'cpu'], [44, 64, 'mem'], [82, 30, 'out']];
+  let h = `<svg class="diag" viewBox="0 0 120 100" role="img" aria-label="Схема: ввод, обработка, память, вывод">`;
+  h += `<defs><marker id="am" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0L6 3L0 6z" fill="#8b96ad"/></marker></defs>`;
+  h += `<path d="M38 38H43" stroke="#8b96ad" stroke-width=".7" marker-end="url(#am)"/><path d="M76 38H81" stroke="#8b96ad" stroke-width=".7" marker-end="url(#am)"/><path d="M57 47V63M63 63V47" stroke="#8b96ad" stroke-width=".7" marker-end="url(#am)"/>`;
+  for (const [x, y, g] of box) {
+    const gr = Ls.groups.find(q => q.id === g), list = Ls.devices.filter(d => S.place[d.id] === g).map(d => d.name);
+    h += `<rect x="${x}" y="${y - 22}" width="32" height="${g === 'mem' ? 30 : 39}" rx="3" fill="#121a28" stroke="${GC[g]}" stroke-width=".6"/><text x="${x + 16}" y="${y - 15}" font-size="4" fill="${GC[g]}" text-anchor="middle">${gr.name}</text>`;
+    list.forEach((n, j) => { h += `<text x="${x + 16}" y="${y - 8 + j * 6}" font-size="3.6" fill="#e8ecf4" text-anchor="middle">${n}</text>`; });
+    if (!list.length) h += `<text x="${x + 16}" y="${y - 4}" font-size="4" fill="#56627d" text-anchor="middle">?</text>`;
+  }
+  return h + '</svg>';
+}
+function treeDiag() {
+  const Ls = L(), rows = [];
+  rows.push({ t: 'D:\\', c: '#e8ecf4', d: 0 });
+  Ls.folders.forEach(fo => { rows.push({ t: fo.name, c: '#ffcf6b', d: 1 }); Ls.files.filter(f => S.loc[f.id] === fo.id).forEach(f => rows.push({ t: fullName(f), c: S.loc[f.id] === TYPE[f.ext].f ? '#86e0a8' : '#ff8a73', d: 2 })); });
+  const desk = Ls.files.filter(f => S.loc[f.id] === 'desk');
+  rows.push({ t: 'Рабочий стол', c: '#8b96ad', d: 0 });
+  desk.forEach(f => rows.push({ t: fullName(f), c: '#e8ecf4', d: 1 }));
+  const H = rows.length * 6 + 6;
+  let h = `<svg class="diag" viewBox="0 0 120 ${H}" role="img" aria-label="Дерево папок диска D">`;
+  rows.forEach((r, i) => { const y = 7 + i * 6; h += (r.d ? `<path d="M${4 + (r.d - 1) * 8} ${y - 6}V${y - 1.5}h5" fill="none" stroke="#3a4762" stroke-width=".4"/>` : '') + `<text x="${4 + r.d * 8 + (r.d ? 2 : 0)}" y="${y}" font-size="3.8" fill="${r.c}">${esc(r.t)}</text>`; });
+  return h + '</svg>';
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; };
+  const d = el.querySelector('#sDiag');
+  if (m.kind === 'hw') {
+    if (d) d.innerHTML = hwDiag();
+    set('#r1', `${m.placed}/${m.total}`); set('#r2', String(m.total - m.placed)); set('#r3', String(m.miss));
+    const dc = el.querySelector('#devChips');
+    if (dc) { dc.innerHTML = L().devices.filter(x => !S.place[x.id]).map(x => `<button data-d="${x.id}" aria-pressed="${S.sel === x.id}">${x.name}</button>`).join('') || '<span class="note">Все устройства на месте.</span>'; dc.querySelectorAll('button').forEach(b => b.onclick = () => { S.sel = S.sel === b.dataset.d ? null : b.dataset.d; update(); }); }
+  } else if (m.kind === 'files') {
+    if (d) d.innerHTML = treeDiag();
+    set('#r1', `${m.inRight}/${m.total}`); set('#r2', String(m.onDesk)); set('#r3', m.sel ? fullName(m.sel) : '—');
+    const fc = el.querySelector('#fileChips');
+    if (fc) { fc.innerHTML = L().files.map(f => `<button data-f="${f.id}" aria-pressed="${S.sel === f.id}">${fullName(f)}</button>`).join(''); fc.querySelectorAll('button').forEach(b => b.onclick = () => { S.sel = S.sel === b.dataset.f ? null : b.dataset.f; update(); }); }
+  } else {
+    const p = S.paras[S.psel];
+    set('#r1', String(m.words)); set('#r2', String(m.chars)); set('#r3', `№${S.psel + 1}`);
+    el.querySelectorAll('#parChips button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.p === S.psel));
+    el.querySelectorAll('#faceChips button').forEach(b => b.setAttribute('aria-pressed', !!p[b.dataset.k]));
+    el.querySelectorAll('#alChips button').forEach(b => b.setAttribute('aria-pressed', p.align === b.dataset.al));
+    const sz = el.querySelector('#inSize'); if (sz && document.activeElement !== sz) sz.value = p.size;
+    set('#inSizeO', p.size + ' пт');
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'hw') return [
+    { id: 'in', icon: dIcon('kbd'), name: 'Устройства ввода', spec: 'Переводят то, что делает человек (нажатие, движение, голос), в сигналы для компьютера.' },
+    { id: 'cpu', icon: dIcon('cpu'), name: 'Процессор', spec: 'Обрабатывает информацию: складывает, сравнивает, решает, что показать. Быстрый процессор делает миллиарды операций в секунду.' },
+    { id: 'mem', icon: dIcon('ram'), name: 'Память', spec: 'Оперативная (ОЗУ) — быстрая, но временная. Долговременная (SSD, жёсткий диск, флешка) — хранит файлы и без питания.' },
+    { id: 'out', icon: dIcon('screen'), name: 'Устройства вывода', spec: 'Выдают результат человеку: картинку, звук, печатный лист.' }];
+  if (id === 'files') return [
+    { id: 'disk', icon: IC('<rect x="3" y="9" width="28" height="16" rx="3" fill="none" stroke="var(--fg)" stroke-width="1.6"/><circle cx="25" cy="17" r="2" fill="var(--ok)"/><path d="M7 17h12" stroke="var(--muted)" stroke-width="1.6"/>'), name: 'Диск D:', spec: 'Устройство долговременной памяти. У каждого диска своя буква: C:, D: и так далее.' },
+    { id: 'folder', icon: IC('<g transform="translate(2 4) scale(1.15)">' + folderGlyph(0, 4, '#ffcf6b') + '</g>'), name: 'Папка', spec: 'Хранит файлы и другие папки. Сама информацию не содержит, она просто наводит порядок.' },
+    { id: 'file', icon: IC('<path d="M10 3h11l6 6v20q0 2-2 2H10q-2 0-2-2V5q0-2 2-2z" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M12 15h11M12 19h11M12 23h7" stroke="var(--arm)" stroke-width="1.6"/>'), name: 'Файл', spec: 'Информация на диске, у которой есть имя. Размер файла измеряют в байтах, килобайтах (КБ) и мегабайтах (МБ).' },
+    { id: 'ext', icon: IC('<rect x="4" y="11" width="26" height="12" rx="3" fill="var(--ok)"/><text x="17" y="20.5" font-size="8" text-anchor="middle" fill="#0b1019" font-family="monospace">.jpg</text>'), name: 'Расширение', spec: 'Буквы после последней точки в имени. По ним компьютер понимает, какой программой открыть файл.' },
+    { id: 'path', icon: IC('<path d="M4 10h8l3 4h15v12H4z" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M9 20h16" stroke="var(--force)" stroke-width="1.6" stroke-dasharray="3 2"/>'), name: 'Путь к файлу', spec: 'Полный адрес: диск, папки и имя файла через обратную косую черту. Пример: D:\\Музыка\\гимн.mp3.' }];
+  return [
+    { id: 'page', icon: IC('<rect x="7" y="3" width="20" height="28" rx="2" fill="var(--paper)"/><path d="M11 9h12M11 14h12M11 19h8" stroke="#0b1019" stroke-width="1.6"/>'), name: 'Абзац', spec: 'Часть текста от одного нажатия Enter до другого. Оформление в нашем редакторе применяется к выделенному абзацу.' },
+    { id: 'face', icon: IC('<text x="17" y="23" font-size="17" text-anchor="middle" font-weight="700" fill="var(--fg)">Ж</text>'), name: 'Начертание', spec: 'Жирный — для главного, курсив — для мягкого акцента, подчёркнутый — редко, чтобы не путать со ссылками.' },
+    { id: 'size', icon: IC('<text x="9" y="25" font-size="18" fill="var(--fg)">A</text><text x="23" y="25" font-size="10" fill="var(--muted)">A</text>'), name: 'Размер шрифта', spec: 'В пунктах (пт). 1 пт ≈ 0,35 мм. Основной текст 12–14 пт, заголовок 18–28 пт.' },
+    { id: 'align', icon: IC('<path d="M5 8h24M9 14h16M5 20h24M9 26h16" stroke="var(--fg)" stroke-width="2"/>'), name: 'Выравнивание', spec: 'По левому краю — обычный текст, по центру — заголовки и объявления, по правому — подписи и даты.' },
+    { id: 'find', icon: IC('<circle cx="14" cy="14" r="8" fill="none" stroke="var(--fg)" stroke-width="2"/><path d="M20 20l8 8" stroke="var(--force)" stroke-width="2.4" stroke-linecap="round"/>'), name: 'Найти и заменить', spec: 'Ищет все совпадения сразу и меняет их на новый текст. В настоящих редакторах открывается сочетанием Ctrl + H.' }];
+}
+function flashEl(id) {
+  const map = { page: '#page', face: '#tools', size: '#tools', align: '#tools', find: '#findBar', path: '#meter' };
+  const el = map[id] && $(map[id]); if (!el) return;
+  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      (Ls.safe ? `<div class="safe"><b>Безопасность</b>${Ls.safe}</div>` : '') +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    const head = { hw: ['Из чего состоит компьютер', 'Четыре группы устройств. Нажмите на группу, чтобы найти её на столе.'], files: ['Как хранится информация', 'Нажмите на пункт, чтобы найти его на экране.'], text: ['Инструменты редактора', 'Нажмите на пункт, чтобы подсветить его.'] }[Ls.id];
+    $('#pane-parts').innerHTML = `<h2>${head[0]}</h2><p class="note">${head[1]}</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => {
+      if (Ls.id === 'text' || b.dataset.id === 'path') flashEl(b.dataset.id);
+      else { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; }
+    });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const Ls = L();
+  if (m.kind === 'hw') {
+    let h = `<h2>Как определить группу</h2><div class="formula">ввод → обработка ⇄ память → вывод</div><p class="note">Задайте про устройство четыре вопроса по порядку. Первое «да» и есть ответ.</p><div class="steps">` +
+      step('1. Передаёт информацию в компьютер?', 'ввод') + step('2. Считает и решает?', 'обработка') + step('3. Хранит?', 'память') + step('4. Выдаёт результат человеку?', 'вывод') + `</div>`;
+    const placed = Ls.devices.filter(d => S.place[d.id]).sort((a, b) => S.order[a.id] - S.order[b.id]);
+    h += `<h3>Уже разложено · ${placed.length} из ${Ls.devices.length}</h3>`;
+    h += placed.length ? `<div class="steps">` + placed.map(d => step(d.name, Ls.groups.find(g => g.id === d.g).name.toLowerCase(), 'okk')).join('') + `</div>` : `<p class="note">Пока пусто. Поставьте первую карточку в группу.</p>`;
+    if (S.done.hw) h += `<h3>Что происходит при нажатии клавиши</h3><div class="steps">` +
+      step('1. Клавиатура', 'отправляет код буквы') + step('2. Процессор', 'понимает, что это «А»') + step('3. ОЗУ', 'запоминает текст') + step('4. Процессор', 'рисует букву') + step('5. Монитор', 'показывает её', 'sum') + `</div>`;
+    return h;
+  }
+  if (m.kind === 'files') {
+    let h = `<h2>Размер папок</h2><div class="formula">1 МБ = 1024 КБ</div><p class="note">Размер папки — это сумма размеров файлов внутри неё.</p>`;
+    for (const fo of Ls.folders.concat([{ id: 'desk', name: 'Рабочий стол' }])) {
+      const list = Ls.files.filter(f => S.loc[f.id] === fo.id); if (!list.length) continue;
+      const sum = list.reduce((s, f) => s + f.kb, 0);
+      h += `<h3>${fo.name}</h3><div class="steps">` + list.map(f => step(fullName(f), big(f.kb) + ' КБ')).join('') +
+        step('всего', `${list.map(f => big(f.kb)).join(' + ')} = ${big(sum)} КБ` + (sum >= 1024 ? ` ≈ ${fmt(sum / 1024, 1)} МБ` : ''), 'sum') + `</div>`;
+    }
+    if (m.sel) {
+      const f = m.sel, where = S.loc[f.id];
+      h += `<h3>Путь к файлу ${fullName(f)}</h3><div class="steps">` + (where === 'desk'
+        ? step('диск', 'C:') + step('папка', 'Рабочий стол')
+        : step('диск', 'D:') + step('папка', folderName(where))) + step('имя', f.name) + step('расширение', '.' + f.ext + ' — ' + TYPE[f.ext].kind.toLowerCase()) + step('путь', pathOf(f), 'sum') + `</div>`;
+    } else h += `<p class="note" style="margin-top:12px">Нажмите на любой файл — здесь появится его путь.</p>`;
+    return h;
+  }
+  const done = (ok, s) => step(s, ok ? '✓' : '—', ok ? 'okk' : '');
+  return `<h2>Подсчёт текста</h2><div class="formula">символов = буквы + цифры + знаки + пробелы</div><div class="steps">` +
+    step('слов', String(m.words)) + step('символов с пробелами', String(m.chars)) + step('символов без пробелов', String(m.noSp)) + `</div>
+    <h3>Сколько места занимает текст</h3><p class="note">В кодировке UTF-8, которой пользуются почти все сайты и программы, русская буква занимает 2 байта, а латинская буква, цифра, пробел и знак препинания — 1 байт.</p><div class="steps">` +
+    step('русских букв', `${m.cyr} × 2 = ${m.cyr * 2} байт`) + step('остальных символов', `${m.other} → ${m.bytes - m.cyr * 2} байт`) + step('итого', `${m.bytes} байт`, 'sum') + `</div>
+    <p class="note" style="margin-top:10px">Файл .docx с этим объявлением весит больше: в нём хранится ещё и оформление.</p>
+    <h3>Задание по шагам</h3><div class="steps">` +
+    done(m.textOk, '1. Ошибка исправлена везде') + done(m.headOk, '2. Заголовок: жирный, 24 пт, по центру') + done(m.tailOk, '3. Последняя строка курсивом') + `</div>`;
+}
+
+function renderMeter(m) {
+  const el = $('#meter'), ok = !!S.done[LID()];
+  if (m.kind === 'hw') {
+    const d = S.sel ? L().devices.find(x => x.id === S.sel) : null;
+    el.innerHTML = `<div class="k">Разложено</div><div class="v ${ok ? 'ok' : ''}">${m.correct} / ${m.total}</div><div class="gauge"><b style="width:${(m.correct / m.total * 100).toFixed(1)}%"></b></div><div class="lr"><span>${d ? 'выбрано' : 'промахов'}</span><span>${d ? d.name : m.miss}</span></div>`;
+  } else if (m.kind === 'files') {
+    el.innerHTML = m.sel
+      ? `<div class="k">Путь к файлу</div><div class="v sm">${esc(pathOf(m.sel))}</div><div class="lr"><span>${TYPE[m.sel.ext].kind}</span><span>${sizeStr(m.sel.kb)}</span></div>`
+      : `<div class="k">По папкам</div><div class="v ${ok ? 'ok' : ''}">${m.inRight} / ${m.total}</div><div class="gauge"><b style="width:${(m.inRight / m.total * 100).toFixed(1)}%"></b></div><div class="lr"><span>на столе</span><span>${m.onDesk}</span></div>`;
+  } else {
+    el.innerHTML = `<div class="k">Документ</div><div class="v ${ok ? 'ok' : ''}">${m.words} слов</div><div class="lr"><span>символов</span><span>${m.chars}</span></div><div class="lr"><span>байт</span><span>${m.bytes}</span></div>`;
+  }
+}
+
+function update() {
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Теперь вы уверенный пользователь компьютера!'), 900);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  if (Ls.id === 'text') { renderDoc(); renderTools(); }
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  hw: '<rect x="6" y="5" width="22" height="15" rx="1.5" fill="none" stroke="#e8ecf4" stroke-width="1.3"/><rect x="8.5" y="7.5" width="17" height="10" fill="#5fb4d9" opacity=".5"/><path d="M17 20v4M12 25h10" stroke="#e8ecf4" stroke-width="1.3"/><rect x="34" y="20" width="24" height="7" rx="1.5" fill="none" stroke="#e8ecf4" stroke-width="1.2"/><path d="M37 23.5h18" stroke="#ffb547" stroke-width="1.2" stroke-dasharray="2 1.5"/><rect x="38" y="5" width="12" height="12" rx="1" fill="none" stroke="#ff8a73" stroke-width="1.2"/><rect x="41.5" y="8.5" width="5" height="5" fill="#ff8a73"/>',
+  files: '<path d="M6 8q0-2 2-2h6l2 3h10q2 0 2 2v12q0 2-2 2H8q-2 0-2-2z" fill="#ffcf6b"/><path d="M38 4h12l5 5v17H38z" fill="#e8ecf4"/><rect x="41" y="12" width="10" height="7" fill="#86e0a8"/><path d="M30 15h5m-2-2l2 2-2 2" stroke="#8b96ad" stroke-width="1" fill="none"/>',
+  text: '<rect x="14" y="2" width="38" height="26" rx="2" fill="#eef1f6"/><path d="M24 8h18" stroke="#0b1019" stroke-width="2.4"/><path d="M19 15h28M19 19h28M19 23h18" stroke="#8b96ad" stroke-width="1.2"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Lx, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Lx.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Lx.title}</span></span>
+      ${S.done[Lx.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const Ls = LESSONS[i];
+  S.lesson = i; S.place = {}; S.order = {}; S.seq = 0; S.miss = 0; S.sel = null; S.hl = null; S.flow = 0; S.lastBad = null; vis = {}; drag = null;
+  S.loc = {}; for (const f of LESSONS[1].files) S.loc[f.id] = 'desk';
+  S.paras = LESSONS[2].paras.map(p => Object.assign({}, p)); S.psel = 0;
+  $('#fFind').value = ''; $('#fRepl').value = '';
+  save();
+  const doc = Ls.id === 'text';
+  $('#scene').style.display = doc ? 'none' : ''; $('#docwrap').hidden = !doc; $('#stage').classList.toggle('docmode', doc); $('#stage').classList.toggle('tall', Ls.id === 'files');
+  if (doc) scene.innerHTML = '';
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = Ls.task;
+  $('#hint').textContent = Ls.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  requestAnimationFrame(fit);
+  const cur = $('#lessons .lesson[aria-current="true"]'), ls = $('#lessons'); if (cur) { const dx = cur.getBoundingClientRect().left - ls.getBoundingClientRect().left; if (dx < 0 || dx + cur.offsetWidth > ls.clientWidth) ls.scrollLeft += dx - 8; }
+}
+window.addEventListener('resize', () => requestAnimationFrame(fit));
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '';
+  if (id === 'hw') {
+    const placed = Ls.devices.filter(d => S.place[d.id]).map(d => `${d.name} — ${Ls.groups.find(g => g.id === d.g).name.toLowerCase()}`);
+    const left = Ls.devices.filter(d => !S.place[d.id]).map(d => d.name);
+    now = `Ученик раскладывает карточки устройств по четырём группам: ввод, обработка, память, вывод (неверная карточка возвращается). Уже правильно разложены: ${placed.join('; ') || 'пока ни одной'}. Ещё не разложены: ${left.join(', ') || 'нет'}. Промахов: ${m.miss}.${S.sel ? ` Сейчас выбрана карточка «${Ls.devices.find(d => d.id === S.sel).name}».` : ''} Не называй группы для неразложенных устройств — наводи вопросами («информация идёт в компьютер или из него?»).`;
+  }
+  if (id === 'files') {
+    const where = Ls.files.map(f => `${fullName(f)} (${big(f.kb)} КБ) — ${folderName(S.loc[f.id])}`).join('; ');
+    now = `Слева папки на диске D: Фото, Музыка, Документы; справа рабочий стол. Где сейчас файлы: ${where}. В правильных папках (по расширению) ${m.inRight} из ${m.total}.${m.sel ? ` Выбран файл ${fullName(m.sel)}, путь ${pathOf(m.sel)}.` : ''} Не говори прямо, куда положить конкретный файл — подсказывай, что тип определяется расширением, и спрашивай, что это за расширение. Обрати внимание: файл «ноты.png» — это картинка, несмотря на «музыкальное» имя.`;
+  }
+  if (id === 'text') {
+    now = `Текстовый редактор с объявлением. Абзацы: ${S.paras.map((p, i) => `${i + 1}) «${p.text}» — ${p.size} пт, ${p.b ? 'жирный, ' : ''}${p.i ? 'курсив, ' : ''}${p.u ? 'подчёркнутый, ' : ''}выравнивание ${{ left: 'слева', center: 'по центру', right: 'справа' }[p.align]}`).join('; ')}. Выделен абзац ${S.psel + 1}. Есть инструмент «Найти и заменить». Ошибочных «ярмор…» в тексте: ${m.typos}. Шаги: ошибка исправлена — ${m.textOk ? 'да' : 'нет'}, заголовок оформлен — ${m.headOk ? 'да' : 'нет'}, последняя строка курсивом — ${m.tailOk ? 'да' : 'нет'}. Слов ${m.words}, символов ${m.chars}, ${m.bytes} байт в UTF-8. Наводи вопросами, не делай за ученика.`;
+  }
+  return [
+    `Раздел: информатика, 5 класс, тема «Компьютер и файлы». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { hw: 'Чем оперативная память отличается от SSD?', files: 'Зачем файлу расширение?', text: 'Как найти и заменить слово сразу во всём тексте?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

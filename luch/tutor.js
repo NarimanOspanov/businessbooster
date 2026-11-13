@@ -68,8 +68,8 @@
   .lt-btn:focus-visible,.lt-ib:focus-visible,.lt-send:focus-visible,.lt-mic:focus-visible,.lt-orb:focus-visible,.lt-sug button:focus-visible{outline:2px solid #72d4e8;outline-offset:2px}
   @media (max-width:600px){
     .lt-panel{right:0;left:0;bottom:0;width:100%;height:min(86vh,660px);border-radius:18px 18px 0 0;padding-bottom:env(safe-area-inset-bottom,0px)}
-    .lt-btn{padding:8px 14px 8px 8px}
-    .lt-btn small{display:none}
+    .lt-btn{padding:7px;opacity:.94}
+    .lt-btn>span{display:none}
     .lt-ib .lt-tx{display:none}
   }
   @media (prefers-reduced-motion:reduce){.lt-dots i,.lt-orb,.lt-mic.rec{animation:none!important}.lt-btn:hover{transform:none}}`;
@@ -86,7 +86,7 @@
   let lang = ls.get(LANG_KEY) === 'kk' ? 'kk' : 'ru';
 
   const btn = document.createElement('button');
-  btn.className = 'lt-btn'; btn.type = 'button';
+  btn.className = 'lt-btn'; btn.type = 'button'; btn.setAttribute('aria-label', 'Спросить репетитора');
   btn.innerHTML = `${AV}<span>Спросить репетитора<small>текстом или голосом</small></span>`;
   const panel = document.createElement('section');
   panel.className = 'lt-panel'; panel.hidden = true; panel.setAttribute('aria-label', 'ИИ-репетитор');

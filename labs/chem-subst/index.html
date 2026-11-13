@@ -1,0 +1,1071 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная химическая лаборатория для 7 класса: чистые вещества и смеси, физические и химические явления, разделение смесей, правила безопасности.">
+<title>Вещества и смеси</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* The same lab shell as /chemistry: SVG bench on the left, lesson notebook on the right, lesson strip under the bench. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag],.scene [data-hit]{cursor:pointer}
+.scene [data-drag].mv{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.meter .lr.ok{color:var(--ok)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--liq);transition:width .2s}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+.lupa{display:block;width:min(220px,70%);height:auto;margin:0 auto}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.chips button.ok{border-color:rgba(134,224,168,.6);color:var(--ok)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 16px/1.4 var(--font-mono);text-align:center;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+.step.ok span{color:var(--ok)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 230px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M16 8h8M17 8v9l-8 13q-1.5 3 2 3h18q3.5 0 2-3l-8-13V8" fill="none" stroke="var(--fg)" stroke-width="2" stroke-linejoin="round"/><path d="M12.5 25h15l2.3 4q.8 1.6-1 1.6H11.2q-1.8 0-1-1.6z" fill="var(--arm)"/><circle cx="16" cy="27" r="1.3" fill="var(--force)"/><circle cx="22" cy="28" r="1.1" fill="var(--fg)"/><circle cx="25" cy="26.5" r="1" fill="var(--force)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Химия · Вещества и смеси</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#chem">Карта</a><a href="/physics/#chem">Химия</a><a href="/labs/chem-subst/" aria-current="page">Вещества</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Вещества</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Лабораторный стол">
+    <svg class="scene" id="scene" role="img" aria-label="Лабораторный стол. Предметы можно нажимать и перетаскивать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const GLASS = 'rgba(200,225,255,.08)', GLASS_S = '#9fb3d1';
+const KEY = 'luch-chem-subst';
+const R = seed => { let s = seed; return () => (s = (s * 16807) % 2147483647) / 2147483647; };
+const f1 = x => x.toFixed(1);
+const lerp = (a, b, k) => a + (b - a) * k;
+const mixHex = (a, b, k) => { const h = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16)); const A = h(a), B = h(b); return '#' + A.map((v, i) => Math.round(lerp(v, B[i], clamp(k, 0, 1))).toString(16).padStart(2, '0')).join(''); };
+
+// ---------- lesson 1: samples ----------
+const ITEMS = [
+  { id: 'dist', name: 'Дистиллированная вода', short: 'Дист. вода', pure: true, kind: 'liq', fill: '#8fcbe8', view: 'water', types: 1, what: 'только молекулы воды H₂O' },
+  { id: 'air', name: 'Воздух', short: 'Воздух', pure: false, kind: 'gas', fill: '#cfd8e6', view: 'air', types: 4, what: 'азот N₂, кислород O₂, немного аргона и углекислого газа' },
+  { id: 'salt', name: 'Поваренная соль NaCl', short: 'Соль', pure: true, kind: 'powder', fill: '#eef3fa', view: 'salt', types: 1, what: 'кристалл из ионов натрия и хлора — одно вещество NaCl' },
+  { id: 'milk', name: 'Молоко', short: 'Молоко', pure: false, kind: 'milk', fill: '#f4f1e8', view: 'milk', types: 4, what: 'вода, капельки жира, белки, молочный сахар' },
+  { id: 'copper', name: 'Медная проволока', short: 'Медь', pure: true, kind: 'wire', fill: '#d9824a', view: 'copper', types: 1, what: 'только атомы меди Cu' },
+  { id: 'tap', name: 'Вода из-под крана', short: 'Из крана', pure: false, kind: 'liq', fill: '#a9d6ea', view: 'tap', types: 3, what: 'вода с растворёнными солями и газами' },
+  { id: 'sugar', name: 'Сахар', short: 'Сахар', pure: true, kind: 'powder', fill: '#f7efdc', view: 'sugar', types: 1, what: 'только молекулы сахарозы C₁₂H₂₂O₁₁' },
+  { id: 'granite', name: 'Гранит', short: 'Гранит', pure: false, kind: 'rock', fill: '#b9a59a', view: 'granite', types: 3, what: 'зёрна кварца, полевого шпата и слюды' },
+];
+// ---------- lesson 2: phenomena ----------
+const PHEN = [
+  { id: 'ice', name: 'Тает лёд', short: 'Лёд', chem: false, see: 'Твёрдый лёд стал жидкой водой. Если её заморозить, снова получится лёд.', sign: 'изменилось агрегатное состояние, вещество то же — вода' },
+  { id: 'soda', name: 'Сода в уксусе', short: 'Сода', chem: true, see: 'Смесь зашипела и вспенилась: пошли пузырьки газа, которого раньше не было.', sign: 'выделение газа (углекислый газ)' },
+  { id: 'bend', name: 'Сгибаем медную проволоку', short: 'Изгиб', chem: false, see: 'Изменилась только форма. Проволока блестит и гнётся, как раньше.', sign: 'изменилась форма, вещество то же — медь' },
+  { id: 'rust', name: 'Гвоздь во влажной банке', short: 'Гвоздь', chem: true, see: 'За две недели серый гвоздь покрылся рыжим рыхлым налётом, который крошится.', sign: 'изменение цвета: появилась ржавчина' },
+  { id: 'sugar', name: 'Сахар в воде', short: 'Сахар', chem: false, see: 'Кубик исчез, но вода стала сладкой. Если воду выпарить, сахар останется на дне.', sign: 'сахар растворился, но остался сахаром' },
+  { id: 'heat', name: 'Медь в пламени', short: 'Медь+огонь', chem: true, see: 'Блестящая медная пластинка почернела. Чёрный налёт не похож на медь и не смывается водой.', sign: 'изменение цвета: появился чёрный оксид меди' },
+];
+// ---------- lesson 4: hazards ----------
+const HAZ = [
+  { id: 'food', name: 'Еда и чай на рабочем столе', rule: 'В кабинете химии не едят и не пьют: следы реактивов попадают с рук и посуды в еду.', box: [32, 312, 96, 48] },
+  { id: 'spirit', name: 'Открытый спирт рядом с огнём', rule: 'Горючие жидкости держат закрытыми и подальше от пламени. Спиртовку зажигают спичкой и гасят колпачком.', box: [174, 292, 46, 66] },
+  { id: 'tube', name: 'Пробирка смотрит на соседа', rule: 'При нагревании отверстие пробирки направляют от себя и от соседей: жидкость может выплеснуться.', box: [228, 240, 84, 64] },
+  { id: 'nolabel', name: 'Склянка без этикетки', rule: 'Вещество без подписи не берут и не нюхают. Склянку отдают учителю.', box: [383, 296, 34, 62] },
+  { id: 'glass', name: 'Осколки на столе', rule: 'Разбитую посуду руками не собирают: говорят учителю, осколки сметают щёткой в совок.', box: [418, 334, 34, 24] },
+  { id: 'edge', name: 'Стакан на краю стола', rule: 'Посуду ставят подальше от края, чтобы случайно не смахнуть локтем.', box: [453, 310, 42, 48] },
+];
+const DECOY = {
+  goggles: { name: 'Защитные очки', ok: 'Очки лежат наготове — их надевают перед опытом. Тут всё правильно.', box: [134, 330, 40, 26] },
+  ext: { name: 'Огнетушитель', ok: 'Огнетушитель висит на своём месте. Тут всё правильно.', box: [18, 178, 36, 92] },
+  kit: { name: 'Аптечка', ok: 'Аптечка на видном месте. Тут всё правильно.', box: [436, 166, 58, 44] },
+};
+
+const LESSONS = [
+  { id: 'pure', title: 'Чистое вещество или смесь',
+    text: ['Чистое вещество состоит из одинаковых частиц. В дистиллированной воде — только молекулы воды, в медной проволоке — только атомы меди. Поэтому свойства у чистого вещества постоянные: чистая вода всегда кипит при 100 °C.',
+           'Смесь — это два и больше веществ вместе. Каждое вещество в смеси сохраняет свои свойства, поэтому смесь можно разделить. Бывают однородные смеси (составных частей не видно: воздух, сладкий чай) и неоднородные (видно: гранит, вода с песком).',
+           'Нажмите на образец — в лупе справа вверху будет видно, из каких частиц он состоит.'],
+    why: 'Геологи Казахстана ищут руды — это смеси минералов. На комбинатах из руды получают чистые металлы: медь в Жезказгане и Балхаше, цинк и свинец в Усть-Каменогорске. Технолог молочного завода знает, что молоко — смесь, и следит за долей жира. А дома умение читать состав на этикетке помогает не переплачивать за «чистый» продукт.',
+    safe: 'Даже знакомые вещества в лаборатории не пробуют на вкус: посуда могла быть в реактивах.',
+    task: 'Разложите все 8 образцов по лоткам: «Чистое вещество» и «Смесь».',
+    hint: 'Перетащите образец в лоток. Можно и так: нажать на образец, потом на лоток. Сомневаетесь — смотрите в лупу: частицы одного вида или разных?',
+    stage: 'Нажмите на образец, чтобы заглянуть в лупу. Перетащите его в нужный лоток.',
+    samples: 8,
+    check: m => m.sorted === ITEMS.length },
+  { id: 'phen', title: 'Физические и химические явления',
+    text: ['При физическом явлении меняются форма, размер или состояние вещества, но само вещество остаётся тем же. Лёд, вода и пар — всё это вода H₂O.',
+           'При химическом явлении (химической реакции) из одних веществ получаются другие. Её выдают признаки: выделяется газ, выпадает осадок, меняется цвет, появляется запах, выделяются тепло и свет.',
+           'Главный вопрос всегда один: появилось ли новое вещество?'],
+    why: 'Автомеханик и строитель каждый день борются с ржавчиной — химической реакцией железа с водой и кислородом. Её тормозят краской и цинком, и на этом держится целая отрасль. Повар знает, что растопить масло — физика, а поджарить мясо до корочки — химия. Пожарный понимает горение как реакцию: убери кислород или горючее — и огонь погаснет.',
+    safe: 'Опыты с огнём проводят только при учителе. Над пламенем не наклоняются, волосы убирают.',
+    task: 'Проведите все 6 опытов и для каждого решите: явление физическое или химическое.',
+    hint: 'Выберите опыт на плитках у края стола, нажмите «Провести опыт», прочитайте, что изменилось, и выберите ответ.',
+    stage: 'Плитки у края стола — опыты. Нажмите на установку, чтобы провести опыт.',
+    count: 6,
+    check: m => m.right === PHEN.length },
+  { id: 'sep', title: 'Разделение смесей',
+    text: ['Смесь разделяют, пользуясь разницей в свойствах веществ. Железо притягивается магнитом, а песок и соль — нет. Соль растворяется в воде, а песок — нет.',
+           'Фильтрование задерживает нерастворимые частицы: песок остаётся на фильтре, а раствор проходит насквозь. Выпаривание убирает воду: она испаряется, а соль остаётся кристаллами.',
+           'Есть и другие способы: отстаивание (песок оседает на дно), делительная воронка (масло и вода), перегонка — дистилляция (так получают чистую воду).'],
+    why: 'На водоканале воду из реки отстаивают и фильтруют, прежде чем она попадёт в кран. На Соколовско-Сарбайском комбинате в Рудном железную руду отделяют от пустой породы магнитами. Под Аральском соль добывают из солёных озёр, а на заводах её очищают растворением и выпариванием. Дома то же самое — фильтр-кувшин для воды, сито для муки, дуршлаг для макарон.',
+    safe: 'Горячую фарфоровую чашку руками не трогают — только щипцами. Над выпариваемым раствором не наклоняются: горячие брызги «стреляют». Спиртовку гасят колпачком.',
+    task: 'Разделите смесь железных опилок, песка и соли так, чтобы каждое вещество оказалось отдельно. Потом погасите спиртовку.',
+    hint: 'Для каждого вещества найдите свойство, которого нет у других. Магнит, вода, фильтр, выпаривание — подумайте о порядке.',
+    stage: 'Тащите магнит, кувшин, стакан со смесью и колбу. Спиртовка зажигается и гасится нажатием.',
+    mixture: ['железные опилки', 'песок', 'поваренная соль'],
+    check: m => m.iron && m.sand && m.salt && !m.burner },
+  { id: 'rules', title: 'Безопасность в лаборатории',
+    text: ['Кабинет химии не опасен, если соблюдать правила. Большинство травм случаются из-за спешки и невнимательности.',
+           'Главное: работай только с разрешения учителя, в очках и халате. Ничего не пробуй на вкус. Запах определяй, направляя воздух ладонью к себе. Пробирку нагревай отверстием от людей.',
+           'Если что-то пролилось, разбилось или попало на кожу — сразу скажи учителю и промой кожу большим количеством воды.'],
+    why: 'Правила одинаковы в школе, на заводе и в аптеке. Лаборант, химик-технолог, провизор каждый год проходят инструктаж по технике безопасности. Специалист по охране труда нужен на каждом крупном предприятии Казахстана — от нефтяных промыслов Атырау до рудников Караганды. А дома эти правила спасают от отравлений бытовой химией.',
+    safe: 'При ожоге — держать под холодной водой 10–15 минут. Попало в глаз — промывать водой и сразу к учителю или врачу.',
+    task: 'Найдите на столе 6 нарушений правил безопасности.',
+    hint: 'Нажимайте на предметы. Ищите то, что может обжечь, отравить, порезать или упасть.',
+    stage: 'Нажимайте на предметы, которые нарушают правила.',
+    hazards: 6,
+    check: m => m.found === HAZ.length },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const freshSep = () => ({ mix: { iron: 1, sand: 1, salt: 1, water: 0 }, mag: 0, filt: { sand: 0, iron: 0 }, flask: { salt: 0, water: 0 }, dish: { salt: 0, water: 0 }, heat: 0, burner: false, said: false });
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null,
+            sort: {}, order: { P: [], M: [] }, sel: null, miss: 0,
+            ph: 0, p: 0, playing: false, ans: {}, phMiss: 0,
+            sp: freshSep(), found: {}, hzMiss: 0 };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+function model() {
+  const id = LID();
+  if (id === 'pure') return { kind: 'sort', sorted: Object.keys(S.sort).length, miss: S.miss, sel: S.sel === null ? null : ITEMS[S.sel] };
+  if (id === 'phen') return { kind: 'phen', right: Object.keys(S.ans).length, cur: PHEN[S.ph], p: S.p, miss: S.phMiss };
+  if (id === 'sep') { const s = S.sp; return { kind: 'sep', iron: s.mag === 1, sand: !!s.filt.sand && !s.filt.iron, salt: !!s.dish.salt && !s.dish.water, burner: s.burner, heat: s.heat, s }; }
+  return { kind: 'haz', found: Object.keys(S.found).length, miss: S.hzMiss };
+}
+
+// ---------- drawing helpers ----------
+const ol = (d, fill, stroke, w = 2.2, extra = '') => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${w + 2.6}" stroke-linejoin="round" stroke-linecap="round"/><path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round" ${extra}/>`;
+const glassD = (x0, x1, top, bot) => `M${x0 - 5} ${top}L${x0} ${top + 5}V${bot - 6}Q${x0} ${bot} ${x0 + 7} ${bot}H${x1 - 7}Q${x1} ${bot} ${x1} ${bot - 6}V${top + 5}L${x1 + 3} ${top}`;
+const glassSVG = (x0, x1, top, bot) => { const d = glassD(x0, x1, top, bot); return `<path d="${d}Z" fill="${GLASS}"/>` + ol(d, 'none', GLASS_S, 2.2) + `<path d="M${x0 + 7} ${top + 12}V${bot - 10}" stroke="#fff" stroke-opacity=".14" stroke-width="4" stroke-linecap="round"/>`; };
+const liquid = (x0, x1, lv, bot, col, op = 0.5) => `<rect x="${x0 + 1.5}" y="${f1(lv)}" width="${x1 - x0 - 3}" height="${f1(bot - lv - 1.5)}" rx="4" fill="${col}" opacity="${op}"/><rect x="${x0 + 1.5}" y="${f1(lv)}" width="${x1 - x0 - 3}" height="1.6" fill="#d8f0ff" opacity=".7"/>`;
+function wrapText(s, max) { const out = []; let line = ''; for (const w of s.split(' ')) { if ((line + ' ' + w).trim().length > max && line) { out.push(line); line = w; } else line = (line + ' ' + w).trim(); } if (line) out.push(line); return out; }
+
+function bench() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="2360" fill="url(#tile)"/>
+    <rect x="-2000" y="360" width="4520" height="1200" fill="#1a2232"/>
+    <rect x="-2000" y="358" width="4520" height="4" fill="#2c3954"/>
+    <rect x="-2000" y="362" width="4520" height="2" fill="${INK}" opacity=".6"/>`;
+}
+
+// ---------- the magnifier: what the particles look like ----------
+function lupaInner(view) {
+  const r = R(view.length * 977 + view.charCodeAt(0) * 31 + 5); let h = '';
+  const W = (x, y, a) => { const H = d => `<circle cx="${f1(x + 4.6 * Math.cos(a + d))}" cy="${f1(y + 4.6 * Math.sin(a + d))}" r="2.1" fill="#f2f4f8"/>`; return H(0.91) + H(-0.91) + `<circle cx="${f1(x)}" cy="${f1(y)}" r="3.5" fill="#e5534b"/>`; };
+  const pair = (x, y, a, c, rr) => { const dx = Math.cos(a) * rr * 0.8, dy = Math.sin(a) * rr * 0.8; return `<circle cx="${f1(x - dx)}" cy="${f1(y - dy)}" r="${rr}" fill="${c}"/><circle cx="${f1(x + dx)}" cy="${f1(y + dy)}" r="${rr}" fill="${c}"/>`; };
+  const grid = (st, jit, fn) => { let i = 0; for (let y = st / 2; y < 100; y += st) for (let x = st / 2; x < 100; x += st) h += fn(x + (r() - .5) * st * jit, y + (r() - .5) * st * jit, i++); };
+  if (view === 'water') grid(13, .35, (x, y) => W(x, y, r() * 6.28));
+  if (view === 'tap') grid(13, .35, (x, y, i) => i % 9 === 4 ? `<circle cx="${f1(x)}" cy="${f1(y)}" r="3.4" fill="#7ddc8a"/>` : i % 9 === 7 ? `<circle cx="${f1(x)}" cy="${f1(y)}" r="2.6" fill="#a78bfa"/>` : W(x, y, r() * 6.28));
+  if (view === 'milk') { grid(13, .35, (x, y) => W(x, y, r() * 6.28)); for (const [x, y, rr] of [[30, 34, 11], [68, 58, 13], [38, 74, 8]]) h += `<circle cx="${x}" cy="${y}" r="${rr}" fill="#f5dc8a" stroke="#c9a94a" stroke-width="1"/>`; h += `<path d="M62 22q4-5 8 0t8 0" fill="none" stroke="#f08a5d" stroke-width="2.4" stroke-linecap="round"/>`; }
+  if (view === 'air') grid(24, .5, (x, y, i) => i === 6 ? `<circle cx="${f1(x)}" cy="${f1(y)}" r="3.4" fill="#c7ccd6"/>` : i % 4 === 1 ? pair(x, y, r() * 6.28, '#e5534b', 3) : pair(x, y, r() * 6.28, '#6fa8ff', 3));
+  if (view === 'salt') { let j = 0; for (let y = 6; y < 100; y += 11, j++) for (let x = 6, i = 0; x < 100; x += 11, i++) h += (i + j) % 2 ? `<circle cx="${x}" cy="${y}" r="2.6" fill="#a78bfa"/>` : `<circle cx="${x}" cy="${y}" r="4" fill="#7ddc8a"/>`; }
+  if (view === 'copper') { let j = 0; for (let y = 5; y < 104; y += 9.5, j++) for (let x = j % 2 ? 10.5 : 5; x < 104; x += 11) h += `<circle cx="${x}" cy="${y}" r="5" fill="#e08a4f" stroke="#a85a2a" stroke-width=".8"/>`; }
+  if (view === 'sugar') grid(21, .3, (x, y) => { const a = r() * 6.28; let s = ''; for (let k = 0; k < 6; k++) s += `<circle cx="${f1(x + 5.5 * Math.cos(a + k * 1.047))}" cy="${f1(y + 5.5 * Math.sin(a + k * 1.047))}" r="2.2" fill="${k % 3 ? '#f2c46d' : '#e5534b'}"/>`; return s; });
+  if (view === 'granite') { const seeds = [[20, 25, 0], [70, 18, 1], [55, 60, 2], [18, 78, 1], [85, 80, 0], [40, 45, 0]], col = ['#d9dde6', '#e7a99a', '#3d3a45'];
+    let j = 0; for (let y = 4; y < 100; y += 8.5, j++) for (let x = j % 2 ? 8 : 4; x < 100; x += 8.5) { let b = 0, bd = 1e9; seeds.forEach((s, k) => { const d = (s[0] - x) ** 2 + (s[1] - y) ** 2; if (d < bd) { bd = d; b = k; } }); h += `<circle cx="${x}" cy="${y}" r="3.7" fill="${col[seeds[b][2]]}"/>`; } }
+  return h;
+}
+let lupaN = 0;
+function lupaSVG(item, cls) {
+  const id = 'lc' + (lupaN++);
+  if (!item) return `<svg ${cls ? `class="${cls}"` : ''} viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46" fill="#0b1019" stroke="#56627d" stroke-width="3"/><text x="50" y="47" font-size="8" fill="#8b96ad" text-anchor="middle" font-family="IBM Plex Mono,monospace">выберите</text><text x="50" y="58" font-size="8" fill="#8b96ad" text-anchor="middle" font-family="IBM Plex Mono,monospace">образец</text></svg>`;
+  return `<svg ${cls ? `class="${cls}"` : ''} viewBox="0 0 100 100" role="img" aria-label="Частицы под лупой: ${item.name}"><defs><clipPath id="${id}"><circle cx="50" cy="50" r="45"/></clipPath></defs><circle cx="50" cy="50" r="46" fill="#0b1019"/><g clip-path="url(#${id})">${lupaInner(item.view)}</g><circle cx="50" cy="50" r="46" fill="none" stroke="#a9b4c9" stroke-width="3"/></svg>`;
+}
+
+// ---------- lesson 1 scene ----------
+const BINS = { P: { x0: 22, x1: 250, label: 'Чистое вещество' }, M: { x0: 270, x1: 498, label: 'Смесь' } };
+const restOf = i => { const b = S.sort[i]; if (!b) return [42 + i * 62.3, 252]; const j = S.order[b].indexOf(i); return [BINS[b].x0 + 30 + j * 56, 346]; };
+function jarSVG(it, o, sel, i) {
+  const x = o.x, y = o.y; let h = `<g data-drag="it${i}" class="mv"><rect x="${f1(x - 26)}" y="${f1(y - 60)}" width="52" height="${S.sort[i] ? 62 : 76}" fill="transparent"/>`;
+  if (sel) h += `<rect x="${f1(x - 26)}" y="${f1(y - 62)}" width="52" height="66" rx="8" fill="rgba(255,181,71,.08)" stroke="#ffb547" stroke-width="1.6" stroke-dasharray="4 3"/>`;
+  const x0 = x - 18, x1 = x + 18, top = y - 50;
+  if (it.kind === 'liq' || it.kind === 'milk') h += liquid(x0, x1, y - 32, y, it.fill, it.kind === 'milk' ? 0.95 : 0.55);
+  if (it.kind === 'powder') h += `<path d="M${x0 + 2} ${y - 2}Q${x0 + 6} ${y - 22} ${x} ${y - 24}Q${x1 - 6} ${y - 22} ${x1 - 2} ${y - 2}Z" fill="${it.fill}" stroke="${INK}" stroke-width=".8"/>`;
+  if (it.kind === 'wire') for (let k = 0; k < 5; k++) h += `<ellipse cx="${x}" cy="${f1(y - 8 - k * 6)}" rx="12" ry="3.6" fill="none" stroke="${k % 2 ? '#f0a46c' : '#d9824a'}" stroke-width="2.4"/>`;
+  if (it.kind === 'rock') { h += `<path d="M${x0 + 2} ${y - 2}L${x0 + 4} ${y - 18}L${x - 4} ${y - 26}L${x1 - 4} ${y - 20}L${x1 - 2} ${y - 2}Z" fill="${it.fill}" stroke="${INK}" stroke-width=".8"/>`; const r = R(91); for (let k = 0; k < 14; k++) h += `<rect x="${f1(x0 + 5 + r() * 24)}" y="${f1(y - 18 + r() * 14)}" width="2.6" height="2.6" fill="${['#e7a99a', '#3d3a45', '#eef1f6'][k % 3]}"/>`; }
+  if (it.kind === 'gas') h += `<rect x="${x - 7}" y="${top - 8}" width="14" height="9" rx="2" fill="#56627d" stroke="${INK}" stroke-width="1"/>`;
+  h += glassSVG(x0, x1, top, y);
+  h += `<text x="${x}" y="${f1(y + 12)}" font-size="9.5" fill="${S.sort[i] ? '#86e0a8' : '#e8ecf4'}" text-anchor="middle">${it.short}</text>`;
+  return h + `</g>`;
+}
+function sortScene() {
+  let h = '';
+  for (const [k, b] of Object.entries(BINS)) {
+    h += `<g data-drag="bin${k}"><rect x="${b.x0}" y="286" width="${b.x1 - b.x0}" height="74" rx="10" fill="${k === 'P' ? 'rgba(114,212,232,.07)' : 'rgba(255,181,71,.07)'}" stroke="${k === 'P' ? '#72d4e8' : '#ffb547'}" stroke-width="1.6" stroke-dasharray="7 5"/>`;
+    h += `<text x="${(b.x0 + b.x1) / 2}" y="380" font-size="11" fill="${k === 'P' ? '#72d4e8' : '#ffb547'}" text-anchor="middle" font-weight="500">${b.label}</text>`;
+    h += `<text x="${(b.x0 + b.x1) / 2}" y="395" font-size="8.5" fill="#8b96ad" text-anchor="middle">${k === 'P' ? 'один вид частиц' : 'два вида частиц и больше'}</text></g>`;
+  }
+  const draggingId = drag && drag.id.startsWith('it') ? drag.id : null;
+  ITEMS.forEach((it, i) => { if ('it' + i !== draggingId) h += jarSVG(it, P['it' + i], S.sel === i, i); });
+  if (draggingId) { const i = +draggingId.slice(2); h += jarSVG(ITEMS[i], P[draggingId], true, i); }
+  return h;
+}
+
+// ---------- lesson 2 scene ----------
+function phenScene(t) {
+  const ph = PHEN[S.ph], p = S.p; let h = '';
+  h += `<g data-drag="app"><rect x="140" y="170" width="240" height="190" fill="transparent"/>`;
+  if (ph.id === 'ice') {
+    h += `<ellipse cx="260" cy="352" rx="88" ry="8" fill="#c8d1e2" stroke="${INK}" stroke-width="1.6"/>`;
+    if (p > 0) h += `<ellipse cx="260" cy="349" rx="${f1(14 + 60 * p)}" ry="${f1(2 + 3.5 * p)}" fill="var(--liq)" opacity=".6"/>`;
+    const s = 64 * Math.pow(1 - p, 0.6);
+    if (s > 1) { const r = 6 * (1 - p) + 2; h += `<rect x="${f1(260 - s / 2)}" y="${f1(348 - s * 0.9)}" width="${f1(s)}" height="${f1(s * 0.9)}" rx="${f1(r)}" fill="#dff3ff" opacity=".85" stroke="${INK}" stroke-width="1.4"/><path d="M${f1(260 - s / 2 + 6)} ${f1(348 - s * 0.9 + 6)}h${f1(s * 0.4)}" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".8"/>`; }
+    if (p > 0.05 && p < 1 && !reduce) for (let k = 0; k < 3; k++) { const y = 300 + ((t / 9 + k * 17) % 46); h += `<ellipse cx="${260 + (k - 1) * s * 0.35}" cy="${f1(Math.max(y, 348 - s * 0.9))}" rx="1.6" ry="2.4" fill="#bfe6ff"/>`; }
+    h += `<text x="360" y="200" font-size="10" fill="#8b96ad">в комнате +22 °C</text>`;
+  }
+  if (ph.id === 'soda' || ph.id === 'sugar') {
+    const x0 = 200, x1 = 320, top = 222, bot = 356, lv = 286;
+    h += liquid(x0, x1, lv, bot, ph.id === 'soda' ? '#e9eef3' : '#8fcbe8', ph.id === 'soda' ? 0.35 : 0.45);
+    if (ph.id === 'soda') {
+      const k = clamp((p - 0.12) / 0.88, 0, 1), foam = Math.sin(Math.min(1, k * 1.4) * Math.PI / 2) * (1 - Math.max(0, k - 0.75) * 2.2);
+      if (k > 0) { const fh = 62 * Math.max(0, foam); h += `<path d="M${x0 + 2} ${lv}V${f1(lv - fh)}q15 -8 29 0t29 0t29 0t29 0V${lv}Z" fill="#f4f6fa" opacity=".88"/>`;
+        const r = R(5); for (let j = 0; j < 18; j++) { const bx = x0 + 10 + r() * 100, sp = 30 + r() * 30, y = bot - 6 - ((t / (reduce ? 1e9 : 1) * sp / 1000 + r() * 70) % 70); if (k < 1) h += `<circle cx="${f1(bx)}" cy="${f1(y)}" r="${f1(1.5 + r() * 2)}" fill="none" stroke="#fff" stroke-width="1" opacity=".8"/>`; } }
+      const sp = clamp(p / 0.12, 0, 1), ang = -40 * sp;
+      if (p < 0.3) h += `<g transform="translate(300 ${f1(204 - 6 * sp)}) rotate(${f1(ang)})"><path d="M0 0L70 -30" stroke="#a9b4c9" stroke-width="4" stroke-linecap="round"/><path d="M-14 -2Q-14 9 0 9Q14 9 14 -2Z" fill="#c8d1e2" stroke="${INK}" stroke-width="1.2"/>${sp < 1 ? '<ellipse cx="0" cy="-2" rx="11" ry="3.5" fill="#fff"/>' : ''}</g>`;
+      h += `<text x="260" y="340" font-size="9" fill="#0b1019" text-anchor="middle" opacity=".7">уксус</text>`;
+    } else {
+      const fall = clamp(p / 0.18, 0, 1), dis = clamp((p - 0.18) / 0.82, 0, 1), cy = lerp(170, 334, fall * fall), s = 26 * (1 - dis);
+      if (s > 0.6) h += `<rect x="${f1(260 - s / 2)}" y="${f1(cy - s)}" width="${f1(s)}" height="${f1(s)}" rx="2" fill="#fbf7ee" stroke="${INK}" stroke-width="1.2"/>`;
+      const r = R(17); for (let j = 0; j < 40; j++) { const u = r(), v = r(), spread = dis; if (dis <= 0) break; const x = 260 + (u - .5) * 108 * spread, y = 352 - v * 64 * spread - 2; h += `<circle cx="${f1(x)}" cy="${f1(y)}" r="1.6" fill="#ffcf7a" opacity="${f1(0.4 + 0.6 * dis)}"/>`; }
+      h += `<text x="330" y="260" font-size="9" fill="#8b96ad">вода</text>`;
+    }
+    h += glassSVG(x0, x1, top, bot);
+  }
+  if (ph.id === 'bend') {
+    let d = '';
+    for (let k = 0; k <= 12; k++) { const a = Math.PI * k / 12, sx = 165 + k * 15.8, sy = 334, bx = 260 - 60 * Math.cos(a), by = 334 - 60 * Math.sin(a) * 1.05, x = lerp(sx, bx, p), y = lerp(sy, by, p); d += (k ? 'L' : 'M') + f1(x) + ' ' + f1(y); }
+    h += `<path d="${d}" fill="none" stroke="${INK}" stroke-width="8.6" stroke-linecap="round" stroke-linejoin="round"/><path d="${d}" fill="none" stroke="#d9824a" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><path d="${d}" fill="none" stroke="#f6c49c" stroke-width="1.6" stroke-linecap="round" opacity=".8" transform="translate(0 -1.4)"/>`;
+    h += `<rect x="150" y="346" width="220" height="10" rx="2" fill="#3a4762" stroke="${INK}" stroke-width="1.2"/>`;
+    if (p < 1) h += `<path d="M180 300q-10 -30 20 -50" fill="none" stroke="#ffb547" stroke-width="1.6" stroke-dasharray="4 4" marker-end=""/><path d="M340 300q10 -30 -20 -50" fill="none" stroke="#ffb547" stroke-width="1.6" stroke-dasharray="4 4"/>`;
+  }
+  if (ph.id === 'rust') {
+    const x0 = 205, x1 = 315, top = 222, bot = 356, day = 1 + Math.round(p * 13);
+    h += liquid(x0, x1, 300, bot, mixHex('#8fcbe8', '#c9a17a', p * 0.7), 0.45);
+    const nail = 'M228 242L292 342', col = mixHex('#9aa3ad', '#a8552a', p);
+    h += `<path d="${nail}" stroke="${INK}" stroke-width="9.6" stroke-linecap="round"/><path d="${nail}" stroke="${col}" stroke-width="7" stroke-linecap="round"/><path d="M218 236L240 246" stroke="${INK}" stroke-width="9" stroke-linecap="round"/><path d="M218 236L240 246" stroke="${col}" stroke-width="6.4" stroke-linecap="round"/>`;
+    const r = R(23); for (let j = 0; j < 22; j++) { const k = r(), x = lerp(232, 290, k) + (r() - .5) * 8, y = lerp(248, 338, k) + (r() - .5) * 6; if (r() < p) h += `<circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(1.6 + r() * 2.6)}" fill="#c4612b" opacity=".9"/>`; }
+    h += glassSVG(x0, x1, top, bot);
+    h += `<rect x="330" y="230" width="62" height="24" rx="5" fill="#1a2438" stroke="#56627d"/><text x="361" y="246" font-size="10" fill="#e8ecf4" text-anchor="middle">день ${day}</text>`;
+  }
+  if (ph.id === 'heat') {
+    h += `<path d="M232 356Q226 322 260 316Q294 322 288 356Z" fill="rgba(200,225,255,.12)" stroke="${GLASS_S}" stroke-width="2"/><rect x="253" y="303" width="14" height="14" rx="2" fill="#56627d" stroke="${INK}"/><path d="M258.5 303V294" stroke="#e8ecf4" stroke-width="2"/>`;
+    const fl = reduce ? 0 : Math.sin(t / 90) * 1.5;
+    h += `<path d="M258.5 294C249 282 252 ${f1(262 + fl)} 258.5 ${f1(244 + fl)}C265 ${f1(262 + fl)} 268 282 258.5 294Z" fill="#ffb547" opacity=".85"/><path d="M258.5 292C254 284 255 274 258.5 ${f1(266 + fl)}C262 274 263 284 258.5 292Z" fill="#9fd3ff" opacity=".8"/>`;
+    const black = clamp(p * 1.15, 0, 1), w = 30 + 60 * p;
+    h += `<g><rect x="196" y="250" width="118" height="9" rx="1.5" fill="#d9824a" stroke="${INK}" stroke-width="1.4"/><rect x="${f1(258 - w / 2)}" y="250.5" width="${f1(Math.min(w, 314 - 258 + w / 2 - 1))}" height="8" fill="#231c1a" opacity="${f1(black * 0.95)}"/><path d="M198 252H${f1(258 - w / 2)}" stroke="#f6c49c" stroke-width="1.2" opacity=".8"/></g>`;
+    h += `<path d="M312 252L410 206M312 258L410 214" stroke="#a9b4c9" stroke-width="3.2" stroke-linecap="round"/>`;
+    h += `<text x="232" y="380" font-size="9" fill="#8b96ad" text-anchor="middle"></text>`;
+  }
+  h += `</g>`;
+  // observation
+  const lines = p >= 1 ? wrapText(ph.see, 40) : [S.playing ? 'Идёт опыт…' : p > 0 ? 'Опыт на паузе.' : 'Нажмите на установку или «Провести опыт».'];
+  h += `<text x="260" y="122" font-size="15" fill="#e8ecf4" text-anchor="middle" font-weight="500">${ph.name}</text>`;
+  lines.forEach((ln, k) => { h += `<text x="260" y="${144 + k * 16}" font-size="13" fill="${p >= 1 ? '#ffd08a' : '#8b96ad'}" text-anchor="middle">${ln}</text>`; });
+  // tiles
+  PHEN.forEach((q, i) => {
+    const x = 24 + i * 79, cur = i === S.ph, ok = S.ans[i];
+    h += `<g data-drag="tile${i}"><rect x="${x}" y="368" width="74" height="30" rx="7" fill="${cur ? '#26324a' : '#121a28'}" stroke="${cur ? '#ffb547' : ok ? '#86e0a8' : '#3a4762'}" stroke-width="1.5"/><text x="${x + 37}" y="387.5" font-size="10.5" fill="${ok ? '#86e0a8' : '#e8ecf4'}" text-anchor="middle">${ok ? '✓ ' : ''}${q.short}</text></g>`;
+  });
+  return h;
+}
+
+// ---------- lesson 3 scene ----------
+const SEP = { mixb: [75, 356], magnet: [80, 214], jug: [178, 356], flask: [275, 356] };
+function grains(x0, x1, ybot, hgt, types, n, seed) {
+  const r = R(seed), col = { iron: '#4b5260', sand: '#d8b779', salt: '#f4f7fb' }; let h = '';
+  if (!types.length) return '';
+  for (let i = 0; i < n; i++) { const tp = types[i % types.length], x = x0 + r() * (x1 - x0), y = ybot - r() * hgt * (1 - Math.abs((x - (x0 + x1) / 2) / ((x1 - x0) / 2)) * 0.5);
+    h += tp === 'salt' ? `<rect x="${f1(x - 1.6)}" y="${f1(y - 1.6)}" width="3.2" height="3.2" fill="${col.salt}" stroke="${INK}" stroke-width=".4"/>` : `<circle cx="${f1(x)}" cy="${f1(y)}" r="${tp === 'iron' ? 1.4 : 1.8}" fill="${col[tp]}"/>`; }
+  return h;
+}
+function mixbSVG(o) {
+  const s = S.sp.mix, x = o.x, y = o.y, x0 = x - 40, x1 = x + 40, top = y - 98; let h = `<g data-drag="mixb" class="mv"><rect x="${x0 - 6}" y="${top - 6}" width="92" height="106" fill="transparent"/>`;
+  const solids = ['iron', 'sand'].filter(k => s[k]).concat(s.salt && !s.water ? ['salt'] : []);
+  if (s.water) h += liquid(x0, x1, y - 62, y, '#8fcbe8', 0.42);
+  if (solids.length) { const hh = s.water ? 12 : 20; h += `<path d="M${x0 + 3} ${y - 2}Q${x} ${y - hh * 1.8} ${x1 - 3} ${y - 2}Z" fill="${s.sand ? '#a88a55' : '#3a3f4a'}" opacity=".7"/>` + grains(x0 + 4, x1 - 4, y - 3, hh, solids, 90, 3); }
+  h += glassSVG(x0, x1, top, y);
+  h += `<text x="${x}" y="${top - 8}" font-size="8.5" fill="#8b96ad" text-anchor="middle">${s.iron || s.sand || s.salt ? 'смесь' : 'пусто'}</text>`;
+  return h + `</g>`;
+}
+function magnetSVG(o) {
+  const x = o.x, y = o.y; let h = `<g data-drag="magnet" class="mv"><rect x="${x - 26}" y="${y - 66}" width="52" height="72" fill="transparent"/>`;
+  h += ol(`M${x - 19} ${y}V${y - 40}A19 19 0 0 1 ${x + 19} ${y - 40}V${y}H${x + 9}V${y - 40}A9 9 0 0 0 ${x - 9} ${y - 40}V${y}Z`, '#e5534b', '#ff8a73', 1.6);
+  h += `<rect x="${x - 19}" y="${y - 11}" width="10" height="11" fill="#c8d1e2" stroke="${INK}" stroke-width="1"/><rect x="${x + 9}" y="${y - 11}" width="10" height="11" fill="#c8d1e2" stroke="${INK}" stroke-width="1"/>`;
+  if (S.sp.mag) { const r = R(8); for (let i = 0; i < 26; i++) { const side = i % 2 ? 1 : -1; h += `<circle cx="${f1(x + side * 14 + (r() - .5) * 14)}" cy="${f1(y + r() * 7 - 1)}" r="1.4" fill="#4b5260" stroke="#0b1019" stroke-width=".3"/>`; } }
+  return h + `</g>`;
+}
+function jugSVG(o) {
+  const x = o.x, y = o.y; let h = `<g data-drag="jug" class="mv"><rect x="${x - 30}" y="${y - 72}" width="64" height="74" fill="transparent"/>`;
+  h += liquid(x - 20, x + 20, y - 46, y, '#5fb4d9', 0.55);
+  h += ol(`M${x + 20} ${y - 52}c14 0 14 34 0 34`, 'none', '#56627d', 4);
+  h += ol(`M${x - 28} ${y - 66}L${x - 20} ${y - 58}V${y - 6}Q${x - 20} ${y} ${x - 14} ${y}H${x + 14}Q${x + 20} ${y} ${x + 20} ${y - 6}V${y - 66}Z`, GLASS, GLASS_S, 2.2);
+  h += `<text x="${x}" y="${y - 24}" font-size="9" fill="#0b1019" text-anchor="middle" font-weight="500">H₂O</text>`;
+  return h + `</g>`;
+}
+function flaskSVG(o) {
+  const x = o.x, y = o.y, s = S.sp.flask; let h = `<g data-drag="flask" class="mv"><rect x="${x - 40}" y="${y - 96}" width="80" height="98" fill="transparent"/>`;
+  if (s.water) h += `<path d="M${x - 24} ${y - 32}H${x + 24}L${x + 34} ${y - 5}Q${x + 35} ${y - 2} ${x + 30} ${y - 2}H${x - 30}Q${x - 35} ${y - 2} ${x - 34} ${y - 5}Z" fill="#8fcbe8" opacity=".5"/>`;
+  const d = `M${x - 10} ${y - 94}V${y - 62}L${x - 36} ${y - 8}Q${x - 39} ${y} ${x - 30} ${y}H${x + 30}Q${x + 39} ${y} ${x + 36} ${y - 8}L${x + 10} ${y - 62}V${y - 94}`;
+  h += `<path d="${d}Z" fill="${GLASS}"/>` + ol(d, 'none', GLASS_S, 2.2);
+  if (s.water) h += `<text x="${x}" y="${y - 12}" font-size="7.5" fill="#0b1019" text-anchor="middle">${s.salt ? 'р-р соли' : 'вода'}</text>`;
+  return h + `</g>`;
+}
+function sepScene(t) {
+  const s = S.sp; let h = '';
+  // filter stand + funnel
+  h += ol('M338 356V150', 'none', '#a9b4c9', 4) + ol('M318 356h44v4h-44z', '#2a3348', '#3a4762', 1.4) + ol('M338 206H306', 'none', '#8a96b0', 3.4);
+  h += `<g data-drag="funnel"><rect x="232" y="186" width="86" height="80" fill="transparent"/>`;
+  h += `<path d="M244 200L275 236L306 200Z" fill="#f1ece0" opacity=".9"/>`;
+  if (s.filt.sand || s.filt.iron) { h += `<path d="M258 220L275 236L292 220Z" fill="${s.filt.sand ? '#d8b779' : '#4b5260'}"/>` + grains(260, 290, 234, 12, ['sand', 'iron'].filter(k => s.filt[k]), 40, 11); }
+  h += ol('M238 198L272 240V264H278V240L312 198', 'none', GLASS_S, 2.2) + `</g>`;
+  // evaporation: tripod, dish, lamp
+  h += `<path d="M402 290L392 356M472 290L482 356M437 292V356" stroke="#8a96b0" stroke-width="3"/><path d="M396 290H478" stroke="#a9b4c9" stroke-width="3.6"/>`;
+  h += `<defs><clipPath id="dishIn"><path d="M399 278Q437 312 475 278Z"/></clipPath></defs>`;
+  h += `<g data-drag="dish"><rect x="390" y="262" width="94" height="40" fill="transparent"/>`;
+  if (s.dish.water || s.dish.salt) {
+    h += `<g clip-path="url(#dishIn)">`;
+    if (s.dish.water) h += `<rect x="395" y="${f1(281 + s.heat * 11)}" width="84" height="30" fill="#8fcbe8" opacity=".55"/>`;
+    if (s.dish.salt) { const r = R(29), n = Math.round(4 + 26 * (s.dish.water ? s.heat : 1)); for (let i = 0; i < n; i++) h += `<rect x="${f1(414 + r() * 46)}" y="${f1(286 + r() * 7)}" width="3" height="3" fill="#f4f7fb" stroke="${INK}" stroke-width=".4"/>`; }
+    h += `</g>`;
+  }
+  h += ol('M397 278Q437 314 477 278', 'none', '#e8ecf4', 2) + `</g>`;
+  if (s.burner && s.dish.water && !reduce) for (let k = 0; k < 3; k++) { const ph = (t / 1400 + k / 3) % 1; h += `<path d="M${420 + k * 16} ${f1(272 - ph * 40)}q-5 -6 0 -12t0 -12" fill="none" stroke="#c8d6ec" stroke-width="1.6" opacity="${f1(0.6 * (1 - ph))}"/>`; }
+  h += `<g data-drag="lamp"><rect x="408" y="296" width="58" height="62" fill="transparent"/>`;
+  h += `<path d="M415 356Q410 330 437 324Q464 330 459 356Z" fill="rgba(200,225,255,.12)" stroke="${GLASS_S}" stroke-width="2"/><rect x="431" y="314" width="12" height="11" rx="2" fill="#56627d" stroke="${INK}"/><path d="M437 314V308" stroke="#e8ecf4" stroke-width="2"/>`;
+  if (s.burner) { const fl = reduce ? 0 : Math.sin(t / 90) * 1.2; h += `<path d="M437 309C430 302 432 ${f1(294 + fl)} 437 ${f1(286 + fl)}C442 ${f1(294 + fl)} 444 302 437 309Z" fill="#ffb547" opacity=".9"/>`; }
+  else h += `<rect x="428" y="302" width="18" height="16" rx="3" fill="#8a96b0" stroke="${INK}" stroke-width="1.2"/>`;
+  h += `<text x="437" y="372" font-size="8" fill="#8b96ad" text-anchor="middle">${s.burner ? 'горит' : 'колпачок'}</text></g>`;
+  // movable things, dragged one on top
+  const order = ['flask', 'mixb', 'jug', 'magnet'].sort((a, b) => (drag && drag.id === a ? 1 : 0) - (drag && drag.id === b ? 1 : 0));
+  for (const k of order) { const o = P[k]; h += k === 'mixb' ? mixbSVG(o) : k === 'magnet' ? magnetSVG(o) : k === 'jug' ? jugSVG(o) : flaskSVG(o); }
+  // fraction labels
+  const lab = (x, txt, ok) => `<text x="${x}" y="392" font-size="9" fill="${ok ? '#86e0a8' : '#8b96ad'}" text-anchor="middle">${txt}</text>`;
+  const m = model();
+  h += lab(75, 'стакан', false) + lab(275, m.sand ? '✓ песок на фильтре' : 'фильтр и колба', m.sand) + lab(437, m.salt ? '✓ соль в чашке' : 'фарфоровая чашка', m.salt);
+  return h;
+}
+
+// ---------- lesson 4 scene ----------
+function hazScene(t) {
+  let h = `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs><rect x="-2000" y="-2000" width="4520" height="2600" fill="url(#tile)"/>`;
+  // wall items
+  h += `<g data-hit="ext"><rect x="18" y="178" width="36" height="92" fill="transparent"/><path d="M28 186h14v-6h-14z" fill="#3a4762"/><rect x="25" y="194" width="20" height="72" rx="8" fill="#d8433a" stroke="${INK}" stroke-width="1.4"/><path d="M42 190q12 4 8 24" fill="none" stroke="#2a3348" stroke-width="2.4"/><rect x="28" y="218" width="14" height="18" fill="#f1ece0"/></g>`;
+  h += `<g data-hit="kit"><rect x="436" y="166" width="58" height="44" fill="transparent"/><rect x="442" y="172" width="46" height="34" rx="4" fill="#eef1f6" stroke="${INK}" stroke-width="1.4"/><path d="M465 179v20M455 189h20" stroke="#d8433a" stroke-width="5"/></g>`;
+  // neighbour behind the table
+  h += `<circle cx="352" cy="232" r="16" fill="#3a4762"/><path d="M322 360V292Q322 264 352 262Q382 264 382 292V360Z" fill="#2c3954"/><text x="352" y="302" font-size="8" fill="#8b96ad" text-anchor="middle">сосед</text>`;
+  // table
+  h += `<rect x="-2000" y="356" width="2470" height="10" fill="#2c3954"/><rect x="-2000" y="366" width="2470" height="200" fill="#1a2232"/><rect x="452" y="366" width="14" height="200" fill="#151c2a"/><rect x="-2000" y="366" width="2470" height="2" fill="${INK}" opacity=".6"/>`;
+  // food
+  h += `<g data-hit="food"><rect x="32" y="312" width="96" height="48" fill="transparent"/><path d="M40 346h52v8H40z" fill="#d9a35f" stroke="${INK}" stroke-width="1.2"/><path d="M38 342h56v4H38z" fill="#f2cf4a"/><path d="M42 338h48v4H42z" fill="#7cc443"/><path d="M40 330q26-8 52 0v8H40z" fill="#e8b26a" stroke="${INK}" stroke-width="1.2"/>`;
+  h += `<path d="M100 326h20v26q0 4-4 4h-12q-4 0-4-4z" fill="#e8ecf4" stroke="${INK}" stroke-width="1.2"/><path d="M120 332q8 0 8 8t-8 8" fill="none" stroke="#e8ecf4" stroke-width="2.4"/>`;
+  if (!reduce) for (let k = 0; k < 2; k++) { const ph = (t / 1600 + k / 2) % 1; h += `<path d="M${106 + k * 8} ${f1(322 - ph * 18)}q-3-4 0-8t0-8" fill="none" stroke="#c8d6ec" stroke-width="1.2" opacity="${f1(0.7 * (1 - ph))}"/>`; }
+  h += `</g>`;
+  // goggles
+  h += `<g data-hit="goggles"><rect x="134" y="330" width="40" height="26" fill="transparent"/><path d="M138 350q16 6 32 0" fill="none" stroke="#56627d" stroke-width="2"/><ellipse cx="146" cy="346" rx="8" ry="6" fill="rgba(114,212,232,.25)" stroke="#72d4e8" stroke-width="2"/><ellipse cx="164" cy="346" rx="8" ry="6" fill="rgba(114,212,232,.25)" stroke="#72d4e8" stroke-width="2"/></g>`;
+  // open spirit bottle + cap lying
+  h += `<g data-hit="spirit"><rect x="174" y="292" width="46" height="66" fill="transparent"/><path d="M182 356V318q0-6 6-8V300h8v10q6 2 6 8v38z" fill="rgba(200,225,255,.12)" stroke="${GLASS_S}" stroke-width="1.8"/><rect x="183" y="326" width="18" height="16" fill="#e8ecf4"/><text x="192" y="337" font-size="6" fill="#0b1019" text-anchor="middle">спирт</text><rect x="206" y="350" width="10" height="6" rx="1" fill="#e5534b"/></g>`;
+  // spirit lamp + test tube in a holder
+  const fl = reduce ? 0 : Math.sin(t / 90) * 1.2;
+  h += `<path d="M228 356Q224 334 246 330Q268 334 264 356Z" fill="rgba(200,225,255,.12)" stroke="${GLASS_S}" stroke-width="2"/><rect x="241" y="320" width="10" height="10" rx="2" fill="#56627d"/><path d="M246 320V314" stroke="#e8ecf4" stroke-width="2"/>`;
+  h += `<path d="M246 315C240 308 241 ${f1(300 + fl)} 246 ${f1(292 + fl)}C251 ${f1(300 + fl)} 252 308 246 315Z" fill="#ffb547" opacity=".9"/>`;
+  h += `<g data-hit="tube"><rect x="228" y="240" width="84" height="64" fill="transparent"/><path d="M244 296L302 266" stroke="${INK}" stroke-width="10" stroke-linecap="round"/><path d="M244 296L302 266" stroke="#cfe3f7" stroke-width="7.4" stroke-linecap="round"/><path d="M246 295L262 287" stroke="#8fcbe8" stroke-width="6" stroke-linecap="round"/><path d="M282 276L296 248" stroke="#c9a074" stroke-width="5" stroke-linecap="round"/><rect x="278" y="268" width="10" height="10" rx="2" fill="#a07850" transform="rotate(-27 283 273)"/>`;
+  h += `<path d="M308 262l14 -6M308 268l16 0" stroke="#ff8a73" stroke-width="1.4" stroke-dasharray="3 3"/></g>`;
+  // unlabeled bottle
+  h += `<g data-hit="nolabel"><rect x="383" y="296" width="34" height="62" fill="transparent"/><path d="M388 356V320q0-6 7-8V302h10v10q7 2 7 8v36z" fill="#6b4a2a" opacity=".85" stroke="${INK}" stroke-width="1.4"/><rect x="393" y="296" width="14" height="7" rx="2" fill="#3a4762"/><text x="400" y="340" font-size="10" fill="#f1ece0" text-anchor="middle">?</text></g>`;
+  // glass shards
+  h += `<g data-hit="glass"><rect x="418" y="334" width="34" height="24" fill="transparent"/><path d="M422 356l6-12 5 12zM433 356l9-8 3 8zM441 356l4-14 4 14z" fill="rgba(200,225,255,.35)" stroke="#c8d6ec" stroke-width="1"/></g>`;
+  // beaker on the edge
+  h += `<g data-hit="edge"><rect x="453" y="310" width="42" height="48" fill="transparent"/>` + liquid(458, 488, 330, 356, '#a78bfa', 0.5) + glassSVG(458, 488, 316, 356) + `</g>`;
+  // found marks
+  HAZ.forEach((z, i) => { if (!S.found[z.id]) return; const [x, y, w, hh] = z.box, cx = x + w / 2, cy = y + hh / 2, rr = Math.max(w, hh) / 2 + 4;
+    h += `<circle cx="${cx}" cy="${cy}" r="${rr}" fill="rgba(134,224,168,.08)" stroke="#86e0a8" stroke-width="2"/><circle cx="${f1(cx + rr * 0.7)}" cy="${f1(cy - rr * 0.7)}" r="7" fill="#86e0a8"/><text x="${f1(cx + rr * 0.7)}" y="${f1(cy - rr * 0.7 + 3)}" font-size="8.5" fill="#0b1019" text-anchor="middle" font-weight="500">${S.found[z.id]}</text>`; });
+  return h;
+}
+
+function hlBox(id) {
+  if (Array.isArray(id)) return id;
+  const L = LID(), o = P[id];
+  if (L === 'pure') return { items: [14, 186, 492, 80], binP: [18, 282, 236, 82], binM: [266, 282, 236, 82] }[id] || null;
+  if (L === 'phen') return { app: [140, 170, 240, 192], tiles: [20, 364, 480, 38], obs: [30, 104, 460, 82] }[id] || null;
+  if (L === 'sep') { if (o) return id === 'magnet' ? [o.x - 26, o.y - 66, 52, 72] : id === 'jug' ? [o.x - 32, o.y - 72, 64, 74] : id === 'mixb' ? [o.x - 46, o.y - 106, 92, 110] : [o.x - 40, o.y - 98, 80, 100];
+    return { funnel: [232, 186, 86, 82], dish: [388, 262, 98, 38], lamp: [406, 296, 62, 62] }[id] || null; }
+  if (DECOY[id]) return DECOY[id].box;
+  return { table: [0, 352, 470, 16] }[id] || null;
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = id === 'rules' ? hazScene(t) : bench();
+  if (id === 'pure') h += sortScene();
+  if (id === 'phen') h += phenScene(t);
+  if (id === 'sep') h += sepScene(t);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${f1(b[0])}" y="${f1(b[1])}" width="${f1(b[2])}" height="${f1(b[3])}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}" pointer-events="none"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 490, hh / 410, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 405 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- props, dragging, clicking ----------
+let P = {}, drag = null, dirty = true;
+function resetProps() {
+  P = {}; const id = LID();
+  if (id === 'pure') ITEMS.forEach((_, i) => { const [x, y] = restOf(i); P['it' + i] = { x, y, rx: x, ry: y }; });
+  if (id === 'sep') for (const [k, [x, y]] of Object.entries(SEP)) P[k] = { x, y, rx: x, ry: y };
+}
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag],[data-hit]'); if (!el) return;
+  e.preventDefault();
+  const id = el.dataset.drag || ('hit:' + el.dataset.hit);
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  const o = P[id], p = toSvg(e);
+  drag = { id, x: e.clientX, y: e.clientY, moved: false, dx: o ? o.x - p.x : 0, dy: o ? o.y - p.y : 0 };
+  if (o) { scene.classList.add('grabbing'); if (id.startsWith('it')) { S.sel = +id.slice(2); update(); } }
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 5) drag.moved = true;
+  const o = P[drag.id]; if (!o || !drag.moved) return;
+  if (LID() === 'pure' && S.sort[+drag.id.slice(2)]) return;
+  const p = toSvg(e);
+  o.x = clamp(p.x + drag.dx, VB.x + 20, VB.x + VB.w - 20); o.y = clamp(p.y + drag.dy, VB.y + 70, 362);
+  if (drag.id === 'magnet') magnetAt(o);
+  dirty = true;
+});
+const endDrag = cancel => {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing');
+  if (cancel) { dirty = true; return; }
+  const id = d.id, o = P[id], L = LID();
+  if (L === 'pure') {
+    if (id.startsWith('bin')) { if (S.sel !== null && !S.sort[S.sel]) classify(S.sel, id.slice(3)); else if (S.sel === null) toast('Сначала нажмите на образец.'); }
+    else if (id.startsWith('it') && d.moved) { const i = +id.slice(2), cy = o.y - 26; if (!S.sort[i] && cy > 250) { if (o.x < 260 && o.x > BINS.P.x0 - 20) classify(i, 'P'); else if (o.x >= 260 && o.x < BINS.M.x1 + 20) classify(i, 'M'); } }
+  }
+  if (L === 'phen') { if (id.startsWith('tile')) pickPhen(+id.slice(4)); else if (id === 'app') runPhen(); }
+  if (L === 'sep') {
+    if (!d.moved) { if (id === 'lamp') act('lamp'); else if (id === 'magnet') act('magnet'); else if (id === 'jug') act('water'); else if (id === 'mixb') act('filter'); else if (id === 'flask') act('dish'); else if (id === 'funnel') toast('Воронка с бумажным фильтром. Перетащите сюда стакан со смесью.'); else if (id === 'dish') toast('Фарфоровая чашка для выпаривания. Перетащите сюда колбу.'); }
+    else if (id === 'jug' && Math.abs(o.x - SEP.mixb[0]) < 70 && o.y < 352) act('water');
+    else if (id === 'mixb' && Math.abs(o.x - 275) < 60 && o.y < 290) act('filter');
+    else if (id === 'flask' && Math.abs(o.x - 437) < 60 && o.y < 330) act('dish');
+  }
+  if (L === 'rules' && id.startsWith('hit:') && !d.moved) hit(id.slice(4));
+  dirty = true;
+};
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+// lesson 1
+function classify(i, bin) {
+  const it = ITEMS[i];
+  if (S.sort[i]) return;
+  if (it.pure === (bin === 'P')) {
+    S.sort[i] = bin; S.order[bin].push(i); S.sel = i;
+    const [x, y] = restOf(i); P['it' + i].rx = x; P['it' + i].ry = y;
+    toast(`Верно! ${it.name}: ${it.what}.`);
+  } else { S.miss++; S.sel = i; toast('Не туда. Загляните в лупу: частицы одного вида или разных?'); }
+  update();
+}
+// lesson 2
+function pickPhen(i) { S.ph = clamp(i, 0, PHEN.length - 1); S.p = 0; S.playing = false; update(); }
+function runPhen() { if (S.p >= 1 || !S.playing) { if (S.p >= 1) S.p = 0; S.playing = true; if (reduce) { S.p = 1; S.playing = false; } update(); } }
+function answer(chem) {
+  const q = PHEN[S.ph];
+  if (S.ans[S.ph]) { toast('Этот опыт уже разобран. Выберите следующий.'); return; }
+  if (S.p < 1) { toast('Сначала проведите опыт до конца и посмотрите, что изменилось.'); return; }
+  if (q.chem === chem) { S.ans[S.ph] = true; toast(chem ? 'Верно: получилось новое вещество — это химическое явление.' : 'Верно: вещество осталось тем же — это физическое явление.'); }
+  else { S.phMiss++; toast('Подумайте ещё: появилось новое вещество или изменились только форма и состояние?'); }
+  update();
+}
+function nextPhen() { for (let k = 1; k <= PHEN.length; k++) { const i = (S.ph + k) % PHEN.length; if (!S.ans[i]) return pickPhen(i); } pickPhen((S.ph + 1) % PHEN.length); }
+// lesson 3
+function magnetAt(o) {
+  const s = S.sp;
+  if (Math.abs(o.x - SEP.mixb[0]) < 44 && o.y > 250 && o.y < 352 && s.mix.iron) { s.mix.iron = 0; s.mag = 1; toast('Железные опилки прилипли к магниту.'); update(); }
+  else if (Math.abs(o.x - 275) < 34 && o.y > 196 && o.y < 250 && s.filt.iron) { s.filt.iron = 0; s.mag = 1; toast('Магнит собрал опилки прямо с фильтра.'); update(); }
+}
+function sepAct(a) {
+  const s = S.sp, mx = s.mix, any = mx.iron || mx.sand || mx.salt;
+  if (a === 'magnet') { if (mx.iron) { mx.iron = 0; s.mag = 1; toast('Железные опилки прилипли к магниту.'); } else if (s.filt.iron) { s.filt.iron = 0; s.mag = 1; toast('Магнит собрал опилки прямо с фильтра.'); } else toast(s.mag ? 'Железо уже на магните.' : 'Железа рядом нет.'); }
+  if (a === 'water') { if (!any) toast('Стакан пуст — разбавлять нечего.'); else if (mx.water) toast('Воды уже достаточно.'); else { mx.water = 1; toast(mx.salt ? 'Налили воды и размешали: соль растворилась, песок осел на дно.' : 'Налили воды и размешали.'); } }
+  if (a === 'filter') {
+    if (!any && !mx.water) toast('Стакан пуст.');
+    else if (!mx.water) toast('Сухую смесь через фильтр не пропустить: соль останется вместе с песком. Сначала добавьте воды.');
+    else if (s.flask.water) toast('Колба уже полная. Сначала перелейте раствор в чашку.');
+    else { s.filt.sand = s.filt.sand || mx.sand; s.filt.iron = s.filt.iron || mx.iron; s.flask.salt = mx.salt; s.flask.water = 1; const ir = mx.iron; S.sp.mix = { iron: 0, sand: 0, salt: 0, water: 0 };
+      toast(ir ? 'Песок и железные опилки застряли на фильтре, раствор соли прошёл в колбу.' : 'Песок остался на фильтре, прозрачный раствор соли прошёл в колбу.'); }
+  }
+  if (a === 'dish') { if (!s.flask.water) toast('В колбе пусто: сначала профильтруйте смесь.'); else if (s.dish.water) toast('В чашке уже есть раствор.'); else { s.dish.salt = s.dish.salt || s.flask.salt; s.dish.water = 1; s.heat = 0; s.flask = { salt: 0, water: 0 }; toast('Раствор в фарфоровой чашке. Зажгите спиртовку.'); } }
+  if (a === 'lamp') { s.burner = !s.burner; toast(s.burner ? 'Спиртовка горит.' : 'Спиртовку погасили колпачком.'); }
+  if (a === 'reset') { S.sp = freshSep(); resetProps(); }
+  update();
+}
+// lesson 4
+function hit(id) {
+  const z = HAZ.find(x => x.id === id);
+  if (z) { if (S.found[id]) toast(z.rule); else { S.found[id] = Object.keys(S.found).length + 1; toast(`Нарушение: ${z.name.toLowerCase()}. ${z.rule}`); } }
+  else if (DECOY[id]) { S.hzMiss++; toast(DECOY[id].ok); }
+  update();
+}
+
+let last = performance.now(), lastDraw = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  let anim = false;
+  for (const [k, o] of Object.entries(P)) {
+    if (drag && drag.id === k && drag.moved) continue;
+    const nx = reduce ? o.rx : o.x + (o.rx - o.x) * Math.min(1, dt * 10), ny = reduce ? o.ry : o.y + (o.ry - o.y) * Math.min(1, dt * 10);
+    if (Math.abs(nx - o.x) + Math.abs(ny - o.y) > 0.05) anim = true; else { o.x = o.rx; o.y = o.ry; continue; }
+    o.x = nx; o.y = ny;
+  }
+  const L = LID();
+  if (L === 'phen' && S.playing) { S.p = Math.min(1, S.p + dt / 2.6); anim = true; if (S.p >= 1) { S.playing = false; update(); } }
+  if (L === 'sep') { const s = S.sp; if (s.burner && s.dish.water) { s.heat = Math.min(1, s.heat + dt / 4); anim = true; if (s.heat >= 1) { s.dish.water = 0; toast('Вода испарилась, в чашке остались кристаллы соли. Не забудьте погасить спиртовку.'); update(); } } }
+  if (S.hl) anim = true;
+  const live = !reduce && ((L === 'phen' && S.p > 0) || (L === 'sep' && S.sp.burner) || L === 'rules') && t - lastDraw > 50;
+  if (dirty || anim || live) { drawScene(t); dirty = false; lastDraw = t; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3200); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label) => `<button data-a="${k}">${label}</button>`, sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    pure: B('toP', 'В «Чистое»') + B('toM', 'В «Смесь»') + sep + B('resort', 'Заново'),
+    phen: B('run', 'Провести опыт') + sep + B('phys', 'Физическое') + B('chem', 'Химическое') + sep + B('nextp', 'Дальше ›'),
+    sep: B('magnet', 'Магнит') + B('water', 'Вода') + B('filter', 'Фильтр') + B('dish', 'В чашку') + B('lamp', 'Спиртовка') + sep + B('reset', 'Заново'),
+    rules: B('tip', 'Подсказка') + sep + B('rehaz', 'Заново'),
+  }[id];
+}
+function act(a) {
+  if (a === 'toP' || a === 'toM') { if (S.sel === null) toast('Сначала нажмите на образец.'); else if (S.sort[S.sel]) toast('Этот образец уже в лотке.'); else classify(S.sel, a.slice(2)); return; }
+  if (a === 'resort') { S.sort = {}; S.order = { P: [], M: [] }; S.sel = null; S.miss = 0; resetProps(); update(); return; }
+  if (a === 'run') return runPhen();
+  if (a === 'phys') return answer(false);
+  if (a === 'chem') return answer(true);
+  if (a === 'nextp') return nextPhen();
+  if (['magnet', 'water', 'filter', 'dish', 'lamp', 'reset'].includes(a)) return sepAct(a);
+  if (a === 'tip') { const z = HAZ.find(x => !S.found[x.id]); if (z) { S.hl = { id: z.box, t: performance.now() }; dirty = true; toast('Посмотрите на выделенное место.'); } else toast('Все нарушения уже найдены.'); return; }
+  if (a === 'rehaz') { S.found = {}; S.hzMiss = 0; update(); }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  jar: IC('<path d="M10 7l2 2v17q0 3 3 3h4q3 0 3-3V9l2-2" fill="none" stroke="var(--fg)" stroke-width="1.6"/><rect x="13" y="17" width="8" height="10" fill="var(--liq)" opacity=".5"/>'),
+  bin: IC('<rect x="3" y="12" width="28" height="14" rx="3" fill="none" stroke="var(--arm)" stroke-width="1.6" stroke-dasharray="3 2"/>'),
+  binM: IC('<rect x="3" y="12" width="28" height="14" rx="3" fill="none" stroke="var(--force)" stroke-width="1.6" stroke-dasharray="3 2"/>'),
+  lupa: IC('<circle cx="14" cy="14" r="9" fill="none" stroke="var(--fg)" stroke-width="2"/><path d="M21 21l9 9" stroke="var(--fg)" stroke-width="3" stroke-linecap="round"/><circle cx="11" cy="12" r="2" fill="#e5534b"/><circle cx="17" cy="16" r="2" fill="#6fa8ff"/>'),
+  flame: IC('<path d="M17 4C10 12 9 20 17 30C25 20 24 12 17 4Z" fill="var(--force)" opacity=".85"/><path d="M17 16C14 20 14 24 17 28C20 24 20 20 17 16Z" fill="#9fd3ff"/>'),
+  tiles: IC('<rect x="2" y="12" width="9" height="9" rx="2" fill="none" stroke="var(--fg)" stroke-width="1.4"/><rect x="13" y="12" width="9" height="9" rx="2" fill="none" stroke="var(--force)" stroke-width="1.4"/><rect x="24" y="12" width="9" height="9" rx="2" fill="none" stroke="var(--ok)" stroke-width="1.4"/>'),
+  text: IC('<path d="M5 10h24M5 16h24M5 22h16" stroke="var(--force)" stroke-width="2" stroke-linecap="round"/>'),
+  magnet: IC('<path d="M8 28V15a9 9 0 0 1 18 0v13h-5V15a4 4 0 0 0-8 0v13z" fill="#e5534b"/><rect x="8" y="24" width="5" height="4" fill="#c8d1e2"/><rect x="21" y="24" width="5" height="4" fill="#c8d1e2"/>'),
+  jug: IC('<path d="M6 7l4 3v16q0 3 3 3h8q3 0 3-3V8H9z" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M11 16h11v9q0 2-2 2h-7q-2 0-2-2z" fill="var(--liq)" opacity=".5"/>'),
+  mix: IC('<path d="M8 6l2 2v18q0 3 3 3h8q3 0 3-3V8l2-2" fill="none" stroke="var(--fg)" stroke-width="1.6"/><circle cx="14" cy="25" r="1.5" fill="#d8b779"/><circle cx="19" cy="26" r="1.3" fill="#4b5260"/><rect x="16" y="22" width="2.6" height="2.6" fill="#f4f7fb"/>'),
+  funnel: IC('<path d="M5 6h24L19 18v12h-4V18z" fill="#f1ece0" opacity=".8" stroke="var(--fg)" stroke-width="1.4"/>'),
+  flask: IC('<path d="M14 4v10l-8 13q-1 3 2 3h18q3 0 2-3l-8-13V4" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M9 23h16l2.4 4q.6 1.5-1 1.5H7.6q-1.6 0-1-1.5z" fill="var(--liq)" opacity=".6"/>'),
+  dish: IC('<path d="M3 14q14 16 28 0z" fill="none" stroke="var(--fg)" stroke-width="1.8"/><rect x="12" y="17" width="3" height="3" fill="#f4f7fb"/><rect x="18" y="18" width="3" height="3" fill="#f4f7fb"/>'),
+  lamp: IC('<path d="M8 30q-2-10 9-12q11 2 9 12z" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M17 15C13 11 14 7 17 3C20 7 21 11 17 15Z" fill="var(--force)"/>'),
+  table: IC('<path d="M3 14h28M7 14v14M27 14v14" stroke="var(--fg)" stroke-width="2.4" stroke-linecap="round"/>'),
+  ext: IC('<rect x="11" y="8" width="12" height="22" rx="5" fill="#d8433a"/><path d="M14 8V5h6v3M20 6q8 2 6 12" fill="none" stroke="var(--fg)" stroke-width="1.6"/>'),
+  kit: IC('<rect x="4" y="9" width="26" height="19" rx="3" fill="#eef1f6"/><path d="M17 12v13M10.5 18.5h13" stroke="#d8433a" stroke-width="3.4"/>'),
+  goggles: IC('<ellipse cx="11" cy="18" rx="7" ry="5.5" fill="rgba(114,212,232,.25)" stroke="var(--arm)" stroke-width="1.8"/><ellipse cx="23" cy="18" rx="7" ry="5.5" fill="rgba(114,212,232,.25)" stroke="var(--arm)" stroke-width="1.8"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (m.kind === 'sort') return `Разложено ${m.sorted} из ${ITEMS.length} · ошибок ${m.miss}`;
+  if (m.kind === 'phen') return `Разобрано ${m.right} из ${PHEN.length} · сейчас: ${m.cur.name.toLowerCase()}`;
+  if (m.kind === 'sep') { const n = [m.iron, m.sand, m.salt].filter(Boolean).length; return n === 3 && m.burner ? 'Всё разделено — погасите спиртовку' : `Отделено веществ: ${n} из 3`; }
+  return `Найдено ${m.found} из ${HAZ.length}`;
+}
+
+function sepFlowSVG(m) {
+  const s = S.sp, box = (x, y, w, txt, ok, cur) => `<rect x="${x}" y="${y}" width="${w}" height="13" rx="2.5" fill="${ok ? 'rgba(134,224,168,.12)' : '#1a2438'}" stroke="${ok ? '#86e0a8' : cur ? '#ffb547' : '#26324a'}" stroke-width=".6"/><text x="${x + w / 2}" y="${y + 8.6}" font-size="4.2" fill="${ok ? '#86e0a8' : '#e8ecf4'}" text-anchor="middle">${txt}</text>`;
+  const ar = (x1, y1, x2, y2, txt) => `<path d="M${x1} ${y1}L${x2} ${y2}" stroke="#56627d" stroke-width=".6"/><text x="${(x1 + x2) / 2 + 2}" y="${(y1 + y2) / 2 + 1}" font-size="3.4" fill="#8b96ad">${txt}</text>`;
+  let h = `<svg class="diag" viewBox="0 0 120 92" role="img" aria-label="Схема разделения смеси">`;
+  h += box(30, 4, 60, 'железо + песок + соль', false, true);
+  h += ar(40, 17, 18, 30, 'магнит') + box(2, 30, 34, 'железо', m.iron);
+  h += ar(70, 17, 72, 30, 'вода') + box(46, 30, 64, 'песок + раствор соли', false, s.mix.water);
+  h += ar(62, 43, 34, 56, 'фильтр') + box(10, 56, 38, 'песок', m.sand);
+  h += ar(90, 43, 90, 56, '') + box(62, 56, 52, 'раствор соли', false, s.flask.water || s.dish.water);
+  h += ar(88, 69, 88, 76, 'выпаривание') + box(66, 77, 44, 'соль', m.salt);
+  return h + `</svg>`;
+}
+
+function slider(id, label, min, max, stepv, val) { return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`; }
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme'); let h = '';
+  if (id === 'pure') h = `<h2>Лупа</h2><div id="sDiag"></div><p class="note" style="margin-top:8px;text-align:center">Цветные шарики — частицы. Одинаковый цвет и форма — одинаковые частицы.</p>
+    <dl class="reads"><div><dt>Образец</dt><dd id="r1"></dd></div><div><dt>Разложено</dt><dd id="r2"></dd></div><div><dt>Ошибок</dt><dd id="r3"></dd></div></dl>
+    <div class="ctl"><div class="lbl">Выбрать образец</div><div class="chips" id="itChips">${ITEMS.map((it, i) => `<button data-i="${i}">${it.short}</button>`).join('')}</div></div>
+    <div class="row"><button class="ghostbtn" data-a="toP">В «Чистое вещество»</button><button class="ghostbtn" data-a="toM">В «Смесь»</button></div>`;
+  if (id === 'phen') h = `<h2>Ход опыта</h2>
+    <dl class="reads"><div><dt>Опыт</dt><dd id="r1"></dd></div><div><dt>Готово</dt><dd id="r2"></dd></div><div><dt>Разобрано</dt><dd id="r3"></dd></div></dl>
+    <div class="ctl"><div class="lbl">Выбрать опыт</div><div class="chips" id="phChips">${PHEN.map((q, i) => `<button data-i="${i}">${q.name}</button>`).join('')}</div></div>` +
+    slider('inP', 'Время опыта', 0, 100, 1, Math.round(S.p * 100)) +
+    `<div class="row"><button class="ghostbtn" data-a="run">Провести опыт</button><button class="ghostbtn" data-a="phys">Физическое</button><button class="ghostbtn" data-a="chem">Химическое</button></div>`;
+  if (id === 'sep') h = `<h2>План разделения</h2><div id="sDiag"></div>
+    <dl class="reads"><div><dt>Железо</dt><dd id="r1"></dd></div><div><dt>Песок</dt><dd id="r2"></dd></div><div><dt>Соль</dt><dd id="r3"></dd></div></dl>
+    <div class="row"><button class="ghostbtn" data-a="magnet">Магнит</button><button class="ghostbtn" data-a="water">Налить воды</button><button class="ghostbtn" data-a="filter">Профильтровать</button><button class="ghostbtn" data-a="dish">Перелить в чашку</button><button class="ghostbtn" data-a="lamp">Спиртовка</button><button class="ghostbtn" data-a="reset">Заново</button></div>
+    <div class="ctl"><div class="lbl">Выпаривание <output id="heatO"></output></div><div class="gauge"><b id="heatB" style="width:0"></b></div></div>`;
+  if (id === 'rules') h = `<h2>Осмотр стола</h2>
+    <dl class="reads"><div><dt>Найдено</dt><dd id="r1"></dd></div><div><dt>Осталось</dt><dd id="r2"></dd></div><div><dt>Промахов</dt><dd id="r3"></dd></div></dl>
+    <div class="row"><button class="ghostbtn" data-a="tip">Подсказать место</button><button class="ghostbtn" data-a="rehaz">Заново</button></div><div id="sDiag"></div>`;
+  el.innerHTML = h;
+  const inp = el.querySelector('#inP'); if (inp) inp.addEventListener('input', e => { S.p = +e.target.value / 100; S.playing = false; update(); });
+  el.querySelectorAll('#itChips button').forEach(b => b.onclick = () => { S.sel = +b.dataset.i; update(); });
+  el.querySelectorAll('#phChips button').forEach(b => b.onclick = () => pickPhen(+b.dataset.i));
+  el.querySelectorAll('.row [data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; };
+  const d = el.querySelector('#sDiag');
+  if (m.kind === 'sort') {
+    if (d) d.innerHTML = lupaSVG(m.sel, 'lupa');
+    set('#r1', m.sel ? m.sel.short : '—'); set('#r2', `${m.sorted}/${ITEMS.length}`); set('#r3', String(m.miss));
+    el.querySelectorAll('#itChips button').forEach(b => { const i = +b.dataset.i; b.setAttribute('aria-pressed', i === S.sel); b.classList.toggle('ok', !!S.sort[i] && i !== S.sel); });
+  }
+  if (m.kind === 'phen') {
+    set('#r1', m.cur.short); set('#r2', Math.round(m.p * 100) + ' %'); set('#r3', `${m.right}/${PHEN.length}`); set('#inPO', Math.round(m.p * 100) + ' %');
+    const x = el.querySelector('#inP'); if (x && document.activeElement !== x) x.value = Math.round(m.p * 100);
+    el.querySelectorAll('#phChips button').forEach(b => { const i = +b.dataset.i; b.setAttribute('aria-pressed', i === S.ph); b.classList.toggle('ok', !!S.ans[i] && i !== S.ph); });
+  }
+  if (m.kind === 'sep') {
+    if (d) d.innerHTML = sepFlowSVG(m);
+    set('#r1', m.iron ? '✓ отдельно' : S.sp.mag ? '' : 'в смеси'); set('#r2', m.sand ? '✓ отдельно' : S.sp.filt.iron ? 'с железом' : 'в смеси'); set('#r3', m.salt ? '✓ отдельно' : S.sp.dish.water ? 'в растворе' : S.sp.flask.water ? 'в растворе' : 'в смеси');
+    set('#heatO', Math.round(S.sp.heat * 100) + ' %'); const hb = el.querySelector('#heatB'); if (hb) hb.style.width = (S.sp.heat * 100) + '%';
+  }
+  if (m.kind === 'haz') {
+    set('#r1', `${m.found}/${HAZ.length}`); set('#r2', String(HAZ.length - m.found)); set('#r3', String(m.miss));
+    if (d) d.innerHTML = `<h3>Найденные нарушения</h3><div class="steps">` + (HAZ.filter(z => S.found[z.id]).sort((a, b) => S.found[a.id] - S.found[b.id]).map(z => step(S.found[z.id] + '. ' + z.name, '✓', 'ok')).join('') || '<p class="note">Пока ничего не найдено.</p>') + `</div>`;
+  }
+}
+
+function partsList() {
+  const id = LID(), ph = PHEN[S.ph];
+  if (id === 'pure') return [
+    { id: 'items', icon: ICON.jar, name: 'Образцы', spec: 'Восемь веществ и материалов, которые встречаются дома и в природе. Нажатие на образец показывает его частицы в лупе.' },
+    { id: 'binP', icon: ICON.bin, name: 'Лоток «Чистое вещество»', spec: 'Сюда кладут то, что состоит из частиц одного вида.' },
+    { id: 'binM', icon: ICON.binM, name: 'Лоток «Смесь»', spec: 'Сюда — то, в чём перемешаны частицы двух и более веществ.' },
+    { id: 'lupa', icon: ICON.lupa, name: 'Лупа', spec: 'В правом верхнем углу стола. Показывает частицы образца «как под сверхмикроскопом» — в жизни они в миллионы раз мельче.' }];
+  if (id === 'phen') return [
+    { id: 'app', icon: ICON.flame, name: 'Установка: ' + ph.name.toLowerCase(), spec: { ice: 'Кубик льда на блюдце при комнатной температуре.', soda: 'Стакан столового уксуса и ложка питьевой соды NaHCO₃.', bend: 'Кусок медной проволоки. Её сгибают руками.', rust: 'Железный гвоздь в банке с водой, на воздухе. Время ускорено: две недели за пару секунд.', sugar: 'Стакан воды комнатной температуры и кубик сахара.', heat: 'Медная пластинка в тигельных щипцах над пламенем спиртовки.' }[ph.id] },
+    { id: 'tiles', icon: ICON.tiles, name: 'Плитки опытов', spec: 'Шесть опытов. Зелёная галочка — опыт разобран верно.' },
+    { id: 'obs', icon: ICON.text, name: 'Наблюдение', spec: 'Что увидел бы химик после опыта. Читайте внимательно: ответ прячется в признаках.' }];
+  if (id === 'sep') return [
+    { id: 'mixb', icon: ICON.mix, name: 'Стакан со смесью', spec: 'Железные опилки, речной песок и поваренная соль, перемешанные вместе.' },
+    { id: 'magnet', icon: ICON.magnet, name: 'Магнит', spec: 'Притягивает железо. Песок и соль к нему не липнут.' },
+    { id: 'jug', icon: ICON.jug, name: 'Кувшин с водой', spec: 'В воде соль растворяется, а песок и железо — нет.' },
+    { id: 'funnel', icon: ICON.funnel, name: 'Воронка с фильтром', spec: 'Бумажный фильтр с крошечными порами: вода и растворённая соль проходят, песчинки — нет.' },
+    { id: 'flask', icon: ICON.flask, name: 'Колба', spec: 'Собирает фильтрат — прозрачную жидкость, прошедшую через фильтр.' },
+    { id: 'dish', icon: ICON.dish, name: 'Фарфоровая чашка на треноге', spec: 'Фарфор не трескается от нагрева. Из раствора в ней выпаривают воду.' },
+    { id: 'lamp', icon: ICON.lamp, name: 'Спиртовка', spec: 'Зажигают спичкой, гасят колпачком — не задувают.' }];
+  return [
+    { id: 'table', icon: ICON.table, name: 'Рабочий стол', spec: 'На нём шесть нарушений. Найдите их все.' },
+    { id: 'goggles', icon: ICON.goggles, name: 'Защитные очки', spec: 'Берегут глаза от брызг. Надевают до начала опыта.' },
+    { id: 'ext', icon: ICON.ext, name: 'Огнетушитель', spec: 'Висит у выхода. Им пользуется учитель; ученик при пожаре зовёт взрослых и выходит.' },
+    { id: 'kit', icon: ICON.kit, name: 'Аптечка', spec: 'Бинт, пластырь, средство от ожогов. Всегда на видном месте.' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      `<div class="safe"><b>Безопасность</b>${L.safe}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>${L.id === 'rules' ? 'Кабинет химии' : 'Оборудование'}</h2><p class="note">Нажмите на пункт, чтобы найти его на столе.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { if (b.dataset.id === 'lupa') toast('Лупа — в правом верхнем углу стола.'); else { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; } });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  if (m.kind === 'sort') {
+    let h = `<h2>Как рассуждать</h2><div class="formula">1 вид частиц → чистое вещество<br>2 вида и больше → смесь</div>`;
+    if (m.sel) {
+      const i = S.sel, it = m.sel, sorted = S.sort[i];
+      h += `<h3>${it.name}</h3><div class="steps">` +
+        step('1. Сколько видов частиц в лупе?', sorted ? String(it.types) : 'посчитайте сами') +
+        step('2. Состав', sorted ? it.what : 'появится, когда образец будет в лотке') +
+        step('3. Вывод', sorted ? (it.pure ? 'чистое вещество' : 'смесь') : '?', 'sum') + `</div>`;
+      if (!sorted) h += `<p class="note" style="margin-top:10px">Подсказка: одинаковые шарики одного цвета, собранные одинаково, — это частицы одного вещества.</p>`;
+    } else h += `<p class="note">Нажмите на образец — здесь появятся шаги рассуждения.</p>`;
+    const list = ITEMS.filter((_, i) => S.sort[i]);
+    if (list.length) h += `<h3>Уже в лотках</h3><div class="steps">` + list.map(it => step(it.name, it.pure ? 'чистое' : 'смесь', 'ok')).join('') + `</div>`;
+    return h;
+  }
+  if (m.kind === 'phen') {
+    const q = m.cur, ok = S.ans[S.ph];
+    let h = `<h2>Признаки реакции</h2><div class="formula">Появилось новое вещество?<br>да → химическое<br>нет → физическое</div>
+      <p class="note">Признаки химической реакции: выделяется газ, выпадает осадок, меняется цвет, появляется запах, выделяются тепло и свет.</p><h3>${q.name}</h3><div class="steps">` +
+      step('1. Что было', { ice: 'твёрдый лёд', soda: 'уксус и сода', bend: 'прямая медная проволока', rust: 'серый железный гвоздь', sugar: 'вода и кубик сахара', heat: 'блестящая медь' }[q.id]) +
+      step('2. Что увидели', m.p >= 1 ? 'см. наблюдение на столе' : 'проведите опыт') +
+      step('3. Есть признак реакции?', ok ? (q.chem ? 'да: ' + q.sign : 'нет: ' + q.sign) : 'подумайте') +
+      step('4. Вывод', ok ? (q.chem ? 'химическое явление' : 'физическое явление') : '?', 'sum') + `</div>`;
+    const list = PHEN.filter((_, i) => S.ans[i]);
+    if (list.length) h += `<h3>Разобрано</h3><div class="steps">` + list.map(x => step(x.name, x.chem ? 'химическое' : 'физическое', 'ok')).join('') + `</div>`;
+    return h;
+  }
+  if (m.kind === 'sep') {
+    const s = S.sp;
+    return `<h2>Свойство → способ</h2><div class="formula">разные свойства →<br>разные способы</div><div class="steps">` +
+      step('Железо притягивается магнитом', m.iron ? '✓ магнит' : 'магнит', m.iron ? 'ok' : '') +
+      step('Соль растворяется в воде, песок — нет', s.mix.water || s.flask.water || s.dish.water || m.salt || m.sand ? '✓ растворение' : 'растворение', s.mix.water || s.flask.water || s.dish.water || m.salt || m.sand ? 'ok' : '') +
+      step('Песчинки крупнее пор фильтра', m.sand ? '✓ фильтрование' : 'фильтрование', m.sand ? 'ok' : '') +
+      step('Вода испаряется, соль — нет', m.salt ? '✓ выпаривание' : 'выпаривание', m.salt ? 'ok' : '') +
+      step('Спиртовка', s.burner ? 'горит — погасите' : 'погашена', 'sum') + `</div>
+      <h3>Почему порядок важен</h3><p class="note">Если сразу фильтровать сухую смесь, соль останется на фильтре вместе с песком. Если выпаривать, не отфильтровав, в чашке окажутся и соль, и песок. Железо удобнее снять магнитом в самом начале, но можно и с фильтра.</p>
+      <h3>Другие способы</h3><div class="steps">` + step('Отстаивание', 'песок и вода, масло и вода') + step('Делительная воронка', 'две несмешивающиеся жидкости') + step('Дистилляция', 'чистая вода из солёной') + step('Хроматография', 'краски в чернилах') + `</div>`;
+  }
+  const list = HAZ.filter(z => S.found[z.id]).sort((a, b) => S.found[a.id] - S.found[b.id]);
+  return `<h2>Правила</h2><div class="formula">Найдено ${m.found} из ${HAZ.length}</div><p class="note">Для каждого нарушения — правило, которое его исправляет.</p><div class="steps">` +
+    (list.map(z => `<div class="step"><b>${S.found[z.id]}. ${z.name}</b><span style="font-family:var(--font-body);text-align:left;max-width:60%">${z.rule}</span></div>`).join('') || '<p class="note">Найдите первое нарушение на столе.</p>') + `</div>
+    <h3>Всегда</h3><div class="steps">` + step('Очки и халат', 'до начала опыта') + step('Запах', 'ладонью к себе') + step('Вкус', 'никогда') + step('Пролил, разбил, обжёгся', 'сразу сказать учителю', 'sum') + `</div>`;
+}
+
+function renderMeter(m) {
+  const el = $('#meter');
+  if (m.kind === 'sort') el.innerHTML = `<div class="k">Лупа</div>${lupaSVG(m.sel)}<div class="lr"><span>${m.sel ? m.sel.short : '—'}</span><span>${m.sorted}/${ITEMS.length}</span></div>`;
+  else if (m.kind === 'phen') el.innerHTML = `<div class="k">Опыт ${S.ph + 1} из ${PHEN.length}</div><div class="v ${S.ans[S.ph] ? 'ok' : ''}">${m.cur.short}</div><div class="gauge"><b style="width:${(m.p * 100).toFixed(0)}%"></b></div><div class="lr"><span>разобрано</span><span>${m.right}/${PHEN.length}</span></div>`;
+  else if (m.kind === 'sep') {
+    const row = (n, ok) => `<div class="lr ${ok ? 'ok' : ''}"><span>${n}</span><span>${ok ? '✓' : '—'}</span></div>`;
+    el.innerHTML = `<div class="k">Отделено</div>` + row('железо', m.iron) + row('песок', m.sand) + row('соль', m.salt) + `<div class="gauge"><b style="width:${(m.heat * 100).toFixed(0)}%"></b></div><div class="lr"><span>спиртовка</span><span>${m.burner ? 'горит' : 'нет'}</span></div>`;
+  } else el.innerHTML = `<div class="k">Нарушения</div><div class="v ${m.found === HAZ.length ? 'ok' : ''}">${m.found} из ${HAZ.length}</div><div class="gauge"><b style="width:${(m.found / HAZ.length * 100).toFixed(0)}%"></b></div><div class="lr"><span>промахов</span><span>${m.miss}</span></div>`;
+}
+
+function update() {
+  const m = model(), L = LESSONS[S.lesson];
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Вы готовы к работе в лаборатории!'), 1600);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  pure: '<path d="M10 6v17q0 2 2 2h8q2 0 2-2V6M44 6v17q0 2 2 2h8q2 0 2-2V6" fill="none" stroke="#e8ecf4" stroke-width="1.2"/><circle cx="14" cy="18" r="1.6" fill="#e5534b"/><circle cx="18" cy="21" r="1.6" fill="#e5534b"/><circle cx="15" cy="23" r="1.6" fill="#e5534b"/><circle cx="48" cy="18" r="1.6" fill="#e5534b"/><circle cx="52" cy="21" r="1.6" fill="#6fa8ff"/><circle cx="49" cy="23" r="1.6" fill="#7ddc8a"/><path d="M28 15h8" stroke="#ffb547" stroke-width="1.2"/>',
+  phen: '<rect x="8" y="12" width="10" height="10" rx="2" fill="#dff3ff" opacity=".8"/><ellipse cx="13" cy="25" rx="9" ry="2" fill="#5fb4d9" opacity=".6"/><path d="M42 8v15q0 2 2 2h10q2 0 2-2V8" fill="none" stroke="#e8ecf4" stroke-width="1.2"/><path d="M43 16q3-3 6 0t6 0V23H43z" fill="#f4f6fa"/><circle cx="47" cy="12" r="1.2" fill="none" stroke="#fff" stroke-width=".7"/><circle cx="52" cy="10" r="1" fill="none" stroke="#fff" stroke-width=".7"/>',
+  sep: '<path d="M8 22V12a6 6 0 0 1 12 0v10h-3V12a3 3 0 0 0-6 0v10z" fill="#e5534b"/><path d="M28 7h14l-5 7v6h-4v-6z" fill="#f1ece0" opacity=".8"/><path d="M46 20q8 8 16 0z" fill="none" stroke="#e8ecf4" stroke-width="1.2"/><rect x="51" y="21" width="2" height="2" fill="#fff"/><rect x="55" y="21" width="2" height="2" fill="#fff"/>',
+  rules: '<path d="M33 4l12 22H21z" fill="none" stroke="#ff8a73" stroke-width="1.6" stroke-linejoin="round"/><path d="M33 12v7" stroke="#ff8a73" stroke-width="1.8" stroke-linecap="round"/><circle cx="33" cy="22.5" r="1.1" fill="#ff8a73"/><ellipse cx="11" cy="16" rx="5" ry="4" fill="none" stroke="#72d4e8" stroke-width="1.3"/><ellipse cx="55" cy="16" rx="5" ry="4" fill="none" stroke="#72d4e8" stroke-width="1.3"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i];
+  S.lesson = i; S.hl = null; drag = null;
+  S.sort = {}; S.order = { P: [], M: [] }; S.sel = null; S.miss = 0;
+  S.ph = 0; S.p = 0; S.playing = false; S.ans = {}; S.phMiss = 0;
+  S.sp = freshSep(); S.found = {}; S.hzMiss = 0;
+  save(); resetProps();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '', how = '';
+  if (id === 'pure') {
+    now = `На столе 8 образцов: ${ITEMS.map(x => x.name).join(', ')}. Уже разложено верно ${m.sorted}: ${ITEMS.filter((_, i) => S.sort[i]).map(x => `${x.name} — ${x.pure ? 'чистое вещество' : 'смесь'}`).join('; ') || 'пока ни одного'}. Ошибок: ${m.miss}. ${m.sel ? `В лупе сейчас «${m.sel.name}».` : 'Образец для лупы не выбран.'}`;
+    how = 'Не называй ученику, куда класть ещё не разложенные образцы. Веди вопросами: из скольких видов частиц он состоит, можно ли его разделить, постоянны ли его свойства.';
+  }
+  if (id === 'phen') {
+    now = `Опыты: ${PHEN.map(x => x.name).join(', ')}. Сейчас выбран опыт «${m.cur.name}», он проведён на ${Math.round(m.p * 100)} %${m.p >= 1 ? `; наблюдение: ${m.cur.see}` : ''}. Верно разобрано ${m.right} из ${PHEN.length}: ${PHEN.filter((_, i) => S.ans[i]).map(x => `${x.name} — ${x.chem ? 'химическое' : 'физическое'}`).join('; ') || 'пока ни одного'}. Ошибок: ${m.miss}.`;
+    how = 'Не говори прямо, физическое или химическое явление в ещё не разобранных опытах. Спрашивай: появилось ли новое вещество, какие признаки реакции заметны (газ, осадок, цвет, запах, тепло и свет), можно ли вернуть всё как было.';
+  }
+  if (id === 'sep') {
+    const s = S.sp;
+    now = `Смесь: железные опилки, песок, поваренная соль. В стакане сейчас: ${['iron', 'sand', 'salt'].filter(k => s.mix[k]).map(k => ({ iron: 'железо', sand: 'песок', salt: 'соль' })[k]).join(', ') || 'пусто'}${s.mix.water ? ', есть вода (соль растворена)' : ''}. На магните ${s.mag ? 'железные опилки' : 'ничего'}. На фильтре: ${[s.filt.sand && 'песок', s.filt.iron && 'железо'].filter(Boolean).join(', ') || 'ничего'}. В колбе: ${s.flask.water ? 'раствор соли' : 'пусто'}. В фарфоровой чашке: ${s.dish.water ? `раствор соли, выпарено на ${Math.round(s.heat * 100)} %` : s.dish.salt ? 'кристаллы соли' : 'пусто'}. Спиртовка ${s.burner ? 'горит' : 'погашена'}. Отделено: железо ${m.iron ? 'да' : 'нет'}, песок ${m.sand ? 'да' : 'нет'}, соль ${m.salt ? 'да' : 'нет'}.`;
+    how = 'Подсказывай через свойства веществ (магнетизм, растворимость, размер частиц, испарение воды), не диктуй всю последовательность сразу.';
+  }
+  if (id === 'rules') {
+    now = `На столе: бутерброд и чай, защитные очки, открытая бутылка спирта, горящая спиртовка, пробирка в держателе над пламенем, сосед за столом, склянка без этикетки, осколки стекла, стакан у края стола; на стене огнетушитель и аптечка. Найдено нарушений ${m.found} из ${HAZ.length}: ${HAZ.filter(z => S.found[z.id]).map(z => z.name).join('; ') || 'пока ни одного'}. Промахов: ${m.miss}.`;
+    how = 'Не перечисляй ненайденные нарушения. Спрашивай: что здесь может обжечь, порезать, отравить или упасть?';
+  }
+  return [
+    `Раздел: химия, 7 класс, тема «Вещества и смеси». Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на столе: ${now}`,
+    `Как помогать: ${how}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = { pure: 'Почему воздух — это смесь, а не одно вещество?', phen: 'По каким признакам узнать химическую реакцию?', sep: 'Почему нельзя сразу профильтровать сухую смесь?', rules: 'Как правильно нюхать вещество в лаборатории?' }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, с чего начать задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
