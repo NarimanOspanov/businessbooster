@@ -68,7 +68,7 @@ window.LUCH_SUBJECTS = {
       { id: 'atoms', b: 'base', g: 7, t: 'Атомы и молекулы', items: ['Химический элемент', 'Знаки элементов', 'Химическая формула', 'Относительная масса'], req: [], status: 'done', href: '/labs/chem-atoms/', lessons: 4, doneItems: 4 },
 
       { id: 'valence', b: 'struct', g: 7, t: 'Валентность и формулы', items: ['Валентность', 'Составление формул', 'Простые и сложные вещества'], req: ['atoms'], status: 'done', href: '/labs/chem-valence/', lessons: 3, doneItems: 3 },
-      { id: 'atomst', b: 'struct', g: 8, t: 'Строение атома', items: ['Протоны, нейтроны, электроны', 'Изотопы', 'Электронные оболочки'], req: ['atoms'] },
+      { id: 'atomst', b: 'struct', g: 8, t: 'Строение атома', items: ['Протоны, нейтроны, электроны', 'Изотопы', 'Электронные оболочки'], req: ['atoms'], status: 'done', href: '/labs/chem-atomst/', lessons: 3, doneItems: 3 },
       { id: 'table', b: 'struct', g: 8, t: 'Периодическая система', items: ['Закон Менделеева', 'Периоды и группы', 'Металлы и неметаллы', 'Как предсказать свойства'], req: ['atomst'] },
       { id: 'bonds', b: 'struct', g: 8, t: 'Химическая связь', items: ['Ковалентная связь', 'Ионная связь', 'Металлическая связь', 'Кристаллические решётки'], req: ['table'] },
       { id: 'redox', b: 'struct', g: 9, t: 'Окислительно-восстановительные реакции', items: ['Степень окисления', 'Окислитель и восстановитель', 'Электронный баланс'], req: ['bonds', 'equations'] },
@@ -113,8 +113,8 @@ window.LUCH_SUBJECTS = {
       { id: 'alive', b: 'base', g: 7, t: 'Признаки живого', items: ['Обмен веществ', 'Рост и развитие', 'Размножение', 'Уровни организации жизни'], req: [], status: 'done', href: '/labs/bio-alive/', lessons: 4, doneItems: 4 },
       { id: 'methods', b: 'base', g: 7, t: 'Как изучают жизнь', items: ['Наблюдение и эксперимент', 'Микроскоп', 'Как поставить опыт'], req: [], status: 'done', href: '/labs/bio-methods/', lessons: 3, doneItems: 3 },
 
-      { id: 'cellst', b: 'cell', g: 7, t: 'Строение клетки', items: ['Мембрана и оболочка', 'Ядро', 'Органоиды', 'Клетки растений и животных'], req: ['alive', 'methods'] },
-      { id: 'tissues', b: 'cell', g: 7, t: 'Ткани и органы', items: ['Ткани растений', 'Ткани животных', 'Органы и системы органов'], req: ['cellst'] },
+      { id: 'cellst', b: 'cell', g: 7, t: 'Строение клетки', items: ['Мембрана и оболочка', 'Ядро', 'Органоиды', 'Клетки растений и животных'], req: ['alive', 'methods'], status: 'done', href: '/labs/bio-cellst/', lessons: 4, doneItems: 4 },
+      { id: 'tissues', b: 'cell', g: 7, t: 'Ткани и органы', items: ['Ткани растений', 'Ткани животных', 'Органы и системы органов'], req: ['cellst'], status: 'done', href: '/labs/bio-tissues/', lessons: 3, doneItems: 3 },
       { id: 'chemcell', b: 'cell', g: 10, t: 'Химия клетки', items: ['Вода и минеральные вещества', 'Белки', 'Углеводы и липиды', 'ДНК и РНК'], req: ['cellst'] },
       { id: 'metab', b: 'cell', g: 10, t: 'Обмен веществ', items: ['Ферменты', 'Фотосинтез', 'Клеточное дыхание', 'АТФ — батарейка клетки'], req: ['chemcell'] },
       { id: 'division', b: 'cell', g: 10, t: 'Деление клетки', items: ['Митоз', 'Мейоз', 'Жизненный цикл клетки'], req: ['chemcell'] },
@@ -174,7 +174,7 @@ window.LUCH_SUBJECTS = {
       { id: 'db', b: 'data', g: 9, t: 'Базы данных', items: ['Таблицы и связи', 'Запросы SQL', 'Проектирование базы'], req: ['sheets', 'logic'] },
       { id: 'analysis', b: 'data', g: 10, t: 'Анализ данных', items: ['Сбор и очистка данных', 'Визуализация', 'Python для данных'], req: ['db', 'func'] },
 
-      { id: 'safe', b: 'net', g: 5, t: 'Интернет и безопасность', items: ['Поиск информации', 'Надёжные пароли', 'Цифровой след', 'Как распознать фейк'], req: ['pc'] },
+      { id: 'safe', b: 'net', g: 5, t: 'Интернет и безопасность', items: ['Поиск информации', 'Надёжные пароли', 'Цифровой след', 'Как распознать фейк'], req: ['pc'], status: 'done', href: '/labs/cs-safe/', lessons: 4, doneItems: 4 },
       { id: 'networks', b: 'net', g: 8, t: 'Компьютерные сети', items: ['Как устроен интернет', 'IP-адреса и DNS', 'Протоколы'], req: ['binary', 'safe'] },
       { id: 'web', b: 'net', g: 9, t: 'Создание сайтов', items: ['HTML', 'CSS', 'Основы JavaScript', 'Публикация сайта'], req: ['networks', 'python'] },
       { id: 'cyber', b: 'net', g: 10, t: 'Кибербезопасность', items: ['Шифрование', 'Атаки и защита', 'Этичный хакинг'], req: ['networks', 'logic'] },

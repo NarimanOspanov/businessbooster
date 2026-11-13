@@ -1,0 +1,1131 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по биологии, 7 класс: ткани растений, ткани животных, органы и системы органов.">
+<title>Ткани и органы</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --leaf:#5fbf6a;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-hit]{cursor:pointer}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+.scene .lbl{font-family:var(--font-body)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .v.bad{color:var(--warn)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--arm);transition:width .2s}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:19%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 15px/1.4 var(--font-mono);text-align:center;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+.feat{display:grid;gap:6px}
+.feat div{background:var(--surface-2);border-radius:10px;padding:9px 11px;font-size:13px;line-height:1.45;border-left:4px solid var(--line)}
+.feat b{display:block;font-weight:600;font-size:13.5px;margin-bottom:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 250px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M9 12h7v7H9zM16 12h7v7h-7zM23 12h7v7h-7zM9 19h7v7H9zM16 19h7v7h-7zM23 19h7v7h-7z" fill="rgba(95,191,106,.25)" stroke="var(--leaf)" stroke-width="1.2"/><circle cx="12.5" cy="15.5" r="1.6" fill="var(--ok)"/><circle cx="19.5" cy="22.5" r="1.6" fill="var(--ok)"/><circle cx="26.5" cy="15.5" r="1.6" fill="var(--ok)"/><circle cx="20" cy="31" r="1.6" fill="var(--force)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Биология · Ткани и органы</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#bio">Карта</a><a href="/physics/#bio">Биология</a><a href="/labs/bio-tissues/" aria-current="page">Ткани и органы</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Ткани</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Лабораторный стол">
+    <svg class="scene" id="scene" role="img" aria-label="Лабораторный стол с опытом. Предметы можно нажимать и перетаскивать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const f = x => (Math.round(x * 10) / 10).toString();
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const KEY = 'luch-bio-tissues';
+const rng = seed => { let s = seed; return () => (s = (s * 16807) % 2147483647) / 2147483647; };
+
+// ---------- biology data ----------
+// Lesson 1: plant tissue groups and the 7 sample points on a potato plant
+const PT = {
+  edu: { name: 'Образовательная', c: '#b48cff', feat: 'Мелкие клетки плотно прижаты друг к другу, стенки тонкие, ядро крупное. Клетки всё время делятся.', where: 'верхушки побега и корня, камбий в стебле' },
+  cover: { name: 'Покровная', c: '#72d4e8', feat: 'Плотно сомкнутые бесцветные клетки в один слой (кожица) или мёртвые клетки пробки. В кожице есть устьица — пары клеток со щелью.', where: 'кожица листа, кора и пробка' },
+  basic: { name: 'Основная', c: '#86e0a8', feat: 'Живые клетки с тонкими стенками. В листе в них много хлоропластов (фотосинтез), в клубне — зёрна крахмала (запас).', where: 'мякоть листа, клубни, корнеплоды, мякоть плодов' },
+  cond: { name: 'Проводящая', c: '#ffb547', feat: 'Длинные трубки. Сосуды — пустые, со спиральными или кольцевыми утолщениями. Ситовидные трубки — живые, с перегородками в дырочку.', where: 'жилки листа, стебель, корень' },
+  mech: { name: 'Механическая', c: '#e0a070', feat: 'Длинные узкие клетки с заострёнными концами и очень толстыми стенками. Внутри почти пусто.', where: 'волокна стебля (лён), скорлупа ореха, косточка вишни' },
+};
+const PTK = ['edu', 'cover', 'basic', 'cond', 'mech'];
+const POINTS = [
+  { x: 140, y: 97, name: 'Верхушка побега', pic: 'meri', ans: 'edu' },
+  { x: 74, y: 141, name: 'Лист, поверхность', pic: 'epi', ans: 'cover' },
+  { x: 208, y: 176, name: 'Лист, поперечный срез', pic: 'photo', ans: 'basic' },
+  { x: 141, y: 214, name: 'Стебель, середина', pic: 'cond', ans: 'cond' },
+  { x: 139, y: 268, name: 'Стебель, у края', pic: 'mech', ans: 'mech' },
+  { x: 205, y: 346, name: 'Клубень', pic: 'store', ans: 'basic' },
+  { x: 100, y: 373, name: 'Кончик корня', pic: 'meri', ans: 'edu' },
+];
+const PIC_SEEN = {
+  meri: 'мелкие квадратные клетки вплотную друг к другу, в каждой крупное тёмное ядро',
+  epi: 'один слой бесцветных клеток, сомкнутых как мозаика; среди них пары бобовидных зелёных клеток со щелью между ними',
+  photo: 'вытянутые столбиком клетки, вдоль стенок много зелёных зёрнышек',
+  store: 'крупные клетки, набитые округлыми бледными зёрнами со слоистым рисунком',
+  cond: 'длинные трубки: одни со спиральными утолщениями стенок, другие с поперечными перегородками в дырочку',
+  mech: 'длинные узкие клетки с острыми концами и очень толстыми стенками',
+};
+// Lesson 2: animal tissues and 8 slides
+const AT = {
+  epi: { name: 'Эпителиальная', c: '#72d4e8', feat: 'Клетки плотно прилегают друг к другу, межклеточного вещества почти нет. Образуют пласт.', func: 'покрывает тело, выстилает органы изнутри, образует железы' },
+  conn: { name: 'Соединительная', c: '#ffb547', feat: 'Клеток немного, межклеточного вещества много: оно бывает жидким (кровь), плотным (хрящ) или твёрдым (кость).', func: 'опора, защита, перенос веществ, запас жира' },
+  musc: { name: 'Мышечная', c: '#ff8a73', feat: 'Длинные клетки-волокна, которые умеют сокращаться. Скелетная — с поперечной исчерченностью, гладкая — клетки-веретёна.', func: 'движение тела и работа внутренних органов' },
+  nerv: { name: 'Нервная', c: '#b48cff', feat: 'Нейроны: тело клетки и отростки — короткие ветвистые и один длинный. Вокруг вспомогательные клетки.', func: 'принимает раздражение и передаёт сигнал' },
+};
+const ATK = ['epi', 'conn', 'musc', 'nerv'];
+const SLIDES = [
+  { id: 'skin', name: ['Кожа,', 'снаружи'], short: 'Кожа', ans: 'epi' },
+  { id: 'gut', name: ['Кишка', 'изнутри'], short: 'Кишка', ans: 'epi' },
+  { id: 'blood', name: ['Кровь'], short: 'Кровь', ans: 'conn' },
+  { id: 'bone', name: ['Кость,', 'срез'], short: 'Кость', ans: 'conn' },
+  { id: 'fat', name: ['Жир под', 'кожей'], short: 'Жир', ans: 'conn' },
+  { id: 'skm', name: ['Мышца', 'бедра'], short: 'Мышца бедра', ans: 'musc' },
+  { id: 'smooth', name: ['Мышцы', 'желудка'], short: 'Мышцы желудка', ans: 'musc' },
+  { id: 'neuron', name: ['Спинной', 'мозг'], short: 'Спинной мозг', ans: 'nerv' },
+];
+// Lesson 3: organ systems and organs of the human body
+const SYS = {
+  nerv: { name: 'Нервная', c: '#c9a8ef', job: 'управляет работой всего организма' },
+  resp: { name: 'Дыхательная', c: '#72d4e8', job: 'доставляет кислород и удаляет углекислый газ' },
+  circ: { name: 'Кровеносная', c: '#ff6b6b', job: 'разносит кровь с веществами по телу' },
+  dig: { name: 'Пищеварительная', c: '#ffb547', job: 'переваривает пищу и всасывает питательные вещества' },
+  excr: { name: 'Выделительная', c: '#e9d84f', job: 'удаляет из крови ненужные и вредные вещества' },
+};
+const SYSK = ['nerv', 'resp', 'circ', 'dig', 'excr'];
+const ORGANS = [
+  { id: 'brain', name: 'Головной мозг', sys: 'nerv', job: 'Принимает сигналы от органов чувств и управляет телом.', tis: { nerv: 'нейроны', conn: 'оболочки и сосуды' } },
+  { id: 'trachea', name: 'Трахея', sys: 'resp', job: 'Трубка, по которой воздух идёт в лёгкие. Хрящевые полукольца не дают ей сплющиться.', tis: { epi: 'реснитчатый, гонит слизь с пылью', conn: 'хрящевые полукольца', musc: 'гладкая', nerv: 'нервы' } },
+  { id: 'lungs', name: 'Лёгкие', sys: 'resp', job: 'В лёгочных пузырьках кислород переходит в кровь, а углекислый газ — из крови.', tis: { epi: 'тонкие стенки пузырьков', conn: 'каркас и сосуды', musc: 'гладкая в бронхах', nerv: 'нервы' } },
+  { id: 'heart', name: 'Сердце', sys: 'circ', job: 'Мышечный насос: сокращается около 70 раз в минуту и гонит кровь по сосудам.', tis: { musc: 'сердечная', conn: 'клапаны и оболочка', epi: 'гладкая выстилка внутри', nerv: 'нервы' } },
+  { id: 'vessels', name: 'Кровеносные сосуды', sys: 'circ', job: 'Трубки, по которым кровь идёт от сердца ко всем органам и обратно.', tis: { epi: 'выстилка изнутри', musc: 'гладкая в стенке', conn: 'наружная оболочка', nerv: 'нервы' } },
+  { id: 'stomach', name: 'Желудок', sys: 'dig', job: 'Перемешивает пищу с желудочным соком и начинает переваривать белки.', tis: { epi: 'железы сока', musc: 'гладкая, три слоя', conn: 'оболочки', nerv: 'нервы' } },
+  { id: 'liver', name: 'Печень', sys: 'dig', job: 'Самая крупная железа: выделяет желчь для переваривания жиров и обезвреживает яды.', tis: { epi: 'печёночные клетки', conn: 'капсула и перегородки', nerv: 'нервы' } },
+  { id: 'gut', name: 'Кишечник', sys: 'dig', job: 'В тонкой кишке пища переваривается до конца и всасывается в кровь.', tis: { epi: 'всасывает пищу', musc: 'гладкая, двигает пищу', conn: 'оболочки', nerv: 'нервы' } },
+  { id: 'kidneys', name: 'Почки', sys: 'excr', job: 'Фильтруют кровь и образуют мочу.', tis: { epi: 'канальцы', conn: 'капсула', nerv: 'нервы' } },
+  { id: 'bladder', name: 'Мочевой пузырь', sys: 'excr', job: 'Собирает мочу и выводит её наружу.', tis: { epi: 'растяжимая выстилка', musc: 'гладкая', conn: 'оболочка', nerv: 'нервы' } },
+];
+
+const LESSONS = [
+  { id: 'plant', title: 'Ткани растений',
+    text: ['Ткань — это группа клеток, похожих по строению и выполняющих общую работу. Между клетками бывает межклеточное вещество. Одна клетка не может делать всё сразу, поэтому в многоклеточном организме клетки «разделили обязанности».',
+           'У растений пять групп тканей. Образовательная — мелкие клетки, которые всё время делятся: за счёт них растение растёт. Покровная — кожица и пробка, защищают от высыхания и повреждений. Основная — мякоть листа, где идёт фотосинтез, и запасающие клетки, например с крахмалом в клубне.',
+           'Проводящая ткань — это трубки: по сосудам вода с солями идёт от корня вверх, по ситовидным трубкам сахар идёт от листьев к другим органам. Механическая ткань из толстостенных волокон делает растение прочным.'],
+    why: 'Агроном по картофелю знает: урожай — это крахмал, запасённый в основной ткани клубня, и от него зависит выручка хозяйств Павлодарской и Костанайской областей. Садовник при прививке совмещает камбий — образовательную ткань — подвоя и привоя, иначе яблоня не приживётся. Из механических волокон льна ткут льняную ткань, а древесина для мебели — это проводящая и механическая ткань дерева.',
+    task: 'Определите ткань во всех 7 точках растения картофеля.',
+    hint: 'Нажмите на точку и рассмотрите клетки в микроскопе. Мелкие с крупным ядром? Плотный слой с устьицами? Зелёные зёрнышки или крахмал? Длинные трубки? Толстые стенки?',
+    stage: 'Нажмите на точку на растении, рассмотрите клетки и выберите ткань внизу.',
+    mag: 200,
+    check: m => m.right === 7 },
+  { id: 'animal', title: 'Ткани животных',
+    text: ['У животных и человека четыре группы тканей: эпителиальная, соединительная, мышечная и нервная.',
+           'В эпителии клетки сомкнуты плотно, межклеточного вещества почти нет: он покрывает тело снаружи и выстилает органы изнутри. В соединительной ткани всё наоборот — межклеточного вещества много. В кости оно твёрдое, в хряще плотное, в крови жидкое.',
+           'Мышечная ткань умеет сокращаться: скелетная — по нашей воле, гладкая в стенках органов — сама по себе, сердечная — всю жизнь без отдыха. Нервная ткань состоит из нейронов: они принимают сигнал и передают его по отросткам.'],
+    why: 'Врач-гистолог рассматривает под микроскопом кусочек ткани и по виду клеток находит болезнь на ранней стадии. Лаборант считает в анализе крови эритроциты и лейкоциты — это клетки соединительной ткани. Тренер и спортивный врач знают, как растут мышечные волокна, и строят тренировки без травм. Донорская кровь из центров крови спасает людей после аварий и операций.',
+    task: 'Разложите 8 препаратов по четырём группам тканей.',
+    hint: 'Смотрите на межклеточное вещество: почти нет — эпителий, много — соединительная. Длинные волокна — мышечная, тело с отростками — нервная.',
+    stage: 'Перетащите карточку в коробку или нажмите карточку, а потом коробку.',
+    check: m => m.right === 8 },
+  { id: 'organs', title: 'Органы и системы органов',
+    text: ['Орган — часть тела со своей формой, местом и работой. Каждый орган построен из нескольких тканей. В желудке, например, есть эпителий, гладкие мышцы, соединительная и нервная ткани.',
+           'Органы, которые вместе делают одну большую работу, образуют систему органов. Пищеварительная перерабатывает пищу, дыхательная доставляет кислород, кровеносная разносит вещества, выделительная удаляет ненужное, а нервная управляет всеми.',
+           'У растений тоже есть органы: вегетативные — корень, стебель, лист — и генеративные — цветок, плод, семя. Все корни растения образуют корневую систему, а стебель с листьями и почками — побег.'],
+    why: 'Хирург должен точно знать, где лежит каждый орган и какие ткани он разрежет. Врач УЗИ осматривает печень, почки и сердце без единого разреза. Фельдшер скорой помощи по признакам понимает, какая система в опасности — дыхание, кровообращение или нервная. Ветеринар на ферме лечит коров и овец: у них те же системы органов.',
+    task: 'Раскрасьте все 10 органов по их системам.',
+    hint: 'Выберите систему внизу и нажимайте на органы. Спросите себя: какую работу делает этот орган?',
+    stage: 'Выберите систему-кисть и нажимайте на органы. Без кисти нажатие показывает, из каких тканей орган.',
+    check: m => m.right === 10 },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+function resetLesson() {
+  const L = LESSONS[S.lesson];
+  S.cur = -1; S.pa = Array(POINTS.length).fill(null); S.mag = L.mag || 200; S.curT = -1e9;
+  S.bin = Array(SLIDES.length).fill(-1); S.sel = -1; S.look = -1;
+  S.paint = {}; S.brush = null; S.org = -1; S.paintT = -1e9;
+}
+
+// ---------- models ----------
+function model() {
+  const id = LID();
+  if (id === 'plant') { let n = 0, r = 0; S.pa.forEach((a, i) => { if (a) { n++; if (a === POINTS[i].ans) r++; } }); return { kind: 'pt', placed: n, right: r, cur: S.cur }; }
+  if (id === 'animal') { let n = 0, r = 0; S.bin.forEach((b, i) => { if (b >= 0) { n++; if (ATK[b] === SLIDES[i].ans) r++; } }); return { kind: 'sort', placed: n, right: r }; }
+  let n = 0, r = 0; ORGANS.forEach(o => { const p = S.paint[o.id]; if (p) { n++; if (p === o.sys) r++; } });
+  return { kind: 'org', placed: n, right: r, org: S.org };
+}
+
+// ---------- lesson 1 actions ----------
+function pickPoint(i) { S.cur = i; S.curT = performance.now(); renderTools(); update(); }
+function assign(k) {
+  if (S.cur < 0) { toast('Сначала нажмите на точку на растении.'); return; }
+  S.pa[S.cur] = k;
+  const m = model();
+  if (m.placed === POINTS.length && m.right < POINTS.length) toast(`Определены все точки. Верно ${m.right} из 7 — проверьте красные.`);
+  else if (m.placed < POINTS.length) { // go to the next empty point
+    for (let d = 1; d <= POINTS.length; d++) { const j = (S.cur + d) % POINTS.length; if (!S.pa[j]) { S.cur = j; S.curT = performance.now(); break; } }
+  }
+  renderTools(); update();
+}
+
+// ---------- lesson 2 actions ----------
+function drop(c, b) {
+  S.bin[c] = b; S.sel = -1; S.look = c;
+  const m = model();
+  if (m.placed === SLIDES.length && m.right < SLIDES.length) toast(`Все препараты разложены. Верно ${m.right} из 8 — красные переложите.`);
+  update();
+}
+
+// ---------- lesson 3 actions ----------
+function tapOrgan(i) {
+  S.org = i;
+  const o = ORGANS[i];
+  if (S.brush === 'erase') delete S.paint[o.id];
+  else if (S.brush) { S.paint[o.id] = S.brush; S.paintT = performance.now(); }
+  const m = model();
+  if (S.brush && S.brush !== 'erase' && m.placed === ORGANS.length && m.right < ORGANS.length) toast(`Все органы раскрашены. Верно ${m.right} из 10 — проверьте органы с красной рамкой.`);
+  update();
+}
+
+// ---------- microscope pictures (plant), field radius 100, cell size s ----------
+const R0 = 100;
+function quadCells(S0, jit, seed, fill, stroke, sw) {
+  const r = rng(seed), n = Math.ceil(R0 / S0) + 2, P = {};
+  for (let i = -n; i <= n; i++) for (let j = -n; j <= n; j++) P[i + ',' + j] = [i * S0 + (r() - .5) * S0 * jit, j * S0 * 0.82 + (r() - .5) * S0 * jit];
+  let h = '';
+  const cells = [];
+  for (let i = -n; i < n; i++) for (let j = -n; j < n; j++) {
+    const a = P[i + ',' + j], b = P[(i + 1) + ',' + j], c = P[(i + 1) + ',' + (j + 1)], d = P[i + ',' + (j + 1)];
+    const cx = (a[0] + b[0] + c[0] + d[0]) / 4, cy = (a[1] + b[1] + c[1] + d[1]) / 4;
+    if (Math.hypot(cx, cy) > R0 + S0) continue;
+    h += `<path d="M${f(a[0])} ${f(a[1])}L${f(b[0])} ${f(b[1])}L${f(c[0])} ${f(c[1])}L${f(d[0])} ${f(d[1])}Z" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" stroke-linejoin="round"/>`;
+    cells.push([cx, cy]);
+  }
+  return { h, cells };
+}
+const PICS = {
+  meri(s) {
+    const r = rng(7), n = Math.ceil(R0 / s) + 1; let h = `<rect x="-120" y="-120" width="240" height="240" fill="#efeaf5"/>`;
+    for (let j = -n; j < n; j++) for (let i = -n; i < n; i++) {
+      const x = i * s + (j % 2 ? s * .5 : 0), y = j * s;
+      if (Math.hypot(x + s / 2, y + s / 2) > R0 + s) continue;
+      const jx = (r() - .5) * s * .1, jy = (r() - .5) * s * .1;
+      h += `<rect x="${f(x + jx)}" y="${f(y + jy)}" width="${f(s * .97)}" height="${f(s * .97)}" rx="${f(s * .12)}" fill="#dccfeb" stroke="#7d66a6" stroke-width="${f(Math.max(.6, s * .05))}"/>`;
+      h += `<circle cx="${f(x + jx + s * .48)}" cy="${f(y + jy + s * .48)}" r="${f(s * .27)}" fill="#6d4f9c"/>`;
+    }
+    return h;
+  },
+  epi(s) {
+    const S0 = s * 1.8, q = quadCells(S0, .35, 11, '#f2f6f2', '#7d9a8a', f(Math.max(.7, s * .06)));
+    let h = `<rect x="-120" y="-120" width="240" height="240" fill="#e6ece6"/>` + q.h;
+    const st = q.cells.filter((_, k) => k % 7 === 3);
+    for (const [x, y] of st) {
+      const a = S0 * .17, b = S0 * .3;
+      h += `<ellipse cx="${f(x - a)}" cy="${f(y)}" rx="${f(a)}" ry="${f(b)}" fill="#b9dca4" stroke="#4f7f3f" stroke-width="${f(Math.max(.6, s * .05))}"/>`;
+      h += `<ellipse cx="${f(x + a)}" cy="${f(y)}" rx="${f(a)}" ry="${f(b)}" fill="#b9dca4" stroke="#4f7f3f" stroke-width="${f(Math.max(.6, s * .05))}"/>`;
+      h += `<ellipse cx="${f(x)}" cy="${f(y)}" rx="${f(S0 * .035)}" ry="${f(b * .7)}" fill="#2c3a2c"/>`;
+      for (const dy of [-.5, 0, .5]) h += `<circle cx="${f(x - a * 1.2)}" cy="${f(y + dy * b)}" r="${f(S0 * .035)}" fill="#3f9a3f"/><circle cx="${f(x + a * 1.2)}" cy="${f(y + dy * b)}" r="${f(S0 * .035)}" fill="#3f9a3f"/>`;
+    }
+    return h;
+  },
+  photo(s) {
+    const w = s * 1.05, ht = s * 2.9, n = Math.ceil(R0 / w) + 1, m = Math.ceil(R0 / ht) + 1;
+    let h = `<rect x="-120" y="-120" width="240" height="240" fill="#eef4e6"/>`;
+    for (let i = -n; i < n; i++) for (let j = -m; j < m; j++) {
+      const x = i * w * 1.06, y = j * ht * 1.04 + (i % 2 ? ht * .5 : 0);
+      if (Math.hypot(x + w / 2, y + ht / 2) > R0 + ht) continue;
+      h += `<rect x="${f(x)}" y="${f(y)}" width="${f(w)}" height="${f(ht)}" rx="${f(w * .42)}" fill="#d9ecc8" stroke="#5f8f4c" stroke-width="${f(Math.max(.6, s * .05))}"/>`;
+      for (let k = 0; k < 5; k++) {
+        const yy = y + ht * (.14 + .18 * k);
+        h += `<ellipse cx="${f(x + w * .22)}" cy="${f(yy)}" rx="${f(w * .12)}" ry="${f(w * .17)}" fill="#3f9a3f"/><ellipse cx="${f(x + w * .78)}" cy="${f(yy + ht * .08)}" rx="${f(w * .12)}" ry="${f(w * .17)}" fill="#3f9a3f"/>`;
+      }
+    }
+    return h;
+  },
+  store(s) {
+    const S0 = s * 2.5, q = quadCells(S0, .3, 23, '#f1ead2', '#a8976a', f(Math.max(.7, s * .07)));
+    let h = `<rect x="-120" y="-120" width="240" height="240" fill="#ece4cc"/>` + q.h;
+    const r = rng(5);
+    for (const [x, y] of q.cells) for (let k = 0; k < 5; k++) {
+      const gx = x + (r() - .5) * S0 * .5, gy = y + (r() - .5) * S0 * .42, rx = S0 * (.09 + r() * .05);
+      h += `<ellipse cx="${f(gx)}" cy="${f(gy)}" rx="${f(rx)}" ry="${f(rx * .78)}" fill="#fbf8ee" stroke="#b5a46f" stroke-width="${f(Math.max(.4, s * .04))}"/><ellipse cx="${f(gx - rx * .2)}" cy="${f(gy)}" rx="${f(rx * .45)}" ry="${f(rx * .35)}" fill="none" stroke="#c9b98a" stroke-width="${f(Math.max(.3, s * .03))}"/>`;
+    }
+    return h;
+  },
+  cond(s) {
+    let h = `<rect x="-120" y="-120" width="240" height="240" fill="#eef0e2"/>`;
+    const W = s * 3.1, n = Math.ceil(R0 / W) + 1, sw = f(Math.max(.6, s * .07));
+    for (let i = -n; i < n; i++) {
+      const x0 = i * W, vw = s * 1.4;
+      h += `<rect x="${f(x0)}" y="-120" width="${f(vw)}" height="240" fill="#f6efd8" stroke="#9a7b3c" stroke-width="${sw}"/>`;
+      for (let y = -120 + (i & 1) * s * .2; y < 120; y += s * .42) h += `<path d="M${f(x0)} ${f(y)}L${f(x0 + vw)} ${f(y + s * .28)}" stroke="#9a7b3c" stroke-width="${f(Math.max(.6, s * .09))}"/>`;
+      const sx = x0 + vw + s * .15, sww = s * .95;
+      h += `<rect x="${f(sx)}" y="-120" width="${f(sww)}" height="240" fill="#e0efd6" stroke="#6f9a5c" stroke-width="${sw}"/>`;
+      for (let y = -120 + ((i * 37) % 10) / 10 * s * 2.6; y < 120; y += s * 2.6) h += `<path d="M${f(sx)} ${f(y)}H${f(sx + sww)}" stroke="#6f9a5c" stroke-width="${f(Math.max(.8, s * .12))}" stroke-dasharray="${f(s * .1)} ${f(s * .08)}"/>`;
+      const cx = sx + sww + s * .05;
+      h += `<rect x="${f(cx)}" y="-120" width="${f(s * .4)}" height="240" fill="#cfe3c4" stroke="#6f9a5c" stroke-width="${sw}"/>`;
+      for (let y = -110 + (i % 3) * s; y < 120; y += s * 2.6) h += `<ellipse cx="${f(cx + s * .2)}" cy="${f(y)}" rx="${f(s * .12)}" ry="${f(s * .25)}" fill="#7a6aa0"/>`;
+    }
+    return h;
+  },
+  mech(s) {
+    let h = `<rect x="-120" y="-120" width="240" height="240" fill="#f0e8d6"/>`;
+    const w = s * .8, L = s * 6, n = Math.ceil(R0 / w) + 1;
+    for (let i = -n; i < n; i++) {
+      const x = i * w * .98, off = ((i * 7 + 20) % 10) / 10 * L;
+      for (let y = -120 - off; y < 120; y += L * .96) {
+        h += `<path d="M${f(x + w / 2)} ${f(y)}Q${f(x + w)} ${f(y + L * .2)} ${f(x + w)} ${f(y + L / 2)}Q${f(x + w)} ${f(y + L * .8)} ${f(x + w / 2)} ${f(y + L)}Q${f(x)} ${f(y + L * .8)} ${f(x)} ${f(y + L / 2)}Q${f(x)} ${f(y + L * .2)} ${f(x + w / 2)} ${f(y)}Z" fill="#c9a66a" stroke="#8a6630" stroke-width="${f(Math.max(.5, w * .1))}"/>`;
+        h += `<path d="M${f(x + w / 2)} ${f(y + L * .18)}V${f(y + L * .82)}" stroke="#f5ecd8" stroke-width="${f(Math.max(.4, w * .14))}" stroke-linecap="round"/>`;
+      }
+    }
+    return h;
+  },
+};
+
+// ---------- animal slides, drawn in a circle of radius 22 ----------
+const APICS = {
+  skin() {
+    let h = `<rect x="-24" y="-24" width="48" height="48" fill="#f6e3ea"/>`;
+    const rows = [[12, 6, 5], [7, 6, 4.4], [2.2, 7, 4], [-2, 8.5, 3.2], [-5.6, 10, 2.6], [-8.4, 12, 2], [-10.6, 14, 1.6], [-12.4, 16, 1.4]];
+    rows.forEach(([y, w, ht], k) => {
+      for (let x = -26 + (k % 2) * w / 2; x < 26; x += w) {
+        h += `<rect x="${f(x)}" y="${f(y)}" width="${f(w * .96)}" height="${f(ht)}" rx="${f(Math.min(1.5, ht * .4))}" fill="${k < 5 ? '#efc0d0' : '#f6dfe6'}" stroke="#b0708a" stroke-width=".35"/>`;
+        if (k < 5) h += `<ellipse cx="${f(x + w * .48)}" cy="${f(y + ht / 2)}" rx="${f(Math.min(1.6, w * .2))}" ry="${f(Math.min(1.4, ht * .28))}" fill="#6d4f9c"/>`;
+      }
+    });
+    return h + `<rect x="-24" y="17.2" width="48" height="8" fill="#f9eef2"/>`;
+  },
+  gut() {
+    let h = `<rect x="-24" y="-24" width="48" height="48" fill="#f9eef2"/>`;
+    for (let x = -24; x < 24; x += 4.2) {
+      h += `<rect x="${f(x)}" y="-12" width="4" height="22" rx="1" fill="#efc0d0" stroke="#b0708a" stroke-width=".35"/>`;
+      h += `<ellipse cx="${f(x + 2)}" cy="5" rx="1.2" ry="2.4" fill="#6d4f9c"/>`;
+      h += `<path d="M${f(x + .6)} -12v-1.6M${f(x + 1.6)} -12v-1.6M${f(x + 2.6)} -12v-1.6M${f(x + 3.4)} -12v-1.6" stroke="#b0708a" stroke-width=".3"/>`;
+    }
+    return h + `<path d="M-24 14Q-12 12 0 15T24 14" stroke="#e3b9c7" stroke-width=".6" fill="none"/>`;
+  },
+  blood() {
+    let h = `<rect x="-24" y="-24" width="48" height="48" fill="#f7ecd8"/>`;
+    const r = rng(31);
+    for (let k = 0; k < 26; k++) {
+      const x = (r() - .5) * 46, y = (r() - .5) * 46;
+      h += `<circle cx="${f(x)}" cy="${f(y)}" r="3.1" fill="#e0555d"/><circle cx="${f(x)}" cy="${f(y)}" r="1.2" fill="#ef9196"/>`;
+    }
+    for (const [x, y] of [[-8, 6], [9, -9]]) h += `<circle cx="${x}" cy="${y}" r="4.6" fill="#efe6f3" stroke="#a88cc4" stroke-width=".4"/><path d="M${x - 2.4} ${y}q1.2-2.4 2.4 0q1.2 2.4 2.4 0" stroke="#6d4f9c" stroke-width="1.6" fill="none" stroke-linecap="round"/>`;
+    return h;
+  },
+  bone() {
+    let h = `<rect x="-24" y="-24" width="48" height="48" fill="#efe2c2"/>`;
+    for (const rr of [18, 14.5, 11, 7.5]) h += `<circle r="${rr}" fill="none" stroke="#c4ad7f" stroke-width=".9"/>`;
+    h += `<circle r="3.4" fill="#f9f3e4" stroke="#b49a68" stroke-width=".6"/>`;
+    for (const [rr, n] of [[16.2, 10], [12.7, 8], [9.2, 6]]) for (let k = 0; k < n; k++) {
+      const a = k / n * 6.283 + rr, x = rr * Math.cos(a), y = rr * Math.sin(a);
+      h += `<ellipse cx="${f(x)}" cy="${f(y)}" rx="1.3" ry=".7" transform="rotate(${f(a * 57.3 + 90)} ${f(x)} ${f(y)})" fill="#6b5232"/>`;
+    }
+    return h;
+  },
+  fat() {
+    let h = `<rect x="-24" y="-24" width="48" height="48" fill="#f4e6ea"/>`;
+    for (let j = -3; j <= 3; j++) for (let i = -3; i <= 3; i++) {
+      const x = i * 15 + (j % 2 ? 7.5 : 0), y = j * 13;
+      h += `<circle cx="${f(x)}" cy="${f(y)}" r="7.6" fill="#fbf8f0" stroke="#c99aa8" stroke-width=".6"/><ellipse cx="${f(x + 5.6)}" cy="${f(y - 4)}" rx="1.4" ry=".8" transform="rotate(-50 ${f(x + 5.6)} ${f(y - 4)})" fill="#6d4f9c"/>`;
+    }
+    return h;
+  },
+  skm() {
+    let h = `<rect x="-24" y="-24" width="48" height="48" fill="#f6e3ea"/>`;
+    for (let y = -24; y < 24; y += 8.4) {
+      h += `<rect x="-26" y="${y}" width="52" height="7.8" rx="2" fill="#e8909f"/>`;
+      for (let x = -25; x < 25; x += 1.5) h += `<path d="M${f(x)} ${f(y + .6)}v6.6" stroke="#b9566a" stroke-width=".55"/>`;
+      h += `<ellipse cx="${f(-12 + (y % 3) * 4)}" cy="${f(y + 1.2)}" rx="2.4" ry=".8" fill="#5e3f8c"/><ellipse cx="${f(10 - (y % 2) * 3)}" cy="${f(y + 6.6)}" rx="2.4" ry=".8" fill="#5e3f8c"/>`;
+    }
+    return h;
+  },
+  smooth() {
+    let h = `<rect x="-24" y="-24" width="48" height="48" fill="#f6e3ea"/>`;
+    for (let j = -6; j <= 6; j++) for (let i = -2; i <= 2; i++) {
+      const x = i * 18 + (j % 2 ? 9 : 0), y = j * 3.8;
+      h += `<path d="M${f(x - 10)} ${f(y)}Q${f(x)} ${f(y - 3.6)} ${f(x + 10)} ${f(y)}Q${f(x)} ${f(y + 3.6)} ${f(x - 10)} ${f(y)}Z" fill="#ec9fb0" stroke="#b9566a" stroke-width=".35"/><ellipse cx="${f(x)}" cy="${f(y)}" rx="2.8" ry=".7" fill="#5e3f8c"/>`;
+    }
+    return h;
+  },
+  neuron() {
+    let h = `<rect x="-24" y="-24" width="48" height="48" fill="#f1eaf5"/>`;
+    const r = rng(17);
+    for (let k = 0; k < 14; k++) h += `<circle cx="${f((r() - .5) * 46)}" cy="${f((r() - .5) * 46)}" r="1" fill="#a88cc4"/>`;
+    for (const a of [.4, 1.5, 2.5, 3.6, 4.6]) {
+      const x1 = 13 * Math.cos(a), y1 = 13 * Math.sin(a);
+      h += `<path d="M0 0L${f(x1)} ${f(y1)}M${f(x1 * .7)} ${f(y1 * .7)}l${f(4 * Math.cos(a + .8))} ${f(4 * Math.sin(a + .8))}M${f(x1)} ${f(y1)}l${f(4 * Math.cos(a - .6))} ${f(4 * Math.sin(a - .6))}" stroke="#7d58aa" stroke-width="1.1" stroke-linecap="round" fill="none"/>`;
+    }
+    h += `<path d="M2 3Q10 12 26 16" stroke="#7d58aa" stroke-width="1.3" fill="none"/>`;
+    return h + `<path d="M-6 -1L-2 -6L4 -5L6 1L1 6L-5 4Z" fill="#a77fc9" stroke="#6d4f9c" stroke-width=".5"/><circle cx="0" cy="0" r="2.4" fill="#efe6f3"/><circle cx=".4" cy="-.2" r=".8" fill="#5e3f8c"/>`;
+  },
+};
+// one slide image at (x, y) with radius r; uid makes the clip id unique
+function slideSVG(id, x, y, r, uid) {
+  return `<g transform="translate(${f(x)} ${f(y)}) scale(${f(r / 22 * 100) / 100})"><clipPath id="sc${uid}"><circle r="22"/></clipPath><g clip-path="url(#sc${uid})">${APICS[id]()}</g><circle r="22" fill="none" stroke="#3a4762" stroke-width="${f(2.4 * 22 / r)}"/></g>`;
+}
+
+// ---------- drawing helpers ----------
+const ol = (d, fill, stroke, w = 2.2, extra = '') => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${w + 2.6}" stroke-linejoin="round" stroke-linecap="round"/><path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round" ${extra}/>`;
+function bench() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4000" fill="url(#tile)"/>`;
+}
+const leaflet = (x, y, a, rx, ry) => `<ellipse cx="${f(x)}" cy="${f(y)}" rx="${rx}" ry="${ry}" transform="rotate(${f(a)} ${f(x)} ${f(y)})" fill="#5fbf6a" stroke="${INK}" stroke-width="1"/>`;
+function compoundLeaf(x0, y0, x1, y1) {
+  const a = Math.atan2(y1 - y0, x1 - x0) * 57.3;
+  let h = `<path d="M${x0} ${y0}L${x1} ${y1}" stroke="#3f8f4c" stroke-width="2.4"/>`;
+  for (const t of [.35, .62, .86]) {
+    const x = x0 + (x1 - x0) * t, y = y0 + (y1 - y0) * t, nx = -(y1 - y0), ny = x1 - x0, l = Math.hypot(nx, ny) || 1;
+    h += leaflet(x + nx / l * 9, y + ny / l * 9, a + 35, 11, 6) + leaflet(x - nx / l * 9, y - ny / l * 9, a - 35, 11, 6);
+  }
+  return h + leaflet(x1 + (x1 - x0) * .08, y1 + (y1 - y0) * .08, a, 14, 8);
+}
+const FX = 392, FY = 222, FR = 100;
+function plantScene(t) {
+  let h = bench();
+  // soil
+  h += `<rect x="18" y="300" width="256" height="94" rx="12" fill="#2e241c" stroke="${INK}" stroke-width="1.5"/><path d="M18 302H274" stroke="#5a4430" stroke-width="3"/>`;
+  h += `<text class="lbl" x="262" y="388" font-size="10" fill="#8b96ad" text-anchor="end">почва</text>`;
+  // roots, stolon, tuber
+  h += `<path d="M140 302Q128 340 100 372M140 302Q142 350 135 386M140 302Q150 335 168 362M118 340l-12 6M139 352l10 8" stroke="#e8dcc0" stroke-width="2" fill="none" stroke-linecap="round"/>`;
+  h += `<path d="M141 306Q160 318 182 336" stroke="#d9cbb0" stroke-width="2.6" fill="none"/>`;
+  h += ol('M174 346Q174 324 205 324Q238 324 238 346Q238 368 205 368Q174 368 174 346Z', '#c9a46a', '#d9b680', 1.6);
+  h += `<circle cx="196" cy="338" r="1.6" fill="#8a6a3a"/><circle cx="220" cy="352" r="1.6" fill="#8a6a3a"/><circle cx="211" cy="334" r="1.4" fill="#8a6a3a"/>`;
+  // stem and leaves
+  h += ol('M140 302Q134 220 140 108', 'none', '#4ea65a', 6);
+  h += compoundLeaf(138, 168, 76, 138) + compoundLeaf(141, 198, 206, 172) + compoundLeaf(139, 248, 84, 236);
+  h += ol('M133 112Q140 90 147 112Z', '#86d07a', '#4ea65a', 1.4);
+  // line from the chosen point to the microscope
+  if (S.cur >= 0) { const p = POINTS[S.cur]; h += `<path d="M${p.x} ${p.y}L${FX - FR - 8} ${FY}" stroke="#ffb547" stroke-width="1.4" stroke-dasharray="4 4" opacity=".7"/>`; }
+  // sample points
+  const all = S.pa.every(Boolean);
+  POINTS.forEach((p, i) => {
+    const a = S.pa[i], sel = S.cur === i, pulse = sel && !reduce ? 1 + .12 * Math.sin((t - S.curT) / 180) : 1;
+    h += `<g data-hit="pt${i}"><circle cx="${p.x}" cy="${p.y}" r="21" fill="transparent"/>`;
+    h += `<circle cx="${p.x}" cy="${p.y}" r="${f(12.5 * pulse)}" fill="${a ? PT[a].c : '#1a2438'}" stroke="${sel ? '#ffb547' : INK}" stroke-width="${sel ? 2.6 : 1.6}"/>`;
+    h += `<text x="${p.x}" y="${p.y + 4}" font-size="11" font-weight="600" fill="${a ? INK : '#e8ecf4'}" text-anchor="middle">${i + 1}</text></g>`;
+    if (all) h += `<text x="${p.x + 15}" y="${p.y - 8}" font-size="12" fill="${a === p.ans ? '#86e0a8' : '#ff8a73'}" text-anchor="middle">${a === p.ans ? '✓' : '✗'}</text>`;
+  });
+  // microscope field
+  h += `<circle cx="${FX}" cy="${FY}" r="${FR + 8}" fill="#2a3550" stroke="${INK}" stroke-width="2"/><circle cx="${FX}" cy="${FY}" r="${FR + 3}" fill="#121a28"/>`;
+  if (S.cur >= 0) {
+    const p = POINTS[S.cur], s = 6 * S.mag / 100;
+    h += `<g data-hit="field" transform="translate(${FX} ${FY})"><clipPath id="fieldClip"><circle r="${FR}"/></clipPath><g clip-path="url(#fieldClip)">${PICS[p.pic](s)}</g>`;
+    h += `<circle r="${FR}" fill="none" stroke="rgba(0,0,0,.25)" stroke-width="10"/></g>`;
+    h += `<text class="lbl" x="${FX}" y="${FY - FR - 16}" font-size="12" font-weight="600" fill="#e8ecf4" text-anchor="middle">${S.cur + 1}. ${p.name}</text>`;
+    const a = S.pa[S.cur];
+    h += `<text class="lbl" x="${FX}" y="${FY + FR + 26}" font-size="12" fill="${a ? PT[a].c : '#8b96ad'}" text-anchor="middle">${a ? 'Ваш ответ: ' + PT[a].name.toLowerCase() : 'Какая это ткань?'}</text>`;
+  } else {
+    h += `<text class="lbl" x="${FX}" y="${FY - 4}" font-size="12" fill="#8b96ad" text-anchor="middle">Нажмите на точку</text><text class="lbl" x="${FX}" y="${FY + 13}" font-size="12" fill="#8b96ad" text-anchor="middle">на растении</text>`;
+  }
+  h += `<text x="${FX + FR - 4}" y="${FY + FR + 4}" font-size="10" fill="#8b96ad" text-anchor="end">×${S.mag}</text>`;
+  return h;
+}
+
+// ---------- lesson 2 scene ----------
+const CW = 116, CH = 70, BW = 116, BH = 100;
+const homeXY = c => { const k = [3, 0, 6, 1, 5, 7, 2, 4].indexOf(c); return [14 + (k % 4) * 124, 112 + Math.floor(k / 4) * 82]; };
+const binXY = b => [14 + b * 124, 284];
+// chips in a bin shrink when more than 3 cards are put there
+const chipStep = b => Math.min(22, 72 / Math.max(1, S.bin.filter(x => x === b).length));
+const chipXY = (c) => { const b = S.bin[c], [x, y] = binXY(b), k = SLIDES.filter((_, j) => j < c && S.bin[j] === b).length; return [x + 6, y + 26 + k * chipStep(b)]; };
+function cardSVG(c, x, y, sel, uid) {
+  const sl = SLIDES[c];
+  let h = `<g data-drag="c${c}" transform="translate(${f(x)} ${f(y)})"><rect width="${CW}" height="${CH}" rx="10" fill="#1a2438" stroke="${sel ? '#ffb547' : '#56627d'}" stroke-width="${sel ? 2.4 : 1.4}"/>`;
+  h += slideSVG(sl.id, 32, CH / 2, 24, uid);
+  sl.name.forEach((ln, k) => { h += `<text class="lbl" x="62" y="${f(CH / 2 + 4 + (k - (sl.name.length - 1) / 2) * 14)}" font-size="11.5" font-weight="600" fill="#e8ecf4">${ln}</text>`; });
+  return h + `</g>`;
+}
+function sortScene() {
+  let h = bench();
+  const full = S.bin.every(b => b >= 0);
+  // home slots
+  for (let c = 0; c < SLIDES.length; c++) {
+    const [x, y] = homeXY(c);
+    h += `<rect x="${x}" y="${y}" width="${CW}" height="${CH}" rx="10" fill="rgba(160,185,230,.03)" stroke="#26324a" stroke-dasharray="4 3"/>`;
+  }
+  h += `<text class="lbl" x="260" y="100" font-size="11" fill="#8b96ad" text-anchor="middle">препараты под микроскопом</text>`;
+  // bins
+  ATK.forEach((k, b) => {
+    const [x, y] = binXY(b), T = AT[k];
+    h += `<g data-hit="bin${b}"><rect x="${x}" y="${y}" width="${BW}" height="${BH}" rx="10" fill="rgba(26,36,56,.85)" stroke="${T.c}" stroke-width="1.6"/>`;
+    h += `<rect x="${x}" y="${y}" width="${BW}" height="20" rx="10" fill="${T.c}" opacity=".18"/><text class="lbl" x="${x + BW / 2}" y="${y + 14}" font-size="11" font-weight="600" fill="${T.c}" text-anchor="middle">${T.name}</text></g>`;
+  });
+  // chips in bins
+  for (let c = 0; c < SLIDES.length; c++) {
+    if (S.bin[c] < 0 || (drag && drag.c === c && drag.moved)) continue;
+    const [x, y] = chipXY(c), ok = ATK[S.bin[c]] === SLIDES[c].ans, sel = S.sel === c, st = chipStep(S.bin[c]), ch = st - 3, fs = Math.min(10, ch * .62);
+    h += `<g data-drag="c${c}"><rect x="${x}" y="${f(y)}" width="${BW - 12}" height="${f(ch)}" rx="${f(Math.min(6, ch / 3))}" fill="#121a28" stroke="${sel ? '#ffb547' : full ? (ok ? '#86e0a8' : '#ff8a73') : '#3a4762'}" stroke-width="${sel ? 2 : 1.2}"/>`;
+    h += `<text class="lbl" x="${x + 7}" y="${f(y + ch / 2 + fs * .36)}" font-size="${f(fs)}" fill="#e8ecf4">${SLIDES[c].short}</text>`;
+    if (full) h += `<text x="${x + BW - 19}" y="${f(y + ch / 2 + fs * .38)}" font-size="${f(fs + 1)}" fill="${ok ? '#86e0a8' : '#ff8a73'}" text-anchor="middle">${ok ? '✓' : '✗'}</text>`;
+    h += `</g>`;
+  }
+  // cards still at home
+  for (let c = 0; c < SLIDES.length; c++) {
+    if (S.bin[c] >= 0 || (drag && drag.c === c && drag.moved)) continue;
+    const [x, y] = homeXY(c);
+    h += cardSVG(c, x, y, S.sel === c, c);
+  }
+  if (drag && drag.c >= 0 && drag.moved) h += cardSVG(drag.c, drag.px + drag.dx, drag.py + drag.dy, true, 'd');
+  return h;
+}
+
+// ---------- lesson 3 scene ----------
+const BX = 300;
+const ORG_D = {
+  brain: 'M279 84Q279 64 300 64Q321 64 321 84Q321 100 300 100Q279 100 279 84Z',
+  trachea: 'M295 116H305V166H295Z',
+  lungs: 'M293 168Q262 160 250 184Q242 212 248 240Q270 248 293 238ZM307 168Q338 160 350 184Q358 212 352 240Q330 248 307 238Z',
+  heart: 'M313 236C292 220 292 200 305 199C310 199 313 203 313 206C313 203 316 199 321 199C334 200 334 220 313 236Z',
+  vessels: 'M211 156V322M389 156V322M291 112V140M309 112V140',
+  liver: 'M246 250Q252 244 302 246Q306 254 298 264Q272 282 249 274Q242 264 246 250Z',
+  stomach: 'M306 252Q330 240 348 252Q357 270 341 285Q319 294 307 282Q318 277 320 267Q315 259 306 257Z',
+  gut: 'M262 302Q262 290 274 290H326Q338 290 338 302V334Q338 346 326 346H274Q262 346 262 334Z',
+  kidneys: 'M246 290Q236 290 237 304Q238 318 247 318Q253 318 251 310Q249 304 251 298Q253 290 246 290ZM354 290Q364 290 363 304Q362 318 353 318Q347 318 349 310Q351 304 349 298Q347 290 354 290Z',
+  bladder: 'M285 366Q285 352 300 352Q315 352 315 366Q315 377 300 377Q285 377 285 366Z',
+};
+function organsScene(t) {
+  let h = bench();
+  // body
+  h += ol(`M228 152Q228 138 250 136H350Q372 138 372 152L362 300Q368 340 362 386H238Q232 340 238 300Z`, '#202a3e', '#3a4762', 1.6);
+  h += ol('M200 160Q200 148 211 148Q222 148 222 160V326Q222 336 211 336Q200 336 200 326Z', '#202a3e', '#3a4762', 1.4);
+  h += ol('M378 160Q378 148 389 148Q400 148 400 160V326Q400 336 389 336Q378 336 378 326Z', '#202a3e', '#3a4762', 1.4);
+  h += ol('M288 110H312V140H288Z', '#202a3e', '#3a4762', 1.4);
+  h += ol(`M${BX - 30} 86Q${BX - 30} 56 ${BX} 56Q${BX + 30} 56 ${BX + 30} 86Q${BX + 30} 116 ${BX} 116Q${BX - 30} 116 ${BX - 30} 86Z`, '#202a3e', '#3a4762', 1.6);
+  const all = ORGANS.every(o => S.paint[o.id]);
+  const order = ['vessels', 'brain', 'trachea', 'lungs', 'liver', 'stomach', 'gut', 'kidneys', 'bladder', 'heart'];
+  for (const id of order) {
+    const i = ORGANS.findIndex(o => o.id === id), o = ORGANS[i], p = S.paint[id], sel = S.org === i;
+    const col = p ? SYS[p].c : '#56627d', wrong = all && p !== o.sys;
+    const stroke = sel ? '#ffb547' : wrong ? '#ff8a73' : INK, sw = sel || wrong ? 2.4 : 1.2;
+    const fresh = sel && p && !reduce ? clamp(1 - (t - S.paintT) / 500, 0, 1) : 0;
+    h += `<g data-hit="org${i}">`;
+    if (id === 'vessels') {
+      h += `<path d="${ORG_D[id]}" stroke="transparent" stroke-width="16"/>`;
+      if (sel || wrong) h += `<path d="${ORG_D[id]}" stroke="${stroke}" stroke-width="7" stroke-linecap="round"/>`;
+      h += `<path d="${ORG_D[id]}" stroke="${col}" stroke-width="${f(3.4 + fresh * 2)}" stroke-linecap="round"/>`;
+    } else {
+      h += `<path d="${ORG_D[id]}" fill="${col}" fill-opacity="${p ? .9 : .55}" stroke="${stroke}" stroke-width="${sw}" stroke-linejoin="round"${wrong ? ' stroke-dasharray="4 3"' : ''}/>`;
+      if (fresh > 0) h += `<path d="${ORG_D[id]}" fill="#fff" fill-opacity="${f(fresh * .5 * 10) / 10}"/>`;
+    }
+    if (id === 'brain') h += `<path d="M286 80q6-6 10 0t10 0t8 2M288 90q6-5 12 0t12-2M300 66v8" stroke="${INK}" stroke-width=".9" fill="none" opacity=".55"/>`;
+    if (id === 'trachea') h += `<path d="M295 124h10M295 132h10M295 140h10M295 148h10M295 156h10" stroke="${INK}" stroke-width=".9" opacity=".55"/>`;
+    if (id === 'gut') h += `<path d="M270 300q10 8 20 0t20 0t20 0M270 316q10 8 20 0t20 0t20 0M270 332q10 8 20 0t20 0t20 0" stroke="${INK}" stroke-width="1" fill="none" opacity=".5"/>`;
+    h += `</g>`;
+  }
+  // info card: what the chosen organ is made of
+  const x = 22, y = 140;
+  h += `<rect x="${x}" y="${y}" width="164" height="166" rx="12" fill="rgba(18,26,40,.9)" stroke="#26324a"/>`;
+  if (S.org >= 0) {
+    const o = ORGANS[S.org];
+    h += `<text class="lbl" x="${x + 12}" y="${y + 22}" font-size="12.5" font-weight="600" fill="#e8ecf4">${o.name}</text>`;
+    h += `<text class="lbl" x="${x + 12}" y="${y + 40}" font-size="10" fill="#8b96ad">из каких тканей состоит:</text>`;
+    ATK.forEach((k, j) => {
+      const has = o.tis[k], yy = y + 62 + j * 24;
+      h += `<circle cx="${x + 18}" cy="${yy - 4}" r="5" fill="${has ? AT[k].c : 'none'}" stroke="${AT[k].c}" stroke-width="1.2" opacity="${has ? 1 : .45}"/>`;
+      h += `<text class="lbl" x="${x + 30}" y="${yy}" font-size="11" fill="${has ? '#e8ecf4' : '#56627d'}">${AT[k].name}</text>`;
+    });
+    const p = S.paint[o.id];
+    h += `<text class="lbl" x="${x + 12}" y="${y + 154}" font-size="10.5" fill="${p ? SYS[p].c : '#8b96ad'}">${p ? 'система: ' + SYS[p].name.toLowerCase() : 'система: не выбрана'}</text>`;
+  } else {
+    ['Нажмите на орган,', 'чтобы узнать,', 'из каких тканей', 'он состоит.'].forEach((ln, j) => { h += `<text class="lbl" x="${x + 12}" y="${y + 30 + j * 17}" font-size="11.5" fill="#8b96ad">${ln}</text>`; });
+  }
+  if (S.brush) h += `<text class="lbl" x="${x + 12}" y="${y + 186}" font-size="11" fill="${S.brush === 'erase' ? '#8b96ad' : SYS[S.brush].c}">кисть: ${S.brush === 'erase' ? 'ластик' : SYS[S.brush].name.toLowerCase()}</text>`;
+  return h;
+}
+
+function hlBox(id) {
+  const L = LID();
+  if (L === 'plant') return { apex: [118, 80, 44, 40], leaf: [56, 120, 170, 140], stem: [124, 100, 32, 206], tuber: [168, 318, 76, 56], root: [90, 300, 90, 92], field: [FX - FR - 10, FY - FR - 10, 2 * FR + 20, 2 * FR + 20], pts: [50, 80, 190, 312] }[id];
+  if (L === 'animal') { const b = ATK.indexOf(id); if (b >= 0) { const [x, y] = binXY(b); return [x - 4, y - 4, BW + 8, BH + 8]; } return null; }
+  const B = { brain: [276, 60, 48, 44], trachea: [290, 112, 20, 58], lungs: [242, 156, 116, 92], heart: [290, 195, 46, 44], vessels: [196, 108, 208, 230], liver: [240, 240, 70, 40], stomach: [302, 238, 60, 60], gut: [258, 286, 84, 64], kidneys: [232, 286, 136, 36], bladder: [280, 348, 40, 34] };
+  return B[id] || null;
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = id === 'plant' ? plantScene(t) : id === 'animal' ? sortScene() : organsScene(t);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// fit the scene: 520 × 405 units, centred, content at the bottom
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 510, hh / 410, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 405 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer: taps and dragging cards ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+const binAt = p => { for (let b = 0; b < 4; b++) { const [x, y] = binXY(b); if (p.x > x - 6 && p.x < x + BW + 6 && p.y > y - 10 && p.y < y + BH + 6) return b; } return -1; };
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag],[data-hit]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  if (el.dataset.drag) {
+    const c = +el.dataset.drag.slice(1), p = toSvg(e);
+    let dx = -CW / 2, dy = -CH / 2;
+    if (S.bin[c] < 0) { const [x, y] = homeXY(c); dx = x - p.x; dy = y - p.y; }
+    drag = { c, dx, dy, px: p.x, py: p.y, x: e.clientX, y: e.clientY, moved: false };
+    scene.classList.add('grabbing');
+  } else drag = { c: -1, hit: el.dataset.hit, x: e.clientX, y: e.clientY, moved: false };
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 6) drag.moved = true;
+  if (drag.c < 0 || !drag.moved) return;
+  const p = toSvg(e); drag.px = p.x; drag.py = p.y; dirty = true;
+});
+function endDrag(cancel) {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing');
+  if (cancel) { dirty = true; return; }
+  if (d.c >= 0) {
+    if (!d.moved) { S.sel = S.sel === d.c ? -1 : d.c; S.look = d.c; update(); return; }
+    drop(d.c, binAt({ x: d.px, y: d.py }));
+    return;
+  }
+  if (d.moved) return;
+  tap(d.hit);
+}
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+function tap(id) {
+  const L = LID();
+  if (L === 'plant' && id.startsWith('pt')) pickPoint(+id.slice(2));
+  if (L === 'animal' && id.startsWith('bin')) {
+    if (S.sel >= 0) drop(S.sel, +id.slice(3)); else toast('Сначала нажмите на карточку с препаратом, потом на коробку.');
+  }
+  if (L === 'organs' && id.startsWith('org')) tapOrgan(+id.slice(3));
+}
+
+function loop(t) {
+  requestAnimationFrame(loop);
+  let anim = false;
+  const id = LID();
+  if (id === 'plant' && S.cur >= 0 && !reduce) anim = t - S.curT < 1200;
+  if (id === 'organs' && !reduce) anim = t - S.paintT < 520;
+  if (S.hl) anim = true;
+  if (dirty || anim) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2800); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, c) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${c ? `<i style="background:${c}"></i>` : ''}${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  const cur = S.cur >= 0 ? S.pa[S.cur] : null;
+  tb.innerHTML = {
+    plant: PTK.map(k => B('pt-' + k, PT[k].name, cur === k, PT[k].c)).join('') + sep + B('reset', 'Сбросить'),
+    animal: B('reset', 'Убрать все карточки'),
+    organs: SYSK.map(k => B('sys-' + k, SYS[k].name, S.brush === k, SYS[k].c)).join('') + B('erase', 'Ластик', S.brush === 'erase') + sep + B('reset', 'Сбросить'),
+  }[id];
+  placeHint();
+}
+// the stage hint sits bottom-left; hide it when the toolbar is wide enough to cover it
+function placeHint() {
+  const hn = $('#hint'), st = $('#stage').getBoundingClientRect(), tb = $('#tools').getBoundingClientRect();
+  hn.style.visibility = tb.left - st.left < st.width * 0.19 + 30 ? 'hidden' : '';
+}
+addEventListener('resize', placeHint);
+function act(a) {
+  if (a.startsWith('pt-')) return assign(a.slice(3));
+  if (a.startsWith('sys-')) { const k = a.slice(4); S.brush = S.brush === k ? null : k; renderTools(); update(); return; }
+  if (a === 'erase') { S.brush = S.brush === 'erase' ? null : 'erase'; renderTools(); update(); return; }
+  if (a === 'reset') { const mag = S.mag; resetLesson(); S.mag = mag; renderTools(); update(); return; }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const dot = c => IC(`<circle cx="17" cy="17" r="11" fill="${c}" opacity=".85"/><circle cx="17" cy="17" r="4" fill="#0b1019"/>`);
+const ICON = {
+  apex: IC('<path d="M17 32V12" stroke="#4ea65a" stroke-width="2.4"/><path d="M12 14Q17 0 22 14Z" fill="#86d07a"/>'),
+  leaf: IC('<path d="M4 28L28 8" stroke="#3f8f4c" stroke-width="1.6"/><ellipse cx="12" cy="18" rx="7" ry="4" fill="var(--leaf)" transform="rotate(-40 12 18)"/><ellipse cx="22" cy="10" rx="7" ry="4" fill="var(--leaf)" transform="rotate(-40 22 10)"/>'),
+  stem: IC('<path d="M17 32V3" stroke="#4ea65a" stroke-width="4"/>'),
+  tuber: IC('<ellipse cx="17" cy="18" rx="13" ry="9" fill="#c9a46a"/><circle cx="13" cy="15" r="1.4" fill="#8a6a3a"/><circle cx="22" cy="20" r="1.4" fill="#8a6a3a"/>'),
+  root: IC('<path d="M17 2v26M17 12l-8 8M17 16l8 8" stroke="#e8dcc0" stroke-width="1.8" fill="none"/><circle cx="17" cy="29" r="2" fill="#b48cff"/>'),
+  field: IC('<circle cx="17" cy="17" r="13" fill="#e6ece6" stroke="#2a3550" stroke-width="3"/><path d="M8 13h18M8 19h18M13 6v22M20 6v22" stroke="#7d9a8a" stroke-width=".8"/>'),
+  pts: IC('<circle cx="10" cy="10" r="6" fill="#1a2438" stroke="var(--fg)"/><circle cx="24" cy="22" r="6" fill="var(--ok)"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (m.kind === 'pt') return m.placed < 7 ? `Определено ${m.placed} из 7` : `Верно ${m.right} из 7`;
+  if (m.kind === 'sort') return m.placed < 8 ? `Разложено ${m.placed} из 8` : `Верно ${m.right} из 8`;
+  return m.placed < 10 ? `Раскрашено ${m.placed} из 10` : `Верно ${m.right} из 10`;
+}
+
+// Scheme tab: built once per lesson, values refreshed after
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function sysChart() {
+  let h = `<svg class="diag" viewBox="0 0 120 64" role="img" aria-label="Сколько органов раскрашено каждой системой">`;
+  SYSK.forEach((k, i) => {
+    const n = ORGANS.filter(o => S.paint[o.id] === k).length, x = 10 + i * 22, H = n * 11;
+    h += `<rect x="${x}" y="${f(48 - H)}" width="14" height="${Math.max(.6, H)}" fill="${SYS[k].c}"/><text x="${x + 7}" y="${f(46 - H)}" font-size="4" fill="#e8ecf4" text-anchor="middle">${n}</text>`;
+    h += `<text x="${x + 7}" y="56" font-size="3.4" fill="#8b96ad" text-anchor="middle">${SYS[k].name.slice(0, 6)}.</text>`;
+  });
+  return h + `<path d="M6 48H116" stroke="#26324a" stroke-width=".6"/></svg>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'plant') h = `<h2>Микроскоп</h2><p class="note">Выберите точку и меняйте увеличение: при большом видно строение одной клетки, при малом — сколько их и как они лежат.</p>` +
+      slider('inMag', 'Увеличение', 100, 400, 50, S.mag) +
+      `<div class="ctl"><div class="lbl">Точка на растении</div><div class="chips" id="ptChips">${POINTS.map((p, i) => `<button data-i="${i}">${i + 1}</button>`).join('')}</div></div>
+      <dl class="reads"><div><dt>Точка</dt><dd id="r1"></dd></div><div><dt>Определено</dt><dd id="r2"></dd></div><div><dt>Верно</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Ткань для выбранной точки</div><div class="chips" id="tChips">${PTK.map(k => `<button data-k="${k}">${PT[k].name}</button>`).join('')}</div></div>`;
+  if (id === 'animal') h = `<h2>Сортировка препаратов</h2><p class="note">Нажмите карточку — её препарат крупно появится справа вверху на столе.</p>
+      <dl class="reads"><div><dt>Разложено</dt><dd id="r1"></dd></div><div><dt>Верно</dt><dd id="r2"></dd></div><div><dt>Выбрано</dt><dd id="r3"></dd></div></dl>
+      <h3>В коробках</h3><div class="steps" id="binList"></div>
+      <div class="row"><button class="ghostbtn" data-a="reset">Убрать все карточки</button></div>`;
+  if (id === 'organs') h = `<h2>Системы органов</h2><div id="sDiag"></div>
+      <dl class="reads"><div><dt>Раскрашено</dt><dd id="r1"></dd></div><div><dt>Верно</dt><dd id="r2"></dd></div><div><dt>Орган</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Кисть</div><div class="chips" id="sChips">${SYSK.map(k => `<button data-k="${k}">${SYS[k].name}</button>`).join('')}<button data-k="erase">Ластик</button></div></div>
+      <div class="row"><button class="ghostbtn" data-a="reset">Сбросить</button></div>`;
+  el.innerHTML = h;
+  const inp = el.querySelector('#inMag'); if (inp) inp.addEventListener('input', e => { S.mag = +e.target.value; update(); });
+  el.querySelectorAll('#ptChips button').forEach(b => b.onclick = () => pickPoint(+b.dataset.i));
+  el.querySelectorAll('#tChips button').forEach(b => b.onclick = () => assign(b.dataset.k));
+  el.querySelectorAll('#sChips button').forEach(b => b.onclick = () => act(b.dataset.k === 'erase' ? 'erase' : 'sys-' + b.dataset.k));
+  el.querySelectorAll('.row [data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (m.kind === 'pt') {
+    set('#inMagO', '×' + S.mag); val('#inMag', S.mag);
+    set('#r1', S.cur >= 0 ? String(S.cur + 1) : '—'); set('#r2', `${m.placed} из 7`); set('#r3', m.placed === 7 ? `${m.right} из 7` : '—');
+    el.querySelectorAll('#ptChips button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.i === S.cur));
+    el.querySelectorAll('#tChips button').forEach(b => b.setAttribute('aria-pressed', S.cur >= 0 && S.pa[S.cur] === b.dataset.k));
+  } else if (m.kind === 'sort') {
+    set('#r1', `${m.placed} из 8`); set('#r2', m.placed === 8 ? `${m.right} из 8` : '—'); set('#r3', S.look >= 0 ? SLIDES[S.look].short : '—');
+    const bl = el.querySelector('#binList');
+    if (bl) bl.innerHTML = ATK.map((k, b) => step(AT[k].name, SLIDES.filter((_, c) => S.bin[c] === b).map(s => s.short).join(', ') || '—')).join('');
+  } else {
+    const d = el.querySelector('#sDiag'); if (d) d.innerHTML = sysChart();
+    set('#r1', `${m.placed} из 10`); set('#r2', m.placed === 10 ? `${m.right} из 10` : '—'); set('#r3', S.org >= 0 ? ORGANS[S.org].name : '—');
+    el.querySelectorAll('#sChips button').forEach(b => b.setAttribute('aria-pressed', S.brush === b.dataset.k));
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'plant') return [
+    { id: 'pts', icon: ICON.pts, name: 'Точки 1–7', spec: 'Места, откуда взяты кусочки для микроскопа. Цвет точки — ваш ответ.' },
+    { id: 'field', icon: ICON.field, name: 'Поле зрения микроскопа', spec: 'Клетки выбранной точки. Увеличение меняется на вкладке «Схема».' },
+    { id: 'apex', icon: ICON.apex, name: 'Верхушка побега', spec: 'Здесь стебель растёт в длину и появляются новые листья.' },
+    { id: 'leaf', icon: ICON.leaf, name: 'Листья', spec: 'Сложные листья картофеля. Снаружи — защита, внутри — «фабрика» сахара на свету.' },
+    { id: 'stem', icon: ICON.stem, name: 'Стебель', spec: 'Соединяет корни и листья, держит растение прямо.' },
+    { id: 'tuber', icon: ICON.tuber, name: 'Клубень', spec: 'Утолщённый подземный побег. В нём растение запасает питательные вещества на зиму.' },
+    { id: 'root', icon: ICON.root, name: 'Корни', spec: 'Всасывают воду с минеральными солями. Кончик корня всё время растёт вглубь.' }];
+  if (id === 'animal') return ATK.map(k => ({ id: k, icon: dot(AT[k].c), name: AT[k].name + ' ткань', spec: `${AT[k].feat} Работа: ${AT[k].func}.` }));
+  return ORGANS.map(o => ({ id: o.id, icon: dot(S.paint[o.id] ? SYS[S.paint[o.id]].c : '#56627d'), name: o.name, spec: o.job }));
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    let h = `<h2>${L.id === 'animal' ? 'Группы тканей' : L.id === 'organs' ? 'Органы' : 'Что на столе'}</h2><p class="note">Нажмите на строку, чтобы найти это на столе.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    if (L.id === 'plant') h += `<h3>Приметы тканей под микроскопом</h3><div class="feat">` + PTK.map(k => `<div style="border-left-color:${PT[k].c}"><b>${PT[k].name}</b>${PT[k].feat}</div>`).join('') + `</div>`;
+    $('#pane-parts').innerHTML = h;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => {
+      S.hl = { id: b.dataset.id, t: performance.now() };
+      if (L.id === 'organs') { S.org = ORGANS.findIndex(o => o.id === b.dataset.id); update(); }
+      dirty = true;
+    });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'plant') {
+    let h = `<h2>Как определить ткань</h2><div class="formula">строение клеток → работа → ткань</div><h3>Вопросы по порядку</h3><div class="steps">` +
+      step('1. Клетки мелкие, вплотную, ядро крупное?', 'образовательная') +
+      step('2. Один плотный слой, есть устьица?', 'покровная') +
+      step('3. Длинные трубки?', 'проводящая') +
+      step('4. Толстые стенки, острые концы?', 'механическая') +
+      step('5. Хлоропласты или запас крахмала?', 'основная') + `</div>`;
+    if (S.cur >= 0) h += `<h3>Точка ${S.cur + 1}: что видно</h3><p>${PIC_SEEN[POINTS[S.cur].pic][0].toUpperCase() + PIC_SEEN[POINTS[S.cur].pic].slice(1)}.</p>`;
+    const all = m.placed === 7;
+    h += `<h3>Ваши ответы</h3><div class="steps">` + POINTS.map((p, i) => step(`${i + 1}. ${p.name}`, S.pa[i] ? PT[S.pa[i]].name + (all ? (S.pa[i] === p.ans ? ' ✓' : ' ✗') : '') : '—')).join('') +
+      step('итого', all ? `верно ${m.right} из 7` : `определено ${m.placed} из 7`, 'sum') + `</div>`;
+    if (!all) h += `<p class="note" style="margin-top:10px">Проверка появится, когда все 7 точек будут определены.</p>`;
+    return h;
+  }
+  if (id === 'animal') {
+    const all = m.placed === 8;
+    let h = `<h2>Как рассуждать</h2><div class="formula">межклеточное вещество: мало → эпителий, много → соединительная</div><div class="steps">` +
+      step('1. Клетки сомкнуты в пласт?', 'эпителиальная') + step('2. Между клетками много вещества?', 'соединительная') +
+      step('3. Длинные волокна или веретёна?', 'мышечная') + step('4. Тело клетки с отростками?', 'нервная') + `</div>`;
+    h += `<h3>Сейчас</h3><div class="steps">` + SLIDES.map((s, c) => step(s.short, S.bin[c] < 0 ? '—' : AT[ATK[S.bin[c]]].name + (all ? (ATK[S.bin[c]] === s.ans ? ' ✓' : ' ✗') : ''))).join('') +
+      step('итого', all ? `верно ${m.right} из 8` : `разложено ${m.placed} из 8`, 'sum') + `</div>`;
+    if (!all) h += `<p class="note" style="margin-top:10px">Проверка появится, когда все 8 карточек будут в коробках.</p>`;
+    return h;
+  }
+  const all = m.placed === 10;
+  let h = `<h2>От клетки к организму</h2><div class="formula">клетки → ткань → орган → система органов → организм</div>`;
+  if (S.org >= 0) {
+    const o = ORGANS[S.org];
+    h += `<h3>${o.name}: ткани</h3><div class="steps">` + ATK.filter(k => o.tis[k]).map(k => step(AT[k].name, o.tis[k])).join('') +
+      step('всего тканей', `${Object.keys(o.tis).length} из 4`, 'sum') + `</div><p class="note" style="margin-top:8px">${o.job}</p>`;
+  } else h += `<p class="note">Нажмите на орган, чтобы увидеть, из каких тканей он состоит.</p>`;
+  h += `<h3>Системы и их работа</h3><div class="steps">` + SYSK.map(k => step(SYS[k].name, `${ORGANS.filter(o => S.paint[o.id] === k).length} орг.`)).join('') +
+    step('итого', all ? `верно ${m.right} из 10` : `раскрашено ${m.placed} из 10`, 'sum') + `</div>`;
+  h += `<p class="note" style="margin-top:10px">Спросите про каждый орган: какую работу он делает? Работа системы: ${SYSK.map(k => `${SYS[k].name.toLowerCase()} — ${SYS[k].job}`).join('; ')}.</p>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const el = $('#meter');
+  if (m.kind === 'pt') {
+    el.innerHTML = `<div class="k">Определено</div><div class="v ${S.done.plant ? 'ok' : ''}">${m.placed} / 7</div>
+      <div class="gauge"><b style="width:${(m.placed / 7 * 100).toFixed(1)}%"></b></div>
+      <div class="lr"><span>верно</span><span>${m.placed === 7 ? m.right + ' из 7' : '—'}</span></div><div class="lr"><span>увеличение</span><span>×${S.mag}</span></div>`;
+  } else if (m.kind === 'sort') {
+    const c = S.look;
+    el.innerHTML = `<div class="k">${c >= 0 ? 'Препарат' : 'Разложено'}</div><div class="v ${S.done.animal ? 'ok' : ''}">${c >= 0 ? SLIDES[c].short : m.placed + ' / 8'}</div>` +
+      (c >= 0 ? `<svg viewBox="-24 -24 48 48" aria-hidden="true">${slideSVG(SLIDES[c].id, 0, 0, 22, 'm')}</svg>` : `<div class="gauge"><b style="width:${(m.placed / 8 * 100).toFixed(1)}%"></b></div>`) +
+      `<div class="lr"><span>всего</span><span>${m.placed}/8</span></div>`;
+  } else {
+    el.innerHTML = `<div class="k">Раскрашено</div><div class="v ${S.done.organs ? 'ok' : ''}">${m.placed} / 10</div>
+      <div class="gauge"><b style="width:${(m.placed / 10 * 100).toFixed(1)}%"></b></div>
+      <div class="lr"><span>верно</span><span>${m.placed === 10 ? m.right + ' из 10' : '—'}</span></div>`;
+  }
+}
+
+function update() {
+  const m = model(), L = LESSONS[S.lesson];
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Вы настоящий гистолог!');
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  plant: '<path d="M8 24h24" stroke="#6b4c36" stroke-width="3"/><path d="M18 24V6" stroke="#4ea65a" stroke-width="1.6"/><ellipse cx="13" cy="11" rx="4" ry="2" fill="#5fbf6a"/><ellipse cx="23" cy="15" rx="4" ry="2" fill="#5fbf6a"/><circle cx="47" cy="15" r="11" fill="#eef4e6" stroke="#56627d" stroke-width="2"/><path d="M40 10h14M40 15h14M40 20h14M44 5v20M49 5v20" stroke="#5f8f4c" stroke-width=".8"/>',
+  animal: '<rect x="4" y="6" width="12" height="18" rx="2" fill="#72d4e8" opacity=".8"/><rect x="19" y="6" width="12" height="18" rx="2" fill="#ffb547" opacity=".8"/><rect x="34" y="6" width="12" height="18" rx="2" fill="#ff8a73" opacity=".8"/><rect x="49" y="6" width="12" height="18" rx="2" fill="#b48cff" opacity=".8"/>',
+  organs: '<circle cx="33" cy="6" r="4" fill="#c9a8ef"/><path d="M24 12h18l-2 16H26z" fill="#202a3e" stroke="#56627d"/><ellipse cx="29" cy="16" rx="3" ry="4" fill="#72d4e8"/><ellipse cx="37" cy="16" rx="3" ry="4" fill="#72d4e8"/><circle cx="35" cy="19" r="2" fill="#ff6b6b"/><rect x="28" y="22" width="10" height="5" rx="2" fill="#ffb547"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i];
+  S.lesson = i; S.hl = null; drag = null;
+  resetLesson();
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '', guide = '';
+  if (id === 'plant') {
+    now = `Растение картофеля с 7 точками, из которых взяты кусочки для микроскопа: ${POINTS.map((p, i) => `${i + 1}) ${p.name} — ответ ученика: ${S.pa[i] ? PT[S.pa[i]].name.toLowerCase() : 'нет'}`).join('; ')}. ` +
+      (S.cur >= 0 ? `Сейчас в микроскопе (×${S.mag}) точка ${S.cur + 1} «${POINTS[S.cur].name}»: видны ${PIC_SEEN[POINTS[S.cur].pic]}. ` : 'Точка пока не выбрана. ') +
+      (m.placed === 7 ? `Все точки определены, верно ${m.right} из 7.` : `Определено ${m.placed} из 7, проверка появится, когда будут определены все.`);
+    guide = 'Не называй, какая ткань в какой точке. Спрашивай про приметы клеток: размер, толщину стенок, форму, что внутри, и какую работу такие клетки могут делать.';
+  }
+  if (id === 'animal') {
+    now = `8 карточек-препаратов: ${SLIDES.map((s, c) => `${s.short} — ${S.bin[c] < 0 ? 'не разложена' : 'в коробке «' + AT[ATK[S.bin[c]]].name + '»'}`).join('; ')}. Коробки: эпителиальная, соединительная, мышечная, нервная. ` +
+      (m.placed === 8 ? `Все разложены, верно ${m.right} из 8.` : `Разложено ${m.placed} из 8.`) + (S.look >= 0 ? ` Крупно показан препарат «${SLIDES[S.look].short}».` : '');
+    guide = 'Не говори, в какую коробку класть карточку. Подводи вопросами: много ли вещества между клетками, есть ли волокна или отростки, какую работу делает эта ткань в теле.';
+  }
+  if (id === 'organs') {
+    now = `Схема тела человека с 10 органами: ${ORGANS.map(o => `${o.name} — ${S.paint[o.id] ? 'раскрашен как «' + SYS[S.paint[o.id]].name + '»' : 'не раскрашен'}`).join('; ')}. Кисть: ${S.brush ? (S.brush === 'erase' ? 'ластик' : SYS[S.brush].name) : 'не выбрана'}. ` +
+      (S.org >= 0 ? `Выбран орган «${ORGANS[S.org].name}», его ткани: ${Object.entries(ORGANS[S.org].tis).map(([k, v]) => AT[k].name.toLowerCase() + ' (' + v + ')').join(', ')}. ` : '') +
+      (m.placed === 10 ? `Все органы раскрашены, верно ${m.right} из 10.` : `Раскрашено ${m.placed} из 10.`);
+    guide = 'Не называй систему для каждого органа. Спрашивай, какую работу делает орган и с какими органами он работает вместе.';
+  }
+  return [
+    `Раздел: биология, 7 класс, тема «Ткани и органы». Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Для тьютора: ${guide}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = {
+    plant: 'Чем образовательная ткань отличается от покровной?', animal: 'Почему кровь — это соединительная ткань?',
+    organs: 'Чем орган отличается от ткани?',
+  }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
