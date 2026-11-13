@@ -313,18 +313,22 @@
   }
 
   // ---------- dictation (mic next to the input) ----------
-  let dict = null;
+  // a question asked by voice gets an answer in text and in voice at the same time
+  let dict = null, dictated = false;
   mic.hidden = !canListen;
   mic.addEventListener('click', async () => {
+    unlockAudio();
     if (dict) { dict.stop(); return; }
     const before = inp.value ? inp.value.trim() + ' ' : '';
     mic.classList.add('rec'); mic.setAttribute('aria-label', 'Остановить запись');
     inp.placeholder = SR ? 'Говорите…' : 'Говорите, я запишу и расшифрую…';
     dict = listen(t => { inp.value = before + t; });
-    try { const t = await dict.p; inp.value = (before + t).trim(); }
+    let heard = '';
+    try { heard = await dict.p; inp.value = (before + heard).trim(); }
     catch (e) { flash(micError(e)); }
     dict = null; mic.classList.remove('rec'); mic.setAttribute('aria-label', 'Надиктовать вопрос');
-    inp.placeholder = 'Спросите что угодно про опыт…'; inp.dispatchEvent(new Event('input')); inp.focus();
+    inp.placeholder = 'Спросите что угодно про опыт…'; inp.dispatchEvent(new Event('input'));
+    if (heard) { dictated = true; form.requestSubmit(); } else inp.focus();
   });
   function flash(msg) { const d = bubble('assistant', msg); d.style.opacity = '.8'; scroll(); }
 
@@ -374,7 +378,12 @@
   $('#lt-new').addEventListener('click', () => { if (ctrl) ctrl.abort(); speaker.stop(); chat = []; saveChat(); busy = false; send.disabled = false; render(); if (voiceMode) setVoice('idle', ''); });
   panel.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
   sug.addEventListener('click', e => { const b = e.target.closest('button'); if (b) ask(b.textContent); });
-  form.addEventListener('submit', e => { e.preventDefault(); const q = inp.value; inp.value = ''; inp.style.height = ''; ask(q).then(() => inp.focus()); });
+  form.addEventListener('submit', e => {
+    e.preventDefault(); const q = inp.value, voice = dictated; dictated = false;
+    inp.value = ''; inp.style.height = '';
+    if (voice) speaker.stop();
+    ask(q, { voice }).then(() => inp.focus());
+  });
   inp.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); } });
   inp.addEventListener('input', () => { inp.style.height = 'auto'; inp.style.height = Math.min(inp.scrollHeight, 120) + 'px'; });
   if (window.speechSynthesis) speechSynthesis.getVoices();
