@@ -1,0 +1,833 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория: восемь ламп-битов, перевод чисел между двоичной, десятичной и шестнадцатеричной системами, сложение с переносом и цвет #RRGGBB.">
+<title>Двоичная система</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /optics and /mechanics. 2D bench of lamp-bits on the left, lesson notebook on the right, lesson strip under the bench. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --red:#ff6b6b;
+  --green:#5fe08f;
+  --blue:#5ea8ff;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap;min-width:0}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;flex-wrap:wrap;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:100%}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap;min-width:0}
+
+/* ---------- stage ---------- */
+.stage{position:relative;min-height:0;min-width:0;display:flex;flex-direction:column;gap:12px;padding:14px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.top{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;flex:none}
+.card{background:var(--tag-bg);border:1px solid var(--line);border-radius:12px}
+.task{flex:1 1 260px;max-width:400px;padding:11px 14px 12px}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+.board{flex:0 1 210px;min-width:150px;padding:10px 12px}
+.board .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.board .v{display:flex;align-items:center;gap:8px;font:500 26px/1.1 var(--font-mono);margin-top:7px;font-variant-numeric:tabular-nums}
+.board .v .chip{width:22px;height:22px;border-radius:6px;border:1px solid var(--line);flex:none}
+.board .sub{font:500 11.5px/1.35 var(--font-mono);color:var(--muted);margin-top:6px;overflow-wrap:anywhere}
+.board .sub.ok{color:var(--ok)}.board .sub.warn{color:var(--warn)}
+
+.bench{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:6px 2px}
+
+.bits{--cols:8;display:grid;grid-template-columns:repeat(var(--cols),minmax(0,1fr));gap:6px;width:100%;max-width:calc(var(--cols) * 82px)}
+.bit{--c:var(--force);display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;background:none;border:0;padding:4px 0;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;border-radius:10px}
+.bit:hover .glass{stroke:var(--fg)}
+.bit svg{display:block;width:100%;max-width:56px;height:auto;overflow:visible}
+.bit .w{font:500 12px/1 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.bit .d{font:500 20px/1 var(--font-mono)}
+.bit.on .w{color:var(--c)}
+.glass{fill:var(--surface-2);stroke:var(--muted);stroke-width:1.5}
+.fil{fill:none;stroke:var(--muted);stroke-width:1.3;stroke-linejoin:round;stroke-linecap:round}
+.cap{fill:#56627d}
+.bit.on .glass{fill:var(--c);stroke:var(--c)}
+.bit.on .fil{stroke:#fff7e0}
+.bit.on svg{filter:drop-shadow(0 0 7px var(--c))}
+.bit.sm{gap:2px;padding:2px 0}
+.bit.sm svg{max-width:32px}
+.bit.sm .d{font-size:14px}
+.bit.res{--c:var(--arm);cursor:default}
+.bit.ovf{--c:var(--warn)}
+.bit.flip svg{animation:flip .28s ease-out}
+@keyframes flip{from{transform:scale(.82)}to{transform:none}}
+@keyframes pop{from{opacity:0;transform:translateY(-5px) scale(.7)}to{opacity:1;transform:none}}
+.pop{animation:pop .34s ease-out both;animation-delay:var(--d,0ms)}
+
+.sumline{font:500 15px/1.4 var(--font-mono);text-align:center;color:var(--muted);overflow-wrap:anywhere}
+.sumline b{color:var(--force);font-weight:500;font-size:20px}
+.combos{display:flex;flex-direction:column;align-items:center;gap:8px;width:100%}
+.combos .lbl{font-size:13px;color:var(--muted)}
+.cgrid{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;max-width:520px}
+.combo{min-width:22px;height:22px;padding:0 6px;display:inline-grid;place-items:center;border:1px solid var(--line);border-radius:6px;font:500 12px/1 var(--font-mono);color:var(--muted)}
+.combo.seen{background:rgba(255,181,71,.16);border-color:var(--force);color:var(--fg)}
+.combo.cur{outline:2px solid var(--arm);outline-offset:1px}
+.pbar{width:min(320px,100%);height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.pbar i{display:block;height:100%;background:var(--force)}
+
+.goal{font:500 15px/1.3 var(--font-body);color:var(--muted);text-align:center}
+.goal b{font:500 30px/1 var(--font-mono);color:var(--fg);margin:0 6px;vertical-align:-3px}
+.div{width:100%;max-width:420px;display:grid;gap:5px}
+.drow{display:flex;justify-content:space-between;gap:10px;align-items:center;background:var(--surface-2);border-radius:9px;padding:7px 11px;font:500 14px/1.2 var(--font-mono);font-variant-numeric:tabular-nums}
+.drow .r{color:var(--muted);font-family:var(--font-body);font-size:13px}
+.drow .r b{display:inline-grid;place-items:center;width:24px;height:24px;margin-left:6px;border-radius:6px;background:var(--force);color:var(--bg);font:600 14px/1 var(--font-mono)}
+.drow .r b.z{background:var(--line);color:var(--fg)}
+.dans{text-align:center;font-size:14px;color:var(--muted);padding-top:4px}
+.dans b{font:500 18px var(--font-mono);color:var(--force);letter-spacing:.08em}
+.dempty{font-size:13px;color:var(--muted);text-align:center;border:1px dashed var(--line);border-radius:10px;padding:12px}
+
+.add{display:grid;grid-template-columns:54px repeat(9,minmax(0,1fr));gap:4px 4px;width:100%;max-width:640px;align-items:center}
+.add .ah{font:500 11px/1 var(--font-mono);color:var(--muted);text-align:center;font-variant-numeric:tabular-nums}
+.add .ah.o{color:var(--warn)}
+.add .al{font:600 15px/1.1 var(--font-mono);text-align:left}
+.add .al small{display:block;font:500 11px/1.2 var(--font-mono);color:var(--muted)}
+.cy{display:grid;place-items:center;height:22px}
+.cy i{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--force);color:var(--bg);font:600 12px/1 var(--font-mono);font-style:normal}
+.add .rule{grid-column:1/-1;height:1px;background:var(--muted);opacity:.6}
+.add .sign{text-align:center;font:500 18px/1 var(--font-mono);color:var(--muted)}
+.ovfmsg{font-size:14px;text-align:center;color:var(--muted);max-width:460px}
+.ovfmsg.warn{color:var(--warn)}
+
+.rgb{display:grid;gap:10px;width:100%;max-width:640px}
+.crow{display:grid;grid-template-columns:22px minmax(0,1fr) auto 36px;gap:8px;align-items:center}
+.crow .cl{font:600 16px/1 var(--font-mono);color:var(--c)}
+.crow .cd{font:500 13px/1 var(--font-mono);color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.cbits{display:flex;gap:8px;min-width:0}
+.nib{flex:1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px;min-width:0}
+.hx{display:flex;gap:3px}
+.hx button{width:30px;height:36px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);font:500 17px/1 var(--font-mono);cursor:pointer;touch-action:manipulation}
+.hx button:hover{border-color:var(--c)}
+.swatch{width:100%;max-width:640px;height:92px;border-radius:14px;border:1px solid var(--line);display:flex;align-items:flex-end;justify-content:space-between;padding:10px 14px;font:500 15px/1 var(--font-mono);transition:background .2s}
+
+.tools{flex:none;align-self:center;display:flex;flex-wrap:wrap;justify-content:center;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:100%}
+.tools button{background:none;border:0;border-radius:7px;padding:7px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap;touch-action:manipulation}
+.tools button:hover{color:var(--fg)}
+.tools button:disabled{opacity:.35;cursor:default}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px}
+.tools .sq{min-width:30px;padding:7px 0;font:500 14px/1 var(--font-mono)}
+.tools .tl{font-size:12px;color:var(--muted);padding:0 6px}
+
+.flash{outline:2px solid var(--arm);outline-offset:3px;border-radius:8px;animation:flashk 1.6s ease-out}
+@keyframes flashk{0%,50%{outline-color:var(--arm)}25%,75%{outline-color:transparent}}
+
+/* ---------- panel ---------- */
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.why{border-left:2px solid var(--arm);padding-left:12px;font-size:14px}
+.why b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--arm);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+
+#diagram{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.dg-box{fill:var(--surface-2);stroke:var(--muted);stroke-width:.3}
+.dg-box.on{fill:rgba(255,181,71,.2);stroke:var(--force)}
+.dg-t{fill:var(--fg);font:500 4px var(--font-mono);text-anchor:middle;dominant-baseline:central}
+.dg-s{fill:var(--muted);font:500 2.6px var(--font-mono);text-anchor:middle;dominant-baseline:central}
+.dg-o{fill:var(--force)}.dg-a{fill:var(--arm)}.dg-w{fill:var(--warn)}.dg-ok{fill:var(--ok)}
+.dg-l{stroke:var(--muted);stroke-width:.3;fill:none}
+.dg-l.on{stroke:var(--force);stroke-width:.45}
+.dg-n{fill:var(--surface-2);stroke:var(--muted);stroke-width:.3}
+.dg-n.on{fill:var(--force);stroke:var(--force)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+
+.formula{font:500 19px/1.2 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px;overflow-wrap:anywhere}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.dim span{color:var(--muted)}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+.step.hl{background:none;border:1px solid var(--force)}
+.step.hl b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:5;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{min-height:0}
+  .bench{overflow:visible;justify-content:flex-start}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .stage{padding:10px}
+  .sections a{padding:8px 7px;font-size:10.5px;letter-spacing:.04em}
+  .task{padding:9px 11px}
+  .task p{font-size:13px}
+  .board{flex:1 1 100%}
+  .board .v{font-size:22px}
+  .bits{gap:3px}
+  .bit .w{font-size:10px}
+  .bit .d{font-size:16px}
+  .add{grid-template-columns:40px repeat(9,minmax(0,1fr));gap:3px 2px}
+  .add .ah{font-size:8.5px}
+  .add .al{font-size:13px}
+  .add .al small{font-size:10px}
+  .crow{grid-template-columns:16px minmax(0,1fr) auto 28px;gap:5px}
+  .cbits{gap:5px}
+  .hx button{width:26px;height:32px;font-size:15px}
+  .crow .cd{font-size:11px}
+  .tools button{padding:7px 7px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><circle cx="11" cy="17" r="4.2" fill="var(--force)"/><circle cx="20" cy="17" r="4.2" fill="none" stroke="var(--muted)" stroke-width="1.6"/><circle cx="29" cy="17" r="4.2" fill="var(--force)"/><path d="M9 28h4M18 28h4M27 28h4" stroke="var(--arm)" stroke-width="2" stroke-linecap="round"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Информатика · Биты</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/">Карта</a><a href="/optics/">Оптика</a><a href="/mechanics/">Механика</a><a href="/informatics/" aria-current="page">Информатика</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Двоичная</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/5</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Стенд с лампами-битами">
+    <div class="top">
+      <div class="task card" aria-live="polite">
+        <div class="k" id="taskK">Задание</div>
+        <p id="taskText"></p>
+        <div class="state" id="taskState"></div>
+      </div>
+      <div class="board card" id="board">
+        <div class="k" id="boardK"></div>
+        <div class="v" id="boardV"></div>
+        <div class="sub" id="boardS"></div>
+      </div>
+    </div>
+    <div class="bench" id="bench"></div>
+    <div class="tools" id="tools" role="toolbar" aria-label="Управление стендом"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden>
+      <h2 id="schemeH">Схема</h2>
+      <svg id="diagram" viewBox="0 0 120 50" role="img" aria-label="Схема разрядов"></svg>
+      <dl class="reads" id="reads"></dl>
+      <div id="schemeCtl"></div>
+    </div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c; };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const bin = (v, n = 8) => v.toString(2).padStart(n, '0');
+const hex2 = v => v.toString(16).toUpperCase().padStart(2, '0');
+const HEXD = '0123456789ABCDEF';
+const SUP = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+const sup = n => String(n).split('').map(d => SUP[d]).join('');
+const nib = s => s.slice(0, 4) + ' ' + s.slice(4);
+const ascii = v => v === 32 ? 'пробел' : v > 32 && v < 127 ? '«' + String.fromCharCode(v) + '»' : v < 32 || v === 127 ? 'служебный, не печатается' : 'вне таблицы ASCII';
+const CH = [
+  { name: 'R', ru: 'красный', c: 'var(--red)', hex: '#ff6b6b' },
+  { name: 'G', ru: 'зелёный', c: 'var(--green)', hex: '#5fe08f' },
+  { name: 'B', ru: 'синий', c: 'var(--blue)', hex: '#5ea8ff' },
+];
+const TARGET_RGB = [255, 128, 0];
+
+const LESSONS = [
+  { id: 'bit', title: 'Бит — это лампочка',
+    text: ['Внутри компьютера — миллиарды крошечных переключателей. Каждый умеет только две вещи: ток есть или тока нет. Записываем это как 1 и 0. Один такой переключатель называют <b>битом</b>.',
+           'Одна лампа — 2 состояния. Добавим вторую: на каждое положение первой есть два положения второй, значит 2 · 2 = 4. Три лампы — 2 · 2 · 2 = 8. Правило простое: <b>n ламп дают 2ⁿ комбинаций</b>. Восемь бит называют байтом, у него 2⁸ = 256 состояний.'],
+    why: 'Программист решает, сколько бит отдать под число, сетевой инженер по той же формуле 2ⁿ считает, сколько устройств влезет в сеть, а разработчик игр хранит в одном байте восемь флажков: «ключ найден», «дверь открыта»… А ещё биты объясняют, почему тариф в 100 Мбит/с качает файл со скоростью около 12 мегабайт в секунду.',
+    task: 'Оставьте 3 лампы и переберите все 8 комбинаций.',
+    hint: 'Число ламп меняется кнопками внизу стенда. Кнопка «+1» перебирает комбинации по порядку, но можно щёлкать и сами лампы.',
+    check: () => S.n === 3 && S.seen.size === 8,
+    mini: [{ bits: '101', c: 'var(--force)' }] },
+  { id: 'to10', title: 'Из двоичной в десятичную',
+    text: ['В числе 345 цифры стоят на местах с весами 100, 10 и 1: веса растут в 10 раз. В двоичной системе так же, только веса растут <b>в 2 раза</b>: 1, 2, 4, 8, 16, 32, 64, 128.',
+           'Чтобы перевести двоичное число в десятичное, сложите веса тех ламп, что горят. Например, 00000101 = 4 + 1 = 5. Если горят все восемь, получится 255 — больше в байт не влезает.',
+           'Байт может быть и буквой: в таблице ASCII число 65 — это «A», 97 — «a», 48 — цифра «0». Смотрите на табло.'],
+    why: 'Сетевой инженер видит это каждый день: в IP-адресе 192.168.1.1 каждое из четырёх чисел — один байт, поэтому там не бывает чисел больше 255. Программист так читает флажки и права доступа к файлам, а на собеседованиях в IT перевод чисел — частый вопрос.',
+    task: 'Зажгите лампы так, чтобы получилось число 45.',
+    hint: 'Найдите самый большой вес, который помещается в 45, и вычтите его. С остатком сделайте то же самое.',
+    check: () => S.v === 45,
+    mini: [{ bits: bin(45), c: 'var(--force)' }] },
+  { id: 'to2', title: 'Из десятичной в двоичную',
+    text: ['Обратный путь — деление на 2. Делим число пополам и записываем остаток: 0, если поделилось ровно, и 1, если нет. Частное снова делим на 2 — и так, пока не получим 0.',
+           'Остатки, прочитанные <b>снизу вверх</b>, и есть двоичная запись. Первый остаток — самый правый разряд (вес 1), последний — самый левый.'],
+    why: 'Этот алгоритм работает внутри любой программы, которая показывает числа на экране. Программист пишет его коротким циклом, разработчик игр так упаковывает очки и уровни в байты. А на экзамене по информатике такая задача встречается почти всегда.',
+    task: () => `Переведите число ${S.target} в двоичную систему и зажгите нужные лампы.`,
+    hint: 'Жмите «Шаг деления» — столбик будет расти. Первый остаток — самая правая лампа, дальше влево.',
+    check: () => S.v === S.target,
+    mini: [{ bits: bin(77), c: 'var(--force)' }] },
+  { id: 'add', title: 'Сложение с переносом',
+    text: ['Двоичные числа складывают столбиком, как обычные, справа налево. Правил всего четыре: 0 + 0 = 0, 0 + 1 = 1, 1 + 1 = 10 (пишем 0, единицу переносим влево), 1 + 1 + перенос 1 = 11 (пишем 1 и снова переносим 1).',
+           'В байте только 8 ламп. Если сумма больше 255, девятой лампы нет и последний перенос теряется. Это <b>переполнение</b>: в байте 200 + 100 даёт не 300, а 44, потому что 300 − 256 = 44.'],
+    why: 'Именно так складывает процессор — миллиарды раз в секунду. Разработчик игр ловит переполнение, когда счётчик очков вдруг обнуляется (в старых играх так и бывало), а программист банковского приложения выбирает переменную побольше, чтобы деньги на счёте не «сбросились».',
+    task: 'Наберите в строках A и B такие числа, чтобы сумма не влезла в байт, и посмотрите, что осталось в лампах.',
+    hint: 'Нажимайте на лампы в строках A и B. Переносы — оранжевые кружки над столбцами. Девятая лампа слева загорается при переполнении.',
+    check: () => S.A + S.B > 255,
+    mini: [{ bits: bin(45), c: 'var(--force)' }, { bits: bin(27), c: 'var(--force)' }] },
+  { id: 'hex', title: 'Шестнадцатеричная система и цвет',
+    text: ['Длинные ряды нулей и единиц читать трудно, поэтому байт делят на две четвёрки бит. Четыре бита дают 2⁴ = 16 вариантов, и каждый пишут одной цифрой: 0–9, а дальше буквы A = 10, B = 11, C = 12, D = 13, E = 14, F = 15. Байт превращается в две цифры: 1111 1111 = FF = 255.',
+           'Цвет точки на экране — это три байта: сколько красного (R), зелёного (G) и синего (B). Записывают его как <b>#RRGGBB</b>: #FF0000 — красный, #FFFFFF — белый, #000000 — чёрный.'],
+    why: 'Дизайнер каждый день вписывает цвета вроде #1E90FF в Figma, веб-разработчик — в CSS, разработчик игр так подбирает палитру персонажей. Программист видит шестнадцатеричные числа в адресах памяти и кодах ошибок. Кто читает hex, тот понимает, что на самом деле лежит внутри файла.',
+    task: 'Соберите чистый оранжевый цвет #FF8000.',
+    hint: 'Красный — на полную (FF), зелёный — ровно половина (80 = 128), синего нет (00). Цифру hex можно увеличивать нажатием на неё.',
+    check: () => S.rgb[0] === TARGET_RGB[0] && S.rgb[1] === TARGET_RGB[1] && S.rgb[2] === TARGET_RGB[2],
+    mini: [{ bits: bin(255), c: 'var(--red)' }, { bits: bin(128), c: 'var(--green)' }, { bits: bin(0), c: 'var(--blue)' }] },
+];
+const taskText = L => typeof L.task === 'function' ? L.task() : L.task;
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem('luch-binary') || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), tab: 'overview', done: saved.done || {},
+            v: 0, n: 1, seen: new Set([0]), target: 77, shown: 0, anim: null, A: 45, B: 27, rgb: [0x33, 0x66, 0xcc], flip: null };
+const save = () => { try { localStorage.setItem('luch-binary', JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const lid = () => LESSONS[S.lesson].id;
+
+// ---------- maths ----------
+function divSteps(n) { const out = []; while (n > 0) { out.push({ n, q: n >> 1, r: n & 1 }); n >>= 1; } return out; }
+function addCols(A, B) {
+  const c = [0], s = [];
+  for (let j = 0; j < 8; j++) { const t = ((A >> j) & 1) + ((B >> j) & 1) + c[j]; s.push(t & 1); c.push(t >> 1); }
+  return { c, s, sum: A + B, byte: (A + B) & 255, ovf: c[8] === 1 };
+}
+const weightsOn = v => [128, 64, 32, 16, 8, 4, 2, 1].filter(w => v & w);
+const rgbHex = () => '#' + S.rgb.map(hex2).join('');
+const newTarget = () => { let t; do t = 20 + Math.floor(Math.random() * 236); while (t === S.target); return t; };
+
+// ---------- lamp markup ----------
+const BULB = '<svg viewBox="0 0 40 52" aria-hidden="true"><path class="glass" d="M20 3a15 15 0 0 0-9 27v5h18v-5A15 15 0 0 0 20 3z"/><path class="fil" d="M15.5 31v-8l2.2-3.2 2.3 3.2 2.3-3.2 2.2 3.2v8"/><rect class="cap" x="11" y="36.5" width="18" height="4" rx="1.2"/><rect class="cap" x="12.5" y="42" width="15" height="4" rx="1.2"/><rect class="cap" x="16" y="47.5" width="8" height="3" rx="1"/></svg>';
+function lamp(k, on, o = {}) {
+  const cls = `bit${on ? ' on' : ''}${o.sm ? ' sm' : ''}${o.cls ? ' ' + o.cls : ''}${S.flip === k ? ' flip' : ''}`;
+  const style = o.style ? ` style="${o.style}"` : '';
+  const inner = `${o.w !== undefined ? `<span class="w">${o.w}</span>` : ''}${BULB}<span class="d">${on ? 1 : 0}</span>`;
+  if (o.static) return `<span class="${cls}"${style} role="img" aria-label="${o.label || ''}">${inner}</span>`;
+  return `<button class="${cls}" data-k="${k}" aria-pressed="${!!on}" aria-label="${o.label}"${style}>${inner}</button>`;
+}
+const byteLamps = (v, n = 8, showW = true) => {
+  let h = '';
+  for (let j = n - 1; j >= 0; j--) { const on = (v >> j) & 1, w = 1 << j; h += lamp(`b:${j}`, on, { w: showW ? w : undefined, label: showW ? `Разряд с весом ${w}: ${on}` : `Лампа ${n - j}: ${on}` }); }
+  return `<div class="bits" style="--cols:${n}" data-part="byte">${h}</div>`;
+};
+
+// ---------- bench (the stage) ----------
+function benchHTML() {
+  const id = lid();
+  if (id === 'bit') {
+    const N = 1 << S.n;
+    let combos = '';
+    if (S.n <= 5) {
+      for (let v = 0; v < N; v++) combos += `<span class="combo${S.seen.has(v) ? ' seen' : ''}${v === S.v ? ' cur' : ''}">${S.n <= 4 ? bin(v, S.n) : ''}</span>`;
+      combos = `<div class="cgrid">${combos}</div>`;
+    } else combos = `<div class="pbar"><i style="width:${(S.seen.size / N * 100).toFixed(1)}%"></i></div>`;
+    return byteLamps(S.v, S.n, false) +
+      `<div class="combos"><div class="lbl">Комбинации: найдено ${S.seen.size} из ${N}</div>${combos}</div>`;
+  }
+  if (id === 'to10') {
+    const ws = weightsOn(S.v);
+    return byteLamps(S.v) + `<div class="sumline" data-part="sum">${ws.length ? ws.join(' + ') + ' = <b>' + S.v + '</b>' : 'все лампы погашены = <b>0</b>'}</div>`;
+  }
+  if (id === 'to2') {
+    const st = divSteps(S.target), a = S.anim; S.anim = null;
+    let rows = '';
+    st.slice(0, S.shown).forEach((x, i) => {
+      const anim = a && i >= a.from && i < a.to ? ` pop" style="--d:${(i - a.from) * 160}ms` : '';
+      rows += `<div class="drow${anim}"><span>${x.n} : 2 = ${x.q}</span><span class="r">остаток<b class="${x.r ? '' : 'z'}">${x.r}</b></span></div>`;
+    });
+    const fin = S.shown >= st.length;
+    const ans = fin ? `<div class="dans${a ? ' pop" style="--d:' + ((st.length - a.from) * 160) + 'ms' : ''}">Остатки снизу вверх ↑ <b>${st.map(x => x.r).reverse().join('')}</b></div>` : '';
+    return `<div class="goal">Число<b>${S.target}</b>→ в двоичную</div>` + byteLamps(S.v) +
+      `<div class="div" data-part="div">${rows || '<div class="dempty">Нажмите «Шаг деления», и столбик начнёт расти.</div>'}${ans}</div>`;
+  }
+  if (id === 'add') {
+    const r = addCols(S.A, S.B), T = 110;
+    let h = `<div class="add" data-part="byte"><span></span><span class="ah o">9-й</span>`;
+    for (let j = 7; j >= 0; j--) h += `<span class="ah">${1 << j}</span>`;
+    h += `<span class="al" style="font-size:11px;color:var(--muted)">перенос</span>`;
+    for (let j = 8; j >= 0; j--) h += `<span class="cy">${j > 0 && r.c[j] ? `<i class="pop" style="--d:${(j - 1) * T + 60}ms">1</i>` : ''}</span>`;
+    h += `<span class="al">A<small>${S.A}</small></span><span></span>`;
+    for (let j = 7; j >= 0; j--) { const on = (S.A >> j) & 1; h += lamp(`x:${j}`, on, { sm: true, label: `A, разряд ${1 << j}: ${on}` }); }
+    h += `<span class="al">B<small>${S.B}</small></span><span class="sign">+</span>`;
+    for (let j = 7; j >= 0; j--) { const on = (S.B >> j) & 1; h += lamp(`y:${j}`, on, { sm: true, label: `B, разряд ${1 << j}: ${on}` }); }
+    h += `<span class="rule"></span><span class="al">=<small>${r.byte}</small></span>`;
+    h += `<span class="pop" style="--d:${8 * T}ms">${lamp('s:8', r.ovf, { sm: true, static: true, cls: 'res ovf', label: `девятый разряд: ${r.ovf ? 1 : 0}` })}</span>`;
+    for (let j = 7; j >= 0; j--) h += `<span class="pop" style="--d:${j * T}ms">${lamp(`s:${j}`, r.s[j], { sm: true, static: true, cls: 'res', label: `сумма, разряд ${1 << j}: ${r.s[j]}` })}</span>`;
+    h += `</div>`;
+    const msg = r.ovf ? `Переполнение! ${r.sum} не влезает в байт: девятый разряд потерян, в восьми лампах осталось ${r.byte} = ${r.sum} − 256.`
+                      : `${S.A} + ${S.B} = ${r.sum} — влезает в байт (до 255).`;
+    return h + `<div class="ovfmsg${r.ovf ? ' warn' : ''}">${msg}</div>`;
+  }
+  // hex
+  let h = '<div class="rgb">';
+  CH.forEach((ch, ci) => {
+    const v = S.rgb[ci], hx = hex2(v);
+    let bits = '';
+    for (let j = 7; j >= 0; j--) {
+      const on = (v >> j) & 1;
+      if (j === 7 || j === 3) bits += '<div class="nib">';
+      bits += lamp(`p:${ci}:${j}`, on, { sm: true, style: `--c:${ch.c}`, label: `${ch.ru}, разряд ${1 << j}: ${on}` });
+      if (j === 4 || j === 0) bits += '</div>';
+    }
+    h += `<div class="crow" style="--c:${ch.c}"><span class="cl">${ch.name}</span><div class="cbits" data-part="byte">${bits}</div>
+      <div class="hx" data-part="hex"><button data-k="h:${ci}:1" aria-label="${ch.ru}, старшая цифра ${hx[0]}. Нажмите, чтобы увеличить">${hx[0]}</button><button data-k="h:${ci}:0" aria-label="${ch.ru}, младшая цифра ${hx[1]}. Нажмите, чтобы увеличить">${hx[1]}</button></div>
+      <span class="cd">${v}</span></div>`;
+  });
+  const [R, G, B] = S.rgb, light = 0.299 * R + 0.587 * G + 0.114 * B > 150;
+  h += `</div><div class="swatch" data-part="swatch" style="background:${rgbHex()};color:${light ? '#0b1019' : '#e8ecf4'}"><span>${rgbHex()}</span><span>rgb(${R}, ${G}, ${B})</span></div>`;
+  return h;
+}
+
+function toolsHTML() {
+  const id = lid(), b = (k, t, o = {}) => `<button data-k="${k}"${o.sq ? ' class="sq"' : ''}${o.pressed !== undefined ? ` aria-pressed="${o.pressed}"` : ''}${o.dis ? ' disabled' : ''}${o.label ? ` aria-label="${o.label}"` : ''}>${t}</button>`;
+  const sep = '<span class="sep"></span>';
+  if (id === 'bit') {
+    let h = '<span class="tl">Ламп</span>';
+    for (let k = 1; k <= 8; k++) h += b(`n:${k}`, k, { sq: true, pressed: S.n === k, label: `${k} ${plural(k, 'лампа', 'лампы', 'ламп')}` });
+    return h + sep + b('plus', '+1') + b('zero', 'Все 0');
+  }
+  if (id === 'to10') return b('minus', '−1') + b('plus', '+1') + sep + b('zero', 'Все 0') + b('ones', 'Все 1');
+  if (id === 'to2') { const full = S.shown >= divSteps(S.target).length; return b('step', 'Шаг деления', { dis: full }) + b('all', 'Все шаги', { dis: full }) + sep + b('zero', 'Все 0') + b('new', 'Новое число'); }
+  if (id === 'add') return b('zA', 'A = 0') + b('zB', 'B = 0') + sep + b('swap', 'Поменять A и B');
+  return b('black', 'Чёрный #000000') + b('white', 'Белый #FFFFFF');
+}
+
+function boardFill() {
+  const id = lid(); let k, v, s, cls = '';
+  if (id === 'bit') { const N = 1 << S.n; k = 'Комбинаций'; v = `2${sup(S.n)} = ${N}`; s = `найдено ${S.seen.size} из ${N}`; if (S.seen.size === N) cls = 'ok'; }
+  else if (id === 'to10') { k = 'Десятичное'; v = S.v; s = `${nib(bin(S.v))} · символ ${esc(ascii(S.v))}`; }
+  else if (id === 'to2') { k = `Цель: ${S.target}`; v = S.v; s = S.v === S.target ? '✓ совпало' : `сейчас ${nib(bin(S.v))}`; if (S.v === S.target) cls = 'ok'; }
+  else if (id === 'add') { const r = addCols(S.A, S.B); k = 'A + B'; v = r.sum; s = r.ovf ? `в байте осталось ${r.byte} · переполнение` : 'влезает в байт'; cls = r.ovf ? 'warn' : ''; }
+  else { k = 'Цвет'; v = `<i class="chip" style="background:${rgbHex()}"></i>${rgbHex()}`; s = `rgb(${S.rgb.join(', ')})`; if (LESSONS[4].check()) cls = 'ok'; }
+  $('#boardK').textContent = k; $('#boardV').innerHTML = v; $('#boardS').textContent = s; $('#boardS').className = 'sub ' + cls;
+}
+
+function renderStage() {
+  const ae = document.activeElement, key = ae && ae.dataset && ae.dataset.k && $('#stage').contains(ae) ? ae.dataset.k : null;
+  $('#bench').innerHTML = benchHTML();
+  $('#tools').innerHTML = toolsHTML();
+  S.flip = null;
+  if (key) { const el = $('#stage').querySelector(`[data-k="${key}"]`); if (el && !el.disabled) el.focus({ preventScroll: true }); }
+  boardFill();
+}
+
+// ---------- actions ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+function setV(v) {
+  if (lid() === 'bit') { v &= (1 << S.n) - 1; S.seen.add(v); }
+  S.v = v & 255;
+}
+function act(k) {
+  const [t, a, c] = k.split(':'), id = lid();
+  if (t === 'b') { S.flip = k; setV(S.v ^ (1 << +a)); }
+  else if (t === 'x') { S.flip = k; S.A ^= 1 << +a; }
+  else if (t === 'y') { S.flip = k; S.B ^= 1 << +a; }
+  else if (t === 'p') { S.flip = k; S.rgb[+a] ^= 1 << +c; }
+  else if (t === 'h') { const sh = +c ? 4 : 0, ci = +a, d = ((S.rgb[ci] >> sh) & 15) + 1 & 15; S.rgb[ci] = (S.rgb[ci] & ~(15 << sh) & 255) | (d << sh); }
+  else if (t === 'n') { S.n = +a; S.v &= (1 << S.n) - 1; S.seen = new Set([S.v]); }
+  else if (t === 'plus') setV(id === 'bit' ? (S.v + 1) % (1 << S.n) : (S.v + 1) % 256);
+  else if (t === 'minus') setV((S.v + 255) % 256);
+  else if (t === 'zero') setV(0);
+  else if (t === 'ones') setV(255);
+  else if (t === 'step') { const L = divSteps(S.target).length; if (S.shown < L) { S.anim = { from: S.shown, to: S.shown + 1 }; S.shown++; } }
+  else if (t === 'all') { const L = divSteps(S.target).length; S.anim = { from: S.shown, to: L }; S.shown = L; }
+  else if (t === 'new') { S.target = newTarget(); S.shown = 0; S.v = 0; }
+  else if (t === 'zA') S.A = 0;
+  else if (t === 'zB') S.B = 0;
+  else if (t === 'swap') [S.A, S.B] = [S.B, S.A];
+  else if (t === 'black') S.rgb = [0, 0, 0];
+  else if (t === 'white') S.rgb = [255, 255, 255];
+  update();
+}
+$('#stage').addEventListener('click', e => { const b = e.target.closest('button[data-k]'); if (b && !b.disabled) act(b.dataset.k); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  renderPanes();
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- panes ----------
+const ICON = {
+  bit: '<svg viewBox="0 0 34 34"><circle cx="17" cy="13" r="8" fill="var(--force)"/><path d="M13 22h8M14 26h6" stroke="var(--muted)" stroke-width="2" stroke-linecap="round"/></svg>',
+  byte: '<svg viewBox="0 0 34 34">' + [0, 1, 2, 3, 4, 5, 6, 7].map(i => `<circle cx="${3.5 + i * 3.85}" cy="17" r="1.6" fill="${'10110101'[i] === '1' ? 'var(--force)' : 'none'}" stroke="var(--muted)" stroke-width=".6"/>`).join('') + '</svg>',
+  weight: '<svg viewBox="0 0 34 34"><text x="17" y="15" fill="var(--force)" font-family="IBM Plex Mono,monospace" font-size="9" text-anchor="middle">128</text><path d="M7 22h20" stroke="var(--muted)" stroke-width="1.4"/><text x="17" y="31" fill="var(--muted)" font-family="IBM Plex Mono,monospace" font-size="7" text-anchor="middle">×2</text></svg>',
+  board: '<svg viewBox="0 0 34 34"><rect x="4" y="8" width="26" height="18" rx="3" fill="none" stroke="var(--arm)" stroke-width="1.6"/><text x="17" y="21" fill="var(--fg)" font-family="IBM Plex Mono,monospace" font-size="9" text-anchor="middle">45</text></svg>',
+  carry: '<svg viewBox="0 0 34 34"><circle cx="11" cy="10" r="5" fill="var(--force)"/><path d="M25 18c0-6-6-8-11-8" stroke="var(--muted)" stroke-width="1.4" fill="none"/><text x="25" y="29" fill="var(--fg)" font-family="IBM Plex Mono,monospace" font-size="9" text-anchor="middle">1</text></svg>',
+  hex: '<svg viewBox="0 0 34 34"><rect x="5" y="7" width="11" height="20" rx="3" fill="none" stroke="var(--muted)" stroke-width="1.4"/><rect x="18" y="7" width="11" height="20" rx="3" fill="none" stroke="var(--muted)" stroke-width="1.4"/><text x="10.5" y="21" fill="var(--fg)" font-family="IBM Plex Mono,monospace" font-size="10" text-anchor="middle">F</text><text x="23.5" y="21" fill="var(--fg)" font-family="IBM Plex Mono,monospace" font-size="10" text-anchor="middle">8</text></svg>',
+  swatch: '<svg viewBox="0 0 34 34"><rect x="4" y="6" width="26" height="22" rx="4" fill="#ff8000"/><circle cx="12" cy="17" r="2" fill="var(--red)"/><circle cx="17" cy="17" r="2" fill="var(--green)"/><circle cx="22" cy="17" r="2" fill="var(--blue)"/></svg>',
+};
+const PARTS = [
+  { id: 'bit', name: 'Лампа-бит', sel: '#bench .bit', from: 0, spec: 'Один разряд: горит — 1, погашена — 0. Нажмите на лампу, чтобы переключить.' },
+  { id: 'byte', name: 'Байт', sel: '#bench [data-part="byte"]', from: 0, spec: '8 бит подряд. 2⁸ = 256 значений: от 0 до 255.' },
+  { id: 'weight', name: 'Вес разряда', sel: '#bench .bit .w, #bench .ah', from: 1, spec: 'Числа 128, 64 … 1 над лампами. Каждый вес вдвое больше правого соседа.' },
+  { id: 'board', name: 'Табло', sel: '#board', from: 0, spec: 'Показывает число в десятичной системе, букву ASCII, сумму или цвет.' },
+  { id: 'carry', name: 'Перенос', sel: '#bench .cy', from: 3, spec: 'Кружок над столбцом: 1 + 1 = 10, единица уходит в соседний левый разряд.' },
+  { id: 'hex', name: 'Шестнадцатеричная цифра', sel: '#bench .hx', from: 4, spec: 'Заменяет четыре бита: 0–9 и A–F (A = 10 … F = 15). Нажатие увеличивает цифру на 1.' },
+  { id: 'swatch', name: 'Пиксель', sel: '#bench .swatch', from: 4, spec: 'Цвет из трёх байтов: красный, зелёный и синий. Запись #RRGGBB.' },
+];
+function highlight(p) {
+  const els = document.querySelectorAll(p.sel);
+  if (!els.length) return toast(`Эта деталь есть в уроке ${p.from + 1}.`);
+  els.forEach(el => { el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1700); });
+  const st = $('#stage'); if (st.getBoundingClientRect().top < 0) st.scrollIntoView({ block: 'start' });
+}
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState() {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (L.id === 'bit') return S.n !== 3 ? `Сейчас ламп: ${S.n}, нужно 3` : `Найдено ${S.seen.size} из 8 комбинаций`;
+  if (L.id === 'to10') return `Сейчас ${S.v}, нужно 45${S.v > 45 ? ' — многовато' : S.v < 45 && S.v ? ' — маловато' : ''}`;
+  if (L.id === 'to2') return `Сейчас ${S.v}, нужно ${S.target}`;
+  if (L.id === 'add') return `${S.A} + ${S.B} = ${S.A + S.B}, ${S.A + S.B > 255 ? 'больше 255' : 'пока влезает в байт'}`;
+  return `Сейчас ${rgbHex()}, нужно #FF8000`;
+}
+
+// ---------- scheme diagram ----------
+function diagramSVG() {
+  const id = lid();
+  if (id === 'bit') {
+    const L = Math.min(S.n, 4), H = 14, top = 6, vbH = top + L * H + 14;
+    let h = `<circle class="dg-n on" cx="60" cy="${top}" r="1.6"/>`;
+    for (let k = 1; k <= L; k++) {
+      const cnt = 1 << k, dx = 112 / cnt, pdx = 112 / (cnt >> 1);
+      for (let i = 0; i < cnt; i++) {
+        const x = 4 + (i + 0.5) * dx, y = top + k * H, px = 4 + ((i >> 1) + 0.5) * pdx, py = y - H;
+        const code = bin(i, k), leafOn = k === L && S.n <= 4 && S.seen.has(i);
+        h += `<line class="dg-l${leafOn ? ' on' : ''}" x1="${px.toFixed(2)}" y1="${py}" x2="${x.toFixed(2)}" y2="${y}"/>`;
+        h += `<text class="dg-s ${i & 1 ? 'dg-o' : ''}" x="${((px + x) / 2 + (i & 1 ? 1.6 : -1.6)).toFixed(2)}" y="${y - H / 2}">${i & 1}</text>`;
+        h += `<circle class="dg-n${leafOn ? ' on' : ''}" cx="${x.toFixed(2)}" cy="${y}" r="1.3"/>`;
+        if (k === L) h += `<text class="dg-s" x="${x.toFixed(2)}" y="${y + 4}">${code}</text>`;
+      }
+    }
+    const prod = Array(S.n).fill(2).join(' · ');
+    h += `<text class="dg-t" x="60" y="${vbH - 4}" style="font-size:3.4px">${S.n > 4 ? 'первые 4 уровня · ' : ''}${S.n > 1 ? prod + ' = ' : ''}${1 << S.n}</text>`;
+    return { vb: `0 0 120 ${vbH}`, h, label: `Дерево выбора: каждая лампа удваивает число комбинаций, ${S.n} ${plural(S.n, 'лампа', 'лампы', 'ламп')} дают ${1 << S.n}.` };
+  }
+  if (id === 'to10' || id === 'to2') {
+    let h = '';
+    for (let j = 7; j >= 0; j--) {
+      const i = 7 - j, x = 4 + i * 14, on = (S.v >> j) & 1;
+      h += `<text class="dg-s" x="${x + 6}" y="6">${1 << j}</text><rect class="dg-box${on ? ' on' : ''}" x="${x}" y="9" width="12" height="11" rx="1.5"/><text class="dg-t" x="${x + 6}" y="14.6">${on}</text>`;
+      if (on) h += `<line class="dg-l on" x1="${x + 6}" y1="20" x2="${x + 6}" y2="26"/><line class="dg-l on" x1="${x + 6}" y1="26" x2="60" y2="31"/>`;
+    }
+    const ws = weightsOn(S.v);
+    h += `<text class="dg-t dg-o" x="60" y="37" style="font-size:3.2px">${ws.length ? ws.join(' + ') : '0'}</text>`;
+    h += `<text class="dg-t" x="60" y="44">= ${S.v}${id === 'to2' ? (S.v === S.target ? ' ✓' : ` (цель ${S.target})`) : ''}</text>`;
+    return { vb: '0 0 120 50', h, label: `Байт ${bin(S.v)}: веса горящих ламп складываются в ${S.v}.` };
+  }
+  if (id === 'add') {
+    const r = addCols(S.A, S.B), X = c => 26 + c * 10; // c = 0 is the ninth column
+    let h = '';
+    const row = (y, lbl, f) => { h += `<text class="dg-s" x="10" y="${y}" style="font-size:3px">${lbl}</text>`; for (let c = 0; c <= 8; c++) h += f(c, X(c), y); };
+    row(6, 'перенос', (c, x, y) => { const j = 8 - c; return j > 0 && r.c[j] ? `<text class="dg-s dg-o" x="${x}" y="${y}" style="font-size:3.2px">1</text>` : ''; });
+    row(15, `A = ${S.A}`, (c, x, y) => c ? `<text class="dg-t" x="${x}" y="${y}">${(S.A >> (8 - c)) & 1}</text>` : '');
+    row(24, `B = ${S.B}`, (c, x, y) => c ? `<text class="dg-t" x="${x}" y="${y}">${(S.B >> (8 - c)) & 1}</text>` : `<text class="dg-t" x="${x}" y="${y}">+</text>`);
+    h += `<line class="dg-l" x1="${X(0) - 4}" y1="29" x2="${X(8) + 4}" y2="29"/>`;
+    row(34, `= ${r.sum}`, (c, x, y) => { const v = c ? r.s[8 - c] : r.c[8]; return c || v ? `<text class="dg-t ${c ? 'dg-a' : 'dg-w'}" x="${x}" y="${y}">${v}</text>` : ''; });
+    h += `<text class="dg-s ${r.ovf ? 'dg-w' : ''}" x="60" y="44" style="font-size:3px">${r.ovf ? `переполнение: в байте осталось ${r.byte}` : 'девятый разряд пуст — сумма влезла в байт'}</text>`;
+    return { vb: '0 0 120 50', h, label: `Сложение столбиком: ${bin(S.A)} + ${bin(S.B)} = ${bin(r.sum, r.ovf ? 9 : 8)}.` };
+  }
+  let h = '';
+  CH.forEach((ch, ci) => {
+    const v = S.rgb[ci], y = 8 + ci * 12, b = bin(v), hx = hex2(v);
+    h += `<text class="dg-t" x="5" y="${y}" style="fill:${ch.hex}">${ch.name}</text>`;
+    h += `<text class="dg-t" x="25" y="${y}" style="font-size:3.4px">${b.slice(0, 4)}</text><text class="dg-t" x="40" y="${y}" style="font-size:3.4px">${b.slice(4)}</text>`;
+    h += `<text class="dg-s" x="50" y="${y}">→</text><text class="dg-t dg-o" x="57" y="${y}">${hx[0]}</text><text class="dg-t dg-o" x="62" y="${y}">${hx[1]}</text>`;
+    h += `<text class="dg-s" x="70" y="${y}">=</text><text class="dg-t" x="78" y="${y}" style="font-size:3.4px">${v}</text>`;
+  });
+  h += `<rect x="90" y="3" width="26" height="30" rx="2" fill="${rgbHex()}" stroke="var(--line)" stroke-width=".3"/>`;
+  h += `<text class="dg-t" x="60" y="43" style="font-size:3.6px">${rgbHex()}</text>`;
+  return { vb: '0 0 120 48', h, label: `Цвет ${rgbHex()}: три байта по две шестнадцатеричные цифры.` };
+}
+
+function readsHTML() {
+  const id = lid(), r = (k, v) => `<div><dt>${k}</dt><dd>${v}</dd></div>`;
+  if (id === 'bit') return r('Ламп', S.n) + r('Комбинаций', 1 << S.n) + r('Найдено', S.seen.size);
+  if (id === 'to10') return r('Двоичное', bin(S.v)) + r('Десятичное', S.v) + r('Символ', esc(ascii(S.v)));
+  if (id === 'to2') return r('Цель', S.target) + r('Сейчас', S.v) + r('Шагов', `${S.shown}/${divSteps(S.target).length}`);
+  if (id === 'add') { const s = addCols(S.A, S.B); return r('A', S.A) + r('B', S.B) + r('В байте', s.byte); }
+  return CH.map((ch, i) => r(ch.name, `${hex2(S.rgb[i])} · ${S.rgb[i]}`)).join('');
+}
+
+// sliders on the Схема tab: built once per lesson so dragging is never interrupted
+function renderSchemeCtl() {
+  const id = lid(), sl = (k, lbl, color) => `<div class="ctl"><label for="s${k}">${lbl} <output id="o${k}"></output></label><input type="range" id="s${k}" data-s="${k}" min="0" max="255" step="1"${color ? ` style="accent-color:${color}"` : ''}></div>`;
+  const H = { bit: 'Дерево комбинаций', to10: 'Схема байта', to2: 'Схема байта', add: 'Сложение столбиком', hex: 'Байты цвета' };
+  $('#schemeH').textContent = H[id];
+  let h = '';
+  if (id === 'add') h = sl('A', 'Число A') + sl('B', 'Число B');
+  else if (id === 'hex') h = CH.map((ch, i) => sl('C' + i, `${ch.name} — ${ch.ru}`, ch.hex)).join('');
+  else h = `<p class="note" style="margin-top:14px">${id === 'bit' ? 'Каждая новая лампа раздваивает каждую ветку: так получается 2ⁿ. Оранжевым отмечены комбинации, которые вы уже нашли.' : 'Схема меняется, когда вы нажимаете лампы на стенде.'}</p>`;
+  $('#schemeCtl').innerHTML = h;
+  $('#schemeCtl').querySelectorAll('input[type=range]').forEach(inp => inp.addEventListener('input', () => {
+    const k = inp.dataset.s, v = +inp.value;
+    if (k === 'A') S.A = v; else if (k === 'B') S.B = v; else S.rgb[+k.slice(1)] = v;
+    update();
+  }));
+}
+function syncCtl() {
+  const set = (k, v, txt) => { const i = $('#s' + k); if (i) { if (+i.value !== v) i.value = v; $('#o' + k).textContent = txt; } };
+  set('A', S.A, S.A + ' = ' + bin(S.A)); set('B', S.B, S.B + ' = ' + bin(S.B));
+  S.rgb.forEach((v, i) => set('C' + i, v, `${v} = ${hex2(v)}`));
+}
+
+function calcHTML() {
+  const id = lid();
+  if (id === 'bit') {
+    let rows = '';
+    for (let k = 1; k <= 8; k++) rows += step(`${k} ${plural(k, 'лампа', 'лампы', 'ламп')}`, `2${sup(k)} = ${1 << k}`, k === S.n ? 'hl' : '');
+    return `<h2>Сколько комбинаций</h2><div class="formula">N = 2ⁿ</div><p class="note">n — число ламп (бит), N — сколько разных комбинаций они могут показать. Каждая новая лампа удваивает N.</p><h3>Таблица степеней двойки</h3><div class="steps">${rows}</div>
+      <p class="note" style="margin-top:10px">Сейчас ${S.n} ${plural(S.n, 'лампа', 'лампы', 'ламп')}: ${S.n > 1 ? Array(S.n).fill(2).join(' · ') + ' = ' : ''}${1 << S.n}. Найдено ${S.seen.size}.</p>`;
+  }
+  if (id === 'to10' || id === 'to2') {
+    let h = '';
+    if (id === 'to2') {
+      const st = divSteps(S.target), ans = st.map(x => x.r).reverse().join('');
+      h += `<h2>Деление на 2</h2><div class="formula">${S.target} → ?₂</div><p class="note">Делим на 2, записываем остаток, частное снова делим. Остатки читаем снизу вверх.</p><h3>Столбик для ${S.target}</h3><div class="steps">` +
+        st.map((x, i) => step(`шаг ${i + 1}`, i < S.shown ? `${x.n} : 2 = ${x.q}, остаток ${x.r}` : 'скрыт — нажмите «Шаг деления»', i < S.shown ? '' : 'dim')).join('') +
+        (S.shown >= st.length ? step('остатки снизу вверх', `${ans}₂`, 'sum') + step('проверка', `${weightsOn(S.target).join(' + ')} = ${S.target}`, 'sum') : '') + `</div>`;
+      h += `<h3>Лампы сейчас</h3>`;
+    } else h += `<h2>Перевод в десятичную</h2><div class="formula">${bin(S.v)}₂ = ${S.v}₁₀</div><p class="note">Каждый бит умножаем на вес разряда и складываем: число = Σ (бит × вес).</p><h3>По разрядам</h3>`;
+    let rows = '';
+    for (let j = 7; j >= 0; j--) { const on = (S.v >> j) & 1; rows += step(`бит ${on}, вес ${1 << j}`, `${on} × ${1 << j} = ${on * (1 << j)}`, on ? '' : 'dim'); }
+    rows += step('сумма', `${weightsOn(S.v).join(' + ') || '0'} = ${S.v}`, 'sum');
+    h += `<div class="steps">${rows}</div>`;
+    if (id === 'to10') h += `<p class="note" style="margin-top:10px">В таблице ASCII число ${S.v} — ${esc(ascii(S.v))}.</p>`;
+    return h;
+  }
+  if (id === 'add') {
+    const r = addCols(S.A, S.B);
+    let rows = '';
+    for (let j = 0; j < 8; j++) {
+      const a = (S.A >> j) & 1, b = (S.B >> j) & 1, c = r.c[j], t = a + b + c;
+      rows += step(`разряд ${1 << j}`, `${a} + ${b}${c ? ' + 1' : ''} = ${t} → пишем ${t & 1}${t > 1 ? ', переносим 1' : ''}`, t > 1 ? 'hl' : '');
+    }
+    return `<h2>Сложение столбиком</h2><div class="formula">${bin(S.A)}<br>+ ${bin(S.B)}<br>= ${bin(r.sum, r.ovf ? 9 : 8)}</div>
+      <p class="note">Идём справа налево. 1 + 1 = 10: пишем 0, единицу переносим. Рамкой отмечены разряды с переносом.</p><h3>По разрядам</h3><div class="steps">${rows}` +
+      step('проверка в десятичной', `${S.A} + ${S.B} = ${r.sum}`, 'sum') +
+      (r.ovf ? step('в байте осталось', `${r.sum} − 256 = ${r.byte}`, 'sum') : '') + `</div>
+      <p class="note" style="margin-top:10px">${r.ovf ? 'Последний перенос ушёл в девятый разряд, которого в байте нет, — это переполнение.' : 'Переноса из старшего разряда нет, сумма влезла в 8 бит.'}</p>`;
+  }
+  const rows = CH.map((ch, i) => { const v = S.rgb[i], hx = hex2(v), hi = v >> 4, lo = v & 15;
+    return step(`${ch.name}: ${nib(bin(v))}`, `${hx} = ${hi} × 16 + ${lo} = ${v}`); }).join('');
+  return `<h2>Цвет из трёх байтов</h2><div class="formula">#RRGGBB = ${rgbHex()}</div>
+    <p class="note">Каждая шестнадцатеричная цифра — 4 бита. Старшая цифра умножается на 16, младшая прибавляется.</p>
+    <h3>Цифры hex</h3><div class="steps">${step('0–9', 'как обычно')}${step('A B C D E F', '10 11 12 13 14 15')}</div>
+    <h3>Каналы сейчас</h3><div class="steps">${rows}${step('цель', '#FF8000 = rgb(255, 128, 0)', LESSONS[4].check() ? 'hl' : 'sum')}</div>`;
+}
+
+function renderPanes() {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') + `<p class="why"><b>Зачем это в жизни</b>${L.why}</p>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${taskText(L)}</p><div class="state ${done ? 'done' : ''}">${taskState()}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Детали</h2><p class="note">Из чего собран стенд. Нажмите на деталь, чтобы найти её.</p><div class="parts">` +
+      PARTS.map((p, i) => `<button class="part" data-i="${i}">${ICON[p.id]}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => highlight(PARTS[+b.dataset.i]));
+  }
+  if (S.tab === 'scheme') {
+    const d = diagramSVG(), svg = $('#diagram');
+    svg.setAttribute('viewBox', d.vb); svg.setAttribute('aria-label', d.label); svg.innerHTML = d.h;
+    $('#reads').innerHTML = readsHTML();
+    syncCtl();
+  }
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML();
+}
+
+function update() {
+  const L = LESSONS[S.lesson];
+  renderStage();
+  if (!S.done[L.id] && L.check()) {
+    S.done[L.id] = true; save(); renderStrip();
+    toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены.');
+  }
+  $('#taskText').textContent = taskText(L);
+  $('#taskState').textContent = taskState();
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes();
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+}
+
+function miniSVG(rows) {
+  const k = rows.length;
+  return rows.map((r, ri) => {
+    const y = k === 1 ? 15 : k === 2 ? 10 + ri * 10 : 7 + ri * 8, n = r.bits.length, rad = k === 3 ? 2.5 : 2.9;
+    return r.bits.split('').map((b, i) => `<circle cx="${(33 + (i - (n - 1) / 2) * 7.4).toFixed(1)}" cy="${y}" r="${rad}" fill="${b === '1' ? r.c : 'none'}" stroke="${b === '1' ? r.c : 'var(--muted)'}" stroke-width=".8"/>`).join('');
+  }).join('');
+}
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${miniSVG(L.mini)}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  S.lesson = i; S.v = 0; S.flip = null; S.anim = null;
+  const id = LESSONS[i].id;
+  if (id === 'bit') { S.n = 1; S.seen = new Set([0]); }
+  if (id === 'to2') { S.target = newTarget(); S.shown = 0; }
+  if (id === 'add') { S.A = 45; S.B = 27; }
+  if (id === 'hex') S.rgb = [0x33, 0x66, 0xcc];
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  renderStrip(); renderSchemeCtl(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const L = LESSONS[S.lesson], id = L.id;
+  let now;
+  if (id === 'bit') now = `Включено мест для ламп: ${S.n}. Лампы сейчас: ${bin(S.v, S.n)}. Комбинаций всего 2^${S.n} = ${1 << S.n}, найдено ${S.seen.size}: ${[...S.seen].sort((a, b) => a - b).map(v => bin(v, S.n)).join(', ')}.`;
+  else if (id === 'to10') now = `Лампы (веса 128…1): ${bin(S.v)}. Горят веса: ${weightsOn(S.v).join(' + ') || 'ни одна'}. Десятичное значение ${S.v}. В ASCII это ${ascii(S.v)}.`;
+  else if (id === 'to2') { const st = divSteps(S.target); now = `Нужно перевести ${S.target}, в двоичной это ${bin(S.target).replace(/^0+/, '')}. Показано шагов деления ${S.shown} из ${st.length}: ${st.slice(0, S.shown).map(x => `${x.n}:2=${x.q} ост.${x.r}`).join('; ') || 'ни одного'}. Лампы сейчас: ${bin(S.v)} = ${S.v}.`; }
+  else if (id === 'add') { const r = addCols(S.A, S.B); now = `A = ${bin(S.A)} (${S.A}), B = ${bin(S.B)} (${S.B}). Сумма ${bin(r.sum, r.ovf ? 9 : 8)} = ${r.sum}. Переносы в разряды с весами: ${r.c.map((c, j) => c && j < 8 ? 1 << j : 0).filter(Boolean).join(', ') || 'нет'}${r.ovf ? '. Переполнение: девятый разряд потерян, в байте осталось ' + r.byte : '. Переполнения нет'}.`; }
+  else now = `Цвет ${rgbHex()} = rgb(${S.rgb.join(', ')}). R = ${nib(bin(S.rgb[0]))}, G = ${nib(bin(S.rgb[1]))}, B = ${nib(bin(S.rgb[2]))}. Цель #FF8000.`;
+  return [
+    `Раздел: информатика, двоичная система. Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ').replace(/<[^>]+>/g, '')}`,
+    `Задание: ${taskText(L)} Статус: ${S.done[L.id] ? 'выполнено' : 'не выполнено'}.`,
+    `Стенд: ряд ламп-битов, каждая лампа горит (1) или погашена (0); веса разрядов справа налево 1, 2, 4 … 128.`,
+    `Сейчас: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], first = S.done[L.id] ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание';
+  const Q = {
+    bit: ['Почему каждая лампа удваивает число комбинаций?', 'Сколько бит нужно, чтобы закодировать 1000 вариантов?'],
+    to10: [`Как быстро перевести ${S.v || 45} в десятичную?`, 'Почему в IP-адресе нет чисел больше 255?'],
+    to2: ['Почему остатки читают снизу вверх?', 'Как понять по числу, что последний бит будет 1?'],
+    add: ['Что такое переполнение и где оно встречается?', 'Почему 1 + 1 в двоичной это 10?'],
+    hex: ['Почему #808080 — серый?', 'Зачем программистам шестнадцатеричная система?'],
+  }[L.id];
+  return [first, ...Q];
+};
+
+setLesson(S.lesson);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

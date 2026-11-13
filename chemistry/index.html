@@ -1,0 +1,1043 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная химическая лаборатория: массовая доля, разбавление и смешивание растворов, шкала pH и нейтрализация.">
+<title>Растворы и кислотность</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /mechanics and /optics. Lab bench (SVG) on the left, lesson notebook on the right, lesson strip under the bench. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--liq);transition:width .2s}
+.gauge i{position:absolute;top:-4px;width:2px;height:14px;background:var(--force);transform:translateX(-50%)}
+.swatch{height:12px;border-radius:4px;margin-top:9px;border:1px solid rgba(255,255,255,.15)}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M16 8h8M17 8v9l-8 13q-1.5 3 2 3h18q3.5 0 2-3l-8-13V8" fill="none" stroke="var(--fg)" stroke-width="2" stroke-linejoin="round"/><path d="M12.5 25h15l2.3 4q.8 1.6-1 1.6H11.2q-1.8 0-1-1.6z" fill="var(--arm)"/><circle cx="20" cy="21" r="1.4" fill="var(--force)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Химия · Растворы</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/">Карта</a><a href="/optics/">Оптика</a><a href="/mechanics/">Механика</a><a href="/chemistry/" aria-current="page">Химия</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Растворы</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/5</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Лабораторный стол">
+    <svg class="scene" id="scene" role="img" aria-label="Лабораторный стол с посудой. Предметы можно перетаскивать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const big = n => Math.round(n).toLocaleString('ru-RU');
+const SUPD = { '-': '⁻', '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹' };
+const pow10 = e => '10' + String(e).split('').map(c => SUPD[c] || c).join('');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c; };
+const INK = '#04070d';
+
+// ---------- chemistry constants ----------
+const SOL = { salt: 0.359, sugar: 2.04 };            // растворимость при 20 °C, г на 1 г воды (NaCl 35,9 г / 100 г; сахароза 204 г / 100 г)
+const SUBN = { salt: { nom: 'соль', gen: 'соли', f: 'NaCl', jar: 'NaCl' }, sugar: { nom: 'сахар', gen: 'сахара', f: 'C₁₂H₂₂O₁₁', jar: 'сахар' } };
+const L1MAX = { salt: 60, water: 300 }, L2 = { m0: 100, w0: 0.15, max: 300 }, L3 = { wA: 0.20, wB: 0.05, max: 250 };
+const VA = 20, CA = 0.1, CB = 0.1, DROP = 0.05, BUR = 50, KW = 1e-14; // мл, моль/л, мл
+const SAMPLES = [
+  { id: 'lemon', name: 'Лимонный сок', short: 'Лимон', pH: 2, tint: '#f2e7a2', what: 'лимонная кислота' },
+  { id: 'vinegar', name: 'Столовый уксус', short: 'Уксус', pH: 3, tint: '#e9eef3', what: 'уксусная кислота' },
+  { id: 'water', name: 'Чистая вода', short: 'Вода', pH: 7, tint: '#cfe6f5', what: 'ни кислоты, ни щёлочи' },
+  { id: 'soda', name: 'Раствор питьевой соды', short: 'Сода', pH: 8, tint: '#e6edf3', what: 'гидрокарбонат натрия NaHCO₃' },
+  { id: 'soap', name: 'Мыльный раствор', short: 'Мыло', pH: 10, tint: '#dfe3ee', what: 'щелочные соли жирных кислот' },
+  { id: 'drain', name: 'Средство для труб', short: 'Для труб', pH: 13, tint: '#d9e6c8', what: 'едкий натр NaOH' },
+];
+// Universal indicator, pH 0…14: red → orange → yellow → green → blue → violet
+const PAL = ['#c9151e', '#e0262a', '#ec4527', '#f37526', '#f8a11f', '#fbc81b', '#e9e21f', '#7cc443', '#33a84f', '#1b9c8c', '#2179bb', '#2f55a3', '#4a3c97', '#5e2c89', '#4a1d6e'];
+const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+function uiColor(pH) {
+  const x = clamp(pH, 0, 14), i = Math.min(13, Math.floor(x)), f = x - i, a = hex(PAL[i]), b = hex(PAL[i + 1]);
+  return '#' + a.map((v, k) => Math.round(v + (b[k] - v) * f).toString(16).padStart(2, '0')).join('');
+}
+const lum = c => { const [r, g, b] = hex(c); return 0.299 * r + 0.587 * g + 0.114 * b; };
+const env = pH => pH < 6.5 ? 'кислая' : pH > 7.5 ? 'щелочная' : 'нейтральная';
+
+// pH after adding V ml of NaOH to 20 ml of HCl (both strong, 0,1 моль/л). Exact charge balance: [H+] − [OH−] = d.
+function titr(drops) {
+  const V = drops * DROP, na = CA * VA / 1000, nb = CB * V / 1000, Vt = (VA + V) / 1000;
+  const d = (na - nb) / Vt, H = (d + Math.sqrt(d * d + 4 * KW)) / 2;
+  return { V, na, nb, Vt, d, H, pH: -Math.log10(H) };
+}
+
+const LESSONS = [
+  { id: 'mass', title: 'Массовая доля',
+    text: ['Раствор — это вода, в которой что-то растворили: соль, сахар, лекарство. Масса раствора — это масса воды плюс масса растворённого вещества.',
+           'Массовая доля ω («омега») показывает, какая часть массы раствора приходится на вещество: ω = m(вещества) / m(раствора). Обычно её пишут в процентах: 10 % значит, что в каждых 100 г раствора 10 г соли.'],
+    life: 'Фармацевт готовит физраствор — ровно 0,9 % соли: ошибёшься — лекарство навредит. Технолог пищевого производства держит рассол для сыра и солений на нужных процентах, иначе партия испортится. А дома ты сам посолишь рассол по рецепту, а не «на глаз».',
+    safe: 'В лаборатории ничего не пробуют на вкус — даже соль и сахар.',
+    task: 'Приготовьте 200 г раствора соли с массовой долей 10 %.',
+    hint: 'Тащите шпатель с солью и кувшин с водой к стакану: пока держите над ним, сыплется и льётся. Нажатие — маленькая порция. Точно настроить можно на вкладке «Схема».',
+    stage: 'Тащите шпатель и кувшин к стакану. Весы показывают массу того, что в стакане.',
+    check: m => S.sub === 'salt' && m.sed === 0 && Math.abs(m.m - 200) < 1e-6 && Math.abs(m.w - 0.1) < 1e-9 },
+  { id: 'dilute', title: 'Разбавление',
+    text: ['Если долить в раствор воды, он становится слабее. Масса раствора растёт, а масса соли остаётся той же. Посмотрите на точки в стакане: их не стало меньше, им просто стало просторнее.',
+           'Значит, m(соли) = ω₁ · m₁ = ω₂ · m₂. Хотите ослабить раствор в 3 раза — увеличьте его массу в 3 раза.'],
+    life: 'Агроном разводит концентрат удобрения по инструкции: перепутал пропорцию — сжёг корни всему полю. Лаборант каждый день готовит рабочие растворы из крепких. Дома так получают столовый уксус 9 % из уксусной эссенции 70 %.',
+    safe: 'Если разбавляют кислоту, то льют кислоту в воду, а не воду в кислоту, иначе раствор может вскипеть и брызнуть.',
+    task: 'В стакане 100 г раствора соли 15 %. Разбавьте его водой до 5 %.',
+    hint: 'Сначала посчитайте: соли в стакане 15 г, и они должны составить 5 % нового раствора. Какой тогда будет его масса?',
+    stage: 'Тащите кувшин к стакану. Соль здесь не добавляем — только воду.',
+    check: m => Math.abs(m.w - 0.05) < 1e-9 },
+  { id: 'mix', title: 'Смешивание растворов',
+    text: ['Когда сливают два раствора одной соли, массы соли складываются, и массы растворов тоже складываются.',
+           'Поэтому ω смеси всегда лежит между ω двух исходных: из 20 % и 5 % не получится ни 25 %, ни 3 %. И она ближе к тому раствору, которого налили больше.'],
+    life: 'Технолог пищевого производства смешивает крепкий и слабый сироп, чтобы попасть точно в рецептуру напитка. Фармацевт получает раствор нужной крепости из двух готовых, а агроном — смесь для опрыскивания из остатков двух баков, не выливая лишнего.',
+    safe: 'Растворы в бутылках подписаны не просто так: незнакомую жидкость не нюхают в упор и не смешивают «на удачу».',
+    task: 'Смешайте раствор А (20 %) и раствор Б (5 %) так, чтобы получилось 300 г раствора 10 %.',
+    hint: 'Налейте поровну и посмотрите, куда «уехала» ω. Как посчитать точно — «правило креста» на вкладке «Расчёты».',
+    stage: 'Тащите стаканы А и Б к большому стакану и наливайте.',
+    check: m => Math.abs(m.m - 300) < 1e-6 && Math.abs(m.w - 0.1) < 1e-9 },
+  { id: 'ph', title: 'Шкала pH',
+    text: ['Насколько раствор кислый, показывает число pH от 0 до 14. Меньше 7 — среда кислая, около 7 — нейтральная, больше 7 — щелочная.',
+           'Каждая единица — это в 10 раз. Раствор с pH 2 в 10 раз кислее, чем с pH 3, и в 100 000 раз кислее чистой воды. Универсальный индикатор показывает это цветом: красный в кислоте, зелёный в нейтральной среде, синий и фиолетовый в щёлочи.'],
+    life: 'Агроном меряет pH почвы: картофель любит слабокислую землю, капуста — нейтральную, и от этого зависит урожай. Технолог косметики подбирает шампунь под кожу (её pH около 5,5). Кто следит за бассейном или аквариумом, проверяет pH воды каждый день.',
+    safe: 'Средство для прочистки труб — едкая щёлочь: только в перчатках и очках. Попало на кожу — сразу долго промывать водой.',
+    task: 'Проверьте индикаторной полоской все шесть образцов.',
+    hint: 'Перетащите полоску в стаканчик или просто нажмите на стаканчик. Полоска окрасится, а на шкале у края стола появится отметка.',
+    stage: 'Окуните полоску в стаканчик и сравните цвет со шкалой на краю стола.',
+    check: m => m.n === SAMPLES.length },
+  { id: 'neutral', title: 'Нейтрализация',
+    text: ['Кислота и щёлочь «гасят» друг друга: HCl + NaOH → NaCl + H₂O. Получаются обычная поваренная соль и вода.',
+           'В колбе 20 мл соляной кислоты 0,1 моль/л и капля универсального индикатора. Из бюретки добавляем щёлочь NaOH той же концентрации. Пока кислоты больше, среда кислая. Когда щёлочи добавлено ровно столько же моль, сколько было кислоты, pH = 7. Рядом с этой точкой pH прыгает от одной капли.'],
+    life: 'Это титрование — главный приём лаборанта контроля качества. Так на молочном заводе проверяют кислотность молока, а на водоканале — воду из-под крана. Таблетка от изжоги работает так же: щелочное вещество нейтрализует лишнюю кислоту в желудке.',
+    safe: 'Кислота и щёлочь разъедают кожу и глаза: очки и перчатки обязательны. Жидкости не набирают ртом — для этого есть бюретка и груша.',
+    task: 'Добавляйте щёлочь, пока индикатор не станет зелёным: pH от 6,5 до 7,5.',
+    hint: 'Зажмите кран бюретки — потечёт струйка. Короткое нажатие — одна капля (0,05 мл). Ближе к концу капайте по одной. Перелили — «Заново».',
+    stage: 'Зажмите кран бюретки — течёт струйка, короткое нажатие — одна капля.',
+    check: m => Math.abs(m.pH - 7) <= 0.5 },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem('luch-chem') || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', sub: 'salt',
+            salt: 0, water: 0, add: 0, a: 0, b: 0, tested: {}, last: null, drops: 0, trace: [0], hl: null };
+const save = () => { try { localStorage.setItem('luch-chem', JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+function model() {
+  const id = LID();
+  if (id === 'mass') {
+    const dis = Math.min(S.salt, SOL[S.sub] * S.water), sed = S.salt - dis, m = S.water + dis;
+    return { kind: 'sol', solute: dis, sed: sed > 1e-9 ? sed : 0, water: S.water, m, total: S.salt + S.water, w: m > 0 ? dis / m : 0 };
+  }
+  if (id === 'dilute') { const s = L2.m0 * L2.w0, m = L2.m0 + S.add; return { kind: 'sol', solute: s, sed: 0, water: m - s, m, total: m, w: s / m }; }
+  if (id === 'mix') {
+    const sA = L3.wA * S.a, sB = L3.wB * S.b, s = sA + sB, m = S.a + S.b;
+    return { kind: 'sol', solute: s, sA, sB, sed: 0, water: m - s, m, total: m, w: m > 0 ? s / m : 0 };
+  }
+  if (id === 'ph') { const smp = S.last === null ? null : SAMPLES[S.last]; return { kind: 'ph', smp, pH: smp ? smp.pH : null, n: Object.keys(S.tested).length }; }
+  return Object.assign({ kind: 'tit' }, titr(S.drops));
+}
+
+// ---------- scene geometry (SVG units; the bench top is y = 360) ----------
+const BK = { x: 188, y: 160, w: 144, h: 178, bot: 336 };           // beaker on the balance
+const level = m => BK.bot - m * 0.33;                              // ~1 г ≈ 1 мл, 500 мл → 165 units
+const inBeaker = o => o.x > BK.x + 6 && o.x < BK.x + BK.w - 6 && o.y > 20 && o.y < BK.y + 14;
+const CUPX = [52, 135, 218, 302, 385, 468];
+const BUR_Y0 = 14, BUR_K = 4;                                      // burette: 0 мл at y 14, 4 units per мл
+const FL = { bot: 352 };
+const flaskLevel = V => FL.bot - 2 - (VA + V) * 0.55;
+
+// draggable things and where they rest in each lesson
+const RESTS = {
+  mass: { scoop: [74, 284], jug: [408, 242] },
+  dilute: { jug: [408, 242] },
+  mix: { A: [112, 242], B: [408, 242] },
+  ph: { strip: [260, 236] },
+  neutral: {},
+};
+let P = {};
+const resetProps = () => { P = {}; for (const [k, [x, y]] of Object.entries(RESTS[LID()])) P[k] = { x, y, rx: x, ry: y, tilt: 0 }; };
+
+// seeded dots: one dot ≈ 1 г of dissolved substance
+const DOTS = []; { let s = 7; const r = () => (s = (s * 16807) % 2147483647) / 2147483647; for (let i = 0; i < 90; i++) DOTS.push({ u: r(), v: r(), p: r() * 6.28 }); }
+
+const ol = (d, fill, stroke, w = 2.2, extra = '') => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${w + 2.6}" stroke-linejoin="round" stroke-linecap="round"/><path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round" ${extra}/>`;
+const GLASS = 'rgba(200,225,255,.08)', GLASS_S = '#9fb3d1';
+
+function bench(id) {
+  let h = `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern>
+    <clipPath id="bkIn"><rect x="${BK.x + 2}" y="100" width="${BK.w - 4}" height="${BK.bot - 100}" rx="6"/></clipPath>
+    <clipPath id="flIn"><path d="M249 262V293L201 344Q197 350 205 350H315Q323 350 319 344L271 293V262Z"/></clipPath></defs>
+    <rect x="-2000" y="-2000" width="4520" height="2360" fill="url(#tile)"/>
+    <rect x="-2000" y="360" width="4520" height="1200" fill="#1a2232"/>
+    <rect x="-2000" y="358" width="4520" height="4" fill="#2c3954"/>
+    <rect x="-2000" y="362" width="4520" height="2" fill="${INK}" opacity=".6"/>`;
+  if (id === 'ph' || id === 'neutral') {
+    const x0 = 50, sw = 28.6;
+    for (let i = 0; i <= 14; i++) h += `<rect x="${(x0 + i * sw).toFixed(1)}" y="370" width="${(sw + 0.4).toFixed(1)}" height="11" fill="${PAL[i]}"/><text x="${(x0 + i * sw + sw / 2).toFixed(1)}" y="394" font-size="9" fill="#8b96ad" text-anchor="middle">${i}</text>`;
+    h += `<rect x="${x0}" y="370" width="${(15 * sw).toFixed(1)}" height="11" fill="none" stroke="${INK}" stroke-width="1.5" rx="2"/>`;
+    const pv = id === 'ph' ? (S.last === null ? null : SAMPLES[S.last].pH) : titr(S.drops).pH;
+    if (pv !== null) { const mx = x0 + (pv + 0.5) * sw; h += `<path d="M${mx.toFixed(1)} 368l-5-8h10z" fill="#e8ecf4" stroke="${INK}" stroke-width="1.2"/>`; }
+  }
+  return h;
+}
+
+function beakerSVG(m, t) {
+  const lv = level(m.total), lvL = level(m.m + 0), solute = m.solute;
+  let h = '';
+  // balance
+  h += ol('M170 343h180v12q0 5-5 5H175q-5 0-5-5z', '#2a3348', '#3a4762');
+  h += `<rect x="216" y="346" width="86" height="11" rx="2" fill="#0d1a14" stroke="${INK}"/><text x="298" y="355" font-size="8.5" fill="#86e0a8" text-anchor="end">${fmt(m.total, 1)} г</text><text x="178" y="354" font-size="6" fill="#8b96ad">0,1 г</text>`;
+  h += ol('M180 337h160v6H180z', '#8a96b0', '#a9b4c9', 1.4);
+  // liquid
+  const liqTop = level(m.water + solute + (m.sed || 0) * 0.45);
+  h += `<g clip-path="url(#bkIn)">`;
+  if (m.water > 0) {
+    h += `<rect x="${BK.x}" y="${liqTop.toFixed(1)}" width="${BK.w}" height="${(BK.bot - liqTop + 2).toFixed(1)}" fill="var(--liq)" opacity="${(0.28 + Math.min(0.12, m.w * 0.6)).toFixed(2)}"/>`;
+    h += `<rect x="${BK.x}" y="${liqTop.toFixed(1)}" width="${BK.w}" height="2" fill="#a8e2f5" opacity=".8"/>`;
+  }
+  if (m.sed > 0) {
+    const hs = Math.min(26, 3 + m.sed * 0.7), c = S.sub === 'sugar' && LID() === 'mass' ? '#f3d9a4' : '#eef3fa';
+    h += `<path d="M${BK.x + 4} ${BK.bot}Q${BK.x + BK.w / 2} ${(BK.bot - 2 * hs).toFixed(1)} ${BK.x + BK.w - 4} ${BK.bot}Z" fill="${c}" stroke="${INK}" stroke-width="1"/>`;
+  }
+  const n = Math.min(DOTS.length, Math.round(solute)), H = BK.bot - liqTop - 6;
+  if (m.water > 0 && H > 2) {
+    const col = S.sub === 'sugar' && LID() === 'mass' ? '#ffcf7a' : '#f2f7ff';
+    for (let i = 0; i < n; i++) {
+      const d = DOTS[i], dx = reduce ? 0 : Math.sin(t / 900 + d.p) * 2.5, dy = reduce ? 0 : Math.cos(t / 1150 + d.p * 1.3) * 2;
+      const x = BK.x + 7 + d.u * (BK.w - 14) + dx, y = clamp(BK.bot - 4 - d.v * H + dy, liqTop + 3, BK.bot - 3);
+      h += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.1" fill="${col}"/>`;
+    }
+  }
+  h += `</g>`;
+  // glass
+  const d = `M${BK.x - 6} ${BK.y}L${BK.x} ${BK.y + 6}V${BK.bot - 6}Q${BK.x} ${BK.bot + 2} ${BK.x + 8} ${BK.bot + 2}H${BK.x + BK.w - 8}Q${BK.x + BK.w} ${BK.bot + 2} ${BK.x + BK.w} ${BK.bot - 6}V${BK.y + 6}L${BK.x + BK.w + 4} ${BK.y}`;
+  h += `<path d="${d}Z" fill="${GLASS}"/>` + ol(d, 'none', GLASS_S, 2.4);
+  h += `<path d="M${BK.x + 10} ${BK.y + 18}V${BK.bot - 14}" stroke="#fff" stroke-opacity=".14" stroke-width="5" stroke-linecap="round"/>`;
+  for (let v = 100; v <= 500; v += 100) { const y = level(v); h += `<path d="M${BK.x + BK.w - 24} ${y.toFixed(1)}h18" stroke="#c8d6ec" stroke-width="1.2" opacity=".7"/><text x="${BK.x + BK.w - 27}" y="${(y + 3).toFixed(1)}" font-size="7.5" fill="#8b96ad" text-anchor="end">${v}</text>`; }
+  h += `<text x="${BK.x + BK.w - 6}" y="${BK.y + 16}" font-size="7" fill="#8b96ad" text-anchor="end">мл</text>`;
+  return h;
+}
+
+function jarSVG() {
+  const sugar = S.sub === 'sugar';
+  let h = ol('M34 262h72v90q0 8-8 8H42q-8 0-8-8z', GLASS, GLASS_S, 2.2);
+  h += `<path d="M37 292h66v58q0 6-6 6H43q-6 0-6-6z" fill="${sugar ? '#f3d9a4' : '#eef3fa'}" opacity=".9"/>`;
+  h += `<rect x="44" y="314" width="52" height="22" rx="3" fill="#e8ecf4" stroke="${INK}" stroke-width="1.5"/><text x="70" y="329" font-size="10" fill="#0b1019" text-anchor="middle" font-weight="500">${SUBN[S.sub].jar}</text>`;
+  h += ol('M30 256h80v8H30z', '#3a4762', '#56627d', 1.6);
+  return h;
+}
+
+// a pouring vessel; origin at the spout tip, body to the right (dir −1) or mirrored to the left (dir +1)
+function vesselSVG(o, dir, liq, label, sub, id) {
+  const sx = dir < 0 ? 1 : -1;
+  let h = `<g transform="translate(${o.x.toFixed(1)} ${o.y.toFixed(1)}) rotate(${(o.tilt * dir).toFixed(1)}) scale(${sx} 1)" data-drag="${id}">`;
+  h += `<rect x="-6" y="-8" width="104" height="132" fill="transparent"/>`;
+  h += ol('M76 24c22 0 24 54 0 58', 'none', '#56627d', 5);
+  h += `<path d="M21 ${34 - 0}h52v76q0 5-5 5H26q-5 0-5-5z" fill="${liq}" opacity=".55"/>`;
+  h += ol('M0 0L18 9V110q0 8 8 8h42q8 0 8-8V4H12Z', GLASS, GLASS_S, 2.4);
+  h += `<path d="M26 18v88" stroke="#fff" stroke-opacity=".16" stroke-width="4" stroke-linecap="round"/>`;
+  h += `<g transform="translate(47 74) scale(${sx} 1)"><rect x="-22" y="-13" width="44" height="${sub ? 30 : 20}" rx="3" fill="#e8ecf4" stroke="${INK}" stroke-width="1.4"/><text y="1" font-size="11" fill="#0b1019" text-anchor="middle" font-weight="500">${label}</text>${sub ? `<text y="13" font-size="8.5" fill="#0b1019" text-anchor="middle">${sub}</text>` : ''}</g>`;
+  return h + `</g>`;
+}
+
+function scoopSVG(o) {
+  const full = !(Math.abs(o.x - o.rx) < 1 && Math.abs(o.y - o.ry) < 1);
+  const sugar = S.sub === 'sugar';
+  let h = `<g transform="translate(${o.x.toFixed(1)} ${o.y.toFixed(1)}) rotate(${(-o.tilt).toFixed(1)})" data-drag="scoop">`;
+  h += `<rect x="-18" y="-44" width="86" height="56" fill="transparent"/>`;
+  h += ol('M10 -3L62 -36', 'none', '#a9b4c9', 4);
+  if (full) h += `<ellipse cx="0" cy="-3" rx="10" ry="3.6" fill="${sugar ? '#f3d9a4' : '#eef3fa'}" stroke="${INK}" stroke-width="1"/>`;
+  h += ol('M-13 -3Q-13 8 0 8Q13 8 13 -3Z', '#c8d1e2', '#e8ecf4', 1.6);
+  return h + `</g>`;
+}
+
+function streamSVG(o, surf, kind, t) {
+  if (kind === 'grain') {
+    let h = ''; const L = surf - o.y; if (L < 4) return '';
+    const col = S.sub === 'sugar' ? '#f3d9a4' : '#eef3fa';
+    for (let i = 0; i < 12; i++) { const y = o.y + 6 + ((t * 0.22 + i * 29) % L), x = o.x - 6 + ((i * 7) % 11); h += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="2.2" height="2.2" fill="${col}"/>`; }
+    return h;
+  }
+  const w = reduce ? 0 : Math.sin(t / 70) * 1.2;
+  return `<path d="M${o.x.toFixed(1)} ${o.y.toFixed(1)}Q${(o.x - 3 + w).toFixed(1)} ${((o.y + surf) / 2).toFixed(1)} ${(o.x - 1).toFixed(1)} ${surf.toFixed(1)}" stroke="var(--liq)" stroke-width="3.6" fill="none" opacity=".85" stroke-linecap="round"/><ellipse cx="${o.x - 1}" cy="${surf.toFixed(1)}" rx="7" ry="2" fill="#a8e2f5" opacity=".7"/>`;
+}
+
+function phSceneSVG() {
+  let h = '';
+  SAMPLES.forEach((s, i) => {
+    const cx = CUPX[i], tested = S.tested[i];
+    h += `<g data-drag="cup${i}"><rect x="${cx - 32}" y="262" width="64" height="98" fill="transparent"/>`;
+    h += `<path d="M${cx - 25} 306L${cx - 22} 354Q${cx - 22} 356 ${cx - 20} 356H${cx + 20}Q${cx + 22} 356 ${cx + 22} 354L${cx + 25} 306Z" fill="${s.tint}" opacity=".5"/>`;
+    h += ol(`M${cx - 28} 290L${cx - 24} 354Q${cx - 24} 360 ${cx - 18} 360H${cx + 18}Q${cx + 24} 360 ${cx + 24} 354L${cx + 28} 290`, GLASS, GLASS_S, 2.2);
+    h += `<text x="${cx}" y="346" font-size="8" fill="#e8ecf4" text-anchor="middle">${s.short}</text>`;
+    if (tested) { const c = uiColor(s.pH); h += `<rect x="${cx - 22}" y="266" width="44" height="17" rx="4" fill="${c}" stroke="${INK}" stroke-width="1.4"/><text x="${cx}" y="278.5" font-size="9.5" fill="${lum(c) > 150 ? '#0b1019' : '#fff'}" text-anchor="middle" font-weight="500">pH ${s.pH}</text>`; }
+    h += `</g>`;
+  });
+  const o = P.strip, pad = S.last === null ? '#e8c873' : uiColor(SAMPLES[S.last].pH);
+  h += `<g transform="translate(${o.x.toFixed(1)} ${o.y.toFixed(1)})" data-drag="strip"><rect x="-20" y="-124" width="40" height="130" fill="transparent"/>`;
+  h += ol('M-7 -112H7V0H-7Z', '#f1ece0', '#fff', 1.4);
+  h += `<rect x="-7" y="-22" width="14" height="22" fill="${pad}" stroke="${INK}" stroke-width="1.2"/>`;
+  h += `<rect x="-7" y="-112" width="14" height="14" fill="#c9d3e3"/></g>`;
+  return h;
+}
+
+let dropFx = [];
+function titrSceneSVG(t, open) {
+  const r = titr(S.drops), lv = flaskLevel(r.V), col = uiColor(r.pH);
+  let h = '';
+  // stand
+  h += ol('M104 350h104v10H104z', '#2a3348', '#3a4762', 1.6);
+  h += ol('M150 -400V350', 'none', '#a9b4c9', 4.5);
+  h += ol('M150 66H252', 'none', '#8a96b0', 4);
+  h += ol('M246 58h28v16h-28z', '#3a4762', '#56627d', 1.6);
+  // white tile + flask
+  h += `<rect x="176" y="352" width="168" height="8" rx="1.5" fill="#dfe6f0" stroke="${INK}" stroke-width="1.6"/>`;
+  h += `<g clip-path="url(#flIn)"><rect x="190" y="${lv.toFixed(1)}" width="140" height="${(FL.bot - lv + 2).toFixed(1)}" fill="${col}" opacity=".78"/><rect x="190" y="${lv.toFixed(1)}" width="140" height="2" fill="#fff" opacity=".35"/></g>`;
+  h += ol('M246 258L249 262V293L201 344Q197 352 207 352H313Q323 352 319 344L271 293V262L274 258', 'none', GLASS_S, 2.4);
+  h += `<path d="M249 262V293L201 344Q197 352 207 352H313Q323 352 319 344L271 293V262Z" fill="${GLASS}"/>`;
+  h += `<path d="M256 296L222 334" stroke="#fff" stroke-opacity=".16" stroke-width="5" stroke-linecap="round"/>`;
+  h += `<text x="330" y="318" font-size="9" fill="#8b96ad">HCl 0,1 моль/л</text><text x="330" y="330" font-size="9" fill="#8b96ad">20 мл + индикатор</text>`;
+  // burette
+  const top = -400, y0 = BUR_Y0, yl = y0 + r.V * BUR_K;
+  h += `<rect x="253" y="${yl.toFixed(1)}" width="14" height="${(236 - yl).toFixed(1)}" fill="#bcd7f2" opacity=".35"/>`;
+  h += `<rect x="253" y="${(yl - 1).toFixed(1)}" width="14" height="2.4" fill="#d8ecff" opacity=".9"/>`;
+  h += ol(`M252 ${top}V236H268V${top}`, 'none', GLASS_S, 2);
+  for (let v = 0; v <= BUR; v++) {
+    const y = y0 + v * BUR_K, L = v % 5 === 0 ? 8 : 4;
+    h += `<path d="M268 ${y}h-${L}" stroke="#c8d6ec" stroke-width="1" opacity=".7"/>`;
+    if (v % 10 === 0) h += `<text x="248" y="${y + 3}" font-size="7.5" fill="#8b96ad" text-anchor="end">${v}</text>`;
+  }
+  h += `<text x="276" y="${y0 + 26}" font-size="9" fill="#8b96ad">NaOH</text><text x="276" y="${y0 + 38}" font-size="9" fill="#8b96ad">0,1 моль/л</text>`;
+  // stopcock + tip
+  h += ol('M257 246H263L261.5 270H258.5Z', GLASS, GLASS_S, 1.6);
+  h += ol('M250 236h20v10h-20z', '#3a4762', '#56627d', 1.4);
+  h += `<g data-drag="tap"><rect x="222" y="224" width="76" height="34" fill="transparent"/>` +
+       (open ? ol('M257 226h6v30h-6z', '#ffb547', '#ffd08a', 1.4) : ol('M240 238h40v6h-40z', '#ffb547', '#ffd08a', 1.4)) + `</g>`;
+  if (open && r.V < BUR) h += `<path d="M260 270V${lv.toFixed(1)}" stroke="#d8ecff" stroke-width="1.6" opacity=".8"/>`;
+  dropFx = dropFx.filter(d => t - d < 380);
+  for (const d of dropFx) { const k = (t - d) / 380, y = 272 + (lv - 272) * k * k; h += `<ellipse cx="260" cy="${y.toFixed(1)}" rx="2" ry="2.8" fill="#d8ecff"/>`; }
+  return h;
+}
+
+function hlBox(id) {
+  const o = P[id];
+  const box = {
+    beaker: [180, 152, 162, 194], balance: [166, 334, 188, 30], jar: [26, 252, 90, 112], scoop: o ? [o.x - 18, o.y - 42, 86, 54] : null,
+    jug: o ? [o.x + 8, o.y - 6, 96, 128] : null, A: o ? [o.x - 104, o.y - 6, 96, 128] : null, B: o ? [o.x + 8, o.y - 6, 96, 128] : null,
+    cups: [16, 260, 488, 104], strip: o ? [o.x - 14, o.y - 118, 28, 124] : null, scale: [42, 362, 446, 40],
+    burette: [242, 0, 36, 274], flask: [192, 254, 136, 104], tile: [172, 348, 176, 16], stand: [100, 0, 112, 364],
+  }[id];
+  return box;
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID(), m = model();
+  let h = bench(id);
+  if (m.kind === 'sol') {
+    h += beakerSVG(m, t);
+    const surf = level(m.water + m.solute + (m.sed || 0) * 0.45);
+    if (id === 'mass') { h += jarSVG(); }
+    for (const k of Object.keys(P)) {
+      const o = P[k];
+      if (pourOn === k) h += streamSVG(o, Math.min(surf, BK.bot - 2), k === 'scoop' ? 'grain' : 'liquid', t);
+      if (k === 'scoop') h += scoopSVG(o);
+      if (k === 'jug') h += vesselSVG(o, -1, '#5fb4d9', 'H₂O', '', 'jug');
+      if (k === 'A') h += vesselSVG(o, +1, '#7fc4e4', 'А', '20 %', 'A');
+      if (k === 'B') h += vesselSVG(o, -1, '#a9d9ee', 'Б', '5 %', 'B');
+    }
+  } else if (m.kind === 'ph') h += phSceneSVG();
+  else h += titrSceneSVG(t, tapOpen);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// fit the scene: 520 × 405 units, centred, bench at the bottom
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 490, hh / 410, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 405 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- dragging and pouring ----------
+let drag = null, pourOn = null, tapOpen = false, dirty = true, acc = 0, limitSaid = false;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  const id = el.dataset.drag; e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  if (id.startsWith('cup')) { drag = { id, x: e.clientX, y: e.clientY, moved: false }; return; }
+  if (id === 'tap') { drag = { id, t0: performance.now(), x: e.clientX, y: e.clientY, moved: false }; return; }
+  const p = toSvg(e), o = P[id]; if (!o) return;
+  drag = { id, dx: o.x - p.x, dy: o.y - p.y, x: e.clientX, y: e.clientY, moved: false };
+  limitSaid = false; acc = 0;
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 5) drag.moved = true;
+  const o = P[drag.id]; if (!o || !drag.moved) return;
+  const p = toSvg(e);
+  o.x = clamp(p.x + drag.dx, VB.x + 10, VB.x + VB.w - 10); o.y = clamp(p.y + drag.dy, VB.y + 10, 356);
+  if (drag.id === 'strip') {
+    const i = CUPX.findIndex(cx => Math.abs(o.x - cx) < 24 && o.y > 312 && o.y < 362);
+    if (i >= 0 && S.last !== i) testCup(i);
+  }
+  dirty = true;
+});
+const endDrag = cancel => {
+  if (!drag) return;
+  const d = drag; drag = null; pourOn = null; tapOpen = false; scene.classList.remove('grabbing');
+  if (cancel) return;
+  if (!d.moved) {
+    if (d.id.startsWith('cup')) testCup(+d.id.slice(3));
+    else if (d.id === 'tap') { if (performance.now() - d.t0 < 250) addDrops(1); }
+    else if (d.id === 'scoop') pour('scoop', 1);
+    else if (d.id === 'jug') pour('jug', 10);
+    else if (d.id === 'A' || d.id === 'B') pour(d.id, 5);
+    else if (d.id === 'strip') toast('Перетащите полоску в стаканчик.');
+  }
+  dirty = true;
+};
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+function pour(id, amt) {
+  const L = LID(); let ok = true;
+  if (id === 'scoop') { if (S.salt + amt > L1MAX.salt) ok = false; else S.salt += amt; }
+  else if (id === 'jug' && L === 'mass') { if (S.water + amt > L1MAX.water) ok = false; else S.water += amt; }
+  else if (id === 'jug' && L === 'dilute') { if (S.add + amt > L2.max) ok = false; else S.add += amt; }
+  else if (id === 'A') { if (S.a + amt > L3.max) ok = false; else S.a += amt; }
+  else if (id === 'B') { if (S.b + amt > L3.max) ok = false; else S.b += amt; }
+  if (!ok) { if (!limitSaid) toast(id === 'scoop' ? `Хватит: больше ${L1MAX.salt} г в этот опыт не кладём.` : id === 'A' || id === 'B' ? 'В этом стакане раствор закончился.' : 'Стакан почти полный, больше не лейте.'); limitSaid = true; return false; }
+  update(); return true;
+}
+function addDrops(n) {
+  if (S.drops >= BUR / DROP) { toast('Бюретка пустая. Нажмите «Заново».'); return false; }
+  S.drops = Math.min(BUR / DROP, S.drops + n);
+  if (!S.trace.includes(S.drops)) S.trace.push(S.drops);
+  if (!reduce) dropFx.push(performance.now());
+  update(); return true;
+}
+function testCup(i) {
+  S.last = i; S.tested[i] = true;
+  const s = SAMPLES[i];
+  toast(`${s.name}: pH ${s.pH}, среда ${env(s.pH)}`);
+  update();
+}
+
+let last = performance.now(), lastDraw = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  let anim = false;
+  // pouring vessels: tilt over the beaker, pour while held
+  for (const [k, o] of Object.entries(P)) {
+    if (k === 'strip') { if (!(drag && drag.id === k)) { const nx = reduce ? o.rx : o.x + (o.rx - o.x) * Math.min(1, dt * 10), ny = reduce ? o.ry : o.y + (o.ry - o.y) * Math.min(1, dt * 10); if (Math.abs(nx - o.x) + Math.abs(ny - o.y) > 0.05) anim = true; o.x = nx; o.y = ny; } continue; }
+    const held = drag && drag.id === k && drag.moved, over = held && inBeaker(o);
+    const target = over ? (k === 'scoop' ? 35 : 52) : 0;
+    const nt = reduce ? target : o.tilt + (target - o.tilt) * Math.min(1, dt * 9);
+    if (Math.abs(nt - o.tilt) > 0.05) anim = true; o.tilt = nt;
+    if (!held) {
+      const nx = reduce ? o.rx : o.x + (o.rx - o.x) * Math.min(1, dt * 9), ny = reduce ? o.ry : o.y + (o.ry - o.y) * Math.min(1, dt * 9);
+      if (Math.abs(nx - o.x) + Math.abs(ny - o.y) > 0.05) anim = true; o.x = nx; o.y = ny;
+    }
+    if (over && o.tilt > target * 0.7) {
+      pourOn = k; anim = true;
+      const step = k === 'scoop' ? 0.12 : 0.1, amt = k === 'scoop' ? 1 : 5;
+      acc += dt; while (acc >= step) { acc -= step; if (!pour(k, amt)) { acc = 0; break; } }
+    } else if (pourOn === k) pourOn = null;
+  }
+  // burette tap held
+  if (drag && drag.id === 'tap' && t - drag.t0 > 250) {
+    tapOpen = true; anim = true; acc += dt;
+    while (acc >= 0.1) { acc -= 0.1; if (!addDrops(1)) { acc = 0; break; } }
+  } else if (!drag || drag.id !== 'tap') tapOpen = false;
+  if (dropFx.length || S.hl) anim = true;
+  const drift = !reduce && LESSONS[S.lesson].id !== 'ph' && LESSONS[S.lesson].id !== 'neutral' && t - lastDraw > 50;
+  if (dirty || anim || drift) { drawScene(t); dirty = false; lastDraw = t; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    mass: B('sub-salt', 'Соль', S.sub === 'salt') + B('sub-sugar', 'Сахар', S.sub === 'sugar') + sep + B('salt1', '+1 г') + B('water10', '+10 г воды') + sep + B('empty', 'Вылить'),
+    dilute: B('add10', '+10 г воды') + B('add50', '+50 г') + sep + B('reset', 'Заново'),
+    mix: B('a5', '+5 г А') + B('b5', '+5 г Б') + sep + B('empty', 'Вылить'),
+    ph: B('clear', 'Новые полоски'),
+    neutral: B('drop', 'Капля') + B('ml', '+1 мл') + sep + B('reset', 'Заново'),
+  }[id];
+}
+function act(a) {
+  if (a === 'sub-salt' || a === 'sub-sugar') { const s = a.slice(4); if (s !== S.sub) { S.sub = s; S.salt = 0; S.water = 0; toast(`Стакан вымыт. Теперь растворяем ${SUBN[s].nom}.`); renderTools(); buildScheme(); update(); } return; }
+  if (a === 'salt1') return pour('scoop', 1);
+  if (a === 'water10') return pour('jug', 10);
+  if (a === 'add10') return pour('jug', 10);
+  if (a === 'add50') return pour('jug', 50);
+  if (a === 'a5') return pour('A', 5);
+  if (a === 'b5') return pour('B', 5);
+  if (a === 'empty') { S.salt = 0; S.water = 0; S.a = 0; S.b = 0; update(); return; }
+  if (a === 'reset') { S.add = 0; S.drops = 0; S.trace = [0]; dropFx = []; update(); return; }
+  if (a === 'clear') { S.tested = {}; S.last = null; update(); return; }
+  if (a === 'drop') return addDrops(1);
+  if (a === 'ml') return addDrops(Math.round(1 / DROP));
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = (inner) => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  beaker: IC('<path d="M8 6l2 2v18q0 3 3 3h8q3 0 3-3V8l2-2" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M11 17h12v9q0 2-2 2h-8q-2 0-2-2z" fill="var(--liq)" opacity=".5"/>'),
+  balance: IC('<rect x="5" y="17" width="24" height="10" rx="2" fill="none" stroke="var(--fg)" stroke-width="1.6"/><rect x="9" y="13" width="16" height="3" fill="var(--muted)"/><rect x="10" y="20" width="12" height="4" fill="var(--ok)" opacity=".7"/>'),
+  jar: IC('<rect x="9" y="8" width="16" height="20" rx="2" fill="none" stroke="var(--fg)" stroke-width="1.6"/><rect x="10" y="15" width="14" height="12" fill="#eef3fa" opacity=".8"/><path d="M22 14L31 4" stroke="var(--muted)" stroke-width="1.8"/>'),
+  jug: IC('<path d="M5 7l5 3v16q0 3 3 3h9q3 0 3-3V8H9z" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M25 12q6 0 6 6t-6 6" fill="none" stroke="var(--muted)" stroke-width="1.6"/><path d="M11 16h12v9q0 2-2 2h-8q-2 0-2-2z" fill="var(--liq)" opacity=".5"/>'),
+  cups: IC('<path d="M3 12l1 16h7l1-16M13 12l1 16h7l1-16M23 12l1 16h7l1-16" fill="none" stroke="var(--fg)" stroke-width="1.4"/><rect x="5" y="19" width="5" height="8" fill="#ec4527"/><rect x="15" y="19" width="5" height="8" fill="#33a84f"/><rect x="25" y="19" width="5" height="8" fill="#4a3c97"/>'),
+  strip: IC('<rect x="13" y="3" width="8" height="28" rx="1" fill="#f1ece0"/><rect x="13" y="22" width="8" height="9" fill="#f8a11f"/>'),
+  scale: IC('<rect x="2" y="13" width="30" height="8" rx="2" fill="url(#g)"/><defs><linearGradient id="g"><stop offset="0" stop-color="#c9151e"/><stop offset=".3" stop-color="#fbc81b"/><stop offset=".5" stop-color="#33a84f"/><stop offset=".75" stop-color="#2179bb"/><stop offset="1" stop-color="#4a1d6e"/></linearGradient></defs>'),
+  burette: IC('<path d="M15 2v22h4V2" fill="none" stroke="var(--fg)" stroke-width="1.5"/><rect x="12" y="24" width="10" height="3" fill="var(--force)"/><path d="M17 27v5" stroke="var(--fg)" stroke-width="1.5"/><path d="M19 6h-2M19 10h-2M19 14h-2" stroke="var(--muted)"/>'),
+  flask: IC('<path d="M14 4v10l-8 13q-1 3 2 3h18q3 0 2-3l-8-13V4" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M9 23h16l2.4 4q.6 1.5-1 1.5H7.6q-1.6 0-1-1.5z" fill="#ec4527" opacity=".8"/>'),
+  tile: IC('<rect x="3" y="20" width="28" height="7" rx="1.5" fill="#dfe6f0"/>'),
+  stand: IC('<path d="M10 3v26M4 30h16M10 10h16" stroke="var(--fg)" stroke-width="1.8" stroke-linecap="round"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+const pc = w => fmt(w * 100, 1) + ' %';
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (L.id === 'mass') {
+    if (S.sub !== 'salt') return 'Сейчас растворяем сахар, а нужна соль';
+    if (m.sed > 0) return `${fmt(m.sed, 1)} г соли не растворилось — долейте воды`;
+    return `Раствор ${fmt(m.m, 0)} г · ω = ${pc(m.w)}`;
+  }
+  if (L.id === 'dilute') return `Долито ${S.add} г воды · ω = ${pc(m.w)}`;
+  if (L.id === 'mix') return `${fmt(m.m, 0)} г смеси · ω = ${pc(m.w)}`;
+  if (L.id === 'ph') return `Проверено ${m.n} из ${SAMPLES.length}`;
+  return `NaOH ${fmt(m.V, 2)} мл · pH ${fmt(m.pH, 2)}` + (m.pH > 7.5 ? ' · перелили, жмите «Заново»' : '');
+}
+
+// composition bars for lessons 1–3
+function compSVG(rows) {
+  const maxT = Math.max(100, ...rows.map(r => r.total)), H = rows.length * 17 + 6;
+  let h = `<svg class="diag" viewBox="0 0 120 ${H}" role="img" aria-label="Состав растворов">`;
+  rows.forEach((r, i) => {
+    const y = 6 + i * 17, W = r.total / maxT * 70, ws = r.total > 0 ? r.solute / r.total * W : 0;
+    h += `<text x="2" y="${y + 3}" font-size="3.6" fill="#8b96ad">${r.label}</text>`;
+    h += `<rect x="2" y="${y + 5.5}" width="70" height="6" rx="1" fill="#1a2438"/>`;
+    if (W > 0) h += `<rect x="2" y="${y + 5.5}" width="${W.toFixed(2)}" height="6" rx="1" fill="var(--liq)" opacity=".55"/><rect x="2" y="${y + 5.5}" width="${Math.max(ws, r.solute > 0 ? 0.6 : 0).toFixed(2)}" height="6" fill="var(--force)"/>`;
+    h += `<text x="75" y="${y + 10}" font-size="3.6" fill="#e8ecf4">${fmt(r.solute, 1)} / ${fmt(r.total, 0)} г</text>`;
+    h += `<text x="118" y="${y + 3}" font-size="3.6" fill="${r.hi ? '#86e0a8' : '#8b96ad'}" text-anchor="end">${r.total > 0 ? 'ω ' + pc(r.solute / r.total) : '—'}</text>`;
+  });
+  return h + `</svg>`;
+}
+function phScaleSVG() {
+  let h = `<svg class="diag" viewBox="0 0 120 44" role="img" aria-label="Шкала pH с отметками проверенных образцов">`;
+  for (let i = 0; i <= 14; i++) h += `<rect x="${(4 + i * 7.47).toFixed(2)}" y="22" width="7.6" height="7" fill="${PAL[i]}"/><text x="${(4 + i * 7.47 + 3.7).toFixed(2)}" y="34" font-size="3.2" fill="#8b96ad" text-anchor="middle">${i}</text>`;
+  h += `<text x="4" y="41" font-size="3.2" fill="#ec4527">кислая</text><text x="60" y="41" font-size="3.2" fill="#33a84f" text-anchor="middle">нейтральная</text><text x="116" y="41" font-size="3.2" fill="#8f86ff" text-anchor="end">щелочная</text>`;
+  SAMPLES.forEach((s, i) => {
+    if (!S.tested[i]) return;
+    const x = 4 + s.pH * 7.47 + 3.7, row = i % 2;
+    h += `<path d="M${x.toFixed(2)} 21.5v${row ? -9 : -3}" stroke="#e8ecf4" stroke-width=".35"/><text x="${x.toFixed(2)}" y="${row ? 11 : 17}" font-size="3.3" fill="${S.last === i ? '#ffb547' : '#e8ecf4'}" text-anchor="middle">${s.short}</text>`;
+  });
+  return h + `</svg>`;
+}
+// titration curve: x 0…50 мл, y pH 0…14
+function chartSVG(mini) {
+  const X = v => 12 + v * 2.1, Y = p => 70 - p * 4.6;
+  let h = `<svg class="${mini ? '' : 'diag'}" viewBox="0 0 120 78" role="img" aria-label="Кривая титрования: pH от объёма щёлочи">`;
+  if (mini) h = `<svg viewBox="0 0 120 78" aria-hidden="true">`;
+  h += `<rect x="12" y="5.6" width="105" height="64.4" fill="none" stroke="#26324a" stroke-width=".5"/>`;
+  h += `<path d="M12 ${Y(7)}H117" stroke="#33a84f" stroke-width=".5" stroke-dasharray="1.5 1.5"/><path d="M${X(20)} 5.6V70" stroke="#26324a" stroke-width=".5" stroke-dasharray="1.5 1.5"/>`;
+  for (const p of [0, 7, 14]) h += `<text x="10" y="${Y(p) + 1.3}" font-size="${mini ? 5 : 3.4}" fill="#8b96ad" text-anchor="end">${p}</text>`;
+  for (const v of [0, 10, 20, 30, 40, 50]) if (!mini || v % 20 === 0) h += `<text x="${X(v)}" y="75.5" font-size="${mini ? 5 : 3.4}" fill="#8b96ad" text-anchor="middle">${v}</text>`;
+  if (!mini) h += `<text x="117" y="10" font-size="3.4" fill="#8b96ad" text-anchor="end">pH</text><text x="114" y="67" font-size="3.4" fill="#8b96ad" text-anchor="end">V(NaOH), мл</text>`;
+  if (S.done.neutral) {
+    let d = ''; for (let k = 0; k <= 1000; k += (k > 360 && k < 440 ? 1 : 10)) { const r = titr(k); d += (d ? 'L' : 'M') + X(r.V).toFixed(2) + ' ' + Y(r.pH).toFixed(2); }
+    h += `<path d="${d}" fill="none" stroke="#8b96ad" stroke-width=".5" stroke-dasharray="1.2 1.2"/>`;
+  }
+  const pts = S.trace.slice().sort((a, b) => a - b).map(k => titr(k));
+  h += `<path d="${pts.map((r, i) => (i ? 'L' : 'M') + X(r.V).toFixed(2) + ' ' + Y(r.pH).toFixed(2)).join('')}" fill="none" stroke="#ffb547" stroke-width="${mini ? 1.6 : 1}"/>`;
+  const r = titr(S.drops);
+  h += `<circle cx="${X(r.V).toFixed(2)}" cy="${Y(r.pH).toFixed(2)}" r="${mini ? 3 : 1.8}" fill="${uiColor(r.pH)}" stroke="#e8ecf4" stroke-width="${mini ? .8 : .5}"/>`;
+  return h + `</svg>`;
+}
+
+// Scheme tab: built once per lesson, then values refreshed (sliders keep focus while dragging)
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'mass') h = `<h2>Из чего состоит раствор</h2><div id="sDiag"></div><p class="note" style="margin-top:8px">Оранжевая часть полосы — ${SUBN[S.sub].nom}, голубая — вода. В стакане одна точка — примерно 1 г растворённого вещества.</p>
+      <dl class="reads"><div><dt>m(${SUBN[S.sub].gen})</dt><dd id="r1"></dd></div><div><dt>m(р-ра)</dt><dd id="r2"></dd></div><div><dt>ω</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Что растворяем</div><div class="chips" id="subChips"><button data-s="salt" aria-pressed="${S.sub === 'salt'}">Соль NaCl</button><button data-s="sugar" aria-pressed="${S.sub === 'sugar'}">Сахар</button></div></div>` +
+      slider('inSalt', `Масса ${SUBN[S.sub].gen}`, 0, L1MAX.salt, 1, S.salt) + slider('inWater', 'Масса воды', 0, L1MAX.water, 5, S.water);
+  if (id === 'dilute') h = `<h2>Было и стало</h2><div id="sDiag"></div><p class="note" style="margin-top:8px">Оранжевая часть — соль. Её масса не меняется, сколько воды ни доливай.</p>
+      <dl class="reads"><div><dt>m(соли)</dt><dd id="r1"></dd></div><div><dt>m(р-ра)</dt><dd id="r2"></dd></div><div><dt>ω</dt><dd id="r3"></dd></div></dl>` +
+      slider('inAdd', 'Долить воды', 0, L2.max, 5, S.add);
+  if (id === 'mix') h = `<h2>Смешивание</h2><div id="sDiag"></div><p class="note" style="margin-top:8px">Соль из двух стаканов складывается, массы растворов тоже.</p>
+      <dl class="reads"><div><dt>m(соли)</dt><dd id="r1"></dd></div><div><dt>m(смеси)</dt><dd id="r2"></dd></div><div><dt>ω</dt><dd id="r3"></dd></div></dl>` +
+      slider('inA', 'Раствор А, 20 %', 0, L3.max, 5, S.a) + slider('inB', 'Раствор Б, 5 %', 0, L3.max, 5, S.b);
+  if (id === 'ph') h = `<h2>Шкала pH</h2><div id="sDiag"></div>
+      <dl class="reads"><div><dt>Образец</dt><dd id="r1"></dd></div><div><dt>pH</dt><dd id="r2"></dd></div><div><dt>Среда</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Проверить образец</div><div class="chips" id="smpChips">${SAMPLES.map((s, i) => `<button data-i="${i}">${s.name}</button>`).join('')}</div></div>`;
+  if (id === 'neutral') h = `<h2>Кривая титрования</h2><div id="sDiag"></div><p class="note" style="margin-top:8px">Оранжевая линия — ваш путь. Зелёный пунктир — pH 7.</p>
+      <dl class="reads"><div><dt>V(NaOH)</dt><dd id="r1"></dd></div><div><dt>pH</dt><dd id="r2"></dd></div><div><dt>Среда</dt><dd id="r3"></dd></div></dl>
+      <div class="row"><button class="ghostbtn" data-a="drop">Капля 0,05 мл</button><button class="ghostbtn" data-a="ml">+1 мл</button><button class="ghostbtn" data-a="reset">Заново</button></div>`;
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn); };
+  on('#inSalt', e => { S.salt = +e.target.value; update(); });
+  on('#inWater', e => { S.water = +e.target.value; update(); });
+  on('#inAdd', e => { S.add = +e.target.value; update(); });
+  on('#inA', e => { S.a = +e.target.value; update(); });
+  on('#inB', e => { S.b = +e.target.value; update(); });
+  el.querySelectorAll('#subChips button').forEach(b => b.onclick = () => act('sub-' + b.dataset.s));
+  el.querySelectorAll('#smpChips button').forEach(b => b.onclick = () => testCup(+b.dataset.i));
+  el.querySelectorAll('.row [data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  const d = el.querySelector('#sDiag'); if (!d) return;
+  if (m.kind === 'sol') {
+    set('#r1', fmt(m.solute, 1) + ' г'); set('#r2', fmt(m.m, 1) + ' г'); set('#r3', pc(m.w));
+    if (id === 'mass') {
+      d.innerHTML = compSVG([{ label: 'раствор в стакане', solute: m.solute, total: m.m, hi: true }].concat(m.sed > 0 ? [{ label: 'не растворилось, лежит на дне', solute: m.sed, total: m.sed }] : []));
+      set('#inSaltO', S.salt + ' г'); set('#inWaterO', S.water + ' г'); val('#inSalt', S.salt); val('#inWater', S.water);
+    }
+    if (id === 'dilute') {
+      d.innerHTML = compSVG([{ label: 'было', solute: 15, total: 100 }, { label: 'долили воды', solute: 0, total: S.add }, { label: 'стало', solute: m.solute, total: m.m, hi: true }]);
+      set('#inAddO', S.add + ' г'); val('#inAdd', S.add);
+    }
+    if (id === 'mix') {
+      d.innerHTML = compSVG([{ label: 'А, 20 %', solute: m.sA, total: S.a }, { label: 'Б, 5 %', solute: m.sB, total: S.b }, { label: 'смесь', solute: m.solute, total: m.m, hi: true }]);
+      set('#inAO', S.a + ' г'); set('#inBO', S.b + ' г'); val('#inA', S.a); val('#inB', S.b);
+    }
+  } else if (m.kind === 'ph') {
+    d.innerHTML = phScaleSVG();
+    set('#r1', m.smp ? m.smp.short : '—'); set('#r2', m.smp ? String(m.pH) : '—'); set('#r3', m.smp ? env(m.pH) : '—');
+    el.querySelectorAll('#smpChips button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.i === S.last));
+  } else {
+    d.innerHTML = chartSVG(false);
+    set('#r1', fmt(m.V, 2) + ' мл'); set('#r2', fmt(m.pH, 2)); set('#r3', env(m.pH));
+  }
+}
+
+function partsList() {
+  const id = LID(), sugar = S.sub === 'sugar';
+  const beaker = { id: 'beaker', icon: ICON.beaker, name: 'Химический стакан', spec: 'На 500 мл, отметки через 100 мл. 1 мл воды весит около 1 г, поэтому по отметкам удобно прикидывать массу.' };
+  const balance = { id: 'balance', icon: ICON.balance, name: 'Электронные весы', spec: 'Точность 0,1 г. Пустой стакан уже «оттарирован»: весы показывают только то, что в нём.' };
+  if (id === 'mass') return [beaker, balance,
+    { id: 'jar', icon: ICON.jar, name: sugar ? 'Банка с сахаром и шпатель' : 'Банка с солью и шпатель', spec: sugar ? 'Сахар растворяется отлично: до 204 г в 100 г воды при 20 °C.' : 'Поваренная соль NaCl. В 100 г воды при 20 °C растворяется не больше 36 г, лишнее ляжет на дно.' },
+    { id: 'jug', icon: ICON.jug, name: 'Кувшин с водой', spec: 'Дистиллированная вода — без примесей, чтобы результат был честным. Льётся по 5 г за долю секунды.' }];
+  if (id === 'dilute') return [beaker, balance, { id: 'jug', icon: ICON.jug, name: 'Кувшин с водой', spec: 'Нажатие — 10 г, если держать над стаканом — льётся струйкой.' }];
+  if (id === 'mix') return [beaker, balance,
+    { id: 'A', icon: ICON.jug, name: 'Раствор А, 20 %', spec: 'В каждых 100 г — 20 г соли. Запас 250 г.' },
+    { id: 'B', icon: ICON.jug, name: 'Раствор Б, 5 %', spec: 'В каждых 100 г — 5 г соли. Запас 250 г.' }];
+  if (id === 'ph') return [
+    { id: 'cups', icon: ICON.cups, name: 'Образцы', spec: 'Шесть жидкостей, которые есть почти в каждом доме: от лимонного сока до средства для труб.' },
+    { id: 'strip', icon: ICON.strip, name: 'Индикаторная бумага', spec: 'Пропитана универсальным индикатором — смесью красителей, которые меняют цвет при разном pH.' },
+    { id: 'scale', icon: ICON.scale, name: 'Шкала pH', spec: 'От 0 до 14. Цвет полоски сравнивают с ней и читают число.' }];
+  return [
+    { id: 'burette', icon: ICON.burette, name: 'Бюретка', spec: `Трубка на ${BUR} мл с краном внизу. Ноль сверху, отсчёт вниз. Одна капля — около 0,05 мл.` },
+    { id: 'flask', icon: ICON.flask, name: 'Коническая колба', spec: '20 мл соляной кислоты HCl 0,1 моль/л и несколько капель универсального индикатора. Узкое горло — ничего не расплескать при помешивании.' },
+    { id: 'tile', icon: ICON.tile, name: 'Белая плитка', spec: 'Лежит под колбой, чтобы лучше видеть цвет индикатора.' },
+    { id: 'stand', icon: ICON.stand, name: 'Штатив с лапкой', spec: 'Держит бюретку строго вертикально над колбой.' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.life}</div>` +
+      `<div class="safe"><b>Безопасность</b>${L.safe}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Оборудование</h2><p class="note">Что стоит на столе. Нажмите на предмет, чтобы найти его.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'mass') {
+    const g = SUBN[S.sub].gen;
+    let h = `<h2>Массовая доля</h2><div class="formula">ω = m(в-ва) / m(р-ра)</div><p class="note">m(р-ра) = m(в-ва) + m(воды). Чтобы получить проценты, ω умножают на 100 %.</p><h3>Сейчас в стакане</h3><div class="steps">` +
+      step(`m(${g})`, fmt(S.salt, 0) + ' г') + step('m(воды)', fmt(S.water, 0) + ' г');
+    if (m.sed > 0) h += step('растворится максимум', `${fmt(S.water, 0)} × ${fmt(SOL[S.sub], 3)} = ${fmt(m.solute, 1)} г`) + step('лежит на дне', fmt(m.sed, 1) + ' г');
+    h += step('m(р-ра)', `${fmt(m.solute, 1)} + ${fmt(S.water, 0)} = ${fmt(m.m, 1)} г`) +
+      step('ω', m.m > 0 ? `${fmt(m.solute, 1)} / ${fmt(m.m, 1)} = ${fmt(m.w, 3)} = ${pc(m.w)}` : 'стакан пуст', 'sum') + `</div>`;
+    if (m.sed > 0) h += `<p class="note" style="margin-top:10px">Раствор насыщенный: больше ${g} в этой воде не растворится. Нерастворившееся вещество в раствор не входит.</p>`;
+    h += `<h3>Для задания</h3><div class="steps">` + step('m(соли)', '200 г × 0,10 = 20 г') + step('m(воды)', '200 − 20 = 180 г') + `</div>`;
+    return h;
+  }
+  if (id === 'dilute') {
+    return `<h2>Разбавление</h2><div class="formula">ω₁ · m₁ = ω₂ · m₂</div><p class="note">Слева и справа — масса соли. При разбавлении она не меняется.</p><h3>Сейчас</h3><div class="steps">` +
+      step('m(соли)', '100 г × 0,15 = 15 г') + step('долили воды', S.add + ' г') + step('m(р-ра)', `100 + ${S.add} = ${fmt(m.m, 0)} г`) +
+      step('ω', `15 / ${fmt(m.m, 0)} = ${fmt(m.w, 4)} = ${pc(m.w)}`, 'sum') + `</div>
+      <h3>Для задания</h3><div class="steps">` + step('m₂ = m(соли) / ω₂', '15 / 0,05 = 300 г') + step('долить воды', '300 − 100 = 200 г', 'sum') + `</div>
+      <p class="note" style="margin-top:10px">Раствор ослаб в 3 раза (15 % → 5 %), значит, его масса выросла в 3 раза.</p>`;
+  }
+  if (id === 'mix') {
+    return `<h2>Смешивание</h2><div class="formula">ω = (m₁ω₁ + m₂ω₂) / (m₁ + m₂)</div><h3>Сейчас</h3><div class="steps">` +
+      step('соль из А', `${S.a} × 0,20 = ${fmt(m.sA, 1)} г`) + step('соль из Б', `${S.b} × 0,05 = ${fmt(m.sB, 2)} г`) +
+      step('всего соли', `${fmt(m.solute, 2)} г`) + step('m(смеси)', `${S.a} + ${S.b} = ${fmt(m.m, 0)} г`) +
+      step('ω', m.m > 0 ? `${fmt(m.solute, 2)} / ${fmt(m.m, 0)} = ${pc(m.w)}` : 'стакан пуст', 'sum') + `</div>
+      <h3>Правило креста</h3><p class="note">Из большей ω вычитаем нужную, из нужной — меньшую. Получаем, сколько частей какого раствора взять.</p><div class="steps">` +
+      step('частей Б (5 %)', '20 − 10 = 10') + step('частей А (20 %)', '10 − 5 = 5') + step('А : Б', '5 : 10 = 1 : 2') + step('на 300 г', 'А 100 г, Б 200 г', 'sum') + `</div>
+      <p class="note" style="margin-top:10px">Проверка: 100 × 0,20 + 200 × 0,05 = 20 + 10 = 30 г соли; 30 / 300 = 10 %.</p>`;
+  }
+  if (id === 'ph') {
+    let h = `<h2>Что значит pH</h2><div class="formula">[H⁺] = 10<sup>−pH</sup> моль/л</div><p class="note">[H⁺] — сколько ионов водорода в литре раствора. Именно они делают раствор кислым.</p>`;
+    if (m.smp) {
+      const k = 7 - m.pH;
+      h += `<h3>${m.smp.name}</h3><div class="steps">` + step('pH', String(m.pH)) + step('[H⁺]', `${pow10(-m.pH)}${m.pH <= 3 ? ' = ' + fmt(10 ** -m.pH, m.pH) : ''} моль/л`) +
+        step('по сравнению с чистой водой', k > 0 ? `в ${big(10 ** k)} раз кислее` : k < 0 ? `в ${big(10 ** -k)} раз меньше H⁺` : 'то же самое') +
+        step('среда', env(m.pH), 'sum') + `</div><p class="note" style="margin-top:10px">Что внутри: ${m.smp.what}.</p>`;
+    } else h += `<p class="note">Проверьте любой образец полоской — здесь появится расчёт.</p>`;
+    const list = SAMPLES.filter((s, i) => S.tested[i]);
+    if (list.length) h += `<h3>Проверено</h3><div class="steps">` + list.map(s => step(s.name, `pH ${s.pH} · ${env(s.pH)}`)).join('') + `</div>`;
+    return h;
+  }
+  const exA = m.na - m.nb, mm = x => fmt(x * 1000, 3);
+  let h = `<h2>Нейтрализация</h2><div class="formula">HCl + NaOH → NaCl + H₂O</div><p class="note">Кислота и щёлочь реагируют 1 : 1 по молям. n = c · V.</p><h3>Сейчас</h3><div class="steps">` +
+    step('n(HCl) было', `0,1 × 0,020 л = ${mm(m.na)} ммоль`) + step('n(NaOH) добавили', `0,1 × ${fmt(m.V / 1000, 5)} л = ${mm(m.nb)} ммоль`) +
+    step('объём в колбе', `20 + ${fmt(m.V, 2)} = ${fmt(VA + m.V, 2)} мл`);
+  if (Math.abs(exA) < 1e-12) h += step('избыток', 'нет: кислоты и щёлочи поровну') + step('pH', '7,00 (только NaCl и вода)', 'sum');
+  else if (exA > 0) h += step('осталось HCl', `${mm(exA)} ммоль`) + step('[H⁺]', `${mm(exA)} / ${fmt(VA + m.V, 2)} = ${fmt(exA / m.Vt, 6)} моль/л`) + step('pH = −lg[H⁺]', fmt(m.pH, 2), 'sum');
+  else h += step('лишний NaOH', `${mm(-exA)} ммоль`) + step('[OH⁻]', `${mm(-exA)} / ${fmt(VA + m.V, 2)} = ${fmt(-exA / m.Vt, 6)} моль/л`) + step('pH = 14 + lg[OH⁻]', fmt(m.pH, 2), 'sum');
+  h += `</div><h3>Точка эквивалентности</h3><div class="steps">` + step('V(NaOH) = n(HCl) / c(NaOH)', '0,002 / 0,1 = 0,020 л') + step('нужно добавить', '20,00 мл', 'sum') + `</div>
+    <p class="note" style="margin-top:10px">За каплю до этой точки pH около 3,9, ровно в ней — 7, через каплю — около 10,1. Поэтому в конце капают по одной.</p>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter');
+  if (m.kind === 'sol') {
+    const target = { mass: 0.10, dilute: 0.05, mix: 0.10 }[id], ok = !!S.done[id];
+    el.innerHTML = `<div class="k">Массовая доля</div><div class="v ${ok ? 'ok' : ''}">ω = ${pc(m.w)}</div>
+      <div class="gauge"><b style="width:${clamp(m.w / 0.3 * 100, 0, 100).toFixed(1)}%"></b><i style="left:${(target / 0.3 * 100).toFixed(1)}%"></i></div>
+      <div class="lr"><span>m р-ра</span><span>${fmt(m.m, 0)} г</span></div>`;
+  } else if (m.kind === 'ph') {
+    el.innerHTML = `<div class="k">Индикатор</div><div class="v">${m.smp ? `pH ${m.pH} · ${env(m.pH)}` : 'pH —'}</div>
+      <div class="swatch" style="background:${m.smp ? uiColor(m.pH) : '#e8c873'}"></div><div class="lr"><span>${m.smp ? m.smp.short : 'сухая полоска'}</span><span>${m.n}/${SAMPLES.length}</span></div>`;
+  } else {
+    el.innerHTML = `<div class="k">pH в колбе</div><div class="v ${Math.abs(m.pH - 7) <= 0.5 ? 'ok' : ''}">pH ${fmt(m.pH, 2)}</div>${chartSVG(true)}<div class="lr"><span>NaOH</span><span>${fmt(m.V, 2)} мл</span></div>`;
+  }
+}
+
+function update() {
+  const m = model(), L = LESSONS[S.lesson];
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Вы настоящий лаборант!');
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  mass: '<path d="M24 4l2 2v18q0 2 2 2h10q2 0 2-2V6l2-2" fill="none" stroke="#e8ecf4" stroke-width="1.3"/><rect x="27" y="13" width="12" height="12" fill="#5fb4d9" opacity=".45"/><circle cx="30" cy="17" r="1" fill="#fff"/><circle cx="35" cy="20" r="1" fill="#fff"/><circle cx="32" cy="23" r="1" fill="#fff"/><circle cx="36" cy="15.5" r="1" fill="#fff"/><path d="M8 10h8M48 10h8" stroke="#ffb547" stroke-width="1.3"/>',
+  dilute: '<path d="M30 4l2 2v18q0 2 2 2h10q2 0 2-2V6l2-2" fill="none" stroke="#e8ecf4" stroke-width="1.3"/><rect x="33" y="9" width="12" height="16" fill="#5fb4d9" opacity=".35"/><circle cx="36" cy="14" r="1" fill="#fff"/><circle cx="41" cy="21" r="1" fill="#fff"/><path d="M14 8q-4 6 0 9q4-3 0-9z" fill="#5fb4d9"/><path d="M19 14h7m-2-2l2 2-2 2" stroke="#8b96ad" stroke-width="1" fill="none"/>',
+  mix: '<path d="M8 8v13h8V8M50 8v13h8V8" fill="none" stroke="#e8ecf4" stroke-width="1.2"/><rect x="9" y="13" width="6" height="8" fill="#5fb4d9" opacity=".8"/><rect x="51" y="13" width="6" height="8" fill="#5fb4d9" opacity=".3"/><path d="M26 6v17q0 2 2 2h10q2 0 2-2V6" fill="none" stroke="#e8ecf4" stroke-width="1.3"/><rect x="27" y="14" width="12" height="10" fill="#5fb4d9" opacity=".55"/><path d="M18 12l6 3M48 12l-6 3" stroke="#ffb547" stroke-width="1"/>',
+  ph: PAL.map((c, i) => `<rect x="${4 + i * 3.9}" y="11" width="4" height="9" fill="${c}"/>`).join(''),
+  neutral: '<path d="M31 1v15h4V1" fill="none" stroke="#e8ecf4" stroke-width="1.1"/><rect x="29" y="15" width="8" height="2" fill="#ffb547"/><path d="M30 19v3l-6 6h18l-6-6v-3" fill="none" stroke="#e8ecf4" stroke-width="1.2"/><path d="M25.5 26.5l3-3h9l3 3z" fill="#33a84f"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i];
+  S.lesson = i; S.salt = 0; S.water = 0; S.add = 0; S.a = 0; S.b = 0; S.tested = {}; S.last = null; S.drops = 0; S.trace = [0]; S.hl = null;
+  dropFx = []; drag = null; pourOn = null; tapOpen = false;
+  save(); resetProps();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '';
+  if (id === 'mass') now = `Растворяем ${SUBN[S.sub].nom} (${SUBN[S.sub].f}). В стакане ${fmt(S.salt, 0)} г вещества и ${fmt(S.water, 0)} г воды. Растворилось ${fmt(m.solute, 1)} г${m.sed > 0 ? `, ${fmt(m.sed, 1)} г лежит на дне (раствор насыщенный, растворимость при 20 °C ${fmt(SOL[S.sub] * 100, 0)} г на 100 г воды)` : ''}. Масса раствора ${fmt(m.m, 1)} г, массовая доля ω = ${pc(m.w)}.`;
+  if (id === 'dilute') now = `Исходно 100 г раствора соли 15 % (15 г соли). Долито ${S.add} г воды. Масса раствора ${fmt(m.m, 0)} г, соли по-прежнему 15 г, ω = ${pc(m.w)}.`;
+  if (id === 'mix') now = `Раствор А 20 %: налито ${S.a} г (соли ${fmt(m.sA, 1)} г). Раствор Б 5 %: налито ${S.b} г (соли ${fmt(m.sB, 2)} г). Смесь ${fmt(m.m, 0)} г, соли ${fmt(m.solute, 2)} г, ω = ${pc(m.w)}.`;
+  if (id === 'ph') now = `Образцы и их pH: ${SAMPLES.map(s => `${s.name} — pH ${s.pH}`).join('; ')}. Проверено индикатором ${m.n} из ${SAMPLES.length}: ${SAMPLES.filter((s, i) => S.tested[i]).map(s => s.name).join(', ') || 'пока ни одного'}. ${m.smp ? `Последний: ${m.smp.name}, pH ${m.pH}, среда ${env(m.pH)}, цвет универсального индикатора соответствующий.` : 'Полоска пока сухая.'}`;
+  if (id === 'neutral') now = `В колбе 20 мл HCl 0,1 моль/л (2,00 ммоль) с универсальным индикатором. Из бюретки добавлено ${fmt(m.V, 2)} мл NaOH 0,1 моль/л (${fmt(m.nb * 1000, 2)} ммоль). pH = ${fmt(m.pH, 2)}, среда ${env(m.pH)}. Точка эквивалентности — 20,00 мл. Одна капля = 0,05 мл.`;
+  return [
+    `Раздел: химия, растворы и кислотность. Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на столе: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = {
+    mass: 'Почему соль перестаёт растворяться?', dilute: 'Почему масса соли не меняется, когда доливаешь воду?', mix: 'Как работает правило креста?',
+    ph: 'Почему шаг pH — это в 10 раз?', neutral: 'Почему pH так резко прыгает возле 20 мл?',
+  }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

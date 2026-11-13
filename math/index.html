@@ -1,0 +1,891 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория: графики прямой и параболы на координатной плоскости — наклон, сдвиги, вершина, корни и дискриминант.">
+<title>Прямая и парабола</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /mechanics and /optics. Live coordinate plane on the left, lesson notebook on the right, lesson strip under the plane. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;flex-wrap:wrap;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+#plane{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+#plane.grabbing{cursor:grabbing}
+.g-minor{stroke:rgba(160,185,230,.07);stroke-width:1}
+.g-major{stroke:rgba(160,185,230,.16);stroke-width:1}
+.g-axis{stroke:var(--muted);stroke-width:1.4}
+.g-axis-h{fill:var(--muted)}
+.g-num{fill:var(--muted);font:500 11px var(--font-mono)}
+.g-ax{fill:var(--fg);font:500 13px var(--font-mono)}
+.curve{fill:none;stroke:var(--arm);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.ghost{fill:none;stroke:var(--muted);stroke-width:1.6;stroke-dasharray:6 6;opacity:.7}
+.sym{stroke:var(--arm);stroke-width:1.2;stroke-dasharray:3 5;opacity:.7}
+.slope line{stroke:var(--force);stroke-width:1.6;stroke-dasharray:4 3}
+.mk{fill:var(--bg);stroke:var(--arm);stroke-width:2}
+.mk.root{stroke:var(--ok);fill:var(--ok)}
+.tgt{fill:none;stroke:var(--ok);stroke-width:2;stroke-dasharray:4 3}
+.tgt.hit{stroke-dasharray:none;fill:rgba(134,224,168,.25)}
+.lbl{font:500 12px var(--font-mono);fill:var(--fg);paint-order:stroke;stroke:var(--bg);stroke-width:4px;stroke-linejoin:round}
+.lbl.m{fill:var(--muted)}.lbl.o{fill:var(--ok)}.lbl.f{fill:var(--force)}.lbl.a{fill:var(--arm)}
+.hdl{cursor:grab;outline:none}
+.hdl .hit{fill:transparent}
+.hdl .dot{fill:var(--force);stroke:var(--bg);stroke-width:2.5}
+.hdl .ring{fill:none;stroke:var(--force);stroke-width:1.5;opacity:.45}
+.hdl.blue .dot{fill:var(--arm)}.hdl.blue .ring{stroke:var(--arm)}
+.hdl:hover .ring,.hdl:focus-visible .ring{opacity:1;stroke-width:2.5}
+.hdl:focus-visible .dot{stroke:var(--fg)}
+.hl{filter:drop-shadow(0 0 5px #72d4e8) drop-shadow(0 0 2px #72d4e8)}
+@media (prefers-reduced-motion:no-preference){.hl{animation:blink .5s ease-in-out 4 alternate}}
+@keyframes blink{from{opacity:1}to{opacity:.35}}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 230px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.readout{position:absolute;top:14px;right:14px;width:200px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.readout .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.readout .v{font:500 15px/1.3 var(--font-mono);margin-top:8px;color:var(--arm);overflow-wrap:anywhere}
+.readout .sub{font:500 11.5px/1.45 var(--font-mono);color:var(--muted);margin-top:6px}
+.readout .sub .ok{color:var(--ok)}.readout .sub .warn{color:var(--warn)}
+
+.tools{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px}
+.tools .sq{width:30px;padding:6px 0;font:500 15px/1 var(--font-mono)}
+.hint{position:absolute;left:16px;bottom:20px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{border-left:3px solid var(--arm);background:var(--surface-2);border-radius:0 10px 10px 0;padding:10px 12px;margin:4px 0 0;font-size:14px;line-height:1.5}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--arm);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.vtab{width:100%;border-collapse:collapse;font:500 13px var(--font-mono);font-variant-numeric:tabular-nums;table-layout:fixed}
+.vtab th,.vtab td{border:1px solid var(--line);padding:7px 2px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vtab th{color:var(--muted);font-weight:500;background:var(--surface-2);width:34px}
+
+.formula{font:500 19px/1.2 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:5;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:420px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .sections a{padding:8px 8px;letter-spacing:.06em;font-size:11px}
+  .readout{width:128px;padding:8px}
+  .readout .v{font-size:12.5px}
+  .readout .sub{font-size:10.5px}
+  .task{max-width:calc(100% - 158px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M20 7v27M6 27h28" stroke="var(--muted)" stroke-width="1.4"/><path d="M9 9q11 34 22 0" fill="none" stroke="var(--arm)" stroke-width="2.4" stroke-linecap="round"/><path d="M7 33L33 13" stroke="var(--fg)" stroke-width="2" stroke-linecap="round"/><circle cx="20" cy="27" r="2.6" fill="var(--force)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Математика · Графики</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/">Карта</a><a href="/optics/">Оптика</a><a href="/mechanics/">Механика</a><a href="/math/" aria-current="page">Графики</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Графики</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/5</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Координатная плоскость с графиком">
+    <svg id="plane" xmlns="http://www.w3.org/2000/svg" aria-label="Координатная плоскость. Оранжевые и голубые точки можно перетаскивать или двигать стрелками.">
+      <g id="gGrid"></g><g id="gGhost"></g><g id="gMarks"></g><g id="gCurve"></g><g id="gLabels"></g><g id="gHandles"></g>
+    </svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="readout">
+      <div class="k" id="roK">Функция</div>
+      <div class="v" id="roV"></div>
+      <div class="sub" id="roSub"></div>
+    </div>
+    <div class="hint">Тяните цветные точки. Фон двигает плоскость, колёсико меняет масштаб.</div>
+    <div class="tools" role="toolbar" aria-label="Вид">
+      <button id="tGrid" aria-pressed="true">Сетка</button>
+      <button id="tKeys" aria-pressed="true">Точки</button>
+      <button id="tGhost" aria-pressed="false">Образец</button>
+      <span class="sep"></span>
+      <button class="sq" id="zOut" aria-label="Отдалить">−</button>
+      <button class="sq" id="zIn" aria-label="Приблизить">+</button>
+      <button class="sq" id="vReset" aria-label="Вернуть вид">⟲</button>
+    </div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden>
+      <h2>Пульт</h2>
+      <p class="note">Ползунки меняют числа в формуле, график на плоскости слушается сразу.</p>
+      <dl class="reads" id="reads"></dl>
+      <div id="sliders"></div>
+      <h3>Таблица значений</h3>
+      <table class="vtab" id="vtab"></table>
+      <div class="row"><button class="ghostbtn" id="resetBtn">Вернуть как было в начале урока</button></div>
+    </div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const EPS = 1e-9;
+// number in Russian style: decimal comma, real minus sign, no trailing zeros
+const num = (x, n = 2) => {
+  if (!isFinite(x)) return '∞';
+  let r = Math.round(x * 10 ** n) / 10 ** n;
+  if (Object.is(r, -0) || Math.abs(r) < EPS) r = 0;
+  return String(r).replace('.', ',').replace('-', '−');
+};
+const par = (x, n) => (x < -EPS ? `(${num(x, n)})` : num(x, n));
+const pt = (x, y) => `(${num(x)}; ${num(y)})`;
+const snap = v => Math.round(v * 2) / 2;
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c; };
+
+// polynomial text: terms [[coef, 'x²'], [coef, 'x'], [coef, '']]
+function poly(terms) {
+  let s = '';
+  for (const [c0, v] of terms) {
+    const c = Math.abs(c0) < EPS ? 0 : c0;
+    if (!c) continue;
+    const a = Math.abs(c), body = v ? (Math.abs(a - 1) < EPS ? v : num(a) + v) : num(a);
+    s += s ? (c < 0 ? ' − ' : ' + ') + body : (c < 0 ? '−' : '') + body;
+  }
+  return s || '0';
+}
+
+// ---------- lessons ----------
+// type: line (y = kx + b), pa (y = ax²), vf (y = a(x − m)² + n), std (y = ax² + bx + c)
+const LESSONS = [
+  { id: 'slope', type: 'line', title: 'Наклон прямой: число k', init: () => ({ k: 1, b: 0, xp: 2 }), view: [1, 1.5],
+    text: ['Линейная функция y = kx + b рисует прямую. Сейчас b = 0, поэтому формула простая: y = kx, и прямая всегда проходит через начало координат.',
+           'Число k — наклон: на сколько прямая поднимается, если шагнуть на 1 вправо. k &gt; 0 — прямая идёт вверх, k &lt; 0 — вниз, k = 0 — лежит горизонтально. Чем больше |k|, тем круче.'],
+    life: 'Таксист и бухгалтер: цена поездки растёт по прямой, k — цена километра. Инженер-дорожник: уклон дороги — это тоже k. Программист игр двигает персонажа по прямой той же формулой.',
+    task: 'Перетащите оранжевую точку так, чтобы прямая прошла через точку (2; 5).',
+    hint: 'Прямая проходит через (0; 0). Каким должен быть наклон, чтобы при x = 2 получилось y = 5?',
+    targets: [[2, 5]],
+    check: p => Math.abs(p.k * 2 + p.b - 5) < EPS },
+  { id: 'shift', type: 'line', title: 'Сдвиг b и точки на осях', init: () => ({ k: 1, b: 1, xp: 2 }), view: [1.5, -0.5],
+    text: ['Число b поднимает или опускает прямую целиком, а наклон не трогает. Прямая пересекает ось y в точке (0; b) — просто подставьте x = 0.',
+           'Ось x прямая пересекает там, где y = 0: kx + b = 0, отсюда x = −b / k. Если k = 0 и b ≠ 0, прямая параллельна оси x и не встречает её никогда.'],
+    life: 'Тариф «абонплата + оплата за минуту»: b — абонплата, k — цена минуты. Предприниматель так находит точку безубыточности — место, где прямая прибыли пересекает ось x.',
+    task: 'Сделайте прямую, которая пересекает ось y в точке (0; −2), а ось x — в точке (4; 0).',
+    hint: 'Голубая точка на оси y задаёт b, оранжевая — наклон k.',
+    targets: [[0, -2], [4, 0]],
+    check: p => Math.abs(p.b + 2) < EPS && Math.abs(p.k * 4 + p.b) < EPS },
+  { id: 'para', type: 'pa', title: 'Парабола y = ax²', init: () => ({ a: 1, xp: 1 }), view: [0, 0],
+    text: ['График y = ax² — парабола. Её вершина в точке (0; 0), а две ветви зеркальны относительно оси y.',
+           'Знак a решает, куда смотрят ветви: a &gt; 0 — вверх, a &lt; 0 — вниз. Величина |a| — ширина: при |a| &gt; 1 парабола уже, чем y = x², при |a| &lt; 1 — шире. При a = 0 это уже не парабола, а прямая y = 0.'],
+    life: 'По параболе летят мяч, струя фонтана и капли из шланга. Форму параболы имеют спутниковые тарелки и фары — инженеры-оптики считают их именно по y = ax².',
+    task: 'Сделайте параболу с ветвями вниз, которая проходит через точку (2; −2).',
+    hint: 'Тяните оранжевую точку. Подставьте x = 2: a · 2² = −2. Чему равно a?',
+    targets: [[2, -2]],
+    check: p => Math.abs(p.a * 4 + 2) < EPS },
+  { id: 'vertex', type: 'vf', title: 'Сдвиги и вершина', init: () => ({ a: 1, m: 0, n: 0, xs: 1 }), view: [2.5, -1],
+    text: ['y = a(x − m)² + n — та же парабола y = ax², только перенесённая: на m вправо и на n вверх. Вершина теперь в точке (m; n), форма при сдвиге не меняется.',
+           'Осторожно со знаком: у y = (x − 3)² вершина при x = 3, а у y = (x + 3)² — при x = −3.'],
+    life: 'Вершина — самая высокая или самая низкая точка. Так ищут цену товара, при которой выручка наибольшая, высоту полёта мяча и место, где трос моста провисает ниже всего.',
+    task: 'Перетащите вершину так, чтобы парабола прошла через точки (1; 0) и (5; 0).',
+    hint: 'Парабола симметрична: вершина стоит ровно посередине между этими точками. А на сколько её опустить?',
+    targets: [[1, 0], [5, 0]],
+    check: p => Math.abs(p.a) > EPS && Math.abs(fval(p, 'vf', 1)) < EPS && Math.abs(fval(p, 'vf', 5)) < EPS },
+  { id: 'roots', type: 'std', title: 'Корни и дискриминант', init: () => ({ a: 1, b: 0, c: -4 }), view: [0, 0],
+    text: ['Корни уравнения ax² + bx + c = 0 — это точки, где парабола y = ax² + bx + c пересекает ось x. Сколько их, заранее говорит дискриминант D = b² − 4ac.',
+           'D &gt; 0 — два корня, D = 0 — один: вершина касается оси. D &lt; 0 — корней нет, парабола до оси не достаёт.'],
+    life: 'Физик считает, через сколько секунд брошенный мяч упадёт на землю. Экономист — при какой цене прибыль станет нулевой. Программист игр — попадёт ли луч в мишень. Везде это квадратное уравнение.',
+    task: 'Получите все три случая: два корня, один корень и ни одного.',
+    hint: 'Двигайте оранжевую вершину вверх-вниз или ползунки на вкладке «Схема». Следите за D.',
+    targets: [],
+    check: () => S.seen.pos && S.seen.zero && S.seen.neg },
+];
+
+function fval(p, type, x) {
+  if (type === 'line') return p.k * x + p.b;
+  if (type === 'pa') return p.a * x * x;
+  if (type === 'vf') return p.a * (x - p.m) ** 2 + p.n;
+  return p.a * x * x + p.b * x + p.c;
+}
+const f = x => fval(S.p, LESSONS[S.lesson].type, x);
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem('luch-math-graphs') || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), p: {}, done: saved.done || {}, tab: 'overview',
+            grid: true, keys: true, ghost: false, view: { cx: 0, cy: 0, zoom: 1 }, seen: {}, hl: null };
+const save = () => { try { localStorage.setItem('luch-math-graphs', JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+
+// ---------- model: everything the screen and the tutor need ----------
+function model() {
+  const L = LESSONS[S.lesson], p = S.p, t = L.type, m = { type: t };
+  if (t === 'line') {
+    m.formula = 'y = ' + poly([[p.k, 'x'], [p.b, '']]);
+    m.yInt = p.b;
+    m.xInt = Math.abs(p.k) > EPS ? -p.b / p.k : null;
+    m.onAxis = Math.abs(p.k) < EPS && Math.abs(p.b) < EPS;
+    m.angle = Math.atan(p.k) * 180 / Math.PI;
+  } else {
+    let a, b, c;
+    if (t === 'pa') { a = p.a; b = 0; c = 0; }
+    else if (t === 'vf') { a = p.a; b = -2 * p.a * p.m; c = p.a * p.m * p.m + p.n; }
+    else { a = p.a; b = p.b; c = p.c; }
+    Object.assign(m, { A: a, B: b, C: c });
+    m.isPara = Math.abs(a) > EPS;
+    if (t === 'pa') m.formula = 'y = ' + poly([[a, 'x²']]);
+    else if (t === 'vf') m.formula = vfText(p);
+    else m.formula = 'y = ' + poly([[a, 'x²'], [b, 'x'], [c, '']]);
+    if (m.isPara) {
+      m.vx = t === 'vf' ? p.m : -b / (2 * a);
+      m.vy = t === 'vf' ? p.n : c - b * b / (4 * a);
+      m.D = b * b - 4 * a * c;
+      if (Math.abs(m.D) < 1e-9) m.D = 0;
+      m.roots = m.D > 0 ? [(-b - Math.sqrt(m.D)) / (2 * a), (-b + Math.sqrt(m.D)) / (2 * a)].sort((u, v) => u - v) : m.D === 0 ? [-b / (2 * a)] : [];
+    } else {
+      m.roots = Math.abs(b) > EPS ? [-c / b] : [];
+    }
+  }
+  m.done = !!S.done[L.id];
+  return m;
+}
+function vfText(p) {
+  if (Math.abs(p.a) < EPS) return 'y = ' + num(p.n);
+  const a = Math.abs(p.a - 1) < EPS ? '' : Math.abs(p.a + 1) < EPS ? '−' : num(p.a);
+  const br = Math.abs(p.m) < EPS ? 'x²' : `(x ${p.m > 0 ? '−' : '+'} ${num(Math.abs(p.m))})²`;
+  const n = Math.abs(p.n) < EPS ? '' : ` ${p.n > 0 ? '+' : '−'} ${num(Math.abs(p.n))}`;
+  return 'y = ' + a + br + n;
+}
+
+// handles on the plane: P — orange shape point, B / C — blue point on the y axis, V — orange vertex
+function handles() {
+  const L = LESSONS[S.lesson], p = S.p, m = model(), H = [];
+  if (L.type === 'line') {
+    H.push({ id: 'P', x: p.xp, y: p.k * p.xp + p.b, name: 'Точка на прямой', part: 'k' });
+    if (L.id === 'shift') H.push({ id: 'B', x: 0, y: p.b, blue: true, vert: true, name: 'Точка b на оси y', part: 'b' });
+  } else if (L.type === 'pa') {
+    H.push({ id: 'P', x: p.xp, y: p.a * p.xp * p.xp, name: 'Точка на параболе', part: 'a' });
+  } else if (L.type === 'vf') {
+    H.push({ id: 'V', x: p.m, y: p.n, name: 'Вершина', part: 'vertex' });
+    H.push({ id: 'P', x: p.m + p.xs, y: p.a * p.xs * p.xs + p.n, blue: true, name: 'Точка на параболе, задаёт a', part: 'a' });
+  } else {
+    if (m.isPara) H.push({ id: 'V', x: m.vx, y: m.vy, name: 'Вершина', part: 'vertex' });
+    H.push({ id: 'C', x: 0, y: p.c, blue: true, vert: true, name: 'Точка c на оси y', part: 'c' });
+  }
+  return H;
+}
+
+function dragTo(id, x, y) {
+  const L = LESSONS[S.lesson], p = S.p;
+  x = snap(clamp(x, -30, 30)); y = snap(clamp(y, -30, 30));
+  if (L.type === 'line') {
+    if (id === 'B') { p.b = clamp(y, -10, 10); return; }
+    if (x === 0) return;
+    p.k = clamp((y - p.b) / x, -10, 10); p.xp = x;
+  } else if (L.type === 'pa') {
+    if (x === 0) return;
+    p.a = clamp(y / (x * x), -4, 4); p.xp = x;
+  } else if (L.type === 'vf') {
+    if (id === 'V') { p.m = clamp(x, -10, 10); p.n = clamp(y, -10, 10); return; }
+    const dx = x - p.m; if (dx === 0) return;
+    p.a = clamp((y - p.n) / (dx * dx), -3, 3); p.xs = dx;
+  } else {
+    if (id === 'C') { p.c = clamp(y, -20, 20); return; }
+    if (Math.abs(p.a) < EPS) return;
+    const mm = clamp(x, -10, 10), nn = clamp(y, -20, 20);
+    p.b = -2 * p.a * mm; p.c = p.a * mm * mm + nn;
+  }
+}
+
+// ---------- plane drawing ----------
+const svg = $('#plane'), stage = $('#stage');
+let W = 600, H = 400;
+const U = () => Math.min(W / 17, H / 13) * S.view.zoom;
+const X = x => W / 2 + (x - S.view.cx) * U();
+const Y = y => H / 2 - (y - S.view.cy) * U();
+const toUnit = (px, py) => [S.view.cx + (px - W / 2) / U(), S.view.cy - (py - H / 2) / U()];
+const r1 = v => v.toFixed(1);
+const lbl = (x, y, text, cls, side) => {
+  let px = X(x), py = Y(y), anchor = 'start', dx = 10, dy = -10;
+  if (side === 'below') dy = 20;
+  if (px > W - 110) { anchor = 'end'; dx = -10; }
+  return `<text class="lbl ${cls || ''}" x="${r1(px + dx)}" y="${r1(py + dy)}" text-anchor="${anchor}">${text}</text>`;
+};
+const hlc = part => (S.hl === part ? ' hl' : '');
+
+function drawGrid() {
+  const u = U(), [x0, y1] = toUnit(0, 0), [x1, y0] = toUnit(W, H);
+  const lab = [1, 2, 5, 10, 20].find(s => s * u >= 34) || 50;
+  const minor = u >= 12 ? 1 : lab;
+  let h = '';
+  if (S.grid) {
+    for (let x = Math.ceil(x0 / minor) * minor; x <= x1; x += minor) h += `<line class="${x % lab === 0 ? 'g-major' : 'g-minor'}" x1="${r1(X(x))}" y1="0" x2="${r1(X(x))}" y2="${H}"/>`;
+    for (let y = Math.ceil(y0 / minor) * minor; y <= y1; y += minor) h += `<line class="${y % lab === 0 ? 'g-major' : 'g-minor'}" x1="0" y1="${r1(Y(y))}" x2="${W}" y2="${r1(Y(y))}"/>`;
+  }
+  const ax = clamp(X(0), 0, W), ay = clamp(Y(0), 0, H);
+  h += `<line class="g-axis" x1="0" y1="${r1(ay)}" x2="${W}" y2="${r1(ay)}"/><line class="g-axis" x1="${r1(ax)}" y1="0" x2="${r1(ax)}" y2="${H}"/>`;
+  h += `<path class="g-axis-h" d="M${W} ${r1(ay)}l-10 -4.5v9z"/><path class="g-axis-h" d="M${r1(ax)} 0l-4.5 10h9z"/>`;
+  h += `<text class="g-ax" x="${W - 14}" y="${r1(ay - 10)}" text-anchor="end">x</text><text class="g-ax" x="${r1(ax + 12)}" y="16">y</text>`;
+  for (let x = Math.ceil(x0 / lab) * lab; x <= x1; x += lab) if (x) h += `<text class="g-num" x="${r1(X(x))}" y="${r1(clamp(ay + 16, 14, H - 6))}" text-anchor="middle">${num(x)}</text>`;
+  for (let y = Math.ceil(y0 / lab) * lab; y <= y1; y += lab) if (y) h += `<text class="g-num" x="${r1(clamp(ax - 7, 30, W))}" y="${r1(Y(y) + 4)}" text-anchor="end">${num(y)}</text>`;
+  h += `<text class="g-num" x="${r1(ax - 7)}" y="${r1(ay + 16)}" text-anchor="end">0</text>`;
+  $('#gGrid').innerHTML = h;
+}
+
+function pathOf(fn) {
+  const [x0] = toUnit(-4, 0), [x1] = toUnit(W + 4, 0);
+  let d = '', pen = false;
+  const n = Math.max(60, Math.ceil(W / 2));
+  for (let i = 0; i <= n; i++) {
+    const x = x0 + (x1 - x0) * i / n, py = Y(fn(x));
+    if (py < -H || py > 2 * H) { pen = false; continue; }
+    d += (pen ? 'L' : 'M') + r1(X(x)) + ' ' + r1(py); pen = true;
+  }
+  return d;
+}
+
+function drawPlane() {
+  const L = LESSONS[S.lesson], p = S.p, m = model();
+  drawGrid();
+  // ghost: the starting shape the current graph came from
+  let g = '';
+  if (S.ghost) {
+    const gf = L.type === 'line' ? (L.id === 'slope' ? (x => x) : (x => p.k * x)) : L.type === 'pa' ? (x => x * x) : L.type === 'vf' ? (x => p.a * x * x) : (x => p.a * x * x);
+    g = `<path class="ghost" d="${pathOf(gf)}"/>`;
+  }
+  $('#gGhost').innerHTML = g;
+
+  // marks: targets, intercepts, slope step, vertex axis, roots
+  let mk = '', lb = '';
+  for (const [tx, ty] of L.targets) {
+    const hit = Math.abs(f(tx) - ty) < EPS;
+    mk += `<circle class="tgt${hit ? ' hit' : ''}${hlc('target')}" cx="${r1(X(tx))}" cy="${r1(Y(ty))}" r="11"/>`;
+    lb += lbl(tx, ty, pt(tx, ty), 'o' + hlc('target'), ty === 0 ? 'below' : '');
+  }
+  if (L.type === 'line') {
+    if (S.keys) {
+      // slope step: one to the right, k up
+      const sx = Math.abs(p.xp) >= 1 ? 0 : 1;
+      const y0 = fval(p, 'line', sx);
+      mk += `<g class="slope${hlc('k')}"><line x1="${r1(X(sx))}" y1="${r1(Y(y0))}" x2="${r1(X(sx + 1))}" y2="${r1(Y(y0))}"/><line x1="${r1(X(sx + 1))}" y1="${r1(Y(y0))}" x2="${r1(X(sx + 1))}" y2="${r1(Y(y0 + p.k))}"/></g>`;
+      lb += `<text class="lbl f${hlc('k')}" x="${r1(X(sx + 1) + 8)}" y="${r1((Y(y0) + Y(y0 + p.k)) / 2 + 4)}">k = ${num(p.k)}</text>`;
+      if (L.id === 'shift') lb += lbl(0, p.b, `b = ${num(p.b)}`, 'a' + hlc('b'));
+      else if (S.hl === 'b') mk += `<circle class="mk hl" cx="${r1(X(0))}" cy="${r1(Y(p.b))}" r="5"/>`;
+      if (m.xInt !== null && !(Math.abs(m.xInt) < EPS && L.id === 'slope')) {
+        mk += `<circle class="mk${hlc('ox')}" cx="${r1(X(m.xInt))}" cy="${r1(Y(0))}" r="4.5"/>`;
+        lb += lbl(m.xInt, 0, `x = ${num(m.xInt)}`, 'a' + hlc('ox'), 'below');
+      }
+    }
+    lb += lbl(p.xp, p.k * p.xp + p.b, pt(p.xp, p.k * p.xp + p.b), 'f');
+  } else {
+    if (m.isPara && S.keys) {
+      mk += `<line class="sym${hlc('axis')}" x1="${r1(X(m.vx))}" y1="0" x2="${r1(X(m.vx))}" y2="${H}"/>`;
+    }
+    if (S.keys || L.type === 'std') for (const r of m.roots) {
+      if (L.type === 'pa') continue;
+      mk += `<circle class="mk root${hlc('roots')}" cx="${r1(X(r))}" cy="${r1(Y(0))}" r="5"/>`;
+      if (!L.targets.some(([tx, ty]) => ty === 0 && Math.abs(tx - r) < 1e-6)) lb += lbl(r, 0, `x = ${num(r)}`, 'o' + hlc('roots'), 'below');
+    }
+    if (m.isPara && S.keys && L.type !== 'pa') lb += lbl(m.vx, m.vy, 'вершина ' + pt(m.vx, m.vy), 'f' + hlc('vertex'), m.A > 0 ? 'below' : '');
+    if (L.type === 'pa') lb += lbl(p.xp, p.a * p.xp * p.xp, pt(p.xp, p.a * p.xp * p.xp), 'f');
+    if (L.type === 'pa' && S.keys) lb += lbl(0, 0, 'вершина (0; 0)', 'm' + hlc('vertex'), p.a >= 0 ? 'below' : '');
+    if (L.type === 'std' && S.keys) lb += lbl(0, p.c, `c = ${num(p.c)}`, 'a' + hlc('c'));
+  }
+  $('#gMarks').innerHTML = mk;
+  $('#gCurve').innerHTML = `<path class="curve${hlc('curve')}" d="${pathOf(f)}"/>`;
+  $('#gLabels').innerHTML = lb;
+
+  // handles: persistent nodes so keyboard focus survives redraws
+  const hs = handles(), host = $('#gHandles');
+  for (const n of [...host.children]) if (!hs.some(h => h.id === n.dataset.h)) n.remove();
+  for (const h of hs) {
+    let n = host.querySelector(`[data-h="${h.id}"]`);
+    if (!n) {
+      n = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      n.setAttribute('class', 'hdl'); n.dataset.h = h.id; n.setAttribute('tabindex', '0'); n.setAttribute('role', 'button');
+      n.innerHTML = '<circle class="hit" r="24"/><circle class="ring" r="14"/><circle class="dot" r="8"/>';
+      host.appendChild(n);
+    }
+    n.setAttribute('class', 'hdl' + (h.blue ? ' blue' : '') + hlc(h.part));
+    n.setAttribute('aria-label', `${h.name} ${pt(h.x, h.y)}. Двигайте стрелками.`);
+    n.setAttribute('transform', `translate(${r1(X(h.x))} ${r1(Y(h.y))})`);
+  }
+}
+
+// ---------- pointer: drag handles, pan the plane, wheel zoom ----------
+let drag = null;
+const local = e => { const r = svg.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+svg.addEventListener('pointerdown', e => {
+  const hn = e.target.closest('.hdl');
+  svg.setPointerCapture(e.pointerId); svg.classList.add('grabbing');
+  const [px, py] = local(e);
+  if (hn) {
+    const h = handles().find(q => q.id === hn.dataset.h);
+    drag = { kind: 'h', id: hn.dataset.h, ox: X(h.x) - px, oy: Y(h.y) - py };
+    hn.focus({ preventScroll: true });
+  } else drag = { kind: 'pan', px, py, cx: S.view.cx, cy: S.view.cy };
+  e.preventDefault();
+});
+svg.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const [px, py] = local(e);
+  if (drag.kind === 'pan') {
+    S.view.cx = clamp(drag.cx - (px - drag.px) / U(), -30, 30);
+    S.view.cy = clamp(drag.cy + (py - drag.py) / U(), -30, 30);
+    drawPlane(); return;
+  }
+  const [x, y] = toUnit(px + drag.ox, py + drag.oy);
+  const before = JSON.stringify(S.p);
+  dragTo(drag.id, x, y);
+  if (JSON.stringify(S.p) !== before) update();
+});
+const endDrag = () => { drag = null; svg.classList.remove('grabbing'); };
+svg.addEventListener('pointerup', endDrag); svg.addEventListener('pointercancel', endDrag);
+svg.addEventListener('wheel', e => { e.preventDefault(); zoomBy(1 - e.deltaY * 0.0012); }, { passive: false });
+svg.addEventListener('keydown', e => {
+  const hn = e.target.closest && e.target.closest('.hdl'); if (!hn) return;
+  const d = { ArrowLeft: [-0.5, 0], ArrowRight: [0.5, 0], ArrowUp: [0, 0.5], ArrowDown: [0, -0.5] }[e.key];
+  if (!d) return;
+  e.preventDefault();
+  const h = handles().find(q => q.id === hn.dataset.h); if (!h) return;
+  dragTo(h.id, h.vert ? 0 : h.x + d[0], h.y + d[1]); update();
+});
+function zoomBy(k) { S.view.zoom = clamp(S.view.zoom * k, 0.4, 3); drawPlane(); }
+function resetView() { const L = LESSONS[S.lesson]; S.view = { cx: L.view[0], cy: L.view[1], zoom: 1 }; drawPlane(); }
+new ResizeObserver(() => {
+  W = Math.max(1, stage.clientWidth); H = Math.max(1, stage.clientHeight);
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); drawPlane();
+}).observe(stage);
+
+// ---------- controls ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+const toggle = (id, key) => { const b = $(id); b.addEventListener('click', () => { S[key] = !S[key]; b.setAttribute('aria-pressed', S[key]); drawPlane(); }); };
+toggle('#tGrid', 'grid'); toggle('#tKeys', 'keys'); toggle('#tGhost', 'ghost');
+$('#zIn').addEventListener('click', () => zoomBy(1.2));
+$('#zOut').addEventListener('click', () => zoomBy(1 / 1.2));
+$('#vReset').addEventListener('click', resetView);
+$('#resetBtn').addEventListener('click', () => { S.p = LESSONS[S.lesson].init(); update(); });
+
+const SLIDERS = {
+  line: [{ key: 'k', name: 'Наклон k', min: -10, max: 10, step: 0.1 }, { key: 'b', name: 'Сдвиг b', min: -10, max: 10, step: 0.5 }],
+  pa: [{ key: 'a', name: 'Коэффициент a', min: -4, max: 4, step: 0.1 }],
+  vf: [{ key: 'a', name: 'Коэффициент a', min: -3, max: 3, step: 0.1 }, { key: 'm', name: 'Сдвиг вправо m', min: -10, max: 10, step: 0.5 }, { key: 'n', name: 'Сдвиг вверх n', min: -10, max: 10, step: 0.5 }],
+  std: [{ key: 'a', name: 'Коэффициент a', min: -3, max: 3, step: 0.5 }, { key: 'b', name: 'Коэффициент b', min: -10, max: 10, step: 0.5 }, { key: 'c', name: 'Коэффициент c', min: -10, max: 10, step: 0.5 }],
+};
+const slidersFor = L => SLIDERS[L.type].filter(s => !(L.id === 'slope' && s.key === 'b'));
+function buildSliders() {
+  const L = LESSONS[S.lesson];
+  $('#sliders').innerHTML = slidersFor(L).map(s => `<div class="ctl"><label for="in-${s.key}">${s.name} <output id="o-${s.key}"></output></label>
+    <input type="range" id="in-${s.key}" data-k="${s.key}" min="${s.min}" max="${s.max}" step="${s.step}"></div>`).join('');
+  $('#sliders').querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => {
+    const k = inp.dataset.k, v = +inp.value, p = S.p;
+    if (L.type === 'line' && k === 'b') { p.b = v; }
+    else if (L.type === 'line' && k === 'k') { p.k = v; }
+    else p[k] = v;
+    update();
+  }));
+}
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- panes ----------
+const ICON = {
+  curve: '<svg viewBox="0 0 34 34"><path d="M4 30L30 6" stroke="var(--arm)" stroke-width="2.2" stroke-linecap="round"/></svg>',
+  para: '<svg viewBox="0 0 34 34"><path d="M5 5Q17 49 29 5" fill="none" stroke="var(--arm)" stroke-width="2.2" stroke-linecap="round"/></svg>',
+  k: '<svg viewBox="0 0 34 34"><path d="M4 28L30 8" stroke="var(--arm)" stroke-width="1.8"/><path d="M10 23.4h10v-7.7" fill="none" stroke="var(--force)" stroke-width="1.8" stroke-dasharray="3 2"/></svg>',
+  b: '<svg viewBox="0 0 34 34"><path d="M17 3v28M3 24h28" stroke="var(--muted)" stroke-width="1.4"/><path d="M4 21L30 9" stroke="var(--arm)" stroke-width="1.8"/><circle cx="17" cy="15" r="3.4" fill="var(--arm)"/></svg>',
+  ox: '<svg viewBox="0 0 34 34"><path d="M3 20h28" stroke="var(--muted)" stroke-width="1.4"/><path d="M8 31L28 5" stroke="var(--arm)" stroke-width="1.8"/><circle cx="16.5" cy="20" r="3.2" fill="var(--bg)" stroke="var(--arm)" stroke-width="2"/></svg>',
+  target: '<svg viewBox="0 0 34 34"><circle cx="17" cy="17" r="9" fill="none" stroke="var(--ok)" stroke-width="2" stroke-dasharray="4 3"/><circle cx="17" cy="17" r="2.5" fill="var(--ok)"/></svg>',
+  a: '<svg viewBox="0 0 34 34"><path d="M8 4Q17 44 26 4" fill="none" stroke="var(--arm)" stroke-width="1.8"/><path d="M3 4Q17 30 31 4" fill="none" stroke="var(--muted)" stroke-width="1.4" stroke-dasharray="3 3"/><circle cx="23.3" cy="13" r="3.2" fill="var(--force)"/></svg>',
+  vertex: '<svg viewBox="0 0 34 34"><path d="M5 5Q17 49 29 5" fill="none" stroke="var(--arm)" stroke-width="1.8"/><circle cx="17" cy="27" r="3.6" fill="var(--force)"/></svg>',
+  axis: '<svg viewBox="0 0 34 34"><path d="M17 2v30" stroke="var(--arm)" stroke-width="1.6" stroke-dasharray="3 3"/><path d="M5 5Q17 49 29 5" fill="none" stroke="var(--muted)" stroke-width="1.6"/></svg>',
+  roots: '<svg viewBox="0 0 34 34"><path d="M2 20h30" stroke="var(--muted)" stroke-width="1.4"/><path d="M6 4Q17 52 28 4" fill="none" stroke="var(--arm)" stroke-width="1.6"/><circle cx="10.3" cy="20" r="3" fill="var(--ok)"/><circle cx="23.7" cy="20" r="3" fill="var(--ok)"/></svg>',
+  c: '<svg viewBox="0 0 34 34"><path d="M10 3v28M3 26h28" stroke="var(--muted)" stroke-width="1.4"/><path d="M4 6Q19 46 32 6" fill="none" stroke="var(--arm)" stroke-width="1.6"/><circle cx="10" cy="18" r="3.4" fill="var(--arm)"/></svg>',
+};
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const L = LESSONS[S.lesson], p = S.p;
+  if (S.done[L.id] && L.id !== 'roots') return '✓ Выполнено';
+  if (L.id === 'slope') return `При x = 2 сейчас y = ${num(f(2))}, нужно 5`;
+  if (L.id === 'shift') return `Ось y: ${pt(0, p.b)} · ось x: ${m.xInt !== null ? pt(m.xInt, 0) : m.onAxis ? 'прямая лежит на оси' : 'не пересекает'}`;
+  if (L.id === 'para') return `При x = 2 сейчас y = ${num(f(2))}, нужно −2`;
+  if (L.id === 'vertex') return `y(1) = ${num(f(1))}, y(5) = ${num(f(5))} · нужно 0 и 0`;
+  const mark = k => (S.seen[k] ? '✓' : '·');
+  return (S.done[L.id] ? '✓ Выполнено · ' : '') + `D > 0 ${mark('pos')}  D = 0 ${mark('zero')}  D < 0 ${mark('neg')}` + (m.isPara ? ` · сейчас D = ${num(m.D)}` : ' · a = 0, это не парабола');
+}
+
+function readouts(m) {
+  const L = LESSONS[S.lesson], p = S.p;
+  if (L.type === 'line') return [['k', num(p.k)], ['b', num(p.b)], ['ось x', m.xInt !== null ? 'x = ' + num(m.xInt) : '—']];
+  if (L.type === 'pa') return [['a', num(p.a)], ['ветви', p.a > EPS ? 'вверх' : p.a < -EPS ? 'вниз' : 'прямая'], ['y(2)', num(f(2))]];
+  if (L.type === 'vf') return [['a', num(p.a)], ['вершина', pt(p.m, p.n)], ['корней', String(m.roots.length)]];
+  return [['D', m.isPara ? num(m.D) : '—'], ['корней', String(m.roots.length)], ['вершина', m.isPara ? pt(m.vx, m.vy) : '—']];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], p = S.p, done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(t => `<p>${t}</p>`).join('') +
+      `<p class="life"><b>Зачем это в жизни</b>${L.life}</p>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    let parts;
+    if (L.type === 'line') parts = [
+      { id: 'curve', name: 'Прямая', spec: `График функции ${m.formula}.` },
+      { id: 'k', name: 'Наклон k', spec: `Оранжевая «ступенька»: шаг на 1 вправо — и ${p.k >= 0 ? 'подъём' : 'спуск'} на ${num(Math.abs(p.k))}. Угол с осью x ≈ ${num(m.angle, 0)}°.` },
+      { id: 'b', name: 'Сдвиг b', spec: `Точка пересечения с осью y: ${pt(0, p.b)}.` },
+      { id: 'ox', name: 'Пересечение с осью x', spec: m.xInt !== null ? `В точке ${pt(m.xInt, 0)}.` : m.onAxis ? 'Прямая совпала с осью x.' : 'Нет: прямая параллельна оси x.' },
+      { id: 'target', name: 'Цель задания', spec: 'Зелёные кружки — точки, через которые должна пройти прямая.' },
+    ];
+    else {
+      parts = [
+        { id: 'curve', icon: ICON.para, name: m.isPara ? 'Парабола' : 'График', spec: `${m.formula}.` },
+        { id: 'a', name: 'Коэффициент a', spec: m.isPara ? `a = ${num(m.A)}: ветви ${m.A > 0 ? 'вверх' : 'вниз'}, парабола ${Math.abs(m.A) > 1 + EPS ? 'уже' : Math.abs(m.A) < 1 - EPS ? 'шире' : 'такой же ширины, как'} y = x².` : 'a = 0 — получилась прямая.' },
+        { id: 'vertex', name: 'Вершина', spec: m.isPara ? `Точка ${pt(m.vx, m.vy)} — ${m.A > 0 ? 'самая низкая' : 'самая высокая'} точка графика.` : 'У прямой вершины нет.' },
+        { id: 'axis', name: 'Ось симметрии', spec: m.isPara ? `Прямая x = ${num(m.vx)}: левая ветвь — зеркало правой.` : '—' },
+      ];
+      if (L.type !== 'pa') parts.push({ id: 'roots', name: 'Корни', spec: m.roots.length ? `Пересечения с осью x: ${m.roots.map(r => 'x = ' + num(r)).join(', ')}.` : 'Парабола не пересекает ось x.' });
+      if (L.type === 'std') parts.push({ id: 'c', name: 'Свободный член c', spec: `Парабола пересекает ось y в точке ${pt(0, p.c)}.` });
+      if (L.targets.length) parts.push({ id: 'target', name: 'Цель задания', spec: 'Зелёные кружки — точки, через которые должна пройти парабола.' });
+    }
+    $('#pane-parts').innerHTML = `<h2>Детали</h2><p class="note">Из чего состоит график. Нажмите на пункт, чтобы найти его на плоскости.</p><div class="parts">` +
+      parts.map(q => `<button class="part" data-id="${q.id}">${q.icon || ICON[q.id] || ICON.curve}<div><b>${q.name}</b><span>${q.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => highlight(b.dataset.id));
+  }
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const L = LESSONS[S.lesson], p = S.p;
+  let h = '';
+  if (L.type === 'line') {
+    const yp = p.k * p.xp + p.b;
+    h = `<h2>Линейная функция</h2><div class="formula">y = kx + b</div>
+      <p class="note">k — наклон, b — сдвиг вверх-вниз. Сейчас: <b>${m.formula}</b>.</p>
+      <h3>Как найден наклон</h3><div class="steps">` +
+      step('оранжевая точка', pt(p.xp, yp)) + step('сдвиг b', num(p.b)) +
+      step('k = (y − b) / x', `(${num(yp)} − ${par(p.b)}) / ${par(p.xp)} = ${num(p.k)}`) +
+      step('уравнение', m.formula, 'sum') + `</div>
+      <h3>Точки на осях</h3><div class="steps">` +
+      step('с осью y: x = 0', `y = ${par(p.k)} · 0 + ${par(p.b)} = ${num(p.b)}`) +
+      step('с осью x: y = 0', m.xInt !== null ? `x = −b / k = −${par(p.b)} / ${par(p.k)} = ${num(m.xInt)}` : m.onAxis ? 'прямая лежит на оси x' : 'нет, k = 0') + `</div>
+      <h3>Проверка задания</h3><div class="steps">` +
+      (L.id === 'slope'
+        ? step('при x = 2', `y = ${par(p.k)} · 2 + ${par(p.b)} = ${num(f(2))}`) + step('нужно', 'y = 5', 'sum')
+        : step('пересечение с осью y', `${pt(0, p.b)}, нужно (0; −2)`) + step('при x = 4', `y = ${par(p.k)} · 4 + ${par(p.b)} = ${num(f(4))}, нужно 0`, 'sum')) + `</div>
+      <p class="note" style="margin-top:10px">Угол наклона к оси x: tg α = k, α ≈ ${num(m.angle, 1)}°.</p>`;
+  } else if (L.type === 'pa') {
+    const yp = p.a * p.xp * p.xp;
+    h = `<h2>Парабола</h2><div class="formula">y = ax²</div>
+      <h3>Как найден a</h3><div class="steps">` +
+      step('оранжевая точка', pt(p.xp, yp)) +
+      step('a = y / x²', `${par(yp)} / ${par(p.xp)}² = ${num(yp)} / ${num(p.xp * p.xp)} = ${num(p.a)}`) +
+      step('уравнение', m.formula, 'sum') + `</div>
+      <h3>Что говорит a</h3><div class="steps">` +
+      step('знак a', p.a > EPS ? 'a > 0 → ветви вверх' : p.a < -EPS ? 'a < 0 → ветви вниз' : 'a = 0 → прямая') +
+      step('|a| и ширина', Math.abs(p.a) > 1 + EPS ? `${num(Math.abs(p.a))} > 1 → уже, чем x²` : Math.abs(p.a) < 1 - EPS ? `${num(Math.abs(p.a))} < 1 → шире, чем x²` : '|a| = 1 → как y = x²') + `</div>
+      <h3>Проверка задания</h3><div class="steps">` +
+      step('при x = 2', `y = ${par(p.a)} · 2² = ${par(p.a)} · 4 = ${num(f(2))}`) + step('нужно', 'y = −2', 'sum') + `</div>`;
+  } else if (L.type === 'vf') {
+    h = `<h2>Сдвинутая парабола</h2><div class="formula">y = a(x − m)² + n</div>
+      <h3>Сейчас</h3><div class="steps">` +
+      step('a, m, n', `${num(p.a)}; ${num(p.m)}; ${num(p.n)}`) +
+      step('вершина (m; n)', pt(p.m, p.n)) + step('уравнение', m.formula, 'sum') + `</div>
+      <h3>Раскрываем скобки</h3><div class="steps">` +
+      step('b = −2am', `−2 · ${par(p.a)} · ${par(p.m)} = ${num(m.B)}`) +
+      step('c = am² + n', `${par(p.a)} · ${par(p.m)}² + ${par(p.n)} = ${num(m.C)}`) +
+      step('то же самое', 'y = ' + poly([[m.A, 'x²'], [m.B, 'x'], [m.C, '']]), 'sum') + `</div>
+      <h3>Проверка задания</h3><div class="steps">` +
+      step('при x = 1', `${par(p.a)} · (1 − ${par(p.m)})² + ${par(p.n)} = ${num(f(1))}`) +
+      step('при x = 5', `${par(p.a)} · (5 − ${par(p.m)})² + ${par(p.n)} = ${num(f(5))}`) + step('нужно', 'оба раза 0', 'sum') + `</div>`;
+  } else {
+    h = `<h2>Дискриминант</h2><div class="formula">D = b² − 4ac</div>
+      <p class="note">Уравнение: ${poly([[p.a, 'x²'], [p.b, 'x'], [p.c, '']])} = 0</p>`;
+    if (!m.isPara) {
+      h += `<p>При a = 0 уравнение уже не квадратное: ${poly([[p.b, 'x'], [p.c, '']])} = 0. ${m.roots.length ? `Корень x = ${num(m.roots[0])}.` : 'Корней нет или их бесконечно много.'}</p>`;
+    } else {
+      const b2 = p.b * p.b, ac4 = 4 * p.a * p.c;
+      h += `<h3>Считаем D</h3><div class="steps">` +
+        step('b²', `${par(p.b)}² = ${num(b2)}`) +
+        step('4ac', `4 · ${par(p.a)} · ${par(p.c)} = ${num(ac4)}`) +
+        step('D = b² − 4ac', `${num(b2)} − ${par(ac4)} = ${num(m.D)}`, 'sum') + `</div>
+        <h3>Корни</h3><div class="steps">`;
+      if (m.D > 0) {
+        const s = Math.sqrt(m.D);
+        h += step('D > 0', 'два корня') + step('√D', (Number.isInteger(Math.round(s * 1e6) / 1e6) ? '' : '≈ ') + num(s, 3)) +
+          step('x₁ = (−b − √D) / 2a', `(${num(-p.b)} − ${num(s, 3)}) / ${par(2 * p.a)} = ${num((-p.b - s) / (2 * p.a), 3)}`) +
+          step('x₂ = (−b + √D) / 2a', `(${num(-p.b)} + ${num(s, 3)}) / ${par(2 * p.a)} = ${num((-p.b + s) / (2 * p.a), 3)}`, 'sum');
+      } else if (m.D === 0) {
+        h += step('D = 0', 'один корень') + step('x = −b / 2a', `${num(-p.b)} / ${par(2 * p.a)} = ${num(m.roots[0], 3)}`, 'sum');
+      } else {
+        h += step('D < 0', 'корней нет', 'sum');
+      }
+      h += `</div><h3>Вершина</h3><div class="steps">` +
+        step('x₀ = −b / 2a', `${num(-p.b)} / ${par(2 * p.a)} = ${num(m.vx, 3)}`) +
+        step('y₀ = −D / 4a', `${num(-m.D)} / ${par(4 * p.a)} = ${num(m.vy, 3)}`, 'sum') + `</div>
+        <p class="note" style="margin-top:10px">${m.D > 0 ? `Вершина ${m.A > 0 ? 'ниже' : 'выше'} оси x, а ветви идут ${m.A > 0 ? 'вверх' : 'вниз'} — значит, оси x они достают дважды.` : m.D === 0 ? 'Вершина лежит прямо на оси x — касание, один корень.' : `Вершина ${m.A > 0 ? 'выше' : 'ниже'} оси x, а ветви уходят от неё ${m.A > 0 ? 'вверх' : 'вниз'} — до оси не дотянуться.`}</p>`;
+    }
+  }
+  return h;
+}
+
+let hlT = 0;
+function highlight(id) {
+  S.hl = id; drawPlane(); clearTimeout(hlT);
+  hlT = setTimeout(() => { S.hl = null; drawPlane(); }, 2000);
+}
+
+function update() {
+  const L = LESSONS[S.lesson], m = model(), p = S.p;
+  if (L.id === 'roots' && m.isPara) S.seen[m.D > 0 ? 'pos' : m.D === 0 ? 'zero' : 'neg'] = true;
+  drawPlane();
+  $('#roV').textContent = m.formula;
+  const ro = readouts(m);
+  $('#roSub').innerHTML = ro.map(([k, v]) => `${k}: ${v}`).join('<br>');
+  $('#reads').innerHTML = ro.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
+  for (const s of slidersFor(L)) {
+    const inp = $('#in-' + s.key); if (!inp) continue;
+    inp.value = p[s.key]; $('#o-' + s.key).textContent = num(p[s.key]);
+  }
+  const xs = [-3, -2, -1, 0, 1, 2, 3];
+  $('#vtab').innerHTML = `<tr><th>x</th>${xs.map(x => `<td>${num(x)}</td>`).join('')}</tr><tr><th>y</th>${xs.map(x => `<td>${num(f(x))}</td>`).join('')}</tr>`;
+
+  if (!S.done[L.id] && L.check(p)) {
+    S.done[L.id] = true; save(); renderStrip();
+    toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены.');
+  }
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+}
+
+// small sketches for the lesson strip, unit coordinates, y up
+function mini(i) {
+  const P = fn => {
+    let d = '', pen = false;
+    for (let k = 0; k <= 60; k++) {
+      const x = -6.6 + 13.2 * k / 60, y = fn(x);
+      if (Math.abs(y) > 4) { pen = false; continue; }
+      d += (pen ? 'L' : 'M') + x.toFixed(2) + ' ' + (-y).toFixed(2); pen = true;
+    }
+    return d;
+  };
+  const ax = '<path d="M-6.6 0H6.6M0 -3V3" stroke="#26324a" stroke-width=".25"/>';
+  const c = (fn, col, w) => `<path d="${P(fn)}" fill="none" stroke="${col}" stroke-width="${w || .45}" stroke-linecap="round"/>`;
+  const A = 'var(--arm)', M = 'var(--muted)', F = 'var(--force)';
+  return ax + [
+    () => c(x => 0.35 * x, M, .3) + c(x => -0.6 * x, M, .3) + c(x => 1.4 * x, A),
+    () => c(x => 0.5 * x - 2, M, .3) + c(x => 0.5 * x + 1.5, A),
+    () => c(x => -0.3 * x * x, M, .3) + c(x => 0.25 * x * x, M, .3) + c(x => 1.2 * x * x, A),
+    () => c(x => 0.4 * x * x, M, .3) + c(x => 0.4 * (x - 3) ** 2 - 2, A) + '<circle cx="3" cy="2" r=".5" fill="' + F + '"/>',
+    () => c(x => 0.35 * x * x - 2, A) + c(x => 0.35 * x * x + 1, M, .3) + '<circle cx="-2.39" cy="0" r=".45" fill="var(--ok)"/><circle cx="2.39" cy="0" r=".45" fill="var(--ok)"/>',
+  ][i]();
+}
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="-6.6 -3 13.2 6" aria-hidden="true">${mini(i)}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i];
+  S.lesson = i; S.p = L.init(); S.seen = {}; S.hl = null;
+  S.view = { cx: L.view[0], cy: L.view[1], zoom: 1 };
+  save();
+  $('#gHandles').innerHTML = '';
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#roK').textContent = L.type === 'line' ? 'Линейная функция' : 'Квадратичная функция';
+  buildSliders(); renderStrip(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+}
+
+// for the AI tutor: what is on the screen right now
+const plain = s => s.replace(/&gt;/g, '>').replace(/&lt;/g, '<');
+window.LUCH_CONTEXT = () => {
+  const L = LESSONS[S.lesson], m = model(), p = S.p;
+  let now;
+  if (L.type === 'line') {
+    now = `На плоскости прямая ${m.formula} (k = ${num(p.k)}, b = ${num(p.b)}). Оранжевая точка, которую двигает ученик, стоит в ${pt(p.xp, p.k * p.xp + p.b)}. ` +
+      `Пересечение с осью y: ${pt(0, p.b)}; с осью x: ${m.xInt !== null ? pt(m.xInt, 0) : m.onAxis ? 'прямая лежит на оси x' : 'нет, прямая параллельна оси x'}. Угол наклона ≈ ${num(m.angle, 0)}°.`;
+  } else {
+    now = `На плоскости график ${m.formula}` + (L.type !== 'std' ? ` (в виде ax² + bx + c: ${poly([[m.A, 'x²'], [m.B, 'x'], [m.C, '']])})` : '') + '. ';
+    if (m.isPara) {
+      now += `Это парабола, ветви ${m.A > 0 ? 'вверх' : 'вниз'}, a = ${num(m.A)}, вершина ${pt(m.vx, m.vy)}, ось симметрии x = ${num(m.vx)}. `;
+      if (L.type !== 'pa') now += `Дискриминант D = b² − 4ac = ${num(m.D, 3)}; ${m.roots.length ? 'корни (пересечения с осью x): ' + m.roots.map(r => 'x = ' + num(r, 3)).join(', ') : 'корней нет, парабола не пересекает ось x'}.`;
+      if (L.type === 'pa') now += `Оранжевая точка стоит в ${pt(p.xp, p.a * p.xp * p.xp)}.`;
+    } else now += 'a = 0, поэтому это не парабола, а прямая.';
+  }
+  return [
+    `Раздел: математика, графики функций (прямая и парабола). Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${plain(L.text.join(' '))}`,
+    `Зачем это в жизни: ${L.life}`,
+    `Задание: ${L.task} Статус: ${S.done[L.id] ? 'выполнено' : 'не выполнено'}. Прогресс: ${taskState(m)}.`,
+    `Сейчас: ${now}`,
+    L.targets.length ? `Зелёные целевые точки: ${L.targets.map(([x, y]) => pt(x, y) + (Math.abs(f(x) - y) < EPS ? ' — график через неё проходит' : ` — сейчас при x = ${num(x)} y = ${num(f(x))}`)).join('; ')}.` : '',
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].filter(Boolean).join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], m = model();
+  const second = { slope: 'Что значит отрицательный наклон?', shift: 'Как найти, где прямая пересекает ось x?', para: 'Почему при a < 0 ветви смотрят вниз?',
+                   vertex: 'Почему в (x − 3)² вершина при x = 3, а не −3?', roots: m.isPara && m.D < 0 ? 'Почему при D < 0 нет корней?' : 'Откуда берётся формула корней?' }[L.id];
+  return [S.done[L.id] ? 'Что я сейчас узнал в этом уроке?' : 'Подскажи, как выполнить задание', second, 'Где это пригодится в жизни и в профессии?'];
+};
+
+setLesson(S.lesson);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
