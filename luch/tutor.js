@@ -68,7 +68,7 @@
   .lt-btn:focus-visible,.lt-ib:focus-visible,.lt-send:focus-visible,.lt-mic:focus-visible,.lt-orb:focus-visible,.lt-sug button:focus-visible{outline:2px solid #72d4e8;outline-offset:2px}
   @media (max-width:600px){
     .lt-panel{right:0;left:0;bottom:0;width:100%;height:min(86vh,660px);border-radius:18px 18px 0 0;padding-bottom:env(safe-area-inset-bottom,0px)}
-    .lt-btn{padding:7px;opacity:.94}
+    .lt-btn{padding:7px;opacity:.94;bottom:calc(92px + env(safe-area-inset-bottom,0px))}
     .lt-btn>span{display:none}
     .lt-ib .lt-tx{display:none}
   }

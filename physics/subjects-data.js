@@ -19,7 +19,7 @@ window.LUCH_SUBJECTS = {
 
       { id: 'neg', b: 'alg', g: 6, t: 'Рациональные числа', items: ['Положительные и отрицательные', 'Модуль числа', 'Координатная прямая', 'Действия со знаками'], req: ['num'], status: 'done', href: '/labs/math-neg/', lessons: 4, doneItems: 4 },
       { id: 'expr', b: 'alg', g: 7, t: 'Выражения и уравнения', items: ['Буквенные выражения', 'Линейные уравнения', 'Задачи на составление уравнений'], req: ['neg', 'frac'], status: 'done', href: '/labs/math-expr/', lessons: 3, doneItems: 3 },
-      { id: 'poly', b: 'alg', g: 7, t: 'Многочлены', items: ['Степень с натуральным показателем', 'Одночлены и многочлены', 'Формулы сокращённого умножения', 'Разложение на множители'], req: ['expr'] },
+      { id: 'poly', b: 'alg', g: 7, t: 'Многочлены', items: ['Степень с натуральным показателем', 'Одночлены и многочлены', 'Формулы сокращённого умножения', 'Разложение на множители'], req: ['expr'], status: 'done', href: '/labs/math-poly/', lessons: 4, doneItems: 4 },
       { id: 'systems', b: 'alg', g: 7, t: 'Системы уравнений', items: ['Уравнение с двумя переменными', 'Способ подстановки', 'Способ сложения', 'Графический способ'], req: ['expr'] },
       { id: 'roots', b: 'alg', g: 8, t: 'Квадратные корни', items: ['Иррациональные числа', 'Свойства корней', 'Преобразования с корнями'], req: ['poly'] },
       { id: 'quad', b: 'alg', g: 8, t: 'Квадратные уравнения', items: ['Дискриминант', 'Теорема Виета', 'Дробно-рациональные уравнения', 'Задачи на движение и работу'], req: ['roots'] },
@@ -70,10 +70,10 @@ window.LUCH_SUBJECTS = {
       { id: 'valence', b: 'struct', g: 7, t: 'Валентность и формулы', items: ['Валентность', 'Составление формул', 'Простые и сложные вещества'], req: ['atoms'], status: 'done', href: '/labs/chem-valence/', lessons: 3, doneItems: 3 },
       { id: 'atomst', b: 'struct', g: 8, t: 'Строение атома', items: ['Протоны, нейтроны, электроны', 'Изотопы', 'Электронные оболочки'], req: ['atoms'], status: 'done', href: '/labs/chem-atomst/', lessons: 3, doneItems: 3 },
       { id: 'table', b: 'struct', g: 8, t: 'Периодическая система', items: ['Закон Менделеева', 'Периоды и группы', 'Металлы и неметаллы', 'Как предсказать свойства'], req: ['atomst'], status: 'done', href: '/labs/chem-table/', lessons: 4, doneItems: 4 },
-      { id: 'bonds', b: 'struct', g: 8, t: 'Химическая связь', items: ['Ковалентная связь', 'Ионная связь', 'Металлическая связь', 'Кристаллические решётки'], req: ['table'] },
+      { id: 'bonds', b: 'struct', g: 8, t: 'Химическая связь', items: ['Ковалентная связь', 'Ионная связь', 'Металлическая связь', 'Кристаллические решётки'], req: ['table'], status: 'done', href: '/labs/chem-bonds/', lessons: 4, doneItems: 4 },
       { id: 'redox', b: 'struct', g: 9, t: 'Окислительно-восстановительные реакции', items: ['Степень окисления', 'Окислитель и восстановитель', 'Электронный баланс'], req: ['bonds', 'equations'] },
 
-      { id: 'equations', b: 'react', g: 8, t: 'Химические реакции', items: ['Признаки реакций', 'Уравнения реакций', 'Закон сохранения массы', 'Типы реакций'], req: ['valence', 'subst'] },
+      { id: 'equations', b: 'react', g: 8, t: 'Химические реакции', items: ['Признаки реакций', 'Уравнения реакций', 'Закон сохранения массы', 'Типы реакций'], req: ['valence', 'subst'], status: 'done', href: '/labs/chem-equations/', lessons: 4, doneItems: 4 },
       { id: 'mole', b: 'react', g: 8, t: 'Количество вещества', items: ['Моль и число Авогадро', 'Молярная масса', 'Молярный объём газов', 'Расчёты по уравнениям'], req: ['equations'] },
       { id: 'solutions', b: 'react', g: 8, t: 'Растворы', items: ['Растворимость', 'Массовая доля', 'Молярная концентрация', 'Как приготовить раствор'], req: ['mole'], status: 'done', href: '/chemistry/', lessons: 3, doneItems: 4 },
       { id: 'ions', b: 'react', g: 9, t: 'Электролиты и ионы', items: ['Электролитическая диссоциация', 'Ионные уравнения', 'Кислотность и pH'], req: ['solutions', 'bonds'], status: 'part', href: '/chemistry/', lessons: 2, doneItems: 0 },
@@ -162,7 +162,7 @@ window.LUCH_SUBJECTS = {
 
       { id: 'algo', b: 'prog', g: 5, t: 'Алгоритмы', items: ['Исполнители', 'Последовательность команд', 'Блок-схемы'], req: ['info'], status: 'done', href: '/labs/cs-algo/', lessons: 3, doneItems: 3 },
       { id: 'blocks', b: 'prog', g: 6, t: 'Визуальное программирование', items: ['Scratch', 'Циклы', 'Условия', 'Своя игра'], req: ['algo'], status: 'done', href: '/labs/cs-blocks/', lessons: 4, doneItems: 4 },
-      { id: 'python', b: 'prog', g: 7, t: 'Первые программы на Python', items: ['Ввод и вывод', 'Переменные', 'Условия', 'Циклы'], req: ['blocks'] },
+      { id: 'python', b: 'prog', g: 7, t: 'Первые программы на Python', items: ['Ввод и вывод', 'Переменные', 'Условия', 'Циклы'], req: ['blocks'], status: 'done', href: '/labs/cs-python/', lessons: 4, doneItems: 4 },
       { id: 'func', b: 'prog', g: 8, t: 'Функции и списки', items: ['Функции', 'Списки', 'Строки', 'Поиск ошибок'], req: ['python'] },
       { id: 'algos', b: 'prog', g: 9, t: 'Алгоритмы обработки', items: ['Поиск', 'Сортировки', 'Сложность алгоритма', 'Рекурсия'], req: ['func'] },
       { id: 'oop', b: 'prog', g: 10, t: 'Структуры данных и ООП', items: ['Словари и множества', 'Классы и объекты', 'Работа с файлами'], req: ['algos'] },
