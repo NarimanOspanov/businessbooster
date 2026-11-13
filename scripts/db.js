@@ -4785,6 +4785,21 @@ async function listMaxId() {
   return r.recordset[0] && r.recordset[0].id != null ? Number(r.recordset[0].id) : null;
 }
 
+// Записанные обходом по номерам без координат (13.11.2026): собственники
+// первыми, свежие раньше — их дочитывает fresh.
+async function listWithoutCoords(limit) {
+  const pool = await getPool();
+  await ensureList(pool);
+  const r = await pool.request().input("n", sql.Int, Number(limit) || 2000).query(`
+    SELECT TOP (@n) id, deal, prop, city, price, rooms, area, bumped_on
+    FROM dbo.krisha_list
+    WHERE id > 1017200000 AND lat IS NULL AND storage = 'live' AND price IS NOT NULL
+    ORDER BY CASE WHEN user_type = 'owner' THEN 0 ELSE 1 END, id DESC`);
+  return r.recordset.map((x) => ({ id: Number(x.id), deal: x.deal, prop: x.prop, city: x.city, price: Number(x.price),
+    rooms: x.rooms, area: x.area == null ? null : Number(x.area),
+    bumpedOn: x.bumped_on ? new Date(x.bumped_on).toISOString().slice(0, 10) : null }));
+}
+
 async function knownListIds(ids) {
   const list = (ids || []).map((x) => Number(x)).filter(Boolean);
   if (!list.length) return new Set();
@@ -5681,7 +5696,7 @@ module.exports = { listTextGet, portalUserByToken, portalUsers, portalUserSave, 
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadSetFav, leadSetHide, listEvDenormBackfill, leadPresets, leadPresetSave, leadPresetDel, listYearSources, listYearTodo, listYearSave, leadCopies, leadUncheckedCopies, leadSetCopyPhoto, dropKnownSticky, cleanStickyPhones,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
-  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listMaxId, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, instaCandidates, instaListing, instaPostReserve, instaPostFinish, instaPostByCode, instaPhotoScoresGet, instaPhotoScoreSave, instaPlacesGet, instaPlaceSave, configGet, configSet, instaNextCode, listTextSave, listTextStats, mortgageFlagSave, mortgageFlagStats, instaAccounts, instaAccountSet, instaPostAdd, instaPosts, instaPostedSince, instaPostByMedia, instaRecentMedia, instaRecentListings, instaDmAdd, instaDmMedia, instaDmStats, instaDmPrune, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
+  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listMaxId, listWithoutCoords, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, instaCandidates, instaListing, instaPostReserve, instaPostFinish, instaPostByCode, instaPhotoScoresGet, instaPhotoScoreSave, instaPlacesGet, instaPlaceSave, configGet, configSet, instaNextCode, listTextSave, listTextStats, mortgageFlagSave, mortgageFlagStats, instaAccounts, instaAccountSet, instaPostAdd, instaPosts, instaPostedSince, instaPostByMedia, instaRecentMedia, instaRecentListings, instaDmAdd, instaDmMedia, instaDmStats, instaDmPrune, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,

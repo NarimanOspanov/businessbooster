@@ -3352,6 +3352,8 @@ let freshRunning = false;
 const IDW_RETRY_AFTER = [30 * 60e3, 3 * 3600e3, 12 * 3600e3];
 const IDW_STOP_STREAK = 60;
 const IDW_RETRY_MAX = 20000;
+const IDW_FOUND_MAX = 60; // живых за прогон: столько дочитка с координатами успевает
+const IDW_LOC_MAX = 2000; // очередь «записано без координат»
 // Не чаще IDW_RATE запросов в секунду: сотня в секунду с одного IP Крыше не понравится.
 const IDW_RATE = Number(process.env.KRISHA_IDS_RATE || 10);
 async function freshIdWalk(L, sweepNo, listMaxSeen, deadline, conc) {
@@ -3380,6 +3382,28 @@ async function freshIdWalk(L, sweepNo, listMaxSeen, deadline, conc) {
   // Время: ~55% на номера, остальное — дочитать новые из списка (координаты,
   // фото) и записать. У края номера кончаются быстро, и остаток весь на дочитку.
   const walkEnd = Date.now() + Math.max(0, deadline - Date.now() - 6000) * 0.55;
+  // 0. Локация важнее скорости (13.11.2026): то, что прошлые прогоны записали
+  // без координат (не хватило времени или не нашлось в списке), дочитываем
+  // первым делом — до трёх попыток на объявление.
+  st.loc = st.loc || [];
+  if (!st.locSeeded) { // разово: ночная догонка записала ~10 тыс. без координат
+    st.locSeeded = true;
+    st.loc = st.loc.concat(await db.listWithoutCoords(IDW_LOC_MAX).catch(() => [])).slice(0, IDW_LOC_MAX);
+  }
+  out.located = 0;
+  const locEnd = Date.now() + Math.max(0, deadline - Date.now() - 6000) * 0.3;
+  const locLeft = [];
+  for (let i = 0; i < st.loc.length; i += conc) {
+    const part = st.loc.slice(i, i + conc);
+    if (Date.now() >= locEnd) { locLeft.push(...part); continue; }
+    const c0 = Date.now();
+    const got = await Promise.all(part.map((r) => L.locateFull(r).catch(() => null)));
+    await pace(c0, part.length);
+    const ok = [];
+    part.forEach((r, n) => { if (got[n]) ok.push(got[n]); else if ((r._lt || 0) + 1 < 3) locLeft.push(Object.assign(r, { _lt: (r._lt || 0) + 1 })); });
+    if (ok.length) { await db.saveListAdverts(ok, sweepNo); out.located += ok.length; }
+  }
+  st.loc = locLeft;
   // 1. Созревшие перепроверки, не больше 100 за прогон.
   const now = Date.now();
   const due = [], keep = [];
@@ -3421,6 +3445,8 @@ async function freshIdWalk(L, sweepNo, listMaxSeen, deadline, conc) {
       }
     }
     st.next = base + consumed;
+    // Новых больше, чем успеем дочитать с координатами, — дальше не идём.
+    if (found.size >= IDW_FOUND_MAX) break;
   }
   // Хвост серии: выше края — вернуть курсор к её началу (номера ещё не выданы),
   // ниже — это пропуски между живыми, их в перепроверку.
@@ -3446,13 +3472,15 @@ async function freshIdWalk(L, sweepNo, listMaxSeen, deadline, conc) {
       idx.forEach((k, n) => { if (got[n]) { fresh[k] = got[n]; out.full++; } });
       await pace(c0, idx.length);
     }
+    for (const r of fresh) if (r.lat == null) st.loc.push(r);
+    if (st.loc.length > IDW_LOC_MAX) st.loc = st.loc.slice(-IDW_LOC_MAX);
     for (let i = 0; i < fresh.length; i += 50) {
       const part = fresh.slice(i, i + 50);
       const outs = await db.saveListAdverts(part, sweepNo);
       outs.forEach((o, k) => { if (o.added) out.added++; if (part[k]) listEventFrom(part[k], o, "ids"); });
     }
   }
-  out.next = st.next; out.top = st.top; out.queue = st.retry.length;
+  out.next = st.next; out.top = st.top; out.queue = st.retry.length; out.locQueue = st.loc.length;
   return out;
 }
 let matchListRunning = false;
@@ -9617,7 +9645,7 @@ http
         // Итог вызова в файл состояния, как у полного обхода (06.11.2026).
         KW.freshRuns = (KW.freshRuns || []).concat([{ at: new Date(t0).toISOString(), sec: Math.round((Date.now() - t0) / 1000),
           depth: depth, pages: pages, adverts: adverts, added: added, errors: errors, err: lastErr,
-          ids: ids ? { checked: ids.checked, live: ids.live, added: ids.added, full: ids.full, retried: ids.retried, next: ids.next, queue: ids.queue, err: ids.error || null } : null }]).slice(-30);
+          ids: ids ? { checked: ids.checked, live: ids.live, added: ids.added, full: ids.full, located: ids.located, locQueue: ids.locQueue, retried: ids.retried, next: ids.next, queue: ids.queue, err: ids.error || null } : null }]).slice(-30);
         saveKrisha();
         freshRunning = false;
         send(200, {
