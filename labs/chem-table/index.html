@@ -1,0 +1,959 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по химии, 8 класс: периодический закон Менделеева, периоды и группы, металлы и неметаллы, предсказание свойств неоткрытых элементов.">
+<title>Периодическая система</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /mechanics and /chemistry. Lab bench (SVG) on the left, lesson notebook on the right, lesson strip under the bench. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--liq);transition:width .2s}
+.gauge i{position:absolute;top:-4px;width:2px;height:14px;background:var(--force);transform:translateX(-50%)}
+.swatch{height:12px;border-radius:4px;margin-top:9px;border:1px solid rgba(255,255,255,.15)}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.meter .big{font:700 30px/1 var(--font-display);margin-top:8px;letter-spacing:.02em}
+.pairs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:10px}
+.pairs label{display:flex;justify-content:space-between;align-items:center;gap:6px;background:var(--surface-2);border-radius:9px;padding:6px 8px;font-size:13px;min-width:0}
+.pairs select{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:7px;padding:4px 4px;font:500 12.5px var(--font-mono);min-width:0}
+.pairs select:disabled{color:var(--ok);opacity:1}
+.chips.sym button{font-family:var(--font-mono);min-width:40px}
+.sel2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+.sel2 label{display:grid;gap:6px;font-size:13px;font-weight:500}
+.sel2 select{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:7px 8px;font:500 13px var(--font-mono)}
+.legend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:8px}
+.legend span{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+.legend i{width:14px;height:14px;border-radius:4px;flex:none}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><ellipse cx="20" cy="20" rx="14" ry="5.5" fill="none" stroke="var(--arm)" stroke-width="1.6"/><ellipse cx="20" cy="20" rx="14" ry="5.5" fill="none" stroke="var(--arm)" stroke-width="1.6" transform="rotate(60 20 20)"/><ellipse cx="20" cy="20" rx="14" ry="5.5" fill="none" stroke="var(--arm)" stroke-width="1.6" transform="rotate(-60 20 20)"/><circle cx="20" cy="20" r="3.2" fill="var(--force)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Химия · Периодическая система</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#chem">Карта</a><a href="/physics/#chem">Химия</a><a href="/labs/chem-table/" aria-current="page">Таблица</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Таблица</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Лабораторный стол">
+    <svg class="scene" id="scene" role="img" aria-label="Плитки элементов, атомы и фрагменты периодической таблицы. Клетки можно нажимать, атом — перетаскивать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const KEY = 'luch-chem-table';
+const SUBD = { '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉' };
+const low = s => String(s).replace(/\d/g, d => SUBD[d]);
+const ROM = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
+const num = (v, d) => v.toFixed(d).replace('.', ',');
+const cap = s => s[0].toUpperCase() + s.slice(1);
+
+// ---------- the first 20 elements ----------
+const E = [
+  ['H', 'водород', 1.008], ['He', 'гелий', 4.003], ['Li', 'литий', 6.94], ['Be', 'бериллий', 9.012], ['B', 'бор', 10.81],
+  ['C', 'углерод', 12.01], ['N', 'азот', 14.01], ['O', 'кислород', 16.00], ['F', 'фтор', 19.00], ['Ne', 'неон', 20.18],
+  ['Na', 'натрий', 22.99], ['Mg', 'магний', 24.31], ['Al', 'алюминий', 26.98], ['Si', 'кремний', 28.09], ['P', 'фосфор', 30.97],
+  ['S', 'сера', 32.06], ['Cl', 'хлор', 35.45], ['Ar', 'аргон', 39.95], ['K', 'калий', 39.10], ['Ca', 'кальций', 40.08],
+].map(([s, name, m], i) => {
+  const z = i + 1, sh = z <= 2 ? [z] : z <= 10 ? [2, z - 2] : z <= 18 ? [2, 8, z - 10] : [2, 8, 8, z - 18];
+  return { z, s, name, m, sh, p: sh.length, out: sh[sh.length - 1], g: z === 2 ? 8 : sh[sh.length - 1], met: [3, 4, 11, 12, 13, 19, 20].includes(z) };
+});
+const EZ = z => E[z - 1];
+const MASS = E.slice().sort((a, b) => a.m - b.m);
+const GC = ['', '#c08cf0', '#6fd0b0', '#9fb4d8', '#f0b45a', '#5f9cf0', '#ef6a55', '#6cc96f', '#e88ac8'];
+const GNAME = ['', 'IA · щелочные металлы и водород', 'IIA · щёлочноземельные и Be, Mg', 'IIIA · бор, алюминий', 'IVA · углерод, кремний', 'VA · азот, фосфор', 'VIA · кислород, сера', 'VIIA · галогены', 'VIIIA · инертные газы'];
+const GOOD_CUTS = [2, 10, 18];
+
+// ---------- lesson 2: atoms-riddles ----------
+const MYST = [13, 7, 20, 17, 10];
+
+// ---------- lesson 4: Mendeleev's prediction ----------
+const X4 = [[null, 'Al', 'Si', 'P'], ['Zn', 'Ga', 'Ge', 'As'], ['Cd', 'In', 'Sn', 'Sb']];
+const H4 = ['IIB', 'IIIA', 'IVA', 'VA'];
+const D4 = {
+  Al: { m: 26.98, d: 2.70, n: 'алюминий' }, Si: { m: 28.09, d: 2.33, n: 'кремний' }, P: { m: 30.97, d: 1.82, n: 'фосфор (белый)' },
+  Zn: { m: 65.38, d: 7.14, n: 'цинк' }, Ga: { m: 69.72, d: 5.91, n: 'галлий' }, Ge: { m: 72.63, d: 5.32, n: 'германий' }, As: { m: 74.92, d: 5.73, n: 'мышьяк' },
+  Cd: { m: 112.41, d: 8.65, n: 'кадмий' }, In: { m: 114.82, d: 7.31, n: 'индий' }, Sn: { m: 118.71, d: 7.29, n: 'олово' }, Sb: { m: 121.76, d: 6.69, n: 'сурьма' },
+};
+const TGT = {
+  Ga: { eka: 'экаалюминий', ekaS: 'эка-Al', nb: ['Al', 'In', 'Zn', 'Ge'], g: 3, ox: 'E2O3', men: { m: 68, d: 5.9 }, year: 1875, who: 'Поль Эмиль Лекок де Буабодран (Франция)' },
+  Ge: { eka: 'экасилиций', ekaS: 'эка-Si', nb: ['Si', 'Sn', 'Ga', 'As'], g: 4, ox: 'EO2', men: { m: 72, d: 5.5 }, year: 1886, who: 'Клеменс Винклер (Германия)' },
+};
+const OXES = [['E2O', 1], ['EO', 2], ['E2O3', 3], ['EO2', 4], ['E2O5', 5]];
+const oxTxt = f => low(f).replace(/E/g, 'Э');
+const pos4 = s => { for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) if (X4[r][c] === s) return { r, c }; return null; };
+const solved4 = (pr, t) => pr[t].nb.length === 4 && pr[t].ox === TGT[t].ox;
+
+const LESSONS = [
+  { id: 'law', title: 'Закон Менделеева: лента элементов',
+    text: ['В 1869 году Дмитрий Менделеев выписал известные тогда 63 элемента на карточки и разложил их по возрастанию атомной массы. Он заметил: через несколько шагов свойства повторяются. Литий, натрий и калий — мягкие активные металлы, фтор и хлор — едкие неметаллы.',
+           'Так был открыт периодический закон. Сегодня его формулируют точнее: свойства элементов и их соединений периодически зависят от заряда ядра атома. Причина — у атомов повторяется строение внешнего электронного слоя.',
+           'Если разрезать ряд элементов там, где свойства начинают повторяться, и сложить куски строками, похожие элементы встанут друг под другом. Это и есть периодическая таблица.'],
+    why: 'Таблица висит в каждой лаборатории. По ней работают химики-аналитики на заводах Казахмыса и «Казцинка», геологи, которые ищут редкие металлы, инженеры аккумуляторов. Казахстан — первый в мире по добыче урана: специалисты «Казатомпрома» знают, где уран стоит в таблице и чем он похож на соседей. Кто понимает закономерности таблицы, быстрее разбирается в любом новом веществе.',
+    task: 'Разрежьте ленту из 20 элементов на строки так, чтобы похожие элементы (одного цвета) встали в столбцы друг под другом.',
+    hint: 'Найдите, где снова появляется цвет лития. Нажмите на плитку — после неё появится разрез, ещё одно нажатие уберёт его.',
+    stage: 'Нажмите на плитку — лента разрежется после неё. Порядок «по массе» — кнопкой внизу.',
+    init: { order: 'z', cuts: [] },
+    check: m => m.order === 'z' && m.cuts.join() === GOOD_CUTS.join() },
+  { id: 'pg', title: 'Периоды и группы',
+    text: ['Строки таблицы — периоды, их 7. Номер периода равен числу электронных слоёв в атоме. У натрия три слоя (2, 8, 1), поэтому он в 3-м периоде.',
+           'Столбцы — группы. У элементов главных подгрупп (А) номер группы равен числу электронов на внешнем слое. У натрия на внешнем слое 1 электрон — он в группе IA.',
+           'Порядковый номер элемента равен заряду ядра и числу электронов в атоме. Значит, по строению атома можно найти его клетку, а по клетке — строение атома.'],
+    why: 'Номер группы подсказывает валентность и формулы соединений, номер периода — размер атома. Так читают таблицу технологи-металлурги, инженеры микроэлектроники (кремний и галлий в чипах и светодиодах), радиологи, которые работают с изотопами. Задачи «найди элемент по строению атома» часто встречаются в тестах ЕНТ по химии.',
+    task: 'Найдите клетку для пяти атомов-загадок по числу электронных слоёв и внешних электронов.',
+    hint: 'Сосчитайте слои — это номер строки. Сосчитайте электроны на последнем слое — это номер столбца.',
+    stage: 'Нажмите на клетку таблицы или перетащите атом в клетку.',
+    init: { mi: 0 },
+    check: m => m.found === MYST.length },
+  { id: 'metals', title: 'Металлы и неметаллы',
+    text: ['Примерно 80 % элементов — металлы. В таблице они слева и внизу, неметаллы — справа и вверху. Границу проводят ступенькой от бора B к астату At.',
+           'У атомов металлов на внешнем слое обычно мало электронов (1–3), и они легко их отдают. Атомам неметаллов чаще всего не хватает до восьми всего нескольких электронов, и они стремятся их принять. У инертных газов внешний слой уже завершён.',
+           'В периоде слева направо металлические свойства ослабевают, неметаллические усиливаются. В группе сверху вниз металлические свойства растут: атом становится больше, и внешние электроны держатся слабее.'],
+    why: 'Казахстан добывает и выплавляет медь, цинк, хром, алюминий и титан — металлургия даёт стране большую часть экспорта. Металлурги, горные инженеры и сварщики подбирают металлы и сплавы по свойствам. А на Тенгизе из нефтяного газа получают миллионы тонн серы — неметалла, из которой делают серную кислоту и удобрения.',
+    safe: 'Натрий и калий бурно реагируют с водой, иногда со вспышкой. Их хранят под слоем керосина и берут только пинцетом — никогда руками.',
+    task: 'Раскрасьте все 20 элементов: металлы и неметаллы.',
+    hint: 'Смотрите на место в таблице и на число внешних электронов. Будьте внимательны с водородом и бором.',
+    stage: 'Выберите кисть внизу и нажимайте на клетки. Неверный цвет не ляжет.',
+    init: { brush: 'm' },
+    check: m => m.painted === E.length },
+  { id: 'predict', title: 'Предсказываем неоткрытый элемент',
+    text: ['Менделеев оставил в таблице пустые клетки и описал элементы, которых ещё никто не видел. Он назвал их экаалюминий и экасилиций: «эка» на санскрите — «один», то есть «следующий за алюминием», «следующий за кремнием».',
+           'Способ простой: свойство неизвестного элемента примерно равно среднему у его соседей — сверху, снизу, слева и справа. Формула высшего оксида следует из номера группы: в группе III — Э₂O₃, в группе IV — ЭO₂.',
+           'В 1875 году открыли галлий, в 1886 — германий. Их свойства почти совпали с предсказанными. После этого периодический закон признали химики всего мира.'],
+    why: 'Предсказывать свойства по таблице — работа материаловедов. Так ищут новые полупроводники, сплавы и катализаторы, не перебирая всё наугад, и это экономит годы и деньги. Галлий и германий сегодня — это светодиоды, солнечные панели, оптоволокно и тепловизоры.',
+    task: 'Предскажите экаалюминий и экасилиций: выберите четырёх соседей каждого и формулу высшего оксида.',
+    hint: 'Соседи — только по стороне клетки, не по диагонали. Номер группы равен высшей валентности элемента.',
+    stage: 'Нажимайте на клетки-соседи. Неизвестный элемент и формулу оксида выберите внизу.',
+    init: { tgt: 'Ga' },
+    check: m => solved4(m.pr, 'Ga') && solved4(m.pr, 'Ge') },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const fresh4 = () => ({ Ga: { nb: [], ox: null }, Ge: { nb: [], ox: null } });
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null,
+            order: 'z', cuts: [], mi: 0, placed: {}, wrong2: 0, brush: 'm', paint: {}, sel3: null, wrong3: 0, tgt: 'Ga', pr: fresh4(), wrong4: 0 };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+// lesson 1: rows of the cut ribbon and the column check
+function lawLayout() {
+  const seq = S.order === 'z' ? E : MASS, cuts = S.cuts.slice().sort((a, b) => a - b), rows = [];
+  let st = 0;
+  for (const c of cuts) { rows.push(seq.slice(st, c)); st = c; }
+  rows.push(seq.slice(st));
+  const maxLen = Math.max(...rows.map(r => r.length));
+  const place = rows.map(r => r.map((el, i) => (r.length === 2 && r[0].z === 1 && r[1].z === 2 && maxLen >= 8 && i === 1) ? maxLen - 1 : i));
+  const cols = [];
+  for (let c = 0; c < maxLen; c++) {
+    const inCol = []; rows.forEach((r, ri) => r.forEach((el, i) => { if (place[ri][i] === c) inCol.push(el); }));
+    cols.push({ n: inCol.length, ok: inCol.length >= 2 && inCol.every(el => el.g === inCol[0].g) });
+  }
+  return { seq, rows, place, maxLen, cols, okCols: cols.filter(c => c.ok).length };
+}
+
+function model() {
+  const id = LID();
+  if (id === 'law') { const L = lawLayout(); return { kind: 'law', order: S.order, cuts: S.cuts.slice().sort((a, b) => a - b), ...L }; }
+  if (id === 'pg') { const found = MYST.filter(z => S.placed[z]).length; return { kind: 'pg', found, cur: found < MYST.length ? EZ(MYST[S.mi]) : null }; }
+  if (id === 'metals') return { kind: 'met', painted: Object.keys(S.paint).length, sel: S.sel3 ? EZ(S.sel3) : null };
+  const t = TGT[S.tgt], pr = S.pr[S.tgt], nb = pr.nb;
+  const am = nb.length ? nb.reduce((a, s) => a + D4[s].m, 0) / nb.length : null, ad = nb.length ? nb.reduce((a, s) => a + D4[s].d, 0) / nb.length : null;
+  return { kind: 'pre', tgt: S.tgt, t, nb, ox: pr.ox, am, ad, solved: solved4(S.pr, S.tgt), pr: S.pr };
+}
+
+// ---------- scene ----------
+const scene = $('#scene');
+let drag = null, dirty = true;
+function bench() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="2360" fill="url(#tile)"/>
+    <rect x="-2000" y="360" width="4520" height="1200" fill="#1a2232"/>
+    <rect x="-2000" y="358" width="4520" height="4" fill="#2c3954"/>
+    <rect x="-2000" y="362" width="4520" height="2" fill="${INK}" opacity=".6"/>`;
+}
+const T = (x, y, s, fs, fill, anchor, w) => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${(+fs).toFixed(1)}" fill="${fill}" text-anchor="${anchor || 'middle'}"${w ? ` font-weight="${w}"` : ''}>${s}</text>`;
+
+// ----- lesson 1 -----
+const LAW = { top: 98, bot: 330 };
+function lawGeo(L) {
+  const W = Math.min(58, 480 / L.maxLen), rowH = Math.min(58, (LAW.bot - LAW.top) / L.rows.length);
+  return { W, rowH, x0: 260 - L.maxLen * W / 2 };
+}
+function lawSVG(m) {
+  const g = lawGeo(m);
+  let h = '';
+  const tw = g.W - 3, th = g.rowH - 5;
+  m.cols.forEach((c, i) => { if (c.ok) h += T(g.x0 + (i + 0.5) * g.W, LAW.top - 6, '✓', Math.min(12, g.W * 0.45), '#86e0a8'); });
+  m.rows.forEach((r, ri) => {
+    const y = LAW.top + ri * g.rowH;
+    r.forEach((el, i) => {
+      const x = g.x0 + m.place[ri][i] * g.W, c = GC[el.g];
+      const fs = Math.min(18, tw * 0.42, th * 0.42);
+      h += `<g data-drag="t-${el.z}"><rect x="${(x + 1.5).toFixed(1)}" y="${y.toFixed(1)}" width="${tw.toFixed(1)}" height="${th.toFixed(1)}" rx="${Math.min(8, tw * 0.2).toFixed(1)}" fill="${c}" fill-opacity=".2" stroke="${c}" stroke-width="1.4"/>`;
+      h += T(x + g.W / 2, y + th * 0.5 + fs * 0.36, el.s, fs, '#e8ecf4', 'middle', 500);
+      if (tw >= 30 && th >= 30) h += T(x + 5, y + 10, el.z, 8, '#8b96ad', 'start');
+      if (tw >= 40 && th >= 44) h += T(x + g.W / 2, y + th - 5, num(el.m, 1), 8, '#8b96ad');
+      h += '</g>';
+    });
+    if (ri < m.rows.length - 1) {
+      const xe = g.x0 + (m.place[ri][r.length - 1] + 1) * g.W;
+      h += `<path d="M${(xe + 0.5).toFixed(1)} ${(y - 2).toFixed(1)}v${(th + 4).toFixed(1)}" stroke="#ffb547" stroke-width="2.4" stroke-dasharray="3 3"/>`;
+    }
+  });
+  h += T(260, 348, `порядок: ${m.order === 'z' ? 'по заряду ядра Z' : 'по атомной массе'} · строк: ${m.rows.length}`, 11, m.order === 'z' ? '#8b96ad' : '#ffb547');
+  return h;
+}
+
+// ----- lessons 2 and 3: the short table of the first 20 elements -----
+const G = { x0: 226, y0: 124, cw: 33, ch: 44, gx: 36, gy: 48 };
+const cellXY = el => ({ x: G.x0 + (el.g - 1) * G.gx, y: G.y0 + (el.p - 1) * G.gy });
+const cellAt = p => E.find(el => { const c = cellXY(el); return p.x >= c.x - 2 && p.x <= c.x + G.cw + 2 && p.y >= c.y - 2 && p.y <= c.y + G.ch + 2; }) || null;
+function gridFrame() {
+  let h = '';
+  for (let g = 1; g <= 8; g++) h += T(G.x0 + (g - 1) * G.gx + G.cw / 2, G.y0 - 8, ROM[g], 9, '#8b96ad');
+  for (let p = 1; p <= 4; p++) h += T(G.x0 - 8, G.y0 + (p - 1) * G.gy + G.ch / 2 + 4, p, 10, '#8b96ad', 'end');
+  return h;
+}
+function cellSVG(el, fill, stroke, label, sub, lc) {
+  const c = cellXY(el);
+  return `<g data-drag="c-${el.z}"><rect x="${c.x}" y="${c.y}" width="${G.cw}" height="${G.ch}" rx="6" fill="${fill}" stroke="${stroke}" stroke-width="1.4"/>` +
+    (label ? T(c.x + G.cw / 2, c.y + 25, label, 14, lc || '#e8ecf4', 'middle', 500) : '') +
+    (sub !== undefined ? T(c.x + 4, c.y + 10, sub, 7.5, '#8b96ad', 'start') : '') + '</g>';
+}
+const ATC = { x: 112, y: 222 };
+function atomSVG(el, cx, cy, sc, t, label) {
+  let h = '';
+  el.sh.forEach((n, k) => {
+    const r = (24 + 18 * k) * sc, outer = k === el.sh.length - 1;
+    h += `<circle cx="${cx}" cy="${cy}" r="${r.toFixed(1)}" fill="none" stroke="${outer ? 'rgba(255,181,71,.55)' : '#3a4762'}" stroke-width="${outer ? 1.6 : 1.2}"/>`;
+    const a0 = reduce ? 0 : t / (2600 + 900 * k);
+    for (let i = 0; i < n; i++) {
+      const a = a0 + i * 2 * Math.PI / n - Math.PI / 2;
+      h += `<circle cx="${(cx + Math.cos(a) * r).toFixed(1)}" cy="${(cy + Math.sin(a) * r).toFixed(1)}" r="${(3.6 * sc + 0.4).toFixed(1)}" fill="${outer ? '#ffb547' : '#72d4e8'}"/>`;
+    }
+  });
+  const nr = 15 * sc;
+  h += `<circle cx="${cx}" cy="${cy}" r="${(nr + 1.3).toFixed(1)}" fill="${INK}"/><circle cx="${cx}" cy="${cy}" r="${nr.toFixed(1)}" fill="#e5533f"/>` + T(cx, cy + 4 * sc, label || '+' + el.z, 11 * sc, '#fff', 'middle', 500);
+  return h;
+}
+function pgSVG(m, t) {
+  let h = gridFrame();
+  const hot = drag && drag.moved && drag.id === 'atom' ? cellAt(drag.p) : null;
+  for (const el of E) {
+    const on = S.placed[el.z];
+    h += cellSVG(el, on ? 'rgba(134,224,168,.14)' : hot === el ? 'rgba(114,212,232,.14)' : 'rgba(18,26,40,.75)', on ? '#86e0a8' : hot === el ? '#72d4e8' : '#26324a', on ? el.s : '', on ? el.z : undefined, '#86e0a8');
+  }
+  if (m.cur) {
+    if (!(drag && drag.moved && drag.id === 'atom')) h += `<g data-drag="atom">` + `<circle cx="${ATC.x}" cy="${ATC.y}" r="${(24 + 18 * (m.cur.sh.length - 1) + 8)}" fill="rgba(18,26,40,.01)"/>` + atomSVG(m.cur, ATC.x, ATC.y, 1, t) + '</g>';
+    h += T(ATC.x, 334, `атом-загадка ${S.mi + 1} из ${MYST.length}`, 11, '#e8ecf4');
+    h += T(ATC.x, 349, 'оранжевый — внешний слой', 9, '#8b96ad');
+  } else {
+    h += T(ATC.x, 215, 'Все загадки', 14, '#86e0a8', 'middle', 500) + T(ATC.x, 234, 'разгаданы', 14, '#86e0a8', 'middle', 500);
+  }
+  return h;
+}
+const MCOL = { m: '#b5c0d3', n: '#6cc96f' };
+function metSVG(m, t) {
+  let h = gridFrame();
+  for (const el of E) {
+    const p = S.paint[el.z], sel = S.sel3 === el.z;
+    h += cellSVG(el, p ? (p === 'm' ? 'rgba(181,192,211,.32)' : 'rgba(108,201,111,.28)') : 'rgba(18,26,40,.75)', sel ? '#ffb547' : p ? MCOL[p] : '#3a4762', el.s, el.z);
+  }
+  if (S.done.metals || m.painted === E.length) {
+    const xA = G.x0 + 2 * G.gx - 1.5, xB = G.x0 + 3 * G.gx - 1.5, y2 = G.y0 + G.gy - 2, y3 = G.y0 + 2 * G.gy - 2, y4 = G.y0 + 3 * G.gy - 2;
+    h += `<path d="M${xA} ${y2}V${y3}H${xB}V${y4}" fill="none" stroke="#ffb547" stroke-width="2.6"/>`;
+    h += T(G.x0 + 4 * G.gx, G.y0 + 3 * G.gy + G.ch + 16, '← и ↓ металлические свойства растут', 9.5, '#ffb547');
+  }
+  const el = m.sel;
+  if (el) {
+    h += atomSVG(el, ATC.x, 200, 0.82, t);
+    const p = S.paint[el.z];
+    h += T(ATC.x, 296, `${el.s} · ${el.name}`, 13, '#e8ecf4', 'middle', 500);
+    h += T(ATC.x, 313, `внешних электронов: ${el.out}`, 10, '#8b96ad');
+    h += T(ATC.x, 330, p ? (p === 'm' ? 'металл' : 'неметалл') : 'металл или неметалл?', 11, p ? MCOL[p] : '#ffb547', 'middle', 500);
+  } else h += T(ATC.x, 215, 'нажмите на клетку', 11, '#8b96ad');
+  // brush swatches
+  [['m', 'металл'], ['n', 'неметалл']].forEach(([k, n], i) => {
+    const x = 26 + i * 90, on = S.brush === k;
+    h += `<g data-drag="brush-${k}"><rect x="${x - 4}" y="${88}" width="84" height="26" rx="8" fill="${on ? '#1a2438' : '#121a28'}" stroke="${on ? '#ffb547' : '#26324a'}" stroke-width="1.4"/><rect x="${x + 4}" y="96" width="10" height="10" rx="3" fill="${MCOL[k]}"/>${T(x + 20, 105, n, 10, on ? '#e8ecf4' : '#8b96ad', 'start')}</g>`;
+  });
+  return h;
+}
+
+// ----- lesson 4 -----
+const P4 = { x0: 67, y0: 114, cw: 92, ch: 60, gx: 98, gy: 66 };
+const c4 = (r, c) => ({ x: P4.x0 + c * P4.gx, y: P4.y0 + r * P4.gy });
+function preSVG(m) {
+  let h = '';
+  H4.forEach((s, c) => { h += T(P4.x0 + c * P4.gx + P4.cw / 2, P4.y0 - 8, s, 9, '#8b96ad'); });
+  [3, 4, 5].forEach((p, r) => { h += T(P4.x0 - 8, P4.y0 + r * P4.gy + P4.ch / 2 + 4, p, 10, '#8b96ad', 'end'); });
+    X4.forEach((row, r) => row.forEach((s, c) => {
+    const { x, y } = c4(r, c);
+    if (!s) { h += `<rect x="${x}" y="${y}" width="${P4.cw}" height="${P4.ch}" rx="8" fill="none" stroke="#26324a" stroke-dasharray="4 5"/>`; return; }
+    const isT = s === m.tgt, sel = m.nb.includes(s);
+    if (isT) {
+      const ok = m.solved;
+      h += `<g data-drag="p-${s}"><rect x="${x}" y="${y}" width="${P4.cw}" height="${P4.ch}" rx="8" fill="${ok ? 'rgba(134,224,168,.14)' : 'rgba(255,181,71,.10)'}" stroke="${ok ? '#86e0a8' : '#ffb547'}" stroke-width="2"/>`;
+      h += ok ? T(x + P4.cw / 2, y + 26, s, 18, '#86e0a8', 'middle', 500) + T(x + P4.cw / 2, y + 41, num(D4[s].m, 2), 9, '#8b96ad') + T(x + P4.cw / 2, y + 53, num(D4[s].d, 2) + ' г/см³', 8.5, '#8b96ad')
+        : T(x + P4.cw / 2, y + 30, '?', 22, '#ffb547', 'middle', 500) + T(x + P4.cw / 2, y + 50, m.t.ekaS, 9, '#ffb547');
+      h += '</g>';
+      return;
+    }
+    h += `<g data-drag="p-${s}"><rect x="${x}" y="${y}" width="${P4.cw}" height="${P4.ch}" rx="8" fill="${sel ? '#15293a' : '#121a28'}" stroke="${sel ? '#72d4e8' : '#3a4762'}" stroke-width="${sel ? 2 : 1.3}"/>` +
+      T(x + P4.cw / 2, y + 24, s, 17, '#e8ecf4', 'middle', 500) + T(x + P4.cw / 2, y + 40, num(D4[s].m, 2), 9, '#8b96ad') + T(x + P4.cw / 2, y + 52, num(D4[s].d, 2) + ' г/см³', 8.5, '#8b96ad') + '</g>';
+  }));
+  const yb = P4.y0 + 3 * P4.gy + 14;
+  h += T(260, yb, m.nb.length ? `среднее ${m.nb.length} из 4 соседей: масса ≈ ${num(m.am, 2)} · плотность ≈ ${num(m.ad, 2)} г/см³` : 'выберите соседей «?» — сверху, снизу, слева, справа', 10.5, m.nb.length === 4 ? '#86e0a8' : '#e8ecf4');
+  h += T(260, yb + 18, `высший оксид: ${m.ox ? oxTxt(m.ox) : '?'}${m.solved ? ` · открыт в ${m.t.year} г. — ${D4[m.tgt].n}` : ''}`, 10.5, m.ox ? (m.ox === m.t.ox ? '#86e0a8' : '#ffb547') : '#8b96ad');
+  return h;
+}
+
+function hlBox(id) {
+  const g = LID() === 'law' ? lawGeo(model()) : null, mm = LID() === 'law' ? model() : null;
+  const tp = pos4(S.tgt), tc = c4(tp.r, tp.c);
+  return {
+    tiles: mm ? [g.x0 - 4, LAW.top - 4, mm.maxLen * g.W + 8, mm.rows.length * g.rowH + 4] : null,
+    cutmk: mm ? [g.x0 - 4, LAW.top - 4, mm.maxLen * g.W + 8, mm.rows.length * g.rowH + 4] : null,
+    checks: mm ? [g.x0 - 4, LAW.top - 20, mm.maxLen * g.W + 8, 18] : null,
+    order: [120, 334, 280, 20],
+    nucleus: [ATC.x - 20, ATC.y - 20, 40, 40], shells: [ATC.x - 84, ATC.y - 84, 168, 168],
+    grid: [G.x0 - 4, G.y0 - 4, 7 * G.gx + G.cw + 8, 3 * G.gy + G.ch + 8], groups: [G.x0 - 4, G.y0 - 22, 7 * G.gx + G.cw + 8, 18], periods: [G.x0 - 22, G.y0 - 4, 20, 3 * G.gy + G.ch + 8],
+    info: [20, 120, 184, 222], brushes: [32, 84, 160, 34], border: [G.x0 + G.gx, G.y0 + G.gy - 6, 2 * G.gx + 10, 2 * G.gy + 12],
+    target: [tc.x - 4, tc.y - 4, P4.cw + 8, P4.ch + 8], table4: [P4.x0 - 4, P4.y0 - 4, 4 * P4.gx + 2, 3 * P4.gy + 2], avg: [20, P4.y0 + 3 * P4.gy, 480, 40],
+  }[id];
+}
+
+function ghostSVG(d) {
+  if (d.id !== 'atom') return '';
+  const m = model(); if (!m.cur) return '';
+  return `<rect x="${(d.p.x - 17).toFixed(1)}" y="${(d.p.y - 22).toFixed(1)}" width="34" height="44" rx="6" fill="rgba(229,83,63,.25)" stroke="#e5533f" stroke-width="1.6"/>` + T(d.p.x, d.p.y + 5, '+' + m.cur.z, 12, '#fff', 'middle', 500);
+}
+
+function drawScene(t) {
+  const id = LID(), m = model();
+  let h = bench();
+  if (id === 'law') h += lawSVG(m);
+  else if (id === 'pg') h += pgSVG(m, t);
+  else if (id === 'metals') h += metSVG(m, t);
+  else h += preSVG(m);
+  if (drag && drag.moved) h += `<g opacity=".92" pointer-events="none">${ghostSVG(drag)}</g>`;
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="10" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 500, hh / 410, 1.7);
+  const vw = w / s, vh = hh / s;
+  scene.setAttribute('viewBox', `${(260 - vw / 2).toFixed(1)} ${(405 - vh).toFixed(1)} ${vw.toFixed(1)} ${vh.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer: taps everywhere, dragging for the atom in lesson 2 ----------
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  drag = { id: el.dataset.drag, x: e.clientX, y: e.clientY, p: toSvg(e), moved: false };
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 6 && drag.id === 'atom') drag.moved = true;
+  drag.p = toSvg(e); if (drag.moved) dirty = true;
+});
+const endDrag = cancel => {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing'); dirty = true;
+  if (cancel) return;
+  if (d.moved) { const c = cellAt(d.p); if (c) placeAtom(c.z); } else tap(d.id);
+};
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+function tap(id) {
+  if (id.startsWith('t-')) return toggleCutAfter(+id.slice(2));
+  if (id === 'atom') { toast('Перетащите атом в клетку таблицы или просто нажмите на клетку.'); return; }
+  if (id.startsWith('c-')) return LID() === 'pg' ? placeAtom(+id.slice(2)) : paintCell(+id.slice(2));
+  if (id.startsWith('brush-')) return setBrush(id.slice(6));
+  if (id.startsWith('p-')) return pickNb(id.slice(2));
+}
+
+// ----- actions -----
+function toggleCutAfter(z) {
+  const seq = S.order === 'z' ? E : MASS, pos = seq.findIndex(el => el.z === z) + 1;
+  if (pos >= seq.length) { toast('После последнего элемента резать нечего.'); return false; }
+  const i = S.cuts.indexOf(pos);
+  if (i >= 0) S.cuts.splice(i, 1); else S.cuts.push(pos);
+  update(); return true;
+}
+function setOrder(o) {
+  if (S.order === o) return;
+  S.order = o;
+  if (o === 'mass') toast('По массе аргон (39,9) тяжелее калия (39,1) — они меняются местами. Посмотрите, что станет со столбцами.');
+  buildScheme(); renderTools(); update();
+}
+function placeAtom(z) {
+  const m = model(); if (!m.cur) return false;
+  const el = m.cur, c = EZ(z);
+  if (S.placed[z]) { toast(`Здесь уже стоит ${c.s}.`); return false; }
+  if (c.z !== el.z) {
+    S.wrong2++;
+    toast(c.p !== el.p ? `Не тот период: сосчитайте электронные слои атома — это номер строки.` : `Период верный, а группа — нет: сосчитайте электроны на внешнем (оранжевом) слое.`);
+    update(); return false;
+  }
+  S.placed[z] = true;
+  toast(`Верно: ${el.s} — ${el.name}. Период ${el.p}, группа ${ROM[el.g]}A, порядковый номер ${el.z}.`);
+  const nx = MYST.findIndex(q => !S.placed[q]);
+  if (nx >= 0) S.mi = nx;
+  buildScheme(); update(); return true;
+}
+function setBrush(b) { S.brush = b; renderTools(); update(); }
+function paintCell(z, brush) {
+  const el = EZ(z), b = brush || S.brush, right = el.met ? 'm' : 'n';
+  S.sel3 = z;
+  if (S.paint[z]) { update(); return S.paint[z] === b; }
+  if (b !== right) {
+    S.wrong3++;
+    const why = el.z === 1 ? 'Водород стоит в группе I, но это неметалл — лёгкий газ, он не проводит ток и не блестит.'
+      : el.z === 5 ? 'У бора 3 внешних электрона, но атом маленький и держит их крепко. Бор — неметалл, он стоит справа от границы.'
+      : el.g === 8 ? `${cap(el.name)} — инертный газ, его внешний слой завершён. Это неметалл.`
+      : right === 'm' ? `У атома ${el.s} всего ${el.out} внешн. электрон(а), он легко их отдаёт. Это металл.` : `У атома ${el.s} ${el.out} внешних электронов, ему проще принять недостающие. Это неметалл.`;
+    toast('Не тот цвет. ' + why); update(); return false;
+  }
+  S.paint[z] = b; update(); return true;
+}
+function setTgt(t) { S.tgt = t; renderTools(); buildScheme(); update(); }
+function pickNb(s) {
+  const t = TGT[S.tgt], pr = S.pr[S.tgt];
+  if (s === S.tgt) { toast('Это и есть неизвестный элемент — выбирайте его соседей.'); return false; }
+  const i = pr.nb.indexOf(s);
+  if (i >= 0) { pr.nb.splice(i, 1); update(); return true; }
+  if (!t.nb.includes(s)) {
+    S.wrong4++;
+    const a = pos4(s), b = pos4(S.tgt);
+    toast(Math.abs(a.r - b.r) === 1 && Math.abs(a.c - b.c) === 1 ? 'Это сосед по диагонали. Менделеев брал соседей по стороне клетки: сверху, снизу, слева и справа.' : 'Этот элемент не граничит с клеткой «?».');
+    update(); return false;
+  }
+  pr.nb.push(s); after4(); update(); return true;
+}
+function pickOx(f) {
+  const t = TGT[S.tgt], pr = S.pr[S.tgt];
+  if (pr.ox === t.ox) { toast(`Формула уже найдена: ${oxTxt(t.ox)}.`); return false; }
+  pr.ox = f;
+  if (f !== t.ox) { S.wrong4++; toast('Не то. Номер группы равен высшей валентности; кислород двухвалентен — уравняйте единицы валентности.'); update(); return false; }
+  after4(); renderTools(); update(); return true;
+}
+function after4() {
+  const t = TGT[S.tgt];
+  if (solved4(S.pr, S.tgt)) toast(`Прогноз готов! ${cap(t.eka)} открыли в ${t.year} году — это ${D4[S.tgt].n} ${S.tgt}.`);
+}
+
+let last = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const anim = !!S.hl || (drag && drag.moved);
+  const spin = !reduce && ((LID() === 'pg' && model().cur) || (LID() === 'metals' && S.sel3)) && t - last > 50;
+  if (dirty || anim || spin) { drawScene(t); dirty = false; last = t; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3200); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    law: B('ord-z', 'По заряду Z', S.order === 'z') + B('ord-mass', 'По массе', S.order === 'mass') + sep + B('cuts0', 'Склеить ленту'),
+    pg: B('restart2', 'Начать заново'),
+    metals: B('br-m', 'Кисть: металл', S.brush === 'm') + B('br-n', 'Кисть: неметалл', S.brush === 'n') + sep + B('restart3', 'Заново'),
+    predict: B('tg-Ga', '? эка-Al', S.tgt === 'Ga') + B('tg-Ge', '? эка-Si', S.tgt === 'Ge') + sep + OXES.map(([f]) => B('ox-' + f, oxTxt(f), S.pr[S.tgt].ox === f)).join(''),
+  }[id];
+}
+function act(a) {
+  if (a.startsWith('ord-')) return setOrder(a.slice(4));
+  if (a === 'cuts0') { S.cuts = []; buildScheme(); update(); return; }
+  if (a === 'restart2') { S.placed = {}; S.mi = 0; S.wrong2 = 0; buildScheme(); update(); return; }
+  if (a.startsWith('br-')) return setBrush(a.slice(3));
+  if (a === 'restart3') { S.paint = {}; S.sel3 = null; S.wrong3 = 0; buildScheme(); update(); return; }
+  if (a.startsWith('tg-')) return setTgt(a.slice(3));
+  if (a.startsWith('ox-')) return pickOx(a.slice(3));
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  tiles: IC('<rect x="2" y="11" width="9" height="12" rx="2" fill="#c08cf0" fill-opacity=".3" stroke="#c08cf0"/><rect x="12.5" y="11" width="9" height="12" rx="2" fill="#6fd0b0" fill-opacity=".3" stroke="#6fd0b0"/><rect x="23" y="11" width="9" height="12" rx="2" fill="#9fb4d8" fill-opacity=".3" stroke="#9fb4d8"/>'),
+  cutmk: IC('<rect x="4" y="9" width="11" height="16" rx="2" fill="none" stroke="var(--muted)"/><path d="M19 6v22" stroke="#ffb547" stroke-width="2.4" stroke-dasharray="3 3"/>'),
+  checks: IC('<path d="M8 17l6 6 12-13" fill="none" stroke="#86e0a8" stroke-width="2.6"/>'),
+  order: IC('<text x="17" y="21" font-size="10" text-anchor="middle" fill="var(--fg)" font-family="IBM Plex Mono">1→20</text>'),
+  nucleus: IC('<circle cx="17" cy="17" r="9" fill="#e5533f"/><text x="17" y="20.5" font-size="8" text-anchor="middle" fill="#fff" font-family="IBM Plex Mono">+Z</text>'),
+  shells: IC('<circle cx="17" cy="17" r="7" fill="none" stroke="#3a4762"/><circle cx="17" cy="17" r="13" fill="none" stroke="#ffb547"/><circle cx="17" cy="4" r="2.3" fill="#ffb547"/><circle cx="17" cy="10" r="2" fill="#72d4e8"/>'),
+  grid: IC('<path d="M4 6h26M4 14h26M4 22h26M4 30h26M4 6v24M12 6v24M21 6v24M30 6v24" stroke="var(--muted)" stroke-width="1"/>'),
+  groups: IC('<text x="17" y="14" font-size="9" text-anchor="middle" fill="var(--fg)" font-family="IBM Plex Mono">I…VIII</text><path d="M6 18v12M17 18v12M28 18v12" stroke="var(--muted)"/>'),
+  periods: IC('<text x="7" y="13" font-size="8" fill="var(--fg)" font-family="IBM Plex Mono">1</text><text x="7" y="22" font-size="8" fill="var(--fg)" font-family="IBM Plex Mono">2</text><text x="7" y="31" font-size="8" fill="var(--fg)" font-family="IBM Plex Mono">3</text><path d="M14 10h17M14 19h17M14 28h17" stroke="var(--muted)"/>'),
+  info: IC('<circle cx="17" cy="15" r="5" fill="#e5533f"/><circle cx="17" cy="15" r="11" fill="none" stroke="#ffb547"/><path d="M8 31h18" stroke="var(--muted)"/>'),
+  brushes: IC('<rect x="3" y="11" width="12" height="12" rx="3" fill="#b5c0d3"/><rect x="19" y="11" width="12" height="12" rx="3" fill="#6cc96f"/>'),
+  border: IC('<path d="M10 4v10h10v16" fill="none" stroke="#ffb547" stroke-width="2.4"/>'),
+  target: IC('<rect x="5" y="6" width="24" height="22" rx="4" fill="none" stroke="#ffb547" stroke-width="1.6"/><text x="17" y="22" font-size="13" text-anchor="middle" fill="#ffb547" font-family="IBM Plex Mono">?</text>'),
+  table4: IC('<rect x="12" y="2" width="10" height="9" rx="2" fill="none" stroke="#72d4e8"/><rect x="12" y="23" width="10" height="9" rx="2" fill="none" stroke="#72d4e8"/><rect x="1" y="12.5" width="10" height="9" rx="2" fill="none" stroke="#72d4e8"/><rect x="23" y="12.5" width="10" height="9" rx="2" fill="none" stroke="#72d4e8"/><rect x="12" y="12.5" width="10" height="9" rx="2" fill="none" stroke="#ffb547"/>'),
+  avg: IC('<text x="17" y="21" font-size="10" text-anchor="middle" fill="var(--fg)" font-family="IBM Plex Mono">Σ:4</text>'),
+};
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (m.kind === 'law') return `Строк: ${m.rows.length} · ровных столбцов: ${m.okCols} из ${m.maxLen}${m.order === 'mass' ? ' · порядок по массе' : ''}`;
+  if (m.kind === 'pg') return `Найдено: ${m.found} из ${MYST.length} · ошибок: ${S.wrong2}`;
+  if (m.kind === 'met') return `Раскрашено ${m.painted} из ${E.length} · ошибок: ${S.wrong3}`;
+  return `эка-Al: ${solved4(S.pr, 'Ga') ? 'готово' : S.pr.Ga.nb.length + '/4 соседей'} · эка-Si: ${solved4(S.pr, 'Ge') ? 'готово' : S.pr.Ge.nb.length + '/4 соседей'}`;
+}
+
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'law') {
+    const seq = S.order === 'z' ? E : MASS;
+    h = `<h2>Лента элементов</h2>
+      <dl class="reads"><div><dt>Строк</dt><dd id="r1"></dd></div><div><dt>Ровных столбцов</dt><dd id="r2"></dd></div><div><dt>Порядок</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Порядок элементов</div><div class="chips" id="ordChips"><button data-o="z" aria-pressed="${S.order === 'z'}">по заряду ядра</button><button data-o="mass" aria-pressed="${S.order === 'mass'}">по атомной массе</button></div></div>
+      <div class="ctl"><div class="lbl">Разрез после элемента</div><div class="chips sym" id="cutChips">${seq.slice(0, -1).map((x, i) => `<button data-z="${x.z}" aria-pressed="${S.cuts.includes(i + 1)}">${x.s}</button>`).join('')}</div></div>
+      <h3>Цвета групп</h3><div class="legend">${GNAME.slice(1).map((n, i) => `<span><i style="background:${GC[i + 1]}"></i>${n}</span>`).join('')}</div>`;
+  }
+  if (id === 'pg') h = `<h2>Атом-загадка</h2>
+      <dl class="reads"><div><dt>Заряд ядра</dt><dd id="r1"></dd></div><div><dt>Электронов</dt><dd id="r2"></dd></div><div><dt>Найдено</dt><dd id="r3"></dd></div></dl>
+      <div class="sel2"><label>Период (строка)<select id="sP">${[1, 2, 3, 4].map(p => `<option value="${p}">${p}</option>`).join('')}</select></label>
+      <label>Группа (столбец)<select id="sG">${[1, 2, 3, 4, 5, 6, 7, 8].map(g => `<option value="${g}">${ROM[g]}A</option>`).join('')}</select></label></div>
+      <div class="row"><button class="ghostbtn" id="putBtn">Поставить в клетку</button></div>
+      <p class="note" style="margin-top:12px">Электроны внутренних слоёв — голубые, внешнего — оранжевые.</p>`;
+  if (id === 'metals') h = `<h2>Металл или неметалл</h2>
+      <dl class="reads"><div><dt>Металлов</dt><dd id="r1"></dd></div><div><dt>Неметаллов</dt><dd id="r2"></dd></div><div><dt>Ошибок</dt><dd id="r3"></dd></div></dl>
+      <p class="note">Выберите ответ для каждого элемента. Верный ответ закрепится.</p>
+      <div class="pairs">${E.map(x => `<label>${x.s}<select data-z="${x.z}" ${S.paint[x.z] ? 'disabled' : ''}><option value="">—</option><option value="m" ${S.paint[x.z] === 'm' ? 'selected' : ''}>металл</option><option value="n" ${S.paint[x.z] === 'n' ? 'selected' : ''}>неметалл</option></select></label>`).join('')}</div>`;
+  if (id === 'predict') h = `<h2>Прогноз по соседям</h2>
+      <dl class="reads"><div><dt>Масса ≈</dt><dd id="r1"></dd></div><div><dt>Плотность ≈</dt><dd id="r2"></dd></div><div><dt>Оксид</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Неизвестный элемент</div><div class="chips" id="tgChips">${Object.keys(TGT).map(k => `<button data-t="${k}" aria-pressed="${S.tgt === k}">${TGT[k].eka}</button>`).join('')}</div></div>
+      <div class="ctl"><div class="lbl">Соседи (нажмите, чтобы выбрать)</div><div class="chips sym" id="nbChips">${Object.keys(D4).map(s => `<button data-s="${s}">${s}</button>`).join('')}</div></div>
+      <div class="ctl"><div class="lbl">Формула высшего оксида</div><div class="chips sym" id="oxChips">${OXES.map(([f]) => `<button data-f="${f}">${oxTxt(f)}</button>`).join('')}</div></div>`;
+  el.innerHTML = h;
+  el.querySelectorAll('#ordChips button').forEach(b => b.onclick = () => setOrder(b.dataset.o));
+  el.querySelectorAll('#cutChips button').forEach(b => b.onclick = () => { toggleCutAfter(+b.dataset.z); });
+  const pb = el.querySelector('#putBtn');
+  if (pb) pb.onclick = () => { const p = +$('#sP').value, g = +$('#sG').value, c = E.find(x => x.p === p && x.g === g); if (!c) { toast(`В клетке «период ${p}, группа ${ROM[g]}A» среди первых 20 элементов никого нет.`); return; } placeAtom(c.z); };
+  el.querySelectorAll('.pairs select').forEach(s => s.onchange = () => { if (!s.value) return; const ok = paintCell(+s.dataset.z, s.value); if (ok) s.disabled = true; else s.value = ''; });
+  el.querySelectorAll('#tgChips button').forEach(b => b.onclick = () => setTgt(b.dataset.t));
+  el.querySelectorAll('#nbChips button').forEach(b => b.onclick = () => pickNb(b.dataset.s));
+  el.querySelectorAll('#oxChips button').forEach(b => b.onclick = () => pickOx(b.dataset.f));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; };
+  if (m.kind === 'law') {
+    set('#r1', String(m.rows.length)); set('#r2', `${m.okCols} из ${m.maxLen}`); set('#r3', m.order === 'z' ? 'по Z' : 'по массе');
+    el.querySelectorAll('#cutChips button').forEach(b => { const pos = m.seq.findIndex(x => x.z === +b.dataset.z) + 1; b.setAttribute('aria-pressed', S.cuts.includes(pos)); });
+    el.querySelectorAll('#ordChips button').forEach(b => b.setAttribute('aria-pressed', b.dataset.o === S.order));
+  } else if (m.kind === 'pg') {
+    set('#r1', m.cur ? '+' + m.cur.z : '—'); set('#r2', m.cur ? String(m.cur.z) : '—'); set('#r3', `${m.found} из ${MYST.length}`);
+  } else if (m.kind === 'met') {
+    const v = Object.values(S.paint);
+    set('#r1', String(v.filter(x => x === 'm').length)); set('#r2', String(v.filter(x => x === 'n').length)); set('#r3', String(S.wrong3));
+  } else {
+    set('#r1', m.am ? num(m.am, 2) : '—'); set('#r2', m.ad ? num(m.ad, 2) : '—'); set('#r3', m.ox ? oxTxt(m.ox) : '?');
+    el.querySelectorAll('#tgChips button').forEach(b => b.setAttribute('aria-pressed', b.dataset.t === S.tgt));
+    el.querySelectorAll('#nbChips button').forEach(b => b.setAttribute('aria-pressed', m.nb.includes(b.dataset.s)));
+    el.querySelectorAll('#oxChips button').forEach(b => b.setAttribute('aria-pressed', m.ox === b.dataset.f));
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'law') return [
+    { id: 'tiles', icon: ICON.tiles, name: 'Плитки элементов', spec: 'Знак, порядковый номер Z и атомная масса. Цвет — группа похожих элементов: одинаковый цвет — похожие свойства.' },
+    { id: 'cutmk', icon: ICON.cutmk, name: 'Разрезы', spec: 'Оранжевый пунктир — здесь лента разрезана и началась новая строка, будущий период.' },
+    { id: 'checks', icon: ICON.checks, name: 'Галочки над столбцами', spec: 'Столбец «ровный», если все элементы в нём из одной группы. Так проверяют, что строки сложены правильно.' },
+    { id: 'order', icon: ICON.order, name: 'Порядок ленты', spec: 'По заряду ядра Z — как сегодня. По атомной массе — как в 1869 году; тогда аргон и калий меняются местами.' }];
+  if (id === 'pg') return [
+    { id: 'nucleus', icon: ICON.nucleus, name: 'Ядро', spec: 'Заряд ядра +Z равен порядковому номеру элемента и числу электронов в атоме.' },
+    { id: 'shells', icon: ICON.shells, name: 'Электронные слои', spec: 'Число слоёв равно номеру периода. Внешний слой выделен оранжевым: число его электронов — номер группы (для подгрупп А).' },
+    { id: 'grid', icon: ICON.grid, name: 'Таблица', spec: 'Первые 20 элементов, периоды 1–4, главные подгруппы. Клетка загорается, когда атом поставлен верно.' },
+    { id: 'groups', icon: ICON.groups, name: 'Номера групп', spec: 'Римские цифры I–VIII над столбцами.' },
+    { id: 'periods', icon: ICON.periods, name: 'Номера периодов', spec: 'Арабские цифры 1–4 слева от строк.' }];
+  if (id === 'metals') return [
+    { id: 'grid', icon: ICON.grid, name: 'Таблица', spec: 'Первые 20 элементов. Серебристый — металл, зелёный — неметалл.' },
+    { id: 'brushes', icon: ICON.brushes, name: 'Кисти', spec: 'Выберите цвет и нажимайте на клетки. Кисти есть и на панели внизу.' },
+    { id: 'info', icon: ICON.info, name: 'Карточка атома', spec: 'Строение атома выбранного элемента. Мало внешних электронов — атом скорее отдаёт их (металл).' },
+    { id: 'border', icon: ICON.border, name: 'Граница', spec: 'Ступенька между металлами и неметаллами: от бора вниз вправо. Появится, когда всё раскрашено.' }];
+  return [
+    { id: 'target', icon: ICON.target, name: 'Клетка «?»', spec: 'Неизвестный элемент. Экаалюминий — под алюминием, экасилиций — под кремнием.' },
+    { id: 'table4', icon: ICON.table4, name: 'Соседи', spec: 'Клетки сверху, снизу, слева и справа. В каждой — знак, атомная масса и плотность (г/см³).' },
+    { id: 'avg', icon: ICON.avg, name: 'Прогноз', spec: 'Среднее значение свойств выбранных соседей и формула высшего оксида.' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      (L.safe ? `<div class="safe"><b>Безопасность</b>${L.safe}</div>` : '') +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Детали модели</h2><p class="note">Нажмите на деталь, чтобы найти её на столе.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  if (m.kind === 'law') {
+    const ok = !!S.done.law;
+    let h = `<h2>Как сложилась таблица</h2><div class="formula">свойства = f(заряд ядра Z)<br>повторяются периодически</div><h3>Ваши строки</h3><div class="steps">` +
+      m.rows.map((r, i) => step(`строка ${i + 1}`, r.map(x => x.s).join(' '))).join('') +
+      step('ровных столбцов', `${m.okCols} из ${m.maxLen}`, 'sum') + `</div>`;
+    h += `<h3>Масса или заряд?</h3><div class="steps">${step('Ar · аргон', 'Z = 18 · 39,95')}${step('K · калий', 'Z = 19 · 39,10')}${step('по массе', 'K раньше Ar ✗')}${step('по заряду ядра', 'Ar раньше K ✓', 'sum')}</div>
+      <p class="note" style="margin-top:10px">Менделеев тоже иногда ставил элементы против масс, если этого требовали свойства: теллур (127,6) у него стоит перед йодом (126,9).</p>`;
+    if (ok) h += `<h3>Почему так</h3><div class="steps">${step('внешних электронов, период 1', '1 2')}${step('период 2: Li … Ne', '1 2 3 4 5 6 7 8')}${step('период 3: Na … Ar', '1 2 3 4 5 6 7 8')}${step('период 4: K, Ca', '1 2 …')}</div><p class="note" style="margin-top:10px">Число внешних электронов повторяется — вместе с ним повторяются свойства.</p>`;
+    return h;
+  }
+  if (m.kind === 'pg') {
+    const el = m.cur;
+    if (!el) return `<h2>Все атомы найдены</h2><div class="formula">период = число слоёв<br>группа (А) = внешние e⁻</div><div class="steps">${MYST.map(z => { const x = EZ(z); return step(`${x.s} · ${x.sh.join(', ')}`, `период ${x.p}, группа ${ROM[x.g]}A`); }).join('')}</div>`;
+    return `<h2>Атом +${el.z}</h2><div class="formula">номер = заряд ядра = число e⁻<br>период = число слоёв<br>группа (А) = e⁻ на внешнем слое</div><h3>Разбор</h3><div class="steps">` +
+      step('заряд ядра', '+' + el.z) + step('порядковый номер', String(el.z)) +
+      step('электронных слоёв', 'сосчитайте на рисунке') + step('электронов на внешнем слое', 'сосчитайте оранжевые') +
+      step('клетка', 'период ?, группа ?', 'sum') + `</div><h3>Уже найдены</h3><div class="steps">` +
+      (MYST.filter(z => S.placed[z]).map(z => { const x = EZ(z); return step(`+${z}: ${x.sh.join(', ')}`, `${x.s} · период ${x.p}, ${ROM[x.g]}A`); }).join('') || step('пока никто', '—')) + `</div>`;
+  }
+  if (m.kind === 'met') {
+    const el = m.sel, v = Object.values(S.paint);
+    let h = `<h2>Металлы и неметаллы</h2><div class="formula">мало внешних e⁻ → отдаёт → металл<br>почти 8 внешних e⁻ → принимает → неметалл</div>`;
+    if (el) {
+      const p = S.paint[el.z];
+      h += `<h3>${el.s} · ${el.name}</h3><div class="steps">` + step('строение атома', el.sh.join(', ')) + step('место', `период ${el.p}, группа ${ROM[el.g]}A`) + step('внешних электронов', String(el.out)) +
+        step('вывод', p ? (p === 'm' ? 'металл ✓' : 'неметалл ✓') : 'решите сами', 'sum') + `</div>`;
+    } else h += `<p class="note">Нажмите на клетку — здесь появится разбор элемента.</p>`;
+    h += `<h3>Счёт</h3><div class="steps">${step('металлов', String(v.filter(x => x === 'm').length))}${step('неметаллов', String(v.filter(x => x === 'n').length))}${step('осталось', String(E.length - v.length), 'sum')}</div>`;
+    return h;
+  }
+  const t = m.t, sv = m.solved;
+  let h = `<h2>${cap(t.eka)}</h2><div class="formula">свойство ≈ (сверху + снизу + слева + справа) : 4</div><h3>Атомная масса</h3><div class="steps">` +
+    (m.nb.length ? step(m.nb.map(s => num(D4[s].m, 2)).join(' + '), `= ${num(m.nb.reduce((a, s) => a + D4[s].m, 0), 2)}`) + step(`: ${m.nb.length}`, '≈ ' + num(m.am, 2), 'sum') : step('соседи не выбраны', '—')) + `</div>`;
+  h += `<h3>Плотность, г/см³</h3><div class="steps">` +
+    (m.nb.length ? step(m.nb.map(s => num(D4[s].d, 2)).join(' + '), `= ${num(m.nb.reduce((a, s) => a + D4[s].d, 0), 2)}`) + step(`: ${m.nb.length}`, '≈ ' + num(m.ad, 2), 'sum') : step('соседи не выбраны', '—')) + `</div>`;
+  h += `<h3>Высший оксид</h3><div class="steps">` + step('номер группы', sv ? ROM[t.g] : '? — посмотрите на заголовок столбца') +
+    step('высшая валентность', sv ? ROM[t.g] : '= номеру группы') + step('кислород', 'II') + step('формула', sv ? oxTxt(t.ox) : m.ox ? oxTxt(m.ox) + ' — неверно' : '?', 'sum') + `</div>`;
+  if (sv && m.nb.length === 4) {
+    const r = D4[m.tgt], e1 = (m.am - r.m) / r.m * 100, e2 = (m.ad - r.d) / r.d * 100;
+    h += `<h3>Сверяем с открытием</h3><div class="steps">${step('открыт', `${t.year} · ${t.who}`)}${step('масса: ваш прогноз / факт', `${num(m.am, 1)} / ${num(r.m, 2)}`)}${step('ошибка массы', (e1 >= 0 ? '+' : '') + num(e1, 1) + ' %')}${step('плотность: прогноз / факт', `${num(m.ad, 2)} / ${num(r.d, 2)}`)}${step('ошибка плотности', (e2 >= 0 ? '+' : '') + num(e2, 1) + ' %')}${step('прогноз Менделеева', `масса ≈ ${t.men.m}, плотность ≈ ${num(t.men.d, 1)}`, 'sum')}</div>`;
+  }
+  return h;
+}
+
+function renderMeter(m) {
+  const el = $('#meter');
+  if (m.kind === 'law') el.innerHTML = `<div class="k">Ровные столбцы</div><div class="v ${S.done.law ? 'ok' : ''}">${m.okCols} из ${m.maxLen}</div><div class="gauge"><b style="width:${(m.okCols / m.maxLen * 100).toFixed(1)}%"></b></div><div class="lr"><span>строк</span><span>${m.rows.length}</span></div><div class="lr"><span>порядок</span><span>${m.order === 'z' ? 'Z' : 'масса'}</span></div>`;
+  else if (m.kind === 'pg') el.innerHTML = `<div class="k">Атом-загадка</div><div class="v ${m.cur ? '' : 'ok'}">${m.cur ? 'заряд +' + m.cur.z : 'все найдены'}</div><div class="gauge"><b style="width:${(m.found / MYST.length * 100).toFixed(1)}%"></b></div><div class="lr"><span>найдено</span><span>${m.found} из ${MYST.length}</span></div><div class="lr"><span>ошибок</span><span>${S.wrong2}</span></div>`;
+  else if (m.kind === 'met') el.innerHTML = `<div class="k">Раскраска</div><div class="v ${m.painted === E.length ? 'ok' : ''}">${m.painted} из ${E.length}</div><div class="gauge"><b style="width:${(m.painted / E.length * 100).toFixed(1)}%"></b></div><div class="lr"><span>ошибок</span><span>${S.wrong3}</span></div>`;
+  else el.innerHTML = `<div class="k">${m.t.ekaS}</div><div class="v ${m.solved ? 'ok' : ''}">${m.solved ? m.tgt + ' · ' + D4[m.tgt].n : 'соседей ' + m.nb.length + '/4'}</div><div class="lr"><span>масса ≈</span><span>${m.am ? num(m.am, 1) : '—'}</span></div><div class="lr"><span>плотн. ≈</span><span>${m.ad ? num(m.ad, 2) : '—'}</span></div><div class="lr"><span>оксид</span><span>${m.ox ? oxTxt(m.ox) : '?'}</span></div>`;
+}
+
+function update() {
+  const m = model(), L = LESSONS[S.lesson];
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Периодическая система освоена!');
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  law: '<rect x="4" y="5" width="9" height="9" rx="2" fill="#c08cf0" fill-opacity=".5"/><rect x="14" y="5" width="9" height="9" rx="2" fill="#6fd0b0" fill-opacity=".5"/><rect x="24" y="5" width="9" height="9" rx="2" fill="#9fb4d8" fill-opacity=".5"/><path d="M36 3v12" stroke="#ffb547" stroke-dasharray="2 2"/><rect x="4" y="17" width="9" height="9" rx="2" fill="#c08cf0" fill-opacity=".5"/><rect x="14" y="17" width="9" height="9" rx="2" fill="#6fd0b0" fill-opacity=".5"/><rect x="24" y="17" width="9" height="9" rx="2" fill="#9fb4d8" fill-opacity=".5"/>',
+  pg: '<circle cx="14" cy="15" r="4" fill="#e5533f"/><circle cx="14" cy="15" r="10" fill="none" stroke="#ffb547"/><path d="M30 4h32M30 12h32M30 20h32M30 28h32M30 4v24M38 4v24M46 4v24M54 4v24M62 4v24" stroke="#3a4762"/><rect x="38" y="12" width="8" height="8" fill="#86e0a8" fill-opacity=".5"/>',
+  metals: '<rect x="4" y="4" width="12" height="10" rx="2" fill="#b5c0d3" fill-opacity=".6"/><rect x="4" y="16" width="12" height="10" rx="2" fill="#b5c0d3" fill-opacity=".6"/><rect x="18" y="16" width="12" height="10" rx="2" fill="#b5c0d3" fill-opacity=".6"/><rect x="32" y="4" width="12" height="10" rx="2" fill="#6cc96f" fill-opacity=".6"/><rect x="32" y="16" width="12" height="10" rx="2" fill="#6cc96f" fill-opacity=".6"/><rect x="46" y="4" width="12" height="10" rx="2" fill="#6cc96f" fill-opacity=".6"/><path d="M31 2v12h0" stroke="#ffb547" stroke-width="1.6"/>',
+  predict: '<rect x="27" y="2" width="12" height="8" rx="2" fill="none" stroke="#72d4e8"/><rect x="27" y="20" width="12" height="8" rx="2" fill="none" stroke="#72d4e8"/><rect x="12" y="11" width="12" height="8" rx="2" fill="none" stroke="#72d4e8"/><rect x="42" y="11" width="12" height="8" rx="2" fill="none" stroke="#72d4e8"/><rect x="27" y="11" width="12" height="8" rx="2" fill="none" stroke="#ffb547"/><text x="33" y="17.5" font-size="7" fill="#ffb547" text-anchor="middle">?</text>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i], init = JSON.parse(JSON.stringify(L.init || {}));
+  S.lesson = i; S.hl = null; drag = null;
+  S.order = 'z'; S.cuts = []; S.mi = 0; S.placed = {}; S.wrong2 = 0; S.brush = 'm'; S.paint = {}; S.sel3 = null; S.wrong3 = 0; S.tgt = 'Ga'; S.pr = fresh4(); S.wrong4 = 0;
+  Object.assign(S, init);
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '';
+  if (id === 'law') now = `Лента из первых 20 элементов (H … Ca), упорядоченная ${m.order === 'z' ? 'по заряду ядра' : 'по атомной массе (аргон и калий поменялись местами)'}. Плитки окрашены по группам. Ученик режет ленту на строки: сейчас строк ${m.rows.length}: ${m.rows.map(r => r.map(x => x.s).join(' ')).join(' | ')}. Ровных столбцов (все элементы столбца из одной группы): ${m.okCols} из ${m.maxLen}. Цель — сложить строки так, чтобы похожие элементы встали в столбцы. Не называй, после каких элементов резать, — спрашивай, где снова появляется элемент, похожий на литий.`;
+  if (id === 'pg') now = m.cur ? `Атом-загадка ${S.mi + 1} из ${MYST.length}: заряд ядра +${m.cur.z}, электронная схема на рисунке (слои по ${m.cur.sh.join(', ')}). Ученик должен поставить атом в клетку таблицы первых 20 элементов. Уже найдены: ${MYST.filter(z => S.placed[z]).map(z => EZ(z).s).join(', ') || 'никто'}. Ошибок: ${S.wrong2}. Не называй элемент и клетку — спрашивай, сколько слоёв и сколько электронов на внешнем слое и что это значит.` : 'Все пять атомов-загадок поставлены в таблицу верно.';
+  if (id === 'metals') now = `Таблица первых 20 элементов, ученик раскрашивает металлы и неметаллы. Раскрашено ${m.painted} из 20, ошибок ${S.wrong3}. Уже верно: ${E.filter(x => S.paint[x.z]).map(x => `${x.s} — ${S.paint[x.z] === 'm' ? 'металл' : 'неметалл'}`).join(', ') || 'ничего'}. ${m.sel ? `Выбран элемент ${m.sel.s} (${m.sel.name}), строение ${m.sel.sh.join(', ')}.` : ''} Не называй ответы для нераскрашенных элементов — спрашивай про место в таблице и число внешних электронов.`;
+  if (id === 'predict') now = `Фрагмент таблицы (периоды 3–5, группы IIB–VA) с атомными массами и плотностями. Неизвестный элемент: ${m.t.eka} (клетка «?»). Выбраны соседи: ${m.nb.join(', ') || 'никто'}${m.nb.length ? `; среднее: масса ≈ ${m.am.toFixed(2)}, плотность ≈ ${m.ad.toFixed(2)} г/см³` : ''}. Формула высшего оксида выбрана: ${m.ox ? m.ox.replace(/E/g, 'Э') : 'нет'}. Экаалюминий ${solved4(S.pr, 'Ga') ? 'предсказан' : 'не готов'}, экасилиций ${solved4(S.pr, 'Ge') ? 'предсказан' : 'не готов'}. ${m.solved ? `Элемент раскрыт: ${D4[m.tgt].n}.` : 'Не называй соседей и формулу оксида — подводи вопросами (соседи по стороне клетки; номер группы = высшая валентность).'}`;
+  return [
+    `Предмет: химия, 8 класс. Тема «Периодическая система». Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Веди ученика наводящими вопросами, а не готовыми ответами.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = { law: 'Почему сегодня элементы ставят по заряду ядра, а не по массе?', pg: 'Как по номеру группы узнать число внешних электронов?', metals: 'Почему водород в группе I, но не металл?', predict: 'Как Менделеев угадал свойства галлия?' }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

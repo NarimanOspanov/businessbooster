@@ -1,0 +1,900 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по физике, 7 класс: механическая работа, мощность, кинетическая и потенциальная энергия, закон сохранения энергии.">
+<title>Работа и энергия</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene [data-click]{cursor:pointer}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.meter .lr .ok{color:var(--ok)}
+.meter .lr .bad{color:var(--warn)}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button.rec{color:var(--force)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M7 31C12 31 13 20 19 20S26 11 31 9" fill="none" stroke="var(--force)" stroke-width="2" stroke-dasharray="3 3" stroke-linecap="round"/><path d="M7 31L29 11" stroke="var(--arm)" stroke-width="2.2" stroke-linecap="round"/><path d="M33 8l-7 1.5 4.5 4.5z" fill="var(--arm)"/><circle cx="7" cy="31" r="3" fill="var(--fg)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Физика · Работа и энергия</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/">Карта</a><a href="/physics/">Физика</a><a href="/labs/phys-energy/" aria-current="page">Энергия</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Энергия</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Опытная площадка">
+    <svg class="scene" id="scene" role="img" aria-label="Площадка для опытов с работой и энергией. Предметы можно тянуть и нажимать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const nf = x => fmt(x, Math.abs(x - Math.round(x)) < 1e-9 ? 0 : 1);
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const g = 10;
+
+const LESSONS = [
+  { id: 'work', title: 'Механическая работа',
+    text: ['В физике работу совершает сила, когда тело движется под её действием. Чем больше сила и чем длиннее путь, тем больше работа.',
+           'Если сила направлена вдоль движения, работа равна силе, умноженной на путь: A = F · s. Работу измеряют в джоулях: 1 Дж = 1 Н · 1 м.',
+           'Если тело не сдвинулось, работа равна нулю, как бы сильно вы ни тянули. Работы нет и тогда, когда сила перпендикулярна движению: сила тяжести не совершает работы, пока машина едет по ровной дороге.'],
+    why: 'Инженеры считают работу, когда выбирают мотор для лифта, конвейера или крана. На больших складах в Алматы и Астане погрузчики и конвейеры двигают тысячи коробок в день, и от этой работы зависит счёт за электричество. Тренажёры в фитнес-клубе показывают работу ваших мышц в джоулях и килокалориях.',
+    task: 'Сначала попробуйте сдвинуть ящик слабой силой — 100 Н или меньше. Затем совершите работу ровно 600 Дж, протащив ящик на 4 м.',
+    hint: 'Меняйте силу кнопками − и + и тяните ящик вправо. Ящик тяжёлый: сила 100 Н и меньше его не сдвинет. Какая сила на пути 4 м даст 600 Дж?',
+    stage: 'Выберите силу и тяните ящик вправо.',
+    F0: 50, sMax: 6, Fstuck: 100, Aneed: 600, sNeed: 4,
+    check: m => m.stuck && m.hit },
+  { id: 'power', title: 'Мощность',
+    text: ['Одну и ту же работу можно сделать быстро, а можно медленно. Мощность показывает, какую работу совершают за 1 секунду.',
+           'Мощность равна работе, делённой на время: N = A / t. Её измеряют в ваттах: 1 Вт = 1 Дж / 1 с. Часто берут киловатт: 1 кВт = 1000 Вт.',
+           'Отсюда время работы t = A / N. Чем мощнее мотор, тем быстрее он сделает ту же самую работу.'],
+    why: 'Мощность написана на любом приборе: чайник — 2000 Вт, фен — 1500 Вт. Электрики подбирают по мощности провода и автоматы, чтобы проводка не перегрелась. Строители выбирают кран или лебёдку по мощности: мощная техника дороже в аренде, зато дом сдают быстрее.',
+    task: 'Груз весом 1000 Н надо поднять на 12 м. Подберите мощность мотора, чтобы подъём занял ровно 8 с, и проверьте запуском.',
+    hint: 'Сначала найдите работу: A = F · h. Потом мощность: N = A / t. Рабочий с лебёдкой слева развивает всего 200 Вт — сравните, как медленно он поднимает такой же груз.',
+    stage: 'Выберите мощность мотора и нажмите «Поднять».',
+    P: 1000, H: 12, tNeed: 8, Nw: 200, N0: 750,
+    check: m => m.ok },
+  { id: 'kinpot', title: 'Кинетическая и потенциальная энергия',
+    text: ['Энергия показывает, какую работу может совершить тело. Её измеряют, как и работу, в джоулях.',
+           'Потенциальная энергия — энергия поднятого тела: Eп = m · g · h. Чем тяжелее тело и чем выше его подняли, тем она больше. Здесь g ≈ 10 Н/кг.',
+           'Кинетическая энергия — энергия движения: Eк = m · v² / 2. Если скорость вырастет в 2 раза, энергия вырастет в 4 раза.'],
+    why: 'Капшагайская ГЭС на реке Или превращает потенциальную энергию воды, поднятой плотиной, в электричество. Ветряки под Ерейментау забирают кинетическую энергию ветра. Автоэксперты знают: на скорости 90 км/ч энергия машины в 2,25 раза больше, чем на 60 км/ч, поэтому и тормозной путь, и удар при аварии намного сильнее.',
+    task: 'Сделайте потенциальную энергию гири ровно 200 Дж. Потом разгоните тележку массой 16 кг, чтобы её кинетическая энергия тоже стала 200 Дж.',
+    hint: 'Массу гири выбирайте кнопками, высоту меняйте, перетаскивая гирю. Для тележки решите уравнение 16 · v² / 2 = 200.',
+    stage: 'Тяните гирю вверх и вниз, скорость тележки — кнопками.',
+    mc: 16, Eneed: 200, masses: [2, 3, 4], m0: 3,
+    check: m => m.ep && m.ek },
+  { id: 'cons', title: 'Сохранение энергии',
+    text: ['Когда тело падает, высота уменьшается, а скорость растёт: потенциальная энергия переходит в кинетическую.',
+           'Если сопротивления воздуха нет, полная механическая энергия Eп + Eк не меняется. Это закон сохранения энергии: энергия не исчезает и не появляется, она только переходит из одного вида в другой.',
+           'С сопротивлением воздуха часть механической энергии переходит во внутреннюю: мяч и воздух чуть-чуть нагреваются. Вся энергия вместе всё равно сохраняется.'],
+    why: 'Конструкторы аттракционов по закону сохранения энергии рассчитывают, на какую высоту поднять вагончик горки, чтобы он проехал всю трассу. Электромобили и электрички при торможении возвращают кинетическую энергию в аккумулятор или в сеть. Альпинисты и монтажники-высотники выбирают страховку, зная, какую энергию наберёт падающий человек.',
+    task: 'Выключите сопротивление воздуха и поднимите мяч массой 2 кг на такую высоту, чтобы у земли его скорость была ровно 10 м/с. Бросьте и проверьте.',
+    hint: 'У земли вся энергия — кинетическая: m · v² / 2. Вверху вся энергия — потенциальная: m · g · h. Приравняйте их. Потом включите воздух и посмотрите, куда уходит часть энергии.',
+    stage: 'Тяните мяч вверх и нажмите «Бросить».',
+    mb: 2, vNeed: 10, h0: 3,
+    check: m => m.ok },
+];
+
+const LS_KEY = 'luch-phys-energy';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+
+// ---------- geometry (SVG units; the scene is 520 × 405) ----------
+const W1 = { fl: 330, x0: 40, k: 48, w: 62, hgt: 50 };                 // lesson 1: crate, 1 m = 48 units
+const cx1 = s => W1.x0 + W1.k * s;                                      // left edge of the crate
+const gx1 = s => 150 + 40 * s, gy1 = F => 230 - F / 3;                  // F–s graph: 0…6 m, 0…300 N
+const P2 = { gy: 370, k: 18, xl: 150, xr: 370, top: 96 };             // lesson 2: lifts, 1 m = 18 units
+const y2 = h => P2.gy - P2.k * h;
+const SPEED2 = 6;                                                       // sim seconds per real second
+const K3 = { gy: 365, k: 21, x: 140 };                                  // lesson 3: kettlebell, 1 m = 21 units
+const y3 = h => K3.gy - K3.k * h;
+const C4 = { gy: 372, k: 24, x: 170, r: 12, bx: 318 };                  // lesson 4: drop tower, 1 m = 24 units
+const y4 = h => C4.gy - C4.r - C4.k * h;
+const SLOW4 = 0.55, VT4 = 16;                                           // slow motion; terminal speed with air
+
+function resetState() {
+  const Ls = L();
+  Object.assign(S, {
+    F: Ls.F0 || 50, s: 0, stuck: false, hit: false,
+    N: Ls.N0 || 750, tt: 0, run: false, fin: null, ok: false,
+    m: Ls.m0 || 3, h: 0, v: 0, ep: false, ek: false, phase: 0,
+    h0: Ls.h0 || 3, y: Ls.h0 || 3, vel: 0, fall: false, air: false, land: null, trail: [], tf: 0, hl: null,
+  });
+}
+resetState();
+
+const Ep3 = () => S.m * g * S.h, Ek3 = () => L().mc * S.v * S.v / 2;
+const Ep4 = () => L().mb * g * S.y, Ek4 = () => L().mb * S.vel * S.vel / 2, E04 = () => L().mb * g * S.h0;
+
+function model() {
+  const id = LID(), Ls = L();
+  if (id === 'work') return { kind: 'work', F: S.F, s: S.s, A: S.F * S.s, stuck: S.stuck, hit: S.hit };
+  if (id === 'power') {
+    const A = Ls.P * Ls.H, tm = A / S.N;
+    return { kind: 'power', N: S.N, A, tm, tt: S.tt, hr: Math.min(Ls.H, S.N / Ls.P * S.tt), hw: Math.min(Ls.H, Ls.Nw / Ls.P * S.tt), fin: S.fin, ok: S.ok };
+  }
+  if (id === 'kinpot') return { kind: 'kinpot', m: S.m, h: S.h, v: S.v, Ep: Ep3(), Ek: Ek3(), ep: S.ep, ek: S.ek };
+  return { kind: 'cons', h0: S.h0, y: S.y, vel: S.vel, Ep: Ep4(), Ek: Ek4(), E0: E04(), lost: Math.max(0, E04() - Ep4() - Ek4()), air: S.air, fall: S.fall, land: S.land, ok: S.ok };
+}
+
+// ---------- drawing helpers ----------
+const T = (x, y, s, fill, txt, anchor = 'middle', extra = '') => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${s}" fill="${fill}" text-anchor="${anchor}" ${extra}>${txt}</text>`;
+const halo = `paint-order="stroke" stroke="${INK}" stroke-width="3"`;
+function arrow(x1, y1, x2, y2, col, w = 3) {
+  const a = Math.atan2(y2 - y1, x2 - x1), L2 = Math.hypot(x2 - x1, y2 - y1); if (L2 < 1) return '';
+  const hx = x2 - 12 * Math.cos(a), hy = y2 - 12 * Math.sin(a);
+  const p1 = `${(hx + 6 * Math.sin(a)).toFixed(1)} ${(hy - 6 * Math.cos(a)).toFixed(1)}`, p2 = `${(hx - 6 * Math.sin(a)).toFixed(1)} ${(hy + 6 * Math.cos(a)).toFixed(1)}`;
+  return `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${hx.toFixed(1)} ${hy.toFixed(1)}" stroke="${INK}" stroke-width="${w + 2.6}" stroke-linecap="round"/><path d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${hx.toFixed(1)} ${hy.toFixed(1)}" stroke="${col}" stroke-width="${w}" stroke-linecap="round"/><path d="M${x2.toFixed(1)} ${y2.toFixed(1)}L${p1}L${p2}Z" fill="${col}" stroke="${INK}" stroke-width="1.2" stroke-linejoin="round"/>`;
+}
+function bg() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern>
+    <pattern id="hatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0V10" stroke="#2e3b57" stroke-width="3"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+const ground = y => `<rect x="-2000" y="${y}" width="4520" height="1200" fill="#151e2e"/><rect x="-2000" y="${y}" width="4520" height="12" fill="url(#hatch)"/><path d="M-2000 ${y}H2520" stroke="#3a4762" stroke-width="2"/>`;
+
+// ---------- lesson 1: crate and rope ----------
+function workScene() {
+  const Ls = L(), x = cx1(S.s), y = W1.fl;
+  let h = ground(y);
+  // ruler
+  for (let m = 0; m <= Ls.sMax; m++) h += `<path d="M${cx1(m)} ${y + 14}v8" stroke="#8b96ad" stroke-width="1.4"/>` + T(cx1(m), y + 36, 10, '#8b96ad', m + (m === Ls.sMax ? ' м' : ''));
+  for (let m = 0.5; m < Ls.sMax; m += 1) h += `<path d="M${cx1(m)} ${y + 14}v4" stroke="#8b96ad" stroke-width="1"/>`;
+  // start line and displacement
+  h += `<path d="M${cx1(0)} ${y - 70}V${y}" stroke="#86e0a8" stroke-width="1.6" stroke-dasharray="4 4"/>` + T(cx1(0), y - 76, 9, '#86e0a8', 'старт');
+  if (S.s > 0) { h += arrow(cx1(0), y + 52, x, y + 52, '#72d4e8', 2.4) + T((cx1(0) + x) / 2, y + 68, 10, '#72d4e8', `s = ${nf(S.s)} м`, 'middle', halo); }
+  // crate
+  h += `<g data-drag="crate"><rect x="${x - 10}" y="${y - W1.hgt - 14}" width="${W1.w + 20}" height="${W1.hgt + 20}" fill="transparent"/>
+    <rect x="${x}" y="${y - W1.hgt}" width="${W1.w}" height="${W1.hgt}" rx="3" fill="#a8763e" stroke="${INK}" stroke-width="2.2"/>
+    <path d="M${x + 4} ${y - W1.hgt + 4}L${x + W1.w - 4} ${y - 4}M${x + 4} ${y - 4}L${x + W1.w - 4} ${y - W1.hgt + 4}" stroke="#7a5228" stroke-width="3"/>
+    <rect x="${x + 3}" y="${y - W1.hgt + 3}" width="${W1.w - 6}" height="${W1.hgt - 6}" fill="none" stroke="#7a5228" stroke-width="3"/>
+    ${T(x + W1.w / 2, y - W1.hgt / 2 + 4, 10, '#fff2dc', '80 кг', 'middle', halo)}</g>`;
+  // force arrow (the rope pulls along the floor)
+  const fx = x + W1.w, len = 18 + S.F * 0.26;
+  if (S.F > 0) h += arrow(fx, y - 25, fx + len, y - 25, '#ffb547', 3.4) + T(fx + len / 2, y - 34, 11, '#ffb547', `F = ${S.F} Н`, 'middle', halo);
+  if (S.F > 0 && S.F <= Ls.Fstuck) h += T(x + W1.w / 2, y - W1.hgt - 12, 9.5, '#ff8a73', 'сила мала — ящик стоит', 'middle', halo);
+  // F–s graph: the work is the area of the rectangle
+  h += `<rect x="${gx1(0) - 44}" y="${gy1(300) - 26}" width="${gx1(6) - gx1(0) + 74}" height="${gy1(0) - gy1(300) + 50}" rx="10" fill="#121a28" stroke="#26324a"/>`;
+  for (let F = 0; F <= 300; F += 100) h += `<path d="M${gx1(0)} ${gy1(F)}H${gx1(6)}" stroke="#26324a"/>` + T(gx1(0) - 5, gy1(F) + 3, 8.5, '#8b96ad', F, 'end');
+  for (let m = 0; m <= 6; m += 2) h += T(gx1(m), gy1(0) + 13, 8.5, '#8b96ad', m);
+  if (S.s > 0 && S.F > 0) h += `<rect x="${gx1(0)}" y="${gy1(S.F).toFixed(1)}" width="${(gx1(S.s) - gx1(0)).toFixed(1)}" height="${(gy1(0) - gy1(S.F)).toFixed(1)}" fill="rgba(255,181,71,.3)" stroke="#ffb547" stroke-width="1.4"/>`;
+  h += `<path d="M${gx1(0)} ${gy1(S.F).toFixed(1)}H${gx1(6)}" stroke="#ffb547" stroke-width="2" ${S.s > 0 ? '' : 'stroke-dasharray="5 4"'}/>`;
+  h += `<path d="M${gx1(0)} ${gy1(0)}H${gx1(6) + 6}M${gx1(0)} ${gy1(0)}V${gy1(300) - 8}" stroke="#a9b4c9" stroke-width="1.4"/>`;
+  h += T(gx1(6) + 8, gy1(0) + 3, 9, '#a9b4c9', 's, м', 'start') + T(gx1(0) + 6, gy1(300) - 12, 9, '#a9b4c9', 'F, Н', 'start');
+  h += T(gx1(6) - 2, gy1(300) - 12, 11, S.hit ? '#86e0a8' : '#e8ecf4', `A = ${nf(S.F * S.s)} Дж`, 'end', 'font-weight="500"');
+  if (S.s > 0) h += T((gx1(0) + gx1(S.s)) / 2, (gy1(S.F) + gy1(0)) / 2 + 3, 8.5, '#ffb547', 'площадь = A', 'middle', halo);
+  return h;
+}
+
+// ---------- lesson 2: two lifts ----------
+function lift(x, hgt, col) {
+  const top = P2.top, yb = y2(hgt);
+  let h = `<path d="M${x - 42} ${P2.gy}V${top - 8}M${x + 42} ${P2.gy}V${top - 8}M${x - 50} ${top - 8}H${x + 50}" stroke="#4a5876" stroke-width="5" stroke-linecap="round"/>`;
+  h += `<path d="M${x - 42} ${P2.gy - 60}L${x + 42} ${P2.gy - 120}M${x + 42} ${P2.gy - 60}L${x - 42} ${P2.gy - 120}" stroke="#2e3b57" stroke-width="2"/>`;
+  h += `<circle cx="${x}" cy="${top + 4}" r="10" fill="#26324a" stroke="#a9b4c9" stroke-width="2"/><circle cx="${x}" cy="${top + 4}" r="2.5" fill="#a9b4c9"/>`;
+  h += `<path d="M${x} ${top + 4}V${(yb - 36).toFixed(1)}" stroke="#d8c7a0" stroke-width="2"/>`;
+  h += `<rect x="${x - 26}" y="${(yb - 36).toFixed(1)}" width="52" height="36" rx="3" fill="${col}" stroke="${INK}" stroke-width="2"/>` + T(x, yb - 14, 10, INK, '1000 Н', 'middle', 'font-weight="500"');
+  return h;
+}
+function powerScene() {
+  const Ls = L(), m = model();
+  let h = ground(P2.gy);
+  // height ruler
+  const rx = (P2.xl + P2.xr) / 2;
+  h += `<path d="M${rx} ${P2.gy}V${y2(Ls.H)}" stroke="#8b96ad" stroke-width="1.4"/>`;
+  for (let k = 0; k <= Ls.H; k += 2) h += `<path d="M${rx - 5} ${y2(k)}h10" stroke="#8b96ad" stroke-width="1.4"/>` + T(rx + 9, y2(k) + 3, 9, '#8b96ad', k + (k === Ls.H ? ' м' : ''), 'start');
+  h += `<path d="M${P2.xl - 50} ${y2(Ls.H) - 0.5}H${rx - 8}M${rx + 40} ${y2(Ls.H) - 0.5}H${P2.xr + 50}" stroke="#86e0a8" stroke-width="1.2" stroke-dasharray="6 5"/>`;
+  h += lift(P2.xl, m.hw, '#8b96ad') + lift(P2.xr, m.hr, '#ffb547');
+  // worker with winch (left) and motor (right)
+  const wx = P2.xl - 82, gy = P2.gy;
+  h += `<path d="M${P2.xl - 10} ${P2.top + 4}L${wx + 16} ${gy - 20}" stroke="#d8c7a0" stroke-width="1.6"/>`;
+  h += `<rect x="${wx + 6}" y="${gy - 28}" width="20" height="28" rx="3" fill="#4a5876" stroke="${INK}" stroke-width="1.6"/><circle cx="${wx + 16}" cy="${gy - 20}" r="5" fill="#a9b4c9"/>`;
+  h += `<circle cx="${wx - 12}" cy="${gy - 50}" r="7" fill="#f2c9a0" stroke="${INK}" stroke-width="1.4"/><path d="M${wx - 12} ${gy - 43}V${gy - 18}M${wx - 12} ${gy - 18}l-6 18M${wx - 12} ${gy - 18}l6 18M${wx - 12} ${gy - 36}L${wx + 12} ${gy - 24}" stroke="#72d4e8" stroke-width="4" stroke-linecap="round"/>`;
+  const mx = P2.xr + 62;
+  h += `<path d="M${P2.xr + 10} ${P2.top + 4}L${mx + 18} ${gy - 18}" stroke="#d8c7a0" stroke-width="1.6"/>`;
+  h += `<rect x="${mx}" y="${gy - 30}" width="40" height="30" rx="4" fill="#3c6f8a" stroke="${INK}" stroke-width="1.8"/><path d="M${mx + 6} ${gy - 24}h28M${mx + 6} ${gy - 18}h28M${mx + 6} ${gy - 12}h28" stroke="#72d4e8" stroke-width="1.4"/><circle cx="${mx + 18}" cy="${gy - 18}" r="4" fill="#ffb547" stroke="${INK}"/>`;
+  // labels
+  h += T(P2.xl - 30, gy + 26, 10.5, '#a9b4c9', `рабочий · ${Ls.Nw} Вт`) + T(P2.xl - 30, gy + 42, 10, '#8b96ad', `h = ${fmt(m.hw, 1)} м`);
+  h += T(P2.xr + 30, gy + 26, 10.5, '#ffb547', `мотор · ${S.N} Вт`) + T(P2.xr + 30, gy + 42, 10, m.ok ? '#86e0a8' : '#8b96ad', `h = ${fmt(m.hr, 1)} м`);
+  h += `<rect x="${rx - 55}" y="${y2(Ls.H) - 52}" width="110" height="36" rx="8" fill="#121a28" stroke="#3a4762"/>` + T(rx, y2(Ls.H) - 28, 15, m.ok ? '#86e0a8' : '#e8ecf4', `t = ${fmt(S.tt, 1)} с`, 'middle', 'font-weight="500"');
+  return h;
+}
+
+// ---------- lesson 3: kettlebell and cart ----------
+function kettle(x, yb, m) {
+  const r = 11 + m * 2.2, cy = yb - r;
+  return `<path d="M${x - r * 0.55} ${cy - r * 0.7}C${x - r * 0.6} ${cy - r * 1.7} ${x + r * 0.6} ${cy - r * 1.7} ${x + r * 0.55} ${cy - r * 0.7}" fill="none" stroke="${INK}" stroke-width="8"/><path d="M${x - r * 0.55} ${cy - r * 0.7}C${x - r * 0.6} ${cy - r * 1.7} ${x + r * 0.6} ${cy - r * 1.7} ${x + r * 0.55} ${cy - r * 0.7}" fill="none" stroke="#5d6a86" stroke-width="5"/>
+    <circle cx="${x}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}" fill="#5d6a86" stroke="${INK}" stroke-width="2.2"/>` + T(x, cy + 4, 10, '#e8ecf4', `${m} кг`, 'middle', 'font-weight="500"');
+}
+function kinpotScene() {
+  const Ls = L(), gy = K3.gy;
+  let h = ground(gy);
+  // ruler and shelf
+  const rx = 72;
+  h += `<path d="M${rx} ${gy}V${y3(10) - 6}" stroke="#8b96ad" stroke-width="1.4"/>`;
+  for (let k = 0; k <= 10; k++) h += `<path d="M${rx - (k % 2 ? 3 : 6)} ${y3(k)}h${k % 2 ? 6 : 12}" stroke="#8b96ad" stroke-width="1.2"/>` + (k % 2 ? '' : T(rx - 9, y3(k) + 3, 9, '#8b96ad', k + (k === 10 ? ' м' : ''), 'end'));
+  const yb = y3(S.h);
+  h += `<rect x="${rx + 8}" y="${(yb).toFixed(1)}" width="${K3.x - rx + 34}" height="5" fill="#4a5876" stroke="${INK}" stroke-width="1"/>`;
+  if (S.h > 0) h += `<path d="M${K3.x + 48} ${(yb + 5).toFixed(1)}V${gy}" stroke="#72d4e8" stroke-width="1.4" stroke-dasharray="4 4"/>` + T(K3.x + 54, (yb + gy) / 2 + 3, 10, '#72d4e8', `h = ${nf(S.h)} м`, 'start', halo);
+  h += `<g data-drag="kb"><rect x="${K3.x - 40}" y="${(yb - 70).toFixed(1)}" width="80" height="76" fill="transparent"/>${kettle(K3.x, yb, S.m)}</g>`;
+  h += T(K3.x, yb - 26 - S.m * 4.4 - 14, 11, S.ep ? '#86e0a8' : '#72d4e8', `Eп = ${nf(Ep3())} Дж`, 'middle', halo);
+  // cart on a track
+  const x0 = 300, cw = 96, cy = gy - 22;
+  const ph = S.phase;
+  for (let i = -1; i < 12; i++) { const xx = 250 + ((i * 26 - ph * 21) % 312 + 312) % 312; h += `<path d="M${xx.toFixed(1)} ${gy + 6}h12" stroke="#3a4762" stroke-width="3"/>`; }
+  h += `<rect x="${x0}" y="${cy - 30}" width="${cw}" height="30" rx="5" fill="#ffb547" stroke="${INK}" stroke-width="2.2"/>` + T(x0 + cw / 2, cy - 11, 10, INK, `${Ls.mc} кг`, 'middle', 'font-weight="500"');
+  for (const wx of [x0 + 20, x0 + cw - 20]) {
+    const a = -ph * 1.75;
+    h += `<circle cx="${wx}" cy="${cy + 9}" r="12" fill="#2a3348" stroke="${INK}" stroke-width="2"/><path d="M${(wx + 9 * Math.cos(a)).toFixed(1)} ${(cy + 9 + 9 * Math.sin(a)).toFixed(1)}L${(wx - 9 * Math.cos(a)).toFixed(1)} ${(cy + 9 - 9 * Math.sin(a)).toFixed(1)}M${(wx + 9 * Math.sin(a)).toFixed(1)} ${(cy + 9 - 9 * Math.cos(a)).toFixed(1)}L${(wx - 9 * Math.sin(a)).toFixed(1)} ${(cy + 9 + 9 * Math.cos(a)).toFixed(1)}" stroke="#8b96ad" stroke-width="1.6"/>`;
+  }
+  if (S.v > 0) h += arrow(x0 + cw + 4, cy - 15, x0 + cw + 10 + S.v * 7, cy - 15, '#ffb547', 3) + T(x0 + cw + 10, cy - 26, 10, '#ffb547', `v = ${S.v} м/с`, 'start', halo);
+  h += T(x0 + cw / 2, cy - 48, 11, S.ek ? '#86e0a8' : '#ffb547', `Eк = ${nf(Ek3())} Дж`, 'middle', halo);
+  return h;
+}
+
+// ---------- lesson 4: drop and energy bars ----------
+function consScene() {
+  const m = model(), gy = C4.gy;
+  let h = ground(gy);
+  const rx = 110;
+  h += `<path d="M${rx} ${gy}V${y4(10) + C4.r - 8}" stroke="#8b96ad" stroke-width="1.4"/>`;
+  for (let k = 0; k <= 10; k++) h += `<path d="M${rx - (k % 2 ? 3 : 6)} ${y4(k) + C4.r}h${k % 2 ? 6 : 12}" stroke="#8b96ad" stroke-width="1.2"/>` + (k % 2 ? '' : T(rx - 9, y4(k) + C4.r + 3, 9, '#8b96ad', k + (k === 10 ? ' м' : ''), 'end'));
+  // start mark
+  h += `<path d="M${rx + 8} ${y4(S.h0) + C4.r}H${C4.x + 40}" stroke="#86e0a8" stroke-width="1.2" stroke-dasharray="4 4"/>` + T(C4.x + 44, y4(S.h0) + C4.r + 3, 9.5, '#86e0a8', `h = ${nf(S.h0)} м`, 'start', halo);
+  for (const p of S.trail) h += `<circle cx="${C4.x}" cy="${y4(p).toFixed(1)}" r="${C4.r}" fill="none" stroke="#ffb547" stroke-width="1" opacity=".35"/>`;
+  const by = y4(S.y);
+  h += `<g data-drag="ball"><rect x="${C4.x - 34}" y="${(by - 34).toFixed(1)}" width="68" height="68" fill="transparent"/><circle cx="${C4.x}" cy="${by.toFixed(1)}" r="${C4.r}" fill="#ff8a73" stroke="${INK}" stroke-width="2.2"/><path d="M${C4.x - 8} ${(by - 4).toFixed(1)}q8 6 16 0" fill="none" stroke="${INK}" stroke-width="1.4"/></g>`;
+  if (S.vel > 0.05) h += arrow(C4.x + 22, by - 6, C4.x + 22, by - 6 + 10 + S.vel * 4, '#ffb547', 2.6) + T(C4.x + 30, by + 8, 10, '#ffb547', `v = ${fmt(S.vel, 1)} м/с`, 'start', halo);
+  if (S.land) h += T(C4.x, gy + 30, 10.5, S.ok ? '#86e0a8' : '#e8ecf4', `у земли: ${fmt(S.land.v, 1)} м/с`, 'middle', halo);
+  // bars, 200 J = 200 units
+  const bars = [['Eп', m.Ep, '#72d4e8', 'ep'], ['Eк', m.Ek, '#ffb547', 'ek'], ['Eп + Eк', m.Ep + m.Ek, '#86e0a8', 'sum'], ['тепло', m.lost, '#ff8a73', 'heat']];
+  h += `<path d="M${C4.bx - 10} ${gy - 200}H${C4.bx + 180}" stroke="#3a4762" stroke-dasharray="3 4"/>` + T(C4.bx - 14, gy - 197, 8.5, '#8b96ad', '200 Дж', 'end');
+  bars.forEach(([lab, v, col], i) => {
+    const x = C4.bx + i * 44, hh = clamp(v, 0, 220);
+    h += `<rect x="${x}" y="${(gy - hh).toFixed(1)}" width="30" height="${hh.toFixed(1)}" fill="${col}" opacity="${lab === 'тепло' && !S.air ? .25 : .9}" stroke="${INK}" stroke-width="1.2"/>`;
+    h += T(x + 15, gy - hh - 6, 9.5, col, nf(Math.round(v)), 'middle', halo) + T(x + 15, gy + 26, 9, col, lab);
+  });
+  h += T(C4.bx + 80, gy + 44, 9.5, '#8b96ad', S.air ? 'воздух включён' : 'без сопротивления воздуха');
+  return h;
+}
+
+function hlBox(id) {
+  const lid = LID();
+  if (lid === 'work') { const x = cx1(S.s); return ({ crate: [x - 6, W1.fl - W1.hgt - 6, W1.w + 12, W1.hgt + 12], force: [x + W1.w, W1.fl - 46, 110, 34], ruler: [cx1(0) - 10, W1.fl + 8, cx1(6) - cx1(0) + 30, 36], disp: [cx1(0) - 6, W1.fl + 40, Math.max(40, x - cx1(0) + 12), 36], graph: [gx1(0) - 44, gy1(300) - 26, gx1(6) - gx1(0) + 74, gy1(0) - gy1(300) + 50] })[id]; }
+  if (lid === 'power') return ({ motor: [P2.xr + 54, P2.gy - 38, 56, 44], load: [P2.xr - 34, y2(model().hr) - 44, 68, 52], worker: [P2.xl - 110, P2.gy - 62, 82, 66], ruler: [(P2.xl + P2.xr) / 2 - 10, y2(12) - 6, 46, 18 * 12 + 12], timer: [(P2.xl + P2.xr) / 2 - 59, y2(12) - 56, 118, 44] })[id];
+  if (lid === 'kinpot') return ({ kb: [K3.x - 34, y3(S.h) - 62, 68, 66], ruler: [50, y3(10) - 10, 36, 21 * 10 + 20], cart: [294, K3.gy - 58, 108, 54], arrow: [398, K3.gy - 56, 90, 36], track: [250, K3.gy - 4, 270, 16] })[id];
+  return ({ ball: [C4.x - 18, y4(S.y) - 18, 36, 36], ruler: [86, y4(10) - 4, 36, 24 * 10 + 30], bep: [C4.bx - 4, C4.gy - 206, 38, 212], bek: [C4.bx + 40, C4.gy - 206, 38, 212], bsum: [C4.bx + 84, C4.gy - 206, 38, 212], heat: [C4.bx + 128, C4.gy - 206, 38, 212] })[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = bg();
+  if (id === 'work') h += workScene();
+  else if (id === 'power') h += powerScene();
+  else if (id === 'kinpot') h += kinpotScene();
+  else h += consScene();
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// fit the scene: 520 × 405 units, centred, content at the bottom
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 520, hh / 430, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 425 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  if (el.dataset.drag === 'ball' && S.fall) return;
+  const p = toSvg(e);
+  drag = { id: el.dataset.drag, ox: p.x - cx1(S.s), oy: 0, warned: false };
+  if (drag.id === 'kb') drag.oy = p.y - y3(S.h);
+  if (drag.id === 'ball') drag.oy = p.y - y4(S.h0);
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const p = toSvg(e);
+  if (drag.id === 'crate') pullCrate((p.x - drag.ox - W1.x0) / W1.k);
+  else if (drag.id === 'kb') setH3((K3.gy - (p.y - drag.oy)) / K3.k);
+  else if (drag.id === 'ball') setH0((C4.gy - C4.r - (p.y - drag.oy)) / C4.k);
+});
+const endDrag = () => { if (!drag) return; drag = null; scene.classList.remove('grabbing'); dirty = true; };
+scene.addEventListener('pointerup', endDrag);
+scene.addEventListener('pointercancel', endDrag);
+
+// lesson 1
+function pullCrate(s) {
+  const Ls = L();
+  s = clamp(Math.round(s * 2) / 2, 0, Ls.sMax);
+  if (s <= S.s) return;
+  if (S.F <= Ls.Fstuck) {
+    if (!drag || !drag.warned) toast(S.F === 0 ? 'Без силы ящик сам не поедет.' : `Тянем с силой ${S.F} Н, а ящик стоит: s = 0, значит A = 0.`);
+    if (drag) drag.warned = true;
+    if (S.F > 0) S.stuck = true;
+    update(); return;
+  }
+  S.s = s;
+  if (!S.hit && S.s === Ls.sNeed && S.F * S.s === Ls.Aneed) { S.hit = true; toast(`${S.F} Н × ${Ls.sNeed} м = ${Ls.Aneed} Дж. Есть!`); }
+  else if (S.s === Ls.sNeed && !S.hit) toast(`На 4 м работа ${nf(S.F * S.s)} Дж, а нужно ${Ls.Aneed} Дж. Нажмите «Сброс» и поменяйте силу.`);
+  update();
+}
+function setF(F) {
+  F = clamp(Math.round(F / 25) * 25, 0, 300); if (F === S.F) return;
+  S.F = F; S.s = 0; renderTools(); update();
+}
+// lesson 2
+function setN(N) {
+  N = clamp(Math.round(N / 250) * 250, 500, 3000); if (N === S.N) return;
+  S.N = N; S.tt = 0; S.run = false; S.fin = null; renderTools(); update();
+}
+// lesson 3
+function setH3(h) {
+  h = clamp(Math.round(h * 2) / 2, 0, 10); if (h === S.h) return;
+  S.h = h; checkE(); update();
+}
+function setV3(v) {
+  v = clamp(Math.round(v), 0, 10); if (v === S.v) return;
+  S.v = v; checkE(); renderTools(); update();
+}
+function setM3(m) { if (m === S.m) return; S.m = m; checkE(); renderTools(); update(); }
+function checkE() {
+  const Ls = L();
+  if (!S.ep && Math.abs(Ep3() - Ls.Eneed) < 1e-9) { S.ep = true; toast(`Eп = ${S.m} × 10 × ${nf(S.h)} = 200 Дж. Теперь тележка.`); }
+  if (!S.ek && Math.abs(Ek3() - Ls.Eneed) < 1e-9) { S.ek = true; toast(`Eк = 16 × ${S.v}² / 2 = 200 Дж!`); }
+}
+// lesson 4
+function setH0(h) {
+  if (S.fall) return;
+  h = clamp(Math.round(h * 2) / 2, 0.5, 10); if (h === S.h0 && S.y === h) return;
+  S.h0 = h; S.y = h; S.vel = 0; S.land = null; S.trail = []; update();
+}
+function drop() {
+  if (S.fall) return;
+  S.y = S.h0; S.vel = 0; S.land = null; S.trail = []; S.tf = 0; S.fall = true; renderTools();
+  if (reduce) { while (S.fall) stepFall(0.02); }
+}
+function stepFall(dt) {
+  // integrate in small steps; without air the motion is exact free fall
+  const n = Math.max(1, Math.ceil(dt / 0.002)), h = dt / n;
+  for (let i = 0; i < n && S.fall; i++) {
+    const a = S.air ? g * (1 - S.vel * S.vel / (VT4 * VT4)) : g;
+    S.y -= S.vel * h + a * h * h / 2; S.vel += a * h; S.tf += h;
+    if (Math.floor(S.tf / 0.12) > S.trail.length - 1 && S.trail.length < 30) S.trail.push(S.y);
+    if (S.y <= 0) {
+      if (!S.air) S.vel = Math.sqrt(2 * g * S.h0);
+      S.y = 0; S.fall = false; landed();
+    }
+  }
+}
+function landed() {
+  const Ls = L();
+  S.land = { v: S.vel, air: S.air, h0: S.h0 };
+  if (!S.air && S.h0 * 2 * g === Ls.vNeed * Ls.vNeed) { S.ok = true; toast(`Удар со скоростью ${Ls.vNeed} м/с: ${Ls.mb * g * S.h0} Дж потенциальной энергии стали кинетической.`); }
+  else if (S.air) toast(`С воздухом: ${fmt(S.vel, 1)} м/с. Часть энергии ушла в тепло.`);
+  else toast(`У земли ${fmt(S.vel, 1)} м/с, а нужно ${Ls.vNeed} м/с. Нужно ${S.vel > Ls.vNeed ? 'ниже' : 'выше'}.`);
+  renderTools(); update();
+}
+
+let last = performance.now();
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  const id = LID();
+  if (id === 'power' && S.run) {
+    const Ls = L(), tm = Ls.P * Ls.H / S.N;
+    S.tt += reduce ? 1e9 : dt * SPEED2;
+    if (S.tt >= tm) { S.tt = tm; S.run = false; finishLift(); }
+    update();
+  }
+  if (id === 'kinpot' && S.v > 0 && !reduce) { S.phase += dt * S.v; dirty = true; }
+  if (id === 'cons' && S.fall) { stepFall(dt * SLOW4); update(); }
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+function finishLift() {
+  const Ls = L(), tm = Ls.P * Ls.H / S.N;
+  S.fin = { N: S.N, t: tm, hw: Ls.Nw / Ls.P * tm };
+  if (Math.abs(tm - Ls.tNeed) < 1e-9) { S.ok = true; toast(`Ровно ${Ls.tNeed} с! Рабочий за это время поднял груз всего на ${fmt(S.fin.hw, 1)} м.`); }
+  else toast(`Подъём занял ${fmt(tm, 1)} с, а нужно ${Ls.tNeed} с. Мотор нужен ${tm > Ls.tNeed ? 'мощнее' : 'слабее'}.`);
+  renderTools();
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3200); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, cls) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}${cls ? ` class="${cls}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  let h = '';
+  if (id === 'work') h = B('F-', '− 25 Н') + B('F+', '+ 25 Н') + sep + B('pull', 'Тянуть 0,5 м', undefined, 'rec') + B('reset', 'Сброс');
+  if (id === 'power') h = B('N-', '− 250 Вт') + B('N+', '+ 250 Вт') + sep + B('go', S.run ? 'Поднимаем…' : 'Поднять', undefined, 'rec') + B('reset', 'Сброс');
+  if (id === 'kinpot') h = L().masses.map(m => B('m-' + m, m + ' кг', S.m === m)).join('') + sep + B('h-', 'h −') + B('h+', 'h +') + sep + B('v-', 'v −') + B('v+', 'v +');
+  if (id === 'cons') h = B('h0-', 'h −') + B('h0+', 'h +') + sep + B('drop', S.fall ? 'Летит…' : 'Бросить', undefined, 'rec') + B('air', 'Воздух', S.air) + B('reset', 'Сброс');
+  tb.innerHTML = h;
+}
+function act(a) {
+  const id = LID();
+  if (a === 'reset') {
+    if (id === 'work') S.s = 0;
+    if (id === 'power') { S.tt = 0; S.run = false; S.fin = null; }
+    if (id === 'cons') { if (S.fall) return; S.y = S.h0; S.vel = 0; S.land = null; S.trail = []; }
+    renderTools(); update(); return;
+  }
+  if (a === 'F-' || a === 'F+') return setF(S.F + (a === 'F-' ? -25 : 25));
+  if (a === 'pull') return pullCrate(S.s + 0.5);
+  if (a === 'N-' || a === 'N+') return setN(S.N + (a === 'N-' ? -250 : 250));
+  if (a === 'go') { if (S.run) return; S.tt = 0; S.fin = null; S.run = true; renderTools(); return; }
+  if (a.startsWith('m-')) return setM3(+a.slice(2));
+  if (a === 'h-' || a === 'h+') return setH3(S.h + (a === 'h-' ? -0.5 : 0.5));
+  if (a === 'v-' || a === 'v+') return setV3(S.v + (a === 'v-' ? -1 : 1));
+  if (a === 'h0-' || a === 'h0+') return setH0(S.h0 + (a === 'h0-' ? -0.5 : 0.5));
+  if (a === 'drop') return drop();
+  if (a === 'air') { if (S.fall) return; S.air = !S.air; S.y = S.h0; S.vel = 0; S.land = null; S.trail = []; renderTools(); buildScheme(); update(); return; }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  crate: IC('<rect x="5" y="8" width="24" height="20" rx="2" fill="#a8763e"/><path d="M7 10l20 16M7 26l20-16" stroke="#7a5228" stroke-width="2.4"/>'),
+  force: IC('<path d="M3 17h22" stroke="#ffb547" stroke-width="3"/><path d="M31 17l-9-5v10z" fill="#ffb547"/>'),
+  ruler: IC('<path d="M2 14h30" stroke="var(--muted)" stroke-width="2"/><path d="M4 14v8M12 14v5M20 14v8M28 14v5" stroke="var(--muted)" stroke-width="1.6"/>'),
+  disp: IC('<path d="M3 17h22" stroke="#72d4e8" stroke-width="2.4"/><path d="M31 17l-8-4.5v9z" fill="#72d4e8"/><path d="M3 11v12" stroke="#86e0a8" stroke-width="2"/>'),
+  graph: IC('<path d="M5 3v26h26" fill="none" stroke="var(--fg)" stroke-width="1.6"/><rect x="6" y="12" width="17" height="16" fill="rgba(255,181,71,.4)" stroke="#ffb547"/>'),
+  motor: IC('<rect x="5" y="9" width="24" height="18" rx="3" fill="#3c6f8a"/><path d="M9 14h16M9 18h16M9 22h16" stroke="#72d4e8" stroke-width="1.4"/>'),
+  load: IC('<path d="M17 2v9" stroke="#d8c7a0" stroke-width="2"/><rect x="6" y="11" width="22" height="18" rx="2" fill="#ffb547"/>'),
+  worker: IC('<circle cx="12" cy="7" r="4" fill="#f2c9a0"/><path d="M12 11v11l-4 9M12 22l4 9M12 15l12 6" stroke="#72d4e8" stroke-width="3" stroke-linecap="round"/><rect x="22" y="18" width="8" height="12" fill="#4a5876"/>'),
+  timer: IC('<circle cx="17" cy="19" r="11" fill="none" stroke="var(--fg)" stroke-width="2"/><path d="M17 19V12M14 4h6" stroke="#ffb547" stroke-width="2.4"/>'),
+  kb: IC('<path d="M11 12C10 3 24 3 23 12" fill="none" stroke="#5d6a86" stroke-width="4"/><circle cx="17" cy="20" r="10" fill="#5d6a86"/>'),
+  cart: IC('<rect x="3" y="9" width="28" height="13" rx="3" fill="#ffb547"/><circle cx="10" cy="25" r="5" fill="#2a3348"/><circle cx="24" cy="25" r="5" fill="#2a3348"/>'),
+  arrow: IC('<path d="M3 17h22" stroke="#ffb547" stroke-width="3"/><path d="M31 17l-9-5v10z" fill="#ffb547"/>'),
+  track: IC('<path d="M1 22h32" stroke="#3a4762" stroke-width="3" stroke-dasharray="6 3"/>'),
+  ball: IC('<circle cx="17" cy="17" r="11" fill="#ff8a73"/><path d="M10 15q7 6 14 0" fill="none" stroke="#04070d" stroke-width="1.4"/>'),
+  bep: IC('<rect x="10" y="6" width="14" height="24" fill="#72d4e8"/>'),
+  bek: IC('<rect x="10" y="14" width="14" height="16" fill="#ffb547"/>'),
+  bsum: IC('<rect x="10" y="6" width="14" height="24" fill="#86e0a8"/>'),
+  heat: IC('<rect x="10" y="22" width="14" height="8" fill="#ff8a73"/><path d="M14 18c-2-4 2-5 0-9M20 18c-2-4 2-5 0-9" fill="none" stroke="#ff8a73" stroke-width="1.6"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  const t = (ok, s) => `${s} ${ok ? '✓' : '—'}`;
+  if (id === 'work') return [t(m.stuck, 'Ящик не сдвинулся'), t(m.hit, '600 Дж за 4 м')].join(' · ');
+  if (id === 'power') return S.fin ? `Последний подъём: ${fmt(S.fin.t, 1)} с при ${S.fin.N} Вт` : 'Подъёма ещё не было';
+  if (id === 'kinpot') return [t(m.ep, 'Eп = 200 Дж'), t(m.ek, 'Eк = 200 Дж')].join(' · ');
+  return S.land ? `Последний бросок: с ${nf(S.land.h0)} м, у земли ${fmt(S.land.v, 1)} м/с${S.land.air ? ' (с воздухом)' : ''}` : 'Бросков ещё не было';
+}
+
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'work') h = `<h2>Тянем ящик</h2>` + slider('inF', 'Сила тяги F', 0, 300, 25, S.F) +
+      `<dl class="reads"><div><dt>сила F</dt><dd id="r1"></dd></div><div><dt>путь s</dt><dd id="r2"></dd></div><div><dt>работа A</dt><dd id="r3"></dd></div></dl>
+      <div class="row"><button class="ghostbtn" data-a="pull">Тянуть на 0,5 м</button><button class="ghostbtn" data-a="reset">Вернуть на старт</button></div>
+      <p class="note" style="margin-top:12px">Когда меняете силу, ящик возвращается на старт: в одном опыте сила постоянна. Сила трения покоя не даёт сдвинуть ящик, пока F ≤ 100 Н.</p>`;
+  if (id === 'power') h = `<h2>Подъём груза на 12 м</h2>` + slider('inN', 'Мощность мотора N', 500, 3000, 250, S.N) +
+      `<dl class="reads"><div><dt>работа A</dt><dd id="r1"></dd></div><div><dt>время мотора</dt><dd id="r2"></dd></div><div><dt>рабочему</dt><dd id="r3"></dd></div></dl>
+      <div class="row"><button class="ghostbtn" data-a="go">Поднять</button><button class="ghostbtn" data-a="reset">Сброс</button></div>
+      <p class="note" style="margin-top:12px">Время на площадке идёт в ${SPEED2} раз быстрее. Грузы поднимаются равномерно.</p>`;
+  if (id === 'kinpot') h = `<h2>Гиря и тележка</h2><div class="ctl"><div class="lbl">Масса гири</div><div class="chips">${L().masses.map(m => `<button data-a="m-${m}" aria-pressed="${S.m === m}">${m} кг</button>`).join('')}</div></div>` +
+      slider('inH', 'Высота гири h', 0, 10, 0.5, S.h) + slider('inV', 'Скорость тележки v', 0, 10, 1, S.v) +
+      `<dl class="reads"><div><dt>Eп гири</dt><dd id="r1"></dd></div><div><dt>Eк тележки</dt><dd id="r2"></dd></div><div><dt>g</dt><dd>10 Н/кг</dd></div></dl>`;
+  if (id === 'cons') h = `<h2>Падение мяча 2 кг</h2>` + slider('inH0', 'Высота броска h', 0.5, 10, 0.5, S.h0) +
+      `<div class="ctl"><div class="lbl">Сопротивление воздуха</div><div class="chips"><button data-a="${S.air ? 'air' : 'noop'}" aria-pressed="${!S.air}">выкл</button><button data-a="${S.air ? 'noop' : 'air'}" aria-pressed="${S.air}">вкл</button></div></div>
+      <dl class="reads"><div><dt>высота</dt><dd id="r1"></dd></div><div><dt>скорость</dt><dd id="r2"></dd></div><div><dt>Eп + Eк</dt><dd id="r3"></dd></div></dl>
+      <div class="row"><button class="ghostbtn" data-a="drop">Бросить</button><button class="ghostbtn" data-a="reset">Вернуть мяч</button></div>
+      <p class="note" style="margin-top:12px">Падение показано замедленно. Мяч отпускают без толчка.</p>`;
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn); };
+  on('#inF', e => setF(+e.target.value));
+  on('#inN', e => setN(+e.target.value));
+  on('#inH', e => setH3(+e.target.value));
+  on('#inV', e => setV3(+e.target.value));
+  on('#inH0', e => setH0(+e.target.value));
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => { if (b.dataset.a !== 'noop') act(b.dataset.a); if (/^m-|^air$/.test(b.dataset.a)) buildScheme(); });
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (id === 'work') { set('#inFO', S.F + ' Н'); val('#inF', S.F); set('#r1', S.F + ' Н'); set('#r2', nf(S.s) + ' м'); set('#r3', nf(m.A) + ' Дж'); }
+  if (id === 'power') { set('#inNO', S.N + ' Вт'); val('#inN', S.N); set('#r1', m.A + ' Дж'); set('#r2', fmt(m.tm, 1) + ' с'); set('#r3', fmt(m.A / L().Nw, 0) + ' с'); }
+  if (id === 'kinpot') { set('#inHO', nf(S.h) + ' м'); val('#inH', S.h); set('#inVO', S.v + ' м/с'); val('#inV', S.v); set('#r1', nf(m.Ep) + ' Дж'); set('#r2', nf(m.Ek) + ' Дж'); }
+  if (id === 'cons') { set('#inH0O', nf(S.h0) + ' м'); val('#inH0', S.h0); set('#r1', fmt(S.y, 1) + ' м'); set('#r2', fmt(S.vel, 1) + ' м/с'); set('#r3', fmt(m.Ep + m.Ek, 0) + ' Дж'); }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'work') return [
+    { id: 'crate', icon: ICON.crate, name: 'Ящик 80 кг', spec: 'Тело, которое мы перемещаем. Тяжёлый: слабой силой его не сдвинуть.' },
+    { id: 'force', icon: ICON.force, name: 'Сила тяги F', spec: 'Оранжевая стрелка. Направлена вдоль движения, поэтому A = F · s.' },
+    { id: 'disp', icon: ICON.disp, name: 'Путь s', spec: 'Голубая стрелка от линии старта до ящика.' },
+    { id: 'ruler', icon: ICON.ruler, name: 'Линейка на полу', spec: 'Метки через каждые 0,5 м.' },
+    { id: 'graph', icon: ICON.graph, name: 'График F(s)', spec: 'Площадь закрашенного прямоугольника F × s и есть работа.' }];
+  if (id === 'power') return [
+    { id: 'load', icon: ICON.load, name: 'Груз 1000 Н', spec: 'Его поднимают на 12 м. Работа против силы тяжести A = F · h.' },
+    { id: 'motor', icon: ICON.motor, name: 'Мотор', spec: 'Мощность выбираете вы: от 500 до 3000 Вт.' },
+    { id: 'worker', icon: ICON.worker, name: 'Рабочий с лебёдкой', spec: 'Развивает 200 Вт — для человека это уже тяжёлая работа.' },
+    { id: 'ruler', icon: ICON.ruler, name: 'Шкала высоты', spec: 'От земли до 12 м. Зелёный пунктир — цель.' },
+    { id: 'timer', icon: ICON.timer, name: 'Секундомер', spec: 'Показывает время от начала подъёма.' }];
+  if (id === 'kinpot') return [
+    { id: 'kb', icon: ICON.kb, name: 'Гиря', spec: 'Поднятое тело: у неё есть потенциальная энергия Eп = m · g · h.' },
+    { id: 'ruler', icon: ICON.ruler, name: 'Шкала высоты', spec: 'Высоту h отсчитываем от пола.' },
+    { id: 'cart', icon: ICON.cart, name: 'Тележка 16 кг', spec: 'Движущееся тело: у неё есть кинетическая энергия Eк = m · v² / 2.' },
+    { id: 'arrow', icon: ICON.arrow, name: 'Стрелка скорости', spec: 'Чем быстрее тележка, тем длиннее стрелка.' },
+    { id: 'track', icon: ICON.track, name: 'Дорога', spec: 'Ровная: высота тележки не меняется, поэтому её Eп мы не считаем.' }];
+  return [
+    { id: 'ball', icon: ICON.ball, name: 'Мяч 2 кг', spec: 'Тяните его вверх, чтобы задать высоту броска.' },
+    { id: 'ruler', icon: ICON.ruler, name: 'Шкала высоты', spec: 'От земли до 10 м.' },
+    { id: 'bep', icon: ICON.bep, name: 'Столбик Eп', spec: 'Потенциальная энергия. Убывает, пока мяч падает.' },
+    { id: 'bek', icon: ICON.bek, name: 'Столбик Eк', spec: 'Кинетическая энергия. Растёт вместе со скоростью.' },
+    { id: 'bsum', icon: ICON.bsum, name: 'Столбик Eп + Eк', spec: 'Полная механическая энергия. Без воздуха не меняется.' },
+    { id: 'heat', icon: ICON.heat, name: 'Тепло', spec: 'Энергия, ушедшая во внутреннюю из-за сопротивления воздуха.' }];
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Что на площадке</h2><p class="note">Нажмите на деталь, чтобы найти её на площадке.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID(), Ls = L();
+  if (id === 'work') {
+    return `<h2>Работа силы</h2><div class="formula">A = F · s</div><p class="note">F — сила в ньютонах, s — путь в метрах, A — работа в джоулях.</p>
+      <h3>Сейчас</h3><div class="steps">` + step('сила F', `${S.F} Н`) + step('путь s', `${nf(S.s)} м`) +
+      step('работа', `A = ${S.F} × ${nf(S.s)} = ${nf(m.A)} Дж`, 'sum') + `</div>
+      <h3>Нужно</h3><div class="steps">` + step('работа A', `${Ls.Aneed} Дж`) + step('путь s', `${Ls.sNeed} м`) + step('сила', 'F = A / s = ?', 'sum') + `</div>
+      <p class="note" style="margin-top:10px">${S.F <= Ls.Fstuck ? `При F = ${S.F} Н ящик стоит: s = 0, значит A = ${S.F} × 0 = 0 Дж.` : 'Ящик едет, сила совершает работу.'}</p>`;
+  }
+  if (id === 'power') {
+    return `<h2>Мощность</h2><div class="formula">N = A / t    t = A / N</div><p class="note">При подъёме груза работа A = F · h, где F — вес груза.</p>
+      <h3>Работа</h3><div class="steps">` + step('вес F', `${Ls.P} Н`) + step('высота h', `${Ls.H} м`) + step('A', `${Ls.P} × ${Ls.H} = ${m.A} Дж`, 'sum') + `</div>
+      <h3>Время подъёма</h3><div class="steps">` + step(`мотор ${S.N} Вт`, `${m.A} / ${S.N} = ${fmt(m.tm, 1)} с`, 'sum') + step(`рабочий ${Ls.Nw} Вт`, `${m.A} / ${Ls.Nw} = ${fmt(m.A / Ls.Nw, 0)} с`) + `</div>
+      <h3>Цель</h3><div class="steps">` + step('время t', `${Ls.tNeed} с`) + step('мощность', `N = ${m.A} / ${Ls.tNeed} = ?`, 'sum') + `</div>
+      <p class="note" style="margin-top:10px">${S.N >= 1000 ? `${S.N} Вт = ${nf(S.N / 1000)} кВт.` : '1 кВт = 1000 Вт.'}</p>`;
+  }
+  if (id === 'kinpot') {
+    return `<h2>Два вида энергии</h2><div class="formula">Eп = m · g · h</div><div class="formula">Eк = m · v² / 2</div><p class="note">m — масса в кг, h — высота в м, v — скорость в м/с, g ≈ 10 Н/кг.</p>
+      <h3>Гиря</h3><div class="steps">` + step('m, h', `${S.m} кг, ${nf(S.h)} м`) + step('Eп', `${S.m} × 10 × ${nf(S.h)} = ${nf(m.Ep)} Дж`, 'sum') + `</div>
+      <h3>Тележка</h3><div class="steps">` + step('m, v', `${Ls.mc} кг, ${S.v} м/с`) + step('v²', `${S.v} × ${S.v} = ${S.v * S.v}`) + step('Eк', `${Ls.mc} × ${S.v * S.v} / 2 = ${nf(m.Ek)} Дж`, 'sum') +
+      (S.v > 0 && S.v <= 5 ? step(`при v = ${2 * S.v} м/с`, `${nf(Ls.mc * 4 * S.v * S.v / 2)} Дж — в 4 раза больше`) : '') + `</div>`;
+  }
+  const E0 = m.E0;
+  return `<h2>Закон сохранения энергии</h2><div class="formula">Eп + Eк = const</div><div class="formula">m · g · h = m · v² / 2</div><p class="note">Без сопротивления воздуха масса сокращается: v² = 2 · g · h.</p>
+    <h3>Старт</h3><div class="steps">` + step('h', `${nf(S.h0)} м`) + step('Eп вверху', `2 × 10 × ${nf(S.h0)} = ${nf(E0)} Дж`, 'sum') + step('Eк вверху', '0 Дж') + `</div>
+    <h3>Сейчас</h3><div class="steps">` + step('высота', `${fmt(S.y, 2)} м`) + step('Eп', `${fmt(m.Ep, 0)} Дж`) + step('Eк', `${fmt(m.Ek, 0)} Дж`) +
+    step('Eп + Eк', `${fmt(m.Ep + m.Ek, 0)} Дж`, 'sum') + (S.air ? step('ушло в тепло', `${fmt(m.lost, 0)} Дж`) : '') + `</div>
+    <h3>Цель</h3><div class="steps">` + step('Eк у земли при 10 м/с', '2 × 10² / 2 = ? Дж') + step('высота', 'h = Eк / (m · g) = ?', 'sum') + `</div>`;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter');
+  if (id === 'work') el.innerHTML = `<div class="k">Работа</div><div class="v ${S.hit ? 'ok' : ''}">A = ${nf(m.A)} Дж</div><div class="lr"><span>F</span><span class="${S.F <= L().Fstuck ? 'bad' : ''}">${S.F} Н</span></div><div class="lr"><span>s</span><span>${nf(S.s)} м</span></div>`;
+  else if (id === 'power') el.innerHTML = `<div class="k">Мотор</div><div class="v ${S.ok ? 'ok' : ''}">N = ${S.N} Вт</div><div class="lr"><span>A</span><span>${m.A} Дж</span></div><div class="lr"><span>t</span><span>${fmt(S.tt, 1)} с</span></div>`;
+  else if (id === 'kinpot') el.innerHTML = `<div class="k">Энергия</div><div class="lr"><span>Eп</span><span class="${S.ep ? 'ok' : ''}">${nf(m.Ep)} Дж</span></div><div class="lr"><span>Eк</span><span class="${S.ek ? 'ok' : ''}">${nf(m.Ek)} Дж</span></div><div class="lr"><span>h · v</span><span>${nf(S.h)} м · ${S.v} м/с</span></div>`;
+  else el.innerHTML = `<div class="k">Мяч 2 кг</div><div class="v ${S.ok ? 'ok' : ''}">v = ${fmt(S.vel, 1)} м/с</div><div class="lr"><span>h</span><span>${fmt(S.y, 1)} м</span></div><div class="lr"><span>Eп+Eк</span><span>${fmt(m.Ep + m.Ek, 0)} Дж</span></div>`;
+}
+
+function update() {
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Теперь вы умеете считать работу и энергию!'), 1600);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  work: '<path d="M2 24h62" stroke="#3a4762" stroke-width="2"/><rect x="8" y="10" width="16" height="14" fill="#a8763e"/><path d="M24 17h16" stroke="#ffb547" stroke-width="2"/><path d="M44 17l-5-3v6z" fill="#ffb547"/><rect x="48" y="8" width="14" height="14" fill="rgba(255,181,71,.35)" stroke="#ffb547"/>',
+  power: '<path d="M8 27V5M24 27V5M6 5h20M40 27V5M56 27V5M38 5h20" stroke="#4a5876" stroke-width="2"/><rect x="11" y="20" width="10" height="7" fill="#8b96ad"/><rect x="43" y="8" width="10" height="7" fill="#ffb547"/>',
+  kinpot: '<path d="M2 27h62" stroke="#3a4762" stroke-width="2"/><circle cx="14" cy="10" r="6" fill="#5d6a86"/><path d="M14 16V27" stroke="#72d4e8" stroke-dasharray="2 2"/><rect x="34" y="15" width="20" height="8" rx="2" fill="#ffb547"/><circle cx="38" cy="25" r="2.5" fill="#2a3348"/><circle cx="50" cy="25" r="2.5" fill="#2a3348"/>',
+  cons: '<circle cx="12" cy="7" r="4" fill="#ff8a73"/><path d="M12 13v12" stroke="#ffb547" stroke-dasharray="2 2"/><rect x="30" y="8" width="7" height="19" fill="#72d4e8"/><rect x="40" y="18" width="7" height="9" fill="#ffb547"/><rect x="50" y="5" width="7" height="22" fill="#86e0a8"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Lx, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Lx.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Lx.title}</span></span>
+      ${S.done[Lx.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  S.lesson = i; drag = null;
+  resetState(); save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L().task;
+  $('#hint').textContent = L().stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '';
+  if (id === 'work') now = `Ящик 80 кг на полу, его тянут верёвкой с силой F = ${S.F} Н вдоль пола. Сила трения покоя не даёт сдвинуть ящик при F ≤ 100 Н. Ящик сдвинут на s = ${nf(S.s)} м, работа силы A = ${nf(m.A)} Дж. Попытка сдвинуть слабой силой ${S.stuck ? 'была (ящик стоял, A = 0)' : 'ещё не сделана'}; работа 600 Дж на пути 4 м ${S.hit ? 'получена' : 'ещё не получена'}. Нужную силу не называй — наводи вопросами про A = F · s.`;
+  if (id === 'power') now = `Два подъёмника поднимают груз весом 1000 Н на 12 м (работа 12000 Дж). Слева рабочий с лебёдкой, 200 Вт. Справа мотор, выбрана мощность ${S.N} Вт — ему нужно ${fmt(m.tm, 1)} с. Секундомер: ${fmt(S.tt, 1)} с. ${S.fin ? `Последний подъём: ${fmt(S.fin.t, 1)} с при ${S.fin.N} Вт.` : 'Запуска ещё не было.'} Цель — подъём ровно за 8 с; ${S.ok ? 'выполнено' : 'не выполнено'}. Нужную мощность не называй — пусть ученик найдёт A, потом N = A / t.`;
+  if (id === 'kinpot') now = `Гиря массой ${S.m} кг на высоте ${nf(S.h)} м: Eп = ${nf(m.Ep)} Дж (g = 10 Н/кг). Тележка 16 кг едет со скоростью ${S.v} м/с: Eк = ${nf(m.Ek)} Дж. Eп = 200 Дж ${S.ep ? 'получена' : 'ещё не получена'}, Eк = 200 Дж ${S.ek ? 'получена' : 'ещё не получена'}. Готовые высоту и скорость не называй, наводи вопросами.`;
+  if (id === 'cons') now = `Мяч 2 кг отпускают без толчка с высоты ${nf(S.h0)} м (Eп вверху ${nf(m.E0)} Дж). Сопротивление воздуха ${S.air ? 'включено' : 'выключено'}. Сейчас мяч на высоте ${fmt(S.y, 1)} м, скорость ${fmt(S.vel, 1)} м/с, Eп = ${fmt(m.Ep, 0)} Дж, Eк = ${fmt(m.Ek, 0)} Дж${S.air ? `, в тепло ушло ${fmt(m.lost, 0)} Дж` : ''}. ${S.land ? `Последний бросок: с ${nf(S.land.h0)} м, у земли ${fmt(S.land.v, 1)} м/с${S.land.air ? ' (с воздухом)' : ''}.` : 'Бросков ещё не было.'} Цель — 10 м/с у земли без воздуха; ${S.ok ? 'выполнено' : 'не выполнено'}. Нужную высоту не называй — наводи: чему равна Eк при 10 м/с, откуда она взялась.`;
+  return [
+    `Раздел: физика, 7 класс, тема «Работа и энергия». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'} (${taskState(m)}).`,
+    `Сейчас на площадке: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Помогай наводящими вопросами, готовые ответы не выдавай.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { work: 'Почему работа равна нулю, если ящик не сдвинулся?', power: 'Чем отличается работа от мощности?', kinpot: 'Почему энергия растёт как квадрат скорости?', cons: 'Куда девается энергия, когда мяч ударяется о землю?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

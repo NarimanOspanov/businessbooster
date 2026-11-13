@@ -1,0 +1,845 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по математике, 6 класс: координаты точки на плоскости, координатные четверти, графики зависимостей, чтение графиков.">
+<title>Координатная плоскость</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--liq);transition:width .2s}
+.gauge i{position:absolute;top:-4px;width:2px;height:14px;background:var(--force);transform:translateX(-50%)}
+.swatch{height:12px;border-radius:4px;margin-top:9px;border:1px solid rgba(255,255,255,.15)}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.fr{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1.05;font-size:.82em;margin:0 2px}
+.fr i{font-style:normal;padding:0 3px}
+.fr i:first-child{border-bottom:1.5px solid currentColor}
+.meter .v .fr{font-size:1.15em}
+.found{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 0}
+.found span{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-mono)}
+.found span.ok{border-color:var(--ok);color:var(--ok)}
+.signtab{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;text-align:center;margin:4px 0 0}
+.signtab div{background:var(--surface-2);border-radius:8px;padding:8px 4px;font:500 15px/1 var(--font-mono)}
+.signtab .h{background:none;color:var(--muted);font:600 10px/1.2 var(--font-body);letter-spacing:.08em;text-transform:uppercase;padding:8px 2px}
+.signtab .on{background:var(--force);color:var(--bg)}
+.tbl{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;text-align:center;margin:4px 0 0}
+.tbl div{background:var(--surface-2);border-radius:8px;padding:8px 2px;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.tbl .h{background:none;color:var(--muted);font:600 10px/1.2 var(--font-body);letter-spacing:.08em;text-transform:uppercase}
+.tbl .ok{color:var(--ok)}
+.signtab.q{grid-template-columns:repeat(3,minmax(0,1fr))}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M20 20V7A13 13 0 0 1 33 20Z" fill="var(--force)"/><path d="M20 20H33A13 13 0 1 1 20 7Z" fill="none" stroke="var(--fg)" stroke-width="2" stroke-linejoin="round"/><path d="M20 20L10.8 29.2" stroke="var(--fg)" stroke-width="2"/><path d="M20 20V33" stroke="var(--arm)" stroke-width="2"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Математика · Координатная плоскость</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#math">Карта</a><a href="/physics/#math">Математика</a><a href="./" aria-current="page">Плоскость</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Координаты</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Рабочее поле">
+    <svg class="scene" id="scene" role="img" aria-label="Рабочее поле: координатная плоскость и графики. Точки и курсор можно перетаскивать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const trim = (x, n = 3) => fmt(x, n).replace(/,?0+$/, '') || '0';
+const num = v => trim(v, 2);
+const sg = v => v > 0 ? '+' + num(v) : num(v);
+const pt = (x, y) => `(${num(x)}; ${num(y)})`;
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const plural = (n, a, b, c) => { n = Math.abs(n); const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c; };
+const INK = '#04070d';
+const TARGET = { A: [-4, 3], B: [5, -2], C: [0, -5] };
+const KEYS = ['A', 'B', 'C'];
+const quad = (x, y) => x > 0 && y > 0 ? 'I' : x < 0 && y > 0 ? 'II' : x < 0 && y < 0 ? 'III' : x > 0 && y < 0 ? 'IV' : '';
+const quadWord = (x, y) => { const q = quad(x, y); return q ? `${q} четверть` : x === 0 && y === 0 ? 'начало координат' : x === 0 ? 'на оси ординат Oy' : 'на оси абсцисс Ox'; };
+// temperature every 2 hours, 0…24 h
+const DATA = [-4, -5, -6, -4, -2, 0, 3, 5, 6, 4, 2, 0, -3];
+const temp = h => { const i = Math.floor(h / 2); return i >= 12 ? DATA[12] : h % 2 === 0 ? DATA[i] : (DATA[i] + DATA[i + 1]) / 2; };
+
+const LESSONS = [
+  { id: 'point', title: 'Координаты точки',
+    text: ['Две перпендикулярные координатные прямые с общим нулём образуют прямоугольную систему координат. Горизонтальная ось Ox — ось абсцисс, вертикальная Oy — ось ординат. Точка их пересечения O — начало координат.',
+           'Положение точки задают два числа. Первое — абсцисса x: на сколько шагнуть вправо (+) или влево (−). Второе — ордината y: на сколько подняться (+) или опуститься (−). Пишут A(−4; 3): сначала x, потом y, через точку с запятой.',
+           'Оси делят плоскость на четыре координатные четверти. Их нумеруют против часовой стрелки: I — справа сверху, дальше II, III, IV. Точки на осях не входят ни в одну четверть: у них x = 0 или y = 0.'],
+    why: 'Навигатор в телефоне хранит каждое место как пару чисел — широту и долготу: так 2ГИС и такси находят ваш подъезд. Геодезист на стройке в Астане выносит углы будущего дома по координатам. Программист игры двигает героя, меняя x и y, а дизайнер задаёт место каждой кнопки на экране. Ряд и место в кинотеатре, клетка e4 в шахматах, ячейка B3 в Excel — тоже координаты.',
+    task: 'Поставьте точки A(−4; 3), B(5; −2) и C(0; −5) на координатную плоскость.',
+    hint: 'Сначала x: от O вправо или влево по оси абсцисс. Потом y: вверх или вниз. Если x = 0, точка лежит прямо на оси ординат.',
+    stage: 'Тащите точки из лотка на плоскость. Мимо плоскости — точка вернётся.',
+    check: m => m.right === 3 },
+  { id: 'graph', title: 'Графики зависимостей',
+    text: ['Одни величины зависят от других: путь — от времени в дороге, стоимость покупки — от количества, длина тени — от времени суток. Зависимость можно задать таблицей, формулой или графиком.',
+           'Чтобы построить график, каждую пару из таблицы превращают в точку. По горизонтали откладывают время t, по вертикали — путь s. Пара «t = 2 ч, s = 8 км» даёт точку (2; 8).',
+           'При постоянной скорости v путь s = v · t: за вдвое большее время — вдвое больший путь. Это прямая пропорциональность. Её график — прямая, которая проходит через начало координат.'],
+    why: 'Стоимость бензина на заправке пропорциональна литрам, счёт за воду — кубометрам, а путь машины — времени в дороге при той же скорости. Логист транспортной компании по таким графикам прикидывает, сколько грузовик проедет за смену и когда фура будет в Шымкенте. Экономисты и аналитики данных строят графики каждый день, чтобы увидеть закономерность и посчитать выгоду.',
+    task: 'Пешеход идёт со скоростью 4 км/ч. Поставьте точки графика пути для t = 1, 2, 3 и 4 ч.',
+    hint: 'Для каждого t посчитайте путь s = 4 · t и поднимите точку на нужную высоту. Одна клетка по вертикали — 1 км. Получились ли точки на одной прямой?',
+    stage: 'Тащите точки вверх и вниз в их столбиках.',
+    v: 4,
+    check: m => m.v === 4 && m.right === 4 },
+  { id: 'read', title: 'Чтение графиков',
+    text: ['График сам рассказывает, как менялась величина. Чтобы узнать значение в нужный момент, найдите время на горизонтальной оси, поднимитесь до линии графика и посмотрите влево на вертикальную ось.',
+           'Где линия слева направо идёт вверх, величина растёт. Где вниз — убывает. Самая высокая точка графика — наибольшее значение, самая низкая — наименьшее.',
+           'Там, где график пересекает ось времени, температура ровно 0 °C. Выше оси — тепло, ниже — мороз.'],
+    why: 'Синоптики Казгидромета читают графики температуры и давления, чтобы сделать прогноз. Врач смотрит кардиограмму и температурный лист больного. Энергетики следят за графиком потребления: вечером, когда все включают свет и плиты, нагрузка на сеть растёт. Фитнес-браслет рисует график пульса, а новости — график курса тенге. Кто быстро читает графики, тот раньше замечает важное.',
+    task: 'График температуры за весенние сутки. Найдите час, когда было теплее всего, и все моменты, когда было ровно 0 °C. Отметьте их кнопками внизу.',
+    hint: 'Ведите курсор и следите за табло. Самая высокая точка — где линия перестаёт расти и начинает падать. Сколько раз линия пересекает ось времени?',
+    stage: 'Тащите курсор по графику. Отмечайте находки кнопками.',
+    h: 6,
+    check: m => m.max && m.zeros.length === 2 },
+];
+
+const KEY = 'luch-math-coord';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview',
+            pos: { A: null, B: null, C: null }, sel: 'A', v: 4, s: [1, 1, 1, 1], h: 6, max: false, zeros: [], hl: null };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+const isRight = k => S.pos[k] !== null && S.pos[k][0] === TARGET[k][0] && S.pos[k][1] === TARGET[k][1];
+
+function model() {
+  const id = LID();
+  if (id === 'point') {
+    const pos = {}; KEYS.forEach(k => pos[k] = S.pos[k] ? S.pos[k].slice() : null);
+    return { kind: id, pos, placed: KEYS.filter(k => pos[k]).length, right: KEYS.filter(isRight).length, sel: S.sel };
+  }
+  if (id === 'graph') {
+    const s = S.s.slice(), right = s.filter((x, i) => x === S.v * (i + 1)).length;
+    const k = s[0] > 0 && s.every((x, i) => x === s[0] * (i + 1)) ? s[0] : null;
+    return { kind: id, v: S.v, s, right, k };
+  }
+  return { kind: id, h: S.h, T: temp(S.h), max: S.max, zeros: S.zeros.slice() };
+}
+
+// ---------- geometry (SVG units, 520 × 405) ----------
+const X1 = x => 260 + x * 22, Y1 = y => 200 - y * 22;          // lesson 1: −6…6
+const TRAY = { A: [170, 368], B: [260, 368], C: [350, 368] };
+const XT = t => 130 + t * 56, YS = s => 330 - s * 10.5;        // lesson 2: t 0…5 h, s 0…20 km
+const XH = h => 76 + h * 17, YT = T => 225 - T * 12;           // lesson 3: 0…24 h, −8…8 °C
+
+const T = (x, y, s, txt, fill = '#8b96ad', anchor = 'middle', extra = '') => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${s}" fill="${fill}" text-anchor="${anchor}" ${extra}>${txt}</text>`;
+const L = (x1, y1, x2, y2, col, w = 1, extra = '') => `<path d="M${(+x1).toFixed(1)} ${(+y1).toFixed(1)}L${(+x2).toFixed(1)} ${(+y2).toFixed(1)}" stroke="${col}" stroke-width="${w}" ${extra}/>`;
+const arrowHead = (x, y, dir) => dir === 'r' ? `<path d="M${x} ${y}l-8 -4.5v9z" fill="#a9b4c9"/>` : `<path d="M${x} ${y}l-4.5 8h9z" fill="#a9b4c9"/>`;
+const tag = (x, y, txt, col, w) => `<rect x="${(x - w / 2).toFixed(1)}" y="${(y - 12).toFixed(1)}" width="${w}" height="18" rx="6" fill="${col}" stroke="${INK}" stroke-width="1.4"/>` + T(x, y + 1, 11, txt, '#0b1019', 'middle', 'font-weight="500"');
+function backdrop() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.05)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+
+// ---------- lesson 1: points ----------
+const onPlane = (x, y) => x >= X1(-6.5) && x <= X1(6.5) && y >= Y1(6.5) && y <= Y1(-6.5);
+const snap1 = (x, y) => [clamp(Math.round((x - 260) / 22), -6, 6), clamp(Math.round((200 - y) / 22), -6, 6)];
+function planeSVG() {
+  let h = `<rect x="${X1(-6)}" y="${Y1(6)}" width="${12 * 22}" height="${12 * 22}" fill="rgba(18,26,40,.55)"/>`;
+  for (let v = -6; v <= 6; v++) {
+    h += L(X1(v), Y1(6), X1(v), Y1(-6), 'rgba(160,185,230,.13)') + L(X1(-6), Y1(v), X1(6), Y1(v), 'rgba(160,185,230,.13)');
+  }
+  // quadrant numbers
+  h += T(X1(5), Y1(5.2), 15, 'I', 'rgba(232,236,244,.28)', 'middle', 'font-weight="500"') + T(X1(-5), Y1(5.2), 15, 'II', 'rgba(232,236,244,.28)', 'middle', 'font-weight="500"') +
+       T(X1(-5), Y1(-5.6), 15, 'III', 'rgba(232,236,244,.28)', 'middle', 'font-weight="500"') + T(X1(5), Y1(-5.6), 15, 'IV', 'rgba(232,236,244,.28)', 'middle', 'font-weight="500"');
+  // axes
+  h += L(X1(-6.5), Y1(0), X1(6.6), Y1(0), '#a9b4c9', 2) + arrowHead(X1(6.6) + 6, Y1(0), 'r');
+  h += L(X1(0), Y1(-6.5), X1(0), Y1(6.6), '#a9b4c9', 2) + arrowHead(X1(0), Y1(6.6) - 6, 'u');
+  for (let v = -6; v <= 6; v++) {
+    if (!v) continue;
+    h += L(X1(v), Y1(0) - 3.5, X1(v), Y1(0) + 3.5, '#a9b4c9', 1) + T(X1(v), Y1(0) + 15, 9, num(v));
+    h += L(X1(0) - 3.5, Y1(v), X1(0) + 3.5, Y1(v), '#a9b4c9', 1) + T(X1(0) - 7, Y1(v) + 3.5, 9, num(v), '#8b96ad', 'end');
+  }
+  h += T(X1(0) - 6, Y1(0) - 6, 10.5, 'O', '#e8ecf4', 'end');
+  h += T(X1(6.6) + 4, Y1(0) - 9, 12, 'x', '#e8ecf4') + T(X1(0) + 12, Y1(6.6) - 2, 12, 'y', '#e8ecf4');
+  // unit segments
+  h += L(X1(0), Y1(0), X1(1), Y1(0), '#72d4e8', 3, 'stroke-linecap="round"') + L(X1(0), Y1(0), X1(0), Y1(1), '#72d4e8', 3, 'stroke-linecap="round"');
+  return h;
+}
+function markerXY(k) {
+  if (drag && drag.kind === 'mk' && drag.k === k) return [drag.x, drag.y];
+  const p = S.pos[k]; return p ? [X1(p[0]), Y1(p[1])] : null;
+}
+function markerSVG(k) {
+  const held = drag && drag.kind === 'mk' && drag.k === k, p = S.pos[k], ok = !held && isRight(k);
+  const col = ok ? '#86e0a8' : '#ffb547';
+  if (!held && !p) { // chip in the tray
+    const [x, y] = TRAY[k], [tx, ty] = TARGET[k];
+    return `<g data-drag="${k}" transform="translate(${x} ${y})"><rect x="-42" y="-16" width="84" height="32" rx="8" fill="#1a2438" stroke="${INK}" stroke-width="4"/><rect x="-42" y="-16" width="84" height="32" rx="8" fill="#1a2438" stroke="${col}" stroke-width="1.6"/>` +
+      `<circle cx="-29" cy="0" r="6" fill="${col}" stroke="${INK}" stroke-width="1.6"/>` + T(5, 4.5, 11.5, `${k}${pt(tx, ty)}`, '#e8ecf4', 'middle', 'font-weight="500"') + `</g>`;
+  }
+  const [x, y] = markerXY(k);
+  let h = '';
+  if (!held) {
+    const lbl = `${k}${pt(p[0], p[1])}`, w = lbl.length * 6.9 + 12, lx = p[0] < 0 ? x - w / 2 - 8 : x + w / 2 + 8, ly = y - 14;
+    h += `<g data-drag="${k}"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="16" fill="transparent"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6.5" fill="${col}" stroke="${INK}" stroke-width="2"/>` + tag(lx, ly, lbl, col, w) + `</g>`;
+  } else {
+    h += `<g><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="8" fill="${col}" stroke="${INK}" stroke-width="2" opacity=".85"/>` + T(x, y - 14, 12, k, col, 'middle', 'font-weight="500"') + `</g>`;
+  }
+  return h;
+}
+function pointSVG() {
+  let h = planeSVG();
+  h += `<rect x="118" y="347" width="284" height="42" rx="12" fill="rgba(26,36,56,.55)" stroke="#26324a" stroke-width="1.2" stroke-dasharray="5 4"/>`;
+  if (drag && drag.kind === 'mk' && onPlane(drag.x, drag.y)) {
+    const [gx, gy] = snap1(drag.x, drag.y), x = X1(gx), y = Y1(gy);
+    h += L(x, y, x, Y1(0), '#e8ecf4', 1.3, 'stroke-dasharray="3 3"') + L(x, y, X1(0), y, '#e8ecf4', 1.3, 'stroke-dasharray="3 3"');
+    h += `<circle cx="${X1(gx)}" cy="${Y1(0)}" r="3.5" fill="#ffb547"/><circle cx="${X1(0)}" cy="${Y1(gy)}" r="3.5" fill="#72d4e8"/>`;
+    h += `<circle cx="${x}" cy="${y}" r="9" fill="none" stroke="#e8ecf4" stroke-width="1.8"/>`;
+    const lbl = `${drag.k}${pt(gx, gy)}`;
+    h += `<rect x="${(x + 12).toFixed(1)}" y="${(y + 8).toFixed(1)}" width="${lbl.length * 6.9 + 12}" height="18" rx="6" fill="#0e1520" stroke="#e8ecf4" stroke-width="1.2"/>` + T(x + 18, y + 21, 11, lbl, '#e8ecf4', 'start', 'font-weight="500"');
+  }
+  for (const k of KEYS) if (!(drag && drag.k === k)) h += markerSVG(k);
+  if (drag && drag.kind === 'mk') h += markerSVG(drag.k);
+  return h;
+}
+
+// ---------- lesson 2: graph s = v·t ----------
+function graphSVG(m) {
+  let h = `<rect x="${XT(0)}" y="${YS(20)}" width="${XT(5) - XT(0)}" height="${YS(0) - YS(20)}" fill="rgba(18,26,40,.55)"/>`;
+  for (let s = 1; s <= 20; s++) h += L(XT(0), YS(s), XT(5), YS(s), s % 4 ? 'rgba(160,185,230,.09)' : 'rgba(160,185,230,.2)');
+  for (let t = 1; t <= 5; t++) h += L(XT(t), YS(0), XT(t), YS(20), 'rgba(160,185,230,.2)');
+  h += L(XT(0), YS(0), XT(5.5), YS(0), '#a9b4c9', 2) + arrowHead(XT(5.5) + 6, YS(0), 'r') + L(XT(0), YS(0), XT(0), YS(21.3), '#a9b4c9', 2) + arrowHead(XT(0), YS(21.3) - 6, 'u');
+  for (let t = 1; t <= 5; t++) h += T(XT(t), YS(0) + 16, 10, t);
+  for (let s = 4; s <= 20; s += 4) h += T(XT(0) - 7, YS(s) + 3.5, 10, s, '#8b96ad', 'end');
+  h += T(XT(0) - 6, YS(0) + 15, 10.5, 'O', '#e8ecf4', 'end') + T(XT(5.5) + 2, YS(0) - 10, 11, 't, ч', '#e8ecf4') + T(XT(0) - 10, YS(21.3) + 2, 11, 's, км', '#e8ecf4', 'end');
+  h += T(330, 86, 15, `s = v · t = ${m.v} · t`, '#e8ecf4', 'middle', 'font-weight="500"');
+  // polyline or line
+  if (m.k) {
+    const tEnd = Math.min(5, 20 / m.k), good = m.k === m.v, col = good ? '#86e0a8' : '#72d4e8';
+    h += L(XT(0), YS(0), XT(tEnd), YS(m.k * tEnd), col, 2.4, 'stroke-linecap="round"');
+    h += T(330, 106, 11, good ? 'точки на одной прямой через O — это график s = ' + m.v + 't' : `прямая через O, но это скорость ${m.k} км/ч, а не ${m.v}`, col);
+  } else {
+    const d = 'M' + XT(0) + ' ' + YS(0) + m.s.map((s, i) => `L${XT(i + 1)} ${YS(s).toFixed(1)}`).join('');
+    h += `<path d="${d}" fill="none" stroke="#8b96ad" stroke-width="1.2" stroke-dasharray="4 4"/>`;
+  }
+  // points
+  m.s.forEach((s, i) => {
+    const t = i + 1, x = XT(t), y = YS(s), ok = s === m.v * t, col = ok ? '#86e0a8' : '#ffb547';
+    h += L(x, y, XT(0), y, col, 1, 'stroke-dasharray="3 3" opacity=".7"');
+    h += `<g data-drag="s${i}"><rect x="${x - 22}" y="${YS(20) - 6}" width="44" height="${YS(0) - YS(20) + 12}" fill="transparent"/><circle cx="${x}" cy="${y.toFixed(1)}" r="7.5" fill="${col}" stroke="${INK}" stroke-width="2"/>` +
+      `<path d="M${x} ${(y - 12).toFixed(1)}l-3 3.5h6zM${x} ${(y + 12).toFixed(1)}l-3 -3.5h6z" fill="${col}"/></g>`;
+    h += T(x - 11, y - 8, 10, pt(t, s), col, 'end');
+  });
+  // table
+  const tx = 440, ty0 = 160;
+  h += `<rect x="${tx}" y="${ty0}" width="76" height="${5 * 24 + 4}" rx="8" fill="#0e1520" stroke="#26324a" stroke-width="1.2"/>`;
+  h += L(tx + 34, ty0 + 4, tx + 34, ty0 + 120, '#26324a') + L(tx + 4, ty0 + 26, tx + 72, ty0 + 26, '#26324a');
+  h += T(tx + 17, ty0 + 17, 10, 't, ч', '#8b96ad') + T(tx + 55, ty0 + 17, 10, 's, км', '#8b96ad');
+  m.s.forEach((s, i) => { const y = ty0 + 42 + i * 24, ok = s === m.v * (i + 1); h += T(tx + 17, y, 12, i + 1, '#e8ecf4') + T(tx + 55, y, 12, s, ok ? '#86e0a8' : '#ffb547', 'middle', 'font-weight="500"'); });
+  return h;
+}
+
+// ---------- lesson 3: reading a temperature graph ----------
+function readSVG(m) {
+  let h = `<rect x="${XH(0)}" y="${YT(8)}" width="${XH(24) - XH(0)}" height="${YT(0) - YT(8)}" fill="rgba(255,181,71,.05)"/><rect x="${XH(0)}" y="${YT(0)}" width="${XH(24) - XH(0)}" height="${YT(-8) - YT(0)}" fill="rgba(114,212,232,.06)"/>`;
+  for (let T0 = -8; T0 <= 8; T0++) if (T0) h += L(XH(0), YT(T0), XH(24), YT(T0), T0 % 2 ? 'rgba(160,185,230,.07)' : 'rgba(160,185,230,.16)');
+  for (let hh = 0; hh <= 24; hh += 2) h += L(XH(hh), YT(8), XH(hh), YT(-8), hh % 4 ? 'rgba(160,185,230,.08)' : 'rgba(160,185,230,.17)');
+  for (let hh = 0; hh <= 24; hh += 4) h += T(XH(hh), YT(-8) + 15, 10, hh);
+  for (let T0 = -8; T0 <= 8; T0 += 2) h += T(XH(0) - 7, YT(T0) + 3.5, 10, sg(T0), T0 === 0 ? '#e8ecf4' : '#8b96ad', 'end');
+  h += L(XH(0), YT(-8.6), XH(0), YT(9), '#a9b4c9', 2) + arrowHead(XH(0), YT(9) - 6, 'u');
+  h += L(XH(0), YT(0), XH(24.6), YT(0), '#e8ecf4', 1.6) + arrowHead(XH(24.6) + 6, YT(0), 'r');
+  h += T(XH(24.6) + 2, YT(0) - 9, 11, 't, ч', '#e8ecf4') + T(XH(0) + 10, YT(9) - 3, 11, 'T, °C', '#e8ecf4', 'start');
+  h += T(XH(12), YT(-8) + 30, 10.5, 'время суток, ч', '#8b96ad');
+  // curve
+  const d = DATA.map((v, i) => `${i ? 'L' : 'M'}${XH(i * 2)} ${YT(v)}`).join('');
+  h += `<path d="${d}" fill="none" stroke="${INK}" stroke-width="5.6" stroke-linejoin="round"/><path d="${d}" fill="none" stroke="#ff8a73" stroke-width="3" stroke-linejoin="round"/>`;
+  // found marks
+  m.zeros.forEach(z => { h += `<circle cx="${XH(z)}" cy="${YT(0)}" r="7" fill="none" stroke="#86e0a8" stroke-width="2.2"/>` + T(XH(z), YT(0) + 20, 10, `${z} ч`, '#86e0a8'); });
+  if (m.max) { const x = XH(16), y = YT(6); h += `<path d="M${x} ${y - 30}v20" stroke="#86e0a8" stroke-width="1.4"/><path d="M${x} ${y - 30}h18l-5 5 5 5h-18z" fill="#86e0a8" stroke="${INK}" stroke-width="1"/>` + T(x + 22, y - 21, 10, 'max', '#86e0a8', 'start'); }
+  // cursor
+  const x = XH(m.h), y = YT(m.T), col = m.T > 0 ? '#ffb547' : m.T < 0 ? '#72d4e8' : '#e8ecf4';
+  h += L(x, YT(8), x, YT(-8), '#e8ecf4', 1.2, 'stroke-dasharray="4 4" opacity=".6"');
+  h += L(x, y, XH(0), y, col, 1.3, 'stroke-dasharray="3 3"');
+  h += `<circle cx="${x}" cy="${y}" r="6.5" fill="${col}" stroke="${INK}" stroke-width="2"/>`;
+  const lbl = `${m.h} ч: ${sg(m.T)} °C`, w = lbl.length * 6.9 + 14, lx = clamp(x, XH(0) + w / 2, XH(24) - w / 2);
+  h += tag(lx, YT(8) - 12, lbl, col, w);
+  h += `<g data-drag="cur"><rect x="${x - 18}" y="${YT(-8) + 2}" width="36" height="34" fill="transparent"/><circle cx="${x}" cy="${YT(-8) + 26}" r="9" fill="#2a3348" stroke="#ffb547" stroke-width="2"/><path d="M${x - 5} ${YT(-8) + 26}l3 -3v6zM${x + 5} ${YT(-8) + 26}l-3 -3v6z" fill="#ffb547"/></g>`;
+  return h;
+}
+
+function hlBox(id) {
+  const B = {
+    xaxis: [X1(-6.6), Y1(0) - 12, 12 * 22 + 40, 28], yaxis: [X1(0) - 16, Y1(6.8), 32, 12 * 22 + 40], origin: [X1(0) - 22, Y1(0) - 12, 34, 32],
+    unit: [X1(0) - 6, Y1(1) - 6, 34, 34], quads: [X1(-6), Y1(6), 12 * 22, 12 * 22], tray: [114, 343, 292, 50],
+    taxis: [XT(0) - 4, YS(0) - 12, XT(5.6) - XT(0) + 16, 34], saxis: [XT(0) - 34, YS(21.5) - 10, 48, YS(0) - YS(21.5) + 20], pts: [XT(0.6), YS(20) - 8, XT(4.4) - XT(0.6), YS(0) - YS(20) + 16],
+    table: [436, 156, 84, 132], formula: [180, 68, 300, 46],
+    curve: [XH(0) - 4, YT(6.5), XH(24) - XH(0) + 8, YT(-6.5) - YT(6.5)], zero: [XH(0) - 4, YT(0) - 10, XH(24.8) - XH(0) + 8, 20], taxisR: [XH(0) - 36, YT(9.5), 44, YT(-8) - YT(9.5) + 8],
+    cursor: [XH(S.h) - 20, YT(8) - 26, 40, YT(-8) - YT(8) + 64], marks: [XH(0), YT(7), XH(24) - XH(0), YT(-2) - YT(7)],
+  };
+  return B[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID(), m = model();
+  let h = backdrop();
+  if (id === 'point') h += pointSVG(m);
+  else if (id === 'graph') h += graphSVG(m);
+  else h += readSVG(m);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b && b[2] > 0) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 500, hh / 410, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 408 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer ----------
+let drag = null, dirty = true;
+const toSvg = e => { const p = scene.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; const c = scene.getScreenCTM(); return c ? p.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+const setS = (i, y) => { const s = clamp(Math.round((330 - y) / 10.5), 0, 20); if (s !== S.s[i]) { S.s[i] = s; update(); } };
+const setH = x => { const h = clamp(Math.round((x - 76) / 17), 0, 24); if (h !== S.h) { S.h = h; update(); } };
+function dropMarker(k, gx, gy) {
+  S.pos[k] = [gx, gy]; S.sel = k;
+  const [tx, ty] = TARGET[k];
+  if (!isRight(k) && tx !== ty && gx === ty && gy === tx) toast('Похоже, x и y поменялись местами. Первое число — по горизонтали.');
+  update();
+}
+
+scene.addEventListener('pointerdown', e => {
+  const id = LID(), p = toSvg(e);
+  const grab = () => { e.preventDefault(); try { scene.setPointerCapture(e.pointerId); } catch (er) {} scene.classList.add('grabbing'); };
+  if (id === 'graph') {
+    if (p.x < XT(0.5) || p.x > XT(4.5) || p.y < YS(20) - 20 || p.y > YS(0) + 20) return;
+    const i = clamp(Math.round((p.x - 130) / 56), 1, 4) - 1; grab(); drag = { kind: 's', i }; setS(i, p.y); return;
+  }
+  if (id === 'read') {
+    if (p.x < XH(0) - 14 || p.x > XH(24) + 14 || p.y < YT(8) - 24 || p.y > YT(-8) + 40) return;
+    grab(); drag = { kind: 'cur' }; setH(p.x); return;
+  }
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  const k = el.dataset.drag; if (!KEYS.includes(k)) return;
+  const cur = markerXY(k);
+  grab(); S.sel = k;
+  drag = cur ? { kind: 'mk', k, dx: cur[0] - p.x, dy: cur[1] - p.y, x: cur[0], y: cur[1] } : { kind: 'mk', k, dx: 0, dy: 0, x: p.x, y: p.y };
+  dirty = true;
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const p = toSvg(e);
+  if (drag.kind === 's') return setS(drag.i, p.y);
+  if (drag.kind === 'cur') return setH(p.x);
+  drag.x = clamp(p.x + drag.dx, VB.x + 10, VB.x + VB.w - 10); drag.y = clamp(p.y + drag.dy, VB.y + 10, 400); dirty = true;
+});
+const endDrag = cancel => {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing');
+  if (d.kind === 'mk') {
+    if (!cancel && onPlane(d.x, d.y)) { const [gx, gy] = snap1(d.x, d.y); dropMarker(d.k, gx, gy); return; }
+    if (!cancel) S.pos[d.k] = null;
+    update();
+  }
+  dirty = true;
+};
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+function loop(t) {
+  requestAnimationFrame(loop);
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2800); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label) => `<button data-a="${k}">${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    point: B('back', 'Точки в лоток'),
+    graph: B('v-1', 'v −1') + B('v+1', 'v +1') + sep + B('clr', 'Сбросить точки'),
+    read: B('h-1', '−1 ч') + B('h+1', '+1 ч') + sep + B('mmax', 'Теплее всего') + B('mzero', 'Ровно 0 °C'),
+  }[id];
+}
+function markMax() {
+  if (S.max) { toast('Самый тёплый час уже отмечен.'); return; }
+  if (S.h === 16) { S.max = true; toast('Верно: в 16 ч график выше всего.'); }
+  else toast(`В ${S.h} ч было ${sg(temp(S.h))} °C. Есть ли на графике точка выше?`);
+  update();
+}
+function markZero() {
+  const T0 = temp(S.h);
+  if (T0 === 0) {
+    if (S.zeros.includes(S.h)) toast('Этот момент уже отмечен.');
+    else { S.zeros.push(S.h); S.zeros.sort((a, b) => a - b); toast(S.zeros.length < 2 ? `Да, в ${S.h} ч ровно 0 °C. Есть ли ещё такой момент?` : `Да, в ${S.h} ч ровно 0 °C.`); }
+  } else toast(`В ${S.h} ч график ${T0 > 0 ? 'выше' : 'ниже'} оси времени: ${sg(T0)} °C.`);
+  update();
+}
+function act(a) {
+  if (a === 'back') { S.pos = { A: null, B: null, C: null }; update(); return; }
+  if (a === 'v-1' || a === 'v+1') { S.v = clamp(S.v + (a === 'v-1' ? -1 : 1), 1, 5); update(); return; }
+  if (a === 'clr') { S.s = [0, 0, 0, 0]; update(); return; }
+  if (a === 'h-1' || a === 'h+1') { S.h = clamp(S.h + (a === 'h-1' ? -1 : 1), 0, 24); update(); return; }
+  if (a === 'mmax') return markMax();
+  if (a === 'mzero') return markZero();
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const AX = '<path d="M4 24h26M10 30V4" stroke="var(--fg)" stroke-width="1.5"/>';
+const ICON = {
+  xaxis: IC('<path d="M3 17h26" stroke="var(--force)" stroke-width="2"/><path d="M31 17l-5 -3.5v7z" fill="var(--force)"/><text x="27" y="11" font-size="8" fill="var(--fg)" text-anchor="middle" font-family="monospace">x</text>'),
+  yaxis: IC('<path d="M17 31V6" stroke="var(--arm)" stroke-width="2"/><path d="M17 3l-3.5 5h7z" fill="var(--arm)"/><text x="25" y="10" font-size="8" fill="var(--fg)" text-anchor="middle" font-family="monospace">y</text>'),
+  origin: IC('<path d="M3 17h28M17 3v28" stroke="var(--fg)" stroke-width="1.3"/><circle cx="17" cy="17" r="3" fill="var(--fg)"/><text x="11" y="27" font-size="8" fill="var(--fg)" text-anchor="middle" font-family="monospace">O</text>'),
+  unit: IC('<path d="M3 22h28M12 3v28" stroke="var(--fg)" stroke-width="1"/><path d="M12 22h10M12 22V12" stroke="var(--arm)" stroke-width="3" stroke-linecap="round"/>'),
+  quads: IC('<path d="M3 17h28M17 3v28" stroke="var(--fg)" stroke-width="1.2"/><text x="25" y="12" font-size="6.5" fill="var(--fg)" text-anchor="middle" font-family="monospace">I</text><text x="9" y="12" font-size="6.5" fill="var(--fg)" text-anchor="middle" font-family="monospace">II</text><text x="9" y="28" font-size="6.5" fill="var(--fg)" text-anchor="middle" font-family="monospace">III</text><text x="25" y="28" font-size="6.5" fill="var(--fg)" text-anchor="middle" font-family="monospace">IV</text>'),
+  tray: IC('<rect x="3" y="11" width="28" height="12" rx="4" fill="none" stroke="var(--force)" stroke-width="1.5"/><circle cx="9" cy="17" r="2.6" fill="var(--force)"/><path d="M14 17h13" stroke="var(--fg)" stroke-width="1.4"/>'),
+  pts: IC(AX + '<circle cx="15" cy="20" r="2.6" fill="var(--ok)"/><circle cx="20" cy="15" r="2.6" fill="var(--ok)"/><circle cx="25" cy="10" r="2.6" fill="var(--ok)"/>'),
+  line: IC(AX + '<path d="M10 24L30 6" stroke="var(--ok)" stroke-width="2"/>'),
+  table: IC('<rect x="5" y="5" width="24" height="24" rx="3" fill="none" stroke="var(--fg)" stroke-width="1.4"/><path d="M17 5v24M5 12h24M5 18h24M5 24h24" stroke="var(--fg)" stroke-width=".9"/>'),
+  formula: IC('<text x="17" y="21" font-size="10" fill="var(--fg)" text-anchor="middle" font-family="monospace">s=vt</text>'),
+  curve: IC(AX + '<path d="M10 22L15 24L21 12L26 9L30 18" fill="none" stroke="#ff8a73" stroke-width="2" stroke-linejoin="round"/>'),
+  zero: IC('<path d="M3 17h28" stroke="var(--fg)" stroke-width="2"/><path d="M6 24L14 17L24 9" stroke="#ff8a73" stroke-width="1.8" fill="none"/><circle cx="14" cy="17" r="3" fill="none" stroke="var(--ok)" stroke-width="1.6"/>'),
+  cursor: IC(AX + '<path d="M21 4v20" stroke="var(--fg)" stroke-width="1.3" stroke-dasharray="2 2"/><circle cx="21" cy="13" r="3" fill="var(--force)"/><path d="M10 13h11" stroke="var(--force)" stroke-width="1" stroke-dasharray="2 2"/>'),
+  marks: IC('<path d="M12 28V6" stroke="var(--ok)" stroke-width="1.5"/><path d="M12 6h14l-4 4 4 4h-14z" fill="var(--ok)"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const Ls = LESSONS[S.lesson];
+  if (S.done[Ls.id]) return '✓ Выполнено';
+  if (Ls.id === 'point') return `На плоскости ${m.placed} из 3 точек · верно ${m.right}`;
+  if (Ls.id === 'graph') return `v = ${m.v} км/ч · точек на месте: ${m.right} из 4`;
+  return `${m.h} ч: ${sg(m.T)} °C · найдено ${(m.max ? 1 : 0) + m.zeros.length} из 3`;
+}
+
+// ---------- Scheme tab ----------
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'point') {
+    const p = S.pos[S.sel] || [0, 0];
+    h = `<h2>Точки и четверти</h2><div class="chips" id="selChips">${KEYS.map(k => `<button data-k="${k}" aria-pressed="${S.sel === k}">${k}</button>`).join('')}</div>
+      <dl class="reads"><div><dt>A</dt><dd id="r1"></dd></div><div><dt>B</dt><dd id="r2"></dd></div><div><dt>C</dt><dd id="r3"></dd></div></dl>` +
+      slider('inX', 'Абсцисса x', -6, 6, 1, p[0]) + slider('inY', 'Ордината y', -6, 6, 1, p[1]) +
+      `<p class="note" style="margin-top:8px">Ползунок ставит выбранную точку на плоскость без перетаскивания.</p><h3>Знаки координат</h3><div class="signtab q" id="sDiag"></div>`;
+  }
+  if (id === 'graph') h = `<h2>Таблица → график</h2><div class="tbl" id="sDiag"></div>
+      <dl class="reads"><div><dt>v, км/ч</dt><dd id="r1"></dd></div><div><dt>Верно</dt><dd id="r2"></dd></div><div><dt>s : t</dt><dd id="r3"></dd></div></dl>` +
+      slider('inV', 'Скорость v, км/ч', 1, 5, 1, S.v) + S.s.map((s, i) => slider('inS' + i, `Путь при t = ${i + 1} ч, км`, 0, 20, 1, s)).join('');
+  if (id === 'read') h = `<h2>Курсор на графике</h2><div class="found" id="sDiag"></div>
+      <dl class="reads"><div><dt>Время</dt><dd id="r1"></dd></div><div><dt>T</dt><dd id="r2"></dd></div><div><dt>За час</dt><dd id="r3"></dd></div></dl>` +
+      slider('inH', 'Время суток, ч', 0, 24, 1, S.h) + `<p class="note" style="margin-top:8px">Находки отмечаются кнопками «Теплее всего» и «Ровно 0 °C» под рабочим полем.</p>`;
+  el.innerHTML = h;
+  const on = (sel, ev, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener(ev, fn); };
+  const setXY = () => { const x = +el.querySelector('#inX').value, y = +el.querySelector('#inY').value; S.pos[S.sel] = [x, y]; update(); };
+  on('#inX', 'input', setXY); on('#inY', 'input', setXY);
+  el.querySelectorAll('#selChips button').forEach(b => b.onclick = () => { S.sel = b.dataset.k; buildScheme(); update(); });
+  on('#inV', 'input', e => { S.v = +e.target.value; update(); });
+  S.s.forEach((s, i) => on('#inS' + i, 'input', e => { S.s[i] = +e.target.value; update(); }));
+  on('#inH', 'input', e => { S.h = +e.target.value; update(); });
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  const d = el.querySelector('#sDiag'); if (!d) return;
+  if (m.kind === 'point') {
+    KEYS.forEach((k, i) => set('#r' + (i + 1), m.pos[k] ? pt(m.pos[k][0], m.pos[k][1]) : '—'));
+    const p = m.pos[m.sel], q = p ? quad(p[0], p[1]) : '';
+    set('#inXO', p ? num(p[0]) : 'в лотке'); set('#inYO', p ? num(p[1]) : 'в лотке');
+    if (p) { val('#inX', p[0]); val('#inY', p[1]); }
+    const row = (n, a, b) => `<div class="h">${n}</div><div class="${q === n ? 'on' : ''}">${a}</div><div class="${q === n ? 'on' : ''}">${b}</div>`;
+    d.innerHTML = `<div class="h">четверть</div><div class="h">x</div><div class="h">y</div>` + row('I', '+', '+') + row('II', '−', '+') + row('III', '−', '−') + row('IV', '+', '−');
+    el.querySelectorAll('#selChips button').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === m.sel));
+  } else if (m.kind === 'graph') {
+    d.innerHTML = `<div class="h">t, ч</div>` + [1, 2, 3, 4].map(t => `<div>${t}</div>`).join('') + `<div class="h">s, км</div>` + m.s.map((s, i) => `<div class="${s === m.v * (i + 1) ? 'ok' : ''}">${s}</div>`).join('');
+    set('#r1', m.v); set('#r2', `${m.right}/4`); set('#r3', m.k ? m.k : '—');
+    set('#inVO', `${m.v} км/ч`); val('#inV', m.v);
+    m.s.forEach((s, i) => { set(`#inS${i}O`, `${s} км`); val('#inS' + i, s); });
+  } else {
+    const ch = m.h > 0 ? m.T - temp(m.h - 1) : null;
+    d.innerHTML = `<span class="${m.max ? 'ok' : ''}">${m.max ? 'max: 16 ч ✓' : 'max: ?'}</span>` + [0, 1].map(i => m.zeros[i] !== undefined ? `<span class="ok">0 °C: ${m.zeros[i]} ч ✓</span>` : '<span>0 °C: ?</span>').join('');
+    set('#r1', `${m.h} ч`); set('#r2', `${sg(m.T)}°`); set('#r3', ch === null ? '—' : `${sg(ch)}°`);
+    set('#inHO', `${m.h} ч`); val('#inH', m.h);
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'point') return [
+    { id: 'xaxis', icon: ICON.xaxis, name: 'Ось абсцисс Ox', spec: 'Горизонтальная ось. По ней читают первую координату x. Вправо — плюс, влево — минус.' },
+    { id: 'yaxis', icon: ICON.yaxis, name: 'Ось ординат Oy', spec: 'Вертикальная ось. По ней читают вторую координату y. Вверх — плюс, вниз — минус.' },
+    { id: 'origin', icon: ICON.origin, name: 'Начало координат O', spec: 'Точка пересечения осей, O(0; 0). От неё отсчитывают оба шага.' },
+    { id: 'unit', icon: ICON.unit, name: 'Единичные отрезки', spec: 'Голубые отрезки от O до 1 на каждой оси. Одна клетка — одна единица.' },
+    { id: 'quads', icon: ICON.quads, name: 'Координатные четверти', spec: 'I, II, III, IV — против часовой стрелки, начиная справа сверху.' },
+    { id: 'tray', icon: ICON.tray, name: 'Лоток с точками', spec: 'Отсюда тащите A, B и C. Точка на своём месте становится зелёной.' }];
+  if (id === 'graph') return [
+    { id: 'taxis', icon: ICON.xaxis, name: 'Ось времени t', spec: 'Горизонтальная ось, часы от 0 до 5.' },
+    { id: 'saxis', icon: ICON.yaxis, name: 'Ось пути s', spec: 'Вертикальная ось, километры. Одна клетка — 1 км, подписи через 4 км.' },
+    { id: 'pts', icon: ICON.pts, name: 'Точки графика', spec: 'Пары (t; s). Каждая ходит только вверх-вниз в своём столбике.' },
+    { id: 'table', icon: ICON.table, name: 'Таблица', spec: 'Те же пары в виде таблицы. Зелёные значения подходят к формуле.' },
+    { id: 'formula', icon: ICON.formula, name: 'Формула', spec: 's = v · t. Если все точки на одной прямой через O, она проводится сама.' }];
+  return [
+    { id: 'curve', icon: ICON.curve, name: 'График температуры', spec: 'Измерения каждые 2 часа, соединённые отрезками.' },
+    { id: 'taxisR', icon: ICON.yaxis, name: 'Ось температуры', spec: 'Градусы от −8 до +8 °C. Выше нуля — тепло, ниже — мороз.' },
+    { id: 'zero', icon: ICON.zero, name: 'Ось времени (0 °C)', spec: 'Горизонтальная ось проходит через 0 °C. Пересечение с графиком — ровно ноль.' },
+    { id: 'cursor', icon: ICON.cursor, name: 'Курсор', spec: 'Вертикальная линия на выбранном часе и табло со значением.' },
+    { id: 'marks', icon: ICON.marks, name: 'Отметки', spec: 'Найденные максимум и моменты 0 °C.' }];
+}
+
+function renderPanes(m) {
+  const Ls = LESSONS[S.lesson], done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Модель</h2><p class="note">Из чего состоит рабочее поле. Нажмите на пункт, чтобы найти его.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+const stepsWord = (n, pos, neg) => n === 0 ? 'на месте' : `${Math.abs(n)} ${plural(n, 'шаг', 'шага', 'шагов')} ${n > 0 ? pos : neg}`;
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'point') {
+    const k = m.sel, p = m.pos[k];
+    let h = `<h2>Как читать координаты</h2><div class="formula">${k}(x; y)</div><h3>Точка ${k}</h3><div class="steps">`;
+    if (!p) h += step(`${k} в лотке`, 'поставьте её на плоскость');
+    else h += step('1. абсцисса x', `${num(p[0])}: ${stepsWord(p[0], 'вправо', 'влево')}`) + step('2. ордината y', `${num(p[1])}: ${stepsWord(p[1], 'вверх', 'вниз')}`) +
+      step('запись', `${k}${pt(p[0], p[1])}`) + step('где', quadWord(p[0], p[1]), 'sum');
+    h += `</div><h3>Все точки</h3><div class="steps">`;
+    for (const q of KEYS) { const c = m.pos[q], tg = TARGET[q]; h += step(`${q}${pt(tg[0], tg[1])}`, c ? `стоит в ${pt(c[0], c[1])} ${isRight(q) ? '✓' : '✗'}` : 'в лотке'); }
+    return h + `</div><p class="note" style="margin-top:10px">Порядок важен: точки (5; −2) и (−2; 5) — разные. Первое число всегда по горизонтали.</p>`;
+  }
+  if (id === 'graph') {
+    let h = `<h2>Путь при постоянной скорости</h2><div class="formula">s = v · t</div><h3>Таблица для v = ${m.v} км/ч</h3><div class="steps">`;
+    m.s.forEach((s, i) => { const t = i + 1, need = m.v * t; h += step(`t = ${t} ч`, `s = ${m.v} · ${t} = ${need} км ${s === need ? '✓' : `(у вас ${s})`}`); });
+    h += `</div><h3>Проверка пропорциональности</h3><div class="steps">` + m.s.map((s, i) => step(`s : t при t = ${i + 1}`, `${s} : ${i + 1} = ${num(s / (i + 1))}`)).join('') +
+      step('вывод', m.k ? `отношение одно и то же (${m.k}) → прямая через O` : 'отношения разные → не прямая пропорциональность', 'sum') + `</div>`;
+    return h + `<p class="note" style="margin-top:10px">Отношение s : t и есть скорость. Чем больше скорость, тем круче идёт прямая.</p>`;
+  }
+  const hr = m.h, T0 = m.T;
+  let h = `<h2>Читаем график</h2><div class="formula">${hr} ч → ${sg(T0)} °C</div><h3>Шаги</h3><div class="steps">` +
+    step('1. время', `${hr} ч на оси t`) + step('2. вверх до графика', `точка ${pt(hr, T0)}`) + step('3. влево до оси T', `${sg(T0)} °C`);
+  if (hr % 2 === 1) { const a = temp(hr - 1), b = temp(hr + 1); h += step('между измерениями', `(${num(a)} + ${num(b)}) : 2 = ${num(T0)}`); }
+  h += step('знак', T0 > 0 ? 'выше оси — тепло' : T0 < 0 ? 'ниже оси — мороз' : 'на оси — ровно 0 °C', 'sum') + `</div>`;
+  if (hr > 0) { const ch = T0 - temp(hr - 1); h += `<h3>За последний час</h3><div class="steps">` + step(`${hr - 1} ч → ${hr} ч`, `${sg(temp(hr - 1))} → ${sg(T0)}`) + step('изменение', `${sg(ch)}°: ${ch > 0 ? 'растёт' : ch < 0 ? 'убывает' : 'не меняется'}`, 'sum') + `</div>`; }
+  return h + `<p class="note" style="margin-top:10px">Пример: в 4 ч график ниже всего — −6 °C. Это наименьшее значение за сутки.</p>`;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter'), ok = !!S.done[id];
+  if (id === 'point') el.innerHTML = `<div class="k">Точки</div><div class="v ${ok ? 'ok' : ''}">${m.right} / 3</div><div class="lr"><span>на плоскости</span><span>${m.placed}</span></div><div class="gauge"><b style="width:${(m.right / 3 * 100).toFixed(1)}%;background:var(--ok)"></b></div>`;
+  else if (id === 'graph') el.innerHTML = `<div class="k">Скорость</div><div class="v ${ok ? 'ok' : ''}">${m.v} км/ч</div><div class="lr"><span>точек</span><span>${m.right} из 4</span></div><div class="gauge"><b style="width:${(m.right / 4 * 100).toFixed(1)}%;background:var(--ok)"></b></div>`;
+  else el.innerHTML = `<div class="k">Курсор</div><div class="v ${ok ? 'ok' : ''}">${sg(m.T)} °C</div><div class="lr"><span>время</span><span>${m.h} ч</span></div><div class="lr"><span>найдено</span><span>${(m.max ? 1 : 0) + m.zeros.length} из 3</span></div>`;
+}
+
+function update() {
+  const m = model(), Ls = LESSONS[S.lesson];
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Координатная плоскость покорена!'), 900);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  point: '<path d="M8 17h50M33 3v26" stroke="#a9b4c9" stroke-width="1"/><circle cx="20" cy="9" r="2.8" fill="#86e0a8"/><circle cx="48" cy="22" r="2.8" fill="#ffb547"/><path d="M20 9V17M20 9H33" stroke="#86e0a8" stroke-width=".7" stroke-dasharray="1.5 1.5"/>',
+  graph: '<path d="M10 26h50M10 26V3" stroke="#a9b4c9" stroke-width="1"/><path d="M10 26L52 5" stroke="#86e0a8" stroke-width="1.6"/><circle cx="20.5" cy="20.75" r="2.4" fill="#86e0a8"/><circle cx="31" cy="15.5" r="2.4" fill="#86e0a8"/><circle cx="41.5" cy="10.25" r="2.4" fill="#86e0a8"/>',
+  read: '<path d="M6 16h56M6 28V2" stroke="#a9b4c9" stroke-width="1"/><path d="M6 20L14 23L22 18L28 16L36 9L44 8L50 13L56 16L62 20" fill="none" stroke="#ff8a73" stroke-width="1.6"/><path d="M44 3v24" stroke="#e8ecf4" stroke-width=".8" stroke-dasharray="2 2"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Ls, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Ls.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Ls.title}</span></span>
+      ${S.done[Ls.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const Ls = LESSONS[i];
+  S.lesson = i; S.hl = null; drag = null;
+  S.pos = { A: null, B: null, C: null }; S.sel = 'A';
+  S.v = Ls.v === undefined ? 4 : Ls.v; S.s = [1, 1, 1, 1];
+  S.h = Ls.h === undefined ? 6 : Ls.h; S.max = false; S.zeros = [];
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = Ls.task;
+  $('#hint').textContent = Ls.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = LESSONS[S.lesson], id = Ls.id;
+  let now = '';
+  if (id === 'point') now = `Координатная плоскость, x и y от −6 до 6, шаг 1 клетка. Нужно поставить A(−4; 3), B(5; −2), C(0; −5). Сейчас: ` +
+    KEYS.map(k => m.pos[k] ? `${k} стоит в ${pt(m.pos[k][0], m.pos[k][1])} (${quadWord(m.pos[k][0], m.pos[k][1])}, ${isRight(k) ? 'верно' : 'неверно'})` : `${k} ещё в лотке`).join('; ') + '.';
+  if (id === 'graph') now = `График пути пешехода: ось t от 0 до 5 ч, ось s от 0 до 20 км. Выбранная скорость v = ${m.v} км/ч (по заданию нужна 4 км/ч). Точки ученика: ` +
+    m.s.map((s, i) => `t = ${i + 1} ч → s = ${s} км`).join('; ') + `. Совпадают с s = v·t: ${m.right} из 4.${m.k ? ` Все точки на одной прямой через O с отношением s:t = ${m.k}.` : ' Точки пока не на одной прямой через начало координат.'}`;
+  if (id === 'read') now = `График температуры за сутки (замеры каждые 2 ч, с 0 до 24 ч): ${DATA.map((v, i) => `${i * 2} ч ${sg(v)}`).join(', ')}. Между замерами — отрезки. Курсор на ${m.h} ч, там ${sg(m.T)} °C. Ученик отметил: максимум — ${m.max ? 'да (16 ч)' : 'ещё нет'}; моменты 0 °C — ${m.zeros.length ? m.zeros.map(z => z + ' ч').join(', ') : 'пока ни одного'} (всего их 2).`;
+  return [
+    `Раздел: математика, 6 класс, функции и анализ, тема «Координатная плоскость». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+    'Не называй готовый ответ к заданию (нужные часы, значения пути): веди ученика наводящими вопросами и проверяй его рассуждения.',
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = LESSONS[S.lesson], done = S.done[Ls.id];
+  const q = {
+    point: 'Почему в записи A(x; y) важен порядок чисел?', graph: 'Почему при постоянной скорости график — прямая?',
+    read: 'Как по графику понять, что температура растёт?',
+  }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

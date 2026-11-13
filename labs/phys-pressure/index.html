@@ -1,0 +1,1002 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по физике, 7 класс: давление твёрдых тел, давление в жидкости и газе, атмосферное давление, закон Архимеда, плавание тел.">
+<title>Давление</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene [data-click]{cursor:pointer}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.meter .lr .ok{color:var(--ok)}
+.meter .lr .bad{color:var(--warn)}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button.rec{color:var(--force)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.rec{display:grid;gap:4px;margin-top:8px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M8 26a12 12 0 0 1 24 0" fill="none" stroke="var(--arm)" stroke-width="2.2" stroke-linecap="round"/><path d="M20 26L28 15" stroke="var(--force)" stroke-width="2.4" stroke-linecap="round"/><circle cx="20" cy="26" r="3" fill="var(--fg)"/><path d="M9 32h22" stroke="var(--muted)" stroke-width="2" stroke-linecap="round"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Физика · Давление</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/">Карта</a><a href="/physics/">Физика</a><a href="/labs/phys-pressure/" aria-current="page">Давление</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Давление</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/5</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Опытная площадка">
+    <svg class="scene" id="scene" role="img" aria-label="Площадка для опытов с давлением. Предметы можно тянуть и нажимать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const nf = x => fmt(x, Math.abs(x - Math.round(x)) < 1e-9 ? 0 : 1);
+const big = x => String(Math.round(x)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+
+const LESSONS = [
+  { id: 'solid', title: 'Давление твёрдых тел',
+    text: ['Давление показывает, с какой силой тело давит на каждый квадратный метр опоры. Одна и та же сила может давить сильно или слабо — всё решает площадь.',
+           'Давление находят так: p = F / S. Здесь F — сила давления (у стоящего человека это его вес), S — площадь опоры. Единица давления — паскаль: 1 Па = 1 Н/м², 1 кПа = 1000 Па.',
+           'Чтобы уменьшить давление, площадь опоры увеличивают: лыжи, гусеницы, широкий фундамент. Чтобы увеличить — уменьшают: нож точат, иглу делают острой.'],
+    why: 'Инженер-строитель подбирает ширину фундамента так, чтобы дом не давил на грунт сильнее допустимого — иначе стены дадут трещины. Вездеходы и тракторы на мягких полях Северного Казахстана ездят на широких шинах и гусеницах, чтобы не вязнуть. Спасатели МЧС на тонком льду ползут или кладут доску: площадь больше — давление меньше.',
+    task: 'Турист весит 60 кг и несёт рюкзак 20 кг. Подберите обувь, чтобы давление на снег было не больше 4 кПа. Потом встаньте в кроссовках на одну ногу.',
+    hint: 'Обувь и рюкзак меняются кнопками внизу. Снег выдерживает 4 кПа: если давление больше, турист проваливается. Считаем g ≈ 10 Н/кг.',
+    stage: 'Меняйте обувь и рюкзак кнопками внизу.',
+    body: 60, load0: 20, needLoad: 20, pMax: 4000,
+    check: m => m.safe && m.oneTried },
+  { id: 'liquid', title: 'Давление в жидкости и газе',
+    text: ['Молекулы жидкости и газа подвижны и всё время ударяются о стенки сосуда. Поэтому жидкость давит не только на дно, но и на стенки и на любое тело внутри неё.',
+           'Закон Паскаля: давление в жидкости или газе передаётся во все стороны одинаково. На одной глубине датчик покажет одно и то же, куда его ни поверни.',
+           'С глубиной давление жидкости растёт: p = ρgh, где ρ — плотность жидкости, h — глубина. Чем плотнее жидкость и чем глубже, тем больше давление.'],
+    why: 'Водолазы и дайверы знают: каждые 10 м воды добавляют около 100 кПа, поэтому глубоко погружаются только в прочном снаряжении. Плотину Капшагайской ГЭС внизу делают толще, чем вверху: там вода давит сильнее. Сантехники и инженеры водоканала рассчитывают давление в трубах, чтобы вода доходила до верхних этажей.',
+    task: 'Найдите в воде глубину, где давление воды 20 кПа, и поверните там датчик. Затем налейте керосин и найдите глубину с тем же давлением.',
+    hint: 'Тяните датчик вверх-вниз или жмите стрелки. Считаем g ≈ 10 Н/кг и только давление самой жидкости, без воздуха над ней.',
+    stage: 'Тяните датчик вверх и вниз.',
+    h0: 5, pNeed: 20000,
+    check: m => m.w20 && m.turned && m.k25 },
+  { id: 'atm', title: 'Атмосферное давление',
+    text: ['Землю окружает слой воздуха — атмосфера. У воздуха есть вес, поэтому он давит на всё, что находится на Земле. Это давление называют атмосферным.',
+           'Торричелли заполнил ртутью стеклянную трубку длиной 1 м и опустил её открытым концом в чашку с ртутью. Ртуть опустилась до высоты около 760 мм: такой столб уравновешивает давление воздуха. Нормальное атмосферное давление — 760 мм рт. ст. ≈ 101 300 Па.',
+           'Чем выше в горы, тем меньше воздуха над нами и тем ниже давление. Внизу при подъёме примерно на 11–12 м давление падает на 1 мм рт. ст. Атмосферное давление измеряют барометром.'],
+    why: 'Синоптики Казгидромета следят за давлением: если оно быстро падает, жди ветра и осадков. У пилотов и альпинистов высотомер — это барометр со шкалой в метрах. Врачи измеряют артериальное давление тоже в миллиметрах ртутного столба: «120 на 80» — это оттуда.',
+    task: 'Поднимитесь с барометром на высоту, где ртутный столбик опустится до 600 мм. Переведите это давление в килопаскали.',
+    hint: 'Тяните альпиниста по склону или жмите кнопки высоты. 1 мм рт. ст. ≈ 133 Па.',
+    stage: 'Тяните альпиниста вверх по склону.',
+    safe: 'Ртуть ядовита: её пары опасны для здоровья. Опыт Торричелли сегодня показывают только на модели или в закрытой установке. Разбился ртутный градусник — выйдите из комнаты, откройте окно и позвоните 112.',
+    H0: 800, mmNeed: 600, kpaOpts: [60, 80, 101, 600],
+    check: m => m.reached && m.conv },
+  { id: 'arch', title: 'Закон Архимеда',
+    text: ['Почему в воде камень поднять легче? Давление жидкости растёт с глубиной, поэтому снизу она давит на тело сильнее, чем сверху. Из этой разницы и получается выталкивающая сила.',
+           'Закон Архимеда: на тело в жидкости или газе действует выталкивающая сила, равная весу жидкости в объёме погружённой части тела: FA = ρж·g·Vпогр.',
+           'Сила Архимеда зависит от плотности жидкости и от объёма погружённой части. От материала тела не зависит, а от глубины — только пока тело не ушло под воду целиком.'],
+    why: 'Ювелиры и оценщики ломбардов проверяют золото «по Архимеду»: взвешивают изделие в воздухе и в воде и находят его плотность — подделку так видно сразу. Водолазы подбирают грузы на пояс, чтобы сила Архимеда не выталкивала их наверх. Инженеры порта Актау считают, сколько груза можно поставить на баржу.',
+    task: 'Погрузите в воду целиком алюминиевый цилиндр, а затем стальной того же объёма (100 см³). Сравните силы Архимеда.',
+    hint: 'Тяните динамометр вниз или жмите «Ниже». Сила Архимеда = вес в воздухе − показание в воде. Считаем g ≈ 10 Н/кг.',
+    stage: 'Тяните динамометр с цилиндром вниз, в воду.',
+    V: 100,
+    check: m => m.recAl && m.recSt },
+  { id: 'float', title: 'Плавание тел',
+    text: ['На тело в жидкости действуют две силы: сила тяжести вниз и сила Архимеда вверх. Какая больше — туда тело и движется.',
+           'Если плотность тела больше плотности жидкости, тело тонет. Если меньше — всплывает и плавает на поверхности. Если плотности равны, тело плавает внутри жидкости на любой глубине.',
+           'Плавающее тело погружается настолько, чтобы вес вытесненной жидкости был равен весу тела. Доля под водой равна ρтела / ρжидкости: у льда в воде это 9/10.'],
+    why: 'Кораблестроители рассчитывают, на сколько осядет судно с грузом: на борту рисуют ватерлинию, ниже которой загружать нельзя. Подводная лодка набирает воду в балластные цистерны, чтобы погрузиться, и выдувает её, чтобы всплыть. Рыбак подбирает поплавок и грузило так, чтобы поплавок стоял ровно и чутко ловил поклёвку.',
+    task: 'Подберите жидкости так, чтобы лёд утонул, стальной кубик всплыл, а кубик из оргстекла завис в толще жидкости.',
+    hint: 'Выберите тело и жидкость, затем нажмите «Опустить» или бросьте кубик мышкой. Сравнивайте плотности в таблице на вкладке «Схема».',
+    stage: 'Выберите тело и жидкость, бросьте кубик в сосуд.',
+    safe: 'Ртуть ядовита. Опыт с ртутью здесь — только виртуальный: дома и в школе с ней не работают.',
+    fb0: 'ice', fl0: 'water',
+    check: m => m.iceSink && m.steelFloat && m.plexHover },
+];
+
+const LS_KEY = 'luch-phys-pressure';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+
+// ---------- physics data ----------
+const g = 10;
+const SHOES = { boots: { n: 'Кроссовки', s: 0.02, w: 20 }, shoes: { n: 'Снегоступы', s: 0.09, w: 64 }, skis: { n: 'Лыжи', s: 0.13, w: 180 } };
+const LIQ = {
+  water: { n: 'Вода', r: 1000, c: '#4f9fd6' }, kero: { n: 'Керосин', r: 800, c: '#c9b46a' }, brine: { n: 'Солёная вода', r: 1200, c: '#45b9ad' },
+  oil: { n: 'Масло', r: 900, c: '#d6a94a' }, merc: { n: 'Ртуть', r: 13600, c: '#aeb8c9' } };
+const LIQ2 = ['water', 'kero', 'brine'], LIQ4 = ['water', 'oil', 'brine'], LIQ5 = ['kero', 'water', 'brine', 'merc'];
+const ABODY = { al: { n: 'Алюминий', r: 2700, c: '#c3cbd8' }, st: { n: 'Сталь', r: 7800, c: '#7d8799' } };
+const FB = {
+  cork: { n: 'Пробка', r: 240, c: '#c99a63' }, pine: { n: 'Сосна', r: 500, c: '#e3b56e' }, ice: { n: 'Лёд', r: 900, c: '#d4f1fb' },
+  plex: { n: 'Оргстекло', r: 1200, c: '#8fd0e0' }, al: { n: 'Алюминий', r: 2700, c: '#c3cbd8' }, steel: { n: 'Сталь', r: 7800, c: '#7d8799' } };
+const FBK = Object.keys(FB);
+const PLACES = [{ n: 'Уровень моря', H: 0 }, { n: 'Алматы', H: 800 }, { n: 'Медеу', H: 1690 }, { n: 'Шымбулак', H: 2260 }, { n: 'Пик Талгар', H: 4979 }, { n: 'Хан-Тенгри', H: 7010 }];
+const mmHg = H => 760 * Math.exp(-H / 8400);       // barometric formula, scale height ≈ 8,4 km
+const PA_MM = 133.3;
+
+// ---------- geometry (SVG units; the scene is 520 × 405) ----------
+const SN = { y: 236, cm: 2.2 };                                        // lesson 1: snow surface, units per cm
+const TK = { x0: 170, x1: 370, ys: 100, k: 90 };                       // lesson 2: tank, 90 units per metre
+const MT = [[0, 44], [800, 84], [1690, 118], [2260, 140], [3500, 182], [4979, 222], [7010, 262]];  // lesson 3: left slope (H, x)
+const yOfH = H => 370 - H * 0.032;
+const xOfH = H => { for (let i = 1; i < MT.length; i++) if (H <= MT[i][0]) { const a = MT[i - 1], b = MT[i]; return a[1] + (b[1] - a[1]) * (H - a[0]) / (b[0] - a[0]); } return MT[MT.length - 1][1]; };
+const TB = { x: 444, yz: 372, k: 0.285 };                              // lesson 3: Torricelli tube, units per mm
+const AR = { x: 250, ys: 292, top: 118 };                              // lesson 4: dynamometer column, water surface
+const FT = { x0: 122, x1: 398, ys: 176, yb: 386, A: 56, cx: 260, top: 96 };   // lesson 5: tank and cube
+
+function resetState() {
+  const Ls = L();
+  Object.assign(S, {
+    load: Ls.load0 != null ? Ls.load0 : 20, shoe: 'boots', one: false, safeOK: false, oneOK: false, sv: 0,
+    hd: Ls.h0 != null ? Ls.h0 : 5, liq: 'water', orient: 0, seenOr: {}, w20: false, turned: false, k25: false,
+    H: Ls.H0 != null ? Ls.H0 : 800, reached: false, conv: false,
+    tr: 0, body: 'al', liq2: 'water', recAl: null, recSt: null,
+    fb: Ls.fb0 || 'ice', fl: Ls.fl0 || 'water', fy: FT.top, fmode: 'held', seen: {}, hl: null,
+  });
+}
+resetState();
+
+const pSolid = () => (L().body + S.load) * g / (SHOES[S.shoe].s * (S.one ? 1 : 2));
+const sinkOf = p => p <= L().pMax ? 0.4 : Math.min(45, 1 + (p - L().pMax) / 600);
+const pLiq = () => LIQ[S.liq].r * g * S.hd / 10;
+const fSub = () => clamp((AR.top + S.tr + 137 - AR.ys) / 50, 0, 1);        // body bottom = top + tr + 137
+const archF = () => { const V = L().V * 1e-6, P = ABODY[S.body].r * g * V, Fa = LIQ[S.liq2].r * g * V * fSub(); return { P, Fa, F: P - Fa, Vs: L().V * fSub() }; };
+const subFrac = () => clamp((S.fy + FT.A - FT.ys) / FT.A, 0, 1);
+const outcomeOf = (fb, fl) => FB[fb].r < LIQ[fl].r ? 'float' : FB[fb].r > LIQ[fl].r ? 'sink' : 'hover';
+const OUT = { float: 'плавает на поверхности', sink: 'тонет', hover: 'плавает внутри жидкости' };
+const seenAny = (b, o) => Object.keys(S.seen).some(k => k.split('|')[0] === b && S.seen[k] === o);
+
+function model() {
+  const id = LID();
+  if (id === 'solid') { const p = pSolid(); return { kind: id, F: (L().body + S.load) * g, Sa: SHOES[S.shoe].s * (S.one ? 1 : 2), p, sink: p > L().pMax, safe: S.safeOK, oneTried: S.oneOK }; }
+  if (id === 'liquid') return { kind: id, h: S.hd / 10, p: pLiq(), w20: S.w20, turned: S.turned, k25: S.k25 };
+  if (id === 'atm') { const mm = mmHg(S.H); return { kind: id, H: S.H, mm, pa: mm * PA_MM, reached: S.reached, conv: S.conv }; }
+  if (id === 'arch') return Object.assign({ kind: id, f: fSub(), recAl: S.recAl != null, recSt: S.recSt != null }, archF());
+  return { kind: id, out: outcomeOf(S.fb, S.fl), k: subFrac(), iceSink: seenAny('ice', 'sink'), steelFloat: seenAny('steel', 'float'), plexHover: seenAny('plex', 'hover') };
+}
+
+// ---------- drawing helpers ----------
+const T = (x, y, s, fill, txt, anchor = 'middle', extra = '') => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${s}" fill="${fill}" text-anchor="${anchor}" ${extra}>${txt}</text>`;
+const HALO = `paint-order="stroke" stroke="${INK}" stroke-width="3"`;
+function arrow(x1, y1, x2, y2, col, w = 3) {
+  const a = Math.atan2(y2 - y1, x2 - x1), L2 = Math.hypot(x2 - x1, y2 - y1); if (L2 < 1) return '';
+  const hl = Math.min(11, L2 * 0.6), hx = x2 - hl * Math.cos(a), hy = y2 - hl * Math.sin(a), hw = hl * 0.5;
+  const p1 = `${(hx + hw * Math.sin(a)).toFixed(1)} ${(hy - hw * Math.cos(a)).toFixed(1)}`, p2 = `${(hx - hw * Math.sin(a)).toFixed(1)} ${(hy + hw * Math.cos(a)).toFixed(1)}`;
+  return `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${hx.toFixed(1)} ${hy.toFixed(1)}" stroke="${INK}" stroke-width="${w + 2.6}" stroke-linecap="round"/><path d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${hx.toFixed(1)} ${hy.toFixed(1)}" stroke="${col}" stroke-width="${w}" stroke-linecap="round"/><path d="M${x2.toFixed(1)} ${y2.toFixed(1)}L${p1}L${p2}Z" fill="${col}" stroke="${INK}" stroke-width="1.2" stroke-linejoin="round"/>`;
+}
+function bg() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern>
+    <linearGradient id="deep" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".45"/></linearGradient></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+
+// ---------- lesson 1: tourist on snow ----------
+function solidScene() {
+  const Ls = L(), sh = SHOES[S.shoe], p = pSolid(), dy = S.sv * SN.cm, fy = SN.y + dy, cx = 250;
+  let h = `<rect x="-2000" y="${SN.y}" width="4520" height="1200" fill="#c9d6ea" opacity=".16"/><path d="M-2000 ${SN.y}H2520" stroke="#dfe8f5" stroke-width="2" opacity=".6"/>`;
+  for (let i = 0; i < 46; i++) { const x = 30 + (i * 97) % 470, y = SN.y + 12 + (i * 53) % 118; h += `<circle cx="${x}" cy="${y}" r="1.4" fill="#dfe8f5" opacity=".25"/>`; }
+  // pit
+  if (dy > 1.5) h += `<rect x="${(cx - sh.w / 2 - 4).toFixed(1)}" y="${SN.y}" width="${sh.w + 8}" height="${dy.toFixed(1)}" fill="#0e1520" opacity=".75"/>`;
+  // ruler
+  h += `<path d="M452 ${SN.y}V${SN.y + 50 * SN.cm}" stroke="#a9b4c9" stroke-width="1.6"/>`;
+  for (let c = 0; c <= 50; c += 10) h += `<path d="M446 ${SN.y + c * SN.cm}h12" stroke="#a9b4c9" stroke-width="1.2"/>` + T(462, SN.y + c * SN.cm + 3, 9, '#8b96ad', c + (c === 50 ? ' см' : ''), 'start');
+  h += `<path d="M440 ${fy.toFixed(1)}H458" stroke="${p > Ls.pMax ? '#ff8a73' : '#86e0a8'}" stroke-width="2.4"/>` + T(436, fy + 3, 9.5, p > Ls.pMax ? '#ff8a73' : '#86e0a8', `${fmt(S.sv, 0)} см`, 'end', HALO);
+  // footwear
+  if (S.shoe === 'skis') h += `<path d="M${cx - sh.w / 2} ${fy - 3}H${cx + sh.w / 2 - 8}q10 0 12 -10" fill="none" stroke="${INK}" stroke-width="8" stroke-linecap="round"/><path d="M${cx - sh.w / 2} ${fy - 3}H${cx + sh.w / 2 - 8}q10 0 12 -10" fill="none" stroke="#ff8a73" stroke-width="5" stroke-linecap="round"/>`;
+  else if (S.shoe === 'shoes') h += `<ellipse cx="${cx}" cy="${fy - 3}" rx="${sh.w / 2}" ry="5" fill="#3b4b69" stroke="${INK}" stroke-width="2"/><path d="M${cx - sh.w / 2 + 6} ${fy - 3}H${cx + sh.w / 2 - 6}M${cx - 14} ${fy - 7}v8M${cx} ${fy - 7}v8M${cx + 14} ${fy - 7}v8" stroke="#8b96ad" stroke-width="1.2"/>`;
+  // person: legs, body, head
+  const hip = fy - 62, sho = fy - 112;
+  const legL = `M${cx - 4} ${hip}L${cx - 8} ${fy - 6}`, legR = S.one ? `M${cx + 4} ${hip}L${cx + 22} ${fy - 34}L${cx + 14} ${fy - 50}` : `M${cx + 4} ${hip}L${cx + 8} ${fy - 6}`;
+  h += `<path d="${legL}${legR}" fill="none" stroke="${INK}" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/><path d="${legL}${legR}" fill="none" stroke="#5c6f96" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>`;
+  if (S.shoe === 'boots') h += `<rect x="${cx - 18}" y="${fy - 8}" width="20" height="8" rx="3" fill="#ffb547" stroke="${INK}" stroke-width="1.6"/>` + (S.one ? `<rect x="${cx + 10}" y="${fy - 56}" width="18" height="8" rx="3" fill="#ffb547" stroke="${INK}" stroke-width="1.6" transform="rotate(-50 ${cx + 19} ${fy - 52})"/>` : `<rect x="${cx - 1}" y="${fy - 8}" width="20" height="8" rx="3" fill="#ffb547" stroke="${INK}" stroke-width="1.6"/>`);
+  else h += `<rect x="${cx - 14}" y="${fy - 9}" width="14" height="7" rx="3" fill="#3a4762" stroke="${INK}" stroke-width="1.4"/>` + (S.one ? '' : `<rect x="${cx + 1}" y="${fy - 9}" width="14" height="7" rx="3" fill="#3a4762" stroke="${INK}" stroke-width="1.4"/>`);
+  // backpack
+  if (S.load > 0) { const bh = 18 + S.load * 1.3, bw = 22 + S.load * 0.5; h += `<rect x="${(cx - 12 - bw).toFixed(1)}" y="${(sho + 2).toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="6" fill="#86e0a8" stroke="${INK}" stroke-width="2"/>` + T(cx - 12 - bw / 2, sho + 2 + bh / 2 + 3, 8.5, INK, S.load + ' кг'); }
+  h += `<path d="M${cx} ${hip}V${sho}" stroke="${INK}" stroke-width="22" stroke-linecap="round"/><path d="M${cx} ${hip}V${sho}" stroke="#72d4e8" stroke-width="18" stroke-linecap="round"/>`;
+  h += `<path d="M${cx + 6} ${sho + 6}L${cx + 22} ${hip - 6}" stroke="#72d4e8" stroke-width="6" stroke-linecap="round"/>`;
+  h += `<circle cx="${cx}" cy="${sho - 18}" r="12" fill="#f2c9a0" stroke="${INK}" stroke-width="2"/><path d="M${cx - 12} ${sho - 21}q12 -14 24 0z" fill="#ff8a73" stroke="${INK}" stroke-width="1.4"/>`;
+  // weight arrow
+  h += arrow(cx + 40, sho + 10, cx + 40, hip + 30, '#ffb547', 3) + T(cx + 48, sho + 30, 10, '#ffb547', `F = ${big((Ls.body + S.load) * g)} Н`, 'start', HALO);
+  // pressure arrows under the support
+  const n = S.shoe === 'skis' ? 9 : S.shoe === 'shoes' ? 5 : S.one ? 2 : 4, w = S.shoe === 'boots' ? (S.one ? 18 : 38) : sh.w - 12;
+  const x0 = S.shoe === 'boots' ? cx - 17 : cx - w / 2, len = clamp(p / 1000 * 1.6, 5, 30), col = p > Ls.pMax ? '#ff8a73' : '#86e0a8';
+  for (let i = 0; i < n; i++) { const x = x0 + (n === 1 ? w / 2 : w * i / (n - 1)); h += arrow(x, fy + 2, x, fy + 2 + len, col, 2); }
+  h += T(Math.min(x0, cx - sh.w / 2) - 10, fy + 16, 11, col, `p = ${fmt(p / 1000, 1)} кПа`, 'end', HALO);
+  h += T(30, SN.y - 10, 9.5, '#dfe8f5', `снег выдерживает ${Ls.pMax / 1000} кПа`, 'start', HALO);
+  return h;
+}
+
+// ---------- lesson 2: tank and pressure probe ----------
+function gauge(cx, cy, r, val, max, unit, label) {
+  let h = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#121a28" stroke="#a9b4c9" stroke-width="2.4"/>`;
+  const ang = v => (-225 + 270 * v / max) * Math.PI / 180;
+  for (let i = 0; i <= 6; i++) { const a = ang(max * i / 6); h += `<path d="M${(cx + Math.cos(a) * (r - 4)).toFixed(1)} ${(cy + Math.sin(a) * (r - 4)).toFixed(1)}L${(cx + Math.cos(a) * (r - 10)).toFixed(1)} ${(cy + Math.sin(a) * (r - 10)).toFixed(1)}" stroke="#a9b4c9" stroke-width="1.4"/>` + T(cx + Math.cos(a) * (r - 18), cy + Math.sin(a) * (r - 18) + 3, 7.5, '#8b96ad', nf(max * i / 6)); }
+  const a = ang(clamp(val, 0, max));
+  h += `<path d="M${cx} ${cy}L${(cx + Math.cos(a) * (r - 8)).toFixed(1)} ${(cy + Math.sin(a) * (r - 8)).toFixed(1)}" stroke="#ff8a73" stroke-width="2.4" stroke-linecap="round"/><circle cx="${cx}" cy="${cy}" r="3.5" fill="#e8ecf4"/>`;
+  h += T(cx, cy + r + 16, 11, '#e8ecf4', `${fmt(val, 1)} ${unit}`, 'middle', HALO);
+  return h;
+}
+function liquidScene() {
+  const lq = LIQ[S.liq], h0 = S.hd / 10, py = TK.ys + h0 * TK.k, cx = 270;
+  let h = '';
+  // jets from holes in the left wall: deeper — stronger
+  for (const d of [0.5, 1.5, 2.5]) { const y = TK.ys + d * TK.k, r = 22 * Math.sqrt(d * lq.r / 1000) + 8; h += `<path d="M${TK.x0} ${y}q${-r * 0.7} 2 ${-r} ${390 - y > 60 ? 60 : 390 - y}" fill="none" stroke="${lq.c}" stroke-width="3" opacity=".7" stroke-linecap="round"/>`; }
+  h += `<rect x="${TK.x0 + 2}" y="${TK.ys}" width="${TK.x1 - TK.x0 - 4}" height="${3 * TK.k}" fill="${lq.c}" opacity=".42"/><rect x="${TK.x0 + 2}" y="${TK.ys}" width="${TK.x1 - TK.x0 - 4}" height="${3 * TK.k}" fill="url(#deep)"/>`;
+  h += `<path d="M${TK.x0 + 2} ${TK.ys}H${TK.x1 - 2}" stroke="${lq.c}" stroke-width="2"/>`;
+  h += `<path d="M${TK.x0} ${TK.ys - 22}V${TK.ys + 3 * TK.k}H${TK.x1}V${TK.ys - 22}" fill="none" stroke="#a9b4c9" stroke-width="3" stroke-linejoin="round"/>`;
+  h += T((TK.x0 + TK.x1) / 2, TK.ys + 3 * TK.k - 8, 10, '#e8ecf4', `${lq.n} · ρ = ${big(lq.r)} кг/м³`, 'middle', HALO);
+  // depth scale on the right wall
+  for (let d = 0; d <= 30; d += 5) { const y = TK.ys + d / 10 * TK.k; h += `<path d="M${TK.x1} ${y}h${d % 10 ? 6 : 10}" stroke="#a9b4c9" stroke-width="1.2"/>`; if (d % 10 === 0) h += T(TK.x1 + 14, y + 3, 9, '#8b96ad', (d / 10) + ' м', 'start'); }
+  // hose to the gauge
+  h += `<path d="M${cx} ${py}V${TK.ys - 40}H452V258" fill="none" stroke="#72d4e8" stroke-width="2.4" opacity=".8"/>`;
+  // probe with membrane, rotated by orientation
+  const rot = [0, -90, 180][S.orient];
+  h += `<g data-drag="probe"><circle cx="${cx}" cy="${py.toFixed(1)}" r="26" fill="transparent"/><g transform="translate(${cx} ${py.toFixed(1)}) rotate(${rot})">
+    <path d="M-14 12L-6 -6H6L14 12Z" fill="#e8ecf4" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/><path d="M-14 12H14" stroke="#ff8a73" stroke-width="3.4"/><path d="M0 -6V-16" stroke="#e8ecf4" stroke-width="3"/></g>
+    </g>`;
+  h += T(cx + 30, py + 4, 10, '#ffb547', `h = ${fmt(h0, 1)} м`, 'start', HALO);
+  h += gauge(452, 300, 42, pLiq() / 1000, 36, 'кПа', 'манометр');
+  return h;
+}
+
+// ---------- lesson 3: mountain and Torricelli tube ----------
+function atmScene() {
+  const mm = mmHg(S.H);
+  let h = '';
+  // height axis
+  for (let H = 0; H <= 7000; H += 1000) h += `<path d="M28 ${yOfH(H)}h6" stroke="#a9b4c9" stroke-width="1.2"/>` + T(25, yOfH(H) + 3, 8.5, '#8b96ad', H / 1000 + (H === 7000 ? ' км' : ''), 'end');
+  h += `<path d="M31 ${yOfH(0)}V${yOfH(7100)}" stroke="#a9b4c9" stroke-width="1.2"/>`;
+  // mountain
+  const pts = MT.map(([H, x]) => `${x},${yOfH(H).toFixed(1)}`).join(' ');
+  h += `<polygon points="34,372 ${pts} 296,${yOfH(5600).toFixed(1)} 322,${yOfH(4300).toFixed(1)} 352,${yOfH(2400).toFixed(1)} 380,372" fill="#2a3550" stroke="#4a5a7c" stroke-width="2" stroke-linejoin="round"/>`;
+  h += `<polygon points="${xOfH(4300)},${yOfH(4300)} ${xOfH(4979)},${yOfH(4979)} 262,${yOfH(7010)} 290,${yOfH(5900)} 276,${yOfH(5300)} 252,${yOfH(5600)} 236,${yOfH(4700)}" fill="#dfe8f5" opacity=".75"/>`;
+  h += `<rect x="-2000" y="372" width="4520" height="600" fill="#1b2a22"/>`;
+  // places
+  PLACES.forEach((P, i) => { const x = xOfH(P.H), y = yOfH(P.H); h += `<g data-click="pl-${i}"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="10" fill="transparent"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.4" fill="#72d4e8" stroke="${INK}" stroke-width="1.2"/>` + T(x + 8, y + 12, 8.5, '#72d4e8', P.n, 'start', HALO) + `</g>`; });
+  // climber
+  const x = xOfH(S.H), y = yOfH(S.H);
+  h += `<g data-drag="climber"><circle cx="${x.toFixed(1)}" cy="${(y - 12).toFixed(1)}" r="24" fill="transparent"/><path d="M${x.toFixed(1)} ${y.toFixed(1)}v-30" stroke="#e8ecf4" stroke-width="1.8"/><path d="M${x.toFixed(1)} ${(y - 30).toFixed(1)}h16l-4 5 4 5h-16z" fill="#ffb547" stroke="${INK}" stroke-width="1.2"/><circle cx="${(x - 7).toFixed(1)}" cy="${(y - 18).toFixed(1)}" r="7" fill="#ff8a73" stroke="${INK}" stroke-width="2"/></g>`;
+  h += T(x - 18, y - 30, 10, '#ffb547', `${big(S.H)} м`, 'end', HALO);
+  // tube
+  const ytop = TB.yz - 830 * TB.k, yHg = TB.yz - mm * TB.k;
+  h += `<path d="M${TB.x - 46} ${TB.yz}V${ytop}" stroke="#a9b4c9" stroke-width="1.2"/>`;
+  for (let v = 0; v <= 800; v += 100) h += `<path d="M${TB.x - 46} ${TB.yz - v * TB.k}h${v % 200 ? 6 : 10}" stroke="#a9b4c9" stroke-width="1.2"/>` + (v % 200 === 0 ? T(TB.x - 50, TB.yz - v * TB.k + 3, 8.5, '#8b96ad', v, 'end') : '');
+  h += T(TB.x - 50, ytop - 6, 8.5, '#8b96ad', 'мм', 'end');
+  h += `<path d="M${TB.x - 40} ${(TB.yz - 760 * TB.k).toFixed(1)}H${TB.x + 30}" stroke="#86e0a8" stroke-width="1" stroke-dasharray="3 3"/>` + T(TB.x + 32, TB.yz - 760 * TB.k + 3, 8.5, '#86e0a8', '760', 'start');
+  h += `<rect x="${TB.x - 8}" y="${ytop}" width="16" height="${(TB.yz + 10 - ytop).toFixed(1)}" rx="8" fill="rgba(160,185,230,.08)"/>`;
+  h += `<rect x="${TB.x - 5}" y="${yHg.toFixed(1)}" width="10" height="${(TB.yz + 10 - yHg).toFixed(1)}" fill="#aeb8c9"/>`;
+  h += `<rect x="${TB.x - 8}" y="${ytop}" width="16" height="${(TB.yz + 10 - ytop).toFixed(1)}" rx="8" fill="none" stroke="#e8ecf4" stroke-width="2"/>`;
+  h += T(TB.x + 13, (ytop + yHg) / 2, 8.5, '#8b96ad', 'пустота', 'start');
+  h += `<path d="M${TB.x - 34} ${TB.yz}h68v14q0 6 -6 6h-56q-6 0 -6 -6z" fill="#aeb8c9" stroke="#e8ecf4" stroke-width="2"/>`;
+  h += `<path d="M${TB.x + 12} ${yHg.toFixed(1)}h22" stroke="#ffb547" stroke-width="1.6"/>` + T(TB.x + 36, yHg + 4, 10.5, '#ffb547', `${fmt(mm, 0)} мм`, 'start', HALO);
+  // air pressure arrows on the dish
+  const al = clamp(mm / 760 * 22, 6, 24);
+  for (const dx of [-28, 22]) h += arrow(TB.x + dx, TB.yz - 6 - al, TB.x + dx, TB.yz - 3, '#72d4e8', 2);
+  h += T(TB.x, TB.yz + 36, 9, '#72d4e8', 'давит воздух');
+  return h;
+}
+
+// ---------- lesson 4: dynamometer and overflow vessel ----------
+function archScene() {
+  const A = archF(), lq = LIQ[S.liq2], top = AR.top + S.tr, x = AR.x, b = ABODY[S.body];
+  let h = '';
+  // overflow vessel and cup
+  h += `<rect x="190" y="${AR.ys}" width="120" height="${386 - AR.ys}" fill="${lq.c}" opacity=".42"/>`;
+  h += `<path d="M190 ${AR.ys - 50}V386H310V${AR.ys - 50}" fill="none" stroke="#a9b4c9" stroke-width="3" stroke-linejoin="round"/><path d="M310 ${AR.ys - 2}l34 12" stroke="#a9b4c9" stroke-width="3" stroke-linecap="round"/>`;
+  const cupH = 70, lvl = A.Vs / 100 * 40;
+  h += `<rect x="352" y="${(386 - lvl).toFixed(1)}" width="56" height="${lvl.toFixed(1)}" fill="${lq.c}" opacity=".6"/><path d="M352 ${386 - cupH}V386H408V${386 - cupH}" fill="none" stroke="#a9b4c9" stroke-width="2.4" stroke-linejoin="round"/>`;
+  if (A.Vs > 0.5) h += `<path d="M344 ${AR.ys + 10}q8 4 10 ${386 - lvl - AR.ys - 14}" fill="none" stroke="${lq.c}" stroke-width="2" opacity=".7"/>`;
+  h += T(380, 404, 9, '#8b96ad', `${nf(A.Vs)} см³ · ${fmt(LIQ[S.liq2].r * g * A.Vs * 1e-6, 2)} Н`);
+  // stand rod
+  h += `<path d="M${x} ${top - 400}V${top}" stroke="#a9b4c9" stroke-width="2"/>`;
+  // dynamometer body: scale 0…10 N
+  const dyn = `<rect x="${x - 20}" y="${top}" width="40" height="86" rx="8" fill="#e8ecf4" stroke="${INK}" stroke-width="2"/>`;
+  let sc = '';
+  for (let n = 0; n <= 10; n += 1) sc += `<path d="M${x - 14} ${top + 10 + n * 6.6}h${n % 5 ? 6 : 10}" stroke="${INK}" stroke-width="1"/>` + (n % 2 === 0 ? T(x + 12, top + 13 + n * 6.6, 7, INK, n, 'end') : '');
+  const pyy = top + 10 + A.F * 6.6;
+  h += `<g data-drag="dyn"><rect x="${x - 60}" y="${top - 10}" width="120" height="160" fill="transparent"/>${dyn}${sc}<path d="M${x - 18} ${pyy.toFixed(1)}h22" stroke="#ff8a73" stroke-width="2.6"/></g>`;
+  return h + archBody(A, b, top, x, lq);
+}
+function archBody(A, b, top, x, lq) {
+  const y0 = top + 87, cy = y0 + 50;
+  let h = `<g data-drag="dyn"><path d="M${x} ${top + 86}V${y0}" stroke="#e8ecf4" stroke-width="1.6"/><rect x="${x - 20}" y="${y0}" width="40" height="50" rx="4" fill="${b.c}" stroke="${INK}" stroke-width="2"/>
+    <ellipse cx="${x}" cy="${y0}" rx="20" ry="4" fill="#e8ecf4" opacity=".35"/>` + T(x, y0 + 29, 8.5, INK, b.n.slice(0, 2)) + `</g>`;
+  // water drawn over the immersed part
+  if (A.Vs > 0) h += `<rect x="${x - 21}" y="${AR.ys}" width="42" height="${(Math.min(cy, 386) - AR.ys).toFixed(1)}" fill="${lq.c}" opacity=".35" pointer-events="none"/>`;
+  h += `<path d="M190 ${AR.ys}H310" stroke="${lq.c}" stroke-width="2"/>`;
+  // forces on the cylinder
+  const k = 12, mx = x + 46;
+  h += arrow(mx, y0 + 25, mx, y0 + 25 + A.P * k * 0.5 + 6, '#ffb547', 2.6) + T(mx + 6, y0 + 25 + A.P * k * 0.25 + 10, 9, '#ffb547', `P = ${fmt(A.P, 1)} Н`, 'start', HALO);
+  if (A.Fa > 0.01) h += arrow(x - 46, y0 + 45, x - 46, y0 + 45 - A.Fa * k * 0.5 - 6, '#72d4e8', 2.6) + T(x - 52, y0 + 40, 9, '#72d4e8', `FA = ${fmt(A.Fa, 2)} Н`, 'end', HALO);
+  h += T(x - 26, top + 20, 11, '#ff8a73', `${fmt(A.F, 2)} Н`, 'end', HALO);
+  h += T(250, 401, 9, '#e8ecf4', `${lq.n} · ρ = ${big(lq.r)} кг/м³`, 'middle', HALO);
+  return h;
+}
+
+// ---------- lesson 5: floating cube ----------
+const fArrowLen = rho => 10 + 46 * Math.sqrt(rho / 13600);
+function floatScene() {
+  const lq = LIQ[S.fl], b = FB[S.fb], A = FT.A, x0 = FT.cx - A / 2, k = subFrac();
+  let h = `<rect x="${FT.x0 + 2}" y="${FT.ys}" width="${FT.x1 - FT.x0 - 4}" height="${FT.yb - FT.ys}" fill="${lq.c}" opacity="${S.fl === 'merc' ? .7 : .42}"/><rect x="${FT.x0 + 2}" y="${FT.ys}" width="${FT.x1 - FT.x0 - 4}" height="${FT.yb - FT.ys}" fill="url(#deep)" opacity=".6"/>`;
+  h += `<g data-drag="cube"><rect x="${x0 - 14}" y="${(S.fy - 14).toFixed(1)}" width="${A + 28}" height="${A + 28}" fill="transparent"/><rect x="${x0}" y="${S.fy.toFixed(1)}" width="${A}" height="${A}" rx="4" fill="${b.c}" stroke="${INK}" stroke-width="2.2" ${S.fb === 'plex' ? 'fill-opacity=".75"' : ''}/>` +
+    (S.fb === 'pine' ? `<path d="M${x0 + 8} ${(S.fy + 16).toFixed(1)}q20 6 40 0M${x0 + 8} ${(S.fy + 34).toFixed(1)}q20 6 40 0" fill="none" stroke="#a87a3e" stroke-width="1.4"/>` : '') +
+    T(FT.cx, S.fy + A / 2 + 4, 9, INK, b.n) + `</g>`;
+  // liquid over the immersed part, surface line, walls
+  if (k > 0) h += `<rect x="${x0}" y="${Math.max(FT.ys, S.fy).toFixed(1)}" width="${A}" height="${(A * k).toFixed(1)}" fill="${lq.c}" opacity=".28" pointer-events="none"/>`;
+  h += `<path d="M${FT.x0 + 2} ${FT.ys}H${FT.x1 - 2}" stroke="${lq.c}" stroke-width="2"/>`;
+  h += `<path d="M${FT.x0} ${FT.ys - 40}V${FT.yb}H${FT.x1}V${FT.ys - 40}" fill="none" stroke="#a9b4c9" stroke-width="3" stroke-linejoin="round"/>`;
+  // forces
+  const cy = S.fy + A / 2, lw = fArrowLen(b.r), la = k > 0 ? fArrowLen(lq.r * k) : 0;
+  h += arrow(FT.cx + 44, cy, FT.cx + 44, cy + lw, '#ffb547', 2.6) + T(FT.cx + 50, cy + lw / 2 + 4, 9.5, '#ffb547', 'Fт', 'start', HALO);
+  if (la > 0) h += arrow(FT.cx - 44, cy, FT.cx - 44, cy - la, '#72d4e8', 2.6) + T(FT.cx - 50, cy - la / 2 + 4, 9.5, '#72d4e8', 'FA', 'end', HALO);
+  if (S.fmode === 'rest' && outcomeOf(S.fb, S.fl) === 'float') h += T(FT.cx + 34, S.fy + A + 2 - A * (1 - k) - 6, 9, '#e8ecf4', `под жидкостью ${Math.round(k * 100)}%`, 'start', HALO);
+  h += T(FT.x0 + 8, FT.yb - 10, 9.5, '#e8ecf4', `${lq.n}: ρ = ${big(lq.r)} кг/м³`, 'start', HALO);
+  h += T(FT.x0 + 8, FT.yb - 24, 9.5, b.c, `${b.n}: ρ = ${big(b.r)} кг/м³`, 'start', HALO);
+  return h;
+}
+
+function hlBox(id) {
+  const lid = LID();
+  if (lid === 'solid') {
+    const fy = SN.y + S.sv * SN.cm, w = SHOES[S.shoe].w;
+    return ({ tourist: [216, fy - 150, 70, 152], pack: [190, fy - 120, 56, 60], shoes: [250 - w / 2 - 8, fy - 16, w + 16, 22], snow: [20, SN.y - 4, 410, 130], arrows: [250 - w / 2 - 8, fy, w + 16, 70], ruler: [426, SN.y - 8, 70, 132] })[id];
+  }
+  if (lid === 'liquid') { const py = TK.ys + S.hd / 10 * TK.k; return ({ tank: [TK.x0 - 6, TK.ys - 26, TK.x1 - TK.x0 + 12, 3 * TK.k + 32], probe: [240, py - 24, 60, 48], gauge: [404, 252, 96, 106], hose: [264, TK.ys - 46, 196, 60], jets: [100, TK.ys + 30, 76, 240], scale: [TK.x1 - 4, TK.ys - 8, 50, 3 * TK.k + 16] })[id]; }
+  if (lid === 'atm') { const x = xOfH(S.H), y = yOfH(S.H), yHg = TB.yz - mmHg(S.H) * TB.k, yt = TB.yz - 830 * TB.k; return ({ mountain: [30, yOfH(7100), 356, 372 - yOfH(7100)], climber: [x - 24, y - 40, 44, 46], tube: [TB.x - 14, yt - 6, 28, TB.yz - yt + 20], vacuum: [TB.x - 12, yt - 4, 24, yHg - yt + 4], mercury: [TB.x - 10, yHg - 4, 20, TB.yz - yHg + 16], dish: [TB.x - 40, TB.yz - 6, 80, 30], ruler: [TB.x - 70, yt - 14, 32, TB.yz - yt + 22] })[id]; }
+  if (lid === 'arch') { const top = AR.top + S.tr; return ({ dyn: [AR.x - 26, top - 6, 52, 98], body: [AR.x - 26, top + 82, 52, 60], vessel: [184, AR.ys - 54, 132, 386 - AR.ys + 60], cup: [346, 310, 68, 82], forces: [AR.x - 70, top + 84, 140, 80] })[id]; }
+  return ({ tank: [FT.x0 - 6, FT.ys - 44, FT.x1 - FT.x0 + 12, FT.yb - FT.ys + 50], cube: [FT.cx - 36, S.fy - 8, 72, 72], ft: [FT.cx + 34, S.fy + 20, 40, 64], fa: [FT.cx - 70, S.fy - 30, 40, 64], liq: [FT.x0, FT.yb - 40, 200, 36] })[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = bg();
+  if (id === 'solid') h += solidScene();
+  else if (id === 'liquid') h += liquidScene();
+  else if (id === 'atm') h += atmScene();
+  else if (id === 'arch') h += archScene();
+  else h += floatScene();
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// fit the scene: 520 × 405 units, centred, content at the bottom
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 520, hh / 415, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 410 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => {
+  const ck = e.target.closest('[data-click]'); if (ck) { act(ck.dataset.click); return; }
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  const p = toSvg(e);
+  drag = { id: el.dataset.drag, y0: p.y, tr0: S.tr, fy0: S.fy };
+  if (drag.id === 'cube') { S.fmode = 'held'; }
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const p = toSvg(e);
+  if (drag.id === 'probe') setDepth(Math.round((p.y - TK.ys) / (TK.k / 10)));
+  else if (drag.id === 'climber') setH(Math.round((370 - p.y) / 0.032 / 10) * 10);
+  else if (drag.id === 'dyn') setTr(Math.round((drag.tr0 + p.y - drag.y0) / 5) * 5);
+  else if (drag.id === 'cube') { S.fy = clamp(drag.fy0 + p.y - drag.y0, 60, FT.yb - FT.A); update(); }
+});
+const endDrag = () => {
+  if (!drag) return;
+  if (drag.id === 'cube') S.fmode = 'free';
+  drag = null; scene.classList.remove('grabbing'); dirty = true;
+};
+scene.addEventListener('pointerup', endDrag);
+scene.addEventListener('pointercancel', endDrag);
+
+function setDepth(d) { d = clamp(d, 0, 30); if (d === S.hd) return; S.hd = d; update(); }
+function setH(H) { H = clamp(H, 0, 7100); if (H === S.H) return; S.H = H; update(); }
+function setTr(v) { v = clamp(v, 0, 100); if (v === S.tr) return; S.tr = v; update(); }
+function setLoad(v) { v = clamp(v, 0, 30); if (v === S.load) return; S.load = v; update(); }
+
+// task progress that is reached by a state (latched, with a toast)
+function latch() {
+  const id = LID(), Ls = L();
+  if (id === 'solid') {
+    const p = pSolid();
+    if (!S.safeOK && S.load === Ls.needLoad && p <= Ls.pMax) { S.safeOK = true; toast(`${SHOES[S.shoe].n}: ${fmt(p / 1000, 1)} кПа — снег держит! Теперь встаньте в кроссовках на одну ногу.`); }
+    if (!S.oneOK && S.one && S.shoe === 'boots') { S.oneOK = true; toast(`Площадь вдвое меньше — давление вдвое больше: ${fmt(p / 1000, 0)} кПа.`); }
+  }
+  if (id === 'liquid') {
+    if (S.liq === 'water' && S.hd === 20) {
+      if (!S.w20) { S.w20 = true; toast('20 кПа! Теперь поверните датчик и посмотрите на манометр.'); }
+      S.seenOr[S.orient] = 1;
+      if (!S.turned && Object.keys(S.seenOr).length >= 2) { S.turned = true; toast('Повернули — показание то же. Это закон Паскаля. Теперь керосин.'); }
+    }
+    if (!S.k25 && S.liq === 'kero' && S.hd === 25) { S.k25 = true; toast('В керосине 20 кПа только на 2,5 м: он легче воды.'); }
+  }
+  if (id === 'atm' && !S.reached && Math.abs(mmHg(S.H) - Ls.mmNeed) <= 2) { S.reached = true; toast(`Высота ${big(S.H)} м: столбик ${fmt(mmHg(S.H), 0)} мм. Сколько это в кПа?`); renderTools(); buildScheme(); }
+  if (id === 'arch' && fSub() === 1 && S.liq2 === 'water') {
+    const Fa = archF().Fa;
+    if (S.body === 'al' && S.recAl == null) { S.recAl = Fa; toast(S.recSt == null ? `Алюминий: FA = ${fmt(Fa, 1)} Н. Теперь стальной цилиндр.` : `Алюминий: тоже ${fmt(Fa, 1)} Н!`); buildScheme(); }
+    if (S.body === 'st' && S.recSt == null) { S.recSt = Fa; toast(S.recAl == null ? `Сталь: FA = ${fmt(Fa, 1)} Н. Теперь алюминиевый цилиндр.` : `Сталь: тоже ${fmt(Fa, 1)} Н! Сила Архимеда не зависит от материала.`); buildScheme(); }
+  }
+}
+
+function floatTarget() {
+  const rb = FB[S.fb].r, rl = LIQ[S.fl].r, A = FT.A;
+  if (rb < rl) return FT.ys - A + A * rb / rl;
+  if (rb > rl) return FT.yb - A;
+  return S.fy >= FT.ys ? S.fy : FT.ys + 6;
+}
+function settleFloat() {
+  const key = S.fb + '|' + S.fl, o = outcomeOf(S.fb, S.fl), was = S.seen[key];
+  S.seen[key] = o;
+  if (!was) toast(`${FB[S.fb].n} в жидкости «${LIQ[S.fl].n}»: ${OUT[o]}.`);
+  buildScheme();
+}
+
+let last = performance.now();
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  const id = LID();
+  if (id === 'solid') {
+    const tg = sinkOf(pSolid());
+    if (Math.abs(S.sv - tg) > 0.02) { S.sv = reduce ? tg : S.sv + (tg - S.sv) * Math.min(1, dt * 5); dirty = true; }
+  }
+  if (id === 'float' && S.fmode === 'free') {
+    const tg = floatTarget(), d = tg - S.fy;
+    if (Math.abs(d) < 0.6 || reduce) { S.fy = tg; S.fmode = 'rest'; settleFloat(); }
+    else S.fy += Math.sign(d) * Math.min(Math.abs(d), dt * 150);
+    update();
+  }
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3400); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, cls) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}${cls ? ` class="${cls}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  let h = '';
+  if (id === 'solid') h = Object.keys(SHOES).map(k => B('shoe-' + k, SHOES[k].n, S.shoe === k)).join('') + sep + B('one', 'На одной ноге', S.one) + sep + B('load-', 'Рюкзак −5') + B('load+', '+5');
+  if (id === 'liquid') h = B('h-', '↑') + B('h+', '↓') + B('or', 'Повернуть', undefined, 'rec') + sep + LIQ2.map(k => B('liq-' + k, LIQ[k].n, S.liq === k)).join('');
+  if (id === 'atm') {
+    h = B('alt-100', '▼ 100 м') + B('alt-10', '▼ 10') + B('alt+10', '▲ 10') + B('alt+100', '▲ 100 м');
+    if (S.reached && !S.conv) h += sep + L().kpaOpts.map(k => B('kpa-' + k, k + ' кПа')).join('');
+  }
+  if (id === 'arch') h = B('tr-', 'Выше') + B('tr+', 'Ниже', undefined, 'rec') + sep + Object.keys(ABODY).map(k => B('body-' + k, ABODY[k].n, S.body === k)).join('') + sep + LIQ4.map(k => B('liq2-' + k, LIQ[k].n, S.liq2 === k)).join('');
+  if (id === 'float') h = B('fbnext', 'Тело: ' + FB[S.fb].n) + B('flnext', LIQ[S.fl].n) + sep + B('drop', 'Опустить', undefined, 'rec') + B('lift', 'Вынуть');
+  tb.innerHTML = h;
+}
+function act(a) {
+  const id = LID();
+  if (a.startsWith('shoe-')) { S.shoe = a.slice(5); renderTools(); buildScheme(); update(); return; }
+  if (a === 'one') { S.one = !S.one; renderTools(); buildScheme(); update(); return; }
+  if (a === 'load-' || a === 'load+') return setLoad(S.load + (a === 'load-' ? -5 : 5));
+  if (a === 'h-' || a === 'h+') return setDepth(S.hd + (a === 'h-' ? -1 : 1));
+  if (a === 'or' || a.startsWith('or-')) { S.orient = a === 'or' ? (S.orient + 1) % 3 : +a.slice(3); buildScheme(); update(); return; }
+  if (a.startsWith('liq-')) { S.liq = a.slice(4); renderTools(); buildScheme(); update(); return; }
+  if (a.startsWith('alt')) return setH(S.H + +a.slice(3));
+  if (a.startsWith('pl-')) return setH(PLACES[+a.slice(3)].H);
+  if (a.startsWith('kpa-')) {
+    const k = +a.slice(4), right = Math.round(L().mmNeed * PA_MM / 1000);
+    if (k === right) { S.conv = true; toast(`Верно: 600 × 133,3 ≈ 80 000 Па = 80 кПа. Это на 20% меньше, чем у моря.`); renderTools(); buildScheme(); update(); }
+    else toast('Нет. 1 мм рт. ст. ≈ 133 Па. Умножьте и переведите в кПа.');
+    return;
+  }
+  if (a === 'tr-' || a === 'tr+') return setTr(S.tr + (a === 'tr-' ? -5 : 5));
+  if (a.startsWith('body-')) { S.body = a.slice(5); renderTools(); buildScheme(); update(); return; }
+  if (a.startsWith('liq2-')) { S.liq2 = a.slice(5); renderTools(); buildScheme(); update(); return; }
+  if (a === 'fbnext' || a.startsWith('fb-')) { S.fb = a === 'fbnext' ? FBK[(FBK.indexOf(S.fb) + 1) % FBK.length] : a.slice(3); S.fy = FT.top; S.fmode = 'held'; renderTools(); buildScheme(); update(); return; }
+  if (a === 'flnext' || a.startsWith('fl-')) { S.fl = a === 'flnext' ? LIQ5[(LIQ5.indexOf(S.fl) + 1) % LIQ5.length] : a.slice(3); if (S.fmode === 'rest') S.fmode = 'free'; renderTools(); buildScheme(); update(); return; }
+  if (a === 'drop') { if (S.fmode === 'held') S.fmode = 'free'; return; }
+  if (a === 'lift') { S.fy = FT.top; S.fmode = 'held'; update(); return; }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  tourist: IC('<circle cx="17" cy="7" r="5" fill="#f2c9a0"/><rect x="12" y="12" width="10" height="12" rx="4" fill="#72d4e8"/><path d="M14 24l-1 8M20 24l1 8" stroke="#5c6f96" stroke-width="3"/>'),
+  pack: IC('<rect x="9" y="7" width="16" height="22" rx="5" fill="#86e0a8"/><path d="M12 13h10" stroke="#0b1019" stroke-width="2"/>'),
+  shoes: IC('<path d="M3 24h28" stroke="#ff8a73" stroke-width="4" stroke-linecap="round"/><rect x="10" y="17" width="14" height="6" rx="3" fill="#3a4762"/>'),
+  snow: IC('<rect x="2" y="14" width="30" height="18" fill="#c9d6ea" opacity=".35"/><path d="M2 14h30" stroke="#dfe8f5" stroke-width="2"/>'),
+  arrows: IC('<path d="M9 6v18M17 6v18M25 6v18" stroke="#86e0a8" stroke-width="2.4"/><path d="M5 22l4 6 4-6M13 22l4 6 4-6M21 22l4 6 4-6" fill="#86e0a8"/>'),
+  ruler: IC('<path d="M10 3v28" stroke="var(--fg)" stroke-width="2"/><path d="M10 6h8M10 12h5M10 18h8M10 24h5M10 30h8" stroke="var(--fg)" stroke-width="1.6"/>'),
+  tank: IC('<path d="M5 4v26h24V4" fill="none" stroke="#a9b4c9" stroke-width="2.4"/><rect x="6" y="10" width="22" height="19" fill="#4f9fd6" opacity=".5"/>'),
+  probe: IC('<path d="M10 24l5-10h4l5 10z" fill="var(--fg)"/><path d="M10 24h14" stroke="#ff8a73" stroke-width="3"/><path d="M17 14V4" stroke="#72d4e8" stroke-width="2"/>'),
+  gauge: IC('<circle cx="17" cy="17" r="13" fill="#121a28" stroke="#a9b4c9" stroke-width="2"/><path d="M17 17l7-6" stroke="#ff8a73" stroke-width="2.4"/>'),
+  hose: IC('<path d="M5 30V8h24v18" fill="none" stroke="#72d4e8" stroke-width="2.4"/>'),
+  jets: IC('<path d="M28 8q-10 0 -14 8M28 16q-14 0 -20 10M28 24q-18 0 -26 8" fill="none" stroke="#4f9fd6" stroke-width="2.2"/>'),
+  scale: IC('<path d="M8 3v28" stroke="var(--fg)" stroke-width="2"/><path d="M8 6h10M8 13h6M8 20h10M8 27h6" stroke="var(--fg)" stroke-width="1.6"/>'),
+  mountain: IC('<path d="M2 31L14 9l6 9 4-6 9 19z" fill="#2a3550" stroke="#4a5a7c" stroke-width="1.6"/><path d="M11 14l3-5 3 5z" fill="#dfe8f5"/>'),
+  climber: IC('<path d="M14 30V8" stroke="var(--fg)" stroke-width="1.8"/><path d="M14 8h12l-3 4 3 4H14z" fill="#ffb547"/><circle cx="9" cy="22" r="5" fill="#ff8a73"/>'),
+  tube: IC('<rect x="13" y="2" width="8" height="26" rx="4" fill="none" stroke="var(--fg)" stroke-width="2"/><rect x="15" y="12" width="4" height="16" fill="#aeb8c9"/>'),
+  vacuum: IC('<rect x="13" y="2" width="8" height="26" rx="4" fill="none" stroke="var(--fg)" stroke-width="2"/><rect x="15" y="4" width="4" height="10" fill="#26324a"/>'),
+  mercury: IC('<rect x="13" y="10" width="8" height="20" rx="2" fill="#aeb8c9"/>'),
+  dish: IC('<path d="M3 20h28v6q0 4-4 4H7q-4 0-4-4z" fill="#aeb8c9"/><path d="M9 6v10M25 6v10" stroke="#72d4e8" stroke-width="2"/>'),
+  dyn: IC('<rect x="11" y="2" width="12" height="24" rx="3" fill="var(--fg)"/><path d="M13 14h7" stroke="#ff8a73" stroke-width="2"/><path d="M17 26v6" stroke="#a9b4c9" stroke-width="2"/>'),
+  body: IC('<rect x="9" y="7" width="16" height="22" rx="3" fill="#c3cbd8"/>'),
+  vessel: IC('<path d="M4 6v24h20V6" fill="none" stroke="#a9b4c9" stroke-width="2.4"/><rect x="5" y="12" width="18" height="17" fill="#4f9fd6" opacity=".5"/><path d="M24 12l7 3" stroke="#a9b4c9" stroke-width="2.4"/>'),
+  cup: IC('<path d="M7 10v20h20V10" fill="none" stroke="#a9b4c9" stroke-width="2.4"/><rect x="8" y="20" width="18" height="9" fill="#4f9fd6" opacity=".7"/>'),
+  forces: IC('<path d="M10 4v18M24 30V12" stroke="#ffb547" stroke-width="2.4"/><path d="M6 20l4 6 4-6" fill="#ffb547"/><path d="M24 30V12" stroke="#72d4e8" stroke-width="2.4"/><path d="M20 14l4-6 4 6" fill="#72d4e8"/>'),
+  cube: IC('<rect x="7" y="7" width="20" height="20" rx="3" fill="#d4f1fb"/>'),
+  ft: IC('<path d="M17 4v20" stroke="#ffb547" stroke-width="2.6"/><path d="M11 22l6 9 6-9z" fill="#ffb547"/>'),
+  fa: IC('<path d="M17 30V10" stroke="#72d4e8" stroke-width="2.6"/><path d="M11 12l6-9 6 9z" fill="#72d4e8"/>'),
+  liq: IC('<rect x="2" y="12" width="30" height="18" fill="#4f9fd6" opacity=".5"/><path d="M2 12h30" stroke="#4f9fd6" stroke-width="2"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  const t = (ok, s) => `${s} ${ok ? '✓' : '—'}`;
+  if (id === 'solid') return [t(m.safe, 'Не провалиться'), t(m.oneTried, 'Одна нога')].join(' · ');
+  if (id === 'liquid') return [t(m.w20, '20 кПа в воде'), t(m.turned, 'Поворот'), t(m.k25, 'Керосин')].join(' · ');
+  if (id === 'atm') return [t(m.reached, '600 мм'), t(m.conv, 'В кПа')].join(' · ');
+  if (id === 'arch') return [t(m.recAl, 'Алюминий'), t(m.recSt, 'Сталь')].join(' · ');
+  return [t(m.iceSink, 'Лёд утонул'), t(m.steelFloat, 'Сталь всплыла'), t(m.plexHover, 'Оргстекло зависло')].join(' · ');
+}
+
+// Scheme tab: built once per lesson, then values refreshed (sliders keep focus while dragging)
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+const chips = (lbl, items) => `<div class="ctl"><div class="lbl">${lbl}</div><div class="chips">${items.map(([a, n, on]) => `<button data-a="${a}" aria-pressed="${!!on}">${n}</button>`).join('')}</div></div>`;
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'solid') h = `<h2>Турист на снегу</h2>` + chips('Обувь', Object.keys(SHOES).map(k => ['shoe-' + k, `${SHOES[k].n} · ${nf(SHOES[k].s * 10000)} см²`, S.shoe === k])) +
+      chips('Стойка', [['one', 'На одной ноге', S.one]]) + slider('inLoad', 'Рюкзак', 0, 30, 5, S.load) +
+      `<dl class="reads"><div><dt>вес F</dt><dd id="r1"></dd></div><div><dt>площадь S</dt><dd id="r2"></dd></div><div><dt>давление p</dt><dd id="r3"></dd></div></dl>
+      <p class="note" style="margin-top:12px">Площадь в списке — для одной ступни. Турист весит 60 кг. Снег выдерживает 4 кПа.</p>`;
+  if (id === 'liquid') h = `<h2>Бак и датчик</h2>` + slider('inH', 'Глубина датчика', 0, 3, 0.1, S.hd / 10) +
+      chips('Плёнка датчика смотрит', [['or-0', 'вниз', S.orient === 0], ['or-1', 'вбок', S.orient === 1], ['or-2', 'вверх', S.orient === 2]]) +
+      chips('Жидкость', LIQ2.map(k => ['liq-' + k, `${LIQ[k].n} · ${big(LIQ[k].r)}`, S.liq === k])) +
+      `<dl class="reads"><div><dt>глубина</dt><dd id="r1"></dd></div><div><dt>ρ, кг/м³</dt><dd id="r2"></dd></div><div><dt>давление</dt><dd id="r3"></dd></div></dl>`;
+  if (id === 'atm') h = `<h2>Барометр в горах</h2>` + slider('inAlt', 'Высота над уровнем моря', 0, 7100, 10, S.H) +
+      chips('Перенестись', PLACES.map((P, i) => ['pl-' + i, `${P.n} · ${big(P.H)} м`, S.H === P.H])) +
+      `<dl class="reads"><div><dt>столбик</dt><dd id="r1"></dd></div><div><dt>давление</dt><dd id="r2"></dd></div><div><dt>от нормы</dt><dd id="r3"></dd></div></dl>` +
+      (S.reached ? chips('600 мм рт. ст. — это…', L().kpaOpts.map(k => ['kpa-' + k, k + ' кПа', S.conv && k === 80])) : '') +
+      `<p class="note" style="margin-top:12px">Модель: давление убывает с высотой по барометрической формуле. Погода тоже немного меняет давление — здесь её нет.</p>`;
+  if (id === 'arch') h = `<h2>Динамометр и отливной сосуд</h2>` + slider('inTr', 'Опустить цилиндр', 0, 100, 5, S.tr) +
+      chips('Цилиндр (100 см³)', Object.keys(ABODY).map(k => ['body-' + k, `${ABODY[k].n} · ${big(ABODY[k].r)}`, S.body === k])) +
+      chips('Жидкость', LIQ4.map(k => ['liq2-' + k, `${LIQ[k].n} · ${big(LIQ[k].r)}`, S.liq2 === k])) +
+      `<dl class="reads"><div><dt>в воздухе</dt><dd id="r1"></dd></div><div><dt>динамометр</dt><dd id="r2"></dd></div><div><dt>FA</dt><dd id="r3"></dd></div></dl>
+      <h3>Записи (целиком в воде)</h3><div class="rec">` + step('алюминий', S.recAl != null ? fmt(S.recAl, 1) + ' Н' : '—') + step('сталь', S.recSt != null ? fmt(S.recSt, 1) + ' Н' : '—') + `</div>`;
+  if (id === 'float') h = `<h2>Сосуд с жидкостью</h2>` + chips('Тело (плотность, кг/м³)', FBK.map(k => ['fb-' + k, `${FB[k].n} · ${big(FB[k].r)}`, S.fb === k])) +
+      chips('Жидкость', LIQ5.map(k => ['fl-' + k, `${LIQ[k].n} · ${big(LIQ[k].r)}`, S.fl === k])) +
+      `<div class="row"><button class="ghostbtn" data-a="drop">Опустить</button><button class="ghostbtn" data-a="lift">Вынуть</button></div>
+      <h3>Что уже видели</h3><div class="rec">` + (Object.keys(S.seen).length ? Object.keys(S.seen).map(k => { const [b, l] = k.split('|'); return step(`${FB[b].n} в «${LIQ[l].n}»`, OUT[S.seen[k]]); }).join('') : '<p class="note">Пока ничего. Бросьте кубик в сосуд.</p>') + `</div>`;
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn); };
+  on('#inLoad', e => setLoad(+e.target.value));
+  on('#inH', e => setDepth(Math.round(+e.target.value * 10)));
+  on('#inAlt', e => setH(+e.target.value));
+  on('#inTr', e => setTr(+e.target.value));
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (id === 'solid') { set('#inLoadO', S.load + ' кг'); val('#inLoad', S.load); set('#r1', big(m.F) + ' Н'); set('#r2', fmt(m.Sa, 2) + ' м²'); set('#r3', fmt(m.p / 1000, 1) + ' кПа'); }
+  if (id === 'liquid') { set('#inHO', fmt(m.h, 1) + ' м'); val('#inH', m.h); set('#r1', fmt(m.h, 1) + ' м'); set('#r2', big(LIQ[S.liq].r)); set('#r3', fmt(m.p / 1000, 1) + ' кПа'); }
+  if (id === 'atm') { set('#inAltO', big(S.H) + ' м'); val('#inAlt', S.H); set('#r1', fmt(m.mm, 0) + ' мм'); set('#r2', fmt(m.pa / 1000, 1) + ' кПа'); set('#r3', '−' + fmt(760 - m.mm, 0) + ' мм'); }
+  if (id === 'arch') { set('#inTrO', Math.round(m.f * 100) + '% в жидкости'); val('#inTr', S.tr); set('#r1', fmt(m.P, 2) + ' Н'); set('#r2', fmt(m.F, 2) + ' Н'); set('#r3', fmt(m.Fa, 2) + ' Н'); }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'solid') return [
+    { id: 'tourist', icon: ICON.tourist, name: 'Турист', spec: 'Масса 60 кг. Стоя, давит на опору с силой, равной своему весу.' },
+    { id: 'pack', icon: ICON.pack, name: 'Рюкзак', spec: 'Добавляет вес: 1 кг ≈ 10 Н. Чем тяжелее, тем больше сила давления.' },
+    { id: 'shoes', icon: ICON.shoes, name: 'Обувь (опора)', spec: 'Кроссовок — 200 см², снегоступ — 900 см², лыжа — 1300 см² на одну ногу.' },
+    { id: 'snow', icon: ICON.snow, name: 'Снег', spec: 'Рыхлый снег держит до 4 кПа. Больше — проваливаемся.' },
+    { id: 'arrows', icon: ICON.arrows, name: 'Стрелки давления', spec: 'Длина стрелок показывает давление: зелёные — снег держит, красные — нет.' },
+    { id: 'ruler', icon: ICON.ruler, name: 'Линейка глубины', spec: 'Показывает, на сколько сантиметров ноги ушли в снег.' }];
+  if (id === 'liquid') return [
+    { id: 'tank', icon: ICON.tank, name: 'Бак', spec: 'Глубина 3 м. Жидкость можно менять: вода, керосин, солёная вода.' },
+    { id: 'probe', icon: ICON.probe, name: 'Датчик с плёнкой', spec: 'Жидкость давит на красную плёнку. Его можно опускать и поворачивать.' },
+    { id: 'hose', icon: ICON.hose, name: 'Трубка', spec: 'Передаёт давление от датчика к манометру.' },
+    { id: 'gauge', icon: ICON.gauge, name: 'Манометр', spec: 'Показывает давление жидкости в килопаскалях.' },
+    { id: 'jets', icon: ICON.jets, name: 'Струи из отверстий', spec: 'Чем глубже отверстие, тем сильнее давление и тем дальше бьёт струя.' },
+    { id: 'scale', icon: ICON.scale, name: 'Шкала глубины', spec: 'Метки через каждые 0,5 м от поверхности жидкости.' }];
+  if (id === 'atm') return [
+    { id: 'mountain', icon: ICON.mountain, name: 'Горы Заилийского Алатау', spec: 'От уровня моря до Хан-Тенгри (7010 м). Точки — известные места.' },
+    { id: 'climber', icon: ICON.climber, name: 'Альпинист с барометром', spec: 'Тяните его вверх и вниз по склону.' },
+    { id: 'tube', icon: ICON.tube, name: 'Трубка Торричелли', spec: 'Стеклянная трубка около 1 м, запаянная сверху.' },
+    { id: 'vacuum', icon: ICON.vacuum, name: 'Пустота', spec: 'Над ртутью воздуха нет, поэтому сверху на столбик ничего не давит.' },
+    { id: 'mercury', icon: ICON.mercury, name: 'Столбик ртути', spec: 'Его высота в миллиметрах и есть давление в мм рт. ст.' },
+    { id: 'dish', icon: ICON.dish, name: 'Чашка с ртутью', spec: 'На открытую ртуть давит воздух и держит столбик в трубке.' },
+    { id: 'ruler', icon: ICON.ruler, name: 'Шкала, мм', spec: 'Пунктир на 760 мм — нормальное давление у моря.' }];
+  if (id === 'arch') return [
+    { id: 'dyn', icon: ICON.dyn, name: 'Динамометр', spec: 'Шкала 0–10 Н. Показывает, с какой силой тянет цилиндр.' },
+    { id: 'body', icon: ICON.body, name: 'Цилиндр 100 см³', spec: 'Алюминиевый (2,7 Н) или стальной (7,8 Н) — объём одинаковый.' },
+    { id: 'vessel', icon: ICON.vessel, name: 'Отливной сосуд', spec: 'Налит до носика: сколько тело вытеснит, столько и выльется.' },
+    { id: 'cup', icon: ICON.cup, name: 'Стаканчик', spec: 'Собирает вытесненную жидкость. Её вес равен силе Архимеда.' },
+    { id: 'forces', icon: ICON.forces, name: 'Силы', spec: 'Оранжевая — вес тела P, голубая — сила Архимеда FA.' }];
+  return [
+    { id: 'tank', icon: ICON.tank, name: 'Сосуд', spec: 'Большой сосуд: уровень жидкости почти не меняется.' },
+    { id: 'cube', icon: ICON.cube, name: 'Кубик 10 см', spec: 'Объём 1 дм³ = 0,001 м³. Материал меняется кнопкой «Тело».' },
+    { id: 'ft', icon: ICON.ft, name: 'Сила тяжести Fт', spec: 'Тянет вниз. Зависит от плотности тела.' },
+    { id: 'fa', icon: ICON.fa, name: 'Сила Архимеда FA', spec: 'Толкает вверх. Растёт, пока тело погружается.' },
+    { id: 'liq', icon: ICON.liq, name: 'Подписи плотностей', spec: 'Сравните две цифры — и вы заранее знаете, утонет тело или нет.' }];
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      (Ls.safe ? `<div class="safe"><b>Безопасность</b>${Ls.safe}</div>` : '') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Что на площадке</h2><p class="note">Нажмите на деталь, чтобы найти её на площадке.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID(), Ls = L();
+  if (id === 'solid') {
+    const n = S.one ? 1 : 2, s1 = SHOES[S.shoe].s;
+    return `<h2>Давление на снег</h2><div class="formula">p = F / S</div><p class="note">F — вес туриста с рюкзаком (F = m·g, g ≈ 10 Н/кг), S — площадь опоры в м². 1 м² = 10 000 см².</p>
+      <h3>Сейчас</h3><div class="steps">` +
+      step('масса', `${Ls.body} + ${S.load} = ${Ls.body + S.load} кг`) + step('сила F', `${Ls.body + S.load} × 10 = ${big(m.F)} Н`) +
+      step('площадь S', `${n} × ${fmt(s1, 2)} = ${fmt(m.Sa, 2)} м²`) + step('давление p', `${big(m.F)} / ${fmt(m.Sa, 2)} = ${big(m.p)} Па`, 'sum') +
+      step('в кПа', `${fmt(m.p / 1000, 1)} кПа ${m.p <= Ls.pMax ? '≤' : '>'} 4 кПа`) + `</div>
+      <p class="note" style="margin-top:10px">${m.p <= Ls.pMax ? 'Снег держит.' : 'Снег не держит — турист проваливается.'} Чтобы давление не превышало 4 кПа при весе ${big(m.F)} Н, нужна площадь не меньше ${big(m.F)} / 4000 = ${fmt(m.F / 4000, 2)} м².</p>`;
+  }
+  if (id === 'liquid') {
+    const r = LIQ[S.liq].r;
+    return `<h2>Давление жидкости</h2><div class="formula">p = ρ · g · h</div><p class="note">ρ — плотность жидкости (кг/м³), g ≈ 10 Н/кг, h — глубина от поверхности (м). Давление воздуха над жидкостью здесь не учитываем.</p>
+      <h3>Сейчас</h3><div class="steps">` + step('ρ', `${big(r)} кг/м³ (${LIQ[S.liq].n.toLowerCase()})`) + step('h', `${fmt(m.h, 1)} м`) +
+      step('p', `${big(r)} × 10 × ${fmt(m.h, 1)} = ${big(m.p)} Па`, 'sum') + step('в кПа', `${fmt(m.p / 1000, 1)} кПа`) + `</div>
+      <h3>Как найти нужную глубину</h3><div class="steps">` + step('из формулы', 'h = p / (ρ · g)') + step('для 20 кПа', `20 000 / (${big(r)} × 10) = ?`, 'sum') + `</div>
+      <p class="note" style="margin-top:10px">Направление плёнки в формулу не входит — по закону Паскаля давление на одной глубине одинаково во все стороны.</p>`;
+  }
+  if (id === 'atm') {
+    return `<h2>Атмосферное давление</h2><div class="formula">p = ρрт · g · h</div><p class="note">Давление столба ртути равно давлению воздуха. Здесь берём точнее: g = 9,8 Н/кг, ρрт = 13 600 кг/м³.</p>
+      <h3>У моря</h3><div class="steps">` + step('h', '760 мм = 0,76 м') + step('p₀', '13 600 × 9,8 × 0,76 ≈ 101 300 Па', 'sum') + `</div>
+      <h3>1 мм ртутного столба</h3><div class="steps">` + step('p', '13 600 × 9,8 × 0,001 ≈ 133,3 Па', 'sum') + `</div>
+      <h3>На высоте ${big(S.H)} м</h3><div class="steps">` + step('столбик', `${fmt(m.mm, 0)} мм`) +
+      step('p', `${fmt(m.mm, 0)} × 133,3 ≈ ${big(m.pa)} Па`, 'sum') + step('ниже нормы на', `${fmt(760 - m.mm, 0)} мм рт. ст.`) + `</div>
+      <h3>Цель</h3><div class="steps">` + step('600 мм рт. ст.', S.conv ? '600 × 133,3 ≈ 80 000 Па = 80 кПа' : '600 × 133,3 = ? Па = ? кПа', 'sum') + `</div>
+      <p class="note" style="margin-top:10px">Правило для небольших высот: подъём на 11–12 м — минус 1 мм рт. ст. Выше воздух разрежен, и давление падает медленнее.</p>`;
+  }
+  if (id === 'arch') {
+    const b = ABODY[S.body], l = LIQ[S.liq2];
+    return `<h2>Сила Архимеда</h2><div class="formula">FA = ρж · g · Vпогр</div><p class="note">Vпогр — объём погружённой части. Цилиндр 100 см³ = 0,0001 м³, g ≈ 10 Н/кг.</p>
+      <h3>Сейчас</h3><div class="steps">` +
+      step('вес в воздухе P', `${big(b.r)} × 10 × 0,0001 = ${fmt(m.P, 2)} Н`) + step('погружено', `${Math.round(m.f * 100)}% → ${nf(m.Vs)} см³`) +
+      step('FA', `${big(l.r)} × 10 × ${fmt(m.Vs * 1e-6, 6).replace(/0+$/, '').replace(/,$/, '')} = ${fmt(m.Fa, 2)} Н`, 'sum') +
+      step('динамометр', `${fmt(m.P, 2)} − ${fmt(m.Fa, 2)} = ${fmt(m.F, 2)} Н`) + step('вес вылитой жидкости', `${fmt(m.Fa, 2)} Н = FA`) + `</div>
+      <p class="note" style="margin-top:10px">Сравните: вес вытесненной жидкости в стаканчике всегда равен силе Архимеда. Это и есть закон Архимеда.</p>`;
+  }
+  const b = FB[S.fb], l = LIQ[S.fl], V = 0.001, Ft = b.r * g * V, FAmax = l.r * g * V;
+  return `<h2>Утонет или всплывёт?</h2><div class="formula">Fт = ρт·g·V    FA = ρж·g·Vпогр</div><p class="note">Кубик 10 см: V = 0,001 м³, g ≈ 10 Н/кг.</p>
+    <h3>${b.n} в жидкости «${l.n}»</h3><div class="steps">` +
+    step('Fт', `${big(b.r)} × 10 × 0,001 = ${fmt(Ft, 1)} Н`) + step('FA, если целиком', `${big(l.r)} × 10 × 0,001 = ${fmt(FAmax, 1)} Н`) +
+    step('сравнение', `${b.r} ${b.r < l.r ? '<' : b.r > l.r ? '>' : '='} ${l.r} → ${OUT[outcomeOf(S.fb, S.fl)]}`, 'sum') +
+    (b.r < l.r ? step('доля под жидкостью', `${big(b.r)} / ${big(l.r)} = ${Math.round(b.r / l.r * 100)}%`) : '') + `</div>
+    <p class="note" style="margin-top:10px">Сравнивать удобнее плотности: объём у тела и вытесненной жидкости один и тот же, а g одинаково.</p>`;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter');
+  if (id === 'solid') el.innerHTML = `<div class="k">Давление на снег</div><div class="v ${m.sink ? '' : 'ok'}">${fmt(m.p / 1000, 1)} кПа</div><div class="lr"><span>F</span><span>${big(m.F)} Н</span></div><div class="lr"><span>S</span><span>${fmt(m.Sa, 2)} м²</span></div><div class="lr"><span>снег</span><span class="${m.sink ? 'bad' : 'ok'}">${m.sink ? 'не держит' : 'держит'}</span></div>`;
+  else if (id === 'liquid') el.innerHTML = `<div class="k">Манометр</div><div class="v ${S.done.liquid ? 'ok' : ''}">${fmt(m.p / 1000, 1)} кПа</div><div class="lr"><span>h</span><span>${fmt(m.h, 1)} м</span></div><div class="lr"><span>ρ</span><span>${big(LIQ[S.liq].r)}</span></div>`;
+  else if (id === 'atm') el.innerHTML = `<div class="k">Барометр</div><div class="v ${S.reached ? 'ok' : ''}">${fmt(m.mm, 0)} мм рт. ст.</div><div class="lr"><span>H</span><span>${big(S.H)} м</span></div><div class="lr"><span>p</span><span>${fmt(m.pa / 1000, 1)} кПа</span></div>`;
+  else if (id === 'arch') el.innerHTML = `<div class="k">Динамометр</div><div class="v">${fmt(m.F, 2)} Н</div><div class="lr"><span>P</span><span>${fmt(m.P, 2)} Н</span></div><div class="lr"><span>FA</span><span class="${m.f === 1 ? 'ok' : ''}">${fmt(m.Fa, 2)} Н</span></div>`;
+  else el.innerHTML = `<div class="k">${FB[S.fb].n}</div><div class="v">${big(FB[S.fb].r)} кг/м³</div><div class="lr"><span>жидк.</span><span>${big(LIQ[S.fl].r)}</span></div><div class="lr"><span>итог</span><span class="${S.fmode === 'rest' ? 'ok' : ''}">${S.fmode === 'rest' ? { float: 'плавает', sink: 'утонул', hover: 'завис' }[m.out] : '…'}</span></div>`;
+}
+
+function update() {
+  latch();
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Теперь вы разбираетесь в давлении!'), 1700);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  solid: '<path d="M2 22h62" stroke="#c9d6ea" stroke-width="1.4" opacity=".6"/><circle cx="33" cy="5" r="3" fill="#f2c9a0"/><rect x="30" y="8" width="6" height="8" rx="2" fill="#72d4e8"/><path d="M31 16v5M35 16v5" stroke="#5c6f96" stroke-width="2"/><path d="M14 21h38" stroke="#ff8a73" stroke-width="2.4" stroke-linecap="round"/><path d="M20 24v4M33 24v4M46 24v4" stroke="#86e0a8" stroke-width="1.4"/>',
+  liquid: '<path d="M8 3v25h34V3" fill="none" stroke="#a9b4c9" stroke-width="1.4"/><rect x="9" y="7" width="32" height="20" fill="#4f9fd6" opacity=".5"/><path d="M22 20l3-5h2l3 5z" fill="#e8ecf4"/><path d="M26 15V2H56v14" fill="none" stroke="#72d4e8" stroke-width="1"/><circle cx="56" cy="21" r="6" fill="#121a28" stroke="#a9b4c9"/>',
+  atm: '<path d="M2 28L18 6l8 10 5-6 12 18z" fill="#2a3550" stroke="#4a5a7c"/><path d="M15 10l3-4 3 4z" fill="#dfe8f5"/><rect x="52" y="3" width="5" height="22" rx="2.5" fill="none" stroke="#e8ecf4"/><rect x="53" y="10" width="3" height="16" fill="#aeb8c9"/><path d="M47 25h15" stroke="#aeb8c9" stroke-width="3"/>',
+  arch: '<rect x="28" y="1" width="9" height="12" rx="2" fill="#e8ecf4"/><rect x="28" y="15" width="9" height="10" rx="2" fill="#c3cbd8"/><path d="M18 18v11h28V18" fill="none" stroke="#a9b4c9" stroke-width="1.4"/><rect x="19" y="18" width="26" height="10" fill="#4f9fd6" opacity=".5"/><path d="M50 22v7h10v-7" fill="none" stroke="#a9b4c9"/><rect x="51" y="25" width="8" height="3" fill="#4f9fd6"/>',
+  float: '<path d="M6 3v25h54V3" fill="none" stroke="#a9b4c9" stroke-width="1.4"/><rect x="7" y="10" width="52" height="17" fill="#4f9fd6" opacity=".5"/><rect x="14" y="6" width="9" height="9" fill="#d4f1fb"/><rect x="29" y="14" width="9" height="9" fill="#8fd0e0"/><rect x="44" y="18" width="9" height="9" fill="#7d8799"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Lx, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Lx.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Lx.title}</span></span>
+      ${S.done[Lx.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  S.lesson = i; drag = null;
+  resetState(); save();
+  S.sv = sinkOf(pSolid());
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L().task;
+  $('#hint').textContent = L().stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '';
+  if (id === 'solid') now = `Турист 60 кг с рюкзаком ${S.load} кг (вес ${big(m.F)} Н, g ≈ 10 Н/кг) стоит на рыхлом снегу, который выдерживает 4 кПа. Обувь: ${SHOES[S.shoe].n.toLowerCase()} (${nf(SHOES[S.shoe].s * 10000)} см² на одну ногу), стоит ${S.one ? 'на одной ноге' : 'на двух ногах'}. Площадь опоры ${fmt(m.Sa, 2)} м², давление ${fmt(m.p / 1000, 1)} кПа — снег ${m.sink ? 'не держит, турист проваливается' : 'держит'}. Подзадачи: не провалиться с рюкзаком 20 кг — ${S.safeOK ? 'сделано' : 'нет'}; встать в кроссовках на одну ногу — ${S.oneOK ? 'сделано' : 'нет'}. Какую обувь выбрать, не называй — пусть ученик посчитает нужную площадь F / 4000.`;
+  if (id === 'liquid') now = `Бак глубиной 3 м, жидкость: ${LIQ[S.liq].n.toLowerCase()} (ρ = ${LIQ[S.liq].r} кг/м³). Датчик на глубине ${fmt(m.h, 1)} м, плёнка смотрит ${['вниз', 'вбок', 'вверх'][S.orient]}. Манометр: ${fmt(m.p / 1000, 1)} кПа (только давление жидкости, g ≈ 10 Н/кг). Подзадачи: 20 кПа в воде — ${S.w20 ? 'найдено' : 'нет'}; повернуть датчик там — ${S.turned ? 'сделано' : 'нет'}; 20 кПа в керосине — ${S.k25 ? 'найдено' : 'нет'}. Глубины не называй — наводи через h = p / (ρg).`;
+  if (id === 'atm') now = `Горный склон от уровня моря до 7010 м (Алматы, Медеу, Шымбулак, пик Талгар, Хан-Тенгри) и трубка Торричелли. Альпинист на высоте ${big(S.H)} м, ртутный столбик ${fmt(m.mm, 0)} мм (${fmt(m.pa / 1000, 1)} кПа). Модель: барометрическая формула p = 760·e^(−H/8400) мм рт. ст. Подзадачи: найти высоту, где 600 мм, — ${S.reached ? 'сделано' : 'нет'}; перевести 600 мм рт. ст. в кПа — ${S.conv ? 'сделано' : 'нет'}. Высоту и ответ в кПа не называй — наводи (сколько Па в 1 мм рт. ст., как перевести Па в кПа).`;
+  if (id === 'arch') now = `Динамометр с цилиндром 100 см³ (${ABODY[S.body].n.toLowerCase()}, вес в воздухе ${fmt(m.P, 2)} Н) над отливным сосудом с жидкостью «${LIQ[S.liq2].n}» (ρ = ${LIQ[S.liq2].r} кг/м³). Погружено ${Math.round(m.f * 100)}%, динамометр показывает ${fmt(m.F, 2)} Н, сила Архимеда ${fmt(m.Fa, 2)} Н, в стаканчик вылилось ${nf(m.Vs)} см³. Записи в воде: алюминий ${S.recAl != null ? fmt(S.recAl, 1) + ' Н' : 'нет'}, сталь ${S.recSt != null ? fmt(S.recSt, 1) + ' Н' : 'нет'}.`;
+  if (id === 'float') now = `Сосуд с жидкостью «${LIQ[S.fl].n}» (ρ = ${LIQ[S.fl].r} кг/м³), кубик 10 см из материала «${FB[S.fb].n}» (ρ = ${FB[S.fb].r} кг/м³). Состояние кубика: ${S.fmode === 'held' ? 'держим над сосудом' : S.fmode === 'free' ? 'движется' : OUT[m.out]}. Уже видели: ${Object.keys(S.seen).map(k => { const [b, l] = k.split('|'); return `${FB[b].n} в «${LIQ[l].n}» — ${OUT[S.seen[k]]}`; }).join('; ') || 'ничего'}. Подзадачи: лёд утонул — ${m.iceSink ? 'да' : 'нет'}, сталь всплыла — ${m.steelFloat ? 'да' : 'нет'}, оргстекло зависло — ${m.plexHover ? 'да' : 'нет'}. Нужные жидкости не называй — наводи сравнением плотностей.`;
+  return [
+    `Раздел: физика, 7 класс, тема «Давление». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'} (${taskState(m)}).`,
+    `Сейчас на площадке: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Помогай наводящими вопросами, готовые ответы не выдавай.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { solid: 'Почему острый нож режет лучше тупого?', liquid: 'Почему плотину внизу делают толще?', atm: 'Почему в горах уши «закладывает»?', arch: 'Почему сила Архимеда не зависит от материала?', float: 'Почему железный корабль не тонет?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
