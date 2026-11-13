@@ -1,0 +1,875 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по информатике, 6 класс: растровая и векторная графика, оцифровка звука и видео, сжатие файлов.">
+<title>Графика и медиа</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag],.scene [data-hit]{cursor:pointer}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+.scene .sans{font-family:var(--font-body)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--arm);transition:width .2s}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button.big{font:600 15px/1 var(--font-mono);color:var(--fg);min-width:34px}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:22%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.chips button:disabled{opacity:.35;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.mtab{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:8px}
+.mtab span{background:var(--surface-2);border-radius:7px;padding:6px 7px;font:500 12.5px/1.2 var(--font-mono);display:flex;justify-content:space-between;gap:4px;min-width:0}
+.mtab span b{font-weight:600;color:var(--fg)}
+.mtab span i{font-style:normal;color:var(--force);letter-spacing:.06em}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:470px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mtab{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(100vw + 180px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><circle cx="11" cy="20" r="3" fill="var(--force)"/><rect x="17" y="18" width="12" height="4" rx="2" fill="var(--arm)"/><circle cx="34" cy="20" r="1.6" fill="var(--fg)"/><path d="M8 11h24M8 29h24" stroke="var(--fg)" stroke-width="2" stroke-linecap="round" opacity=".5"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Информатика · Графика и медиа</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#cs">Карта</a><a href="/physics/#cs">Информатика</a><a href="/labs/cs-media/" aria-current="page">Графика и медиа</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Медиа</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Рабочий стол лаборатории">
+    <svg class="scene" id="scene" role="img" aria-label="Интерактивная сцена: рисунки можно увеличивать, ручку тянуть, клетки закрашивать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const big = n => Math.round(n).toLocaleString('ru-RU');
+const fmt = (x, n = 1) => (Math.round(x * 10 ** n) / 10 ** n).toFixed(n).replace('.', ',');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c; };
+const INK = '#04070d';
+
+const LESSONS = [
+  { id: 'raster', title: 'Растровая и векторная графика',
+    text: ['Растровая картинка — это мозаика из крошечных квадратиков-пикселей. Файл хранит цвет каждого пикселя. Чем больше пикселей (выше разрешение), тем чётче картинка и тем тяжелее файл. Так устроены фотографии с телефона.',
+           'Векторная картинка хранит не точки, а описание фигур: «круг, центр здесь, радиус такой, цвет оранжевый». При любом размере компьютер заново рисует фигуры, поэтому края остаются гладкими. Так делают логотипы, шрифты, иконки и чертежи.',
+           'При сильном увеличении растр распадается на «лесенку» из квадратиков. А вектор плохо подходит для фотографий: описать фигурами каждую травинку и каждый блик слишком сложно.'],
+    why: 'Графический дизайнер рисует логотип в векторе (Figma, Illustrator, Inkscape), чтобы его можно было напечатать и на визитке, и на рекламном щите у дороги. Фотограф и ретушёр работают с растром в Photoshop или GIMP. Дизайнеры в Казахстане берут заказы от магазинов, кафе и блогеров, и первое, что нужно понимать, — когда нужен вектор, а когда растр. А в жизни ты поймёшь, почему растянутая картинка в презентации становится мутной.',
+    task: 'Увеличьте оба рисунка в 8 раз и нажмите на тот, который остался гладким.',
+    hint: 'Кнопки «− лупа» и «+ лупа» меняют увеличение, кнопки 8×8…64×64 — число пикселей в растре. Круг можно менять, потянув за точку на правом рисунке.',
+    stage: 'Тяните точку на круге справа. Нажмите на рисунок, чтобы выбрать его.',
+    res: 16, zoom: 1, r: 0.36,
+    check: m => m.zoom === 8 && m.pick === 'vec' },
+  { id: 'av', title: 'Звук и видео: оцифровка',
+    text: ['Звук — это колебания воздуха. Микрофон превращает их в плавно меняющийся сигнал. Плавную линию компьютер хранить не умеет, поэтому много раз в секунду измеряет её высоту и записывает числа. Это называется дискретизацией, или оцифровкой.',
+           'Частота дискретизации — сколько измерений в секунду: 44,1 кГц значит 44 100 измерений. Глубина кодирования — сколько бит на одно измерение: 8 бит дают 2⁸ = 256 уровней. Чем больше оба числа, тем точнее звук и тем тяжелее файл: объём = частота × глубина × время.',
+           'Видео — это быстрая смена картинок-кадров. Если показывать 24 кадра в секунду и больше, глаз видит плавное движение. Каждый кадр — растровая картинка, поэтому видео без сжатия весит очень много.'],
+    why: 'Звукорежиссёры, саунд-дизайнеры и видеомонтажёры каждый день выбирают частоту, глубину и число кадров: для подкаста, клипа, рекламы на ТВ или ролика в соцсетях. Монтажёр, который понимает форматы, с первого раза сдаёт ролик нужного качества и размера и успевает взять больше заказов. А тебе это пригодится при съёмке: видео в 60 кадров в секунду плавнее, но занимает в памяти телефона заметно больше, чем в 30.',
+    task: 'Оцифруйте звук: похожесть не меньше 90 %, а 1 секунда — не больше 32 Кбайт. Потом в режиме «Видео» подберите частоту кадров, при которой мяч летит плавно.',
+    hint: 'Ступеньки должны прижаться к волне: добавляйте измерения (кГц) и уровни (бит), но следите за объёмом. В видео пробуйте разные кадры в секунду — в кино показывают 24.',
+    stage: 'Кнопки внизу меняют частоту и глубину. «▶» — послушать, что получилось.',
+    rate: 8, bits: 3, fps: 4,
+    check: m => m.sim >= 90 && m.kb <= 32 && m.vidOk },
+  { id: 'zip', title: 'Сжатие файлов',
+    text: ['Сжатие — это запись того же файла меньшим числом бит. Архиваторы (ZIP, 7-Zip, RAR) ищут в файле повторы и записывают их коротко.',
+           'Самый простой способ — кодирование длин серий (RLE). Вместо «голубой, голубой, голубой, голубой, голубой» пишем «5 × голубой». Чем больше одноцветных участков, тем сильнее сжатие. А пёстрый «шум» после такого кодирования может стать даже длиннее исходника.',
+           'RLE и ZIP сжимают без потерь: после распаковки файл точно такой же. JPEG, MP3 и MP4 сжимают с потерями: выбрасывают детали, которые глаз и ухо почти не замечают, и уменьшают файл в 10 раз и больше.'],
+    why: 'Веб-разработчики сжимают картинки и видео, чтобы сайт открывался быстро даже на слабом мобильном интернете в селе — иначе покупатель уйдёт из интернет-магазина. Инженеры крупных онлайн-сервисов экономят на сжатии большие деньги за серверы и трафик. А тебе архив ZIP поможет отправить папку с проектом одним файлом, а сжатое видео — пролезть в лимит мессенджера.',
+    task: 'Нажмите «Шум» и посмотрите на сжатие. Потом нарисуйте картинку из всех 4 цветов, которую RLE сожмёт хотя бы в 3 раза.',
+    hint: 'Сжатие считается по строкам: каждая серия стоит 6 бит. Чем меньше серий в строках, тем лучше. Инструмент «Строка» закрашивает строку целиком.',
+    stage: 'Выберите цвет и рисуйте пальцем или мышью по клеткам.',
+    pic: ['0000000000001100', '0000000000011110', '0000000000011110', '0000033000001100', '0000333300000000',
+          '0003333330000000', '0000111100000000', '0000131100000000', '2222111122222222', '2222222222222222'],
+    check: m => m.noiseSeen && m.ratio >= 3 && m.colors === 4 },
+];
+
+const KEY = 'luch-cs-media';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview',
+            res: 16, zoom: 1, r: 0.36, pick: null,
+            mode: 'sound', rate: 8, bits: 3, fps: 4, vidOk: false, playing: !reduce, vt: 0,
+            pic: [], color: 0, tool: 'brush', noiseSeen: false, curRow: 0, hl: null };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+
+// ---------- lesson 1: raster vs vector ----------
+const RES = [8, 16, 32, 64];
+const ZOOMS = [1, 2, 4, 8];
+const FR = { ras: { x: 8, y: 100 }, vec: { x: 184, y: 100 }, s: 168 };
+const vecCmd = () => `<circle cx="50" cy="50" r="${Math.round(S.r * 100)}" fill="#ffb547"/>`;
+const rasterInfo = () => { let n = 0; const N = S.res; for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) if (((i + .5) / N - .5) ** 2 + ((j + .5) / N - .5) ** 2 <= S.r * S.r) n++; return { filled: n, total: N * N, bytes: N * N * 3 }; };
+function view() { // visible window of the unit image
+  const z = S.zoom, ex = .5 + S.r * Math.SQRT1_2, ey = .5 - S.r * Math.SQRT1_2;
+  const cx = .5 + (ex - .5) * (1 - 1 / z), cy = .5 + (ey - .5) * (1 - 1 / z);
+  return { x0: cx - .5 / z, y0: cy - .5 / z, s: FR.s * z };
+}
+
+// ---------- lesson 2: sound and video ----------
+const FPS = [1, 2, 4, 6, 12, 24, 30, 60];
+const quant = (v, b) => { const Lv = 2 ** b; return Math.round((v + 1) / 2 * (Lv - 1)) / (Lv - 1) * 2 - 1; };
+const sampleAt = (p, rate, b) => quant(Math.sin(2 * Math.PI * Math.floor(p * rate + 1e-9) / rate), b); // p in periods of a 1 kHz tone, rate in kHz
+function similarity(rate, b) {
+  let e = 0; const n = 2000;
+  for (let i = 0; i < n; i++) { const p = (i + .5) / n * 2; e += Math.abs(Math.sin(2 * Math.PI * p) - sampleAt(p, rate, b)); }
+  return clamp(100 * (1 - e / n), 0, 100);
+}
+const FRAME = { w: 1280, h: 720 };
+
+// ---------- lesson 3: RLE ----------
+const PAL = [{ c: '#5fb4d9', n: 'голубой', k: 'Г' }, { c: '#ffd27a', n: 'жёлтый', k: 'Ж' }, { c: '#86e0a8', n: 'зелёный', k: 'З' }, { c: '#e0604a', n: 'красный', k: 'К' }];
+const GW = 16, GH = 10, CS = 20, GX = 20, GY = 92, RUNBITS = 6, PIXBITS = 2;
+const runsOf = row => { const r = []; for (const c of row) { if (r.length && r[r.length - 1].c === c) r[r.length - 1].n++; else r.push({ c, n: 1 }); } return r; };
+
+function model() {
+  const id = LID();
+  if (id === 'raster') { const ri = rasterInfo(); return { kind: 'raster', res: S.res, zoom: S.zoom, r: S.r, pick: S.pick, ...ri, vbytes: vecCmd().length }; }
+  if (id === 'av') {
+    const sim = similarity(S.rate, S.bits), bps = S.rate * 1000 * S.bits, kb = bps / 8 / 1024;
+    const frameB = FRAME.w * FRAME.h * 3, vMB = frameB * S.fps / 1024 / 1024;
+    return { kind: 'av', mode: S.mode, rate: S.rate, bits: S.bits, levels: 2 ** S.bits, sim, simR: Math.floor(sim), bps, kb, fps: S.fps, frameB, vMB, vidOk: S.vidOk };
+  }
+  const rows = S.pic.map(runsOf), runs = rows.reduce((s, r) => s + r.length, 0), orig = GW * GH * PIXBITS, rle = runs * RUNBITS;
+  const colors = new Set(S.pic.flat()).size;
+  return { kind: 'zip', rows, runs, orig, rle, ratio: orig / rle, colors, noiseSeen: S.noiseSeen };
+}
+
+// ---------- drawing ----------
+const ol = (d, fill, stroke, w = 2.2, extra = '') => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${w + 2.6}" stroke-linejoin="round" stroke-linecap="round"/><path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round" ${extra}/>`;
+
+function drawRaster() {
+  const m = model(), v = view(), N = S.res, s = FR.s, r = S.r;
+  let h = '';
+  for (const kind of ['ras', 'vec']) {
+    const f = FR[kind], picked = S.pick === kind;
+    const X = u => f.x + (u - v.x0) * v.s, Y = u => f.y + (u - v.y0) * v.s;
+    h += `<g data-hit="pick:${kind}"><g clip-path="url(#clip-${kind})" pointer-events="none"><rect x="${f.x}" y="${f.y}" width="${s}" height="${s}" fill="#f3efe6"/>`;
+    if (kind === 'ras') {
+      const ps = v.s / N, i0 = Math.max(0, Math.floor(v.x0 * N)), i1 = Math.min(N - 1, Math.ceil((v.x0 + 1 / S.zoom) * N)), j0 = Math.max(0, Math.floor(v.y0 * N)), j1 = Math.min(N - 1, Math.ceil((v.y0 + 1 / S.zoom) * N));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        if (((i + .5) / N - .5) ** 2 + ((j + .5) / N - .5) ** 2 <= r * r) h += `<rect x="${X(i / N).toFixed(2)}" y="${Y(j / N).toFixed(2)}" width="${(ps + .3).toFixed(2)}" height="${(ps + .3).toFixed(2)}" fill="#ffb547"/>`;
+      }
+      if (ps >= 7) { let g = ''; for (let i = i0; i <= i1 + 1; i++) g += `M${X(i / N).toFixed(1)} ${f.y}V${f.y + s}`; for (let j = j0; j <= j1 + 1; j++) g += `M${f.x} ${Y(j / N).toFixed(1)}H${f.x + s}`; h += `<path d="${g}" stroke="rgba(11,16,25,.18)" stroke-width=".7"/>`; }
+    } else {
+      h += `<circle cx="${X(.5).toFixed(2)}" cy="${Y(.5).toFixed(2)}" r="${(r * v.s).toFixed(2)}" fill="#ffb547"/>`;
+    }
+    h += `</g><rect x="${f.x}" y="${f.y}" width="${s}" height="${s}" rx="3" fill="transparent" stroke="${picked ? (kind === 'vec' ? '#86e0a8' : '#ff8a73') : '#56627d'}" stroke-width="${picked ? 2.4 : 1.4}"/>`;
+    h += `<rect x="${f.x + s - 34}" y="${f.y + 6}" width="28" height="16" rx="4" fill="rgba(11,16,25,.75)"/><text x="${f.x + s - 20}" y="${f.y + 17.5}" font-size="9.5" fill="#e8ecf4" text-anchor="middle">×${S.zoom}</text></g>`;
+  }
+  if (S.zoom === 1) { // radius handle on the vector picture
+    const hx = FR.vec.x + (.5 + r) * s, hy = FR.vec.y + .5 * s;
+    h += `<line x1="${FR.vec.x + s / 2}" y1="${hy}" x2="${hx}" y2="${hy}" stroke="${INK}" stroke-width="1.2" stroke-dasharray="3 3"/>`;
+    h += `<g data-drag="rad"><circle cx="${hx}" cy="${hy}" r="16" fill="transparent"/><circle cx="${hx}" cy="${hy}" r="6.5" fill="#72d4e8" stroke="${INK}" stroke-width="2"/></g>`;
+  }
+  h += `<text x="${FR.ras.x}" y="93" font-size="9.5" fill="#e8ecf4" class="sans" font-weight="600">РАСТР · ${N}×${N} пикселей</text>`;
+  h += `<text x="${FR.vec.x}" y="93" font-size="9.5" fill="#e8ecf4" class="sans" font-weight="600">ВЕКТОР · одна фигура</text>`;
+  // what the files store
+  h += `<text x="8" y="294" font-size="9" fill="#8b96ad">растр хранит цвет каждого пикселя:</text>`;
+  h += `<text x="8" y="309" font-size="10.5" fill="#e8ecf4">${N}×${N} = ${big(m.total)} пикс. × 3 байта = ${big(m.bytes)} байт</text>`;
+  h += `<text x="8" y="330" font-size="9" fill="#8b96ad">вектор хранит команду (формат SVG):</text>`;
+  h += `<text x="8" y="345" font-size="9.4" fill="#ffb547">${vecCmd().replace(/</g, '&lt;')}</text>`;
+  h += `<text x="8" y="360" font-size="10.5" fill="#e8ecf4">${m.vbytes} символов ≈ ${m.vbytes} байт при любом размере</text>`;
+  // size bars
+  const mx = Math.max(m.bytes, m.vbytes), bw = 344;
+  h += `<rect x="8" y="372" width="${Math.max(2, bw * m.bytes / mx).toFixed(1)}" height="8" rx="3" fill="#ff8a73"/><rect x="8" y="384" width="${Math.max(2, bw * m.vbytes / mx).toFixed(1)}" height="8" rx="3" fill="#86e0a8"/>`;
+  h += `<text x="352" y="400" font-size="8.5" fill="#8b96ad" text-anchor="end">красная полоса — растр, зелёная — вектор</text>`;
+  return h;
+}
+
+function drawSound() {
+  const m = model(), X0 = 20, W = 320, Yc = 182, A = 72, Lv = 2 ** S.bits;
+  const X = p => X0 + p / 2 * W, Y = v => Yc - v * A;
+  let h = `<rect x="${X0 - 6}" y="${Yc - A - 14}" width="${W + 12}" height="${2 * A + 28}" rx="8" fill="#101827" stroke="#26324a"/>`;
+  h += `<line x1="${X0}" y1="${Yc}" x2="${X0 + W}" y2="${Yc}" stroke="#26324a"/>`;
+  if (Lv <= 32) for (let k = 0; k < Lv; k++) { const v = k / (Lv - 1) * 2 - 1; h += `<line x1="${X0}" y1="${Y(v).toFixed(1)}" x2="${X0 + W}" y2="${Y(v).toFixed(1)}" stroke="rgba(255,181,71,.16)" stroke-width=".8"/>`; }
+  for (let p = 0; p <= 2; p++) h += `<line x1="${X(p)}" y1="${Yc - A - 8}" x2="${X(p)}" y2="${Yc + A + 8}" stroke="#26324a" stroke-dasharray="2 4"/><text x="${X(p)}" y="${Yc + A + 24}" font-size="8.5" fill="#8b96ad" text-anchor="middle">${p} мс</text>`;
+  let d = ''; for (let i = 0; i <= 240; i++) { const p = i / 120; d += (i ? 'L' : 'M') + X(p).toFixed(1) + ' ' + Y(Math.sin(2 * Math.PI * p)).toFixed(1); }
+  h += `<path d="${d}" fill="none" stroke="#72d4e8" stroke-width="2.2" opacity=".85"/>`;
+  const n = S.rate * 2; let st = '', dots = '';
+  for (let k = 0; k < n; k++) {
+    const v = sampleAt(k / S.rate, S.rate, S.bits), x1 = X(k / S.rate), x2 = X((k + 1) / S.rate), y = Y(v).toFixed(1);
+    st += (k ? 'L' : 'M') + x1.toFixed(1) + ' ' + y + 'H' + x2.toFixed(1);
+    if (n <= 64) dots += `<circle cx="${x1.toFixed(1)}" cy="${y}" r="2.6" fill="#ffb547" stroke="${INK}" stroke-width="1"/>`;
+  }
+  h += `<path d="${st}" fill="none" stroke="#ffb547" stroke-width="2"/>` + dots;
+  h += `<text x="${X0 + W}" y="${Yc - A - 20}" font-size="9" text-anchor="end"><tspan fill="#72d4e8">— звук (тон 1 кГц)</tspan><tspan fill="#ffb547" dx="10">— цифровая запись</tspan></text>`;
+  h += `<text x="180" y="${Yc + A + 38}" font-size="9.5" fill="#e8ecf4" text-anchor="middle">${S.rate} кГц: ${S.rate} ${plural(S.rate, 'измерение', 'измерения', 'измерений')} на период · ${S.bits} ${plural(S.bits, 'бит', 'бита', 'бит')}: ${Lv} ${plural(Lv, 'уровень', 'уровня', 'уровней')}</text>`;
+  // bars: similarity and size
+  const bar = (y, label, val, max, mark, good, txt) => {
+    let b = `<text x="8" y="${y - 5}" font-size="9" fill="#8b96ad">${label}</text><text x="352" y="${y - 5}" font-size="10" fill="${good ? '#86e0a8' : '#ff8a73'}" text-anchor="end">${txt}</text>`;
+    b += `<rect x="8" y="${y}" width="344" height="9" rx="4" fill="#1a2438"/><rect x="8" y="${y}" width="${(344 * clamp(val / max, 0, 1)).toFixed(1)}" height="9" rx="4" fill="${good ? '#86e0a8' : '#ff8a73'}"/>`;
+    b += `<line x1="${8 + 344 * mark / max}" y1="${y - 3}" x2="${8 + 344 * mark / max}" y2="${y + 12}" stroke="#e8ecf4" stroke-width="1.6"/>`;
+    return b;
+  };
+  h += bar(352, 'похожесть на настоящий звук (цель ≥ 90 %)', m.sim, 100, 90, m.sim >= 90, `${m.simR} %`);
+  h += bar(386, 'объём 1 секунды (лимит 32 Кбайт)', m.kb, 48, 32, m.kb <= 32, `${fmt(m.kb, 1)} Кбайт`);
+  return h;
+}
+
+function ballAt(t) { // ball position on a 1 × 1 screen, loop of 2 s
+  const u = (t % 2) / 2, x = u < .5 ? u * 2 : 2 - u * 2;
+  return { x: .08 + .84 * x, y: .86 - .62 * Math.abs(Math.sin(Math.PI * 3 * u)) };
+}
+function drawVideo() {
+  const m = model(), sx = 20, sy = 92, sw = 320, sh = 180;
+  const k = Math.floor(S.vt * S.fps + 1e-9), tq = k / S.fps, b = ballAt(tq);
+  let h = `<rect x="${sx}" y="${sy}" width="${sw}" height="${sh}" rx="6" fill="#16233a" stroke="#56627d" stroke-width="1.4"/>`;
+  h += `<rect x="${sx}" y="${sy + sh * .9}" width="${sw}" height="${sh * .1}" fill="#2c4a3a"/>`;
+  h += `<circle cx="${(sx + b.x * sw).toFixed(1)}" cy="${(sy + b.y * sh - 2).toFixed(1)}" r="13" fill="#ffb547" stroke="${INK}" stroke-width="2"/>`;
+  h += `<rect x="${sx + 8}" y="${sy + 8}" width="112" height="18" rx="4" fill="rgba(11,16,25,.7)"/><text x="${sx + 14}" y="${sy + 20.5}" font-size="9.5" fill="#e8ecf4">кадр ${k % (2 * S.fps) + 1} · ${S.fps} кадр/с</text>`;
+  if (!S.playing) h += `<text x="${sx + sw - 10}" y="${sy + 20}" font-size="10" fill="#8b96ad" text-anchor="end">пауза</text>`;
+  // film strip: neighbouring frames
+  const fy = 290, tw = 40, th = 24, n = 8, k0 = k - 3;
+  h += `<rect x="6" y="${fy - 6}" width="348" height="${th + 12}" rx="4" fill="#0b1019" stroke="#26324a"/>`;
+  for (let i = 0; i < n; i++) {
+    const kk = k0 + i, fx = 14 + i * 42.5, bb = ballAt(Math.max(0, kk) / S.fps), cur = kk === k;
+    h += `<rect x="${fx}" y="${fy}" width="${tw}" height="${th}" rx="2" fill="#16233a" stroke="${cur ? '#ffb547' : '#3a4762'}" stroke-width="${cur ? 1.8 : 1}"/>`;
+    if (kk >= 0) h += `<circle cx="${(fx + bb.x * tw).toFixed(1)}" cy="${(fy + bb.y * th - 1).toFixed(1)}" r="2.6" fill="#ffb547"/>`;
+  }
+  h += `<text x="180" y="${fy + th + 22}" font-size="9" fill="#8b96ad" text-anchor="middle">плёнка: соседние кадры (рамка — показан сейчас)</text>`;
+  const smooth = S.fps >= 24;
+  h += `<text x="180" y="${fy + th + 44}" font-size="10" fill="${smooth ? '#86e0a8' : '#ff8a73'}" text-anchor="middle">${smooth ? 'движение выглядит плавным' : S.fps >= 12 ? 'движение рывками, но уже похоже на мультик' : 'видны отдельные картинки — слайд-шоу'}</text>`;
+  h += `<text x="180" y="${fy + th + 64}" font-size="9.5" fill="#e8ecf4" text-anchor="middle">1 кадр ${FRAME.w}×${FRAME.h} × 3 байта ≈ ${fmt(m.frameB / 1048576, 1)} Мбайт · за 1 с ≈ ${fmt(m.vMB, 0)} Мбайт</text>`;
+  h += `<text x="180" y="${fy + th + 80}" font-size="8.5" fill="#8b96ad" text-anchor="middle">это без сжатия — поэтому видео всегда сжимают (урок 3)</text>`;
+  return h;
+}
+
+function drawZip() {
+  const m = model();
+  let h = '';
+  h += `<g data-paint="1"><rect x="${GX}" y="${GY}" width="${GW * CS}" height="${GH * CS}" fill="transparent"/>`;
+  for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) h += `<rect x="${GX + i * CS}" y="${GY + j * CS}" width="${CS}" height="${CS}" fill="${PAL[S.pic[j][i]].c}" stroke="rgba(11,16,25,.35)" stroke-width=".6"/>`;
+  h += `</g><rect x="${GX - 1}" y="${GY + S.curRow * CS - 1}" width="${GW * CS + 2}" height="${CS + 2}" fill="none" stroke="#e8ecf4" stroke-width="1.8" pointer-events="none"/>`;
+  m.rows.forEach((r, j) => h += `<text x="${GX + GW * CS + 10}" y="${GY + j * CS + 14}" font-size="9" fill="${r.length <= 2 ? '#86e0a8' : r.length >= 6 ? '#ff8a73' : '#8b96ad'}" text-anchor="middle">${r.length}</text>`);
+  h += `<text x="${GX + GW * CS + 10}" y="${GY - 6}" font-size="7.5" fill="#8b96ad" text-anchor="middle">серий</text>`;
+  h += `<text x="${GX}" y="${GY - 6}" font-size="9" fill="#8b96ad">картинка 16×10, 4 цвета → 2 бита на пиксель</text>`;
+  // run bar of the current row
+  const ry = 304, runs = m.rows[S.curRow];
+  let x = GX;
+  for (const r of runs) {
+    h += `<rect x="${x + .5}" y="${ry}" width="${r.n * CS - 1}" height="20" rx="4" fill="${PAL[r.c].c}" stroke="${INK}" stroke-width="1"/>`;
+    if (r.n * CS >= 18) h += `<text x="${x + r.n * CS / 2}" y="${ry + 14}" font-size="9.5" fill="${INK}" text-anchor="middle" font-weight="600">${r.n}${r.n * CS >= 34 ? PAL[r.c].k : ''}</text>`;
+    x += r.n * CS;
+  }
+  h += `<text x="${GX}" y="${ry + 36}" font-size="9.5" fill="#e8ecf4">строка ${S.curRow + 1}: ${runs.length} ${plural(runs.length, 'серия', 'серии', 'серий')} × 6 бит = ${runs.length * 6} бит (было 32)</text>`;
+  // palette
+  PAL.forEach((p, i) => {
+    const px = GX + i * 46, sel = S.color === i;
+    h += `<g data-hit="col:${i}"><rect x="${px}" y="358" width="38" height="30" rx="7" fill="${p.c}" stroke="${sel ? '#e8ecf4' : INK}" stroke-width="${sel ? 3 : 1.4}"/><text x="${px + 19}" y="377" font-size="10" fill="${INK}" text-anchor="middle" font-weight="600">${p.k}</text></g>`;
+  });
+  h += `<text x="${GX + 4 * 46 + 4}" y="370" font-size="9" fill="#8b96ad">${S.tool === 'row' ? 'инструмент: строка' : 'инструмент: кисть'}</text>`;
+  h += `<text x="${GX + 4 * 46 + 4}" y="385" font-size="10.5" fill="${m.ratio >= 3 ? '#86e0a8' : m.ratio < 1 ? '#ff8a73' : '#e8ecf4'}">${m.orig} → ${m.rle} бит</text>`;
+  return h;
+}
+
+function hlBox(id) {
+  const lid = LID();
+  if (lid === 'raster') return { ras: [4, 82, 176, 190], pixel: [4, 82, 176, 190], vec: [180, 82, 176, 190], handle: [180, 82, 176, 190], cmd: [2, 282, 356, 82], bars: [2, 366, 356, 36] }[id];
+  if (lid === 'av') return { wave: [10, 80, 340, 190], samples: [10, 80, 340, 190], levels: [10, 80, 340, 190], bars: [2, 334, 356, 68], screen: [16, 88, 328, 188], strip: [2, 280, 356, 48], vsize: [2, 330, 356, 56] }[id];
+  if (lid === 'zip') return { grid: [GX - 4, GY - 4, GW * CS + 8, GH * CS + 8], counts: [GX + GW * CS, GY - 18, 22, GH * CS + 22], runs: [GX - 4, 298, GW * CS + 8, 46], pal: [GX - 4, 352, 4 * 46 + 4, 42] }[id];
+  return null;
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern>
+    <clipPath id="clip-ras"><rect x="${FR.ras.x}" y="${FR.ras.y}" width="${FR.s}" height="${FR.s}" rx="3"/></clipPath><clipPath id="clip-vec"><rect x="${FR.vec.x}" y="${FR.vec.y}" width="${FR.s}" height="${FR.s}" rx="3"/></clipPath></defs>
+    <rect x="-2000" y="-2000" width="4360" height="4405" fill="url(#tile)"/>`;
+  if (id === 'raster') h += drawRaster();
+  else if (id === 'av') h += S.mode === 'sound' ? drawSound() : drawVideo();
+  else h += drawZip();
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 360, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 372, hh / 412, 1.8);
+  VB = { w: w / s, h: hh / s }; VB.x = 180 - VB.w / 2; VB.y = 404 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- interaction ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+
+function paintAt(p) {
+  const i = Math.floor((p.x - GX) / CS), j = Math.floor((p.y - GY) / CS);
+  if (i < 0 || i >= GW || j < 0 || j >= GH) return;
+  let changed = S.curRow !== j; S.curRow = j;
+  if (S.tool === 'row') { for (let k = 0; k < GW; k++) if (S.pic[j][k] !== S.color) { S.pic[j][k] = S.color; changed = true; } }
+  else if (S.pic[j][i] !== S.color) { S.pic[j][i] = S.color; changed = true; }
+  if (changed) update();
+}
+function setRadius(p) {
+  const u = (p.x - FR.vec.x) / FR.s - .5, v = (p.y - FR.vec.y) / FR.s - .5;
+  const r = Math.round(clamp(Math.hypot(u, v), .15, .48) * 100) / 100;
+  if (r !== S.r) { S.r = r; S.pick = null; update(); }
+}
+
+scene.addEventListener('pointerdown', e => {
+  const d = e.target.closest('[data-drag]'), hit = e.target.closest('[data-hit]'), paint = e.target.closest('[data-paint]');
+  if (!d && !hit && !paint) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  if (d) { drag = { id: 'rad' }; scene.classList.add('grabbing'); return; }
+  if (paint) { drag = { id: 'paint' }; paintAt(toSvg(e)); return; }
+  drag = { id: 'hit', h: hit.dataset.hit };
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (drag.id === 'rad') setRadius(toSvg(e));
+  else if (drag.id === 'paint') paintAt(toSvg(e));
+});
+function endDrag(e, cancel) {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing'); dirty = true;
+  if (!cancel && d.id === 'hit') onHit(d.h);
+}
+scene.addEventListener('pointerup', e => endDrag(e, false));
+scene.addEventListener('pointercancel', e => endDrag(e, true));
+
+function onHit(h) {
+  const [k, v] = h.split(':');
+  if (k === 'pick') pick(v);
+  if (k === 'col') { S.color = +v; update(); }
+}
+function pick(v) {
+  if (S.zoom < 8) { toast(`Сейчас увеличение ×${S.zoom}. Сначала увеличьте рисунки до ×8 кнопкой «+ лупа».`); return; }
+  S.pick = v;
+  if (v === 'ras') toast('Посмотрите на край круга слева. Он ровный или из ступенек? Из чего состоит этот рисунок?');
+  update();
+}
+
+// sound playback: the staircase signal, as it would sound
+let audio = null;
+function playSound() {
+  try {
+    if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state === 'suspended') audio.resume();
+    const sr = audio.sampleRate, dur = 0.7, n = Math.floor(sr * dur), buf = audio.createBuffer(1, n, sr), ch = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) { const t = i / sr, env = Math.min(1, t / .03, (dur - t) / .05); ch[i] = 0.12 * env * sampleAt(t * 1000, S.rate, S.bits); }
+    const src = audio.createBufferSource(); src.buffer = buf; src.connect(audio.destination); src.start();
+  } catch (e) { toast('Звук в этом браузере недоступен.'); }
+}
+
+let last = performance.now();
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  let anim = !!S.hl;
+  if (LID() === 'av' && S.mode === 'video' && S.playing) { S.vt += dt; anim = true; }
+  if (dirty || anim) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3000); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, cls) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}${cls ? ` class="${cls}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  if (id === 'raster') tb.innerHTML = RES.map(n => B('res:' + n, `${n}×${n}`, S.res === n)).join('') + sep + B('zoom:-', '− лупа') + B('zoom:+', '+ лупа');
+  else if (id === 'av') tb.innerHTML = B('mode:sound', 'Звук', S.mode === 'sound') + B('mode:video', 'Видео', S.mode === 'video') + sep +
+    (S.mode === 'sound' ? B('rate:-', '− кГц') + B('rate:+', '+ кГц') + B('bits:-', '− бит') + B('bits:+', '+ бит') + B('play', '▶', undefined, 'big')
+                        : B('fps:-', '− кадры') + B('fps:+', '+ кадры') + B('vplay', S.playing ? '❚❚' : '▶', undefined, 'big'));
+  else tb.innerHTML = B('tool:brush', 'Кисть', S.tool === 'brush') + B('tool:row', 'Строка', S.tool === 'row') + sep + B('noise', 'Шум') + B('clear', 'Очистить') + B('reset', 'Как было');
+}
+function setFps(f) { S.fps = f; if (S.mode === 'video' && f >= 24 && !S.vidOk) { S.vidOk = true; toast('Плавно! С 24 кадров в секунду глаз перестаёт замечать смену картинок.'); } }
+function act(a) {
+  const [k, v] = a.split(':');
+  if (k === 'res') { S.res = +v; S.pick = null; }
+  else if (k === 'zoom') { const i = ZOOMS.indexOf(S.zoom) + (v === '+' ? 1 : -1); if (i < 0 || i >= ZOOMS.length) return; S.zoom = ZOOMS[i]; S.pick = null; }
+  else if (k === 'mode') { S.mode = v; if (v === 'video') setFps(S.fps); }
+  else if (k === 'rate') S.rate = clamp(S.rate + (v === '+' ? 2 : -2), 2, 48);
+  else if (k === 'bits') S.bits = clamp(S.bits + (v === '+' ? 1 : -1), 1, 8);
+  else if (k === 'play') { playSound(); return; }
+  else if (k === 'fps') { const i = clamp(FPS.indexOf(S.fps) + (v === '+' ? 1 : -1), 0, FPS.length - 1); setFps(FPS[i]); }
+  else if (k === 'vplay') S.playing = !S.playing;
+  else if (k === 'tool') S.tool = v;
+  else if (k === 'noise') { S.pic = S.pic.map(r => r.map(() => Math.floor(Math.random() * 4))); if (!S.noiseSeen) { S.noiseSeen = true; } toast(`Шум: ${model().rle} бит вместо 320. Код стал длиннее самой картинки!`); }
+  else if (k === 'clear') S.pic = S.pic.map(r => r.map(() => S.color));
+  else if (k === 'reset') S.pic = L().pic.map(r => r.split('').map(Number));
+  renderTools(); update();
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  ras: IC('<rect x="5" y="5" width="24" height="24" fill="#f3efe6"/><path d="M13 9h8v4h4v8h-4v4h-8v-4H9v-8h4z" fill="#ffb547"/>'),
+  pixel: IC('<path d="M5 5h24v24H5z" fill="none" stroke="var(--muted)" stroke-width="1"/><path d="M11 5v24M17 5v24M23 5v24M5 11h24M5 17h24M5 23h24" stroke="var(--muted)" stroke-width=".8"/><rect x="11" y="11" width="6" height="6" fill="#ffb547"/>'),
+  vec: IC('<rect x="5" y="5" width="24" height="24" fill="#f3efe6"/><circle cx="17" cy="17" r="9" fill="#ffb547"/>'),
+  handle: IC('<circle cx="15" cy="17" r="10" fill="none" stroke="#ffb547" stroke-width="1.6"/><path d="M15 17h10" stroke="var(--fg)" stroke-dasharray="2 2"/><circle cx="25" cy="17" r="3.5" fill="#72d4e8"/>'),
+  cmd: IC('<text x="17" y="21" font-size="9" fill="#ffb547" text-anchor="middle" font-family="monospace">&lt;/&gt;</text>'),
+  bars: IC('<rect x="4" y="10" width="26" height="5" rx="2" fill="#ff8a73"/><rect x="4" y="19" width="6" height="5" rx="2" fill="#86e0a8"/>'),
+  wave: IC('<path d="M3 17Q8 4 13 17T23 17T33 17" fill="none" stroke="#72d4e8" stroke-width="2"/>'),
+  samples: IC('<path d="M3 17h5v-8h5v-2h5v10h5v8h5v-2h4" fill="none" stroke="#ffb547" stroke-width="2"/>'),
+  levels: IC('<path d="M4 8h26M4 14h26M4 20h26M4 26h26" stroke="#ffb547" stroke-width="1.2" opacity=".6"/>'),
+  sbars: IC('<rect x="4" y="10" width="20" height="5" rx="2" fill="#86e0a8"/><rect x="4" y="19" width="14" height="5" rx="2" fill="#86e0a8"/><path d="M22 7v20" stroke="var(--fg)"/>'),
+  screen: IC('<rect x="3" y="7" width="28" height="18" rx="2" fill="#16233a" stroke="var(--fg)" stroke-width="1.2"/><circle cx="20" cy="15" r="3.5" fill="#ffb547"/>'),
+  strip: IC('<rect x="2" y="11" width="30" height="12" fill="#0b1019" stroke="var(--muted)"/><rect x="4" y="13" width="8" height="8" fill="#16233a"/><rect x="13" y="13" width="8" height="8" fill="#16233a"/><rect x="22" y="13" width="8" height="8" fill="#16233a" stroke="#ffb547"/><circle cx="6" cy="18" r="1.4" fill="#ffb547"/><circle cx="17" cy="16" r="1.4" fill="#ffb547"/><circle cx="27" cy="18" r="1.4" fill="#ffb547"/>'),
+  vsize: IC('<text x="17" y="21" font-size="9" fill="var(--fg)" text-anchor="middle" font-family="monospace">МБ/с</text>'),
+  grid: IC('<rect x="5" y="8" width="24" height="18" fill="#5fb4d9"/><rect x="5" y="20" width="24" height="6" fill="#86e0a8"/><rect x="21" y="10" width="5" height="5" fill="#ffd27a"/>'),
+  counts: IC('<text x="17" y="15" font-size="8" fill="#86e0a8" text-anchor="middle" font-family="monospace">1</text><text x="17" y="26" font-size="8" fill="#ff8a73" text-anchor="middle" font-family="monospace">9</text>'),
+  runs: IC('<rect x="3" y="12" width="14" height="10" rx="2" fill="#5fb4d9"/><rect x="18" y="12" width="5" height="10" rx="2" fill="#ffd27a"/><rect x="24" y="12" width="7" height="10" rx="2" fill="#5fb4d9"/>'),
+  pal: IC('<rect x="3" y="11" width="6" height="12" rx="2" fill="#5fb4d9"/><rect x="10.5" y="11" width="6" height="12" rx="2" fill="#ffd27a"/><rect x="18" y="11" width="6" height="12" rx="2" fill="#86e0a8"/><rect x="25.5" y="11" width="6" height="12" rx="2" fill="#e0604a"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  if (id === 'raster') return `Увеличение ×${m.zoom}` + (m.zoom < 8 ? ' · нужно ×8' : '') + (m.pick === 'ras' ? ' · выбран растр — присмотритесь' : '');
+  if (id === 'av') return `Похожесть ${m.simR} % · ${fmt(m.kb, 1)} Кбайт · видео ${m.vidOk ? 'плавное ✓' : 'ещё не плавное'}`;
+  return `Шум ${m.noiseSeen ? '✓' : '—'} · цветов ${m.colors}/4 · сжатие ×${fmt(m.ratio, 2)}`;
+}
+
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'raster') h = `<h2>Растр и вектор</h2>
+      <dl class="reads"><div><dt>Пикселей</dt><dd id="r1"></dd></div><div><dt>Растр</dt><dd id="r2"></dd></div><div><dt>Вектор</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Разрешение растра</div><div class="chips" id="resChips"></div></div>` +
+      slider('inZoom', 'Увеличение', 0, 3, 1, ZOOMS.indexOf(S.zoom)) + slider('inR', 'Радиус круга', 15, 48, 1, Math.round(S.r * 100)) +
+      `<div class="ctl"><div class="lbl">Какой рисунок остался гладким?</div><div class="chips"><button data-p="ras">Растр</button><button data-p="vec">Вектор</button></div></div>`;
+  if (id === 'av') h = `<h2>Оцифровка</h2>
+      <dl class="reads"><div><dt>Похожесть</dt><dd id="r1"></dd></div><div><dt>1 с звука</dt><dd id="r2"></dd></div><div><dt>Кадр/с</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Режим</div><div class="chips" id="modeChips"></div></div>` +
+      slider('inRate', 'Частота дискретизации', 2, 48, 2, S.rate) + slider('inBits', 'Глубина кодирования', 1, 8, 1, S.bits) +
+      `<div class="row"><button class="ghostbtn" data-a="play">▶ Послушать</button></div>` +
+      slider('inFps', 'Кадров в секунду', 0, FPS.length - 1, 1, FPS.indexOf(S.fps)) +
+      `<p class="note" style="margin-top:8px">Для сравнения: музыка на CD — 44,1 кГц и 16 бит, кино — 24 кадра в секунду.</p>`;
+  if (id === 'zip') h = `<h2>Кодирование серий</h2>
+      <dl class="reads"><div><dt>Было</dt><dd id="r1"></dd></div><div><dt>Стало</dt><dd id="r2"></dd></div><div><dt>Сжатие</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Цвет</div><div class="chips" id="colChips"></div></div>
+      <div class="ctl"><div class="lbl">Инструмент</div><div class="chips" id="toolChips"></div></div>
+      <div class="row"><button class="ghostbtn" data-a="noise">Шум</button><button class="ghostbtn" data-a="clear">Очистить</button><button class="ghostbtn" data-a="reset">Как было</button></div>`;
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn); };
+  on('#inZoom', e => { const z = ZOOMS[+e.target.value]; if (z !== S.zoom) { S.zoom = z; S.pick = null; update(); } });
+  on('#inR', e => { S.r = +e.target.value / 100; S.pick = null; update(); });
+  on('#inRate', e => { S.rate = +e.target.value; update(); });
+  on('#inBits', e => { S.bits = +e.target.value; update(); });
+  on('#inFps', e => { setFps(FPS[+e.target.value]); update(); });
+  el.querySelectorAll('.row [data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+  el.querySelectorAll('[data-p]').forEach(b => b.onclick = () => pick(b.dataset.p));
+}
+function chipsInto(el, sel, items, onClick) {
+  const c = el.querySelector(sel); if (!c) return;
+  c.innerHTML = items.map(it => `<button data-v="${it.v}" aria-pressed="${it.on}">${it.label}</button>`).join('');
+  c.querySelectorAll('button').forEach(b => b.onclick = () => onClick(b.dataset.v));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (id === 'raster') {
+    set('#r1', `${m.res}×${m.res}`); set('#r2', `${big(m.bytes)} Б`); set('#r3', `${m.vbytes} Б`);
+    set('#inZoomO', '×' + S.zoom); val('#inZoom', ZOOMS.indexOf(S.zoom)); set('#inRO', String(Math.round(S.r * 100))); val('#inR', Math.round(S.r * 100));
+    chipsInto(el, '#resChips', RES.map(n => ({ v: n, label: `${n}×${n}`, on: S.res === n })), v => act('res:' + v));
+  } else if (id === 'av') {
+    set('#r1', `${m.simR} %`); set('#r2', `${fmt(m.kb, 1)} КБ`); set('#r3', String(S.fps));
+    set('#inRateO', `${S.rate} кГц`); val('#inRate', S.rate); set('#inBitsO', `${S.bits} бит · ${m.levels} ур.`); val('#inBits', S.bits);
+    set('#inFpsO', `${S.fps}`); val('#inFps', FPS.indexOf(S.fps));
+    chipsInto(el, '#modeChips', [{ v: 'sound', label: 'Звук', on: S.mode === 'sound' }, { v: 'video', label: 'Видео', on: S.mode === 'video' }], v => act('mode:' + v));
+  } else {
+    set('#r1', `${m.orig} бит`); set('#r2', `${m.rle} бит`); set('#r3', '×' + fmt(m.ratio, 2));
+    chipsInto(el, '#colChips', PAL.map((p, i) => ({ v: i, label: p.n, on: S.color === i })), v => { S.color = +v; update(); });
+    chipsInto(el, '#toolChips', [{ v: 'brush', label: 'Кисть', on: S.tool === 'brush' }, { v: 'row', label: 'Строка', on: S.tool === 'row' }], v => act('tool:' + v));
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'raster') return [
+    { id: 'ras', icon: ICON.ras, name: 'Растровый рисунок', spec: 'Сетка пикселей. Каждый пиксель — один цвет. При увеличении пиксели становятся большими квадратами.' },
+    { id: 'pixel', icon: ICON.pixel, name: 'Пиксель', spec: 'Самая маленькая точка растра (от англ. picture element). Разрешение 16×16 — 16 пикселей в ширину и 16 в высоту.' },
+    { id: 'vec', icon: ICON.vec, name: 'Векторный рисунок', spec: 'Хранит фигуру формулой. При любом увеличении компьютер рисует её заново, края гладкие.' },
+    { id: 'handle', icon: ICON.handle, name: 'Ручка радиуса', spec: 'Тяните её при увеличении ×1: в векторе меняется одно число r, а в растре — цвет многих пикселей.' },
+    { id: 'cmd', icon: ICON.cmd, name: 'Что хранит файл', spec: 'Растр: цвет каждого пикселя (3 байта на цвет). Вектор: одна строка-команда в формате SVG.' },
+    { id: 'bars', icon: ICON.bars, name: 'Объём файлов', spec: 'Длина полосы — сколько байт занимает каждый вариант.' }];
+  if (id === 'av') return [
+    { id: 'wave', mode: 'sound', icon: ICON.wave, name: 'Звуковая волна', spec: 'Настоящий звук: давление воздуха плавно меняется. Тон 1 кГц — 1000 колебаний в секунду.' },
+    { id: 'samples', mode: 'sound', icon: ICON.samples, name: 'Измерения (отсчёты)', spec: 'Оранжевые точки — моменты измерения. Между ними значение держится, получается «лесенка».' },
+    { id: 'levels', mode: 'sound', icon: ICON.levels, name: 'Уровни', spec: 'Глубина b бит даёт 2^b уровней. Каждое измерение округляется до ближайшего уровня.' },
+    { id: 'bars', mode: 'sound', icon: ICON.sbars, name: 'Похожесть и объём', spec: 'Насколько запись похожа на волну и сколько весит 1 секунда. Белая черта — цель задания.' },
+    { id: 'screen', mode: 'video', icon: ICON.screen, name: 'Экран', spec: 'Показывает кадры один за другим с выбранной частотой.' },
+    { id: 'strip', mode: 'video', icon: ICON.strip, name: 'Плёнка кадров', spec: 'Соседние кадры. Чем меньше кадров в секунду, тем дальше мяч прыгает между ними.' },
+    { id: 'vsize', mode: 'video', icon: ICON.vsize, name: 'Объём видео', spec: 'Кадр — растровая картинка. Объём = размер кадра × кадров в секунду × секунды.' }];
+  return [
+    { id: 'grid', icon: ICON.grid, name: 'Картинка 16×10', spec: '160 пикселей, 4 цвета. Без сжатия каждый пиксель — 2 бита, всего 320 бит.' },
+    { id: 'counts', icon: ICON.counts, name: 'Серий в строке', spec: 'Сколько одноцветных отрезков в каждой строке. Зелёное число — строка сжимается хорошо, красное — плохо.' },
+    { id: 'runs', icon: ICON.runs, name: 'Код строки', spec: 'Выбранная строка, записанная сериями: «длина + цвет». Серия стоит 6 бит: 4 бита на длину (1–16) и 2 бита на цвет.' },
+    { id: 'pal', icon: ICON.pal, name: 'Палитра', spec: 'Четыре цвета: голубой (Г), жёлтый (Ж), зелёный (З), красный (К).' }];
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    const list = partsList();
+    $('#pane-parts').innerHTML = `<h2>Из чего состоит опыт</h2><p class="note">Нажмите на деталь, чтобы найти её на сцене.</p><div class="parts">` +
+      list.map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => {
+      const p = list.find(x => x.id === b.dataset.id);
+      if (p.mode && p.mode !== S.mode) { S.mode = p.mode; renderTools(); }
+      S.hl = { id: p.id, t: performance.now() }; dirty = true;
+    });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'raster') {
+    let h = `<h2>Сколько весит рисунок</h2><div class="formula">растр: ширина × высота × 3 байта</div><h3>Растр сейчас</h3><div class="steps">` +
+      step('пикселей', `${m.res} × ${m.res} = ${big(m.total)}`) + step('цвет пикселя', '24 бита = 3 байта') +
+      step('объём', `${big(m.total)} × 3 = ${big(m.bytes)} байт`, 'sum') + step('закрашено', `${big(m.filled)} пикс. из ${big(m.total)}`) + `</div>`;
+    h += `<h3>Вектор сейчас</h3><div class="steps">` + step('команда', `круг, r = ${Math.round(S.r * 100)}`) + step('объём', `${m.vbytes} символов ≈ ${m.vbytes} байт`, 'sum') + `</div>`;
+    h += `<h3>Увеличение ×${S.zoom}</h3><div class="steps">` +
+      step('рисунок на экране', `${FR.s} × ${S.zoom} = ${FR.s * S.zoom} точек`) +
+      step('1 пиксель растра', `${FR.s * S.zoom} : ${m.res} = ${fmt(FR.s * S.zoom / m.res, 1)} точки`, 'sum') +
+      step('вектор', 'рисуется заново — край гладкий') + `</div>`;
+    h += `<p class="note" style="margin-top:10px">Вдвое больше пикселей по каждой стороне — в 4 раза больше пикселей и в 4 раза тяжелее файл. Вектор от размера не тяжелеет.</p>`;
+    return h;
+  }
+  if (id === 'av') {
+    let h = `<h2>Объём звука</h2><div class="formula">V = частота × глубина × время</div><div class="steps">` +
+      step('измерений в 1 с', `${S.rate} кГц = ${big(S.rate * 1000)}`) +
+      step('уровней', `2^${S.bits} = ${m.levels}`) +
+      step('бит в 1 с', `${big(S.rate * 1000)} × ${S.bits} = ${big(m.bps)}`) +
+      step('байт', `${big(m.bps)} : 8 = ${big(m.bps / 8)}`) +
+      step('Кбайт', `${big(m.bps / 8)} : 1024 ≈ ${fmt(m.kb, 1)} ${m.kb <= 32 ? '≤' : '>'} 32`, 'sum') + `</div>`;
+    h += `<h3>Похожесть</h3><div class="steps">` + step('измерений на 1 период', `${S.rate}`) + step('средний промах', `${fmt(100 - m.sim, 1)} % от высоты волны`) +
+      step('похожесть', `100 − ${fmt(100 - m.sim, 1)} = ${m.simR} % ${m.sim >= 90 ? '≥' : '<'} 90`, 'sum') + `</div>`;
+    h += `<p class="note" style="margin-top:10px">${S.rate <= 2 ? 'При 2 кГц все измерения попадают в ноль — запись молчит! Нужно больше измерений на период.' : 'Больше измерений — ступеньки уже, больше уровней — ступеньки точнее по высоте.'}</p>`;
+    h += `<h3>Объём видео без сжатия</h3><div class="steps">` +
+      step('кадр', `${FRAME.w} × ${FRAME.h} × 3 = ${big(m.frameB)} байт`) +
+      step('за 1 с', `${big(m.frameB)} × ${S.fps} ≈ ${fmt(m.vMB, 0)} Мбайт`, 'sum') +
+      step('фильм 1,5 часа', `≈ ${fmt(m.vMB * 5400 / 1024 / 1024, 1)} Тбайт`) + `</div>`;
+    return h;
+  }
+  let h = `<h2>Считаем сжатие</h2><div class="formula">серия = 4 бита длины + 2 бита цвета</div><h3>По строкам</h3><div class="steps">`;
+  m.rows.forEach((r, j) => h += step(`${j + 1}: ${r.map(x => x.n + PAL[x.c].k).join(' ')}`, `${r.length} × 6 = ${r.length * 6}`, j === S.curRow ? 'sum' : ''));
+  h += `</div><h3>Итог</h3><div class="steps">` + step('без сжатия', `160 пикс. × 2 бита = ${m.orig} бит`) + step('RLE', `${m.runs} ${plural(m.runs, 'серия', 'серии', 'серий')} × 6 = ${m.rle} бит`) +
+    step('степень сжатия', `${m.orig} : ${m.rle} ≈ ${fmt(m.ratio, 2)} ${m.ratio >= 3 ? '≥' : '<'} 3`, 'sum') + step('цветов', `${m.colors} из 4`) + `</div>`;
+  h += `<p class="note" style="margin-top:10px">Буквы: Г — голубой, Ж — жёлтый, З — зелёный, К — красный. «12Г» значит 12 голубых пикселей подряд. Распаковка восстанавливает картинку точно — это сжатие без потерь.</p>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const el = $('#meter'), ok = !!S.done[LID()];
+  if (m.kind === 'raster') el.innerHTML = `<div class="k">Увеличение</div><div class="v ${ok ? 'ok' : ''}">×${m.zoom}</div><div class="gauge"><b style="width:${(ZOOMS.indexOf(m.zoom) / 3 * 100).toFixed(0)}%"></b></div><div class="lr"><span>растр</span><span>${m.res}×${m.res}</span></div>`;
+  else if (m.kind === 'av') el.innerHTML = S.mode === 'sound'
+    ? `<div class="k">Похожесть</div><div class="v ${ok ? 'ok' : ''}">${m.simR} %</div><div class="gauge"><b style="width:${m.sim.toFixed(1)}%;background:${m.sim >= 90 ? 'var(--ok)' : 'var(--arm)'}"></b></div><div class="lr"><span>1 с</span><span>${fmt(m.kb, 1)} КБ</span></div>`
+    : `<div class="k">Кадров в секунду</div><div class="v ${ok ? 'ok' : ''}">${m.fps}</div><div class="gauge"><b style="width:${(m.fps / 60 * 100).toFixed(1)}%;background:${m.fps >= 24 ? 'var(--ok)' : 'var(--arm)'}"></b></div><div class="lr"><span>кино</span><span>24</span></div>`;
+  else el.innerHTML = `<div class="k">Сжатие</div><div class="v ${ok ? 'ok' : ''}">×${fmt(m.ratio, 2)}</div><div class="gauge"><b style="width:${clamp(m.ratio / 5.33 * 100, 0, 100).toFixed(1)}%;background:${m.ratio >= 3 ? 'var(--ok)' : 'var(--arm)'}"></b></div><div class="lr"><span>бит</span><span>${m.orig}→${m.rle}</span></div>`;
+}
+
+function update() {
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Отличная работа!');
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  raster: '<rect x="6" y="4" width="22" height="22" fill="#f3efe6"/><path d="M12 7h10v4h3v8h-3v4H12v-4H9v-8h3z" fill="#ffb547"/><rect x="38" y="4" width="22" height="22" fill="#f3efe6"/><circle cx="49" cy="15" r="8.5" fill="#ffb547"/>',
+  av: '<path d="M4 15Q11 2 18 15T32 15" fill="none" stroke="#72d4e8" stroke-width="1.6"/><path d="M4 15h3.5v-8h3.5v-2h3.5v6h3.5v8h3.5v4h3.5v-4h3.5v-4" fill="none" stroke="#ffb547" stroke-width="1.3"/><rect x="38" y="6" width="24" height="18" rx="2" fill="#16233a" stroke="#8b96ad"/><circle cx="52" cy="14" r="3.4" fill="#ffb547"/>',
+  zip: '<rect x="4" y="5" width="28" height="5" fill="#5fb4d9"/><rect x="4" y="10" width="10" height="5" fill="#5fb4d9"/><rect x="14" y="10" width="18" height="5" fill="#ffd27a"/><rect x="4" y="15" width="28" height="10" fill="#86e0a8"/><text x="49" y="19" font-size="9" fill="#e8ecf4" text-anchor="middle" font-family="monospace">5Г</text>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Ls, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Ls.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Ls.title}</span></span>
+      ${S.done[Ls.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const Ls = LESSONS[i];
+  S.lesson = i; S.hl = null; drag = null;
+  if (Ls.id === 'raster') { S.res = Ls.res; S.zoom = Ls.zoom; S.r = Ls.r; S.pick = null; }
+  if (Ls.id === 'av') { S.mode = 'sound'; S.rate = Ls.rate; S.bits = Ls.bits; S.fps = Ls.fps; S.vidOk = false; S.vt = 0; S.playing = !reduce; }
+  if (Ls.id === 'zip') { S.pic = Ls.pic.map(r => r.split('').map(Number)); S.color = 0; S.tool = 'brush'; S.noiseSeen = false; S.curRow = 0; }
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = Ls.task;
+  $('#hint').textContent = Ls.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '', guide = '';
+  if (id === 'raster') {
+    now = `Слева растровый рисунок оранжевого круга ${m.res}×${m.res} пикселей (${big(m.total)} пикселей × 3 байта = ${big(m.bytes)} байт), справа тот же круг в векторе — команда ${vecCmd()} (${m.vbytes} байт). Радиус круга ${Math.round(S.r * 100)} из 100. Увеличение ×${m.zoom}. ${m.pick ? `Ученик выбрал как гладкий: ${m.pick === 'vec' ? 'вектор' : 'растр'}.` : 'Выбор ещё не сделан.'}`;
+    guide = 'Не говори прямо, какой рисунок гладкий: попроси увеличить до ×8 и сравнить края кругов, спроси, из чего состоит каждый рисунок.';
+  }
+  if (id === 'av') {
+    now = `Режим «${S.mode === 'sound' ? 'Звук' : 'Видео'}». Звук: синусоида 1 кГц оцифрована с частотой ${S.rate} кГц (${S.rate} измерений на период) и глубиной ${S.bits} бит (${m.levels} уровней); похожесть ${m.simR} %, объём 1 секунды ${fmt(m.kb, 1)} Кбайт (${big(m.bps)} бит). Видео: ${S.fps} кадров в секунду, кадр 1280×720 без сжатия ≈ ${fmt(m.frameB / 1048576, 1)} Мбайт. Условия задания: похожесть ≥ 90 % (${m.sim >= 90 ? 'да' : 'нет'}), объём ≤ 32 Кбайт (${m.kb <= 32 ? 'да' : 'нет'}), плавное видео найдено (${m.vidOk ? 'да' : 'нет'}).`;
+    guide = 'Не называй готовые числа: спроси, что меняет каждый ползунок — ширину ступенек или их высоту, и как это влияет на объём по формуле частота × глубина.';
+  }
+  if (id === 'zip') {
+    now = `Картинка 16×10 пикселей из 4 цветов (без сжатия ${m.orig} бит). Код RLE по строкам: ${m.rows.map((r, j) => `${j + 1}) ${r.map(x => x.n + PAL[x.c].k).join(' ')}`).join('; ')}. Всего ${m.runs} серий × 6 бит = ${m.rle} бит, сжатие ×${fmt(m.ratio, 2)}. Цветов на картинке: ${m.colors}. Кнопку «Шум» ${m.noiseSeen ? 'уже нажимали' : 'ещё не нажимали'}. Инструмент: ${S.tool === 'row' ? 'строка' : 'кисть'}.`;
+    guide = 'Не рисуй за ученика: спроси, от чего зависит число серий в строке и как сделать, чтобы серий было меньше, но все 4 цвета остались.';
+  }
+  return [
+    `Раздел: информатика, 6 класс, тема «Графика и медиа». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    S.done[id] ? 'Задание уже выполнено — можно обсуждать свободно.' : guide,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = {
+    raster: 'Почему фотографии хранят в растре, а логотипы — в векторе?',
+    av: 'Почему при 2 кГц цифровая запись молчит?',
+    zip: 'Чем сжатие с потерями отличается от сжатия без потерь?',
+  }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
