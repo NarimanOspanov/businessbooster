@@ -106,7 +106,132 @@ async function streamGemini(system, messages, write, signal) {
   }
 }
 
-function handle(req, res, { readBody, clientIp }) {
+// ---------- голос: озвучка ответа и расшифровка речи (Gemini) ----------
+const TTS_MODEL = process.env.TUTOR_TTS_MODEL || process.env.GEMINI_TTS_MODEL || "gemini-3.8-flash-tts";
+const STT_MODEL = process.env.TUTOR_STT_MODEL || "gemini-flash-lite-latest";
+// ElevenLabs читает текст точно и быстрее (~1 с); у Gemini TTS бывают сбои, когда
+// вместо текста звучит посторонняя речь. Gemini — запасной вариант и для казахского.
+const ELEVEN_VOICE = process.env.TUTOR_ELEVEN_VOICE || "EXAVITQu4vr4xnSDxMaL";
+const ELEVEN_MODEL = process.env.TUTOR_ELEVEN_MODEL || "eleven_flash_v2_5";
+const VOICE = process.env.TUTOR_VOICE || "Kore";
+const VOICE_RULES = [
+  "Сейчас разговор голосом: твой ответ сразу озвучивается, а вопрос ученика расшифрован из речи (в нём могут быть ошибки распознавания — угадывай смысл).",
+  "Говори как живой человек в разговоре: 1–4 коротких предложения, без списков, без звёздочек и другого оформления.",
+  "Формулы и знаки произноси словами: «один делить на F», «F умножить на l», «сантиметров», «ньютонов».",
+  "Заканчивай вопросом или короткой подсказкой, чтобы разговор продолжался.",
+].join("\n");
+const voiceHits = new Map();
+function voiceAllowed(ip) {
+  const now = Date.now(), h = (voiceHits.get(ip) || []).filter((t) => now - t < 3600e3);
+  if (h.length >= 400) return false;
+  h.push(now); voiceHits.set(ip, h);
+  if (voiceHits.size > 5000) for (const [k, v] of voiceHits) if (!v.some((t) => now - t < 3600e3)) voiceHits.delete(k);
+  return true;
+}
+async function gemini(model, body) {
+  const key = keyFrom("GEMINI_API_KEY", ".gemini-key");
+  if (!key) throw new Error("no_model_key");
+  const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
+    method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key }, body: JSON.stringify(body), signal: AbortSignal.timeout(30000),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error("gemini_" + res.status + ": " + text.slice(0, 200));
+  return JSON.parse(text);
+}
+async function speak(text) {
+  const key = keyFrom("ELEVENLABS_API_KEY", ".elevenlabs-key");
+  if (key && !/[әғқңөұүһі]/i.test(text)) {
+    try {
+      const r = await fetch("https://api.elevenlabs.io/v1/text-to-speech/" + ELEVEN_VOICE + "?output_format=mp3_44100_64", {
+        method: "POST", headers: { "xi-api-key": key, "Content-Type": "application/json" },
+        body: JSON.stringify({ text, model_id: ELEVEN_MODEL }),
+        signal: AbortSignal.timeout(20000),
+      });
+      if (r.ok) return { type: "audio/mpeg", buf: Buffer.from(await r.arrayBuffer()) };
+      console.log("[tutor tts] ElevenLabs " + r.status + " " + (await r.text()).slice(0, 120));
+    } catch (e) { console.log("[tutor tts] ElevenLabs " + (e && e.message)); }
+  }
+  return { type: "audio/wav", buf: await tts(text) };
+}
+// Gemini отдаёт то готовый WAV (бывает WAV внутри WAV), то сырой PCM — приводим к WAV.
+async function tts(text) {
+  const j = await gemini(TTS_MODEL, {
+    contents: [{ parts: [{ text }] }],
+    generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: VOICE } } } },
+  });
+  const part = ((((j.candidates || [])[0] || {}).content || {}).parts || []).find((p) => p.inlineData);
+  if (!part) throw new Error("tts: нет звука в ответе");
+  let b = Buffer.from(part.inlineData.data, "base64");
+  const inner = b.indexOf("RIFF", 4);
+  if (b.slice(0, 4).toString() === "RIFF" && inner > 0 && inner < 100) b = b.slice(inner);
+  if (b.slice(0, 4).toString() === "RIFF") return b;
+  const rate = Number((String(part.inlineData.mimeType).match(/rate=(\d+)/) || [])[1]) || 24000;
+  const h = Buffer.alloc(44);
+  h.write("RIFF", 0); h.writeUInt32LE(36 + b.length, 4); h.write("WAVEfmt ", 8); h.writeUInt32LE(16, 16);
+  h.writeUInt16LE(1, 20); h.writeUInt16LE(1, 22); h.writeUInt32LE(rate, 24); h.writeUInt32LE(rate * 2, 28);
+  h.writeUInt16LE(2, 32); h.writeUInt16LE(16, 34); h.write("data", 36); h.writeUInt32LE(b.length, 40);
+  return Buffer.concat([h, b]);
+}
+async function stt(b64, mime) {
+  const key = keyFrom("ELEVENLABS_API_KEY", ".elevenlabs-key");
+  if (key) {
+    try {
+      const fd = new FormData();
+      fd.append("model_id", process.env.TUTOR_SCRIBE_MODEL || "scribe_v1");
+      fd.append("file", new Blob([Buffer.from(b64, "base64")], { type: mime }), mime === "audio/wav" ? "q.wav" : "q.audio");
+      const r = await fetch("https://api.elevenlabs.io/v1/speech-to-text", { method: "POST", headers: { "xi-api-key": key }, body: fd, signal: AbortSignal.timeout(20000) });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) return String(j.text || "").replace(/\((?:[^)]*)\)|\[(?:[^\]]*)\]/g, " ").replace(/\s+/g, " ").trim();
+      console.log("[tutor stt] ElevenLabs " + r.status);
+    } catch (e) { console.log("[tutor stt] ElevenLabs " + (e && e.message)); }
+  }
+  const j = await gemini(STT_MODEL, {
+    contents: [{ parts: [{ inlineData: { mimeType: mime, data: b64 } },
+      { text: "Это запись вопроса школьника репетитору по физике. Напиши дословно, что он сказал, на языке оригинала (русский или казахский), числа цифрами. Только сам текст, без кавычек и пояснений. Если в записи нет речи, напиши ровно: [тишина]" }] }],
+    generationConfig: { temperature: 0, maxOutputTokens: 1000 },
+  });
+  const c = ((j.candidates || [])[0] || {}).content;
+  const t = (c && c.parts ? c.parts.map((p) => (p.thought ? "" : p.text || "")).join("") : "").trim();
+  return /^\[?тишина\]?$/i.test(t) ? "" : t;
+}
+
+function handle(req, res, deps) {
+  const p = (req.url || "").split("?")[0];
+  if (p === "/api/tutor/tts") return handleTts(req, res, deps);
+  if (p === "/api/tutor/stt") return handleStt(req, res, deps);
+  return handleChat(req, res, deps);
+}
+function handleTts(req, res, { readBody, clientIp }) {
+  const fail = (code, msg) => { res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }); res.end(JSON.stringify({ ok: false, error: msg })); };
+  if (req.method !== "POST") return fail(405, "POST");
+  (async () => {
+    let b = {};
+    try { b = JSON.parse(await readBody(req)) || {}; } catch { return fail(400, "bad json"); }
+    const text = String(b.text || "").replace(/[*_`#]/g, "").trim().slice(0, 700);
+    if (!text) return fail(400, "нужен текст");
+    if (!voiceAllowed(clientIp(req))) return fail(429, "слишком много запросов");
+    try {
+      const a = await speak(text);
+      res.writeHead(200, { "Content-Type": a.type, "Cache-Control": "no-store", "Content-Length": a.buf.length });
+      res.end(a.buf);
+    } catch (e) { console.log("[tutor tts] " + (e && e.message)); fail(502, "озвучка не получилась"); }
+  })().catch(() => { try { fail(500, "error"); } catch { /* уже ответили */ } });
+}
+function handleStt(req, res, { readBody, clientIp }) {
+  const send = (code, obj) => { res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); };
+  if (req.method !== "POST") return send(405, { ok: false, error: "POST" });
+  (async () => {
+    let b = {};
+    try { b = JSON.parse(await readBody(req)) || {}; } catch { return send(400, { ok: false, error: "запись слишком длинная" }); }
+    const audio = String(b.audio || ""), mime = /^audio\/[a-z0-9.+-]+$/.test(b.mime || "") ? b.mime : "audio/wav";
+    if (!audio || audio.length > 990000) return send(400, { ok: false, error: "нет записи" });
+    if (!voiceAllowed(clientIp(req))) return send(429, { ok: false, error: "слишком много запросов" });
+    try { send(200, { ok: true, text: await stt(audio, mime) }); }
+    catch (e) { console.log("[tutor stt] " + (e && e.message)); send(502, { ok: false, error: "не получилось распознать речь" }); }
+  })().catch(() => { try { send(500, { ok: false, error: "error" }); } catch { /* уже ответили */ } });
+}
+
+function handleChat(req, res, { readBody, clientIp }) {
   const fail = (code, msg) => { res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }); res.end(JSON.stringify({ ok: false, error: msg })); };
   if (req.method !== "POST") return fail(405, "POST");
   (async () => {
@@ -118,7 +243,7 @@ function handle(req, res, { readBody, clientIp }) {
     if (block) return fail(429, block);
     const page = String(b.page || "").slice(0, 80);
     const ctx = String(b.context || "").slice(0, MAX_CTX);
-    const system = SYSTEM + "\n\nЧто сейчас на экране (страница " + page + "):\n" + (ctx || "нет данных");
+    const system = SYSTEM + (b.voice ? "\n\n" + VOICE_RULES : "") + "\n\nЧто сейчас на экране (страница " + page + "):\n" + (ctx || "нет данных");
 
     const ac = new AbortController();
     res.on("close", () => { if (!res.writableEnded) ac.abort(); });
