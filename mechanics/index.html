@@ -1,0 +1,853 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивные опыты с рычагом: грузы, динамометр и правило моментов на 3D-стенде.">
+<title>Рычаг и грузы</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /optics. Live 3D lever stand on the left, lesson notebook on the right, lesson strip under the stand. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.stage canvas.gl{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+.stage canvas.gl.grabbing{cursor:grabbing}
+.tags{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.tag{position:absolute;left:0;top:0;background:var(--tag-bg);border:1px solid var(--line);border-radius:7px;padding:4px 8px 5px;font:600 10.5px/1.25 var(--font-body);letter-spacing:.11em;text-transform:uppercase;white-space:nowrap;will-change:transform}
+.tag span{display:block;font:500 11px/1.35 var(--font-mono);letter-spacing:0;text-transform:none;color:var(--muted)}
+.tag .ok{color:var(--ok);font-style:normal}
+.tag .warn{color:var(--warn);font-style:normal}
+.tag.w{text-transform:none;letter-spacing:0;font:500 11px/1.3 var(--font-mono);color:var(--force)}
+.tag.w span{color:var(--arm)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.balance{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.balance .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.balance .v{font:500 15px/1 var(--font-mono);margin-top:8px}
+.balance .v.ok{color:var(--ok)}
+.scale{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.scale i{position:absolute;top:-3px;width:3px;height:12px;border-radius:2px;background:var(--force);left:50%;transform:translateX(-50%);transition:left .2s}
+.scale:after{content:"";position:absolute;left:50%;top:-5px;bottom:-5px;width:1px;background:var(--muted)}
+.balance .lr{display:flex;justify-content:space-between;margin-top:7px;font:500 10.5px/1 var(--font-mono);color:var(--muted)}
+
+.tools{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px}
+.tools .sq{width:30px;padding:6px 0;font:500 15px/1 var(--font-mono)}
+.hint{position:absolute;left:16px;bottom:20px;font-size:12px;color:var(--muted);max-width:30%}
+.nogl{position:absolute;inset:0;display:grid;place-items:center;padding:24px;text-align:center;color:var(--muted)}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+#diagram{display:block;width:100%;height:auto;aspect-ratio:120/54;background:var(--bg);border:1px solid var(--line);border-radius:10px;cursor:pointer;touch-action:manipulation}
+.d-stand{fill:var(--surface-2);stroke:var(--muted);stroke-width:.4}
+.d-beam{fill:var(--surface-2);stroke:var(--fg);stroke-width:.45}
+.d-hole{fill:var(--bg);stroke:var(--muted);stroke-width:.2}
+.d-num{fill:var(--muted);font:500 2.4px var(--font-mono);text-anchor:middle}
+.d-str{stroke:var(--muted);stroke-width:.25}
+.d-w{fill:#c9a24a;stroke:#5a4513;stroke-width:.25}
+.d-f line,.d-f polyline{stroke:var(--force);stroke-width:.5;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.d-dyn line,.d-dyn polyline{stroke:var(--arm);stroke-width:.55;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.d-lbl{fill:var(--force);font:500 2.6px var(--font-mono);text-anchor:middle}
+.d-lbl.dy{fill:var(--arm)}
+.d-hit{fill:transparent}
+.d-hit:hover{fill:rgba(255,255,255,.04)}
+.mini .d-beam{stroke-width:1}.mini .d-stand{stroke-width:.8}.mini .d-f line,.mini .d-f polyline{stroke-width:1.1}.mini .d-dyn line,.mini .d-dyn polyline{stroke-width:1.2}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips.mono button{font-family:var(--font-mono)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.pool{font:500 12px var(--font-mono);color:var(--muted)}
+
+.formula{font:500 19px/1.2 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:5;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:400px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .balance{width:112px;padding:8px}
+  .balance .v{font-size:13px}
+  .task{max-width:calc(100% - 140px);padding:9px 11px}
+  .task p{font-size:13px}
+  .hint{display:none}
+  .tools button{padding:6px 7px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M6 17l28-5" stroke="var(--fg)" stroke-width="2.4" stroke-linecap="round"/><path d="M20 15l-4 14h8z" fill="var(--arm)"/><rect x="5" y="19" width="5" height="6" rx="1" fill="var(--force)"/><rect x="29" y="15" width="4" height="4" rx="1" fill="var(--force)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Механика · Рычаг</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/optics/">Оптика</a><a href="/mechanics/" aria-current="page">Механика</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Рычаг</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/5</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Стенд с рычагом">
+    <div class="tags" id="tags"></div>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="balance">
+      <div class="k">Моменты сил</div>
+      <div class="v" id="balV"></div>
+      <div class="scale"><i id="balI"></i></div>
+      <div class="lr"><span>слева</span><span>справа</span></div>
+    </div>
+    <div class="hint">Нажмите на деление, чтобы повесить груз. Стопку можно перетащить, фон поворачивает вид.</div>
+    <div class="tools" role="toolbar" aria-label="Вид">
+      <button id="mAdd" aria-pressed="true">Вешать</button>
+      <button id="mDel" aria-pressed="false">Снимать</button>
+      <span class="sep"></span>
+      <button id="tForces" aria-pressed="true">Силы</button>
+      <button id="tArms" aria-pressed="true">Плечи</button>
+      <span class="sep"></span>
+      <button class="sq" id="zOut" aria-label="Отдалить">−</button>
+      <button class="sq" id="zIn" aria-label="Приблизить">+</button>
+      <button class="sq" id="vReset" aria-label="Вернуть вид">⟲</button>
+    </div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="false">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="true">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel">
+      <h2>Схема рычага</h2>
+      <svg id="diagram" viewBox="-60 -32 120 54" role="img" aria-label="Схема рычага с грузами. Нажмите на деление, чтобы повесить или снять груз."></svg>
+      <dl class="reads">
+        <div><dt>M ↺</dt><dd id="rL"></dd></div>
+        <div><dt>M ↻</dt><dd id="rR"></dd></div>
+        <div><dt>Динамометр</dt><dd id="rT"></dd></div>
+      </dl>
+      <div class="ctl">
+        <div class="lbl">Что делает нажатие <span class="pool" id="pool"></span></div>
+        <div class="chips" id="modeChips"><button data-m="add" aria-pressed="true">Вешать груз</button><button data-m="del" aria-pressed="false">Снимать груз</button></div>
+        <div class="row"><button class="ghostbtn" id="clearBtn">Снять все грузы справа</button></div>
+      </div>
+      <div class="ctl">
+        <div class="lbl">Динамометр на делении</div>
+        <div class="chips mono" id="dynChips"></div>
+      </div>
+      <div class="ctl" id="liftCtl">
+        <label for="inLift">Поднять динамометр <output id="oLift"></output></label>
+        <input type="range" id="inLift" min="0" max="10" step="0.5" value="0">
+      </div>
+    </div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c; };
+
+// Stand geometry, centimetres. Pivot in the middle of the beam, holes every 5 cm, numbered 1–10 each side.
+const PY = 40, SP = 5, NH = 10, BL = 104, BH = 3, WR = 1.5, WH = 2.6, STR = 3, POOL = 10, MAXSTACK = 6, DYN_MAX = 5, DEG_PER_UNIT = 6, MAX_TILT = 15;
+const DYN_HOLES = [2, 4, 6, 8, 10];
+
+const LESSONS = [
+  { id: 'rule', title: 'Правило рычага', w: { '-3': 2 }, dyn: null,
+    text: ['Рычаг — твёрдая планка, которая поворачивается вокруг опоры. Груз тянет свою сторону вниз тем сильнее, чем он тяжелее и чем дальше висит от опоры.',
+           'Произведение силы на плечо называют моментом силы: M = F · l. Рычаг стоит ровно, когда моменты слева и справа равны.'],
+    task: 'Повесьте грузы справа так, чтобы рычаг встал ровно.',
+    hint: 'Слева два груза на делении 3. Нажмите на деление справа, чтобы повесить груз.',
+    check: m => m.leftU > 0 && m.rightU > 0 && m.balanced && !S.dyn },
+  { id: 'one', title: 'Один груз против четырёх', w: { '-2': 4 }, dyn: null,
+    text: ['Один груз может уравновесить четыре, если висит в четыре раза дальше от опоры. Короткое плечо — большая сила, длинное — маленькая.',
+           'Так работают лом, гвоздодёр и качели: кто легче, садится дальше от середины.'],
+    task: 'Уравновесьте четыре груза слева одним-единственным грузом справа.',
+    hint: 'Слева четыре груза на делении 2. На каком делении должен висеть один груз?',
+    check: m => m.balanced && !S.dyn && count(-1) === 4 && count(1) === 1 },
+  { id: 'dyn', title: 'Динамометр: сила руки', w: { '4': 3 }, dyn: 4,
+    text: ['Рычаг можно держать рукой. Три груза висят справа на делении 4, а динамометр тянет вверх с той же стороны и показывает, с какой силой приходится тянуть, чтобы рычаг стоял ровно.',
+           'Чем дальше от опоры тянуть, тем меньше нужна сила. Поэтому ручку двери делают у края, а не у петель.'],
+    task: 'Передвиньте динамометр так, чтобы он показывал не больше 1,5 Н.',
+    hint: 'Тяните динамометр мышкой вдоль рычага или выберите деление на вкладке «Схема». Тянуть вверх имеет смысл только с той стороны, где грузы.',
+    check: m => S.dyn && m.held && m.T > 0 && m.T <= 1.5 + 1e-9 },
+  { id: 'many', title: 'Несколько грузов', w: { '-6': 2, '-2': 1 }, dyn: null,
+    text: ['Если грузов несколько, их моменты складываются. Рычаг стоит ровно, когда сумма моментов слева равна сумме справа.',
+           'Слева сейчас два груза на делении 6 и один на делении 2. В делениях это 2 · 6 + 1 · 2 = 14.'],
+    task: 'Уравновесьте рычаг, повесив грузы справа хотя бы на два разных деления.',
+    hint: 'Нужно набрать справа те же 14: например, 2 · 5 + 1 · 4.',
+    check: m => m.balanced && !S.dyn && count(-1) > 0 && holes(1) >= 2 },
+  { id: 'golden', title: 'Золотое правило механики', w: { '2': 4 }, dyn: 8,
+    text: ['Рычаг даёт выигрыш в силе, но не в работе. Во сколько раз выигрываем в силе, во столько же раз проигрываем в расстоянии.',
+           'Динамометр тянет с силой в 4 раза меньше веса грузов, зато проходит в 4 раза больший путь. Работа A = F · s с обеих сторон одинакова.'],
+    task: 'Поднимите динамометр на 8 см и сравните работу на вкладке «Расчёты».',
+    hint: 'Ползунок «Поднять динамометр» на вкладке «Схема».',
+    check: m => S.dyn && m.held && S.lift >= 8 },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem('luch-lever') || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), w: {}, dyn: null, lift: 0, mode: 'add',
+            forces: true, arms: true, done: saved.done || {}, tab: 'scheme' };
+const save = () => { try { localStorage.setItem('luch-lever', JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+
+const total = () => Object.values(S.w).reduce((a, b) => a + b, 0);
+const count = side => Object.entries(S.w).reduce((a, [h, c]) => a + (Math.sign(+h) === side ? c : 0), 0);
+const holes = side => Object.entries(S.w).filter(([h, c]) => c > 0 && Math.sign(+h) === side).length;
+const entries = () => Object.entries(S.w).filter(([, c]) => c > 0).map(([h, c]) => [+h, c]).sort((a, b) => a[0] - b[0]);
+
+// ---------- physics: one weight = 1 N, moments counted in N·division (1 division = 5 cm) ----------
+function model() {
+  let mu = 0, leftU = 0, rightU = 0;
+  for (const [h, c] of entries()) { mu += c * h; if (h < 0) leftU += c * -h; else rightU += c * h; }
+  let T = 0, held = false, req = 0;
+  if (S.dyn) { req = mu / S.dyn; if (req > 1e-9) { T = Math.min(req, DYN_MAX); held = req <= DYN_MAX + 1e-9; } }
+  const net = mu - (S.dyn ? T * S.dyn : 0);
+  const balanced = Math.abs(net) < 1e-9;
+  const liftMax = S.dyn ? Math.floor(SP * Math.abs(S.dyn) * Math.sin(MAX_TILT * Math.PI / 180) * 2) / 2 : 0;
+  const lift = held ? Math.min(S.lift, liftMax) : 0;
+  const theta = lift > 0 ? Math.sign(S.dyn) * Math.asin(lift / (SP * Math.abs(S.dyn))) * 180 / Math.PI
+                         : clamp(-net * DEG_PER_UNIT, -MAX_TILT, MAX_TILT);
+  return { mu, leftU, rightU, T, req, held, net, balanced, theta, lift, liftMax };
+}
+const Nm = u => u * SP / 100; // N·division → N·m
+// Moments by direction: weights on the right and a pull up on the left turn the lever clockwise.
+const turns = m => {
+  const dU = S.dyn ? m.T * Math.abs(S.dyn) : 0;
+  return { ccw: Nm(m.leftU + (S.dyn > 0 ? dU : 0)), cw: Nm(m.rightU + (S.dyn < 0 ? dU : 0)) };
+};
+
+// ---------- 2D diagram ----------
+function arrow(x1, y1, x2, y2, cls) {
+  const a = Math.atan2(y2 - y1, x2 - x1), L = 1.6;
+  const p1 = [x2 - L * Math.cos(a - 0.5), y2 - L * Math.sin(a - 0.5)], p2 = [x2 - L * Math.cos(a + 0.5), y2 - L * Math.sin(a + 0.5)];
+  return `<g class="${cls}"><line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}"/><polyline points="${p1[0].toFixed(2)},${p1[1].toFixed(2)} ${x2.toFixed(2)},${y2.toFixed(2)} ${p2[0].toFixed(2)},${p2[1].toFixed(2)}"/></g>`;
+}
+function diagramSVG(st, mini) {
+  const th = -st.theta * Math.PI / 180, c = Math.cos(th), s = Math.sin(th); // svg y points down
+  const pt = (x, y) => [x * c - y * s, x * s + y * c];
+  let h = `<polygon class="d-stand" points="0,1.8 -3.2,8 3.2,8"/><rect class="d-stand" x="-9" y="8" width="18" height="2" rx=".5"/>`;
+  h += `<g transform="rotate(${(-st.theta).toFixed(2)})"><rect class="d-beam" x="${-BL / 2}" y="${-BH / 2}" width="${BL}" height="${BH}" rx=".6"/>`;
+  for (let i = -NH; i <= NH; i++) {
+    if (i === 0) { h += `<circle cx="0" cy="0" r=".8" fill="var(--arm)"/>`; continue; }
+    h += `<circle class="d-hole" cx="${i * SP}" cy="0" r=".55"/>`;
+    if (!mini) h += `<text class="d-num" x="${i * SP}" y="-2.4">${Math.abs(i)}</text>`;
+  }
+  h += `</g>`;
+  for (const [i, n] of st.entries) {
+    const [x, y] = pt(i * SP, BH / 2);
+    h += `<line class="d-str" x1="${x}" y1="${y}" x2="${x}" y2="${y + 2}"/>`;
+    for (let k = 0; k < n; k++) h += `<rect class="d-w" x="${x - 1.6}" y="${(y + 2 + k * 2.4).toFixed(2)}" width="3.2" height="2.1" rx=".4"/>`;
+    if (!mini && st.forces) {
+      const [ax, ay] = pt(i * SP, 0);
+      h += arrow(ax + 2.4, ay, ax + 2.4, ay + n * 3, 'd-f');
+      h += `<text class="d-lbl" x="${x}" y="${(y + 2 + n * 2.4 + 3).toFixed(2)}">${n} Н</text>`;
+    }
+  }
+  if (st.dyn) {
+    const [x, y] = pt(st.dyn * SP, -BH / 2), len = Math.max(st.T * 3, 2.5);
+    h += arrow(x, y, x, y - len, 'd-dyn');
+    if (!mini) h += `<text class="d-lbl dy" x="${x}" y="${(y - len - 1.5).toFixed(2)}">${fmt(st.T, 1)} Н</text>`;
+  }
+  if (!mini) for (let i = -NH; i <= NH; i++) if (i) h += `<rect class="d-hit" data-h="${i}" x="${i * SP - SP / 2}" y="-32" width="${SP}" height="54"/>`;
+  return h;
+}
+
+// ---------- 3D stand ----------
+function initGL() {
+  if (!window.THREE) throw new Error('three');
+  const T = THREE, host = $('#stage');
+  const renderer = new T.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap;
+  renderer.domElement.className = 'gl';
+  host.prepend(renderer.domElement);
+
+  const scene = new T.Scene();
+  const cam = new T.OrthographicCamera(-1, 1, 1, -1, 1, 1000);
+  const target = new T.Vector3(0, 28, 0);
+  const VIEW = { az: 0.38, el: 0.32, zoom: 1 };
+  let az = VIEW.az, el = VIEW.el, zoom = VIEW.zoom;
+  const placeCam = () => {
+    const R = 300;
+    cam.position.set(target.x - R * Math.sin(az) * Math.cos(el), target.y + R * Math.sin(el), target.z + R * Math.cos(az) * Math.cos(el));
+    cam.lookAt(target);
+  };
+  const resize = () => {
+    const w = host.clientWidth, h = host.clientHeight; if (!w || !h) return;
+    renderer.setSize(w, h, false);
+    const asp = w / h, vh = Math.max(72, 132 / asp) / zoom;
+    cam.top = vh / 2; cam.bottom = -vh / 2; cam.left = -vh * asp / 2; cam.right = vh * asp / 2;
+    cam.updateProjectionMatrix();
+  };
+
+  scene.add(new T.HemisphereLight(0xc4d6ff, 0x18202e, 0.7));
+  const key = new T.DirectionalLight(0xffffff, 0.75);
+  key.position.set(-40, 100, 70); key.castShadow = true; key.shadow.mapSize.set(2048, 2048);
+  Object.assign(key.shadow.camera, { left: -90, right: 90, top: 80, bottom: -60, near: 1, far: 300 });
+  key.shadow.bias = -0.0006; scene.add(key);
+  const rim = new T.DirectionalLight(0x9fd8ff, 0.25); rim.position.set(60, 40, -50); scene.add(rim);
+
+  const grad = new T.DataTexture(new Uint8Array([72, 150, 255]), 3, 1, T.LuminanceFormat);
+  grad.minFilter = grad.magFilter = T.NearestFilter; grad.generateMipmaps = false; grad.needsUpdate = true;
+  const toon = (c, extra) => new T.MeshToonMaterial(Object.assign({ color: c, gradientMap: grad }, extra || {}));
+  const INK = new T.LineBasicMaterial({ color: 0x04070d });
+  const mk = (geo, mat, o = {}) => {
+    const m = new T.Mesh(geo, mat); m.castShadow = o.cast !== false; m.receiveShadow = !!o.recv;
+    if (o.edges !== false) m.add(new T.LineSegments(new T.EdgesGeometry(geo, 28), o.edges || INK));
+    return m;
+  };
+  const canvasTex = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; const t = new T.CanvasTexture(c); t.anisotropy = 8; t.userData = { c, draw }; draw(c.getContext('2d'), w, h); return t; };
+  const redraw = t => { t.userData.draw(t.userData.c.getContext('2d'), t.userData.c.width, t.userData.c.height); t.needsUpdate = true; };
+
+  // table
+  const gridTex = canvasTex(512, 512, (g, w) => {
+    g.fillStyle = '#151d2c'; g.fillRect(0, 0, w, w);
+    g.strokeStyle = 'rgba(160,185,230,0.07)'; g.lineWidth = 2;
+    for (let i = 0; i <= 10; i++) { const p = i * w / 10; g.beginPath(); g.moveTo(p, 0); g.lineTo(p, w); g.moveTo(0, p); g.lineTo(w, p); g.stroke(); }
+  });
+  gridTex.wrapS = gridTex.wrapT = T.RepeatWrapping; gridTex.repeat.set(3, 1.8);
+  const table = mk(new T.PlaneGeometry(300, 180), toon(0xffffff, { map: gridTex }), { edges: false, cast: false, recv: true });
+  table.rotation.x = -Math.PI / 2; scene.add(table);
+
+  // stand: base, rod, clamp and axle
+  const stand = new T.Group(); scene.add(stand);
+  const base = mk(new T.BoxGeometry(34, 2.2, 22), toon(0x2a3348), { recv: true }); base.position.set(0, 1.1, -4); stand.add(base);
+  const rod = mk(new T.CylinderGeometry(1.1, 1.1, PY, 20), toon(0xa9b4c9)); rod.position.set(0, PY / 2 + 2, -5); stand.add(rod);
+  const clampB = mk(new T.BoxGeometry(4, 4, 4), toon(0x3a4762)); clampB.position.set(0, PY, -5); stand.add(clampB);
+  const axle = mk(new T.CylinderGeometry(0.7, 0.7, 6.5, 16), toon(0x8a96b0)); axle.rotation.x = Math.PI / 2; axle.position.set(0, PY, -1.6); stand.add(axle);
+  const cap = mk(new T.CylinderGeometry(1.1, 1.1, 0.6, 20), toon(0x72d4e8)); cap.rotation.x = Math.PI / 2; cap.position.set(0, PY, 1.4); stand.add(cap);
+
+  // beam with printed holes and numbers
+  const beamG = new T.Group(); beamG.position.set(0, PY, 0); scene.add(beamG);
+  const beam = mk(new T.BoxGeometry(BL, BH, 1.6), toon(0x56627d)); beamG.add(beam);
+  const faceTex = canvasTex(4160, 120, (g, W, Hh) => {
+    const pc = W / BL;
+    g.fillStyle = '#c8d1e2'; g.fillRect(0, 0, W, Hh);
+    g.font = '500 44px "IBM Plex Mono", monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (let i = -NH; i <= NH; i++) {
+      const x = (i * SP + BL / 2) * pc;
+      if (i === 0) { g.fillStyle = '#2b9fb5'; g.beginPath(); g.arc(x, Hh / 2, 26, 0, Math.PI * 2); g.fill(); continue; }
+      g.fillStyle = '#18202f'; g.beginPath(); g.arc(x, Hh / 2, 17, 0, Math.PI * 2); g.fill();
+      g.fillText(String(Math.abs(i)), x + (i > 0 ? 48 : -48), Hh / 2 + 2);
+    }
+  });
+  const face = new T.Mesh(new T.PlaneGeometry(BL - 0.2, BH - 0.2), toon(0xffffff, { map: faceTex })); face.position.z = 0.81; beamG.add(face);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => redraw(faceTex));
+  const hitBox = new T.Mesh(new T.BoxGeometry(BL + 4, 10, 8), new T.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }));
+  beamG.add(hitBox);
+
+  // arms (cyan) live inside the beam group so they tilt with it
+  const armsG = new T.Group(); beamG.add(armsG);
+  const UNIT = new T.CylinderGeometry(1, 1, 1, 8, 1, true), YUP = new T.Vector3(0, 1, 0);
+  const ARM = new T.MeshBasicMaterial({ color: 0x72d4e8 });
+  const FORCE = new T.MeshBasicMaterial({ color: 0xffb547 });
+  const CONE = new T.ConeGeometry(1, 1, 12);
+  const A = new T.Vector3(), B = new T.Vector3(), D = new T.Vector3();
+  const rodBetween = (parent, a, b, mat, r) => {
+    const len = a.distanceTo(b); if (len < 1e-3) return;
+    const m = new T.Mesh(UNIT, mat); m.position.copy(a).add(b).multiplyScalar(0.5); m.scale.set(r, len, r);
+    m.quaternion.setFromUnitVectors(YUP, D.copy(b).sub(a).normalize()); parent.add(m);
+  };
+  const arrow3 = (parent, from, dir, len, mat) => {
+    const headL = Math.min(1.8, len * 0.45), tip = from.clone().addScaledVector(dir, len), neck = from.clone().addScaledVector(dir, len - headL);
+    rodBetween(parent, from, neck, mat, 0.32);
+    const c = new T.Mesh(CONE, mat); c.scale.set(0.9, headL, 0.9); c.position.copy(neck).addScaledVector(dir, headL / 2);
+    c.quaternion.setFromUnitVectors(YUP, dir); parent.add(c);
+  };
+
+  // weights
+  const stacksG = new T.Group(); scene.add(stacksG);
+  const brass = toon(0xc9a24a), brassDark = toon(0x8f6f2a), wire = new T.MeshBasicMaterial({ color: 0x9aa6bd });
+  const WGEO = new T.CylinderGeometry(WR, WR, WH - 0.25, 24), HOOK = new T.TorusGeometry(0.45, 0.12, 8, 16);
+  let stacks = [];
+  const buildStacks = () => {
+    while (stacksG.children.length) stacksG.remove(stacksG.children[0]);
+    stacks = entries().map(([i, c]) => {
+      const g = new T.Group(); g.userData.hole = i;
+      rodBetween(g, new T.Vector3(0, 0, 0), new T.Vector3(0, -STR, 0), wire, 0.09);
+      for (let k = 0; k < c; k++) {
+        const y = -STR - 0.35 - k * WH;
+        const hook = new T.Mesh(HOOK, brassDark); hook.position.set(0, y, 0); g.add(hook);
+        const w = mk(WGEO, k % 2 ? brass : brass); w.position.set(0, y - 0.35 - (WH - 0.25) / 2, 0); w.userData.hole = i; g.add(w);
+      }
+      const fg = new T.Group(); fg.name = 'force'; g.add(fg);
+      arrow3(fg, new T.Vector3(WR + 1.4, 0, 1.2), new T.Vector3(0, -1, 0), c * 3, FORCE);
+      stacksG.add(g);
+      return { g, i, c };
+    });
+  };
+
+  // dynamometer: origin at its hook, pulls straight up
+  const dynG = new T.Group(); dynG.userData.dyn = true; scene.add(dynG);
+  const dynBody = mk(new T.CylinderGeometry(1.5, 1.5, 15, 24), toon(0x2b6d7c)); dynBody.position.y = 11; dynG.add(dynBody);
+  const scaleTex = canvasTex(128, 768, (g, w, h) => {
+    g.fillStyle = '#eef2f8'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#18202f'; g.font = '500 30px "IBM Plex Mono", monospace'; g.textAlign = 'right'; g.textBaseline = 'middle';
+    for (let v = 0; v <= 50; v++) { const y = 48 + v * (h - 96) / 50, L = v % 10 === 0 ? 50 : v % 5 === 0 ? 34 : 20; g.fillRect(w - L - 6, y - 1.5, L, 3); if (v % 10 === 0) g.fillText(String(v / 10), w - 64, y); }
+  });
+  const plate = new T.Mesh(new T.PlaneGeometry(2.2, 13), new T.MeshBasicMaterial({ map: scaleTex })); plate.position.set(0, 11, 1.52); dynG.add(plate);
+  const pointer = mk(new T.BoxGeometry(2.6, 0.35, 0.4), toon(0xff5a4a)); pointer.position.set(0, 0, 1.7); dynG.add(pointer);
+  const dynRod = new T.Mesh(UNIT, wire); dynG.add(dynRod);
+  const dynHook = new T.Mesh(new T.TorusGeometry(0.7, 0.16, 8, 20), brassDark); dynHook.position.y = 0.6; dynG.add(dynHook);
+  const ringTop = mk(new T.TorusGeometry(1.4, 0.3, 10, 28), toon(0x8a96b0)); ringTop.position.y = 20; dynG.add(ringTop);
+  const dynForce = new T.Group(); dynG.add(dynForce);
+  let dynForceLen = -1;
+
+  // labels
+  const tagsEl = $('#tags');
+  const mkTag = cls => { const el = document.createElement('div'); el.className = 'tag' + (cls ? ' ' + cls : ''); tagsEl.appendChild(el); return el; };
+  const tagPivot = mkTag(), tagDyn = mkTag();
+  tagPivot.innerHTML = 'Опора<span>ось рычага</span>';
+  let wTags = [];
+
+  const holePoint = (i, yLocal) => { A.set(i * SP, yLocal, 0); return beamG.localToWorld(A.clone()); };
+  const V = new T.Vector3();
+  const place = (el, p, mode) => {
+    const w = host.clientWidth, h = host.clientHeight; V.copy(p).project(cam);
+    const off = mode === true ? '-50%,0' : mode === 'right' ? '12px,-50%' : '-50%,-100%';
+    el.style.transform = `translate(${((V.x + 1) / 2 * w).toFixed(1)}px,${((1 - V.y) / 2 * h).toFixed(1)}px) translate(${off})`;
+  };
+
+  // picking: dynamometer, weight stacks, then the beam itself
+  const rc = new T.Raycaster(), ndc = new T.Vector2(), plane = new T.Plane(new T.Vector3(0, 0, 1), 0), hit = new T.Vector3();
+  const cv = renderer.domElement;
+  const setNdc = e => { const r = cv.getBoundingClientRect(); ndc.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1); rc.setFromCamera(ndc, cam); };
+  const holeAtRay = () => {
+    if (!rc.ray.intersectPlane(plane, hit)) return null;
+    const p = beamG.worldToLocal(hit.clone());
+    const i = clamp(Math.round(p.x / SP), -NH, NH);
+    return i === 0 ? null : i;
+  };
+  const pick = () => {
+    const hits = rc.intersectObjects(S.dyn ? [dynG, stacksG, hitBox] : [stacksG, hitBox], true);
+    for (const hh of hits) {
+      let o = hh.object;
+      while (o) { if (o.userData.dyn) return { kind: 'dyn' }; if (o.userData.hole !== undefined) return { kind: 'stack', hole: o.userData.hole }; if (o === hitBox) break; o = o.parent; }
+      if (o === hitBox) { const p = beamG.worldToLocal(hh.point.clone()); const i = clamp(Math.round(p.x / SP), -NH, NH); return i ? { kind: 'beam', hole: i } : null; }
+    }
+    return null;
+  };
+  let drag = null;
+  cv.addEventListener('pointerdown', e => {
+    setNdc(e); const p = pick();
+    cv.setPointerCapture(e.pointerId); cv.classList.add('grabbing');
+    drag = Object.assign({ x: e.clientX, y: e.clientY, moved: false, az, el }, p || { kind: 'orbit' });
+  });
+  cv.addEventListener('pointermove', e => {
+    setNdc(e);
+    if (!drag) { const p = pick(); cv.style.cursor = p ? (p.kind === 'beam' ? 'pointer' : 'ew-resize') : ''; return; }
+    if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 5) drag.moved = true;
+    if (!drag.moved) return;
+    if (drag.kind === 'orbit') {
+      az = clamp(drag.az - (e.clientX - drag.x) * 0.006, -0.6, 1.2);
+      el = clamp(drag.el + (e.clientY - drag.y) * 0.005, 0.05, 1.2); placeCam(); return;
+    }
+    const i = holeAtRay(); if (i === null) return;
+    if (drag.kind === 'dyn' && i !== S.dyn) setDyn(i);
+    if (drag.kind === 'stack' && i !== drag.hole) { if (moveStack(drag.hole, i)) drag.hole = i; }
+  });
+  const end = () => {
+    if (drag && !drag.moved && (drag.kind === 'beam' || drag.kind === 'stack')) clickHole(drag.hole);
+    drag = null; cv.classList.remove('grabbing');
+  };
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', () => { drag = null; cv.classList.remove('grabbing'); });
+  cv.addEventListener('wheel', e => { e.preventDefault(); zoom = clamp(zoom * (1 - e.deltaY * 0.0012), 0.6, 2.8); resize(); }, { passive: false });
+
+  let hl = null;
+  const highlight = id => { hl = { g: { lever: beamG, pivot: stand, weights: stacksG, dyn: dynG }[id], t: performance.now() }; };
+
+  // beam swings to its target angle on a damped spring
+  let theta = 0, omega = 0, thetaEq = 0, mdl = null, last = performance.now();
+  const sync = (m, rebuild) => {
+    mdl = m; thetaEq = m.theta * Math.PI / 180;
+    if (reduce) { theta = thetaEq; omega = 0; }
+    if (rebuild) {
+      buildStacks();
+      wTags.forEach(t => t.remove());
+      wTags = stacks.map(s => { const el = mkTag('w'); el.innerHTML = `${s.c} × 1 Н<span>l = ${Math.abs(s.i) * SP} см</span>`; return el; });
+    }
+    armsG.visible = S.arms;
+    while (armsG.children.length) armsG.remove(armsG.children[0]);
+    const y0 = -BH / 2 - 0.9;
+    for (const [i] of entries()) {
+      rodBetween(armsG, new T.Vector3(0, y0, 0.9), new T.Vector3(i * SP, y0, 0.9), ARM, 0.16);
+      rodBetween(armsG, new T.Vector3(i * SP, y0 - 0.7, 0.9), new T.Vector3(i * SP, y0 + 0.7, 0.9), ARM, 0.16);
+    }
+    if (S.dyn) {
+      const y1 = BH / 2 + 0.9;
+      rodBetween(armsG, new T.Vector3(0, y1, 0.9), new T.Vector3(S.dyn * SP, y1, 0.9), ARM, 0.16);
+      rodBetween(armsG, new T.Vector3(S.dyn * SP, y1 - 0.7, 0.9), new T.Vector3(S.dyn * SP, y1 + 0.7, 0.9), ARM, 0.16);
+    }
+    dynG.visible = !!S.dyn; tagDyn.hidden = !S.dyn;
+    if (S.dyn) {
+      pointer.position.y = 17.5 - 1 - (m.T / DYN_MAX) * 12;
+      const len = Math.max(m.T * 3, 0.01);
+      if (Math.abs(len - dynForceLen) > 1e-3) {
+        while (dynForce.children.length) dynForce.remove(dynForce.children[0]);
+        if (m.T > 0) arrow3(dynForce, new T.Vector3(2.6, 0, 1.2), new T.Vector3(0, 1, 0), len, ARM);
+        dynForceLen = len;
+      }
+      tagDyn.innerHTML = `Динамометр<span>${m.T > 0 ? fmt(m.T, 1) + ' Н' : 'не натянут'}${m.req > DYN_MAX ? ' · <em class="warn">шкалы не хватает</em>' : ''}</span>`;
+    }
+    stacks.forEach(s => { const f = s.g.getObjectByName('force'); if (f) f.visible = S.forces; });
+    dynForce.visible = S.forces;
+  };
+
+  const loop = t => {
+    requestAnimationFrame(loop);
+    const dt = Math.min(0.05, (t - last) / 1000); last = t;
+    if (!reduce) { const w0 = 7, z = 0.38; omega += (w0 * w0 * (thetaEq - theta) - 2 * z * w0 * omega) * dt; theta += omega * dt; }
+    else theta = thetaEq;
+    beamG.rotation.z = theta;
+    beamG.updateMatrixWorld();
+    for (const s of stacks) { const p = holePoint(s.i, -BH / 2); s.g.position.copy(p); }
+    if (S.dyn) {
+      const p = holePoint(S.dyn, BH / 2); dynG.position.copy(p);
+      const springTop = 3.5; dynRod.position.set(0, (0.9 + springTop) / 2, 0); dynRod.scale.set(0.12, springTop - 0.9, 0.12);
+      place(tagDyn, B.set(p.x + 2, p.y + 12, 0), 'right');
+    }
+    stacks.forEach((s, k) => { const tg = wTags[k]; if (tg) place(tg, B.set(s.g.position.x, s.g.position.y - STR - s.c * WH - 1.2, 0), true); });
+    place(tagPivot, B.set(0, PY - 4, 3));
+    if (hl) {
+      const k = Math.max(0, 1 - (t - hl.t) / 1600), p = k * (0.6 + 0.4 * Math.sin((t - hl.t) * 0.012));
+      hl.g.traverse(o => { if (o.material && o.material.emissive) o.material.emissive.setRGB(p * 0.2, p * 0.45, p * 0.55); });
+      if (k === 0) hl = null;
+    }
+    renderer.render(scene, cam);
+  };
+
+  new ResizeObserver(resize).observe(host);
+  placeCam(); resize();
+  requestAnimationFrame(loop);
+  return {
+    sync, highlight,
+    zoomBy: f => { zoom = clamp(zoom * f, 0.6, 2.8); resize(); },
+    resetView: () => { az = VIEW.az; el = VIEW.el; zoom = VIEW.zoom; placeCam(); resize(); },
+  };
+}
+
+let gl = null;
+try { gl = initGL(); }
+catch (e) {
+  $('#stage').insertAdjacentHTML('afterbegin', '<p class="nogl">Не получилось запустить 3D в этом браузере. Схема, кнопки и расчёты справа работают.</p>');
+  document.querySelectorAll('.tools, .hint').forEach(n => n.hidden = true);
+}
+
+// ---------- actions ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+function clickHole(i) {
+  if (!i) return;
+  const c = S.w[i] || 0;
+  if (S.mode === 'add') {
+    if (total() >= POOL) return toast(`В наборе ${POOL} грузов, все уже висят. Снимите какой-нибудь.`);
+    if (c >= MAXSTACK) return toast(`На одно деление помещается не больше ${MAXSTACK} грузов.`);
+    S.w[i] = c + 1;
+  } else {
+    if (!c) return toast('На этом делении нет грузов.');
+    S.w[i] = c - 1; if (!S.w[i]) delete S.w[i];
+  }
+  update(true);
+}
+function moveStack(from, to) {
+  const c = S.w[from] || 0; if (!c) return false;
+  if ((S.w[to] || 0) + c > MAXSTACK) return false;
+  delete S.w[from]; S.w[to] = (S.w[to] || 0) + c; update(true); return true;
+}
+function setDyn(i) { S.dyn = i || null; S.lift = 0; update(false); }
+
+const toggle = (id, key) => { const b = $(id); b.addEventListener('click', () => { S[key] = !S[key]; b.setAttribute('aria-pressed', S[key]); update(false); }); };
+toggle('#tForces', 'forces'); toggle('#tArms', 'arms');
+function setMode(m) {
+  S.mode = m;
+  $('#mAdd').setAttribute('aria-pressed', m === 'add'); $('#mDel').setAttribute('aria-pressed', m === 'del');
+  document.querySelectorAll('#modeChips button').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === m));
+}
+$('#mAdd').addEventListener('click', () => setMode('add'));
+$('#mDel').addEventListener('click', () => setMode('del'));
+$('#modeChips').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setMode(b.dataset.m); });
+$('#clearBtn').addEventListener('click', () => { for (const h of Object.keys(S.w)) if (+h > 0) delete S.w[h]; update(true); });
+$('#zIn').addEventListener('click', () => gl && gl.zoomBy(1.2));
+$('#zOut').addEventListener('click', () => gl && gl.zoomBy(1 / 1.2));
+$('#vReset').addEventListener('click', () => gl && gl.resetView());
+
+const dynChips = $('#dynChips');
+dynChips.innerHTML = `<button data-d="0">нет</button>` + DYN_HOLES.map(d => `<button data-d="${d}">${d}</button>`).join('');
+dynChips.addEventListener('click', e => { const b = e.target.closest('button'); if (b) setDyn(+b.dataset.d); });
+$('#inLift').addEventListener('input', e => { S.lift = +e.target.value; update(false); });
+$('#diagram').addEventListener('click', e => { const r = e.target.closest('[data-h]'); if (r) clickHole(+r.dataset.h); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- panes ----------
+const ICON = {
+  lever: '<svg viewBox="0 0 34 34"><rect x="2" y="13" width="30" height="5" rx="1" fill="none" stroke="var(--fg)" stroke-width="1.6"/><circle cx="17" cy="15.5" r="1.4" fill="var(--arm)"/><circle cx="7" cy="15.5" r=".9" fill="var(--muted)"/><circle cx="27" cy="15.5" r=".9" fill="var(--muted)"/></svg>',
+  pivot: '<svg viewBox="0 0 34 34"><path d="M17 8v20M9 29h16" stroke="var(--fg)" stroke-width="1.8" stroke-linecap="round"/><circle cx="17" cy="8" r="3" fill="none" stroke="var(--arm)" stroke-width="1.8"/></svg>',
+  weights: '<svg viewBox="0 0 34 34"><path d="M17 3v5" stroke="var(--muted)" stroke-width="1.4"/><rect x="11" y="8" width="12" height="7" rx="1.5" fill="var(--force)"/><rect x="11" y="17" width="12" height="7" rx="1.5" fill="var(--force)" opacity=".7"/></svg>',
+  dyn: '<svg viewBox="0 0 34 34"><rect x="12" y="5" width="10" height="22" rx="2" fill="none" stroke="var(--arm)" stroke-width="1.6"/><path d="M15 10h4M15 14h4M15 18h4" stroke="var(--muted)"/><path d="M17 27v4" stroke="var(--fg)" stroke-width="1.6"/></svg>',
+};
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (L.id === 'dyn') return S.dyn ? (m.T > 0 ? `Динамометр показывает ${fmt(m.T, 1)} Н` : 'Динамометр не натянут: он с той же стороны, что перевес?') : 'Повесьте динамометр на вкладке «Схема»';
+  if (L.id === 'golden') return !S.dyn ? 'Повесьте динамометр на деление 8' : m.held ? `Поднято на ${fmt(m.lift, 1)} из 8 см` : 'Динамометр не держит рычаг';
+  if (L.id === 'one' && count(1) > 1) return `Справа ${count(1)} ${plural(count(1), 'груз', 'груза', 'грузов')}, нужен один`;
+  if (m.balanced) return 'Ровно, но условие ещё не выполнено';
+  return `Слева ${fmt(Nm(m.leftU), 2)} · справа ${fmt(Nm(m.rightU), 2)} Н·м`;
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    const parts = [
+      { id: 'lever', icon: ICON.lever, name: 'Рычаг', spec: `Планка ${BL} см, по ${NH} делений с каждой стороны через ${SP} см.` },
+      { id: 'pivot', icon: ICON.pivot, name: 'Опора на штативе', spec: 'Ось точно посередине, поэтому пустой рычаг стоит ровно.' },
+      { id: 'weights', icon: ICON.weights, name: 'Грузы', spec: `Набор из ${POOL} штук, каждый весит 1 Н (около 102 г). Сейчас висит ${total()}.` },
+      { id: 'dyn', icon: ICON.dyn, name: 'Динамометр', spec: `Шкала до ${DYN_MAX} Н, цена деления 0,1 Н. ${S.dyn ? `Висит на делении ${Math.abs(S.dyn)} ${S.dyn > 0 ? 'справа' : 'слева'}.` : 'Сейчас снят.'}` },
+    ];
+    $('#pane-parts').innerHTML = `<h2>Детали</h2><p class="note">Из чего собран опыт. Нажмите на деталь, чтобы найти её на стенде.</p><div class="parts">` +
+      parts.map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => gl && gl.highlight(b.dataset.id));
+  }
+  if (S.tab === 'calc') {
+    const rows = entries().map(([i, c]) => step(`${i < 0 ? 'слева' : 'справа'}, деление ${Math.abs(i)}`, `${c} Н × ${fmt(Math.abs(i) * SP / 100, 2)} м = ${fmt(Nm(c * Math.abs(i)), 2)} Н·м`)).join('');
+    let h = `<h2>Правило моментов</h2><div class="formula">F₁ · l₁ = F₂ · l₂</div>
+      <p class="note">F — сила (вес грузов), l — плечо, расстояние от опоры до точки, где висит груз. Момент M = F · l.</p>
+      <h3>Моменты сейчас</h3><div class="steps">${rows || step('грузов нет', '—')}` +
+      (S.dyn && m.T > 0 ? step(`динамометр, деление ${Math.abs(S.dyn)}`, `${fmt(m.T, 2)} Н × ${fmt(Math.abs(S.dyn) * SP / 100, 2)} м = ${fmt(m.T * Nm(Math.abs(S.dyn)), 2)} Н·м`) : '') +
+      step('крутят против часовой', fmt(turns(m).ccw, 2) + ' Н·м', 'sum') +
+      step('крутят по часовой', fmt(turns(m).cw, 2) + ' Н·м', 'sum') + `</div>
+      <p class="note" style="margin-top:10px">Грузы слева и динамометр справа поворачивают рычаг против часовой стрелки, грузы справа и динамометр слева — по часовой.</p>
+      <p class="note" style="margin-top:10px">${m.balanced ? 'Моменты равны, рычаг стоит ровно.' : `Перевешивает ${m.net > 0 ? 'правая' : 'левая'} сторона на ${fmt(Math.abs(Nm(m.net)), 2)} Н·м.`}</p>`;
+    if (S.dyn && m.held) {
+      const ld = Math.abs(S.dyn) * SP, need = m.mu / S.dyn;
+      h += `<h3>Сколько тянуть динамометром</h3><div class="steps">` +
+        step('F = M грузов / l', `${fmt(Math.abs(Nm(m.mu)), 2)} / ${fmt(ld / 100, 2)} = ${fmt(need, 2)} Н`) + `</div>`;
+      if (m.lift > 0) {
+        const sinA = m.lift / ld, sLoad = entries().map(([i, c]) => ({ i, c, s: Math.abs(i) * SP * sinA }));
+        const A1 = m.T * m.lift / 100, A2 = Math.abs(m.mu) * SP * sinA / 100;
+        h += `<h3>Золотое правило</h3><div class="steps">` +
+          step('динамометр', `${fmt(m.T, 2)} Н × ${fmt(m.lift / 100, 3)} м = ${fmt(A1, 3)} Дж`) +
+          sLoad.map(x => step(`груз${x.c > 1 ? 'ы' : ''} на делении ${Math.abs(x.i)}`, `${x.c} Н × ${fmt(x.s / 100, 3)} м`)).join('') +
+          step('работа над грузами', `${fmt(A2, 3)} Дж`, 'sum') + `</div>
+          <p class="note" style="margin-top:10px">Динамометр тянет в ${fmt(total() / m.T, 1)} раза слабее, чем весят грузы (${total()} Н), зато проходит во столько же раз больший путь. Работа одна и та же.</p>`;
+      }
+    }
+    $('#pane-calc').innerHTML = h;
+  }
+}
+
+function update(rebuild) {
+  const m = model(), L = LESSONS[S.lesson];
+  if (!m.held && S.lift) S.lift = 0;
+  if (S.lift > m.liftMax) S.lift = m.liftMax;
+  $('#diagram').innerHTML = diagramSVG({ entries: entries(), dyn: S.dyn, T: m.T, theta: m.theta, forces: S.forces }, false);
+  const tr = turns(m);
+  $('#rL').textContent = fmt(tr.ccw, 2) + ' Н·м';
+  $('#rR').textContent = fmt(tr.cw, 2) + ' Н·м';
+  $('#rT').textContent = S.dyn ? (m.T > 0 ? fmt(m.T, 1) + ' Н' : '0 Н') : '—';
+  $('#pool').textContent = `грузов осталось ${POOL - total()} из ${POOL}`;
+  dynChips.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', (+b.dataset.d || null) === S.dyn));
+  const lc = $('#liftCtl'); lc.hidden = !(S.dyn && m.held);
+  const il = $('#inLift'); il.max = m.liftMax; il.value = S.lift; $('#oLift').textContent = fmt(S.lift, 1) + ' см';
+  $('#balV').textContent = m.balanced ? 'Равновесие' : `Перевес ${m.net > 0 ? 'справа' : 'слева'}`;
+  $('#balV').classList.toggle('ok', m.balanced);
+  $('#balI').style.left = clamp(50 + m.net * 3, 2, 98) + '%';
+  if (gl) gl.sync(m, rebuild);
+
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены.');
+  }
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+}
+
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => {
+    const ent = Object.entries(L.w).map(([h, c]) => [+h, c]);
+    const mu = ent.reduce((a, [h, c]) => a + h * c, 0), T = L.dyn ? Math.max(0, mu / L.dyn) : 0;
+    const th = L.dyn ? 0 : clamp(-mu * DEG_PER_UNIT, -MAX_TILT, MAX_TILT);
+    return `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg class="mini" viewBox="-56 -14 112 34" aria-hidden="true">${diagramSVG({ entries: ent, dyn: L.dyn, T, theta: th, forces: false }, true)}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`;
+  }).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i];
+  S.lesson = i; S.w = Object.assign({}, L.w); S.dyn = L.dyn; S.lift = 0;
+  save(); setMode('add');
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  renderStrip(); update(true);
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+setLesson(S.lesson);
+})();
+</script>
+</body>
+</html>
