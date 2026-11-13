@@ -1,0 +1,852 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивные опыты с линзой: свеча, экран и ход лучей на оптической скамье.">
+<style>body{margin:0}[hidden]{display:none!important}</style>
+<title>Оптическая скамья</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: a darkened optics lab. Live 3D bench on the left, lesson notebook on the right, lesson strip under the bench. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --ray:#ffb547;
+  --glass:#72d4e8;
+  --ok:#86e0a8;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--glass);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--glass);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.prog .lensinfo{font:12px/1 var(--font-mono);color:var(--muted);padding-left:14px;border-left:1px solid var(--line)}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 42% 38%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.stage canvas.gl{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+.stage canvas.gl.grabbing{cursor:grabbing}
+.tags{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.tag{position:absolute;left:0;top:0;background:var(--tag-bg);border:1px solid var(--line);border-radius:7px;padding:4px 8px 5px;font:600 10.5px/1.25 var(--font-body);letter-spacing:.11em;text-transform:uppercase;white-space:nowrap;will-change:transform}
+.tag span{display:block;font:500 11px/1.35 var(--font-mono);letter-spacing:0;text-transform:none;color:var(--muted)}
+.tag .ok{color:var(--ok)}
+.tag.fx{background:none;border:0;padding:0;font:500 11px/1 var(--font-mono);letter-spacing:0;text-transform:none;color:var(--glass)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ray)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.inset{position:absolute;top:14px;right:14px;width:150px;margin:0;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:8px}
+.inset canvas{display:block;width:100%;aspect-ratio:1;border-radius:4px}
+.inset figcaption{display:flex;justify-content:space-between;gap:6px;margin-top:6px;font:600 10px/1.2 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.inset figcaption span{font:500 10.5px/1.2 var(--font-mono);letter-spacing:0;text-transform:none}
+
+.tools{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px}
+.tools .sq{width:30px;padding:6px 0;font:500 15px/1 var(--font-mono)}
+.hint{position:absolute;left:16px;bottom:20px;font-size:12px;color:var(--muted)}
+.nogl{position:absolute;inset:0;display:grid;place-items:center;padding:24px;text-align:center;color:var(--muted)}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--ray)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ray);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:9px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+#diagram{display:block;width:100%;height:auto;aspect-ratio:128/46;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.d-axis{stroke:var(--line);stroke-width:.3;stroke-dasharray:1.4 1}
+.d-f{fill:var(--glass)}
+.d-t{fill:var(--glass);font:500 3.2px var(--font-mono);text-anchor:middle}
+.d-lens{stroke:var(--glass);stroke-width:.55;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.d-screen{stroke:var(--muted);stroke-width:1;stroke-linecap:round}
+.d-ray{stroke:var(--ray);stroke-width:.35;fill:none;stroke-linejoin:round;opacity:.95}
+.d-vray{stroke:var(--glass);stroke-width:.3;stroke-dasharray:1.2 .9;fill:none}
+.d-obj line,.d-obj polyline{stroke:var(--fg);stroke-width:.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.d-img line,.d-img polyline{stroke:var(--ray);stroke-width:.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.d-vimg line,.d-vimg polyline{stroke:var(--glass);stroke-width:.55;fill:none;stroke-dasharray:1 .7;stroke-linecap:round}
+.mini .d-ray{stroke-width:1}.mini .d-lens{stroke-width:1.3}.mini .d-obj line,.mini .d-obj polyline,.mini .d-img line,.mini .d-img polyline{stroke-width:1.4}.mini .d-vray{stroke-width:.8}.mini .d-vimg line,.mini .d-vimg polyline{stroke-width:1.2}
+
+.reads{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.sharp{height:4px;border-radius:2px;background:var(--line);margin-top:6px;overflow:hidden}
+.sharp i{display:block;height:100%;background:var(--ok);width:0}
+.ctl{margin-top:16px}
+.ctl label{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--ray)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-mono);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+
+.formula{font:500 20px/1 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.cases{overflow-x:auto}
+.cases table{width:100%;border-collapse:collapse;font-size:12.5px}
+.cases th{font:600 10px/1.2 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-align:left;padding:6px 6px;border-bottom:1px solid var(--line)}
+.cases td{padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+.cases td:first-child,.cases td:nth-child(2){font-family:var(--font-mono);white-space:nowrap}
+.cases tr.now td{background:var(--surface-2);color:var(--fg)}
+.cases tr.now td:first-child{box-shadow:inset 2px 0 0 var(--ray)}
+.cases tr:not(.now) td{color:var(--muted)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--ray);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:5;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:380px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .inset{width:92px;padding:5px}
+  .inset figcaption{flex-direction:column;gap:2px}
+  .task{max-width:calc(100% - 134px);padding:9px 11px}
+  .task p{font-size:13px}
+  .hint{display:none}
+  .tools button{padding:6px 7px}
+  .prog .lensinfo{display:none}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M20 8c3 3.5 3 20.5 0 24c-3-3.5-3-20.5 0-24z" fill="var(--glass)" opacity=".85"/><path d="M5 15h15l15 9" stroke="var(--ray)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 26h15l15-9" stroke="var(--ray)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".55"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Оптика · Линзы</small></div>
+    </div>
+    <div class="prog" aria-label="Прогресс">
+      <b>Линзы</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/5</span>
+      <span class="lensinfo" id="lensInfo"></span>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Оптическая скамья">
+    <div class="tags" id="tags"></div>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <figure class="inset">
+      <canvas id="scr" width="320" height="320" aria-label="Что видно на экране"></canvas>
+      <figcaption>Экран <span id="insetState"></span></figcaption>
+    </figure>
+    <div class="hint">Тяните свечу и экран вдоль скамьи. Фон поворачивает вид.</div>
+    <div class="tools" role="toolbar" aria-label="Вид">
+      <button id="tRays" aria-pressed="true">Лучи</button>
+      <button id="tGhost" aria-pressed="true">Изображение</button>
+      <button id="tFoci" aria-pressed="true">Фокусы</button>
+      <span class="sep"></span>
+      <button class="sq" id="zOut" aria-label="Отдалить">−</button>
+      <button class="sq" id="zIn" aria-label="Приблизить">+</button>
+      <button class="sq" id="vReset" aria-label="Вернуть вид">⟲</button>
+    </div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="false">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="true">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel">
+      <h2>Ход лучей</h2>
+      <svg id="diagram" viewBox="-64 -24 128 46" role="img" aria-label="Схема хода лучей через линзу"></svg>
+      <dl class="reads">
+        <div><dt>d, свеча</dt><dd id="rD"></dd></div>
+        <div><dt>f, изобр.</dt><dd id="rF"></dd></div>
+        <div><dt>Г</dt><dd id="rG"></dd></div>
+        <div><dt>Резкость</dt><dd id="rS"></dd><div class="sharp"><i id="rSb"></i></div></div>
+      </dl>
+      <div class="ctl">
+        <label for="inD">Свеча от линзы <output id="oD"></output></label>
+        <input type="range" id="inD" min="5" max="58" step="0.5">
+      </div>
+      <div class="ctl">
+        <label for="inS">Экран от линзы <output id="oS"></output></label>
+        <input type="range" id="inS" min="5" max="58" step="0.1">
+      </div>
+      <div class="ctl">
+        <label>Линза, фокусное расстояние F</label>
+        <div class="chips" id="chips"></div>
+      </div>
+      <div class="row"><button class="ghostbtn" id="focusBtn">Навести резкость</button></div>
+    </div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const signed = (x, n = 0) => (x > 0 ? '+' : '') + fmt(x, n);
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Bench geometry, centimetres. Lens at x = 0, candle at x = -d, screen at x = s.
+const AX = 14, H = 6, LR = 3.5, DL = 2 * LR, RAIL_Y = 3, XMIN = 5, XMAX = 58;
+const LENSES = [8, 10, 15, 20, -10];
+
+const LESSONS = [
+  { id: 'image', title: 'Как линза строит изображение', F: 10, d: 30, s: 24,
+    text: ['Свеча светит во все стороны. Собирающая линза ловит часть этих лучей и снова сводит их в одну точку. Там, где сошлись лучи от пламени, получается его изображение.',
+           'Если экран стоит ровно в этой точке, на нём видно резкое перевёрнутое пламя. Ближе или дальше лучи ещё не сошлись или уже разошлись, и вместо пламени на экране пятно.'],
+    task: 'Двигайте экран, пока пламя на нём не станет резким.',
+    hint: 'Тяните экран прямо на скамье или двигайте ползунок на вкладке «Схема».',
+    check: o => o.focused },
+  { id: 'focus', title: 'Далёкая свеча и фокус', F: 10, d: 36, s: 20,
+    text: ['Чем дальше свеча, тем ближе к фокусу собирается её изображение. От очень далёкого предмета лучи приходят почти параллельно, и линза сводит их точно в фокусе.',
+           'Так фокусное расстояние находят без формул: ловят на экране изображение далёкого окна и меряют расстояние от линзы до экрана.'],
+    task: 'Отодвиньте свечу дальше 45 см и поймайте резкое изображение. Сравните расстояние до экрана с F.',
+    hint: 'Чем дальше свеча, тем ближе к отметке F приходится ставить экран.',
+    check: o => S.d >= 45 && o.focused },
+  { id: 'zoom', title: 'Увеличенное изображение', F: 10, d: 24, s: 30,
+    text: ['Если поставить свечу между F и 2F, изображение уходит дальше 2F и становится крупнее самой свечи. Так работает проектор: маленький кадр превращается в большую картинку на стене.',
+           'Увеличение Г = f / d показывает, во сколько раз изображение больше предмета.'],
+    task: 'Получите на экране резкое изображение крупнее самой свечи (Г > 1).',
+    hint: 'Придвиньте свечу ближе 2F, но не ближе F, и отодвиньте экран.',
+    check: o => o.focused && o.G > 1 },
+  { id: 'virtual', title: 'Лупа: мнимое изображение', F: 10, d: 16, s: 30,
+    text: ['Когда свеча ближе фокуса, лучи после линзы расходятся и нигде не сходятся. Экран ничего не поймает, сколько его ни двигай.',
+           'Глаз, который смотрит сквозь линзу, продолжает эти лучи назад и видит за линзой большую прямую свечу. Это мнимое изображение, так работает лупа. На скамье оно показано голубым контуром.'],
+    task: 'Поставьте свечу ближе фокуса (d < F) и найдите мнимое изображение.',
+    hint: 'Фокус отмечен на оси буквой F. Голубой контур появится по ту же сторону, где свеча.',
+    check: o => S.F > 0 && S.d < S.F - 0.2 },
+  { id: 'diverging', title: 'Рассеивающая линза', F: -10, d: 25, s: 20,
+    text: ['Рассеивающая линза тоньше в центре, чем по краям. Она не сводит лучи, а разводит их, поэтому действительного изображения у неё не бывает.',
+           'Продолжения лучей сходятся перед линзой, там видно уменьшенное прямое мнимое изображение. Фокусное расстояние и оптическую силу такой линзы пишут со знаком минус.'],
+    task: 'Подвигайте экран в общей сложности на 20 см. Получится ли поймать пламя?',
+    hint: 'Следите за пятном в окошке «Экран» справа вверху.',
+    check: o => S.F < 0 && S.travel >= 20 },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem('luch-optics') || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), F: 10, d: 30, s: 24, travel: 0,
+            rays: true, ghost: true, foci: true, done: saved.done || {}, tab: 'scheme' };
+const save = () => { try { localStorage.setItem('luch-optics', JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+
+// ---------- physics ----------
+function imageDist(F, d) { return Math.abs(d - F) < 1e-6 ? Infinity : F * d / (d - F); }
+function optics() {
+  const { F, d, s } = S, f = imageDist(F, d);
+  let c;
+  if (!isFinite(f)) c = DL;
+  else if (f > 0) c = DL * Math.abs(s - f) / f;
+  else c = DL * (s - f) / (-f);
+  const real = isFinite(f) && f > 0;
+  return { f, c, real, G: isFinite(f) ? Math.abs(f) / d : Infinity, k: s / d,
+           sharp: clamp(1 - c / 1.5, 0, 1), focused: real && c < 0.3 };
+}
+// Three principal rays from the flame tip, in (x, height above axis).
+function rays2D(F, d, end) {
+  const f = imageDist(F, d), P = [-d, H], solid = [], dashed = [];
+  const virt = isFinite(f) && f < 0, Q = isFinite(f) ? [f, -H * f / d] : null;
+  const go = (y0, dx, dy) => {
+    let x1 = end, y1 = y0 + dy * (end / dx);
+    if (y1 > 24) { x1 = (24 - y0) * dx / dy; y1 = 24; }
+    else if (y1 < -13.5) { x1 = (-13.5 - y0) * dx / dy; y1 = -13.5; }
+    solid.push([P, [0, y0], [x1, y1]]);
+    if (virt) dashed.push([[0, y0], Q]);
+  };
+  go(H, F > 0 ? F : -F, F > 0 ? -H : H);
+  go(0, d, -H);
+  if (Math.abs(d - F) > 0.4) { const y3 = -H * F / (d - F); if (y3 <= 16 && y3 >= -13) go(y3, 1, 0); }
+  return { solid, dashed, f, Q };
+}
+
+// ---------- 2D diagram ----------
+function arrow(x, y0, y1, cls) {
+  const dir = Math.sign(y1 - y0) || 1, tip = -y1;
+  return `<g class="${cls}"><line x1="${x}" y1="${-y0}" x2="${x}" y2="${tip}"/><polyline points="${x - 1.2},${tip + dir * 1.8} ${x},${tip} ${x + 1.2},${tip + dir * 1.8}"/></g>`;
+}
+function diagramSVG(F, d, s, mini) {
+  const R = rays2D(F, d, s), f = R.f, Q = R.Q, pt = q => q[0].toFixed(2) + ',' + (-q[1]).toFixed(2);
+  let h = `<line x1="-64" y1="0" x2="64" y2="0" class="d-axis"/>`;
+  for (const [x, l] of [[-2 * F, '2F'], [-F, 'F'], [F, 'F'], [2 * F, '2F']]) {
+    if (Math.abs(x) > 62) continue;
+    h += `<circle cx="${x}" cy="0" r="${mini ? 1.3 : 0.7}" class="d-f"/>`;
+    if (!mini) h += `<text x="${x}" y="4.8" class="d-t">${l}</text>`;
+  }
+  h += `<line x1="0" y1="-10" x2="0" y2="10" class="d-lens"/>`;
+  h += F > 0
+    ? `<polyline class="d-lens" points="-1.6,-8.2 0,-10 1.6,-8.2"/><polyline class="d-lens" points="-1.6,8.2 0,10 1.6,8.2"/>`
+    : `<polyline class="d-lens" points="-1.6,-11.8 0,-10 1.6,-11.8"/><polyline class="d-lens" points="-1.6,11.8 0,10 1.6,11.8"/>`;
+  if (!mini) h += `<line x1="${s}" y1="-10" x2="${s}" y2="10" class="d-screen"/>`;
+  for (const p of R.solid) h += `<polyline class="d-ray" points="${p.map(pt).join(' ')}"/>`;
+  for (const p of R.dashed) h += `<polyline class="d-vray" points="${p.map(pt).join(' ')}"/>`;
+  h += arrow(-d, 0, H, 'd-obj');
+  if (Q && Math.abs(Q[0]) < 63) h += arrow(Q[0], 0, Q[1], f > 0 ? 'd-img' : 'd-vimg');
+  return h;
+}
+
+// ---------- screen image (shared by 3D texture and inset) ----------
+const scr = $('#scr'), sctx = scr.getContext('2d'), SC = scr.width, PX = SC / 20;
+const oc = document.createElement('canvas'); oc.width = oc.height = SC; const octx = oc.getContext('2d');
+const HAS_FILTER = typeof sctx.filter === 'string';
+function drawScreen(o) {
+  const g = sctx;
+  g.save();
+  g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; if (HAS_FILTER) g.filter = 'none';
+  g.fillStyle = '#272e3c'; g.fillRect(0, 0, SC, SC);
+  const spill = g.createRadialGradient(SC / 2, SC / 2, 0, SC / 2, SC / 2, SC * 0.75);
+  spill.addColorStop(0, 'rgba(255,170,80,0.10)'); spill.addColorStop(1, 'rgba(255,170,80,0)');
+  g.fillStyle = spill; g.fillRect(0, 0, SC, SC);
+  // Chief ray through the lens centre sets where the image lands: height y goes to -y·s/d.
+  const k = o.k, cx = SC / 2, Y = y => SC / 2 + y * k * PX;
+  octx.clearRect(0, 0, SC, SC);
+  octx.globalAlpha = clamp(1.1 / k, 0.3, 1);
+  octx.fillStyle = 'rgba(235,190,140,0.32)';
+  octx.fillRect(cx - k * PX, Y(0), 2 * k * PX, 3.8 * k * PX);
+  const fy = Y(5.0), rx = Math.max(0.55 * k * PX, 0.6), ry = Math.max(1.0 * k * PX, 1);
+  octx.save(); octx.translate(cx, fy); octx.scale(1, ry / rx);
+  const gr = octx.createRadialGradient(0, 0, 0, 0, 0, rx * 1.3);
+  gr.addColorStop(0, '#fffbe9'); gr.addColorStop(0.45, '#ffd27a'); gr.addColorStop(1, 'rgba(255,140,40,0)');
+  octx.fillStyle = gr; octx.beginPath(); octx.arc(0, 0, rx * 1.3, 0, Math.PI * 2); octx.fill();
+  octx.restore();
+  const r = Math.min(o.c * PX / 2, 140);
+  g.globalCompositeOperation = 'lighter';
+  if (HAS_FILTER) { g.filter = r > 0.6 ? `blur(${(r * 0.55).toFixed(1)}px)` : 'none'; g.drawImage(oc, 0, 0); g.filter = 'none'; }
+  else {
+    const N = r < 1 ? 1 : 22; g.globalAlpha = 1 / N;
+    for (let i = 0; i < N; i++) { const a = i * 2.39996, rr = N === 1 ? 0 : r * Math.sqrt((i + 0.5) / N); g.drawImage(oc, Math.cos(a) * rr, Math.sin(a) * rr); }
+  }
+  g.restore();
+}
+
+// ---------- 3D bench ----------
+function initGL() {
+  if (!window.THREE) throw new Error('three');
+  const T = THREE, host = $('#stage');
+  const renderer = new T.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap;
+  renderer.domElement.className = 'gl';
+  host.prepend(renderer.domElement);
+
+  const scene = new T.Scene();
+  const cam = new T.OrthographicCamera(-1, 1, 1, -1, 1, 1000);
+  const target = new T.Vector3(0, 9, 0);
+  const VIEW = { az: 0.5, el: 0.5, zoom: 1 };
+  let az = VIEW.az, el = VIEW.el, zoom = VIEW.zoom;
+  const placeCam = () => {
+    const R = 300;
+    cam.position.set(target.x - R * Math.sin(az) * Math.cos(el), target.y + R * Math.sin(el), target.z + R * Math.cos(az) * Math.cos(el));
+    cam.lookAt(target);
+  };
+  const resize = () => {
+    const w = host.clientWidth, h = host.clientHeight; if (!w || !h) return;
+    renderer.setSize(w, h, false);
+    const asp = w / h, vh = Math.max(56, 120 / asp) / zoom;
+    cam.top = vh / 2; cam.bottom = -vh / 2; cam.left = -vh * asp / 2; cam.right = vh * asp / 2;
+    cam.updateProjectionMatrix();
+  };
+
+  scene.add(new T.HemisphereLight(0xc4d6ff, 0x18202e, 0.6));
+  const key = new T.DirectionalLight(0xffffff, 0.7);
+  key.position.set(-40, 90, 60); key.castShadow = true; key.shadow.mapSize.set(2048, 2048);
+  Object.assign(key.shadow.camera, { left: -85, right: 85, top: 60, bottom: -60, near: 1, far: 260 });
+  key.shadow.bias = -0.0006; scene.add(key);
+
+  const grad = new T.DataTexture(new Uint8Array([72, 150, 255]), 3, 1, T.LuminanceFormat);
+  grad.minFilter = grad.magFilter = T.NearestFilter; grad.generateMipmaps = false; grad.needsUpdate = true;
+  const toon = (c, extra) => new T.MeshToonMaterial(Object.assign({ color: c, gradientMap: grad }, extra || {}));
+  const INK = new T.LineBasicMaterial({ color: 0x04070d });
+  const mk = (geo, mat, o = {}) => {
+    const m = new T.Mesh(geo, mat); m.castShadow = o.cast !== false; m.receiveShadow = !!o.recv;
+    if (o.edges !== false) m.add(new T.LineSegments(new T.EdgesGeometry(geo, 28), o.edges || INK));
+    return m;
+  };
+  const canvasTex = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new T.CanvasTexture(c); t.anisotropy = 4; return t; };
+
+  // table
+  const gridTex = canvasTex(512, 512, (g, w) => {
+    g.fillStyle = '#151d2c'; g.fillRect(0, 0, w, w);
+    g.strokeStyle = 'rgba(160,185,230,0.07)'; g.lineWidth = 2;
+    for (let i = 0; i <= 10; i++) { const p = i * w / 10; g.beginPath(); g.moveTo(p, 0); g.lineTo(p, w); g.moveTo(0, p); g.lineTo(w, p); g.stroke(); }
+  });
+  gridTex.wrapS = gridTex.wrapT = T.RepeatWrapping; gridTex.repeat.set(3, 1.8);
+  const table = mk(new T.PlaneGeometry(300, 180), toon(0xffffff, { map: gridTex }), { edges: false, cast: false, recv: true });
+  table.rotation.x = -Math.PI / 2; scene.add(table);
+
+  // rail with a centimetre ruler, zero at the lens
+  const rail = mk(new T.BoxGeometry(124, 3, 6), toon(0x56627d), { recv: true });
+  rail.position.set(0, 1.5, 0); scene.add(rail);
+  for (const x of [-63, 63]) { const cap = mk(new T.BoxGeometry(2, 3.6, 7), toon(0x2a3348)); cap.position.set(x, 1.8, 0); scene.add(cap); }
+  const rulerCanvas = document.createElement('canvas'); rulerCanvas.width = 4096; rulerCanvas.height = 96;
+  const rulerTex = new T.CanvasTexture(rulerCanvas); rulerTex.anisotropy = 8;
+  const drawRuler = () => {
+    const g = rulerCanvas.getContext('2d'), W = 4096, pc = W / 122;
+    g.fillStyle = '#c8d1e2'; g.fillRect(0, 0, W, 96);
+    g.fillStyle = '#18202f'; g.textAlign = 'center'; g.font = '500 30px "IBM Plex Mono", monospace';
+    for (let v = -60; v <= 60; v++) {
+      const x = (v + 61) * pc, len = v % 10 === 0 ? 40 : v % 5 === 0 ? 26 : 14;
+      g.fillRect(x - 1.5, 0, 3, len);
+      if (v % 10 === 0) g.fillText(String(Math.abs(v)), x, 80);
+    }
+    rulerTex.needsUpdate = true;
+  };
+  drawRuler(); if (document.fonts && document.fonts.ready) document.fonts.ready.then(drawRuler);
+  const ruler = new T.Mesh(new T.PlaneGeometry(122, 2.5), toon(0xffffff, { map: rulerTex }));
+  ruler.position.set(0, 1.55, 3.02); ruler.receiveShadow = true; scene.add(ruler);
+
+  const rider = () => {
+    const g = new T.Group();
+    const b = mk(new T.BoxGeometry(5, 2.4, 8), toon(0x2b3650)); b.position.y = RAIL_Y + 1.2; g.add(b);
+    const knob = mk(new T.CylinderGeometry(0.7, 0.7, 1.2, 16), toon(0x8a96b0)); knob.rotation.x = Math.PI / 2; knob.position.set(0, RAIL_Y + 1.2, 4.6); g.add(knob);
+    return g;
+  };
+  const post = top => { const h = top - (RAIL_Y + 2.4); const p = mk(new T.CylinderGeometry(0.45, 0.45, h, 16), toon(0xa9b4c9)); p.position.y = RAIL_Y + 2.4 + h / 2; return p; };
+
+  // candle
+  const candleBody = (m, edges) => {
+    const g = new T.Group();
+    const wax = mk(new T.CylinderGeometry(1, 1.05, 3.8, 24), m.wax, { edges }); wax.position.y = 1.9;
+    const wick = mk(new T.CylinderGeometry(0.08, 0.08, 0.6, 6), m.wick, { edges: false }); wick.position.y = 4.1;
+    const flame = new T.Mesh(new T.SphereGeometry(0.55, 20, 14), m.flame); flame.scale.y = 1.8; flame.position.y = 5.0;
+    const core = new T.Mesh(new T.SphereGeometry(0.28, 16, 10), m.core); core.scale.y = 1.6; core.position.y = 4.75;
+    g.add(wax, wick, flame, core); g.userData.flame = flame; return g;
+  };
+  const candleRig = new T.Group(); candleRig.add(rider(), post(AX - 0.5));
+  const plate = mk(new T.CylinderGeometry(2.2, 2.2, 0.5, 24), toon(0x8a96b0)); plate.position.y = AX - 0.25; candleRig.add(plate);
+  const candle = candleBody({ wax: toon(0xf1e7d0), wick: toon(0x222222), flame: new T.MeshBasicMaterial({ color: 0xffc96b }), core: new T.MeshBasicMaterial({ color: 0xfff6dc }) });
+  candle.position.y = AX; candleRig.add(candle);
+  const glowTex = canvasTex(128, 128, (g, w) => { const r = g.createRadialGradient(64, 64, 0, 64, 64, 64); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.25, 'rgba(255,255,255,.45)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, w, w); });
+  const glow = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: 0xffa640, blending: T.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.85 }));
+  glow.scale.set(10, 10, 1); glow.position.y = AX + 5; candleRig.add(glow);
+  const flameLight = new T.PointLight(0xffa64a, 1.1, 46, 1.6); flameLight.position.y = AX + 5.6; candleRig.add(flameLight);
+  scene.add(candleRig);
+
+  // lens
+  const lensRig = new T.Group(); lensRig.add(rider(), post(AX - LR - 0.6));
+  const ring = mk(new T.TorusGeometry(LR + 0.3, 0.35, 12, 48), toon(0x3a4762)); ring.rotation.y = Math.PI / 2; ring.position.y = AX; lensRig.add(ring);
+  const glassMat = new T.MeshPhongMaterial({ color: 0x72d4e8, transparent: true, opacity: 0.4, shininess: 90, specular: 0xffffff, side: T.DoubleSide, depthWrite: false });
+  let glass = null;
+  const buildLens = F => {
+    if (glass) { lensRig.remove(glass); glass.geometry.dispose(); }
+    const n = 18, conv = F > 0, t = clamp(26 / Math.abs(F), 0.8, 2.6), e = 0.12, pts = [];
+    const z = r => conv ? e + (t / 2) * (1 - (r / LR) ** 2) : e + 0.12 + t * 0.42 * (r / LR) ** 2;
+    for (let i = 0; i <= n; i++) pts.push(new T.Vector2(LR * i / n, z(LR * i / n)));
+    for (let i = n; i >= 0; i--) pts.push(new T.Vector2(LR * i / n, -z(LR * i / n)));
+    const geo = new T.LatheGeometry(pts, 48); geo.rotateZ(Math.PI / 2);
+    glass = new T.Mesh(geo, glassMat); glass.position.y = AX; glass.renderOrder = 2; lensRig.add(glass);
+  };
+  scene.add(lensRig);
+
+  // screen
+  const scrTex = new T.CanvasTexture(scr);
+  const screenRig = new T.Group(); screenRig.add(rider(), post(AX - 10.6));
+  const frame = mk(new T.BoxGeometry(0.8, 21.2, 21.2), toon(0x2a3348)); frame.position.y = AX; screenRig.add(frame);
+  const face = new T.Mesh(new T.PlaneGeometry(20, 20), new T.MeshBasicMaterial({ map: scrTex }));
+  face.rotation.y = -Math.PI / 2; face.position.set(-0.42, AX, 0); screenRig.add(face);
+  scene.add(screenRig);
+
+  // image ghost: real = amber, virtual = cyan
+  const gMat = { wax: new T.MeshBasicMaterial({ transparent: true, opacity: 0.2, depthWrite: false, side: T.DoubleSide }),
+                 wick: new T.MeshBasicMaterial({ transparent: true, opacity: 0.3, depthWrite: false }),
+                 flame: new T.MeshBasicMaterial({ transparent: true, opacity: 0.55, depthWrite: false, side: T.DoubleSide }),
+                 core: new T.MeshBasicMaterial({ transparent: true, opacity: 0.4, depthWrite: false, side: T.DoubleSide }) };
+  const gEdge = new T.LineBasicMaterial({ transparent: true, opacity: 0.85 });
+  const ghost = candleBody(gMat, gEdge); ghost.traverse(o => { o.castShadow = false; o.renderOrder = 3; }); scene.add(ghost);
+  const setGhostColor = hex => { for (const k in gMat) gMat[k].color.setHex(hex); gEdge.color.setHex(hex); };
+
+  // optical axis + focus marks
+  const axisGeo = new T.BufferGeometry().setFromPoints([new T.Vector3(-62, AX, 0), new T.Vector3(62, AX, 0)]);
+  const axisLine = new T.Line(axisGeo, new T.LineDashedMaterial({ color: 0x5a6886, dashSize: 1.2, gapSize: 0.9 }));
+  axisLine.computeLineDistances(); scene.add(axisLine);
+  const fociG = new T.Group(); scene.add(fociG);
+  const fMat = new T.MeshBasicMaterial({ color: 0x72d4e8 }), f2Mat = new T.MeshBasicMaterial({ color: 0x3f7f8c });
+  const fMarks = [-2, -1, 1, 2].map(m => { const s = new T.Mesh(new T.SphereGeometry(0.45, 12, 8), Math.abs(m) === 1 ? fMat : f2Mat); s.userData.m = m; fociG.add(s); return s; });
+
+  // rays
+  const raysG = new T.Group(); scene.add(raysG);
+  const UNIT = new T.CylinderGeometry(1, 1, 1, 8, 1, true), YUP = new T.Vector3(0, 1, 0);
+  const RAY = new T.MeshBasicMaterial({ color: 0xffc15e });
+  const GLOW = new T.MeshBasicMaterial({ color: 0xff9d2e, transparent: true, opacity: 0.16, blending: T.AdditiveBlending, depthWrite: false });
+  const VRAY = new T.MeshBasicMaterial({ color: 0x72d4e8, transparent: true, opacity: 0.85 });
+  const A = new T.Vector3(), B = new T.Vector3(), D = new T.Vector3();
+  const seg = (a, b, mat, r) => {
+    A.set(a[0], AX + a[1], 0); B.set(b[0], AX + b[1], 0);
+    const len = A.distanceTo(B); if (len < 1e-3) return;
+    const m = new T.Mesh(UNIT, mat); m.position.copy(A).add(B).multiplyScalar(0.5); m.scale.set(r, len, r);
+    m.quaternion.setFromUnitVectors(YUP, D.copy(B).sub(A).normalize()); raysG.add(m);
+  };
+  const dashSeg = (a, b) => {
+    const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy), n = Math.floor(len / 2);
+    for (let i = 0; i <= n; i++) { const t0 = i * 2 / len, t1 = Math.min(1, (i * 2 + 1.2) / len); if (t0 >= 1) break; seg([a[0] + dx * t0, a[1] + dy * t0], [a[0] + dx * t1, a[1] + dy * t1], VRAY, 0.09); }
+  };
+
+  // labels
+  const tagsEl = $('#tags');
+  const mkTag = cls => { const el = document.createElement('div'); el.className = 'tag' + (cls ? ' ' + cls : ''); tagsEl.appendChild(el); return el; };
+  const tagCandle = mkTag(), tagLens = mkTag(), tagScreen = mkTag();
+  const fTags = fMarks.map(m => { const el = mkTag('fx'); el.textContent = Math.abs(m.userData.m) === 1 ? 'F' : '2F'; return el; });
+  const anchors = [
+    [tagCandle, () => A.set(candleRig.position.x, AX + 9.2, 0)],
+    [tagLens, () => A.set(0, AX + LR + 3.4, 0)],
+    [tagScreen, () => A.set(screenRig.position.x, AX + 13.2, 0)],
+    ...fTags.map((el, i) => [el, () => A.set(fMarks[i].position.x, AX + 2.6, 0)]),
+  ];
+  const placeTags = () => {
+    const w = host.clientWidth, h = host.clientHeight;
+    for (const [el, pos] of anchors) {
+      if (el.hidden) continue;
+      const v = pos().project(cam);
+      el.style.transform = `translate(${((v.x + 1) / 2 * w).toFixed(1)}px,${((1 - v.y) / 2 * h).toFixed(1)}px) translate(-50%,-100%)`;
+    }
+  };
+
+  // dragging and orbit
+  const rc = new T.Raycaster(), ndc = new T.Vector2(), plane = new T.Plane(new T.Vector3(0, 0, 1), 0), hit = new T.Vector3();
+  const cv = renderer.domElement;
+  const setNdc = e => { const r = cv.getBoundingClientRect(); ndc.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1); rc.setFromCamera(ndc, cam); };
+  const pick = () => {
+    const hits = rc.intersectObjects([candleRig, screenRig], true);
+    for (const hh of hits) { let o = hh.object; while (o && o !== candleRig && o !== screenRig) o = o.parent; if (o) return o === candleRig ? 'candle' : 'screen'; }
+    return null;
+  };
+  const planeX = () => rc.ray.intersectPlane(plane, hit) ? hit.x : null;
+  let drag = null;
+  cv.addEventListener('pointerdown', e => {
+    setNdc(e); const who = pick();
+    cv.setPointerCapture(e.pointerId); cv.classList.add('grabbing');
+    if (who) { const px = planeX(); const cur = who === 'candle' ? -S.d : S.s; drag = { who, off: px === null ? 0 : cur - px }; }
+    else drag = { who: 'orbit', x: e.clientX, y: e.clientY, az, el };
+  });
+  cv.addEventListener('pointermove', e => {
+    setNdc(e);
+    if (!drag) { cv.style.cursor = pick() ? 'ew-resize' : ''; return; }
+    if (drag.who === 'orbit') {
+      az = clamp(drag.az - (e.clientX - drag.x) * 0.006, -0.3, 1.3);
+      el = clamp(drag.el + (e.clientY - drag.y) * 0.005, 0.12, 1.2); placeCam(); return;
+    }
+    const px = planeX(); if (px === null) return;
+    const x = px + drag.off;
+    if (drag.who === 'candle') setD(clamp(Math.round(-x * 2) / 2, XMIN, XMAX));
+    else setS(clamp(Math.round(x * 10) / 10, XMIN, XMAX));
+  });
+  const end = () => { drag = null; cv.classList.remove('grabbing'); };
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+  cv.addEventListener('wheel', e => { e.preventDefault(); zoom = clamp(zoom * (1 - e.deltaY * 0.0012), 0.6, 2.8); resize(); }, { passive: false });
+
+  // highlight a part (from the Details tab)
+  let hl = null;
+  const highlight = id => { hl = { g: { candle: candleRig, lens: lensRig, screen: screenRig, bench: rail }[id], t: performance.now() }; };
+
+  const sync = o => {
+    candleRig.position.x = -S.d; screenRig.position.x = S.s;
+    while (raysG.children.length) raysG.remove(raysG.children[0]);
+    if (S.rays) {
+      const R = rays2D(S.F, S.d, S.s);
+      for (const p of R.solid) for (let i = 0; i < p.length - 1; i++) { seg(p[i], p[i + 1], RAY, 0.11); seg(p[i], p[i + 1], GLOW, 0.38); }
+      for (const p of R.dashed) dashSeg(p[0], p[1]);
+    }
+    const f = o.f;
+    if (S.ghost && isFinite(f) && Math.abs(f) < 64 && Math.abs(-f / S.d) < 5) {
+      const k = -f / S.d; ghost.visible = true; ghost.position.set(f, AX, 0); ghost.scale.set(Math.abs(k), k, Math.abs(k));
+      setGhostColor(f > 0 ? 0xffb547 : 0x72d4e8);
+    } else ghost.visible = false;
+    fociG.visible = S.foci;
+    fMarks.forEach((m, i) => { const x = m.userData.m * S.F; m.position.set(x, AX, 0); m.visible = Math.abs(x) <= 62; fTags[i].hidden = !S.foci || !m.visible; });
+    drawScreen(o); scrTex.needsUpdate = true;
+    tagCandle.innerHTML = `Свеча<span>d = ${fmt(S.d)} см</span>`;
+    tagLens.innerHTML = `${S.F > 0 ? 'Собирающая' : 'Рассеивающая'} линза<span>F = ${signed(S.F)} см</span>`;
+    tagScreen.innerHTML = `Экран<span>${fmt(S.s)} см · ${o.focused ? '<em class="ok">резко</em>' : o.real ? 'размыто' : 'пятно'}</span>`;
+  };
+
+  const loop = t => {
+    requestAnimationFrame(loop);
+    if (!reduce) {
+      const fl = 1 + Math.sin(t * 0.011) * 0.05 + Math.sin(t * 0.029 + 1.3) * 0.035;
+      candle.userData.flame.scale.set(1 / fl, 1.8 * fl, 1 / fl);
+      flameLight.intensity = 1.1 + (fl - 1) * 4; glow.material.opacity = 0.75 + (fl - 1) * 2;
+    }
+    if (hl) {
+      const k = Math.max(0, 1 - (t - hl.t) / 1600), p = k * (0.6 + 0.4 * Math.sin((t - hl.t) * 0.012));
+      hl.g.traverse(o => { if (o.material && o.material.emissive) o.material.emissive.setRGB(p * 0.2, p * 0.45, p * 0.55); });
+      if (k === 0) hl = null;
+    }
+    renderer.render(scene, cam); placeTags();
+  };
+
+  new ResizeObserver(resize).observe(host);
+  placeCam(); resize(); buildLens(S.F);
+  requestAnimationFrame(loop);
+  return {
+    sync, buildLens, highlight,
+    zoomBy: f => { zoom = clamp(zoom * f, 0.6, 2.8); resize(); },
+    resetView: () => { az = VIEW.az; el = VIEW.el; zoom = VIEW.zoom; placeCam(); resize(); },
+  };
+}
+
+let gl = null;
+try { gl = initGL(); }
+catch (e) {
+  $('#stage').insertAdjacentHTML('afterbegin', '<p class="nogl">Не получилось запустить 3D в этом браузере. Схема, ползунки и расчёты справа работают.</p>');
+  document.querySelectorAll('.tools, .hint').forEach(n => n.hidden = true);
+}
+
+// ---------- UI ----------
+const inD = $('#inD'), inS = $('#inS');
+function setD(v) { S.d = v; update(); }
+function setS(v) { S.travel += Math.abs(v - S.s); S.s = v; update(); }
+inD.addEventListener('input', () => setD(+inD.value));
+inS.addEventListener('input', () => setS(+inS.value));
+
+const chips = $('#chips');
+chips.innerHTML = LENSES.map(F => `<button data-f="${F}" aria-pressed="false">${signed(F)} см</button>`).join('');
+chips.addEventListener('click', e => { const b = e.target.closest('button'); if (b) setF(+b.dataset.f); });
+function setF(F) { if (F === S.F) return; S.F = F; gl && gl.buildLens(F); update(); }
+
+let tween = null;
+$('#focusBtn').addEventListener('click', () => {
+  const o = optics();
+  if (!o.real) return toast(isFinite(o.f) || S.F < 0 ? 'Здесь не поймать: лучи после линзы расходятся.' : 'Свеча в фокусе: лучи идут параллельно, изображения нет.');
+  if (o.f > XMAX) return toast('Изображение дальше конца скамьи. Отодвиньте свечу от линзы.');
+  const from = S.s, to = Math.round(o.f * 10) / 10, t0 = performance.now(), dur = reduce ? 0 : 650;
+  cancelAnimationFrame(tween);
+  const step = t => { const k = dur ? clamp((t - t0) / dur, 0, 1) : 1, e = 1 - (1 - k) ** 3; setS(from + (to - from) * e); if (k < 1) tween = requestAnimationFrame(step); };
+  tween = requestAnimationFrame(step);
+});
+
+const toggle = (id, key) => { const b = $(id); b.addEventListener('click', () => { S[key] = !S[key]; b.setAttribute('aria-pressed', S[key]); update(); }); };
+toggle('#tRays', 'rays'); toggle('#tGhost', 'ghost'); toggle('#tFoci', 'foci');
+$('#zIn').addEventListener('click', () => gl && gl.zoomBy(1.2));
+$('#zOut').addEventListener('click', () => gl && gl.zoomBy(1 / 1.2));
+$('#vReset').addEventListener('click', () => gl && gl.resetView());
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  renderPanes(optics());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+
+const ICON = {
+  candle: '<svg viewBox="0 0 34 34"><rect x="13" y="15" width="8" height="14" rx="1.5" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M17 4c3 4 3 7 0 9c-3-2-3-5 0-9z" fill="var(--ray)"/></svg>',
+  lens: '<svg viewBox="0 0 34 34"><path d="M17 4c4 5 4 21 0 26c-4-5-4-21 0-26z" fill="none" stroke="var(--glass)" stroke-width="1.6"/><path d="M3 17h28" stroke="var(--muted)" stroke-dasharray="2 2"/></svg>',
+  lensD: '<svg viewBox="0 0 34 34"><path d="M12 4h10c-3 6-3 20 0 26H12c3-6 3-20 0-26z" fill="none" stroke="var(--glass)" stroke-width="1.6"/><path d="M3 17h28" stroke="var(--muted)" stroke-dasharray="2 2"/></svg>',
+  screen: '<svg viewBox="0 0 34 34"><rect x="7" y="5" width="20" height="20" rx="1.5" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M17 25v5M12 30h10" stroke="var(--muted)" stroke-width="1.6"/></svg>',
+  bench: '<svg viewBox="0 0 34 34"><rect x="2" y="15" width="30" height="6" rx="1" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M6 21v-3M10 21v-2M14 21v-3M18 21v-2M22 21v-3M26 21v-2" stroke="var(--muted)"/></svg>',
+};
+
+function caseRows(F, d) {
+  if (F < 0) return [{ c: 'любое d', f: '|f| < |F|', t: 'мнимое, прямое, уменьшенное', now: true }];
+  const tol = 0.3;
+  const cur = Math.abs(d - 2 * F) < tol ? 'eq2' : d > 2 * F ? 'gt2' : Math.abs(d - F) < tol ? 'eqF' : d > F ? 'mid' : 'ltF';
+  return [
+    { id: 'gt2', c: 'd > 2F', f: 'F < f < 2F', t: 'действительное, перевёрнутое, уменьшенное' },
+    { id: 'eq2', c: 'd = 2F', f: 'f = 2F', t: 'действительное, перевёрнутое, равное' },
+    { id: 'mid', c: 'F < d < 2F', f: 'f > 2F', t: 'действительное, перевёрнутое, увеличенное' },
+    { id: 'eqF', c: 'd = F', f: '—', t: 'изображения нет, лучи идут параллельно' },
+    { id: 'ltF', c: 'd < F', f: 'f < 0', t: 'мнимое, прямое, увеличенное' },
+  ].map(r => Object.assign(r, { now: r.id === cur }));
+}
+const step = (a, b) => `<div class="step"><b>${a}</b><span>${b}</span></div>`;
+
+function renderPanes(o) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(o)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    const parts = [
+      { id: 'candle', icon: ICON.candle, name: 'Свеча', spec: `Высота с пламенем ${H} см. Стоит в ${fmt(S.d)} см от линзы.` },
+      { id: 'lens', icon: S.F > 0 ? ICON.lens : ICON.lensD, name: S.F > 0 ? 'Собирающая линза' : 'Рассеивающая линза', spec: `F = ${signed(S.F)} см, оптическая сила ${signed(100 / S.F, 1)} дптр, диаметр ${DL} см.` },
+      { id: 'screen', icon: ICON.screen, name: 'Экран', spec: `Белый матовый, 20 × 20 см. Стоит в ${fmt(S.s)} см от линзы.` },
+      { id: 'bench', icon: ICON.bench, name: 'Оптическая скамья', spec: 'Рельс 120 см со шкалой в сантиметрах. Ноль шкалы под линзой.' },
+    ];
+    $('#pane-parts').innerHTML = `<h2>Детали</h2><p class="note">Из чего собран опыт. Нажмите на деталь, чтобы найти её на скамье.</p><div class="parts">` +
+      parts.map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => gl && gl.highlight(b.dataset.id));
+  }
+  if (S.tab === 'calc') {
+    const { F, d, s } = S, f = o.f, inv = 1 / F - 1 / d;
+    let h = `<h2>Формула тонкой линзы</h2><div class="formula">1/F = 1/d + 1/f</div>
+      <p class="note">F — фокусное расстояние, d — от линзы до свечи, f — от линзы до изображения. Всё в сантиметрах.</p><div class="steps">` +
+      step('1/f = 1/F − 1/d', `1/${fmt(F, 0)} − 1/${fmt(d, 1)} = ${fmt(inv, 4)}`) +
+      step('f', isFinite(f) ? `${fmt(f, 1)} см` : '∞') +
+      step('Г = |f| / d', isFinite(f) ? `${fmt(Math.abs(f), 1)} / ${fmt(d, 1)} = ${fmt(o.G, 2)}` : '∞') +
+      step('D = 1/F', `1 / ${fmt(F / 100, 2)} м = ${signed(100 / F, 1)} дптр`) + `</div>
+      <h3>Что видно на экране</h3><div class="steps">` +
+      step('экран стоит на', `${fmt(s, 1)} см`) +
+      (o.real ? step('промах |s − f|', `${fmt(Math.abs(s - f), 1)} см`) : '') +
+      step('пятно размытия', `${fmt(o.c, 2)} см`) + `</div>
+      <p class="note" style="margin-top:10px">${o.real ? 'Пятно размытия = диаметр линзы × промах / f. Если оно меньше 0,3 см, глаз видит пламя резким.' : 'Лучи после линзы расходятся, поэтому пятно только растёт, куда экран ни ставь.'}</p>
+      <h3>Где получается изображение</h3><div class="cases"><table><thead><tr><th>Свеча</th><th>Изображение</th><th>Какое</th></tr></thead><tbody>` +
+      caseRows(F, d).map(r => `<tr class="${r.now ? 'now' : ''}"><td>${r.c}</td><td>${r.f}</td><td>${r.t}</td></tr>`).join('') + `</tbody></table></div>`;
+    $('#pane-calc').innerHTML = h;
+  }
+}
+
+function taskState(o) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (L.id === 'virtual') return `d = ${fmt(S.d)} см, F = ${signed(S.F)} см`;
+  if (L.id === 'diverging') return S.F < 0 ? `Экран сдвинут на ${fmt(Math.min(S.travel, 20), 0)} из 20 см` : 'Выберите линзу −10 см';
+  if (L.id === 'focus' && S.d < 45) return `Свеча на ${fmt(S.d)} см, нужно дальше 45`;
+  return o.real ? `Резкость ${Math.round(o.sharp * 100)}%` : 'Изображение на экран не попадает';
+}
+
+function update() {
+  const o = optics(), L = LESSONS[S.lesson];
+  inD.value = S.d; inS.value = S.s;
+  $('#oD').textContent = fmt(S.d) + ' см'; $('#oS').textContent = fmt(S.s) + ' см';
+  chips.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.f === S.F));
+  $('#diagram').innerHTML = diagramSVG(S.F, S.d, S.s, false);
+  $('#rD').textContent = fmt(S.d) + ' см';
+  $('#rF').textContent = isFinite(o.f) ? fmt(o.f) + ' см' : '∞';
+  $('#rG').textContent = isFinite(o.G) ? fmt(o.G, 2) : '∞';
+  $('#rS').textContent = o.real ? Math.round(o.sharp * 100) + '%' : '—';
+  $('#rSb').style.width = (o.real ? o.sharp * 100 : 0) + '%';
+  $('#lensInfo').textContent = `F = ${signed(S.F)} см · ${signed(100 / S.F, 1)} дптр`;
+  $('#insetState').textContent = o.focused ? 'резко' : o.real ? 'размыто' : 'пятно';
+  $('#insetState').style.color = o.focused ? 'var(--ok)' : '';
+  if (gl) gl.sync(o); else drawScreen(o);
+
+  if (!S.done[L.id] && L.check(o)) {
+    S.done[L.id] = true; save(); renderStrip();
+    toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены.');
+  }
+  const done = !!S.done[L.id];
+  $('#taskState').textContent = taskState(o);
+  $('#taskState').classList.toggle('done', done);
+  renderPanes(o);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+}
+
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => {
+    const f = imageDist(L.F, L.d), s = isFinite(f) && f > 0 && f < 60 ? f : 40;
+    return `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg class="mini" viewBox="-60 -15 120 30" aria-hidden="true">${diagramSVG(L.F, L.d, s, true)}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`;
+  }).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i];
+  cancelAnimationFrame(tween);
+  S.lesson = i; S.d = L.d; S.s = L.s; S.travel = 0;
+  if (S.F !== L.F) { S.F = L.F; gl && gl.buildLens(L.F); }
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  renderStrip(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+setLesson(S.lesson);
+})();
+</script>
+</body>
+</html>
