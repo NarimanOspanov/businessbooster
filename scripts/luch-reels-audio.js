@@ -9,7 +9,7 @@ const vm = require("vm");
 const crypto = require("crypto");
 
 const ROOT = path.join(__dirname, "..");
-const VOICE = process.env.LUCH_REEL_VOICE || "3EuKHIEZbSzrHGNmdYsx"; // Николай: русский голос для соцсетей, готов к v3
+const VOICE = process.env.LUCH_REEL_VOICE || "kwajW3Xh5svCeKU5ky2S"; // Дмитрий: молодой русский голос для соцсетей
 const MODEL = process.env.LUCH_REEL_MODEL || "eleven_v3"; // v3 понимает [теги] интонации
 const key = (process.env.ELEVENLABS_API_KEY || fs.readFileSync(path.join(os.homedir(), ".elevenlabs-key"), "utf8")).trim();
 const force = process.argv.includes("--force");
