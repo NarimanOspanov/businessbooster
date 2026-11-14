@@ -1,0 +1,1279 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по информатике, 9 класс: базы данных — таблицы, ключи и связи, запросы SQL, проектирование базы.">
+<title>Базы данных</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. SVG stage on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene.grabbing{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none;z-index:3}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none;z-index:3}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.meter .v.ok{color:var(--ok)}
+.meter .v.bad{color:var(--warn)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--arm);transition:width .2s}
+.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%,40%{box-shadow:0 0 0 3px var(--arm)}100%{box-shadow:0 0 0 0 transparent}}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px);z-index:3}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.tools button:hover{color:var(--fg)}
+.tools button.go{background:var(--fg);color:var(--bg);font-weight:600}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg);box-shadow:inset 0 0 0 1px var(--force)}
+.tools button:disabled{opacity:.35;cursor:default}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.tools input{width:330px;flex:none;background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:5px 8px;font:500 13px/1.2 var(--font-mono);color:var(--fg)}
+.tools input:focus{border-color:var(--force);outline:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:22%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.pbody code{font:500 13px var(--font-mono);color:var(--force)}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:14px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl .row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.ctl .row input,.ctl select{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 8px;font:500 13px var(--font-mono)}
+.ctl > select{width:100%;margin-top:8px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--fg)}
+.chips button:hover{border-color:var(--muted)}
+.chips button[aria-pressed="true"]{border-color:var(--force)}
+.chips button.mono{font-family:var(--font-mono)}
+.listing{font:500 13px/1.6 var(--font-mono);padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);margin-top:10px;overflow-wrap:anywhere}
+.listing .cur{color:var(--force)}
+.listing .bad{color:var(--warn)}
+.listing .good{color:var(--ok)}
+.listing .dim{color:var(--muted)}
+.listing .lk{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.listing .lk button{background:none;border:1px solid var(--line);border-radius:6px;padding:2px 8px;cursor:pointer;color:var(--muted)}
+
+.formula{font:500 15px/1.4 var(--font-mono);text-align:center;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px;overflow-wrap:anywhere}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted);overflow-wrap:anywhere}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+.step.okk span{color:var(--ok)}
+.step.badd span{color:var(--warn)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1760px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:70vh;min-height:600px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .tools input{width:170px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 480px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><ellipse cx="20" cy="11" rx="10" ry="4" fill="none" stroke="var(--fg)" stroke-width="2"/><path d="M10 11v18c0 2.2 4.5 4 10 4s10-1.8 10-4V11" fill="none" stroke="var(--fg)" stroke-width="2"/><path d="M10 20c0 2.2 4.5 4 10 4s10-1.8 10-4" fill="none" stroke="var(--arm)" stroke-width="1.6"/><circle cx="25" cy="28" r="2.2" fill="var(--force)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Информатика · Базы данных</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#cs">Карта</a><a href="/physics/#cs">Информатика</a><a href="/labs/cs-db/" aria-current="page">Базы данных</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Базы</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Рабочий стол лаборатории">
+    <svg class="scene" id="scene" role="img" aria-label="Схема базы данных: таблицы, ключи и связи"></svg>
+    <div class="task" id="taskBox" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Команды" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const LESSONS = [
+  { id: 'relations', title: 'Таблицы и связи',
+    text: ['База данных хранит сведения в таблицах. Каждая строка — запись об одном объекте: одном читателе, одной книге. Каждый столбец — поле: имя, класс, автор. В реляционной базе таблиц несколько, и они связаны между собой.',
+           'Чтобы точно найти нужную строку, у таблицы есть первичный ключ — поле, значения которого никогда не повторяются. Имя для этого не годится: в школе вполне может быть две Айгерим. Поэтому каждой записи дают номер — id.',
+           'В таблице «Выдачи» не пишут имя читателя и название книги — там хранят их номера: reader_id и book_id. Такое поле называют внешним ключом: оно ссылается на первичный ключ другой таблицы. Один читатель может взять много книг — это связь «один-ко-многим».'],
+    why: 'Так устроены базы библиотеки, электронного журнала Kundelik, интернет-магазина, банка, eGov: клиенты в одной таблице, заказы или платежи — в другой, а связаны они по номеру. Ключи и связи должен понимать каждый бэкенд-разработчик, аналитик данных и тестировщик — это одни из самых востребованных IT-профессий. Даже функция ВПР в Excel делает то же самое: ищет строку по ключу.',
+    task: 'Назначьте первичный ключ в каждой таблице и свяжите «Выдачи» с «Читателями» и «Книгами», чтобы внизу появились имена и названия.',
+    hint: 'Нажмите на столбец — он станет ключом, если значения в нём не повторяются. Протяните от столбца одной таблицы к столбцу другой — появится связь. Число на связи показывает, сколько значений нашлось. Нажмите на него, чтобы удалить связь.',
+    stage: 'Нажмите на столбец — ключ. Протяните к другому столбцу — связь.',
+    check: m => m.relOk },
+  { id: 'sql', title: 'Запросы SQL',
+    text: ['SQL — язык запросов к базам данных. Запрос не меняет таблицу, а выбирает из неё нужное. Самый простой запрос: SELECT * FROM olymp — «выбери все столбцы из таблицы olymp».',
+           'После SELECT через запятую перечисляют нужные столбцы. WHERE задаёт условие отбора строк: score > 70, subject = \'физика\'. Текст пишут в кавычках, числа — без. Условия соединяют словами AND (и) и OR (или).',
+           'ORDER BY сортирует результат: по возрастанию (ASC, так по умолчанию) или по убыванию (DESC). LIMIT оставляет только первые строки. Порядок частей всегда такой: SELECT … FROM … WHERE … ORDER BY … LIMIT.'],
+    why: 'SQL спрашивают у аналитиков данных, бэкенд-разработчиков, тестировщиков и даже маркетологов — это один из самых полезных навыков в IT. Аналитик банка одним запросом находит клиентов, которые давно не пользуются картой; сотрудник управления образования — школы района без спортзала. Когда ты ставишь фильтр «сначала дешёвые» на Kaspi или Krisha.kz, сервер выполняет похожий запрос с WHERE и ORDER BY.',
+    task: 'Выведите только имена и баллы девятиклассников, набравших больше 70 баллов, — от лучшего результата к худшему.',
+    hint: 'Нужны столбцы name и score. Условий два — про класс и про баллы, соедините их AND. «Больше 70» — это > или >=? «От лучшего» — по возрастанию или по убыванию? Набирайте запрос в строке внизу или нажимайте на слова-подсказки, потом ▶.',
+    stage: 'Наберите запрос внизу и нажмите ▶.',
+    sql0: 'SELECT * FROM olymp',
+    check: m => m.sqlOk },
+  { id: 'design', title: 'Проектирование базы',
+    text: ['Учитель записывал кружки в одну большую таблицу. Имя и класс ученика повторяются в каждой его записи, а руководитель и кабинет — у каждого участника кружка. Повторы рождают ошибки: исправили руководителя в одной строке, забыли в другой — и база противоречит сама себе.',
+           'Проектирование начинают с сущностей: о ком или о чём мы храним данные? Здесь это ученики и кружки. Каждой сущности — своя таблица со своим первичным ключом. Каждый факт хранится ровно один раз.',
+           'Ученик ходит в несколько кружков, а в кружке много учеников — это связь «многие-ко-многим». Её хранят в отдельной связующей таблице «Записи»: в ней ключ ученика, ключ кружка и то, что относится к самой записи.'],
+    why: 'Проектировщик баз данных решает это до того, как появится первая строка: переделывать готовую систему долго и дорого. Так проектируют базы поликлиник, автосалонов, школ и маркетплейсов. Если откроешь своё дело — онлайн-школу, доставку, магазин в Instagram, — правильно разложенные таблицы клиентов, заказов и товаров сэкономят часы ручной работы и уберегут от путаницы в заказах.',
+    task: 'Разложите поля большой таблицы по трём новым так, чтобы не осталось ни одного лишнего повтора и ни одного конфликта.',
+    hint: 'Для каждого поля спросите: «Это свойство ученика, кружка или самой записи?» Перетащите карточку в таблицу или нажмите на карточку, а потом на таблицу. Кнопка «Сменить руководителя» покажет, сколько ячеек пришлось бы исправлять.',
+    stage: 'Перетащите поля в три новые таблицы.',
+    check: m => m.designOk },
+];
+
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+const KEY = 'luch-cs-db';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null,
+            pk: {}, links: [], mids: [], drag: null,
+            sqlText: '', sqlRun: '', res: null, caret: null, b: null,
+            place: {}, pick: null, anom: null };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+
+// ---------- lesson 1 data: a school library ----------
+const DB1 = {
+  readers: { ru: 'Читатели', cols: ['id', 'name', 'class'], rows: [[1, 'Айгерим', '9А'], [2, 'Данияр', '9Б'], [3, 'Айгерим', '9Б'], [4, 'Тимур', '9А'], [5, 'Алия', '9В']] },
+  loans: { ru: 'Выдачи', cols: ['id', 'reader_id', 'book_id', 'date'], rows: [[11, 1, 101, '02.09'], [12, 2, 103, '02.09'], [13, 1, 104, '05.09'], [14, 4, 102, '05.09'], [15, 3, 101, '09.09'], [16, 5, 105, '09.09'], [17, 2, 102, '12.09'], [18, 4, 103, '12.09']] },
+  books: { ru: 'Книги', cols: ['id', 'title', 'author'], rows: [[101, 'Путь Абая', 'Ауэзов'], [102, 'Слова назидания', 'Абай'], [103, 'Кочевники', 'Есенберлин'], [104, 'Капитанская дочка', 'Пушкин'], [105, 'Избранные стихи', 'Абай']] },
+};
+const T1 = ['readers', 'loans', 'books'];
+const colVals = key => { const [t, c] = key.split('.'); const i = DB1[t].cols.indexOf(c); return DB1[t].rows.map(r => r[i]); };
+const dupOf = vals => { const cnt = {}; vals.forEach(v => { cnt[v] = (cnt[v] || 0) + 1; }); const d = Object.keys(cnt).find(k => cnt[k] > 1); return d == null ? null : { v: d, n: cnt[d] }; };
+const isPK = key => { const [t, c] = key.split('.'); return S.pk[t] === c; };
+function linkInfo(l) {
+  const ta = l.a.split('.')[0], tb = l.b.split('.')[0];
+  const pkA = isPK(l.a), pkB = isPK(l.b);
+  if (!pkA && !pkB) return { pk: null, fk: null, found: 0, total: 0, valid: false };
+  const pkEnd = pkB && !pkA ? l.b : pkA && !pkB ? l.a : l.b, fkEnd = pkEnd === l.a ? l.b : l.a;
+  const pv = new Set(colVals(pkEnd).map(String)), fv = colVals(fkEnd);
+  const found = fv.filter(v => pv.has(String(v))).length;
+  return { pk: pkEnd, fk: fkEnd, found, total: fv.length, valid: ta !== tb && found === fv.length };
+}
+const isFK = key => S.links.some(l => { const i = linkInfo(l); return i.fk === key; });
+const GOOD = ['loans.reader_id|readers.id', 'books.id|loans.book_id'];
+const lkey = l => [l.a, l.b].sort().join('|');
+function resolve(fkCol, value) {
+  const key = 'loans.' + fkCol;
+  for (const l of S.links) {
+    const other = l.a === key ? l.b : l.b === key ? l.a : null; if (!other) continue;
+    const [t, c] = other.split('.'); if (S.pk[t] !== c || t === 'loans') continue;
+    const ci = DB1[t].cols.indexOf(c), row = DB1[t].rows.find(r => String(r[ci]) === String(value));
+    if (!row) return { s: 'не найден', c: '#ff8a73' };
+    return { s: t === 'readers' ? `${row[1]}, ${row[2]}` : t === 'books' ? `«${row[1]}»` : 'выдача ' + row[0], c: '#e8ecf4' };
+  }
+  return { s: '?', c: '#56627d' };
+}
+
+// ---------- lesson 2 data: olympiad results ----------
+const OC = ['id', 'name', 'grade', 'subject', 'score'];
+const OLYMP = [[1, 'Арман', 9, 'математика', 82], [2, 'Дана', 9, 'физика', 64], [3, 'Ерлан', 8, 'математика', 91], [4, 'Мадина', 9, 'математика', 77], [5, 'Нурлан', 10, 'физика', 88],
+  [6, 'Софья', 9, 'информатика', 95], [7, 'Тимур', 9, 'математика', 70], [8, 'Алия', 10, 'информатика', 73], [9, 'Данияр', 9, 'физика', 71], [10, 'Камила', 8, 'информатика', 58]];
+const WANT = [['Софья', 95], ['Арман', 82], ['Мадина', 77], ['Данияр', 71]];
+const KW = new Set(['SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'NOT', 'ORDER', 'BY', 'ASC', 'DESC', 'LIMIT']);
+const CMPS = ['=', '<>', '!=', '<', '>', '<=', '>='];
+function sqlTok(s) {
+  const out = []; let i = 0;
+  while (i < s.length) {
+    const r = s.slice(i); let m;
+    if ((m = /^\s+/.exec(r))) { i += m[0].length; continue; }
+    if ((m = /^'([^']*)'/.exec(r)) || (m = /^"([^"]*)"/.exec(r)) || (m = /^«([^»]*)»/.exec(r))) { out.push({ t: 'str', v: m[1], r: "'" + m[1] + "'" }); i += m[0].length; continue; }
+    if (r[0] === "'" || r[0] === '"' || r[0] === '«') throw 'Кавычка не закрыта: текст пишут в кавычках с двух сторон, например \'физика\'.';
+    if ((m = /^\d+(?:[.,]\d+)?/.exec(r))) { out.push({ t: 'num', v: parseFloat(m[0].replace(',', '.')), r: m[0] }); i += m[0].length; continue; }
+    if ((m = /^[A-Za-zА-Яа-яЁё_][A-Za-zА-Яа-яЁё_0-9]*/.exec(r))) { const u = m[0].toUpperCase(); out.push(KW.has(u) ? { t: 'kw', v: u, r: u } : { t: 'id', v: m[0], r: m[0] }); i += m[0].length; continue; }
+    if ((m = /^(<>|!=|<=|>=|=|<|>|,|\*|\(|\)|;)/.exec(r))) { out.push({ t: 'op', v: m[0], r: m[0] }); i += m[0].length; continue; }
+    throw `Непонятный символ «${r[0]}». В запросе бывают слова, числа, текст в кавычках и знаки = < > , * ( ).`;
+  }
+  return out;
+}
+function sqlParse(src) {
+  const tk = sqlTok(src); let i = 0;
+  const pk = () => tk[i], nx = () => tk[i++];
+  const isK = v => pk() && pk().t === 'kw' && pk().v === v, isO = v => pk() && pk().t === 'op' && pk().v === v;
+  const need = (v, msg) => { if (!isK(v)) throw msg; i++; };
+  const colName = where => {
+    const t = nx();
+    if (!t) throw `Запрос оборвался: ${where} нужно имя столбца.`;
+    if (t.t !== 'id') throw `${where[0].toUpperCase() + where.slice(1)} ожидалось имя столбца, а стоит «${t.r}».`;
+    const c = t.v.toLowerCase();
+    if (!OC.includes(c)) throw `Столбца «${t.v}» нет. В таблице olymp есть: ${OC.join(', ')}.` + (/[А-Яа-яЁё]/.test(t.v) ? ' Если это текст, возьмите его в кавычки.' : '');
+    return c;
+  };
+  if (!tk.length) throw 'Запрос пустой. Начните со слова SELECT.';
+  need('SELECT', 'Запрос начинается со слова SELECT.');
+  let cols = [];
+  if (isO('*')) { i++; cols = OC.slice(); }
+  else { cols.push(colName('после SELECT')); while (isO(',')) { i++; cols.push(colName('после запятой')); } }
+  if (isO(',')) throw 'Лишняя запятая перед FROM.';
+  need('FROM', pk() && pk().t === 'id' ? `Между столбцами нужна запятая, а перед таблицей — FROM. Непонятно, что такое «${pk().r}».` : 'После списка столбцов нужно слово FROM и имя таблицы.');
+  const tt = nx();
+  if (!tt || tt.t !== 'id') throw 'После FROM напишите имя таблицы: olymp.';
+  if (tt.v.toLowerCase() !== 'olymp') throw `Таблицы «${tt.v}» нет. В этой базе одна таблица: olymp.`;
+  const operand = () => {
+    const t = nx();
+    if (!t) throw 'Условие оборвалось: после знака сравнения нужно число, текст в кавычках или столбец.';
+    if (t.t === 'num' || t.t === 'str') return { k: 'v', v: t.v };
+    if (t.t === 'id') { i--; return { k: 'c', c: colName('в условии') }; }
+    throw `В условии непонятно «${t.r}».`;
+  };
+  const cmp = () => {
+    const a = operand(), o = nx();
+    if (!o || o.t !== 'op' || !CMPS.includes(o.v)) throw 'В условии нужен знак сравнения: =, <>, <, >, <=, >=. Например: score > 70.';
+    return { op: 'CMP', o: o.v, a, b: operand() };
+  };
+  const notE = () => {
+    if (isK('NOT')) { i++; return { op: 'NOT', a: notE() }; }
+    if (isO('(')) { i++; const e = orE(); if (!isO(')')) throw 'Скобка в условии не закрыта.'; i++; return { op: 'PAR', a: e }; }
+    return cmp();
+  };
+  const andE = () => { let a = notE(); while (isK('AND')) { i++; a = { op: 'AND', a, b: notE() }; } return a; };
+  const orE = () => { let a = andE(); while (isK('OR')) { i++; a = { op: 'OR', a, b: andE() }; } return a; };
+  let where = null, order = [], limit = null;
+  if (isK('WHERE')) { i++; where = orE(); }
+  if (isK('ORDER')) {
+    i++; need('BY', 'После ORDER нужно BY: ORDER BY score.');
+    for (;;) { const c = colName('после ORDER BY'); let d = 1; if (isK('ASC')) i++; else if (isK('DESC')) { i++; d = -1; } order.push({ c, d }); if (isO(',')) { i++; continue; } break; }
+  }
+  if (isK('LIMIT')) { i++; const n = nx(); if (!n || n.t !== 'num') throw 'После LIMIT нужно число строк: LIMIT 3.'; limit = Math.floor(n.v); }
+  if (isO(';')) i++;
+  if (i < tk.length) {
+    const t = tk[i];
+    if (t.t === 'kw' && ['WHERE', 'ORDER', 'LIMIT'].includes(t.v)) throw `«${t.v}» стоит не на своём месте. Порядок частей: SELECT … FROM … WHERE … ORDER BY … LIMIT.`;
+    if (t.t === 'id' || t.t === 'num' || t.t === 'str') throw `Непонятно, к чему относится «${t.r}». Условия соединяют словами AND или OR.`;
+    throw `Лишнее в конце запроса: «${t.r}».`;
+  }
+  return { cols, where, order, limit };
+}
+const ci2 = c => OC.indexOf(c);
+const opv = (x, row) => x.k === 'v' ? x.v : row[ci2(x.c)];
+function cmpVals(a, o, b) {
+  let x = a, y = b;
+  const nA = typeof x === 'number' || (typeof x === 'string' && /^-?\d+([.,]\d+)?$/.test(x)), nB = typeof y === 'number' || (typeof y === 'string' && /^-?\d+([.,]\d+)?$/.test(y));
+  let d;
+  if (nA && nB) { x = parseFloat(String(x).replace(',', '.')); y = parseFloat(String(y).replace(',', '.')); d = x - y; }
+  else d = String(x).toLowerCase().localeCompare(String(y).toLowerCase(), 'ru');
+  return { '=': d === 0, '<>': d !== 0, '!=': d !== 0, '<': d < 0, '>': d > 0, '<=': d <= 0, '>=': d >= 0 }[o];
+}
+function evalW(e, row) {
+  if (e.op === 'CMP') return cmpVals(opv(e.a, row), e.o, opv(e.b, row));
+  if (e.op === 'AND') return evalW(e.a, row) && evalW(e.b, row);
+  if (e.op === 'OR') return evalW(e.a, row) || evalW(e.b, row);
+  if (e.op === 'NOT') return !evalW(e.a, row);
+  return evalW(e.a, row);
+}
+const showV = v => typeof v === 'string' ? `'${v}'` : String(v);
+function descW(e, row) {
+  if (e.op === 'CMP') return `${row ? showV(opv(e.a, row)) : e.a.k === 'c' ? e.a.c : showV(e.a.v)} ${e.o} ${row ? showV(opv(e.b, row)) : e.b.k === 'c' ? e.b.c : showV(e.b.v)}`;
+  if (e.op === 'AND' || e.op === 'OR') return `${descW(e.a, row)} ${e.op} ${descW(e.b, row)}`;
+  if (e.op === 'NOT') return `NOT ${descW(e.a, row)}`;
+  return `(${descW(e.a, row)})`;
+}
+function sqlRun(src) {
+  try {
+    const q = sqlParse(src);
+    const idx = OLYMP.map((r, k) => k), pass = idx.filter(k => !q.where || evalW(q.where, OLYMP[k]));
+    const ord = pass.slice();
+    if (q.order.length) ord.sort((p, r) => { for (const o of q.order) { const a = OLYMP[p][ci2(o.c)], b = OLYMP[r][ci2(o.c)]; const d = typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b), 'ru'); if (d) return o.d * d; } return p - r; });
+    const fin = q.limit != null ? ord.slice(0, Math.max(0, q.limit)) : ord;
+    return { ok: true, q, pass, ord, idx: fin, cols: q.cols, rows: fin.map(k => q.cols.map(c => OLYMP[k][ci2(c)])) };
+  } catch (e) {
+    return { ok: false, err: typeof e === 'string' ? e : 'Запрос не удалось разобрать.' };
+  }
+}
+
+// ---------- lesson 3 data: school clubs in one big table ----------
+const FLAT = [
+  ['Айдана', '9А', 'Робототехника', 'Ахметов Е.', '204', '03.09'],
+  ['Айдана', '9А', 'Шахматы', 'Ким О.', '112', '03.09'],
+  ['Бекзат', '9Б', 'Робототехника', 'Ахметов Е.', '204', '04.09'],
+  ['Вика', '9А', 'Домбра', 'Нурланова А.', '301', '04.09'],
+  ['Гани', '9В', 'Робототехника', 'Ахметов Е.', '204', '05.09'],
+  ['Гани', '9В', 'Шахматы', 'Ким О.', '112', '06.09'],
+  ['Диана', '9Б', 'Домбра', 'Нурланова А.', '301', '06.09'],
+  ['Бекзат', '9Б', 'Шахматы', 'Ким О.', '112', '07.09'],
+];
+const FIELDS = [
+  { id: 'sname', ru: 'имя ученика', col: 0, e: 's' }, { id: 'sclass', ru: 'класс', col: 1, e: 's' },
+  { id: 'cname', ru: 'название кружка', col: 2, e: 'c' }, { id: 'teacher', ru: 'руководитель', col: 3, e: 'c' },
+  { id: 'room', ru: 'кабинет', col: 4, e: 'c' }, { id: 'date', ru: 'дата записи', col: 5, e: 'e' }];
+const TB3 = [
+  { id: 's', ru: 'Ученики', keys: [['id', 'PK']], rows: 5 },
+  { id: 'e', ru: 'Записи', keys: [['ученик_id', 'FK'], ['кружок_id', 'FK']], rows: 8 },
+  { id: 'c', ru: 'Кружки', keys: [['id', 'PK']], rows: 3 }];
+const ENT = { s: 'ученика', c: 'кружка', e: 'записи' };
+const FLAT_HEAD = ['ученик', 'класс', 'кружок', 'руководитель', 'кабинет', 'дата'];
+const FLAT_HEAD_N = ['ученик', 'кл.', 'кружок', 'руковод.', 'каб.', 'дата'];
+const entKey = (row, e) => e === 's' ? row[0] : e === 'c' ? row[2] : row.join('|');
+const extra = e => FLAT.length - new Set(FLAT.map(r => entKey(r, e))).size; // s → 3, c → 5
+const FLAT_COPIES = FIELDS.reduce((p, f) => p + extra(f.e), 0);
+function fStatus(f) {
+  const t = S.place[f.id];
+  if (!t) return { st: 'none', n: 0 };
+  if (t === f.e) return { st: 'ok', n: 0 };
+  if (t === 'e') return { st: 'rep', n: extra(f.e) };
+  return { st: 'bad', n: 0 };
+}
+function why3(f, t) {
+  const tn = TB3.find(x => x.id === t).ru;
+  if (t === f.e) return `«${f.ru}» — свойство ${ENT[f.e]}. В таблице «${tn}» оно хранится один раз.`;
+  if (t === 'e') return `«${f.ru}» в «Записях» повторится в каждой записи ${ENT[f.e]}: ${extra(f.e)} лишних копии. Это свойство ${ENT[f.e]}, а не записи.`;
+  if (f.e === 'e') return `Конфликт: у ${t === 's' ? 'ученика' : 'кружка'} несколько записей с разными датами — какую дату вписать в его строку?`;
+  if (t === 's') return `Конфликт: ученик ходит в несколько кружков. Какой «${f.ru}» вписать в его строку в «Учениках»?`;
+  return `Конфликт: в кружке много учеников. Чьё поле «${f.ru}» вписать в строку кружка?`;
+}
+
+// ---------- model ----------
+function model() {
+  const id = LID();
+  if (id === 'relations') {
+    const infos = S.links.map(l => Object.assign({ key: lkey(l) }, linkInfo(l)));
+    const keys = T1.filter(t => S.pk[t] === 'id').length, pkSet = T1.filter(t => S.pk[t]).length;
+    const good = GOOD.filter(g => infos.some(x => x.key === g && x.valid)).length;
+    const extraL = infos.filter(x => !GOOD.includes(x.key) || !x.valid).length;
+    return { kind: id, infos, keys, pkSet, good, extraL, relOk: keys === 3 && good === 2 && extraL === 0 };
+  }
+  if (id === 'sql') {
+    const r = S.res, ok = !!(r && r.ok);
+    const sqlOk = ok && r.cols.join(',') === 'name,score' && r.rows.length === WANT.length && r.rows.every((x, k) => x[0] === WANT[k][0] && x[1] === WANT[k][1]);
+    return { kind: id, r, ok, sqlOk, n: ok ? r.rows.length : 0, stale: S.sqlText.trim() !== S.sqlRun.trim() };
+  }
+  const st = FIELDS.map(f => Object.assign({ f }, fStatus(f)));
+  const copies = st.reduce((p, x) => p + x.n, 0), bad = st.filter(x => x.st === 'bad').length, placed = st.filter(x => x.st !== 'none').length;
+  return { kind: id, st, copies, bad, placed, designOk: placed === FIELDS.length && copies === 0 && bad === 0 };
+}
+
+// ---------- geometry (SVG units). Wide stage: content in x 8…516. Narrow (phone): x 0…302. ----------
+let NAR = false;
+const RH1 = 28, HD1 = 22;
+function lay1() {
+  const o = { cards: {} }, ch = t => HD1 + DB1[t].cols.length * RH1;
+  if (!NAR) { o.cards.readers = { x: 8, y: 96, w: 150 }; o.cards.loans = { x: 183, y: 96, w: 158 }; o.cards.books = { x: 366, y: 96, w: 150 }; }
+  else { o.cards.readers = { x: 0, y: 96, w: 145 }; o.cards.books = { x: 157, y: 96, w: 145 }; o.cards.loans = { x: 66, y: 96 + ch('readers') + 46, w: 170 }; }
+  for (const t of T1) o.cards[t].h = ch(t);
+  const by = Math.max(...T1.map(t => o.cards[t].y + o.cards[t].h));
+  o.join = { x: NAR ? 0 : 8, y: by + 22, w: NAR ? 302 : 508, rh: 15 }; o.join.h = 34 + DB1.loans.rows.length * o.join.rh + 6;
+  o.y1 = o.join.y + o.join.h + 4; return o;
+}
+const colBox = (G, key) => { const [t, c] = key.split('.'), cd = G.cards[t], i = DB1[t].cols.indexOf(c); return { x: cd.x, y: cd.y + HD1 + i * RH1, w: cd.w, h: RH1 }; };
+const OW_W = { id: 24, name: 66, grade: 44, subject: 96, score: 46 }, OW_N = { id: 20, name: 58, grade: 40, subject: 86, score: 42 };
+const CHIPS = ['SELECT', '*', ',', 'FROM olymp', 'WHERE', 'AND', 'OR', 'ORDER BY', 'DESC', 'LIMIT', 'name', 'grade', 'subject', 'score', '=', '>', '<', '>=', '<>', "'физика'"];
+function sqlLines(src) {
+  let tk; try { tk = sqlTok(src); } catch (e) { return [[{ s: src, c: '#e8ecf4' }]]; }
+  const lines = [[]]; let cur = lines[0];
+  tk.forEach((t, k) => {
+    if (t.t === 'kw' && ['FROM', 'WHERE', 'ORDER', 'LIMIT'].includes(t.v) && cur.length) { cur = []; lines.push(cur); }
+    const c = t.t === 'kw' ? '#ffb547' : t.t === 'id' ? (OC.includes(t.v.toLowerCase()) ? '#72d4e8' : '#e8ecf4') : t.t === 'op' ? '#e8ecf4' : '#86e0a8';
+    const glue = t.t === 'op' && (t.v === ',' || t.v === ')' || t.v === ';');
+    cur.push({ s: (cur.length && !glue && !(k && tk[k - 1].r === '(') ? ' ' : '') + t.r, c });
+  });
+  return lines;
+}
+function lay2() {
+  const x0 = NAR ? 0 : 8, W = NAR ? 302 : 508, OW = NAR ? OW_N : OW_W;
+  const lines = sqlLines(S.sqlRun || ' ');
+  const o = { x0, W, OW, lines };
+  o.card = { x: x0, y: 96, w: W, h: 26 + lines.length * 15 + 18 };
+  // token chips flow
+  const fs = NAR ? 9.5 : 10, chh = 21, gap = 5; let x = x0, y = o.card.y + o.card.h + 10;
+  o.chips = CHIPS.map(s => { const w = Math.round(s.length * fs * 0.62 + 14); if (x + w > x0 + W) { x = x0; y += chh + gap; } const c = { s, x, y, w, h: chh }; x += w + gap; return c; });
+  o.fs = fs;
+  const cb = y + chh;
+  const rh = NAR ? 15 : 16, hh = 18, sw = OC.reduce((p, c) => p + OW[c], 0);
+  o.src = { x: x0, y: cb + 30, w: sw, rh, hh }; o.src.h = hh + OLYMP.length * rh;
+  const r = S.res, rc = r && r.ok ? r.cols : [], rw = Math.max(r && r.ok ? rc.reduce((p, c) => p + OW[c], 0) : 0, NAR ? 150 : 170);
+  const nr = r && r.ok ? Math.max(1, r.rows.length) : 1;
+  if (!NAR && x0 + sw + 22 + rw <= x0 + W) o.res = { x: x0 + sw + 22, y: o.src.y, w: rw, rh, hh, cols: rc };
+  else o.res = { x: x0, y: o.src.y + o.src.h + 30, w: rw, rh, hh, cols: rc };
+  o.res.h = hh + nr * rh;
+  o.y1 = Math.max(o.src.y + o.src.h, o.res.y + o.res.h) + 4;
+  return o;
+}
+function lay3() {
+  const x0 = NAR ? 0 : 8, W = NAR ? 302 : 508;
+  const fw = NAR ? [54, 30, 62, 70, 40, 42] : [80, 44, 104, 110, 72, 72], rh = NAR ? 14 : 15, fsum = fw.reduce((p, q) => p + q, 0);
+  const o = { x0, W, fw, rh, fs: NAR ? 8.5 : 9.5 };
+  o.flat = { x: x0 + (W - fsum) / 2, y: 96, w: fsum, hh: 17 }; o.flat.h = o.flat.hh + FLAT.length * rh;
+  const per = NAR ? 3 : 6, cw = NAR ? 96 : 78, cg = NAR ? 7 : 8, chh = 24;
+  const py = o.flat.y + o.flat.h + 30;
+  o.slots = FIELDS.map((f, k) => ({ x: x0 + (k % per) * (cw + cg), y: py + Math.floor(k / per) * (chh + 7), w: cw, h: chh }));
+  const pb = py + Math.ceil(FIELDS.length / per) * (chh + 7) - 7;
+  o.pool = { x: x0 - 4, y: py - 6, w: W + 8, h: pb - py + 12 };
+  const counts = TB3.map(t => FIELDS.filter(f => S.place[f.id] === t.id).length);
+  const n = Math.max(3, ...counts), bw = NAR ? 96 : 160, bg = NAR ? 7 : 14, by = pb + 34;
+  o.fh = NAR ? 21 : 22;
+  o.boxes = TB3.map((t, k) => ({ id: t.id, x: x0 + k * (bw + bg), y: by, w: bw, h: 22 + 2 * 17 + 6 + n * (o.fh + 3) + 20 }));
+  o.y1 = by + o.boxes[0].h + 4;
+  return o;
+}
+function LAY() {
+  const id = LID(), o = id === 'relations' ? lay1() : id === 'sql' ? lay2() : lay3();
+  o.bx0 = NAR ? 0 : 8; o.bx1 = NAR ? 302 : 516; return o;
+}
+function fieldBox(G, f) {
+  const t = S.place[f.id];
+  if (!t) return G.slots[FIELDS.indexOf(f)];
+  const b = G.boxes.find(x => x.id === t), k = FIELDS.filter(x => S.place[x.id] === t).indexOf(f);
+  return { x: b.x + 5, y: b.y + 22 + 2 * 17 + 6 + k * (G.fh + 3), w: b.w - 10, h: G.fh };
+}
+
+// ---------- drawing ----------
+const scene = $('#scene');
+function bg() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+const fit1 = (s, w, fs) => { s = String(s); const n = Math.max(1, Math.floor((w - 6) / (fs * 0.6))); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
+const BODY = 'style="font-family:var(--font-body)"';
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+const inR = (p, b) => b && p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h;
+
+// lesson 1
+function anchors(G, a, b) {
+  const A = colBox(G, a), B = colBox(G, b), ca = A.x + A.w / 2, cb = B.x + B.w / 2, ya = A.y + A.h / 2, yb = B.y + B.h / 2;
+  if (cb > ca + 20) return [{ x: A.x + A.w, y: ya, d: 1 }, { x: B.x, y: yb, d: -1 }];
+  if (cb < ca - 20) return [{ x: A.x, y: ya, d: -1 }, { x: B.x + B.w, y: yb, d: 1 }];
+  return [{ x: A.x, y: ya, d: -1 }, { x: B.x, y: yb, d: -1 }];
+}
+function hitCol(G, p) { for (const t of T1) for (const c of DB1[t].cols) { const k = t + '.' + c; if (inR(p, colBox(G, k))) return k; } return null; }
+function draw1(G) {
+  let h = '';
+  const dragKey = S.drag && S.drag.col, tgt = S.drag && S.drag.moved ? hitCol(G, S.drag.p) : null;
+  for (const t of T1) {
+    const c = G.cards[t], D = DB1[t];
+    h += `<g data-part="card-${t}"><rect x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}" rx="10" fill="rgba(18,26,40,.92)" stroke="#3a4762" stroke-width="1.3"/>`;
+    h += `<text x="${c.x + 10}" y="${c.y + 15}" font-size="11.5" font-weight="600" fill="#e8ecf4" ${BODY}>${D.ru}</text><text x="${c.x + c.w - 10}" y="${c.y + 15}" font-size="9" fill="#8b96ad" text-anchor="end">${t}</text>`;
+    D.cols.forEach((cn, ci) => {
+      const key = t + '.' + cn, b = colBox(G, key), pk = S.pk[t] === cn, fk = isFK(key);
+      h += `<path d="M${c.x} ${b.y}h${c.w}" stroke="#26324a"/>`;
+      if (pk) h += `<rect x="${c.x + 1}" y="${b.y}" width="${c.w - 2}" height="${RH1}" fill="rgba(255,181,71,.09)"${ci === D.cols.length - 1 ? ' rx="9"' : ''}/>`;
+      if (key === dragKey || key === tgt) h += `<rect x="${c.x + 2}" y="${b.y + 1}" width="${c.w - 4}" height="${RH1 - 2}" rx="5" fill="rgba(114,212,232,.1)" stroke="#72d4e8" stroke-width="1.6"/>`;
+      if (pk) h += `<circle cx="${c.x + 11}" cy="${b.y + 9}" r="3.2" fill="none" stroke="#ffb547" stroke-width="1.6"/><path d="M${c.x + 14.2} ${b.y + 9}h5.5v3M${c.x + 17.5} ${b.y + 9}v2.4" fill="none" stroke="#ffb547" stroke-width="1.5"/>`;
+      h += `<text x="${c.x + 24}" y="${b.y + 12.5}" font-size="10.5" fill="${pk ? '#ffb547' : '#e8ecf4'}">${cn}</text>`;
+      if (pk || fk) h += `<text x="${c.x + c.w - 9}" y="${b.y + 12.5}" font-size="8.5" font-weight="500" fill="${pk ? '#ffb547' : '#72d4e8'}" text-anchor="end">${pk && fk ? 'PK·FK' : pk ? 'PK' : 'FK'}</text>`;
+      h += `<text x="${c.x + 24}" y="${b.y + 23.5}" font-size="8" fill="#8b96ad">${esc(fit1(D.rows.map(r => r[ci]).join(', '), c.w - 28, 8))}</text>`;
+    });
+    h += '</g>';
+  }
+  S.mids = [];
+  S.links.forEach((l, i) => {
+    const inf = linkInfo(l), [p, q] = anchors(G, l.a, l.b);
+    const col = inf.valid ? '#86e0a8' : inf.pk ? '#ff8a73' : '#8b96ad';
+    const c1 = { x: p.x + p.d * 42, y: p.y }, c2 = { x: q.x + q.d * 42, y: q.y };
+    h += `<path d="M${p.x} ${p.y}C${c1.x} ${c1.y} ${c2.x} ${c2.y} ${q.x} ${q.y}" fill="none" stroke="${col}" stroke-width="2"${inf.pk ? '' : ' stroke-dasharray="5 4"'}/>`;
+    h += `<circle cx="${p.x}" cy="${p.y}" r="3" fill="${col}"/><circle cx="${q.x}" cy="${q.y}" r="3" fill="${col}"/>`;
+    if (inf.valid) {
+      const P = inf.pk === l.a ? p : q, F = inf.pk === l.a ? q : p;
+      h += `<text x="${P.x + P.d * 9}" y="${P.y - 5}" font-size="10" fill="#86e0a8" text-anchor="middle">1</text><text x="${F.x + F.d * 9}" y="${F.y - 4}" font-size="11" fill="#86e0a8" text-anchor="middle">∞</text>`;
+    }
+    const mx = (p.x + 3 * c1.x + 3 * c2.x + q.x) / 8, my = (p.y + 3 * c1.y + 3 * c2.y + q.y) / 8;
+    const lab = inf.pk ? `${inf.found}/${inf.total}` : 'нет PK', lw = lab.length * 5.4 + 12;
+    h += `<rect x="${mx - lw / 2}" y="${my - 8}" width="${lw}" height="16" rx="8" fill="#0b1019" stroke="${col}" stroke-width="1.3"/><text x="${mx}" y="${my + 3.2}" font-size="9" fill="${col}" text-anchor="middle">${lab}</text>`;
+    S.mids.push({ x: mx, y: my, i });
+  });
+  if (S.drag && S.drag.moved) {
+    const b = colBox(G, S.drag.col), right = S.drag.p.x > b.x + b.w / 2, sx = right ? b.x + b.w : b.x, sy = b.y + b.h / 2;
+    h += `<path d="M${sx} ${sy}L${S.drag.p.x} ${S.drag.p.y}" stroke="#72d4e8" stroke-width="2" stroke-dasharray="5 4" pointer-events="none"/><circle cx="${S.drag.p.x}" cy="${S.drag.p.y}" r="4" fill="#72d4e8"/>`;
+  }
+  // the loans table with data looked up through the links
+  const J = G.join, cx = [J.x + 10, J.x + (NAR ? 40 : 56), J.x + (NAR ? 160 : 270)], cw = [30, NAR ? 116 : 206, NAR ? 138 : 230];
+  h += `<g data-part="join"><rect x="${J.x}" y="${J.y}" width="${J.w}" height="${J.h}" rx="10" fill="rgba(18,26,40,.85)" stroke="#3a4762"/>`;
+  h += `<text x="${J.x + 10}" y="${J.y + 14}" font-size="8.5" fill="#8b96ad" letter-spacing=".6">${NAR ? 'ВЫДАЧИ: ДАННЫЕ ПО СВЯЗЯМ' : 'ВЫДАЧИ ГЛАЗАМИ БИБЛИОТЕКАРЯ: ДАННЫЕ ПОДСТАВЛЕНЫ ПО СВЯЗЯМ'}</text>`;
+  ['id', 'reader_id → кто взял', 'book_id → какая книга'].forEach((s, k) => { h += `<text x="${cx[k]}" y="${J.y + 29}" font-size="8.5" fill="#72d4e8">${esc(fit1(s, cw[k], 8.5))}</text>`; });
+  DB1.loans.rows.forEach((r, k) => {
+    const y = J.y + 34 + k * J.rh, a = resolve('reader_id', r[1]), b = resolve('book_id', r[2]);
+    if (k % 2 === 0) h += `<rect x="${J.x + 4}" y="${y}" width="${J.w - 8}" height="${J.rh}" fill="rgba(255,255,255,.025)"/>`;
+    h += `<text x="${cx[0]}" y="${y + 11}" font-size="9" fill="#8b96ad">${r[0]}</text>`;
+    h += `<text x="${cx[1]}" y="${y + 11}" font-size="9"><tspan fill="#8b96ad">${r[1]} → </tspan><tspan fill="${a.c}">${esc(fit1(a.s, cw[1] - 30, 9))}</tspan></text>`;
+    h += `<text x="${cx[2]}" y="${y + 11}" font-size="9"><tspan fill="#8b96ad">${r[2]} → </tspan><tspan fill="${b.c}">${esc(fit1(b.s, cw[2] - 38, 9))}</tspan></text>`;
+  });
+  return h + '</g>';
+}
+
+// lesson 2
+function drawTable2(G, B, cols, rows, opts) {
+  const OW = G.OW, fs = NAR ? 9 : 9.5;
+  let h = `<rect x="${B.x}" y="${B.y}" width="${B.w}" height="${B.h}" fill="#0e1520" stroke="#3a4762" stroke-width="1.3"/>`;
+  let x = B.x;
+  cols.forEach((c, k) => {
+    const on = opts.hiCols && opts.hiCols.includes(c);
+    h += `<rect x="${x}" y="${B.y}" width="${OW[c]}" height="${B.hh}" fill="${on ? '#1d3340' : '#162032'}" stroke="#2f3b55"/><text x="${x + 5}" y="${B.y + 12.5}" font-size="${fs}" fill="${on ? '#72d4e8' : '#8b96ad'}">${c}</text>`;
+    x += OW[c];
+  });
+  rows.forEach((r, k) => {
+    const y = B.y + B.hh + k * B.rh, dim = opts.dim && opts.dim(k), hi = opts.hi && opts.hi(k);
+    if (hi) h += `<rect x="${B.x}" y="${y}" width="${B.w}" height="${B.rh}" fill="rgba(134,224,168,.08)"/><rect x="${B.x}" y="${y}" width="2.5" height="${B.rh}" fill="#86e0a8"/>`;
+    let x2 = B.x;
+    cols.forEach((c, j) => {
+      const v = r[j], num = typeof v === 'number';
+      h += `<text x="${num ? x2 + OW[c] - 5 : x2 + 5}" y="${y + B.rh / 2 + 3.5}" font-size="${fs}" fill="${dim ? '#4a5570' : '#e8ecf4'}"${num ? ' text-anchor="end"' : ''}>${esc(fit1(v, OW[c], fs))}</text>`;
+      x2 += OW[c];
+    });
+    h += `<path d="M${B.x} ${y + B.rh}h${B.w}" stroke="#1d273a"/>`;
+  });
+  return h;
+}
+function draw2(G) {
+  const C = G.card, r = S.res, m = model();
+  let h = `<g data-part="query"><rect x="${C.x}" y="${C.y}" width="${C.w}" height="${C.h}" rx="10" fill="rgba(18,26,40,.9)" stroke="#3a4762"/>`;
+  h += `<text x="${C.x + 10}" y="${C.y + 15}" font-size="8.5" fill="#8b96ad" letter-spacing="1">ВЫПОЛНЕННЫЙ ЗАПРОС SQL</text>`;
+  const fs = NAR ? 10 : 11, maxc = Math.floor((C.w - 20) / (fs * 0.6));
+  G.lines.forEach((ln, k) => {
+    let used = 0, parts = '';
+    for (const sg of ln) { if (used >= maxc) break; let s = sg.s; if (used + s.length > maxc) s = s.slice(0, maxc - used - 1) + '…'; used += s.length; parts += `<tspan fill="${sg.c}">${esc(s).replace(/ /g, '&#160;')}</tspan>`; }
+    h += `<text x="${C.x + 10}" y="${C.y + 33 + k * 15}" font-size="${fs}">${parts}</text>`;
+  });
+  const sy = C.y + C.h - 9, sfs = NAR ? 8.5 : 9;
+  let st, sc;
+  if (!r) { st = 'запрос ещё не выполнялся'; sc = '#8b96ad'; }
+  else if (!r.ok) { st = '✕ ' + r.err; sc = '#ff8a73'; }
+  else { st = `✓ выполнено: ${r.rows.length} ${plural(r.rows.length, 'строка', 'строки', 'строк')} из ${OLYMP.length}`; sc = '#86e0a8'; }
+  if (m.stale && S.sqlText.trim()) { st = 'в строке внизу запрос изменён — нажмите ▶'; sc = '#ffb547'; }
+  h += `<text x="${C.x + 10}" y="${sy}" font-size="${sfs}" fill="${sc}" ${BODY}>${esc(fit1(st, C.w - 14, sfs * 0.92))}</text></g>`;
+  h += `<g data-part="chips">`;
+  G.chips.forEach(c => { const kw = /^[A-Z]/.test(c.s) && c.s !== c.s.toLowerCase(); const col = OC.includes(c.s) ? '#72d4e8' : kw ? '#ffb547' : c.s.startsWith("'") ? '#86e0a8' : '#e8ecf4';
+    h += `<rect x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}" rx="6" fill="#1a2438" stroke="#3a4762"/><text x="${c.x + c.w / 2}" y="${c.y + 14}" font-size="${G.fs}" fill="${col}" text-anchor="middle">${esc(c.s)}</text>`; });
+  h += `</g>`;
+  const ok = r && r.ok, pass = ok ? new Set(r.pass) : null, inRes = ok ? new Set(r.idx) : null;
+  h += `<text x="${G.src.x}" y="${G.src.y - 8}" font-size="8.5" fill="#8b96ad" letter-spacing="1">ТАБЛИЦА olymp · ${OLYMP.length} СТРОК${ok && r.q.where ? ` · WHERE ПРОПУСТИЛ ${r.pass.length}` : ''}</text>`;
+  h += `<g data-part="src">` + drawTable2(G, G.src, OC, OLYMP, { hiCols: ok ? r.cols : null, dim: k => ok && !pass.has(k), hi: k => ok && inRes.has(k) && (r.q.where || r.q.limit != null) }) + '</g>';
+  const R = G.res;
+  h += `<g data-part="res"><text x="${R.x}" y="${R.y - 8}" font-size="8.5" fill="${ok ? '#86e0a8' : '#ff8a73'}" letter-spacing="1">${ok ? `РЕЗУЛЬТАТ · ${r.rows.length} ${plural(r.rows.length, 'СТРОКА', 'СТРОКИ', 'СТРОК')}` : r ? 'РЕЗУЛЬТАТА НЕТ — ОШИБКА В ЗАПРОСЕ' : 'РЕЗУЛЬТАТ'}</text>`;
+  if (ok && r.rows.length) h += drawTable2(G, R, r.cols, r.rows, {});
+  else h += `<rect x="${R.x}" y="${R.y}" width="${R.w}" height="${R.h}" fill="#0e1520" stroke="#3a4762" stroke-dasharray="4 3"/><text x="${R.x + R.w / 2}" y="${R.y + R.h / 2 + 3}" font-size="9" fill="#8b96ad" text-anchor="middle">${ok ? 'ни одна строка не подошла' : 'пусто'}</text>`;
+  return h + '</g>';
+}
+const plural = (n, a, b, c) => { const d = n % 10, e = n % 100; return d === 1 && e !== 11 ? a : d >= 2 && d <= 4 && (e < 12 || e > 14) ? b : c; };
+
+// lesson 3
+function draw3(G) {
+  let h = '';
+  const F = G.flat, fs = G.fs, heads = NAR ? FLAT_HEAD_N : FLAT_HEAD, anomOn = S.anom && performance.now() - S.anom.t < 4000;
+  h += `<text x="${F.x}" y="${F.y - 7}" font-size="8.5" fill="#8b96ad" letter-spacing="1">БЫЛО: ОДНА ТАБЛИЦА · ${FLAT.length} СТРОК · ЛИШНИХ КОПИЙ ${FLAT_COPIES}</text>`;
+  h += `<g data-part="flat"><rect x="${F.x}" y="${F.y}" width="${F.w}" height="${F.h}" fill="#0e1520" stroke="#3a4762" stroke-width="1.3"/>`;
+  let x = F.x;
+  FIELDS.forEach((f, k) => {
+    const st = fStatus(f).st, hc = st === 'ok' ? '#86e0a8' : st === 'none' ? '#8b96ad' : st === 'rep' ? '#ffb547' : '#ff8a73';
+    h += `<rect x="${x}" y="${F.y}" width="${G.fw[k]}" height="${F.hh}" fill="#162032" stroke="#2f3b55"/><text x="${x + 4}" y="${F.y + 12}" font-size="${fs}" fill="${hc}">${esc(fit1(heads[k], G.fw[k], fs))}</text>`;
+    const seen = new Set();
+    FLAT.forEach((r, i) => {
+      const y = F.y + F.hh + i * G.rh, ek = entKey(r, f.e), rep = f.e !== 'e' && seen.has(ek); seen.add(ek);
+      const an = anomOn && k === 3 && r[2] === 'Робототехника';
+      if (an) h += `<rect x="${x + 1}" y="${y + 1}" width="${G.fw[k] - 2}" height="${G.rh - 2}" fill="rgba(255,138,115,.25)" stroke="#ff8a73"/>`;
+      else if (rep) h += `<rect x="${x + 1}" y="${y + 1}" width="${G.fw[k] - 2}" height="${G.rh - 2}" fill="rgba(255,181,71,.10)"/>`;
+      h += `<text x="${x + 4}" y="${y + G.rh / 2 + 3.3}" font-size="${fs}" fill="${rep ? '#b39466' : '#e8ecf4'}">${esc(fit1(r[k], G.fw[k], fs))}</text>`;
+    });
+    x += G.fw[k];
+  });
+  for (let i = 1; i < FLAT.length; i++) h += `<path d="M${F.x} ${F.y + F.hh + i * G.rh}h${F.w}" stroke="#1d273a"/>`;
+  h += '</g>';
+  // pool
+  const P = G.pool;
+  h += `<g data-part="pool"><text x="${G.x0}" y="${P.y - 4}" font-size="8.5" fill="#8b96ad" letter-spacing="1">ПОЛЯ — ПЕРЕТАЩИТЕ В НОВЫЕ ТАБЛИЦЫ</text>`;
+  G.slots.forEach(s => { h += `<rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" rx="6" fill="none" stroke="#26324a" stroke-dasharray="4 3"/>`; });
+  h += '</g>';
+  // boxes
+  const bFs = NAR ? 8.5 : 9.5;
+  G.boxes.forEach(b => {
+    const T = TB3.find(t => t.id === b.id), over = S.drag && S.drag.moved && inR(S.drag.p, b), pickOn = S.pick && !S.drag;
+    h += `<g data-part="box-${b.id}"><rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="10" fill="rgba(18,26,40,.92)" stroke="${over ? '#72d4e8' : pickOn ? '#56627d' : '#3a4762'}" stroke-width="${over ? 2 : 1.3}"${pickOn ? ' stroke-dasharray="5 4"' : ''}/>`;
+    h += `<text x="${b.x + 8}" y="${b.y + 15}" font-size="${NAR ? 10 : 11.5}" font-weight="600" fill="#e8ecf4" ${BODY}>${T.ru}</text>`;
+    T.keys.forEach((kk, i) => {
+      const y = b.y + 22 + i * 17;
+      h += `<text x="${b.x + 8}" y="${y + 12}" font-size="${bFs}" fill="${kk[1] === 'PK' ? '#ffb547' : '#72d4e8'}">${kk[0]}</text><text x="${b.x + b.w - 7}" y="${y + 12}" font-size="8" fill="${kk[1] === 'PK' ? '#ffb547' : '#72d4e8'}" text-anchor="end">${kk[1]}</text>`;
+    });
+    h += `<path d="M${b.x + 6} ${b.y + 22 + 2 * 17 + 2}h${b.w - 12}" stroke="#26324a"/>`;
+    h += `<text x="${b.x + 8}" y="${b.y + b.h - 7}" font-size="8" fill="#8b96ad">${T.rows} ${plural(T.rows, 'строка', 'строки', 'строк')}</text></g>`;
+  });
+  // relationship lines: Записи.ученик_id → Ученики.id, Записи.кружок_id → Кружки.id
+  const bs = G.boxes[0], be = G.boxes[1], bc = G.boxes[2], ky = (b, i) => b.y + 22 + i * 17 + 8;
+  h += `<path d="M${be.x} ${ky(be, 0)}C${be.x - 14} ${ky(be, 0)} ${bs.x + bs.w + 14} ${ky(bs, 0)} ${bs.x + bs.w} ${ky(bs, 0)}" fill="none" stroke="#72d4e8" stroke-width="1.5"/>`;
+  h += `<path d="M${be.x + be.w} ${ky(be, 1)}C${be.x + be.w + 14} ${ky(be, 1)} ${bc.x - 14} ${ky(bc, 0)} ${bc.x} ${ky(bc, 0)}" fill="none" stroke="#72d4e8" stroke-width="1.5"/>`;
+  // field cards
+  const anomF = anomOn ? FIELDS[3] : null;
+  FIELDS.forEach(f => {
+    if (S.drag && S.drag.f === f.id && S.drag.moved) return;
+    h += drawField(fieldBox(G, f), f, f === anomF);
+  });
+  if (S.drag && S.drag.moved) { const f = FIELDS.find(x => x.id === S.drag.f), b = fieldBox(G, f); h += drawField({ x: S.drag.p.x - S.drag.ox, y: S.drag.p.y - S.drag.oy, w: b.w, h: b.h }, f, false, true); }
+  return h;
+}
+function drawField(b, f, anom, floating) {
+  const s = fStatus(f), picked = S.pick === f.id;
+  const col = s.st === 'ok' ? '#86e0a8' : s.st === 'rep' ? '#ffb547' : s.st === 'bad' ? '#ff8a73' : '#8b96ad';
+  const fs = NAR ? 8.5 : 9.5, badge = s.st === 'ok' ? '✓' : s.st === 'rep' ? '×' + s.n : s.st === 'bad' ? '!' : '';
+  let h = `<g${floating ? ' opacity=".92"' : ''}><rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="6" fill="${floating ? '#26324a' : '#1a2438'}" stroke="${picked || floating ? '#ffb547' : anom ? '#ff8a73' : col}" stroke-width="${picked || floating || anom ? 2 : 1.2}"/>`;
+  h += `<text x="${b.x + 6}" y="${b.y + b.h / 2 + 3.4}" font-size="${fs}" fill="#e8ecf4" ${BODY}>${esc(fit1(f.ru, b.w - (badge ? 16 : 4), fs))}</text>`;
+  if (badge) h += `<text x="${b.x + b.w - 5}" y="${b.y + b.h / 2 + 3.4}" font-size="8.5" fill="${col}" text-anchor="end">${badge}</text>`;
+  return h + '</g>';
+}
+
+function hlBoxes(id) {
+  const G = LAY(), lid = LID(), pad = b => b ? [[b.x - 3, b.y - 3, b.w + 6, b.h + 6]] : [];
+  if (lid === 'relations') {
+    if (id === 'table') return pad(G.cards.readers);
+    if (id === 'field') return pad(colBox(G, 'readers.name'));
+    if (id === 'pk') return pad(colBox(G, 'readers.id')).concat(pad(colBox(G, 'books.id')));
+    if (id === 'fk') return pad(colBox(G, 'loans.reader_id')).concat(pad(colBox(G, 'loans.book_id')));
+    if (id === 'record') return [[G.join.x + 2, G.join.y + 32, G.join.w - 4, G.join.rh + 4]];
+    if (id === 'join') return pad(G.join);
+  }
+  if (lid === 'sql') {
+    if (id === 'query') return pad(G.card);
+    if (id === 'chips') { const a = G.chips[0], z = G.chips[G.chips.length - 1]; return [[G.x0 - 3, a.y - 3, G.W + 6, z.y + z.h - a.y + 6]]; }
+    if (id === 'src') return pad(G.src);
+    if (id === 'res') return pad(G.res);
+  }
+  if (lid === 'design') {
+    if (id === 'flat') return pad(G.flat);
+    if (id === 'pool') return pad(G.pool);
+    const bx = G.boxes.find(b => 'box-' + b.id === id); if (bx) return pad(bx);
+    if (id === 'keys') return G.boxes.map(b => [b.x + 2, b.y + 20, b.w - 4, 2 * 17 + 4]);
+  }
+  return [];
+}
+
+let lastY1 = 0;
+function drawScene(t) {
+  const G = LAY(), id = LID();
+  if (Math.abs(G.y1 - lastY1) > 0.5) { lastY1 = G.y1; fit(); }
+  let h = bg() + (id === 'relations' ? draw1(G) : id === 'sql' ? draw2(G) : draw3(G));
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1);
+    if (k === 0) S.hl = null;
+    else for (const b of hlBoxes(S.hl.id)) h += `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="6" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// fit the scene under the task box when there is room
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const wasN = NAR; NAR = w < 560;
+  const G = LAY(); lastY1 = G.y1;
+  const B = { x0: G.bx0, x1: G.bx1, y1: G.y1 }, cw = B.x1 - B.x0 + 8, ch = B.y1 - 80 + 4;
+  const tb = $('#taskBox').getBoundingClientRect(), mt = $('#meter').getBoundingClientRect();
+  const topPx = Math.max(tb.bottom, mt.bottom) - rc.top + 8;
+  const s = Math.min(w / cw, Math.max((hh - topPx) / ch, hh / (ch * 1.6)), 1.5);
+  const VB = { w: w / s, h: hh / s }; VB.x = (B.x0 + B.x1) / 2 - VB.w / 2;
+  VB.y = 80 - topPx / s;
+  const slack = VB.y + VB.h - (B.y1 + 2);
+  VB.y = slack < 0 ? B.y1 + 2 - VB.h : VB.y - slack / 2;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+  if (wasN !== NAR && S.tab === 'calc') renderPanes(model());
+}
+new ResizeObserver(() => fit()).observe(scene);
+
+// ---------- actions ----------
+function setPK(t, c) {
+  if (!c) { S.pk[t] = null; toast(`У таблицы «${DB1[t].ru}» больше нет первичного ключа.`); update(); return true; }
+  const d = dupOf(colVals(t + '.' + c));
+  if (d) { toast(`В столбце ${c} есть повторы: «${d.v}» встречается ${d.n} раза. По нему не отличить одну строку от другой — ключом он быть не может.`); update(); return false; }
+  S.pk[t] = c;
+  toast(`Первичный ключ таблицы «${DB1[t].ru}» — ${c}: у каждой строки своё значение.`);
+  update(); return true;
+}
+function togglePK(key) { const [t, c] = key.split('.'); setPK(t, S.pk[t] === c ? null : c); }
+function addLink(a, b) {
+  if (a === b) return;
+  if (a.split('.')[0] === b.split('.')[0]) { toast('Связь соединяет столбцы разных таблиц.'); return; }
+  const l = { a, b };
+  if (S.links.some(x => lkey(x) === lkey(l))) { toast('Такая связь уже есть.'); return; }
+  if (S.links.length >= 6) { toast('Слишком много связей. Удалите лишние: нажмите на число на связи.'); return; }
+  S.links.push(l);
+  const inf = linkInfo(l);
+  if (!inf.pk) toast('Ни один конец связи не первичный ключ. Связь должна вести к ключу — тогда по значению найдётся ровно одна строка.');
+  else if (inf.valid) toast(`Каждое значение ${inf.fk} нашлось в ${inf.pk}: ${inf.found} из ${inf.total}. Связь «один-ко-многим» работает.`);
+  else toast(`Нашлось только ${inf.found} из ${inf.total} значений ${inf.fk} в ${inf.pk}. Эти столбцы хранят разное.`);
+  update();
+}
+function delLink(i) { const l = S.links[i]; if (!l) return; S.links.splice(i, 1); toast(`Связь ${l.a} — ${l.b} удалена.`); update(); }
+
+function place3(fid, t) {
+  const f = FIELDS.find(x => x.id === fid); if (!f) return;
+  S.pick = null;
+  if (!t) { if (S.place[fid]) { delete S.place[fid]; toast(`«${f.ru}» вернулось в список полей.`); } update(); return; }
+  S.place[fid] = t; toast(why3(f, t)); update();
+}
+function anomaly() {
+  const st = fStatus(FIELDS[3]).st;
+  const where = st === 'ok' ? 'В новой базе — одну ячейку в таблице «Кружки».' : st === 'rep' ? 'В новой базе — тоже 3 ячейки, ведь руководитель лежит в «Записях».' : st === 'bad' ? 'В новой базе руководителю вообще нет верного места: в строке ученика не записать руководителей всех его кружков.' : 'В новой базе поле «руководитель» ещё не разложено.';
+  S.anom = { t: performance.now() };
+  toast(`Кружок робототехники ведёт новый учитель. В большой таблице правим 3 ячейки — пропустим одну, и база начнёт врать. ${where}`);
+  dirty = true;
+}
+
+// SQL input
+const sqlEl = () => $('#sql');
+function setSQL(text, run) {
+  S.sqlText = text; S.caret = text.length;
+  const f = sqlEl(); if (f) f.value = text;
+  if (run) runSQL(); else update();
+}
+function runSQL() {
+  const f = sqlEl(); if (f) S.sqlText = f.value;
+  S.sqlRun = S.sqlText.trim();
+  S.res = sqlRun(S.sqlRun);
+  if (!S.res.ok) toast(S.res.err);
+  update();
+}
+function insertTok(tok, focus) {
+  const f = sqlEl(); let v = f ? f.value : S.sqlText;
+  const c = S.caret != null ? clamp(S.caret, 0, v.length) : v.length;
+  const before = v.slice(0, c), after = v.slice(c);
+  const glue = tok === ',' || tok === ')';
+  const pre = before && !/\s$/.test(before) && !glue && !/\($/.test(before) ? ' ' : '';
+  const post = after && !/^\s/.test(after) ? ' ' : '';
+  v = before + pre + tok + (after ? post : ' ') + after;
+  S.caret = (before + pre + tok).length + 1;
+  S.sqlText = v; if (f) { f.value = v; if (focus) { f.focus({ preventScroll: true }); try { f.setSelectionRange(S.caret, S.caret); } catch (e) {} } }
+  lite();
+}
+
+// ---------- pointer ----------
+let dirty = true;
+scene.addEventListener('pointerdown', e => {
+  const p = toSvg(e), id = LID(), G = LAY();
+  if (id === 'relations') {
+    const md = S.mids.find(q => Math.hypot(q.x - p.x, q.y - p.y) < 13);
+    if (md) { e.preventDefault(); delLink(md.i); return; }
+    const col = hitCol(G, p); if (!col) return;
+    e.preventDefault(); try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+    S.drag = { col, p0: p, p, moved: false }; scene.classList.add('grabbing'); dirty = true; return;
+  }
+  if (id === 'sql') {
+    const c = G.chips.find(q => inR(p, q));
+    if (c) { e.preventDefault(); insertTok(c.s, e.pointerType === 'mouse'); return; }
+    if (p.y >= G.src.y && p.y <= G.src.y + G.src.hh) {
+      let x = G.src.x; for (const cn of OC) { if (p.x >= x && p.x < x + G.OW[cn]) { e.preventDefault(); insertTok(cn, e.pointerType === 'mouse'); return; } x += G.OW[cn]; }
+    }
+    return;
+  }
+  const f = FIELDS.find(q => inR(p, fieldBox(G, q)));
+  if (f) {
+    const b = fieldBox(G, f);
+    e.preventDefault(); try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+    S.drag = { f: f.id, p0: p, p, ox: p.x - b.x, oy: p.y - b.y, moved: false }; scene.classList.add('grabbing'); dirty = true; return;
+  }
+  if (S.pick) {
+    const bx = G.boxes.find(b => inR(p, b));
+    if (bx) { place3(S.pick, bx.id); return; }
+    if (inR(p, G.pool)) { place3(S.pick, null); return; }
+    S.pick = null; dirty = true;
+  }
+});
+scene.addEventListener('pointermove', e => {
+  if (!S.drag) return;
+  const p = toSvg(e); S.drag.p = p;
+  if (!S.drag.moved && Math.hypot(p.x - S.drag.p0.x, p.y - S.drag.p0.y) > 6) S.drag.moved = true;
+  dirty = true;
+});
+function endDrag(cancel) {
+  const d = S.drag; if (!d) return;
+  S.drag = null; scene.classList.remove('grabbing'); dirty = true;
+  if (cancel) return;
+  const G = LAY();
+  if (d.col) {
+    if (!d.moved) { togglePK(d.col); return; }
+    const t = hitCol(G, d.p);
+    if (t && t !== d.col) addLink(d.col, t);
+    return;
+  }
+  if (d.f) {
+    if (!d.moved) { S.pick = S.pick === d.f ? null : d.f; if (S.pick) toast('Теперь нажмите на таблицу, куда положить поле.'); dirty = true; return; }
+    const bx = G.boxes.find(b => inR(d.p, b));
+    if (bx) place3(d.f, bx.id);
+    else if (inR(d.p, G.pool) || d.p.y < G.pool.y + G.pool.h) place3(d.f, null);
+  }
+}
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+function loop(t) {
+  requestAnimationFrame(loop);
+  if (S.anom && t - S.anom.t > 4100) { S.anom = null; dirty = true; }
+  if (dirty || S.hl || S.anom) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 4200); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, aria, cls) => `<button data-a="${k}"${aria ? ` aria-label="${aria}"` : ''}${cls ? ` class="${cls}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  if (id === 'relations') tb.innerHTML = B('nokeys', 'Снять ключи') + B('unlink', 'Удалить связи') + sep + B('reset', 'Заново');
+  else if (id === 'sql') tb.innerHTML = `<input id="sql" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Запрос SQL" placeholder="SELECT … FROM olymp">` + B('run', '▶', 'Выполнить запрос', 'go') + sep + B('clear', 'Очистить') + B('all', 'Все строки', 'Запрос всех строк') + B('reset', 'Заново');
+  else tb.innerHTML = B('anom', 'Сменить руководителя') + sep + B('reset', 'Заново');
+  const f = sqlEl();
+  if (f) {
+    f.value = S.sqlText;
+    f.addEventListener('input', () => { S.sqlText = f.value; S.caret = f.selectionStart; lite(); });
+    const car = () => { S.caret = f.selectionStart; };
+    f.addEventListener('keyup', car); f.addEventListener('click', car); f.addEventListener('select', car);
+    f.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); runSQL(); } });
+  }
+}
+function resetLesson() {
+  const Ls = L();
+  S.pk = {}; S.links = []; S.mids = []; S.drag = null;
+  S.b = { cols: ['*'], w1: { c: '', o: '=', v: '' }, j: '', w2: { c: '', o: '=', v: '' }, ob: '', dir: 'ASC', lim: '' };
+  S.sqlText = Ls.sql0 || ''; S.sqlRun = ''; S.res = null; S.caret = null;
+  if (Ls.id === 'sql') { S.sqlRun = S.sqlText; S.res = sqlRun(S.sqlRun); }
+  S.place = {}; S.pick = null; S.anom = null;
+}
+function act(a) {
+  if (a === 'reset') { resetLesson(); const f = sqlEl(); if (f) f.value = S.sqlText; buildScheme(); update(); return; }
+  if (a === 'nokeys') { S.pk = {}; update(); return; }
+  if (a === 'unlink') { S.links = []; update(); return; }
+  if (a === 'run') { runSQL(); return; }
+  if (a === 'clear') { setSQL('', false); const f = sqlEl(); if (f) f.focus({ preventScroll: true }); return; }
+  if (a === 'all') { setSQL('SELECT * FROM olymp', true); return; }
+  if (a === 'anom') { anomaly(); return; }
+}
+const tb0 = $('#tools');
+tb0.addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); });
+tb0.addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.disabled) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+
+function taskState(m) {
+  if (S.done[LID()]) return '✓ Выполнено';
+  if (m.kind === 'relations') return `Ключи: ${m.pkSet}/3 · верных связей: ${m.good}/2${m.extraL ? ` · лишних или неверных: ${m.extraL}` : ''}`;
+  if (m.kind === 'sql') return !m.r ? 'Запрос не выполнен' : !m.ok ? 'Ошибка в запросе' : `Строк: ${m.n} · столбцы: ${m.r.cols.join(', ')} — пока не то`;
+  return `Разложено: ${m.placed}/6 · лишних копий: ${m.copies} · конфликтов: ${m.bad}`;
+}
+
+// ---------- SQL builder (Scheme tab of lesson 2) ----------
+function buildSQL(b) {
+  const cols = b.cols.includes('*') || !b.cols.length ? '*' : b.cols.join(', ');
+  const cond = w => w.c && String(w.v).trim() !== '' ? `${w.c} ${w.o} ${/^-?\d+([.,]\d+)?$/.test(String(w.v).trim()) ? String(w.v).trim() : `'${String(w.v).trim().replace(/'/g, '')}'`}` : '';
+  const c1 = cond(b.w1), c2 = b.j ? cond(b.w2) : '';
+  let s = `SELECT ${cols} FROM olymp`;
+  if (c1 && c2) s += ` WHERE ${c1} ${b.j} ${c2}`; else if (c1 || c2) s += ` WHERE ${c1 || c2}`;
+  if (b.ob) s += ` ORDER BY ${b.ob}${b.dir === 'DESC' ? ' DESC' : ''}`;
+  if (b.lim) s += ` LIMIT ${b.lim}`;
+  return s;
+}
+const opts = (list, cur) => list.map(x => { const [v, t] = Array.isArray(x) ? x : [x, x]; return `<option value="${esc(v)}"${String(v) === String(cur) ? ' selected' : ''}>${esc(t)}</option>`; }).join('');
+const ALLCOLS = () => T1.flatMap(t => DB1[t].cols.map(c => t + '.' + c));
+
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'relations') {
+    h = `<h2>Ключи и связи</h2><p class="note">То же, что на сцене, но списками. Ключ можно назначить только столбцу без повторов.</p>
+      <dl class="reads"><div><dt>Ключей</dt><dd id="r1"></dd></div><div><dt>Связей</dt><dd id="r2"></dd></div><div><dt>Верных</dt><dd id="r3"></dd></div></dl>` +
+      T1.map(t => `<div class="ctl"><label for="pk-${t}">Первичный ключ · ${DB1[t].ru}</label><select id="pk-${t}" data-pk="${t}">${opts([['', '— нет —']].concat(DB1[t].cols), S.pk[t] || '')}</select></div>`).join('') +
+      `<div class="ctl"><div class="lbl">Новая связь</div><div class="row"><select id="lkA" aria-label="Первый столбец">${opts(ALLCOLS(), 'loans.id')}</select><select id="lkB" aria-label="Второй столбец">${opts(ALLCOLS(), 'readers.id')}</select></div><div class="chips"><button id="lkGo">Связать</button><button data-a="unlink">Удалить все связи</button><button data-a="reset">Заново</button></div></div>
+      <h3>Связи</h3><div class="listing" id="lst"></div>`;
+  }
+  if (id === 'sql') {
+    const b = S.b, cc = [['', '—']].concat(OC), ops = ['=', '<>', '>', '<', '>=', '<='];
+    h = `<h2>Конструктор запроса</h2><p class="note">Соберите запрос из частей — он появится в строке внизу сцены и сразу выполнится. Можно и набирать вручную.</p>
+      <dl class="reads"><div><dt>Строк</dt><dd id="r1"></dd></div><div><dt>Столбцов</dt><dd id="r2"></dd></div><div><dt>Статус</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">SELECT — столбцы</div><div class="chips">${['*'].concat(OC).map(c => `<button class="mono" data-bc="${c}">${c}</button>`).join('')}</div></div>
+      <div class="ctl"><div class="lbl">WHERE — условие</div><div class="row"><select data-b="w1.c" aria-label="Столбец условия">${opts(cc, b.w1.c)}</select><select data-b="w1.o" aria-label="Знак">${opts(ops, b.w1.o)}</select><input data-b="w1.v" aria-label="Значение" placeholder="70" value="${esc(b.w1.v)}"></div>
+        <div class="row"><select data-b="j" aria-label="Связка условий">${opts([['', 'без второго условия'], 'AND', 'OR'], b.j)}</select></div>
+        <div class="row"><select data-b="w2.c" aria-label="Столбец второго условия">${opts(cc, b.w2.c)}</select><select data-b="w2.o" aria-label="Знак">${opts(ops, b.w2.o)}</select><input data-b="w2.v" aria-label="Значение" placeholder="физика" value="${esc(b.w2.v)}"></div></div>
+      <div class="ctl"><div class="lbl">ORDER BY — сортировка</div><div class="row"><select data-b="ob" aria-label="Столбец сортировки">${opts(cc, b.ob)}</select><select data-b="dir" aria-label="Направление">${opts([['ASC', 'ASC — по возрастанию'], ['DESC', 'DESC — по убыванию']], b.dir)}</select></div></div>
+      <div class="ctl"><div class="lbl">LIMIT — сколько строк</div><div class="row"><select data-b="lim" aria-label="Лимит">${opts([['', 'все'], '1', '3', '5'], b.lim)}</select></div></div>
+      <div class="ctl"><div class="chips"><button data-a="all">Все строки</button><button data-a="reset">Заново</button></div></div>
+      <h3>Запрос</h3><div class="listing" id="lst"></div>`;
+  }
+  if (id === 'design') {
+    h = `<h2>Куда положить поле</h2><p class="note">То же, что перетаскивание на сцене. Ключи id, ученик_id и кружок_id уже на месте.</p>
+      <dl class="reads"><div><dt>Разложено</dt><dd id="r1"></dd></div><div><dt>Копий</dt><dd id="r2"></dd></div><div><dt>Конфликтов</dt><dd id="r3"></dd></div></dl>` +
+      FIELDS.map(f => `<div class="ctl"><label for="pl-${f.id}">${f.ru}</label><select id="pl-${f.id}" data-f="${f.id}">${opts([['', '— не разложено —'], ['s', 'Ученики'], ['e', 'Записи'], ['c', 'Кружки']], S.place[f.id] || '')}</select></div>`).join('') +
+      `<div class="ctl"><div class="chips"><button data-a="anom">Сменить руководителя</button><button data-a="reset">Заново</button></div></div><h3>Новые таблицы</h3><div class="listing" id="lst"></div>`;
+  }
+  el.innerHTML = h;
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+  el.querySelectorAll('[data-pk]').forEach(s => s.onchange = () => setPK(s.dataset.pk, s.value));
+  const go = el.querySelector('#lkGo'); if (go) go.onclick = () => addLink(el.querySelector('#lkA').value, el.querySelector('#lkB').value);
+  el.querySelectorAll('[data-f]').forEach(s => s.onchange = () => place3(s.dataset.f, s.value || null));
+  el.querySelectorAll('[data-bc]').forEach(btn => btn.onclick = () => {
+    const c = btn.dataset.bc, b = S.b;
+    if (c === '*') b.cols = ['*'];
+    else { b.cols = b.cols.filter(x => x !== '*'); b.cols = b.cols.includes(c) ? b.cols.filter(x => x !== c) : b.cols.concat(c); if (!b.cols.length) b.cols = ['*']; }
+    setSQL(buildSQL(b), true);
+  });
+  el.querySelectorAll('[data-b]').forEach(inp => {
+    const h2 = () => { const [k1, k2] = inp.dataset.b.split('.'); if (k2) S.b[k1][k2] = inp.value; else S.b[k1] = inp.value; setSQL(buildSQL(S.b), true); };
+    inp.addEventListener(inp.tagName === 'INPUT' ? 'change' : 'change', h2);
+    if (inp.tagName === 'INPUT') inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); h2(); } });
+  });
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; };
+  const lst = el.querySelector('#lst');
+  if (m.kind === 'relations') {
+    set('#r1', `${m.pkSet}/3`); set('#r2', String(S.links.length)); set('#r3', `${m.good}/2`);
+    T1.forEach(t => { const s = el.querySelector('#pk-' + t); if (s && document.activeElement !== s) s.value = S.pk[t] || ''; });
+    if (lst) {
+      lst.innerHTML = S.links.length ? S.links.map((l, i) => { const inf = linkInfo(l); return `<div class="lk"><span class="${inf.valid ? 'good' : inf.pk ? 'bad' : 'dim'}">${l.a} — ${l.b}: ${inf.pk ? `${inf.found}/${inf.total}` : 'нет PK'}</span><button data-del="${i}" aria-label="Удалить связь">✕</button></div>`; }).join('') : '<span class="note">Связей пока нет.</span>';
+      lst.querySelectorAll('[data-del]').forEach(b => b.onclick = () => delLink(+b.dataset.del));
+    }
+  } else if (m.kind === 'sql') {
+    set('#r1', m.ok ? String(m.n) : '—'); set('#r2', m.ok ? String(m.r.cols.length) : '—'); set('#r3', !m.r ? '—' : m.ok ? 'OK' : 'ошибка');
+    el.querySelectorAll('[data-bc]').forEach(b => b.setAttribute('aria-pressed', S.b.cols.includes(b.dataset.bc) ? 'true' : 'false'));
+    if (lst) lst.innerHTML = `<div class="${m.ok ? '' : 'bad'}">${esc(S.sqlRun || '—')}</div>` + (m.r && !m.ok ? `<div class="bad">${esc(m.r.err)}</div>` : '');
+  } else {
+    set('#r1', `${m.placed}/6`); set('#r2', String(m.copies)); set('#r3', String(m.bad));
+    FIELDS.forEach(f => { const s = el.querySelector('#pl-' + f.id); if (s && document.activeElement !== s) s.value = S.place[f.id] || ''; });
+    if (lst) lst.innerHTML = TB3.map(t => `<div>${t.ru}(${t.keys.map(k => k[0]).concat(FIELDS.filter(f => S.place[f.id] === t.id).map(f => f.ru.replace(/ /g, '_'))).join(', ')})</div>`).join('');
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'relations') return [
+    { id: 'table', icon: IC('<rect x="4" y="6" width="26" height="22" rx="3" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M4 12h26M4 19h26" stroke="var(--muted)" stroke-width="1.2"/>'), name: 'Таблица (отношение)', spec: 'Хранит сведения об объектах одного вида: читатели, книги, выдачи.' },
+    { id: 'record', icon: IC('<rect x="3" y="13" width="28" height="8" fill="rgba(114,212,232,.2)" stroke="var(--arm)" stroke-width="1.6"/>'), name: 'Запись', spec: 'Одна строка таблицы — один объект: одна выдача книги.' },
+    { id: 'field', icon: IC('<rect x="12" y="3" width="10" height="28" fill="rgba(114,212,232,.2)" stroke="var(--arm)" stroke-width="1.6"/>'), name: 'Поле', spec: 'Столбец: одно свойство всех объектов. У поля есть имя и тип — число, текст, дата.' },
+    { id: 'pk', icon: IC('<circle cx="11" cy="17" r="6" fill="none" stroke="var(--force)" stroke-width="2.2"/><path d="M17 17h12v5M25 17v4" fill="none" stroke="var(--force)" stroke-width="2.2"/>'), name: 'Первичный ключ (PK)', spec: 'Поле без повторов. По его значению находится ровно одна строка.' },
+    { id: 'fk', icon: IC('<text x="4" y="22" font-size="13" fill="var(--arm)" font-family="monospace">FK</text>'), name: 'Внешний ключ (FK)', spec: 'Поле, где хранят номер строки из другой таблицы: reader_id → readers.id.' },
+    { id: 'join', icon: IC('<path d="M5 10h10M5 17h10M5 24h10" stroke="var(--muted)" stroke-width="2"/><path d="M17 17h12" stroke="var(--ok)" stroke-width="2"/><path d="M25 13l4 4-4 4" fill="none" stroke="var(--ok)" stroke-width="2"/>'), name: 'Данные по связям', spec: 'Внизу сцены: вместо номеров подставлены имена и названия. Так СУБД соединяет таблицы.' }];
+  if (id === 'sql') return [
+    { id: 'query', icon: IC('<text x="2" y="15" font-size="8" fill="var(--force)" font-family="monospace">SELECT</text><text x="2" y="27" font-size="8" fill="var(--arm)" font-family="monospace">name</text>'), name: 'Запрос', spec: 'Каждая часть с новой строки: SELECT — что показать, FROM — откуда, WHERE — какие строки, ORDER BY — в каком порядке.' },
+    { id: 'fx', icon: IC('<rect x="2" y="10" width="30" height="14" rx="3" fill="none" stroke="var(--fg)" stroke-width="1.6"/><text x="5" y="21" font-size="8" fill="var(--force)" font-family="monospace">SQL▶</text>'), name: 'Строка запроса', spec: 'Поле внизу сцены. Enter или ▶ отправляет запрос базе.' },
+    { id: 'chips', icon: IC('<rect x="2" y="8" width="14" height="8" rx="2" fill="none" stroke="var(--muted)"/><rect x="18" y="8" width="14" height="8" rx="2" fill="none" stroke="var(--muted)"/><rect x="2" y="19" width="20" height="8" rx="2" fill="none" stroke="var(--muted)"/>'), name: 'Слова-подсказки', spec: 'Нажмите — слово добавится в запрос. Нажатие на заголовок таблицы добавляет имя столбца.' },
+    { id: 'src', icon: IC('<rect x="4" y="5" width="26" height="24" fill="none" stroke="var(--fg)" stroke-width="1.4"/><path d="M4 12h26" stroke="var(--fg)"/><rect x="4" y="16" width="26" height="5" fill="rgba(134,224,168,.3)"/>'), name: 'Исходная таблица', spec: 'Строки, которые не прошли WHERE, бледнеют. Зелёная полоска — строки, попавшие в ответ.' },
+    { id: 'res', icon: IC('<rect x="8" y="6" width="18" height="22" fill="none" stroke="var(--ok)" stroke-width="1.6"/><path d="M8 12h18M8 18h18M8 23h18" stroke="var(--ok)" stroke-width="1"/>'), name: 'Результат', spec: 'Новая временная таблица — ответ на запрос. Исходные данные не меняются.' }];
+  return [
+    { id: 'flat', icon: IC('<rect x="2" y="7" width="30" height="20" fill="none" stroke="var(--fg)" stroke-width="1.4"/><rect x="4" y="15" width="8" height="4" fill="rgba(255,181,71,.4)"/><rect x="4" y="21" width="8" height="4" fill="rgba(255,181,71,.4)"/>'), name: 'Исходная таблица', spec: 'Жёлтым подсвечены лишние копии: факт уже записан выше, а его повторили.' },
+    { id: 'pool', icon: IC('<rect x="3" y="11" width="13" height="12" rx="2" fill="none" stroke="var(--muted)" stroke-dasharray="3 2"/><rect x="18" y="11" width="13" height="12" rx="2" fill="none" stroke="var(--fg)"/>'), name: 'Поля', spec: 'Карточки свойств. Зелёная рамка — поле на своём месте, жёлтая — повторы, красная — конфликт.' },
+    { id: 'box-s', icon: IC('<circle cx="17" cy="12" r="5" fill="none" stroke="var(--fg)" stroke-width="1.8"/><path d="M8 29c0-6 4-9 9-9s9 3 9 9" fill="none" stroke="var(--fg)" stroke-width="1.8"/>'), name: 'Ученики', spec: 'Сущность «ученик»: одна строка на каждого ученика, ключ id.' },
+    { id: 'box-c', icon: IC('<rect x="6" y="7" width="22" height="20" rx="3" fill="none" stroke="var(--fg)" stroke-width="1.8"/><path d="M11 13h12M11 18h8" stroke="var(--muted)" stroke-width="1.6"/>'), name: 'Кружки', spec: 'Сущность «кружок»: одна строка на кружок, ключ id.' },
+    { id: 'box-e', icon: IC('<path d="M4 17h26" stroke="var(--arm)" stroke-width="2"/><circle cx="6" cy="17" r="3" fill="var(--arm)"/><circle cx="28" cy="17" r="3" fill="var(--arm)"/>'), name: 'Записи (связующая)', spec: 'Одна строка — один ученик в одном кружке. Превращает «многие-ко-многим» в два «один-ко-многим».' },
+    { id: 'keys', icon: IC('<text x="3" y="15" font-size="9" fill="var(--force)" font-family="monospace">PK</text><text x="3" y="28" font-size="9" fill="var(--arm)" font-family="monospace">FK</text>'), name: 'Ключи', spec: 'PK — id самой таблицы. FK в «Записях» — ссылки на ученика и кружок.' }];
+}
+function flashEl(sel) { const el = $(sel); if (!el) return; el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${esc(p)}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    const head = { relations: 'Из чего состоит база', sql: 'Части запроса', design: 'Части проекта' }[Ls.id];
+    $('#pane-parts').innerHTML = `<h2>${head}</h2><p class="note">Нажмите на пункт, чтобы найти его на сцене.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => {
+      if (b.dataset.id === 'fx') flashEl('#tools');
+      else { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; }
+    });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  if (m.kind === 'relations') {
+    let h = `<h2>Может ли поле быть ключом?</h2><div class="formula">ключ ⇔ все значения разные</div><div class="steps">`;
+    for (const t of T1) DB1[t].cols.forEach(c => {
+      const v = colVals(t + '.' + c), d = new Set(v.map(String)).size, ok = d === v.length;
+      h += step(`${t}.${c}${S.pk[t] === c ? ' · PK' : ''}`, `${v.length} знач., разных ${d} → ${ok ? 'можно' : 'нельзя'}`, ok ? 'okk' : '');
+    });
+    h += `</div><h3>Проверка связей</h3><p class="note">Связь верна, когда каждое значение внешнего ключа есть среди значений первичного ключа. Это называют ссылочной целостностью.</p><div class="steps">`;
+    if (!S.links.length) h += step('связей нет', '—');
+    S.links.forEach(l => {
+      const inf = linkInfo(l);
+      if (!inf.pk) { h += step(`${l.a} — ${l.b}`, 'ни один конец не PK', 'badd'); return; }
+      const miss = colVals(inf.fk).filter(v => !new Set(colVals(inf.pk).map(String)).has(String(v)));
+      h += step(`${inf.fk} → ${inf.pk}`, `найдено ${inf.found} из ${inf.total}${miss.length ? `; нет: ${[...new Set(miss)].slice(0, 4).join(', ')}` : ''}`, inf.valid ? 'okk' : 'badd');
+    });
+    h += step('итог', `ключей ${m.pkSet}/3, верных связей ${m.good}/2`, m.relOk ? 'okk sum' : 'sum') + '</div>';
+    return h;
+  }
+  if (m.kind === 'sql') {
+    const r = m.r;
+    if (!r) return `<h2>Как выполняется запрос</h2><p class="note">Выполните запрос — здесь появятся шаги.</p>`;
+    if (!r.ok) return `<h2>Запрос с ошибкой</h2><div class="formula">${esc(S.sqlRun || '—')}</div><div class="steps">${step('ошибка', esc(r.err), 'badd')}</div><p class="note" style="margin-top:10px">Порядок частей: SELECT … FROM … WHERE … ORDER BY … LIMIT. Текст — в кавычках, столбцы — без кавычек.</p>`;
+    const q = r.q;
+    let h = `<h2>Как СУБД выполняет запрос</h2><div class="formula">${esc(S.sqlRun)}</div><p class="note">База выполняет части не в том порядке, как они написаны: сначала FROM, потом WHERE, ORDER BY, LIMIT и только в конце SELECT.</p><div class="steps">`;
+    h += step('1. FROM olymp', `${OLYMP.length} строк`);
+    if (q.where) {
+      h += step('2. WHERE ' + esc(descW(q.where)), `осталось ${r.pass.length}`) + '</div><h3>Проверка условия для каждой строки</h3><div class="steps">';
+      OLYMP.forEach(row => { const ok = evalW(q.where, row); h += step(esc(row[1]), `${esc(descW(q.where, row))} → ${ok ? 'да' : 'нет'}`, ok ? 'okk' : ''); });
+      h += '</div><div class="steps" style="margin-top:6px">';
+    } else h += step('2. WHERE', 'нет — берём все строки');
+    h += step('3. ORDER BY', q.order.length ? q.order.map(o => `${o.c} ${o.d < 0 ? 'DESC (9→1)' : 'ASC (1→9)'}`).join(', ') : 'нет — порядок как в таблице');
+    h += step('4. LIMIT', q.limit != null ? `первые ${q.limit}` : 'нет');
+    h += step('5. SELECT', esc(q.cols.join(', ')));
+    h += step('ответ', `${r.rows.length} ${plural(r.rows.length, 'строка', 'строки', 'строк')}: ${esc(r.rows.slice(0, 5).map(x => x.join(' ')).join('; '))}${r.rows.length > 5 ? '…' : ''}`, m.sqlOk ? 'okk sum' : 'sum') + '</div>';
+    return h;
+  }
+  let h = `<h2>Считаем лишние копии</h2><div class="formula">копий = строк в таблице − разных объектов</div><p class="note">В большой таблице ${FLAT.length} записей, но учеников всего 5, а кружков 3. Поле ученика повторяется 8 − 5 = 3 лишних раза, поле кружка — 8 − 3 = 5 раз.</p><div class="steps">`;
+  m.st.forEach(x => {
+    const t = S.place[x.f.id], tn = t ? TB3.find(q => q.id === t).ru : 'не разложено';
+    const v = x.st === 'ok' ? `${tn}: 0` : x.st === 'rep' ? `${tn}: 8 − ${8 - x.n} = ${x.n}` : x.st === 'bad' ? `${tn}: конфликт` : tn;
+    h += step(`${x.f.ru} (свойство ${ENT[x.f.e]})`, v, x.st === 'ok' ? 'okk' : x.st === 'none' ? '' : 'badd');
+  });
+  h += step('было в одной таблице', `${FLAT_COPIES} копий`) + step('стало', `${m.copies} копий, ${m.bad} конфликтов`, m.designOk ? 'okk sum' : 'sum') + '</div>';
+  const ts = fStatus(FIELDS[3]).st;
+  h += `<h3>Сменился руководитель кружка</h3><div class="steps">` + step('одна таблица', '3 ячейки') + step('ваша база', ts === 'ok' ? '1 ячейка' : ts === 'rep' ? '3 ячейки' : ts === 'bad' ? 'некуда записать' : 'поле не разложено', ts === 'ok' ? 'okk' : '') + '</div>';
+  return h;
+}
+
+function renderMeter(m) {
+  const el = $('#meter'), ok = !!S.done[LID()];
+  if (m.kind === 'relations') el.innerHTML = `<div class="k">Верных связей</div><div class="v ${ok ? 'ok' : ''}">${m.good} / 2</div><div class="gauge"><b style="width:${m.good * 50}%"></b></div><div class="lr"><span>ключей</span><span>${m.pkSet}/3</span></div><div class="lr"><span>лишних</span><span>${m.extraL}</span></div>`;
+  else if (m.kind === 'sql') el.innerHTML = `<div class="k">Результат</div><div class="v ${ok ? 'ok' : m.r && !m.ok ? 'bad' : ''}">${!m.r ? '—' : m.ok ? `${m.n} ${plural(m.n, 'строка', 'строки', 'строк')}` : 'ошибка'}</div><div class="lr"><span>столбцов</span><span>${m.ok ? m.r.cols.length : '—'}</span></div><div class="lr"><span>WHERE</span><span>${m.ok && m.r.q.where ? m.r.pass.length + '/10' : '—'}</span></div>`;
+  else el.innerHTML = `<div class="k">Лишних копий</div><div class="v ${ok ? 'ok' : m.bad ? 'bad' : ''}">${m.copies} <span style="font-size:11px;color:var(--muted)">было ${FLAT_COPIES}</span></div><div class="gauge"><b style="width:${m.placed / 6 * 100}%"></b></div><div class="lr"><span>разложено</span><span>${m.placed}/6</span></div><div class="lr"><span>конфликтов</span><span>${m.bad}</span></div>`;
+}
+
+function lite() { const m = model(); renderMeter(m); if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m); if (S.tab === 'scheme') updateScheme(m); $('#taskState').textContent = taskState(m); dirty = true; }
+function update() {
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Вы спроектировали настоящую базу данных!'), 1400);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  relations: '<rect x="4" y="6" width="20" height="18" rx="3" fill="none" stroke="#e8ecf4"/><rect x="42" y="6" width="20" height="18" rx="3" fill="none" stroke="#e8ecf4"/><path d="M24 12C33 12 33 18 42 18" fill="none" stroke="#86e0a8" stroke-width="1.6"/><circle cx="9" cy="12" r="2" fill="none" stroke="#ffb547"/>',
+  sql: '<text x="4" y="13" font-size="8" fill="#ffb547" font-family="monospace">SELECT</text><text x="4" y="24" font-size="8" fill="#72d4e8" font-family="monospace">WHERE &gt;</text>',
+  design: '<rect x="4" y="4" width="58" height="8" fill="none" stroke="#ffb547"/><path d="M33 13v4" stroke="#8b96ad"/><rect x="4" y="18" width="16" height="9" rx="2" fill="none" stroke="#86e0a8"/><rect x="25" y="18" width="16" height="9" rx="2" fill="none" stroke="#72d4e8"/><rect x="46" y="18" width="16" height="9" rx="2" fill="none" stroke="#86e0a8"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Lx, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Lx.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Lx.title}</span></span>
+      ${S.done[Lx.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const Ls = LESSONS[i];
+  S.lesson = i; S.hl = null;
+  resetLesson();
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = Ls.task;
+  $('#hint').textContent = Ls.stage;
+  scene.setAttribute('aria-label', { relations: 'Схема базы библиотеки: три таблицы, ключи и связи', sql: 'Запрос SQL, таблица olymp и результат запроса', design: 'Большая таблица кружков и три новые таблицы, куда раскладывают поля' }[Ls.id]);
+  renderTools(); renderStrip(); buildScheme(); update();
+  requestAnimationFrame(fit);
+  const cur = $('#lessons .lesson[aria-current="true"]'), ls = $('#lessons'); if (cur) { const dx = cur.getBoundingClientRect().left - ls.getBoundingClientRect().left; if (dx < 0 || dx + cur.offsetWidth > ls.clientWidth) ls.scrollLeft += dx - 8; }
+}
+window.addEventListener('resize', () => requestAnimationFrame(fit));
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '';
+  if (id === 'relations') {
+    const ls = m.infos.length ? m.infos.map(x => `${x.key.replace('|', ' — ')} (${x.pk ? `найдено ${x.found} из ${x.total}${x.valid ? ', верная' : ', неверная'}` : 'ни один конец не первичный ключ'})`).join('; ') : 'нет';
+    now = `База школьной библиотеки. readers(id, name, class): 5 читателей, среди них две Айгерим из разных классов. books(id, title, author): 5 книг с номерами 101–105, у Абая две книги. loans(id, reader_id, book_id, date): 8 выдач с номерами 11–18. Первичные ключи: readers — ${S.pk.readers || 'не назначен'}, loans — ${S.pk.loans || 'не назначен'}, books — ${S.pk.books || 'не назначен'}. Связи: ${ls}. Внизу таблица выдач, где по связям подставляются имена читателей и названия книг. Не называй прямо, какие столбцы связать, — спрашивай: почему имя не годится в ключ, где в «Выдачах» записан номер читателя и в каком столбце «Читателей» этот номер искать.`;
+  }
+  if (id === 'sql') {
+    const r = m.r;
+    now = `Таблица olymp(id, name, grade, subject, score) — результаты школьной олимпиады, 10 строк: ${OLYMP.map(x => `${x[1]} ${x[2]} кл. ${x[3]} ${x[4]}`).join('; ')}. В строке ввода: «${S.sqlText}». Последний выполненный запрос: «${S.sqlRun || 'нет'}». ${!r ? 'Результата нет.' : r.ok ? `Результат: ${r.rows.length} строк, столбцы ${r.cols.join(', ')}: ${r.rows.map(x => x.join(' ')).join('; ')}.` : `Ошибка: ${r.err}`} Задание ${m.sqlOk ? 'выполнено' : 'не выполнено'}. Не пиши готовый запрос целиком — наводи вопросами: какие столбцы нужны, какие два условия и чем их соединить, «больше 70» включает ли 70, в какую сторону сортировать.`;
+  }
+  if (id === 'design') {
+    now = `Большая таблица записей в кружки: 8 строк, поля: имя ученика, класс, название кружка, руководитель, кабинет, дата записи; учеников 5, кружков 3. Новые таблицы: Ученики(id), Кружки(id), Записи(ученик_id, кружок_id). Раскладка полей: ${m.st.map(x => `${x.f.ru} → ${S.place[x.f.id] ? TB3.find(t => t.id === S.place[x.f.id]).ru : 'не разложено'} (${{ ok: 'на месте', rep: `повторов ${x.n}`, bad: 'конфликт', none: '—' }[x.st]})`).join('; ')}. Лишних копий: ${m.copies} (было ${FLAT_COPIES}), конфликтов: ${m.bad}. Не говори, куда класть каждое поле, — спрашивай: это свойство ученика, кружка или самой записи? сколько раз оно повторится?`;
+  }
+  return [
+    `Раздел: информатика, 9 класс, тема «Базы данных». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { relations: 'Почему имя нельзя сделать первичным ключом?', sql: 'Чем WHERE отличается от ORDER BY?', design: 'Зачем нужна таблица «Записи»?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

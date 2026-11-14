@@ -38,7 +38,7 @@ window.LUCH_SUBJECTS = {
       { id: 'gbase', b: 'geo', g: 7, t: 'Начала геометрии', items: ['Точки, прямые, отрезки', 'Смежные и вертикальные углы', 'Параллельные прямые', 'Как доказывать'], req: ['shapes'], status: 'done', href: '/labs/math-gbase/', lessons: 4, doneItems: 4 },
       { id: 'tri', b: 'geo', g: 7, t: 'Треугольники', items: ['Признаки равенства', 'Равнобедренный треугольник', 'Сумма углов', 'Построения циркулем'], req: ['gbase'], status: 'done', href: '/labs/math-tri/', lessons: 4, doneItems: 4 },
       { id: 'quadr', b: 'geo', g: 8, t: 'Четырёхугольники', items: ['Параллелограмм', 'Прямоугольник, ромб, квадрат', 'Трапеция', 'Площади многоугольников'], req: ['tri'], status: 'done', href: '/labs/math-quadr/', lessons: 4, doneItems: 4 },
-      { id: 'pyth', b: 'geo', g: 8, t: 'Пифагор и подобие', items: ['Теорема Пифагора', 'Подобные треугольники', 'Синус, косинус, тангенс угла'], req: ['quadr', 'roots'] },
+      { id: 'pyth', b: 'geo', g: 8, t: 'Пифагор и подобие', items: ['Теорема Пифагора', 'Подобные треугольники', 'Синус, косинус, тангенс угла'], req: ['quadr', 'roots'], status: 'done', href: '/labs/math-pyth/', lessons: 3, doneItems: 3 },
       { id: 'circ', b: 'geo', g: 8, t: 'Окружность', items: ['Касательная', 'Вписанные углы', 'Вписанная и описанная окружность'], req: ['tri'] },
       { id: 'vect', b: 'geo', g: 9, t: 'Векторы и координаты', items: ['Векторы', 'Метод координат', 'Уравнение окружности и прямой'], req: ['pyth', 'coord'] },
       { id: 'stereo', b: 'geo', g: 10, t: 'Стереометрия', items: ['Аксиомы пространства', 'Параллельность и перпендикулярность', 'Углы и расстояния'], req: ['vect'] },
@@ -128,7 +128,7 @@ window.LUCH_SUBJECTS = {
 
       { id: 'body', b: 'human', g: 9, t: 'Опора и движение', items: ['Скелет', 'Мышцы', 'Осанка и травмы'], req: ['verts'], status: 'done', href: '/labs/bio-body/', lessons: 3, doneItems: 3 },
       { id: 'blood', b: 'human', g: 9, t: 'Кровь и сердце', items: ['Состав крови', 'Сердце', 'Сосуды и давление', 'Иммунитет и прививки'], req: ['body'], status: 'done', href: '/labs/bio-blood/', lessons: 4, doneItems: 4 },
-      { id: 'digest', b: 'human', g: 9, t: 'Дыхание и питание', items: ['Лёгкие и дыхание', 'Пищеварение', 'Питание и витамины', 'Выделение'], req: ['blood'] },
+      { id: 'digest', b: 'human', g: 9, t: 'Дыхание и питание', items: ['Лёгкие и дыхание', 'Пищеварение', 'Питание и витамины', 'Выделение'], req: ['blood'], status: 'done', href: '/labs/bio-digest/', lessons: 4, doneItems: 4 },
       { id: 'nerves', b: 'human', g: 9, t: 'Мозг и чувства', items: ['Нейрон и рефлекс', 'Головной мозг', 'Зрение и слух', 'Сон и память'], req: ['body'] },
       { id: 'hormones', b: 'human', g: 9, t: 'Гормоны и взросление', items: ['Железы внутренней секреции', 'Половое созревание', 'Рост организма'], req: ['nerves'] },
       { id: 'health', b: 'human', g: 9, t: 'Здоровье и первая помощь', items: ['Первая помощь', 'Вредные привычки', 'Гигиена и режим дня'], req: ['blood'] },
@@ -171,7 +171,7 @@ window.LUCH_SUBJECTS = {
       { id: 'binary', b: 'data', g: 6, t: 'Системы счисления', items: ['Двоичная система', 'Перевод чисел', 'Шестнадцатеричная система'], req: ['info'], status: 'done', href: '/informatics/', lessons: 5, doneItems: 3 },
       { id: 'sheets', b: 'data', g: 7, t: 'Электронные таблицы', items: ['Формулы', 'Ссылки на ячейки', 'Диаграммы', 'Сортировка и фильтр'], req: ['pc'], status: 'done', href: '/labs/cs-sheets/', lessons: 4, doneItems: 4 },
       { id: 'logic', b: 'data', g: 8, t: 'Логика', items: ['Высказывания', 'И, ИЛИ, НЕ', 'Таблицы истинности', 'Логические схемы'], req: ['binary'], status: 'done', href: '/labs/cs-logic/', lessons: 4, doneItems: 4 },
-      { id: 'db', b: 'data', g: 9, t: 'Базы данных', items: ['Таблицы и связи', 'Запросы SQL', 'Проектирование базы'], req: ['sheets', 'logic'] },
+      { id: 'db', b: 'data', g: 9, t: 'Базы данных', items: ['Таблицы и связи', 'Запросы SQL', 'Проектирование базы'], req: ['sheets', 'logic'], status: 'done', href: '/labs/cs-db/', lessons: 3, doneItems: 3 },
       { id: 'analysis', b: 'data', g: 10, t: 'Анализ данных', items: ['Сбор и очистка данных', 'Визуализация', 'Python для данных'], req: ['db', 'func'] },
 
       { id: 'safe', b: 'net', g: 5, t: 'Интернет и безопасность', items: ['Поиск информации', 'Надёжные пароли', 'Цифровой след', 'Как распознать фейк'], req: ['pc'], status: 'done', href: '/labs/cs-safe/', lessons: 4, doneItems: 4 },
