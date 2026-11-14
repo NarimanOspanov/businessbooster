@@ -8752,7 +8752,7 @@ http
     }
 
     // ИИ-репетитор на страницах опытов (/physics, /optics, /mechanics).
-    if (urlPath === "/api/tutor" || urlPath === "/api/tutor/tts" || urlPath === "/api/tutor/stt") {
+    if (urlPath === "/api/tutor" || urlPath === "/api/tutor/tts" || urlPath === "/api/tutor/stt" || urlPath === "/api/tutor/hw") {
       require("./scripts/tutor.js").handle(req, res, { readBody, clientIp });
       return;
     }
