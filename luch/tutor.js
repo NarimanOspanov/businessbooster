@@ -13,7 +13,9 @@
   const LANGS = [['ru', 'Рус'], ['en', 'Eng'], ['kk', 'Қаз'], ['es', 'Esp']];
   const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
   const fromUrl = new URLSearchParams(location.search).get('lang');
-  let lang = LANGS.some(l => l[0] === fromUrl) ? fromUrl : (store.get('luch-lang') || 'ru');
+  // Пока сайт только на русском: переключатель скрыт, другие языки включаются лишь вручную через ?lang=en (для проверки).
+  const LANGS_ON = false;
+  let lang = LANGS.some(l => l[0] === fromUrl) ? fromUrl : (LANGS_ON ? (store.get('luch-lang') || 'ru') : 'ru');
   if (!LANGS.some(l => l[0] === lang)) lang = 'ru';
   if (fromUrl) store.set('luch-lang', lang);
   document.documentElement.lang = lang;
@@ -35,7 +37,7 @@
     box.addEventListener('click', e => { const b = e.target.closest('button'); if (b && b.dataset.l !== lang) api.set(b.dataset.l); });
     header.appendChild(box);
   };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount); else mount();
+  if (LANGS_ON) { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount); else mount(); }
   if (lang === 'ru') return;
 
   const CY = /[А-Яа-яЁё]/;
