@@ -1,0 +1,858 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория: постулаты Эйнштейна, замедление времени на световых часах и энергия покоя E = mc².">
+<title>Теория относительности</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry. Space stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene [data-act]{cursor:pointer}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--arm);transition:width .2s}
+.gauge i{position:absolute;top:-4px;width:2px;height:14px;background:var(--force);transform:translateX(-50%)}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button.go{color:var(--force)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 230px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M9 10h10M21 30h10" stroke="var(--fg)" stroke-width="2.2" stroke-linecap="round"/><path d="M14 11L26 29" stroke="var(--force)" stroke-width="1.8" stroke-dasharray="2.5 2"/><circle cx="22" cy="23" r="2.4" fill="var(--force)"/><path d="M8 20h4M28 20h4" stroke="var(--arm)" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Физика · Теория относительности</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/">Карта</a><a href="/physics/">Физика</a><a href="/labs/phys-relat/" aria-current="page">Относительность</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>СТО</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Опытная площадка">
+    <svg class="scene" id="scene" role="img" aria-label="Площадка для мысленных опытов Эйнштейна. Ползунок внизу площадки можно тянуть."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const SUPD = { '-': '⁻', '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹' };
+const pow10 = e => '10' + String(e).split('').map(c => SUPD[c] || c).join('');
+const sci = (x, n = 2) => {
+  if (!x) return '0';
+  let e = Math.floor(Math.log10(Math.abs(x))), mt = x / 10 ** e;
+  if (Math.round(mt * 10 ** n) / 10 ** n >= 10) { mt /= 10; e += 1; }
+  return fmt(mt, n) + '·' + pow10(e);
+};
+const nice = x => x >= 1e9 ? fmt(x / 1e9, x >= 1e10 ? 0 : 1) + ' млрд' : x >= 1e6 ? fmt(x / 1e6, x >= 1e7 ? 0 : 1) + ' млн' : x >= 1e3 ? fmt(x / 1e3, x >= 1e4 ? 0 : 1) + ' тыс.' : fmt(x, x >= 10 ? 0 : 2);
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+
+// ---------- physics constants ----------
+const C = 3e8;                                  // скорость света, школьное значение, м/с
+const gam = b => 1 / Math.sqrt(1 - b * b);      // лоренц-фактор γ
+const E_KZ = 115e9 * 3.6e6;                     // ≈115 млрд кВт·ч в год → Дж
+const J_KT = 4.184e12, J_COAL_T = 2.93e10;      // 1 кт тротила; 1 т условного топлива (29,3 МДж/кг)
+// lesson 1 geometry: gates A and B are 300 000 км apart (1 световая секунда), light pulse crosses in T1 seconds of animation
+const GA = 150, GB = 450, LV = GB - GA, CV1 = 150, T1 = LV / CV1, RY = 300, PRE = 0.4;
+// lesson 2: light clock, mirrors HC apart, one tick = 2·HC / CV2 seconds of animation
+const CV2 = 120, HC = 120, T0 = 2 * HC / CV2, YB = 340, YT = YB - HC, X0 = 240, W2 = 240, XR = 100;
+// in-scene slider
+const KX0 = 120, KX1 = 420, KY = 388;
+
+const LESSONS = [
+  { id: 'post', title: 'Постулаты Эйнштейна',
+    text: ['Первый постулат: все инерциальные системы отсчёта равноправны. В вагоне, который едет ровно и без толчков, мяч падает и свет распространяется так же, как на перроне. Никаким опытом внутри нельзя узнать, едешь ты или стоишь.',
+           'Второй постулат: скорость света в вакууме одинакова во всех инерциальных системах, c ≈ 3·10⁸ м/с. Она не зависит ни от скорости источника, ни от скорости наблюдателя.',
+           'По Галилею скорости складываются, и свет фонаря ракеты должен лететь со скоростью c + v. Проверим. Ракета с выключенными двигателями пролетает ворота А и включает фонарь. Приборы на Земле засекают, за сколько свет пройдёт 300 000 км до ворот Б.'],
+    why: 'Инженеры спутниковой навигации и связи закладывают постоянство c во все расчёты: GPS и ГЛОНАСС находят расстояние до спутника по времени полёта сигнала. Связисты, которые тянут оптоволокно между Алматы и Астаной, считают задержку сигнала через ту же c. Астрономы обсерватории Ассы-Тургень знают: свет от звезды, к которой Земля летит, и от звезды, от которой удаляется, приходит с одной скоростью.',
+    task: 'Сделайте три замера: ракета стоит; летит со скоростью от 0,5c, фонарь светит вперёд; летит от 0,5c, фонарь светит назад.',
+    hint: 'Скорость ракеты — ползунок внизу площадки. Направление фонаря и «Пуск» — на панели. Сравните секундомер с прогнозом Галилея.',
+    stage: 'Тяните ползунок скорости, затем «Пуск». Нажатие на ракету тоже запускает опыт.',
+    b: 0.5, dir: 1,
+    check: m => m.has0 && m.hasF && m.hasB },
+  { id: 'dilation', title: 'Замедление времени',
+    text: ['Самые простые часы — световые: импульс света бегает между двумя зеркалами. Один «тик» — путь туда и обратно. Пусть зеркала стоят в 15 см друг от друга, тогда тик длится 1 нс.',
+           'Поставим такие часы в ракету. Для космонавта свет бегает прямо вверх-вниз. А с Земли видно, что зеркала уезжают и свет идёт по косой — путь длиннее. Скорость света та же, значит, тик длится дольше.',
+           'Отсюда Δt = Δt₀ / √(1 − v²/c²). Δt₀ — собственное время, его показывают часы, которые движутся вместе с ракетой. Чем ближе v к c, тем сильнее замедление.'],
+    why: 'Без поправок теории относительности GPS ошибался бы примерно на 10 км за сутки: часы на спутниках идут иначе, чем на Земле, и инженеры учитывают это в каждом приёмнике. На этом держатся навигатор такси, спутниковый автопилот трактора на полях Костанайской области и работа геодезиста на стройке. Физики на ускорителях — например, в Дубне, где работают и учёные из Казахстана — каждый день видят, что быстрые частицы живут дольше.',
+    task: 'Подберите скорость ракеты, при которой её часы идут вдвое медленнее земных: пока на Земле проходит 2 тика, в ракете проходит 1.',
+    hint: 'Замедление показывает γ = 1 / √(1 − v²/c²). Какой должна быть γ? Двигайте ползунок, а точно — кнопками ±0,001c.',
+    stage: 'Тяните ползунок скорости и сравнивайте тики двух часов.',
+    b: 0.3,
+    check: m => Math.abs(m.g - 2) <= 0.02 },
+  { id: 'emc2', title: 'E = mc²',
+    text: ['Масса — это ещё и мера энергии. Тело в покое хранит энергию покоя E₀ = mc². Квадрат скорости света огромен, 9·10¹⁶ м²/с², поэтому даже грамм вещества — гигантский запас энергии.',
+           'Движущееся тело имеет полную энергию E = γmc², а кинетическая — это разность E − mc². И обратно: если тело отдало энергию ΔE, его масса уменьшилась на Δm = ΔE / c².',
+           'Целиком в энергию масса переходит, только когда частица встречает свою античастицу. В реакторе АЭС в энергию переходит меньше 0,1 % массы урана — и этого хватает, чтобы снабжать током города.'],
+    why: 'По E = mc² инженеры-ядерщики считают, сколько энергии даст топливо. Казахстан — первый в мире по добыче урана, а у озера Балхаш собираются строить АЭС: там понадобятся физики, инженеры и дозиметристы. В ПЭТ-центрах врачи находят опухоли по γ-квантам, которые рождаются, когда позитрон и электрон исчезают и вся их масса превращается в энергию.',
+    task: 'Казахстан за год потребляет около 115 млрд кВт·ч электроэнергии. Подберите массу, которая, целиком превратившись в энергию, даст столько же, и нажмите «Превратить».',
+    hint: 'Переведите кВт·ч в джоули: 1 кВт·ч = 3,6·10⁶ Дж. Потом m = E / c². Точность — 3 %.',
+    stage: 'Тяните ползунок массы, затем «Превратить». Нажатие на кубик тоже превращает.',
+    m: 1,
+    check: m => m.conv && Math.abs(m.E / E_KZ - 1) <= 0.03 },
+];
+
+const LS_KEY = 'luch-phys-relat';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null,
+            b1: 0.5, dir: 1, runs: [], run: null, shot: null, b2: 0.3, t2: 0, m: 1, conv: false, convT: -1e9 };
+const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+function model() {
+  const id = LID();
+  if (id === 'post') {
+    const b = S.b1, d = b === 0 ? 1 : S.dir, last = S.runs[S.runs.length - 1] || null;
+    return { kind: 'post', b, d, vGal: 1 + d * b, tGal: 1 / (1 + d * b), last, n: S.runs.length,
+             has0: S.runs.some(r => r.b === 0), hasF: S.runs.some(r => r.d === 1 && r.b >= 0.5 - 1e-9), hasB: S.runs.some(r => r.d === -1 && r.b >= 0.5 - 1e-9) };
+  }
+  if (id === 'dilation') { const b = S.b2, g = gam(b), t = S.t2 / T0; return { kind: 'dil', b, g, t, tau: t / g }; }
+  const E = S.m * C * C;
+  return { kind: 'emc', m: S.m, E, conv: S.conv, frac: E / E_KZ, kwh: E / 3.6e6, kt: E / J_KT, coal: E / J_COAL_T };
+}
+const mass = m => m < 1 ? fmt(m * 1000, 0) + ' г' : fmt(m, 2) + ' кг';
+
+// ---------- scene ----------
+const STARS = []; { let s = 11; const r = () => (s = (s * 16807) % 2147483647) / 2147483647; for (let i = 0; i < 70; i++) STARS.push([r() * 900 - 190, r() * 560 - 220, r() * 1.1 + 0.3]); }
+const ol = (d, fill, stroke, w = 2.2, extra = '') => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${w + 2.6}" stroke-linejoin="round" stroke-linecap="round"/><path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round" ${extra}/>`;
+
+function sky(ground) {
+  let h = `<defs><radialGradient id="glow"><stop offset="0" stop-color="#fff6c8"/><stop offset=".35" stop-color="#ffd36b" stop-opacity=".8"/><stop offset="1" stop-color="#ffb547" stop-opacity="0"/></radialGradient>
+    <clipPath id="clipR"><rect x="${X0 - 34}" y="150" width="${W2 + 68}" height="230"/></clipPath></defs>`;
+  for (const [x, y, r] of STARS) if (!ground || y < 340) h += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(2)}" fill="#c8d6ec" opacity=".45"/>`;
+  if (ground) h += `<rect x="-2000" y="350" width="4520" height="1200" fill="#1a2232"/><rect x="-2000" y="348" width="4520" height="3" fill="#2c3954"/>`;
+  return h;
+}
+
+// in-scene slider: value 0…1 → knob position
+function knobSVG(label, frac, text, disabled) {
+  const x = KX0 + clamp(frac, 0, 1) * (KX1 - KX0);
+  return `<g data-drag="knob" opacity="${disabled ? 0.45 : 1}"><rect x="${KX0 - 14}" y="${KY - 14}" width="${KX1 - KX0 + 28}" height="28" fill="transparent"/>
+    <rect x="${KX0}" y="${KY - 2.5}" width="${KX1 - KX0}" height="5" rx="2.5" fill="#26324a"/><rect x="${KX0}" y="${KY - 2.5}" width="${(x - KX0).toFixed(1)}" height="5" rx="2.5" fill="#ffb547"/>
+    <circle cx="${x.toFixed(1)}" cy="${KY}" r="9" fill="#e8ecf4" stroke="${INK}" stroke-width="2"/></g>
+    <text x="${KX0 - 18}" y="${KY + 4}" font-size="11" fill="#8b96ad" text-anchor="end">${label}</text>
+    <text x="${KX1 + 18}" y="${KY + 4}" font-size="11" fill="#e8ecf4">${text}</text>`;
+}
+
+function rocketSVG(x, y, noseRight, lamp) {
+  const L = x - 70, R = x;
+  const body = noseRight ? `M${L} ${y - 10}H${R - 18}Q${R + 2} ${y} ${R - 18} ${y + 10}H${L}Z` : `M${R} ${y - 10}H${L + 18}Q${L - 2} ${y} ${L + 18} ${y + 10}H${R}Z`;
+  const tail = noseRight ? L : R, s = noseRight ? 1 : -1;
+  let h = `<g data-act="run">` + ol(`M${tail + 6 * s} ${y - 9}L${tail - 6 * s} ${y - 20}L${tail + 20 * s} ${y - 9}ZM${tail + 6 * s} ${y + 9}L${tail - 6 * s} ${y + 20}L${tail + 20 * s} ${y + 9}Z`, '#56627d', '#8a96b0', 1.4);
+  h += ol(body, '#c8d1e2', '#e8ecf4', 1.8);
+  h += `<circle cx="${x - 35}" cy="${y}" r="4.5" fill="#72d4e8" stroke="${INK}" stroke-width="1.5"/>`;
+  h += `<rect x="${R - 4}" y="${y - 16}" width="8" height="6" rx="1.5" fill="${lamp ? '#ffd36b' : '#56627d'}" stroke="${INK}" stroke-width="1.2"/>`;
+  return h + `</g>`;
+}
+
+function gateSVG(x, label, lit) {
+  let h = ol(`M${x - 16} 350V250H${x + 16}V350`, 'none', '#8a96b0', 3);
+  h += `<rect x="${x - 7}" y="242" width="14" height="10" rx="2" fill="${lit ? '#86e0a8' : '#26324a'}" stroke="${INK}" stroke-width="1.4"/>`;
+  return h + `<text x="${x}" y="236" font-size="12" fill="#e8ecf4" text-anchor="middle" font-weight="500">${label}</text>`;
+}
+
+function postScene(t) {
+  let h = sky(true);
+  const r = S.run || S.shot, b = r ? r.b : S.b1, d = b === 0 ? 1 : (r ? r.d : S.dir);
+  const tt = S.run ? S.run.t : S.shot ? PRE + T1 : 0;
+  const lt = tt - PRE;
+  h += `<path d="M${GA} 368H${GB}" stroke="#56627d" stroke-width="1.2"/><path d="M${GA} 363v10M${GB} 363v10" stroke="#56627d" stroke-width="1.2"/>`;
+  h += `<text x="${(GA + GB) / 2}" y="364" font-size="10" fill="#8b96ad" text-anchor="middle">L = 300 000 км</text>`;
+  h += gateSVG(GA, 'А', lt >= 0) + gateSVG(GB, 'Б', lt >= T1 - 1e-6);
+  // Galileo's prediction: a ghost pulse that would move at c + v
+  if (lt >= 0 && b > 0) {
+    const gx = Math.min(GB + 60, GA + CV1 * (1 + d * b) * lt);
+    h += `<circle cx="${gx.toFixed(1)}" cy="${RY}" r="7" fill="none" stroke="#ff8a73" stroke-width="1.6" stroke-dasharray="3 3"/><text x="${gx.toFixed(1)}" y="${RY + 26}" font-size="9" fill="#ff8a73" text-anchor="middle">Галилей</text>`;
+  }
+  // rocket: emitter at x, reaches gate A at tt = PRE
+  const xe = GA + d * b * CV1 * lt;
+  h += rocketSVG(xe, RY, d === 1, lt >= 0);
+  // the real light pulse always moves at c
+  if (lt >= 0) {
+    const px = Math.min(GB, GA + CV1 * lt);
+    h += `<path d="M${GA} ${RY}H${px.toFixed(1)}" stroke="#ffd36b" stroke-width="2" opacity=".55"/><circle cx="${px.toFixed(1)}" cy="${RY}" r="14" fill="url(#glow)"/><circle cx="${px.toFixed(1)}" cy="${RY}" r="3.5" fill="#fff6c8"/>`;
+    h += `<text x="${px.toFixed(1)}" y="${RY - 22}" font-size="9" fill="#ffd36b" text-anchor="middle">свет</text>`;
+  }
+  // stopwatch
+  const sw = lt < 0 ? 0 : Math.min(1, lt / T1);
+  h += `<g transform="translate(280 196)"><rect x="-74" y="-18" width="148" height="34" rx="8" fill="#0d1a14" stroke="#26324a" stroke-width="1.5"/>
+    <text x="0" y="-5" font-size="8" fill="#8b96ad" text-anchor="middle">СЕКУНДОМЕР А → Б</text><text x="0" y="10" font-size="13" fill="#86e0a8" text-anchor="middle">${fmt(sw, 3)} с</text></g>`;
+  const busy = !!S.run;
+  h += knobSVG('v', S.b1 / 0.9, fmt(S.b1, 2) + 'c', busy);
+  return h;
+}
+
+function mirrorPair(x, label) {
+  let h = ol(`M${x - 22} ${YT - 4}H${x + 22}`, 'none', '#a9b4c9', 4) + ol(`M${x - 22} ${YB + 4}H${x + 22}`, 'none', '#a9b4c9', 4);
+  h += `<path d="M${x - 22} ${YT - 8}H${x + 22}M${x - 22} ${YB + 8}H${x + 22}" stroke="#56627d" stroke-width="2" stroke-dasharray="3 3"/>`;
+  return h + (label ? `<text x="${x}" y="${YB + 26}" font-size="10" fill="#8b96ad" text-anchor="middle">${label}</text>` : '');
+}
+const zz = (u) => YB - HC * (1 - Math.abs(1 - 2 * u));   // height of the photon over one tick, u = 0…1
+
+function dilScene() {
+  let h = sky(false);
+  const g = gam(S.b2), P = g * T0, vx = S.b2 * CV2;
+  const t = reduce ? 0.92 * P : S.t2;
+  // rest clock (on Earth)
+  const u0 = (t % T0) / T0;
+  h += `<text x="${XR}" y="182" font-size="11" fill="#e8ecf4" text-anchor="middle">Часы на Земле</text>`;
+  h += mirrorPair(XR, '') + `<path d="M${XR} ${YB}V${YT}" stroke="#ffd36b" stroke-width="1" opacity=".3"/>`;
+  h += `<circle cx="${XR}" cy="${zz(u0).toFixed(1)}" r="10" fill="url(#glow)"/><circle cx="${XR}" cy="${zz(u0).toFixed(1)}" r="3" fill="#fff6c8"/>`;
+  // moving clock seen from Earth: unwrap x, then shift into the panel
+  const raw = vx * t, shift = X0 + ((raw % W2) + W2) % W2 - raw, P0 = Math.floor(t / P) * P;
+  const pts = [];
+  for (let k = P0 - P; k <= t + 1e-9; k += P / 2) pts.push([vx * k, Math.round((k - P0 + P) / (P / 2)) % 2 ? YT : YB]);
+  pts.push([raw, zz(((t % P) + P) % P / P)]);
+  const xm = raw + shift;
+  h += `<text x="${X0 + W2 / 2}" y="182" font-size="11" fill="#e8ecf4" text-anchor="middle">Часы в ракете — вид с Земли</text>`;
+  h += `<g clip-path="url(#clipR)">`;
+  h += `<rect x="${(xm - 34).toFixed(1)}" y="${YT - 16}" width="68" height="${HC + 32}" rx="12" fill="rgba(200,225,255,.04)" stroke="#56627d" stroke-width="1.2" stroke-dasharray="5 4"/>`;
+  h += `<path d="${pts.map((p, i) => (i ? 'L' : 'M') + (p[0] + shift).toFixed(1) + ' ' + p[1].toFixed(1)).join('')}" fill="none" stroke="#ffd36b" stroke-width="1.6" opacity=".7"/>`;
+  h += mirrorPair(xm, '');
+  const py = pts[pts.length - 1][1];
+  h += `<circle cx="${xm.toFixed(1)}" cy="${py.toFixed(1)}" r="10" fill="url(#glow)"/><circle cx="${xm.toFixed(1)}" cy="${py.toFixed(1)}" r="3" fill="#fff6c8"/>`;
+  if (S.b2 > 0.02) h += `<path d="M${(xm + 40).toFixed(1)} ${YT - 12}h22m-6-4l6 4-6 4" fill="none" stroke="#72d4e8" stroke-width="1.6"/>`;
+  h += `</g>`;
+  // counters
+  const m = model(), tt = reduce ? 1 : m.t, tau = reduce ? 1 / g : m.tau;
+  h += `<text x="${XR}" y="${YB + 32}" font-size="11" fill="#86e0a8" text-anchor="middle">t = ${fmt(tt, 1)} нс</text>`;
+  h += `<text x="${X0 + W2 / 2}" y="${YB + 32}" font-size="11" fill="#ffb547" text-anchor="middle">τ = ${fmt(tau, 1)} нс · γ = ${fmt(g, 3)}</text>`;
+  h += knobSVG('v', S.b2 / 0.999, fmt(S.b2, 3) + 'c', false);
+  return h;
+}
+
+function emcScene(t) {
+  let h = sky(false);
+  const m = model(), k = reduce ? 1 : clamp((t - S.convT) / 1400, 0, 1), anim = S.conv && k < 1;
+  // pedestal
+  h += ol('M50 344h120v10q0 4-4 4H54q-4 0-4-4z', '#2a3348', '#3a4762', 1.6);
+  h += `<text x="110" y="376" font-size="10" fill="#8b96ad" text-anchor="middle">m = ${mass(S.m)}</text>`;
+  const side = S.m > 0 ? 12 + 58 * Math.cbrt(S.m / 10) : 0;
+  if (side > 0) {
+    const sc = S.conv ? (anim ? 1 - k : 0) : 1, s2 = side * sc, x = 110 - s2 / 2, y = 344 - s2;
+    if (S.conv && !anim) h += `<rect x="${110 - side / 2}" y="${344 - side}" width="${side}" height="${side}" fill="none" stroke="#56627d" stroke-dasharray="4 4"/><text x="110" y="${330 - side}" font-size="9" fill="#8b96ad" text-anchor="middle">стало энергией</text>`;
+    if (s2 > 0.5) h += `<g data-act="conv">` + ol(`M${x} ${y}h${s2}v${s2}h${-s2}z`, '#7d8db0', '#c8d1e2', 1.6) + `<path d="M${x} ${y}l6 -5h${s2}l-6 5zM${x + s2} ${y}l6 -5v${s2}l-6 5z" fill="#a9b4c9" stroke="${INK}" stroke-width="1"/></g>`;
+    if (anim) {
+      for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, r1 = 10 + k * 40, r2 = 20 + k * 130; h += `<path d="M${(110 + Math.cos(a) * r1).toFixed(1)} ${(344 - side / 2 + Math.sin(a) * r1).toFixed(1)}L${(110 + Math.cos(a) * r2).toFixed(1)} ${(344 - side / 2 + Math.sin(a) * r2).toFixed(1)}" stroke="#ffd36b" stroke-width="2.4" opacity="${(1 - k).toFixed(2)}" stroke-linecap="round"/>`; }
+      h += `<circle cx="110" cy="${(344 - side / 2).toFixed(1)}" r="${(20 + 60 * k).toFixed(1)}" fill="url(#glow)" opacity="${(1 - k).toFixed(2)}"/>`;
+    }
+  }
+  // energy readout
+  const rows = [['E = mc²', sci(m.E) + ' Дж', '#e8ecf4'], ['в кВт·ч', nice(m.kwh) + ' кВт·ч', '#72d4e8'],
+                ['как взрыв', m.kt >= 1000 ? fmt(m.kt / 1000, m.kt >= 1e4 ? 0 : 1) + ' Мт тротила' : fmt(m.kt, m.kt >= 10 ? 0 : 2) + ' кт тротила', '#ff8a73'],
+                ['как сжечь', nice(m.coal) + ' т угля', '#a9b4c9']];
+  rows.forEach((r, i) => { const y = 204 + i * 27; h += `<text x="238" y="${y}" font-size="9" fill="#8b96ad">${r[0]}</text><text x="238" y="${y + 13}" font-size="12.5" fill="${r[2]}">${r[1]}</text>`; });
+  const f = S.conv ? m.frac * k : 0, bw = 250;
+  h += `<text x="238" y="316" font-size="9" fill="#8b96ad">Электроэнергия Казахстана за год</text>`;
+  h += `<rect x="238" y="322" width="${bw}" height="12" rx="3" fill="#26324a"/><rect x="238" y="322" width="${(clamp(f / 2, 0, 1) * bw).toFixed(1)}" height="12" rx="3" fill="${f > 2 ? '#ff8a73' : '#ffd36b'}"/>`;
+  h += `<path d="M${238 + bw / 2} 318v20" stroke="#e8ecf4" stroke-width="1.6"/><text x="${238 + bw / 2}" y="348" font-size="9" fill="#e8ecf4" text-anchor="middle">1 год</text>`;
+  h += `<text x="${238 + bw}" y="348" font-size="9" fill="#8b96ad" text-anchor="end">${S.conv ? fmt(m.frac * 100, 1) + ' %' : 'ждёт превращения'}</text>`;
+  h += knobSVG('m', S.m / 10, mass(S.m), false);
+  return h;
+}
+
+function hlBox(id) {
+  const xe = GA + (S.b1 === 0 ? 1 : S.dir) * S.b1 * CV1 * ((S.run ? S.run.t : S.shot ? PRE + T1 : 0) - PRE);
+  const side = 12 + 58 * Math.cbrt(Math.max(S.m, 0.001) / 10);
+  return {
+    rocket: [xe - 82, RY - 26, 94, 52], gateA: [GA - 24, 228, 48, 126], gateB: [GB - 24, 228, 48, 126], watch: [200, 172, 160, 50], knob: [KX0 - 30, KY - 16, KX1 - KX0 + 100, 32],
+    rest: [XR - 34, 168, 68, 210], moving: [X0 - 34, 168, W2 + 68, 210],
+    cube: [110 - side / 2 - 10, 334 - side, side + 26, side + 30], rows: [230, 190, 270, 112], kz: [230, 306, 268, 48],
+  }[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = id === 'post' ? postScene(t) : id === 'dilation' ? dilScene() : emcScene(t);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 500, hh / 410, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 280 - VB.w / 2; VB.y = 405 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- input ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+function setVal(v) {
+  const id = LID();
+  if (id === 'post') setB1(v * 0.9);
+  else if (id === 'dilation') setB2(v * 0.999);
+  else setM(v * 10);
+}
+function setB1(b) { if (S.run) return; const n = clamp(Math.round(b / 0.05) * 0.05, 0, 0.9); S.b1 = Math.round(n * 100) / 100; S.shot = null; update(); }
+function setB2(b) { const n = Math.round(clamp(b, 0, 0.999) * 1000) / 1000; if (n !== S.b2) { S.b2 = n; S.t2 = 0; } update(); }
+function setM(m) { const n = Math.round(clamp(m, 0, 10) * 1000) / 1000; if (n !== S.m) { S.m = n; S.conv = false; } update(); }
+scene.addEventListener('pointerdown', e => {
+  const a = e.target.closest('[data-act]');
+  if (a) { e.preventDefault(); act(a.dataset.act); return; }
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  drag = { id: el.dataset.drag };
+  setVal(clamp((toSvg(e).x - KX0) / (KX1 - KX0), 0, 1));
+});
+scene.addEventListener('pointermove', e => { if (drag) setVal(clamp((toSvg(e).x - KX0) / (KX1 - KX0), 0, 1)); });
+const endDrag = () => { if (!drag) return; drag = null; scene.classList.remove('grabbing'); dirty = true; };
+scene.addEventListener('pointerup', endDrag);
+scene.addEventListener('pointercancel', endDrag);
+
+function startRun() {
+  if (S.run) return;
+  S.shot = null;
+  const b = S.b1, d = b === 0 ? 0 : S.dir;
+  S.run = { t: 0, b, d };
+  if (reduce) finishRun(); else update();
+}
+function finishRun() {
+  const r = S.run; if (!r) return;
+  S.runs.push({ b: r.b, d: r.d, tg: 1 / (1 + (r.d || 0) * r.b) });
+  if (S.runs.length > 12) S.runs.shift();
+  S.shot = { b: r.b, d: r.d || 1 }; S.run = null;
+  toast(r.b === 0 ? 'Ракета стоит: свет прошёл 300 000 км за 1,000 с.' : `Измерено 1,000 с, скорость света c. Галилей ждал ${fmt(1 / (1 + r.d * r.b), 3)} с.`);
+  update();
+}
+
+let last = performance.now();
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  let anim = false;
+  const id = LID();
+  if (id === 'post' && S.run) { S.run.t += dt; anim = true; if (S.run.t >= PRE + T1) finishRun(); }
+  if (id === 'dilation' && !reduce) { S.t2 += dt; anim = true; if (t - lastPanel > 250) { lastPanel = t; refreshLive(); } }
+  if (id === 'emc2' && S.conv && t - S.convT < 1500) anim = true;
+  if (S.hl) anim = true;
+  if (dirty || anim) { drawScene(t); dirty = false; }
+}
+let lastPanel = 0;
+function refreshLive() { const m = model(); renderMeter(m); $('#taskState').textContent = taskState(m); if (S.tab === 'scheme') updateScheme(m); }
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2800); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, cls) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}${cls ? ` class="${cls}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    post: B('dirF', 'Фонарь вперёд', S.dir === 1) + B('dirB', 'Фонарь назад', S.dir === -1) + sep + B('b1-', 'v −') + B('b1+', 'v +') + sep + B('run', 'Пуск', undefined, 'go'),
+    dilation: B('b2--', '−0,01c') + B('b2-', '−0,001c') + B('b2+', '+0,001c') + B('b2++', '+0,01c') + sep + B('t0', 'Сброс часов'),
+    emc2: B('m1g', '1 г') + B('m1', '1 кг') + B('m-', '−0,1 кг') + B('m+', '+0,1 кг') + sep + B('conv', 'Превратить', undefined, 'go'),
+  }[id];
+}
+function act(a) {
+  if (a === 'dirF' || a === 'dirB') { if (S.run) return; S.dir = a === 'dirF' ? 1 : -1; S.shot = null; renderTools(); buildScheme(); update(); return; }
+  if (a === 'b1-') return setB1(S.b1 - 0.05);
+  if (a === 'b1+') return setB1(S.b1 + 0.05);
+  if (a === 'run') return startRun();
+  if (a === 'clr') { if (S.run) return; S.runs = []; S.shot = null; update(); return; }
+  if (a === 'b2--') return setB2(S.b2 - 0.01);
+  if (a === 'b2-') return setB2(S.b2 - 0.001);
+  if (a === 'b2+') return setB2(S.b2 + 0.001);
+  if (a === 'b2++') return setB2(S.b2 + 0.01);
+  if (a === 't0') { S.t2 = 0; update(); return; }
+  if (a === 'm1g') return setM(0.001);
+  if (a === 'm1') return setM(1);
+  if (a === 'm-') return setM(S.m - 0.1);
+  if (a === 'm+') return setM(S.m + 0.1);
+  if (a === 'conv') {
+    if (S.m <= 0) { toast('Сначала задайте массу.'); return; }
+    if (S.conv) { toast('Эта масса уже превратилась. Измените массу.'); return; }
+    S.conv = true; S.convT = performance.now(); update(); return;
+  }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  rocket: IC('<path d="M4 13h18q7 4 0 8H4z" fill="#c8d1e2"/><path d="M6 13L2 8h7l3 5M6 21L2 26h7l3-5" fill="#8a96b0"/><circle cx="14" cy="17" r="2" fill="#72d4e8"/><rect x="24" y="9" width="5" height="4" rx="1" fill="#ffd36b"/>'),
+  gate: IC('<path d="M8 31V6h18v25" fill="none" stroke="var(--fg)" stroke-width="2"/><rect x="13" y="2" width="8" height="6" rx="1.5" fill="var(--ok)"/>'),
+  watch: IC('<rect x="3" y="9" width="28" height="16" rx="4" fill="#0d1a14" stroke="var(--line)"/><text x="17" y="21" font-size="8" fill="#86e0a8" text-anchor="middle" font-family="monospace">1,000</text>'),
+  knob: IC('<rect x="3" y="15" width="28" height="4" rx="2" fill="var(--line)"/><rect x="3" y="15" width="16" height="4" rx="2" fill="var(--force)"/><circle cx="19" cy="17" r="5" fill="var(--fg)"/>'),
+  clock: IC('<path d="M8 6h18M8 28h18" stroke="var(--fg)" stroke-width="2.4"/><path d="M17 7v20" stroke="#ffd36b" stroke-width="1.2" stroke-dasharray="2 2"/><circle cx="17" cy="14" r="2.5" fill="#fff6c8"/>'),
+  zig: IC('<path d="M3 6h8M23 28h8M3 28h8M23 6h8" stroke="var(--fg)" stroke-width="2"/><path d="M7 28L17 6L27 28" fill="none" stroke="#ffd36b" stroke-width="1.4"/>'),
+  cube: IC('<path d="M7 12h16v16H7z" fill="#7d8db0"/><path d="M7 12l5-5h16l-5 5zM23 12l5-5v16l-5 5z" fill="#a9b4c9"/>'),
+  rows: IC('<path d="M4 9h26M4 17h20M4 25h14" stroke="var(--arm)" stroke-width="2.4" stroke-linecap="round"/>'),
+  kz: IC('<rect x="3" y="14" width="28" height="7" rx="2" fill="var(--line)"/><rect x="3" y="14" width="15" height="7" rx="2" fill="#ffd36b"/><path d="M17 10v15" stroke="var(--fg)" stroke-width="1.6"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+const dirName = d => d === 1 ? 'вперёд' : d === -1 ? 'назад' : '—';
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (m.kind === 'post') return `Стоит ${m.has0 ? '✓' : '—'} · вперёд ≥0,5c ${m.hasF ? '✓' : '—'} · назад ≥0,5c ${m.hasB ? '✓' : '—'}`;
+  if (m.kind === 'dil') return `v = ${fmt(m.b, 3)}c · γ = ${fmt(m.g, 3)}`;
+  return `m = ${mass(m.m)} · E = ${sci(m.E)} Дж` + (m.conv ? ` · ${fmt(m.frac * 100, 1)} % годового` : '');
+}
+
+// Scheme diagrams
+function runsSVG() {
+  const rs = S.runs.slice(-6), H = 18 + Math.max(1, rs.length) * 16;
+  let h = `<svg class="diag" viewBox="0 0 120 ${H}" role="img" aria-label="Скорость света в замерах и прогноз Галилея">`;
+  h += `<text x="2" y="7" font-size="3.6" fill="#86e0a8">■ замер</text><text x="28" y="7" font-size="3.6" fill="#ff8a73">■ по Галилею</text><text x="118" y="7" font-size="3.4" fill="#8b96ad" text-anchor="end">в долях c</text>`;
+  const X = v => 30 + v * 42;
+  h += `<path d="M${X(1)} 10V${H - 2}" stroke="#86e0a8" stroke-width=".3" stroke-dasharray="1 1"/>`;
+  if (!rs.length) h += `<text x="60" y="${H - 6}" font-size="3.6" fill="#8b96ad" text-anchor="middle">Пока нет замеров</text>`;
+  rs.forEach((r, i) => {
+    const y = 12 + i * 16, vg = 1 + (r.d || 0) * r.b;
+    h += `<text x="2" y="${y + 5}" font-size="3.4" fill="#e8ecf4">${fmt(r.b, 2)}c</text><text x="2" y="${y + 10}" font-size="3" fill="#8b96ad">${r.b === 0 ? 'стоит' : dirName(r.d)}</text>`;
+    h += `<rect x="30" y="${y + 1}" width="${(X(1) - 30).toFixed(2)}" height="4.5" fill="#86e0a8"/><rect x="30" y="${y + 6.5}" width="${(X(vg) - 30).toFixed(2)}" height="4.5" fill="#ff8a73"/>`;
+    h += `<text x="${(X(1) + 1.5).toFixed(2)}" y="${y + 4.7}" font-size="3.2" fill="#86e0a8">1,00</text><text x="${(X(vg) + 1.5).toFixed(2)}" y="${y + 10.2}" font-size="3.2" fill="#ff8a73">${fmt(vg, 2)}</text>`;
+  });
+  return h + `</svg>`;
+}
+function gammaSVG() {
+  const X = b => 12 + b * 100, Y = g => 70 - (Math.min(g, 8) - 1) * 9;
+  let h = `<svg class="diag" viewBox="0 0 120 80" role="img" aria-label="График γ от скорости">`;
+  h += `<rect x="12" y="7" width="100" height="63" fill="none" stroke="#26324a" stroke-width=".5"/>`;
+  for (const g of [1, 2, 4, 8]) h += `<text x="10" y="${Y(g) + 1.2}" font-size="3.4" fill="#8b96ad" text-anchor="end">${g}</text><path d="M12 ${Y(g)}H112" stroke="#26324a" stroke-width=".3"/>`;
+  for (const b of [0, 0.5, 1]) h += `<text x="${X(b)}" y="76" font-size="3.4" fill="#8b96ad" text-anchor="middle">${fmt(b, b === 0.5 ? 1 : 0)}</text>`;
+  h += `<text x="112" y="74" font-size="3.2" fill="#8b96ad" text-anchor="end">v/c</text><text x="14" y="11" font-size="3.4" fill="#8b96ad">γ</text>`;
+  let d = ''; for (let i = 0; i <= 200; i++) { const b = Math.min(0.9922, i / 200); d += (i ? 'L' : 'M') + X(b).toFixed(2) + ' ' + Y(gam(b)).toFixed(2); }
+  h += `<path d="${d}" fill="none" stroke="#72d4e8" stroke-width=".8"/><path d="M${X(1)} 7V70" stroke="#ff8a73" stroke-width=".4" stroke-dasharray="1.2 1.2"/>`;
+  const g = gam(S.b2);
+  h += `<circle cx="${X(S.b2).toFixed(2)}" cy="${Y(g).toFixed(2)}" r="1.8" fill="#ffb547" stroke="#e8ecf4" stroke-width=".4"/>`;
+  return h + `</svg>`;
+}
+function energySVG() {
+  const lo = 6, hi = 20, X = e => 6 + (Math.log10(e) - lo) / (hi - lo) * 108;
+  const refs = [[3.6e6, '1 кВт·ч'], [1e9, 'молния'], [6.3e13, 'Хиросима'], [E_KZ, 'КЗ за год']];
+  let h = `<svg class="diag" viewBox="0 0 120 44" role="img" aria-label="Шкала энергий от киловатт-часа до годового потребления Казахстана">`;
+  h += `<path d="M6 24H114" stroke="#56627d" stroke-width=".6"/>`;
+  for (let e = lo; e <= hi; e += 2) h += `<path d="M${X(10 ** e).toFixed(2)} 22.5v3" stroke="#56627d" stroke-width=".4"/><text x="${X(10 ** e).toFixed(2)}" y="31" font-size="3" fill="#8b96ad" text-anchor="middle">${pow10(e)}</text>`;
+  refs.forEach(([e, l], i) => { const x = X(e); h += `<circle cx="${x.toFixed(2)}" cy="24" r="1.2" fill="#a9b4c9"/><text x="${x.toFixed(2)}" y="${i % 2 ? 40 : 37}" font-size="3" fill="#a9b4c9" text-anchor="middle">${l}</text>`; });
+  const E = S.m * C * C;
+  if (E > 0) { const x = clamp(X(E), 6, 114); h += `<path d="M${x.toFixed(2)} 13v11" stroke="#ffb547" stroke-width=".8"/><text x="${x.toFixed(2)}" y="10" font-size="3.4" fill="#ffb547" text-anchor="middle">${mass(S.m)}</text>`; }
+  return h + `<text x="114" y="36" font-size="2.8" fill="#8b96ad" text-anchor="end">Дж</text></svg>`;
+}
+
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'post') h = `<h2>Замеры скорости света</h2><div id="sDiag"></div><p class="note" style="margin-top:8px">Зелёная полоса — что показал прибор, красная — что ждал Галилей: c + v вперёд и c − v назад.</p>
+      <dl class="reads"><div><dt>v ракеты</dt><dd id="r1"></dd></div><div><dt>t замер</dt><dd id="r2"></dd></div><div><dt>t Галилея</dt><dd id="r3"></dd></div></dl>` +
+      slider('inB1', 'Скорость ракеты', 0, 0.9, 0.05, S.b1) +
+      `<div class="ctl"><div class="lbl">Фонарь светит</div><div class="chips" id="dirChips"><button data-d="1" aria-pressed="${S.dir === 1}">Вперёд, по ходу</button><button data-d="-1" aria-pressed="${S.dir === -1}">Назад, против хода</button></div></div>
+      <div class="row"><button class="ghostbtn" data-a="run">Пуск</button><button class="ghostbtn" data-a="clr">Стереть замеры</button></div>`;
+  if (id === 'dilation') h = `<h2>Замедление γ</h2><div id="sDiag"></div><p class="note" style="margin-top:8px">При малых скоростях γ почти 1. Возле c график уходит вверх: часы почти останавливаются.</p>
+      <dl class="reads"><div><dt>v</dt><dd id="r1"></dd></div><div><dt>γ</dt><dd id="r2"></dd></div><div><dt>τ : t</dt><dd id="r3"></dd></div></dl>` +
+      slider('inB2', 'Скорость ракеты, доли c', 0, 0.999, 0.001, S.b2) +
+      `<div class="row"><button class="ghostbtn" data-a="b2-">−0,001c</button><button class="ghostbtn" data-a="b2+">+0,001c</button><button class="ghostbtn" data-a="t0">Сброс часов</button></div>`;
+  if (id === 'emc2') h = `<h2>Шкала энергий</h2><div id="sDiag"></div><p class="note" style="margin-top:8px">Шкала логарифмическая: каждое деление — в 100 раз больше.</p>
+      <dl class="reads"><div><dt>m</dt><dd id="r1"></dd></div><div><dt>E</dt><dd id="r2"></dd></div><div><dt>Доля КЗ</dt><dd id="r3"></dd></div></dl>` +
+      slider('inM', 'Масса, кг', 0, 10, 0.01, S.m) +
+      `<div class="row"><button class="ghostbtn" data-a="m-">−0,1 кг</button><button class="ghostbtn" data-a="m+">+0,1 кг</button><button class="ghostbtn" data-a="conv">Превратить</button></div>`;
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn); };
+  on('#inB1', e => setB1(+e.target.value));
+  on('#inB2', e => setB2(+e.target.value));
+  on('#inM', e => setM(+e.target.value));
+  el.querySelectorAll('#dirChips button').forEach(b => b.onclick = () => act(b.dataset.d === '1' ? 'dirF' : 'dirB'));
+  el.querySelectorAll('.row [data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  const d = el.querySelector('#sDiag'); if (!d) return;
+  if (m.kind === 'post') {
+    d.innerHTML = runsSVG();
+    set('#r1', fmt(m.b, 2) + 'c'); set('#r2', m.last ? '1,000 с' : '—'); set('#r3', fmt(m.tGal, 3) + ' с');
+    set('#inB1O', fmt(S.b1, 2) + 'c'); val('#inB1', S.b1);
+  } else if (m.kind === 'dil') {
+    d.innerHTML = gammaSVG();
+    set('#r1', fmt(m.b, 3) + 'c'); set('#r2', fmt(m.g, 3)); set('#r3', '1 : ' + fmt(m.g, 2));
+    set('#inB2O', fmt(S.b2, 3) + 'c'); val('#inB2', S.b2);
+  } else {
+    d.innerHTML = energySVG();
+    set('#r1', mass(m.m)); set('#r2', sci(m.E) + ' Дж'); set('#r3', fmt(m.frac * 100, 1) + ' %');
+    set('#inMO', mass(S.m)); val('#inM', S.m);
+  }
+}
+
+function partsList() {
+  const id = LID();
+  const knob = { id: 'knob', icon: ICON.knob, name: 'Ползунок на площадке', spec: 'Тяните его пальцем или мышью. Он задаёт главный параметр опыта.' };
+  if (id === 'post') return [
+    { id: 'rocket', icon: ICON.rocket, name: 'Ракета с фонарём', spec: 'Двигатели выключены, ракета летит по инерции — это инерциальная система отсчёта. Фонарь можно повернуть вперёд по ходу или назад.' },
+    { id: 'gateA', icon: ICON.gate, name: 'Ворота А', spec: 'Когда фонарь ракеты поравняется с воротами, он вспыхивает, а датчик запускает секундомер.' },
+    { id: 'gateB', icon: ICON.gate, name: 'Ворота Б', spec: 'Стоят в 300 000 км от ворот А. Датчик останавливает секундомер, когда приходит свет.' },
+    { id: 'watch', icon: ICON.watch, name: 'Секундомер', spec: 'Показывает время полёта света от А до Б в системе отсчёта Земли.' }, knob];
+  if (id === 'dilation') return [
+    { id: 'rest', icon: ICON.clock, name: 'Световые часы на Земле', spec: 'Два зеркала в 15 см друг от друга. Свет бегает вверх-вниз, один тик — 1 нс.' },
+    { id: 'moving', icon: ICON.zig, name: 'Такие же часы в ракете', spec: 'Так их видно с Земли: зеркала уезжают, свет идёт зигзагом. Путь длиннее — тик дольше.' }, knob];
+  return [
+    { id: 'cube', icon: ICON.cube, name: 'Кусок вещества', spec: 'Мысленный опыт: вся его масса превращается в энергию, как при встрече вещества с антивеществом.' },
+    { id: 'rows', icon: ICON.rows, name: 'Табло энергии', spec: 'Энергия в джоулях и в понятных мерах: киловатт-часы, тротил, уголь.' },
+    { id: 'kz', icon: ICON.kz, name: 'Шкала «Казахстан за год»', spec: 'Около 115 млрд кВт·ч — столько электроэнергии страна потребляет за год. Белая черта — ровно 1 год.' }, knob];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}" id="ovState">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Что на площадке</h2><p class="note">Нажмите на деталь, чтобы найти её на площадке.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  if (m.kind === 'post') {
+    const v = m.b * C;
+    let h = `<h2>Свет не складывается со скоростью ракеты</h2><div class="formula">t = L / c</div><p class="note">L = 300 000 км = 3·10⁸ м. По Галилею вместо c стояло бы c + v (фонарь вперёд) или c − v (фонарь назад).</p><h3>Сейчас</h3><div class="steps">` +
+      step('v ракеты', m.b === 0 ? '0' : `${fmt(m.b, 2)} · 3·10⁸ = ${sci(v)} м/с`) +
+      step('Галилей: скорость света', m.b === 0 ? 'c = 3·10⁸ м/с' : `c ${m.d === 1 ? '+' : '−'} v = ${sci(m.vGal * C)} м/с`) +
+      step('Галилей: время', `3·10⁸ / ${sci(m.vGal * C)} = ${fmt(m.tGal, 3)} с`) +
+      step('Опыт: время', '1,000 с') +
+      step('Опыт: скорость', '3·10⁸ / 1,000 = 3·10⁸ м/с = c', 'sum') + `</div>`;
+    if (S.runs.length) h += `<h3>Мои замеры</h3><div class="steps">` + S.runs.map(r => step(`${fmt(r.b, 2)}c, ${r.b === 0 ? 'стоит' : 'фонарь ' + dirName(r.d)}`, `1,000 с (Галилей ${fmt(r.tg, 3)} с)`)).join('') + `</div>`;
+    h += `<p class="note" style="margin-top:10px">Так и в настоящих опытах: свет от быстрых частиц и от двойных звёзд, которые то летят к нам, то от нас, приходит с одной скоростью c.</p>`;
+    return h;
+  }
+  if (m.kind === 'dil') {
+    const b2 = m.b * m.b;
+    return `<h2>Замедление времени</h2><div class="formula">Δt = Δt₀ / √(1 − v²/c²)</div>
+      <p class="note">Откуда формула. За полтика с Земли свет проходит гипотенузу c·Δt/2, зеркала уезжают на v·Δt/2, высота — L. По Пифагору (cΔt/2)² = L² + (vΔt/2)², отсюда Δt = (2L/c) / √(1 − v²/c²), а 2L/c = Δt₀.</p><h3>Сейчас</h3><div class="steps">` +
+      step('v/c', fmt(m.b, 3)) + step('v²/c²', fmt(b2, 4)) + step('1 − v²/c²', fmt(1 - b2, 4)) + step('√(1 − v²/c²)', fmt(Math.sqrt(1 - b2), 4)) +
+      step('γ = 1 / √(…)', fmt(m.g, 3)) + step('тик в ракете с Земли', `Δt = γ · 1 нс = ${fmt(m.g, 3)} нс`, 'sum') + `</div>
+      <h3>Мюоны из космоса</h3><div class="steps">` +
+      step('собственное время жизни', 'τ₀ = 2,2 мкс') + step('без СТО пролетит', '3·10⁸ · 2,2·10⁻⁶ ≈ 660 м') +
+      step('при v = 0,998c', 'γ ≈ 15,8') + step('с замедлением', '≈ 660 м · 15,8 ≈ 10 км', 'sum') + `</div>
+      <p class="note" style="margin-top:10px">Мюоны рождаются на высоте 10–15 км и всё равно долетают до земли — потому что их «часы» идут медленнее.</p>`;
+  }
+  const kz = E_KZ;
+  return `<h2>Энергия покоя</h2><div class="formula">E₀ = m · c²</div><p class="note">c² = (3·10⁸)² = 9·10¹⁶ м²/с². Масса — в килограммах, энергия — в джоулях.</p><h3>Сейчас</h3><div class="steps">` +
+    step('m', `${fmt(m.m, 3)} кг`) + step('E = m · 9·10¹⁶', `${sci(m.E)} Дж`) + step('в кВт·ч (÷ 3,6·10⁶)', `${sci(m.kwh)} кВт·ч`) +
+    step('доля годового потребления КЗ', `${fmt(m.frac * 100, 1)} %`, 'sum') + `</div>
+    <h3>Для задания</h3><div class="steps">` + step('E(КЗ за год)', `115·10⁹ · 3,6·10⁶ = ${sci(kz)} Дж`) + step('m = E / c²', 'посчитайте сами и проверьте ползунком', 'sum') + `</div>
+    <h3>Для сравнения</h3><div class="steps">` + step('1 г вещества', '9·10¹³ Дж ≈ 21 кт тротила') + step('масса электрона', '9,1·10⁻³¹ кг → 8,2·10⁻¹⁴ Дж') + `</div>
+    <p class="note" style="margin-top:10px">Позитрон и электрон в ПЭТ-сканере исчезают, и рождаются два γ-кванта, каждый с энергией m·c² электрона.</p>`;
+}
+
+function renderMeter(m) {
+  const el = $('#meter');
+  if (m.kind === 'post') {
+    el.innerHTML = m.last ? `<div class="k">Скорость света</div><div class="v ok">замер: 1,00c</div><div class="lr"><span>Галилей</span><span>${fmt(1 + (m.last.d || 0) * m.last.b, 2)}c</span></div><div class="lr"><span>замеров</span><span>${m.n}</span></div>`
+      : `<div class="k">Скорость света</div><div class="v">замер: —</div><div class="lr"><span>Галилей</span><span>${fmt(m.vGal, 2)}c</span></div>`;
+  } else if (m.kind === 'dil') {
+    el.innerHTML = `<div class="k">Замедление</div><div class="v ${S.done.dilation ? 'ok' : ''}">γ = ${fmt(m.g, 3)}</div><div class="gauge"><b style="width:${clamp((m.g - 1) / 4 * 100, 0, 100).toFixed(1)}%"></b></div><div class="lr"><span>v</span><span>${fmt(m.b, 3)}c</span></div>`;
+  } else {
+    el.innerHTML = `<div class="k">Энергия покоя</div><div class="v ${S.done.emc2 ? 'ok' : ''}">${sci(m.E)} Дж</div><div class="gauge"><b style="width:${clamp(m.frac / 2 * 100, 0, 100).toFixed(1)}%"></b><i style="left:50%"></i></div><div class="lr"><span>КЗ за год</span><span>${fmt(m.frac * 100, 0)} %</span></div>`;
+  }
+}
+
+function update() {
+  const m = model(), L = LESSONS[S.lesson];
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Эйнштейн бы одобрил!');
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  post: '<path d="M6 11h14q5 4 0 8H6z" fill="#c8d1e2"/><path d="M24 15H58" stroke="#ffd36b" stroke-width="1.4"/><circle cx="58" cy="15" r="2.6" fill="#fff6c8"/><path d="M30 8v18M56 8v18" stroke="#8a96b0" stroke-width="1.2"/>',
+  dilation: '<path d="M4 5h10M4 25h10M22 25h10M38 5h10M54 25h10" stroke="#e8ecf4" stroke-width="1.6"/><path d="M27 25L43 5L59 25" fill="none" stroke="#ffd36b" stroke-width="1.2"/><path d="M9 6v18" stroke="#ffd36b" stroke-width="1" stroke-dasharray="2 2"/>',
+  emc2: '<path d="M8 12h12v12H8z" fill="#7d8db0"/><path d="M8 12l4-4h12l-4 4zM20 12l4-4v12l-4 4z" fill="#a9b4c9"/><text x="44" y="20" font-size="9" fill="#ffd36b" text-anchor="middle" font-family="monospace">mc²</text>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i];
+  S.lesson = i; S.hl = null; drag = null;
+  S.runs = []; S.run = null; S.shot = null; S.b1 = L.b !== undefined && L.id === 'post' ? L.b : 0.5; S.dir = L.dir || 1;
+  S.b2 = L.id === 'dilation' ? L.b : 0.3; S.t2 = 0;
+  S.m = L.m || 1; S.conv = false; S.convT = -1e9;
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const strip = $('#lessons'), cur = strip.querySelector('.lesson[aria-current="true"]');
+  if (cur) { const br = strip.getBoundingClientRect(), cr = cur.getBoundingClientRect(); strip.scrollLeft = Math.max(0, strip.scrollLeft + (cr.left - br.left) - (br.width - cr.width) / 2); }
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '';
+  if (id === 'post') now = `Ракета (двигатели выключены) скорость v = ${fmt(m.b, 2)}c, фонарь светит ${m.b === 0 ? '(ракета стоит)' : dirName(m.d)}. Между воротами А и Б 300 000 км. Прибор на Земле всегда измеряет время полёта света 1,000 с, то есть скорость c. По Галилею свет летел бы со скоростью ${fmt(m.vGal, 2)}c и время было бы ${fmt(m.tGal, 3)} с. Сделано замеров: ${S.runs.length ? S.runs.map(r => `${fmt(r.b, 2)}c ${r.b === 0 ? 'стоит' : 'фонарь ' + dirName(r.d)}`).join('; ') : 'ни одного'}. Нужны: ракета стоит ${m.has0 ? '(есть)' : '(нет)'}, фонарь вперёд при v ≥ 0,5c ${m.hasF ? '(есть)' : '(нет)'}, фонарь назад при v ≥ 0,5c ${m.hasB ? '(есть)' : '(нет)'}.${S.run ? ' Сейчас идёт замер.' : ''}`;
+  if (id === 'dilation') now = `Световые часы: зеркала в 15 см, тик 1 нс. Скорость ракеты v = ${fmt(m.b, 3)}c, γ = ${fmt(m.g, 3)}. Пока на Земле прошло ${fmt(m.t, 1)} нс, часы ракеты (с точки зрения Земли) показали ${fmt(m.tau, 1)} нс. Задание требует γ = 2 с точностью ±0,02. Не называй нужную скорость числом — наводи вопросами: какой должна быть γ, чему тогда равно 1 − v²/c².`;
+  if (id === 'emc2') now = `Масса ${fmt(m.m, 3)} кг, энергия покоя E = mc² = ${sci(m.E)} Дж = ${sci(m.kwh)} кВт·ч. ${m.conv ? `Масса превращена в энергию: это ${fmt(m.frac * 100, 1)} % годового потребления электроэнергии Казахстана (≈115 млрд кВт·ч = 4,14·10¹⁷ Дж).` : 'Кнопка «Превратить» ещё не нажата для этой массы.'} Точность задания 3 %. Не называй ответную массу — помоги перевести кВт·ч в джоули и применить m = E/c².`;
+  return [
+    `Раздел: физика, 11 класс, теория относительности. Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на площадке: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Веди ученика вопросами, не выдавай готовый ответ.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = {
+    post: 'Почему свет не летит со скоростью c + v?', dilation: 'Почему свет в движущихся часах идёт по косой?', emc2: 'Почему в реакторе в энергию уходит так мало массы?',
+  }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
