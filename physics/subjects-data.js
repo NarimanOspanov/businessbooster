@@ -45,7 +45,7 @@ window.LUCH_SUBJECTS = {
       { id: 'solids', b: 'geo', g: 11, t: 'Тела и объёмы', items: ['Призма и пирамида', 'Цилиндр, конус, шар', 'Площади поверхности', 'Объёмы тел'], req: ['stereo'] },
 
       { id: 'data', b: 'prob', g: 6, t: 'Данные и диаграммы', items: ['Таблицы', 'Столбчатые и круговые диаграммы', 'Среднее арифметическое'], req: ['frac'], status: 'done', href: '/labs/math-data/', lessons: 3, doneItems: 3 },
-      { id: 'comb', b: 'prob', g: 9, t: 'Комбинаторика', items: ['Правило умножения', 'Перестановки', 'Сочетания', 'Треугольник Паскаля'], req: ['num'] },
+      { id: 'comb', b: 'prob', g: 9, t: 'Комбинаторика', items: ['Правило умножения', 'Перестановки', 'Сочетания', 'Треугольник Паскаля'], req: ['num'], status: 'done', href: '/labs/math-comb/', lessons: 4, doneItems: 4 },
       { id: 'probab', b: 'prob', g: 9, t: 'Вероятность', items: ['Случайные события', 'Классическая вероятность', 'Сложение и умножение вероятностей'], req: ['comb', 'frac'] },
       { id: 'stat', b: 'prob', g: 10, t: 'Статистика', items: ['Медиана и мода', 'Разброс и дисперсия', 'Выборки и опросы', 'Как графики вводят в заблуждение'], req: ['data', 'probab'] },
       { id: 'rv', b: 'prob', g: 11, t: 'Случайные величины', items: ['Математическое ожидание', 'Биномиальное распределение', 'Закон больших чисел'], req: ['stat'] },
@@ -116,8 +116,8 @@ window.LUCH_SUBJECTS = {
       { id: 'cellst', b: 'cell', g: 7, t: 'Строение клетки', items: ['Мембрана и оболочка', 'Ядро', 'Органоиды', 'Клетки растений и животных'], req: ['alive', 'methods'], status: 'done', href: '/labs/bio-cellst/', lessons: 4, doneItems: 4 },
       { id: 'tissues', b: 'cell', g: 7, t: 'Ткани и органы', items: ['Ткани растений', 'Ткани животных', 'Органы и системы органов'], req: ['cellst'], status: 'done', href: '/labs/bio-tissues/', lessons: 3, doneItems: 3 },
       { id: 'chemcell', b: 'cell', g: 10, t: 'Химия клетки', items: ['Вода и минеральные вещества', 'Белки', 'Углеводы и липиды', 'ДНК и РНК'], req: ['cellst'], status: 'done', href: '/labs/bio-chemcell/', lessons: 4, doneItems: 4 },
-      { id: 'metab', b: 'cell', g: 10, t: 'Обмен веществ', items: ['Ферменты', 'Фотосинтез', 'Клеточное дыхание', 'АТФ — батарейка клетки'], req: ['chemcell'] },
-      { id: 'division', b: 'cell', g: 10, t: 'Деление клетки', items: ['Митоз', 'Мейоз', 'Жизненный цикл клетки'], req: ['chemcell'] },
+      { id: 'metab', b: 'cell', g: 10, t: 'Обмен веществ', items: ['Ферменты', 'Фотосинтез', 'Клеточное дыхание', 'АТФ — батарейка клетки'], req: ['chemcell'], status: 'done', href: '/labs/bio-metab/', lessons: 4, doneItems: 4 },
+      { id: 'division', b: 'cell', g: 10, t: 'Деление клетки', items: ['Митоз', 'Мейоз', 'Жизненный цикл клетки'], req: ['chemcell'], status: 'done', href: '/labs/bio-division/', lessons: 3, doneItems: 3 },
       { id: 'biotech', b: 'cell', g: 11, t: 'Биотехнологии', items: ['Генная инженерия', 'Клонирование', 'ПЦР-тесты', 'Биобезопасность'], req: ['division', 'mendel'] },
 
       { id: 'micro', b: 'div', g: 7, t: 'Бактерии, грибы, вирусы', items: ['Бактерии', 'Грибы и лишайники', 'Вирусы', 'Микробы и здоровье'], req: ['cellst'], status: 'done', href: '/labs/bio-micro/', lessons: 4, doneItems: 4 },

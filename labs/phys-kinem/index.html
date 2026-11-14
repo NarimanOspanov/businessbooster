@@ -1,0 +1,925 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по физике, 9 класс: равноускоренное движение, свободное падение, бросок под углом, относительность движения.">
+<title>Кинематика</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.meter .lr .ok{color:var(--ok)}
+.meter .lr .bad{color:var(--warn)}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button.rec{color:var(--force)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safety{border:1px solid rgba(255,138,115,.45);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safety b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 250px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M7 31Q17 1 33 31" fill="none" stroke="var(--force)" stroke-width="2" stroke-dasharray="3 3" stroke-linecap="round"/><path d="M7 31L17 17" stroke="var(--arm)" stroke-width="2.2" stroke-linecap="round"/><path d="M19.5 13.5l-6 2.5 4 3z" fill="var(--arm)"/><circle cx="7" cy="31" r="3" fill="var(--fg)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Физика · Кинематика</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/">Карта</a><a href="/physics/">Физика</a><a href="/labs/phys-kinem/" aria-current="page">Кинематика</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Кинематика</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Опытная площадка">
+    <svg class="scene" id="scene" role="img" aria-label="Площадка для опытов по кинематике. Значения меняются кнопками внизу и ползунками во вкладке «Схема»."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const nf = x => fmt(x, Math.abs(x - Math.round(x)) < 1e-9 ? 0 : 1);
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const DEG = Math.PI / 180;
+
+const LESSONS = [
+  { id: 'accel', title: 'Равноускоренное движение',
+    text: ['При равноускоренном движении скорость тела за любые равные промежутки времени меняется на одну и ту же величину. Быстроту изменения скорости показывает ускорение: a = (v − v₀) / t. Его измеряют в м/с².',
+           'Скорость в любой момент: v = v₀ + at. Если ускорение направлено против скорости (a < 0), тело тормозит. Путь находят по формуле s = v₀t + at²/2, а без времени — по формуле s = (v² − v₀²) / (2a).',
+           'График скорости v(t) — наклонная прямая. Площадь под ней равна пройденному пути. Метки каждой секунды на дороге показывают: при торможении отрезки за секунду становятся всё короче.'],
+    why: 'Инженеры автопроизводителей и испытатели тормозов считают тормозной путь по этим формулам. Автоэксперт по ДТП по длине тормозного следа восстанавливает скорость машины — от его вывода зависит, кто платит за ремонт. Пилоты знают, какая длина полосы нужна для разгона самолёта. А каждому водителю полезно помнить: при вдвое большей скорости тормозной путь вырастает вчетверо.',
+    safety: 'На мокром или зимнем асфальте ускорение торможения в 2–4 раза меньше, а тормозной путь во столько же раз длиннее. Переходите дорогу только когда машина уже остановилась.',
+    task: 'Машина едет со скоростью 20 м/с (72 км/ч). Подберите торможение так, чтобы она остановилась ровно у стоп-линии через 50 м.',
+    hint: 'Начальную скорость оставьте 20 м/с. Подумайте, что быстрее: s = (v² − v₀²) / (2a) или подбор. Ускорение меняйте кнопками «a −» и «a +», потом жмите «Пуск».',
+    stage: 'Меняйте v₀ и a кнопками внизу и жмите «Пуск».',
+    v0: 20, a0: -2, line: 50,
+    check: m => m.ok },
+  { id: 'fall', title: 'Свободное падение',
+    text: ['Свободное падение — движение тела только под действием силы тяжести, без сопротивления воздуха. Галилей показал: в пустоте все тела падают одинаково, лёгкие и тяжёлые.',
+           'Это равноускоренное движение без начальной скорости. Ускорение свободного падения у поверхности Земли g ≈ 9,8 м/с². Скорость v = gt, пройденный путь h = gt²/2, а время падения t = √(2h/g).',
+           'Стробоскоп отмечает шарик через каждые 0,2 с: расстояния между отметками растут. На Луне g ≈ 1,6 м/с², там всё падает в 2,5 раза дольше.'],
+    why: 'Промышленные альпинисты и монтажники высотных работ знают: падающий с 20 м инструмент летит к земле всего 2 секунды, поэтому внизу ограждают опасную зону, а каски обязательны. Каскадёры и проектировщики аттракционов «свободного падения» считают время и скорость по g. Геологи и спасатели оценивают глубину колодца или ущелья по времени падения камня.',
+    safety: 'Ничего не бросайте с балконов и мостов: даже камешек с 20 м долетает со скоростью около 70 км/ч.',
+    task: 'Камень, упавший с башни, долетел до земли ровно за 2 с. Подберите высоту башни на Земле и проверьте броском.',
+    hint: 'Высоту меняйте кнопками внизу (шаг 0,1 м). Можно подбирать, но быстрее посчитать h = gt²/2 при g = 9,8 м/с².',
+    stage: 'Выберите высоту и планету, затем жмите «Бросить».',
+    h0: 45,
+    check: m => m.ok },
+  { id: 'throw', title: 'Бросок под углом',
+    text: ['Тело, брошенное под углом α к горизонту, летит по параболе. Его движение удобно разложить на два простых: по горизонтали — равномерное со скоростью vₓ = v₀·cos α, по вертикали — равноускоренное с ускорением g.',
+           'Время полёта t = 2v₀·sin α / g, наибольшая высота H = (v₀·sin α)² / (2g), дальность L = v₀²·sin 2α / g. Сопротивление воздуха здесь не учитываем.',
+           'Самая большая дальность — при 45°. А углы, которые в сумме дают 90° (например, 30° и 60°), дают одну и ту же дальность: у них одинаковый sin 2α.'],
+    why: 'Баскетболист, футболист и метатель копья интуитивно подбирают угол броска — тренеры разбирают это по видео и формулам. Инженеры пожарных машин рассчитывают, куда достанет струя из ствола. Агрономы настраивают дождевальные установки на полях Туркестанской области, а разработчики компьютерных игр пишут по этим формулам полёт мяча и снарядов.',
+    task: 'Мишень стоит в 30 м. При одной и той же начальной скорости попадите в неё двумя разными углами (разница не меньше 10°).',
+    hint: 'Попробуйте v₀ = 20 м/с. Найдите один угол, потом вспомните, какой второй угол даёт ту же дальность.',
+    stage: 'Меняйте угол и скорость кнопками и жмите «Огонь».',
+    al0: 45, v0: 20, target: 30, tol: 1,
+    check: m => m.ok },
+  { id: 'river', title: 'Относительность движения',
+    text: ['Покой и движение относительны: скорость, траектория и перемещение зависят от того, с каким телом связана система отсчёта. Человек на плоту неподвижен относительно плота, но движется относительно берега.',
+           'Закон сложения скоростей: скорость тела относительно берега равна векторной сумме скорости относительно воды и скорости течения: v⃗ = v⃗₁ + v⃗₂.',
+           'Чтобы лодку не сносило, её нос поворачивают против течения. Тогда сумма скоростей направлена прямо поперёк реки. Посмотрите на ту же переправу «с плота»: там лодка плывёт по прямой, куда смотрит нос, а уплывают берега.'],
+    why: 'Лодочники и капитаны паромов на Иртыше и Или всегда держат нос против течения, чтобы пристать точно к причалу. Пилоты делают то же с ветром: самолёт летит чуть боком, а штурман складывает векторы скорости. Диспетчеры спутниковой навигации и инженеры GPS учитывают, что сами спутники движутся относительно Земли.',
+    safety: 'На воде — только в спасательном жилете. Течение реки сносит даже хорошего пловца, поэтому купаются только в разрешённых местах.',
+    task: 'Течение 3 м/с, моторная лодка плывёт относительно воды со скоростью 5 м/с. Поверните нос так, чтобы пристать к причалу точно напротив. Затем посмотрите на переправу из системы «Плот».',
+    hint: 'Поворачивайте руль кнопками. Сумма векторов должна смотреть прямо вверх: значит, проекция скорости лодки на берег должна погасить течение.',
+    stage: 'Поворачивайте нос лодки и жмите «Плыть». Переключайте систему отсчёта.',
+    u: 5, cur0: 3, W: 60,
+    check: m => m.pier && m.raft },
+];
+
+const LS_KEY = 'luch-phys-kinem';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+
+function resetState() {
+  const Ls = L();
+  Object.assign(S, {
+    t: 0, run: false, res: null, ok: false, hl: null,
+    v0: Ls.v0 || 20, a: Ls.a0 != null ? Ls.a0 : -2,
+    h: Ls.h0 || 45, planet: 'earth',
+    al: Ls.al0 || 45, shots: [], hits: [],
+    th: 0, cur: Ls.cur0 != null ? Ls.cur0 : 3, frame: 'shore', pier: false, raft: false,
+  });
+}
+resetState();
+
+// ---------- physics ----------
+// lesson 1: braking / accelerating car on 0…100 m, max 12 s
+const T1MAX = 12, X1MAX = 100;
+const tStop = (v0, a) => a < 0 ? -v0 / a : Infinity;
+function kin(v0, a, t) { const te = Math.min(t, tStop(v0, a)); return { x: v0 * te + a * te * te / 2, v: v0 + a * te }; }
+function t100(v0, a) {
+  if (Math.abs(a) < 1e-12) return v0 > 0 ? X1MAX / v0 : Infinity;
+  const d = v0 * v0 + 2 * a * X1MAX; if (d < 0) return Infinity;
+  return (-v0 + Math.sqrt(d)) / a;
+}
+const tEnd1 = (v0, a) => Math.min(T1MAX, tStop(v0, a), t100(v0, a));
+// lesson 2
+const GV = { earth: 9.8, moon: 1.6 };
+const gNow = () => GV[S.planet];
+const tFall = (h, g) => Math.sqrt(2 * h / g);
+// lesson 3 (g = 9.8)
+const G3 = 9.8;
+const flight = (v0, al) => ({ T: 2 * v0 * Math.sin(al * DEG) / G3, H: (v0 * Math.sin(al * DEG)) ** 2 / (2 * G3), R: v0 * v0 * Math.sin(2 * al * DEG) / G3 });
+// lesson 4: river 60 m wide, boat 5 m/s relative to water, current to the right
+const RV = () => { const u = L().u || 5; return { vx: S.cur + u * Math.sin(S.th * DEG), vy: u * Math.cos(S.th * DEG), u }; };
+const crossT = () => { const r = RV(); return (L().W || 60) / r.vy; };
+
+function model() {
+  const id = LID(), Ls = L();
+  if (id === 'accel') { const k = kin(S.v0, S.a, S.t); return { kind: id, v0: S.v0, a: S.a, t: S.t, x: k.x, v: k.v, res: S.res, ok: S.ok }; }
+  if (id === 'fall') { const g = gNow(), tf = tFall(S.h, g), tt = Math.min(S.t, tf); return { kind: id, h: S.h, g, tf, t: tt, y: S.h - g * tt * tt / 2, v: g * tt, res: S.res, ok: S.ok }; }
+  if (id === 'throw') { const f = flight(S.v0, S.al); return { kind: id, v0: S.v0, al: S.al, ...f, hits: S.hits, ok: S.ok }; }
+  const r = RV(), T = crossT();
+  return { kind: id, th: S.th, cur: S.cur, vx: r.vx, vy: r.vy, vres: Math.hypot(r.vx, r.vy), T, xL: r.vx * T, t: S.t, res: S.res, pier: S.pier, raft: S.raft, frame: S.frame };
+}
+
+// ---------- drawing helpers ----------
+const T = (x, y, s, fill, txt, anchor = 'middle', extra = '') => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${s}" fill="${fill}" text-anchor="${anchor}" ${extra}>${txt}</text>`;
+const HALO = `paint-order="stroke" stroke="${INK}" stroke-width="3"`;
+function arrow(x1, y1, x2, y2, col, w = 3) {
+  const a = Math.atan2(y2 - y1, x2 - x1), L2 = Math.hypot(x2 - x1, y2 - y1); if (L2 < 4) return '';
+  const hl = Math.min(11, L2 * 0.5), hx = x2 - hl * Math.cos(a), hy = y2 - hl * Math.sin(a);
+  const p1 = `${(hx + 5.5 * Math.sin(a)).toFixed(1)} ${(hy - 5.5 * Math.cos(a)).toFixed(1)}`, p2 = `${(hx - 5.5 * Math.sin(a)).toFixed(1)} ${(hy + 5.5 * Math.cos(a)).toFixed(1)}`;
+  return `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${hx.toFixed(1)} ${hy.toFixed(1)}" stroke="${INK}" stroke-width="${w + 2.6}" stroke-linecap="round"/><path d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${hx.toFixed(1)} ${hy.toFixed(1)}" stroke="${col}" stroke-width="${w}" stroke-linecap="round"/><path d="M${x2.toFixed(1)} ${y2.toFixed(1)}L${p1}L${p2}Z" fill="${col}" stroke="${INK}" stroke-width="1.2" stroke-linejoin="round"/>`;
+}
+function bg() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern>
+    <clipPath id="cg1"><rect x="50" y="228" width="196" height="160"/></clipPath><clipPath id="cg2"><rect x="300" y="228" width="196" height="160"/></clipPath></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+// axes: origin (ox, oy), width w, height h; xs/ys = tick lists [value, label]
+function axes(ox, oy, w, h, xt, yt, xl, yl, fx, fy) {
+  let s = '';
+  for (const [v, lab] of xt) s += `<path d="M${fx(v).toFixed(1)} ${oy}V${oy - h}" stroke="#26324a" stroke-width="1"/>` + (lab != null ? T(fx(v), oy + 13, 8.5, '#8b96ad', lab) : '');
+  for (const [v, lab] of yt) s += `<path d="M${ox} ${fy(v).toFixed(1)}H${ox + w}" stroke="#26324a" stroke-width="1"/>` + (lab != null ? T(ox - 4, fy(v) + 3, 8.5, '#8b96ad', lab, 'end') : '');
+  s += `<path d="M${ox} ${oy}H${ox + w + 6}M${ox} ${oy}V${oy - h - 8}" stroke="#a9b4c9" stroke-width="1.4"/>`;
+  s += T(ox + w + 4, oy - 5, 8.5, '#a9b4c9', xl, 'end') + T(ox + 5, oy - h - 9, 8.5, '#a9b4c9', yl, 'start');
+  return s;
+}
+const poly = (pts, col, w, extra = '') => `<polyline points="${pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ')}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round" ${extra}/>`;
+
+// ---------- lesson 1: road, car, graphs ----------
+const RD = { x0: 40, x1: 480, y: 170 };
+const rdx = s => RD.x0 + (RD.x1 - RD.x0) * s / X1MAX;
+const v1x = t => 52 + 15 * t, v1y = v => 386 - 5 * v;       // v(t): 0…12 s, 0…30 m/s
+const s1x = t => 302 + 15 * t, s1y = s => 386 - 1.5 * s;    // s(t): 0…12 s, 0…100 m
+function car(x, y, braking) {
+  const X = n => (x + n).toFixed(1);
+  return `<g><path d="M${X(-30)} ${y - 8}V${y - 20}Q${X(-28)} ${y - 24} ${X(-20)} ${y - 24}L${X(-10)} ${y - 34}H${X(10)}L${X(20)} ${y - 24}H${X(26)}Q${X(32)} ${y - 22} ${X(32)} ${y - 14}V${y - 8}Z" fill="#72d4e8" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M${X(-7)} ${y - 31}H${X(0)}V${y - 24}H${X(-14)}ZM${X(3)} ${y - 31}H${X(9)}L${X(16)} ${y - 24}H${X(3)}Z" fill="#2b3a55"/>
+    <rect x="${X(28)}" y="${y - 20}" width="4" height="4" fill="#fff3c2"/><rect x="${X(-30)}" y="${y - 20}" width="4" height="5" fill="${braking ? '#ff4d3a' : '#7a2b24'}"/>
+    <circle cx="${X(-17)}" cy="${y - 7}" r="7" fill="#2a3348" stroke="${INK}" stroke-width="2"/><circle cx="${X(19)}" cy="${y - 7}" r="7" fill="#2a3348" stroke="${INK}" stroke-width="2"/></g>`;
+}
+function accelScene() {
+  const Ls = L(), k = kin(S.v0, S.a, S.t), te = tEnd1(S.v0, S.a);
+  let h = `<rect x="-2000" y="${RD.y + 16}" width="4520" height="40" fill="#1b2a22"/>`;
+  h += `<rect x="-2000" y="${RD.y - 26}" width="4520" height="42" fill="#2a3348"/><path d="M-2000 ${RD.y - 5}H2520" stroke="#e8ecf4" stroke-width="1.6" stroke-dasharray="14 12" opacity=".45"/>`;
+  for (let m = 0; m <= X1MAX; m += 10) h += `<path d="M${rdx(m)} ${RD.y + 16}v6" stroke="#8b96ad" stroke-width="1.2"/>` + (m % 20 === 0 ? T(rdx(m), RD.y + 33, 9, '#8b96ad', m + (m === X1MAX ? ' м' : '')) : '');
+  // stop line and zebra
+  const xl = rdx(Ls.line);
+  for (let i = 0; i < 6; i++) h += `<rect x="${xl + 8}" y="${RD.y - 25 + i * 7}" width="18" height="4" fill="#e8ecf4" opacity=".75"/>`;
+  h += `<rect x="${xl - 2}" y="${RD.y - 26}" width="4" height="42" fill="#ff8a73"/>` + T(xl, RD.y - 36, 9, '#ff8a73', 'стоп-линия · 50 м');
+  // per-second marks
+  let lastLab = -99;
+  for (let s = 1; s <= Math.floor(Math.min(S.t, te) + 1e-9); s++) {
+    const xs = rdx(kin(S.v0, S.a, s).x); if (xs > RD.x1 + 4) continue;
+    h += `<circle cx="${xs.toFixed(1)}" cy="${RD.y + 9}" r="3.2" fill="#ffb547" stroke="${INK}"/>`;
+    if (xs - lastLab >= 22) { h += T(xs, RD.y + 46, 8, '#ffb547', s + ' с'); lastLab = xs; }
+  }
+  h += car(rdx(Math.min(k.x, X1MAX + 6)), RD.y + 12, S.a < 0 && k.v > 0 && S.t > 0);
+  h += T(rdx(Math.min(k.x, X1MAX)), RD.y - 52, 10, '#72d4e8', `v = ${fmt(k.v, 1)} м/с`, 'middle', HALO);
+  // graphs
+  const tt = Math.min(S.t, te);
+  h += axes(52, 386, 180, 150, [[0, 0], [2, 2], [4, 4], [6, 6], [8, 8], [10, 10], [12, null]], [[0, 0], [10, 10], [20, 20], [30, 30]], 't, с', 'v, м/с', v1x, v1y);
+  h += axes(302, 386, 180, 150, [[0, 0], [2, 2], [4, 4], [6, 6], [8, 8], [10, 10], [12, null]], [[0, 0], [50, 50], [100, 100]], 't, с', 's, м', s1x, s1y);
+  h += `<path d="M${s1x(0)} ${s1y(Ls.line)}H${s1x(12)}" stroke="#ff8a73" stroke-width="1" stroke-dasharray="4 4"/>` + T(s1x(12), s1y(Ls.line) - 4, 8, '#ff8a73', '50 м', 'end');
+  const N = 48, plan = [], planS = [], done = [], doneS = [];
+  for (let i = 0; i <= N; i++) { const t = te * i / N, kk = kin(S.v0, S.a, t); plan.push([v1x(t), v1y(kk.v)]); planS.push([s1x(t), s1y(kk.x)]); }
+  for (let i = 0; i <= N; i++) { const t = tt * i / N, kk = kin(S.v0, S.a, t); done.push([v1x(t), v1y(kk.v)]); doneS.push([s1x(t), s1y(kk.x)]); }
+  h += `<g clip-path="url(#cg1)">` + (tt > 0 ? `<path d="M${v1x(0)} ${v1y(0)}L${done.map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join('L')}L${v1x(tt).toFixed(1)} ${v1y(0)}Z" fill="rgba(255,181,71,.22)"/>` : '') +
+    poly(plan, '#72d4e8', 1.4, 'stroke-dasharray="5 4" opacity=".6"') + (tt > 0 ? poly(done, '#72d4e8', 2.6) : '') + `</g>`;
+  h += `<g clip-path="url(#cg2)">` + poly(planS, '#ffb547', 1.4, 'stroke-dasharray="5 4" opacity=".6"') + (tt > 0 ? poly(doneS, '#ffb547', 2.6) : '') + `</g>`;
+  h += T(v1x(12), 228, 8.5, '#ffb547', 'площадь под v(t) = путь', 'end', HALO);
+  return h;
+}
+
+// ---------- lesson 2: tower ----------
+const FY = h => 385 - 5 * h;                  // ground at 385, 1 m = 5 units
+function fallScene() {
+  const g = gNow(), tf = tFall(S.h, g), tt = Math.min(S.t, tf), y = S.h - g * tt * tt / 2;
+  const moon = S.planet === 'moon';
+  let h = `<rect x="-2000" y="385" width="4520" height="400" fill="${moon ? '#3a3f4a' : '#1b2a22'}"/><path d="M-2000 385H2520" stroke="${moon ? '#6b7180' : '#2f6b4a'}" stroke-width="2"/>`;
+  // ruler
+  for (let m = 0; m <= 60; m += 5) h += `<path d="M64 ${FY(m)}h${m % 10 ? 5 : 9}" stroke="#8b96ad" stroke-width="1.2"/>` + (m % 10 === 0 ? T(58, FY(m) + 3, 9, '#8b96ad', m, 'end') : '');
+  h += `<path d="M64 ${FY(0)}V${FY(60)}" stroke="#8b96ad" stroke-width="1.2"/>` + T(58, FY(60) - 12, 9, '#a9b4c9', 'h, м', 'end');
+  // tower
+  const top = FY(S.h);
+  h += `<rect x="96" y="${top}" width="52" height="${385 - top}" fill="#2e3b57" stroke="${INK}" stroke-width="2"/>`;
+  for (let yy = top + 10; yy < 375; yy += 18) h += `<rect x="106" y="${yy}" width="10" height="9" fill="#ffd27a" opacity=".35"/><rect x="128" y="${yy}" width="10" height="9" fill="#ffd27a" opacity=".35"/>`;
+  h += `<rect x="92" y="${top - 6}" width="78" height="6" fill="#3a4a6a" stroke="${INK}" stroke-width="1.6"/>`;
+  h += `<path d="M150 ${top}H200" stroke="#ffb547" stroke-width="1" stroke-dasharray="3 3"/>` + T(204, top + 3, 9.5, '#ffb547', `h = ${fmt(S.h, 1)} м`, 'start', HALO);
+  // strobe marks
+  if (S.t > 0) for (let k = 1; k * 0.2 <= tt + 1e-9; k++) { const tk = k * 0.2, yk = S.h - g * tk * tk / 2; h += `<circle cx="180" cy="${FY(yk).toFixed(1)}" r="6" fill="none" stroke="#72d4e8" stroke-width="1.2" opacity=".55"/>`; }
+  h += `<circle cx="180" cy="${(FY(y) - 7).toFixed(1)}" r="7" fill="#e8ecf4" stroke="${INK}" stroke-width="2"/>`;
+  if (tt > 0.05) h += arrow(180, FY(y) - 7, 180, FY(y) - 7 + Math.min(70, 2 * g * tt), '#72d4e8', 2.6);
+  // v(t) graph
+  const tmax = moon ? 9 : 4, vmax = moon ? 15 : 40;
+  const gx = t => 290 + 200 * t / tmax, gy = v => 385 - 190 * v / vmax;
+  const xt = []; for (let t = 0; t <= tmax; t += 1) xt.push([t, t]);
+  const yt = []; for (let v = 0; v <= vmax; v += moon ? 5 : 10) yt.push([v, v]);
+  h += axes(290, 385, 200, 190, xt, yt, 't, с', 'v, м/с', gx, gy);
+  h += `<path d="M${gx(0)} ${gy(0)}L${gx(tf).toFixed(1)} ${gy(g * tf).toFixed(1)}" stroke="#72d4e8" stroke-width="1.4" stroke-dasharray="5 4" opacity=".6"/>`;
+  if (tt > 0) h += `<path d="M${gx(0)} ${gy(0)}L${gx(tt).toFixed(1)} ${gy(g * tt).toFixed(1)}L${gx(tt).toFixed(1)} ${gy(0)}Z" fill="rgba(255,181,71,.2)"/><path d="M${gx(0)} ${gy(0)}L${gx(tt).toFixed(1)} ${gy(g * tt).toFixed(1)}" stroke="#72d4e8" stroke-width="2.6"/>`;
+  h += T(390, 172, 10, moon ? '#c9cdd6' : '#86e0a8', moon ? 'Луна · g = 1,6 м/с²' : 'Земля · g = 9,8 м/с²');
+  return h;
+}
+
+// ---------- lesson 3: projectile ----------
+const P3 = { x0: 40, y0: 372, k: 7 };          // 1 m = 7 units
+const px3 = x => P3.x0 + P3.k * x, py3 = y => P3.y0 - P3.k * y;
+function trajPts(v0, al, tmax) {
+  const c = v0 * Math.cos(al * DEG), s = v0 * Math.sin(al * DEG), pts = [];
+  for (let i = 0; i <= 40; i++) { const t = tmax * i / 40; pts.push([px3(c * t), py3(s * t - G3 * t * t / 2)]); }
+  return pts;
+}
+function throwScene() {
+  const Ls = L(), f = flight(S.v0, S.al);
+  let h = `<rect x="-2000" y="${P3.y0}" width="4520" height="400" fill="#1b2a22"/><path d="M-2000 ${P3.y0}H2520" stroke="#2f6b4a" stroke-width="2"/>`;
+  for (let m = 0; m <= 60; m += 10) h += `<path d="M${px3(m)} ${P3.y0}v6" stroke="#8b96ad" stroke-width="1.2"/>` + T(px3(m), P3.y0 + 18, 9, '#8b96ad', m + (m === 60 ? ' м' : ''));
+  // target
+  const xt = px3(Ls.target);
+  h += `<rect x="${px3(Ls.target - Ls.tol).toFixed(1)}" y="${P3.y0 - 4}" width="${(2 * Ls.tol * P3.k).toFixed(1)}" height="8" rx="2" fill="#ff8a73" stroke="${INK}" stroke-width="1.4"/>`;
+  h += `<path d="M${xt} ${P3.y0 - 4}V${P3.y0 - 40}" stroke="#a9b4c9" stroke-width="2"/><path d="M${xt} ${P3.y0 - 40}h18l-5 6 5 6h-18z" fill="#ff8a73" stroke="${INK}" stroke-width="1.2"/>` + T(xt, P3.y0 + 32, 9, '#ff8a73', 'мишень · 30 м');
+  // old shots
+  S.shots.forEach((sh, i) => { if (i === S.shots.length - 1 && S.run) return; h += poly(trajPts(sh.v0, sh.al, sh.T), sh.hit ? '#86e0a8' : '#8b96ad', 1.6, `stroke-dasharray="4 4" opacity="${sh.hit ? .8 : .45}"`) + T(px3(sh.R / 2), py3(sh.H) - 6, 8.5, sh.hit ? '#86e0a8' : '#8b96ad', sh.al + '°', 'middle', HALO); });
+  // current shot
+  const c = S.v0 * Math.cos(S.al * DEG), s = S.v0 * Math.sin(S.al * DEG);
+  if (S.run || (S.t > 0 && S.shots.length)) {
+    const tt = Math.min(S.t, f.T), bx = c * tt, by = s * tt - G3 * tt * tt / 2, vy = s - G3 * tt;
+    h += poly(trajPts(S.v0, S.al, tt), '#ffb547', 2.4);
+    if (S.run) {
+      h += arrow(px3(bx), py3(by), px3(bx) + c * 2.2, py3(by), '#ffb547', 2.2) + arrow(px3(bx), py3(by), px3(bx), py3(by) - vy * 2.2, '#72d4e8', 2.2) + arrow(px3(bx), py3(by), px3(bx) + c * 2.2, py3(by) - vy * 2.2, '#e8ecf4', 1.6);
+    }
+    h += `<circle cx="${px3(bx).toFixed(1)}" cy="${(py3(by) - 4).toFixed(1)}" r="5" fill="#e8ecf4" stroke="${INK}" stroke-width="1.8"/>`;
+  }
+  // cannon
+  h += `<g transform="translate(${P3.x0} ${P3.y0 - 8}) rotate(${-S.al})"><rect x="-4" y="-6" width="34" height="12" rx="3" fill="#a9b4c9" stroke="${INK}" stroke-width="2"/></g>`;
+  h += `<circle cx="${P3.x0}" cy="${P3.y0 - 8}" r="9" fill="#5b6680" stroke="${INK}" stroke-width="2"/><path d="M${P3.x0 - 14} ${P3.y0}h28" stroke="${INK}" stroke-width="3"/>`;
+  h += `<path d="M${P3.x0 + 40} ${P3.y0 - 8}A40 40 0 0 0 ${(P3.x0 + 40 * Math.cos(S.al * DEG)).toFixed(1)} ${(P3.y0 - 8 - 40 * Math.sin(S.al * DEG)).toFixed(1)}" fill="none" stroke="#ffb547" stroke-width="1.2"/>` + T(P3.x0 + 46, P3.y0 - 14, 9.5, '#ffb547', `α = ${S.al}°`, 'start', HALO);
+  // planned path (aim line)
+  if (!S.run) h += poly(trajPts(S.v0, S.al, f.T), '#ffb547', 1, 'stroke-dasharray="2 5" opacity=".35"');
+  h += T(500, P3.y0 - 300, 9, '#8b96ad', 'без сопротивления воздуха · g = 9,8 м/с²', 'end');
+  return h;
+}
+
+// ---------- lesson 4: river ----------
+const RX = m => 260 + 3.5 * m, RY = m => 340 - 3.5 * m;   // m: along the bank / across from the near bank
+function boat(x, y, th) {
+  return `<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${th})"><path d="M0 -16Q8 -6 7 12H-7Q-8 -6 0 -16Z" fill="#ffb547" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/><rect x="-4" y="2" width="8" height="7" rx="1.5" fill="#2b3a55"/></g>`;
+}
+function riverScene() {
+  const Ls = L(), r = RV(), T4 = crossT(), tt = Math.min(S.t, T4), raftV = S.frame === 'raft';
+  const off = raftV ? S.cur * tt : 0;                       // shore-fixed things shift by −v·t in the raft frame
+  let h = `<rect x="-2000" y="${RY(Ls.W)}" width="4520" height="${RY(0) - RY(Ls.W)}" fill="#14324a"/>`;
+  h += `<rect x="-2000" y="${RY(0)}" width="4520" height="400" fill="#1b2a22"/><rect x="-2000" y="-2000" width="4520" height="${2000 + RY(Ls.W)}" fill="#1b2a22"/>`;
+  h += `<path d="M-2000 ${RY(0)}H2520M-2000 ${RY(Ls.W)}H2520" stroke="#c9b27a" stroke-width="4"/>`;
+  // flow marks: move with the water in the shore frame, still in the raft frame
+  for (let i = -12; i <= 12; i++) for (const yy of [10, 25, 40, 52]) {
+    const xm = i * 20 + (yy * 7) % 20 + (raftV ? 0 : S.cur * tt);
+    const xw = ((xm + 240) % 480 + 480) % 480 - 240;
+    h += `<path d="M${RX(xw).toFixed(1)} ${RY(yy)}h14" stroke="#5fb4d9" stroke-width="1.4" stroke-linecap="round" opacity=".45"/>`;
+  }
+  // trees on both banks (shore frame objects)
+  for (let m = -200; m <= 240; m += 40) for (const [yb, dy] of [[0, 20], [Ls.W, -18]]) {
+    const xt = RX(m - off); if (xt < -400 || xt > 920) continue;
+    h += `<circle cx="${xt.toFixed(1)}" cy="${RY(yb) + dy}" r="8" fill="#2f6b4a" stroke="${INK}" stroke-width="1.2"/>`;
+  }
+  // pier on the far bank and the start jetty
+  const xp = RX(0 - off), xs = RX(0 - off);
+  h += `<rect x="${(xp - 12).toFixed(1)}" y="${RY(Ls.W) - 16}" width="24" height="20" fill="#8a6a45" stroke="${INK}" stroke-width="1.6"/>` + T(xp, RY(Ls.W) - 22, 9, '#ffb547', 'причал', 'middle', HALO);
+  h += `<rect x="${(xs - 10).toFixed(1)}" y="${RY(0) - 2}" width="20" height="14" fill="#8a6a45" stroke="${INK}" stroke-width="1.4"/>` + T(xs, RY(0) + 40, 9, '#8b96ad', 'старт', 'middle', HALO);
+  // raft drifting in the middle
+  const xr = -30 + (raftV ? 0 : S.cur * tt);
+  h += `<g><rect x="${(RX(xr) - 14).toFixed(1)}" y="${RY(Ls.W / 2) - 8}" width="28" height="16" fill="#a8834f" stroke="${INK}" stroke-width="1.6"/><path d="M${(RX(xr) - 14).toFixed(1)} ${RY(Ls.W / 2)}h28M${(RX(xr) - 5).toFixed(1)} ${RY(Ls.W / 2) - 8}v16M${(RX(xr) + 5).toFixed(1)} ${RY(Ls.W / 2) - 8}v16" stroke="${INK}" stroke-width="1"/>
+    <circle cx="${RX(xr).toFixed(1)}" cy="${RY(Ls.W / 2) - 14}" r="4" fill="#e8ecf4" stroke="${INK}"/></g>` + T(RX(xr), RY(Ls.W / 2) + 20, 8.5, '#c9b27a', 'плот', 'middle', HALO);
+  // boat trail and boat
+  const bx = t => raftV ? r.u * Math.sin(S.th * DEG) * t : r.vx * t;
+  const pts = []; for (let i = 0; i <= 30; i++) { const t = tt * i / 30; pts.push([RX(bx(t)), RY(r.vy * t)]); }
+  if (tt > 0) h += poly(pts, raftV ? '#ffb547' : '#86e0a8', 2, 'stroke-dasharray="6 4"');
+  const X = RX(bx(tt)), Y = RY(r.vy * tt);
+  // velocity vectors (8 units per m/s)
+  const k = 8, ux = r.u * Math.sin(S.th * DEG) * k, uy = -r.u * Math.cos(S.th * DEG) * k;
+  if (raftV) h += arrow(X, Y, X + ux, Y + uy, '#ffb547', 2.6) + arrow(RX(-off) + 40, RY(Ls.W) - 40, RX(-off) + 40 - S.cur * k, RY(Ls.W) - 40, '#c9b27a', 2.4);
+  else h += arrow(X, Y, X + ux, Y + uy, '#ffb547', 2.6) + arrow(X + ux, Y + uy, X + ux + S.cur * k, Y + uy, '#5fb4d9', 2.6) + arrow(X, Y, X + ux + S.cur * k, Y + uy, '#86e0a8', 2.6);
+  h += boat(X, Y, S.th);
+  h += T(260, RY(0) + 58, 10, raftV ? '#c9b27a' : '#86e0a8', raftV ? 'система отсчёта: ПЛОТ — берега уплывают влево' : 'система отсчёта: БЕРЕГ', 'middle', HALO);
+  return h;
+}
+
+function hlBox(id) {
+  const lid = LID();
+  if (lid === 'accel') { const x = rdx(Math.min(kin(S.v0, S.a, S.t).x, X1MAX)); return ({ road: [RD.x0 - 10, RD.y - 30, RD.x1 - RD.x0 + 20, 50], car: [x - 36, RD.y - 28, 72, 44], line: [rdx(50) - 10, RD.y - 46, 50, 66], marks: [RD.x0 - 6, RD.y, RD.x1 - RD.x0 + 12, 54], vgraph: [30, 222, 216, 180], sgraph: [280, 222, 216, 180] })[id]; }
+  if (lid === 'fall') { const m = model(); return ({ tower: [88, FY(S.h) - 10, 86, 385 - FY(S.h) + 16], ball: [168, FY(m.y) - 20, 24, 26], ruler: [36, FY(60) - 22, 44, 315], strobe: [168, FY(S.h) - 10, 24, 385 - FY(S.h) + 12], vgraph: [270, 180, 236, 222] })[id]; }
+  if (lid === 'throw') { const f = flight(S.v0, S.al); return ({ cannon: [P3.x0 - 22, P3.y0 - 46, 50, 52], target: [px3(29) - 8, P3.y0 - 48, 40, 60], path: [P3.x0, py3(f.H) - 12, Math.max(40, f.R * P3.k), f.H * P3.k + 16], vec: [P3.x0, py3(f.H) - 20, Math.max(60, f.R * P3.k), 60], ground: [P3.x0 - 6, P3.y0 - 6, 440, 32] })[id]; }
+  const r = RV(), tt = Math.min(S.t, crossT()), bx = S.frame === 'raft' ? r.u * Math.sin(S.th * DEG) * tt : r.vx * tt;
+  return ({ river: [0, RY(60) - 4, 520, RY(0) - RY(60) + 8], boat: [RX(bx) - 22, RY(r.vy * tt) - 22, 44, 44], pier: [RX(0) - 20, RY(60) - 32, 40, 40], vecs: [RX(bx) - 50, RY(r.vy * tt) - 50, 100, 60], raft: [RX(-30 + (S.frame === 'raft' ? 0 : S.cur * tt)) - 24, RY(30) - 24, 48, 52] })[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = bg();
+  if (id === 'accel') h += accelScene();
+  else if (id === 'fall') h += fallScene();
+  else if (id === 'throw') h += throwScene();
+  else h += riverScene();
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// fit the scene: 520 × 405 units, centred, content at the bottom
+let VB = { x: 0, y: 0, w: 520, h: 405 }, dirty = true;
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 520, hh / 410, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 405 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- animation ----------
+let last = performance.now();
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  const id = LID();
+  if (S.run) {
+    if (id === 'accel') { const te = tEnd1(S.v0, S.a); S.t += reduce ? 1e9 : dt; if (S.t >= te) { S.t = te; S.run = false; finishAccel(); } update(); }
+    else if (id === 'fall') { const tf = tFall(S.h, gNow()); S.t += reduce ? 1e9 : dt; if (S.t >= tf) { S.t = tf; S.run = false; finishFall(); } update(); }
+    else if (id === 'throw') { const f = flight(S.v0, S.al); S.t += reduce ? 1e9 : dt * 1.3; if (S.t >= f.T) { S.t = f.T; S.run = false; finishThrow(); } update(); }
+    else { const T4 = crossT(); S.t += reduce ? 1e9 : dt * 4; if (S.frame === 'raft') S.raft = true; if (S.t >= T4) { S.t = T4; S.run = false; finishRiver(); } update(); }
+  }
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+function finishAccel() {
+  const Ls = L(), te = tEnd1(S.v0, S.a), k = kin(S.v0, S.a, te), stopped = S.a < 0 && Math.abs(te - tStop(S.v0, S.a)) < 1e-9;
+  S.res = { x: k.x, t: te, v: k.v, stopped, v0: S.v0, a: S.a };
+  if (stopped && S.v0 === Ls.v0 && Math.abs(k.x - Ls.line) <= 0.5) { S.ok = true; toast(`Остановились ровно у линии: путь ${fmt(k.x, 1)} м за ${fmt(te, 1)} с.`); }
+  else if (stopped) toast(`Остановка через ${fmt(k.x, 1)} м${S.v0 !== Ls.v0 ? ' — но по условию v₀ = 20 м/с' : k.x > Ls.line ? ' — за стоп-линией! Тормозите сильнее.' : ' — раньше линии. Тормозите слабее.'}`);
+  else toast(k.x >= X1MAX - 1e-6 ? 'Машина проехала всю дорогу и не остановилась.' : `За ${T1MAX} с машина не остановилась.`);
+  renderTools();
+}
+function finishFall() {
+  const g = gNow(), tf = tFall(S.h, g);
+  S.res = { h: S.h, tf, v: g * tf, planet: S.planet };
+  if (S.planet === 'earth' && Math.abs(tf - 2) < 0.003) { S.ok = true; toast(`Ровно 2,00 с! Скорость у земли ${fmt(g * tf, 1)} м/с.`); }
+  else toast(`Падение длилось ${fmt(tf, 2)} с${S.planet === 'moon' ? ' — это на Луне' : tf > 2 ? ' — башня высоковата' : ' — башня низковата'}.`);
+  renderTools();
+}
+function finishThrow() {
+  const Ls = L(), f = flight(S.v0, S.al), hit = Math.abs(f.R - Ls.target) <= Ls.tol;
+  const sh = S.shots[S.shots.length - 1]; if (sh) sh.hit = hit;
+  if (hit) {
+    if (!S.hits.some(x => x.v0 === S.v0 && x.al === S.al)) S.hits.push({ v0: S.v0, al: S.al });
+    const pair = S.hits.some(a => S.hits.some(b => a.v0 === b.v0 && Math.abs(a.al - b.al) >= 10));
+    if (pair) { S.ok = true; toast(`Попадание вторым углом! Углы в сумме дают около 90°.`); }
+    else toast(`Попадание при α = ${S.al}°. Теперь найдите второй угол при той же скорости.`);
+  } else toast(`Дальность ${fmt(f.R, 1)} м — ${f.R < Ls.target ? 'недолёт' : 'перелёт'}.`);
+  renderTools();
+}
+function finishRiver() {
+  const r = RV(), T4 = crossT(), xL = r.vx * T4;
+  S.res = { xL, T: T4, th: S.th, cur: S.cur };
+  if (Math.abs(xL) <= 2 && S.cur === L().cur0) { if (!S.pier) toast(`Причалили! Снос ${fmt(xL, 1)} м, переправа ${fmt(T4, 1)} с.${S.raft ? '' : ' Теперь посмотрите с плота.'}`); S.pier = true; }
+  else if (Math.abs(xL) <= 2) toast('К причалу попали, но течение по условию 3 м/с.');
+  else toast(`Лодку снесло на ${fmt(Math.abs(xL), 1)} м ${xL > 0 ? 'вниз' : 'вверх'} по течению.`);
+  renderTools();
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3400); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, cls) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}${cls ? ` class="${cls}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  let h = '';
+  if (id === 'accel') h = B('v0-', 'v₀ −1') + B('v0+', 'v₀ +1') + sep + B('a-', 'a −0,5') + B('a+', 'a +0,5') + sep + B('go', S.run ? 'Едет…' : 'Пуск', undefined, 'rec') + B('reset', 'Сброс');
+  if (id === 'fall') h = B('h-1', '−1 м') + B('h-.1', '−0,1') + B('h+.1', '+0,1') + B('h+1', '+1 м') + sep + B('go', S.run ? 'Летит…' : 'Бросить', undefined, 'rec') + sep + B('p-earth', 'Земля', S.planet === 'earth') + B('p-moon', 'Луна', S.planet === 'moon');
+  if (id === 'throw') h = B('al-', 'α −1°') + B('al+', 'α +1°') + sep + B('v0-', 'v₀ −1') + B('v0+', 'v₀ +1') + sep + B('go', S.run ? 'Летит…' : 'Огонь', undefined, 'rec') + B('clear', 'Очистить');
+  if (id === 'river') h = B('th-', '◀ нос') + B('th+', 'нос ▶') + sep + B('c-', 'течение −') + B('c+', 'течение +') + sep + B('go', S.run ? 'Плывёт…' : 'Плыть', undefined, 'rec') + sep + B('f-shore', 'Берег', S.frame === 'shore') + B('f-raft', 'Плот', S.frame === 'raft');
+  tb.innerHTML = h;
+}
+function stopRun() { S.run = false; S.t = 0; S.res = null; }
+function setVal(key, v) {
+  const id = LID();
+  if (id === 'accel' && key === 'v0') v = clamp(Math.round(v), 0, 30);
+  if (id === 'accel' && key === 'a') v = clamp(Math.round(v * 2) / 2, -5, 3);
+  if (key === 'h') v = clamp(Math.round(v * 10) / 10, 5, 60);
+  if (id === 'throw' && key === 'v0') v = clamp(Math.round(v), 10, 25);
+  if (key === 'al') v = clamp(Math.round(v), 5, 85);
+  if (key === 'th') v = clamp(Math.round(v), -60, 60);
+  if (key === 'cur') v = clamp(Math.round(v * 2) / 2, 0, 4);
+  if (S[key] === v) return;
+  S[key] = v;
+  if (id === 'throw') { if (S.run) { S.run = false; S.shots.pop(); } S.t = 0; }
+  else stopRun();
+  renderTools(); update();
+}
+function act(a) {
+  const id = LID();
+  if (a === 'reset') { stopRun(); renderTools(); update(); return; }
+  if (a === 'v0-' || a === 'v0+') return setVal('v0', S.v0 + (a === 'v0-' ? -1 : 1));
+  if (a === 'a-' || a === 'a+') return setVal('a', S.a + (a === 'a-' ? -0.5 : 0.5));
+  if (a.startsWith('h')) return setVal('h', S.h + parseFloat(a.slice(1)));
+  if (a.startsWith('p-')) { S.planet = a.slice(2); stopRun(); renderTools(); buildScheme(); update(); return; }
+  if (a === 'al-' || a === 'al+') return setVal('al', S.al + (a === 'al-' ? -1 : 1));
+  if (a === 'th-' || a === 'th+') return setVal('th', S.th + (a === 'th-' ? -1 : 1));
+  if (a === 'c-' || a === 'c+') return setVal('cur', S.cur + (a === 'c-' ? -0.5 : 0.5));
+  if (a.startsWith('f-')) { S.frame = a.slice(2); if (S.frame === 'raft' && (S.run || S.res)) S.raft = true; renderTools(); buildScheme(); update(); return; }
+  if (a === 'clear') { S.shots = []; S.t = 0; S.run = false; renderTools(); update(); return; }
+  if (a === 'go') {
+    if (S.run) return;
+    if (id === 'accel' && S.v0 === 0 && S.a <= 0) { toast('Машина стоит: дайте ей скорость или ускорение.'); return; }
+    if (id === 'throw') { const f = flight(S.v0, S.al); S.shots.push({ v0: S.v0, al: S.al, R: f.R, H: f.H, T: f.T, hit: false }); if (S.shots.length > 6) S.shots.shift(); }
+    S.t = 0; S.res = null; S.run = true; renderTools(); update();
+  }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  road: IC('<rect x="1" y="12" width="32" height="10" fill="#2a3348"/><path d="M2 17h30" stroke="#e8ecf4" stroke-dasharray="4 3"/>'),
+  car: IC('<path d="M3 23v-6l5-1 4-5h10l4 5h4v7z" fill="#72d4e8"/><circle cx="10" cy="24" r="3.5" fill="#2a3348"/><circle cx="25" cy="24" r="3.5" fill="#2a3348"/>'),
+  line: IC('<rect x="10" y="4" width="4" height="26" fill="#ff8a73"/><path d="M18 6h10M18 12h10M18 18h10M18 24h10" stroke="#e8ecf4" stroke-width="3"/>'),
+  marks: IC('<path d="M2 20h30" stroke="var(--muted)"/><circle cx="5" cy="20" r="2.5" fill="#ffb547"/><circle cx="16" cy="20" r="2.5" fill="#ffb547"/><circle cx="24" cy="20" r="2.5" fill="#ffb547"/><circle cx="29" cy="20" r="2.5" fill="#ffb547"/>'),
+  vgraph: IC('<path d="M5 3v26h26" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M5 9L27 29H5z" fill="rgba(255,181,71,.35)"/><path d="M5 9L27 29" stroke="#72d4e8" stroke-width="2.4"/>'),
+  sgraph: IC('<path d="M5 3v26h26" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M5 29Q15 9 29 8" fill="none" stroke="#ffb547" stroke-width="2.4"/>'),
+  tower: IC('<rect x="10" y="4" width="14" height="27" fill="#2e3b57" stroke="var(--fg)"/><path d="M13 9h3M18 9h3M13 15h3M18 15h3M13 21h3M18 21h3" stroke="#ffd27a"/>'),
+  ball: IC('<circle cx="17" cy="14" r="7" fill="#e8ecf4"/><path d="M17 23v8" stroke="#72d4e8" stroke-width="2.4"/>'),
+  ruler: IC('<path d="M12 3v28M12 5h6M12 11h4M12 17h6M12 23h4M12 29h6" stroke="var(--muted)" stroke-width="1.6"/>'),
+  strobe: IC('<circle cx="17" cy="4" r="3" fill="none" stroke="#72d4e8"/><circle cx="17" cy="9" r="3" fill="none" stroke="#72d4e8"/><circle cx="17" cy="17" r="3" fill="none" stroke="#72d4e8"/><circle cx="17" cy="29" r="3" fill="none" stroke="#72d4e8"/>'),
+  cannon: IC('<g transform="rotate(-40 12 24)"><rect x="10" y="20" width="20" height="8" rx="2" fill="#a9b4c9"/></g><circle cx="12" cy="25" r="6" fill="#5b6680"/>'),
+  target: IC('<path d="M14 30V6" stroke="#a9b4c9" stroke-width="2"/><path d="M14 6h12l-4 4 4 4H14z" fill="#ff8a73"/><rect x="6" y="28" width="18" height="4" fill="#ff8a73"/>'),
+  path: IC('<path d="M3 30Q17 -6 31 30" fill="none" stroke="#ffb547" stroke-width="2.4"/>'),
+  vec: IC('<path d="M6 26h18" stroke="#ffb547" stroke-width="2.4"/><path d="M6 26V8" stroke="#72d4e8" stroke-width="2.4"/><path d="M6 26L24 8" stroke="#e8ecf4" stroke-width="1.6"/>'),
+  ground: IC('<rect x="1" y="20" width="32" height="12" fill="#1b2a22"/><path d="M1 20h32" stroke="#2f6b4a" stroke-width="2"/><path d="M6 20v4M16 20v4M26 20v4" stroke="var(--muted)"/>'),
+  river: IC('<rect x="1" y="8" width="32" height="18" fill="#14324a"/><path d="M4 14h8M18 20h8" stroke="#5fb4d9" stroke-width="1.6"/>'),
+  boat: IC('<path d="M17 3Q25 13 24 30H10Q9 13 17 3Z" fill="#ffb547"/>'),
+  pier: IC('<rect x="9" y="8" width="16" height="14" fill="#8a6a45"/><path d="M11 22v8M23 22v8" stroke="#8a6a45" stroke-width="2"/>'),
+  vecs: IC('<path d="M8 28L4 8" stroke="#ffb547" stroke-width="2.2"/><path d="M4 8h14" stroke="#5fb4d9" stroke-width="2.2"/><path d="M8 28L18 8" stroke="#86e0a8" stroke-width="2.2"/>'),
+  raft: IC('<rect x="5" y="14" width="24" height="12" fill="#a8834f"/><path d="M13 14v12M21 14v12" stroke="#04070d"/><circle cx="17" cy="9" r="4" fill="#e8ecf4"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  const t = (ok, s) => `${s} ${ok ? '✓' : '—'}`;
+  if (id === 'accel') return S.res ? `Последний заезд: ${S.res.stopped ? `стоп через ${fmt(S.res.x, 1)} м` : 'не остановилась'}` : 'Заезда ещё не было';
+  if (id === 'fall') return S.res ? `Последний бросок: ${fmt(S.res.tf, 2)} с` : 'Бросков ещё не было';
+  if (id === 'throw') return `Попаданий: ${S.hits.length}` + (S.hits.length ? ` (${S.hits.map(x => x.al + '°').join(', ')})` : '');
+  return [t(m.pier, 'К причалу'), t(m.raft, 'Вид с плота')].join(' · ');
+}
+
+// Scheme tab: built once per lesson, then values refreshed (sliders keep focus while dragging)
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'accel') h = `<h2>Торможение у перехода</h2>` + slider('inV0', 'Начальная скорость v₀', 0, 30, 1, S.v0) + slider('inA', 'Ускорение a', -5, 3, 0.5, S.a) +
+    `<dl class="reads"><div><dt>t</dt><dd id="r1"></dd></div><div><dt>v</dt><dd id="r2"></dd></div><div><dt>путь</dt><dd id="r3"></dd></div></dl>
+    <div class="row"><button class="ghostbtn" data-a="go">Пуск</button><button class="ghostbtn" data-a="reset">Сброс</button></div>
+    <p class="note" style="margin-top:12px">a &lt; 0 — машина тормозит, a &gt; 0 — разгоняется. Отметки на дороге ставятся каждую секунду.</p>`;
+  if (id === 'fall') h = `<h2>Бросок с башни</h2>` + slider('inH', 'Высота башни h', 5, 60, 0.1, S.h) +
+    `<div class="ctl"><div class="lbl">Где проводим опыт</div><div class="chips"><button data-a="p-earth" aria-pressed="${S.planet === 'earth'}">Земля · 9,8 м/с²</button><button data-a="p-moon" aria-pressed="${S.planet === 'moon'}">Луна · 1,6 м/с²</button></div></div>
+    <dl class="reads"><div><dt>t</dt><dd id="r1"></dd></div><div><dt>v</dt><dd id="r2"></dd></div><div><dt>высота</dt><dd id="r3"></dd></div></dl>
+    <div class="row"><button class="ghostbtn" data-a="go">Бросить</button></div>
+    <p class="note" style="margin-top:12px">Стробоскоп отмечает шарик каждые 0,2 с. Сопротивление воздуха не учитываем.</p>`;
+  if (id === 'throw') h = `<h2>Пушка и мишень</h2>` + slider('inAl', 'Угол α', 5, 85, 1, S.al) + slider('inV3', 'Начальная скорость v₀', 10, 25, 1, S.v0) +
+    `<dl class="reads"><div><dt>дальность</dt><dd id="r1"></dd></div><div><dt>высота</dt><dd id="r2"></dd></div><div><dt>полёт</dt><dd id="r3"></dd></div></dl>
+    <div class="row"><button class="ghostbtn" data-a="go">Огонь</button><button class="ghostbtn" data-a="clear">Очистить</button></div>
+    <p class="note" style="margin-top:12px">Дальность и высота считаются заранее по формулам, проверьте их выстрелом. Мишень засчитывает попадание в пределах ±1 м.</p>`;
+  if (id === 'river') h = `<h2>Переправа</h2>` + slider('inTh', 'Поворот носа (− против течения)', -60, 60, 1, S.th) + slider('inCur', 'Скорость течения', 0, 4, 0.5, S.cur) +
+    `<div class="ctl"><div class="lbl">Система отсчёта</div><div class="chips"><button data-a="f-shore" aria-pressed="${S.frame === 'shore'}">Берег</button><button data-a="f-raft" aria-pressed="${S.frame === 'raft'}">Плот</button></div></div>
+    <dl class="reads"><div><dt>v отн. берега</dt><dd id="r1"></dd></div><div><dt>время</dt><dd id="r2"></dd></div><div><dt>снос</dt><dd id="r3"></dd></div></dl>
+    <div class="row"><button class="ghostbtn" data-a="go">Плыть</button></div>
+    <p class="note" style="margin-top:12px">Ширина реки 60 м. Оранжевая стрелка — скорость лодки относительно воды (5 м/с), синяя — течение, зелёная — их сумма. Время на площадке ускорено в 4 раза.</p>`;
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn); };
+  on('#inV0', e => setVal('v0', +e.target.value));
+  on('#inA', e => setVal('a', +e.target.value));
+  on('#inH', e => setVal('h', +e.target.value));
+  on('#inAl', e => setVal('al', +e.target.value));
+  on('#inV3', e => setVal('v0', +e.target.value));
+  on('#inTh', e => setVal('th', +e.target.value));
+  on('#inCur', e => setVal('cur', +e.target.value));
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (id === 'accel') { set('#inV0O', S.v0 + ' м/с'); val('#inV0', S.v0); set('#inAO', fmt(S.a, 1) + ' м/с²'); val('#inA', S.a); set('#r1', fmt(m.t, 1) + ' с'); set('#r2', fmt(m.v, 1) + ' м/с'); set('#r3', fmt(m.x, 1) + ' м'); }
+  if (id === 'fall') { set('#inHO', fmt(S.h, 1) + ' м'); val('#inH', S.h); set('#r1', fmt(m.t, 2) + ' с'); set('#r2', fmt(m.v, 1) + ' м/с'); set('#r3', fmt(m.y, 1) + ' м'); }
+  if (id === 'throw') { set('#inAlO', S.al + '°'); val('#inAl', S.al); set('#inV3O', S.v0 + ' м/с'); val('#inV3', S.v0); set('#r1', fmt(m.R, 1) + ' м'); set('#r2', fmt(m.H, 1) + ' м'); set('#r3', fmt(m.T, 2) + ' с'); }
+  if (id === 'river') { set('#inThO', S.th === 0 ? '0° (поперёк)' : `${Math.abs(S.th)}° ${S.th < 0 ? 'против' : 'по'} течени${S.th < 0 ? 'я' : 'ю'}`); val('#inTh', S.th); set('#inCurO', fmt(S.cur, 1) + ' м/с'); val('#inCur', S.cur); set('#r1', fmt(m.vres, 2) + ' м/с'); set('#r2', fmt(m.T, 1) + ' с'); set('#r3', S.res ? fmt(S.res.xL, 1) + ' м' : '—'); }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'accel') return [
+    { id: 'road', icon: ICON.road, name: 'Дорога', spec: 'Прямой участок 100 м, отметки через каждые 10 м.' },
+    { id: 'car', icon: ICON.car, name: 'Автомобиль', spec: 'Движется равноускоренно. При торможении горят стоп-сигналы.' },
+    { id: 'line', icon: ICON.line, name: 'Стоп-линия и переход', spec: 'Стоп-линия — в 50 м от начала торможения.' },
+    { id: 'marks', icon: ICON.marks, name: 'Метки каждую секунду', spec: 'При торможении расстояния между ними уменьшаются, при разгоне — растут.' },
+    { id: 'vgraph', icon: ICON.vgraph, name: 'График скорости v(t)', spec: 'Наклонная прямая. Её наклон — ускорение, площадь под ней — путь.' },
+    { id: 'sgraph', icon: ICON.sgraph, name: 'График пути s(t)', spec: 'Ветвь параболы. После остановки становится горизонтальным.' }];
+  if (id === 'fall') return [
+    { id: 'tower', icon: ICON.tower, name: 'Башня', spec: 'Высоту меняете вы: от 5 до 60 м.' },
+    { id: 'ball', icon: ICON.ball, name: 'Шарик', spec: 'Падает без начальной скорости. Голубая стрелка — его скорость.' },
+    { id: 'ruler', icon: ICON.ruler, name: 'Шкала высоты', spec: 'Метры от земли, крупные деления через 10 м.' },
+    { id: 'strobe', icon: ICON.strobe, name: 'Стробоскоп', spec: 'Отметки через каждые 0,2 с. Промежутки растут — шарик разгоняется.' },
+    { id: 'vgraph', icon: ICON.vgraph, name: 'График v(t)', spec: 'Прямая из начала координат, её наклон равен g.' }];
+  if (id === 'throw') return [
+    { id: 'cannon', icon: ICON.cannon, name: 'Пушка', spec: 'Задаёт угол α и начальную скорость v₀.' },
+    { id: 'path', icon: ICON.path, name: 'Траектория', spec: 'Парабола. Пунктиры — прошлые выстрелы, зелёные — попадания.' },
+    { id: 'vec', icon: ICON.vec, name: 'Скорость в полёте', spec: 'Оранжевая vₓ не меняется, голубая vᵧ уменьшается, в верхней точке равна нулю, потом растёт вниз.' },
+    { id: 'target', icon: ICON.target, name: 'Мишень', spec: 'В 30 м от пушки, засчитывает ±1 м.' },
+    { id: 'ground', icon: ICON.ground, name: 'Шкала дальности', spec: 'Метры по горизонтали.' }];
+  return [
+    { id: 'river', icon: ICON.river, name: 'Река', spec: 'Ширина 60 м, течение слева направо. Чёрточки плывут вместе с водой.' },
+    { id: 'boat', icon: ICON.boat, name: 'Лодка', spec: 'Относительно воды плывёт 5 м/с туда, куда смотрит нос.' },
+    { id: 'pier', icon: ICON.pier, name: 'Причал', spec: 'Точно напротив старта. Допуск ±2 м.' },
+    { id: 'vecs', icon: ICON.vecs, name: 'Векторы скоростей', spec: 'Оранжевый — относительно воды, синий — течение, зелёный — сумма, скорость относительно берега.' },
+    { id: 'raft', icon: ICON.raft, name: 'Плот', spec: 'Плывёт вместе с водой. В системе «Плот» он неподвижен.' }];
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      (Ls.safety ? `<div class="safety"><b>Безопасность</b>${Ls.safety}</div>` : '') +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Что на площадке</h2><p class="note">Нажмите на деталь, чтобы найти её на площадке.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID(), Ls = L();
+  if (id === 'accel') {
+    const ts = tStop(S.v0, S.a), braking = S.a < 0 && S.v0 > 0;
+    return `<h2>Равноускоренное движение</h2><div class="formula">v = v₀ + at</div><div class="formula">s = v₀t + at²/2</div><div class="formula">s = (v² − v₀²) / (2a)</div>
+      <h3>Сейчас: t = ${fmt(m.t, 1)} с</h3><div class="steps">` +
+      step('скорость', `${S.v0} + (${fmt(S.a, 1)}) · ${fmt(m.t, 1)} = ${fmt(m.v, 1)} м/с`) +
+      step('путь', `${S.v0} · ${fmt(m.t, 1)} + (${fmt(S.a, 1)}) · ${fmt(m.t, 1)}² / 2 = ${fmt(m.x, 1)} м`, 'sum') + `</div>` +
+      (braking ? `<h3>Если тормозить до остановки</h3><div class="steps">` + step('время до остановки', `t = (0 − ${S.v0}) / (${fmt(S.a, 1)}) = ${fmt(ts, 1)} с`) +
+        step('тормозной путь', `(0 − ${S.v0}²) / (2 · (${fmt(S.a, 1)})) = ${fmt(S.v0 * S.v0 / (-2 * S.a), 1)} м`, 'sum') + `</div>` :
+        `<p class="note" style="margin-top:10px">Сейчас a ≥ 0 — машина не тормозит. Чтобы остановиться, нужно a &lt; 0.</p>`) +
+      `<h3>Для задания</h3><div class="steps">` + step('v₀, v, s', `20 м/с, 0, ${Ls.line} м`) + step('a', `(0 − 20²) / (2 · ${Ls.line}) = ?`, 'sum') + `</div>`;
+  }
+  if (id === 'fall') {
+    const g = m.g;
+    return `<h2>Свободное падение</h2><div class="formula">h = gt²/2    v = gt</div><div class="formula">t = √(2h / g)</div>
+      <h3>При h = ${fmt(S.h, 1)} м, g = ${fmt(g, 1)} м/с²</h3><div class="steps">` +
+      step('время падения', `√(2 · ${fmt(S.h, 1)} / ${fmt(g, 1)}) = ${fmt(m.tf, 2)} с`, 'sum') +
+      step('скорость у земли', `${fmt(g, 1)} · ${fmt(m.tf, 2)} = ${fmt(g * m.tf, 1)} м/с`) +
+      step('в км/ч', `${fmt(g * m.tf, 1)} · 3,6 = ${fmt(g * m.tf * 3.6, 0)} км/ч`) + `</div>
+      <h3>Сейчас: t = ${fmt(m.t, 2)} с</h3><div class="steps">` + step('пролетел', `${fmt(g, 1)} · ${fmt(m.t, 2)}² / 2 = ${fmt(g * m.t * m.t / 2, 1)} м`) + step('высота', `${fmt(m.y, 1)} м`) + `</div>
+      <h3>Для задания</h3><div class="steps">` + step('t, g', '2 с, 9,8 м/с²') + step('h', '9,8 · 2² / 2 = ?', 'sum') + `</div>
+      <p class="note" style="margin-top:10px">За каждую следующую 0,2 с шарик пролетает больше: пути за равные промежутки относятся как 1 : 3 : 5 : 7…</p>`;
+  }
+  if (id === 'throw') {
+    const s2 = Math.sin(2 * S.al * DEG);
+    return `<h2>Бросок под углом</h2><div class="formula">vₓ = v₀cos α   vᵧ = v₀sin α − gt</div><div class="formula">L = v₀² · sin 2α / g</div>
+      <h3>При v₀ = ${S.v0} м/с, α = ${S.al}°</h3><div class="steps">` +
+      step('vₓ', `${S.v0} · cos ${S.al}° = ${fmt(S.v0 * Math.cos(S.al * DEG), 2)} м/с`) +
+      step('vᵧ в начале', `${S.v0} · sin ${S.al}° = ${fmt(S.v0 * Math.sin(S.al * DEG), 2)} м/с`) +
+      step('время полёта', `2 · ${fmt(S.v0 * Math.sin(S.al * DEG), 2)} / 9,8 = ${fmt(m.T, 2)} с`) +
+      step('высота', `${fmt(S.v0 * Math.sin(S.al * DEG), 2)}² / (2 · 9,8) = ${fmt(m.H, 1)} м`) +
+      step('дальность', `${S.v0}² · sin ${2 * S.al}° / 9,8 = ${S.v0 * S.v0} · ${fmt(s2, 3)} / 9,8 = ${fmt(m.R, 1)} м`, 'sum') + `</div>
+      <h3>Для задания</h3><div class="steps">` + step('нужно', `sin 2α = 30 · 9,8 / ${S.v0}² = ${fmt(30 * 9.8 / (S.v0 * S.v0), 3)}`) + step('второй угол', 'sin 2α = sin (180° − 2α) → α₂ = ?', 'sum') + `</div>` +
+      (30 * 9.8 / (S.v0 * S.v0) > 1 ? `<p class="note" style="margin-top:10px">sin 2α не бывает больше 1: при такой скорости до мишени не достать.</p>` : '');
+  }
+  const r = RV(), sTh = Math.sin(S.th * DEG), cTh = Math.cos(S.th * DEG);
+  return `<h2>Сложение скоростей</h2><div class="formula">v⃗ = v⃗₁ + v⃗₂</div><p class="note">v₁ — скорость лодки относительно воды (5 м/с), v₂ — скорость течения, v — скорость относительно берега. Угол θ отсчитываем от направления «прямо поперёк».</p>
+    <h3>При θ = ${S.th}°, течение ${fmt(S.cur, 1)} м/с</h3><div class="steps">` +
+    step('вдоль берега', `${fmt(S.cur, 1)} + 5 · sin(${S.th}°) = ${fmt(r.vx, 2)} м/с`) +
+    step('поперёк реки', `5 · cos(${S.th}°) = ${fmt(r.vy, 2)} м/с`) +
+    step('|v| отн. берега', `√(${fmt(r.vx, 2)}² + ${fmt(r.vy, 2)}²) = ${fmt(m.vres, 2)} м/с`) +
+    step('время переправы', `60 / ${fmt(r.vy, 2)} = ${fmt(m.T, 1)} с`) +
+    step('снос', `${fmt(r.vx, 2)} · ${fmt(m.T, 1)} = ${fmt(m.xL, 1)} м`, 'sum') + `</div>
+    <h3>Чтобы не сносило</h3><div class="steps">` + step('условие', 'v₂ + 5 · sin θ = 0') + step('sin θ', '−v₂ / 5 = ?', 'sum') + `</div>
+    <p class="note" style="margin-top:10px">${sTh < 0 && cTh > 0 ? 'Нос повёрнут против течения — течение частично погашено.' : 'Нос не повёрнут против течения — лодку сносит вниз.'} В системе «Плот» скорость лодки равна v₁: течение там не видно.</p>`;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter');
+  if (id === 'accel') el.innerHTML = `<div class="k">Автомобиль</div><div class="v ${S.ok ? 'ok' : ''}">a = ${fmt(S.a, 1)} м/с²</div><div class="lr"><span>v₀</span><span>${S.v0} м/с</span></div><div class="lr"><span>v</span><span>${fmt(m.v, 1)} м/с</span></div><div class="lr"><span>s</span><span>${fmt(m.x, 1)} м</span></div>`;
+  else if (id === 'fall') el.innerHTML = `<div class="k">Шарик</div><div class="v ${S.ok ? 'ok' : ''}">h = ${fmt(S.h, 1)} м</div><div class="lr"><span>t</span><span>${fmt(m.t, 2)} с</span></div><div class="lr"><span>v</span><span>${fmt(m.v, 1)} м/с</span></div>`;
+  else if (id === 'throw') el.innerHTML = `<div class="k">Выстрел</div><div class="v ${S.ok ? 'ok' : ''}">α = ${S.al}°</div><div class="lr"><span>v₀</span><span>${S.v0} м/с</span></div><div class="lr"><span>попаданий</span><span class="${S.hits.length ? 'ok' : ''}">${S.hits.length}</span></div>`;
+  else el.innerHTML = `<div class="k">Лодка · ${S.frame === 'raft' ? 'плот' : 'берег'}</div><div class="v ${S.pier ? 'ok' : ''}">θ = ${S.th}°</div><div class="lr"><span>течение</span><span>${fmt(S.cur, 1)} м/с</span></div><div class="lr"><span>снос</span><span class="${S.res ? (Math.abs(S.res.xL) <= 2 ? 'ok' : 'bad') : ''}">${S.res ? fmt(S.res.xL, 1) + ' м' : '—'}</span></div>`;
+}
+
+function update() {
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Кинематика пройдена!'), 1600);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  accel: '<path d="M2 20h62" stroke="#2a3348" stroke-width="6"/><circle cx="8" cy="25" r="1.5" fill="#ffb547"/><circle cx="24" cy="25" r="1.5" fill="#ffb547"/><circle cx="35" cy="25" r="1.5" fill="#ffb547"/><circle cx="42" cy="25" r="1.5" fill="#ffb547"/><circle cx="45" cy="25" r="1.5" fill="#ffb547"/><path d="M38 17v-5l3-1 3-3h7l3 4h3v5z" fill="#72d4e8"/><rect x="52" y="12" width="2" height="12" fill="#ff8a73"/>',
+  fall: '<rect x="8" y="4" width="10" height="24" fill="#2e3b57"/><circle cx="24" cy="5" r="2" fill="none" stroke="#72d4e8"/><circle cx="24" cy="8" r="2" fill="none" stroke="#72d4e8"/><circle cx="24" cy="14" r="2" fill="none" stroke="#72d4e8"/><circle cx="24" cy="24" r="2.6" fill="#e8ecf4"/><path d="M36 4v22h26" fill="none" stroke="#e8ecf4" stroke-width="1"/><path d="M36 26L60 6" stroke="#72d4e8" stroke-width="1.6"/>',
+  throw: '<path d="M2 27h62" stroke="#2f6b4a" stroke-width="2"/><path d="M6 26Q22 -8 40 26" fill="none" stroke="#ffb547" stroke-width="1.6"/><path d="M6 26Q30 6 40 26" fill="none" stroke="#86e0a8" stroke-width="1.2" stroke-dasharray="2 2"/><rect x="37" y="25" width="7" height="3" fill="#ff8a73"/>',
+  river: '<rect x="0" y="6" width="66" height="18" fill="#14324a"/><path d="M8 12h6M30 18h6M50 11h6" stroke="#5fb4d9"/><path d="M33 24L28 6" stroke="#ffb547" stroke-width="1.6"/><path d="M28 6h8" stroke="#5fb4d9" stroke-width="1.4"/><path d="M33 24L35 6" stroke="#86e0a8" stroke-width="1.4"/><rect x="31" y="2" width="6" height="4" fill="#8a6a45"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Lx, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Lx.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Lx.title}</span></span>
+      ${S.done[Lx.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  S.lesson = i;
+  resetState(); save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L().task;
+  $('#hint').textContent = L().stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  // centre the active card by scrolling only the strip (never the page)
+  const strip = $('#lessons'), cur = strip.querySelector('.lesson[aria-current="true"]');
+  if (cur) strip.scrollLeft = Math.max(0, cur.offsetLeft - strip.offsetLeft - (strip.clientWidth - cur.offsetWidth) / 2);
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '';
+  if (id === 'accel') now = `Автомобиль на прямой дороге 100 м, стоп-линия в 50 м. Ученик выбрал v₀ = ${S.v0} м/с, a = ${fmt(S.a, 1)} м/с². Сейчас t = ${fmt(m.t, 1)} с, v = ${fmt(m.v, 1)} м/с, путь ${fmt(m.x, 1)} м. ${S.res ? (S.res.stopped ? `Последний заезд: остановка через ${fmt(S.res.x, 1)} м за ${fmt(S.res.t, 1)} с.` : 'Последний заезд: машина не остановилась.') : 'Заездов ещё не было.'} Нужное ускорение не называй — наводи к формуле s = (v² − v₀²) / (2a) и знаку ускорения при торможении.`;
+  if (id === 'fall') now = `Шарик падает с башни высотой ${fmt(S.h, 1)} м, ${S.planet === 'earth' ? 'Земля, g = 9,8 м/с²' : 'Луна, g = 1,6 м/с²'}. Расчётное время падения ${fmt(m.tf, 2)} с, сейчас t = ${fmt(m.t, 2)} с, скорость ${fmt(m.v, 1)} м/с. ${S.res ? `Последний бросок длился ${fmt(S.res.tf, 2)} с.` : 'Бросков ещё не было.'} Нужную высоту не называй — наводи к h = gt²/2.`;
+  if (id === 'throw') now = `Пушка стреляет под углом α = ${S.al}° со скоростью v₀ = ${S.v0} м/с, g = 9,8 м/с², без сопротивления воздуха. Расчётная дальность ${fmt(m.R, 1)} м, высота ${fmt(m.H, 1)} м, время полёта ${fmt(m.T, 2)} с. Мишень в 30 м (±1 м). Попадания: ${S.hits.length ? S.hits.map(x => `${x.al}° при ${x.v0} м/с`).join(', ') : 'пока нет'}. Нужные углы не называй — наводи к формуле дальности и к тому, что sin 2α = sin(180° − 2α).`;
+  if (id === 'river') now = `Река шириной 60 м, течение ${fmt(S.cur, 1)} м/с вправо, лодка плывёт относительно воды 5 м/с, нос повёрнут на ${S.th}° от направления поперёк реки (минус — против течения). Скорость относительно берега ${fmt(m.vres, 2)} м/с, время переправы ${fmt(m.T, 1)} с, снос ${fmt(m.xL, 1)} м. Система отсчёта на экране: ${S.frame === 'raft' ? 'плот (плывёт с водой)' : 'берег'}. К причалу ${S.pier ? 'пристали' : 'ещё не пристали'}, вид с плота ${S.raft ? 'посмотрели' : 'ещё не смотрели'}. Нужный угол не называй — наводи к условию sin θ = −v₂ / v₁.`;
+  return [
+    `Раздел: физика, 9 класс, тема «Кинематика» (механика). Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'} (${taskState(m)}).`,
+    `Сейчас на площадке: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Помогай наводящими вопросами, готовые ответы не выдавай.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { accel: 'Почему при вдвое большей скорости тормозной путь вчетверо длиннее?', fall: 'Почему перо в воздухе падает медленнее, а в пустоте — нет?', throw: 'Почему 30° и 60° дают одну дальность?', river: 'Почему с плота не видно течения?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
