@@ -164,6 +164,14 @@ CREATE TABLE luch.i18n (
   CONSTRAINT PK_luch_i18n PRIMARY KEY (src_hash, lang)
 );
 
+-- «История урока»: популярный рассказ к уроку (что это, зачем, как работает, история), генерирует ИИ один раз.
+IF OBJECT_ID('luch.lesson_story', 'U') IS NULL
+CREATE TABLE luch.lesson_story (
+  story_key   NVARCHAR(300) NOT NULL PRIMARY KEY,   -- путь страницы|номер урока|язык
+  body_json   NVARCHAR(MAX) NOT NULL,
+  created_at  DATETIME2(0)  NOT NULL CONSTRAINT DF_luch_story_created DEFAULT SYSUTCDATETIME()
+);
+
 MERGE luch.languages AS t USING (VALUES ('ru', N'Русский', 1), ('kk', N'Қазақша', 2), ('en', N'English', 3), ('es', N'Español', 4)) AS s(code, name, sort)
   ON t.code = s.code
   WHEN NOT MATCHED THEN INSERT (code, name, sort, is_active) VALUES (s.code, s.name, s.sort, CASE WHEN s.code = 'ru' THEN 1 ELSE 0 END);

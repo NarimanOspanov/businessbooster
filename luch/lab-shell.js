@@ -189,5 +189,113 @@
   });
   hwPane.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('input')) { const b = e.target.closest('.ls-task').querySelector('[data-a="check"]'); if (b && !b.disabled) b.click(); } });
 
-  window.LuchShell = { lessonIdx, lessonUrl, openHw, openTab };
+  // ---------- урок начинается с теории: «История урока» (или видео) → практика → ДЗ ----------
+  const css2 = document.createElement('style');
+  css2.textContent = `
+  .ls-story{margin:12px 16px 0;border:1px solid var(--line,#26324a);border-radius:14px;background:linear-gradient(135deg,var(--surface-2,#1a2438),var(--surface,#121a28));padding:12px;flex:none}
+  .ls-story[hidden]{display:none}
+  .ls-story .play{display:flex;align-items:center;gap:12px;width:100%;background:none;border:0;color:var(--fg,#e8ecf4);cursor:pointer;text-align:left;padding:0}
+  .ls-story .play i{width:42px;height:42px;flex:none;border-radius:50%;background:var(--accent,#ffb547);display:grid;place-items:center;color:#0b1019;font-style:normal;font-size:16px}
+  .ls-story .play b{display:block;font:600 15px/1.25 var(--font-body,"Golos Text",sans-serif)}
+  .ls-story .play small{display:block;font:500 12px/1.35 var(--font-mono,monospace);color:var(--muted,#8b96ad);margin-top:3px}
+  .ls-story .cap{margin-top:12px;font-size:14.5px;line-height:1.55}
+  .ls-story .cap b{display:block;font:600 11px/1 var(--font-body,sans-serif);letter-spacing:.12em;text-transform:uppercase;color:var(--accent,#ffb547);margin-bottom:6px}
+  .ls-story .dots{display:flex;gap:5px;margin-top:10px}
+  .ls-story .dots span{flex:1;height:3px;border-radius:2px;background:var(--line,#26324a)}
+  .ls-story .dots span.on{background:var(--accent,#ffb547)}
+  .ls-story .go{margin-top:12px}
+  .ls-start{position:fixed;inset:0;z-index:70;display:grid;place-items:center;background:rgba(5,8,14,.72);padding:16px}
+  .ls-start .card{width:min(440px,100%);background:var(--surface,#121a28);border:1px solid var(--line,#26324a);border-radius:20px;padding:24px;box-shadow:0 30px 80px -20px rgba(0,0,0,.8);color:var(--fg,#e8ecf4)}
+  .ls-start .k{font:500 11px/1.4 var(--font-mono,monospace);letter-spacing:.1em;text-transform:uppercase;color:var(--muted,#8b96ad)}
+  .ls-start h3{font:500 22px/1.25 var(--font-display,"Unbounded",sans-serif);margin:8px 0 10px;text-wrap:balance}
+  .ls-start p{margin:0 0 18px;color:var(--muted,#8b96ad);font-size:14.5px;line-height:1.55}
+  .ls-start .acts{display:flex;flex-direction:column;gap:8px}
+  .ls-start .ls-btn{padding:13px 16px;font-size:15px;border-radius:12px}
+  .ls-start .ls-btn.main{background:var(--accent,#ffb547)}`;
+  document.head.appendChild(css2);
+  const story = document.createElement('div'); story.className = 'ls-story';
+  sub.after(story);
+  const LANG2 = (window.LuchI18n && window.LuchI18n.lang) || 'ru';
+  const reelBtn = () => P('overview') && P('overview').querySelector('[data-reel]');
+  const taskBox = () => [...document.querySelectorAll('[class*="task"]')].find(e => e.offsetParent && !e.closest('.ls-story,.ls-start,#pane-hw,.lt-panel,.lt-tip') && e.getBoundingClientRect().width > 120);
+  const toPractice = () => { stopStory(); openTab('scheme'); const t = taskBox(); if (t && window.LuchTutor && window.LuchTutor.highlight) window.LuchTutor.highlight(t); };
+  let sRun = 0, sAudio = null, cache = {};
+  const storyKey = () => location.pathname + '|' + lessonIdx();
+  function fetchStory() {
+    const k = storyKey();
+    if (!cache[k]) cache[k] = fetch('/api/tutor/story', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: k, lang: LANG2, context: 'Тема: ' + document.title + '\nУрок ' + (lessonIdx() + 1) + ': ' + lessonTitle() + '\n' + ctx() }) })
+      .then(r => r.json().then(j => { if (!r.ok || !j.sections) throw new Error(j.error || 'story'); return j; })).catch(e => { delete cache[k]; throw e; });
+    return cache[k];
+  }
+  function storyIdle() {
+    const reel = reelBtn();
+    story.innerHTML = `<button type="button" class="play" data-a="story"><i>▶</i><span><b>${reel ? 'Начнём с теории: видео и история' : 'Начнём с теории: история урока'}</b><small>что это · зачем нужно · как работает · немного истории</small></span></button>` +
+      (reel ? `<div class="acts" style="display:flex;gap:6px;margin-top:10px"><button class="ls-btn" data-a="reel">▶ Смотреть видео</button><button class="ls-btn ghost" data-a="story">Послушать историю</button></div>` : '');
+  }
+  function stopStory() { sRun++; try { sAudio && sAudio.pause(); } catch (e) {} }
+  const tts = text => fetch('/api/tutor/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) }).then(r => r.ok ? r.blob() : null).catch(() => null);
+  async function playStory() {
+    const my = ++sRun;
+    if (!sAudio) sAudio = new Audio();
+    sAudio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA='; sAudio.play().catch(() => {});
+    story.innerHTML = `<div class="cap"><b>История урока</b>Готовлю рассказ… это займёт несколько секунд.</div><div class="acts" style="margin-top:10px"><button class="ls-btn ghost" data-a="stop">Остановить</button></div>`;
+    let s; try { s = await fetchStory(); } catch (e) { if (my === sRun) story.innerHTML = `<div class="cap"><b>История урока</b>Не получилось подготовить рассказ.</div><button class="ls-btn" data-a="story" style="margin-top:10px">Ещё раз</button>`; return; }
+    const secs = s.sections; let next = tts(secs[0].text);
+    for (let i = 0; i < secs.length; i++) {
+      if (my !== sRun) return;
+      story.innerHTML = `<div class="cap" data-noi18n><b>${esc(secs[i].title)}</b>${esc(secs[i].text)}</div><div class="dots">${secs.map((x, k) => `<span class="${k <= i ? 'on' : ''}"></span>`).join('')}</div>
+        <div class="acts" style="display:flex;gap:6px;margin-top:10px"><button class="ls-btn ghost" data-a="stop">Остановить</button><button class="ls-btn ghost" data-a="practice">К практике →</button></div>`;
+      if (secs[i].board && window.LuchTutor && window.LuchTutor.board) window.LuchTutor.board.draw(secs[i].board);
+      const blob = await next; if (i + 1 < secs.length) next = tts(secs[i + 1].text);
+      if (my !== sRun) return;
+      if (blob && blob.size > 100) { const u = URL.createObjectURL(blob); await new Promise(res => { sAudio.onended = sAudio.onerror = res; sAudio.src = u; sAudio.play().catch(res); }); URL.revokeObjectURL(u); }
+      else await new Promise(r => setTimeout(r, 5000));
+    }
+    if (my !== sRun) return;
+    story.innerHTML = `<div class="cap"><b>Теория пройдена</b>Теперь самое интересное — попробуй сам в опыте.</div><button class="ls-btn go" data-a="practice">Теперь попробуй сам →</button> <button class="ls-btn ghost go" data-a="story">Послушать ещё раз</button>`;
+  }
+  story.addEventListener('click', e => {
+    const b = e.target.closest('[data-a]'); if (!b) return;
+    const a = b.dataset.a;
+    if (a === 'story') playStory();
+    else if (a === 'reel') { stopStory(); const r = reelBtn(); if (r) r.click(); }
+    else if (a === 'stop') { stopStory(); storyIdle(); }
+    else if (a === 'practice') { if (window.LuchTutor && window.LuchTutor.board) window.LuchTutor.board.hide(); toPractice(); }
+  });
+  const syncStory = () => { story.hidden = group !== 'theory'; };
+  new MutationObserver(syncStory).observe(bar, { attributes: true, subtree: true, attributeFilter: ['aria-selected'] });
+  syncStory(); storyIdle();
+
+  // карточка в начале урока: «Начнём с теории?» (один раз на урок)
+  const seenKey = () => 'oe-start:' + location.pathname + ':' + lessonIdx();
+  let startShown = false;
+  function startCard() {
+    if (localStorage.getItem(seenKey())) return false;
+    try { localStorage.setItem(seenKey(), '1'); } catch (e) {}
+    startShown = true;
+    const reel = reelBtn(), h = lessonTitle(), n = lessonIdx() + 1, total = cards().length;
+    const w = document.createElement('div'); w.className = 'ls-start'; w.setAttribute('role', 'dialog'); w.setAttribute('aria-label', 'Начало урока');
+    w.innerHTML = `<div class="card"><div class="k">Урок ${n} из ${total}</div><h3>${esc(h)}</h3>
+      <p>Сначала — интересная теория: что это, зачем нужно и как работает. Потом попробуешь сам в опыте, а в конце закрепим домашним заданием.</p>
+      <div class="acts">${reel ? '<button class="ls-btn main" data-a="reel">▶ Смотреть видео</button>' : ''}<button class="ls-btn ${reel ? '' : 'main'}" data-a="story">▶ Послушать историю урока</button><button class="ls-btn ghost" data-a="practice">Сразу к практике</button></div></div>`;
+    const close = () => { w.remove(); startShown = false; };
+    w.addEventListener('click', e => {
+      if (e.target === w) return close();
+      const b = e.target.closest('[data-a]'); if (!b) return;
+      close();
+      if (b.dataset.a === 'reel') { openTab('overview'); const r = reelBtn(); if (r) r.click(); }
+      else if (b.dataset.a === 'story') { openTab('overview'); playStory(); }
+      else toPractice();
+    });
+    addEventListener('keydown', function esc2(e) { if (e.key === 'Escape') { close(); removeEventListener('keydown', esc2); } });
+    const show = () => { if (document.querySelector('.oe-splash')) return setTimeout(show, 150); document.body.appendChild(w); const m = w.querySelector('.main'); if (m) m.focus(); };
+    show();
+    return true;
+  }
+  // готовим историю заранее, пока человек читает карточку
+  const prep = () => { if (!reelBtn()) fetchStory().catch(() => {}); };
+  setTimeout(() => { startCard(); prep(); }, 300);
+  if (lessonsBox) { let t2 = 0; new MutationObserver(() => { clearTimeout(t2); t2 = setTimeout(() => { stopStory(); storyIdle(); startCard(); prep(); }, 400); }).observe(lessonsBox, { attributes: true, subtree: true, attributeFilter: ['aria-current'] }); }
+
+  window.LuchShell = { lessonIdx, lessonUrl, openHw, openTab, startPending: () => startShown, storyPlaying: () => !!story.querySelector('[data-a="stop"]') };
 })();

@@ -233,6 +233,7 @@ function handle(req, res, deps) {
   if (p === "/api/tutor/tts") return handleTts(req, res, deps);
   if (p === "/api/tutor/stt") return handleStt(req, res, deps);
   if (p === "/api/tutor/hw") return handleHw(req, res, deps);
+  if (p === "/api/tutor/story") return handleStory(req, res, deps);
   return handleChat(req, res, deps);
 }
 function handleTts(req, res, { readBody, clientIp }) {
@@ -316,11 +317,11 @@ const HW_CHECK = [
 async function oneShot(system, user) {
   const c = claudeClient();
   if (c) {
-    const r = await c.messages.create({ model: CLAUDE_MODEL, max_tokens: 1500, system, messages: [{ role: "user", content: user }] });
+    const r = await c.messages.create({ model: CLAUDE_MODEL, max_tokens: 4000, system, messages: [{ role: "user", content: user }] });
     return (r.content || []).filter((x) => x.type === "text").map((x) => x.text).join("");
   }
   const j = await gemini(GEMINI_MODEL, { systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts: [{ text: user }] }],
-    generationConfig: { maxOutputTokens: 1500, temperature: 0.5, responseMimeType: "application/json" } });
+    generationConfig: { maxOutputTokens: 8000, temperature: 0.5, responseMimeType: "application/json" } });
   const cc = ((j.candidates || [])[0] || {}).content;
   return cc && cc.parts ? cc.parts.map((p) => (p.thought ? "" : p.text || "")).join("") : "";
 }
@@ -347,6 +348,68 @@ function handleHw(req, res, { readBody, clientIp }) {
       if (!tasks.length) throw new Error("no tasks");
       send(200, { tasks });
     } catch (e) { console.log("[tutor hw] " + (e && e.message)); send(502, { error: "Не получилось. Попробуйте ещё раз." }); }
+  })().catch(() => { try { send(500, { error: "error" }); } catch { /* уже ответили */ } });
+}
+
+// ---------- «История урока»: популярная теория, которая вызывает интерес ----------
+// POST /api/tutor/story { key: "/labs/phys-forces/|2", context } → { sections: [{ title, text, board? }] }
+// Генерируем один раз на урок и храним в luch.lesson_story.
+const STORY = [
+  "Ты — увлечённый популяризатор науки и добрый наставник Open Edu AI. Напиши короткую «историю урока» — популярную теорию, с которой начинается урок (описание урока ниже). Слушают и школьники, и взрослые: интересно, понятно, без зубрёжки.",
+  "Ровно 4 раздела по порядку:",
+  "1) «Что это» — простое объяснение одной-двумя фразами, через знакомый образ из жизни.",
+  "2) «Зачем это нужно» — где это встречается и пригождается: в жизни, технике, профессиях.",
+  "3) «Как это работает» — суть механизма, 2–3 фразы. Для этого раздела нарисуй схему на доске: поле board — SVG-элементы без тега <svg> на холсте 480×300 (line, path, circle, ellipse, rect, polyline, polygon, text). Цвета мела: #f4f1e8, #ffd166, #7fd4ff, #ff8fa3, #9be89b; линии stroke-width 2–3, fill=\"none\" кроме точек; текст font-size 16–22. Стрелка: marker-end=\"url(#arr)\". Не больше 20 элементов.",
+  "4) «Немного истории» — кто и как это открыл или придумал, один яркий проверенный факт (имя, век или год). Если точных данных нет — скажи в общем, без выдуманных имён и дат.",
+  "Каждый раздел (кроме board) — 1–3 коротких живых предложения, без формул в LaTeX; формулы словами или простым текстом. Текст будет звучать голосом.",
+  "Ответь только JSON: {\"sections\":[{\"title\":\"Что это\",\"text\":\"…\"},{\"title\":\"Зачем это нужно\",\"text\":\"…\"},{\"title\":\"Как это работает\",\"text\":\"…\",\"board\":\"…\"},{\"title\":\"Немного истории\",\"text\":\"…\"}]}",
+].join("\n");
+const storyMem = new Map();
+async function storyGet(key) {
+  if (storyMem.has(key)) return storyMem.get(key);
+  try {
+    const sql = require("mssql"), pool = await db().getPool();
+    const r = await pool.request().input("k", sql.NVarChar(300), key).query("SELECT body_json FROM luch.lesson_story WHERE story_key = @k");
+    if (r.recordset[0]) { const v = JSON.parse(r.recordset[0].body_json); storyMem.set(key, v); return v; }
+  } catch (e) { console.log("[story db] " + (e && e.message)); }
+  return null;
+}
+async function storyPut(key, v) {
+  storyMem.set(key, v);
+  try {
+    const sql = require("mssql"), pool = await db().getPool();
+    await pool.request().input("k", sql.NVarChar(300), key).input("j", sql.NVarChar(sql.MAX), JSON.stringify(v))
+      .query("IF NOT EXISTS (SELECT 1 FROM luch.lesson_story WHERE story_key = @k) INSERT luch.lesson_story (story_key, body_json) VALUES (@k, @j)");
+  } catch (e) { console.log("[story db write] " + (e && e.message)); }
+}
+const storyPending = new Map();
+function handleStory(req, res, { readBody, clientIp }) {
+  const send = (code, obj) => { res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); };
+  if (req.method !== "POST") return send(405, { error: "POST" });
+  (async () => {
+    let b = {};
+    try { b = JSON.parse(await readBody(req)) || {}; } catch { return send(400, { error: "bad json" }); }
+    const key = String(b.key || "").slice(0, 280) + "|" + (LANG_NAMES[b.lang] ? b.lang : "ru");
+    if (!/^\/[\w\-/]*\|\d+\|\w+$/.test(key)) return send(400, { error: "key" });
+    const have = await storyGet(key);
+    if (have) return send(200, have);
+    const block = allowed(clientIp(req));
+    if (block) return send(429, { error: block });
+    try {
+      let p = storyPending.get(key);
+      if (!p) {
+        p = (async () => {
+          const j = jsonOf(await oneShot(STORY + langRule(b.lang), "Урок:\n" + String(b.context || "").slice(0, MAX_CTX)));
+          const sections = (j.sections || []).slice(0, 4).map((s) => ({ title: String(s.title || ""), text: String(s.text || ""), board: s.board ? String(s.board).slice(0, 6000) : undefined }));
+          if (sections.length < 3) throw new Error("story: few sections");
+          const v = { sections };
+          await storyPut(key, v);
+          return v;
+        })();
+        storyPending.set(key, p); p.finally(() => storyPending.delete(key)).catch(() => {});
+      }
+      send(200, await p);
+    } catch (e) { console.log("[story] " + (e && e.message)); send(502, { error: "Не получилось подготовить историю. Попробуйте ещё раз." }); }
   })().catch(() => { try { send(500, { error: "error" }); } catch { /* уже ответили */ } });
 }
 

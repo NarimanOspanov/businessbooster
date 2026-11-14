@@ -806,18 +806,12 @@
         const x = info(); idleShown = false; remember();
         show(`Урок ${x.i + 1}: «${x.title}». ${x.task ? 'Задача: ' + x.task : 'Попробуй опыт слева.'}`, [['Покажи, с чего начать', () => askVoice('Покажи на странице, с чего начать это задание. Коротко, по одному шагу.')]], { force, el: taskEl() });
       }
-      // первая лаборатория в жизни — короткая экскурсия в два шага
-      setTimeout(() => {
-        if (!store.get('luch-guide-tour')) {
-          store.set('luch-guide-tour', '1');
-          show('Это лаборатория. Слева — опыт: всё можно двигать руками. В рамке — задание урока.', [['Понятно →', () => {
-            show('Справа: «Теория» — объяснение, «Практика» — управление и расчёты, «ДЗ» — задачи на дом. А я рядом, если что-то непонятно.', [['Начать урок', () => lessonTip(true)]], { force: true, el: document.querySelector('.ls-tabs') });
-          }]], { force: true, el: taskEl() });
-        } else lessonTip(true);
-      }, 1300);
+      // урок начинается с карточки «Начнём с теории» (lab-shell); пока она открыта — молчим
+      const tipUnlessStart = () => { remember(); if (sh.startPending && sh.startPending()) return; if (!document.querySelector('.ls-start')) lessonTip(true); };
+      setTimeout(tipUnlessStart, 1300);
       // смена урока
       const strip = document.querySelector('.lessons'); let lt = 0;
-      if (strip) new MutationObserver(() => { clearTimeout(lt); lt = setTimeout(() => lessonTip(true), 700); }).observe(strip, { attributes: true, subtree: true, attributeFilter: ['aria-current'] });
+      if (strip) new MutationObserver(() => { clearTimeout(lt); lt = setTimeout(tipUnlessStart, 900); }).observe(strip, { attributes: true, subtree: true, attributeFilter: ['aria-current'] });
       // урок пройден: счётчик «2/5» в шапке вырос
       const counter = [...document.querySelectorAll('header *')].find(e => !e.children.length && /^\s*\d+\s*\/\s*\d+\s*$/.test(e.textContent));
       if (counter) {
@@ -832,6 +826,7 @@
       // ученик долго ничего не делает — предлагаем помощь (один раз на урок)
       setInterval(() => {
         if (idleShown || closes >= 3 || !panel.hidden || document.hidden || Date.now() - lastAct < 30000) return;
+        if ((sh.storyPlaying && sh.storyPlaying()) || document.querySelector('.ls-start')) { lastAct = Date.now(); return; }
         idleShown = true;
         show('Что-то не получается? Подскажу следующий шаг.', [['Подскажи шаг', () => askVoice('Я застрял. Подскажи следующий шаг в задании, коротко.')]], { force: true });
       }, 5000);
