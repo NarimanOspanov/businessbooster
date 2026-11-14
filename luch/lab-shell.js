@@ -100,7 +100,7 @@
     return cur.dataset.i !== undefined ? +cur.dataset.i : Math.max(0, list.indexOf(cur));
   }
   const lessonTitle = () => { const h = P('overview') && P('overview').querySelector('h2'); return h ? h.textContent.trim() : ''; };
-  const lessonUrl = () => location.origin + location.pathname + '?l=' + (lessonIdx() + 1);
+  const lessonUrl = () => { const l = window.LuchI18n && window.LuchI18n.lang; return location.origin + location.pathname + '?l=' + (lessonIdx() + 1) + (l && l !== 'ru' ? '&lang=' + l : ''); };
   function syncUrl() { try { history.replaceState(null, '', location.pathname + '?l=' + (lessonIdx() + 1) + location.hash); } catch (e) {} }
   // открыть урок из ссылки ?l=N
   const want = parseInt(new URLSearchParams(location.search).get('l'), 10);
@@ -133,7 +133,8 @@
   });
 
   // ---------- домашнее задание ----------
-  const HWKEY = () => 'luch-hw:' + location.pathname + ':' + lessonIdx();
+  const LANG = (window.LuchI18n && window.LuchI18n.lang) || 'ru';
+  const HWKEY = () => 'luch-hw:' + location.pathname + ':' + lessonIdx() + (LANG === 'ru' ? '' : ':' + LANG);
   const load = () => { try { return JSON.parse(localStorage.getItem(HWKEY()) || 'null'); } catch (e) { return null; } };
   const save = v => { try { localStorage.setItem(HWKEY(), JSON.stringify(v)); } catch (e) {} };
   const ctx = () => { try { return (window.LUCH_CONTEXT && window.LUCH_CONTEXT()) || ''; } catch (e) { return ''; } };
@@ -149,12 +150,12 @@
       h += `<p class="note">Решено ${done} из ${hw.tasks.length}. ${done === hw.tasks.length ? 'Отличная работа! 🎉' : 'Решайте по порядку, подсказка не отнимает баллов.'}</p>`;
       h += hw.tasks.map((t, i) => `<div class="ls-task ${t.ok ? 'ok' : ''}" data-i="${i}">
           <div class="lv"><span>${i + 1}. ${esc(t.level || '')}</span><span>${t.ok ? 'решено ✓' : ''}</span></div>
-          <p class="q">${esc(t.q)}</p>
+          <p class="q" data-noi18n>${esc(t.q)}</p>
           <div class="row"><input type="text" value="${esc(t.mine || '')}" placeholder="Ваш ответ" aria-label="Ответ на задачу ${i + 1}" ${t.ok ? 'readonly' : ''}>
             <button class="ls-btn" data-a="check" ${t.ok ? 'disabled' : ''}>Проверить</button></div>
           <div class="acts"><button class="ls-btn ghost" data-a="hint">Подсказка</button><button class="ls-btn ghost" data-a="ask">Спросить репетитора</button></div>
-          ${t.showHint ? `<div class="hint">💡 ${esc(t.hint)}</div>` : ''}
-          ${t.fb ? `<div class="fb">${esc(t.fb)}</div>` : ''}</div>`).join('');
+          ${t.showHint ? `<div class="hint" data-noi18n>💡 ${esc(t.hint)}</div>` : ''}
+          ${t.fb ? `<div class="fb" data-noi18n>${esc(t.fb)}</div>` : ''}</div>`).join('');
       h += `<button class="ls-btn ghost" id="ls-make">Другие задачи</button>`;
     }
     hwPane.innerHTML = h;
@@ -164,7 +165,7 @@
     if (b.id === 'ls-make') {
       if (loading) return; loading = true; save(null); renderHw();
       try {
-        const r = await fetch('/api/tutor/hw', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'make', context: document.title + '\n' + ctx() }) });
+        const r = await fetch('/api/tutor/hw', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'make', lang: LANG, context: document.title + '\n' + ctx() }) });
         const j = await r.json();
         if (!r.ok || !j.tasks) throw new Error(j.error || 'error');
         save({ tasks: j.tasks });
@@ -179,7 +180,7 @@
       const val = card.querySelector('input').value.trim(); if (!val) return;
       t.mine = val; b.disabled = true; b.textContent = 'Проверяю…';
       try {
-        const r = await fetch('/api/tutor/hw', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'check', context: document.title + '\n' + ctx(), task: t, answer: val }) });
+        const r = await fetch('/api/tutor/hw', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'check', lang: LANG, context: document.title + '\n' + ctx(), task: t, answer: val }) });
         const j = await r.json(); if (!r.ok) throw new Error(j.error);
         t.ok = !!j.ok; t.fb = j.feedback;
       } catch (err) { t.fb = 'Не получилось проверить. Попробуйте ещё раз.'; }

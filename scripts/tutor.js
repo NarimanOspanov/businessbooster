@@ -38,6 +38,13 @@ const SYSTEM = [
   "Если ученик прислал рисунок со своей доски — посмотри на него внимательно, скажи, что на нём верно, и мягко поправь ошибки.",
 ].join("\n");
 
+// язык сайта, выбранный учеником: описание урока приходит по-русски, а отвечать надо на его языке
+const LANG_NAMES = { ru: "русский", en: "английский (English)", kk: "казахский (қазақ тілі)", es: "испанский (español)" };
+function langRule(l) {
+  if (!LANG_NAMES[l] || l === "ru") return "";
+  return "\n\nЯзык сайта у ученика — " + LANG_NAMES[l] + ". Отвечай только на этом языке (и текст на доске тоже на нём), даже если описание экрана ниже по-русски. Названия кнопок и частей экрана переводи на этот язык.";
+}
+
 function keyFrom(envName, fileName) {
   if (process.env[envName]) return process.env[envName].trim();
   try { return fs.readFileSync(path.join(os.homedir(), fileName), "utf8").trim() || null; } catch { return null; }
@@ -264,7 +271,7 @@ function handleChat(req, res, { readBody, clientIp }) {
     const els = String(b.elements || "").slice(0, 3000);
     const m = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(b.image || ""));
     if (m && m[2].length < 900000) messages[messages.length - 1].image = { mime: m[1], data: m[2] };
-    const system = SYSTEM + (b.voice ? "\n\n" + VOICE_RULES : "") + "\n\nЧто сейчас на экране (страница " + page + "):\n" + (ctx || "нет данных") +
+    const system = SYSTEM + (b.voice ? "\n\n" + VOICE_RULES : "") + langRule(b.lang) + "\n\nЧто сейчас на экране (страница " + page + "):\n" + (ctx || "нет данных") +
       (els ? "\n\nЭлементы страницы (для меток [[n]]):\n" + els : "");
 
     const ac = new AbortController();
@@ -323,10 +330,10 @@ function handleHw(req, res, { readBody, clientIp }) {
         const task = b.task || {};
         const user = "Урок:\n" + ctx + "\n\nЗадача: " + String(task.q || "").slice(0, 800) + "\nПравильный ответ (для тебя): " + String(task.answer || "").slice(0, 200) +
           "\nОтвет ученика: " + String(b.answer || "").slice(0, 500);
-        const j = jsonOf(await oneShot(HW_CHECK, user));
+        const j = jsonOf(await oneShot(HW_CHECK + langRule(b.lang), user));
         return send(200, { ok: !!j.ok, feedback: String(j.feedback || "") });
       }
-      const j = jsonOf(await oneShot(HW_MAKE, "Урок:\n" + ctx));
+      const j = jsonOf(await oneShot(HW_MAKE + langRule(b.lang), "Урок:\n" + ctx));
       const tasks = (j.tasks || []).slice(0, 3).map((t) => ({ level: String(t.level || ""), q: String(t.q || ""), hint: String(t.hint || ""), answer: String(t.answer || "") }));
       if (!tasks.length) throw new Error("no tasks");
       send(200, { tasks });
@@ -334,4 +341,95 @@ function handleHw(req, res, { readBody, clientIp }) {
   })().catch(() => { try { send(500, { error: "error" }); } catch { /* уже ответили */ } });
 }
 
-module.exports = { handle };
+// ---------- перевод интерфейса страниц «Луча» ----------
+// POST /api/luch/i18n { lang: "en"|"kk"|"es", texts: ["русская строка", …] } → { tr: ["перевод", …] }
+// Кэш: память процесса + таблица luch.i18n; модель вызывается только для новых строк.
+const I18N_LANGS = { en: "English", kk: "Kazakh (Қазақ тілі, Cyrillic script)", es: "Spanish (Español)" };
+const I18N_MODEL = process.env.LUCH_I18N_MODEL || process.env.GEMINI_MODEL || "gemini-3.7-flash";
+const i18nMem = new Map(); // `${lang}:${hash}` → перевод
+const sha1 = (s) => require("crypto").createHash("sha1").update(s).digest("hex");
+const i18nHits = new Map();
+function i18nAllowed(ip) {
+  const now = Date.now(), h = (i18nHits.get(ip) || []).filter((t) => now - t < 3600e3);
+  if (h.length >= 1500) return false;
+  h.push(now); i18nHits.set(ip, h);
+  if (i18nHits.size > 5000) for (const [k, v] of i18nHits) if (!v.some((t) => now - t < 3600e3)) i18nHits.delete(k);
+  return true;
+}
+let dbMod = null;
+const db = () => { if (!dbMod) dbMod = require("./db.js"); return dbMod; };
+async function i18nFromDb(lang, hashes) {
+  const sql = require("mssql"), pool = await db().getPool();
+  const r = await pool.request().input("lang", sql.NVarChar(8), lang).input("j", sql.NVarChar(sql.MAX), JSON.stringify(hashes))
+    .query("SELECT i.src_hash, i.dst FROM luch.i18n i JOIN OPENJSON(@j) j ON j.value = i.src_hash WHERE i.lang = @lang");
+  return r.recordset;
+}
+async function i18nToDb(lang, rows) {
+  const sql = require("mssql"), pool = await db().getPool();
+  await pool.request().input("lang", sql.NVarChar(8), lang).input("j", sql.NVarChar(sql.MAX), JSON.stringify(rows)).query(`
+    MERGE luch.i18n AS t USING (SELECT * FROM OPENJSON(@j) WITH (h CHAR(40), s NVARCHAR(MAX), d NVARCHAR(MAX))) AS s
+      ON t.src_hash = s.h AND t.lang = @lang
+    WHEN NOT MATCHED THEN INSERT (src_hash, lang, src, dst) VALUES (s.h, @lang, s.s, s.d);`);
+}
+async function i18nModel(lang, texts) {
+  const system = [
+    "You translate the interface and lesson texts of «Луч», an interactive school learning site (physics, maths, chemistry, biology, computer science, grades 5–11), from Russian into " + I18N_LANGS[lang] + ".",
+    "Rules: natural, friendly language for school students; keep numbers, units (convert unit abbreviations to the target language's standard ones: Н→N, см→cm, кг→kg, с→s), formulas, chemical formulas, symbols, emoji, punctuation at the edges and leading/trailing spaces exactly as in the source. Keep proper names of Kazakhstan places/companies. Translate the name of the site «Луч» as «Luch». If a string is a single letter/variable or has nothing to translate, return it unchanged.",
+    "Placeholders like {0}, {1} stand for numbers: keep every placeholder exactly once, unchanged (you may move it if the target grammar needs it).",
+    "Input: a JSON array of strings. Output: ONLY a JSON array of the same length with translations in the same order.",
+  ].join("\n");
+  const user = JSON.stringify(texts);
+  let out = "";
+  if (keyFrom("GEMINI_API_KEY", ".gemini-key")) {
+    const j = await gemini(I18N_MODEL, { systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts: [{ text: user }] }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 16000, responseMimeType: "application/json" } });
+    const c = ((j.candidates || [])[0] || {}).content;
+    out = c && c.parts ? c.parts.map((p) => (p.thought ? "" : p.text || "")).join("") : "";
+  } else {
+    const c = claudeClient(); if (!c) throw new Error("no_model_key");
+    const r = await c.messages.create({ model: process.env.LUCH_I18N_CLAUDE || CLAUDE_MODEL, max_tokens: 16000, system, messages: [{ role: "user", content: user }] });
+    out = (r.content || []).filter((x) => x.type === "text").map((x) => x.text).join("");
+  }
+  const a = out.indexOf("["), z = out.lastIndexOf("]");
+  const arr = JSON.parse(out.slice(a, z + 1));
+  if (!Array.isArray(arr) || arr.length !== texts.length) throw new Error("i18n: length mismatch " + (arr && arr.length) + "/" + texts.length);
+  return arr.map((x, i) => (typeof x === "string" && x.trim() ? x : texts[i]));
+}
+const i18nPending = new Map(); // одна и та же строка, запрошенная разными посетителями одновременно, переводится один раз
+async function translate(lang, texts) {
+  const res = new Array(texts.length), need = [], hashes = texts.map(sha1);
+  texts.forEach((t, i) => { const v = i18nMem.get(lang + ":" + hashes[i]); if (v !== undefined) res[i] = v; });
+  let miss = [...new Set(hashes.filter((h, i) => res[i] === undefined))];
+  if (miss.length) {
+    try { for (const r of await i18nFromDb(lang, miss)) i18nMem.set(lang + ":" + r.src_hash, r.dst); } catch (e) { console.log("[i18n db] " + (e && e.message)); }
+    texts.forEach((t, i) => { const v = i18nMem.get(lang + ":" + hashes[i]); if (v !== undefined) res[i] = v; else if (!need.some((n) => n.h === hashes[i])) need.push({ h: hashes[i], s: t }); });
+  }
+  for (let k = 0; k < need.length; k += 60) {
+    const part = need.slice(k, k + 60);
+    const key = lang + ":" + part.map((p) => p.h).join(",");
+    let p = i18nPending.get(key);
+    if (!p) { p = i18nModel(lang, part.map((x) => x.s)); i18nPending.set(key, p); p.finally(() => i18nPending.delete(key)); }
+    const tr = await p;
+    const rows = part.map((x, i) => ({ h: x.h, s: x.s, d: tr[i] }));
+    rows.forEach((r) => i18nMem.set(lang + ":" + r.h, r.d));
+    i18nToDb(lang, rows).catch((e) => console.log("[i18n db write] " + (e && e.message)));
+  }
+  return texts.map((t, i) => (res[i] !== undefined ? res[i] : i18nMem.get(lang + ":" + hashes[i]) ?? t));
+}
+function handleI18n(req, res, { readBody, clientIp }) {
+  const send = (code, obj) => { res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); };
+  if (req.method !== "POST") return send(405, { error: "POST" });
+  (async () => {
+    let b = {};
+    try { b = JSON.parse(await readBody(req)) || {}; } catch { return send(400, { error: "bad json" }); }
+    const lang = String(b.lang || "");
+    if (!I18N_LANGS[lang]) return send(400, { error: "lang" });
+    const texts = (Array.isArray(b.texts) ? b.texts : []).slice(0, 200).map((t) => String(t).slice(0, 1500));
+    if (!texts.length) return send(200, { tr: [] });
+    if (!i18nAllowed(clientIp(req))) return send(429, { error: "too many" });
+    try { send(200, { tr: await translate(lang, texts) }); }
+    catch (e) { console.log("[i18n] " + (e && e.message)); send(502, { error: "translate failed" }); }
+  })().catch(() => { try { send(500, { error: "error" }); } catch { /* уже ответили */ } });
+}
+
+module.exports = { handle, handleI18n };

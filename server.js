@@ -8756,6 +8756,10 @@ http
       require("./scripts/tutor.js").handle(req, res, { readBody, clientIp });
       return;
     }
+    if (urlPath === "/api/luch/i18n") {
+      require("./scripts/tutor.js").handleI18n(req, res, { readBody, clientIp });
+      return;
+    }
 
     // Заявка с лендинга подбора ипотеки (/ipoteka): анкета, подходящие
     // программы, контакт. Пишем в базу и сразу шлём админам в Телеграм.

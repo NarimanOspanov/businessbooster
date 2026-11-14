@@ -3,9 +3,122 @@
 // и «Голосом» — живой разговор: ученик говорит, репетитор отвечает вслух и снова слушает.
 // Страница может задать window.LUCH_CONTEXT() — текст о том, что сейчас на экране,
 // и window.LUCH_SUGGEST() — список готовых вопросов.
+
+// ---------- языки сайта: Рус · Eng · Қаз · Esp ----------
+// Страницы написаны по-русски; для других языков весь текст страницы (включая подписи стенда,
+// которые перерисовываются каждый кадр) подменяется переводом из кэша. Новые строки переводит
+// сервер (/api/luch/i18n, кэш в базе), здесь они запоминаются в localStorage.
+(() => {
+  if (window.LuchI18n) return;
+  const LANGS = [['ru', 'Рус'], ['en', 'Eng'], ['kk', 'Қаз'], ['es', 'Esp']];
+  const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
+  const fromUrl = new URLSearchParams(location.search).get('lang');
+  let lang = LANGS.some(l => l[0] === fromUrl) ? fromUrl : (store.get('luch-lang') || 'ru');
+  if (!LANGS.some(l => l[0] === lang)) lang = 'ru';
+  if (fromUrl) store.set('luch-lang', lang);
+  document.documentElement.lang = lang;
+  const api = window.LuchI18n = { lang, langs: LANGS, set(l) { store.set('luch-lang', l); const u = new URL(location.href); u.searchParams.delete('lang'); location.href = u.toString(); } };
+
+  // переключатель в шапке
+  const css = document.createElement('style');
+  css.textContent = `.li-lang{display:flex;gap:2px;background:var(--surface,#121a28);border:1px solid var(--line,#26324a);border-radius:10px;padding:3px;flex:none}
+    .li-lang button{background:none;border:0;border-radius:7px;padding:6px 9px;font:600 12px/1 var(--font-body,"Golos Text",sans-serif);color:var(--muted,#8b96ad);cursor:pointer}
+    .li-lang button[aria-pressed="true"]{background:var(--fg,#e8ecf4);color:var(--bg,#0b1019)}
+    .li-lang button:hover{color:var(--fg,#e8ecf4)}
+    html.li-wait body{opacity:0}
+    body{transition:opacity .18s}`;
+  document.head.appendChild(css);
+  const mount = () => {
+    const header = document.querySelector('header'); if (!header || header.querySelector('.li-lang')) return;
+    const box = document.createElement('div'); box.className = 'li-lang'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Language'); box.dataset.noi18n = '';
+    box.innerHTML = LANGS.map(([c, n]) => `<button type="button" data-l="${c}" aria-pressed="${c === lang}">${n}</button>`).join('');
+    box.addEventListener('click', e => { const b = e.target.closest('button'); if (b && b.dataset.l !== lang) api.set(b.dataset.l); });
+    header.appendChild(box);
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount); else mount();
+  if (lang === 'ru') return;
+
+  const CY = /[А-Яа-яЁё]/;
+  const KEY = 'luch-i18n-' + lang;
+  let cache;
+  try { cache = new Map(JSON.parse(store.get(KEY) || '[]')); } catch (e) { cache = new Map(); }
+  const done = new Set(cache.values());          // уже переведённые строки (для казахского они тоже кириллица)
+  const queue = new Set(), inflight = new Set(), waiting = new Set();
+  const SKIP = 'script,style,textarea,code,pre,[data-noi18n],.lt-m';
+  const ATTRS = ['placeholder', 'aria-label', 'title', 'alt'];
+  // числа меняются каждый кадр («12,3 см») — переводим шаблон «{0} см», а числа подставляем обратно
+  const NUM = /-?\d+(?:[.,]\d+)*/g;
+  const lookup = s => {
+    const k = s.trim(); if (!k || !CY.test(k) || done.has(k)) return null;
+    const nums = k.match(NUM) || []; let i = 0;
+    const tmpl = nums.length ? k.replace(NUM, () => '{' + (i++) + '}') : k;
+    if (done.has(tmpl)) return null;
+    const t = cache.get(tmpl);
+    if (t !== undefined) { const out = nums.length ? t.replace(/\{(\d+)\}/g, (m, n) => nums[+n] !== undefined ? nums[+n] : m) : t; return s.replace(k, out); }
+    queue.add(tmpl); return undefined;
+  };
+  function textNode(n) {
+    const p = n.parentElement; if (!p || p.closest(SKIP)) return;
+    const r = lookup(n.nodeValue); if (r === null) return;
+    if (r === undefined) { waiting.add(n); return; }
+    if (n.nodeValue !== r) n.nodeValue = r;
+  }
+  function attrs(el) {
+    if (el.closest(SKIP)) return;
+    for (const a of ATTRS) { const v = el.getAttribute(a); if (!v) continue; const r = lookup(v); if (r === undefined) waiting.add(el); else if (r !== null && r !== v) el.setAttribute(a, r); }
+  }
+  function walk(root) {
+    if (root.nodeType === 3) return textNode(root);
+    if (root.nodeType !== 1 || root.matches(SKIP)) return;
+    attrs(root);
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, { acceptNode: n => (n.nodeType === 1 && n.matches(SKIP)) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+    while (w.nextNode()) { const n = w.currentNode; if (n.nodeType === 3) textNode(n); else attrs(n); }
+  }
+  let saveT = 0;
+  const save = () => { clearTimeout(saveT); saveT = setTimeout(() => { const arr = [...cache].slice(-6000); store.set(KEY, JSON.stringify(arr)); }, 800); };
+  let flushT = 0, first = true;
+  const kick = () => { if (!flushT) flushT = setTimeout(flush, 90); };
+  async function flush() {
+    flushT = 0;
+    const batch = [...queue].filter(k => !inflight.has(k)).slice(0, 150);
+    queue.clear();
+    if (!batch.length) { reveal(); return; }
+    batch.forEach(k => inflight.add(k));
+    try {
+      const r = await fetch('/api/luch/i18n', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang, texts: batch }) });
+      const j = await r.json();
+      if (r.ok && Array.isArray(j.tr)) { batch.forEach((k, i) => { const t = j.tr[i]; cache.set(k, t); done.add(t); }); save(); }
+    } catch (e) {}
+    batch.forEach(k => inflight.delete(k));
+    const ws = [...waiting]; waiting.clear();
+    ws.forEach(n => { if (n.isConnected) (n.nodeType === 3 ? textNode(n) : attrs(n)); });
+    if (queue.size) kick(); else reveal();
+  }
+  function reveal() { if (first) { first = false; document.documentElement.classList.remove('li-wait'); } }
+  // первая отрисовка: прячем страницу, пока не подставим перевод (не дольше 2,5 с)
+  document.documentElement.classList.add('li-wait');
+  setTimeout(reveal, 2500);
+  const start = () => {
+    walk(document.body);
+    const title = document.title; const t = lookup(title); if (t) document.title = t;
+    new MutationObserver(ms => {
+      for (const m of ms) {
+        if (m.type === 'characterData') textNode(m.target);
+        else if (m.type === 'attributes') attrs(m.target);
+        else m.addedNodes.forEach(walk);
+      }
+      if (queue.size) kick();
+    }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ATTRS });
+    new MutationObserver(() => { const t = lookup(document.title); if (t && t !== document.title) document.title = t; if (queue.size) kick(); }).observe(document.querySelector('title') || document.head, { childList: true, subtree: true, characterData: true });
+    if (queue.size) kick(); else reveal();
+  };
+  api.pending = () => queue.size + inflight.size + waiting.size;
+  if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
+})();
+
 (() => {
   if (window.__luchTutor) return; window.__luchTutor = true;
-  const KEY = 'luch-tutor-chat', LANG_KEY = 'luch-tutor-lang';
+  const KEY = 'luch-tutor-chat';
   const page = location.pathname.replace(/\/+$/, '') || '/';
   const ls = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
 
@@ -105,7 +218,9 @@
   let chat = [];
   try { chat = JSON.parse(ls.get(KEY) || '[]') || []; } catch (e) { chat = []; }
   const saveChat = () => ls.set(KEY, JSON.stringify(chat.slice(-30)));
-  let lang = ls.get(LANG_KEY) === 'kk' ? 'kk' : 'ru';
+  // язык речи и ответов = язык сайта (переключатель в шапке)
+  const lang = (window.LuchI18n && window.LuchI18n.lang) || 'ru';
+  const LOCALE = { ru: 'ru-RU', en: 'en-US', kk: 'kk-KZ', es: 'es-ES' }[lang] || 'ru-RU';
 
   const btn = document.createElement('button');
   btn.className = 'lt-btn'; btn.type = 'button'; btn.setAttribute('aria-label', 'Спросить репетитора');
@@ -127,7 +242,7 @@
       <button class="lt-orb" id="lt-orb" type="button" data-s="idle" aria-label="Говорить"><svg width="30" height="30" viewBox="0 0 18 18" aria-hidden="true"><rect x="6" y="1.5" width="6" height="10" rx="3" fill="#0b1019"/><path d="M3.5 8.5a5.5 5.5 0 0 0 11 0M9 14v2.5" stroke="#0b1019" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg></button>
       <div class="lt-vs" id="lt-vs">Нажмите и говорите</div>
       <div class="lt-vh" id="lt-vh"></div>
-      <div class="lt-vrow"><div class="lt-lang" role="group" aria-label="Язык речи"><button type="button" data-l="ru">Рус</button><button type="button" data-l="kk">Қаз</button></div>
+      <div class="lt-vrow">
         <button class="lt-ib" id="lt-vend" type="button">Закончить разговор</button></div>
     </div>`;
   document.body.append(btn, panel);
@@ -191,8 +306,8 @@
     return new Promise(res => {
       if (!window.speechSynthesis) return res();
       const u = new SpeechSynthesisUtterance(text);
-      u.lang = lang === 'kk' ? 'kk-KZ' : 'ru-RU';
-      const v = speechSynthesis.getVoices().find(v => v.lang && v.lang.toLowerCase().startsWith(lang === 'kk' ? 'kk' : 'ru'));
+      u.lang = LOCALE;
+      const v = speechSynthesis.getVoices().find(v => v.lang && v.lang.toLowerCase().startsWith(lang));
       if (v) u.voice = v;
       u.onend = u.onerror = () => res();
       speechSynthesis.speak(u);
@@ -247,7 +362,7 @@
   function listenBrowser(onInterim) {
     let rec, stopFn;
     const p = new Promise((resolve, reject) => {
-      rec = new SR(); rec.lang = lang === 'kk' ? 'kk-KZ' : 'ru-RU'; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
+      rec = new SR(); rec.lang = LOCALE; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
       let fin = '', heard = '';
       rec.onresult = e => { let interim = ''; fin = ''; for (const r of e.results) { if (r.isFinal) fin += r[0].transcript; else interim += r[0].transcript; } heard = (fin + ' ' + interim).trim(); onInterim && onInterim(heard); };
       rec.onerror = e => { if (e.error === 'not-allowed' || e.error === 'service-not-allowed') reject(new Error('mic')); };
@@ -481,7 +596,7 @@
     ctrl = new AbortController();
     try {
       const res = await fetch('/api/tutor', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctrl.signal,
-        body: JSON.stringify({ page, voice: !!opts.voice, context: `${document.title}\n${context}`, elements, image: opts.image || undefined, messages: chat.slice(-20) }) });
+        body: JSON.stringify({ page, lang, voice: !!opts.voice, context: `${document.title}\n${context}`, elements, image: opts.image || undefined, messages: chat.slice(-20) }) });
       if (!res.ok) { let msg = 'Не получилось ответить. Попробуйте ещё раз.'; try { msg = (await res.json()).error || msg; } catch (e) {} text = msg; }
       else {
         const rd = res.body.getReader(), dec = new TextDecoder();
@@ -524,9 +639,6 @@
   let vListen = null, vState = 'idle';
   const VS = { idle: 'Нажмите и говорите', listening: 'Слушаю…', thinking: 'Думаю…', speaking: 'Говорю… нажмите, чтобы перебить' };
   function setVoice(s, hint) { vState = s; orb.dataset.s = s; vs.textContent = VS[s]; if (hint !== undefined) vh.textContent = hint; }
-  function setLang(l) { lang = l; ls.set(LANG_KEY, l); voiceBox.querySelectorAll('.lt-lang button').forEach(b => b.setAttribute('aria-pressed', b.dataset.l === l)); }
-  voiceBox.querySelector('.lt-lang').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setLang(b.dataset.l); });
-  setLang(lang);
   async function turn() {
     if (!voiceMode || busy) return;
     setVoice('listening', '');

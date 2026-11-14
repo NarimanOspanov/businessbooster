@@ -153,7 +153,18 @@ CREATE TABLE luch.reel_scene_texts (
   CONSTRAINT PK_luch_reel_scene_texts PRIMARY KEY (scene_id, lang)
 );
 
-MERGE luch.languages AS t USING (VALUES ('ru', N'Русский', 1), ('kk', N'Қазақша', 2), ('en', N'English', 3)) AS s(code, name, sort)
+-- Переводы интерфейса страниц (машинный перевод, кэш): ключ — sha1 исходной русской строки.
+IF OBJECT_ID('luch.i18n', 'U') IS NULL
+CREATE TABLE luch.i18n (
+  src_hash    CHAR(40)      NOT NULL,
+  lang        NVARCHAR(8)   NOT NULL,
+  src         NVARCHAR(MAX) NOT NULL,
+  dst         NVARCHAR(MAX) NOT NULL,
+  created_at  DATETIME2(0)  NOT NULL CONSTRAINT DF_luch_i18n_created DEFAULT SYSUTCDATETIME(),
+  CONSTRAINT PK_luch_i18n PRIMARY KEY (src_hash, lang)
+);
+
+MERGE luch.languages AS t USING (VALUES ('ru', N'Русский', 1), ('kk', N'Қазақша', 2), ('en', N'English', 3), ('es', N'Español', 4)) AS s(code, name, sort)
   ON t.code = s.code
   WHEN NOT MATCHED THEN INSERT (code, name, sort, is_active) VALUES (s.code, s.name, s.sort, CASE WHEN s.code = 'ru' THEN 1 ELSE 0 END);
 `;
