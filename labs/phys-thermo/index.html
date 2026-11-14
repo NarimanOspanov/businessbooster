@@ -1,0 +1,972 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по термодинамике: первый закон, работа газа на графике p–V, второй закон и тепловой насос, цикл Карно и КПД идеальной машины.">
+<title>Термодинамика</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--liq);transition:width .2s}
+.gauge i{position:absolute;top:-4px;width:2px;height:14px;background:var(--force);transform:translateX(-50%)}
+.swatch{height:12px;border-radius:4px;margin-top:9px;border:1px solid rgba(255,255,255,.15)}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M12 9v22h16V9" fill="none" stroke="var(--fg)" stroke-width="2" stroke-linejoin="round"/><rect x="13.5" y="16" width="13" height="3.5" fill="var(--muted)"/><rect x="13.5" y="20" width="13" height="10" fill="var(--warn)" opacity=".55"/><path d="M20 16V6" stroke="var(--fg)" stroke-width="2"/><path d="M17 36q3-4 0-7q6 2 3 7" fill="var(--force)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Физика · Термодинамика</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/">Карта</a><a href="/physics/">Физика</a><a href="/labs/phys-thermo/" aria-current="page">Термодинамика</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Термодинамика</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Опытная площадка">
+    <svg class="scene" id="scene" role="img" aria-label="Площадка для опытов по термодинамике: цилиндр с газом, график p–V, бруски и тепловой насос. Предметы можно перетаскивать и нажимать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const sg = (x, n = 0) => (x > 0 ? '+' : '') + fmt(x, n);
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const LS_KEY = 'luch-phys-thermo';
+
+// ---------- physics constants ----------
+// Везде ν = 1 моль одноатомного идеального газа (гелий). p в кПа, V в литрах: p·V сразу в джоулях.
+const R = 8.31, CV = 1.5 * R, CP = 2.5 * R;
+const L1 = { T0: 300, p0: 100, qMin: -1000, qMax: 1500, target: 500 };
+const V0L = R * L1.T0 / L1.p0;                       // 24,93 л
+const P1 = [10, 300], P2 = [30, 100];                // состояния 1 и 2 урока «Работа газа»
+const B3 = { C: 2000, k: 800, Th0: 353.15, Tc0: 293.15, pump: 14000, rest: 330, touch: 190 }; // Дж/К, Вт/К, К, Вт
+const TK = T => T - 273.15;
+
+const LESSONS = [
+  { id: 'first', title: 'Первый закон',
+    text: ['Газу можно передать энергию двумя путями: нагреть его (теплопередача, тепло Q) или сжать, то есть совершить над ним работу. Внутренняя энергия U — это энергия беспорядочного движения молекул. У одноатомного идеального газа U = 3/2 · νRT: чем горячее газ, тем она больше.',
+           'Первый закон термодинамики — это закон сохранения энергии: Q = ΔU + A. Полученное тепло идёт на нагрев самого газа (ΔU) и на работу A, которую газ совершает, толкая поршень.',
+           'В цилиндре 1 моль гелия при 300 K и 100 кПа. Если поршень закреплён, газ работы не совершает и всё тепло уходит в ΔU. Если поршень свободен (на нём груз, давление постоянное), часть тепла уходит в работу.'],
+    why: 'Теплотехники ТЭЦ Алматы и Астаны по этому закону считают, сколько топлива нужно, чтобы нагреть воду и получить пар. Инженеры по отоплению и вентиляции подбирают мощность котлов для домов и школ — это стабильная работа в любом городе. А в жизни: насос греется, когда качаешь шину, — работа превращается во внутреннюю энергию воздуха.',
+    safe: 'Газ в закрытом сосуде при нагреве сильно повышает давление. Баллоны и аэрозольные баллончики нельзя нагревать и бросать в огонь — они взрываются.',
+    task: 'Передайте газу 500 Дж тепла дважды: при закреплённом поршне и при свободном. Где газ нагреется сильнее?',
+    hint: 'Нажатие на горелку — +50 Дж, если держать — греет непрерывно. Режим поршня меняют кнопки внизу; при смене режима газ начинает с 300 K заново. Точно — ползунком на вкладке «Схема».',
+    stage: 'Нажмите или держите горелку. Внизу выбирается режим поршня.',
+    mode: 'fix', q: 0,
+    check: m => !!(S.rec.fix && S.rec.free) },
+  { id: 'work', title: 'Работа газа',
+    text: ['Когда газ расширяется, он давит на поршень и сдвигает его — совершает работу. При постоянном давлении A = p · ΔV. Если газ сжимают, его работа отрицательная: работу совершают над ним.',
+           'На графике p(V) работа газа равна площади под линией процесса. Поэтому работа зависит от пути: из одного состояния в другое можно прийти разными дорогами, а площади под ними разные.',
+           'Точки 1 и 2 лежат на одной изотерме: произведение pV в них одинаковое, значит, одинаковы температура и внутренняя энергия. А работа на разных путях — разная, и тепло тоже.'],
+    why: 'Конструкторы двигателей и компрессоров по p–V-диаграммам видят, сколько работы даёт каждый цикл и где теряется энергия. Механики на нефтегазовых промыслах Атырау и Мангистау так проверяют компрессоры, которые качают газ по трубопроводам. А сам приём «площадь под графиком» ты уже знаешь: так из графика скорости находят путь.',
+    task: 'Переведите газ из состояния 1 в состояние 2 так, чтобы он совершил работу ровно 6 кДж.',
+    hint: 'Тащите белую точку по графику. Работа — это площадь под путём: при расширении она прибавляется, при сжатии вычитается. Какая дорога из 1 в 2 даёт площадь больше?',
+    stage: 'Тащите белую точку по графику p(V). Зелёная заливка — работа газа, красная — работа над газом.',
+    start: [10, 300],
+    check: m => m.at2 && Math.abs(m.A - 6000) < 0.5 },
+  { id: 'second', title: 'Второй закон',
+    text: ['Первый закон не запрещает горячему чаю нагреться ещё сильнее, забрав тепло у холодной чашки: энергия бы сохранилась. Но так никогда не бывает.',
+           'Второй закон термодинамики: тепло само собой переходит только от горячего тела к холодному. Обратно его можно перекачать, только затратив работу. Так работают холодильник, кондиционер и тепловой насос.',
+           'Поэтому процессы в природе необратимы. Бруски сами выравнивают температуры, но сами обратно не «разойдутся». И даже идеальная машина не вернёт всё как было бесплатно.'],
+    why: 'Инженеры-холодильщики обслуживают склады, мясокомбинаты и ледовые арены, а монтажники кондиционеров и тепловых насосов в Казахстане без работы не сидят: летом в Шымкенте за +40 °C, зимой в Астане за −30 °C. Кто понимает второй закон, тот объяснит клиенту, почему кондиционер тратит электричество и как выбрать экономный.',
+    safe: 'Нагретый металл выглядит так же, как холодный. Горячие предметы берут прихваткой или щипцами.',
+    task: 'Сведите бруски и дождитесь равновесия. Потом тепловым насосом снова нагрейте левый брусок до 80 °C.',
+    hint: 'Тащите правый брусок к левому. Когда температуры сравняются, разведите бруски, иначе тепло будет утекать обратно, и включите насос — коробку сверху.',
+    stage: 'Тащите правый брусок к левому. Насос — коробка сверху, нажмите на неё.',
+    Th: 353.15, Tc: 293.15,
+    check: m => S.mixed && m.Th >= B3.Th0 - 0.05 },
+  { id: 'carnot', title: 'Цикл Карно',
+    text: ['Тепловой двигатель берёт тепло Q₁ у нагревателя, часть превращает в работу A, а остаток Q₂ отдаёт холодильнику. КПД η = A / Q₁. По второму закону что-то отдать холодильнику придётся обязательно, поэтому η < 100 %.',
+           'Цикл Карно — самый выгодный цикл идеальной машины. В нём две изотермы и две адиабаты: расширение при T₁ на нагревателе, расширение без теплообмена, сжатие при T₂ на холодильнике и сжатие без теплообмена.',
+           'КПД цикла Карно зависит только от температур в кельвинах: η = 1 − T₂ / T₁. Ни один реальный двигатель между теми же температурами не работает лучше.'],
+    why: 'Энергетики Экибастузских ГРЭС и городских ТЭЦ знают: чтобы поднять КПД, пар делают горячее, а охлаждают его в градирнях и водоёмах. Каждый процент КПД — это тысячи тонн сэкономленного угля и меньше выбросов. По этой же формуле автоконструкторы понимают, почему бензиновый мотор не даёт больше 35–40 %.',
+    task: 'Подберите температуры так, чтобы КПД идеальной машины был ровно 40 %, и проведите один полный цикл.',
+    hint: 'η = 1 − T₂ / T₁. Какое тогда должно быть отношение T₂ / T₁? Меняйте температуры кнопками или ползунками на «Схеме», потом нажмите «Цикл ▶».',
+    stage: 'Меняйте T₁ и T₂, затем запустите цикл.',
+    T1: 600, T2: 300,
+    check: m => Math.abs(m.eta - 0.4) < 1e-9 && S.doneKey === S.T1 + '/' + S.T2 },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null,
+            mode: 'fix', q: 0, rec: {}, flame: 0, cold: 0,
+            path: [[10, 300]], A2: 0, arr: [],
+            Th: B3.Th0, Tc: B3.Tc0, cx: B3.rest, pump: false, W: 0, Qflow: 0, Qp: 0, mixed: false, trace: [],
+            T1: 600, T2: 300, ph: 0, run: false, doneKey: null, cycles: 0 };
+const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+function resetState() {
+  const L = LESSONS[S.lesson];
+  S.mode = 'fix'; S.q = 0; S.rec = {};
+  S.path = [(L.start || P1).slice()]; S.A2 = 0; S.arr = [];
+  S.Th = B3.Th0; S.Tc = B3.Tc0; S.cx = B3.rest; S.pump = false; S.W = 0; S.Qflow = 0; S.Qp = 0; S.mixed = false; S.trace = [[S.Th, S.Tc]];
+  S.T1 = L.T1 || 600; S.T2 = L.T2 || 300; S.ph = 0; S.run = false; S.doneKey = null; S.cycles = 0;
+}
+
+function carnotGeo(T1, T2) {
+  const r = Math.pow(T1 / T2, 1.5), V1 = 10, V2 = 20, V3 = V2 * r, V4 = V1 * r;
+  const Q1 = R * T1 * Math.log(V2 / V1), Q2 = R * T2 * Math.log(V3 / V4), A = Q1 - Q2;
+  return { V1, V2, V3, V4, r, Q1, Q2, A, eta: 1 - T2 / T1, p1: R * T1 / V1, p2: R * T1 / V2, p3: R * T2 / V3, p4: R * T2 / V4 };
+}
+// точка на цикле: этап k (0…3), доля f
+function stagePt(g, T1, T2, k, f) {
+  let V, T;
+  if (k >= 4) { k = 0; f = 0; }
+  if (k === 0) { V = g.V1 * Math.pow(g.V2 / g.V1, f); T = T1; }
+  else if (k === 1) { V = g.V2 * Math.pow(g.V3 / g.V2, f); T = T1 * Math.pow(g.V2 / V, 2 / 3); }
+  else if (k === 2) { V = g.V3 * Math.pow(g.V4 / g.V3, f); T = T2; }
+  else { V = g.V4 * Math.pow(g.V1 / g.V4, f); T = T2 * Math.pow(g.V4 / V, 2 / 3); }
+  return { V, T, p: R * T / V };
+}
+const STAGES = ['Изотермическое расширение при T₁', 'Адиабатное расширение', 'Изотермическое сжатие при T₂', 'Адиабатное сжатие'];
+
+function model() {
+  const id = LID();
+  if (id === 'first') {
+    const Q = S.q, fix = S.mode === 'fix';
+    const dT = Q / (fix ? CV : CP), T = L1.T0 + dT, V = fix ? V0L : R * T / L1.p0, p = R * T / V;
+    return { kind: id, Q, dT, T, V, p, A: fix ? 0 : R * dT, dU: CV * dT, fix };
+  }
+  if (id === 'work') {
+    const [V, p] = S.path[S.path.length - 1];
+    return { kind: id, V, p, A: S.A2, T: p * V / R, at1: V === P1[0] && p === P1[1], at2: V === P2[0] && p === P2[1] };
+  }
+  if (id === 'second') {
+    const contact = S.cx <= B3.touch + 1;
+    const dS = B3.C * Math.log(S.Th / B3.Th0) + B3.C * Math.log(S.Tc / B3.Tc0);
+    return { kind: id, Th: S.Th, Tc: S.Tc, contact, pump: S.pump, W: S.W, Qflow: S.Qflow, Qp: S.Qp, dS };
+  }
+  const g = carnotGeo(S.T1, S.T2), k = Math.min(3, Math.floor(S.ph)), cur = stagePt(g, S.T1, S.T2, S.ph >= 4 ? 4 : k, S.ph - k);
+  return Object.assign({ kind: id, T1: S.T1, T2: S.T2, k: S.run ? k : -1, cur }, g);
+}
+
+// ---------- drawing helpers ----------
+const ol = (d, fill, stroke, w = 2.2, extra = '') => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${w + 2.6}" stroke-linejoin="round" stroke-linecap="round"/><path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round" ${extra}/>`;
+const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+const mixC = (a, b, f) => { const A = hex(a), B = hex(b); return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * f).toString(16).padStart(2, '0')).join(''); };
+function heatCol(T, lo, hi) { const f = clamp((T - lo) / (hi - lo), 0, 1); return f < 0.5 ? mixC('#4f8fe0', '#9aa6bd', f * 2) : mixC('#9aa6bd', '#ef6a3c', (f - 0.5) * 2); }
+const tri = z => { const m = ((z % 2) + 2) % 2; return 1 - Math.abs(m - 1); };
+const DOTS = []; { let s = 11; const r = () => (s = (s * 16807) % 2147483647) / 2147483647; for (let i = 0; i < 44; i++) DOTS.push({ u: r() * 2, v: r() * 2, a: r() * 2 - 1, b: r() * 2 - 1 }); }
+function gasDots(x, y, w, h, T, t, n) {
+  if (w < 6 || h < 6) return '';
+  const sp = reduce ? 0 : 0.00022 * Math.sqrt(Math.max(T, 20) / 300);
+  let s = '';
+  for (let i = 0; i < n; i++) {
+    const d = DOTS[i], px = x + 4 + tri(d.u + d.a * sp * t) * (w - 8), py = y + 4 + tri(d.v + d.b * sp * t * 1.3) * (h - 8);
+    s += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="2.3" fill="#eef3fa" opacity=".85"/>`;
+  }
+  return s;
+}
+const arrow = (x1, y1, x2, y2, c, w = 2.4) => { const a = Math.atan2(y2 - y1, x2 - x1), L = 7; return `<path d="M${x1} ${y1}L${x2} ${y2}" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/><path d="M${x2} ${y2}L${(x2 - L * Math.cos(a - 0.45)).toFixed(1)} ${(y2 - L * Math.sin(a - 0.45)).toFixed(1)}L${(x2 - L * Math.cos(a + 0.45)).toFixed(1)} ${(y2 - L * Math.sin(a + 0.45)).toFixed(1)}Z" fill="${c}"/>`; };
+
+function bench() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="2360" fill="url(#tile)"/>
+    <rect x="-2000" y="360" width="4520" height="1200" fill="#1a2232"/>
+    <rect x="-2000" y="358" width="4520" height="4" fill="#2c3954"/>
+    <rect x="-2000" y="362" width="4520" height="2" fill="${INK}" opacity=".6"/>`;
+}
+
+// ---- урок 1: цилиндр с горелкой ----
+const CYL = { x: 190, w: 140, top: 120, bot: 310, k: 4.4 };
+function firstSVG(m, t) {
+  const { x, w, top, bot, k } = CYL, gt = bot - m.V * k, g0 = bot - V0L * k;
+  let h = '';
+  h += ol(`M${x + 10} ${bot}V358M${x + w - 10} ${bot}V358`, 'none', '#56627d', 5);
+  h += `<rect x="${x + 3}" y="${gt.toFixed(1)}" width="${w - 6}" height="${(bot - gt).toFixed(1)}" fill="${heatCol(m.T, 240, 380)}" opacity=".3"/>`;
+  h += gasDots(x + 3, gt, w - 6, bot - gt, m.T, t, 36);
+  h += `<path d="M${x - 14} ${g0.toFixed(1)}h${w + 28}" stroke="#8b96ad" stroke-width="1" stroke-dasharray="4 4"/><text x="${x - 16}" y="${(g0 + 3).toFixed(1)}" font-size="9" fill="#8b96ad" text-anchor="end">начало</text>`;
+  h += ol(`M${x} ${top}V${bot}H${x + w}V${top}`, 'none', '#a9b4c9', 4);
+  h += ol(`M${x + 4} ${(gt - 14).toFixed(1)}h${w - 8}v14h-${w - 8}z`, '#8a96b0', '#c8d1e2', 1.6);
+  if (m.fix) {
+    for (const yy of [gt - 22, gt + 2]) h += `<rect x="${x - 9}" y="${yy.toFixed(1)}" width="16" height="6" rx="1.5" fill="#ffb547" stroke="${INK}" stroke-width="1.2"/><rect x="${x + w - 7}" y="${yy.toFixed(1)}" width="16" height="6" rx="1.5" fill="#ffb547" stroke="${INK}" stroke-width="1.2"/>`;
+    h += `<text x="${x + w + 14}" y="${(gt - 10).toFixed(1)}" font-size="9.5" fill="#ffb547">упоры</text>`;
+  } else {
+    h += ol(`M${x + 38} ${(gt - 46).toFixed(1)}h64v32h-64z`, '#3a4762', '#56627d', 1.6);
+    h += `<text x="${x + 70}" y="${(gt - 26).toFixed(1)}" font-size="10" fill="#e8ecf4" text-anchor="middle">груз</text>`;
+    if (m.A > 0.5) h += arrow(x + w + 22, gt + 10, x + w + 22, gt - 24, '#72d4e8') + `<text x="${x + w + 30}" y="${(gt - 4).toFixed(1)}" font-size="10" fill="#72d4e8">A</text>`;
+  }
+  // горелка
+  const fl = t < S.flame, ice = t < S.cold;
+  h += `<g data-drag="burner"><rect x="214" y="312" width="92" height="50" fill="transparent"/>`;
+  if (fl) {
+    const wob = reduce ? 0 : Math.sin(t / 60) * 1.5;
+    h += `<path d="M248 330Q${248 + wob} 316 260 311Q${272 - wob} 316 272 330Z" fill="#ffb547" opacity=".95"/><path d="M254 330Q256 320 260 317Q264 320 266 330Z" fill="#fff3c4"/>`;
+  }
+  h += ol('M246 330h28v20h-28z', '#3a4762', '#56627d', 1.6) + ol('M226 350h68v8h-68z', '#2a3348', '#3a4762', 1.6);
+  h += `<rect x="255" y="333" width="10" height="6" fill="${fl ? '#ffb547' : '#56627d'}"/></g>`;
+  if (fl) h += arrow(x + w / 2 + 34, bot + 2, x + w / 2 + 34, bot - 30, '#ffb547') + `<text x="${x + w / 2 + 42}" y="${bot - 18}" font-size="10" fill="#ffb547">Q</text>`;
+  if (ice) h += arrow(x + 30, bot - 26, x + 30, bot + 6, '#72d4e8') + `<text x="${x + 12}" y="${bot + 18}" font-size="9" fill="#72d4e8">охлаждение</text>`;
+  h += `<text x="${x + w / 2}" y="${top - 8}" font-size="9.5" fill="#8b96ad" text-anchor="middle">1 моль гелия</text>`;
+  return h;
+}
+
+// ---- урок 2: график p(V) ----
+const WX = V => 180 + V * 8, WY = p => 360 - p * 0.6;
+function workSVG(m, t) {
+  let h = '';
+  for (let V = 0; V <= 40; V += 5) h += `<path d="M${WX(V)} ${WY(0)}V${WY(400)}" stroke="#26324a" stroke-width="${V % 10 ? .6 : 1}"/>` + (V % 10 === 0 ? `<text x="${WX(V)}" y="${WY(0) + 13}" font-size="9" fill="#8b96ad" text-anchor="middle">${V}</text>` : '');
+  for (let p = 0; p <= 400; p += 50) h += `<path d="M${WX(0)} ${WY(p)}H${WX(40)}" stroke="#26324a" stroke-width="${p % 100 ? .6 : 1}"/>` + (p % 100 === 0 ? `<text x="${WX(0) - 5}" y="${WY(p) + 3}" font-size="9" fill="#8b96ad" text-anchor="end">${p}</text>` : '');
+  h += `<path d="M${WX(0)} ${WY(400)}V${WY(0)}H${WX(40)}" stroke="#8b96ad" stroke-width="1.6" fill="none"/>`;
+  h += `<text x="${WX(0) + 5}" y="${WY(400) + 9}" font-size="9.5" fill="#e8ecf4">p, кПа</text><text x="${WX(40)}" y="${WY(0) - 6}" font-size="9.5" fill="#e8ecf4" text-anchor="end">V, л</text>`;
+  let d = ''; for (let V = 7.5; V <= 40.001; V += 0.5) d += (d ? 'L' : 'M') + WX(V).toFixed(1) + ' ' + WY(3000 / V).toFixed(1);
+  h += `<path d="${d}" stroke="#8b96ad" stroke-width="1" stroke-dasharray="4 4" fill="none"/><text x="${WX(38)}" y="${WY(3000 / 38) - 6}" font-size="8.5" fill="#8b96ad" text-anchor="end">изотерма</text>`;
+  const P = S.path;
+  for (let i = 1; i < P.length; i++) {
+    const [Va, pa] = P[i - 1], [Vb, pb] = P[i]; if (Va === Vb) continue;
+    h += `<path d="M${WX(Va)} ${WY(pa)}L${WX(Vb)} ${WY(pb)}L${WX(Vb)} ${WY(0)}L${WX(Va)} ${WY(0)}Z" fill="${Vb > Va ? '#86e0a8' : '#ff8a73'}" opacity=".2"/>`;
+  }
+  if (P.length > 1) h += `<path d="${P.map((q, i) => (i ? 'L' : 'M') + WX(q[0]) + ' ' + WY(q[1])).join('')}" stroke="#ffb547" stroke-width="2.4" fill="none" stroke-linejoin="round"/>`;
+  for (const [pt, lab] of [[P1, '1'], [P2, '2']]) h += `<circle cx="${WX(pt[0])}" cy="${WY(pt[1])}" r="5" fill="none" stroke="#ffb547" stroke-width="2"/><text x="${WX(pt[0]) + 8}" y="${WY(pt[1]) - 8}" font-size="12" fill="#ffb547" font-weight="500">${lab}</text>`;
+  h += `<g data-drag="pt"><circle cx="${WX(m.V)}" cy="${WY(m.p)}" r="22" fill="transparent"/><circle cx="${WX(m.V)}" cy="${WY(m.p)}" r="8" fill="#e8ecf4" stroke="${INK}" stroke-width="2"/></g>`;
+  // цилиндр слева
+  const x = 36, w = 100, bot = 350, top = 196, gt = bot - m.V * 3.6;
+  h += `<rect x="${x + 3}" y="${gt.toFixed(1)}" width="${w - 6}" height="${(bot - gt).toFixed(1)}" fill="${heatCol(m.T, 150, 600)}" opacity=".3"/>`;
+  h += gasDots(x + 3, gt, w - 6, bot - gt, m.T, t, 26);
+  h += ol(`M${x} ${top}V${bot}H${x + w}V${top}`, 'none', '#a9b4c9', 3.4);
+  h += ol(`M${x + 4} ${(gt - 12).toFixed(1)}h${w - 8}v12h-${w - 8}z`, '#8a96b0', '#c8d1e2', 1.4) + ol(`M${x + w / 2} ${(gt - 12).toFixed(1)}V${top - 30}`, 'none', '#a9b4c9', 3);
+  h += `<text x="${x + w / 2}" y="${bot + 4 + 12}" font-size="9" fill="#8b96ad" text-anchor="middle">V = ${m.V} л</text>`;
+  return h;
+}
+
+// ---- урок 3: бруски и тепловой насос ----
+function blockSVG(x, T, id) {
+  let h = `<g data-drag="${id}"><rect x="${x - 4}" y="168" width="98" height="196" fill="transparent"/>`;
+  h += ol(`M${x} 250h90v90h-90z`, heatCol(T, 285, 360), '#c8d1e2', 2);
+  h += `<path d="M${x + 8} 258h74" stroke="#fff" stroke-opacity=".25" stroke-width="4" stroke-linecap="round"/>`;
+  h += `<rect x="${x + 4}" y="340" width="82" height="18" fill="#d9dfe9" stroke="${INK}" stroke-width="1.4"/>`;
+  // термометр
+  const tx = x + (id === 'hot' ? 22 : 70), col = clamp(TK(T), -10, 100) * 0.62;
+  h += `<rect x="${tx - 3.5}" y="180" width="7" height="72" rx="3.5" fill="#e8ecf4" fill-opacity=".14" stroke="#a9b4c9" stroke-width="1.2"/>`;
+  h += `<rect x="${tx - 1.6}" y="${(246 - col).toFixed(1)}" width="3.2" height="${(col + 4).toFixed(1)}" fill="#ff5a4a"/><circle cx="${tx}" cy="252" r="5.5" fill="#ff5a4a" stroke="${INK}" stroke-width="1"/>`;
+  h += `<text x="${tx}" y="172" font-size="11" fill="#e8ecf4" text-anchor="middle" font-weight="500">${fmt(TK(T), 1)} °C</text>`;
+  return h + `</g>`;
+}
+function secondSVG(m, t) {
+  let h = '';
+  const cx = S.cx, run = m.pump, dash = reduce ? 0 : -(t / 40) % 20;
+  // насос и трубки
+  const hp = `M222 132H168V250`, cp = `M288 132H${cx + 22}V250`;
+  h += ol(hp, 'none', '#ef6a3c', 3) + ol(cp, 'none', '#4f8fe0', 3);
+  if (run) h += `<path d="${hp}" stroke="#ffd08a" stroke-width="2" fill="none" stroke-dasharray="6 14" stroke-dashoffset="${-dash}"/><path d="${cp}" stroke="#bfe6ff" stroke-width="2" fill="none" stroke-dasharray="6 14" stroke-dashoffset="${dash}"/>`;
+  h += ol('M255 78V112', 'none', '#56627d', 2.4) + `<text x="262" y="86" font-size="9" fill="#8b96ad">сеть</text>`;
+  h += `<g data-drag="pump"><rect x="214" y="106" width="82" height="52" fill="transparent"/>` + ol('M220 112h70v40h-70z', run ? '#2c4a3a' : '#2a3348', run ? '#86e0a8' : '#56627d', 2);
+  h += `<text x="255" y="128" font-size="9.5" fill="#e8ecf4" text-anchor="middle">насос</text><text x="255" y="143" font-size="9" fill="${run ? '#86e0a8' : '#8b96ad'}" text-anchor="middle">${run ? 'работает' : 'выключен'}</text></g>`;
+  h += blockSVG(110, m.Th, 'hot') + blockSVG(cx, m.Tc, 'cold');
+  if (m.contact && Math.abs(m.Th - m.Tc) > 0.3) {
+    const dir = m.Th > m.Tc ? 1 : -1, sh = reduce ? 0 : ((t / 400) % 1) * 6;
+    for (const y of [272, 296, 320]) h += dir > 0 ? arrow(176 + sh, y, 204 + sh, y, '#ffb547', 2.2) : arrow(204 - sh, y, 176 - sh, y, '#ffb547', 2.2);
+  }
+  if (!m.contact) h += `<text x="${cx + 45}" y="384" font-size="9" fill="#8b96ad" text-anchor="middle">тащите ←</text>`;
+  return h;
+}
+
+// ---- урок 4: цикл Карно ----
+const SCOL = ['#ff8a73', '#8b96ad', '#72d4e8', '#8b96ad'];
+function carnotSVG(m, t) {
+  const Vmax = m.V3 * 1.1, pmax = m.p1 * 1.12;
+  const X = V => 200 + V / Vmax * 290, Y = p => 350 - p / pmax * 215;
+  let h = `<path d="M200 ${Y(pmax)}V350H495" stroke="#8b96ad" stroke-width="1.6" fill="none"/>`;
+  h += `<text x="205" y="${Y(pmax) + 9}" font-size="9.5" fill="#e8ecf4">p</text><text x="495" y="344" font-size="9.5" fill="#e8ecf4" text-anchor="end">V</text>`;
+  const pts = []; let curves = '';
+  for (let k = 0; k < 4; k++) {
+    let d = '';
+    for (let i = 0; i <= 40; i++) { const q = stagePt(m, S.T1, S.T2, k, i / 40); const s = X(q.V).toFixed(1) + ' ' + Y(q.p).toFixed(1); d += (d ? 'L' : 'M') + s; pts.push(s); }
+    curves += `<path d="${d}" stroke="${SCOL[k]}" stroke-width="${m.k === k ? 3.4 : 2}" fill="none"/>`;
+  }
+  h += `<path d="M${pts.join('L')}Z" fill="#ffb547" opacity=".14"/>` + curves;
+  [[m.V1, m.p1], [m.V2, m.p2], [m.V3, m.p3], [m.V4, m.p4]].forEach(([V, p], i) => {
+    h += `<circle cx="${X(V).toFixed(1)}" cy="${Y(p).toFixed(1)}" r="3.4" fill="#e8ecf4"/><text x="${(X(V) + (i === 0 ? -10 : 7)).toFixed(1)}" y="${(Y(p) + (i === 2 ? 14 : -6)).toFixed(1)}" font-size="11" fill="#e8ecf4">${i + 1}</text>`;
+  });
+  const cx = X(m.cur.V), cy = Y(m.cur.p);
+  h += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="6" fill="#ffb547" stroke="${INK}" stroke-width="1.6"/>`;
+  h += `<text x="${(X(m.V1 + (m.V3 - m.V1) * 0.45)).toFixed(1)}" y="${(Y(m.p4 * 0.6 + m.p2 * 0.4)).toFixed(1)}" font-size="10" fill="#ffb547" text-anchor="middle">A</text>`;
+  // цилиндр
+  const x = 40, w = 110, bot = 296, gh = 20 + 150 * (m.cur.V / Vmax), gt = bot - gh;
+  h += `<rect x="${x + 3}" y="${gt.toFixed(1)}" width="${w - 6}" height="${gh.toFixed(1)}" fill="${heatCol(m.cur.T, Math.min(250, S.T2), Math.max(700, S.T1))}" opacity=".32"/>`;
+  h += gasDots(x + 3, gt, w - 6, gh, m.cur.T, t, 28);
+  h += ol(`M${x} 112V${bot}H${x + w}V112`, 'none', '#a9b4c9', 3.4);
+  h += ol(`M${x + 4} ${(gt - 12).toFixed(1)}h${w - 8}v12h-${w - 8}z`, '#8a96b0', '#c8d1e2', 1.4) + ol(`M${x + w / 2} ${(gt - 12).toFixed(1)}V80`, 'none', '#a9b4c9', 3);
+  const k = m.k, pc = k === 0 ? '#ef6a3c' : k === 2 ? '#4f8fe0' : '#56627d';
+  h += ol(`M${x - 10} 300h${w + 20}v14h-${w + 20}z`, pc, '#8b96ad', 1.4);
+  h += `<text x="${x + w / 2}" y="330" font-size="9.5" fill="#e8ecf4" text-anchor="middle">${k === 0 ? `нагреватель ${S.T1} K` : k === 2 ? `холодильник ${S.T2} K` : k < 0 ? 'подставка' : 'теплоизоляция'}</text>`;
+  if (k === 0) h += arrow(x + w / 2, 318, x + w / 2, 282, '#ffb547') + `<text x="${x + w / 2 + 8}" y="290" font-size="10" fill="#ffb547">Q₁</text>`;
+  if (k === 2) h += arrow(x + w / 2, 276, x + w / 2, 312, '#72d4e8') + `<text x="${x + w / 2 + 8}" y="290" font-size="10" fill="#72d4e8">Q₂</text>`;
+  h += `<text x="${x + w / 2}" y="346" font-size="9" fill="#8b96ad" text-anchor="middle">T = ${fmt(m.cur.T, 0)} K</text>`;
+  return h;
+}
+
+function hlBox(id) {
+  const m = model();
+  if (LID() === 'first') {
+    const gt = CYL.bot - m.V * CYL.k;
+    return { cyl: [182, 112, 156, 206], piston: [186, gt - 18, 148, 22], gas: [192, gt, 136, CYL.bot - gt], burner: [216, 306, 88, 56],
+             load: m.fix ? [178, gt - 26, 164, 38] : [224, gt - 50, 72, 40] }[id];
+  }
+  if (LID() === 'work') return { chart: [172, 112, 330, 262], pt: [WX(m.V) - 14, WY(m.p) - 14, 28, 28], area: [176, WY(300) - 4, 330, WY(0) - WY(300) + 8], cyl: [28, 160, 116, 200] }[id];
+  if (LID() === 'second') return { hot: [104, 160, 102, 204], cold: [S.cx - 6, 160, 102, 204], pump: [212, 70, 86, 90], pads: [108, 336, S.cx + 90 - 108, 26] }[id];
+  return { plate: [26, 296, 138, 40], cyl: [32, 76, 126, 224], chart: [190, 120, 314, 240] }[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID(), m = model();
+  let h = bench();
+  if (id === 'first') h += firstSVG(m, t);
+  else if (id === 'work') h += workSVG(m, t);
+  else if (id === 'second') h += secondSVG(m, t);
+  else h += carnotSVG(m, t);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 500, hh / 410, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 262 - VB.w / 2; VB.y = 400 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- actions ----------
+let drag = null, dirty = true, acc = 0, lastUpd = 0, traceAcc = 0;
+function addQ(d) {
+  const nq = clamp(S.q + d, L1.qMin, L1.qMax);
+  if (nq === S.q) { toast(d > 0 ? 'Хватит греть: дальше опыт не рассчитан.' : 'Хватит охлаждать.'); return false; }
+  S.q = nq; if (d > 0) S.flame = performance.now() + 260; else S.cold = performance.now() + 500;
+  update(); return true;
+}
+function setMode(md) { if (md === S.mode) return; S.mode = md; S.q = 0; toast(md === 'fix' ? 'Поршень закреплён. Газ снова 300 K.' : 'Поршень свободен, на нём груз. Газ снова 300 K.'); renderTools(); buildScheme(); update(); }
+function moveTo(V, p) {
+  const [V0, p0] = S.path[S.path.length - 1];
+  if (V === V0 && p === p0) return;
+  S.A2 += (p0 + p) / 2 * (V - V0);
+  S.path.push([V, p]); if (S.path.length > 900) S.path.splice(1, 1);
+  if (V === P2[0] && p === P2[1]) { S.arr.push(S.A2); if (S.arr.length > 6) S.arr.shift(); toast(`Газ в состоянии 2. Работа газа ${fmt(S.A2 / 1000, 2)} кДж.`); }
+  update();
+}
+function goHome() { S.path = [P1.slice()]; S.A2 = 0; update(); }
+function pumpStep(Qc) {
+  const n = Math.max(1, Math.ceil(Qc / 25)), dq = Qc / n;
+  for (let i = 0; i < n; i++) {
+    if (S.Tc - dq / B3.C < 230) { S.pump = false; toast('Правый брусок слишком остыл, насос остановлен.'); break; }
+    const A = dq * (S.Th / S.Tc - 1);
+    S.Tc -= dq / B3.C; S.Th += (dq + A) / B3.C; S.W += A; S.Qp += dq;
+    if (S.mixed && S.Th >= B3.Th0) { if (S.pump) { S.pump = false; toast('Левый брусок снова 80 °C. Насос остановлен.'); } break; }
+  }
+}
+function setT(T1, T2) {
+  T2 = clamp(Math.round(T2 / 10) * 10, 200, 400); T1 = clamp(Math.round(T1 / 10) * 10, 300, 1000);
+  if (T1 < T2 + 50) T1 = T2 + 50;
+  S.T1 = T1; S.T2 = T2; S.run = false; S.ph = 0; update();
+}
+function startRun() { S.ph = 0; S.run = true; update(); }
+
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  const id = el.dataset.drag; e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  const p = toSvg(e);
+  drag = { id, t0: performance.now(), x: e.clientX, y: e.clientY, moved: false, dx: id === 'cold' ? S.cx - p.x : 0 };
+  acc = 0;
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 5) drag.moved = true;
+  if (!drag.moved) return;
+  const p = toSvg(e);
+  if (drag.id === 'pt') {
+    const [V0, p0] = S.path[S.path.length - 1];
+    // «прилипание»: по второстепенной оси точка держит прежнее значение, чтобы легко провести изобару или изохору
+    const dx = Math.abs(p.x - WX(V0)), dy = Math.abs(p.y - WY(p0)), horiz = dx >= dy;
+    const V = !horiz && dx < 10 ? V0 : Math.round((p.x - 180) / 8);
+    const pp = horiz && dy < 10 ? p0 : Math.round((360 - p.y) / 0.6 / 10) * 10;
+    moveTo(clamp(V, 5, 38), clamp(pp, 20, 380));
+  } else if (drag.id === 'cold') {
+    let x = clamp(p.x + drag.dx, B3.touch, 390); if (x < B3.touch + 6) x = B3.touch;
+    if (x !== S.cx) { const was = S.cx <= B3.touch + 1; S.cx = x; if (was !== (x <= B3.touch + 1)) { renderTools(); update(); } }
+  }
+  dirty = true;
+});
+const endDrag = cancel => {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing');
+  if (cancel) return;
+  if (!d.moved) {
+    if (d.id === 'burner' && performance.now() - d.t0 < 250) addQ(50);
+    if (d.id === 'pump') act('pump');
+    if (d.id === 'pt') toast('Тащите точку, не отпуская.');
+  }
+  dirty = true;
+};
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+let last = performance.now(), lastDraw = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, Math.max(0, (t - last) / 1000)); last = t;
+  const id = LID(); let anim = false;
+  if (drag && drag.id === 'burner' && t - drag.t0 > 250) {
+    acc += dt; anim = true;
+    while (acc >= 0.08) { acc -= 0.08; if (!addQ(10)) { acc = 0; drag = null; break; } }
+  }
+  if (id === 'second') {
+    const contact = S.cx <= B3.touch + 1; let changed = false;
+    if (contact && Math.abs(S.Th - S.Tc) > 1e-4) {
+      for (let i = 0; i < 4; i++) { const q = B3.k * (S.Th - S.Tc) * dt / 4; S.Th -= q / B3.C; S.Tc += q / B3.C; S.Qflow += q; }
+      changed = true;
+      if (!S.mixed && Math.abs(S.Th - S.Tc) < 0.3) { S.mixed = true; toast(`Равновесие: оба бруска ≈ ${fmt(TK((S.Th + S.Tc) / 2), 1)} °C. Теперь верните левому 80 °C.`); }
+    }
+    if (S.pump) { pumpStep(B3.pump * dt); changed = true; if (!S.pump) lastUpd = -1e9; }
+    if (changed) {
+      traceAcc += dt; if (traceAcc > 0.2) { traceAcc = 0; S.trace.push([S.Th, S.Tc]); if (S.trace.length > 300) S.trace.splice(0, S.trace.length - 300); }
+      anim = true; if (t - lastUpd > 150) { lastUpd = t; update(); }
+    }
+  }
+  if (id === 'carnot' && S.run) {
+    const k0 = Math.floor(S.ph);
+    S.ph = Math.min(4, S.ph + dt / (reduce ? 0.3 : 1.4)); anim = true;
+    if (S.ph >= 4) { S.run = false; S.cycles++; S.doneKey = S.T1 + '/' + S.T2; const g = carnotGeo(S.T1, S.T2); toast(`Цикл пройден: работа ${fmt(g.A, 0)} Дж, КПД ${fmt(g.eta * 100, 1)} %.`); update(); }
+    else if (Math.floor(S.ph) !== k0) update();
+  }
+  if (S.hl) anim = true;
+  const drift = !reduce && id !== 'second' && t - lastDraw > 40;
+  if (dirty || anim || drift) { drawScene(t); dirty = false; lastDraw = t; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2800); }
+
+let toolsSig = '';
+function renderTools(force) {
+  const id = LID(), tb = $('#tools');
+  const contact = S.cx <= B3.touch + 1;
+  const sig = id + S.mode + contact + S.pump + S.run + force;
+  if (sig === toolsSig && !force) return; toolsSig = sig;
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    first: B('fix', 'Закреплён', S.mode === 'fix') + B('free', 'Свободен', S.mode === 'free') + sep + B('q50', '+50 Дж') + B('qm50', '−50 Дж') + sep + B('reset', 'Заново'),
+    work: B('home', 'В точку 1') + B('pathLow', 'Вниз, потом вправо') + B('pathLine', 'По прямой'),
+    second: B('contact', contact ? 'Развести' : 'Свести') + B('pump', 'Насос', S.pump) + B('pump1', 'Насос +1 кДж') + sep + B('reset', 'Заново'),
+    carnot: B('run', 'Цикл ▶', S.run) + sep + B('t1m', 'T₁ −50') + B('t1p', 'T₁ +50') + B('t2m', 'T₂ −10') + B('t2p', 'T₂ +10'),
+  }[id];
+}
+function act(a) {
+  if (a === 'fix' || a === 'free') return setMode(a);
+  if (a === 'q50') return addQ(50);
+  if (a === 'qm50') return addQ(-50);
+  if (a === 'reset') { resetState(); renderTools(); buildScheme(); update(); return; }
+  if (a === 'home') return goHome();
+  if (a === 'pathLow') { goHome(); moveTo(10, 100); moveTo(30, 100); return; }
+  if (a === 'pathLine') { goHome(); moveTo(30, 100); return; }
+  if (a === 'contact') { S.cx = S.cx <= B3.touch + 1 ? B3.rest : B3.touch; renderTools(); update(); return; }
+  if (a === 'pump') { S.pump = !S.pump; if (S.pump && S.cx <= B3.touch + 1) toast('Бруски касаются: часть тепла будет утекать обратно.'); renderTools(); update(); return; }
+  if (a === 'pump1') { pumpStep(1000); S.trace.push([S.Th, S.Tc]); update(); return; }
+  if (a === 'run') return startRun();
+  if (a === 't1m') return setT(S.T1 - 50, S.T2);
+  if (a === 't1p') return setT(S.T1 + 50, S.T2);
+  if (a === 't2m') return setT(S.T1, S.T2 - 10);
+  if (a === 't2p') return setT(S.T1, S.T2 + 10);
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  cyl: IC('<path d="M8 4v26h18V4" fill="none" stroke="var(--fg)" stroke-width="1.8"/><rect x="9" y="14" width="16" height="15" fill="var(--warn)" opacity=".35"/>'),
+  piston: IC('<path d="M8 4v26h18V4" fill="none" stroke="var(--muted)" stroke-width="1.4"/><rect x="9" y="11" width="16" height="5" fill="var(--fg)"/>'),
+  gas: IC('<circle cx="11" cy="12" r="2.2" fill="var(--fg)"/><circle cx="22" cy="9" r="2.2" fill="var(--fg)"/><circle cx="17" cy="20" r="2.2" fill="var(--fg)"/><circle cx="25" cy="25" r="2.2" fill="var(--fg)"/><circle cx="9" cy="26" r="2.2" fill="var(--fg)"/><path d="M13 13l4 2M19 21l3 2" stroke="var(--arm)" stroke-width="1.2"/>'),
+  burner: IC('<path d="M14 18q-3-6 3-12q6 6 3 12z" fill="var(--force)"/><rect x="12" y="19" width="10" height="8" fill="var(--muted)"/><rect x="7" y="27" width="20" height="4" fill="var(--line)"/>'),
+  load: IC('<rect x="8" y="10" width="18" height="12" fill="var(--surface-2)" stroke="var(--fg)" stroke-width="1.6"/><rect x="4" y="24" width="7" height="3" fill="var(--force)"/><rect x="23" y="24" width="7" height="3" fill="var(--force)"/>'),
+  chart: IC('<path d="M5 3v26h26" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M8 8q6 14 21 16" fill="none" stroke="var(--force)" stroke-width="1.8"/>'),
+  pt: IC('<circle cx="17" cy="17" r="7" fill="var(--fg)"/><circle cx="17" cy="17" r="12" fill="none" stroke="var(--muted)" stroke-dasharray="3 3"/>'),
+  area: IC('<path d="M5 8h14v21H5z" fill="var(--ok)" opacity=".4"/><path d="M5 3v26h26M5 8h14" fill="none" stroke="var(--fg)" stroke-width="1.6"/>'),
+  hot: IC('<rect x="6" y="10" width="22" height="18" fill="#ef6a3c" stroke="var(--fg)" stroke-width="1.4"/>'),
+  cold: IC('<rect x="6" y="10" width="22" height="18" fill="#4f8fe0" stroke="var(--fg)" stroke-width="1.4"/>'),
+  pump: IC('<rect x="8" y="10" width="18" height="12" fill="var(--surface-2)" stroke="var(--ok)" stroke-width="1.6"/><path d="M8 16H3v13M26 16h5v13" stroke="var(--muted)" stroke-width="1.6" fill="none"/><path d="M17 10V3" stroke="var(--muted)" stroke-width="1.6"/>'),
+  pads: IC('<rect x="4" y="20" width="26" height="8" fill="#d9dfe9"/>'),
+  plate: IC('<rect x="4" y="18" width="13" height="8" fill="#ef6a3c"/><rect x="17" y="18" width="13" height="8" fill="#4f8fe0"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+const J = x => fmt(x, 0) + ' Дж';
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (L.id === 'first') return `Q = ${S.q} Дж · закреплён ${S.rec.fix ? '✓' : '—'} · свободен ${S.rec.free ? '✓' : '—'}`;
+  if (L.id === 'work') return `A = ${fmt(m.A / 1000, 2)} кДж · ${m.at2 ? 'газ в состоянии 2' : m.at1 ? 'газ в состоянии 1' : `V ${m.V} л, p ${m.p} кПа`}`;
+  if (L.id === 'second') return S.mixed ? `Равновесие было ✓ · левый ${fmt(TK(m.Th), 1)} °C из 80` : `Левый ${fmt(TK(m.Th), 1)} °C · правый ${fmt(TK(m.Tc), 1)} °C`;
+  return `η = ${fmt(m.eta * 100, 1)} % · циклов ${S.cycles}${S.run ? ' · идёт цикл' : ''}`;
+}
+
+function energyBar(parts, max, label) {
+  let h = `<svg class="diag" viewBox="0 0 120 30" role="img" aria-label="${label}">`, x = 4;
+  for (const p of parts) {
+    const w = Math.abs(p.v) / max * 112;
+    if (w > 0.2) { h += `<rect x="${x.toFixed(2)}" y="6" width="${w.toFixed(2)}" height="9" fill="${p.c}" opacity="${p.v < 0 ? .45 : .85}"/>`; h += `<text x="${(x + w / 2).toFixed(2)}" y="24" font-size="3.6" fill="#e8ecf4" text-anchor="middle">${p.n} ${sg(p.v, 0)}</text>`; x += w; }
+  }
+  if (x === 4) h += `<text x="60" y="13" font-size="4" fill="#8b96ad" text-anchor="middle">пока тепла не передавали</text>`;
+  return h + `</svg>`;
+}
+function traceSVG() {
+  const T = S.trace, lo = 270, hi = 370, n = Math.max(T.length - 1, 1);
+  const X = i => 10 + i / n * 106, Y = v => 50 - (v - lo) / (hi - lo) * 44;
+  let h = `<svg class="diag" viewBox="0 0 120 56" role="img" aria-label="Температуры брусков во времени"><rect x="10" y="6" width="106" height="44" fill="none" stroke="#26324a" stroke-width=".5"/>`;
+  for (const c of [20, 50, 80]) h += `<path d="M10 ${Y(c + 273.15)}H116" stroke="#26324a" stroke-width=".4" stroke-dasharray="1.5 1.5"/><text x="8.5" y="${Y(c + 273.15) + 1.2}" font-size="3.4" fill="#8b96ad" text-anchor="end">${c}°</text>`;
+  const line = k => T.map((v, i) => (i ? 'L' : 'M') + X(i).toFixed(2) + ' ' + Y(clamp(v[k], lo, hi)).toFixed(2)).join('');
+  h += `<path d="${line(0)}" stroke="#ef6a3c" stroke-width=".9" fill="none"/><path d="${line(1)}" stroke="#4f8fe0" stroke-width=".9" fill="none"/>`;
+  h += `<text x="116" y="54.5" font-size="3.4" fill="#8b96ad" text-anchor="end">время →</text>`;
+  return h + `</svg>`;
+}
+
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'first') h = `<h2>Куда уходит тепло</h2><div id="sDiag"></div><p class="note" style="margin-top:8px">Оранжевая часть — нагрев газа ΔU, голубая — работа газа A. Вместе они равны Q.</p>
+      <dl class="reads"><div><dt>T</dt><dd id="r1"></dd></div><div><dt>ΔU</dt><dd id="r2"></dd></div><div><dt>A</dt><dd id="r3"></dd></div><div><dt>V</dt><dd id="r4"></dd></div><div><dt>p</dt><dd id="r5"></dd></div><div><dt>ΔT</dt><dd id="r6"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Поршень</div><div class="chips" id="modeChips"><button data-m="fix" aria-pressed="${S.mode === 'fix'}">Закреплён (V = const)</button><button data-m="free" aria-pressed="${S.mode === 'free'}">Свободен (p = const)</button></div></div>` +
+      slider('inQ', 'Передано тепла Q', L1.qMin, L1.qMax, 10, S.q);
+  if (id === 'work') h = `<h2>Состояние газа</h2>
+      <dl class="reads"><div><dt>V</dt><dd id="r1"></dd></div><div><dt>p</dt><dd id="r2"></dd></div><div><dt>T</dt><dd id="r3"></dd></div><div><dt>A газа</dt><dd id="r4"></dd></div></dl>
+      <p class="note">Белую точку тащат прямо на графике. Рядом с прямой линией точка «прилипает»: так легче провести изобару (p = const) или изохору (V = const).</p>
+      <div class="row"><button class="ghostbtn" data-a="home">В точку 1</button><button class="ghostbtn" data-a="pathLow">Вниз, потом вправо</button><button class="ghostbtn" data-a="pathLine">По прямой</button></div>
+      <h3>Приходы в состояние 2</h3><div id="sDiag"></div>`;
+  if (id === 'second') h = `<h2>Температуры брусков</h2><div id="sDiag"></div><p class="note" style="margin-top:8px">Красная линия — левый брусок, синяя — правый.</p>
+      <dl class="reads"><div><dt>Левый</dt><dd id="r1"></dd></div><div><dt>Правый</dt><dd id="r2"></dd></div><div><dt>Работа насоса</dt><dd id="r3"></dd></div></dl>
+      <div class="row"><button class="ghostbtn" data-a="contact">Свести / развести</button><button class="ghostbtn" data-a="pump">Насос вкл/выкл</button><button class="ghostbtn" data-a="pump1">Насос +1 кДж</button><button class="ghostbtn" data-a="reset">Заново</button></div>`;
+  if (id === 'carnot') h = `<h2>Машина Карно</h2><div id="sDiag"></div><p class="note" style="margin-top:8px">Из тепла Q₁ (вся полоса) голубая часть стала работой, серая ушла холодильнику.</p>
+      <dl class="reads"><div><dt>η</dt><dd id="r1"></dd></div><div><dt>Q₁</dt><dd id="r2"></dd></div><div><dt>A</dt><dd id="r3"></dd></div></dl>` +
+      slider('inT1', 'Нагреватель T₁', 300, 1000, 10, S.T1) + slider('inT2', 'Холодильник T₂', 200, 400, 10, S.T2) +
+      `<div class="row"><button class="ghostbtn" data-a="run">Цикл ▶</button></div>`;
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn); };
+  on('#inQ', e => { S.q = +e.target.value; update(); });
+  on('#inT1', e => setT(+e.target.value, S.T2));
+  on('#inT2', e => setT(S.T1, +e.target.value));
+  el.querySelectorAll('#modeChips button').forEach(b => b.onclick = () => setMode(b.dataset.m));
+  el.querySelectorAll('.row [data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  const d = el.querySelector('#sDiag');
+  if (id === 'first') {
+    if (d) d.innerHTML = energyBar([{ n: 'ΔU', v: m.dU, c: '#ffb547' }, { n: 'A', v: m.A, c: '#72d4e8' }], 1500, 'Распределение тепла');
+    set('#r1', fmt(m.T, 1) + ' K'); set('#r2', J(m.dU)); set('#r3', J(m.A)); set('#r4', fmt(m.V, 2) + ' л'); set('#r5', fmt(m.p, 1) + ' кПа'); set('#r6', sg(m.dT, 1) + ' K');
+    set('#inQO', S.q + ' Дж'); val('#inQ', S.q);
+    el.querySelectorAll('#modeChips button').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === S.mode));
+  } else if (id === 'work') {
+    set('#r1', m.V + ' л'); set('#r2', m.p + ' кПа'); set('#r3', fmt(m.T, 0) + ' K'); set('#r4', fmt(m.A / 1000, 2) + ' кДж');
+    if (d) d.innerHTML = S.arr.length ? `<div class="steps">${S.arr.map((a, i) => step(`приход ${i + 1}`, fmt(a / 1000, 2) + ' кДж')).join('')}</div>` : '<p class="note">Пока газ в состояние 2 не приходил.</p>';
+  } else if (id === 'second') {
+    if (d) d.innerHTML = traceSVG();
+    set('#r1', fmt(TK(m.Th), 1) + ' °C'); set('#r2', fmt(TK(m.Tc), 1) + ' °C'); set('#r3', fmt(m.W / 1000, 2) + ' кДж');
+  } else {
+    if (d) d.innerHTML = energyBar([{ n: 'A', v: m.A, c: '#72d4e8' }, { n: 'Q₂', v: m.Q2, c: '#8b96ad' }], m.Q1, 'Распределение тепла нагревателя');
+    set('#r1', fmt(m.eta * 100, 1) + ' %'); set('#r2', J(m.Q1)); set('#r3', J(m.A));
+    set('#inT1O', S.T1 + ' K'); set('#inT2O', S.T2 + ' K'); val('#inT1', S.T1); val('#inT2', S.T2);
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'first') return [
+    { id: 'cyl', icon: ICON.cyl, name: 'Цилиндр', spec: 'Металлический, стенки не пропускают газ. Внутри 1 моль гелия — одноатомного газа, почти идеального.' },
+    { id: 'gas', icon: ICON.gas, name: 'Газ', spec: 'Точки — молекулы. Чем выше температура, тем быстрее они летают и тем больше внутренняя энергия U = 3/2 · νRT.' },
+    { id: 'piston', icon: ICON.piston, name: 'Поршень', spec: 'Ходит без трения. Пунктир «начало» показывает, где он был при 300 K.' },
+    { id: 'load', icon: ICON.load, name: S.mode === 'fix' ? 'Упоры' : 'Груз', spec: S.mode === 'fix' ? 'Не дают поршню сдвинуться: объём постоянный, газ работы не совершает.' : 'Давит на поршень так, что давление газа всё время 100 кПа. Расширяясь, газ поднимает груз — совершает работу.' },
+    { id: 'burner', icon: ICON.burner, name: 'Горелка', spec: 'Передаёт газу тепло порциями: нажатие — 50 Дж, удержание — по 10 Дж.' }];
+  if (id === 'work') return [
+    { id: 'chart', icon: ICON.chart, name: 'График p(V)', spec: 'По горизонтали объём в литрах, по вертикали давление в кПа. Пунктир — изотерма pV = 3000 Дж: на ней температура одна и та же.' },
+    { id: 'pt', icon: ICON.pt, name: 'Состояние газа', spec: 'Белая точка — давление и объём газа сейчас. Её путь — процесс, через который проходит газ.' },
+    { id: 'area', icon: ICON.area, name: 'Площадь под путём', spec: 'Зелёная — газ расширялся и совершал работу, красная — газ сжимали. 1 кПа · 1 л = 1 Дж.' },
+    { id: 'cyl', icon: ICON.cyl, name: 'Цилиндр', spec: 'Показывает тот же газ: поршень стоит там, где объём на графике.' }];
+  if (id === 'second') return [
+    { id: 'hot', icon: ICON.hot, name: 'Левый брусок', spec: 'Медь, около 5 кг. Теплоёмкость C = 2 кДж/К: чтобы нагреть его на 1 K, нужно 2 кДж. Сначала 80 °C.' },
+    { id: 'cold', icon: ICON.cold, name: 'Правый брусок', spec: 'Такой же медный брусок, сначала 20 °C. Его можно двигать.' },
+    { id: 'pump', icon: ICON.pump, name: 'Тепловой насос', spec: 'Идеальный: забирает тепло у правого бруска и отдаёт левому, тратя работу из сети. Лучше, чем он, не бывает.' },
+    { id: 'pads', icon: ICON.pads, name: 'Подставки из пенопласта', spec: 'Почти не проводят тепло, так что бруски обмениваются теплом только друг с другом.' }];
+  return [
+    { id: 'cyl', icon: ICON.cyl, name: 'Цилиндр с газом', spec: '1 моль одноатомного идеального газа. В начале цикла объём 10 л, после изотермы — 20 л.' },
+    { id: 'plate', icon: ICON.plate, name: 'Нагреватель, холодильник, изоляция', spec: 'На этапе 1 цилиндр стоит на нагревателе T₁, на этапе 3 — на холодильнике T₂, на этапах 2 и 4 — на теплоизоляции.' },
+    { id: 'chart', icon: ICON.chart, name: 'Диаграмма цикла', spec: 'Красная — изотерма T₁, голубая — изотерма T₂, серые — адиабаты. Площадь внутри — полезная работа за цикл.' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      (L.safe ? `<div class="safe"><b>Безопасность</b>${L.safe}</div>` : '') +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Что на площадке</h2><p class="note">Нажмите на деталь, чтобы найти её.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'first') {
+    let h = `<h2>Первый закон</h2><div class="formula">Q = ΔU + A</div><p class="note">ν = 1 моль, R = 8,31 Дж/(моль·K). Одноатомный газ: ΔU = 3/2 · νRΔT.</p><h3>Сейчас: поршень ${m.fix ? 'закреплён' : 'свободен'}</h3><div class="steps">` +
+      step('Q', J(m.Q));
+    if (m.fix) h += step('A = p·ΔV', 'ΔV = 0, значит A = 0') + step('ΔU = Q', J(m.dU)) + step('ΔT = ΔU / (3/2 · νR)', `${fmt(m.dU, 0)} / 12,465 = ${sg(m.dT, 2)} K`) + step('p = νRT / V', `8,31 × ${fmt(m.T, 1)} / ${fmt(V0L, 2)} = ${fmt(m.p, 1)} кПа`);
+    else h += step('Q = 5/2 · νRΔT', `ΔT = ${fmt(m.Q, 0)} / 20,775 = ${sg(m.dT, 2)} K`) + step('ΔU = 3/2 · νRΔT', `12,465 × ${fmt(m.dT, 2)} = ${J(m.dU)}`) + step('A = pΔV = νRΔT', `8,31 × ${fmt(m.dT, 2)} = ${J(m.A)}`) + step('V = νRT / p', `8,31 × ${fmt(m.T, 1)} / 100 = ${fmt(m.V, 2)} л`);
+    h += step('проверка ΔU + A', `${fmt(m.dU, 0)} + ${fmt(m.A, 0)} = ${J(m.dU + m.A)}`, 'sum') + `</div>`;
+    h += `<p class="note" style="margin-top:10px">При свободном поршне из каждых 5 частей тепла 3 идут на нагрев и 2 — на работу. Поэтому при p = const газ нагревается слабее.</p>`;
+    if (S.rec.fix || S.rec.free) h += `<h3>Ваши опыты с Q = 500 Дж</h3><div class="steps">` + (S.rec.fix ? step('поршень закреплён', `ΔT = ${sg(S.rec.fix.dT, 1)} K`) : '') + (S.rec.free ? step('поршень свободен', `ΔT = ${sg(S.rec.free.dT, 1)} K`) : '') + `</div>`;
+    return h;
+  }
+  if (id === 'work') {
+    const P = S.path, segs = [];
+    for (let i = Math.max(1, P.length - 6); i < P.length; i++) { const [Va, pa] = P[i - 1], [Vb, pb] = P[i]; segs.push(step(`${Va}→${Vb} л, ${pa}→${pb} кПа`, `${fmt((pa + pb) / 2, 0)} × ${sg(Vb - Va, 0)} = ${sg((pa + pb) / 2 * (Vb - Va), 0)} Дж`)); }
+    return `<h2>Работа газа</h2><div class="formula">A = p · ΔV</div><p class="note">1 кПа · 1 л = 1000 Па · 0,001 м³ = 1 Дж. Если давление на участке меняется линейно, берут среднее давление (площадь трапеции).</p>
+      <h3>Последние участки пути</h3><div class="steps">${segs.join('') || step('пока', 'точка не двигалась')}${step('всего A газа', `${fmt(m.A, 0)} Дж = ${fmt(m.A / 1000, 2)} кДж`, 'sum')}</div>
+      <h3>Пример: путь «вниз, потом вправо»</h3><div class="steps">${step('1 → (10 л; 100 кПа)', 'ΔV = 0, A = 0')}${step('→ 2 при 100 кПа', '100 × (30 − 10) = 2000 Дж')}${step('итого', '2 кДж', 'sum')}</div>
+      <h3>Энергия в точках 1 и 2</h3><div class="steps">${step('p₁V₁', '300 × 10 = 3000 Дж')}${step('p₂V₂', '100 × 30 = 3000 Дж')}${step('T₁ = T₂ = pV / νR', '3000 / 8,31 ≈ 361 K')}${step('ΔU от 1 до 2', '0, значит Q = A', 'sum')}</div>`;
+  }
+  if (id === 'second') {
+    const Tf = (B3.Th0 + B3.Tc0) / 2, Tc2 = Tf * Tf / B3.Th0, Wmin = B3.C * (B3.Th0 - Tf) - B3.C * (Tf - Tc2);
+    let h = `<h2>Второй закон</h2><div class="formula">Q = C · ΔT</div><p class="note">C = 2000 Дж/К у каждого бруска. Тепло через контакт идёт от горячего к холодному, никогда наоборот.</p><h3>Сейчас</h3><div class="steps">` +
+      step('перешло через контакт', `${fmt(m.Qflow / 1000, 2)} кДж`) +
+      step('левый брусок', `${fmt(TK(m.Th), 2)} °C`) + step('правый брусок', `${fmt(TK(m.Tc), 2)} °C`) +
+      step('насос взял у правого Q₂', `${fmt(m.Qp / 1000, 2)} кДж`) + step('насос потратил работу A', `${fmt(m.W / 1000, 2)} кДж`) + step('отдал левому Q₁ = Q₂ + A', `${fmt((m.Qp + m.W) / 1000, 2)} кДж`, 'sum') + `</div>`;
+    h += `<h3>Идеальный насос</h3><div class="formula">A = Q₂ · (T₁ / T₂ − 1)</div><p class="note">T₁ и T₂ — температуры горячего и холодного тела в кельвинах. Чем больше разница, тем дороже перекачать каждый джоуль.</p>`;
+    h += `<h3>Почему «как было» не получится</h3><div class="steps">` + step('равновесие', `(80 + 20) / 2 = ${fmt(TK(Tf), 0)} °C`) + step('после насоса правый', `≈ ${fmt(TK(Tc2), 1)} °C, а не 20 °C`) + step('минимум работы', `≈ ${fmt(Wmin / 1000, 1)} кДж`, 'sum') + `</div>
+      <p class="note" style="margin-top:10px">Работа насоса превратилась в лишнее тепло, поэтому правый брусок остаётся теплее, чем был. Энтропия — мера беспорядка — при выравнивании выросла на ${fmt(B3.C * Math.log(Tf / B3.Th0) + B3.C * Math.log(Tf / B3.Tc0), 1)} Дж/К, и никакая машина не уменьшит её даром. Сейчас изменение: ${sg(m.dS, 1)} Дж/К.</p>`;
+    return h;
+  }
+  return `<h2>Цикл Карно</h2><div class="formula">η = 1 − T₂ / T₁</div><h3>Сейчас</h3><div class="steps">` +
+    step('T₁, T₂', `${S.T1} K, ${S.T2} K`) + step('η', `1 − ${S.T2} / ${S.T1} = ${fmt(m.eta, 4)} = ${fmt(m.eta * 100, 1)} %`) +
+    step('Q₁ = νRT₁ · ln(V₂/V₁)', `8,31 × ${S.T1} × ln 2 = ${J(m.Q1)}`) + step('A = η · Q₁', J(m.A)) + step('Q₂ = Q₁ − A', J(m.Q2), 'sum') + `</div>
+    <h3>Этапы цикла</h3><div class="steps">${STAGES.map((s, i) => step(`${i + 1} → ${(i + 1) % 4 + 1}`, s)).join('')}</div>
+    <p class="note" style="margin-top:10px">На адиабатах TV^(2/3) = const, поэтому V₃ / V₂ = (T₁ / T₂)^1,5 = ${fmt(m.r, 2)}. Реальные машины теряют больше: у ТЭЦ с паром около 560 °C (≈ 833 K) и охлаждением около 30 °C (≈ 303 K) предел Карно ≈ ${fmt((1 - 303 / 833) * 100, 0)} %, а на деле около 40 %.</p>`;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter');
+  if (id === 'first') el.innerHTML = `<div class="k">Q = ΔU + A</div><div class="v">${fmt(m.Q, 0)} = ${fmt(m.dU, 0)} + ${fmt(m.A, 0)}</div><div class="lr"><span>T</span><span>${fmt(m.T, 1)} K</span></div><div class="lr"><span>V</span><span>${fmt(m.V, 2)} л</span></div>`;
+  else if (id === 'work') el.innerHTML = `<div class="k">Работа газа</div><div class="v ${S.done.work ? 'ok' : ''}">A = ${fmt(m.A / 1000, 2)} кДж</div><div class="lr"><span>V</span><span>${m.V} л</span></div><div class="lr"><span>p</span><span>${m.p} кПа</span></div>`;
+  else if (id === 'second') el.innerHTML = `<div class="k">Температуры</div><div class="v">${fmt(TK(m.Th), 1)} / ${fmt(TK(m.Tc), 1)} °C</div><div class="gauge"><b style="width:${clamp(TK(m.Th), 0, 100).toFixed(1)}%;background:#ef6a3c"></b><i style="left:80%"></i></div><div class="lr"><span>работа насоса</span><span>${fmt(m.W / 1000, 2)} кДж</span></div>`;
+  else el.innerHTML = `<div class="k">КПД идеальной машины</div><div class="v ${S.done.carnot ? 'ok' : ''}">η = ${fmt(m.eta * 100, 1)} %</div><div class="lr"><span>T₁</span><span>${S.T1} K</span></div><div class="lr"><span>T₂</span><span>${S.T2} K</span></div>${m.k >= 0 ? `<div class="lr"><span>этап</span><span>${m.k + 1} из 4</span></div>` : ''}`;
+}
+
+function update() {
+  const m = model(), L = LESSONS[S.lesson];
+  if (L.id === 'first' && S.q === L1.target && !S.rec[S.mode]) { S.rec[S.mode] = { dT: m.dT }; toast(`Q = 500 Дж: газ нагрелся на ${fmt(m.dT, 1)} K${S.mode === 'free' ? `, совершил работу ${fmt(m.A, 0)} Дж` : ''}.`); }
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Термодинамика покорена!'), 900);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  if (L.id === 'second' || L.id === 'carnot') renderTools();
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  first: '<path d="M24 4v22h18V4" fill="none" stroke="#e8ecf4" stroke-width="1.3"/><rect x="25" y="9" width="16" height="3" fill="#8a96b0"/><rect x="25" y="13" width="16" height="13" fill="#ef6a3c" opacity=".4"/><path d="M31 29q-2-3 2-5q4 2 2 5z" fill="#ffb547"/><path d="M48 12v-8M45 7l3-3 3 3" stroke="#72d4e8" stroke-width="1.2" fill="none"/>',
+  work: '<path d="M10 3v24h48" fill="none" stroke="#8b96ad" stroke-width="1"/><path d="M18 8H44V22H18Z" fill="#86e0a8" opacity=".25"/><path d="M18 8H44V22" fill="none" stroke="#ffb547" stroke-width="1.4"/><circle cx="18" cy="8" r="1.8" fill="#e8ecf4"/><circle cx="44" cy="22" r="1.8" fill="#e8ecf4"/>',
+  second: '<rect x="10" y="10" width="18" height="14" fill="#ef6a3c"/><rect x="38" y="10" width="18" height="14" fill="#4f8fe0"/><path d="M29 17h7m-3-3 3 3-3 3" stroke="#ffb547" stroke-width="1.3" fill="none"/>',
+  carnot: '<path d="M14 5Q22 9 30 12Q42 18 54 25Q44 23 34 20Q22 12 14 5Z" fill="#ffb547" opacity=".2"/><path d="M14 5Q22 9 30 12" stroke="#ff8a73" stroke-width="1.4" fill="none"/><path d="M30 12Q42 18 54 25" stroke="#8b96ad" stroke-width="1.2" fill="none"/><path d="M54 25Q44 23 34 20" stroke="#72d4e8" stroke-width="1.4" fill="none"/><path d="M34 20Q22 12 14 5" stroke="#8b96ad" stroke-width="1.2" fill="none"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i];
+  S.lesson = i; S.hl = null; drag = null;
+  resetState(); save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(true); renderStrip(); buildScheme(); update();
+  const strip = $('#lessons'), cur = strip.querySelector('.lesson[aria-current="true"]');
+  if (cur) { const sr = strip.getBoundingClientRect(), cr = cur.getBoundingClientRect(); strip.scrollLeft += cr.left - sr.left - (sr.width - cr.width) / 2; }
+}
+
+// для ИИ-репетитора: что сейчас на экране
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '';
+  if (id === 'first') now = `Цилиндр с 1 моль гелия (одноатомный идеальный газ), начальное состояние 300 K, 100 кПа, ${fmt(V0L, 2)} л. Поршень ${m.fix ? 'закреплён упорами (V = const)' : 'свободен, на нём груз (p = const = 100 кПа)'}. Передано тепла Q = ${m.Q} Дж. ΔU = ${fmt(m.dU, 1)} Дж, работа газа A = ${fmt(m.A, 1)} Дж, T = ${fmt(m.T, 1)} K (ΔT = ${fmt(m.dT, 2)} K), V = ${fmt(m.V, 2)} л, p = ${fmt(m.p, 1)} кПа. Опыт с Q = 500 Дж: при закреплённом поршне ${S.rec.fix ? 'сделан' : 'не сделан'}, при свободном ${S.rec.free ? 'сделан' : 'не сделан'}.`;
+  if (id === 'work') now = `График p(V) для 1 моль газа. Состояние 1: 10 л, 300 кПа; состояние 2: 30 л, 100 кПа (оба на изотерме pV = 3000 Дж). Сейчас газ: V = ${m.V} л, p = ${m.p} кПа, T ≈ ${fmt(m.T, 0)} K. Накоплена работа газа на пройденном пути A = ${fmt(m.A, 0)} Дж. Газ ${m.at2 ? 'в состоянии 2' : 'не в состоянии 2'}. Приходы в состояние 2 с работой: ${S.arr.map(a => fmt(a, 0) + ' Дж').join(', ') || 'пока нет'}. Не называй готовый путь сразу: наводи вопросами про площадь под графиком.`;
+  if (id === 'second') now = `Два медных бруска по C = 2000 Дж/К на пенопласте. Левый ${fmt(TK(m.Th), 2)} °C (начально 80 °C), правый ${fmt(TK(m.Tc), 2)} °C (начально 20 °C). Бруски ${m.contact ? 'соприкасаются' : 'разведены'}. Через контакт перешло ${fmt(m.Qflow / 1000, 2)} кДж. Равновесие ${S.mixed ? 'уже было достигнуто' : 'ещё не достигнуто'}. Идеальный тепловой насос ${m.pump ? 'работает' : 'выключен'}: взял у правого ${fmt(m.Qp / 1000, 2)} кДж, потратил работу ${fmt(m.W / 1000, 2)} кДж. Изменение энтропии системы ${fmt(m.dS, 1)} Дж/К.`;
+  if (id === 'carnot') now = `Идеальная машина Карно, 1 моль одноатомного газа, V₁ = 10 л, V₂ = 20 л. T₁ = ${S.T1} K, T₂ = ${S.T2} K, η = ${fmt(m.eta * 100, 1)} %, Q₁ = ${fmt(m.Q1, 0)} Дж, A = ${fmt(m.A, 0)} Дж, Q₂ = ${fmt(m.Q2, 0)} Дж. ${S.run ? `Идёт цикл, этап ${m.k + 1}: ${STAGES[m.k]}.` : 'Цикл не идёт.'} Полных циклов: ${S.cycles}${S.doneKey ? ` (последний при ${S.doneKey.replace('/', ' K и ')} K)` : ''}. Не называй готовые температуры: помоги вывести отношение T₂/T₁ из формулы.`;
+  return [
+    `Раздел: физика, 10 класс, термодинамика. Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на площадке: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Веди ученика вопросами, не решай за него.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = {
+    first: 'Почему при свободном поршне газ нагревается слабее?', work: 'Почему работа зависит от пути?',
+    second: 'Почему нельзя бесплатно вернуть тепло горячему телу?', carnot: 'Почему КПД не может быть 100 %?',
+  }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

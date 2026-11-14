@@ -142,7 +142,7 @@ window.LUCH_SUBJECTS = {
       { id: 'env', b: 'eco', g: 8, t: 'Организм и среда', items: ['Факторы среды', 'Приспособления', 'Биоритмы'], req: ['plants'], status: 'done', href: '/labs/bio-env/', lessons: 3, doneItems: 3 },
       { id: 'ecosys', b: 'eco', g: 10, t: 'Экосистемы', items: ['Пищевые цепи', 'Круговорот веществ', 'Устойчивость экосистем'], req: ['env', 'metab'], status: 'done', href: '/labs/bio-ecosys/', lessons: 3, doneItems: 3 },
       { id: 'biosphere', b: 'eco', g: 11, t: 'Биосфера', items: ['Учение Вернадского', 'Природные зоны планеты', 'Человек и биосфера'], req: ['ecosys', 'evolution'], status: 'done', href: '/labs/bio-biosphere/', lessons: 3, doneItems: 3 },
-      { id: 'protect', b: 'eco', g: 11, t: 'Охрана природы', items: ['Красная книга', 'Заповедники Казахстана', 'Устойчивое развитие'], req: ['biosphere'] },
+      { id: 'protect', b: 'eco', g: 11, t: 'Охрана природы', items: ['Красная книга', 'Заповедники Казахстана', 'Устойчивое развитие'], req: ['biosphere'], status: 'done', href: '/labs/bio-protect/', lessons: 3, doneItems: 3 },
     ],
   },
 

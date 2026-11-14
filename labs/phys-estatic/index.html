@@ -1,0 +1,878 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по физике, 10 класс: закон Кулона, напряжённость и потенциал поля, конденсаторы.">
+<title>Электростатика</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene [data-click]{cursor:pointer}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.meter .lr .ok{color:var(--ok)}
+.meter .lr .bad{color:var(--warn)}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button.rec{color:var(--force)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M7 31C12 31 13 20 19 20S26 11 31 9" fill="none" stroke="var(--force)" stroke-width="2" stroke-dasharray="3 3" stroke-linecap="round"/><path d="M7 31L29 11" stroke="var(--arm)" stroke-width="2.2" stroke-linecap="round"/><path d="M33 8l-7 1.5 4.5 4.5z" fill="var(--arm)"/><circle cx="7" cy="31" r="3" fill="var(--fg)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Физика · Электростатика</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/">Карта</a><a href="/physics/">Физика</a><a href="/labs/phys-estatic/" aria-current="page">Электростатика</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Электростатика</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Опытная площадка">
+    <svg class="scene" id="scene" role="img" aria-label="Площадка для опытов по электростатике: заряды, поле и конденсатор. Шары, пробную точку и пластину можно перетаскивать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const sg = (x, n = 1) => (x > 0 ? '+' : '') + fmt(x, n);
+const big = x => String(Math.round(x)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ').replace('-', '−');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const EPS0 = 8.85e-12, U0 = 12;
+
+const LESSONS = [
+  { id: 'coul', title: 'Закон Кулона',
+    text: ['Два точечных заряда действуют друг на друга с силами, направленными вдоль прямой, которая их соединяет. Одноимённые заряды отталкиваются, разноимённые притягиваются. По третьему закону Ньютона эти силы равны по модулю и противоположны по направлению.',
+           'Закон Кулона: F = k·|q₁|·|q₂| / (ε·r²). Здесь k = 9·10⁹ Н·м²/Кл², r — расстояние между зарядами, ε — диэлектрическая проницаемость среды. Увеличьте r в 2 раза — сила уменьшится в 4 раза. Удвойте один заряд — сила вырастет вдвое.',
+           'В веществе сила в ε раз слабее, чем в вакууме: в керосине ε = 2, в воде ε = 81. Поэтому вода так хорошо растворяет соль: притяжение ионов Na⁺ и Cl⁻ в ней слабеет в 81 раз.'],
+    why: 'Химики-технологи на заводах Павлодара, Шымкента и Атырау подбирают растворители по проницаемости ε: от неё зависит, растворится ли соль и пойдёт ли реакция. Разработчики микросхем считают силы между зарядами в транзисторах размером в десятки нанометров. В цехах порошковой покраски настраивают заряд краски и расстояние до детали: от этого зависит расход краски, а значит и прибыль цеха.',
+    task: 'Сделайте так, чтобы шары притягивались в керосине с силой 0,4 Н (допуск 3 %).',
+    hint: 'Среду меняет кнопка «Среда». Нажмите на кнопку q₁ или q₂, чтобы поменять знак заряда. Тащите правый шар, чтобы менять r; модули зарядов — на вкладке «Схема». Подсказка — график F(r) внизу.',
+    stage: 'Тащите правый шар вдоль оси.',
+    q1: 2, q2: 3, r0: 30, target: 0.4, tol: 0.03,
+    check: m => m.F < 0 && m.med === 'ker' && Math.abs(Math.abs(m.F) - 0.4) <= 0.012 },
+  { id: 'field', title: 'Напряжённость и потенциал',
+    text: ['Напряжённость E — силовая характеристика поля: E = F / q, это вектор. У точечного заряда E = k·|q| / r². Если зарядов несколько, их поля складываются как векторы. Это принцип суперпозиции.',
+           'Потенциал φ — энергетическая характеристика поля: φ = W / q, это число со знаком, в вольтах. У точечного заряда φ = k·q / r, знак берётся вместе с зарядом. Потенциалы нескольких зарядов складываются как обычные числа. Работа поля при переносе заряда q: A = q·(φ₁ − φ₂).',
+           'Цвет на площадке показывает потенциал: тёплый — φ > 0, холодный — φ < 0. Пунктиры — эквипотенциальные линии, на них φ одинаков. Стрелки — направление E: оно перпендикулярно эквипотенциалям и направлено в сторону убывания потенциала.'],
+    why: 'Разность потенциалов — это напряжение, его электрики и электронщики измеряют каждый день. Кардиологи по ЭКГ читают разность потенциалов на коже, которую создаёт сердце. Инженеры KEGOC рассчитывают потенциал земли у опор ЛЭП, чтобы шаговое напряжение не убило человека. Геофизики в Казахстане ищут руду и подземную воду, измеряя потенциалы в земле: это электроразведка.',
+    task: 'Найдите две особые точки. Для двух одинаковых зарядов поставьте пробную точку туда, где E = 0. Для разных по знаку зарядов — туда, где φ = 0.',
+    hint: 'Пару зарядов меняет кнопка «Заряды». Точку можно тащить, стрелки ← → ↑ ↓ двигают её на 0,25 см. Подумайте о симметрии: где векторы E двух зарядов гасят друг друга? Где потенциалы равны по модулю, но противоположны по знаку?',
+    safe: 'Если рядом упал провод ЛЭП, не подходите ближе 8 м. Уходите мелкими шагами, не отрывая ступни друг от друга: тогда между ногами почти нет разности потенциалов.',
+    stage: 'Тащите пробную точку по полю.',
+    qm: 2,
+    check: m => m.fe && m.fp },
+  { id: 'cap', title: 'Конденсаторы',
+    text: ['Конденсатор — две проводящие пластины, разделённые диэлектриком. Подключим его к источнику: на пластинах соберутся заряды +q и −q. Ёмкость C = q / U показывает, какой заряд нужен, чтобы зарядить конденсатор до 1 В. Единица ёмкости — фарад (Ф), на практике берут пФ, нФ и мкФ.',
+           'Ёмкость плоского конденсатора: C = ε·ε₀·S / d, где ε₀ = 8,85·10⁻¹² Ф/м, S — площадь пластины, d — расстояние между пластинами. Больше площадь, меньше зазор, лучше диэлектрик — больше ёмкость.',
+           'Важно, подключён ли конденсатор к источнику. Ключ замкнут — напряжение постоянно, а заряд меняется вместе с ёмкостью. Ключ разомкнут — заряду некуда уйти, q = const, и меняется U = q / C. Энергия заряженного конденсатора W = C·U² / 2 = q² / (2C).'],
+    why: 'Конденсаторы есть в каждом телефоне, зарядке и блоке питания — их сотни на одной плате. Вспышка фотоаппарата и дефибриллятор скорой помощи отдают энергию конденсатора за доли секунды. Сенсорный экран — сетка крошечных конденсаторов: палец меняет их ёмкость. Инженеры-электроники и мастера по ремонту техники работают с ёмкостями каждый день, а конденсаторные батареи на заводах снижают потери в сети и экономят деньги на электроэнергии.',
+    task: 'Замкните ключ и зарядите конденсатор от источника 12 В. Потом разомкните ключ и раздвиньте пластины так, чтобы напряжение на конденсаторе стало 36 В (допуск 2 %).',
+    hint: 'Нажмите на ключ на площадке или на кнопку «Ключ». Правую пластину можно тащить. Если q не меняется, а U = q / C, во сколько раз должна уменьшиться ёмкость? И во сколько раз для этого вырасти d?',
+    safe: 'Большие конденсаторы в блоках питания, микроволновках и телевизорах держат заряд и после отключения от розетки. Не разбирайте такие приборы: удар может быть смертельным.',
+    stage: 'Тащите правую пластину. Нажмите на ключ.',
+    d0: 2, S0: 100,
+    check: m => !m.conn && m.q > 0 && Math.abs(m.U - 36) <= 0.72 },
+];
+
+const LS_KEY = 'luch-phys-estatic';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+let drag = null, dirty = true, lastUpd = 0;
+
+const MEDIA = {
+  vac: { name: 'вакуум', e: 1, col: null },
+  ker: { name: 'керосин', e: 2, col: 'rgba(230,193,74,.10)' },
+  wat: { name: 'вода', e: 81, col: 'rgba(95,180,217,.14)' },
+};
+const MK = Object.keys(MEDIA);
+const DIELS = {
+  air: { name: 'воздух', e: 1, col: null },
+  par: { name: 'парафин', e: 2, col: 'rgba(240,232,200,.20)' },
+  mic: { name: 'слюда', e: 6, col: 'rgba(214,170,120,.26)' },
+};
+const DK = Object.keys(DIELS);
+
+// ---------- geometry (SVG units; scene 520 × 405) ----------
+const G1 = { x0: 110, y: 222, ppc: 7, gx0: 0, gy0: 398, gy1: 300, Fmax: 1.2 };
+const G2 = { ax: 170, bx: 350, y: 270, ppc: 10, snap: 2.5 };
+const G3 = { lx: 150, ppm: 20, cy: 290, bx: 260, by: 150, kx: 440 };
+
+function resetState() {
+  const Ls = L();
+  Object.assign(S, {
+    // lesson 1
+    q1: Ls.q1 || 2, q2: Ls.q2 || 3, r: Ls.r0 || 30, med: 'vac',
+    // lesson 2
+    pair: 'same', qm: Ls.qm || 2, px: 330, py: 180, fe: false, fp: false,
+    // lesson 3
+    d: Ls.d0 || 2, Sa: Ls.S0 || 100, diel: 'air', conn: false, qc: 0, dToast: false,
+    hl: null,
+  });
+}
+
+// ---------- lesson 1: Coulomb ----------
+const F1 = () => 9e-3 * S.q1 * S.q2 / (MEDIA[S.med].e * (S.r / 100) ** 2); // q in мкКл, r in см → Н; >0 repulsion
+const Fat = r => 9e-3 * Math.abs(S.q1 * S.q2) / (MEDIA[S.med].e * (r / 100) ** 2);
+const b2x = () => G1.x0 + S.r * G1.ppc;
+function setR(r) { S.r = clamp(Math.round(r * 10) / 10, 5, 50); dirty = true; }
+
+// ---------- lesson 2: superposition ----------
+const srcs = () => [{ x: G2.ax, y: G2.y, q: S.qm }, { x: G2.bx, y: G2.y, q: S.pair === 'same' ? S.qm : -S.qm }];
+function fieldAt(x, y) {
+  let ex = 0, ey = 0, phi = 0; const parts = [];
+  for (const s of srcs()) {
+    const dx = x - s.x, dy = y - s.y, du = Math.hypot(dx, dy) || 1e-6, r = du / G2.ppc / 100;
+    const Em = 9 * s.q / (r * r), f = 9 * s.q / r; // k·q with q in нКл: 9·10⁹·10⁻⁹ = 9
+    const px = Em * dx / du, py = Em * dy / du;
+    ex += px; ey += py; phi += f;
+    parts.push({ ex: px, ey: py, E: Math.abs(Em), phi: f, r: r * 100 });
+  }
+  return { ex, ey, E: Math.hypot(ex, ey), phi, parts };
+}
+function setProbe(x, y) {
+  x = clamp(x, 10, 510); y = clamp(y, 130, 410);
+  for (const s of srcs()) { const dx = x - s.x, dy = y - s.y, d = Math.hypot(dx, dy); if (d < 22) { const k = 22 / (d || 1); x = s.x + (d ? dx * k : 22); y = s.y + (d ? dy * k : 0); } }
+  S.px = Math.round(x / G2.snap) * G2.snap; S.py = Math.round(y / G2.snap) * G2.snap;
+  dirty = true; probeChecks();
+}
+function probeChecks() {
+  const f = fieldAt(S.px, S.py), near = Math.abs(S.px - 260) < 60 && Math.abs(S.py - G2.y) < 60;
+  if (S.pair === 'same' && near && f.E < 100 && !S.fe) { S.fe = true; toast('Есть! Между одинаковыми зарядами их поля равны и направлены навстречу: E = 0. А потенциал здесь не ноль.'); }
+  if (S.pair === 'opp' && Math.abs(f.phi) < 5 && !S.fp) { S.fp = true; toast('Есть! Здесь φ = 0: потенциалы зарядов равны по модулю и противоположны по знаку. А напряжённость не ноль.'); }
+}
+function setPair(p) { S.pair = p; heatKey = ''; renderTools(); probeChecks(); update(); }
+function setQm(v) { S.qm = clamp(Math.round(v * 2) / 2, 1, 4); heatKey = ''; renderTools(); probeChecks(); update(); }
+
+// potential map + field arrows, drawn once into a canvas and used as an <image>
+let heatKey = '', heatURL = '';
+const HX = -260, HY = -260, HW = 1040, HH = 700;
+function heatmap() {
+  const key = S.pair + '|' + S.qm;
+  if (key === heatKey) return heatURL;
+  heatKey = key;
+  const cv = document.createElement('canvas'); cv.width = HW / 2; cv.height = HH / 2;
+  const c = cv.getContext('2d'); c.scale(0.5, 0.5);
+  const B = 4, cols = HW / B, rows = HH / B, lvl = new Array(cols * rows);
+  const step = 40 * S.qm / 2;
+  for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
+    const x = HX + i * B + B / 2, y = HY + j * B + B / 2, f = fieldAt(x, y), a = 0.36 * Math.tanh(Math.abs(f.phi) / (130 * S.qm));
+    c.fillStyle = f.phi >= 0 ? `rgba(255,138,115,${a.toFixed(3)})` : `rgba(127,196,255,${a.toFixed(3)})`;
+    c.fillRect(i * B, j * B, B, B);
+    lvl[j * cols + i] = Math.abs(f.phi) > 9 * step ? null : Math.floor(f.phi / step + 0.5);
+  }
+  c.fillStyle = 'rgba(232,236,244,.42)';
+  for (let j = 0; j < rows - 1; j++) for (let i = 0; i < cols - 1; i++) {
+    const v = lvl[j * cols + i]; if (v === null) continue;
+    const r = lvl[j * cols + i + 1], d = lvl[(j + 1) * cols + i];
+    if ((r !== null && r !== v) || (d !== null && d !== v)) c.fillRect(i * B + B - 1, j * B + B - 1, 2, 2);
+  }
+  c.strokeStyle = 'rgba(200,208,221,.55)'; c.fillStyle = 'rgba(200,208,221,.55)'; c.lineWidth = 1.4;
+  for (let y = HY + 20; y < HY + HH; y += 36) for (let x = HX + 20; x < HX + HW; x += 36) {
+    if (srcs().some(s => Math.hypot(x - s.x, y - s.y) < 26)) continue;
+    const f = fieldAt(x, y); if (f.E < 1) continue;
+    const ux = f.ex / f.E, uy = f.ey / f.E, X = x - HX, Y = y - HY, l = 8;
+    c.globalAlpha = clamp(0.25 + 0.25 * Math.log10(f.E / 200), 0.15, 0.9);
+    c.beginPath(); c.moveTo(X - ux * l, Y - uy * l); c.lineTo(X + ux * l, Y + uy * l); c.stroke();
+    c.beginPath(); c.moveTo(X + ux * (l + 3), Y + uy * (l + 3)); c.lineTo(X + ux * (l - 3) - uy * 3.2, Y + uy * (l - 3) + ux * 3.2); c.lineTo(X + ux * (l - 3) + uy * 3.2, Y + uy * (l - 3) - ux * 3.2); c.fill();
+  }
+  c.globalAlpha = 1;
+  heatURL = cv.toDataURL('image/png');
+  return heatURL;
+}
+
+// ---------- lesson 3: capacitor ----------
+const capC = () => DIELS[S.diel].e * EPS0 * S.Sa * 1e-4 / (S.d * 1e-3); // Ф
+const capU = () => S.conn ? U0 : (S.qc > 0 ? S.qc / capC() : 0);
+const capE = () => capU() / (S.d * 1e-3);
+const capW = () => S.qc > 0 ? S.qc * S.qc / (2 * capC()) : 0;
+function syncCap() { if (S.conn) S.qc = capC() * U0; }
+function setD(d) {
+  const nd = clamp(Math.round(d * 10) / 10, 1, 12);
+  if (nd !== S.d && !S.conn && S.qc > 0 && !S.dToast) { S.dToast = true; toast('Ключ разомкнут: заряду некуда уйти, q не меняется. Ёмкость падает — напряжение U = q / C растёт.'); }
+  S.d = nd; syncCap(); dirty = true;
+}
+function setKey(on) {
+  S.conn = on; syncCap();
+  toast(on ? 'Ключ замкнут: источник зарядил конденсатор до 12 В.' : 'Ключ разомкнут: заряд на пластинах остался, ему некуда уйти.');
+  renderTools(); update();
+}
+const rx = () => G3.lx + S.d * G3.ppm;
+const hh = () => S.Sa * 0.45;
+
+function model() {
+  const id = LID();
+  if (id === 'coul') return { kind: id, F: F1(), med: S.med, r: S.r };
+  if (id === 'field') { const f = fieldAt(S.px, S.py); return { kind: id, fe: S.fe, fp: S.fp, E: f.E, phi: f.phi }; }
+  return { kind: id, conn: S.conn, q: S.qc, U: capU(), C: capC() };
+}
+
+// ---------- drawing helpers ----------
+const T = (x, y, s, fill, txt, anchor = 'middle', extra = '') => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${s}" fill="${fill}" text-anchor="${anchor}" ${extra}>${txt}</text>`;
+const halo = `paint-order="stroke" stroke="${INK}" stroke-width="3"`;
+const NEG = '#7fc4ff', POS = '#ff8a73';
+const sgn = (x, y, plus, size = 11) => T(x, y + size * 0.36, size, plus ? POS : NEG, plus ? '+' : '−', 'middle', 'font-weight="500"');
+const arrow = (x1, y1, x2, y2, col, w, mk) => `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${x2.toFixed(1)} ${y2.toFixed(1)}" stroke="${col}" stroke-width="${w}" marker-end="url(#ar${mk})"/>`;
+function bg() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern>
+    <pattern id="hatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0V10" stroke="#2e3b57" stroke-width="3"/></pattern>
+    <radialGradient id="ballP" cx=".35" cy=".35"><stop offset="0" stop-color="#ffd2c8"/><stop offset="1" stop-color="#c85a46"/></radialGradient>
+    <radialGradient id="ballN" cx=".35" cy=".35"><stop offset="0" stop-color="#d8eeff"/><stop offset="1" stop-color="#3d7fb8"/></radialGradient>
+    <radialGradient id="ball0" cx=".35" cy=".35"><stop offset="0" stop-color="#f2f5fa"/><stop offset="1" stop-color="#7d889e"/></radialGradient>
+    ${[['B', NEG], ['R', POS], ['O', '#ffb547'], ['E', '#86e0a8'], ['W', '#c8d0dd']].map(([k, c]) => `<marker id="ar${k}" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="${c}"/></marker>`).join('')}</defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+const ball = (x, y, q, r = 16) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="url(#${q > 0 ? 'ballP' : q < 0 ? 'ballN' : 'ball0'})" stroke="${INK}" stroke-width="1.5"/>` + T(x, y + r * 0.42, r * 1.1, INK, q > 0 ? '+' : q < 0 ? '−' : '0', 'middle', 'font-weight="500"');
+
+// ---------- lesson 1 scene ----------
+function coulScene() {
+  const g = G1, x2 = b2x(), F = F1(), Fa = Math.abs(F), M = MEDIA[S.med];
+  let h = '';
+  if (M.col) h += `<rect x="40" y="150" width="450" height="122" rx="12" fill="${M.col}" stroke="rgba(160,185,230,.25)"/>` + T(56, 166, 9.5, '#c8d0dd', `${M.name} · ε = ${M.e}`, 'start', halo);
+  else h += T(56, 166, 9.5, '#5d6a86', 'вакуум · ε = 1', 'start', halo);
+  h += `<path d="M60 ${g.y}H480" stroke="#3a4762" stroke-width="1.5" stroke-dasharray="2 4"/>`;
+  // forces
+  if (Fa > 1e-6) {
+    const len = clamp(22 + 22 * Math.log10(Fa / 0.05), 10, 95), dir = F > 0 ? 1 : -1;
+    h += arrow(x2 + dir * 18, g.y, x2 + dir * (18 + len), g.y, '#ffb547', 3, 'O');
+    h += arrow(g.x0 - dir * 18, g.y, g.x0 - dir * (18 + len), g.y, '#ffb547', 3, 'O');
+    h += T(x2 + dir * (24 + len / 2), g.y - 10, 10, '#ffb547', 'F₂₁', 'middle', halo) + T(g.x0 - dir * (24 + len / 2), g.y - 10, 10, '#ffb547', 'F₁₂', 'middle', halo);
+  }
+  h += `<g data-click="b1">${ball(g.x0, g.y, S.q1)}</g>`;
+  h += `<g data-drag="b2"><circle cx="${x2.toFixed(1)}" cy="${g.y}" r="30" fill="transparent"/>${ball(x2, g.y, S.q2)}</g>`;
+  h += T(g.x0, g.y - 26, 10, '#e8ecf4', `q₁ = ${sg(S.q1)} мкКл`, 'middle', halo) + T(x2, g.y - 26, 10, '#e8ecf4', `q₂ = ${sg(S.q2)} мкКл`, 'middle', halo);
+  // distance
+  const dy = g.y + 32;
+  h += `<path d="M${g.x0} ${dy - 5}v10M${x2.toFixed(1)} ${dy - 5}v10M${g.x0} ${dy}H${x2.toFixed(1)}" stroke="#c8d0dd" stroke-width="1.2"/>` + T((g.x0 + x2) / 2, dy - 5, 10, '#e8ecf4', `r = ${fmt(S.r, 1)} см`, 'middle', halo);
+  h += T((g.x0 + x2) / 2, dy + 16, 10, Fa > 1e-6 ? '#ffb547' : '#8b96ad', Fa > 1e-6 ? `F = ${fmt(Fa, Fa < 0.1 ? 4 : 3)} Н · ${F > 0 ? 'отталкиваются' : 'притягиваются'}` : 'F = 0', 'middle', halo);
+  if (!drag && S.r === L().r0 && S.q1 === L().q1) h += T(x2, g.y + 66, 9.5, '#ffb547', '← тяните шар →', 'middle', halo);
+  // graph |F|(r), x aligned with ball 2
+  const gx = r => g.x0 + r * g.ppc, gy = f => g.gy0 - Math.min(f, g.Fmax) / g.Fmax * (g.gy0 - g.gy1);
+  h += `<g data-id="graph"><rect x="${gx(5) - 4}" y="${g.gy1 - 6}" width="${gx(50) - gx(5) + 8}" height="${g.gy0 - g.gy1 + 6}" rx="6" fill="rgba(11,16,25,.55)" stroke="#26324a"/>`;
+  for (let r = 10; r <= 50; r += 10) h += `<path d="M${gx(r)} ${g.gy0}v4" stroke="#5d6a86"/>` + T(gx(r), g.gy0 + 12, 8, '#5d6a86', `${r}`);
+  h += T(gx(50) + 6, g.gy0 + 12, 8, '#5d6a86', 'см', 'start');
+  const ty = gy(L().target || 0.4);
+  h += `<path d="M${gx(5)} ${ty.toFixed(1)}H${gx(50)}" stroke="#86e0a8" stroke-width="1" stroke-dasharray="4 4" opacity=".6"/>` + T(gx(50) - 2, ty - 4, 8.5, '#86e0a8', '0,4 Н', 'end');
+  let p = '';
+  for (let r = 5; r <= 50.01; r += 0.5) p += (p ? 'L' : 'M') + gx(r).toFixed(1) + ' ' + gy(Fat(r)).toFixed(1);
+  h += `<path d="${p}" fill="none" stroke="#ffb547" stroke-width="1.8"/>`;
+  h += `<circle cx="${gx(S.r).toFixed(1)}" cy="${gy(Fa).toFixed(1)}" r="4.5" fill="#ffb547" stroke="${INK}"/>`;
+  h += T(gx(5) + 4, g.gy1 + 8, 8.5, '#c8d0dd', `|F|, Н (до ${fmt(g.Fmax, 1)})`, 'start') + `</g>`;
+  return h;
+}
+
+// ---------- lesson 2 scene ----------
+function fieldScene() {
+  let h = `<image href="${heatmap()}" x="${HX}" y="${HY}" width="${HW}" height="${HH}" preserveAspectRatio="none"/>`;
+  const ss = srcs();
+  ss.forEach((s, i) => { h += `<g data-click="src">${ball(s.x, s.y, s.q, 15)}</g>` + T(s.x, s.y + 32, 10, '#e8ecf4', `q${i ? '₂' : '₁'} = ${sg(s.q)} нКл`, 'middle', halo); });
+  const f = fieldAt(S.px, S.py), L0 = E => clamp(14 + 20 * Math.log10(Math.max(E, 1) / 100), 6, 80);
+  f.parts.forEach((pp, i) => {
+    if (pp.E < 1) return; const l = L0(pp.E), ux = pp.ex / pp.E, uy = pp.ey / pp.E;
+    h += `<path d="M${S.px} ${S.py}l${(ux * l).toFixed(1)} ${(uy * l).toFixed(1)}" stroke="${ss[i].q > 0 ? POS : NEG}" stroke-width="1.6" stroke-dasharray="3 3" marker-end="url(#ar${ss[i].q > 0 ? 'R' : 'B'})"/>`;
+  });
+  if (f.E >= 1) { const l = L0(f.E), ux = f.ex / f.E, uy = f.ey / f.E; h += arrow(S.px, S.py, S.px + ux * l, S.py + uy * l, '#ffb547', 3, 'O') + T(S.px + ux * (l + 12), S.py + uy * (l + 12) + 4, 10.5, '#ffb547', 'E', 'middle', halo); }
+  h += `<g data-drag="probe"><circle cx="${S.px}" cy="${S.py}" r="22" fill="transparent"/><circle cx="${S.px}" cy="${S.py}" r="6" fill="#e8ecf4" stroke="${INK}" stroke-width="1.5"/><circle cx="${S.px}" cy="${S.py}" r="10" fill="none" stroke="#e8ecf4" stroke-width="1" opacity=".6"/></g>`;
+  const ly = S.py > 360 ? S.py - 30 : S.py + 26;
+  h += T(S.px, ly, 9.5, '#e8ecf4', `E = ${big(f.E)} Н/Кл · φ = ${big(f.phi)} В`, 'middle', halo);
+  return h;
+}
+
+// ---------- lesson 3 scene ----------
+function capScene() {
+  const g = G3, xr = rx(), H = hh(), top = g.cy - H, bot = g.cy + H, D = DIELS[S.diel], q = S.qc, U = capU();
+  let h = '';
+  // battery
+  h += `<g data-id="bat"><path d="M${g.bx - 40} ${g.by}H${g.bx - 6}M${g.bx + 6} ${g.by}H${g.bx + 40}" stroke="#c8d0dd" stroke-width="2"/>
+    <path d="M${g.bx - 6} ${g.by - 9}v18" stroke="#c8d0dd" stroke-width="5"/><path d="M${g.bx + 6} ${g.by - 18}v36" stroke="#c8d0dd" stroke-width="2.5"/></g>` +
+    T(g.bx - 16, g.by - 14, 11, NEG, '−') + T(g.bx + 18, g.by - 22, 11, POS, '+') + T(g.bx, g.by + 32, 10, '#e8ecf4', `источник ${U0} В`, 'middle', halo);
+  // wires
+  const wq = S.conn ? '#c8d0dd' : '#8b96ad';
+  h += `<path d="M${g.bx - 40} ${g.by}H${g.lx}V${top}" fill="none" stroke="${wq}" stroke-width="2"/>`;
+  h += `<path d="M${g.bx + 40} ${g.by}H${g.kx}V205M${g.kx} 245V${bot + 18}H${xr.toFixed(1)}V${bot}" fill="none" stroke="${wq}" stroke-width="2"/>`;
+  // key
+  h += `<g data-click="key"><rect x="${g.kx - 26}" y="190" width="52" height="70" fill="transparent"/><circle cx="${g.kx}" cy="205" r="3.5" fill="#c8d0dd"/><circle cx="${g.kx}" cy="245" r="3.5" fill="#c8d0dd"/>
+    <path d="M${g.kx} 245L${S.conn ? g.kx : g.kx + 22} ${S.conn ? 207 : 215}" stroke="${S.conn ? '#86e0a8' : '#ffb547'}" stroke-width="3" stroke-linecap="round"/></g>` +
+    T(g.kx, 275, 9.5, S.conn ? '#86e0a8' : '#ffb547', S.conn ? 'ключ замкнут' : 'ключ разомкнут', 'middle', halo);
+  // dielectric
+  if (D.col) h += `<rect x="${g.lx + 3}" y="${top}" width="${(xr - g.lx - 6).toFixed(1)}" height="${2 * H}" fill="${D.col}" stroke="rgba(240,232,200,.3)"/>`;
+  // field lines (from + plate on the right to − plate on the left)
+  if (U > 0.01) {
+    const n = clamp(Math.round(capE() / 1000), 1, 16);
+    for (let i = 0; i < n; i++) {
+      const y = top + (i + 0.5) * 2 * H / n, x1 = xr - 6, x0 = g.lx + 6;
+      if (x1 - x0 < 14) h += `<path d="M${x1.toFixed(1)} ${y.toFixed(1)}H${x0}" stroke="#ffb547" stroke-width="1.2" opacity=".7"/>`;
+      else h += `<path d="M${x1.toFixed(1)} ${y.toFixed(1)}H${(x0 + 3).toFixed(1)}" stroke="#ffb547" stroke-width="1.2" opacity=".7" marker-end="url(#arO)"/>`;
+    }
+  }
+  // plates
+  h += `<rect x="${g.lx - 4}" y="${top}" width="8" height="${2 * H}" rx="2" fill="#a9b4c9" stroke="${INK}"/>`;
+  h += `<g data-drag="plate"><rect x="${(xr - 20).toFixed(1)}" y="${top - 10}" width="40" height="${2 * H + 20}" fill="transparent"/><rect x="${(xr - 4).toFixed(1)}" y="${top}" width="8" height="${2 * H}" rx="2" fill="#a9b4c9" stroke="${INK}"/>
+    <rect x="${(xr + 4).toFixed(1)}" y="${g.cy - 12}" width="12" height="24" rx="4" fill="#26324a" stroke="#8b96ad"/></g>`;
+  const nq = q > 0 ? clamp(Math.round(4 * Math.sqrt(q * 1e9 / 0.25)), 1, 18) : 0;
+  for (let i = 0; i < nq; i++) { const y = top + (i + 0.5) * 2 * H / nq; h += sgn(g.lx - 11, y, false, 10) + sgn(xr + 11 + (Math.abs(y - g.cy) < 14 ? 12 : 0), y, true, 10); }
+  // labels
+  h += T((g.lx + xr) / 2, top - 12, 10, '#e8ecf4', `d = ${fmt(S.d, 1)} мм`, 'middle', halo);
+  h += `<path d="M${g.lx} ${top - 6}H${xr.toFixed(1)}" stroke="#c8d0dd" stroke-width="1" opacity=".6"/>`;
+  h += T(70, 300, 10.5, '#e8ecf4', `U = ${fmt(U, U < 100 ? 1 : 0)} В`, 'middle', halo) + T(70, 316, 9.5, '#8b96ad', `C = ${fmt(capC() * 1e12, 1)} пФ`, 'middle', halo) + T(70, 331, 9.5, '#8b96ad', `q = ${fmt(q * 1e9, 2)} нКл`, 'middle', halo);
+  if (D.col) h += T((g.lx + xr) / 2, bot - 8, 9, '#f0e8c8', D.name, 'middle', halo);
+  if (!drag && S.d === L().d0 && !S.qc) h += T(xr + 44, g.cy + 36, 9.5, '#ffb547', '← тяните →', 'middle', halo);
+  return h;
+}
+
+function hlBox(id) {
+  const lid = LID();
+  if (lid === 'coul') {
+    const x2 = b2x(), g = G1;
+    return ({ b1: [g.x0 - 22, g.y - 22, 44, 44], b2: [x2 - 22, g.y - 22, 44, 44], force: [g.x0 - 110, g.y - 22, x2 - g.x0 + 220, 44], dist: [g.x0 - 4, g.y + 20, x2 - g.x0 + 8, 34], graph: [g.x0 + 5 * g.ppc - 8, g.gy1 - 10, 45 * g.ppc + 16, g.gy0 - g.gy1 + 26], medium: [36, 146, 458, 130] })[id];
+  }
+  if (lid === 'field') return ({ s1: [G2.ax - 22, G2.y - 22, 44, 44], s2: [G2.bx - 22, G2.y - 22, 44, 44], probe: [S.px - 16, S.py - 16, 32, 32], vec: [S.px - 70, S.py - 70, 140, 140], heat: [20, 140, 480, 260], eq: [G2.ax - 80, G2.y - 80, 360, 160] })[id];
+  const xr = rx(), H = hh(), g = G3;
+  return ({ pl: [g.lx - 14, g.cy - H - 8, 28, 2 * H + 16], pr: [xr - 14, g.cy - H - 8, 34, 2 * H + 16], gap: [g.lx, g.cy - H, xr - g.lx, 2 * H], bat: [g.bx - 46, g.by - 26, 92, 52], key: [g.kx - 16, 194, 46, 62], lines: [g.lx + 4, g.cy - H, xr - g.lx - 8, 2 * H] })[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = bg();
+  if (id === 'coul') h += coulScene();
+  else if (id === 'field') h += fieldScene();
+  else h += capScene();
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${Math.max(4, b[2]).toFixed(1)}" height="${Math.max(4, b[3]).toFixed(1)}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh2 = rc.height; if (!w || !hh2) return;
+  const s = Math.min(w / 520, hh2 / 440, 1.7);
+  VB = { w: w / s, h: hh2 / s }; VB.x = 260 - VB.w / 2; VB.y = 430 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer ----------
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+const throttled = () => { const n = performance.now(); if (n - lastUpd > 120) { lastUpd = n; update(); } };
+scene.addEventListener('pointerdown', e => {
+  const cl = e.target.closest('[data-click]');
+  if (cl) { act(cl.dataset.click); return; }
+  const el = e.target.closest('[data-drag]'), id = LID(), p = toSvg(e);
+  if (id === 'cap' && !el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  if (id === 'coul') { drag = { id: 'b2', dx: el ? p.x - b2x() : 0 }; if (!el) { setR((p.x - G1.x0) / G1.ppc); update(); } }
+  else if (id === 'field') { drag = { id: 'probe', dx: el ? p.x - S.px : 0, dy: el ? p.y - S.py : 0 }; if (!el) { setProbe(p.x, p.y); update(); } }
+  else drag = { id: 'plate', dx: p.x - rx() };
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const p = toSvg(e);
+  if (drag.id === 'b2') setR((p.x - drag.dx - G1.x0) / G1.ppc);
+  else if (drag.id === 'probe') setProbe(p.x - drag.dx, p.y - drag.dy);
+  else setD((p.x - drag.dx - G3.lx) / G3.ppm);
+  throttled();
+});
+const endDrag = () => { if (!drag) return; drag = null; scene.classList.remove('grabbing'); update(); };
+scene.addEventListener('pointerup', endDrag);
+scene.addEventListener('pointercancel', endDrag);
+
+function loop(t) {
+  requestAnimationFrame(loop);
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3600); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, cls) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}${cls ? ` class="${cls}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  let h = '';
+  if (id === 'coul') h = B('q1s', `q₁: ${sg(S.q1)}`) + B('q2s', `q₂: ${sg(S.q2)}`) + sep + B('med', 'Среда: ' + MEDIA[S.med].name, undefined, 'rec') + sep + B('near', 'Ближе') + B('far', 'Дальше');
+  if (id === 'field') h = B('pair', 'Заряды: ' + (S.pair === 'same' ? 'одинаковые' : 'разные'), undefined, 'rec') + sep + B('mvL', '←') + B('mvR', '→') + B('mvU', '↑') + B('mvD', '↓') + sep + B('reset', 'Сброс');
+  if (id === 'cap') h = B('key', 'Ключ: ' + (S.conn ? 'замкнут' : 'разомкнут'), S.conn, 'rec') + B('dis', 'Разрядить') + sep + B('d-', 'd −') + B('d+', 'd +') + sep + B('diel', 'Диэлектрик: ' + DIELS[S.diel].name);
+  tb.innerHTML = h;
+}
+function act(a) {
+  const Ls = L();
+  if (a === 'q1s' || a === 'b1') { S.q1 = -S.q1; renderTools(); buildScheme(); update(); return; }
+  if (a === 'q2s') { S.q2 = -S.q2; renderTools(); buildScheme(); update(); return; }
+  if (/^s[12][PN]$/.test(a)) { const k = 'q' + a[1], v = Math.abs(S[k]) * (a[2] === 'P' ? 1 : -1); S[k] = v; renderTools(); buildScheme(); update(); return; }
+  if (a === 'med') { S.med = MK[(MK.indexOf(S.med) + 1) % MK.length]; renderTools(); buildScheme(); update(); return; }
+  if (/^med-/.test(a)) { S.med = a.slice(4); renderTools(); buildScheme(); update(); return; }
+  if (a === 'near' || a === 'far') { setR(S.r + (a === 'far' ? 0.5 : -0.5)); update(); return; }
+  if (a === 'pair' || a === 'src') { setPair(S.pair === 'same' ? 'opp' : 'same'); buildScheme(); return; }
+  if (/^pair-/.test(a)) { setPair(a.slice(5)); buildScheme(); return; }
+  if (/^mv/.test(a)) { const s = G2.snap; setProbe(S.px + (a === 'mvL' ? -s : a === 'mvR' ? s : 0), S.py + (a === 'mvU' ? -s : a === 'mvD' ? s : 0)); update(); return; }
+  if (a === 'reset') { S.qm = Ls.qm; heatKey = ''; S.px = 330; S.py = 180; renderTools(); buildScheme(); update(); return; }
+  if (a === 'key') { setKey(!S.conn); buildScheme(); return; }
+  if (/^key-/.test(a)) { const on = a === 'key-on'; if (on !== S.conn) setKey(on); buildScheme(); return; }
+  if (a === 'dis') { if (S.conn) { toast('Сначала разомкните ключ: источник сразу зарядит конденсатор снова.'); return; } if (S.qc > 0) toast('Пластины соединили проводником: заряды нейтрализовались, q = 0.'); S.qc = 0; buildScheme(); update(); return; }
+  if (a === 'd-' || a === 'd+') { setD(S.d + (a === 'd+' ? 0.5 : -0.5)); update(); return; }
+  if (a === 'diel') { S.diel = DK[(DK.indexOf(S.diel) + 1) % DK.length]; syncCap(); renderTools(); buildScheme(); update(); return; }
+  if (/^diel-/.test(a)) { S.diel = a.slice(5); syncCap(); renderTools(); buildScheme(); update(); return; }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.disabled) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  bp: IC('<circle cx="17" cy="17" r="10" fill="#c85a46"/><text x="17" y="22" font-size="13" text-anchor="middle" fill="#04070d">+</text>'),
+  bn: IC('<circle cx="17" cy="17" r="10" fill="#3d7fb8"/><text x="17" y="22" font-size="13" text-anchor="middle" fill="#04070d">−</text>'),
+  force: IC('<path d="M4 17h20" stroke="#ffb547" stroke-width="3"/><path d="M23 11l8 6-8 6z" fill="#ffb547"/>'),
+  dist: IC('<path d="M4 12v10M30 12v10M4 17H30" stroke="#c8d0dd" stroke-width="1.5"/>'),
+  graph: IC('<path d="M5 4V29H31" stroke="#5d6a86" stroke-width="1.5" fill="none"/><path d="M8 5Q10 22 30 26" stroke="#ffb547" stroke-width="2" fill="none"/>'),
+  medium: IC('<rect x="3" y="9" width="28" height="18" rx="4" fill="rgba(95,180,217,.3)" stroke="#5fb4d9"/>'),
+  probe: IC('<circle cx="17" cy="17" r="5" fill="#e8ecf4"/><circle cx="17" cy="17" r="9" fill="none" stroke="#e8ecf4" opacity=".6"/>'),
+  vec: IC('<path d="M6 26L24 10" stroke="#ffb547" stroke-width="3"/><path d="M29 6l-3 9-6-6z" fill="#ffb547"/><path d="M6 26h14" stroke="#ff8a73" stroke-dasharray="2 2"/><path d="M6 26V14" stroke="#7fc4ff" stroke-dasharray="2 2"/>'),
+  heat: IC('<rect x="3" y="6" width="14" height="22" fill="rgba(255,138,115,.45)"/><rect x="17" y="6" width="14" height="22" fill="rgba(127,196,255,.45)"/>'),
+  eq: IC('<circle cx="17" cy="17" r="5" fill="none" stroke="#e8ecf4" stroke-dasharray="1 2"/><circle cx="17" cy="17" r="11" fill="none" stroke="#e8ecf4" stroke-dasharray="1 2"/>'),
+  plate: IC('<rect x="14" y="3" width="6" height="28" rx="1" fill="#a9b4c9"/>'),
+  gap: IC('<rect x="5" y="4" width="4" height="26" fill="#a9b4c9"/><rect x="25" y="4" width="4" height="26" fill="#a9b4c9"/><rect x="10" y="4" width="14" height="26" fill="rgba(214,170,120,.4)"/>'),
+  bat: IC('<path d="M3 17h11M20 17h11" stroke="#c8d0dd" stroke-width="2"/><path d="M14 11v12" stroke="#c8d0dd" stroke-width="4"/><path d="M20 6v22" stroke="#c8d0dd" stroke-width="2"/>'),
+  key: IC('<circle cx="8" cy="24" r="2.5" fill="#c8d0dd"/><circle cx="27" cy="24" r="2.5" fill="#c8d0dd"/><path d="M8 24L25 12" stroke="#ffb547" stroke-width="2.5"/>'),
+  lines: IC('<path d="M28 9H8M28 17H8M28 25H8" stroke="#ffb547" stroke-width="1.5"/><path d="M8 9l4-3v6zM8 17l4-3v6zM8 25l4-3v6z" fill="#ffb547"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  const t = (ok, s) => `${s} ${ok ? '✓' : '—'}`;
+  if (id === 'coul') return [t(m.med === 'ker', 'керосин'), t(m.F < 0, 'притяжение'), `|F| = ${fmt(Math.abs(m.F), 3)} Н · цель 0,400 ± 0,012`].join(' · ');
+  if (id === 'field') return [t(S.fe, 'E = 0 найдено'), t(S.fp, 'φ = 0 найдено')].join(' · ');
+  return [t(S.qc > 0, 'заряжен'), t(!S.conn, 'ключ разомкнут'), `U = ${fmt(capU(), 1)} В · цель 36 ± 0,7`].join(' · ');
+}
+
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+const chips = (pre, keys, names, cur) => `<div class="chips">${keys.map(k => `<button data-a="${pre}${k}" aria-pressed="${cur === k}">${names(k)}</button>`).join('')}</div>`;
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'coul') h = `<h2>Два заряженных шара</h2><div class="ctl"><div class="lbl">Среда</div>${chips('med-', MK, k => `${MEDIA[k].name} (ε = ${MEDIA[k].e})`, S.med)}</div>
+      <div class="ctl"><div class="lbl">Знак q₁</div>${chips('s1', ['P', 'N'], k => k === 'P' ? '+' : '−', S.q1 > 0 ? 'P' : 'N')}</div>` +
+      slider('inQ1', 'Модуль |q₁|, мкКл', 0.5, 5, 0.5, Math.abs(S.q1)) +
+      `<div class="ctl"><div class="lbl">Знак q₂</div>${chips('s2', ['P', 'N'], k => k === 'P' ? '+' : '−', S.q2 > 0 ? 'P' : 'N')}</div>` +
+      slider('inQ2', 'Модуль |q₂|, мкКл', 0.5, 5, 0.5, Math.abs(S.q2)) + slider('inR', 'Расстояние r, см', 5, 50, 0.1, S.r) +
+      `<dl class="reads"><div><dt>|F|</dt><dd id="r1"></dd></div><div><dt>ε</dt><dd id="r2"></dd></div><div><dt>шары</dt><dd id="r3"></dd></div></dl>
+      <p class="note" style="margin-top:12px">Шары маленькие по сравнению с r, поэтому их считаем точечными зарядами. 1 мкКл = 10⁻⁶ Кл.</p>`;
+  if (id === 'field') h = `<h2>Поле двух зарядов</h2><div class="ctl"><div class="lbl">Пара зарядов</div>${chips('pair-', ['same', 'opp'], k => k === 'same' ? 'одинаковые (+, +)' : 'разные (+, −)', S.pair)}</div>` +
+      slider('inQ', 'Модуль зарядов |q|, нКл', 1, 4, 0.5, S.qm) +
+      `<dl class="reads"><div><dt>|E|</dt><dd id="r1"></dd></div><div><dt>φ</dt><dd id="r2"></dd></div><div><dt>r₁ / r₂</dt><dd id="r3"></dd></div></dl>
+      <h3>Особые точки</h3><div class="steps">${step('E = 0 (одинаковые)', S.fe ? 'найдена ✓' : 'ищем')}${step('φ = 0 (разные)', S.fp ? 'найдена ✓' : 'ищем')}</div>
+      <div class="row"><button class="ghostbtn" data-a="reset">Сброс</button></div>
+      <p class="note" style="margin-top:12px">Заряды стоят в 18 см друг от друга. Потенциал бесконечно далёкой точки принят за ноль.</p>`;
+  if (id === 'cap') h = `<h2>Плоский конденсатор</h2><div class="ctl"><div class="lbl">Ключ</div>${chips('key-', ['on', 'off'], k => k === 'on' ? 'замкнут' : 'разомкнут', S.conn ? 'on' : 'off')}</div>
+      <div class="ctl"><div class="lbl">Диэлектрик между пластинами</div>${chips('diel-', DK, k => `${DIELS[k].name} (ε = ${DIELS[k].e})`, S.diel)}</div>` +
+      slider('inS', 'Площадь пластины S, см²', 50, 200, 10, S.Sa) + slider('inD', 'Зазор d, мм', 1, 12, 0.1, S.d) +
+      `<dl class="reads"><div><dt>C</dt><dd id="r1"></dd></div><div><dt>q</dt><dd id="r2"></dd></div><div><dt>U</dt><dd id="r3"></dd></div><div><dt>E</dt><dd id="r4"></dd></div><div><dt>W</dt><dd id="r5"></dd></div><div><dt>ε</dt><dd id="r6"></dd></div></dl>
+      <div class="row"><button class="ghostbtn" data-a="dis">Разрядить</button></div>
+      <p class="note" style="margin-top:12px">Источник даёт ${U0} В. Когда ключ разомкнут, заряд пластин сохраняется.</p>`;
+  el.innerHTML = h;
+  const on = (sel, fn2) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn2); };
+  on('#inQ1', e => { S.q1 = Math.sign(S.q1) * +e.target.value; renderTools(); update(); });
+  on('#inQ2', e => { S.q2 = Math.sign(S.q2) * +e.target.value; renderTools(); update(); });
+  on('#inR', e => { setR(+e.target.value); update(); });
+  on('#inQ', e => setQm(+e.target.value));
+  on('#inS', e => { S.Sa = +e.target.value; syncCap(); update(); });
+  on('#inD', e => { setD(+e.target.value); update(); });
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => { act(b.dataset.a); buildScheme(); });
+  updateScheme(model());
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (id === 'coul') { set('#inQ1O', fmt(Math.abs(S.q1), 1)); set('#inQ2O', fmt(Math.abs(S.q2), 1)); set('#inRO', fmt(S.r, 1)); val('#inR', S.r); set('#r1', `${fmt(Math.abs(m.F), 3)} Н`); set('#r2', MEDIA[S.med].e); set('#r3', m.F > 0 ? 'отталк.' : 'притяг.'); }
+  if (id === 'field') { const f = fieldAt(S.px, S.py); set('#inQO', fmt(S.qm, 1)); set('#r1', `${big(f.E)} Н/Кл`); set('#r2', `${big(f.phi)} В`); set('#r3', `${fmt(f.parts[0].r, 1)} / ${fmt(f.parts[1].r, 1)} см`); }
+  if (id === 'cap') { set('#inSO', S.Sa); set('#inDO', fmt(S.d, 1)); val('#inD', S.d); set('#r1', `${fmt(capC() * 1e12, 1)} пФ`); set('#r2', `${fmt(S.qc * 1e9, 2)} нКл`); set('#r3', `${fmt(capU(), 1)} В`); set('#r4', `${big(capE())} В/м`); set('#r5', `${fmt(capW() * 1e9, 1)} нДж`); set('#r6', DIELS[S.diel].e); }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'coul') return [
+    { id: 'b1', icon: ICON.bp, name: 'Заряд q₁', spec: 'Закреплён. Нажмите на него, чтобы поменять знак.' },
+    { id: 'b2', icon: ICON.bn, name: 'Заряд q₂', spec: 'Его можно двигать вдоль оси и так менять расстояние r.' },
+    { id: 'force', icon: ICON.force, name: 'Силы F₁₂ и F₂₁', spec: 'Равны по модулю, направлены в разные стороны вдоль одной прямой. Длина стрелки растёт медленнее силы, иначе не поместится.' },
+    { id: 'dist', icon: ICON.dist, name: 'Расстояние r', spec: 'Между центрами шаров. В законе Кулона стоит r².' },
+    { id: 'graph', icon: ICON.graph, name: 'График |F|(r)', spec: 'Ось r совпадает с положением правого шара. Кривая падает как 1/r². Зелёный пунктир — цель 0,4 Н.' },
+    { id: 'medium', icon: ICON.medium, name: 'Среда', spec: 'Вакуум, керосин или вода. В среде сила в ε раз меньше.' }];
+  if (id === 'field') return [
+    { id: 's1', icon: ICON.bp, name: 'Заряд q₁', spec: 'Положительный, слева. Создаёт поле E₁ и потенциал φ₁.' },
+    { id: 's2', icon: ICON.bn, name: 'Заряд q₂', spec: 'Такой же по модулю. Знак меняет кнопка «Заряды» или нажатие на заряд.' },
+    { id: 'probe', icon: ICON.probe, name: 'Пробная точка', spec: 'В ней считаются E и φ. Тащите её по полю.' },
+    { id: 'vec', icon: ICON.vec, name: 'Векторы E₁, E₂ и E', spec: 'Пунктир — поля каждого заряда, оранжевая стрелка — их векторная сумма.' },
+    { id: 'heat', icon: ICON.heat, name: 'Цвет — потенциал', spec: 'Тёплый — φ > 0, холодный — φ < 0, чем ярче, тем больше |φ|.' },
+    { id: 'eq', icon: ICON.eq, name: 'Эквипотенциали', spec: 'Пунктирные линии равного потенциала. Серые стрелки поля пересекают их под прямым углом.' }];
+  return [
+    { id: 'pl', icon: ICON.plate, name: 'Левая пластина', spec: 'Соединена с «−» источника, получает заряд −q.' },
+    { id: 'pr', icon: ICON.plate, name: 'Правая пластина', spec: 'Соединена с «+» через ключ, получает +q. Её можно двигать, меняя d.' },
+    { id: 'gap', icon: ICON.gap, name: 'Зазор с диэлектриком', spec: 'Воздух, парафин или слюда. Диэлектрик увеличивает ёмкость в ε раз.' },
+    { id: 'lines', icon: ICON.lines, name: 'Поле внутри', spec: 'Однородное: линии параллельны, идут от + к −. E = U / d. Число линий показывает силу поля.' },
+    { id: 'bat', icon: ICON.bat, name: 'Источник 12 В', spec: 'Пока ключ замкнут, держит на пластинах 12 В.' },
+    { id: 'key', icon: ICON.key, name: 'Ключ', spec: 'Нажмите, чтобы замкнуть или разомкнуть цепь.' }];
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      (Ls.safe ? `<div class="safe"><b>Безопасность</b>${Ls.safe}</div>` : '') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Что на площадке</h2><p class="note">Нажмите на деталь, чтобы найти её на площадке.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'coul') {
+    const e = MEDIA[S.med].e, r = S.r / 100, Fa = Math.abs(m.F), num = 9e9 * Math.abs(S.q1 * S.q2) * 1e-12;
+    return `<h2>Сила взаимодействия</h2><div class="formula">F = k·|q₁|·|q₂| / (ε·r²)</div><p class="note">k = 9·10⁹ Н·м²/Кл², заряды в кулонах, r в метрах.</p>
+      <h3>Сейчас</h3><div class="steps">` +
+      step('q₁, q₂', `${sg(S.q1)}·10⁻⁶ Кл, ${sg(S.q2)}·10⁻⁶ Кл`) + step('r', `${fmt(S.r, 1)} см = ${fmt(r, 3)} м`) + step('r²', `${fmt(r * r, 5)} м²`) + step('ε (' + MEDIA[S.med].name + ')', String(e)) +
+      step('k·|q₁|·|q₂|', `9·10⁹ · ${fmt(Math.abs(S.q1), 1)}·10⁻⁶ · ${fmt(Math.abs(S.q2), 1)}·10⁻⁶ = ${fmt(num, 4)} Н·м²`) +
+      step('F = … / (ε·r²)', `${fmt(num, 4)} / (${e} · ${fmt(r * r, 5)}) = ${fmt(Fa, 4)} Н`, 'sum') + `</div>
+      <h3>Направление</h3><div class="steps">` + step('знаки зарядов', S.q1 * S.q2 > 0 ? 'одинаковые' : 'разные') + step('шары', m.F > 0 ? 'отталкиваются' : 'притягиваются') + step('F₁₂ и F₂₁', 'равны по модулю, противоположны', 'sum') + `</div>
+      <h3>Если изменить</h3><div class="steps">` + step(`r в 2 раза больше (${fmt(2 * S.r, 1)} см)`, `${fmt(Fa / 4, 4)} Н — в 4 раза меньше`) +
+      step('|q₁| в 2 раза больше', `${fmt(Fa * 2, 4)} Н — в 2 раза больше`) + step('в вакууме', `${fmt(Fa * e, 4)} Н — в ε раз больше`) + `</div>`;
+  }
+  if (id === 'field') {
+    const f = fieldAt(S.px, S.py), [a, b] = f.parts, ss = srcs();
+    return `<h2>Суперпозиция полей</h2><div class="formula">E⃗ = E⃗₁ + E⃗₂ · φ = φ₁ + φ₂</div><p class="note">E = k·|q| / r², φ = k·q / r, k = 9·10⁹ Н·м²/Кл². Векторы складываем по проекциям, потенциалы — как числа со знаком.</p>
+      <h3>Заряд q₁ = ${sg(ss[0].q)} нКл</h3><div class="steps">` + step('r₁', `${fmt(a.r, 2)} см`) + step('E₁ = k·|q₁| / r₁²', `${big(a.E)} Н/Кл`) + step('φ₁ = k·q₁ / r₁', `9·10⁹ · ${sg(ss[0].q)}·10⁻⁹ / ${fmt(a.r / 100, 4)} = ${big(a.phi)} В`) + `</div>
+      <h3>Заряд q₂ = ${sg(ss[1].q)} нКл</h3><div class="steps">` + step('r₂', `${fmt(b.r, 2)} см`) + step('E₂ = k·|q₂| / r₂²', `${big(b.E)} Н/Кл`) + step('φ₂ = k·q₂ / r₂', `9·10⁹ · ${sg(ss[1].q)}·10⁻⁹ / ${fmt(b.r / 100, 4)} = ${big(b.phi)} В`) + `</div>
+      <h3>Сумма</h3><div class="steps">` + step('E<sub>x</sub> = E₁ₓ + E₂ₓ', `${big(a.ex)} + (${big(b.ex)}) = ${big(f.ex)} Н/Кл`) +
+      step('E<sub>y</sub> = E₁ᵧ + E₂ᵧ', `${big(-a.ey)} + (${big(-b.ey)}) = ${big(-f.ey)} Н/Кл`) +
+      step('|E| = √(E<sub>x</sub>² + E<sub>y</sub>²)', `${big(f.E)} Н/Кл`, 'sum') + step('φ = φ₁ + φ₂', `${big(a.phi)} + (${big(b.phi)}) = ${big(f.phi)} В`, 'sum') + `</div>
+      <h3>Работа поля</h3><div class="steps">` + step('заряд q = +1 нКл уходит отсюда в бесконечность', `A = q·(φ − 0) = ${fmt(f.phi, 0)}·10⁻⁹ Дж`) + `</div>
+      <p class="note" style="margin-top:10px">Ось y направлена вверх. Где E = 0, потенциал может быть не нулём, и наоборот: это разные величины.</p>`;
+  }
+  const C = capC(), D = DIELS[S.diel], U = capU();
+  return `<h2>Плоский конденсатор</h2><div class="formula">C = ε·ε₀·S / d</div><p class="note">ε₀ = 8,85·10⁻¹² Ф/м, S в м², d в м.</p>
+    <h3>Ёмкость</h3><div class="steps">` + step('S', `${S.Sa} см² = ${fmt(S.Sa * 1e-4, 4)} м²`) + step('d', `${fmt(S.d, 1)} мм = ${fmt(S.d * 1e-3, 4)} м`) + step('ε (' + D.name + ')', String(D.e)) +
+    step('C = ε·ε₀·S / d', `${D.e} · 8,85·10⁻¹² · ${fmt(S.Sa * 1e-4, 4)} / ${fmt(S.d * 1e-3, 4)} = ${fmt(C * 1e12, 1)} пФ`, 'sum') + `</div>
+    <h3>${S.conn ? 'Ключ замкнут: U = 12 В' : 'Ключ разомкнут: q = const'}</h3><div class="steps">` +
+    (S.conn ? step('U', `${U0} В — держит источник`) + step('q = C·U', `${fmt(C * 1e12, 1)}·10⁻¹² · ${U0} = ${fmt(S.qc * 1e9, 3)} нКл`, 'sum')
+      : step('q', `${fmt(S.qc * 1e9, 3)} нКл — не меняется`) + step('U = q / C', S.qc > 0 ? `${fmt(S.qc * 1e9, 3)}·10⁻⁹ / ${fmt(C * 1e12, 1)}·10⁻¹² = ${fmt(U, 1)} В` : '0 В — конденсатор не заряжен', 'sum')) + `</div>
+    <h3>Поле и энергия</h3><div class="steps">` + step('E = U / d', `${fmt(U, 1)} / ${fmt(S.d * 1e-3, 4)} = ${big(capE())} В/м`) +
+    step('W = q² / (2C)', `${fmt(capW() * 1e9, 1)} нДж`, 'sum') + `</div>
+    <p class="note" style="margin-top:10px">При разомкнутом ключе, раздвигая пластины, вы совершаете работу: она идёт на рост энергии конденсатора.</p>`;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter');
+  if (id === 'coul') {
+    el.innerHTML = `<div class="k">Сила Кулона</div><div class="v ${S.done.coul ? 'ok' : ''}">${fmt(Math.abs(m.F), 3)} Н</div>` +
+      `<div class="lr"><span>шары</span><span>${m.F > 0 ? 'отталк.' : 'притяг.'}</span></div><div class="lr"><span>r</span><span>${fmt(S.r, 1)} см</span></div><div class="lr"><span>среда</span><span>ε = ${MEDIA[S.med].e}</span></div>`;
+  } else if (id === 'field') {
+    el.innerHTML = `<div class="k">В точке</div><div class="v">${big(m.E)} Н/Кл</div>` +
+      `<div class="lr"><span>φ</span><span>${big(m.phi)} В</span></div><div class="lr"><span>E = 0</span><span class="${S.fe ? 'ok' : ''}">${S.fe ? 'найдена' : '—'}</span></div><div class="lr"><span>φ = 0</span><span class="${S.fp ? 'ok' : ''}">${S.fp ? 'найдена' : '—'}</span></div>`;
+  } else {
+    el.innerHTML = `<div class="k">Напряжение</div><div class="v ${S.done.cap ? 'ok' : ''}">${fmt(m.U, 1)} В</div>` +
+      `<div class="lr"><span>C</span><span>${fmt(m.C * 1e12, 1)} пФ</span></div><div class="lr"><span>q</span><span>${fmt(m.q * 1e9, 2)} нКл</span></div><div class="lr"><span>ключ</span><span class="${S.conn ? 'ok' : 'bad'}">${S.conn ? 'замкнут' : 'разомкнут'}</span></div>`;
+  }
+}
+
+function update() {
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Теперь вы знаете, как устроены силы, поля и конденсаторы!'), 1800);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  coul: '<circle cx="14" cy="15" r="6" fill="#c85a46"/><circle cx="52" cy="15" r="6" fill="#3d7fb8"/><path d="M22 15h8M44 15h-8" stroke="#ffb547" stroke-width="2"/>',
+  field: '<rect x="2" y="2" width="31" height="26" fill="rgba(255,138,115,.25)"/><rect x="33" y="2" width="31" height="26" fill="rgba(127,196,255,.25)"/><circle cx="16" cy="15" r="5" fill="#c85a46"/><circle cx="50" cy="15" r="5" fill="#3d7fb8"/><path d="M33 3v24" stroke="#e8ecf4" stroke-dasharray="1 2"/>',
+  cap: '<rect x="22" y="4" width="4" height="22" fill="#a9b4c9"/><rect x="40" y="4" width="4" height="22" fill="#a9b4c9"/><path d="M38 10H28M38 15H28M38 20H28" stroke="#ffb547"/><path d="M24 4V2H8M42 4V2H58" stroke="#c8d0dd"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Lx, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Lx.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Lx.title}</span></span>
+      ${S.done[Lx.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  S.lesson = i; drag = null;
+  resetState(); save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L().task;
+  $('#hint').textContent = L().stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const st = $('#lessons'), cur = st.querySelector('.lesson[aria-current="true"]');
+  if (cur) { const sr = st.getBoundingClientRect(), cr = cur.getBoundingClientRect(); st.scrollLeft += (cr.left - sr.left) - (sr.width - cr.width) / 2; }
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '';
+  if (id === 'coul') now = `Два шара: q₁ = ${sg(S.q1)} мкКл (закреплён), q₂ = ${sg(S.q2)} мкКл, расстояние r = ${fmt(S.r, 1)} см, среда — ${MEDIA[S.med].name} (ε = ${MEDIA[S.med].e}). Сила Кулона |F| = ${fmt(Math.abs(m.F), 4)} Н, шары ${m.F > 0 ? 'отталкиваются' : 'притягиваются'}. Под шарами график |F|(r) с линией цели 0,4 Н. Цель: керосин, притяжение, |F| = 0,4 ± 0,012 Н. Готовое расстояние не называй — наведи на формулу F = k|q₁||q₂|/(εr²) и на выбор среды и знаков.`;
+  if (id === 'field') { const f = fieldAt(S.px, S.py); now = `Два заряда по ${fmt(S.qm, 1)} нКл в 18 см друг от друга, пара: ${S.pair === 'same' ? 'одинаковые (+, +)' : 'разные (+, −)'}. Пробная точка: r₁ = ${fmt(f.parts[0].r, 1)} см, r₂ = ${fmt(f.parts[1].r, 1)} см, |E| = ${big(f.E)} Н/Кл, φ = ${big(f.phi)} В. Точка E = 0 для одинаковых зарядов ${S.fe ? 'найдена' : 'не найдена'}, точка φ = 0 для разных ${S.fp ? 'найдена' : 'не найдена'}. Где эти точки, не говори — наведи вопросами о симметрии, о сложении векторов и о сложении потенциалов со знаком.`; }
+  if (id === 'cap') now = `Плоский конденсатор: S = ${S.Sa} см², d = ${fmt(S.d, 1)} мм, диэлектрик — ${DIELS[S.diel].name} (ε = ${DIELS[S.diel].e}). Ёмкость C = ${fmt(capC() * 1e12, 1)} пФ. Ключ ${S.conn ? 'замкнут, источник 12 В' : 'разомкнут'}. Заряд q = ${fmt(S.qc * 1e9, 3)} нКл, напряжение U = ${fmt(capU(), 1)} В, поле E = ${big(capE())} В/м, энергия W = ${fmt(capW() * 1e9, 1)} нДж. Цель: при разомкнутом ключе и ненулевом заряде U = 36 ± 0,72 В. Нужное d не называй — наведи на то, что при разомкнутом ключе q = const и U = q/C.`;
+  return [
+    `Раздел: физика, 10 класс, тема «Электростатика». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'} (${taskState(m)}).`,
+    `Сейчас на площадке: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Помогай наводящими вопросами, готовые ответы не выдавай.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { coul: 'Почему в воде сила в 81 раз меньше?', field: 'Чем напряжённость отличается от потенциала?', cap: 'Почему при разомкнутом ключе напряжение растёт?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
