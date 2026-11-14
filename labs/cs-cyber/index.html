@@ -1,0 +1,954 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по информатике, 10 класс: шифрование, сетевые атаки и защита, этичный хакинг.">
+<title>Кибербезопасность</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag],.scene [data-hit]{cursor:pointer}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+.scene .sans{font-family:var(--font-body)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--arm);transition:width .2s}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button.big{font:600 15px/1 var(--font-mono);color:var(--fg);min-width:34px}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:22%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.chips button:disabled{opacity:.35;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.mtab{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:8px}
+.mtab span{background:var(--surface-2);border-radius:7px;padding:6px 7px;font:500 12.5px/1.2 var(--font-mono);display:flex;justify-content:space-between;gap:4px;min-width:0}
+.mtab span b{font-weight:600;color:var(--fg)}
+.mtab span i{font-style:normal;color:var(--force);letter-spacing:.06em}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:470px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mtab{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(100vw + 180px);min-height:0}
+}
+@keyframes pulse{from{opacity:.35}to{opacity:1}}
+.scene .pulse{animation:pulse 1.1s ease-in-out infinite alternate}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><circle cx="11" cy="20" r="3" fill="var(--force)"/><rect x="17" y="18" width="12" height="4" rx="2" fill="var(--arm)"/><circle cx="34" cy="20" r="1.6" fill="var(--fg)"/><path d="M8 11h24M8 29h24" stroke="var(--fg)" stroke-width="2" stroke-linecap="round" opacity=".5"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Информатика · Кибербезопасность</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#cs">Карта</a><a href="/physics/#cs">Информатика</a><a href="/labs/cs-cyber/" aria-current="page">Кибербезопасность</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Кибер</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Рабочий стол лаборатории">
+    <svg class="scene" id="scene" role="img" aria-label="Интерактивная сцена: шифровальный круг можно вращать, меры защиты и элементы сайта — нажимать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c; };
+const INK = '#04070d';
+
+const LESSONS = [
+  { id: 'enc', title: 'Шифрование: взлом шифра Цезаря',
+    text: ['Шифрование превращает понятный текст в набор знаков, который нельзя прочитать без ключа. Открытый текст + ключ → шифртекст. Расшифровать может только тот, кто знает ключ.',
+           'Шифр Цезаря — один из самых древних. Каждая буква сдвигается по алфавиту на k позиций: при k = 3 буква А становится Г, Б — Д. Ключ здесь — число k. Тот же ключ шифрует и расшифровывает, поэтому такой шифр называют симметричным.',
+           'Слабость Цезаря — ключей мало: в алфавите из 32 букв осмысленных сдвигов всего 31. Их можно перебрать за минуту. Современный шифр AES тоже симметричный, но ключ у него длиной 128–256 бит: перебрать 2¹²⁸ вариантов не успеют все компьютеры мира. А HTTPS и мессенджеры дополнительно используют асимметричное шифрование — пару из открытого и закрытого ключей.'],
+    why: 'Шифрование защищает каждый перевод в банковском приложении, вход на eGov.kz и переписку в мессенджерах. Специалисты по защите информации и криптографы работают в банках, у операторов связи, в госорганах — это одна из самых высокооплачиваемых IT-профессий. Программисту знание шифров нужно, чтобы правильно хранить пароли и данные клиентов и не дать им утечь.',
+    task: 'Вы перехватили зашифрованную записку. Вращайте внутренний круг (это ключ k), пока расшифровка не станет осмысленной, и нажмите «Текст читается».',
+    hint: 'Тяните внутреннее кольцо по кругу или жмите ‹ ›. Подсказка частотного анализа: в русском тексте чаще всего встречаются О, Е, А.',
+    stage: 'Тяните внутреннее кольцо — меняется ключ k.',
+    msg: ['ВСТРЕЧАЕМСЯ ВОЗЛЕ ШКОЛЫ В ПЯТЬ', 'ЧАСОВ ВЕЧЕРА ПРИНЕСИ НОУТБУК'],
+    check: m => m.solved },
+  { id: 'atk', title: 'Атаки и защита',
+    text: ['Кибератака — попытка украсть данные, деньги или доступ к устройству. Чаще всего атакуют не «хитрый код», а людей и их привычки: слабый пароль, один пароль на всех сайтах, доверчивость к ссылкам, старые программы.',
+           'Против каждой атаки — своя защита. Перебор пароля останавливает длинный пароль из разных символов. Пароль из чужой утечки бесполезен, если включена двухфакторная аутентификация (2FA) — вход ещё и по коду. От фишинга спасает привычка проверять адрес ссылки, от вирусов — обновления и антивирус, от перехвата в открытом Wi-Fi — шифрование HTTPS.',
+           'Не все «советы» работают. Защита стоит времени и денег, поэтому специалисты выбирают меры, которые реально закрывают угрозы, а не те, что просто выглядят строго.'],
+    why: 'Аналитик SOC (центра мониторинга безопасности) каждый день отбивает такие атаки в банках и телеком-компаниях Казахстана; пентестеры и инженеры по безопасности — среди самых высокооплачиваемых IT-специалистов. Мошенники звонят и пишут от имени «банка» каждый день — умение распознать фишинг и включить 2FA сохраняет деньги тебе и твоим родителям.',
+    task: 'Выберите не больше 4 мер защиты и настройте пароль Wi-Fi так, чтобы все 5 атак были отбиты. Нажмите «Запустить атаки».',
+    hint: 'Нажимайте меры на сцене. Пароль: длина и наборы символов (a–z, A–Z, 0–9, #$%). Перебор должен занимать не меньше 100 лет. Две меры из шести — бесполезные.',
+    stage: 'Нажимайте меры защиты, настройте пароль и запустите атаки.',
+    check: m => m.allBlocked },
+  { id: 'eth', title: 'Этичный хакинг: тест с разрешения',
+    text: ['Этичный хакер (пентестер) ищет уязвимости так же, как злоумышленник, но с письменного разрешения владельца и чтобы их исправили. Главное правило — сначала договор с границами проверки (scope), потом работа.',
+           'Порядок: разрешение → разведка → поиск уязвимостей → отчёт владельцу → исправление и повторная проверка. Найденное не публикуют и не используют для выгоды: о дыре сообщают владельцу и дают время её закрыть. Это называется ответственное раскрытие.',
+           'Частые уязвимости сайтов: нет ограничения попыток входа, пароль по умолчанию (admin/admin), доступ к чужим данным простой заменой номера в адресе (IDOR), устаревшие версии программ с известными дырами.'],
+    why: 'Пентестеры проверяют банки, интернет-магазины и госсистемы по договору. Многие компании платят вознаграждения за найденные уязвимости (bug bounty) — школьники и студенты по всему миру зарабатывают так первые деньги. В Казахстане проходят соревнования CTF, где команды учатся атаковать и защищать в учебных стендах.',
+    safe: 'Взлом чужой системы без разрешения — преступление: в Казахстане это статья 205 УК РК «Неправомерный доступ к информации». Тренируйтесь только на своих учебных стендах, CTF-площадках и по договору с владельцем.',
+    task: 'Получите разрешение на тест учебного дневника, найдите все 4 уязвимости и отправьте отчёт владельцу.',
+    hint: 'Сначала нажмите «Разрешение». Потом исследуйте сайт: адресную строку, форму входа, ссылку /admin и строку о сервере внизу.',
+    stage: 'Сначала разрешение, потом нажимайте элементы сайта.',
+    check: m => m.reported },
+];
+
+const KEY = 'luch-cs-cyber';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null,
+            key: 0, kT: 0, kv: 0, solved: false, tries: 0,
+            def: {}, len: 8, cs: { lo: true }, run: null, res: null,
+            perm: false, found: {}, idor: false, adminIn: false, loginTries: 0, reported: false, bad: 0 };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+
+// ---------- lesson 1: Caesar ----------
+const AB = 'АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ', N = AB.length, STEP = 360 / N;
+const mod = (a, n) => ((a % n) + n) % n;
+const shiftText = (s, k) => s.split('').map(c => { const i = AB.indexOf(c); return i < 0 ? c : AB[mod(i + k, N)]; }).join('');
+const WC = { x: 180, y: 202 };
+const kNow = () => mod(S.kT, N);
+function newKey() { S.key = 5 + Math.floor(Math.random() * 22); S.solved = false; S.tries = 0; }
+const cipherLines = () => L().msg ? L().msg.map(s => shiftText(s, S.key)) : LESSONS[0].msg.map(s => shiftText(s, S.key));
+function freqTop(lines) {
+  const f = {}; lines.join('').split('').forEach(c => { if (AB.includes(c)) f[c] = (f[c] || 0) + 1; });
+  return Object.entries(f).sort((a, b) => b[1] - a[1]);
+}
+
+// ---------- lesson 2: attacks ----------
+const CS = { lo: { n: 26, name: 'a–z', full: 'строчные латинские' }, up: { n: 26, name: 'A–Z', full: 'заглавные' }, dg: { n: 10, name: '0–9', full: 'цифры' }, sy: { n: 32, name: '#$%', full: 'символы' } };
+const CSK = ['lo', 'up', 'dg', 'sy'];
+const SPEED = 1e7; // guesses per second: a small GPU farm against WPA2
+const YEAR = 365.25 * 24 * 3600;
+const DEF = [
+  { id: 'tfa', name: 'Двухфакторный вход (2FA)', short: '2FA' },
+  { id: 'link', name: 'Проверять адрес ссылки', short: 'Проверка ссылок' },
+  { id: 'weekly', name: 'Менять пароль каждую неделю', short: 'Смена пароля' },
+  { id: 'upd', name: 'Обновления и антивирус', short: 'Обновления' },
+  { id: 'hide', name: 'Скрыть имя своей Wi-Fi сети', short: 'Скрытый Wi-Fi' },
+  { id: 'https', name: 'Только сайты с HTTPS', short: 'HTTPS' },
+];
+const ATK = [
+  { id: 'wifi', name: 'Подбор пароля Wi-Fi', sub: 'перебор на видеокартах', by: 'pass',
+    win: 'Пароль подобрали перебором.', stop: 'Перебор дольше 100 лет — бросили.' },
+  { id: 'leak', name: 'Пароль из чужой утечки', sub: 'тот же пароль на другом сайте', by: 'tfa',
+    win: 'Пароль подошёл — аккаунт украден.', stop: 'Нужен ещё код 2FA — вход не удался.' },
+  { id: 'phish', name: 'Фишинговое SMS «от банка»', sub: 'ссылка на поддельный сайт', by: 'link',
+    win: 'Данные ввели на сайте-двойнике.', stop: 'Адрес не банковский — не перешли.' },
+  { id: 'mal', name: 'Вирус во вложении', sub: '«фото_с_выпускного.exe»', by: 'upd',
+    win: 'Вирус прошёл через старую дыру.', stop: 'Обновлённая защита его остановила.' },
+  { id: 'mitm', name: 'Перехват в Wi-Fi кафе', sub: 'открытая сеть без пароля', by: 'https',
+    win: 'Данные прочитали в открытом виде.', stop: 'HTTPS: перехвачен только шифр.' },
+];
+const MAXDEF = 4;
+const alphabet = () => CSK.reduce((s, k) => s + (S.cs[k] ? CS[k].n : 0), 0);
+const combos = () => Math.pow(alphabet(), S.len);
+const crackSec = () => combos() / SPEED;
+const crackYears = () => crackSec() / YEAR;
+const passOK = () => crackYears() >= 100;
+const blocked = a => a.by === 'pass' ? passOK() : !!S.def[a.by];
+const SUP = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+const sup = n => String(n).split('').map(d => d === '-' ? '⁻' : SUP[+d]).join('');
+function fmtE(x) {
+  if (x < 1e6) return Math.round(x).toLocaleString('ru-RU');
+  const e = Math.floor(Math.log10(x)), m = x / Math.pow(10, e);
+  return `${m.toFixed(1).replace('.', ',')}·10${sup(e)}`;
+}
+function fmtTime(s) {
+  if (s < 1) return 'меньше секунды';
+  if (s < 60) return `${Math.round(s)} с`;
+  if (s < 3600) return `${Math.round(s / 60)} мин`;
+  if (s < 86400) return `${(s / 3600).toFixed(1).replace('.', ',')} ч`;
+  if (s < YEAR) return `${Math.round(s / 86400)} сут`;
+  const y = s / YEAR;
+  if (y < 1e6) return `${y < 10 ? y.toFixed(1).replace('.', ',') : Math.round(y).toLocaleString('ru-RU')} лет`;
+  return `${fmtE(y)} лет`;
+}
+const samplePass = () => {
+  const pools = { lo: 'qwertyuiopasdfghjklzxcvbnm', up: 'QWERTYUIOPASDFGHJKLZXCVBNM', dg: '0123456789', sy: '#$%&!?@*' };
+  const act = CSK.filter(k => S.cs[k]); let s = '';
+  for (let i = 0; i < S.len; i++) { const p = pools[act[i % act.length]]; s += p[(i * 7 + 3) % p.length]; }
+  return s;
+};
+
+// ---------- lesson 3: ethical hacking ----------
+const VULN = [
+  { id: 'idor', name: 'Чужие данные по номеру (IDOR)', fix: 'Проверять на сервере, что ученик смотрит только свой id.', p: 3, d: 3 },
+  { id: 'brute', name: 'Нет лимита попыток входа', fix: 'Блокировать вход на 15 минут после 5 ошибок, добавить 2FA.', p: 3, d: 2 },
+  { id: 'def', name: 'Пароль по умолчанию admin/admin', fix: 'Сменить пароль администратора на длинный уникальный.', p: 2, d: 3 },
+  { id: 'old', name: 'Устаревший сервер (2018 г.)', fix: 'Обновить веб-сервер: в старых версиях есть известные дыры.', p: 2, d: 2 },
+];
+
+function model() {
+  const id = LID();
+  if (id === 'enc') {
+    const k = kNow(), lines = cipherLines();
+    return { kind: 'enc', k, cipher: lines, plain: lines.map(s => shiftText(s, -k)), right: k === S.key, solved: S.solved, tries: S.tries };
+  }
+  if (id === 'atk') {
+    const nDef = Object.keys(S.def).length, blockedN = ATK.filter(blocked).length;
+    return { kind: 'atk', nDef, A: alphabet(), len: S.len, N: combos(), sec: crackSec(), years: crackYears(), passOK: passOK(), blockedN,
+      ran: !!S.res, res: S.res, allBlocked: !!S.res && S.res.every(Boolean) && nDef <= MAXDEF, running: !!S.run };
+  }
+  const nf = VULN.filter(v => S.found[v.id]).length;
+  return { kind: 'eth', perm: S.perm, nf, reported: S.reported, bad: S.bad };
+}
+
+// ---------- drawing ----------
+const ol = (d, fill, stroke, w = 2.2, extra = '') => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${w + 2.6}" stroke-linejoin="round" stroke-linecap="round"/><path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round" ${extra}/>`;
+const pol = (r, deg) => { const a = (deg - 90) * Math.PI / 180; return { x: WC.x + r * Math.cos(a), y: WC.y + r * Math.sin(a) }; };
+const sector = (r1, r2, a0, a1) => { const p1 = pol(r2, a0), p2 = pol(r2, a1), p3 = pol(r1, a1), p4 = pol(r1, a0); return `M${p1.x.toFixed(1)} ${p1.y.toFixed(1)}A${r2} ${r2} 0 0 1 ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}L${p3.x.toFixed(1)} ${p3.y.toFixed(1)}A${r1} ${r1} 0 0 0 ${p4.x.toFixed(1)} ${p4.y.toFixed(1)}Z`; };
+
+function drawEnc() {
+  const m = model();
+  let h = '';
+  // outer ring: open text
+  h += `<circle cx="${WC.x}" cy="${WC.y}" r="99" fill="#141d2e" stroke="#3a4762" stroke-width="1.4"/>`;
+  h += `<path d="${sector(78, 99, -STEP / 2, STEP / 2)}" fill="rgba(255,181,71,.18)" stroke="#ffb547" stroke-width="1.2"/>`;
+  for (let i = 0; i < N; i++) { const p = pol(88.5, i * STEP); h += `<text x="${p.x.toFixed(1)}" y="${(p.y + 3.6).toFixed(1)}" font-size="10" fill="#e8ecf4" text-anchor="middle" class="sans" font-weight="600">${AB[i]}</text>`; }
+  // inner ring: cipher, rotates with key
+  h += `<g data-drag="ring"><circle cx="${WC.x}" cy="${WC.y}" r="77" fill="#1d2940" stroke="#72d4e8" stroke-width="1.6"/><circle cx="${WC.x}" cy="${WC.y}" r="54" fill="#0e1520" stroke="#3a4762"/>`;
+  for (let j = 0; j < N; j++) { const p = pol(66, (j - S.kv) * STEP); h += `<text x="${p.x.toFixed(1)}" y="${(p.y + 3.4).toFixed(1)}" font-size="9.5" fill="#72d4e8" text-anchor="middle" class="sans" font-weight="600">${AB[j]}</text>`; }
+  h += `</g>`;
+  h += `<path d="M${WC.x} 98l-6 -9h12z" fill="#ffb547"/>`;
+  h += `<text pointer-events="none" x="${WC.x}" y="${WC.y - 12}" font-size="8" fill="#8b96ad" text-anchor="middle">ключ</text>`;
+  h += `<text pointer-events="none" x="${WC.x}" y="${WC.y + 10}" font-size="22" fill="${m.solved ? '#86e0a8' : '#ffb547'}" text-anchor="middle" font-weight="500">k=${m.k}</text>`;
+  h += `<text pointer-events="none" x="${WC.x}" y="${WC.y + 26}" font-size="7.5" fill="#8b96ad" text-anchor="middle">${AB[0]} → ${AB[m.k]}</text>`;
+  h += `<text x="20" y="116" font-size="8" fill="#e8ecf4" class="sans">внешнее: открытый</text><text x="20" y="127" font-size="8" fill="#72d4e8" class="sans">внутреннее: шифр</text>`;
+  // texts
+  h += `<rect x="8" y="306" width="344" height="40" rx="8" fill="#0e1520" stroke="#26324a"/>`;
+  h += `<text x="14" y="316" font-size="7.5" fill="#8b96ad" class="sans">перехвачено (шифртекст):</text>`;
+  m.cipher.forEach((s, i) => { h += `<text x="14" y="${328 + i * 12}" font-size="10.5" fill="#72d4e8">${s}</text>`; });
+  h += `<g data-hit="plain"><rect x="8" y="350" width="344" height="44" rx="8" fill="${m.solved ? 'rgba(134,224,168,.08)' : '#0e1520'}" stroke="${m.solved ? '#86e0a8' : '#3a4762'}"/>`;
+  h += `<text x="14" y="360" font-size="7.5" fill="#8b96ad" class="sans">расшифровка при k = ${m.k}:</text>`;
+  m.plain.forEach((s, i) => { h += `<text x="14" y="${373 + i * 13}" font-size="11" fill="${m.solved ? '#86e0a8' : '#e8ecf4'}">${s}</text>`; });
+  h += `</g>`;
+  return h;
+}
+
+let RUNPOS = [];
+function drawAtk(t) {
+  const m = model();
+  let h = '';
+  h += `<text x="92" y="100" font-size="8.5" fill="#ff8a73" text-anchor="middle">атаки</text>`;
+  ATK.forEach((a, i) => {
+    const y = 106 + i * 58, r = S.res ? S.res[i] : null;
+    const st = r === null ? '#3a4762' : r ? '#86e0a8' : '#ff8a73';
+    h += `<rect x="8" y="${y}" width="168" height="52" rx="8" fill="#141d2e" stroke="${st}" stroke-width="1.4"/>`;
+    h += `<circle cx="24" cy="${y + 17}" r="8" fill="rgba(255,138,115,.15)" stroke="#ff8a73" stroke-width="1.2"/><text x="24" y="${y + 20.5}" font-size="9" fill="#ff8a73" text-anchor="middle" font-weight="600">${i + 1}</text>`;
+    h += `<text x="37" y="${y + 15}" font-size="9" fill="#e8ecf4" class="sans" font-weight="600">${a.name}</text>`;
+    h += `<text x="37" y="${y + 27}" font-size="7.5" fill="#8b96ad" class="sans">${a.sub}</text>`;
+    if (r !== null) h += `<text x="14" y="${y + 44}" font-size="7.4" fill="${st}" class="sans">${r ? '✓ ' + a.stop : '✗ ' + a.win}</text>`;
+    else if (a.by === 'pass') h += `<text x="14" y="${y + 44}" font-size="7.4" fill="${m.passOK ? '#86e0a8' : '#ffb547'}" class="sans">перебор: ${fmtTime(m.sec)}</text>`;
+  });
+  // password box
+  h += `<rect x="186" y="98" width="166" height="62" rx="8" fill="#141d2e" stroke="${m.passOK ? '#86e0a8' : '#3a4762'}" stroke-width="1.4"/>`;
+  h += `<text x="194" y="110" font-size="7.5" fill="#8b96ad" class="sans">пароль Wi-Fi · ${S.len} симв. · ${m.A} знаков</text>`;
+  const sp = samplePass();
+  h += `<text x="194" y="125" font-size="${sp.length > 16 ? 8.4 : 10}" fill="#e8ecf4">${sp.replace(/&/g, '&amp;')}</text>`;
+  h += `<g data-hit="len:-1"><rect x="${194}" y="134" width="20" height="20" rx="5" fill="#1d2940" stroke="#56627d"/><text x="204" y="148" font-size="12" fill="#e8ecf4" text-anchor="middle">−</text></g>`;
+  h += `<g data-hit="len:1"><rect x="${216}" y="134" width="20" height="20" rx="5" fill="#1d2940" stroke="#56627d"/><text x="226" y="148" font-size="12" fill="#e8ecf4" text-anchor="middle">+</text></g>`;
+  CSK.forEach((k, i) => {
+    const on = !!S.cs[k], x = 240 + i * 28;
+    h += `<g data-hit="cs:${k}"><rect x="${x}" y="134" width="26" height="20" rx="5" fill="${on ? '#ffd27a' : '#1d2940'}" stroke="${on ? '#ffd27a' : '#56627d'}"/><text x="${x + 13}" y="147.5" font-size="7.6" fill="${on ? '#0b1019' : '#8b96ad'}" text-anchor="middle">${CS[k].name}</text></g>`;
+  });
+  // defences
+  h += `<text x="269" y="174" font-size="8.5" fill="#86e0a8" text-anchor="middle">меры защиты: ${m.nDef} из ${MAXDEF}</text>`;
+  DEF.forEach((d, i) => {
+    const y = 180 + i * 25, on = !!S.def[d.id];
+    h += `<g data-hit="def:${d.id}"><rect x="186" y="${y}" width="166" height="22" rx="6" fill="${on ? '#1f3a2f' : '#141d2e'}" stroke="${on ? '#86e0a8' : '#3a4762'}" stroke-width="1.3"/>`;
+    h += `<rect x="192" y="${y + 6}" width="10" height="10" rx="2" fill="${on ? '#86e0a8' : 'none'}" stroke="${on ? '#86e0a8' : '#8b96ad'}"/>${on ? `<path d="M194 ${y + 11}l2.5 2.5 4-5" fill="none" stroke="#0b1019" stroke-width="1.6"/>` : ''}`;
+    h += `<text x="208" y="${y + 14.5}" font-size="8.2" fill="${on ? '#e8ecf4' : '#8b96ad'}" class="sans">${d.name}</text></g>`;
+  });
+  // target
+  const tx = 269, ty = 360;
+  h += `<path d="M${tx - 62} ${ty + 4}Q${tx} ${ty - 54} ${tx + 62} ${ty + 4}" fill="none" stroke="#86e0a8" stroke-width="2.4" stroke-dasharray="${m.nDef ? '0' : '4 4'}" opacity="${0.35 + 0.15 * m.nDef}"/>`;
+  h += `<rect x="${tx - 13}" y="${ty - 20}" width="26" height="40" rx="4" fill="#1d2940" stroke="#e8ecf4" stroke-width="1.8"/><rect x="${tx - 9}" y="${ty - 15}" width="18" height="27" fill="#2f4466"/>`;
+  h += `<path d="M${tx - 5} ${ty - 3}v-3a5 5 0 0 1 10 0v3" fill="none" stroke="#ffb547" stroke-width="1.6"/><rect x="${tx - 6}" y="${ty - 3}" width="12" height="9" rx="1.5" fill="#ffb547"/>`;
+  h += `<text x="${tx}" y="${ty + 32}" font-size="8" fill="#e8ecf4" text-anchor="middle" class="sans">ваш телефон, аккаунты, Wi-Fi</text>`;
+  // flying attacks
+  if (S.run) {
+    const k = clamp((t - S.run.t0) / S.run.dur, 0, 1);
+    ATK.forEach((a, i) => {
+      const x0 = 176, y0 = 132 + i * 58, ok = blocked(a);
+      const ex = ok ? tx - 40 + i * 20 : tx, ey = ok ? ty - 30 + Math.abs(i - 2) * 6 : ty;
+      const x = x0 + (ex - x0) * k, y = y0 + (ey - y0) * k;
+      h += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6" fill="#ff8a73" stroke="${INK}" stroke-width="1.4"/><text x="${x.toFixed(1)}" y="${(y + 3).toFixed(1)}" font-size="7.5" fill="#0b1019" text-anchor="middle" font-weight="600">${i + 1}</text>`;
+      if (k >= 1) h += ok ? `<circle cx="${x}" cy="${y}" r="10" fill="none" stroke="#86e0a8" stroke-width="2"/>` : '';
+    });
+  } else if (S.res) {
+    ATK.forEach((a, i) => {
+      const ok = S.res[i], x = ok ? tx - 40 + i * 20 : tx + 20 + i * 4, y = ok ? ty - 30 + Math.abs(i - 2) * 6 : ty - 8 + i * 4;
+      h += `<circle cx="${x}" cy="${y}" r="6" fill="${ok ? '#1f3a2f' : '#ff8a73'}" stroke="${ok ? '#86e0a8' : INK}" stroke-width="1.4"/><text x="${x}" y="${y + 3}" font-size="7.5" fill="${ok ? '#86e0a8' : '#0b1019'}" text-anchor="middle" font-weight="600">${i + 1}</text>`;
+    });
+  }
+  return h;
+}
+
+function drawEth() {
+  const m = model(), F = S.found;
+  let h = '';
+  h += ol('M14 96H346Q352 96 352 102V296Q352 302 346 302H14Q8 302 8 296V102Q8 96 14 96Z', '#111827', '#3a4762', 1.4);
+  // url bar
+  const id = S.idor ? 1025 : 1024;
+  h += `<g data-hit="url"><rect x="16" y="102" width="328" height="20" rx="5" fill="#0e1520" stroke="${F.idor ? '#ff8a73' : '#3a4762'}"/>`;
+  h += `<text x="24" y="115.5" font-size="8.6" fill="#8b96ad">https://dnevnik-test.school.kz/grades?id=<tspan fill="#ffb547">${id}</tspan></text>`;
+  h += `<text x="338" y="115.5" font-size="7.4" fill="#72d4e8" text-anchor="end">${m.perm ? 'изменить id' : ''}</text></g>`;
+  h += `<text x="16" y="138" font-size="9.5" fill="#e8ecf4" class="sans" font-weight="600">Электронный дневник</text><text x="344" y="138" font-size="7.4" fill="#ffb547" text-anchor="end" class="sans">учебный стенд</text>`;
+  // grades
+  h += `<rect x="16" y="144" width="328" height="50" rx="6" fill="${S.idor ? 'rgba(255,138,115,.08)' : '#141d2e'}" stroke="#26324a"/>`;
+  h += `<text x="24" y="158" font-size="8.4" fill="${S.idor ? '#ff8a73' : '#e8ecf4'}" class="sans">${S.idor ? 'Ученик: Данияр К., 10 «Б» — это ЧУЖИЕ оценки!' : 'Ученик: вы (тестовый аккаунт), 10 «А»'}</text>`;
+  const gr = S.idor ? [['Алгебра', '4 5 4'], ['Физика', '3 4'], ['История', '5 5']] : [['Алгебра', '5 4 5'], ['Физика', '4 5'], ['История', '5']];
+  gr.forEach((g, i) => { h += `<text x="${24 + i * 108}" y="176" font-size="8" fill="#8b96ad" class="sans">${g[0]}</text><text x="${24 + i * 108}" y="188" font-size="9.5" fill="#e8ecf4">${g[1]}</text>`; });
+  // login form
+  h += `<g data-hit="login"><rect x="16" y="200" width="160" height="72" rx="6" fill="#141d2e" stroke="${F.brute ? '#ff8a73' : '#26324a'}"/>`;
+  h += `<text x="24" y="213" font-size="8" fill="#8b96ad" class="sans">Вход для учеников</text>`;
+  h += `<rect x="24" y="218" width="90" height="13" rx="3" fill="#0e1520" stroke="#3a4762"/><text x="28" y="227.5" font-size="7.4" fill="#56627d">логин</text>`;
+  h += `<rect x="24" y="235" width="90" height="13" rx="3" fill="#0e1520" stroke="#3a4762"/><text x="28" y="244.5" font-size="7.4" fill="#56627d">${S.loginTries ? '•'.repeat(6) : 'пароль'}</text>`;
+  h += `<rect x="120" y="226" width="48" height="16" rx="4" fill="#2f4466" stroke="#72d4e8"/><text x="144" y="237" font-size="8" fill="#e8ecf4" text-anchor="middle" class="sans">Войти</text>`;
+  h += `<text x="24" y="264" font-size="7.4" fill="${F.brute ? '#ff8a73' : '#56627d'}" class="sans">${S.loginTries ? `${S.loginTries.toLocaleString('ru-RU')} ошибок — нет блокировки` : 'попробуйте войти'}</text></g>`;
+  // admin
+  h += `<g data-hit="admin"><rect x="184" y="200" width="160" height="72" rx="6" fill="#141d2e" stroke="${F.def ? '#ff8a73' : '#26324a'}"/>`;
+  h += `<text x="192" y="214" font-size="8.4" fill="#72d4e8" text-decoration="underline">/admin</text><text x="226" y="214" font-size="7.4" fill="#8b96ad" class="sans">вход учителя</text>`;
+  h += S.adminIn ? `<text x="192" y="232" font-size="8" fill="#ff8a73" class="sans">логин admin, пароль admin —</text><text x="192" y="245" font-size="8" fill="#ff8a73" class="sans">вход выполнен! Можно менять</text><text x="192" y="258" font-size="8" fill="#ff8a73" class="sans">оценки всего класса.</text>`
+    : `<text x="192" y="236" font-size="7.6" fill="#56627d" class="sans">Панель администратора.</text><text x="192" y="249" font-size="7.6" fill="#56627d" class="sans">Пароль поставили при установке?</text>`;
+  h += `</g>`;
+  // footer
+  h += `<g data-hit="old"><rect x="16" y="278" width="328" height="18" rx="4" fill="${F.old ? 'rgba(255,138,115,.08)' : 'transparent'}" stroke="${F.old ? '#ff8a73' : 'transparent'}"/>`;
+  h += `<text x="180" y="290" font-size="7.6" fill="${F.old ? '#ff8a73' : '#56627d'}" text-anchor="middle">Сервер: Apache 2.4.29 · последнее обновление: 2018</text></g>`;
+  // permission
+  h += `<g data-hit="perm"><rect x="8" y="310" width="132" height="84" rx="8" fill="${m.perm ? '#1f3a2f' : '#141d2e'}" stroke="${m.perm ? '#86e0a8' : '#ffb547'}" stroke-width="1.4"/>`;
+  h += `<path d="M18 320h18l6 6v22H18z" fill="none" stroke="${m.perm ? '#86e0a8' : '#ffb547'}" stroke-width="1.4"/><path d="M22 332h14M22 338h14M22 344h9" stroke="${m.perm ? '#86e0a8' : '#ffb547'}" stroke-width="1"/>`;
+  h += `<text x="50" y="330" font-size="8.4" fill="#e8ecf4" class="sans" font-weight="600">Разрешение</text><text x="50" y="342" font-size="7.2" fill="#8b96ad" class="sans">от директора школы</text>`;
+  h += `<text x="16" y="364" font-size="7.2" fill="#8b96ad" class="sans">Границы: только</text><text x="16" y="374" font-size="7.2" fill="#8b96ad" class="sans">dnevnik-test.school.kz</text>`;
+  h += `<text x="16" y="387" font-size="7.6" fill="${m.perm ? '#86e0a8' : '#ffb547'}" class="sans">${m.perm ? '✓ подписано' : 'нажмите, чтобы получить'}</text></g>`;
+  // report
+  h += `<g data-hit="report"><rect x="146" y="310" width="206" height="84" rx="8" fill="${m.reported ? '#1f3a2f' : '#141d2e'}" stroke="${m.reported ? '#86e0a8' : '#3a4762'}" stroke-width="1.4"/>`;
+  h += `<text x="154" y="323" font-size="8.4" fill="#e8ecf4" class="sans" font-weight="600">Отчёт владельцу · ${m.nf}/4</text>`;
+  VULN.forEach((v, i) => { const f = !!F[v.id]; h += `<text x="154" y="${337 + i * 11}" font-size="7.4" fill="${f ? '#ff8a73' : '#56627d'}" class="sans">${f ? '● ' + v.name : '○ ещё не найдено'}</text>`; });
+  h += `<text x="154" y="388" font-size="7.6" fill="${m.reported ? '#86e0a8' : '#72d4e8'}" class="sans">${m.reported ? '✓ отчёт отправлен' : 'нажмите, чтобы отправить'}</text></g>`;
+  return h;
+}
+
+function hlBox(id) {
+  const lid = LID();
+  if (lid === 'enc') return { outer: [76, 98, 208, 208], inner: [100, 122, 160, 160], key: [140, 170, 80, 64], cipher: [4, 302, 352, 48], plain: [4, 346, 352, 52] }[id];
+  if (lid === 'atk') return { attacks: [4, 102, 176, 292], pass: [182, 94, 174, 70], defs: [182, 176, 174, 154], target: [200, 300, 140, 100] }[id];
+  if (lid === 'eth') return { url: [12, 98, 336, 28], grades: [12, 140, 336, 58], login: [12, 196, 168, 80], admin: [180, 196, 168, 80], old: [12, 274, 336, 26], perm: [4, 306, 140, 92], report: [142, 306, 214, 92] }[id];
+  return null;
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4360" height="4405" fill="url(#tile)"/>`;
+  if (id === 'enc') h += drawEnc();
+  else if (id === 'atk') h += drawAtk(t);
+  else h += drawEth();
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 360, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 372, hh / 412, 1.8);
+  VB = { w: w / s, h: hh / s }; VB.x = 180 - VB.w / 2; VB.y = 404 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- interaction ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+const angOf = p => Math.atan2(p.y - WC.y, p.x - WC.x) * 180 / Math.PI;
+
+scene.addEventListener('pointerdown', e => {
+  const d = e.target.closest('[data-drag]'), hit = e.target.closest('[data-hit]');
+  if (!d && !hit) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  if (d) { drag = { id: 'ring', a0: angOf(toSvg(e)), kv0: S.kv, moved: false }; scene.classList.add('grabbing'); return; }
+  drag = { id: 'hit', h: hit.dataset.hit };
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag || drag.id !== 'ring') return;
+  let da = angOf(toSvg(e)) - drag.a0;
+  if (da > 180) da -= 360; if (da < -180) da += 360;
+  if (Math.abs(da) > 2) drag.moved = true;
+  S.kv = drag.kv0 - da / STEP;
+  if (Math.abs(da) > 90) { drag.a0 += da; drag.kv0 = S.kv; }
+  const k = Math.round(S.kv);
+  if (k !== S.kT) { S.kT = k; update(); }
+  dirty = true;
+});
+function endDrag(e, cancel) {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing'); dirty = true;
+  if (cancel) return;
+  if (d.id === 'hit') { onHit(d.h); return; }
+  S.kT = Math.round(S.kv); update();
+}
+scene.addEventListener('pointerup', e => endDrag(e, false));
+scene.addEventListener('pointercancel', e => endDrag(e, true));
+
+function onHit(h) {
+  const [k, v] = h.split(':');
+  if (k === 'plain') act('readable');
+  if (k === 'len') act(+v > 0 ? 'lenUp' : 'lenDn');
+  if (k === 'cs') toggleCs(v);
+  if (k === 'def') toggleDef(v);
+  if (k === 'perm') act('perm');
+  if (k === 'report') act('report');
+  if (['url', 'login', 'admin', 'old'].includes(k)) probe(k);
+}
+
+// lesson 1
+function turn(d) { S.kT += d; update(); }
+function readable() {
+  const m = model();
+  if (m.solved) { toast('Записка уже прочитана.'); return; }
+  S.tries++;
+  if (!m.right) { toast('Пока это бессмыслица. Поверните круг дальше — ключей всего 31.'); update(); return; }
+  S.solved = true;
+  toast(`Ключ k = ${m.k}! Перебор ключей взломал шифр Цезаря.`); update();
+}
+
+// lesson 2
+function toggleCs(k) {
+  if (S.run) return;
+  if (S.cs[k] && Object.keys(S.cs).length === 1) { toast('Хотя бы один набор символов нужен.'); return; }
+  if (S.cs[k]) delete S.cs[k]; else S.cs[k] = true;
+  S.res = null; update();
+}
+function setLen(n) { if (S.run) return; S.len = clamp(n, 8, 20); S.res = null; update(); }
+function toggleDef(id) {
+  if (S.run) return;
+  if (S.def[id]) delete S.def[id];
+  else {
+    if (Object.keys(S.def).length >= MAXDEF) { toast(`Не больше ${MAXDEF} мер: время и бюджет ограничены. Снимите лишнюю.`); return; }
+    S.def[id] = true;
+  }
+  S.res = null; update();
+}
+function runAttacks() {
+  if (S.run) return;
+  S.res = null; S.run = { t0: performance.now(), dur: 1300 };
+  if (reduce) finishRun(); else update();
+}
+function finishRun() {
+  S.run = null; S.res = ATK.map(blocked);
+  const n = S.res.filter(Boolean).length, waste = ['weekly', 'hide'].filter(k => S.def[k]);
+  let msg = n === ATK.length ? 'Все 5 атак отбиты!' : `Отбито ${n} из ${ATK.length}. Посмотрите, что прошло.`;
+  if (waste.length) msg += ` Мера «${DEF.find(d => d.id === waste[0]).short}» не остановила ни одной атаки.`;
+  toast(msg); update();
+}
+
+// lesson 3
+function probe(k) {
+  if (!S.perm) { S.bad++; toast('Стоп! Без письменного разрешения это неправомерный доступ (ст. 205 УК РК). Сначала получите разрешение.'); update(); return; }
+  if (k === 'url') {
+    S.idor = !S.idor;
+    if (S.idor) { S.found.idor = true; toast('Заменили id=1024 на 1025 — и открылись чужие оценки. Уязвимость IDOR. Данные не сохраняем, записываем в отчёт.'); }
+    else toast('Вернули свой id=1024.');
+  }
+  if (k === 'login') { S.loginTries = 10000; S.found.brute = true; toast('Скрипт сделал 10 000 неверных попыток входа — сайт ни разу не заблокировал. Пароли можно перебирать.'); }
+  if (k === 'admin') { S.adminIn = true; S.found.def = true; toast('Пароль по умолчанию admin/admin подошёл к панели учителя. Ничего не меняем — только фиксируем.'); }
+  if (k === 'old') { S.found.old = true; toast('Версия сервера 2018 года: для неё опубликованы известные уязвимости. Пора обновлять.'); }
+  update();
+}
+function report() {
+  if (!S.perm) { toast('Сначала разрешение и проверка, потом отчёт.'); return; }
+  const n = VULN.filter(v => S.found[v.id]).length;
+  if (n < VULN.length) { toast(`В отчёте ${n} из 4 уязвимостей. Проверьте всё в границах разрешения.`); return; }
+  if (S.reported) { toast('Отчёт уже у владельца.'); return; }
+  S.reported = true; toast('Отчёт отправлен директору и разработчикам: что найдено, насколько опасно и как исправить.'); update();
+}
+
+let last = performance.now();
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  let anim = false;
+  if (!drag || drag.id !== 'ring') {
+    const d = S.kT - S.kv;
+    if (Math.abs(d) > 0.01) { S.kv = reduce ? S.kT : S.kv + d * Math.min(1, dt * 12); anim = true; } else if (S.kv !== S.kT) { S.kv = S.kT; anim = true; }
+  }
+  if (S.run) { anim = true; if (t - S.run.t0 >= S.run.dur) { drawScene(t); finishRun(); } }
+  if (S.hl) anim = true;
+  if (dirty || anim) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3400); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    enc: B('kDn', '‹ k') + B('kUp', 'k ›') + sep + B('readable', 'Текст читается') + B('newMsg', 'Новая записка'),
+    atk: B('run', 'Запустить атаки') + sep + B('lenDn', 'длина −') + B('lenUp', 'длина +') + sep + B('clearDef', 'Снять меры'),
+    eth: B('perm', 'Разрешение', S.perm) + B('report', 'Отчёт владельцу') + B('leak', 'Выложить в соцсети') + sep + B('reset', 'Сначала'),
+  }[id];
+}
+function act(a) {
+  if (a === 'kDn') return turn(-1);
+  if (a === 'kUp') return turn(1);
+  if (a === 'readable') return readable();
+  if (a === 'newMsg') { newKey(); S.kT = 0; update(); toast('Перехвачена новая записка с другим ключом.'); return; }
+  if (a === 'run') return runAttacks();
+  if (a === 'lenDn') return setLen(S.len - 1);
+  if (a === 'lenUp') return setLen(S.len + 1);
+  if (a === 'clearDef') { if (!S.run) { S.def = {}; S.res = null; update(); } return; }
+  if (a === 'perm') {
+    if (S.perm) { toast('Разрешение уже есть. Работаем только в его границах.'); return; }
+    S.perm = true; renderTools(); toast('Договор подписан: тест только dnevnik-test.school.kz, без изменения данных, отчёт — директору.'); update(); return;
+  }
+  if (a === 'report') return report();
+  if (a === 'leak') { S.bad++; toast('Нет! Публикация дыры до исправления помогает злоумышленникам и нарушает договор. Сообщают только владельцу.'); update(); return; }
+  if (a === 'reset') { S.perm = false; S.found = {}; S.idor = false; S.adminIn = false; S.loginTries = 0; S.reported = false; S.bad = 0; renderTools(); update(); return; }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  outer: IC('<circle cx="17" cy="17" r="14" fill="none" stroke="var(--fg)" stroke-width="2"/><text x="17" y="9.5" font-size="6" fill="var(--fg)" text-anchor="middle">А</text>'),
+  inner: IC('<circle cx="17" cy="17" r="10" fill="none" stroke="var(--arm)" stroke-width="2.4"/><path d="M27 13a11 11 0 0 1 0 8" stroke="var(--arm)" stroke-width="1.6" fill="none"/>'),
+  key: IC('<circle cx="11" cy="17" r="5" fill="none" stroke="var(--force)" stroke-width="2"/><path d="M16 17h13M25 17v4M29 17v3" stroke="var(--force)" stroke-width="2"/>'),
+  cipher: IC('<rect x="3" y="10" width="28" height="14" rx="3" fill="none" stroke="var(--arm)"/><path d="M7 17h5M14 17h4M20 17h7" stroke="var(--arm)" stroke-width="2"/>'),
+  plain: IC('<rect x="3" y="10" width="28" height="14" rx="3" fill="none" stroke="var(--ok)"/><path d="M7 17h8M17 17h10" stroke="var(--fg)" stroke-width="2"/>'),
+  attacks: IC('<circle cx="11" cy="17" r="6" fill="var(--warn)"/><path d="M18 17h12M26 13l4 4-4 4" stroke="var(--warn)" stroke-width="2" fill="none"/>'),
+  pass: IC('<rect x="3" y="11" width="28" height="12" rx="3" fill="none" stroke="var(--fg)"/><text x="17" y="20" font-size="7" fill="var(--fg)" text-anchor="middle" font-family="monospace">••••••</text>'),
+  defs: IC('<path d="M17 4l11 4v8c0 7-5 11-11 14C11 27 6 23 6 16V8z" fill="none" stroke="var(--ok)" stroke-width="2"/><path d="M12 17l4 4 6-8" fill="none" stroke="var(--ok)" stroke-width="2"/>'),
+  target: IC('<rect x="11" y="5" width="12" height="24" rx="2" fill="none" stroke="var(--fg)" stroke-width="1.8"/><rect x="14" y="16" width="6" height="5" rx="1" fill="var(--force)"/>'),
+  url: IC('<rect x="2" y="12" width="30" height="10" rx="3" fill="none" stroke="var(--fg)"/><text x="17" y="19.5" font-size="6" fill="var(--force)" text-anchor="middle" font-family="monospace">id=1024</text>'),
+  grades: IC('<text x="17" y="21" font-size="10" fill="var(--fg)" text-anchor="middle" font-family="monospace">5 4</text>'),
+  login: IC('<rect x="5" y="9" width="20" height="6" rx="1.5" fill="none" stroke="var(--muted)"/><rect x="5" y="18" width="20" height="6" rx="1.5" fill="none" stroke="var(--muted)"/><rect x="26" y="13" width="6" height="8" rx="1.5" fill="var(--arm)"/>'),
+  admin: IC('<circle cx="17" cy="12" r="5" fill="none" stroke="var(--warn)" stroke-width="2"/><path d="M8 28c1-6 5-8 9-8s8 2 9 8" fill="none" stroke="var(--warn)" stroke-width="2"/>'),
+  old: IC('<rect x="9" y="5" width="16" height="24" rx="3" fill="none" stroke="var(--muted)" stroke-width="1.6"/><text x="17" y="20" font-size="6.5" fill="var(--muted)" text-anchor="middle" font-family="monospace">2018</text>'),
+  perm: IC('<path d="M8 4h13l6 6v20H8z" fill="none" stroke="var(--ok)" stroke-width="1.8"/><path d="M12 16h11M12 21h11M12 26h6" stroke="var(--ok)" stroke-width="1.4"/>'),
+  report: IC('<path d="M5 9h24v16H5z" fill="none" stroke="var(--arm)" stroke-width="1.8"/><path d="M5 9l12 9 12-9" fill="none" stroke="var(--arm)" stroke-width="1.8"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  if (id === 'enc') return `Ключ k = ${m.k} · проверок: ${m.tries}`;
+  if (id === 'atk') return `Мер ${m.nDef}/${MAXDEF} · перебор пароля: ${fmtTime(m.sec)}` + (m.ran ? ` · отбито ${m.res.filter(Boolean).length}/5` : ' · атаки не запускались');
+  return `${m.perm ? 'Разрешение есть' : 'Разрешения нет'} · найдено ${m.nf}/4` + (m.bad ? ` · нарушений ${m.bad}` : '');
+}
+
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'enc') h = `<h2>Шифровальный круг</h2>
+      <dl class="reads"><div><dt>Ключ k</dt><dd id="r1"></dd></div><div><dt>А →</dt><dd id="r2"></dd></div><div><dt>Ключей</dt><dd id="r3">31</dd></div></dl>` +
+      slider('inK', 'Сдвиг k', 0, N - 1, 1, kNow()) +
+      `<div class="ctl"><div class="lbl">Частые буквы шифровки</div><div class="chips" id="freqChips"></div></div>
+      <div class="row"><button class="ghostbtn" data-a="readable">Текст читается</button><button class="ghostbtn" data-a="newMsg">Новая записка</button></div>`;
+  if (id === 'atk') h = `<h2>Пароль и защита</h2>
+      <dl class="reads"><div><dt>Знаков</dt><dd id="r1"></dd></div><div><dt>Вариантов</dt><dd id="r2"></dd></div><div><dt>Перебор</dt><dd id="r3"></dd></div></dl>` +
+      slider('inLen', 'Длина пароля', 8, 20, 1, S.len) +
+      `<div class="ctl"><div class="lbl">Наборы символов</div><div class="chips" id="csChips"></div></div>
+      <div class="ctl"><div class="lbl">Меры защиты (не больше ${MAXDEF})</div><div class="chips" id="defChips"></div></div>
+      <div class="row"><button class="ghostbtn" data-a="run">Запустить атаки</button><button class="ghostbtn" data-a="clearDef">Снять меры</button></div>`;
+  if (id === 'eth') h = `<h2>Ход проверки</h2>
+      <dl class="reads"><div><dt>Разрешение</dt><dd id="r1"></dd></div><div><dt>Найдено</dt><dd id="r2"></dd></div><div><dt>Нарушения</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Исследовать элемент сайта</div><div class="chips" id="probeChips"><button data-p="url">Адрес (id)</button><button data-p="login">Форма входа</button><button data-p="admin">/admin</button><button data-p="old">Версия сервера</button></div></div>
+      <div class="row"><button class="ghostbtn" data-a="perm">Разрешение</button><button class="ghostbtn" data-a="report">Отчёт владельцу</button><button class="ghostbtn" data-a="leak">Выложить в соцсети</button><button class="ghostbtn" data-a="reset">Сначала</button></div>`;
+  el.innerHTML = h;
+  el.querySelectorAll('.row [data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+  el.querySelectorAll('#probeChips button').forEach(b => b.onclick = () => probe(b.dataset.p));
+  const k = el.querySelector('#inK'); if (k) k.addEventListener('input', e => { S.kT = +e.target.value; update(); });
+  const ln = el.querySelector('#inLen'); if (ln) ln.addEventListener('input', e => setLen(+e.target.value));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (id === 'enc') {
+    set('#r1', String(m.k)); set('#r2', AB[m.k]); set('#inKO', String(m.k)); val('#inK', m.k);
+    const fc = el.querySelector('#freqChips');
+    if (fc) fc.innerHTML = freqTop(m.cipher).slice(0, 5).map(([c, n]) => `<button disabled>${c} × ${n}</button>`).join('');
+  } else if (id === 'atk') {
+    set('#r1', String(m.A)); set('#r2', fmtE(m.N)); set('#r3', fmtTime(m.sec)); set('#inLenO', String(S.len)); val('#inLen', S.len);
+    const cc = el.querySelector('#csChips');
+    if (cc) { cc.innerHTML = CSK.map(k => `<button data-c="${k}" aria-pressed="${!!S.cs[k]}">${CS[k].name} (${CS[k].n})</button>`).join(''); cc.querySelectorAll('button').forEach(b => b.onclick = () => toggleCs(b.dataset.c)); }
+    const dc = el.querySelector('#defChips');
+    if (dc) { dc.innerHTML = DEF.map(d => `<button data-d="${d.id}" aria-pressed="${!!S.def[d.id]}">${d.name}</button>`).join(''); dc.querySelectorAll('button').forEach(b => b.onclick = () => toggleDef(b.dataset.d)); }
+  } else {
+    set('#r1', m.perm ? 'есть' : 'нет'); set('#r2', `${m.nf}/4`); set('#r3', String(m.bad));
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'enc') return [
+    { id: 'outer', icon: ICON.outer, name: 'Внешний круг — открытый текст', spec: 'Обычный алфавит из 32 букв (без Ё).' },
+    { id: 'inner', icon: ICON.inner, name: 'Внутренний круг — шифр', spec: 'Тот же алфавит, повёрнутый на k позиций. Под буквой открытого текста — её шифр.' },
+    { id: 'key', icon: ICON.key, name: 'Ключ k', spec: 'Число сдвига. Знает ключ — может и зашифровать, и расшифровать.' },
+    { id: 'cipher', icon: ICON.cipher, name: 'Шифртекст', spec: 'То, что видит перехватчик. Пробелы в Цезаре не шифруются — это тоже подсказка взломщику.' },
+    { id: 'plain', icon: ICON.plain, name: 'Расшифровка', spec: 'Каждая буква сдвинута назад на k. При верном ключе появляется смысл.' }];
+  if (id === 'atk') return [
+    { id: 'attacks', icon: ICON.attacks, name: 'Атаки', spec: 'Пять типичных угроз для школьника и его семьи.' },
+    { id: 'pass', icon: ICON.pass, name: 'Пароль Wi-Fi', spec: 'Длина и наборы символов определяют число вариантов для перебора.' },
+    { id: 'defs', icon: ICON.defs, name: 'Меры защиты', spec: 'Можно выбрать не больше четырёх. Две из шести не закрывают ни одну атаку.' },
+    { id: 'target', icon: ICON.target, name: 'Что защищаем', spec: 'Телефон, аккаунты и домашний Wi-Fi. Щит толще, когда мер больше.' }];
+  return [
+    { id: 'perm', icon: ICON.perm, name: 'Разрешение (scope)', spec: 'Письменный договор: что можно проверять и что нельзя. Без него — преступление.' },
+    { id: 'url', icon: ICON.url, name: 'Адресная строка', spec: 'Параметр id в адресе. Если сервер не проверяет владельца — видны чужие данные.' },
+    { id: 'grades', icon: ICON.grades, name: 'Оценки ученика', spec: 'Персональные данные. Их нельзя копировать даже при проверке.' },
+    { id: 'login', icon: ICON.login, name: 'Форма входа', spec: 'Без лимита попыток пароль можно перебирать бесконечно.' },
+    { id: 'admin', icon: ICON.admin, name: 'Панель /admin', spec: 'Вход администратора. Пароль после установки часто забывают сменить.' },
+    { id: 'old', icon: ICON.old, name: 'Версия сервера', spec: 'Старые версии программ имеют опубликованные уязвимости.' },
+    { id: 'report', icon: ICON.report, name: 'Отчёт владельцу', spec: 'Что нашли, как воспроизвести, насколько опасно и как исправить.' }];
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      (Ls.safe ? `<div class="safe"><b>Закон и безопасность</b>${Ls.safe}</div>` : '') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Из чего состоит опыт</h2><p class="note">Нажмите на деталь, чтобы найти её на сцене.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'enc') {
+    const c0 = m.cipher[0][0], y = AB.indexOf(c0), x = mod(y - m.k, N);
+    let h = `<h2>Сдвиг по кругу</h2><div class="formula">шифр: y = (x + k) mod 32<br>расшифровка: x = (y − k) mod 32</div><p class="note">x и y — номера букв от 0 (А) до 31 (Я). mod 32 — остаток от деления: после Я снова идёт А.</p>`;
+    h += `<h3>Первая буква записки при k = ${m.k}</h3><div class="steps">` + step('буква шифра', `${c0} → y = ${y}`) + step('x = (y − k) mod 32', `(${y} − ${m.k}) mod 32 = ${x}`) + step('буква открытого текста', AB[x], 'sum') + `</div>`;
+    const top = freqTop(m.cipher)[0];
+    h += `<h3>Частотный анализ</h3><div class="steps">` + step('чаще всего в шифре', `${top[0]} (${top[1]} раз)`) + step('если это О', `k = (${AB.indexOf(top[0])} − 14) mod 32 = ${mod(AB.indexOf(top[0]) - 14, N)}`) + step('если это Е', `k = (${AB.indexOf(top[0])} − 5) mod 32 = ${mod(AB.indexOf(top[0]) - 5, N)}`) + `</div>`;
+    h += `<h3>Сколько перебирать</h3><div class="steps">` + step('Цезарь', '31 ключ — минута вручную') + step('AES-128', '2¹²⁸ ≈ 3,4·10³⁸ ключей') + step('при 10¹² ключей/с', '≈ 10¹⁹ лет', 'sum') + `</div>`;
+    return h;
+  }
+  if (id === 'atk') {
+    const parts = CSK.filter(k => S.cs[k]).map(k => CS[k].n);
+    let h = `<h2>Время перебора</h2><div class="formula">N = A<sup>L</sup>,&nbsp; t = N / v</div><p class="note">A — сколько разных знаков, L — длина, v — скорость перебора. Здесь v = 10⁷ паролей в секунду (несколько видеокарт против пароля Wi-Fi WPA2). Это время полного перебора; в среднем пароль находится вдвое быстрее.</p><div class="steps">`;
+    h += step('A', `${parts.join(' + ')} = ${m.A}`) + step('L', String(m.len)) + step('N = A^L', `${m.A}${sup(m.len)} = ${fmtE(m.N)}`) + step('t = N / 10⁷', `${fmtE(m.sec)} с`) + step('в годах', `${fmtTime(m.sec)}`, 'sum') + `</div>`;
+    h += `<h3>Цель: не меньше 100 лет</h3><div class="steps">` + step('100 лет в секундах', '3,16·10⁹ с') + step('нужно вариантов', '≥ 3,16·10¹⁶') + step('сейчас', m.passOK ? 'достаточно ✓' : 'мало ✗', 'sum') + `</div>`;
+    h += `<h3>Какая мера от чего</h3><div class="steps">` + ATK.map((a, i) => step(`${i + 1}. ${a.name}`, a.by === 'pass' ? 'стойкий пароль' : DEF.find(d => d.id === a.by).short + (S.def[a.by] ? ' ✓' : ''))).join('') + `</div>`;
+    h += `<p class="note" style="margin-top:10px">Частая смена пароля сама по себе не мешает этим атакам: люди начинают выбирать простые пароли вроде «Parol1», «Parol2». Скрытое имя Wi-Fi сети легко находят сканером — от перебора пароля оно не спасает.</p>`;
+    return h;
+  }
+  let h = `<h2>Оценка риска</h2><div class="formula">риск = вероятность × ущерб</div><p class="note">Каждый фактор — от 1 (низкий) до 3 (высокий). Сначала исправляют то, где риск выше.</p><div class="steps">`;
+  const order = VULN.slice().sort((a, b) => b.p * b.d - a.p * a.d);
+  h += order.map(v => S.found[v.id] ? step(v.name, `${v.p} × ${v.d} = ${v.p * v.d}`) : step('○ ещё не найдено', '—')).join('') + `</div>`;
+  h += `<h3>Этапы пентеста</h3><div class="steps">` + [['1. Разрешение и границы', S.perm], ['2. Разведка', S.perm], ['3. Поиск уязвимостей', m.nf === 4], ['4. Отчёт владельцу', S.reported], ['5. Исправление и перепроверка', false]].map(([a, ok]) => step(a, ok ? '✓' : '—')).join('') + `</div>`;
+  const fx = VULN.filter(v => S.found[v.id]);
+  if (fx.length) h += `<h3>Что советуем исправить</h3>` + fx.map(v => `<p class="note"><b style="color:var(--fg)">${v.name}.</b> ${v.fix}</p>`).join('');
+  return h;
+}
+
+function renderMeter(m) {
+  const el = $('#meter'), ok = !!S.done[LID()];
+  if (m.kind === 'enc') el.innerHTML = `<div class="k">Ключ</div><div class="v ${ok ? 'ok' : ''}">k = ${m.k}</div><div class="gauge"><b style="width:${(m.k / (N - 1) * 100).toFixed(1)}%"></b></div><div class="lr"><span>А → ${AB[m.k]}</span><span>из 31</span></div>`;
+  else if (m.kind === 'atk') el.innerHTML = `<div class="k">Перебор пароля</div><div class="v ${m.passOK ? 'ok' : ''}">${fmtTime(m.sec)}</div><div class="gauge"><b style="width:${clamp(Math.log10(Math.max(1, m.years * 365)) / Math.log10(36500) * 100, 0, 100).toFixed(1)}%;background:${m.passOK ? 'var(--ok)' : 'var(--force)'}"></b></div><div class="lr"><span>мер ${m.nDef}/${MAXDEF}</span><span>${m.ran ? 'отбито ' + m.res.filter(Boolean).length + '/5' : '—'}</span></div>`;
+  else el.innerHTML = `<div class="k">Уязвимости</div><div class="v ${ok ? 'ok' : ''}">${m.nf} из 4</div><div class="gauge"><b style="width:${(m.nf / 4 * 100).toFixed(1)}%"></b></div><div class="lr"><span>${m.perm ? 'разрешение ✓' : 'нет разрешения'}</span></div>`;
+}
+
+function update() {
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Отличная работа!'), 1800);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  enc: '<circle cx="33" cy="15" r="12" fill="none" stroke="#e8ecf4" stroke-width="1.5"/><circle cx="33" cy="15" r="7" fill="none" stroke="#72d4e8" stroke-width="2"/><path d="M33 3l-3-3h6z" fill="#ffb547"/><text x="6" y="19" font-size="8" fill="#72d4e8" font-family="monospace">Г</text><text x="52" y="19" font-size="8" fill="#e8ecf4" font-family="monospace">А</text>',
+  atk: '<circle cx="9" cy="9" r="3" fill="#ff8a73"/><circle cx="9" cy="21" r="3" fill="#ff8a73"/><path d="M14 9l20 4M14 21l20-4" stroke="#ff8a73" stroke-width="1.2"/><path d="M38 4q8 11 0 22" fill="none" stroke="#86e0a8" stroke-width="2.4"/><rect x="47" y="7" width="10" height="16" rx="2" fill="none" stroke="#e8ecf4" stroke-width="1.4"/>',
+  eth: '<rect x="4" y="4" width="58" height="22" rx="3" fill="none" stroke="#56627d"/><path d="M4 10h58" stroke="#56627d"/><text x="8" y="20" font-size="6.5" fill="#ffb547" font-family="monospace">id=1025</text><circle cx="52" cy="18" r="4" fill="none" stroke="#86e0a8" stroke-width="1.4"/><path d="M55 21l4 4" stroke="#86e0a8" stroke-width="1.6"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Ls, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Ls.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Ls.title}</span></span>
+      ${S.done[Ls.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const Ls = LESSONS[i];
+  S.lesson = i; S.hl = null;
+  newKey(); S.kT = 0; S.kv = 0;
+  S.def = {}; S.len = 8; S.cs = { lo: true }; S.run = null; S.res = null;
+  S.perm = false; S.found = {}; S.idor = false; S.adminIn = false; S.loginTries = 0; S.reported = false; S.bad = 0;
+  drag = null;
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = Ls.task;
+  $('#hint').textContent = Ls.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const strip = $('#lessons'), cur = $('#lessons .lesson[aria-current="true"]');
+  if (cur) strip.scrollLeft = cur.offsetLeft - strip.offsetLeft - (strip.clientWidth - cur.offsetWidth) / 2;
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '', guide = '';
+  if (id === 'enc') {
+    now = `Шифровальный круг Цезаря: внешний круг — открытый алфавит из 32 букв без Ё, внутренний — шифр, повёрнутый на ключ k. Сейчас k = ${m.k} (А → ${AB[m.k]}). Перехваченный шифртекст: «${m.cipher.join(' / ')}». Расшифровка при текущем k: «${m.plain.join(' / ')}». Самые частые буквы шифра: ${freqTop(m.cipher).slice(0, 3).map(([c, n]) => c + '×' + n).join(', ')}. Проверок «Текст читается»: ${m.tries}. Записка ${m.solved ? 'прочитана' : 'ещё не прочитана'}.`;
+    guide = 'Не называй верный ключ и не расшифровывай записку за ученика: предложи перебор ключей или частотный анализ (в русском чаще всего О, Е, А) и спроси, какое k получится, если самая частая буква шифра — это О.';
+  }
+  if (id === 'atk') {
+    now = `Симулятор атак. Пароль Wi-Fi: длина ${m.len}, наборы символов: ${CSK.filter(k => S.cs[k]).map(k => CS[k].full).join(', ')} (A = ${m.A}). Вариантов N = ${fmtE(m.N)}, при скорости 10^7 в секунду полный перебор займёт ${fmtTime(m.sec)} (цель — не меньше 100 лет). Выбраны меры (${m.nDef} из максимум ${MAXDEF}): ${DEF.filter(d => S.def[d.id]).map(d => d.name).join(', ') || 'нет'}. Доступные меры: ${DEF.map(d => d.name).join('; ')}. Атаки: ${ATK.map((a, i) => `${i + 1}) ${a.name} — ${a.sub}`).join('; ')}. ${m.ran ? 'Результат последнего запуска: ' + ATK.map((a, i) => `${a.name} — ${m.res[i] ? 'отбита' : 'прошла'}`).join('; ') + '.' : 'Атаки ещё не запускались.'}`;
+    guide = 'Не называй готовый набор мер: спрашивай, что именно крадёт каждая атака и какая мера мешает именно этому. Про две бесполезные меры спроси, против какой из пяти атак они бы помогли.';
+  }
+  if (id === 'eth') {
+    now = `Учебный стенд «Электронный дневник» (dnevnik-test.school.kz). Разрешение владельца: ${m.perm ? 'получено' : 'не получено'}. Найдено уязвимостей: ${m.nf} из 4${m.nf ? ' — ' + VULN.filter(v => S.found[v.id]).map(v => v.name).join(', ') : ''}. На странице можно исследовать: адресную строку с параметром id, форму входа, ссылку /admin, строку о версии сервера внизу. Нарушений правил (действия без разрешения или попытка опубликовать): ${m.bad}. Отчёт владельцу ${m.reported ? 'отправлен' : 'не отправлен'}.`;
+    guide = 'Не перечисляй, где именно спрятаны оставшиеся уязвимости: спрашивай, что злоумышленник проверил бы в адресе страницы, в форме входа и в панели администратора. Подчёркивай законность: только с разрешения, отчёт только владельцу.';
+  }
+  return [
+    `Раздел: информатика, 10 класс, тема «Кибербезопасность». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    S.done[id] ? 'Задание уже выполнено — можно обсуждать свободно.' : guide,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = {
+    enc: 'Чем шифр Цезаря отличается от AES и почему его так легко взломать?',
+    atk: 'Почему 2FA спасает, даже если пароль утёк?',
+    eth: 'Чем этичный хакер отличается от преступника?',
+  }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

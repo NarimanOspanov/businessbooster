@@ -40,7 +40,7 @@ window.LUCH_SUBJECTS = {
       { id: 'quadr', b: 'geo', g: 8, t: 'Четырёхугольники', items: ['Параллелограмм', 'Прямоугольник, ромб, квадрат', 'Трапеция', 'Площади многоугольников'], req: ['tri'], status: 'done', href: '/labs/math-quadr/', lessons: 4, doneItems: 4 },
       { id: 'pyth', b: 'geo', g: 8, t: 'Пифагор и подобие', items: ['Теорема Пифагора', 'Подобные треугольники', 'Синус, косинус, тангенс угла'], req: ['quadr', 'roots'], status: 'done', href: '/labs/math-pyth/', lessons: 3, doneItems: 3 },
       { id: 'circ', b: 'geo', g: 8, t: 'Окружность', items: ['Касательная', 'Вписанные углы', 'Вписанная и описанная окружность'], req: ['tri'], status: 'done', href: '/labs/math-circ/', lessons: 3, doneItems: 3 },
-      { id: 'vect', b: 'geo', g: 9, t: 'Векторы и координаты', items: ['Векторы', 'Метод координат', 'Уравнение окружности и прямой'], req: ['pyth', 'coord'] },
+      { id: 'vect', b: 'geo', g: 9, t: 'Векторы и координаты', items: ['Векторы', 'Метод координат', 'Уравнение окружности и прямой'], req: ['pyth', 'coord'], status: 'done', href: '/labs/math-vect/', lessons: 3, doneItems: 3 },
       { id: 'stereo', b: 'geo', g: 10, t: 'Стереометрия', items: ['Аксиомы пространства', 'Параллельность и перпендикулярность', 'Углы и расстояния'], req: ['vect'] },
       { id: 'solids', b: 'geo', g: 11, t: 'Тела и объёмы', items: ['Призма и пирамида', 'Цилиндр, конус, шар', 'Площади поверхности', 'Объёмы тел'], req: ['stereo'] },
 
@@ -87,7 +87,7 @@ window.LUCH_SUBJECTS = {
       { id: 'industry', b: 'inorg', g: 11, t: 'Химическое производство', items: ['Аммиак и серная кислота', 'Металлургия Казахстана', 'Минеральные удобрения'], req: ['nonmet', 'metals', 'kinetics'] },
 
       { id: 'orgbase', b: 'org', g: 10, t: 'Основы органики', items: ['Почему углерод особенный', 'Строение органических молекул', 'Изомерия', 'Названия веществ'], req: ['bonds'], status: 'done', href: '/labs/chem-orgbase/', lessons: 4, doneItems: 4 },
-      { id: 'hydro', b: 'org', g: 10, t: 'Углеводороды', items: ['Алканы', 'Алкены и алкины', 'Арены', 'Нефть и газ'], req: ['orgbase'] },
+      { id: 'hydro', b: 'org', g: 10, t: 'Углеводороды', items: ['Алканы', 'Алкены и алкины', 'Арены', 'Нефть и газ'], req: ['orgbase'], status: 'done', href: '/labs/chem-hydro/', lessons: 4, doneItems: 4 },
       { id: 'oxyorg', b: 'org', g: 10, t: 'Спирты, альдегиды, кислоты', items: ['Спирты', 'Альдегиды', 'Карбоновые кислоты', 'Сложные эфиры и жиры'], req: ['hydro'] },
       { id: 'biomol', b: 'org', g: 11, t: 'Молекулы жизни', items: ['Углеводы', 'Аминокислоты и белки', 'Нуклеиновые кислоты'], req: ['oxyorg'] },
       { id: 'polymers', b: 'org', g: 11, t: 'Полимеры', items: ['Пластмассы', 'Волокна', 'Каучук и резина', 'Переработка пластика'], req: ['hydro'] },
@@ -177,7 +177,7 @@ window.LUCH_SUBJECTS = {
       { id: 'safe', b: 'net', g: 5, t: 'Интернет и безопасность', items: ['Поиск информации', 'Надёжные пароли', 'Цифровой след', 'Как распознать фейк'], req: ['pc'], status: 'done', href: '/labs/cs-safe/', lessons: 4, doneItems: 4 },
       { id: 'networks', b: 'net', g: 8, t: 'Компьютерные сети', items: ['Как устроен интернет', 'IP-адреса и DNS', 'Протоколы'], req: ['binary', 'safe'], status: 'done', href: '/labs/cs-networks/', lessons: 3, doneItems: 3 },
       { id: 'web', b: 'net', g: 9, t: 'Создание сайтов', items: ['HTML', 'CSS', 'Основы JavaScript', 'Публикация сайта'], req: ['networks', 'python'], status: 'done', href: '/labs/cs-web/', lessons: 4, doneItems: 4 },
-      { id: 'cyber', b: 'net', g: 10, t: 'Кибербезопасность', items: ['Шифрование', 'Атаки и защита', 'Этичный хакинг'], req: ['networks', 'logic'] },
+      { id: 'cyber', b: 'net', g: 10, t: 'Кибербезопасность', items: ['Шифрование', 'Атаки и защита', 'Этичный хакинг'], req: ['networks', 'logic'], status: 'done', href: '/labs/cs-cyber/', lessons: 3, doneItems: 3 },
 
       { id: 'media', b: 'tech', g: 6, t: 'Графика и медиа', items: ['Растровая и векторная графика', 'Звук и видео', 'Сжатие файлов'], req: ['info'], status: 'done', href: '/labs/cs-media/', lessons: 3, doneItems: 3 },
       { id: 'robot', b: 'tech', g: 7, t: 'Робототехника', items: ['Датчики', 'Моторы', 'Программирование робота'], req: ['blocks'], status: 'done', href: '/labs/cs-robot/', lessons: 3, doneItems: 3 },
