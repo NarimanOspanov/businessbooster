@@ -681,7 +681,7 @@
   const open = () => { panel.hidden = false; btn.hidden = true; render(); setTimeout(() => (voiceMode ? orb : inp).focus(), 30); };
   function openPanel() { if (panel.hidden) open(); }
   $('#lt-bd').addEventListener('click', () => (board.open ? board.hide() : board.show()));
-  window.LuchTutor = { ask: q => { openPanel(); ask(q); }, open: openPanel, board };
+  window.LuchTutor = { ask: q => { openPanel(); ask(q); }, open: openPanel, board, highlight: el => highlightEl(el), hideTip: () => guide && guide.hide() };
   const close = () => { setMode(false); if (dict) dict.abort(); panel.hidden = true; btn.hidden = false; btn.focus(); };
   // голос в первую очередь: кнопка сразу открывает разговор голосом (если ученик сам не выбрал текст)
   btn.addEventListener('click', () => { open(); if (canListen && ls.get('luch-tutor-mode') !== 'text') setMode(true); });

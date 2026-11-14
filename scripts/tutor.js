@@ -162,7 +162,16 @@ async function gemini(model, body, ms = 30000) {
   if (!res.ok) throw new Error("gemini_" + res.status + ": " + text.slice(0, 200));
   return JSON.parse(text);
 }
+// одинаковые фразы (аудиогид, подсказки наставника) озвучиваем один раз
+const ttsCache = new Map();
 async function speak(text) {
+  const ck = ELEVEN_VOICE + ":" + text;
+  if (ttsCache.has(ck)) { const v = ttsCache.get(ck); ttsCache.delete(ck); ttsCache.set(ck, v); return v; }
+  const a = await speakRaw(text);
+  ttsCache.set(ck, a); if (ttsCache.size > 400) ttsCache.delete(ttsCache.keys().next().value);
+  return a;
+}
+async function speakRaw(text) {
   const key = keyFrom("ELEVENLABS_API_KEY", ".elevenlabs-key");
   if (key && !/[әғқңөұүһі]/i.test(text)) {
     try {

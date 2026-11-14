@@ -58,6 +58,9 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px 20
 
 .intro{display:flex;justify-content:space-between;align-items:flex-end;gap:16px 32px;flex-wrap:wrap;margin:26px 0 18px}
 .intro h2{font:500 clamp(22px,3vw,32px)/1.15 var(--font-display);margin:0 0 10px;text-wrap:balance;max-width:20ch}
+.ag-play{margin-top:14px;display:inline-flex;align-items:center;gap:8px;background:var(--fg);color:var(--bg);border:0;border-radius:999px;padding:10px 16px;font:600 14px var(--font-body);cursor:pointer}
+.ag-play:hover{opacity:.9}
+.ag-play.on{background:var(--accent);color:var(--bg)}
 .intro p{margin:0;color:var(--muted);max-width:60ch}
 .stats{display:flex;gap:8px;flex-wrap:wrap}
 .stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;min-width:96px}
@@ -161,6 +164,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px 20
     <div>
       <h2>Физика от простого к сложному</h2>
       <p>Вся школьная физика с 7 по 11 класс на одной карте. Сверху основы, ниже ветки разделов: чем ниже тема, тем она сложнее. Нажмите на тему, чтобы увидеть, что в ней и что стоит пройти до неё.</p>
+      <button class="ag-play" id="agPlay" type="button">▶ Аудиогид по странице</button>
     </div>
     <div class="stats" id="stats"></div>
   </div>
@@ -419,6 +423,53 @@ window.LUCH_CONTEXT = () => {
 window.LUCH_SUGGEST = () => selected
   ? [`Расскажи коротко про тему «${T[selected].t}»`, 'Что нужно знать перед этой темой?', 'Зачем это в жизни?']
   : [`С чего начать изучать ${({ phys: 'физику', math: 'математику', chem: 'химию', bio: 'биологию', cs: 'информатику' })[SUBJ.id]}?`, 'Что мне подойдёт, если я в 8 классе?', 'Как связаны темы на этой карте?'];
+
+// ---------- аудиогид по странице: наставник рассказывает и подсвечивает, о чём говорит ----------
+const audioGuide = (() => {
+  const btn = $('#agPlay'); let run = 0, audio = null;
+  const lang = (window.LuchI18n && window.LuchI18n.lang) || 'ru';
+  const mobile = () => matchMedia('(max-width:760px)').matches;
+  const steps = () => {
+    const base = TOPICS.filter(t => t.b === 'base').map(t => `«${t.t}»`).join(' и ');
+    const g0 = GRADES[0], g1 = GRADES[GRADES.length - 1], n = BRANCHES.length;
+    return [
+      [`Это карта по предмету «${SUBJ.name}». Здесь все темы с ${g0} по ${g1} класс — от простого к сложному.`, '.intro h2'],
+      ['Вверху можно переключить предмет: физика, математика, химия, биология или информатика.', '#subjects'],
+      [`Начинать стоит с основ: ${base}.`, mobile() ? '#list .lb' : '.trunk'],
+      [`Дальше темы расходятся на ${n} ${plural(n, 'ветку', 'ветки', 'веток')}: ${BRANCHES.map(b => b.name.toLowerCase()).join(', ')}. Чем ниже тема на карте, тем она сложнее.`, mobile() ? '#list' : '.treebox'],
+      ['Нажми на любую тему: появится, что в ней изучают, с чего начать, и кнопка «Открыть опыты».', mobile() ? '#list details' : '#tree .node.done'],
+      ['А если что-то непонятно — спроси меня голосом. Кнопка — внизу справа.', '.lt-btn'],
+    ];
+  };
+  const tr = async texts => {
+    if (lang === 'ru') return texts;
+    try { const r = await fetch('/api/luch/i18n', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang, texts }) }); const j = await r.json(); return j.tr || texts; } catch (e) { return texts; }
+  };
+  const tts = text => fetch('/api/tutor/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) }).then(r => r.ok ? r.blob() : null).catch(() => null);
+  const setBtn = on => { btn.classList.toggle('on', on); btn.textContent = on ? '❚❚ Остановить' : '▶ Аудиогид по странице'; };
+  async function play() {
+    const my = ++run; setBtn(true);
+    if (window.LuchTutor && window.LuchTutor.hideTip) window.LuchTutor.hideTip();
+    if (!audio) audio = new Audio();
+    audio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA='; audio.play().catch(() => {}); // разрешить звук жестом
+    const st = steps(), texts = await tr(st.map(s => s[0]));
+    let next = tts(texts[0]);
+    for (let i = 0; i < st.length; i++) {
+      if (my !== run) return;
+      const blob = await next; if (i + 1 < st.length) next = tts(texts[i + 1]);
+      if (my !== run) return;
+      const el = document.querySelector(st[i][1]);
+      if (el && window.LuchTutor && window.LuchTutor.highlight) window.LuchTutor.highlight(el);
+      if (blob && blob.size > 100) { const u = URL.createObjectURL(blob); await new Promise(res => { audio.onended = audio.onerror = res; audio.src = u; audio.play().catch(res); }); URL.revokeObjectURL(u); }
+      else await new Promise(r => setTimeout(r, 3000));
+    }
+    if (my === run) setBtn(false);
+  }
+  function stop() { run++; try { audio && audio.pause(); } catch (e) {} setBtn(false); }
+  btn.addEventListener('click', () => (btn.classList.contains('on') ? stop() : play()));
+  $('#subjects').addEventListener('click', stop);
+  return { stop };
+})();
 
 useSubject(location.hash.slice(1));
 addEventListener('hashchange', () => { const id = location.hash.slice(1) || 'phys'; if (!SUBJ || SUBJ.id !== id) useSubject(id); });
