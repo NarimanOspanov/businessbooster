@@ -46,7 +46,7 @@ window.LUCH_SUBJECTS = {
 
       { id: 'data', b: 'prob', g: 6, t: 'Данные и диаграммы', items: ['Таблицы', 'Столбчатые и круговые диаграммы', 'Среднее арифметическое'], req: ['frac'], status: 'done', href: '/labs/math-data/', lessons: 3, doneItems: 3 },
       { id: 'comb', b: 'prob', g: 9, t: 'Комбинаторика', items: ['Правило умножения', 'Перестановки', 'Сочетания', 'Треугольник Паскаля'], req: ['num'], status: 'done', href: '/labs/math-comb/', lessons: 4, doneItems: 4 },
-      { id: 'probab', b: 'prob', g: 9, t: 'Вероятность', items: ['Случайные события', 'Классическая вероятность', 'Сложение и умножение вероятностей'], req: ['comb', 'frac'] },
+      { id: 'probab', b: 'prob', g: 9, t: 'Вероятность', items: ['Случайные события', 'Классическая вероятность', 'Сложение и умножение вероятностей'], req: ['comb', 'frac'], status: 'done', href: '/labs/math-probab/', lessons: 3, doneItems: 3 },
       { id: 'stat', b: 'prob', g: 10, t: 'Статистика', items: ['Медиана и мода', 'Разброс и дисперсия', 'Выборки и опросы', 'Как графики вводят в заблуждение'], req: ['data', 'probab'] },
       { id: 'rv', b: 'prob', g: 11, t: 'Случайные величины', items: ['Математическое ожидание', 'Биномиальное распределение', 'Закон больших чисел'], req: ['stat'] },
     ],
@@ -88,7 +88,7 @@ window.LUCH_SUBJECTS = {
 
       { id: 'orgbase', b: 'org', g: 10, t: 'Основы органики', items: ['Почему углерод особенный', 'Строение органических молекул', 'Изомерия', 'Названия веществ'], req: ['bonds'], status: 'done', href: '/labs/chem-orgbase/', lessons: 4, doneItems: 4 },
       { id: 'hydro', b: 'org', g: 10, t: 'Углеводороды', items: ['Алканы', 'Алкены и алкины', 'Арены', 'Нефть и газ'], req: ['orgbase'], status: 'done', href: '/labs/chem-hydro/', lessons: 4, doneItems: 4 },
-      { id: 'oxyorg', b: 'org', g: 10, t: 'Спирты, альдегиды, кислоты', items: ['Спирты', 'Альдегиды', 'Карбоновые кислоты', 'Сложные эфиры и жиры'], req: ['hydro'] },
+      { id: 'oxyorg', b: 'org', g: 10, t: 'Спирты, альдегиды, кислоты', items: ['Спирты', 'Альдегиды', 'Карбоновые кислоты', 'Сложные эфиры и жиры'], req: ['hydro'], status: 'done', href: '/labs/chem-oxyorg/', lessons: 4, doneItems: 4 },
       { id: 'biomol', b: 'org', g: 11, t: 'Молекулы жизни', items: ['Углеводы', 'Аминокислоты и белки', 'Нуклеиновые кислоты'], req: ['oxyorg'] },
       { id: 'polymers', b: 'org', g: 11, t: 'Полимеры', items: ['Пластмассы', 'Волокна', 'Каучук и резина', 'Переработка пластика'], req: ['hydro'] },
 
@@ -181,7 +181,7 @@ window.LUCH_SUBJECTS = {
 
       { id: 'media', b: 'tech', g: 6, t: 'Графика и медиа', items: ['Растровая и векторная графика', 'Звук и видео', 'Сжатие файлов'], req: ['info'], status: 'done', href: '/labs/cs-media/', lessons: 3, doneItems: 3 },
       { id: 'robot', b: 'tech', g: 7, t: 'Робототехника', items: ['Датчики', 'Моторы', 'Программирование робота'], req: ['blocks'], status: 'done', href: '/labs/cs-robot/', lessons: 3, doneItems: 3 },
-      { id: 'ai', b: 'tech', g: 10, t: 'Искусственный интеллект', items: ['Машинное обучение', 'Нейросети', 'Как работают чат-боты', 'Этика ИИ'], req: ['analysis'] },
+      { id: 'ai', b: 'tech', g: 10, t: 'Искусственный интеллект', items: ['Машинное обучение', 'Нейросети', 'Как работают чат-боты', 'Этика ИИ'], req: ['analysis'], status: 'done', href: '/labs/cs-ai/', lessons: 4, doneItems: 4 },
       { id: 'career', b: 'tech', g: 11, t: 'IT-профессии и стартапы', items: ['Кем работать в IT', 'Как устроен стартап', 'Цифровые сервисы и деньги'], req: ['ai', 'web'] },
     ],
   },

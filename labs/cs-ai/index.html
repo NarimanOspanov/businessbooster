@@ -1,0 +1,1147 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по информатике, 10 класс: машинное обучение, нейросети, как работают чат-боты, этика искусственного интеллекта.">
+<link rel="icon" href="data:,">
+<title>Искусственный интеллект</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. SVG stage on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:pointer}
+.scene [data-drag^="hd"]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .v.bad{color:var(--warn)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--arm);transition:width .2s}
+.gauge i{position:absolute;top:-4px;width:2px;height:14px;background:var(--force);transform:translateX(-50%)}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button:disabled{opacity:.35;cursor:default}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.grp{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--arm);margin:20px 0 -6px}
+
+.formula{font:500 17px/1.35 var(--font-mono);text-align:center;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px;overflow-wrap:anywhere}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:66vh;min-height:470px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 300px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M11 13L20 20M11 27L20 20M20 20L29 13M20 20L29 27M11 13L29 27M11 27L29 13" stroke="var(--muted)" stroke-width="1.3"/><circle cx="11" cy="13" r="3" fill="var(--arm)"/><circle cx="11" cy="27" r="3" fill="var(--arm)"/><circle cx="20" cy="20" r="3.4" fill="var(--force)"/><circle cx="29" cy="13" r="3" fill="var(--fg)"/><circle cx="29" cy="27" r="3" fill="var(--fg)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Информатика · Искусственный интеллект</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#cs">Карта</a><a href="/physics/#cs">Информатика</a><a href="/labs/cs-ai/" aria-current="page">ИИ</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>ИИ</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Рабочий стол лаборатории">
+    <svg class="scene" id="scene" role="img" aria-label="Интерактивная сцена: модель машинного обучения, нейросеть, чат-бот или набор данных"></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Команды" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const pc = (x, n = 1) => fmt(x * 100, n) + ' %';
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+
+// ---------- lesson 1 data: fruits, features «масса» and «жёлтость кожуры» (0 — красная, 1 — жёлтая) ----------
+const TRAIN = [
+  [150, .15, 'a'], [170, .25, 'a'], [190, .10, 'a'], [210, .30, 'a'], [230, .20, 'a'], [160, .45, 'a'],
+  [200, .55, 'a'], [240, .40, 'a'], [180, .35, 'a'], [145, .30, 'a'], [220, .60, 'a'], [175, .05, 'a'],
+  [100, .85, 'l'], [120, .90, 'l'], [130, .70, 'l'], [110, .65, 'l'], [140, .80, 'l'], [150, .92, 'l'],
+  [95, .75, 'l'], [125, .55, 'l'], [160, .85, 'l'], [105, .95, 'l'], [135, .62, 'l'], [115, .78, 'l'],
+].map(([m, y, c]) => ({ m, y, c }));
+const TEST = [
+  [165, .20, 'a'], [205, .45, 'a'], [185, .50, 'a'], [225, .15, 'a'], [155, .35, 'a'],
+  [118, .72, 'l'], [142, .88, 'l'], [98, .60, 'l'], [155, .75, 'l'], [128, .68, 'l'],
+].map(([m, y, c]) => ({ m, y, c }));
+const U = m => (m - 80) / 180;           // масса 80…260 г → 0…1
+const LR = 0.25;                          // шаг обучения перцептрона
+const zOf = (w, p) => w[0] * U(p.m) + w[1] * p.y + w[2];
+const predict = (w, p) => zOf(w, p) > 0 ? 'l' : 'a';
+const FN = { a: 'яблоко', l: 'лимон' };
+
+// ---------- lesson 2: network 2 → 2 → 1, step activation ----------
+const NEU = ['h1', 'h2', 'y'];
+const NNAME = { h1: 'H1', h2: 'H2', y: 'Y' };
+const PNAME = { w1: 'w₁', w2: 'w₂', b: 'b' };
+const ROWS4 = [[0, 0], [0, 1], [1, 0], [1, 1]];
+const xor = (a, b) => (a ^ b);
+function net(P, x1, x2) {
+  const s1 = P.h1.w1 * x1 + P.h1.w2 * x2 + P.h1.b, o1 = s1 > 0 ? 1 : 0;
+  const s2 = P.h2.w1 * x1 + P.h2.w2 * x2 + P.h2.b, o2 = s2 > 0 ? 1 : 0;
+  const s3 = P.y.w1 * o1 + P.y.w2 * o2 + P.y.b, o3 = s3 > 0 ? 1 : 0;
+  return { s1, o1, s2, o2, s3, o3 };
+}
+
+// ---------- lesson 3: a tiny bigram language model («сколько раз слово B шло после слова A» в учебном корпусе) ----------
+const BIGRAM = {
+  '^': { 'Казахстан': 5, 'Астана': 3, 'В': 2 },
+  'Казахстан': { '—': 6, 'богат': 2 },
+  '—': { 'большая': 4, 'страна': 3, 'столица': 3 },
+  'большая': { 'страна': 5, 'степь': 2 },
+  'степь': { '.': 3, 'и': 1 },
+  'страна': { 'в': 3, '.': 3, 'степей': 2 },
+  'в': { 'центре': 4, 'Евразии': 2 },
+  'центре': { 'Евразии': 5 },
+  'Евразии': { '.': 6 },
+  'степей': { 'и': 4, '.': 2 },
+  'и': { 'гор': 4, 'озёр': 2 },
+  'гор': { '.': 5 },
+  'озёр': { '.': 4 },
+  'Астана': { '—': 5 },
+  'столица': { 'Казахстана': 5, '.': 1 },
+  'Казахстана': { '.': 5 },
+  'В': { 'Казахстане': 5 },
+  'Казахстане': { 'много': 4, 'живут': 2 },
+  'много': { 'степей': 3, 'гор': 2, 'озёр': 2 },
+  'живут': { '20': 3, 'люди': 2 },
+  '20': { 'миллионов': 5 },
+  'миллионов': { 'человек': 5 },
+  'человек': { '.': 5 },
+  'люди': { '.': 3 },
+  'богат': { 'нефтью': 3, 'и': 1 },
+  'нефтью': { 'и': 3, '.': 2 },
+};
+const HOT = 1.2;
+function dist(ctx, T) {
+  const row = BIGRAM[ctx] || { '.': 1 };
+  const ent = Object.entries(row);
+  let mx = Math.max(...ent.map(e => e[1])), first = ent.findIndex(e => e[1] === mx);
+  const pw = ent.map(([, c]) => T === 0 ? 0 : Math.pow(c, 1 / T)), Z = pw.reduce((a, b) => a + b, 0);
+  return ent.map(([w, c], i) => ({ w, c, pw: pw[i], p: T === 0 ? (i === first ? 1 : 0) : pw[i] / Z })).sort((a, b) => b.p - a.p || b.c - a.c);
+}
+const joinTok = ws => ws.reduce((s, w) => w === '.' ? s + '.' : (s ? s + ' ' : '') + w, '');
+
+// ---------- lesson 4: speech recognition trained on a fixed budget of recordings ----------
+const GROUPS = [
+  { id: 'adult', name: 'Взрослые', sub: '18–60 лет', a: 0.97, k: 0.40, s: 160 },
+  { id: 'kid', name: 'Дети', sub: '7–14 лет', a: 0.96, k: 0.45, s: 200 },
+  { id: 'old', name: 'Пожилые', sub: '60+ лет', a: 0.96, k: 0.44, s: 220 },
+];
+const BUDGET = 1200, NSTEP = 50;
+const accOf = (g, n) => g.a - g.k * Math.exp(-n / g.s);   // условная «кривая обучения» группы
+
+const LESSONS = [
+  { id: 'ml', title: 'Машинное обучение',
+    text: ['Обычную программу пишет человек: «если масса больше 150 г, то…». В машинном обучении правило ищет сам компьютер — по примерам с готовыми ответами. Это обучающая выборка: у каждого примера есть признаки (масса, цвет) и метка (яблоко или лимон).',
+           'Наша модель — прямая на графике. С одной стороны она говорит «лимон», с другой — «яблоко». Обучение — это подбор весов w₁, w₂ и b, при которых ошибок меньше всего. Перцептрон делает это сам: на каждой ошибке чуть сдвигает прямую в сторону правильного ответа.',
+           'Ошибки на обучающих примерах мало что доказывают: их модель уже «видела». Честная проверка — на тестовой выборке, новых фруктах, которых при обучении не было.'],
+    why: 'Так работают антифрод в Kaspi и Halyk (подозрительный платёж или нет), скоринг кредитов, рекомендации товаров, сортировка зерна по фото на элеваторах Северного Казахстана. ML-инженеры и data scientist — одни из самых высокооплачиваемых IT-специалистов: в Алматы и Астане зарплата опытного специалиста часто больше 1 млн ₸. А в жизни полезно понимать, почему банк одобрил или не одобрил заявку за минуту.',
+    task: 'Обучите модель отличать яблоки от лимонов и проверьте её на тесте: нужно не больше 2 ошибок на обучении и точность на тесте не ниже 90 %.',
+    hint: 'Тащите оранжевые ручки прямой или нажимайте «Эпоха» — перцептрон сам сдвинет прямую. Потом «Проверить на тесте».',
+    stage: 'Тащите оранжевые ручки прямой. Нажмите на точку, чтобы разобрать её в «Расчётах».',
+    w0: [3, 0, -1.2],
+    check: m => m.tested && m.errs <= 2 && m.testAcc >= 0.9 },
+  { id: 'nn', title: 'Нейросети',
+    text: ['Искусственный нейрон — маленький калькулятор. Он умножает каждый вход на вес, складывает, прибавляет смещение b и сравнивает сумму с нулём: больше нуля — выдаёт 1, иначе 0. Веса — это «важность» входов.',
+           'Один нейрон проводит одну прямую, поэтому «исключающее ИЛИ» (XOR: 1, только если ровно один вход равен 1) ему не по силам. Помогает скрытый слой: нейроны H1 и H2 становятся детекторами простых признаков, а выходной нейрон Y собирает из них ответ.',
+           'Здесь 9 чисел, и вы подбираете их руками. В настоящих нейросетях миллиарды весов, и их подбирает алгоритм обучения (обратное распространение ошибки) на огромных наборах данных.'],
+    why: 'Нейросети распознают лица в метро и на границе, переводят тексты на казахский, читают рентгеновские снимки, ведут беспилотники. Инженеры компьютерного зрения и NLP-разработчики строят такие сети, а специалисты по разметке данных готовят для них примеры — это доступная первая работа в IT. Понимая, что внутри сети просто числа и суммы, проще и пользоваться ИИ, и не бояться его.',
+    task: 'Настройте веса и смещения так, чтобы сеть решала XOR: на выходе 1, только если ровно один вход равен 1. Все 4 строки таблицы должны совпасть.',
+    hint: 'Пусть H1 отвечает на вопрос «есть ли хотя бы одна единица?», а H2 — «обе ли единицы?». Как из этих двух ответов собрать XOR?',
+    stage: 'Нажмите на вход, чтобы переключить 0/1. Нажмите на вес и меняйте его кнопками внизу.',
+    p0: { h1: { w1: 1, w2: 1, b: -0.5 }, h2: { w1: 1, w2: 1, b: -0.5 }, y: { w1: 1, w2: 1, b: -0.5 } },
+    check: m => m.correct === 4 },
+  { id: 'chat', title: 'Как работают чат-боты',
+    text: ['Чат-бот на основе большой языковой модели (LLM) пишет ответ по одному токену — слову или кусочку слова. Каждый раз модель оценивает вероятности всех вариантов следующего токена и выбирает один из них.',
+           'Наша игрушечная модель знает только, какое слово чаще шло после предыдущего в учебных текстах. Настоящая LLM — нейросеть-трансформер: она смотрит на весь диалог (тысячи токенов), обучена на огромном корпусе текстов, а потом дообучена на примерах хороших ответов и оценках людей.',
+           'Температура T управляет случайностью. При T = 0 всегда берётся самое вероятное слово: ответ одинаковый и предсказуемый. При большой T редкие слова получают шанс: текст разнообразнее, но чаще выходит чепуха. Модель выбирает правдоподобное, а не обязательно правдивое — поэтому чат-боты иногда уверенно ошибаются («галлюцинируют»).'],
+    why: 'Чат-боты отвечают клиентам банков и операторов связи, помогают юристам и врачам искать в документах, пишут код вместе с программистами. Появились профессии промпт-инженера и разработчика ИИ-ассистентов; казахстанские компании обучают модели и на казахском языке. Тому, кто понимает, как бот выбирает слова, проще проверять его ответы и не сдать в школе или на работе выдуманный факт.',
+    safe: 'Не вводите в чат-боты пароли, номер ИИН, данные карты и чужие личные данные: переписка может храниться на серверах. Важные факты из ответа бота проверяйте по надёжным источникам.',
+    task: 'Сгенерируйте два ответа до точки: один при температуре 0, другой при температуре не ниже 1,2. Слова должна выбирать модель, без вашей подсказки.',
+    hint: 'Поставьте T = 0 и нажмите «До точки». Потом T = 1,5 и снова «До точки». Сравните ответы и вероятности.',
+    stage: 'Нажмите на столбик, чтобы самому выбрать слово, или пусть выбирает модель.',
+    T0: 0.7,
+    check: m => m.greedyOK && m.hotOK },
+  { id: 'ethics', title: 'Этика ИИ',
+    text: ['ИИ учится на данных, которые собрали люди. Если в данных мало примеров какой-то группы, модель будет хуже работать именно для неё. Это называется смещением (bias) модели. Злого умысла нет, а несправедливость есть.',
+           'Средняя точность может скрывать проблему: 91 % «в среднем» и 68 % для пожилых людей. Поэтому качество модели проверяют отдельно для каждой группы, а данные собирают осознанно.',
+           'Другие вопросы этики ИИ: кто отвечает за ошибку (решение должен проверять человек), приватность (Закон РК «О персональных данных и их защите»), дипфейки и обман, честность в учёбе (выдавать текст бота за свой — нечестно). В ЕС уже действует закон об ИИ (AI Act), свои правила для ИИ принимают и в других странах, в том числе в Казахстане.'],
+    why: 'Компании нанимают специалистов по ответственному ИИ и аудиторов моделей: они проверяют, не отказывает ли система кому-то несправедливо. Юристы по IT-праву и специалисты по защите данных нужны каждому банку и госсервису. А каждому пользователю этика ИИ помогает не попасться на дипфейк и не нарушить чужие права.',
+    safe: 'Не публикуйте сгенерированные фото и видео реальных людей без их согласия: дипфейк может навредить человеку и нарушить закон.',
+    task: 'Голосовой помощник для госуслуг плохо понимает детей и пожилых. Распределите 1200 записей для обучения так, чтобы точность в каждой группе была не ниже 90 %, а разница между группами — не больше 5 процентных пунктов. Нажмите «Обучить».',
+    hint: 'Поровну — не всегда честно: группам, которые модели даются труднее, нужно больше примеров. Смотрите на худшую группу, а не на среднее.',
+    stage: 'Меняйте число записей кнопками − и + под столбиками, потом «Обучить».',
+    n0: [900, 200, 100],
+    check: m => !m.stale && m.min >= 0.9 && m.gap <= 0.05 },
+];
+
+const KEY = 'luch-cs-ai';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null,
+            w: [3, 0, -1.2], hand: null, epochs: 0, tested: false, pick: null,          // lesson 1
+            P: null, x1: 1, x2: 0, sel: 'y.w2',                                       // lesson 2
+            T: 0.7, words: [], probs: [], gen: null, answers: [], greedyOK: false, hotOK: false, // lesson 3
+            n: [900, 200, 100], tn: [900, 200, 100] };                                 // lesson 4
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+const cloneP = p => JSON.parse(JSON.stringify(p));
+
+// ---------- models ----------
+function model() {
+  const id = LID();
+  if (id === 'ml') {
+    const wrong = TRAIN.map(p => predict(S.w, p) !== p.c), errs = wrong.filter(Boolean).length;
+    const twrong = TEST.map(p => predict(S.w, p) !== p.c), terrs = twrong.filter(Boolean).length;
+    return { kind: 'ml', wrong, errs, acc: (TRAIN.length - errs) / TRAIN.length, twrong, terrs, testAcc: (TEST.length - terrs) / TEST.length, tested: S.tested };
+  }
+  if (id === 'nn') {
+    const rows = ROWS4.map(([a, b]) => { const r = net(S.P, a, b); return { a, b, out: r.o3, want: xor(a, b), r }; });
+    return { kind: 'nn', rows, correct: rows.filter(r => r.out === r.want).length, cur: net(S.P, S.x1, S.x2) };
+  }
+  if (id === 'chat') {
+    const ended = S.words.length > 0 && S.words[S.words.length - 1] === '.';
+    const ctx = S.words.length ? S.words[S.words.length - 1] : '^';
+    return { kind: 'chat', ended, ctx, d: ended ? [] : dist(ctx, S.T), greedyOK: S.greedyOK, hotOK: S.hotOK,
+             pAll: S.probs.reduce((a, b) => a * b, 1) };
+  }
+  const acc = GROUPS.map((g, i) => accOf(g, S.tn[i])), tot = S.tn.reduce((a, b) => a + b, 0);
+  const avg = tot ? acc.reduce((s, a, i) => s + a * S.tn[i] / tot, 0) : 0;
+  const min = Math.min(...acc), max = Math.max(...acc);
+  return { kind: 'eth', acc, avg, min, max, gap: max - min, used: S.n.reduce((a, b) => a + b, 0), stale: S.n.some((v, i) => v !== S.tn[i]) };
+}
+
+// ---------- lesson 1 geometry ----------
+const PX = { x0: 50, x1: 316, y0: 128, y1: 378 };
+const gx = u => PX.x0 + u * (PX.x1 - PX.x0), gy = v => PX.y1 - v * (PX.y1 - PX.y0);
+const ux = x => (x - PX.x0) / (PX.x1 - PX.x0), vy = y => (PX.y1 - y) / (PX.y1 - PX.y0);
+function syncHandles() {
+  const [a, b, c] = S.w, nn = a * a + b * b; if (nn < 1e-9) { S.hand = [[0.2, 0.5], [0.8, 0.5]]; return; }
+  const k = (a * 0.5 + b * 0.5 + c) / nn, p0 = [0.5 - k * a, 0.5 - k * b], L0 = Math.sqrt(nn), d = [-b / L0, a / L0];
+  // clip the line to the box [0.06, 0.94]²
+  let t0 = -Infinity, t1 = Infinity;
+  for (let i = 0; i < 2; i++) {
+    if (Math.abs(d[i]) < 1e-9) { if (p0[i] < 0.06 || p0[i] > 0.94) { t0 = 1; t1 = 0; } continue; }
+    let ta = (0.06 - p0[i]) / d[i], tb = (0.94 - p0[i]) / d[i]; if (ta > tb) [ta, tb] = [tb, ta];
+    t0 = Math.max(t0, ta); t1 = Math.min(t1, tb);
+  }
+  if (t0 > t1) { S.hand = [[p0[0] - 0.3 * d[0], p0[1] - 0.3 * d[1]], [p0[0] + 0.3 * d[0], p0[1] + 0.3 * d[1]]]; return; }
+  const s = (t1 - t0) * 0.12;
+  S.hand = [[p0[0] + (t0 + s) * d[0], p0[1] + (t0 + s) * d[1]], [p0[0] + (t1 - s) * d[0], p0[1] + (t1 - s) * d[1]]];
+}
+function wFromHandles() {
+  const [p, q] = S.hand, dx = q[0] - p[0], dy = q[1] - p[1];
+  let nx = -dy, ny = dx;
+  if (ny < -1e-9 || (Math.abs(ny) <= 1e-9 && nx > 0)) { nx = -nx; ny = -ny; }   // «лимонная» сторона — где кожура желтее
+  const l = Math.hypot(nx, ny) || 1; nx = nx / l * 4; ny = ny / l * 4;
+  S.w = [nx, ny, -(nx * p[0] + ny * p[1])];
+}
+function clipPoly(poly, f) {        // keep the part of poly where f(p) ≥ 0
+  const out = [];
+  for (let i = 0; i < poly.length; i++) {
+    const A = poly[i], B = poly[(i + 1) % poly.length], fa = f(A), fb = f(B);
+    if (fa >= 0) out.push(A);
+    if ((fa >= 0) !== (fb >= 0)) { const t = fa / (fa - fb); out.push([A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t]); }
+  }
+  return out;
+}
+function epoch() {
+  for (const p of TRAIN) {
+    const x = [U(p.m), p.y, 1], t = p.c === 'l' ? 1 : 0, o = predict(S.w, p) === 'l' ? 1 : 0;
+    if (t !== o) for (let i = 0; i < 3; i++) S.w[i] += LR * (t - o) * x[i];
+  }
+  S.epochs++; syncHandles();
+}
+
+// ---------- scene ----------
+const scene = $('#scene');
+const T = (x, y, s, size = 11, fill = '#e8ecf4', anchor = 'start', extra = '') => `<text x="${x}" y="${y}" font-size="${size}" fill="${fill}" text-anchor="${anchor}" ${extra}>${s}</text>`;
+const BG = `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.05)" stroke-width="1.5"/></pattern></defs><rect x="-2000" y="-2000" width="4520" height="4400" fill="url(#tile)"/>`;
+const panel = (x, y, w, h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="12" fill="rgba(18,26,40,.82)" stroke="#26324a" stroke-width="1.2"/>`;
+
+function mlScene(m) {
+  let h = panel(PX.x0 - 40, PX.y0 - 14, PX.x1 - PX.x0 + 54, PX.y1 - PX.y0 + 52);
+  const sq = [[0, 0], [1, 0], [1, 1], [0, 1]], f = p => S.w[0] * p[0] + S.w[1] * p[1] + S.w[2];
+  const toPts = poly => poly.map(p => `${gx(p[0]).toFixed(1)},${gy(p[1]).toFixed(1)}`).join(' ');
+  const lem = clipPoly(sq, f), app = clipPoly(sq, p => -f(p));
+  if (lem.length > 2) h += `<polygon points="${toPts(lem)}" fill="#f6d743" opacity=".10"/>`;
+  if (app.length > 2) h += `<polygon points="${toPts(app)}" fill="#e5484d" opacity=".10"/>`;
+  // axes
+  h += `<rect x="${PX.x0}" y="${PX.y0}" width="${PX.x1 - PX.x0}" height="${PX.y1 - PX.y0}" fill="none" stroke="#26324a"/>`;
+  for (const mm of [80, 140, 200, 260]) { const x = gx(U(mm)); h += `<path d="M${x} ${PX.y1}v4" stroke="#8b96ad"/>` + T(x, PX.y1 + 15, mm, 9.5, '#8b96ad', 'middle'); }
+  for (const v of [0, 0.5, 1]) { const y = gy(v); h += `<path d="M${PX.x0} ${y}h-4" stroke="#8b96ad"/>` + T(PX.x0 - 6, y + 3, fmt(v, 1), 9.5, '#8b96ad', 'end'); }
+  h += T(PX.x1, PX.y1 + 29, 'масса, г →', 10, '#8b96ad', 'end') + T(PX.x0 - 34, PX.y0 - 20, '↑ жёлтость кожуры', 10, '#8b96ad');
+  h += T(PX.x0 + 8, PX.y0 + 16, 'ЛИМОН', 10, '#f6d743', 'start', 'opacity=".55"') + T(PX.x1 - 8, PX.y1 - 8, 'ЯБЛОКО', 10, '#ff8a8a', 'end', 'opacity=".55"');
+  // boundary line (clipped to the plot)
+  const seg = clipPoly(sq, f).length > 2 ? lineInBox() : null;
+  if (seg) h += `<path d="M${gx(seg[0][0]).toFixed(1)} ${gy(seg[0][1]).toFixed(1)}L${gx(seg[1][0]).toFixed(1)} ${gy(seg[1][1]).toFixed(1)}" stroke="${INK}" stroke-width="5.5"/><path d="M${gx(seg[0][0]).toFixed(1)} ${gy(seg[0][1]).toFixed(1)}L${gx(seg[1][0]).toFixed(1)} ${gy(seg[1][1]).toFixed(1)}" stroke="#ffb547" stroke-width="2.6"/>`;
+  // points
+  const dot = (p, i, wrong, test) => {
+    const x = gx(U(p.m)), y = gy(p.y), col = p.c === 'l' ? '#f6d743' : '#e5484d', id = (test ? 'tp' : 'pt') + i;
+    let s = `<g data-drag="${id}"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="13" fill="transparent"/>`;
+    if (test) s += `<rect x="${(x - 6).toFixed(1)}" y="${(y - 6).toFixed(1)}" width="12" height="12" transform="rotate(45 ${x.toFixed(1)} ${y.toFixed(1)})" fill="${INK}" stroke="${col}" stroke-width="2.4"/>`;
+    else s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6" fill="${col}" stroke="${INK}" stroke-width="1.6"/>` + (p.c === 'a' ? `<path d="M${x.toFixed(1)} ${(y - 6).toFixed(1)}v-3" stroke="#6bbf59" stroke-width="1.6"/>` : '');
+    if (wrong) s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="10" fill="none" stroke="#ff8a73" stroke-width="1.8" stroke-dasharray="3 2.4"/>`;
+    if (S.pick && S.pick.test === test && S.pick.i === i) s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="12" fill="none" stroke="#72d4e8" stroke-width="2"/>`;
+    return s + '</g>';
+  };
+  TRAIN.forEach((p, i) => h += dot(p, i, m.wrong[i], false));
+  if (S.tested) TEST.forEach((p, i) => h += dot(p, i, m.twrong[i], true));
+  // handles
+  S.hand.forEach((q, i) => {
+    const x = gx(q[0]), y = gy(q[1]);
+    h += `<g data-drag="hd${i}"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="18" fill="transparent"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="8" fill="#ffb547" stroke="${INK}" stroke-width="2"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.6" fill="${INK}"/></g>`;
+  });
+  // legend
+  const lx = 352;
+  h += panel(lx - 10, 150, 168, 168);
+  h += `<circle cx="${lx + 8}" cy="170" r="6" fill="#e5484d" stroke="${INK}" stroke-width="1.5"/>` + T(lx + 22, 174, 'яблоко', 11);
+  h += `<circle cx="${lx + 8}" cy="192" r="6" fill="#f6d743" stroke="${INK}" stroke-width="1.5"/>` + T(lx + 22, 196, 'лимон', 11);
+  h += `<rect x="${lx + 3}" y="209" width="10" height="10" transform="rotate(45 ${lx + 8} 214)" fill="${INK}" stroke="#8b96ad" stroke-width="2"/>` + T(lx + 22, 218, 'тест (новые)', 11);
+  h += `<circle cx="${lx + 8}" cy="236" r="8" fill="none" stroke="#ff8a73" stroke-width="1.8" stroke-dasharray="3 2.4"/>` + T(lx + 22, 240, 'ошибка модели', 11);
+  h += `<path d="M${lx} 258h16" stroke="#ffb547" stroke-width="2.6"/>` + T(lx + 22, 262, 'граница модели', 11);
+  h += T(lx, 286, `обучение: ${TRAIN.length - m.errs}/${TRAIN.length}`, 11, m.errs <= 2 ? '#86e0a8' : '#e8ecf4');
+  h += T(lx, 305, S.tested ? `тест: ${TEST.length - m.terrs}/${TEST.length}` : 'тест: не проверяли', 11, S.tested ? (m.testAcc >= 0.9 ? '#86e0a8' : '#ff8a73') : '#8b96ad');
+  h += T(lx, 340, `эпох: ${S.epochs}`, 10.5, '#8b96ad');
+  return h;
+}
+function lineInBox() {
+  const [a, b, c] = S.w, nn = a * a + b * b; if (nn < 1e-9) return null;
+  const k = (a * 0.5 + b * 0.5 + c) / nn, p0 = [0.5 - k * a, 0.5 - k * b], l = Math.sqrt(nn), d = [-b / l, a / l];
+  let t0 = -Infinity, t1 = Infinity;
+  for (let i = 0; i < 2; i++) {
+    if (Math.abs(d[i]) < 1e-9) { if (p0[i] < 0 || p0[i] > 1) return null; continue; }
+    let ta = (0 - p0[i]) / d[i], tb = (1 - p0[i]) / d[i]; if (ta > tb) [ta, tb] = [tb, ta];
+    t0 = Math.max(t0, ta); t1 = Math.min(t1, tb);
+  }
+  if (t0 > t1) return null;
+  return [[p0[0] + t0 * d[0], p0[1] + t0 * d[1]], [p0[0] + t1 * d[0], p0[1] + t1 * d[1]]];
+}
+
+// lesson 2 layout
+const NP = { x1: [40, 190], x2: [40, 330], h1: [170, 178], h2: [170, 342], y: [290, 260] };
+function wBadge(x, y, key, val) {
+  const on = S.sel === key, s = fmt(val, 1);
+  return `<g data-drag="w:${key}"><rect x="${x - 24}" y="${y - 12}" width="48" height="24" rx="7" fill="${on ? '#ffb547' : '#1a2438'}" stroke="${on ? '#ffd08a' : '#3a4762'}" stroke-width="1.4"/>` +
+    T(x, y + 4.5, s, 11.5, on ? '#0b1019' : '#e8ecf4', 'middle', 'font-weight="500"') + `</g>`;
+}
+function nnScene(m) {
+  let h = '';
+  const r = m.cur, P = S.P;
+  const wire = (a, b, w, live) => {
+    const col = w > 0 ? '#72d4e8' : w < 0 ? '#ff8a73' : '#3a4762', sw = 1.2 + Math.min(3, Math.abs(w)) * 1.3;
+    return `<path d="M${a[0]} ${a[1]}L${b[0]} ${b[1]}" stroke="${col}" stroke-width="${sw.toFixed(1)}" opacity="${live ? 0.95 : 0.35}"/>`;
+  };
+  h += wire(NP.x1, NP.h1, P.h1.w1, S.x1) + wire(NP.x2, NP.h1, P.h1.w2, S.x2) + wire(NP.x1, NP.h2, P.h2.w1, S.x1) + wire(NP.x2, NP.h2, P.h2.w2, S.x2);
+  h += wire(NP.h1, NP.y, P.y.w1, r.o1) + wire(NP.h2, NP.y, P.y.w2, r.o2);
+  h += `<path d="M${NP.y[0] + 30} ${NP.y[1]}H${NP.y[0] + 52}" stroke="#e8ecf4" stroke-width="2"/><path d="M${NP.y[0] + 52} ${NP.y[1] - 5}l7 5-7 5z" fill="#e8ecf4"/>`;
+  // inputs
+  [['x1', S.x1], ['x2', S.x2]].forEach(([k, v]) => {
+    const [x, y] = NP[k];
+    h += `<g data-drag="in:${k}"><rect x="${x - 26}" y="${y - 26}" width="52" height="52" rx="12" fill="${v ? '#72d4e8' : '#1a2438'}" stroke="${INK}" stroke-width="2"/>` +
+      T(x, y + 7, v, 20, v ? '#0b1019' : '#e8ecf4', 'middle', 'font-weight="500"') + T(x, y - 33, k === 'x1' ? 'x₁' : 'x₂', 12, '#8b96ad', 'middle') + `</g>`;
+  });
+  // neurons
+  const neuron = (k, s, o) => {
+    const [x, y] = NP[k];
+    let g = `<g data-drag="n:${k}"><circle cx="${x}" cy="${y}" r="31" fill="${o ? '#ffb547' : '#121a28'}" stroke="${INK}" stroke-width="2.6"/><circle cx="${x}" cy="${y}" r="31" fill="none" stroke="${o ? '#ffd08a' : '#56627d'}" stroke-width="1.6"/>`;
+    g += T(x, y - 6, NNAME[k], 12, o ? '#0b1019' : '#8b96ad', 'middle', 'font-weight="500"') + T(x, y + 13, 'Σ ' + fmt(s, 1), 11, o ? '#0b1019' : '#e8ecf4', 'middle');
+    return g + `</g>`;
+  };
+  h += neuron('h1', r.s1, r.o1) + neuron('h2', r.s2, r.o2) + neuron('y', r.s3, r.o3);
+  // output value
+  h += `<rect x="${NP.y[0] + 62}" y="${NP.y[1] - 20}" width="34" height="40" rx="9" fill="${r.o3 ? '#ffb547' : '#1a2438'}" stroke="${INK}" stroke-width="2"/>` + T(NP.y[0] + 79, NP.y[1] + 7, r.o3, 18, r.o3 ? '#0b1019' : '#e8ecf4', 'middle', 'font-weight="500"');
+  // weights + biases
+  const mid = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  let q = mid(NP.x1, NP.h1, 0.55); h += wBadge(q[0], q[1] - 12, 'h1.w1', P.h1.w1);
+  q = mid(NP.x2, NP.h1, 0.32); h += wBadge(q[0] + 4, q[1], 'h1.w2', P.h1.w2);
+  q = mid(NP.x1, NP.h2, 0.32); h += wBadge(q[0] + 4, q[1], 'h2.w1', P.h2.w1);
+  q = mid(NP.x2, NP.h2, 0.55); h += wBadge(q[0], q[1] + 12, 'h2.w2', P.h2.w2);
+  q = mid(NP.h1, NP.y, 0.5); h += wBadge(q[0], q[1] - 14, 'y.w1', P.y.w1);
+  q = mid(NP.h2, NP.y, 0.5); h += wBadge(q[0], q[1] + 14, 'y.w2', P.y.w2);
+  h += T(NP.h1[0], NP.h1[1] - 50, 'b', 10, '#8b96ad', 'middle') + wBadge(NP.h1[0] + 34, NP.h1[1] - 52, 'h1.b', P.h1.b);
+  h += T(NP.h2[0] + 4, NP.h2[1] + 48, 'b', 10, '#8b96ad', 'middle') + wBadge(NP.h2[0] + 40, NP.h2[1] + 44, 'h2.b', P.h2.b);
+  h += T(NP.y[0], NP.y[1] - 50, 'b', 10, '#8b96ad', 'middle') + wBadge(NP.y[0] + 34, NP.y[1] - 52, 'y.b', P.y.b);
+  // truth table
+  const tx = 412, ty = 152;
+  h += panel(tx - 8, ty - 6, 106, 168) + T(tx + 45, ty + 12, 'XOR', 11, '#8b96ad', 'middle');
+  h += T(tx + 10, ty + 32, 'x₁x₂', 10, '#8b96ad', 'middle') + T(tx + 50, ty + 32, 'Y', 10, '#8b96ad', 'middle') + T(tx + 80, ty + 32, 'надо', 10, '#8b96ad', 'middle');
+  m.rows.forEach((row, i) => {
+    const y = ty + 44 + i * 28, cur = row.a === S.x1 && row.b === S.x2, ok = row.out === row.want;
+    h += `<g data-drag="row:${i}"><rect x="${tx - 4}" y="${y - 2}" width="98" height="24" rx="6" fill="${cur ? '#1a2438' : 'transparent'}" stroke="${cur ? '#56627d' : 'none'}"/>`;
+    h += T(tx + 10, y + 15, `${row.a} ${row.b}`, 12, '#e8ecf4', 'middle') + T(tx + 50, y + 15, row.out, 12, ok ? '#86e0a8' : '#ff8a73', 'middle', 'font-weight="500"') + T(tx + 80, y + 15, row.want, 12, '#8b96ad', 'middle') + `</g>`;
+  });
+  h += T(tx + 45, ty + 172 + 10, `${m.correct}/4 верно`, 11, m.correct === 4 ? '#86e0a8' : '#e8ecf4', 'middle');
+  h += `<path d="M${tx - 4} 356h16" stroke="#72d4e8" stroke-width="3"/>` + T(tx + 18, 360, 'вес > 0', 10, '#8b96ad');
+  h += `<path d="M${tx - 4} 374h16" stroke="#ff8a73" stroke-width="3"/>` + T(tx + 18, 378, 'вес < 0', 10, '#8b96ad');
+  h += T(tx - 4, 396, 'толще — больше', 10, '#8b96ad') + T(tx - 4, 409, 'по модулю', 10, '#8b96ad');
+  return h;
+}
+
+// lesson 3
+function wrapWords(s, max) {
+  const out = []; let line = '';
+  for (const w of s.split(' ')) { if ((line + ' ' + w).trim().length > max && line) { out.push(line); line = w; } else line = (line + ' ' + w).trim(); }
+  if (line) out.push(line); return out;
+}
+function chatScene(m) {
+  let h = '';
+  // user bubble
+  h += `<rect x="236" y="122" width="262" height="34" rx="14" fill="#2a3a5c" stroke="#3a4f78"/>` + T(486, 144, 'Расскажи про Казахстан.', 12.5, '#e8ecf4', 'end');
+  h += T(498, 168, 'вы', 9, '#8b96ad', 'end');
+  // bot bubble
+  const text = S.words.length ? joinTok(S.words) : '…';
+  const lines = wrapWords(text, 40), bh = 22 + lines.length * 18;
+  h += `<rect x="22" y="176" width="350" height="${bh}" rx="14" fill="#1a2438" stroke="#26324a"/>`;
+  lines.forEach((ln, i) => h += T(38, 196 + i * 18, ln, 13, S.words.length ? '#e8ecf4' : '#8b96ad'));
+  h += T(30, 176 + bh + 13, 'бот', 9, '#8b96ad');
+  // context marker
+  h += `<g data-drag="ctx"><rect x="384" y="178" width="116" height="44" rx="10" fill="rgba(114,212,232,.08)" stroke="#72d4e8" stroke-dasharray="4 3"/>` +
+    T(442, 194, 'контекст', 9.5, '#8b96ad', 'middle') + T(442, 212, m.ctx === '^' ? 'начало' : m.ended ? 'конец ответа' : `«${m.ctx}»`, 12, '#72d4e8', 'middle') + `</g>`;
+  // distribution
+  const y0 = 252;
+  if (m.ended) {
+    h += panel(22, y0 - 8, 478, 120) + T(261, y0 + 34, 'Ответ готов: модель поставила точку.', 12.5, '#86e0a8', 'middle');
+    h += T(261, y0 + 56, `вероятность всей фразы ≈ ${fmtP(m.pAll)}`, 11, '#8b96ad', 'middle');
+    h += T(261, y0 + 80, '«Новый ответ» — начать заново', 11, '#8b96ad', 'middle');
+  } else {
+    h += T(24, y0 - 4, `следующее слово · T = ${fmt(S.T, 1)}`, 10.5, '#8b96ad');
+    m.d.slice(0, 5).forEach((c, i) => {
+      const y = y0 + 6 + i * 25, W = 250 * c.p;
+      h += `<g data-drag="pick:${c.w}"><rect x="22" y="${y - 2}" width="478" height="23" rx="6" fill="transparent"/>`;
+      h += T(116, y + 14, c.w === '.' ? '. (конец)' : c.w, 12, '#e8ecf4', 'end');
+      h += `<rect x="126" y="${y + 2}" width="250" height="14" rx="3" fill="#1a2438"/>`;
+      if (W > 0.3) h += `<rect x="126" y="${y + 2}" width="${W.toFixed(1)}" height="14" rx="3" fill="${i === 0 ? '#ffb547' : '#5fb4d9'}"/>`;
+      h += T(384, y + 14, pc(c.p, 0), 11.5, '#e8ecf4') + T(498, y + 14, `${c.c} раз`, 10, '#8b96ad', 'end') + `</g>`;
+    });
+  }
+  return h;
+}
+const fmtP = p => p >= 0.001 ? pc(p, 1) : p.toExponential(1).replace('.', ',').replace('e-', '·10^−');
+
+// lesson 4
+const GX = [95, 260, 425];
+function ethScene(m) {
+  let h = '';
+  const top = 168, H = 130, maxN = BUDGET;
+  h += T(260, 140, `записей для обучения: ${m.used} из ${BUDGET}`, 11.5, m.used === BUDGET ? '#e8ecf4' : '#ffb547', 'middle');
+  GROUPS.forEach((g, i) => {
+    const x = GX[i], n = S.n[i], bh = n / maxN * H;
+    h += panel(x - 74, 150, 148, 252);
+    h += T(x, top + 6, g.name, 12.5, '#e8ecf4', 'middle', 'font-weight="500"') + T(x, top + 21, g.sub, 9.5, '#8b96ad', 'middle');
+    // stack of recordings
+    const by = top + 30 + H;
+    h += `<rect x="${x - 26}" y="${top + 30}" width="52" height="${H}" rx="5" fill="#0e1520" stroke="#26324a"/>`;
+    const k = Math.round(n / NSTEP);
+    for (let j = 0; j < k; j++) { const yy = by - (j + 1) * (H / (maxN / NSTEP)); h += `<rect x="${x - 24}" y="${(yy + 0.5).toFixed(1)}" width="48" height="${(H / (maxN / NSTEP) - 1).toFixed(1)}" rx="1.5" fill="#5fb4d9" opacity="${0.55 + 0.35 * ((j % 2))}"/>`; }
+    h += T(x, by - bh - 5, n, 11, '#e8ecf4', 'middle');
+    // buttons
+    const btn = (id, cx, s, dis) => `<g data-drag="${id}" opacity="${dis ? 0.35 : 1}"><circle cx="${cx}" cy="${by + 24}" r="17" fill="#1a2438" stroke="#56627d" stroke-width="1.4"/>` + T(cx, by + 30, s, 18, '#e8ecf4', 'middle') + `</g>`;
+    h += btn('dn' + i, x - 34, '−', n <= 0) + btn('up' + i, x + 34, '+', m.used >= BUDGET);
+    // accuracy (of the trained model)
+    const a = m.acc[i], ay = by + 56;
+    h += T(x - 62, ay, 'точность', 9.5, '#8b96ad');
+    h += `<rect x="${x - 62}" y="${ay + 6}" width="124" height="10" rx="3" fill="#1a2438"/>`;
+    const ax = v => x - 62 + clamp((v - 0.5) / 0.5, 0, 1) * 124;
+    h += `<rect x="${x - 62}" y="${ay + 6}" width="${(ax(a) - (x - 62)).toFixed(1)}" height="10" rx="3" fill="${m.stale ? '#56627d' : a >= 0.9 ? '#86e0a8' : '#ff8a73'}"/>`;
+    h += `<path d="M${ax(0.9).toFixed(1)} ${ay + 2}v18" stroke="#ffb547" stroke-width="1.6"/>`;
+    h += T(x + 62, ay, pc(a), 11, m.stale ? '#8b96ad' : a >= 0.9 ? '#86e0a8' : '#ff8a73', 'end', 'font-weight="500"');
+  });
+  if (m.stale) h += T(260, 396 + 22, 'данные изменились — нажмите «Обучить»', 10.5, '#ffb547', 'middle');
+  return h;
+}
+
+function hlBox(id) {
+  const L0 = LID();
+  if (L0 === 'ml') return { plot: [PX.x0 - 6, PX.y0 - 6, PX.x1 - PX.x0 + 12, PX.y1 - PX.y0 + 12], line: S.hand ? [Math.min(gx(S.hand[0][0]), gx(S.hand[1][0])) - 14, Math.min(gy(S.hand[0][1]), gy(S.hand[1][1])) - 14, Math.abs(gx(S.hand[0][0]) - gx(S.hand[1][0])) + 28, Math.abs(gy(S.hand[0][1]) - gy(S.hand[1][1])) + 28] : null, legend: [340, 148, 172, 172], test: [340, 292, 172, 22] }[id];
+  if (L0 === 'nn') return { inputs: [8, 150, 64, 212], hidden: [134, 112, 110, 290], output: [252, 214, 150, 92], weights: [58, 116, 270, 290], table: [400, 142, 114, 194] }[id];
+  if (L0 === 'chat') return { user: [232, 118, 270, 54], bot: [18, 172, 358, 70], ctx: [380, 174, 124, 52], bars: [18, 236, 486, 140] }[id];
+  return { data: [20, 192, 480, 140], buttons: [20, 333, 480, 38], acc: [20, 372, 480, 32], budget: [140, 124, 240, 24] }[id];
+}
+
+function drawScene(t) {
+  const id = LID(), m = model();
+  let h = BG;
+  if (id === 'ml') h += mlScene(m);
+  else if (id === 'nn') h += nnScene(m);
+  else if (id === 'chat') h += chatScene(m);
+  else h += ethScene(m);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}" pointer-events="none"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// fit the scene: 520 × 405 units, centred, content at the bottom
+let VB = { x: 0, y: 0, w: 520, h: 420 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 500, hh / 420, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 420 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  drag = { id: el.dataset.drag, x: e.clientX, y: e.clientY, moved: false };
+  if (drag.id.startsWith('hd')) scene.classList.add('grabbing');
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 5) drag.moved = true;
+  if (!drag.moved || !drag.id.startsWith('hd') || LID() !== 'ml') return;
+  const i = +drag.id.slice(2), p = toSvg(e), q = [clamp(ux(p.x), 0, 1), clamp(vy(p.y), 0, 1)], o = S.hand[1 - i];
+  if (Math.hypot(q[0] - o[0], q[1] - o[1]) < 0.06) return;
+  S.hand[i] = q; wFromHandles(); update();
+});
+const endDrag = cancel => {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing');
+  if (!cancel && !d.moved) tapAct(d.id);
+  dirty = true;
+};
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+function tapAct(id) {
+  const L0 = LID();
+  if (L0 === 'ml') {
+    if (id.startsWith('pt')) { S.pick = { test: false, i: +id.slice(2) }; const p = TRAIN[S.pick.i]; toast(`${FN[p.c]}: ${p.m} г, жёлтость ${fmt(p.y, 2)} → модель: ${FN[predict(S.w, p)]}`); update(); }
+    else if (id.startsWith('tp')) { S.pick = { test: true, i: +id.slice(2) }; const p = TEST[S.pick.i]; toast(`тест, ${FN[p.c]}: ${p.m} г → модель: ${FN[predict(S.w, p)]}`); update(); }
+    return;
+  }
+  if (L0 === 'nn') {
+    if (id.startsWith('w:')) { S.sel = id.slice(2); renderTools(); update(); }
+    else if (id.startsWith('in:')) { const k = id.slice(3); S[k] = S[k] ? 0 : 1; update(); }
+    else if (id.startsWith('row:')) { const [a, b] = ROWS4[+id.slice(4)]; S.x1 = a; S.x2 = b; update(); }
+    else if (id.startsWith('n:')) { S.sel = id.slice(2) + '.b'; renderTools(); update(); }
+    return;
+  }
+  if (L0 === 'chat') {
+    if (id.startsWith('pick:')) chooseWord(id.slice(5), true);
+    else if (id === 'ctx') toast('Наша модель видит только последнее слово. Настоящая LLM — весь диалог.');
+    return;
+  }
+  if (L0 === 'ethics') {
+    const i = +id.slice(2);
+    if (id.startsWith('up')) { if (S.n.reduce((a, b) => a + b, 0) + NSTEP > BUDGET) { toast('Бюджет 1200 записей исчерпан. Сначала уберите записи у другой группы.'); return; } S.n[i] += NSTEP; update(); }
+    if (id.startsWith('dn')) { if (S.n[i] <= 0) return; S.n[i] -= NSTEP; update(); }
+  }
+}
+
+// ---------- lesson actions ----------
+let autoT = 0, trainT = 0;
+function stopTimers() { clearTimeout(autoT); clearTimeout(trainT); autoT = trainT = 0; }
+function newAnswer() { S.words = []; S.probs = []; S.gen = { manual: false, minT: Infinity, maxT: -Infinity }; }
+function chooseWord(w, manual) {
+  if (LID() !== 'chat') return false;
+  if (S.words.length && S.words[S.words.length - 1] === '.') newAnswer();
+  if (!S.gen) newAnswer();
+  const d = dist(S.words.length ? S.words[S.words.length - 1] : '^', S.T), c = d.find(x => x.w === w); if (!c) return false;
+  S.words.push(w); S.probs.push(c.p);
+  if (manual) S.gen.manual = true;
+  S.gen.minT = Math.min(S.gen.minT, S.T); S.gen.maxT = Math.max(S.gen.maxT, S.T);
+  if (w === '.') {
+    const g = S.gen, txt = joinTok(S.words);
+    S.answers.unshift({ txt, T: g.minT === g.maxT ? fmt(g.minT, 1) : `${fmt(g.minT, 1)}…${fmt(g.maxT, 1)}`, manual: g.manual });
+    S.answers = S.answers.slice(0, 6);
+    if (!g.manual && g.maxT === 0) { if (!S.greedyOK) toast('Ответ при T = 0 готов. Сгенерируйте его ещё раз — он будет точно таким же.'); S.greedyOK = true; }
+    else if (!g.manual && g.minT >= HOT) { if (!S.hotOK) toast('Горячий ответ готов. Сравните его с ответом при T = 0.'); S.hotOK = true; }
+    else if (g.manual) toast('Этот ответ собран с вашими подсказками — для задания слова должна выбирать модель.');
+  }
+  update(); return true;
+}
+function modelStep() {
+  if (S.words.length && S.words[S.words.length - 1] === '.') newAnswer();
+  const d = dist(S.words.length ? S.words[S.words.length - 1] : '^', S.T);
+  let r = Math.random(), w = d[0].w;
+  if (S.T > 0) for (const c of d) { r -= c.p; if (r <= 0) { w = c.w; break; } }
+  return chooseWord(w, false);
+}
+function runToEnd() {
+  clearTimeout(autoT);
+  if (S.words.length && S.words[S.words.length - 1] === '.') newAnswer();
+  const go = () => {
+    if (LID() !== 'chat') return;
+    modelStep();
+    if (S.words[S.words.length - 1] !== '.' && S.words.length < 16) autoT = setTimeout(go, reduce ? 0 : 320);
+  };
+  go();
+}
+function trainAuto() {
+  clearTimeout(trainT);
+  const go = () => {
+    if (LID() !== 'ml') return;
+    epoch(); update();
+    if (model().errs > 0 && S.epochs < 300) trainT = setTimeout(go, reduce ? 0 : 140);
+    else toast(model().errs ? 'Ошибки остались: идеальной прямой может и не быть.' : `Обучение закончено за ${S.epochs} ${plural(S.epochs, 'эпоху', 'эпохи', 'эпох')}: на обучении 0 ошибок.`);
+  };
+  go();
+}
+const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c; };
+function nnAdd(dv) {
+  const [k, p] = S.sel.split('.');
+  S.P[k][p] = clamp(Math.round((S.P[k][p] + dv) * 2) / 2, -3, 3); update();
+}
+
+let last = performance.now();
+function loop(t) {
+  requestAnimationFrame(loop);
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2800); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  if (id === 'ml') tb.innerHTML = B('epoch', 'Эпоха') + B('auto', 'Обучать до конца') + sep + B('test', 'Проверить на тесте') + sep + B('mlreset', 'Сброс');
+  if (id === 'nn') { const [k, p] = S.sel.split('.'); tb.innerHTML = `<button disabled>${NNAME[k]}: ${PNAME[p]}</button>` + B('dec', '− 0,5') + B('inc', '+ 0,5') + sep + B('nnreset', 'Сброс'); }
+  if (id === 'chat') tb.innerHTML = B('step', 'Слово') + B('run', 'До точки') + B('new', 'Новый ответ') + sep + B('t0', 'T 0', S.T === 0) + B('t07', 'T 0,7', S.T === 0.7) + B('t15', 'T 1,5', S.T === 1.5);
+  if (id === 'ethics') tb.innerHTML = B('train', 'Обучить') + B('equal', 'Поровну') + sep + B('ereset', 'Как было');
+}
+function act(a) {
+  if (a === 'epoch') { clearTimeout(trainT); epoch(); update(); toast(`Эпоха ${S.epochs}: ошибок на обучении ${model().errs}`); return; }
+  if (a === 'auto') return trainAuto();
+  if (a === 'test') { S.tested = true; update(); const m = model(); toast(`Тест: верно ${TEST.length - m.terrs} из ${TEST.length} (${pc(m.testAcc, 0)})`); return; }
+  if (a === 'mlreset') { stopTimers(); S.w = L().w0.slice(); S.epochs = 0; S.tested = false; S.pick = null; syncHandles(); update(); return; }
+  if (a === 'dec') return nnAdd(-0.5);
+  if (a === 'inc') return nnAdd(0.5);
+  if (a === 'nnreset') { S.P = cloneP(L().p0); update(); return; }
+  if (a === 'step') { clearTimeout(autoT); return modelStep(); }
+  if (a === 'run') return runToEnd();
+  if (a === 'new') { clearTimeout(autoT); newAnswer(); update(); return; }
+  if (a === 't0' || a === 't07' || a === 't15') { setT({ t0: 0, t07: 0.7, t15: 1.5 }[a]); return; }
+  if (a === 'train') { S.tn = S.n.slice(); update(); const m = model(); toast(`Обучено. Худшая группа: ${pc(m.min)}, разница ${fmt(m.gap * 100, 1)} п. п.`); return; }
+  if (a === 'equal') { S.n = [400, 400, 400]; update(); return; }
+  if (a === 'ereset') { S.n = L().n0.slice(); S.tn = L().n0.slice(); update(); return; }
+}
+function setT(v) { S.T = Math.round(v * 10) / 10; renderTools(); update(); }
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b && b.dataset.a) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  plot: IC('<path d="M5 4v25h25" fill="none" stroke="var(--muted)" stroke-width="1.6"/><circle cx="11" cy="10" r="2.6" fill="#f6d743"/><circle cx="15" cy="14" r="2.6" fill="#f6d743"/><circle cx="21" cy="22" r="2.6" fill="#e5484d"/><circle cx="26" cy="18" r="2.6" fill="#e5484d"/>'),
+  line: IC('<path d="M5 28L29 6" stroke="var(--force)" stroke-width="2.4"/><circle cx="9" cy="24" r="3.4" fill="var(--force)"/><circle cx="25" cy="10" r="3.4" fill="var(--force)"/>'),
+  legend: IC('<circle cx="8" cy="9" r="3" fill="#e5484d"/><circle cx="8" cy="17" r="3" fill="#f6d743"/><path d="M15 9h14M15 17h14M15 25h14" stroke="var(--muted)" stroke-width="1.6"/><path d="M5 25h6" stroke="var(--force)" stroke-width="2"/>'),
+  test: IC('<rect x="10" y="10" width="14" height="14" transform="rotate(45 17 17)" fill="none" stroke="#f6d743" stroke-width="2.4"/>'),
+  inputs: IC('<rect x="4" y="5" width="11" height="11" rx="3" fill="var(--arm)"/><rect x="4" y="19" width="11" height="11" rx="3" fill="none" stroke="var(--fg)" stroke-width="1.5"/><path d="M15 10h14M15 24h14" stroke="var(--muted)" stroke-width="1.4"/>'),
+  hidden: IC('<circle cx="17" cy="9" r="6" fill="var(--force)"/><circle cx="17" cy="25" r="6" fill="none" stroke="var(--fg)" stroke-width="1.5"/>'),
+  output: IC('<circle cx="13" cy="17" r="8" fill="var(--force)"/><path d="M21 17h9" stroke="var(--fg)" stroke-width="1.8"/>'),
+  weights: IC('<rect x="5" y="11" width="24" height="12" rx="4" fill="var(--force)"/><text x="17" y="20.5" font-size="8" text-anchor="middle" fill="#0b1019" font-family="monospace">−1</text>'),
+  table: IC('<rect x="5" y="5" width="24" height="24" rx="3" fill="none" stroke="var(--fg)" stroke-width="1.5"/><path d="M5 11h24M5 17h24M5 23h24M17 5v24" stroke="var(--muted)"/>'),
+  user: IC('<rect x="9" y="8" width="22" height="12" rx="5" fill="#2a3a5c"/><rect x="3" y="20" width="22" height="9" rx="4" fill="var(--surface-2)" stroke="var(--line)"/>'),
+  bot: IC('<rect x="3" y="8" width="26" height="15" rx="6" fill="var(--surface-2)" stroke="var(--muted)"/><path d="M8 14h16M8 18h10" stroke="var(--fg)" stroke-width="1.4"/>'),
+  ctx: IC('<rect x="4" y="9" width="26" height="16" rx="4" fill="none" stroke="var(--arm)" stroke-dasharray="3 2"/><path d="M10 17h14" stroke="var(--arm)" stroke-width="2"/>'),
+  bars: IC('<rect x="4" y="6" width="22" height="5" rx="1.5" fill="var(--force)"/><rect x="4" y="14" width="13" height="5" rx="1.5" fill="var(--liq)"/><rect x="4" y="22" width="7" height="5" rx="1.5" fill="var(--liq)"/>'),
+  data: IC('<rect x="5" y="16" width="6" height="13" fill="var(--liq)"/><rect x="14" y="8" width="6" height="21" fill="var(--liq)"/><rect x="23" y="22" width="6" height="7" fill="var(--liq)"/>'),
+  buttons: IC('<circle cx="10" cy="17" r="7" fill="none" stroke="var(--fg)" stroke-width="1.5"/><circle cx="24" cy="17" r="7" fill="none" stroke="var(--fg)" stroke-width="1.5"/><path d="M7 17h6M21 17h6M24 14v6" stroke="var(--fg)" stroke-width="1.5"/>'),
+  acc: IC('<rect x="3" y="13" width="28" height="8" rx="2" fill="var(--surface-2)"/><rect x="3" y="13" width="20" height="8" rx="2" fill="var(--ok)"/><path d="M26 9v16" stroke="var(--force)" stroke-width="1.6"/>'),
+  budget: IC('<rect x="5" y="9" width="24" height="16" rx="3" fill="none" stroke="var(--fg)" stroke-width="1.5"/><path d="M9 14h16M9 19h10" stroke="var(--muted)" stroke-width="1.5"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  if (id === 'ml') return `Ошибок на обучении: ${m.errs} · тест: ${S.tested ? pc(m.testAcc, 0) : 'не проверяли'}`;
+  if (id === 'nn') return `Таблица XOR: верно ${m.correct} из 4`;
+  if (id === 'chat') return `T = 0: ${m.greedyOK ? 'есть ✓' : 'нет'} · T ≥ 1,2: ${m.hotOK ? 'есть ✓' : 'нет'}`;
+  return m.stale ? 'Данные изменены — нажмите «Обучить»' : `Худшая группа ${pc(m.min)} · разница ${fmt(m.gap * 100, 1)} п. п.`;
+}
+
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'ml') h = `<h2>Веса модели</h2><p class="note">Модель говорит «лимон», если z = w₁·u + w₂·v + b больше нуля. Двигайте веса — прямая на графике поворачивается и сдвигается.</p>
+      <dl class="reads"><div><dt>ошибок</dt><dd id="r1"></dd></div><div><dt>точность</dt><dd id="r2"></dd></div><div><dt>тест</dt><dd id="r3"></dd></div></dl>` +
+      slider('inW1', 'w₁ (масса)', -8, 8, 0.1, S.w[0]) + slider('inW2', 'w₂ (жёлтость)', -8, 8, 0.1, S.w[1]) + slider('inB', 'b (смещение)', -8, 8, 0.1, S.w[2]) +
+      `<div class="row"><button class="ghostbtn" data-a="epoch">Эпоха</button><button class="ghostbtn" data-a="test">Проверить на тесте</button><button class="ghostbtn" data-a="mlreset">Сброс</button></div>`;
+  if (id === 'nn') {
+    h = `<h2>Все 9 параметров сети</h2><p class="note">Шаг 0,5. Нейрон выдаёт 1, если Σ = w₁·вход₁ + w₂·вход₂ + b больше нуля.</p>
+      <dl class="reads"><div><dt>x₁ x₂</dt><dd id="r1"></dd></div><div><dt>Y</dt><dd id="r2"></dd></div><div><dt>XOR верно</dt><dd id="r3"></dd></div></dl>`;
+    for (const k of NEU) {
+      h += `<div class="grp">Нейрон ${NNAME[k]}${k === 'y' ? ' (входы — H1 и H2)' : ''}</div>`;
+      for (const p of ['w1', 'w2', 'b']) h += slider(`in_${k}_${p}`, `${PNAME[p]}${p === 'b' ? '' : k === 'y' ? (p === 'w1' ? ' от H1' : ' от H2') : (p === 'w1' ? ' от x₁' : ' от x₂')}`, -3, 3, 0.5, S.P[k][p]);
+    }
+    h += `<div class="ctl"><div class="lbl">Входы</div><div class="chips" id="inChips">${ROWS4.map((r, i) => `<button data-i="${i}">${r[0]} ${r[1]}</button>`).join('')}</div></div>`;
+  }
+  if (id === 'chat') h = `<h2>Вероятности следующего слова</h2><div id="sDiag"></div>
+      <dl class="reads"><div><dt>контекст</dt><dd id="r1"></dd></div><div><dt>T</dt><dd id="r2"></dd></div><div><dt>слов</dt><dd id="r3"></dd></div></dl>` +
+      slider('inT', 'Температура T', 0, 2, 0.1, S.T) +
+      `<div class="row"><button class="ghostbtn" data-a="step">Слово</button><button class="ghostbtn" data-a="run">До точки</button><button class="ghostbtn" data-a="new">Новый ответ</button></div><h3>Готовые ответы</h3><div id="hist"></div>`;
+  if (id === 'ethics') {
+    h = `<h2>Набор данных и точность</h2><div id="sDiag"></div>
+      <dl class="reads"><div><dt>в среднем</dt><dd id="r1"></dd></div><div><dt>худшая</dt><dd id="r2"></dd></div><div><dt>разница</dt><dd id="r3"></dd></div></dl>`;
+    GROUPS.forEach((g, i) => h += slider('inN' + i, `${g.name}, записей`, 0, BUDGET, NSTEP, S.n[i]));
+    h += `<p class="note" style="margin-top:8px">Сумма не может быть больше ${BUDGET}: лишнее не добавится.</p><div class="row"><button class="ghostbtn" data-a="train">Обучить</button><button class="ghostbtn" data-a="equal">Поровну</button><button class="ghostbtn" data-a="ereset">Как было</button></div>`;
+  }
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn); };
+  on('#inW1', e => { S.w[0] = +e.target.value; syncHandles(); update(); });
+  on('#inW2', e => { S.w[1] = +e.target.value; syncHandles(); update(); });
+  on('#inB', e => { S.w[2] = +e.target.value; syncHandles(); update(); });
+  if (id === 'nn') for (const k of NEU) for (const p of ['w1', 'w2', 'b']) on(`#in_${k}_${p}`, e => { S.P[k][p] = +e.target.value; S.sel = k + '.' + p; renderTools(); update(); });
+  on('#inT', e => setT(+e.target.value));
+  GROUPS.forEach((g, i) => on('#inN' + i, e => {
+    const others = S.n.reduce((a, b) => a + b, 0) - S.n[i];
+    S.n[i] = Math.min(+e.target.value, BUDGET - others); update();
+  }));
+  el.querySelectorAll('#inChips button').forEach(b => b.onclick = () => { const [a, c] = ROWS4[+b.dataset.i]; S.x1 = a; S.x2 = c; update(); });
+  el.querySelectorAll('.row [data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (id === 'ml') {
+    set('#r1', `${m.errs}/${TRAIN.length}`); set('#r2', pc(m.acc, 0)); set('#r3', S.tested ? pc(m.testAcc, 0) : '—');
+    ['inW1', 'inW2', 'inB'].forEach((k, i) => { set(`#${k}O`, fmt(S.w[i], 2)); val('#' + k, S.w[i]); });
+  }
+  if (id === 'nn') {
+    set('#r1', `${S.x1} ${S.x2}`); set('#r2', String(m.cur.o3)); set('#r3', `${m.correct}/4`);
+    for (const k of NEU) for (const p of ['w1', 'w2', 'b']) { set(`#in_${k}_${p}O`, fmt(S.P[k][p], 1)); val(`#in_${k}_${p}`, S.P[k][p]); }
+    el.querySelectorAll('#inChips button').forEach(b => { const r = ROWS4[+b.dataset.i]; b.setAttribute('aria-pressed', r[0] === S.x1 && r[1] === S.x2); });
+  }
+  if (id === 'chat') {
+    set('#r1', m.ctx === '^' ? 'начало' : m.ctx); set('#r2', fmt(S.T, 1)); set('#r3', String(S.words.filter(w => w !== '.').length));
+    set('#inTO', fmt(S.T, 1)); val('#inT', S.T);
+    const d = el.querySelector('#sDiag');
+    if (d) d.innerHTML = distSVG(m);
+    const hs = el.querySelector('#hist');
+    if (hs) hs.innerHTML = S.answers.length ? `<div class="steps">${S.answers.map(a => step(`T = ${a.T}${a.manual ? ', с подсказкой' : ''}`, a.txt)).join('')}</div>` : '<p class="note">Пока нет ни одного ответа до точки.</p>';
+  }
+  if (id === 'ethics') {
+    set('#r1', pc(m.avg)); set('#r2', pc(m.min)); set('#r3', fmt(m.gap * 100, 1) + ' п. п.');
+    GROUPS.forEach((g, i) => { set(`#inN${i}O`, String(S.n[i])); val('#inN' + i, S.n[i]); });
+    const d = el.querySelector('#sDiag'); if (d) d.innerHTML = curveSVG(m);
+  }
+}
+function distSVG(m) {
+  let h = `<svg class="diag" viewBox="0 0 120 ${m.ended ? 18 : 8 + m.d.length * 9}" role="img" aria-label="Вероятности следующего слова">`;
+  if (m.ended) return h + `<text x="60" y="11" font-size="4" fill="#86e0a8" text-anchor="middle">ответ закончен точкой</text></svg>`;
+  m.d.forEach((c, i) => {
+    const y = 5 + i * 9;
+    h += `<text x="26" y="${y + 4}" font-size="3.6" fill="#e8ecf4" text-anchor="end">${c.w === '.' ? '. (конец)' : c.w}</text><rect x="28" y="${y}" width="70" height="5" rx="1" fill="#1a2438"/>`;
+    h += `<rect x="28" y="${y}" width="${(70 * c.p).toFixed(2)}" height="5" rx="1" fill="${i === 0 ? '#ffb547' : '#5fb4d9'}"/><text x="118" y="${y + 4}" font-size="3.6" fill="#8b96ad" text-anchor="end">${pc(c.p, 0)}</text>`;
+  });
+  return h + `</svg>`;
+}
+function curveSVG(m) {
+  const X = n => 12 + n / BUDGET * 100, Y = a => 58 - (a - 0.5) / 0.5 * 52;
+  const cols = ['#72d4e8', '#ffb547', '#c49bff'];
+  let h = `<svg class="diag" viewBox="0 0 120 70" role="img" aria-label="Кривые обучения: точность от числа записей">`;
+  h += `<rect x="12" y="6" width="100" height="52" fill="none" stroke="#26324a" stroke-width=".5"/><path d="M12 ${Y(0.9)}H112" stroke="#86e0a8" stroke-width=".4" stroke-dasharray="1.5 1.5"/>`;
+  for (const a of [0.5, 0.9, 1]) h += `<text x="10" y="${Y(a) + 1.3}" font-size="3.3" fill="#8b96ad" text-anchor="end">${a * 100}</text>`;
+  for (const n of [0, 400, 800, 1200]) h += `<text x="${X(n)}" y="64" font-size="3.3" fill="#8b96ad" text-anchor="middle">${n}</text>`;
+  GROUPS.forEach((g, i) => {
+    let d = ''; for (let n = 0; n <= BUDGET; n += 25) d += (d ? 'L' : 'M') + X(n).toFixed(2) + ' ' + Y(accOf(g, n)).toFixed(2);
+    h += `<path d="${d}" fill="none" stroke="${cols[i]}" stroke-width=".7"/><circle cx="${X(S.tn[i]).toFixed(2)}" cy="${Y(m.acc[i]).toFixed(2)}" r="1.5" fill="${cols[i]}" stroke="#0b1019" stroke-width=".4"/>`;
+    h += `<text x="${16 + i * 32}" y="69.5" font-size="3.2" fill="${cols[i]}">● ${g.name}</text>`;
+  });
+  return h + `<text x="112" y="10" font-size="3.2" fill="#8b96ad" text-anchor="end">точность, %</text></svg>`;
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'ml') return [
+    { id: 'plot', icon: ICON.plot, name: 'Обучающая выборка', spec: `${TRAIN.length} фруктов с известным ответом. Признаки: масса (80–260 г) и жёлтость кожуры (0 — красная, 1 — жёлтая). Метка — яблоко или лимон.` },
+    { id: 'line', icon: ICON.line, name: 'Модель — граница', spec: 'Прямая w₁·u + w₂·v + b = 0. Выше неё (желтее) — «лимон», ниже — «яблоко». Две ручки задают её положение.' },
+    { id: 'legend', icon: ICON.legend, name: 'Ошибки модели', spec: 'Пунктирное кольцо — модель ответила не то, что в метке. Обучение уменьшает число таких колец.' },
+    { id: 'test', icon: ICON.test, name: 'Тестовая выборка', spec: `${TEST.length} новых фруктов (ромбы). Модель их не видела, поэтому по ним честно судят о качестве.` }];
+  if (id === 'nn') return [
+    { id: 'inputs', icon: ICON.inputs, name: 'Входы x₁ и x₂', spec: 'Два сигнала: 0 или 1. Нажмите на квадрат, чтобы переключить.' },
+    { id: 'hidden', icon: ICON.hidden, name: 'Скрытый слой H1, H2', spec: 'Нейроны между входом и выходом. Каждый считает свою сумму и может стать детектором признака, например «обе единицы».' },
+    { id: 'output', icon: ICON.output, name: 'Выходной нейрон Y', spec: 'Получает ответы H1 и H2, взвешивает их и выдаёт итог 0 или 1.' },
+    { id: 'weights', icon: ICON.weights, name: 'Веса и смещения', spec: 'Числа на связях — веса, у нейронов — смещения b. Всё «знание» сети хранится в этих числах.' },
+    { id: 'table', icon: ICON.table, name: 'Таблица истинности XOR', spec: 'Все 4 комбинации входов. Зелёный — сеть отвечает верно, красный — ошибается.' }];
+  if (id === 'chat') return [
+    { id: 'user', icon: ICON.user, name: 'Запрос пользователя', spec: 'То, что вы написали боту. В настоящей LLM запрос и весь диалог — часть контекста.' },
+    { id: 'bot', icon: ICON.bot, name: 'Ответ бота', spec: 'Растёт по одному слову. Бот не «знает» ответ заранее: каждое слово выбирается заново.' },
+    { id: 'ctx', icon: ICON.ctx, name: 'Контекст', spec: 'На что модель смотрит, выбирая следующее слово. У нас — одно последнее слово, у GPT-подобных моделей — тысячи токенов.' },
+    { id: 'bars', icon: ICON.bars, name: 'Распределение вероятностей', spec: 'Сколько раз каждое слово шло после контекста в учебных текстах, пересчитанное в вероятности с учётом температуры.' }];
+  return [
+    { id: 'budget', icon: ICON.budget, name: 'Бюджет данных', spec: `Записать и разметить можно ${BUDGET} фраз: разметка стоит денег и времени.` },
+    { id: 'data', icon: ICON.data, name: 'Записи по группам', spec: 'Каждая полоска — 50 записанных голосовых команд. Взрослых найти легко, детей и пожилых — труднее.' },
+    { id: 'buttons', icon: ICON.buttons, name: 'Кнопки − и +', spec: 'Перераспределяют записи между группами шагом 50.' },
+    { id: 'acc', icon: ICON.acc, name: 'Точность по группам', spec: 'Доля верно распознанных команд у обученной модели. Оранжевая черта — порог 90 %.' }];
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      (Ls.safe ? `<div class="safe"><b>Безопасность</b>${Ls.safe}</div>` : '') +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Из чего состоит модель</h2><p class="note">Нажмите на деталь, чтобы найти её на сцене.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'ml') {
+    const pk = S.pick || { test: false, i: m.wrong.indexOf(true) >= 0 ? m.wrong.indexOf(true) : 0 };
+    const p = (pk.test ? TEST : TRAIN)[pk.i], u = U(p.m), z = zOf(S.w, p);
+    let h = `<h2>Как модель решает</h2><div class="formula">z = w₁·u + w₂·v + b</div><p class="note">u = (масса − 80) / 180 — масса, сжатая в отрезок 0…1; v — жёлтость. z &gt; 0 → «лимон», иначе «яблоко».</p>
+      <h3>${pk.test ? 'Тестовый' : 'Обучающий'} пример: ${FN[p.c]}, ${p.m} г</h3><div class="steps">` +
+      step('u', `(${p.m} − 80) / 180 = ${fmt(u, 3)}`) + step('v', fmt(p.y, 2)) +
+      step('z', `${fmt(S.w[0], 2)}·${fmt(u, 3)} + ${fmt(S.w[1], 2)}·${fmt(p.y, 2)} ${S.w[2] < 0 ? '−' : '+'} ${fmt(Math.abs(S.w[2]), 2)} = ${fmt(z, 3)}`) +
+      step('ответ модели', `${z > 0 ? 'z > 0 → лимон' : 'z ≤ 0 → яблоко'} ${predict(S.w, p) === p.c ? '✓' : '✗ ошибка'}`, 'sum') + `</div>
+      <p class="note" style="margin-top:8px">Нажмите на любую точку графика, чтобы разобрать её.</p>
+      <h3>Качество</h3><div class="steps">` +
+      step('точность на обучении', `(${TRAIN.length} − ${m.errs}) / ${TRAIN.length} = ${pc(m.acc, 0)}`) +
+      step('точность на тесте', S.tested ? `(${TEST.length} − ${m.terrs}) / ${TEST.length} = ${pc(m.testAcc, 0)}` : 'ещё не проверяли', 'sum') + `</div>
+      <h3>Правило перцептрона</h3><div class="formula">w ← w + η·(t − y)·x</div><p class="note">t — правильный ответ (лимон = 1, яблоко = 0), y — ответ модели, x = (u, v, 1), η = ${fmt(LR, 2)}. Если модель права, t − y = 0 и веса не меняются. Эпоха — один проход по всем ${TRAIN.length} примерам. Пройдено эпох: ${S.epochs}.</p>`;
+    return h;
+  }
+  if (id === 'nn') {
+    const r = m.cur, P = S.P, sg = v => (v < 0 ? '− ' : '+ ') + fmt(Math.abs(v), 1);
+    const line = (k, a, b, s, o, na, nb) => step(`${NNAME[k]}: Σ`, `${fmt(P[k].w1, 1)}·${a} ${sg(P[k].w2)}·${b} ${sg(P[k].b)} = ${fmt(s, 1)} → ${o}`);
+    return `<h2>Прямой проход</h2><div class="formula">выход = 1, если Σ > 0</div><p class="note">Σ = w₁·вход₁ + w₂·вход₂ + b. Ровно 0 — это ещё не «больше нуля», выход 0.</p><h3>Входы x₁ = ${S.x1}, x₂ = ${S.x2}</h3><div class="steps">` +
+      line('h1', S.x1, S.x2, r.s1, r.o1) + line('h2', S.x1, S.x2, r.s2, r.o2) +
+      step('Y: Σ', `${fmt(P.y.w1, 1)}·${r.o1} ${sg(P.y.w2)}·${r.o2} ${sg(P.y.b)} = ${fmt(r.s3, 1)} → ${r.o3}`, 'sum') + `</div>
+      <h3>Все входы</h3><div class="steps">` + m.rows.map(rw => step(`x₁ = ${rw.a}, x₂ = ${rw.b}`, `H1 ${rw.r.o1}, H2 ${rw.r.o2} → Y = ${rw.out} ${rw.out === rw.want ? '✓' : `✗ (надо ${rw.want})`}`)).join('') + `</div>
+      <p class="note" style="margin-top:10px">Весов и смещений здесь 9. В языковых моделях их миллиарды, но каждый нейрон считает такую же сумму.</p>`;
+  }
+  if (id === 'chat') {
+    let h = `<h2>Как выбирается слово</h2><div class="formula">pᵢ = cᵢ<sup>1/T</sup> / Σ c<sup>1/T</sup></div><p class="note">cᵢ — сколько раз слово шло после контекста в учебных текстах. При T = 1 вероятность пропорциональна частоте. T &lt; 1 усиливает лидера, T &gt; 1 выравнивает шансы. T = 0 — всегда самое частое слово.</p>`;
+    if (m.ended) h += `<h3>Ответ готов</h3><p class="note">Нажмите «Новый ответ» или «Слово», чтобы начать заново.</p>`;
+    else {
+      const Z = m.d.reduce((a, c) => a + c.pw, 0);
+      h += `<h3>Контекст: ${m.ctx === '^' ? 'начало ответа' : '«' + m.ctx + '»'} · T = ${fmt(S.T, 1)}</h3><div class="steps">` +
+        m.d.map(c => step(c.w === '.' ? '. (конец)' : c.w, S.T === 0 ? `c = ${c.c} → ${pc(c.p, 0)}` : `${c.c}<sup>${fmt(1 / S.T, 2)}</sup> = ${fmt(c.pw, 2)} → ${fmt(c.pw, 2)} / ${fmt(Z, 2)} = ${pc(c.p, 1)}`)).join('') + `</div>`;
+    }
+    if (S.probs.length) h += `<h3>Вероятность фразы</h3><div class="steps">` + step('перемножаем шаги', S.probs.map(p => fmt(p, 2)).join(' × ')) + step('итого', fmtP(m.pAll), 'sum') + `</div>`;
+    return h;
+  }
+  const tot = S.tn.reduce((a, b) => a + b, 0);
+  let h = `<h2>Точность по группам</h2><div class="formula">точность = верно / всего</div><p class="note">В нашей модели точность группы растёт с числом её записей n и упирается в потолок: a − k·e<sup>−n/s</sup>. Дети и пожилые говорят иначе, чем взрослые, поэтому им нужно больше примеров.</p><h3>Обученная модель</h3><div class="steps">`;
+  GROUPS.forEach((g, i) => h += step(`${g.name}: n = ${S.tn[i]}`, `${fmt(g.a, 2)} − ${fmt(g.k, 2)}·e<sup>−${S.tn[i]}/${g.s}</sup> = ${pc(m.acc[i])}`));
+  h += step('худшая группа', pc(m.min)) + step('разница лучшей и худшей', `${pc(m.max)} − ${pc(m.min)} = ${fmt(m.gap * 100, 1)} п. п.`, 'sum') + `</div>
+    <h3>Обманчивое среднее</h3><p class="note">Если тестовые записи взять в той же пропорции, что обучающие, общая точность — это среднее с весами-долями:</p><div class="steps">` +
+    step('Σ доля · точность', GROUPS.map((g, i) => `${fmt(S.tn[i] / (tot || 1), 2)}·${fmt(m.acc[i], 3)}`).join(' + ')) + step('в среднем', pc(m.avg), 'sum') + `</div>
+    <p class="note" style="margin-top:10px">Высокое среднее легко получить, если почти все записи от взрослых. Поэтому смотрят на каждую группу отдельно.</p>`;
+  if (m.stale) h += `<p class="note">Вы изменили данные: расчёт для новых чисел появится после «Обучить».</p>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter');
+  if (id === 'ml') el.innerHTML = `<div class="k">Ошибок на обучении</div><div class="v ${m.errs <= 2 ? 'ok' : ''}">${m.errs} из ${TRAIN.length}</div>
+      <div class="gauge"><b style="width:${(m.acc * 100).toFixed(1)}%"></b><i style="left:${(22 / 24 * 100).toFixed(1)}%"></i></div>
+      <div class="lr"><span>тест</span><span>${S.tested ? pc(m.testAcc, 0) : '—'}</span></div>`;
+  if (id === 'nn') el.innerHTML = `<div class="k">Таблица XOR</div><div class="v ${m.correct === 4 ? 'ok' : ''}">${m.correct} из 4 верно</div>
+      <div class="lr"><span>x₁ x₂ = ${S.x1} ${S.x2}</span><span>Y = ${m.cur.o3}</span></div>`;
+  if (id === 'chat') el.innerHTML = `<div class="k">Температура</div><div class="v">T = ${fmt(S.T, 1)}</div>
+      <div class="gauge"><b style="width:${(S.T / 2 * 100).toFixed(1)}%"></b><i style="left:${(HOT / 2 * 100).toFixed(1)}%"></i></div>
+      <div class="lr"><span>слов</span><span>${S.words.filter(w => w !== '.').length}</span></div>`;
+  if (id === 'ethics') el.innerHTML = `<div class="k">Средняя точность</div><div class="v">${pc(m.avg)}</div>
+      <div class="lr"><span>худшая</span><span style="color:${m.min >= 0.9 ? 'var(--ok)' : 'var(--warn)'}">${pc(m.min)}</span></div>
+      <div class="lr"><span>разница</span><span>${fmt(m.gap * 100, 1)} п. п.</span></div>`;
+}
+
+function update() {
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Вы разобрались, как устроен ИИ!');
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  ml: '<path d="M14 26L52 4" stroke="#ffb547" stroke-width="1.6"/><circle cx="18" cy="9" r="2.4" fill="#f6d743"/><circle cx="25" cy="13" r="2.4" fill="#f6d743"/><circle cx="22" cy="6" r="2.4" fill="#f6d743"/><circle cx="40" cy="22" r="2.4" fill="#e5484d"/><circle cx="48" cy="18" r="2.4" fill="#e5484d"/><circle cx="44" cy="25" r="2.4" fill="#e5484d"/>',
+  nn: '<path d="M12 9L33 8M12 9L33 22M12 21L33 8M12 21L33 22M33 8L54 15M33 22L54 15" stroke="#56627d" stroke-width="1"/><circle cx="12" cy="9" r="3" fill="#72d4e8"/><circle cx="12" cy="21" r="3" fill="#72d4e8"/><circle cx="33" cy="8" r="3.4" fill="#ffb547"/><circle cx="33" cy="22" r="3.4" fill="#e8ecf4"/><circle cx="54" cy="15" r="3.6" fill="#ffb547"/>',
+  chat: '<rect x="6" y="5" width="34" height="10" rx="4" fill="#1a2438" stroke="#56627d"/><path d="M10 10h20" stroke="#e8ecf4" stroke-width="1.2"/><rect x="44" y="10" width="16" height="3" rx="1" fill="#ffb547"/><rect x="44" y="16" width="10" height="3" rx="1" fill="#5fb4d9"/><rect x="44" y="22" width="5" height="3" rx="1" fill="#5fb4d9"/>',
+  ethics: '<rect x="12" y="6" width="9" height="20" fill="#5fb4d9" opacity=".8"/><rect x="28" y="16" width="9" height="10" fill="#5fb4d9" opacity=".8"/><rect x="44" y="21" width="9" height="5" fill="#5fb4d9" opacity=".8"/><path d="M8 11h50" stroke="#ffb547" stroke-dasharray="2 2"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Ls, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Ls.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Ls.title}</span></span>
+      ${S.done[Ls.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  stopTimers();
+  const Ls = LESSONS[i];
+  S.lesson = i; S.hl = null; drag = null;
+  S.w = LESSONS[0].w0.slice(); S.epochs = 0; S.tested = false; S.pick = null; syncHandles();
+  S.P = cloneP(LESSONS[1].p0); S.x1 = 1; S.x2 = 0; S.sel = 'h2.b';
+  S.T = LESSONS[2].T0; newAnswer(); S.answers = []; S.greedyOK = false; S.hotOK = false;
+  S.n = LESSONS[3].n0.slice(); S.tn = LESSONS[3].n0.slice();
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = Ls.task;
+  $('#hint').textContent = Ls.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  requestAnimationFrame(fit);
+  const cur = $('#lessons .lesson[aria-current="true"]'), ls = $('#lessons');
+  if (cur) { const dx = cur.getBoundingClientRect().left - ls.getBoundingClientRect().left; if (dx < 0 || dx + cur.offsetWidth > ls.clientWidth) ls.scrollLeft += dx - 8; }
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '';
+  if (id === 'ml') now = `График: ${TRAIN.length} обучающих фруктов (12 яблок, 12 лимонов), признаки — масса 95–240 г и жёлтость кожуры 0–1. Модель — прямая z = w₁·u + w₂·v + b (u = (масса − 80)/180); сейчас w₁ = ${fmt(S.w[0], 2)}, w₂ = ${fmt(S.w[1], 2)}, b = ${fmt(S.w[2], 2)}. Ошибок на обучении ${m.errs} из ${TRAIN.length}. Пройдено эпох перцептрона: ${S.epochs} (η = ${fmt(LR, 2)}). ${S.tested ? `Тест (${TEST.length} новых фруктов): верно ${TEST.length - m.terrs}, точность ${pc(m.testAcc, 0)}.` : 'На тестовой выборке ещё не проверяли.'} Ученик может тащить ручки прямой или нажимать «Эпоха»/«Обучать до конца», затем «Проверить на тесте».`;
+  if (id === 'nn') now = `Сеть 2 → 2 → 1 с пороговой активацией (выход 1, если Σ > 0). Параметры: H1 w₁ = ${fmt(S.P.h1.w1, 1)}, w₂ = ${fmt(S.P.h1.w2, 1)}, b = ${fmt(S.P.h1.b, 1)}; H2 w₁ = ${fmt(S.P.h2.w1, 1)}, w₂ = ${fmt(S.P.h2.w2, 1)}, b = ${fmt(S.P.h2.b, 1)}; Y (входы H1, H2) w₁ = ${fmt(S.P.y.w1, 1)}, w₂ = ${fmt(S.P.y.w2, 1)}, b = ${fmt(S.P.y.b, 1)}. Таблица: ${m.rows.map(r => `${r.a}${r.b} → H1 ${r.r.o1}, H2 ${r.r.o2}, Y ${r.out} (надо ${r.want})`).join('; ')}. Верно ${m.correct} из 4. Не называй готовые значения весов — наводи вопросами: «какую логическую функцию сейчас считает H1, а какую H2?», «когда XOR отличается от ИЛИ?».`;
+  if (id === 'chat') now = `Игрушечная биграммная модель: следующее слово выбирается по частоте после последнего слова. Запрос: «Расскажи про Казахстан.» Текущий ответ: «${joinTok(S.words) || '(пусто)'}». Температура T = ${fmt(S.T, 1)}. ${m.ended ? 'Ответ закончен.' : `Контекст «${m.ctx === '^' ? 'начало' : m.ctx}», варианты: ${m.d.map(c => `${c.w} ${pc(c.p, 0)} (${c.c} раз)`).join(', ')}.`} Готовые ответы: ${S.answers.map(a => `«${a.txt}» при T = ${a.T}${a.manual ? ' (с ручным выбором)' : ''}`).join('; ') || 'нет'}. Задание: ответ при T = 0 ${S.greedyOK ? 'есть' : 'нет'}, ответ при T ≥ 1,2 ${S.hotOK ? 'есть' : 'нет'}. Объясняй разницу настоящей LLM (трансформер, весь контекст, токены) и этой игрушки.`;
+  if (id === 'ethics') now = `Голосовой помощник для госуслуг. Бюджет ${BUDGET} записей. Сейчас выбрано: ${GROUPS.map((g, i) => `${g.name} ${S.n[i]}`).join(', ')}; модель обучена на: ${GROUPS.map((g, i) => `${g.name} ${S.tn[i]}`).join(', ')}${m.stale ? ' (данные изменены, но «Обучить» не нажато)' : ''}. Точность обученной модели: ${GROUPS.map((g, i) => `${g.name} ${pc(m.acc[i])}`).join(', ')}; средняя ${pc(m.avg)}, худшая ${pc(m.min)}, разница ${fmt(m.gap * 100, 1)} п. п. Условие: каждая группа ≥ 90 %, разница ≤ 5 п. п. Не называй готовое распределение — спрашивай, какой группе модель даётся труднее и почему поровну может не хватить.`;
+  return [
+    `Раздел: информатика, 10 класс, тема «Искусственный интеллект». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { ml: 'Зачем проверять модель на тестовой выборке?', nn: 'Почему один нейрон не может решить XOR?', chat: 'Почему чат-бот иногда выдумывает факты?', ethics: 'Откуда у ИИ берётся предвзятость?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
