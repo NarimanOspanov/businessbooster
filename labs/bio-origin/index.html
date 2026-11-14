@@ -1,0 +1,949 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по биологии, 11 класс: происхождение жизни и человека — опыт Миллера, этапы развития жизни на Земле, эволюция человека по находкам.">
+<title>Происхождение жизни и человека</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --leaf:#5fbf6a;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-hit]{cursor:pointer}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+.scene .lbl{font-family:var(--font-body)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .v.bad{color:var(--warn)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--arm);transition:width .2s}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:19%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 15px/1.4 var(--font-mono);text-align:center;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+.feat{display:grid;gap:6px}
+.feat div{background:var(--surface-2);border-radius:10px;padding:9px 11px;font-size:13px;line-height:1.45;border-left:4px solid var(--line)}
+.feat b{display:block;font-weight:600;font-size:13.5px;margin-bottom:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 250px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><circle cx="20" cy="20" r="11" fill="none" stroke="var(--arm)" stroke-width="1.6"/><path d="M14 22q3-7 6-2t6-3" fill="none" stroke="var(--ok)" stroke-width="1.6" stroke-linecap="round"/><circle cx="16" cy="15" r="1.6" fill="var(--force)"/><circle cx="25" cy="25" r="1.6" fill="var(--force)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Биология · Происхождение жизни</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#bio">Карта</a><a href="/physics/#bio">Биология</a><a href="/labs/bio-origin/" aria-current="page">Происхождение жизни</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Происхождение</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Лабораторный стол">
+    <svg class="scene" id="scene" role="img" aria-label="Лабораторный стол с опытом. Предметы можно нажимать и перетаскивать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const f = x => (Math.round(x * 10) / 10).toString();
+const ru = (x, d = 1) => x.toFixed(d).replace('.', ',');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const KEY = 'luch-bio-origin';
+const OK = '#86e0a8', WARN = '#ff8a73', ORA = '#ffb547', CY = '#72d4e8', VIO = '#b48cff', SAND = '#e2c46a', LEAF = '#5fbf6a', MUT = '#8b96ad';
+
+// ---------- lesson 1: Miller's experiment ----------
+const GASES = [
+  { k: 'CH4', n: 'CH₄', name: 'метан' }, { k: 'NH3', n: 'NH₃', name: 'аммиак' }, { k: 'H2', n: 'H₂', name: 'водород' }, { k: 'H2O', n: 'H₂O', name: 'вода (пар)' },
+  { k: 'CO2', n: 'CO₂', name: 'углекислый газ' }, { k: 'N2', n: 'N₂', name: 'азот' }, { k: 'O2', n: 'O₂', name: 'кислород' }];
+const AA = [{ n: 'глицин', s: 'Гли', a: 1 }, { n: 'аланин', s: 'Ала', a: 0.5 }, { n: 'аспарагиновая кислота', s: 'Асп', a: 0.12 }, { n: 'глутаминовая кислота', s: 'Глу', a: 0.06 }, { n: 'валин', s: 'Вал', a: 0.03 }, { n: 'серин', s: 'Сер', a: 0.015 }];
+const THR = 0.1, DAYS = 7, GOAL1 = 5;
+function rateOf(g, E) {
+  const kC = g.CH4 ? 1 : g.CO2 ? 0.08 : 0, kN = g.NH3 ? 1 : g.N2 ? 0.1 : 0, kH = g.H2 ? 1 : 0.6, kW = g.H2O ? 1 : 0, kO = g.O2 ? 0 : 1;
+  return { kC, kN, kH, kW, kO, e: E / 100, v: E / 100 * kC * kN * kH * kW * kO };
+}
+
+// ---------- lesson 2: stages of life ----------
+const ERAS = [
+  { n: 'Архей', a: 4000, b: 2500, c: '#9aa6c4' }, { n: 'Протерозой', a: 2500, b: 541, c: CY }, { n: 'Палеозой', a: 541, b: 252, c: LEAF },
+  { n: 'Мезозой', a: 252, b: 66, c: SAND }, { n: 'Кайнозой', a: 66, b: 0, c: ORA }];
+const CARDS = [
+  { t: 'Первые прокариоты — бактерии', s: 'Прокариоты', e: 0, age: 3500, clue: 'Это самые первые клетки — без ядра. Ищите в самой древней эре с жизнью.' },
+  { t: 'Цианобактерии выделяют кислород', s: 'Цианобактерии', e: 0, age: 2700, clue: 'Фотосинтез появился ещё у прокариот, задолго до клеток с ядром.' },
+  { t: 'Кислород копится в атмосфере', s: 'Кислород', e: 1, age: 2400, clue: 'Цианобактериям понадобились сотни миллионов лет, чтобы насытить воздух кислородом.' },
+  { t: 'Первые эукариоты — клетки с ядром', s: 'Эукариоты', e: 1, age: 1800, clue: 'Эукариотам нужен кислород для дыхания — они появились после того, как его стало много.' },
+  { t: 'Первые многоклеточные организмы', s: 'Многоклеточные', e: 1, age: 600, clue: 'Многоклеточные мягкотелые жили ещё до животных со скелетом.' },
+  { t: '«Кембрийский взрыв»: раковины и скелеты', s: 'Кембрий', e: 2, age: 540, clue: 'Кембрийский период открывает эру «древней жизни».' },
+  { t: 'Растения выходят на сушу', s: 'Выход на сушу', e: 2, age: 430, clue: 'Псилофиты вышли на сушу в силуре — это эра древней жизни.' },
+  { t: 'Первые земноводные', s: 'Земноводные', e: 2, age: 370, clue: 'Кистепёрые рыбы дали начало земноводным в девоне, задолго до динозавров.' },
+  { t: 'Папоротниковые леса — будущий уголь Караганды', s: 'Угольные леса', e: 2, age: 320, clue: 'Каменноугольный период — один из периодов эры древней жизни.' },
+  { t: 'Первые млекопитающие', s: 'Млекопитающие', e: 3, age: 210, clue: 'Мелкие звери появились вместе с первыми динозаврами, а не после них.' },
+  { t: 'Расцвет динозавров', s: 'Динозавры', e: 3, age: 150, clue: 'Эру динозавров называют эрой «средней жизни».' },
+  { t: 'Первые цветковые растения', s: 'Цветковые', e: 3, age: 130, clue: 'Цветки появились в меловом периоде, когда динозавры ещё жили.' },
+  { t: 'Расцвет млекопитающих и птиц', s: 'Расцвет зверей', e: 4, age: 50, clue: 'Звери заняли места динозавров после их вымирания 66 млн лет назад.' },
+  { t: 'Появился человек разумный', s: 'Человек', e: 4, age: 0.3, clue: 'Человек — самое молодое событие на этой ленте.' }];
+const ORDER2 = [0, 5, 10, 3, 13, 7, 1, 11, 4, 8, 12, 2, 9, 6];
+const BAR = { x0: 14, x1: 506, y: 118, h: 16 };
+const ageX = a => BAR.x0 + (4600 - a) / 4600 * (BAR.x1 - BAR.x0);
+const COL = i => 14 + i * 99.2, COLW = 94, COLY0 = 152, COLY1 = 326;
+const eraOf = a => a >= 4000 ? -1 : ERAS.findIndex(E => a <= E.a && a > E.b - 1e-9);
+const fmtMa = a => a >= 1000 ? `${ru(a / 1000)} млрд лет` : a >= 1 ? `${Math.round(a)} млн лет` : `${Math.round(a * 1000)} тыс. лет`;
+function clock(a) { const sec = Math.round(86400 * (1 - a / 4600)); const hh = Math.floor(sec / 3600), mm = Math.floor(sec % 3600 / 60), ss = sec % 60; return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`; }
+
+// ---------- lesson 3: human evolution ----------
+const SP = [
+  { n: 'Австралопитек', s: 'Австралопитек', c: '#9aa6c4', age: '4–2 млн лет', vol: '400–550', f: 'Ходил на двух ногах, но мозг — как у шимпанзе. Каменных орудий ещё не делал. Жил в Африке.' },
+  { n: 'Человек умелый', s: 'Ч. умелый', c: CY, age: '2,4–1,4 млн лет', vol: '550–700', f: 'Первые обработанные каменные орудия — грубые галечные. Жил в Африке.' },
+  { n: 'Человек прямоходящий (архантроп)', s: 'Архантроп', c: LEAF, age: '1,9 млн – 110 тыс. лет', vol: '750–1250', f: 'Питекантроп, синантроп. Ручное рубило, огонь. Первым расселился из Африки в Азию и Европу.' },
+  { n: 'Неандерталец (палеоантроп)', s: 'Неандерталец', c: SAND, age: '400–40 тыс. лет', vol: '1200–1750', f: 'Мощное тело, надбровный валик, нет подбородка. Сложные орудия, погребения. Родственная ветвь, а не прямой предок.' },
+  { n: 'Кроманьонец (неоантроп, Homo sapiens)', s: 'Кроманьонец', c: ORA, age: '300 тыс. лет – сейчас', vol: '1100–1700', f: 'Высокий лоб, подбородочный выступ, членораздельная речь. Иглы, украшения, наскальные рисунки.' }];
+const FINDS = [
+  { age: 3.2e6, vol: 400, where: 'Эфиопия', tools: 'орудий нет; кости таза и ног — для ходьбы на двух ногах', sp: 0 },
+  { age: 1.8e6, vol: 640, where: 'Танзания, ущелье Олдувай', tools: 'грубые галечные орудия', sp: 1 },
+  { age: 5e5, vol: 1000, where: 'Китай, пещера Чжоукоудянь', tools: 'ручные рубила, следы костров', sp: 2 },
+  { age: 7e4, vol: 1500, where: 'Узбекистан, грот Тешик-Таш', tools: 'скрёбла, остроконечники, погребение', sp: 3 },
+  { age: 3e4, vol: 1600, where: 'Франция, Кро-Маньон', tools: 'тонкие пластины, костяные иглы, рисунки', sp: 4 }];
+const CH = { x0: 58, x1: 338, y0: 152, y1: 372 }, LMAX = Math.log10(5e6), LMIN = 4, VMIN = 300, VMAX = 1800;
+const ax = a => CH.x0 + (LMAX - Math.log10(a)) / (LMAX - LMIN) * (CH.x1 - CH.x0);
+const vy = v => CH.y1 - (v - VMIN) / (VMAX - VMIN) * (CH.y1 - CH.y0);
+const xa = x => Math.pow(10, LMAX - (x - CH.x0) / (CH.x1 - CH.x0) * (LMAX - LMIN));
+const yv = y => VMIN + (CH.y1 - y) / (CH.y1 - CH.y0) * (VMAX - VMIN);
+const fmtYr = a => a >= 1e6 ? `${ru(a / 1e6)} млн` : `${Math.round(a / 1e3)} тыс.`;
+const TOLA = 0.1, TOLV = 80;
+const TRAY = { x: 352, w: 158, y: 222, step: 34, h: 30 };
+const trayXY = i => [TRAY.x + 16, TRAY.y + i * TRAY.step + TRAY.h / 2];
+const fits = (i, p) => p && Math.abs(Math.log10(p.a) - Math.log10(FINDS[i].age)) <= TOLA && Math.abs(p.v - FINDS[i].vol) <= TOLV;
+
+const LESSONS = [
+  { id: 'miller', title: 'Как появилась жизнь: опыт Миллера',
+    text: ['Учёные долго спорили, откуда взялась жизнь. Луи Пастер в 1860-х годах опытом с колбами с S-образным горлышком доказал: сегодня живое не возникает из неживого само по себе. Есть и гипотеза панспермии — жизнь занесена из космоса. Но она не объясняет, как жизнь появилась вообще.',
+           'А. И. Опарин (1924) и Дж. Холдейн (1929) предложили гипотезу биохимической эволюции. На молодой Земле не было свободного кислорода, а энергию давали молнии, ультрафиолет, вулканы. Из простых газов образовались простые органические вещества, потом биополимеры, потом капли-коацерваты с оболочкой и, наконец, первые клетки.',
+           'В 1953 году С. Миллер проверил первый шаг на опыте. Он заполнил колбу метаном, аммиаком, водородом и парами воды и неделю пропускал через смесь электрические разряды. В воде накопились аминокислоты — «кирпичики» белков. Сегодня многие учёные считают, что первыми «живыми» молекулами были РНК: они и хранят информацию, и ускоряют реакции.'],
+    why: 'Астробиологи ищут жизнь на Марсе и спутниках Юпитера и Сатурна: они знают, какие условия и молекулы её выдают. Биохимики и фармацевты синтезируют аминокислоты и нуклеотиды для лекарств, кормовых добавок, спортивного питания. Химик-аналитик разделяет смеси хроматографией — так проверяют лекарства, продукты и воду в лабораториях Казахстана. А с Байконура стартуют ракеты, которые несут такие исследования в космос.',
+    note: 'Метан и водород с кислородом образуют взрывчатую смесь. Миллер откачивал воздух из прибора, прежде чем включать искру. Опыт с горючими газами и высоким напряжением — только в оборудованной лаборатории.',
+    task: 'Повторите опыт Миллера: подберите газы для древней атмосферы, «прогоните» прибор и найдите на хроматограмме не меньше 5 разных аминокислот.',
+    hint: 'Сейчас в колбе — современный воздух. Подумайте, каких газов на молодой Земле не было, а каких было много. Подождите несколько суток и сделайте анализ.',
+    stage: 'Нажимайте на газы, чтобы добавить или убрать их. Нажмите на колбу — пуск, на хроматограмму — анализ.',
+    spark: 100,
+    check: m => m.found >= GOAL1 },
+  { id: 'stages', title: 'Этапы развития жизни на Земле',
+    text: ['Историю Земли (4,6 млрд лет) делят на эры: архей, протерозой, палеозой, мезозой и кайнозой. Первые 600 млн лет (катархей) жизни не было. Эры делят на периоды: например, в палеозое — кембрий, ордовик, силур, девон, карбон, пермь. Границы эр — это крупные перемены в живом мире, часто массовые вымирания.',
+           'Почти 3 млрд лет на Земле жили только одноклеточные. Цианобактерии своим фотосинтезом насытили воду и воздух кислородом, а из кислорода в вышине образовался озоновый слой. Появились клетки с ядром — эукариоты, затем многоклеточные. Эту летопись учёные читают по окаменелостям в слоях горных пород.',
+           'В палеозое живые организмы вышли на сушу: сначала растения, затем членистоногие и позвоночные. Мезозой — эра пресмыкающихся и голосеменных, но тогда же появились млекопитающие, птицы и цветковые. После вымирания динозавров 66 млн лет назад наступил кайнозой — эра млекопитающих, птиц, насекомых и цветковых растений.'],
+    why: 'Геологи нефтяных компаний определяют возраст пластов по окаменелостям — от этого зависит, где бурить. Нефть Мангышлака образовалась в юрском периоде мезозоя, а уголь Карагандинского бассейна — из каменноугольных лесов палеозоя. В хребте Каратау нашли знаменитые юрские отпечатки насекомых, рыб и ящеров — их изучают палеонтологи всего мира. Знание эр нужно геологу, палеонтологу, горному инженеру, музейному сотруднику.',
+    task: 'Разложите 14 событий истории жизни по эрам: перетащите каждую карточку в нужную колонку.',
+    hint: 'Порядок подсказывает логика: клетки без ядра → кислород → клетки с ядром → многоклеточные → скелеты → суша → динозавры → звери. Если ошибётесь, появится подсказка.',
+    stage: 'Перетащите карточку в колонку эры (или нажмите на колонку). Бегунок на ленте времени можно двигать.',
+    check: m => m.placed >= CARDS.length },
+  { id: 'human', title: 'Эволюция человека по находкам',
+    text: ['Человек — вид Homo sapiens. Он относится к типу хордовых, классу млекопитающих, отряду приматов, семейству гоминид. Наши ближайшие родственники — шимпанзе и гориллы. Общий предок людей и шимпанзе жил в Африке примерно 6–7 млн лет назад. Мы не произошли от шимпанзе: это две ветви одного дерева.',
+           'Главные этапы: австралопитеки (стали ходить на двух ногах) → человек умелый (первые каменные орудия) → человек прямоходящий, или древнейшие люди-архантропы (огонь, расселение по Евразии) → древние люди-палеоантропы, неандертальцы → новые люди-неоантропы, человек разумный. Дерево ветвилось: разные виды людей жили одновременно.',
+           'Биологические движущие силы эволюции человека — наследственная изменчивость и естественный отбор. С появлением орудий, речи и жизни в группе всё большую роль играли социальные факторы. Все современные люди — один вид. Расы различаются лишь внешними признаками, и все люди могут иметь общее плодовитое потомство.'],
+    why: 'Антропологи и археологи раскапывают стоянки древних людей. В Казахстане каменные орудия возрастом в сотни тысяч лет нашли в горах Каратау — работы хватает и экспедициям, и музеям. Методами датировки (радиоуглеродный анализ) пользуются археологи, геологи и криминалисты. Знание анатомии человека и её происхождения пригодится врачу, ортопеду, судмедэксперту, а сравнение ДНК — генетику.',
+    task: 'Нанесите все 5 находок на график «возраст — объём мозга» и узнайте, кому они принадлежат.',
+    hint: 'Выберите находку справа и перетащите её кружок на график. Над кружком видно, какой возраст и объём он сейчас показывает. Шкала времени логарифмическая: каждое деление — в 10 раз.',
+    stage: 'Перетащите номер находки на график: по горизонтали — возраст, по вертикали — объём мозга.',
+    check: m => m.locked >= FINDS.length },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+function resetMiller() { S.g = { O2: true, N2: true, CO2: true, H2O: true }; S.E = LESSONS[0].spark; S.run = false; S.days = 0; S.Y = 0; S.anal = null; }
+function resetStages() { S.pos = 0; S.placed = ERAS.map(() => []); S.mis = 0; S.cursor = 4600; S.last = -1; S.cd = null; }
+function resetHuman() { S.fp = FINDS.map(() => null); S.lock = FINDS.map(() => false); S.sel = 0; S.fd = null; }
+function resetLesson() { resetMiller(); resetStages(); resetHuman(); }
+
+// ---------- models ----------
+function model() {
+  const id = LID();
+  if (id === 'miller') {
+    const r = rateOf(S.g, S.E), am = AA.map(a => a.a * S.Y), found = S.anal ? S.anal.filter(x => x >= THR).length : 0;
+    return { kind: 'mil', r, days: S.days, Y: S.Y, am, found, anal: S.anal, run: S.run };
+  }
+  if (id === 'stages') {
+    const card = S.pos < CARDS.length ? CARDS[ORDER2[S.pos]] : null;
+    return { kind: 'tl', placed: S.pos, mis: S.mis, card, cursor: S.cursor, era: eraOf(S.cursor) };
+  }
+  const p = S.fp[S.sel];
+  return { kind: 'hum', sel: S.sel, p, locked: S.lock.filter(Boolean).length };
+}
+
+// ---------- lesson 1 actions ----------
+function toggleGas(k) {
+  S.g[k] = !S.g[k]; S.run = false; S.days = 0; S.Y = 0; S.anal = null;
+  const G = GASES.find(x => x.k === k);
+  toast(`${G.n} (${G.name}) ${S.g[k] ? 'добавлен' : 'убран'}. Новая смесь — опыт начинается заново.`);
+  renderTools(); update();
+}
+function setSpark(e) { S.E = clamp(e, 0, 100); renderTools(); update(); }
+function runToggle() {
+  if (S.run) { S.run = false; renderTools(); update(); return; }
+  if (S.days >= DAYS) { S.days = 0; S.Y = 0; S.anal = null; }
+  if (!GASES.some(G => S.g[G.k])) { toast('Колба пуста: добавьте газы.'); return; }
+  S.run = true;
+  toast(S.E ? 'Прибор работает: вода кипит, через газы проскакивают искры.' : 'Искра выключена: энергии для реакций нет.');
+  renderTools(); update();
+}
+function analyze() {
+  if (S.days < 0.5) { toast('В ловушке пока пусто: сначала запустите прибор хотя бы на сутки.'); return; }
+  S.anal = AA.map(a => a.a * S.Y);
+  const n = S.anal.filter(x => x >= THR).length;
+  toast(S.g.O2 ? 'Аминокислот нет: кислород окисляет и разрушает органические вещества.' :
+    !S.g.H2O ? 'Без воды не идут реакции синтеза — аминокислот нет.' :
+    S.E === 0 ? 'Без разрядов нет энергии для реакций — аминокислот нет.' :
+    n === 0 ? 'Аминокислот слишком мало, чтобы их заметить. Нужны источники углерода и азота.' :
+    n < GOAL1 ? `Найдено аминокислот: ${n}. Остальных слишком мало — продлите опыт или улучшите смесь.` : `Найдено ${n} аминокислот! Как у Миллера.`);
+  update();
+}
+function newExp() { S.run = false; S.days = 0; S.Y = 0; S.anal = null; renderTools(); update(); }
+
+// ---------- lesson 2 actions ----------
+function place(i) {
+  if (S.pos >= CARDS.length) return;
+  const c = CARDS[ORDER2[S.pos]];
+  if (c.e === i) {
+    S.placed[i].push(ORDER2[S.pos]); S.last = ORDER2[S.pos]; S.pos++; S.cursor = c.age;
+    toast(`Верно: ${ERAS[i].n}, ≈ ${fmtMa(c.age)} назад.`);
+  } else { S.mis++; toast(`Не ${ERAS[i].n}. ${c.clue}`); }
+  update();
+}
+function setCursor(a) { S.cursor = clamp(Math.round(a), 0, 4600); update(); }
+
+// ---------- lesson 3 actions ----------
+function selFind(i) { S.sel = i; update(); }
+function dropFind(i, p) {
+  if (S.lock[i]) return;
+  if (p.x < CH.x0 - 6 || p.x > CH.x1 + 6 || p.y < CH.y0 - 6 || p.y > CH.y1 + 6) { S.fp[i] = null; update(); return; }
+  const q = { a: xa(clamp(p.x, CH.x0, CH.x1)), v: yv(clamp(p.y, CH.y0, CH.y1)) };
+  S.fp[i] = q;
+  if (fits(i, q)) {
+    S.lock[i] = true; S.fp[i] = { a: FINDS[i].age, v: FINDS[i].vol };
+    toast(`Находка ${i + 1} определена: ${SP[FINDS[i].sp].n}.`);
+  } else {
+    const F = FINDS[i], da = Math.log10(q.a) - Math.log10(F.age), dv = q.v - F.vol, msg = [];
+    if (Math.abs(da) > TOLA) msg.push(da > 0 ? 'слишком левее — это древнее находки' : 'слишком правее — это моложе находки');
+    if (Math.abs(dv) > TOLV) msg.push(dv > 0 ? 'слишком высоко по объёму' : 'слишком низко по объёму');
+    toast(`Не совсем: ${msg.join(', ')}.`);
+  }
+  update();
+}
+function resetFind(i) { if (S.lock[i]) return; S.fp[i] = null; update(); }
+
+// ---------- drawing helpers ----------
+function bench() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4000" fill="url(#tile)"/>`;
+}
+const lbl = (x, y, s, size = 10.5, fill = MUT, anchor = 'middle', extra = '') => `<text class="lbl" x="${f(x)}" y="${f(y)}" font-size="${size}" fill="${fill}" text-anchor="${anchor}" ${extra}>${s}</text>`;
+const mix = (a, b, k) => { const p = s => [1, 3, 5].map(i => parseInt(s.slice(i, i + 2), 16)); const A = p(a), B = p(b); return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * k).toString(16).padStart(2, '0')).join(''); };
+
+// ---------- lesson 1 scene ----------
+function millerScene(t) {
+  let h = bench();
+  const m = model(), on = S.run, k = clamp(S.Y / 6, 0, 1);
+  GASES.forEach((G, i) => {
+    const x = 14 + i * 70.3, sel = !!S.g[G.k], c = G.k === 'O2' ? WARN : CY;
+    h += `<g data-hit="g${i}"><rect x="${f(x)}" y="112" width="64" height="34" rx="8" fill="${sel ? (G.k === 'O2' ? 'rgba(255,138,115,.18)' : 'rgba(114,212,232,.16)') : 'rgba(26,36,56,.5)'}" stroke="${sel ? c : '#26324a'}" stroke-width="1.4"/>` +
+      lbl(x + 32, 128, G.n, 12.5, sel ? '#e8ecf4' : '#56627d', 'middle', 'font-weight="600"') + lbl(x + 32, 141, sel ? 'есть' : 'нет', 8.5, sel ? c : '#56627d') + `</g>`;
+  });
+  const water = mix('#5fb4d9', '#a8763e', k), gasTint = S.g.O2 ? 'rgba(255,138,115,.10)' : 'rgba(114,212,232,.10)';
+  // tubes
+  const tube = (d, w = 7) => `<path d="${d}" fill="none" stroke="rgba(200,215,240,.30)" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/><path d="${d}" fill="none" stroke="#0e1520" stroke-width="${w - 3}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  h += tube('M100 302V176Q100 168 108 168H246') + tube('M290 262L346 322L360 334V384') + tube('M360 386V394H158Q146 394 141 384L132 360');
+  // atmosphere flask
+  h += `<g data-hit="flask"><circle cx="250" cy="222" r="58" fill="${gasTint}" stroke="rgba(200,215,240,.42)" stroke-width="2"/><rect x="242" y="158" width="16" height="12" fill="#0e1520" stroke="rgba(200,215,240,.42)" stroke-width="1.6"/>`;
+  const gl = GASES.filter(G => S.g[G.k]);
+  gl.forEach((G, j) => { const a = 0.5 + j / Math.max(1, gl.length) * 6.283 + (on && !reduce ? t / 2400 : 0), rr = 36; h += lbl(250 + rr * Math.cos(a), 226 + rr * 0.8 * Math.sin(a), G.n, 9.5, G.k === 'O2' ? WARN : '#c9d3e6'); });
+  h += `<path d="M184 222H234M316 222H266" stroke="#c9d3e6" stroke-width="2.4"/><circle cx="236" cy="222" r="3.4" fill="#e8ecf4"/><circle cx="264" cy="222" r="3.4" fill="#e8ecf4"/>`;
+  if (on && S.E > 0) {
+    const ph = reduce ? 1 : Math.floor(t / 70), jit = n => ((ph * 37 + n * 53) % 9) - 4;
+    if (reduce || ph % 3 !== 0) h += `<path d="M239 222L${245} ${222 + jit(1)}L${250} ${222 + jit(2)}L${255} ${222 + jit(3)}L261 222" fill="none" stroke="${VIO}" stroke-width="${f(1 + S.E / 50)}" stroke-linejoin="round"/>`;
+  }
+  h += lbl(250, 296, 'атмосфера', 10, '#c9d3e6') + lbl(250, 308, 'нажмите — пуск / стоп', 8.5, '#56627d') + `</g>`;
+  h += `<g data-hit="spark">` + lbl(186, 240, 'электроды', 8.5, MUT, 'end') + `</g>`;
+  // ocean flask
+  h += `<g data-hit="ocean"><circle cx="100" cy="338" r="38" fill="rgba(160,190,230,.04)" stroke="rgba(200,215,240,.42)" stroke-width="2"/><path d="M63 344A37 37 0 0 0 137 344Z" fill="${water}" fill-opacity=".8"/>`;
+  if (on && !reduce) for (let b = 0; b < 4; b++) { const yy = 370 - ((t / 9 + b * 23) % 26); h += `<circle cx="${84 + b * 10}" cy="${f(yy)}" r="2" fill="none" stroke="#e8ecf4" stroke-opacity=".6"/>`; }
+  h += `<rect x="70" y="381" width="60" height="9" rx="3" fill="${on ? ORA : '#3a4866'}"/>` + lbl(100, 404, 'океан (кипит)', 9.5, '#c9d3e6') + `</g>`;
+  // condenser + trap
+  h += `<g data-hit="cond"><path d="M300 262L352 318" stroke="rgba(114,212,232,.35)" stroke-width="16" stroke-linecap="round"/>` + lbl(340, 280, 'холодильник', 8.5, MUT, 'start') + lbl(340, 291, '«дожди»', 8.5, MUT, 'start') + `</g>`;
+  h += `<g data-hit="trap"><rect x="352" y="356" width="16" height="30" rx="5" fill="${mix('#5fb4d9', '#a8763e', k)}" fill-opacity="${S.days > 0 ? 0.8 : 0.15}" stroke="rgba(200,215,240,.42)"/>` + lbl(374, 376, 'ловушка', 8.5, MUT, 'start') + `</g>`;
+  // chromatogram
+  h += `<g data-hit="chroma"><rect x="418" y="160" width="88" height="236" rx="6" fill="rgba(233,226,207,.10)" stroke="rgba(233,226,207,.35)"/>` + lbl(462, 176, 'хроматограмма', 9, '#c9d3e6');
+  h += `<path d="M426 384H498" stroke="rgba(233,226,207,.35)" stroke-dasharray="3 3"/>`;
+  if (S.anal) {
+    let any = false;
+    S.anal.forEach((x, i) => {
+      const y = 198 + i * 30;
+      if (x >= THR) { any = true; const r = clamp(4 + 3 * Math.log10(x / THR), 4, 11); h += `<ellipse cx="444" cy="${y}" rx="${f(r * 1.3)}" ry="${f(r * 0.8)}" fill="${VIO}" fill-opacity="${f(clamp(0.35 + Math.log10(x / THR) / 2, 0.35, 0.95))}"/>` + lbl(462, y + 4, AA[i].s, 10, '#e8ecf4', 'start'); }
+      else h += lbl(462, y + 4, AA[i].s, 10, '#3a4866', 'start');
+    });
+    if (!any) h += lbl(462, 300, 'пятен нет', 10, WARN, 'middle', 'font-weight="600"');
+  } else h += lbl(462, 270, 'нажмите —', 9, '#56627d') + lbl(462, 282, 'сделать', 9, '#56627d') + lbl(462, 294, 'анализ', 9, '#56627d');
+  h += `</g>`;
+  return h;
+}
+
+// ---------- lesson 2 scene ----------
+function stagesScene() {
+  let h = bench();
+  const m = model();
+  // timeline bar
+  h += `<g data-hit="bar"><rect x="${ageX(4600)}" y="${BAR.y}" width="${f(ageX(4000) - ageX(4600))}" height="${BAR.h}" fill="#3a4866"/>`;
+  ERAS.forEach(E => { h += `<rect x="${f(ageX(E.a))}" y="${BAR.y}" width="${f(ageX(E.b) - ageX(E.a))}" height="${BAR.h}" fill="${E.c}" fill-opacity=".55"/>`; });
+  h += `</g>` + lbl(BAR.x0, BAR.y + BAR.h + 11, '4,6 млрд лет назад', 8.5, MUT, 'start') + lbl(BAR.x1, BAR.y + BAR.h + 11, 'сейчас', 8.5, MUT, 'end') + lbl(ageX(2500), BAR.y + BAR.h + 11, '2,5 млрд', 8.5, MUT);
+  CARDS.forEach((c, i) => { if (S.placed.some(p => p.includes(i))) h += `<path d="M${f(ageX(c.age))} ${BAR.y + 2}v${BAR.h - 4}" stroke="#0b1019" stroke-width="1.4"/>`; });
+  const cx = ageX(S.cursor), ce = eraOf(S.cursor);
+  h += `<g data-drag="cur"><rect x="${f(cx - 14)}" y="${BAR.y - 10}" width="28" height="${BAR.h + 20}" fill="rgba(0,0,0,0)"/><path d="M${f(cx)} ${BAR.y - 3}V${BAR.y + BAR.h + 3}" stroke="#e8ecf4" stroke-width="2"/><path d="M${f(cx - 6)} ${BAR.y - 9}h12l-6 7z" fill="#e8ecf4"/></g>`;
+  h += lbl(clamp(cx, 90, 430), BAR.y - 13, `${S.cursor >= 4600 ? 'образование Земли' : '≈ ' + fmtMa(Math.max(S.cursor, 0.3)) + ' назад'} · ${ce < 0 ? 'катархей' : ERAS[ce].n}`, 9.5, '#e8ecf4');
+  // era columns
+  ERAS.forEach((E, i) => {
+    const x = COL(i), on = S.cd && S.cd.over === i;
+    h += `<g data-hit="col${i}"><rect x="${f(x)}" y="${COLY0}" width="${COLW}" height="${COLY1 - COLY0}" rx="10" fill="${on ? 'rgba(255,181,71,.10)' : 'rgba(26,36,56,.45)'}" stroke="${on ? ORA : '#26324a'}" stroke-width="${on ? 1.8 : 1}"/>`;
+    h += `<rect x="${f(x)}" y="${COLY0}" width="${COLW}" height="4" rx="2" fill="${E.c}"/>`;
+    h += lbl(x + COLW / 2, COLY0 + 20, E.n, 11, '#e8ecf4', 'middle', 'font-weight="600"') + lbl(x + COLW / 2, COLY0 + 33, `${E.a >= 1000 ? ru(E.a / 1000) + ' млрд' : E.a}–${E.b >= 1000 ? ru(E.b / 1000) + ' млрд' : E.b || 0}${E.b >= 1000 ? '' : ' млн'}`, 8.5, MUT);
+    S.placed[i].forEach((ci, j) => { h += `<circle cx="${f(x + 9)}" cy="${COLY0 + 48 + j * 18}" r="3" fill="${E.c}"/>` + lbl(x + 16, COLY0 + 51 + j * 18, CARDS[ci].s, 9.5, ci === S.last ? '#e8ecf4' : '#c9d3e6', 'start'); });
+    h += `</g>`;
+  });
+  // current card
+  if (m.card) {
+    const p = S.cd ? { x: S.cd.x, y: S.cd.y } : { x: 260, y: 366 };
+    h += `<g data-drag="card" transform="translate(${f(p.x - 140)} ${f(p.y - 28)})"><rect width="280" height="56" rx="12" fill="#1a2438" stroke="${ORA}" stroke-width="1.6"${S.cd ? ' stroke-dasharray="0"' : ''}/>` +
+      `<rect x="10" y="17" width="5" height="22" rx="2" fill="${ORA}"/>` + lbl(26, 25, m.card.t, 11.5, '#e8ecf4', 'start', 'font-weight="600"') +
+      lbl(26, 42, `карточка ${S.pos + 1} из ${CARDS.length} · перетащите в эру`, 9, MUT, 'start') + `</g>`;
+  } else h += lbl(260, 362, 'Все события на своих местах!', 13, OK, 'middle', 'font-weight="600"') + lbl(260, 380, `ошибок: ${S.mis}`, 10, MUT);
+  return h;
+}
+
+// ---------- lesson 3 scene ----------
+function skull(cx, cy, v, t) {
+  // side view facing left; v — brain volume, t — 0 archaic … 1 modern
+  const k = Math.sqrt(v / 1400), rx = 26 * k + 4, ry = 15 * k + 3 + t * 5, bx = cx + 10, by = cy - 8;
+  const fx = bx - rx * 0.78, fy = by + ry * 0.5, sn = (1 - t) * 12, brow = (1 - t) * 3.5;
+  let h = `<ellipse cx="${f(bx)}" cy="${f(by)}" rx="${f(rx)}" ry="${f(ry)}" fill="#d9d2bd"/>`;
+  h += `<path d="M${f(fx + 6)} ${f(fy - 6)}L${f(fx - 6 - sn)} ${f(fy + 12)}L${f(fx - 3 - sn * 0.7 - t * 3)} ${f(fy + 25)}L${f(fx + 20)} ${f(fy + 27)}Q${f(fx + 24)} ${f(fy + 16)} ${f(bx + 6)} ${f(by + ry * 0.75)}Z" fill="#c9c1a8"/>`;
+  h += `<ellipse cx="${f(fx + 1)}" cy="${f(fy - 3)}" rx="${f(4 + brow)}" ry="${f(2 + brow * 0.5)}" fill="#d9d2bd"/>`;
+  h += `<circle cx="${f(fx + 3)}" cy="${f(fy + 4)}" r="3.6" fill="#1a2438"/><path d="M${f(fx - 3 - sn * 0.6)} ${f(fy + 18)}h${f(12 + sn * 0.5)}" stroke="#1a2438" stroke-width="1"/>`;
+  return `<g transform="translate(${f(cx)} ${f(cy)}) scale(.8) translate(${f(-cx)} ${f(-cy)})">${h}</g>`;
+}
+function humanScene() {
+  let h = bench();
+  // chart
+  h += `<g data-hit="chart"><rect x="${CH.x0}" y="${CH.y0}" width="${CH.x1 - CH.x0}" height="${CH.y1 - CH.y0}" fill="rgba(18,26,40,.6)" stroke="#26324a"/>`;
+  [[5e6, '5 млн'], [1e6, '1 млн'], [1e5, '100 тыс.'], [1e4, '10 тыс.']].forEach(([a, s]) => { const x = ax(a); h += `<path d="M${f(x)} ${CH.y0}V${CH.y1}" stroke="rgba(139,150,173,.16)"/>` + lbl(x, CH.y1 + 12, s, 8.5, MUT); });
+  [3e6, 3e5, 3e4].forEach(a => { const x = ax(a); h += `<path d="M${f(x)} ${CH.y0}V${CH.y1}" stroke="rgba(139,150,173,.07)" stroke-dasharray="2 3"/>`; });
+  [400, 800, 1200, 1600].forEach(v => { const y = vy(v); h += `<path d="M${CH.x0} ${f(y)}H${CH.x1}" stroke="rgba(139,150,173,.12)"/><text x="${CH.x0 - 4}" y="${f(y + 3)}" font-size="8.5" fill="${MUT}" text-anchor="end">${v}</text>`; });
+  h += lbl(CH.x0 + 4, CH.y0 + 11, 'объём мозга, см³', 9, MUT, 'start') + lbl((CH.x0 + CH.x1) / 2, CH.y1 + 25, 'сколько лет назад (каждое деление — в 10 раз)', 8.5, MUT) + `</g>`;
+  // trend through locked points
+  const lk = FINDS.map((F, i) => i).filter(i => S.lock[i]);
+  if (lk.length > 1) h += `<path d="M${lk.map(i => `${f(ax(FINDS[i].age))} ${f(vy(FINDS[i].vol))}`).join('L')}" fill="none" stroke="rgba(232,236,244,.35)" stroke-width="1.4" stroke-dasharray="4 4"/>`;
+  // tray
+  const SF = FINDS[S.sel], sp = SP[SF.sp];
+  h += `<g data-hit="skull"><rect x="${TRAY.x}" y="152" width="${TRAY.w}" height="62" rx="10" fill="rgba(26,36,56,.45)" stroke="#26324a"/>` + skull(TRAY.x + 52, 186, SF.vol, SF.sp / 4) +
+    lbl(TRAY.x + 100, 176, `№${S.sel + 1}`, 11, '#e8ecf4', 'start', 'font-weight="600"') + lbl(TRAY.x + 100, 191, `${SF.vol} см³`, 9.5, '#c9d3e6', 'start') + lbl(TRAY.x + 100, 204, S.lock[S.sel] ? sp.s : '?', 9, S.lock[S.sel] ? sp.c : MUT, 'start') + `</g>`;
+  FINDS.forEach((F, i) => {
+    const y = TRAY.y + i * TRAY.step, sel = S.sel === i, L = S.lock[i];
+    h += `<g data-hit="f${i}"><rect x="${TRAY.x}" y="${y}" width="${TRAY.w}" height="${TRAY.h}" rx="8" fill="${sel ? 'rgba(255,181,71,.10)' : 'rgba(26,36,56,.45)'}" stroke="${sel ? ORA : L ? SP[F.sp].c : '#26324a'}"/>` +
+      lbl(TRAY.x + 32, y + 13, `${fmtYr(F.age)} лет`, 9.5, '#e8ecf4', 'start') + lbl(TRAY.x + 32, y + 25, L ? SP[F.sp].s : `${F.vol} см³`, 9, L ? SP[F.sp].c : MUT, 'start') + `</g>`;
+  });
+  // markers
+  FINDS.forEach((F, i) => {
+    let x, y, cls = 'tray';
+    if (S.fd && S.fd.i === i) { x = S.fd.x; y = S.fd.y; cls = 'drag'; }
+    else if (S.fp[i]) { x = ax(S.fp[i].a); y = vy(S.fp[i].v); cls = S.lock[i] ? 'lock' : 'off'; }
+    else [x, y] = trayXY(i);
+    if (cls === 'drag' && x >= CH.x0 && x <= CH.x1 && y >= CH.y0 && y <= CH.y1) {
+      h += `<path d="M${f(x)} ${f(y)}V${CH.y1}M${f(x)} ${f(y)}H${CH.x0}" stroke="${ORA}" stroke-opacity=".6" stroke-dasharray="3 3"/>`;
+      const tx = clamp(x, CH.x0 + 60, CH.x1 - 60), ty = y - 18 < CH.y0 + 18 ? y + 28 : y - 18;
+      h += `<rect x="${f(tx - 58)}" y="${f(ty - 12)}" width="116" height="17" rx="5" fill="rgba(11,16,25,.9)" stroke="${ORA}"/>` + lbl(tx, ty, `${fmtYr(xa(x))} лет · ${Math.round(yv(y))} см³`, 9.5, '#e8ecf4');
+    }
+    const c = cls === 'lock' ? SP[F.sp].c : ORA;
+    h += `<g ${S.lock[i] ? `data-hit="m${i}"` : `data-drag="m${i}"`}><circle cx="${f(x)}" cy="${f(y)}" r="16" fill="rgba(0,0,0,0)"/><circle cx="${f(x)}" cy="${f(y)}" r="9" fill="${cls === 'lock' ? c : '#1a2438'}" stroke="${c}" stroke-width="1.8"${cls === 'off' ? ' stroke-dasharray="3 2"' : ''}/>` +
+      `<text x="${f(x)}" y="${f(y + 3.5)}" font-size="10" font-weight="600" fill="${cls === 'lock' ? '#0b1019' : '#e8ecf4'}" text-anchor="middle">${i + 1}</text></g>`;
+    if (cls === 'lock') h += lbl(x + (i < 2 ? 13 : -12), y + (i < 2 ? 4 : -12), SP[F.sp].s, 9, c, i < 2 ? 'start' : 'end');
+  });
+  return h;
+}
+
+function hlBox(id) {
+  const L = LID();
+  if (L === 'miller') return { gases: [10, 108, 500, 42], flask: [186, 158, 128, 154], spark: [180, 204, 140, 30], ocean: [58, 296, 84, 112], cond: [292, 254, 72, 72], trap: [346, 350, 70, 42], chroma: [414, 156, 96, 244] }[id] || null;
+  if (L === 'stages') return { bar: [8, 100, 504, 54], cols: [10, COLY0 - 4, 500, COLY1 - COLY0 + 8], card: [116, 334, 288, 64], kat: [ageX(4600) - 4, BAR.y - 4, ageX(4000) - ageX(4600) + 8, BAR.h + 8] }[id] || null;
+  if (id === 'marker') { const [x, y] = S.fp[S.sel] ? [ax(S.fp[S.sel].a), vy(S.fp[S.sel].v)] : trayXY(S.sel); return [x - 14, y - 14, 28, 28]; }
+  return { chart: [CH.x0 - 30, CH.y0 - 4, CH.x1 - CH.x0 + 34, CH.y1 - CH.y0 + 34], tray: [TRAY.x - 4, TRAY.y - 4, TRAY.w + 8, 5 * TRAY.step + 4], skull: [TRAY.x - 4, 148, TRAY.w + 8, 70] }[id] || null;
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = id === 'miller' ? millerScene(t) : id === 'stages' ? stagesScene() : humanScene();
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${f(b[0])}" y="${f(b[1])}" width="${f(b[2])}" height="${f(b[3])}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 520, h: 405 }, dirty = true;
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 524, hh / 420, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 412 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer: taps and drags ----------
+function svgPt(e) { const m = scene.getScreenCTM(); if (!m) return { x: 0, y: 0 }; const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(m.inverse()); return { x: p.x, y: p.y }; }
+let press = null, drag = null;
+function dragMove(p) {
+  if (drag.id === 'cur') setCursor(4600 - (clamp(p.x, BAR.x0, BAR.x1) - BAR.x0) / (BAR.x1 - BAR.x0) * 4600);
+  else if (drag.id === 'card') { const over = p.y > COLY0 - 20 && p.y < COLY1 + 20 ? ERAS.findIndex((E, i) => p.x >= COL(i) - 3 && p.x <= COL(i) + COLW + 3) : -1; S.cd = { x: p.x, y: p.y, over }; dirty = true; }
+  else if (drag.id[0] === 'm') { S.fd = { i: +drag.id.slice(1), x: p.x, y: p.y }; dirty = true; }
+}
+scene.addEventListener('pointerdown', e => {
+  const d = e.target.closest('[data-drag]'), el = e.target.closest('[data-hit]');
+  if (!d && !el) return;
+  e.preventDefault();
+  if (d) {
+    drag = { id: d.dataset.drag, x: e.clientX, y: e.clientY, moved: false };
+    try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+    scene.classList.add('grabbing');
+    if (drag.id[0] === 'm') { S.sel = +drag.id.slice(1); update(); }
+    if (drag.id === 'cur') dragMove(svgPt(e));
+    return;
+  }
+  press = { hit: el.dataset.hit, x: e.clientX, y: e.clientY, moved: false };
+});
+scene.addEventListener('pointermove', e => {
+  if (drag) { if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 4) drag.moved = true; if (drag.moved || drag.id === 'cur') dragMove(svgPt(e)); return; }
+  if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 8) press.moved = true;
+});
+function endDrag(e, cancel) {
+  const d = drag; drag = null; scene.classList.remove('grabbing');
+  if (d.id === 'card') { const over = S.cd ? S.cd.over : -1; S.cd = null; if (!cancel && d.moved && over >= 0) place(over); else dirty = true; }
+  else if (d.id[0] === 'm') { const fd = S.fd; S.fd = null; if (!cancel && d.moved && fd) dropFind(fd.i, fd); else dirty = true; }
+}
+scene.addEventListener('pointerup', e => { if (drag) return endDrag(e, false); const p = press; press = null; if (p && !p.moved) tap(p.hit); });
+scene.addEventListener('pointercancel', e => { if (drag) endDrag(e, true); press = null; });
+
+function tap(id) {
+  const L = LID();
+  if (L === 'miller') {
+    if (/^g\d$/.test(id)) toggleGas(GASES[+id.slice(1)].k);
+    else if (id === 'flask' || id === 'ocean') runToggle();
+    else if (id === 'chroma' || id === 'trap') analyze();
+    else if (id === 'spark') setSpark(S.E >= 100 ? 0 : S.E + 50);
+  }
+  if (L === 'stages') {
+    if (/^col\d$/.test(id)) place(+id.slice(3));
+  }
+  if (L === 'human') {
+    if (/^f\d$/.test(id)) selFind(+id.slice(1));
+    if (/^m\d$/.test(id)) selFind(+id.slice(1));
+  }
+}
+
+let last = 0, lastUpd = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(100, t - (last || t)); last = t;
+  if (LID() === 'miller' && S.run) {
+    const dd = Math.min(DAYS - S.days, dt / 600);
+    S.days += dd; S.Y += rateOf(S.g, S.E).v * dd;
+    if (S.days >= DAYS - 1e-9) { S.days = DAYS; S.run = false; renderTools(); toast('Прошла неделя, как у Миллера. Возьмите пробу: нажмите «Анализ».'); update(); }
+    else if (t - lastUpd > 200) { lastUpd = t; update(); }
+    dirty = true;
+  }
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3800); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, c) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${c ? `<i style="background:${c}"></i>` : ''}${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    miller: B('run', S.run ? 'Стоп' : 'Пуск', S.run, S.run ? OK : '#56627d') + sep + [0, 50, 100].map(e => B('e' + e, e ? `Искра ${e} %` : 'Без искры', S.E === e, e ? VIO : '#56627d')).join('') + sep + B('anal', 'Анализ') + B('new', 'Новый опыт'),
+    stages: B('cur0', 'К началу') + B('curL', 'К последней') + sep + B('reset', 'Сбросить'),
+    human: B('back', 'Вернуть находку') + B('next', 'Следующая') + sep + B('reset', 'Сбросить'),
+  }[id];
+  placeHint();
+}
+function placeHint() {
+  const hn = $('#hint'), st = $('#stage').getBoundingClientRect(), tb = $('#tools').getBoundingClientRect();
+  hn.style.visibility = tb.left - st.left < st.width * 0.19 + 30 ? 'hidden' : '';
+}
+addEventListener('resize', placeHint);
+function act(a) {
+  if (a === 'run') return runToggle();
+  if (/^e\d+$/.test(a)) return setSpark(+a.slice(1));
+  if (a === 'anal') return analyze();
+  if (a === 'new') return newExp();
+  if (/^gas/.test(a)) return toggleGas(a.slice(3));
+  if (a === 'cur0') return setCursor(4600);
+  if (a === 'curL') return setCursor(S.last >= 0 ? CARDS[S.last].age : 4600);
+  if (/^c\d$/.test(a)) return place(+a.slice(1));
+  if (a === 'back') return resetFind(S.sel);
+  if (a === 'next') { const i = [1, 2, 3, 4, 5].map(k => (S.sel + k) % 5).find(k => !S.lock[k]); return selFind(i === undefined ? (S.sel + 1) % 5 : i); }
+  if (/^s\d$/.test(a)) return selFind(+a.slice(1));
+  if (a === 'reset') {
+    if (LID() === 'miller') resetMiller(); else if (LID() === 'stages') resetStages(); else resetHuman();
+    renderTools(); buildScheme(); update();
+  }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const dot = c => IC(`<circle cx="17" cy="17" r="11" fill="${c}" opacity=".85"/><circle cx="17" cy="17" r="4" fill="#0b1019"/>`);
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (m.kind === 'mil') return `Сутки ${ru(m.days)} из ${DAYS} · ${m.anal ? `найдено аминокислот: ${m.found} из ${GOAL1}` : 'анализа ещё не было'}`;
+  if (m.kind === 'tl') return `Разложено ${m.placed} из ${CARDS.length} · ошибок ${m.mis}`;
+  return `Определено находок: ${m.locked} из ${FINDS.length}`;
+}
+
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'miller') h = `<h2>Прибор Миллера</h2><div class="ctl"><div class="lbl">Газы в колбе</div><div class="chips">` +
+    GASES.map(G => `<button data-a="gas${G.k}" aria-pressed="${!!S.g[G.k]}">${G.n}</button>`).join('') + `</div></div>` +
+    slider('inE', 'Мощность разрядов', 0, 100, 10, S.E) +
+    `<dl class="reads"><div><dt>Скорость v</dt><dd id="r1"></dd></div><div><dt>Сутки</dt><dd id="r2"></dd></div><div><dt>Продукт</dt><dd id="r3"></dd></div>
+    <div><dt>Кислород</dt><dd id="r4"></dd></div><div><dt>Прибор</dt><dd id="r5"></dd></div><div><dt>Найдено</dt><dd id="r6"></dd></div></dl>
+    <div class="row"><button class="ghostbtn" data-a="run">Пуск / стоп</button><button class="ghostbtn" data-a="anal">Анализ</button><button class="ghostbtn" data-a="new">Новый опыт</button></div>`;
+  if (id === 'stages') h = `<h2>Машина времени</h2>` + slider('inT', 'Сколько лет назад', 0, 4600, 10, 4600 - S.cursor) +
+    `<p class="note">Двигайте бегунок вправо — к нашему времени.</p>
+    <dl class="reads"><div><dt>Время</dt><dd id="r1"></dd></div><div><dt>Эра</dt><dd id="r2"></dd></div><div><dt>Часы Земли</dt><dd id="r3"></dd></div>
+    <div><dt>Уже было</dt><dd id="r4"></dd></div><div><dt>Разложено</dt><dd id="r5"></dd></div><div><dt>Ошибок</dt><dd id="r6"></dd></div></dl>
+    <div class="ctl"><div class="lbl">Положить карточку в эру</div><div class="chips">` + ERAS.map((E, i) => `<button data-a="c${i}">${E.n}</button>`).join('') + `</div></div>
+    <div class="row"><button class="ghostbtn" data-a="reset">Начать сначала</button></div>`;
+  if (id === 'human') h = `<h2>Находки</h2><div class="ctl"><div class="lbl">Выбрать находку</div><div class="chips">` +
+    FINDS.map((F, i) => `<button data-a="s${i}" aria-pressed="${S.sel === i}">№${i + 1}</button>`).join('') + `</div></div>
+    <dl class="reads"><div><dt>Возраст</dt><dd id="r1"></dd></div><div><dt>Мозг</dt><dd id="r2"></dd></div><div><dt>На графике</dt><dd id="r3"></dd></div>
+    <div><dt>Место</dt><dd id="r4"></dd></div><div><dt>Вид</dt><dd id="r5"></dd></div><div><dt>Определено</dt><dd id="r6"></dd></div></dl>
+    <p class="note" id="r7"></p>
+    <div class="row"><button class="ghostbtn" data-a="back">Вернуть находку</button><button class="ghostbtn" data-a="reset">Начать сначала</button></div>`;
+  el.innerHTML = h;
+  const ie = el.querySelector('#inE'); if (ie) ie.addEventListener('input', e => { S.E = +e.target.value; renderTools(); update(); });
+  const it = el.querySelector('#inT'); if (it) it.addEventListener('input', e => setCursor(4600 - +e.target.value));
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => { act(b.dataset.a); if (/^(gas|s\d)/.test(b.dataset.a)) buildScheme(), updateScheme(model()); });
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.innerHTML = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (m.kind === 'mil') {
+    set('#inEO', S.E + ' %'); val('#inE', S.E);
+    set('#r1', ru(m.r.v, 3)); set('#r2', ru(m.days)); set('#r3', ru(m.Y, 2)); set('#r4', S.g.O2 ? 'есть' : 'нет'); set('#r5', m.run ? 'работает' : 'стоит'); set('#r6', m.anal ? m.found + ' из 6' : '—');
+  } else if (m.kind === 'tl') {
+    const done = CARDS.filter(c => c.age >= m.cursor).length;
+    set('#inTO', fmtMa(Math.max(m.cursor, 0.3)) + ' назад'); val('#inT', 4600 - m.cursor);
+    set('#r1', fmtMa(Math.max(m.cursor, 0.3))); set('#r2', m.era < 0 ? 'катархей' : ERAS[m.era].n); set('#r3', clock(m.cursor)); set('#r4', `${done} из ${CARDS.length}`); set('#r5', m.placed); set('#r6', m.mis);
+  } else {
+    const F = FINDS[m.sel];
+    set('#r1', fmtYr(F.age)); set('#r2', F.vol + ' см³'); set('#r3', m.p ? `${fmtYr(m.p.a)} · ${Math.round(m.p.v)}` : '—'); set('#r4', F.where.split(',')[0]); set('#r5', S.lock[m.sel] ? SP[F.sp].s : '?'); set('#r6', `${m.locked} из 5`);
+    set('#r7', `Находка №${m.sel + 1}: ${F.where}. ${F.tools[0].toUpperCase() + F.tools.slice(1)}.`);
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'miller') return [
+    { id: 'gases', icon: dot(CY), name: 'Газы', spec: 'Нажмите на плитку, чтобы добавить газ в колбу или убрать его. Сейчас в нашем воздухе есть кислород, а на молодой Земле его не было.' },
+    { id: 'flask', icon: dot('#c9d3e6'), name: 'Колба «атмосфера»', spec: 'Пятилитровая колба с газами. Нажмите на неё — пуск или остановка прибора.' },
+    { id: 'spark', icon: dot(VIO), name: 'Электроды', spec: 'Искровые разряды заменяют молнии древней Земли — источник энергии для реакций.' },
+    { id: 'ocean', icon: dot('#5fb4d9'), name: 'Колба «океан»', spec: 'Кипящая вода даёт пар и собирает продукты. За неделю вода становится бурой.' },
+    { id: 'cond', icon: dot(CY), name: 'Холодильник', spec: 'Охлаждает пар — получаются «дожди», которые смывают вещества обратно в «океан».' },
+    { id: 'trap', icon: dot(SAND), name: 'Ловушка', spec: 'Из неё берут пробу для анализа.' },
+    { id: 'chroma', icon: dot(VIO), name: 'Хроматограмма', spec: 'Бумага разделяет смесь: каждая аминокислота уходит на свою высоту. Пятно видно, только если вещества достаточно.' }];
+  if (id === 'stages') return [
+    { id: 'bar', icon: dot(CY), name: 'Лента времени', spec: 'Все 4,6 млрд лет в настоящем масштабе. Видно, какие короткие палеозой, мезозой и кайнозой по сравнению с докембрием.' },
+    { id: 'kat', icon: dot('#3a4866'), name: 'Катархей', spec: 'Серый участок: первые ≈ 600 млн лет Земля остывала, жизни ещё не было.' },
+    { id: 'cols', icon: dot(LEAF), name: 'Колонки эр', spec: 'Ширина колонок одинаковая, а длительность эр — нет. Сюда кладут карточки.' },
+    { id: 'card', icon: dot(ORA), name: 'Карточка-событие', spec: 'Перетащите её в нужную эру или нажмите на колонку.' }];
+  return [
+    { id: 'chart', icon: dot(CY), name: 'График', spec: 'По горизонтали — сколько лет назад (логарифмическая шкала), по вертикали — объём мозгового отдела черепа.' },
+    { id: 'tray', icon: dot(ORA), name: 'Находки', spec: 'Пять черепов из разных стоянок. У каждой — возраст и объём мозга.' },
+    { id: 'marker', icon: dot(ORA), name: 'Кружок находки', spec: 'Перетащите его на график. Если точка верна, находка «определяется».' },
+    { id: 'skull', icon: dot('#d9d2bd'), name: 'Череп', spec: 'Профиль выбранной находки: с ростом мозга череп становится выше, челюсти — меньше, надбровный валик — слабее.' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      (L.note ? `<div class="safe"><b>Безопасность</b>${L.note}</div>` : '') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    let h = `<h2>${{ miller: 'Прибор на столе', stages: 'Что на столе', human: 'Что на столе' }[L.id]}</h2><p class="note">Нажмите на строку, чтобы найти это на столе.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    if (L.id === 'miller') h += `<h3>Гипотезы происхождения жизни</h3><div class="feat"><div style="border-left-color:${WARN}"><b>Самозарождение</b>Живое постоянно возникает из неживого. Опровергли Ф. Реди (мухи и мясо) и Л. Пастер (колбы с S-образным горлышком).</div><div style="border-left-color:${VIO}"><b>Панспермия</b>Жизнь занесена из космоса. В метеоритах находят аминокислоты, но вопрос, как жизнь возникла, остаётся.</div><div style="border-left-color:${OK}"><b>Биохимическая эволюция</b>Опарин и Холдейн: жизнь возникла из неживого вещества на древней Земле путём долгой химической эволюции.</div></div>
+      <h3>Этапы по Опарину</h3><div class="feat"><div style="border-left-color:${CY}"><b>1. Простые органические вещества</b>Аминокислоты, сахара, азотистые основания из газов — опыт Миллера.</div><div style="border-left-color:${CY}"><b>2. Биополимеры</b>Белки и нуклеиновые кислоты, например на поверхности глин.</div><div style="border-left-color:${CY}"><b>3. Коацерваты (пробионты)</b>Капли с оболочкой, обменивающиеся веществами со средой.</div><div style="border-left-color:${CY}"><b>4. Первые клетки</b>Мембрана, обмен веществ и наследственность (РНК, потом ДНК).</div></div>`;
+    if (L.id === 'stages') h += `<h3>Эры и главные события</h3><div class="feat">` + ERAS.map(E => `<div style="border-left-color:${E.c}"><b>${E.n} · ${E.a >= 1000 ? ru(E.a / 1000) + ' млрд' : E.a + ' млн'} — ${E.b >= 1000 ? ru(E.b / 1000) + ' млрд' : E.b ? E.b + ' млн' : 'сейчас'}</b>${{ 'Архей': 'Прокариоты, начало фотосинтеза, строматолиты.', 'Протерозой': 'Кислородная атмосфера, эукариоты, многоклеточные водоросли и мягкотелые животные.', 'Палеозой': 'Кембрий, ордовик, силур, девон, карбон, пермь. Выход на сушу, рыбы, земноводные, первые пресмыкающиеся, папоротниковые леса.', 'Мезозой': 'Триас, юра, мел. Динозавры, голосеменные, первые млекопитающие, птицы и цветковые.', 'Кайнозой': 'Палеоген, неоген, антропоген. Расцвет млекопитающих, птиц, насекомых и цветковых. Появление человека.' }[E.n]}</div>`).join('') + `</div>`;
+    if (L.id === 'human') h += `<h3>Этапы эволюции человека</h3><div class="feat">` + SP.map(s => `<div style="border-left-color:${s.c}"><b>${s.n}</b>${s.age} · мозг ${s.vol} см³. ${s.f}</div>`).join('') + `</div>
+      <h3>Место человека в системе</h3><div class="feat"><div><b>Царство — Животные</b>Тип Хордовые, подтип Позвоночные.</div><div><b>Класс — Млекопитающие</b>Отряд Приматы, семейство Гоминиды.</div><div style="border-left-color:${ORA}"><b>Род Homo, вид Homo sapiens</b>Человек разумный — единственный живущий вид рода.</div></div>`;
+    $('#pane-parts').innerHTML = h;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  if (m.kind === 'mil') {
+    const r = m.r;
+    let h = `<h2>Скорость синтеза</h2><div class="formula">v = E · k<sub>C</sub> · k<sub>N</sub> · k<sub>H</sub> · k<sub>воды</sub> · k<sub>O₂</sub></div><div class="steps">` +
+      step('Мощность разрядов E', ru(r.e, 1)) + step('Углерод: ' + (S.g.CH4 ? 'метан' : S.g.CO2 ? 'только CO₂' : 'нет'), 'k = ' + ru(r.kC, 2)) +
+      step('Азот: ' + (S.g.NH3 ? 'аммиак' : S.g.N2 ? 'только N₂' : 'нет'), 'k = ' + ru(r.kN, 1)) + step('Водород H₂', S.g.H2 ? 'k = 1' : 'нет → k = 0,6') +
+      step('Вода', S.g.H2O ? 'k = 1' : 'нет → k = 0') + step('Кислород', S.g.O2 ? 'есть → k = 0' : 'нет → k = 1') +
+      step('v (усл. ед. в сутки)', `${ru(r.e, 1)} · ${ru(r.kC, 2)} · ${ru(r.kN, 1)} · ${ru(r.kH, 1)} · ${r.kW} · ${r.kO} = ${ru(r.v, 3)}`, 'sum') + `</div>`;
+    h += `<h3>Продукт в ловушке</h3><div class="steps">` + step('Прошло суток t', ru(m.days, 1)) + step('Всего продукта', `≈ ${ru(m.Y, 2)} усл. ед.`) + `</div>`;
+    h += `<h3>Хватит ли для пятна?</h3><p class="note">Пятно на хроматограмме видно, если вещества не меньше 0,1 усл. ед. Глицина всегда больше всего, остальных — меньше.</p><div class="steps">` +
+      AA.map((a, i) => step(`${a.n} (${ru(a.a * 100, a.a < 0.1 ? 1 : 0)} %)`, `${ru(m.am[i], 2)} ${m.am[i] >= THR ? '≥' : '<'} 0,1 ${m.am[i] >= THR ? '✓' : ''}`)).join('') +
+      step('Будет видно пятен', `${m.am.filter(x => x >= THR).length} из 6`, 'sum') + `</div><p class="note" style="margin-top:8px">Модель упрощена: числа условные. Миллер получил несколько аминокислот, а повторный анализ его проб в 2008 году нашёл больше 20 разных.</p>`;
+    return h;
+  }
+  if (m.kind === 'tl') {
+    const a = Math.max(m.cursor, 0.3), e = m.era;
+    let h = `<h2>«Сутки Земли»</h2><p class="note">Сожмём 4,6 млрд лет в одни сутки: Земля возникла в 00:00, сейчас — полночь.</p><div class="formula">время = 24 ч × (1 − T / 4600)</div><div class="steps">` +
+      step('Сколько лет назад T', `${fmtMa(a)} = ${ru(a, a < 1 ? 1 : 0)} млн`) + step('Доля истории', `${ru(a, a < 1 ? 1 : 0)} ÷ 4600 = ${ru(a / 4600 * 100, a < 46 ? 3 : 1)} %`) +
+      step('Время на часах', clock(a), 'sum') + `</div>`;
+    h += `<h3>Длительность эр</h3><div class="steps">` + ERAS.map((E, i) => step(E.n + (i === e ? ' ←' : ''), `${E.a} − ${E.b} = ${E.a - E.b} млн · ${ru((E.a - E.b) / 4600 * 100, 1)} %`)).join('') +
+      step('Катархей (без жизни)', `600 млн · ${ru(600 / 4600 * 100, 1)} %`) + `</div>`;
+    if (S.last >= 0) { const c = CARDS[S.last]; h += `<h3>Последняя карточка</h3><div class="steps">` + step(c.s, `≈ ${fmtMa(c.age)} назад`) + step('На часах Земли', clock(c.age), 'sum') + `</div>`; }
+    return h + `<p class="note" style="margin-top:8px">Человек разумный появился за ≈ 6 секунд до полуночи. Все динозавры уместились бы примерно в 50 минут.</p>`;
+  }
+  const F = FINDS[m.sel], A = FINDS[0];
+  let h = `<h2>Находка №${m.sel + 1}</h2><div class="formula">x = lg(лет назад)</div><div class="steps">` +
+    step('Возраст', `${fmtYr(F.age)} лет`) + step('lg возраста', `lg ${F.age.toLocaleString('ru-RU')} = ${ru(Math.log10(F.age), 2)}`) + step('Объём мозга', F.vol + ' см³') +
+    (m.p ? step('Точка на графике', `${fmtYr(m.p.a)} лет (lg ${ru(Math.log10(m.p.a), 2)}) · ${Math.round(m.p.v)} см³`) + step('Допуск', `lg ± ${ru(TOLA, 1)}, объём ± ${TOLV} см³`) : step('Точка', 'ещё не на графике')) + `</div>`;
+  h += `<h3>Рост мозга</h3><div class="steps">` + step('Во сколько раз больше, чем у находки №1', `${F.vol} ÷ ${A.vol} = ${ru(F.vol / A.vol, 2)}`) +
+    (m.sel ? step('Средняя скорость роста', `(${F.vol} − ${A.vol}) ÷ (${ru(A.age / 1e6, 1)} − ${ru(F.age / 1e6, 2)}) ≈ ${Math.round((F.vol - A.vol) / ((A.age - F.age) / 1e6))} см³ за млн лет`, 'sum') : step('Это самая древняя находка', 'точка отсчёта', 'sum')) + `</div>`;
+  h += `<h3>Как узнали возраст</h3><div class="steps">`;
+  const c14 = Math.pow(0.5, F.age / 5730);
+  h += step('Углерод-14: период полураспада', '5730 лет') + step('Осталось бы C-14', `(½)^(${F.age.toLocaleString('ru-RU')} ÷ 5730) = ${c14 > 1e-4 ? ru(c14 * 100, 2) + ' %' : '≈ 0'}`);
+  if (F.age <= 5e4) h += step('Вывод', 'радиоуглеродный метод подходит', 'sum');
+  else if (F.age < 2e5) h += step('Вывод', 'C-14 почти не осталось → термолюминесценция, уран-ториевый метод', 'sum');
+  else { const kar = 1 - Math.pow(0.5, F.age / 1.25e9); h += step('Калий-40: период полураспада', '1,25 млрд лет') + step('Распалось K-40 в вулканическом пепле', `1 − (½)^(${ru(F.age / 1e9, 4)} ÷ 1,25) = ${ru(kar * 100, 3)} %`) + step('Вывод', 'калий-аргоновый метод по слоям пепла', 'sum'); }
+  return h + `</div>`;
+}
+
+function renderMeter(m) {
+  const el = $('#meter'), dn = S.done[LID()];
+  if (m.kind === 'mil') {
+    el.innerHTML = `<div class="k">Аминокислоты</div><div class="v ${dn ? 'ok' : m.anal && m.found === 0 ? 'bad' : ''}">${m.anal ? m.found + ' видов' : '—'}</div>
+      <div class="lr"><span>сутки</span><span>${ru(m.days)}</span></div><div class="lr"><span>продукт</span><span>${ru(m.Y, 2)}</span></div><div class="lr"><span>искра</span><span>${S.E} %</span></div>
+      <div class="gauge"><b style="width:${clamp(m.days / DAYS * 100, 0, 100)}%;${dn ? 'background:var(--ok)' : ''}"></b></div>`;
+  } else if (m.kind === 'tl') {
+    el.innerHTML = `<div class="k">Часы Земли</div><div class="v">${clock(Math.max(m.cursor, 0.3))}</div>
+      <div class="lr"><span>эра</span><span>${m.era < 0 ? 'катархей' : ERAS[m.era].n}</span></div><div class="lr"><span>ошибок</span><span>${m.mis}</span></div>
+      <div class="gauge"><b style="width:${m.placed / CARDS.length * 100}%;${dn ? 'background:var(--ok)' : ''}"></b></div>`;
+  } else {
+    const F = FINDS[m.sel], dr = S.fd && S.fd.i === m.sel;
+    el.innerHTML = `<div class="k">Находка №${m.sel + 1}</div><div class="v ${S.lock[m.sel] ? 'ok' : ''}">${fmtYr(F.age)} · ${F.vol}</div>
+      <div class="lr"><span>точка</span><span>${dr ? `${fmtYr(xa(clamp(S.fd.x, CH.x0, CH.x1)))} · ${Math.round(yv(clamp(S.fd.y, CH.y0, CH.y1)))}` : m.p ? `${fmtYr(m.p.a)} · ${Math.round(m.p.v)}` : '—'}</span></div>
+      <div class="lr"><span>определено</span><span>${m.locked}/5</span></div>
+      <div class="gauge"><b style="width:${m.locked / 5 * 100}%;${dn ? 'background:var(--ok)' : ''}"></b></div>`;
+  }
+}
+
+function update() {
+  const m = model(), L = LESSONS[S.lesson];
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Вы прошли путь от молекул до человека!'), 1800);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  miller: '<circle cx="40" cy="13" r="9" fill="rgba(114,212,232,.18)" stroke="#8b96ad"/><path d="M36 13l3-2 2 3 3-2" stroke="#b48cff" fill="none"/><circle cx="16" cy="21" r="6" fill="#a8763e" opacity=".8"/><path d="M16 15V5h22" stroke="#8b96ad" fill="none"/>',
+  stages: '<rect x="4" y="12" width="20" height="6" fill="#9aa6c4" opacity=".7"/><rect x="24" y="12" width="26" height="6" fill="#72d4e8" opacity=".7"/><rect x="50" y="12" width="6" height="6" fill="#5fbf6a"/><rect x="56" y="12" width="4" height="6" fill="#e2c46a"/><rect x="60" y="12" width="2" height="6" fill="#ffb547"/><path d="M40 6v18" stroke="#e8ecf4"/>',
+  human: '<path d="M8 26L58 4" stroke="#8b96ad" stroke-dasharray="2 2"/><circle cx="12" cy="24" r="3" fill="#9aa6c4"/><circle cx="24" cy="20" r="3" fill="#72d4e8"/><circle cx="36" cy="14" r="3" fill="#5fbf6a"/><circle cx="48" cy="8" r="3" fill="#e2c46a"/><circle cx="56" cy="6" r="3" fill="#ffb547"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i];
+  S.lesson = i; S.hl = null; press = null; drag = null;
+  resetLesson();
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const ls = $('#lessons'), cur = ls.querySelector('.lesson[aria-current="true"]');
+  if (cur) { const a = ls.getBoundingClientRect(), b = cur.getBoundingClientRect(); ls.scrollLeft += b.left - a.left - (a.width - b.width) / 2; }
+}
+
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '', guide = '';
+  if (id === 'miller') {
+    now = `Прибор Миллера. Газы в колбе: ${GASES.filter(G => S.g[G.k]).map(G => `${G.n} (${G.name})`).join(', ') || 'нет'}. Мощность разрядов ${S.E} %. Прибор ${m.run ? 'работает' : 'остановлен'}, прошло ${ru(m.days)} суток из 7. Скорость синтеза v = ${ru(m.r.v, 3)} усл. ед./сутки, накоплено ${ru(m.Y, 2)} усл. ед. ${m.anal ? `Анализ (хроматограмма): найдено ${m.found} аминокислот (${AA.filter((a, i) => m.anal[i] >= THR).map(a => a.n).join(', ') || 'нет'}).` : 'Анализа ещё не было.'} В модели: кислород полностью останавливает синтез, без воды и без искры синтеза нет, CO₂ вместо метана и N₂ вместо аммиака дают в 10+ раз меньше. Пятно видно от 0,1 усл. ед.`;
+    guide = 'Не называй сразу готовый состав газов. Спрашивай: был ли кислород в атмосфере молодой Земли и почему, откуда брались углерод и азот для аминокислот, зачем нужны искры и вода, почему за неделю появляется больше видов аминокислот.';
+  }
+  if (id === 'stages') {
+    now = `Лента времени 4,6 млрд лет и 5 колонок эр (архей 4000–2500, протерозой 2500–541, палеозой 541–252, мезозой 252–66, кайнозой 66–0 млн лет). Разложено ${m.placed} из ${CARDS.length} карточек, ошибок ${m.mis}. ${m.card ? `Текущая карточка: «${m.card.t}».` : 'Все карточки разложены.'} Разложено по эрам: ${ERAS.map((E, i) => `${E.n}: ${S.placed[i].map(c => CARDS[c].s).join(', ') || '—'}`).join('; ')}. Бегунок времени: ${fmtMa(Math.max(m.cursor, 0.3))} назад, эра ${m.era < 0 ? 'катархей' : ERAS[m.era].n}, на «часах Земли» ${clock(m.cursor)}.`;
+    guide = 'Не называй эру для текущей карточки напрямую. Спрашивай о логике последовательности: что должно было появиться раньше — кислород или клетки, которым он нужен; жили ли динозавры до выхода на сушу; помоги вспомнить, что значат названия эр (древняя, средняя, новая жизнь).';
+  }
+  if (id === 'human') {
+    now = `График «сколько лет назад (логарифмическая шкала) — объём мозга, см³». Находки: ${FINDS.map((F, i) => `№${i + 1}: ${fmtYr(F.age)} лет, ${F.vol} см³, ${F.where}, ${F.tools} — ${S.lock[i] ? 'определена: ' + SP[F.sp].n : S.fp[i] ? `поставлена неточно (${fmtYr(S.fp[i].a)} лет, ${Math.round(S.fp[i].v)} см³)` : 'не на графике'}`).join('; ')}. Выбрана №${m.sel + 1}. Определено ${m.locked} из 5. Точка засчитывается при ошибке не больше чем в 1,26 раза по возрасту и ±80 см³ по объёму.`;
+    guide = 'Не называй вид неопределённой находки заранее. Помоги прочитать логарифмическую шкалу (каждое деление — в 10 раз) и спрашивай: как меняется объём мозга со временем, что говорят орудия о жизни этих людей, почему неандерталец — не наш прямой предок.';
+  }
+  return [
+    `Раздел: биология, 11 класс, тема «Происхождение жизни и человека» (Наследственность и эволюция). Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Для тьютора: ${guide}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = { miller: 'Почему на молодой Земле не было кислорода?', stages: 'Почему почти 3 млрд лет жили только одноклеточные?', human: 'Почему неандерталец — не наш прямой предок?' }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

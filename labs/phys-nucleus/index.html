@@ -1,0 +1,1160 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по физике, 9 класс: радиоактивность, состав ядра, ядерные реакции, атомная электростанция.">
+<title>Атомное ядро</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.meter .lr .ok{color:var(--ok)}
+.meter .lr .bad{color:var(--warn)}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button.rec{color:var(--force)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.tools .tl{font-size:12px;color:var(--muted);padding:0 4px 0 6px;white-space:nowrap}
+.safe{border:1px solid rgba(255,138,115,.45);background:rgba(255,138,115,.08);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:4px 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:7px}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1600px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 230px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><circle cx="20" cy="20" r="13" fill="none" stroke="var(--arm)" stroke-width="1.4" stroke-dasharray="2 3"/><circle cx="16.5" cy="17" r="4.2" fill="var(--warn)"/><circle cx="23.5" cy="17" r="4.2" fill="#a9b4c9"/><circle cx="16.5" cy="23.5" r="4.2" fill="#a9b4c9"/><circle cx="23.5" cy="23.5" r="4.2" fill="var(--warn)"/><circle cx="20" cy="20.2" r="4.2" fill="var(--force)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Физика · Атомное ядро</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/">Карта</a><a href="/physics/">Физика</a><a href="/labs/phys-nucleus/" aria-current="page">Ядро</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Ядро</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Опытная площадка">
+    <svg class="scene" id="scene" role="img" aria-label="Площадка для опытов с атомным ядром. Протоны, нейтроны и управляющие стержни реактора можно тянуть."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const C1 = '#72d4e8', CP = '#ffb547', OK = '#86e0a8', WARN = '#ff8a73', MUT = '#8b96ad', PRO = '#ff8a73', NEU = '#a9b4c9';
+
+const LESSONS = [
+  { id: 'radio', title: 'Радиоактивность',
+    text: ['В 1896 году Анри Беккерель заметил, что соли урана сами испускают невидимое излучение — оно засвечивало фотопластинку в чёрной бумаге. Мария и Пьер Кюри нашли ещё более сильные излучатели — полоний и радий. Это явление назвали радиоактивностью: неустойчивое ядро само превращается в другое ядро и испускает излучение.',
+           'В магнитном поле пучок делится на три. α-лучи — ядра гелия, заряд +2e. β-лучи — быстрые электроны, заряд −e. γ-лучи — электромагнитное излучение, как свет, но с огромной энергией, заряда у них нет. α задерживает лист бумаги, β — несколько миллиметров алюминия, γ ослабляет только толстый слой свинца или бетона.',
+           'Когда распадётся отдельное ядро, предсказать нельзя — это случай. Но для большого числа ядер есть закон: за период полураспада T½ распадается половина имеющихся ядер. Через два периода остаётся четверть, через три — восьмая часть: N = N₀ · 2^(−t/T½).'],
+    why: 'Дозиметристы и радиационные инженеры работают на урановых рудниках «Казатомпрома», на Ульбинском заводе и в Институте ядерной физики. Радиологи лечат опухоли γ-лучами кобальта-60, а йод-131 помогает при болезнях щитовидной железы. Дефектоскописты γ-лучами просвечивают сварные швы газопроводов и мостов — это хорошо оплачиваемая работа. Археологи по распаду углерода-14 узнают возраст находок.',
+    safety: 'Радиоактивные источники нельзя трогать и брать домой. Если нашли металлический предмет со знаком «трилистник», не поднимайте его, отойдите подальше и сообщите взрослым или позвоните 112.',
+    task: 'Режим «Лучи»: включите магнитное поле и узнайте, куда отклоняется каждый луч. Поставьте бумагу и алюминий — что они задерживают? Режим «Распад»: дождитесь, когда распадётся половина ядер.',
+    hint: 'Кнопки «Лучи» и «Распад» переключают опыт. Ядра в сетке тоже можно нажимать: они покажут, что с ними стало. Распад случайный — каждый запуск чуть отличается.',
+    stage: 'Включите поле и ставьте преграды на пути лучей.',
+    check: m => m.field && m.paper && m.al && m.half },
+  { id: 'nucleus', title: 'Состав ядра',
+    text: ['Ядро состоит из протонов и нейтронов, их вместе называют нуклонами. Число протонов Z — зарядовое число, оно задаёт элемент. Массовое число A = Z + N, где N — число нейтронов. Ядро записывают так: перед символом элемента сверху ставят A, снизу Z, например ⁴₂He.',
+           'Протоны заряжены одинаково и отталкиваются. Ядро не разлетается, потому что нуклоны держат ядерные силы. Они примерно в 100 раз сильнее электрических, но действуют только на крошечном расстоянии — около 10⁻¹⁵ м.',
+           'Масса ядра чуть меньше, чем сумма масс отдельных протонов и нейтронов. Эта разница — дефект масс Δm. По формуле Эйнштейна ей соответствует энергия связи E = Δm · c². Столько энергии нужно, чтобы разобрать ядро на нуклоны, и столько же выделяется, когда ядро собирается.'],
+    why: 'На энергии связи держится вся атомная энергетика: при делении урана и при слиянии водорода в гелий часть энергии связи выходит наружу. Инженеры Ульбинского завода в Усть-Каменогорске делают топливо для реакторов. Масс-спектрометристы в лабораториях взвешивают ядра с точностью до миллионных долей — так проверяют состав руды, лекарств и продуктов.',
+    task: 'Соберите по записи три ядра: ⁴₂He, ¹⁶₈O и ⁵⁶₂₆Fe. Сравните энергию связи на один нуклон и укажите самое прочное ядро.',
+    hint: 'Тяните протоны и нейтроны с лотка в ядро или жмите кнопки. «Шаг 10» ускоряет сборку, во вкладке «Схема» есть ползунки. Прочность ядра — это энергия связи, делённая на число нуклонов.',
+    stage: 'Тяните протоны и нейтроны в ядро.',
+    targets: [{ Z: 2, A: 4, s: 'He', name: 'гелий-4' }, { Z: 8, A: 16, s: 'O', name: 'кислород-16' }, { Z: 26, A: 56, s: 'Fe', name: 'железо-56' }],
+    check: m => m.found >= 3 && m.pick === 'Fe' },
+  { id: 'reactions', title: 'Ядерные реакции',
+    text: ['Ядерная реакция — превращение ядер при столкновении с частицами или друг с другом. Первую искусственную реакцию провёл Резерфорд в 1919 году: он обстрелял азот α-частицами и получил кислород и протон.',
+           'В любой ядерной реакции сохраняются два числа. Сумма массовых чисел A слева равна сумме справа. Сумма зарядовых чисел Z тоже одинакова. У нейтрона A = 1, Z = 0, у электрона A = 0, Z = −1, у γ-кванта оба числа равны нулю.',
+           'Отсюда правила смещения. При α-распаде ядро теряет 2 протона и 2 нейтрона: A уменьшается на 4, Z — на 2. При β-распаде нейтрон в ядре превращается в протон, вылетают электрон и антинейтрино ν̃: A не меняется, Z растёт на 1.'],
+    why: 'Реакции под нейтронами в реакторе ИЯФ в Алматы дают изотопы для больниц: йод-131, технеций для снимков. На ускорителе ДЦ-60 в Астане облучают материалы и делают фильтры. Ядерные физики, радиохимики и инженеры-технологи считают реакции так же, как вы сейчас, — по сохранению A и Z.',
+    task: 'Допишите все четыре реакции: подберите A и Z неизвестной частицы так, чтобы суммы слева и справа совпали.',
+    hint: 'Кнопки 1–4 выбирают реакцию. Сначала сравните суммы A слева и справа, потом суммы Z. По Z узнаёте, что это за частица или элемент.',
+    stage: 'Подберите A и Z для «?».',
+    check: m => m.solved >= 4 },
+  { id: 'npp', title: 'Атомная электростанция',
+    text: ['Ядро урана-235, поглотив нейтрон, делится на два осколка. При этом вылетают 2–3 новых нейтрона и выделяется около 200 МэВ энергии. Новые нейтроны делят следующие ядра — идёт цепная реакция.',
+           'Коэффициент размножения k показывает, во сколько раз растёт число нейтронов в каждом «поколении». Если k > 1, мощность растёт, если k < 1 — падает, при k = 1 держится ровно. Управляющие стержни из бора или кадмия поглощают нейтроны: чем глубже они в реакторе, тем меньше k.',
+           'На АЭС реактор нагревает воду, тепло идёт в парогенератор, пар крутит турбину, турбина — генератор. Дальше всё как на угольной станции, только вместо угля — уран. В электричество превращается около трети тепла, КПД ≈ 33 %.'],
+    why: 'Казахстан — первый в мире по добыче урана. В Актау с 1973 по 1999 год работал реактор БН-350: он давал ток и опреснял воду Каспия для города. В 2024 году на референдуме казахстанцы поддержали строительство АЭС у посёлка Улкен на Балхаше. Станции нужны инженеры-атомщики, операторы реактора, дозиметристы, электрики и сварщики высокой квалификации.',
+    safety: 'Реактор защищён несколькими барьерами: оболочки топлива, стальной корпус, толстая бетонная оболочка. Автоматика сама опускает стержни и глушит реактор, если мощность или температура выше нормы. Чернобыльская авария 1986 года случилась, когда защиту отключили люди.',
+    task: 'Включите насосы, поднимите стержни и выведите реактор на 100 % мощности. Удержите мощность от 95 до 105 % пять секунд подряд.',
+    hint: 'Тяните стержни вверх-вниз прямо на реакторе или ползунком во вкладке «Схема». Мощность меняется не сразу: поднимите стержни чуть выше, дождитесь роста и опустите обратно. Без насосов реактор перегреется.',
+    stage: 'Тяните управляющие стержни вверх-вниз.',
+    check: m => m.hold >= 5 },
+];
+
+const LS_KEY = 'luch-phys-nucleus';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+
+// ---------- data ----------
+const SYM = ',H,He,Li,Be,B,C,N,O,F,Ne,Na,Mg,Al,Si,P,S,Cl,Ar,K,Ca,Sc,Ti,V,Cr,Mn,Fe,Co,Ni,Cu,Zn,Ga,Ge,As,Se,Br,Kr,Rb,Sr,Y,Zr,Nb,Mo,Tc,Ru,Rh,Pd,Ag,Cd,In,Sn,Sb,Te,I,Xe,Cs,Ba,La,Ce,Pr,Nd,Pm,Sm,Eu,Gd,Tb,Dy,Ho,Er,Tm,Yb,Lu,Hf,Ta,W,Re,Os,Ir,Pt,Au,Hg,Tl,Pb,Bi,Po,At,Rn,Fr,Ra,Ac,Th,Pa,U'.split(',');
+const RUN = { 1: 'водород', 2: 'гелий', 3: 'литий', 4: 'бериллий', 5: 'бор', 6: 'углерод', 7: 'азот', 8: 'кислород', 9: 'фтор', 10: 'неон', 11: 'натрий', 12: 'магний', 13: 'алюминий', 14: 'кремний', 15: 'фосфор', 16: 'сера', 17: 'хлор', 18: 'аргон', 19: 'калий', 20: 'кальций', 26: 'железо', 27: 'кобальт', 36: 'криптон', 53: 'йод', 56: 'барий', 82: 'свинец', 86: 'радон', 88: 'радий', 92: 'уран' };
+const elName = Z => RUN[Z] || SYM[Z] || '?';
+// binding energies, MeV (AME tables), key "Z-A"
+const BE = { '1-2': 2.2246, '1-3': 8.4818, '2-3': 7.718, '2-4': 28.2957, '3-6': 31.994, '3-7': 39.2446, '4-9': 58.165, '5-10': 64.7507, '5-11': 76.2048, '6-12': 92.1618, '6-13': 97.1081, '6-14': 105.2845,
+  '7-14': 104.6587, '7-15': 115.4919, '8-16': 127.6193, '8-17': 131.7624, '8-18': 139.8071, '9-19': 147.8013, '10-20': 160.6448, '11-23': 186.564, '12-24': 198.2569, '13-27': 224.952, '14-28': 236.537,
+  '15-31': 262.917, '16-32': 271.781, '17-35': 298.21, '18-40': 343.81, '19-39': 333.724, '20-40': 342.052, '26-56': 492.254, '82-208': 1636.43, '92-235': 1783.87, '92-238': 1801.69 };
+const MP = 1.007276, MN = 1.008665, UMEV = 931.494;
+const ISO = [
+  { id: 'Rn', name: 'радон-222', T: 3.82, u: 'сут' },
+  { id: 'I', name: 'йод-131', T: 8.02, u: 'сут' },
+  { id: 'Co', name: 'кобальт-60', T: 5.27, u: 'года' },
+  { id: 'C', name: 'углерод-14', T: 5730, u: 'лет' },
+];
+const HALF_REAL = 2.5; // seconds of real time per half-life
+const RX = [
+  { id: 'r1', name: 'Резерфорд, 1919: открытие протона', L: [[14, 7, 'N'], [4, 2, 'He']], R: [[17, 8, 'O'], null], ans: [1, 1] },
+  { id: 'r2', name: 'Чедвик, 1932: открытие нейтрона', L: [[9, 4, 'Be'], [4, 2, 'He']], R: [[12, 6, 'C'], null], ans: [1, 0] },
+  { id: 'r3', name: 'α-распад радия-226', L: [[226, 88, 'Ra']], R: [[222, 86, 'Rn'], null], ans: [4, 2] },
+  { id: 'r4', name: 'β-распад углерода-14', L: [[14, 6, 'C']], R: [null, [0, -1, 'e'], [0, 0, 'ν̃']], ans: [14, 7] },
+];
+function particle(A, Z) {
+  if (A === 1 && Z === 1) return { s: 'p', name: 'протон', ok: true };
+  if (A === 1 && Z === 0) return { s: 'n', name: 'нейтрон', ok: true };
+  if (A === 0 && Z === -1) return { s: 'e', name: 'электрон (β-частица)', ok: true };
+  if (A === 0 && Z === 1) return { s: 'e⁺', name: 'позитрон', ok: true };
+  if (A === 0 && Z === 0) return { s: 'γ', name: 'γ-квант', ok: true };
+  if (A === 4 && Z === 2) return { s: 'He', name: 'α-частица, ядро гелия', ok: true };
+  if (Z >= 1 && Z <= 92 && A >= Z && A <= 3.2 * Z + 4) return { s: SYM[Z], name: `ядро: ${elName(Z)}-${A}`, ok: true };
+  return { s: '?', name: 'такой частицы нет', ok: false };
+}
+
+// ---------- state ----------
+const GEO = {
+  ray: { x0: 95, y0: 255, f0: 150, f1: 330, ab: 366, scr: 470 },
+  dec: { gx: 42, gy: 172, c: 20, px: 290, py: 180, pw: 212, ph: 176 },
+  nuc: { cx: 182, cy: 252, tx: 46, ty: [205, 295], R: 74, sx: 405, sy: 200 },
+  npp: { vx: 40, vy: 172, vw: 132, vh: 216, fuelTop: 232, fuelBot: 380, rTop: 214, rRange: 166 },
+};
+function resetState() {
+  Object.assign(S, {
+    mode: 'rays', field: false, ab: 'none', seen: { field: false, paper: false, al: false },
+    iso: 1, nuc: [], dt: 0, run: false, hist: [[0, 100]], halfT: null, decSel: null,
+    Z: 1, N: 0, st: 1, gh: null, found: {}, pick: null, glue: 0,
+    r: 0, un: RX.map(() => ({ A: 0, Z: 0 })), solved: {}, anim: null,
+    P: 0.12, h: 1, pump: false, Tc: 30, scram: false, hold: 0, everHold: false, ph: 0, tickAcc: 0,
+  });
+  S.nuc = Array.from({ length: 100 }, () => ({ d: false, t: 0 }));
+}
+resetState();
+
+const nLeft = () => S.nuc.filter(q => !q.d).length;
+function beOf(Z, N) { return BE[`${Z}-${Z + N}`]; }
+function kOf() { return 1.12 - 0.16 * S.h - 0.04 * S.P / 100; }
+const Pel = () => 3000 * S.P / 100 * 0.33;
+
+function model() {
+  const id = LID();
+  if (id === 'radio') return { kind: id, field: S.seen.field, paper: S.seen.paper, al: S.seen.al, half: S.halfT !== null, N: nLeft(), t: S.dt };
+  if (id === 'nucleus') { const be = beOf(S.Z, S.N); return { kind: id, Z: S.Z, N: S.N, A: S.Z + S.N, be, found: Object.keys(S.found).length, pick: S.pick }; }
+  if (id === 'reactions') { const b = balance(S.r); return { kind: id, r: S.r, A: S.un[S.r].A, Z: S.un[S.r].Z, bal: b, solved: Object.keys(S.solved).length }; }
+  return { kind: id, P: S.P, k: kOf(), h: S.h, pump: S.pump, T: S.Tc, hold: S.everHold ? 5 : S.hold, scram: S.scram, Pel: Pel() };
+}
+
+// ---------- drawing helpers ----------
+const T = (x, y, s, fill, txt, anchor = 'middle', extra = '') => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${s}" fill="${fill}" text-anchor="${anchor}" ${extra}>${txt}</text>`;
+const halo = `paint-order="stroke" stroke="${INK}" stroke-width="3"`;
+const ball = (x, y, r, col, lab) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="${col}" stroke="${INK}" stroke-width="${r > 4 ? 1.3 : 0.8}"/>` + (lab ? T(x, y + 3.3, r > 6 ? 9 : 8, INK, lab, 'middle', 'font-weight="500"') : '');
+// nuclide notation: A up-left, Z down-left, symbol; returns {h, w}
+function nota(A, Z, sym, x, y, fs, col, anchor = 'start') {
+  const sA = String(A), sZ = String(Z).replace('-', '−'), dw = 0.62 * fs * 0.55 * Math.max(sA.length, sZ.length), sw = 0.62 * fs * [...sym].length, w = dw + 2 + sw;
+  const x0 = anchor === 'middle' ? x - w / 2 : x;
+  const h = T(x0 + dw, y - fs * 0.42, fs * 0.55, col, sA, 'end') + T(x0 + dw, y + fs * 0.22, fs * 0.55, col, sZ, 'end') + T(x0 + dw + 2, y, fs, col, sym, 'start', 'font-weight="500"');
+  return { h, w };
+}
+function bg() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.05)" stroke-width="1.5"/></pattern>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffb547" stop-opacity=".55"/><stop offset="1" stop-color="#ffb547" stop-opacity="0"/></radialGradient>
+    <linearGradient id="water" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#5fb4d9" stop-opacity=".22"/><stop offset="1" stop-color="#5fb4d9" stop-opacity=".38"/></linearGradient></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+
+// ---------- lesson 1: radioactivity ----------
+const RCOL = { a: CP, b: C1, g: '#c3a8ff' };
+const RNAME = { a: 'α', b: 'β', g: 'γ' };
+function rayY(k, x) {
+  const G = GEO.ray, d = S.field ? { a: 12, b: -46, g: 0 }[k] : 0;
+  if (x <= G.f0) return G.y0;
+  if (x <= G.f1) { const u = (x - G.f0) / (G.f1 - G.f0); return G.y0 + d * u * u; }
+  return G.y0 + d + 2 * d / (G.f1 - G.f0) * (x - G.f1);
+}
+const stops = (k, ab) => ab === 'paper' ? k === 'a' : (ab === 'al' || ab === 'pb') ? k !== 'g' : false;
+const abW = { none: 0, paper: 3, al: 8, pb: 24 };
+function raysScene(t) {
+  const G = GEO.ray;
+  let h = '';
+  // field region
+  h += `<rect x="${G.f0}" y="140" width="${G.f1 - G.f0}" height="232" rx="10" fill="${S.field ? 'rgba(114,212,232,.06)' : 'none'}" stroke="${S.field ? C1 : '#3a4762'}" stroke-opacity="${S.field ? .5 : 1}" stroke-dasharray="5 5"/>`;
+  if (S.field) for (let x = G.f0 + 18; x < G.f1; x += 30) for (let y = 160; y < 370; y += 30) h += `<circle cx="${x}" cy="${y}" r="4" fill="none" stroke="${C1}" stroke-opacity=".35"/><circle cx="${x}" cy="${y}" r="1.2" fill="${C1}" fill-opacity=".5"/>`;
+  h += T((G.f0 + G.f1) / 2, 384, 9.5, S.field ? '#a9e6f2' : MUT, S.field ? 'магнитное поле направлено на нас ⊙' : 'магнит выключен', 'middle', halo);
+  // screen
+  h += `<path d="M${G.scr} 130V385" stroke="#4a5876" stroke-width="5" stroke-dasharray="2 4"/>` + T(G.scr, 124, 9, MUT, 'экран', 'middle', halo);
+  // absorber
+  if (S.ab !== 'none') {
+    const col = { paper: '#e8ecf4', al: '#9fb0c8', pb: '#56607a' }[S.ab], nm = { paper: 'бумага', al: 'алюминий 3 мм', pb: 'свинец 5 см' }[S.ab];
+    h += `<rect x="${G.ab}" y="138" width="${abW[S.ab]}" height="236" rx="2" fill="${col}" fill-opacity="${S.ab === 'paper' ? .85 : 1}" stroke="${INK}"/>` + T(G.ab + abW[S.ab] / 2, 132, 9.5, '#e8ecf4', nm, 'middle', halo);
+  }
+  // beams
+  const ks = S.field ? ['a', 'b', 'g'] : ['m'];
+  for (const k of ks) {
+    const kinds = k === 'm' ? ['a', 'b', 'g'] : [k];
+    const pass = kinds.filter(q => !stops(q, S.ab));
+    const xEnd = pass.length ? G.scr : G.ab;
+    const kk = k === 'm' ? 'g' : k;
+    let d = '';
+    for (let x = G.x0; x <= xEnd; x += 6) d += (d ? 'L' : 'M') + x.toFixed(1) + ' ' + rayY(kk, x).toFixed(1);
+    d += 'L' + xEnd + ' ' + rayY(kk, xEnd).toFixed(1);
+    const col = k === 'm' ? '#e8ecf4' : RCOL[k];
+    const weak = pass.length && S.ab === 'pb';
+    h += `<path d="${d}" fill="none" stroke="${col}" stroke-opacity=".18" stroke-width="7"/>`;
+    h += `<path d="${d}" fill="none" stroke="${col}" stroke-width="2" stroke-opacity="${weak ? .35 : .95}" stroke-dasharray="7 6" stroke-dashoffset="${reduce ? 0 : (-t * 0.06 % 13).toFixed(1)}"/>`;
+    // stopped part when mixed
+    if (k === 'm' && S.ab !== 'none') {
+      const st = kinds.filter(q => stops(q, S.ab)).map(q => RNAME[q]).join(', ');
+      if (st) h += `<circle cx="${G.ab - 3}" cy="${G.y0}" r="7" fill="url(#glow)"/>` + T(G.ab - 6, G.y0 + 24, 9.5, WARN, `задержаны: ${st}`, 'end', halo);
+    }
+    if (k !== 'm' && !pass.length) h += `<circle cx="${G.ab - 2}" cy="${rayY(k, G.ab).toFixed(1)}" r="9" fill="url(#glow)"/>` + T(G.ab - 8, rayY(k, G.ab) - 9, 10, col, `${RNAME[k]} стоп`, 'end', halo);
+    const lab = k === 'm' ? pass.map(q => RNAME[q]).join(' + ') : RNAME[k];
+    if (pass.length) h += `<circle cx="${G.scr}" cy="${rayY(kk, G.scr).toFixed(1)}" r="${weak ? 4 : 6}" fill="${col}" opacity="${weak ? .5 : .9}"/>` + T(G.scr + 10, rayY(kk, G.scr) + 4, 11, col, lab + (weak ? ' (ослаблен)' : ''), 'start', halo + ' font-weight="500"');
+  }
+  // source
+  h += `<rect x="38" y="${G.y0 - 32}" width="58" height="64" rx="6" fill="#3b4459" stroke="${INK}" stroke-width="2"/><rect x="62" y="${G.y0 - 5}" width="34" height="10" fill="#0e1520"/><circle cx="62" cy="${G.y0}" r="6" fill="#86e0a8" stroke="${INK}"/>`;
+  h += T(67, G.y0 + 48, 9, MUT, 'радий в свинце', 'middle', halo);
+  return h;
+}
+function decayScene(t) {
+  const D = GEO.dec, iso = ISO[S.iso];
+  let h = '';
+  h += T(D.gx, D.gy - 12, 10, '#e8ecf4', `${iso.name}: 100 ядер`, 'start', halo);
+  S.nuc.forEach((q, i) => {
+    const x = D.gx + (i % 10) * D.c + D.c / 2, y = D.gy + Math.floor(i / 10) * D.c + D.c / 2;
+    const age = q.d ? (S.dt - q.t) * HALF_REAL : 9;
+    if (q.d && age < 0.5 && !reduce) h += `<circle cx="${x}" cy="${y}" r="${(6 + 14 * age).toFixed(1)}" fill="none" stroke="${CP}" stroke-opacity="${(1 - 2 * age).toFixed(2)}"/>`;
+    h += `<circle data-nuc="${i}" cx="${x}" cy="${y}" r="7" fill="${q.d ? '#2a3550' : '#86e0a8'}" stroke="${S.decSel === i ? '#e8ecf4' : INK}" stroke-width="${S.decSel === i ? 2 : 1}" style="cursor:pointer"/>`;
+  });
+  h += `<circle cx="${D.gx + 6}" cy="${D.gy + 214}" r="5" fill="#86e0a8"/>` + T(D.gx + 15, D.gy + 218, 9, MUT, 'целое', 'start') + `<circle cx="${D.gx + 70}" cy="${D.gy + 214}" r="5" fill="#2a3550" stroke="${MUT}" stroke-width=".6"/>` + T(D.gx + 79, D.gy + 218, 9, MUT, 'распалось', 'start');
+  // plot
+  const X = tt => D.px + tt / 4 * D.pw, Y = n => D.py + D.ph - n / 100 * D.ph;
+  h += `<rect x="${D.px}" y="${D.py}" width="${D.pw}" height="${D.ph}" fill="#0e1520" stroke="#26324a"/>`;
+  for (let k = 1; k <= 3; k++) h += `<path d="M${X(k)} ${D.py}V${D.py + D.ph}" stroke="#26324a"/>`;
+  for (const n of [50, 25]) h += `<path d="M${D.px} ${Y(n)}H${D.px + D.pw}" stroke="#3a4762" stroke-dasharray="3 4"/>` + T(D.px - 4, Y(n) + 3, 9, MUT, n, 'end');
+  h += T(D.px - 4, Y(100) + 7, 9, MUT, '100', 'end') + T(D.px - 4, Y(0), 9, MUT, '0', 'end');
+  for (let k = 0; k <= 4; k++) h += T(X(k), D.py + D.ph + 13, 9, MUT, k === 0 ? '0' : `${k}T½`);
+  let th = '';
+  for (let tt = 0; tt <= 4.001; tt += 0.1) th += (th ? 'L' : 'M') + X(tt).toFixed(1) + ' ' + Y(100 * 2 ** -tt).toFixed(1);
+  h += `<path d="${th}" fill="none" stroke="${MUT}" stroke-dasharray="4 4"/>`;
+  let dd = '';
+  for (const [tt, n] of S.hist) dd += (dd ? 'L' : 'M') + X(Math.min(tt, 4)).toFixed(1) + ' ' + Y(n).toFixed(1);
+  h += `<path d="${dd}" fill="none" stroke="#86e0a8" stroke-width="2"/>`;
+  if (S.halfT !== null) h += `<path d="M${X(S.halfT).toFixed(1)} ${Y(50)}V${D.py + D.ph}" stroke="${CP}" stroke-width="1.5"/><circle cx="${X(S.halfT).toFixed(1)}" cy="${Y(50)}" r="4" fill="${CP}"/>` + T(X(S.halfT) + 6, Y(50) - 7, 10, CP, `T½ ≈ ${fmtT(S.halfT * iso.T, iso)}`, 'start', halo);
+  h += T(D.px + D.pw, D.py - 8, 9.5, MUT, 'N(t): опыт — зелёная, закон — пунктир', 'end', halo);
+  h += T(D.px + D.pw / 2, D.py + D.ph + 30, 10, '#e8ecf4', `t = ${fmtT(S.dt * iso.T, iso)} · осталось ${nLeft()}`, 'middle', halo);
+  return h;
+}
+function fmtT(v, iso) { return `${fmt(v, v >= 100 ? 0 : 1)} ${iso.u}`; }
+function stepDecay(dt) {
+  if (!S.run) return;
+  const dT = dt / HALF_REAL, p = 1 - 2 ** -dT;
+  S.dt += dT;
+  for (const q of S.nuc) if (!q.d && Math.random() < p) { q.d = true; q.t = S.dt; }
+  const n = nLeft(), last = S.hist[S.hist.length - 1];
+  if (S.dt - last[0] >= 0.04 || n !== last[1]) S.hist.push([S.dt, n]);
+  if (S.halfT === null && n <= 50) {
+    S.halfT = S.dt; const iso = ISO[S.iso];
+    toast(`Осталось ${n} ядер через ${fmtT(S.dt * iso.T, iso)}. По таблице T½ = ${fmtT(iso.T, iso)}.`);
+  }
+  if (S.dt >= 4 || n === 0) { S.run = false; renderTools(); toast(`Прошло 4 периода. Осталось ${n} ядер — по закону около 6.`); }
+}
+function setIso(i) { S.iso = i; resetDecay(); }
+function resetDecay() { S.nuc = Array.from({ length: 100 }, () => ({ d: false, t: 0 })); S.dt = 0; S.run = false; S.hist = [[0, 100]]; S.halfT = null; S.decSel = null; renderTools(); buildScheme(); update(); }
+
+// ---------- lesson 2: composition of the nucleus ----------
+function nucleonPts(Z, N, cx, cy) {
+  const A = Z + N, out = [], r = A > 90 ? 3 : A > 40 ? 3.8 : A > 16 ? 5 : 6.2, sp = r * 0.9;
+  for (let i = 0; i < A; i++) {
+    const isP = Math.floor((i + 1) * Z / A) > Math.floor(i * Z / A);
+    const rr = A === 1 ? 0 : sp * Math.sqrt(i + 0.5), a = i * 2.39996;
+    out.push({ x: cx + rr * Math.cos(a), y: cy + rr * Math.sin(a), p: isP });
+  }
+  return { pts: out.reverse(), r };
+}
+function nucleusScene(t) {
+  const G = GEO.nuc, A = S.Z + S.N, be = beOf(S.Z, S.N);
+  let h = '';
+  // binding glow
+  if (be && !reduce && S.glue > 0) h += `<circle cx="${G.cx}" cy="${G.cy}" r="${(30 + 50 * (1 - S.glue)).toFixed(1)}" fill="none" stroke="${CP}" stroke-opacity="${S.glue.toFixed(2)}" stroke-width="3"/>`;
+  h += `<circle cx="${G.cx}" cy="${G.cy}" r="${G.R}" fill="rgba(255,181,71,.04)" stroke="${be ? OK : '#3a4762'}" stroke-opacity="${be ? .5 : 1}" stroke-dasharray="4 6"/>`;
+  const np = nucleonPts(S.Z, S.N, G.cx, G.cy);
+  const jit = be ? 0 : (reduce ? 0 : 1.2);
+  for (const q of np.pts) { const jx = jit * Math.sin(t / 90 + q.x), jy = jit * Math.cos(t / 110 + q.y); h += ball(q.x + jx, q.y + jy, np.r, q.p ? PRO : NEU, q.p && np.r > 5 ? '+' : ''); }
+  // notation above
+  const sym = SYM[S.Z] || '?';
+  h += nota(A, S.Z, sym, G.cx, G.cy - G.R - 16, 26, be ? '#e8ecf4' : '#a9b4c9', 'middle').h;
+  h += T(G.cx, G.cy + G.R + 20, 11, be ? OK : CP, be ? `${elName(S.Z)}-${A}: ядро держится` : (A === 1 ? 'один протон — ядро водорода-1' : 'такого устойчивого ядра нет в таблице'), 'middle', halo + ' font-weight="500"');
+  h += T(G.cx, G.cy + G.R + 35, 9.5, MUT, `${S.Z} p + ${S.N} n = ${A} нуклонов`, 'middle', halo);
+  // tray
+  h += `<rect x="${G.tx - 30}" y="${G.ty[0] - 34}" width="60" height="${G.ty[1] - G.ty[0] + 72}" rx="12" fill="#121a28" stroke="#26324a"/>`;
+  [['p', PRO, 'протон', '+'], ['n', NEU, 'нейтрон', '']].forEach(([k, col, name, s], i) => {
+    const y = G.ty[i];
+    h += `<g data-drag="t${k}"><circle cx="${G.tx}" cy="${y}" r="24" fill="transparent"/>${ball(G.tx, y, 10, col, s)}</g>` + T(G.tx, y + 25, 9, '#a9b4c9', name);
+  });
+  if (S.gh) h += ball(S.gh.x, S.gh.y, 10, S.gh.k === 'p' ? PRO : NEU, S.gh.k === 'p' ? '+' : '') + `<circle cx="${G.cx}" cy="${G.cy}" r="${G.R + 4}" fill="none" stroke="${OK}" stroke-opacity=".6" stroke-dasharray="6 6"/>`;
+  // scales
+  const mf = S.Z * MP + S.N * MN, dm = be ? be / UMEV : 0, mn = mf - dm;
+  const ang = be && A > 1 ? 7 : 0, a = ang * Math.PI / 180, bx = G.sx, by = G.sy, Lb = 72;
+  const lx = bx - Lb * Math.cos(a), ly = by + Lb * Math.sin(a), rx = bx + Lb * Math.cos(a), ry = by - Lb * Math.sin(a);
+  h += `<path d="M${bx} ${by}V${by + 120}M${bx - 26} ${by + 120}H${bx + 26}" stroke="#5d6a86" stroke-width="4" stroke-linecap="round"/>`;
+  h += `<path d="M${lx.toFixed(1)} ${ly.toFixed(1)}L${rx.toFixed(1)} ${ry.toFixed(1)}" stroke="#8b96ad" stroke-width="4" stroke-linecap="round"/><circle cx="${bx}" cy="${by}" r="5" fill="#8b96ad" stroke="${INK}"/>`;
+  const pan = (x, y) => `<path d="M${x.toFixed(1)} ${y.toFixed(1)}l-24 46M${x.toFixed(1)} ${y.toFixed(1)}l24 46" stroke="#5d6a86"/><path d="M${(x - 30).toFixed(1)} ${(y + 46).toFixed(1)}h60l-8 9h-44z" fill="#5d6a86" stroke="${INK}"/>`;
+  h += pan(lx, ly) + pan(rx, ry);
+  // contents: free nucleons on the left pan, compact nucleus on the right pan
+  const fl = Math.min(A, 12);
+  for (let i = 0; i < fl; i++) { const isP = i < Math.round(fl * S.Z / Math.max(A, 1)); h += ball(lx - 22 + (i % 6) * 9, ly + 40 - Math.floor(i / 6) * 9, 4, isP ? PRO : NEU, ''); }
+  if (A > 12) h += T(lx, ly + 22, 9, MUT, `×${A}`, 'middle', halo);
+  h += `<circle cx="${rx.toFixed(1)}" cy="${(ry + 36).toFixed(1)}" r="${(4 + 1.6 * Math.cbrt(A)).toFixed(1)}" fill="url(#glow)"/>` + ball(rx, ry + 36, 3 + 1.3 * Math.cbrt(A), CP, '');
+  h += T(bx - 72, by + 80, 9.5, '#a9b4c9', 'нуклоны врозь', 'middle', halo) + T(bx - 72, by + 94, 10, '#e8ecf4', `${fmt(mf, 4)} а.е.м.`, 'middle', halo);
+  h += T(bx + 72, by + 80, 9.5, '#a9b4c9', 'ядро', 'middle', halo) + T(bx + 72, by + 94, 10, be ? '#e8ecf4' : MUT, be ? `${fmt(mn, 4)} а.е.м.` : '?', 'middle', halo);
+  if (be && A > 1) {
+    h += T(bx, by + 140, 10.5, CP, `Δm = ${fmt(dm, 4)} а.е.м.`, 'middle', halo);
+    h += T(bx, by + 156, 10.5, '#e8ecf4', `E св = ${fmt(be, 1)} МэВ`, 'middle', halo);
+    h += T(bx, by + 172, 10.5, OK, `на нуклон: ${fmt(be / A, 2)} МэВ`, 'middle', halo + ' font-weight="500"');
+  } else h += T(bx, by + 150, 9.5, MUT, A === 1 ? 'один нуклон — связывать нечего' : 'соберите ядро из таблицы', 'middle', halo);
+  return h;
+}
+function addN(k, d) {
+  const lim = { Z: [1, 92], N: [0, 146] }[k], v = clamp(S[k] + d, lim[0], lim[1]);
+  if (v === S[k]) { toast(k === 'Z' && d < 0 ? 'Без протонов это уже не ядро элемента. Минимум один протон.' : 'Дальше нельзя: в лаборатории ядра до урана.'); return; }
+  S[k] = v; afterNuc();
+}
+function setNuc(Z, N) { S.Z = clamp(Z, 1, 92); S.N = clamp(N, 0, 146); afterNuc(); }
+function afterNuc() {
+  const be = beOf(S.Z, S.N);
+  if (be) S.glue = 1;
+  for (const tg of L().targets || []) {
+    if (S.Z === tg.Z && S.Z + S.N === tg.A && !S.found[tg.s]) {
+      S.found[tg.s] = true;
+      toast(`${tg.name}: энергия связи ${fmt(BE[tg.Z + '-' + tg.A], 1)} МэВ, на нуклон ${fmt(BE[tg.Z + '-' + tg.A] / tg.A, 2)} МэВ.`);
+      if (Object.keys(S.found).length === 3) setTimeout(() => toast('Все три собраны. Теперь укажите самое прочное ядро.'), 2600);
+      renderTools();
+    }
+  }
+  update();
+}
+function pickNuc(s) {
+  if (Object.keys(S.found).length < 3) { toast('Сначала соберите все три ядра.'); return; }
+  S.pick = s;
+  if (s === 'Fe') toast('Верно: у железа-56 энергия связи на нуклон самая большая — около 8,8 МэВ.');
+  else toast('Не то. Сравните энергию связи, делённую на число нуклонов.');
+  renderTools(); update();
+}
+
+// ---------- lesson 3: nuclear reactions ----------
+function sides(i) {
+  const R = RX[i], u = S.un[i];
+  const val = q => q ? q : [u.A, u.Z];
+  const sa = arr => arr.reduce((s, q) => s + val(q)[0], 0), sz = arr => arr.reduce((s, q) => s + val(q)[1], 0);
+  return { AL: sa(R.L), AR: sa(R.R), ZL: sz(R.L), ZR: sz(R.R) };
+}
+function balance(i) { const s = sides(i); return s.AL === s.AR && s.ZL === s.ZR; }
+function reactionScene(t) {
+  const R = RX[S.r], u = S.un[S.r], s = sides(S.r), bal = balance(S.r), solved = !!S.solved[R.id];
+  let h = '';
+  h += T(260, 150, 11, '#a9b4c9', `Реакция ${S.r + 1} из 4 · ${R.name}`, 'middle', halo);
+  // equation
+  const fs = 26, items = [];
+  const term = (q, unk) => {
+    if (unk) { const pr = particle(u.A, u.Z); return { unk: true, ...nota(u.A, u.Z, pr.s, 0, 0, fs, '#e8ecf4'), A: u.A, Z: u.Z, sym: pr.s }; }
+    return { ...nota(q[0], q[1], q[2], 0, 0, fs, '#e8ecf4'), A: q[0], Z: q[1], sym: q[2] };
+  };
+  R.L.forEach((q, i) => { if (i) items.push({ op: '+' }); items.push(term(q, !q)); });
+  items.push({ op: '→' });
+  R.R.forEach((q, i) => { if (i) items.push({ op: '+' }); items.push(term(q, !q)); });
+  const gap = 10, opw = 18;
+  const tw = items.reduce((a, it) => a + (it.op ? opw : it.w + (it.unk ? 14 : 0)) + gap, -gap);
+  let x = 260 - tw / 2;
+  const ey = 216;
+  for (const it of items) {
+    if (it.op) { h += T(x + opw / 2, ey, 22, MUT, it.op); x += opw + gap; continue; }
+    if (it.unk) {
+      const col = solved ? OK : bal ? OK : CP;
+      h += `<rect x="${(x - 2).toFixed(1)}" y="${ey - 30}" width="${(it.w + 18).toFixed(1)}" height="42" rx="8" fill="rgba(255,181,71,.07)" stroke="${col}" stroke-width="1.6" stroke-dasharray="${solved ? '' : '5 4'}"/>`;
+      h += nota(it.A, it.Z, it.sym, x + 7, ey, fs, col).h;
+      x += it.w + 14 + gap; continue;
+    }
+    h += nota(it.A, it.Z, it.sym, x, ey, fs, '#e8ecf4').h; x += it.w + gap;
+  }
+  const pr = particle(u.A, u.Z);
+  h += T(260, ey + 34, 10, pr.ok ? '#a9e6f2' : WARN, `«?» сейчас: A = ${u.A}, Z = ${String(u.Z).replace('-', '−')} — ${pr.name}`, 'middle', halo);
+  // balance bars
+  const row = (lab, l, r, y) => {
+    const ok = l === r;
+    return T(150, y, 12, '#e8ecf4', `${lab} слева: ${String(l).replace('-', '−')}`, 'end', halo) + T(260, y, 14, ok ? OK : WARN, ok ? '=' : '≠', 'middle', halo + ' font-weight="600"') + T(370, y, 12, '#e8ecf4', `справа: ${String(r).replace('-', '−')}`, 'start', halo);
+  };
+  h += `<rect x="70" y="262" width="380" height="54" rx="10" fill="#121a28" stroke="#26324a"/>`;
+  h += row('A', s.AL, s.AR, 284) + row('Z', s.ZL, s.ZR, 304);
+  // collision animation
+  const an = S.anim && S.anim.i === S.r ? S.anim : null;
+  const k = an ? clamp(an.t, 0, 1) : solved ? 1 : 0;
+  const blob = (A, Z, sym, x0, y0) => {
+    if (sym === 'ν̃') return `<circle cx="${x0.toFixed(1)}" cy="${y0.toFixed(1)}" r="2.5" fill="none" stroke="${MUT}"/>` + T(x0, y0 - 6, 9, MUT, 'ν̃');
+    if (A === 0 && Z === 0) return T(x0, y0 + 4, 12, '#c3a8ff', 'γ');
+    if (A === 0) return ball(x0, y0, 3.2, C1, '') + T(x0, y0 - 7, 9, '#a9e6f2', Z < 0 ? 'e⁻' : 'e⁺');
+    const r = 3.5 + 2.2 * Math.cbrt(A);
+    return ball(x0, y0, +r.toFixed(1), Z > 0 && A === 1 ? PRO : A === 1 ? NEU : CP, '') + T(x0, y0 - r - 4, 9, '#e8ecf4', A === 1 ? (Z ? 'p' : 'n') : `${SYM[Z]}`);
+  };
+  const ay = 362;
+  if (k < 0.5) {
+    const kk = k / 0.5, n = R.L.length;
+    R.L.forEach((q, i) => { const sx = n === 1 ? 260 : i === 0 ? 120 : 400, x0 = sx + (260 - sx) * (an ? kk : 0); h += blob(q[0], q[1], q[2], n === 1 ? 260 : x0, ay); });
+    if (!an) h += T(260, ay + 26, 9.5, MUT, bal ? '' : 'когда суммы совпадут, реакция пойдёт', 'middle', halo);
+  } else {
+    const kk = (k - 0.5) / 0.5, prods = R.R.map(q => q || [u.A, u.Z, particle(u.A, u.Z).s]), n = prods.length;
+    if (an && kk < 0.3 && !reduce) h += `<circle cx="260" cy="${ay}" r="${(10 + 40 * kk).toFixed(1)}" fill="url(#glow)"/>`;
+    prods.forEach((q, i) => { const dir = n === 2 ? (i ? 1 : -1) : (i - 1); const x0 = 260 + dir * 140 * kk, y0 = ay + (n === 3 ? (i === 2 ? -14 : i === 1 ? 14 : 0) * kk : 0); h += blob(q[0], q[1], q[2], x0, y0); });
+  }
+  // progress dots
+  RX.forEach((r, i) => { h += `<circle cx="${230 + i * 20}" cy="404" r="5" fill="${S.solved[r.id] ? OK : 'none'}" stroke="${i === S.r ? '#e8ecf4' : MUT}"/>`; });
+  return h;
+}
+function setUn(dA, dZ, abs) {
+  const u = S.un[S.r];
+  if (S.solved[RX[S.r].id]) { toast('Эта реакция уже дописана. Выберите другую кнопками 1–4.'); return; }
+  if (abs) { u.A = clamp(abs[0], 0, 240); u.Z = clamp(abs[1], -1, 92); }
+  else { u.A = clamp(u.A + dA, 0, 240); u.Z = clamp(u.Z + dZ, -1, 92); }
+  if (balance(S.r)) {
+    const pr = particle(u.A, u.Z);
+    S.solved[RX[S.r].id] = true; S.anim = { i: S.r, t: reduce ? 1 : 0 };
+    toast(`Суммы сошлись: неизвестная частица — ${pr.name}.`);
+  }
+  update();
+}
+function setR(i) { S.r = clamp(i, 0, 3); S.anim = null; renderTools(); buildScheme(); update(); }
+
+// ---------- lesson 4: nuclear power plant ----------
+const rodBot = () => GEO.npp.rTop + GEO.npp.rRange * S.h;
+function nppScene(t) {
+  const G = GEO.npp, P = S.P, x0 = G.vx, y0 = G.vy, w = G.vw, hh = G.vh;
+  let h = '';
+  const heat = clamp(P / 100, 0, 1.3);
+  // vessel
+  h += `<rect x="${x0}" y="${y0}" width="${w}" height="${hh}" rx="18" fill="url(#water)" stroke="#8b96ad" stroke-width="3"/>`;
+  h += `<rect x="${x0 + 10}" y="${G.fuelTop - 6}" width="${w - 20}" height="${G.fuelBot - G.fuelTop + 12}" rx="6" fill="rgba(255,181,71,${(0.04 + 0.25 * Math.min(heat, 1)).toFixed(2)})"/>`;
+  // fuel rods
+  for (let i = 0; i < 5; i++) { const fx = x0 + 18 + i * 24; h += `<rect x="${fx}" y="${G.fuelTop}" width="10" height="${G.fuelBot - G.fuelTop}" rx="3" fill="${heat > 0.05 ? '#ffcf80' : '#c9a36a'}" fill-opacity="${(0.55 + 0.45 * Math.min(heat, 1)).toFixed(2)}" stroke="${INK}"/>`; }
+  // neutrons
+  const nn = Math.round(clamp(Math.log10(P * 10 + 1) * 9, 0, 36));
+  for (let i = 0; i < nn; i++) { const ph = reduce ? i : t / 300 + i * 1.7; const nx = x0 + 16 + ((Math.sin(ph * 1.3 + i * 7.1) + 1) / 2) * (w - 32), ny = G.fuelTop + ((Math.cos(ph * 0.9 + i * 3.3) + 1) / 2) * (G.fuelBot - G.fuelTop); h += `<circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="1.8" fill="#e8ecf4" opacity=".85"/>`; }
+  // control rods (drag)
+  const rb = rodBot(), rt = rb - 190;
+  h += `<g data-drag="rods"><rect x="${x0 - 4}" y="${rt - 18}" width="${w + 8}" height="${rb - rt + 26}" fill="transparent"/>`;
+  for (let i = 0; i < 4; i++) { const rx = x0 + 30 + i * 24; h += `<rect x="${rx}" y="${rt}" width="8" height="${rb - rt}" rx="2" fill="#2b3245" stroke="#8b96ad" stroke-width="1"/>`; }
+  h += `<rect x="${x0 + 22}" y="${rt - 10}" width="${w - 44}" height="10" rx="4" fill="#8b96ad" stroke="${INK}"/><path d="M${x0 + w / 2} ${rt - 10}V${rt - 24}" stroke="#8b96ad" stroke-width="3"/>`;
+  h += `<path d="M${x0 + w / 2 - 7} ${rt - 30}l7 -7 7 7M${x0 + w / 2 - 7} ${rt - 46 + 30}" stroke="${CP}" stroke-width="1.6" fill="none"/></g>`;
+  h += T(x0 + w / 2, y0 + hh + 16, 9.5, MUT, `реактор · стержни ${fmt(S.h * 100, 0)} %`, 'middle', halo);
+  // pipes
+  const hot = `rgba(255,${Math.round(181 - 80 * Math.min(heat, 1))},71,.9)`;
+  h += `<path d="M${x0 + w} 200H232" stroke="${hot}" stroke-width="6" fill="none"/><path d="M232 350H${x0 + w}" stroke="#5fb4d9" stroke-width="6" fill="none"/>`;
+  // pump
+  const pa = S.pump && !reduce ? (t / 6) % 360 : 0;
+  h += `<g data-act="pump" style="cursor:pointer"><circle cx="202" cy="350" r="15" fill="#1a2438" stroke="${S.pump ? OK : WARN}" stroke-width="2"/><path d="M202 338v24M190 350h24" stroke="${S.pump ? OK : WARN}" stroke-width="2" transform="rotate(${pa.toFixed(0)} 202 350)"/></g>` + T(202, 380, 9, S.pump ? OK : WARN, S.pump ? 'насос' : 'насос выкл', 'middle', halo);
+  // steam generator
+  h += `<rect x="232" y="182" width="52" height="186" rx="12" fill="#1a2438" stroke="#8b96ad" stroke-width="2"/>`;
+  for (let i = 0; i < 6; i++) h += `<path d="M240 ${210 + i * 24}q10 -8 18 0t18 0" stroke="${hot}" stroke-width="1.6" fill="none" opacity=".7"/>`;
+  h += T(258, 176, 9, MUT, 'парогенератор', 'middle', halo);
+  // steam to turbine
+  const steam = clamp(P / 100, 0, 1.2);
+  h += `<path d="M284 196H318" stroke="#e8ecf4" stroke-opacity="${(0.2 + 0.6 * Math.min(steam, 1)).toFixed(2)}" stroke-width="6"/>`;
+  h += `<path d="M318 176L374 160V246L318 230Z" fill="#3b4459" stroke="#8b96ad" stroke-width="2"/>`;
+  const ta = reduce ? 0 : S.ph * 360;
+  for (let i = 0; i < 4; i++) h += `<path d="M346 203l0 -${18 + i}" stroke="#a9b4c9" stroke-width="2" transform="rotate(${(ta + i * 90).toFixed(0)} 346 203)"/>`;
+  h += T(352, 266, 9, MUT, 'турбина', 'start', halo);
+  // condenser
+  h += `<path d="M346 246V286" stroke="#5fb4d9" stroke-width="4"/><rect x="318" y="286" width="56" height="34" rx="6" fill="rgba(95,180,217,.2)" stroke="#5fb4d9"/>` + T(346, 334, 9, MUT, 'конденсатор', 'middle', halo);
+  h += `<path d="M318 303H300V350H284" stroke="#5fb4d9" stroke-width="4" fill="none"/>`;
+  // generator
+  h += `<path d="M374 203H396" stroke="#a9b4c9" stroke-width="4"/><rect x="396" y="184" width="50" height="38" rx="8" fill="#2b3245" stroke="#8b96ad" stroke-width="2"/>` + T(421, 207, 11, CP, '~', 'middle') + T(421, 176, 9, MUT, 'генератор', 'middle', halo);
+  // power line + houses
+  const pel = Pel(), lit = clamp(Math.round(pel / 1000 * 6), 0, 6);
+  h += `<path d="M446 203H486V280" stroke="${pel > 5 ? CP : '#3a4762'}" stroke-width="2" fill="none"/>`;
+  for (let i = 0; i < 6; i++) { const hx = 420 + (i % 3) * 32, hy = 290 + Math.floor(i / 3) * 40; h += `<path d="M${hx} ${hy + 12}l11 -11 11 11v16h-22z" fill="${i < lit ? '#3b3420' : '#1a2438'}" stroke="${i < lit ? CP : '#3a4762'}"/><rect x="${hx + 8}" y="${hy + 16}" width="6" height="6" fill="${i < lit ? CP : '#26324a'}"/>`; }
+  h += T(453, 386, 10, pel > 5 ? CP : MUT, `${fmt(pel, 0)} МВт эл.`, 'middle', halo + ' font-weight="500"');
+  // status
+  if (S.scram) h += `<rect x="40" y="132" width="250" height="26" rx="8" fill="rgba(255,138,115,.15)" stroke="${WARN}"/>` + T(165, 149, 10.5, WARN, 'Аварийная защита: стержни сброшены', 'middle');
+  return h;
+}
+function stepNpp(dt) {
+  const k = kOf(), LAM = 0.06, S0 = 0.05;
+  S.P = clamp(S.P + ((k - 1) * S.P / LAM + S0) * dt, 0.05, 400);
+  // coolant temperature
+  const target = 30 + 290 * Math.min(1, S.P / 100) + 40 * Math.max(0, S.P / 100 - 1);
+  if (S.pump) S.Tc += (target - S.Tc) * Math.min(1, dt * 0.8);
+  else S.Tc += (S.P / 100) * 60 * dt - (S.Tc - 30) * 0.02 * dt;
+  S.ph += dt * Math.min(S.P, 110) / 100 * 1.2;
+  if (!S.scram && (S.P > 120 || S.Tc > 345)) {
+    S.scram = true; S.h = 1; S.hold = 0;
+    toast(S.P > 120 ? 'Мощность выше 120 % — автоматика сбросила стержни. Поднимайте их медленнее.' : 'Без насосов вода перегрелась — автоматика заглушила реактор. Включите насосы.');
+    renderTools(); buildScheme();
+  }
+  if (S.pump && !S.scram && S.P >= 95 && S.P <= 105) S.hold += dt; else S.hold = 0;
+  if (S.hold >= 5 && !S.everHold) { S.everHold = true; toast('Реактор держит 100 %: k = 1, турбина даёт около 1000 МВт.'); }
+}
+function setH(v) { S.h = clamp(Math.round(v * 200) / 200, 0, 1); if (S.scram && S.h < 1) S.scram = false; dirty = true; }
+
+// ---------- highlight boxes ----------
+function hlBox(id) {
+  const lid = LID();
+  if (lid === 'radio') {
+    const G = GEO.ray, D = GEO.dec;
+    return ({ src: [34, G.y0 - 36, 66, 72], field: [G.f0 - 4, 136, G.f1 - G.f0 + 8, 240], abs: [G.ab - 10, 126, 46, 252], screen: [G.scr - 10, 120, 20, 270], grid: [D.gx - 4, D.gy - 4, 208, 208], plot: [D.px - 6, D.py - 6, D.pw + 12, D.ph + 12] })[id];
+  }
+  if (lid === 'nucleus') {
+    const G = GEO.nuc;
+    return ({ p: [G.tx - 16, G.ty[0] - 16, 32, 32], n: [G.tx - 16, G.ty[1] - 16, 32, 32], core: [G.cx - G.R, G.cy - G.R, 2 * G.R, 2 * G.R], nota: [G.cx - 50, G.cy - G.R - 46, 100, 40], scale: [G.sx - 110, G.sy - 20, 220, 150], be: [G.sx - 90, G.sy + 126, 180, 54] })[id];
+  }
+  if (lid === 'reactions') return ({ eq: [20, 176, 480, 56], unk: [300, 176, 200, 56], bal: [66, 258, 388, 62], anim: [40, 330, 440, 56] })[id];
+  const G = GEO.npp;
+  return ({ fuel: [G.vx + 12, G.fuelTop - 4, G.vw - 24, G.fuelBot - G.fuelTop + 8], rods: [G.vx + 24, rodBot() - 200, G.vw - 48, 200], water: [G.vx - 4, G.vy - 4, G.vw + 8, G.vh + 8], pump: [184, 332, 36, 36], sg: [228, 178, 60, 194], turb: [314, 156, 64, 94], gen: [392, 180, 58, 46], cond: [314, 282, 64, 42] })[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = bg();
+  if (id === 'radio') h += S.mode === 'rays' ? raysScene(t) : decayScene(t);
+  else if (id === 'nucleus') h += nucleusScene(t);
+  else if (id === 'reactions') h += reactionScene(t);
+  else h += nppScene(t);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// fit the scene: 520 × 405 units, centred, content at the bottom
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 520, hh / 430, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 420 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => {
+  const nu = e.target.closest('[data-nuc]');
+  if (nu && LID() === 'radio') {
+    e.preventDefault(); const i = +nu.dataset.nuc, q = S.nuc[i], iso = ISO[S.iso];
+    S.decSel = i; dirty = true;
+    toast(q.d ? `Это ядро распалось через ${fmtT(q.t * iso.T, iso)} после начала.` : 'Это ядро пока целое. Когда оно распадётся — заранее сказать нельзя.');
+    return;
+  }
+  const pa = e.target.closest('[data-act]');
+  if (pa && LID() === 'npp') { e.preventDefault(); act('pump'); return; }
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  const p = toSvg(e);
+  drag = { id: el.dataset.drag, y0: p.y, h0: S.h };
+  if (drag.id[0] === 't') { S.gh = { k: drag.id[1], x: p.x, y: p.y }; dirty = true; }
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const p = toSvg(e);
+  if (drag.id[0] === 't') { S.gh.x = p.x; S.gh.y = p.y; dirty = true; }
+  else if (drag.id === 'rods') { setH(drag.h0 + (p.y - drag.y0) / GEO.npp.rRange); if (S.tab === 'scheme') updateScheme(model()); }
+});
+const endDrag = () => {
+  if (!drag) return;
+  const id = drag.id; drag = null; scene.classList.remove('grabbing');
+  if (id[0] === 't' && S.gh) {
+    const g = S.gh, G = GEO.nuc; S.gh = null;
+    if (Math.hypot(g.x - G.cx, g.y - G.cy) < G.R + 14) addN(g.k === 'p' ? 'Z' : 'N', 1);
+  }
+  if (id === 'rods') { renderTools(); buildScheme(); }
+  dirty = true;
+};
+scene.addEventListener('pointerup', endDrag);
+scene.addEventListener('pointercancel', endDrag);
+
+let last = performance.now();
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  const id = LID();
+  let live = false;
+  if (id === 'radio') { if (S.mode === 'rays') { if (!reduce) dirty = true; } else if (S.run) { stepDecay(dt); dirty = true; live = true; } else if (S.nuc.some(q => q.d && (S.dt - q.t) * HALF_REAL < 0.5)) dirty = true; }
+  if (id === 'nucleus') { if (S.glue > 0) { S.glue = Math.max(0, S.glue - dt * 1.2); dirty = true; } else if (!reduce && !beOf(S.Z, S.N)) dirty = true; }
+  if (id === 'reactions' && S.anim) { S.anim.t += dt / 1.6; if (S.anim.t >= 1) S.anim = null; dirty = true; }
+  if (id === 'npp') { stepNpp(dt); dirty = true; live = true; }
+  if (live) { S.tickAcc += dt; if (S.tickAcc > 0.2) { S.tickAcc = 0; update(true); } }
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3800); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, cls) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}${cls ? ` class="${cls}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  let h = '';
+  if (id === 'radio') {
+    h = B('rays', 'Лучи', S.mode === 'rays') + B('decay', 'Распад', S.mode === 'decay') + sep;
+    if (S.mode === 'rays') h += B('field', 'Поле', S.field) + sep + B('ab-none', 'Нет', S.ab === 'none') + B('ab-paper', 'Бумага', S.ab === 'paper') + B('ab-al', 'Алюминий', S.ab === 'al') + B('ab-pb', 'Свинец', S.ab === 'pb');
+    else h += B('run', S.run ? 'Пауза' : (S.dt > 0 && S.dt < 4 ? 'Дальше' : 'Пуск'), undefined, 'rec') + B('dreset', 'Сброс') + sep + ISO.map((q, i) => B('iso-' + i, q.name.replace('-', '‑'), S.iso === i)).join('');
+  }
+  if (id === 'nucleus') {
+    h = B('Z+', `p +${S.st}`) + B('Z-', `p −${S.st}`) + sep + B('N+', `n +${S.st}`) + B('N-', `n −${S.st}`) + sep + B('st', 'Шаг 10', S.st === 10) + B('reset', 'Сброс');
+    if (Object.keys(S.found).length >= 3) h += sep + '<span class="tl">прочнее всех:</span>' + L().targets.map(tg => B('pk-' + tg.s, tg.s + '-' + tg.A, S.pick === tg.s)).join('');
+  }
+  if (id === 'reactions') h = RX.map((r, i) => B('r-' + i, `${i + 1}${S.solved[r.id] ? ' ✓' : ''}`, S.r === i)).join('') + sep + B('A-', 'A −') + B('A+', 'A +') + sep + B('Z-', 'Z −') + B('Z+', 'Z +');
+  if (id === 'npp') h = B('pump', 'Насосы', S.pump) + sep + B('hup', 'Стержни ↑') + B('hdn', 'Стержни ↓') + sep + B('scram', 'Аварийная защита', undefined, 'rec') + B('reset', 'Сброс');
+  tb.innerHTML = h;
+}
+function act(a) {
+  const id = LID();
+  if (id === 'radio') {
+    if (a === 'rays' || a === 'decay') { S.mode = a; if (a === 'rays') S.run = false; $('#hint').textContent = a === 'rays' ? L().stage : 'Нажмите «Пуск» и следите за графиком.'; renderTools(); buildScheme(); update(); return; }
+    if (a === 'field') {
+      S.field = !S.field;
+      if (S.field && !S.seen.field) { S.seen.field = true; toast('α отклоняются чуть вниз, β — сильно вверх, γ летят прямо. Значит, у α и β заряды разных знаков, а у γ заряда нет.'); }
+      renderTools(); buildScheme(); update(); return;
+    }
+    if (a.startsWith('ab-')) {
+      S.ab = a.slice(3);
+      if (S.ab === 'paper') { S.seen.paper = true; toast('Лист бумаги задержал α-частицы. β и γ прошли.'); }
+      if (S.ab === 'al') { S.seen.al = true; toast('Алюминий задержал α и β. Прошли только γ-лучи.'); }
+      if (S.ab === 'pb') toast('Свинец задержал α и β и сильно ослабил γ — но полностью γ не остановить.');
+      renderTools(); buildScheme(); update(); return;
+    }
+    if (a === 'run') { if (S.dt >= 4 || nLeft() === 0) { resetDecay(); } S.run = !S.run; renderTools(); update(); return; }
+    if (a === 'dreset') return resetDecay();
+    if (a.startsWith('iso-')) return setIso(+a.slice(4));
+  }
+  if (id === 'nucleus') {
+    if (a === 'reset') { S.Z = 1; S.N = 0; update(); return; }
+    if (a === 'st') { S.st = S.st === 10 ? 1 : 10; renderTools(); return; }
+    if (/^[ZN][+-]$/.test(a)) return addN(a[0], (a[1] === '+' ? 1 : -1) * S.st);
+    if (a.startsWith('pk-')) return pickNuc(a.slice(3));
+  }
+  if (id === 'reactions') {
+    if (a.startsWith('r-')) return setR(+a.slice(2));
+    if (a === 'A-' || a === 'A+') return setUn(a[1] === '+' ? 1 : -1, 0);
+    if (a === 'Z-' || a === 'Z+') return setUn(0, a[1] === '+' ? 1 : -1);
+  }
+  if (id === 'npp') {
+    if (a === 'pump') { S.pump = !S.pump; toast(S.pump ? 'Насосы гонят воду через реактор — тепло уходит в парогенератор.' : 'Насосы стоят. Если реактор работает, вода быстро перегреется.'); renderTools(); buildScheme(); update(); return; }
+    if (a === 'hup') { setH(S.h - 0.025); buildScheme(); return; }
+    if (a === 'hdn') { setH(S.h + 0.025); buildScheme(); return; }
+    if (a === 'scram') { S.h = 1; S.scram = true; S.hold = 0; toast('Стержни сброшены в реактор: k < 1, цепная реакция затухает.'); renderTools(); buildScheme(); return; }
+    if (a === 'reset') { Object.assign(S, { P: 0.12, h: 1, pump: false, Tc: 30, scram: false, hold: 0 }); renderTools(); buildScheme(); update(); return; }
+  }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  src: IC('<rect x="3" y="9" width="20" height="16" rx="3" fill="#3b4459"/><circle cx="17" cy="17" r="3.5" fill="#86e0a8"/><path d="M23 17h9" stroke="#e8ecf4" stroke-dasharray="2 2"/>'),
+  field: IC('<rect x="3" y="3" width="28" height="28" rx="5" fill="none" stroke="#72d4e8" stroke-dasharray="3 3"/><circle cx="11" cy="11" r="3" fill="none" stroke="#72d4e8"/><circle cx="23" cy="23" r="3" fill="none" stroke="#72d4e8"/><circle cx="23" cy="11" r="3" fill="none" stroke="#72d4e8"/><circle cx="11" cy="23" r="3" fill="none" stroke="#72d4e8"/>'),
+  abs: IC('<rect x="5" y="4" width="4" height="26" fill="#e8ecf4"/><rect x="13" y="4" width="6" height="26" fill="#9fb0c8"/><rect x="22" y="4" width="10" height="26" fill="#56607a"/>'),
+  screen: IC('<path d="M17 3v28" stroke="#4a5876" stroke-width="4" stroke-dasharray="2 3"/><circle cx="17" cy="10" r="3" fill="#72d4e8"/><circle cx="17" cy="20" r="3" fill="#c3a8ff"/>'),
+  grid: IC('<circle cx="9" cy="9" r="4" fill="#86e0a8"/><circle cx="25" cy="9" r="4" fill="#2a3550"/><circle cx="9" cy="25" r="4" fill="#2a3550"/><circle cx="25" cy="25" r="4" fill="#86e0a8"/>'),
+  plot: IC('<path d="M4 4v26h27" stroke="#8b96ad" fill="none"/><path d="M5 6q8 16 26 22" stroke="#86e0a8" stroke-width="2" fill="none"/>'),
+  p: IC('<circle cx="17" cy="17" r="10" fill="#ff8a73"/><path d="M12 17h10M17 12v10" stroke="#04070d" stroke-width="2"/>'),
+  n: IC('<circle cx="17" cy="17" r="10" fill="#a9b4c9"/>'),
+  core: IC('<circle cx="13" cy="14" r="5" fill="#ff8a73"/><circle cx="21" cy="14" r="5" fill="#a9b4c9"/><circle cx="13" cy="21" r="5" fill="#a9b4c9"/><circle cx="21" cy="21" r="5" fill="#ff8a73"/>'),
+  nota: IC('<text x="4" y="13" font-size="8" fill="#e8ecf4" font-family="monospace">4</text><text x="4" y="26" font-size="8" fill="#e8ecf4" font-family="monospace">2</text><text x="10" y="23" font-size="15" fill="#e8ecf4" font-family="monospace">He</text>'),
+  scale: IC('<path d="M17 6v24M10 30h14M5 10l24 -3" stroke="#8b96ad" stroke-width="2"/><path d="M5 10l-3 8h6zM29 7l-3 8h6z" fill="#5d6a86"/>'),
+  be: IC('<path d="M5 26L13 10l7 10 9-14" stroke="#86e0a8" stroke-width="2" fill="none"/><circle cx="20" cy="20" r="2.5" fill="#ffb547"/>'),
+  eq: IC('<text x="2" y="22" font-size="11" fill="#e8ecf4" font-family="monospace">N+α→</text>'),
+  unk: IC('<rect x="5" y="6" width="24" height="22" rx="4" fill="none" stroke="#ffb547" stroke-dasharray="3 3"/><text x="13" y="22" font-size="13" fill="#ffb547" font-family="monospace">?</text>'),
+  bal: IC('<text x="3" y="14" font-size="10" fill="#86e0a8" font-family="monospace">A =</text><text x="3" y="28" font-size="10" fill="#86e0a8" font-family="monospace">Z =</text>'),
+  anim: IC('<circle cx="8" cy="17" r="5" fill="#ffb547"/><circle cx="26" cy="17" r="3" fill="#ff8a73"/><path d="M14 17h6" stroke="#e8ecf4" stroke-dasharray="2 2"/>'),
+  fuel: IC('<rect x="6" y="5" width="5" height="25" rx="2" fill="#ffcf80"/><rect x="15" y="5" width="5" height="25" rx="2" fill="#ffcf80"/><rect x="24" y="5" width="5" height="25" rx="2" fill="#ffcf80"/>'),
+  rods: IC('<rect x="6" y="3" width="22" height="5" rx="2" fill="#8b96ad"/><rect x="9" y="8" width="5" height="22" fill="#2b3245" stroke="#8b96ad"/><rect x="20" y="8" width="5" height="22" fill="#2b3245" stroke="#8b96ad"/>'),
+  water: IC('<rect x="5" y="4" width="24" height="27" rx="7" fill="rgba(95,180,217,.35)" stroke="#8b96ad" stroke-width="2"/>'),
+  pump: IC('<circle cx="17" cy="17" r="11" fill="none" stroke="#86e0a8" stroke-width="2"/><path d="M17 8v18M8 17h18" stroke="#86e0a8" stroke-width="2"/>'),
+  sg: IC('<rect x="8" y="3" width="18" height="28" rx="5" fill="none" stroke="#8b96ad" stroke-width="2"/><path d="M11 12q3-3 6 0t6 0M11 20q3-3 6 0t6 0" stroke="#ffb547" fill="none"/>'),
+  turb: IC('<path d="M5 9L29 3V31L5 25Z" fill="#3b4459" stroke="#8b96ad"/><path d="M17 17l0 -9M17 17l8 3" stroke="#a9b4c9" stroke-width="2"/>'),
+  gen: IC('<rect x="4" y="9" width="26" height="16" rx="4" fill="#2b3245" stroke="#8b96ad"/><text x="12" y="22" font-size="12" fill="#ffb547">~</text>'),
+  cond: IC('<rect x="4" y="10" width="26" height="15" rx="4" fill="rgba(95,180,217,.3)" stroke="#5fb4d9"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  const t = (ok, s) => `${s} ${ok ? '✓' : '—'}`;
+  if (id === 'radio') return [t(m.field, 'поле'), t(m.paper, 'бумага'), t(m.al, 'алюминий'), t(m.half, 'половина распалась')].join(' · ');
+  if (id === 'nucleus') return L().targets.map(tg => t(S.found[tg.s], tg.s + '-' + tg.A)).join(' · ') + ' · ' + t(m.pick === 'Fe', 'самое прочное');
+  if (id === 'reactions') return `Дописано реакций: ${m.solved} из 4`;
+  return `Мощность ${fmt(m.P, m.P < 10 ? 1 : 0)} % · удержано ${fmt(Math.min(m.hold, 5), 1)} из 5 с`;
+}
+
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'radio') {
+    h = `<h2>${S.mode === 'rays' ? 'Три вида излучения' : 'Закон распада'}</h2><div class="ctl"><div class="lbl">Опыт</div><div class="chips"><button data-a="rays" aria-pressed="${S.mode === 'rays'}">лучи</button><button data-a="decay" aria-pressed="${S.mode === 'decay'}">распад</button></div></div>`;
+    if (S.mode === 'rays') h += `<div class="ctl"><div class="lbl">Магнитное поле</div><div class="chips"><button data-a="field" aria-pressed="${S.field}">${S.field ? 'включено' : 'выключено'}</button></div></div>
+      <div class="ctl"><div class="lbl">Преграда</div><div class="chips">${[['none', 'нет'], ['paper', 'бумага'], ['al', 'алюминий 3 мм'], ['pb', 'свинец 5 см']].map(([k, n]) => `<button data-a="ab-${k}" aria-pressed="${S.ab === k}">${n}</button>`).join('')}</div></div>
+      <dl class="reads"><div><dt>α</dt><dd id="r1"></dd></div><div><dt>β</dt><dd id="r2"></dd></div><div><dt>γ</dt><dd id="r3"></dd></div></dl>
+      <p class="note" style="margin-top:12px">Отклонения в поле показаны условно. α-частица в 7000 раз тяжелее электрона, поэтому поле поворачивает её слабее, чем β.</p>`;
+    else h += `<div class="ctl"><div class="lbl">Изотоп</div><div class="chips">${ISO.map((q, i) => `<button data-a="iso-${i}" aria-pressed="${S.iso === i}">${q.name}</button>`).join('')}</div></div>
+      <dl class="reads"><div><dt>T½ табл.</dt><dd id="r1"></dd></div><div><dt>прошло</dt><dd id="r2"></dd></div><div><dt>осталось</dt><dd id="r3"></dd></div><div><dt>по закону</dt><dd id="r4"></dd></div><div><dt>T½ опыт</dt><dd id="r5"></dd></div></dl>
+      <div class="row"><button class="ghostbtn" data-a="run">Пуск / пауза</button><button class="ghostbtn" data-a="dreset">Сброс</button></div>
+      <p class="note" style="margin-top:12px">В лаборатории один период полураспада идёт 2,5 секунды, какой бы ни был изотоп.</p>`;
+  }
+  if (id === 'nucleus') h = `<h2>Сборка ядра</h2>` + slider('inZ', 'Протоны Z', 1, 92, 1, S.Z) + slider('inN', 'Нейтроны N', 0, 146, 1, S.N) +
+    `<div class="ctl"><div class="lbl">Быстро</div><div class="chips">${L().targets.concat([{ Z: 92, A: 235, s: 'U' }]).map(tg => `<button data-q="${tg.Z}-${tg.A - tg.Z}">${tg.s}: ${tg.Z} p, ${tg.A - tg.Z} n</button>`).join('')}</div></div>
+    <dl class="reads"><div><dt>A = Z + N</dt><dd id="r1"></dd></div><div><dt>E связи</dt><dd id="r2"></dd></div><div><dt>на нуклон</dt><dd id="r3"></dd></div></dl>
+    <p class="note" style="margin-top:12px">Кнопки «Быстро» сразу ставят состав — но для задания сначала попробуйте найти его сами по записи ядра.</p>`;
+  if (id === 'reactions') h = `<h2>Неизвестная частица</h2><div class="ctl"><div class="lbl">Реакция</div><div class="chips">${RX.map((r, i) => `<button data-a="r-${i}" aria-pressed="${S.r === i}">${i + 1}${S.solved[r.id] ? ' ✓' : ''}</button>`).join('')}</div></div>` +
+    slider('inA', 'Массовое число A', 0, 240, 1, S.un[S.r].A) + slider('inZr', 'Зарядовое число Z', -1, 92, 1, S.un[S.r].Z) +
+    `<dl class="reads"><div><dt>A слева</dt><dd id="r1"></dd></div><div><dt>A справа</dt><dd id="r2"></dd></div><div><dt>частица</dt><dd id="r5"></dd></div><div><dt>Z слева</dt><dd id="r3"></dd></div><div><dt>Z справа</dt><dd id="r4"></dd></div></dl>`;
+  if (id === 'npp') h = `<h2>Пульт реактора</h2>` + slider('inH', 'Стержни в активной зоне', 0, 100, 0.5, S.h * 100) +
+    `<div class="ctl"><div class="lbl">Насосы</div><div class="chips"><button data-a="pump" aria-pressed="${S.pump}">${S.pump ? 'работают' : 'стоят'}</button></div></div>
+    <dl class="reads"><div><dt>мощность</dt><dd id="r1"></dd></div><div><dt>k</dt><dd id="r2"></dd></div><div><dt>вода</dt><dd id="r3"></dd></div><div><dt>тепло</dt><dd id="r4"></dd></div><div><dt>ток</dt><dd id="r5"></dd></div><div><dt>удержано</dt><dd id="r6"></dd></div></dl>
+    <div class="row"><button class="ghostbtn" data-a="scram">Аварийная защита</button><button class="ghostbtn" data-a="reset">Сброс</button></div>
+    <p class="note" style="margin-top:12px">Модель упрощена: время в ней идёт быстрее, а мощность нагревом сама немного снижает k — так устроены настоящие водяные реакторы.</p>`;
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn); };
+  on('#inZ', e => setNuc(+e.target.value, S.N));
+  on('#inN', e => setNuc(S.Z, +e.target.value));
+  on('#inA', e => setUn(0, 0, [+e.target.value, S.un[S.r].Z]));
+  on('#inZr', e => setUn(0, 0, [S.un[S.r].A, +e.target.value]));
+  on('#inH', e => { setH(+e.target.value / 100); renderTools(); updateScheme(model()); });
+  el.querySelectorAll('[data-q]').forEach(b => b.onclick = () => { const [z, n] = b.dataset.q.split('-').map(Number); setNuc(z, n); buildScheme(); });
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => {
+    const a = b.dataset.a;
+    act(a); if (/^(rays|decay|field|ab-|iso-|r-|pump|scram|reset)/.test(a)) buildScheme();
+    updateScheme(model());
+  });
+  updateScheme(model());
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (id === 'radio') {
+    if (S.mode === 'rays') { for (const [k, r] of [['a', '#r1'], ['b', '#r2'], ['g', '#r3']]) set(r, stops(k, S.ab) ? 'задержан' : (S.ab === 'pb' && k === 'g' ? 'ослаблен' : 'проходит')); }
+    else { const iso = ISO[S.iso]; set('#r1', fmtT(iso.T, iso)); set('#r2', fmtT(S.dt * iso.T, iso)); set('#r3', nLeft()); set('#r4', fmt(100 * 2 ** -S.dt, 0)); set('#r5', S.halfT === null ? '—' : fmtT(S.halfT * iso.T, iso)); }
+  }
+  if (id === 'nucleus') { set('#inZO', S.Z); set('#inNO', S.N); val('#inZ', S.Z); val('#inN', S.N); set('#r1', m.A); set('#r2', m.be ? fmt(m.be, 1) + ' МэВ' : '—'); set('#r3', m.be && m.A > 1 ? fmt(m.be / m.A, 2) + ' МэВ' : '—'); }
+  if (id === 'reactions') { const s = sides(S.r), u = S.un[S.r]; set('#inAO', u.A); set('#inZrO', String(u.Z).replace('-', '−')); val('#inA', u.A); val('#inZr', u.Z); set('#r1', s.AL); set('#r2', s.AR); set('#r3', String(s.ZL).replace('-', '−')); set('#r4', String(s.ZR).replace('-', '−')); set('#r5', particle(u.A, u.Z).s); }
+  if (id === 'npp') { set('#inHO', fmt(S.h * 100, 1) + ' %'); val('#inH', S.h * 100); set('#r1', fmt(S.P, S.P < 10 ? 1 : 0) + ' %'); set('#r2', fmt(m.k, 3)); set('#r3', fmt(S.Tc, 0) + ' °C'); set('#r4', fmt(3000 * S.P / 100, 0) + ' МВт'); set('#r5', fmt(m.Pel, 0) + ' МВт'); set('#r6', fmt(Math.min(m.hold, 5), 1) + ' с'); }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'radio') return [
+    { id: 'src', icon: ICON.src, name: 'Источник', spec: 'Крупинка радия в свинцовом контейнере с узким каналом — выходит тонкий пучок.' },
+    { id: 'field', icon: ICON.field, name: 'Магнитное поле', spec: 'Поворачивает заряженные частицы. По направлению отклонения узнают знак заряда.' },
+    { id: 'abs', icon: ICON.abs, name: 'Преграды', spec: 'Бумага, алюминий 3 мм, свинец 5 см. Проверяют проникающую способность лучей.' },
+    { id: 'screen', icon: ICON.screen, name: 'Экран-счётчик', spec: 'Отмечает, какие лучи до него долетели.' },
+    { id: 'grid', icon: ICON.grid, name: '100 ядер', spec: 'Каждое ядро распадается в случайный момент. Нажмите на ядро — оно расскажет о себе.' },
+    { id: 'plot', icon: ICON.plot, name: 'График N(t)', spec: 'Зелёная линия — опыт, пунктир — закон N₀ · 2^(−t/T½).' }].filter(p => S.mode === 'rays' ? !['grid', 'plot'].includes(p.id) : ['grid', 'plot'].includes(p.id));
+  if (id === 'nucleus') return [
+    { id: 'p', icon: ICON.p, name: 'Протон', spec: 'Заряд +e, масса 1,00728 а.е.м. Число протонов Z задаёт элемент.' },
+    { id: 'n', icon: ICON.n, name: 'Нейтрон', spec: 'Без заряда, масса 1,00866 а.е.м. — чуть тяжелее протона.' },
+    { id: 'core', icon: ICON.core, name: 'Ядро', spec: 'Нуклоны держат ядерные силы. Если такого ядра нет в таблице, нуклоны дрожат — ядро неустойчиво.' },
+    { id: 'nota', icon: ICON.nota, name: 'Запись ядра', spec: 'Сверху массовое число A, снизу зарядовое Z, справа символ элемента.' },
+    { id: 'scale', icon: ICON.scale, name: 'Весы', spec: 'Слева нуклоны врозь, справа ядро. Ядро легче — это и есть дефект масс. Наклон показан преувеличенно.' },
+    { id: 'be', icon: ICON.be, name: 'Энергия связи', spec: 'E = Δm · c². Делим на число нуклонов — получаем прочность ядра.' }];
+  if (id === 'reactions') return [
+    { id: 'eq', icon: ICON.eq, name: 'Уравнение реакции', spec: 'Слева то, что столкнулось, справа — что получилось.' },
+    { id: 'unk', icon: ICON.unk, name: 'Неизвестная частица', spec: 'Её A и Z меняете вы. По Z видно, какой это элемент или частица.' },
+    { id: 'bal', icon: ICON.bal, name: 'Суммы A и Z', spec: 'Обе суммы должны совпасть слева и справа.' },
+    { id: 'anim', icon: ICON.anim, name: 'Столкновение', spec: 'Когда суммы сошлись, реакция «проигрывается».' }];
+  return [
+    { id: 'fuel', icon: ICON.fuel, name: 'Топливо', spec: 'Таблетки диоксида урана, обогащённого ураном-235 до 3–5 %, в трубках из циркония.' },
+    { id: 'rods', icon: ICON.rods, name: 'Управляющие стержни', spec: 'Бор или кадмий жадно поглощают нейтроны. Ниже стержни — меньше k.' },
+    { id: 'water', icon: ICON.water, name: 'Вода в корпусе', spec: 'Замедляет нейтроны и уносит тепло. Под давлением 160 атмосфер она не кипит даже при 320 °C.' },
+    { id: 'pump', icon: ICON.pump, name: 'Насос', spec: 'Гонит воду по кругу. Нажмите на него, чтобы включить или выключить.' },
+    { id: 'sg', icon: ICON.sg, name: 'Парогенератор', spec: 'Горячая вода из реактора нагревает другую воду — та кипит и превращается в пар.' },
+    { id: 'turb', icon: ICON.turb, name: 'Турбина', spec: 'Пар крутит лопатки, как ветер вертушку.' },
+    { id: 'gen', icon: ICON.gen, name: 'Генератор', spec: 'Вращение превращается в электрический ток — работает электромагнитная индукция.' },
+    { id: 'cond', icon: ICON.cond, name: 'Конденсатор', spec: 'Пар остывает и снова становится водой. Сюда идёт примерно две трети тепла.' }];
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      (Ls.safety ? `<div class="safe"><b>Безопасность</b>${Ls.safety}</div>` : '') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}" id="ovState">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Что на площадке</h2><p class="note">Нажмите на деталь, чтобы найти её на площадке.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'radio') {
+    const iso = ISO[S.iso], tt = S.dt;
+    let h = `<h2>Закон радиоактивного распада</h2><div class="formula">N = N₀ · 2<sup>−t/T½</sup></div><p class="note">N₀ — сколько ядер было, N — сколько осталось через время t, T½ — период полураспада.</p>
+      <h3>Сейчас: ${iso.name}</h3><div class="steps">` + step('N₀', '100 ядер') + step('T½', fmtT(iso.T, iso)) + step('прошло t', fmtT(tt * iso.T, iso)) +
+      step('t / T½', fmt(tt, 2)) + step('2<sup>−t/T½</sup>', fmt(2 ** -tt, 3)) + step('по закону N', `100 · ${fmt(2 ** -tt, 3)} ≈ ${fmt(100 * 2 ** -tt, 0)}`, 'sum') + step('в опыте N', `${nLeft()}`) + `</div>
+      <p class="note" style="margin-top:8px">Опыт и закон немного расходятся: ядер всего 100, а распад случаен. Чем больше ядер, тем точнее закон. В крупинке вещества их миллиарды миллиардов.</p>
+      <h3>Три вида излучения</h3><div class="steps">` + step('α: ядро гелия ⁴₂He', 'заряд +2e · стоп: бумага') + step('β: электрон', 'заряд −e · стоп: алюминий') + step('γ: квант света', 'заряда нет · ослабляет свинец') + `</div>`;
+    return h;
+  }
+  if (id === 'nucleus') {
+    const A = m.A, mf = S.Z * MP + S.N * MN;
+    let h = `<h2>Дефект масс и энергия связи</h2><div class="formula">Δm = Z·m<sub>p</sub> + N·m<sub>n</sub> − M<sub>я</sub></div><div class="formula">E<sub>св</sub> = Δm · c²</div><p class="note">1 а.е.м. = 1,66 · 10⁻²⁷ кг. Ей соответствует энергия 931,5 МэВ, поэтому удобно: E (МэВ) = Δm (а.е.м.) · 931,5.</p>
+      <h3>Сейчас: ${elName(S.Z)}-${A}</h3><div class="steps">` + step('Z · m<sub>p</sub>', `${S.Z} · 1,00728 = ${fmt(S.Z * MP, 5)}`) + step('N · m<sub>n</sub>', `${S.N} · 1,00866 = ${fmt(S.N * MN, 5)}`) + step('нуклоны врозь', `${fmt(mf, 5)} а.е.м.`);
+    if (m.be && A > 1) {
+      const dm = m.be / UMEV;
+      h += step('масса ядра M<sub>я</sub>', `${fmt(mf - dm, 5)} а.е.м.`) + step('Δm', `${fmt(dm, 5)} а.е.м.`) + step('E<sub>св</sub>', `${fmt(dm, 5)} · 931,5 ≈ ${fmt(m.be, 1)} МэВ`, 'sum') + step('на нуклон', `${fmt(m.be, 1)} / ${A} = ${fmt(m.be / A, 2)} МэВ`, 'sum') + step('в джоулях', `${fmt(m.be * 1.602 / 10, 2)} · 10⁻¹² Дж`);
+    } else h += step('масса ядра', A === 1 ? 'это один протон' : 'нет в таблице лаборатории');
+    h += `</div><h3>Собранные ядра</h3><div class="steps">` + L().targets.map(tg => step(`${tg.s}-${tg.A}`, S.found[tg.s] ? `${fmt(BE[tg.Z + '-' + tg.A] / tg.A, 2)} МэВ на нуклон` : 'ещё не собрано')).join('') + `</div>
+      <p class="note" style="margin-top:8px">Чем больше энергия связи на нуклон, тем прочнее ядро. Лёгким ядрам выгодно сливаться, тяжёлым — делиться: в обоих случаях выделяется энергия.</p>`;
+    return h;
+  }
+  if (id === 'reactions') {
+    const R = RX[S.r], u = S.un[S.r], s = sides(S.r);
+    const show = arr => arr.map(q => q ? q : [u.A, u.Z]);
+    const sumA = arr => show(arr).map(q => q[0]).join(' + '), sumZ = arr => show(arr).map(q => String(q[1]).replace('-', '−')).join(' + ');
+    return `<h2>Законы сохранения</h2><div class="formula">ΣA до = ΣA после</div><div class="formula">ΣZ до = ΣZ после</div>
+      <h3>Реакция ${S.r + 1}: ${R.name}</h3><div class="steps">` +
+      step('A слева', `${sumA(R.L)} = ${s.AL}`) + step('A справа', `${sumA(R.R)} = ${s.AR}`) + step('A', s.AL === s.AR ? 'сходится ✓' : `не хватает ${s.AL - s.AR > 0 ? s.AL - s.AR : 'лишнее: ' + (s.AR - s.AL)}`.replace('не хватает лишнее', 'лишнее'), 'sum') +
+      step('Z слева', `${sumZ(R.L)} = ${String(s.ZL).replace('-', '−')}`) + step('Z справа', `${sumZ(R.R)} = ${String(s.ZR).replace('-', '−')}`) + step('Z', s.ZL === s.ZR ? 'сходится ✓' : 'пока не сходится', 'sum') +
+      step('«?» сейчас', particle(u.A, u.Z).name) + `</div>
+      <h3>Правила смещения</h3><div class="steps">` + step('α-распад', 'A − 4, Z − 2') + step('β-распад', 'A не меняется, Z + 1') + step('γ-излучение', 'A и Z не меняются') + `</div>`;
+  }
+  const P = S.P, Pth = 3000 * P / 100, fis = Pth * 1e6 / 3.2e-11, kgDay = fis * 86400 / 6.02e23 * 0.235;
+  const sci = v => { if (v <= 0) return '0'; const e = Math.floor(Math.log10(v)); return `${fmt(v / 10 ** e, 1)} · 10${String(e).replace(/\d/g, d => '⁰¹²³⁴⁵⁶⁷⁸⁹'[d]).replace('-', '⁻')}`; };
+  return `<h2>Энергия деления</h2><div class="formula">²³⁵U + n → ¹⁴¹Ba + ⁹²Kr + 3n + 200 МэВ</div><div class="formula">P<sub>эл</sub> = η · P<sub>тепл</sub></div>
+    <h3>Сейчас</h3><div class="steps">` + step('коэффициент k', `${fmt(kOf(), 3)} → ${kOf() > 1.0005 ? 'мощность растёт' : kOf() < 0.9995 ? 'мощность падает' : 'мощность постоянна'}`) +
+    step('тепловая мощность', `3000 МВт · ${fmt(P, 1)} % = ${fmt(Pth, 0)} МВт`) + step('энергия одного деления', '200 МэВ = 3,2 · 10⁻¹¹ Дж') +
+    step('делений в секунду', `${fmt(Pth, 0)} · 10⁶ / 3,2 · 10⁻¹¹ ≈ ${sci(fis)}`) + step('урана-235 за сутки', `≈ ${fmt(kgDay, 2)} кг`, 'sum') +
+    step('электрическая мощность', `0,33 · ${fmt(Pth, 0)} ≈ ${fmt(Pth * 0.33, 0)} МВт`, 'sum') + `</div>
+    <p class="note" style="margin-top:8px">1 кг урана-235 при полном делении даёт около 8 · 10¹³ Дж — столько же, сколько сгорание примерно 2800 тонн каменного угля. Поэтому АЭС почти не нужны поезда с топливом и она не выбрасывает углекислый газ.</p>`;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter');
+  if (id === 'radio') {
+    if (S.mode === 'rays') el.innerHTML = `<div class="k">Излучение радия</div><div class="v">${S.field ? 'поле вкл' : 'поле выкл'}</div>` + ['a', 'b', 'g'].map(k => `<div class="lr"><span>${RNAME[k]}</span><span class="${stops(k, S.ab) ? 'bad' : 'ok'}">${stops(k, S.ab) ? 'стоп' : 'проходит'}</span></div>`).join('');
+    else { const iso = ISO[S.iso]; el.innerHTML = `<div class="k">${iso.name}</div><div class="v ${m.half ? 'ok' : ''}">N = ${m.N}</div><div class="lr"><span>t</span><span>${fmtT(S.dt * iso.T, iso)}</span></div><div class="lr"><span>закон</span><span>${fmt(100 * 2 ** -S.dt, 0)}</span></div>`; }
+  } else if (id === 'nucleus') el.innerHTML = `<div class="k">${elName(S.Z)}-${m.A}</div><div class="v ${m.be ? 'ok' : ''}">${m.be && m.A > 1 ? fmt(m.be / m.A, 2) + ' МэВ' : '—'}</div><div class="lr"><span>p · n</span><span>${S.Z} · ${S.N}</span></div><div class="lr"><span>E св</span><span>${m.be ? fmt(m.be, 1) : '—'}</span></div>`;
+  else if (id === 'reactions') { const s = sides(S.r); el.innerHTML = `<div class="k">Реакция ${S.r + 1}</div><div class="v ${m.bal ? 'ok' : ''}">${m.bal ? 'сходится' : 'не сходится'}</div><div class="lr"><span>A</span><span class="${s.AL === s.AR ? 'ok' : 'bad'}">${s.AL} | ${s.AR}</span></div><div class="lr"><span>Z</span><span class="${s.ZL === s.ZR ? 'ok' : 'bad'}">${String(s.ZL).replace('-', '−')} | ${String(s.ZR).replace('-', '−')}</span></div>`; }
+  else el.innerHTML = `<div class="k">Реактор</div><div class="v ${S.P >= 95 && S.P <= 105 ? 'ok' : ''}">${fmt(S.P, S.P < 10 ? 1 : 0)} %</div><div class="lr"><span>k</span><span>${fmt(m.k, 3)}</span></div><div class="lr"><span>вода</span><span class="${S.Tc > 330 ? 'bad' : ''}">${fmt(S.Tc, 0)} °C</span></div><div class="lr"><span>ток</span><span>${fmt(m.Pel, 0)} МВт</span></div>`;
+}
+
+function update(light) {
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Теперь вы знаете, как устроено ядро и как работает АЭС!'), 2200);
+    light = false;
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  if (light) {
+    const ov = $('#ovState'); if (ov && S.tab === 'overview') ov.textContent = taskState(m);
+    if (S.tab === 'scheme') updateScheme(m);
+    if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+  } else renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  radio: '<rect x="2" y="10" width="12" height="10" rx="2" fill="#3b4459"/><path d="M14 15h12q14 0 34 -10" stroke="#72d4e8" stroke-width="1.4" fill="none"/><path d="M26 15h34" stroke="#c3a8ff" stroke-width="1.4"/><path d="M26 15q14 0 34 5" stroke="#ffb547" stroke-width="1.4" fill="none"/>',
+  nucleus: '<circle cx="20" cy="13" r="4" fill="#ff8a73"/><circle cx="27" cy="13" r="4" fill="#a9b4c9"/><circle cx="20" cy="20" r="4" fill="#a9b4c9"/><circle cx="27" cy="20" r="4" fill="#ff8a73"/><path d="M42 24h18M51 24V8M41 10l20 -3" stroke="#8b96ad" stroke-width="1.4"/>',
+  reactions: '<text x="4" y="20" font-size="10" fill="#e8ecf4" font-family="monospace">N+α→O+</text><rect x="50" y="9" width="12" height="14" rx="3" fill="none" stroke="#ffb547" stroke-dasharray="2 2"/>',
+  npp: '<rect x="4" y="6" width="16" height="20" rx="4" fill="rgba(95,180,217,.3)" stroke="#8b96ad"/><rect x="8" y="12" width="3" height="12" fill="#ffcf80"/><rect x="13" y="6" width="3" height="10" fill="#2b3245" stroke="#8b96ad" stroke-width=".6"/><path d="M20 10h14" stroke="#ffb547" stroke-width="2"/><path d="M34 8l12 -3v18l-12 -3z" fill="#3b4459"/><rect x="50" y="9" width="12" height="10" rx="2" fill="#2b3245" stroke="#8b96ad"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Lx, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Lx.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Lx.title}</span></span>
+      ${S.done[Lx.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  S.lesson = i; drag = null;
+  resetState(); save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L().task;
+  $('#hint').textContent = L().stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  // centre the active card by scrolling only the strip, never the page
+  const strip = $('#lessons'), cur = strip.querySelector('.lesson[aria-current="true"]');
+  if (cur) { const br = strip.getBoundingClientRect(), cr = cur.getBoundingClientRect(); strip.scrollLeft = Math.max(0, strip.scrollLeft + (cr.left - br.left) - (br.width - cr.width) / 2); }
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '';
+  if (id === 'radio') {
+    const iso = ISO[S.iso];
+    now = S.mode === 'rays'
+      ? `Опыт «Лучи»: пучок от радия, магнитное поле ${S.field ? 'включено (направлено на зрителя): α отклоняются слабо вниз, β сильно вверх, γ прямо' : 'выключено, три вида лучей летят одним пучком'}. Преграда: ${({ none: 'нет', paper: 'лист бумаги', al: 'алюминий 3 мм', pb: 'свинец 5 см' })[S.ab]}. Проходят: ${['a', 'b', 'g'].filter(k => !stops(k, S.ab)).map(k => RNAME[k]).join(', ') || 'ничего'}.`
+      : `Опыт «Распад»: ${iso.name}, T½ по таблице ${fmtT(iso.T, iso)}. Прошло ${fmtT(S.dt * iso.T, iso)} (${fmt(S.dt, 2)} T½), осталось ${nLeft()} ядер из 100, по закону ${fmt(100 * 2 ** -S.dt, 0)}. Таймер ${S.run ? 'идёт' : 'стоит'}. ${S.halfT !== null ? `Половина распалась через ${fmtT(S.halfT * iso.T, iso)}.` : 'Половина ещё не распалась.'}`;
+    now += ` Отмечено: поле ${S.seen.field ? 'да' : 'нет'}, бумага ${S.seen.paper ? 'да' : 'нет'}, алюминий ${S.seen.al ? 'да' : 'нет'}, полураспад ${S.halfT !== null ? 'да' : 'нет'}.`;
+  }
+  if (id === 'nucleus') now = `Собрано ядро: протонов Z = ${S.Z}, нейтронов N = ${S.N}, A = ${m.A}, элемент ${elName(S.Z)} (${SYM[S.Z]}). ${m.be ? `Энергия связи ${fmt(m.be, 1)} МэВ, на нуклон ${m.A > 1 ? fmt(m.be / m.A, 2) : 0} МэВ, дефект масс ${fmt(m.be / UMEV, 4)} а.е.м.` : 'Такого устойчивого ядра нет в таблице лаборатории.'} Цели: ${L().targets.map(tg => `${tg.s}-${tg.A} ${S.found[tg.s] ? 'собрано' : 'не собрано'}`).join(', ')}. Выбор самого прочного: ${S.pick ? S.pick + (S.pick === 'Fe' ? ' (верно)' : ' (неверно)') : 'ещё не сделан'}. Не называй состав ядер и самое прочное ядро — спрашивай, как найти N по записи и как сравнить прочность.`;
+  if (id === 'reactions') {
+    const R = RX[S.r], u = S.un[S.r], s = sides(S.r);
+    now = `Реакция ${S.r + 1} из 4 (${R.name}). Неизвестная частица сейчас: A = ${u.A}, Z = ${u.Z} (${particle(u.A, u.Z).name}). Суммы: A слева ${s.AL}, справа ${s.AR}; Z слева ${s.ZL}, справа ${s.ZR}. Дописаны реакции: ${RX.filter(r => S.solved[r.id]).map(r => RX.indexOf(r) + 1).join(', ') || 'ни одной'}. Не называй ответ — помоги посчитать суммы и понять, какой элемент имеет такой Z.`;
+  }
+  if (id === 'npp') now = `Модель АЭС с водяным реактором 3000 МВт тепловых. Управляющие стержни введены на ${fmt(S.h * 100, 1)} %, k = ${fmt(m.k, 3)}, мощность ${fmt(S.P, 1)} %, вода ${fmt(S.Tc, 0)} °C, насосы ${S.pump ? 'работают' : 'стоят'}, электрическая мощность ${fmt(m.Pel, 0)} МВт. ${S.scram ? 'Сработала аварийная защита.' : ''} Удержание 95–105 %: ${fmt(Math.min(m.hold, 5), 1)} из 5 с. Помогай понять связь k и роста мощности, не диктуй точное положение стержней.`;
+  return [
+    `Раздел: физика, 9 класс, «Атом и Вселенная», тема «Атомное ядро». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'} (${taskState(m)}).`,
+    `Сейчас на площадке: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Помогай наводящими вопросами, готовые ответы не выдавай.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { radio: 'Почему β-лучи отклоняются в другую сторону, чем α?', nucleus: 'Почему ядро легче, чем протоны и нейтроны по отдельности?', reactions: 'Как по A и Z узнать, что за частица вылетела?', npp: 'Почему мощность реактора растёт, если k чуть больше 1?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

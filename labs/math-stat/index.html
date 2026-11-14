@@ -1,0 +1,901 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по математике, 10 класс: медиана и мода, дисперсия, выборки и опросы, обманчивые графики.">
+<title>Статистика</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--liq);transition:width .2s}
+.gauge i{position:absolute;top:-4px;width:2px;height:14px;background:var(--force);transform:translateX(-50%)}
+.swatch{height:12px;border-radius:4px;margin-top:9px;border:1px solid rgba(255,255,255,.15)}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.dtab{width:100%;border-collapse:collapse;font-size:13px;margin:4px 0 0}
+.dtab th,.dtab td{border:1px solid var(--line);padding:7px 8px;text-align:left}
+.dtab th{font:600 10.5px/1.2 var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:var(--surface-2)}
+.dtab td.n{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.dtab tr.tot td{font-weight:600}
+.dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:7px;vertical-align:-1px}
+.chips .lbl2{font-size:12.5px;color:var(--muted);align-self:center;margin-right:2px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M20 20V7A13 13 0 0 1 33 20Z" fill="var(--force)"/><path d="M20 20H33A13 13 0 1 1 20 7Z" fill="none" stroke="var(--fg)" stroke-width="2" stroke-linejoin="round"/><path d="M20 20L10.8 29.2" stroke="var(--fg)" stroke-width="2"/><path d="M20 20V33" stroke="var(--arm)" stroke-width="2"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Математика · Статистика</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#math">Карта</a><a href="/physics/#math">Математика</a><a href="./" aria-current="page">Статистика</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Статистика</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Рабочее поле">
+    <svg class="scene" id="scene" role="img" aria-label="Рабочее поле: точечная диаграмма данных, квадраты отклонений, город для опроса и график продаж. Точки можно перетаскивать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const trim = (x, n = 2) => { const s = fmt(x, n); return s.includes(',') ? s.replace(/,?0+$/, '') : s; };
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c; };
+const INK = '#04070d';
+
+// ---------- statistics helpers ----------
+const sum = a => a.reduce((s, x) => s + x, 0);
+const avg = a => sum(a) / a.length;
+const sorted = a => a.slice().sort((x, y) => x - y);
+const median = a => { const s = sorted(a), n = s.length; return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2; };
+function modes(a) {
+  const c = {}; a.forEach(x => c[x] = (c[x] || 0) + 1);
+  const keys = Object.keys(c), mx = Math.max(...keys.map(k => c[k]));
+  if (mx < 2 || keys.every(k => c[k] === mx)) return { mx, list: [], c };
+  return { mx, list: keys.filter(k => c[k] === mx).map(Number).sort((x, y) => x - y), c };
+}
+
+// survey town: 400 residents, 20 × 20. Park district = first 6 columns (120 people, 90 «за»), the rest 280 people, 84 «за».
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const POP = (() => {
+  const r = rng(118), out = Array(400).fill(0), park = [], rest = [];
+  for (let i = 0; i < 400; i++) (i % 20 < 6 ? park : rest).push(i);
+  const pickYes = (list, k) => { const a = list.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } a.slice(0, k).forEach(i => out[i] = 1); };
+  pickYes(park, 90); pickYes(rest, 84);
+  return out;
+})();
+const PARK = POP.map((_, i) => i).filter(i => i % 20 < 6);
+const TRUE_P = sum(POP) / 400; // 0.435
+
+// sales of the «Саумал» company, tonnes
+const YEARS = [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024];
+const SALES = [120, 118, 112, 105, 98, 96, 97, 99, 101];
+
+const LESSONS = [
+  { id: 'median', title: 'Медиана и мода',
+    text: ['Среднее арифметическое легко «перекосить». Один очень большой или очень маленький результат тянет его за собой. Поэтому у статистики есть и другие меры центра.',
+           'Медиана — это число в середине упорядоченного ряда. Половина данных не больше неё, половина не меньше. Если чисел чётное количество, берут среднее двух средних.',
+           'Мода — значение, которое встречается чаще всех. Мод может быть несколько, а может не быть вовсе, если все значения разные.'],
+    why: 'Когда пишут о зарплатах в Казахстане, медиана честнее среднего: несколько очень высоких зарплат поднимают среднее, а медиана показывает доход «типичного» работника. Риелтор смотрит медианную цену квадратного метра в районе, магазин одежды заказывает больше всего размера-моды. Этим каждый день пользуются экономисты, аналитики данных и маркетологи.',
+    task: 'Расставьте 9 точек так, чтобы медиана была 10, мода — 12 (одна), а среднее меньше 10.',
+    hint: 'Медиана — пятое число в упорядоченном ряду. Для моды нужно, чтобы 12 повторялось чаще других значений. А чтобы среднее стало меньше медианы, утащите пару точек далеко влево.',
+    stage: 'Тяните точки вдоль оси.',
+    vals: [3, 5, 6, 8, 9, 11, 14, 15, 17],
+    check: m => m.medOk && m.modeOk && m.meanOk },
+  { id: 'spread', title: 'Разброс и дисперсия',
+    text: ['У двух наборов может быть одно и то же среднее, а сами данные совсем разные: в одном всё кучно, в другом — от края до края. Это разброс.',
+           'Самая простая мера — размах: наибольшее минус наименьшее. Точнее работает дисперсия. Берём отклонение каждого числа от среднего, возводим в квадрат и находим среднее этих квадратов.',
+           'D = ((x₁ − x̄)² + … + (xₙ − x̄)²) : n. Корень из дисперсии — стандартное отклонение σ. Оно измеряется в тех же единицах, что и данные.'],
+    why: 'На заводе ОТК следит не только за средним размером детали, но и за разбросом: если σ растёт, станок пора настраивать. Инвестор смотрит на σ доходности как на меру риска, логист — на разброс времени доставки, тренер — на стабильность результатов спортсмена. Дисперсия — рабочий инструмент инженеров качества, финансистов и аналитиков.',
+    task: 'Время на дорогу в школу за 6 дней. Сделайте среднее ровно 10 минут, а дисперсию ровно 4.',
+    hint: 'Дисперсия 4 при 6 числах значит: сумма квадратов отклонений равна 24. Попробуйте отклонения поровну вверх и вниз от 10.',
+    stage: 'Тяните точки. Квадраты — отклонения в квадрате.',
+    vals: [6, 8, 9, 11, 12, 14],
+    check: m => m.sum === 60 && m.ssq === 24 },
+  { id: 'sample', title: 'Выборки и опросы',
+    text: ['В городе 400 жителей. Спросить каждого долго и дорого, поэтому опрашивают часть — выборку. По ней оценивают долю всех: p̂ = «за» : n.',
+           'Выборка должна быть случайной: у каждого жителя одинаковый шанс попасть в опрос. Если спрашивать только у парка, где все за новую велодорожку, оценка будет смещённой.',
+           'Чем больше выборка, тем меньше оценки «прыгают». Погрешность примерно равна 1 : √n: при n = 20 это около ±22 %, при n = 200 — около ±7 %.'],
+    why: 'Социологи и маркетологи по опросу 1000–1500 человек оценивают мнение всей страны. Exit poll на выборах, рейтинг приложений, контроль качества партии товара по нескольким штукам — всё это выборки. Ошибка в выборке стоит компаниям денег: продукт делают для «всех», а спрашивали только знакомых.',
+    task: 'Проведите по 3 случайных опроса на 20 и на 200 человек и один опрос только у парка. Сравните, где оценки разбросаны сильнее.',
+    hint: 'Выберите размер и место кнопками снизу, потом жмите «Опросить». Точки справа — оценки доли «за» по каждому опросу.',
+    stage: 'Серые — мнение пока неизвестно.',
+    check: m => m.s20 >= 3 && m.s200 >= 3 && m.sPark >= 1 },
+  { id: 'graphs', title: 'Как графики вводят в заблуждение',
+    text: ['Компания «Саумал» хвастается в рекламе: продажи кумыса стремительно растут! График и правда идёт круто вверх. Но цифры на нём те же, что и в отчёте.',
+           'Три частых приёма. Шкала начинается не с нуля — маленькая разница выглядит огромной. Выбран удобный период — видно только рост. Картинки-значки растут и в высоту, и в ширину — площадь растёт как квадрат.',
+           'Честный столбчатый график начинается с нуля, показывает весь период и использует столбцы одинаковой ширины.'],
+    why: 'Журналисту, аналитику и маркетологу нужно рисовать честные графики, а покупателю, инвестору и избирателю — замечать нечестные. В рекламе банков, застройщиков и инфоцыган такие приёмы встречаются постоянно. Кто их видит, принимает решения о деньгах спокойнее.',
+    task: 'Сделайте график честным: шкала с нуля, весь период с 2016 года, столбцы вместо значков. Потом выберите вывод: рост или спад?',
+    hint: 'Шкалу можно тянуть за левую ось или менять кнопками. Посмотрите, как меняется «рост на глаз» в правом окне.',
+    stage: 'Тяните левую ось вверх-вниз.',
+    check: m => m.honest && S.verdict === 'down' },
+];
+
+const KEY = 'luch-math-stat';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null,
+            vals: [], squares: true, size: 20, park: false, hist: [], last: [], seen: new Set(), truth: false,
+            a: 95, from: 2021, view: 'icons', verdict: '' };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+function model() {
+  const id = LID();
+  if (id === 'median') {
+    const v = S.vals.slice(), mo = modes(v), med = median(v), mean = avg(v);
+    return { kind: id, v, s: sorted(v), n: v.length, mean, med, mo, medOk: med === 10, modeOk: mo.list.length === 1 && mo.list[0] === 12, meanOk: mean < 10 - 1e-9 };
+  }
+  if (id === 'spread') {
+    const v = S.vals.slice(), n = v.length, sm = sum(v), mean = sm / n, devs = v.map(x => x - mean), sq = devs.map(d => d * d), ssq = sum(sq);
+    return { kind: id, v, n, sum: sm, mean, devs, sq, ssq, D: ssq / n, sd: Math.sqrt(ssq / n), range: Math.max(...v) - Math.min(...v), min: Math.min(...v), max: Math.max(...v) };
+  }
+  if (id === 'sample') {
+    const H = S.hist, f = q => H.filter(q);
+    const r20 = f(h => !h.park && h.n === 20), r200 = f(h => !h.park && h.n === 200), pk = f(h => h.park);
+    const spreadOf = a => a.length > 1 ? Math.max(...a.map(h => h.p)) - Math.min(...a.map(h => h.p)) : null;
+    return { kind: id, r20, r200, pk, s20: r20.length, s200: r200.length, sPark: pk.length, last: H[H.length - 1] || null, sp20: spreadOf(r20), sp200: spreadOf(r200) };
+  }
+  const idx = YEARS.map((y, i) => i).filter(i => YEARS[i] >= S.from);
+  const ys = idx.map(i => YEARS[i]), vs = idx.map(i => SALES[i]);
+  const h = v => clamp((v - S.a) / (TOPV - S.a), 0, 1);
+  const hf = h(vs[0]), hl = h(vs[vs.length - 1]);
+  const look = hf > 0 ? (S.view === 'icons' ? (hl / hf) ** 2 : hl / hf) : Infinity;
+  return { kind: id, ys, vs, a: S.a, from: S.from, view: S.view, look, real: vs[vs.length - 1] / vs[0], honest: S.a === 0 && S.from === 2016 && S.view === 'bars' };
+}
+
+// ---------- scene geometry (SVG units, ~520 × 405) ----------
+const AX = { x0: 50, x1: 470 };
+const ux = v => AX.x0 + (AX.x1 - AX.x0) / 20 * v;
+const baseY = () => LID() === 'median' ? 282 : 236;
+const DOT = { r: 9, dy: 19 };
+const GRID = { x0: 28, y0: 118, c: 11 };
+const PLOT = { x0: 296, x1: 492, rows: [168, 238, 308] };
+const px = p => PLOT.x0 + (PLOT.x1 - PLOT.x0) * p;
+const CHT = { x0: 86, x1: 476, base: 330, top: 130 };
+const TOPV = 125;
+const vy = v => CHT.base - clamp((v - S.a) / (TOPV - S.a), 0, 1) * (CHT.base - CHT.top);
+
+const T = (x, y, s, txt, fill = '#8b96ad', anchor = 'middle', extra = '') => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${s}" fill="${fill}" text-anchor="${anchor}" ${extra}>${txt}</text>`;
+
+function backdrop() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+
+function dotPos(v) {
+  const lvl = {}, B = baseY();
+  return v.map(x => { const k = lvl[x] = (lvl[x] || 0) + 1; return [ux(x), B - DOT.r - 2 - (k - 1) * DOT.dy]; });
+}
+function axisSVG(unit) {
+  const B = baseY();
+  let h = `<path d="M${AX.x0 - 12} ${B}H${AX.x1 + 12}" stroke="#a9b4c9" stroke-width="2"/>`;
+  for (let k = 0; k <= 20; k++) {
+    const x = ux(k);
+    h += `<path d="M${x} ${B}v${k % 5 ? 4 : 7}" stroke="#a9b4c9" stroke-width="1.2"/>`;
+    if (k % 2 === 0) h += T(x, B + 18, 10, k, k % 10 ? '#8b96ad' : '#e8ecf4');
+  }
+  return h + T(AX.x1 + 12, B + 32, 10, unit, '#8b96ad', 'end');
+}
+function dotsSVG(m, col) {
+  let h = '';
+  dotPos(m.v).forEach(([x, y], i) => {
+    const act = drag && drag.i === i;
+    h += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${DOT.r}" fill="${act ? '#ffb547' : col}" stroke="${act ? '#e8ecf4' : INK}" stroke-width="2"/>`;
+  });
+  return h;
+}
+function marker(x, y, col, label, dy) {
+  return `<path d="M${x.toFixed(1)} ${y}l-6 10h12z" fill="${col}"/>` + T(x, y + dy, 10.5, label, col, 'middle', 'font-weight="600"');
+}
+
+function medianSVG(m) {
+  const B = baseY();
+  let h = T(260, 104, 11, 'оценки за тест, 9 учеников (из 20 баллов)', '#8b96ad');
+  if (m.mo.list.length) for (const v of m.mo.list) h += `<rect x="${ux(v) - 13}" y="${B - 4 - m.mo.mx * DOT.dy}" width="26" height="${m.mo.mx * DOT.dy + 2}" rx="12" fill="rgba(134,224,168,.12)" stroke="#86e0a8" stroke-width="1.2" stroke-dasharray="4 3"/>`;
+  h += axisSVG('баллы') + dotsSVG(m, '#72d4e8');
+  // markers under the axis
+  const my = B + 24;
+  const near = Math.abs(ux(m.mean) - ux(m.med)) < 26;
+  h += marker(ux(m.med), my, '#72d4e8', 'Me', 22);
+  h += marker(ux(m.mean), my, '#ffb547', 'x̄', near ? 36 : 22);
+  // ordered row
+  const y = 356, w = 40, gap = 6, x0 = 260 - (9 * w + 8 * gap) / 2;
+  h += T(x0 - 4, y - 8, 10, 'упорядоченный ряд', '#8b96ad', 'start');
+  m.s.forEach((v, k) => {
+    const x = x0 + k * (w + gap), isMed = k === 4, isMo = m.mo.list.includes(v);
+    h += `<rect x="${x}" y="${y}" width="${w}" height="26" rx="6" fill="${isMed ? 'rgba(114,212,232,.18)' : '#1a2438'}" stroke="${isMed ? '#72d4e8' : isMo ? '#86e0a8' : '#3a4866'}" stroke-width="${isMed || isMo ? 1.8 : 1.2}"/>`;
+    h += T(x + w / 2, y + 17.5, 13, v, isMed ? '#72d4e8' : isMo ? '#86e0a8' : '#e8ecf4', 'middle', 'font-weight="500"');
+    h += T(x + w / 2, y + 40, 9, k + 1, '#56627d');
+  });
+  return h;
+}
+
+function spreadSVG(m) {
+  const B = baseY();
+  let h = T(260, 104, 11, 'минуты на дорогу в школу, 6 дней', '#8b96ad');
+  const mx = ux(m.mean);
+  // deviation segments
+  dotPos(m.v).forEach(([x, y], i) => { if (Math.abs(x - mx) > 0.5) h += `<path d="M${mx.toFixed(1)} ${y.toFixed(1)}H${x.toFixed(1)}" stroke="${m.devs[i] > 0 ? '#ff8a73' : '#86e0a8'}" stroke-width="2" opacity=".8"/>`; });
+  const stack = modes(m.v).mx, ly = B - stack * DOT.dy - 16;
+  h += `<path d="M${mx.toFixed(1)} ${ly}V${B}" stroke="#ffb547" stroke-width="2" stroke-dasharray="6 4"/><rect x="${(mx - 34).toFixed(1)}" y="${ly - 17}" width="68" height="16" rx="4" fill="#0e1520"/>` + T(mx, ly - 5, 11, `x̄ = ${trim(m.mean)}`, '#ffb547', 'middle', 'font-weight="600"');
+  h += axisSVG('минуты') + dotsSVG(m, '#72d4e8');
+  // range bracket
+  const ry = B + 34;
+  h += `<path d="M${ux(m.min)} ${ry - 5}v5H${ux(m.max)}v-5" fill="none" stroke="#c79bff" stroke-width="1.6"/>` + T((ux(m.min) + ux(m.max)) / 2, ry + 13, 10.5, `размах ${m.range}`, '#c79bff');
+  if (S.squares) {
+    const maxd = Math.max(1, ...m.devs.map(Math.abs)), k = Math.min(6, 58 / maxd), y0 = 296, slot = 74, x0 = 260 - slot * 3;
+    const order = m.v.map((x, i) => i).sort((a, b) => m.v[a] - m.v[b]);
+    order.forEach((i, j) => {
+      const d = m.devs[i], s = Math.abs(d) * k, cx = x0 + slot * (j + 0.5);
+      if (s > 0.1) h += `<rect x="${(cx - s / 2).toFixed(1)}" y="${y0 + 16}" width="${s.toFixed(1)}" height="${s.toFixed(1)}" fill="${d > 0 ? 'rgba(255,138,115,.28)' : 'rgba(134,224,168,.25)'}" stroke="${d > 0 ? '#ff8a73' : '#86e0a8'}" stroke-width="1.4"/>`;
+      else h += `<circle cx="${cx}" cy="${y0 + 18}" r="2" fill="#8b96ad"/>`;
+      h += T(cx, y0 + 10, 10, `${trim(d, 1).replace(/^(?!−)(?!0$)/, '+')}² = ${trim(m.sq[i], 2)}`, '#e8ecf4');
+    });
+    h += T(260, 404, 11, `D = ${trim(m.ssq, 2)} : ${m.n} = ${trim(m.D, 2)}   σ = ${trim(m.sd, 2)}`, '#ffb547', 'middle', 'font-weight="500"');
+  }
+  return h;
+}
+
+function sampleSVG(m) {
+  const { x0, y0, c } = GRID, last = new Set(S.last);
+  let h = `<rect x="${x0 - 4}" y="${y0 - 4}" width="${6 * c + 8}" height="${20 * c + 8}" rx="6" fill="rgba(134,224,168,.06)" stroke="#3a6b52" stroke-dasharray="4 3"/>` + T(x0 + 3 * c, y0 - 10, 10, 'у парка', '#86e0a8');
+  h += T(x0 + 13 * c, y0 - 10, 10, 'остальной город', '#8b96ad');
+  for (let i = 0; i < 400; i++) {
+    const x = x0 + (i % 20) * c + c / 2, y = y0 + Math.floor(i / 20) * c + c / 2, known = S.truth || S.seen.has(i);
+    const col = known ? (POP[i] ? '#86e0a8' : '#ff8a73') : '#3a4866';
+    h += `<circle cx="${x}" cy="${y}" r="${last.has(i) ? 4.2 : 3.4}" fill="${col}" ${last.has(i) ? 'stroke="#e8ecf4" stroke-width="1.2"' : ''} opacity="${known && !last.has(i) && !S.truth ? .55 : 1}"/>`;
+  }
+  h += `<circle cx="${x0 + 4}" cy="${y0 + 20 * c + 18}" r="4" fill="#86e0a8"/>` + T(x0 + 12, y0 + 20 * c + 22, 10, 'за', '#8b96ad', 'start');
+  h += `<circle cx="${x0 + 44}" cy="${y0 + 20 * c + 18}" r="4" fill="#ff8a73"/>` + T(x0 + 52, y0 + 20 * c + 22, 10, 'против', '#8b96ad', 'start');
+  h += `<circle cx="${x0 + 112}" cy="${y0 + 20 * c + 18}" r="4" fill="#3a4866"/>` + T(x0 + 120, y0 + 20 * c + 22, 10, 'не знаем', '#8b96ad', 'start');
+  // estimates plot
+  const labels = ['случайно, n = 20', 'случайно, n = 200', 'только у парка'], sets = [m.r20, m.r200, m.pk];
+  h += T((PLOT.x0 + PLOT.x1) / 2, 124, 10.5, 'оценка доли «за», p̂', '#e8ecf4');
+  PLOT.rows.forEach((y, r) => {
+    h += T(PLOT.x0, y - 24, 10, labels[r], '#8b96ad', 'start');
+    h += `<path d="M${PLOT.x0} ${y}H${PLOT.x1}" stroke="#a9b4c9" stroke-width="1.4"/>`;
+    for (let k = 0; k <= 4; k++) h += `<path d="M${px(k / 4)} ${y}v4" stroke="#a9b4c9"/>` + T(px(k / 4), y + 15, 9, k * 25 + '%', '#56627d');
+    const cnt = {};
+    sets[r].forEach(s => { const key = Math.round(s.p * 100); const lv = cnt[key] = (cnt[key] || 0) + 1; const isLast = s === m.last;
+      h += `<circle cx="${px(s.p).toFixed(1)}" cy="${y - 6 - (lv - 1) * 7}" r="4.5" fill="${r === 2 ? '#c79bff' : '#72d4e8'}" stroke="${isLast ? '#e8ecf4' : INK}" stroke-width="${isLast ? 2 : 1.2}"/>`; });
+  });
+  if (S.truth) h += `<path d="M${px(TRUE_P)} ${PLOT.rows[0] - 40}V${PLOT.rows[2] + 6}" stroke="#86e0a8" stroke-width="1.8" stroke-dasharray="5 4"/>` + T(px(TRUE_P), PLOT.rows[2] + 32, 10.5, `правда: ${trim(TRUE_P * 100, 1)}%`, '#86e0a8', 'middle', 'font-weight="600"');
+  const L = m.last;
+  h += T(PLOT.x0, 366, 11, L ? `последний опрос: ${L.k} «за» из ${L.n} → p̂ = ${trim(L.p * 100, 1)}%` : 'опросов пока не было', L ? '#e8ecf4' : '#8b96ad', 'start');
+  h += T(PLOT.x0, 384, 10, `сейчас: n = ${S.size}, ${S.park ? 'только у парка' : 'весь город'}`, '#8b96ad', 'start');
+  return h;
+}
+
+function bottle(cx, base, w, hgt, col) {
+  if (hgt < 1) return '';
+  const nw = w * 0.38, nh = hgt * 0.22, bx = cx - w / 2;
+  return `<path d="M${(cx - nw / 2).toFixed(1)} ${(base - hgt).toFixed(1)}h${nw.toFixed(1)}v${nh.toFixed(1)}l${((w - nw) / 2).toFixed(1)} ${(hgt * 0.12).toFixed(1)}V${base}H${bx.toFixed(1)}V${(base - hgt + nh + hgt * 0.12).toFixed(1)}l${((w - nw) / 2).toFixed(1)} ${(-hgt * 0.12).toFixed(1)}z" fill="${col}" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/>` +
+    `<rect x="${(bx + w * 0.12).toFixed(1)}" y="${(base - hgt * 0.5).toFixed(1)}" width="${(w * 0.76).toFixed(1)}" height="${(hgt * 0.18).toFixed(1)}" fill="#ffb547" opacity=".85"/>`;
+}
+function graphsSVG(m) {
+  const { x0, x1, base, top } = CHT, H = base - top, n = m.ys.length, slot = (x1 - x0) / n;
+  let h = T((x0 + x1) / 2, 108, 12, `Продажи «Саумал», тонн${m.honest ? '' : ' — РЕКОРДНЫЙ РОСТ!'}`, m.honest ? '#e8ecf4' : '#ffb547', 'middle', 'font-weight="600"');
+  const range = TOPV - S.a, stepv = range <= 40 ? 5 : range <= 80 ? 10 : 25;
+  for (let t = Math.ceil(S.a / stepv) * stepv; t <= TOPV; t += stepv) {
+    const y = vy(t);
+    h += `<path d="M${x0} ${y}H${x1}" stroke="${t === S.a ? '#a9b4c9' : 'rgba(169,180,201,.16)'}"/>` + T(x0 - 8, y + 4, 10, t, '#8b96ad', 'end');
+  }
+  if (S.a > 0 && S.a % stepv) h += T(x0 - 8, base + 4, 10, S.a, '#ff8a73', 'end');
+  // draggable y-axis
+  h += `<g data-axis="1"><rect x="${x0 - 46}" y="${top - 10}" width="50" height="${H + 30}" fill="transparent"/>`;
+  h += `<path d="M${x0} ${top - 6}V${base}" stroke="${S.a ? '#ff8a73' : '#a9b4c9'}" stroke-width="2.5"/><circle cx="${x0}" cy="${base}" r="6" fill="${S.a ? '#ff8a73' : '#a9b4c9'}" stroke="${INK}" stroke-width="1.5"/></g>`;
+  h += `<path d="M${x0} ${base}H${x1}" stroke="#a9b4c9" stroke-width="2"/>`;
+  const hMax = Math.max(1, ...m.vs.map(v => base - vy(v)));
+  m.ys.forEach((yr, i) => {
+    const cx = x0 + slot * (i + 0.5), v = m.vs[i], hh = base - vy(v), col = '#e8ecf4';
+    if (m.view === 'bars') { if (hh > 0) h += `<rect x="${(cx - slot * 0.32).toFixed(1)}" y="${vy(v).toFixed(1)}" width="${(slot * 0.64).toFixed(1)}" height="${hh.toFixed(1)}" rx="2" fill="#5fb4d9" stroke="${INK}" stroke-width="1.6"/>`; }
+    else { const w = Math.min(slot * 0.92, 64) * hh / hMax; h += bottle(cx, base, w, hh, col); }
+    h += T(cx, vy(v) - 6, 10, v, '#e8ecf4');
+    h += T(cx, base + 16, n > 6 ? 9 : 10.5, n > 6 ? "'" + String(yr).slice(2) : yr, '#8b96ad');
+  });
+  if (S.verdict) h += T((x0 + x1) / 2, base + 44, 11.5, `ваш вывод: ${S.verdict === 'down' ? 'спад' : 'рост'}`, '#ffb547', 'middle', 'font-weight="500"');
+  return h;
+}
+
+function hlBox(id) {
+  const B = baseY(), lid = LID();
+  if (lid === 'median' || lid === 'spread') {
+    const sp = { dots: [AX.x0 - 14, B - 9 * DOT.dy - 6, AX.x1 - AX.x0 + 28, 9 * DOT.dy + 6], axis: [AX.x0 - 16, B - 8, AX.x1 - AX.x0 + 32, 44] };
+    if (lid === 'median') return Object.assign(sp, { marks: [AX.x0 - 16, B + 20, AX.x1 - AX.x0 + 32, 32], row: [44, 340, 432, 62], med: [44 + 4 * 46 - 4, 352, 48, 34], mode: [AX.x0 - 16, B - 9 * DOT.dy - 6, AX.x1 - AX.x0 + 32, 9 * DOT.dy + 6] })[id];
+    return Object.assign(sp, { meanline: [ux(model().mean) - 30, B - 6 * DOT.dy - 32, 60, 6 * DOT.dy + 34], range: [AX.x0 - 16, B + 24, AX.x1 - AX.x0 + 32, 30], squares: [30, 292, 460, 118] })[id];
+  }
+  if (lid === 'sample') return { grid: [GRID.x0 - 6, GRID.y0 - 6, 20 * GRID.c + 12, 20 * GRID.c + 12], park: [GRID.x0 - 8, GRID.y0 - 24, 6 * GRID.c + 16, 20 * GRID.c + 30], plot: [PLOT.x0 - 6, 112, PLOT.x1 - PLOT.x0 + 12, 230], last: [PLOT.x0 - 6, 352, 210, 40] }[id];
+  return { yaxis: [CHT.x0 - 46, CHT.top - 12, 54, CHT.base - CHT.top + 30], bars: [CHT.x0 + 4, CHT.top - 10, CHT.x1 - CHT.x0 - 4, CHT.base - CHT.top + 12], years: [CHT.x0, CHT.base + 2, CHT.x1 - CHT.x0, 22], title: [CHT.x0 - 10, 92, CHT.x1 - CHT.x0 + 20, 24] }[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID(), m = model();
+  let h = backdrop();
+  h += { median: medianSVG, spread: spreadSVG, sample: sampleSVG, graphs: graphsSVG }[id](m);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 500, hh / 420, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 414 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+function dotAt(p) {
+  let best = -1, bd = 16;
+  dotPos(S.vals).forEach(([x, y], i) => { const d = Math.hypot(p.x - x, p.y - y); if (d < bd) { bd = d; best = i; } });
+  if (best < 0 && Math.abs(p.y - baseY()) < 30) { // tap near the axis: pick the top dot at that value
+    const v = Math.round((p.x - AX.x0) / (AX.x1 - AX.x0) * 20);
+    for (let i = S.vals.length - 1; i >= 0; i--) if (S.vals[i] === v) return i;
+  }
+  return best;
+}
+const setVal = (i, x) => { const v = clamp(Math.round((x - AX.x0) / (AX.x1 - AX.x0) * 20), 0, 20); if (v !== S.vals[i]) { S.vals[i] = v; update(); } };
+const setAxis = y => { const k = clamp((CHT.base - y) / (CHT.base - CHT.top), 0, 1); const a = clamp(Math.round(k * TOPV / 5) * 5, 0, 95); if (a !== S.a) { S.a = a; renderTools(); update(); } };
+
+scene.addEventListener('pointerdown', e => {
+  const id = LID(), p = toSvg(e);
+  const grab = () => { e.preventDefault(); try { scene.setPointerCapture(e.pointerId); } catch (er) {} scene.classList.add('grabbing'); };
+  if (id === 'median' || id === 'spread') {
+    const i = dotAt(p); if (i < 0) return;
+    grab(); drag = { kind: 'dot', i }; dirty = true; return;
+  }
+  if (id === 'graphs') {
+    if (!e.target.closest('[data-axis]')) return;
+    grab(); drag = { kind: 'axis' }; setAxis(p.y); return;
+  }
+  if (id === 'sample' && p.x >= GRID.x0 && p.x <= GRID.x0 + 20 * GRID.c && p.y >= GRID.y0 && p.y <= GRID.y0 + 20 * GRID.c) toast('Мнение отдельного жителя мы узнаём только из опроса. Нажмите «Опросить».');
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const p = toSvg(e);
+  if (drag.kind === 'dot') setVal(drag.i, p.x);
+  else setAxis(p.y);
+});
+const endDrag = () => { if (!drag) return; drag = null; scene.classList.remove('grabbing'); dirty = true; };
+scene.addEventListener('pointerup', endDrag);
+scene.addEventListener('pointercancel', endDrag);
+
+function loop(t) {
+  requestAnimationFrame(loop);
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- survey ----------
+function survey() {
+  const pool = S.park ? PARK.slice() : POP.map((_, i) => i), n = Math.min(S.size, pool.length);
+  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+  const pick = pool.slice(0, n), k = pick.reduce((a, i) => a + POP[i], 0);
+  pick.forEach(i => S.seen.add(i)); S.last = pick;
+  S.hist.push({ n, park: S.park, k, p: k / n });
+  update();
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed === undefined ? '' : ` aria-pressed="${pressed}"`}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    median: B('outlier', 'Пример с выбросом') + sep + B('reset', 'Заново'),
+    spread: B('sq', 'Квадраты', S.squares) + B('same', 'Все одинаковые') + sep + B('reset', 'Заново'),
+    sample: B('n20', 'n = 20', S.size === 20) + B('n200', 'n = 200', S.size === 200) + sep + B('city', 'Весь город', !S.park) + B('park', 'У парка', S.park) + sep + B('ask', '▶ Опросить') + B('truth', 'Правда', S.truth) + B('reset', 'Заново'),
+    graphs: B('a0', 'Шкала с 0', S.a === 0) + B('a95', 'Шкала с 95', S.a === 95) + sep + B('f2016', 'С 2016', S.from === 2016) + B('f2021', 'С 2021', S.from === 2021) + sep + B('bars', 'Столбцы', S.view === 'bars') + B('icons', 'Значки', S.view === 'icons') + sep + B('vup', 'Вывод: рост', S.verdict === 'up') + B('vdown', 'Вывод: спад', S.verdict === 'down'),
+  }[id];
+}
+function act(a) {
+  const L = LESSONS[S.lesson];
+  if (a === 'reset') {
+    if (L.vals) S.vals = L.vals.slice();
+    else { S.hist = []; S.last = []; S.seen = new Set(); S.truth = false; }
+    renderTools(); update(); return;
+  }
+  if (a === 'outlier') { S.vals = [3, 4, 5, 5, 6, 6, 6, 7, 20]; toast('Один ученик набрал 20. Как сдвинулись среднее и медиана?'); update(); return; }
+  if (a === 'sq') { S.squares = !S.squares; renderTools(); update(); return; }
+  if (a === 'same') { S.vals = [10, 10, 10, 10, 10, 10]; toast('Все числа равны среднему: отклонений нет, D = 0.'); update(); return; }
+  if (a === 'n20' || a === 'n200') { S.size = a === 'n20' ? 20 : 200; renderTools(); update(); return; }
+  if (a === 'city' || a === 'park') { S.park = a === 'park'; renderTools(); update(); return; }
+  if (a === 'ask') { survey(); return; }
+  if (a === 'truth') { S.truth = !S.truth; renderTools(); update(); return; }
+  if (a === 'a0' || a === 'a95') { S.a = a === 'a0' ? 0 : 95; renderTools(); update(); return; }
+  if (a === 'f2016' || a === 'f2021') { S.from = a === 'f2016' ? 2016 : 2021; renderTools(); update(); return; }
+  if (a === 'bars' || a === 'icons') { S.view = a; renderTools(); update(); return; }
+  if (a === 'vup' || a === 'vdown') {
+    S.verdict = a === 'vup' ? 'up' : 'down';
+    if (!model().honest) toast('Сначала сделайте график честным — потом делайте вывод.');
+    else if (S.verdict === 'up') toast('Посмотрите на весь период: 2016 год против 2024-го.');
+    renderTools(); update();
+  }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model()); dirty = true;
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  dots: IC('<path d="M3 27h28" stroke="var(--muted)" stroke-width="1.4"/><circle cx="9" cy="22" r="3.5" fill="#72d4e8"/><circle cx="17" cy="22" r="3.5" fill="#72d4e8"/><circle cx="17" cy="14" r="3.5" fill="#72d4e8"/><circle cx="25" cy="22" r="3.5" fill="#72d4e8"/>'),
+  axis: IC('<path d="M3 17h28" stroke="var(--fg)" stroke-width="1.6"/><path d="M7 17v4M13 17v4M19 17v4M25 17v4" stroke="var(--muted)" stroke-width="1.2"/>'),
+  marks: IC('<path d="M11 12l-5 9h10z" fill="#ffb547"/><path d="M23 12l-5 9h10z" fill="#72d4e8"/>'),
+  row: IC('<rect x="2" y="12" width="9" height="10" rx="2" fill="none" stroke="var(--muted)"/><rect x="12.5" y="12" width="9" height="10" rx="2" fill="none" stroke="#72d4e8" stroke-width="1.6"/><rect x="23" y="12" width="9" height="10" rx="2" fill="none" stroke="var(--muted)"/>'),
+  med: IC('<rect x="9" y="10" width="16" height="14" rx="3" fill="rgba(114,212,232,.2)" stroke="#72d4e8" stroke-width="1.6"/><text x="17" y="21" font-size="9" fill="#72d4e8" text-anchor="middle" font-family="monospace">Me</text>'),
+  mode: IC('<rect x="11" y="4" width="12" height="27" rx="6" fill="none" stroke="#86e0a8" stroke-dasharray="3 2"/><circle cx="17" cy="11" r="3.5" fill="#72d4e8"/><circle cx="17" cy="19" r="3.5" fill="#72d4e8"/><circle cx="17" cy="27" r="3" fill="#72d4e8"/>'),
+  meanline: IC('<path d="M17 3v28" stroke="#ffb547" stroke-width="2" stroke-dasharray="4 3"/>'),
+  range: IC('<path d="M5 14v6h24v-6" fill="none" stroke="#c79bff" stroke-width="1.8"/>'),
+  squares: IC('<rect x="3" y="10" width="14" height="14" fill="rgba(255,138,115,.28)" stroke="#ff8a73"/><rect x="21" y="10" width="8" height="8" fill="rgba(134,224,168,.25)" stroke="#86e0a8"/>'),
+  grid: IC('<g fill="#3a4866"><circle cx="8" cy="8" r="2.5"/><circle cx="17" cy="8" r="2.5"/><circle cx="26" cy="8" r="2.5"/><circle cx="8" cy="17" r="2.5"/><circle cx="26" cy="17" r="2.5"/><circle cx="8" cy="26" r="2.5"/><circle cx="17" cy="26" r="2.5"/></g><circle cx="17" cy="17" r="2.5" fill="#86e0a8"/><circle cx="26" cy="26" r="2.5" fill="#ff8a73"/>'),
+  park: IC('<rect x="5" y="4" width="12" height="26" rx="3" fill="rgba(134,224,168,.12)" stroke="#86e0a8" stroke-dasharray="3 2"/><circle cx="11" cy="12" r="2.5" fill="#86e0a8"/><circle cx="11" cy="21" r="2.5" fill="#86e0a8"/>'),
+  plot: IC('<path d="M3 24h28" stroke="var(--fg)" stroke-width="1.4"/><circle cx="12" cy="20" r="3" fill="#72d4e8"/><circle cx="16" cy="20" r="3" fill="#72d4e8"/><circle cx="16" cy="14" r="3" fill="#72d4e8"/><circle cx="24" cy="20" r="3" fill="#72d4e8"/>'),
+  last: IC('<text x="17" y="22" font-size="13" fill="var(--fg)" text-anchor="middle" font-family="monospace">p̂</text>'),
+  yaxis: IC('<path d="M10 4v26" stroke="#ff8a73" stroke-width="2.4"/><circle cx="10" cy="28" r="3.5" fill="#ff8a73"/><path d="M14 9h4M14 17h4M14 25h4" stroke="var(--muted)"/>'),
+  bars: IC('<rect x="5" y="14" width="6" height="16" fill="#5fb4d9"/><rect x="14" y="17" width="6" height="13" fill="#5fb4d9"/><rect x="23" y="12" width="6" height="18" fill="#5fb4d9"/>'),
+  years: IC('<text x="17" y="21" font-size="9" fill="var(--fg)" text-anchor="middle" font-family="monospace">2016</text>'),
+  title: IC('<path d="M5 13h24M5 20h16" stroke="#ffb547" stroke-width="2"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+const sgn = x => trim(x, 2).replace(/^(?!−)(?!0$)/, '+');
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (L.id === 'median') return `Me ${m.medOk ? '✓' : '✗'} · Mo ${m.modeOk ? '✓' : '✗'} · x̄ < 10 ${m.meanOk ? '✓' : '✗'}`;
+  if (L.id === 'spread') return `x̄ = ${trim(m.mean)} ${m.sum === 60 ? '✓' : '✗'} · D = ${trim(m.D)} ${m.ssq === 24 ? '✓' : '✗'}`;
+  if (L.id === 'sample') return `n = 20: ${Math.min(m.s20, 3)}/3 · n = 200: ${Math.min(m.s200, 3)}/3 · у парка: ${Math.min(m.sPark, 1)}/1`;
+  return `шкала с ${m.a} ${m.a === 0 ? '✓' : '✗'} · с ${m.from} ${m.from === 2016 ? '✓' : '✗'} · ${m.view === 'bars' ? 'столбцы ✓' : 'значки ✗'}` + (m.honest ? (S.verdict ? ' · вывод неверный' : ' · выберите вывод') : '');
+}
+
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'median') h = `<h2>Меры центра</h2>
+      <dl class="reads"><div><dt>Среднее</dt><dd id="r1"></dd></div><div><dt>Медиана</dt><dd id="r2"></dd></div><div><dt>Мода</dt><dd id="r3"></dd></div></dl>` +
+      S.vals.map((v, i) => slider('inV' + i, `Ученик ${i + 1}`, 0, 20, 1, v)).join('');
+  if (id === 'spread') h = `<h2>Меры разброса</h2>
+      <dl class="reads"><div><dt>Среднее</dt><dd id="r1"></dd></div><div><dt>Дисперсия</dt><dd id="r2"></dd></div><div><dt>σ</dt><dd id="r3"></dd></div></dl>` +
+      S.vals.map((v, i) => slider('inV' + i, `День ${i + 1}, мин`, 0, 20, 1, v)).join('');
+  if (id === 'sample') h = `<h2>Опрос жителей</h2><p class="note">Вопрос: «Вы за новую велодорожку?» Жителей 400. Оценка доли «за»: p̂ = «за» : n.</p>
+      <dl class="reads"><div><dt>Опросов</dt><dd id="r1"></dd></div><div><dt>Последняя p̂</dt><dd id="r2"></dd></div><div><dt>Погрешность</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Размер выборки</div><div class="chips"><button data-n="20">n = 20</button><button data-n="200">n = 200</button></div></div>
+      <div class="ctl"><div class="lbl">Где спрашиваем</div><div class="chips"><button data-w="city">весь город, случайно</button><button data-w="park">только у парка</button></div></div>
+      <div class="row"><button class="ghostbtn" id="sAsk">▶ Опросить</button><button class="ghostbtn" id="sTen">10 опросов подряд</button></div>`;
+  if (id === 'graphs') h = `<h2>Настройки графика</h2>
+      <dl class="reads"><div><dt>Рост на глаз</dt><dd id="r1"></dd></div><div><dt>На деле</dt><dd id="r2"></dd></div><div><dt>Период</dt><dd id="r3"></dd></div></dl>` +
+      slider('inA', 'Шкала начинается с', 0, 95, 5, S.a) +
+      `<div class="ctl"><div class="lbl">Период</div><div class="chips"><button data-f="2016">2016–2024</button><button data-f="2019">2019–2024</button><button data-f="2021">2021–2024</button></div></div>
+       <div class="ctl"><div class="lbl">Вид</div><div class="chips"><button data-v="bars">столбцы</button><button data-v="icons">значки-бутылки</button></div></div>`;
+  el.innerHTML = h;
+  S.vals.forEach((_, i) => { const x = el.querySelector('#inV' + i); if (x) x.addEventListener('input', e => { S.vals[i] = +e.target.value; update(); }); });
+  el.querySelectorAll('[data-n]').forEach(b => b.onclick = () => { S.size = +b.dataset.n; renderTools(); update(); });
+  el.querySelectorAll('[data-w]').forEach(b => b.onclick = () => { S.park = b.dataset.w === 'park'; renderTools(); update(); });
+  const ask = el.querySelector('#sAsk'); if (ask) ask.onclick = survey;
+  const ten = el.querySelector('#sTen'); if (ten) ten.onclick = () => { for (let k = 0; k < 10; k++) survey(); };
+  const a = el.querySelector('#inA'); if (a) a.addEventListener('input', e => { S.a = +e.target.value; renderTools(); update(); });
+  el.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { S.from = +b.dataset.f; renderTools(); update(); });
+  el.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { S.view = b.dataset.v; renderTools(); update(); });
+}
+const ratioTxt = r => isFinite(r) ? '×' + trim(r, 2) : '∞';
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (m.kind === 'median' || m.kind === 'spread') {
+    m.v.forEach((v, i) => { set(`#inV${i}O`, v); val('#inV' + i, v); });
+    if (m.kind === 'median') { set('#r1', trim(m.mean)); set('#r2', trim(m.med)); set('#r3', m.mo.list.length ? m.mo.list.join('; ') : 'нет'); }
+    else { set('#r1', trim(m.mean)); set('#r2', trim(m.D)); set('#r3', trim(m.sd)); }
+  } else if (m.kind === 'sample') {
+    set('#r1', S.hist.length); set('#r2', m.last ? trim(m.last.p * 100, 1) + '%' : '—'); set('#r3', '±' + trim(100 / Math.sqrt(S.size), 0) + '%');
+    el.querySelectorAll('[data-n]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.n === S.size));
+    el.querySelectorAll('[data-w]').forEach(b => b.setAttribute('aria-pressed', (b.dataset.w === 'park') === S.park));
+  } else {
+    set('#r1', ratioTxt(m.look)); set('#r2', ratioTxt(m.real)); set('#r3', `${m.from}–2024`);
+    set('#inAO', m.a); val('#inA', m.a);
+    el.querySelectorAll('[data-f]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.f === m.from));
+    el.querySelectorAll('[data-v]').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === m.view));
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'median') return [
+    { id: 'dots', icon: ICON.dots, name: 'Точечная диаграмма', spec: 'Каждая точка — оценка одного ученика. Одинаковые значения встают столбиком.' },
+    { id: 'axis', icon: ICON.axis, name: 'Числовая ось', spec: 'Баллы от 0 до 20. Точки встают только на целые значения.' },
+    { id: 'marks', icon: ICON.marks, name: 'Метки x̄ и Me', spec: 'Оранжевая — среднее арифметическое, голубая — медиана. Смотрите, какая из них дёргается от выброса.' },
+    { id: 'mode', icon: ICON.mode, name: 'Зелёная рамка — мода', spec: 'Обводит самый высокий столбик из точек. Если таких несколько, мод несколько.' },
+    { id: 'row', icon: ICON.row, name: 'Упорядоченный ряд', spec: 'Те же 9 чисел по возрастанию. Номер под клеткой — место в ряду.' },
+    { id: 'med', icon: ICON.med, name: 'Пятое место', spec: 'При 9 числах середина — место (9 + 1) : 2 = 5. Число на нём и есть медиана.' }];
+  if (id === 'spread') return [
+    { id: 'dots', icon: ICON.dots, name: 'Данные', spec: 'Шесть точек — время на дорогу в каждый из 6 дней.' },
+    { id: 'meanline', icon: ICON.meanline, name: 'Линия среднего', spec: 'От неё отсчитывают отклонения. Красные отрезки — выше среднего, зелёные — ниже.' },
+    { id: 'range', icon: ICON.range, name: 'Размах', spec: 'Наибольшее минус наименьшее. Грубая мера: смотрит только на два крайних числа.' },
+    { id: 'squares', icon: ICON.squares, name: 'Квадраты отклонений', spec: 'Сторона квадрата — отклонение, площадь — его квадрат. Дисперсия — средняя площадь.' },
+    { id: 'axis', icon: ICON.axis, name: 'Ось, минуты', spec: 'Значения от 0 до 20 минут.' }];
+  if (id === 'sample') return [
+    { id: 'grid', icon: ICON.grid, name: 'Генеральная совокупность', spec: '400 жителей города. Серые — их мнения мы не знаем. После опроса точка окрашивается.' },
+    { id: 'park', icon: ICON.park, name: 'Район у парка', spec: '120 жителей рядом с парком. Здесь за велодорожку заметно больше людей, чем в среднем по городу.' },
+    { id: 'plot', icon: ICON.plot, name: 'Оценки по опросам', spec: 'Каждая точка — p̂ одного опроса. Три строки: малые, большие и смещённые выборки.' },
+    { id: 'last', icon: ICON.last, name: 'Последний опрос', spec: 'Сколько из опрошенных «за» и какая получилась оценка доли.' }];
+  return [
+    { id: 'yaxis', icon: ICON.yaxis, name: 'Вертикальная шкала', spec: 'Красная — шкала начинается не с нуля. Её можно тянуть.' },
+    { id: 'bars', icon: ICON.bars, name: 'Столбцы или значки', spec: 'Столбец честен: важна только высота. Значок растёт в обе стороны — площадь врёт.' },
+    { id: 'years', icon: ICON.years, name: 'Период', spec: 'Какие годы попали на график. Обрезанный период прячет то, что было раньше.' },
+    { id: 'title', icon: ICON.title, name: 'Заголовок', spec: 'Громкий заголовок настраивает читателя заранее. Проверяйте его по цифрам.' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Модель</h2><p class="note">Из чего состоит рабочее поле. Нажмите на пункт, чтобы найти его.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'median') {
+    const c = m.mo.c, freq = Object.keys(c).map(Number).sort((a, b) => a - b).filter(k => c[k] > 1);
+    return `<h2>Медиана, мода, среднее</h2><div class="formula" style="font-size:15px">Me — середина ряда · Mo — самое частое</div><h3>Шаг за шагом</h3><div class="steps">` +
+      step('данные', m.v.join('; ')) + step('по возрастанию', m.s.join('; ')) +
+      step('место медианы', `(${m.n} + 1) : 2 = ${(m.n + 1) / 2}`) + step('медиана', `Me = ${m.s[4]}`, 'sum') +
+      step('повторы', freq.length ? freq.map(k => `${k} — ${c[k]} раза`).join(', ') : 'нет') +
+      step('мода', m.mo.list.length ? `Mo = ${m.mo.list.join(' и ')}` : 'моды нет', 'sum') +
+      step('сумма', `${sum(m.v)}`) + step('среднее', `${sum(m.v)} : ${m.n} = ${trim(m.mean)}`, 'sum') + `</div>
+      <h3>Сравнение</h3><p class="note">Сейчас среднее ${m.mean < m.med ? 'меньше' : m.mean > m.med ? 'больше' : 'равно'} медианы${m.mean === m.med ? '' : ` на ${trim(Math.abs(m.mean - m.med))}`}. Если хвост данных длинный с одной стороны, среднее уезжает в сторону хвоста, а медиана остаётся у «типичного» значения.</p>`;
+  }
+  if (id === 'spread') {
+    return `<h2>Дисперсия</h2><div class="formula" style="font-size:15px">D = Σ(xᵢ − x̄)² : n · σ = √D</div><h3>Среднее</h3><div class="steps">` +
+      step('сумма', `${m.v.join(' + ')} = ${m.sum}`) + step('x̄', `${m.sum} : ${m.n} = ${trim(m.mean)}`, 'sum') + `</div><h3>Отклонения и их квадраты</h3><div class="steps">` +
+      m.v.map((x, i) => step(`${x} − ${trim(m.mean)}`, `${sgn(m.devs[i])} → ${trim(m.sq[i])}`)).join('') +
+      step('сумма отклонений', '0') + step('сумма квадратов', trim(m.ssq), 'sum') + `</div><h3>Итог</h3><div class="steps">` +
+      step('D', `${trim(m.ssq)} : ${m.n} = ${trim(m.D)}`, 'sum') + step('σ', `√${trim(m.D)} ≈ ${trim(m.sd)} мин`, 'sum') + step('размах', `${m.max} − ${m.min} = ${m.range}`) + `</div>
+      <p class="note" style="margin-top:10px">Почему квадраты? Сами отклонения в сумме всегда дают 0: плюсы гасят минусы. Квадраты все положительны, а большие отклонения весят сильнее.</p>`;
+  }
+  if (id === 'sample') {
+    const L = m.last, stat = (a, nm) => a.length ? step(nm, `${a.length} шт., от ${trim(Math.min(...a.map(h => h.p)) * 100, 0)}% до ${trim(Math.max(...a.map(h => h.p)) * 100, 0)}%`) : step(nm, 'ещё не было');
+    return `<h2>Оценка по выборке</h2><div class="formula" style="font-size:15px">p̂ = «за» : n · погрешность ≈ 1 : √n</div><h3>Последний опрос</h3><div class="steps">` +
+      (L ? step('опрошено', `${L.n}${L.park ? ', у парка' : ', случайно'}`) + step('«за»', `${L.k}`) + step('p̂', `${L.k} : ${L.n} = ${trim(L.p, 3)} ≈ ${trim(L.p * 100, 1)}%`, 'sum') +
+        step('погрешность', `1 : √${L.n} ≈ ±${trim(100 / Math.sqrt(L.n), 0)}%`) : step('опрос', 'ещё не проводился')) +
+      `</div><h3>Разброс оценок</h3><div class="steps">` + stat(m.r20, 'n = 20') + stat(m.r200, 'n = 200') + stat(m.pk, 'у парка') + `</div>
+      <p class="note" style="margin-top:10px">1 : √n — грубая оценка погрешности для доли с надёжностью около 95 %. Увеличить точность вдвое — значит опросить в 4 раза больше людей. А смещение от неслучайной выборки не уходит, сколько людей ни опроси.</p>` +
+      (S.truth ? `<p class="note">Истинная доля: 174 из 400 = ${trim(TRUE_P * 100, 1)}%.</p>` : '');
+  }
+  const f = m.vs[0], l = m.vs[m.vs.length - 1], full = (SALES[8] - SALES[0]) / SALES[0] * 100;
+  return `<h2>Что на самом деле</h2><div class="formula" style="font-size:15px">изменение = (конец − начало) : начало</div><h3>На текущем графике</h3><div class="steps">` +
+    step('период', `${m.from}–2024`) + step('продажи', `${f} → ${l} т`) + step('изменение', `(${l} − ${f}) : ${f} = ${sgn((l - f) / f * 100).replace(/(\d)$/, '$1')}%`, 'sum') +
+    step('высота столбца', `(значение − ${m.a}) : (${TOPV} − ${m.a})`) +
+    step('на глаз', `${m.view === 'icons' ? '(отношение высот)² = ' : 'отношение высот = '}${ratioTxt(m.look)}`) + step('на деле', ratioTxt(m.real), 'sum') + `</div>
+    <h3>Весь период</h3><div class="steps">` + step('2016 → 2024', `${SALES[0]} → ${SALES[8]} т`) + step('изменение', `${sgn(full)}%`, 'sum') + `</div>
+    <p class="note" style="margin-top:10px">Если шкала начинается с a, то высота показывает не значение, а разницу «значение − a». При a = 95 столбцы 96 и 101 различаются по высоте в 6 раз, хотя продажи — лишь на 5 %.</p>`;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter'), ok = !!S.done[id];
+  if (id === 'median') el.innerHTML = `<div class="k">Центр данных</div><div class="v ${ok ? 'ok' : ''}">Me ${trim(m.med)}</div><div class="lr"><span>x̄</span><span>${trim(m.mean)}</span></div><div class="lr"><span>Mo</span><span>${m.mo.list.length ? m.mo.list.join('; ') : 'нет'}</span></div>`;
+  else if (id === 'spread') el.innerHTML = `<div class="k">Разброс</div><div class="v ${ok ? 'ok' : ''}">D = ${trim(m.D)}</div><div class="lr"><span>x̄</span><span>${trim(m.mean)}</span></div><div class="lr"><span>σ</span><span>${trim(m.sd)}</span></div><div class="lr"><span>размах</span><span>${m.range}</span></div>`;
+  else if (id === 'sample') el.innerHTML = `<div class="k">Опрос</div><div class="v ${ok ? 'ok' : ''}">p̂ ${m.last ? trim(m.last.p * 100, 1) + '%' : '—'}</div><div class="lr"><span>опросов</span><span>${S.hist.length}</span></div><div class="lr"><span>±</span><span>${trim(100 / Math.sqrt(S.size), 0)}%</span></div>`;
+  else el.innerHTML = `<div class="k">Рост на глаз</div><div class="v ${ok ? 'ok' : ''}">${ratioTxt(m.look)}</div><div class="lr"><span>на деле</span><span>${ratioTxt(m.real)}</span></div><div class="lr"><span>период</span><span>${m.from}–24</span></div>`;
+}
+
+function update() {
+  const m = model(), L = LESSONS[S.lesson];
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Статистику теперь не обмануть!');
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  median: '<path d="M6 22h54" stroke="#56627d"/><circle cx="14" cy="18" r="3" fill="#72d4e8"/><circle cx="26" cy="18" r="3" fill="#72d4e8"/><circle cx="34" cy="18" r="3" fill="#72d4e8"/><circle cx="34" cy="11" r="3" fill="#72d4e8"/><circle cx="54" cy="18" r="3" fill="#72d4e8"/><path d="M34 24l-3 5h6z" fill="#72d4e8"/>',
+  spread: '<path d="M33 4v24" stroke="#ffb547" stroke-dasharray="2 2"/><rect x="8" y="12" width="12" height="12" fill="rgba(134,224,168,.3)" stroke="#86e0a8"/><rect x="40" y="8" width="16" height="16" fill="rgba(255,138,115,.3)" stroke="#ff8a73"/>',
+  sample: '<g fill="#3a4866"><circle cx="8" cy="8" r="2"/><circle cx="14" cy="8" r="2"/><circle cx="8" cy="15" r="2"/><circle cx="20" cy="22" r="2"/></g><circle cx="14" cy="15" r="2" fill="#86e0a8"/><circle cx="20" cy="8" r="2" fill="#ff8a73"/><circle cx="8" cy="22" r="2" fill="#86e0a8"/><path d="M32 22h28" stroke="#56627d"/><circle cx="44" cy="18" r="2.5" fill="#72d4e8"/><circle cx="47" cy="18" r="2.5" fill="#72d4e8"/><circle cx="47" cy="13" r="2.5" fill="#72d4e8"/>',
+  graphs: '<path d="M10 4v22h52" stroke="#ff8a73" stroke-width="1.4" fill="none"/><rect x="16" y="20" width="8" height="6" fill="#5fb4d9"/><rect x="30" y="14" width="8" height="12" fill="#5fb4d9"/><rect x="44" y="6" width="8" height="20" fill="#5fb4d9"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i];
+  S.lesson = i; S.hl = null; drag = null;
+  S.vals = (L.vals || []).slice(); S.squares = true;
+  S.size = 20; S.park = false; S.hist = []; S.last = []; S.seen = new Set(); S.truth = false;
+  S.a = 95; S.from = 2021; S.view = 'icons'; S.verdict = '';
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const st = $('#lessons'), cur = st.querySelector('.lesson[aria-current="true"]');
+  if (cur) { const sr = st.getBoundingClientRect(), cr = cur.getBoundingClientRect(); st.scrollLeft += (cr.left - sr.left) - (sr.width - cr.width) / 2; }
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '';
+  if (id === 'median') now = `Точечная диаграмма оценок 9 учеников (0–20 баллов): ${m.v.join(', ')}. По возрастанию: ${m.s.join(', ')}. Среднее ${trim(m.mean)}, медиана ${trim(m.med)}, мода ${m.mo.list.length ? m.mo.list.join(' и ') : 'нет'}. Условия задания: медиана 10 — ${m.medOk ? 'да' : 'нет'}, единственная мода 12 — ${m.modeOk ? 'да' : 'нет'}, среднее меньше 10 — ${m.meanOk ? 'да' : 'нет'}.`;
+  if (id === 'spread') now = `Время на дорогу за 6 дней (мин): ${m.v.join(', ')}. Среднее ${trim(m.mean)}, отклонения ${m.devs.map(d => sgn(d)).join(', ')}, сумма квадратов ${trim(m.ssq)}, дисперсия ${trim(m.D)}, σ ≈ ${trim(m.sd)}, размах ${m.range}. Нужно: среднее 10 и дисперсия 4.`;
+  if (id === 'sample') now = `Город из 400 жителей, вопрос «за ли вы велодорожку». Истинная доля скрыта от ученика${S.truth ? ' (сейчас показана: 43,5%)' : ''}; у парка доля «за» заметно выше. Выбран размер n = ${S.size}, место: ${S.park ? 'только у парка' : 'весь город случайно'}. Проведено опросов: случайных n=20 — ${m.s20}${m.s20 ? ` (оценки ${m.r20.map(h => trim(h.p * 100, 0) + '%').join(', ')})` : ''}, случайных n=200 — ${m.s200}${m.s200 ? ` (оценки ${m.r200.map(h => trim(h.p * 100, 0) + '%').join(', ')})` : ''}, у парка — ${m.sPark}${m.sPark ? ` (оценки ${m.pk.map(h => trim(h.p * 100, 0) + '%').join(', ')})` : ''}.`;
+  if (id === 'graphs') now = `Рекламный график продаж кумыса компании «Саумал», тонн. Данные 2016–2024: ${SALES.join(', ')}. Сейчас: шкала с ${m.a}, период ${m.from}–2024, вид — ${m.view === 'bars' ? 'столбцы' : 'значки-бутылки (растут по площади)'}. Рост на глаз ${ratioTxt(m.look)}, на деле ${ratioTxt(m.real)}. График честный: ${m.honest ? 'да' : 'нет'}. Вывод ученика: ${S.verdict ? (S.verdict === 'down' ? 'спад' : 'рост') : 'не выбран'}.`;
+  return [
+    `Раздел: математика, 10 класс, «Статистика» (вероятность и статистика). Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+    'Не называй готовый набор чисел или готовый вывод: веди ученика наводящими вопросами и проверяй его рассуждения.',
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = {
+    median: 'Почему для зарплат медиана честнее среднего?', spread: 'Зачем возводить отклонения в квадрат?',
+    sample: 'Почему опрос у парка даёт неверную оценку?', graphs: 'Как быстро проверить, честный ли график?',
+  }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

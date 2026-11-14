@@ -47,7 +47,7 @@ window.LUCH_SUBJECTS = {
       { id: 'data', b: 'prob', g: 6, t: 'Данные и диаграммы', items: ['Таблицы', 'Столбчатые и круговые диаграммы', 'Среднее арифметическое'], req: ['frac'], status: 'done', href: '/labs/math-data/', lessons: 3, doneItems: 3 },
       { id: 'comb', b: 'prob', g: 9, t: 'Комбинаторика', items: ['Правило умножения', 'Перестановки', 'Сочетания', 'Треугольник Паскаля'], req: ['num'], status: 'done', href: '/labs/math-comb/', lessons: 4, doneItems: 4 },
       { id: 'probab', b: 'prob', g: 9, t: 'Вероятность', items: ['Случайные события', 'Классическая вероятность', 'Сложение и умножение вероятностей'], req: ['comb', 'frac'], status: 'done', href: '/labs/math-probab/', lessons: 3, doneItems: 3 },
-      { id: 'stat', b: 'prob', g: 10, t: 'Статистика', items: ['Медиана и мода', 'Разброс и дисперсия', 'Выборки и опросы', 'Как графики вводят в заблуждение'], req: ['data', 'probab'] },
+      { id: 'stat', b: 'prob', g: 10, t: 'Статистика', items: ['Медиана и мода', 'Разброс и дисперсия', 'Выборки и опросы', 'Как графики вводят в заблуждение'], req: ['data', 'probab'], status: 'done', href: '/labs/math-stat/', lessons: 4, doneItems: 4 },
       { id: 'rv', b: 'prob', g: 11, t: 'Случайные величины', items: ['Математическое ожидание', 'Биномиальное распределение', 'Закон больших чисел'], req: ['stat'] },
     ],
   },
@@ -137,7 +137,7 @@ window.LUCH_SUBJECTS = {
       { id: 'variation', b: 'gen', g: 10, t: 'Изменчивость', items: ['Мутации', 'Модификации', 'Наследственные болезни'], req: ['mendel'], status: 'done', href: '/labs/bio-variation/', lessons: 3, doneItems: 3 },
       { id: 'selection', b: 'gen', g: 11, t: 'Селекция', items: ['Сорта и породы', 'Гибридизация', 'Селекция микроорганизмов'], req: ['variation'], status: 'done', href: '/labs/bio-selection/', lessons: 3, doneItems: 3 },
       { id: 'evolution', b: 'gen', g: 11, t: 'Эволюция', items: ['Дарвин и естественный отбор', 'Вид и видообразование', 'Доказательства эволюции'], req: ['variation', 'verts'], status: 'done', href: '/labs/bio-evolution/', lessons: 3, doneItems: 3 },
-      { id: 'origin', b: 'gen', g: 11, t: 'Происхождение жизни и человека', items: ['Как появилась жизнь', 'Этапы развития жизни', 'Эволюция человека'], req: ['evolution'] },
+      { id: 'origin', b: 'gen', g: 11, t: 'Происхождение жизни и человека', items: ['Как появилась жизнь', 'Этапы развития жизни', 'Эволюция человека'], req: ['evolution'], status: 'done', href: '/labs/bio-origin/', lessons: 3, doneItems: 3 },
 
       { id: 'env', b: 'eco', g: 8, t: 'Организм и среда', items: ['Факторы среды', 'Приспособления', 'Биоритмы'], req: ['plants'], status: 'done', href: '/labs/bio-env/', lessons: 3, doneItems: 3 },
       { id: 'ecosys', b: 'eco', g: 10, t: 'Экосистемы', items: ['Пищевые цепи', 'Круговорот веществ', 'Устойчивость экосистем'], req: ['env', 'metab'], status: 'done', href: '/labs/bio-ecosys/', lessons: 3, doneItems: 3 },
