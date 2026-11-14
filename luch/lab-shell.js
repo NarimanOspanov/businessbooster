@@ -189,7 +189,7 @@
   });
   hwPane.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('input')) { const b = e.target.closest('.ls-task').querySelector('[data-a="check"]'); if (b && !b.disabled) b.click(); } });
 
-  // ---------- урок начинается с теории: «История урока» (или видео) → практика → ДЗ ----------
+  // ---------- урок начинается с теории: «Теория» (рассказ с картинками или видео) → практика → ДЗ ----------
   const css2 = document.createElement('style');
   css2.textContent = `
   .ls-story{margin:12px 16px 0;border:1px solid var(--line,#26324a);border-radius:14px;background:linear-gradient(135deg,var(--surface-2,#1a2438),var(--surface,#121a28));padding:12px;flex:none}
@@ -262,10 +262,10 @@
   }
   function storyIdle() {
     const reel = reelBtn();
-    story.innerHTML = `<button type="button" class="play" data-a="story"><i>▶</i><span><b>${reel ? 'Начнём с теории: видео и история' : 'Начнём с теории: история урока'}</b><small>что это · зачем нужно · как работает · немного истории</small></span></button>` +
-      (reel ? `<div class="acts" style="display:flex;gap:6px;margin-top:10px"><button class="ls-btn" data-a="reel">▶ Смотреть видео</button><button class="ls-btn ghost" data-a="story">Послушать историю</button></div>` : '');
+    story.innerHTML = `<button type="button" class="play" data-a="story"><i>▶</i><span><b>${reel ? 'Теория: видео и рассказ с картинками' : 'Теория: рассказ с картинками'}</b><small>что это · зачем нужно · как работает · немного истории</small></span></button>` +
+      (reel ? `<div class="acts" style="display:flex;gap:6px;margin-top:10px"><button class="ls-btn" data-a="reel">▶ Смотреть видео</button><button class="ls-btn ghost" data-a="story">Послушать теорию</button></div>` : '');
   }
-  // Плеер «Истории урока»: картинка на раздел + голос + подпись. Пауза доступна всегда.
+  // Плеер «Теории»: картинка на раздел + голос + подпись. Пауза доступна всегда.
   const imgUrl = i => '/api/tutor/story/img?k=' + encodeURIComponent(storyKey() + '|' + LANG2) + '&i=' + i;
   const tts = text => fetch('/api/tutor/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) }).then(r => r.ok ? r.blob() : null).catch(() => null);
   let st = null; // { el, secs, i, paused, audio, voice:[promise], timer, run }
@@ -298,7 +298,7 @@
     stPaint();
   }
   function stShell() {
-    const el = document.createElement('div'); el.className = 'ls-stage'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'История урока');
+    const el = document.createElement('div'); el.className = 'ls-stage'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Теория');
     el.innerHTML = '<div class="frame"><div class="pic"><div class="ph"><span>Рисую картинку…</span></div></div>' +
       '<div class="txt" data-noi18n><b></b><p>Готовлю рассказ… это займёт несколько секунд.</p></div>' +
       '<div class="dots"></div>' +
@@ -367,7 +367,7 @@
     const me = st;
     let s; try { s = await fetchStory(); } catch (e) {
       if (st !== me) return;
-      st.el.querySelector('.txt').innerHTML = '<b>История урока</b><p>Не получилось подготовить рассказ. Попробуйте ещё раз чуть позже.</p>';
+      st.el.querySelector('.txt').innerHTML = '<b>Теория</b><p>Не получилось подготовить рассказ. Попробуйте ещё раз чуть позже.</p>';
       return;
     }
     if (st !== me) return;
@@ -395,7 +395,7 @@
     const w = document.createElement('div'); w.className = 'ls-start'; w.setAttribute('role', 'dialog'); w.setAttribute('aria-label', 'Начало урока');
     w.innerHTML = `<div class="card"><div class="k">Урок ${n} из ${total}</div><h3>${esc(h)}</h3>
       <p>Сначала — интересная теория: что это, зачем нужно и как работает. Потом попробуешь сам в опыте, а в конце закрепим домашним заданием.</p>
-      <div class="acts">${reel ? '<button class="ls-btn main" data-a="reel">▶ Смотреть видео</button>' : ''}<button class="ls-btn ${reel ? '' : 'main'}" data-a="story">▶ Послушать историю урока</button><button class="ls-btn ghost" data-a="practice">Сразу к практике</button></div></div>`;
+      <div class="acts">${reel ? '<button class="ls-btn main" data-a="reel">▶ Смотреть видео</button>' : ''}<button class="ls-btn ${reel ? '' : 'main'}" data-a="story">▶ Слушать теорию · 1 мин</button><button class="ls-btn ghost" data-a="practice">Сразу к практике</button></div></div>`;
     const close = () => { w.remove(); startShown = false; };
     w.addEventListener('click', e => {
       if (e.target === w) return close();
