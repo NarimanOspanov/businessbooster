@@ -1,0 +1,988 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по физике, 9 класс: опыты Фарадея, генератор, трансформатор, электромагнитные волны.">
+<title>Электромагнитная индукция</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.meter .lr .ok{color:var(--ok)}
+.meter .lr .bad{color:var(--warn)}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button.rec{color:var(--force)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 230px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><rect x="5" y="17" width="14" height="7" rx="1.5" fill="var(--warn)"/><rect x="5" y="17" width="7" height="7" rx="1.5" fill="var(--arm)"/><path d="M23 12v16M27 12v16M31 12v16" stroke="var(--force)" stroke-width="2.2" stroke-linecap="round"/><path d="M21 30q8 6 14-4" fill="none" stroke="var(--fg)" stroke-width="1.6"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Физика · Индукция</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/">Карта</a><a href="/physics/">Физика</a><a href="/labs/phys-induction/" aria-current="page">Индукция</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Индукция</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Опытная площадка">
+    <svg class="scene" id="scene" role="img" aria-label="Площадка для опытов с электромагнитной индукцией. Магнит можно тянуть."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const nf = x => fmt(x, Math.abs(x - Math.round(x)) < 1e-9 ? 0 : (Math.abs(x * 10 - Math.round(x * 10)) < 1e-9 ? 1 : 2));
+const sgn = x => (x > 0 ? '+' : '') + fmt(x, 1);
+const SUP = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '-': '⁻' };
+const sup = n => String(n).split('').map(c => SUP[c] || c).join('');
+const sig3 = x => { const v = Number(x.toPrecision(3)); return String(v).replace('.', ','); };
+const sci = x => { if (x === 0) return '0'; let e = Math.floor(Math.log10(x) + 1e-9), mm = x / 10 ** e; mm = Math.round(mm * 100) / 100; if (mm >= 10) { mm /= 10; e++; } return (mm === 1 ? '' : String(mm).replace('.', ',') + '·') + '10' + sup(e); };
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const C1 = '#72d4e8', CP = '#ffb547', OK = '#86e0a8', RED = '#ff8a73', CU = '#d9954f', MUT = '#8b96ad';
+
+const LESSONS = [
+  { id: 'faraday', title: 'Опыты Фарадея',
+    text: ['В 1831 году Майкл Фарадей вдвигал магнит в катушку, подключённую к гальванометру, и увидел: пока магнит движется, по катушке идёт ток. Это явление назвали электромагнитной индукцией, а ток — индукционным.',
+           'Ток возникает, только когда меняется магнитный поток через катушку — то есть сколько линий магнитного поля проходит сквозь её витки. Если магнит лежит неподвижно, поток не меняется и тока нет, даже когда магнит внутри катушки.',
+           'Чем быстрее меняется поток и чем больше витков, тем сильнее ток: ℰ = −N · ΔΦ / Δt. Направление тока зависит от того, вносим магнит или вынимаем и каким полюсом. Правило Ленца: индукционный ток своим полем мешает изменению потока, поэтому подносимый магнит катушка отталкивает.'],
+    why: 'На индукции работают почти все источники электричества: генераторы Экибастузской ГРЭС, ветряки Ерейментауской ВЭС, гидростанции на Иртыше. Индукционная плита греет кастрюлю током, который наводится прямо в её дне. Металлоискатели в аэропорту, датчики ABS в машине и беспроводные зарядки телефонов — тоже индукция. Электрики, энергетики и наладчики оборудования зарабатывают как раз на понимании этого опыта.',
+    task: 'Двигайте магнит так, чтобы стрелка гальванометра отклонилась больше чем на 3 деления вправо и больше чем на 3 влево. Потом оставьте магнит внутри катушки и посмотрите на стрелку.',
+    hint: 'Тяните магнит пальцем или мышкой либо жмите «Внести» и «Вынуть». Стрелка еле шевелится? Двигайте быстрее или возьмите катушку с большим числом витков.',
+    stage: 'Тяните магнит к катушке и обратно.',
+    N0: 200, turns: [100, 200, 400], thr: 3,
+    check: m => m.pos && m.neg && m.rest },
+  { id: 'generator', title: 'Генератор переменного тока',
+    text: ['Генератор превращает механическую энергию в электрическую. В простейшем генераторе рамка из провода вращается между полюсами магнита. Поток через рамку всё время меняется, и в ней наводится ЭДС. Ток снимают через кольца и щётки.',
+           'Когда рамка стоит поперёк линий поля, поток самый большой, но в этот миг почти не меняется — ЭДС равна нулю. Когда рамка повёрнута вдоль линий, поток проходит через ноль быстрее всего — ЭДС наибольшая. За один оборот ЭДС дважды меняет знак: получается переменный ток, его график — синусоида.',
+           'Амплитуда ЭДС: ℰₘ = N · B · S · ω, где ω = 2πn — угловая скорость, n — число оборотов в секунду. Частота тока ν равна n. В сети Казахстана частота 50 Гц.'],
+    why: 'Турбины электростанций крутят генераторы так, чтобы частота в сети держалась ровно 50 Гц, — за этим круглые сутки следят диспетчеры системного оператора KEGOC. Автоэлектрики чинят автомобильные генераторы, которые на ходу заряжают аккумулятор. Дизель-генераторы выручают стройки, фермы и больницы при отключениях. Инженер-энергетик — одна из самых востребованных профессий в стране.',
+    safe: 'Напряжение генератора и розетки опасно для жизни. Подключать генератор к домашней сети должен только электрик.',
+    task: 'Настройте генератор как на электростанции: частота 50 Гц и амплитуда ЭДС от 300 до 330 В — столько даёт розетка «220 В».',
+    hint: 'Частота равна числу оборотов в секунду. Амплитуду ℰₘ = N · B · S · 2πn меняйте числом витков рамки. Напряжение 220 В в розетке — действующее, его амплитуда около 311 В.',
+    stage: 'Меняйте обороты и число витков рамки.',
+    B: 0.5, Sa: 0.04, turns: [10, 20, 50, 100], n0: 10, N0: 20,
+    check: m => m.f === 50 && m.Em >= 300 && m.Em <= 330 },
+  { id: 'transformer', title: 'Трансформатор',
+    text: ['Трансформатор — две катушки на общем стальном сердечнике. Переменный ток в первичной обмотке создаёт в сердечнике переменный магнитный поток. Поток пронизывает вторичную обмотку и наводит в ней напряжение. Сами обмотки проводами не соединены.',
+           'Напряжения относятся как числа витков: U₁ / U₂ = N₁ / N₂ = k, k — коэффициент трансформации. Если во вторичной обмотке витков меньше, трансформатор понижающий, если больше — повышающий.',
+           'Постоянный ток создаёт постоянный поток, он не меняется — и во вторичной обмотке напряжения нет. Поэтому трансформатор работает только на переменном токе. Мощность почти не теряется: во сколько раз растёт напряжение, во столько же раз падает сила тока.'],
+    why: 'От Экибастуза электричество идёт по линиям 500 и 1150 кВ: при высоком напряжении ток меньше, и провода меньше греются впустую. У города подстанции понижают напряжение до 10 кВ, а трансформатор во дворе — до 220 В. В зарядке телефона тоже есть трансформатор, только маленький. Электромонтёры подстанций и проектировщики сетей нужны в каждом городе и хорошо зарабатывают.',
+    safe: 'Трансформаторные будки и подстанции — смертельно опасное напряжение. Не заходите за ограждение, не подходите к упавшим проводам, сообщайте о них по номеру 112.',
+    task: 'Получите на выходе 12 В — как для галогенной лампы. Потом соберите повышающий трансформатор на 1100 В. И проверьте, что будет с постоянным током.',
+    hint: 'U₂ = U₁ · N₂ / N₁, а U₁ = 220 В. Витки меняйте кнопками N₁ и N₂. Для опыта с постоянным током нажмите «= Постоянный».',
+    stage: 'Меняйте витки обмоток и род тока.',
+    U1: 220, n1s: [110, 220, 550, 1100, 2200], n2s: [6, 12, 30, 60, 120, 550, 1100, 2200],
+    check: m => m.g12 && m.gUp && m.dc },
+  { id: 'emwaves', title: 'Электромагнитные волны',
+    text: ['Переменный ток в антенне создаёт вокруг неё меняющееся магнитное поле, а меняющееся магнитное поле порождает электрическое — это та же индукция. Поля поддерживают друг друга и уходят от антенны: рождается электромагнитная волна. Её предсказал Максвелл, а на опыте получил Герц в 1888 году.',
+           'В волне векторы E и B колеблются перпендикулярно друг другу и направлению движения — волна поперечная. В вакууме она бежит со скоростью света c = 3 · 10⁸ м/с, и среда ей не нужна.',
+           'Длина волны λ = c / ν. Радиоволны, инфракрасное излучение, видимый свет, ультрафиолет, рентген и гамма-лучи — всё это электромагнитные волны. Они отличаются только частотой и длиной волны.'],
+    why: 'На электромагнитных волнах держится вся связь: радио, телевидение, мобильные сети 4G и 5G, Wi-Fi, GPS, спутники KazSat. Радиоинженеры настраивают вышки связи, врачи-рентгенологи делают снимки, а микроволновка греет еду волнами 2,45 ГГц. Специалисты по связи и телекоммуникациям — одни из самых высокооплачиваемых инженеров.',
+    safe: 'Ультрафиолет обжигает кожу и глаза — летом нужны крем от солнца и тёмные очки. Рентген и гамма-лучи ионизируют вещество, поэтому снимки делают только по назначению врача и с защитным фартуком.',
+    task: 'Найдите частоту FM-радио, при которой длина волны ровно 3 м. Потом сдвиньте частоту в видимый свет и в рентгеновские лучи.',
+    hint: 'λ = c / ν, c = 3 · 10⁸ м/с. Каждое большое деление шкалы — частота в 10 раз больше. Видимый свет — длины волн от 380 до 760 нм.',
+    stage: 'Меняйте частоту волны.',
+    e0: 6,
+    check: m => m.fm && m.vis && m.xr },
+];
+
+const LS_KEY = 'luch-phys-induction';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+
+// ---------- geometry (SVG units; scene 520 × 405) ----------
+const F1 = { xc: 330, y: 190, x0: 260, x1: 400, ry: 44, half: 65, xmin: 70, w: 22, d0: 100, K: 1.5, fast: 400, slow: 120 };
+const gF = d => 1 / (1 + Math.exp((d - F1.d0) / F1.w));   // share of the max flux through the coil
+const G2 = { ax: 260, y0: 125, y1: 215, hw: 80, gy: 348, gx0: 50, gx1: 470, win: 0.08, sc: 44 / 800 };
+const T3 = { x0: 150, x1: 370, y0: 120, y1: 300, th: 30 };
+const W4 = { y: 190, x0: 70, x1: 470, sx0: 30, sx1: 490, sy: 300 };
+const C_LIGHT = 3e8;
+const BANDS = [
+  { n: 'радиоволны', s: 'радио', min: 1e-3, col: '#c3a8ff' },
+  { n: 'инфракрасное', s: 'ИК', min: 7.6e-7, col: '#ff8a73' },
+  { n: 'видимый свет', s: 'свет', min: 3.8e-7, col: 'vis' },
+  { n: 'ультрафиолет', s: 'УФ', min: 1e-8, col: '#9d7cff' },
+  { n: 'рентген', s: 'рентген', min: 1e-11, col: '#72d4e8' },
+  { n: 'гамма-лучи', s: 'гамма', min: 0, col: '#86e0a8' },
+];
+const bandOf = lam => BANDS.find(b => lam >= b.min);
+const EX = { 'радиоволны': 'радио, ТВ, мобильная связь, Wi-Fi, микроволновка', 'инфракрасное': 'пульт от ТВ, тепловизор, тепло от батареи', 'видимый свет': 'всё, что видит глаз: от красного до фиолетового', 'ультрафиолет': 'загар, обеззараживание воды, проверка купюр', 'рентген': 'снимки костей, досмотр багажа', 'гамма-лучи': 'радиоактивный распад, лечение опухолей' };
+function lamCmp(l) {
+  if (l >= 1e3) return 'как улица или город';
+  if (l >= 10) return 'как дом или двор';
+  if (l >= 1) return 'как рост человека';
+  if (l >= 0.1) return 'как ладонь или тетрадь';
+  if (l >= 1e-2) return 'как монета';
+  if (l >= 1e-3) return 'как песчинка';
+  if (l >= 1e-5) return 'как толщина волоса';
+  if (l >= 1e-6) return 'как бактерия';
+  if (l >= 1e-8) return 'как вирус';
+  if (l >= 1e-10) return 'как молекула';
+  if (l >= 1e-12) return 'как атом';
+  return 'меньше атома — как ядро';
+}
+function fHz(f) {
+  if (f >= 1e15) return sci(f) + ' Гц';
+  for (const [k, u] of [[1e12, 'ТГц'], [1e9, 'ГГц'], [1e6, 'МГц'], [1e3, 'кГц'], [1, 'Гц']]) if (f >= k * 0.9995) return sig3(f / k) + ' ' + u;
+  return sig3(f) + ' Гц';
+}
+function lamFmt(l) {
+  for (const [k, u] of [[1e3, 'км'], [1, 'м'], [1e-2, 'см'], [1e-3, 'мм'], [1e-6, 'мкм'], [1e-9, 'нм'], [1e-12, 'пм']]) if (l >= k * 0.9995) return sig3(l / k) + ' ' + u;
+  return sci(l) + ' м';
+}
+
+function resetState() {
+  const Ls = L();
+  Object.assign(S, {
+    mx: 110, pmx: 110, mv: 0, I: 0, nd: 0, pol: 1, N: Ls.N0 || 200, speed: 'fast', go: null, pos: false, neg: false, rest: false, moved: false, still: 0, peak: 0,
+    n: Ls.n0 || 10, th: 0.5, N1: 220, N2: 120, src: 'ac', g12: false, gUp: false, dc: false, ph: 0,
+    e: Ls.e0 || 6, fm: false, vis: false, xr: false, wph: 0, hl: null,
+  });
+}
+resetState();
+
+function model() {
+  const id = LID(), Ls = L();
+  if (id === 'faraday') { const d = F1.xc - S.mx, g = gF(d); return { kind: id, d, g, rate: g * (1 - g) / F1.w * S.mv, I: S.I, v: S.mv, N: S.N, pos: S.pos, neg: S.neg, rest: S.rest }; }
+  if (id === 'generator') { const w = 2 * Math.PI * S.n, Em = S.N * Ls.B * Ls.Sa * w; return { kind: id, f: S.n, w, Em, Urms: Em / Math.SQRT2, e: Em * Math.sin(S.th), N: S.N }; }
+  if (id === 'transformer') { const ac = S.src === 'ac', U2 = ac ? Ls.U1 * S.N2 / S.N1 : 0; return { kind: id, ac, U2, k: S.N1 / S.N2, g12: S.g12, gUp: S.gUp, dc: S.dc }; }
+  const f = 10 ** S.e, lam = C_LIGHT / f;
+  return { kind: id, e: S.e, f, lam, band: bandOf(lam), fm: S.fm, vis: S.vis, xr: S.xr };
+}
+
+// ---------- drawing helpers ----------
+const T = (x, y, s, fill, txt, anchor = 'middle', extra = '') => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${s}" fill="${fill}" text-anchor="${anchor}" ${extra}>${txt}</text>`;
+const halo = `paint-order="stroke" stroke="${INK}" stroke-width="3"`;
+function arrow(x1, y1, x2, y2, col, w = 3) {
+  const a = Math.atan2(y2 - y1, x2 - x1), L2 = Math.hypot(x2 - x1, y2 - y1); if (L2 < 1) return '';
+  const hl = Math.min(10, L2 * 0.8), hx = x2 - hl * Math.cos(a), hy = y2 - hl * Math.sin(a);
+  const p1 = `${(hx + 5 * Math.sin(a)).toFixed(1)} ${(hy - 5 * Math.cos(a)).toFixed(1)}`, p2 = `${(hx - 5 * Math.sin(a)).toFixed(1)} ${(hy + 5 * Math.cos(a)).toFixed(1)}`;
+  return `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${hx.toFixed(1)} ${hy.toFixed(1)}" stroke="${col}" stroke-width="${w}" stroke-linecap="round"/><path d="M${x2.toFixed(1)} ${y2.toFixed(1)}L${p1}L${p2}Z" fill="${col}"/>`;
+}
+const bg = () => `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern>
+  <linearGradient id="vis" x1="0" x2="1"><stop offset="0" stop-color="#ff4d4d"/><stop offset=".25" stop-color="#ffb547"/><stop offset=".45" stop-color="#f5f06a"/><stop offset=".62" stop-color="#5fe08a"/><stop offset=".8" stop-color="#5fb4ff"/><stop offset="1" stop-color="#9d5cff"/></linearGradient>
+  <radialGradient id="glow"><stop offset="0" stop-color="#ffe7a8" stop-opacity=".9"/><stop offset="1" stop-color="#ffb547" stop-opacity="0"/></radialGradient></defs>
+  <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+
+// ---------- lesson 1: magnet and coil ----------
+function nTurnsVis(N) { return N <= 100 ? 6 : N <= 200 ? 10 : 16; }
+function faradayScene() {
+  const y = F1.y, ry = F1.ry, nt = nTurnsVis(S.N), I = S.I, a = clamp(Math.abs(I) / 8, 0, 1);
+  let back = '', front = '';
+  for (let i = 0; i < nt; i++) {
+    const x = F1.x0 + 6 + (F1.x1 - F1.x0 - 12) * i / (nt - 1);
+    back += `<path d="M${x.toFixed(1)} ${y - ry}A10 ${ry} 0 0 0 ${x.toFixed(1)} ${y + ry}" fill="none" stroke="#7a5530" stroke-width="3.2"/>`;
+    front += `<path d="M${x.toFixed(1)} ${y - ry}A10 ${ry} 0 0 1 ${x.toFixed(1)} ${y + ry}" fill="none" stroke="${CU}" stroke-width="3.4"/>`;
+    if (a > 0.04) front += `<path d="M${x.toFixed(1)} ${y - ry}A10 ${ry} 0 0 1 ${x.toFixed(1)} ${y + ry}" fill="none" stroke="${CP}" stroke-width="3.4" opacity="${(a * 0.9).toFixed(2)}"/>`;
+  }
+  // stand
+  let h = `<rect x="250" y="238" width="160" height="9" rx="3" fill="#3b4258" stroke="${INK}" stroke-width="1.4"/>`;
+  // wires to the galvanometer
+  h += `<path d="M${F1.x0 + 6} ${y + ry - 2}C238 250 232 330 266 330M${F1.x1 - 6} ${y + ry - 2}C422 250 428 330 394 330" fill="none" stroke="#c46a5a" stroke-width="2.4"/>`;
+  h += back;
+  // field lines of the magnet
+  const l = S.mx - F1.half, r = S.mx + F1.half;
+  for (const k of [1, 2]) {
+    h += `<path d="M${r} ${y}C${r + 34 * k} ${y - 38 * k} ${l - 34 * k} ${y - 38 * k} ${l} ${y}M${r} ${y}C${r + 34 * k} ${y + 38 * k} ${l - 34 * k} ${y + 38 * k} ${l} ${y}" fill="none" stroke="${MUT}" stroke-width="1.2" stroke-dasharray="4 5" opacity=".45"/>`;
+  }
+  // magnet: right end faces the coil
+  const nR = S.pol > 0, cR = nR ? RED : C1, cL = nR ? C1 : RED;
+  h += `<g data-drag="mag"><rect x="${l - 10}" y="${y - 30}" width="${2 * F1.half + 20}" height="60" fill="transparent"/>`;
+  h += `<rect x="${l}" y="${y - 17}" width="${F1.half}" height="34" rx="3" fill="${cL}" stroke="${INK}" stroke-width="2"/><rect x="${S.mx}" y="${y - 17}" width="${F1.half}" height="34" rx="3" fill="${cR}" stroke="${INK}" stroke-width="2"/>`;
+  h += T(l + 16, y + 6, 15, INK, nR ? 'S' : 'N', 'middle', 'font-weight="500"') + T(r - 16, y + 6, 15, INK, nR ? 'N' : 'S', 'middle', 'font-weight="500"') + `</g>`;
+  h += front;
+  // induced current arrows and induced pole of the coil (Lenz)
+  if (Math.abs(I) > 0.5) {
+    for (const i of [1, nt - 2]) {
+      const x = F1.x0 + 6 + (F1.x1 - F1.x0 - 12) * i / (nt - 1) + 10;
+      h += I > 0 ? arrow(x, y + 14, x, y - 14, CP, 2.4) : arrow(x, y - 14, x, y + 14, CP, 2.4);
+    }
+    const leftN = I > 0;
+    h += `<circle cx="${F1.x0 - 2}" cy="${y - ry - 16}" r="11" fill="${leftN ? RED : C1}" stroke="${INK}" stroke-width="1.6"/>` + T(F1.x0 - 2, y - ry - 12, 11, INK, leftN ? 'N' : 'S', 'middle', 'font-weight="500"');
+    h += T(F1.x0 + 14, y - ry - 12, 10, '#a9b4c9', S.mv > 0 ? 'катушка отталкивает магнит' : 'катушка притягивает магнит', 'start', halo);
+  }
+  h += T(F1.xc, y + ry + 36, 10, MUT, `катушка · ${S.N} витков`, 'middle');
+  // galvanometer
+  const gx = 330, gy = 362, R = 56;
+  h += `<rect x="266" y="284" width="128" height="88" rx="10" fill="#e8ecf4" stroke="${INK}" stroke-width="2"/>`;
+  h += `<path d="M${gx - R * Math.sin(Math.PI / 3)} ${gy - R * Math.cos(Math.PI / 3)}A${R} ${R} 0 0 1 ${gx + R * Math.sin(Math.PI / 3)} ${gy - R * Math.cos(Math.PI / 3)}" fill="none" stroke="#5d6a86" stroke-width="1.4"/>`;
+  for (let v = -10; v <= 10; v += 2) {
+    const an = v * 6 * Math.PI / 180, s1 = Math.sin(an), c1 = Math.cos(an), ln = v % 10 === 0 ? 9 : 5;
+    h += `<path d="M${(gx + R * s1).toFixed(1)} ${(gy - R * c1).toFixed(1)}L${(gx + (R - ln) * s1).toFixed(1)} ${(gy - (R - ln) * c1).toFixed(1)}" stroke="#2a3348" stroke-width="1.4"/>`;
+    if (v % 10 === 0) h += T(gx + (R + 9) * s1, gy - (R + 9) * c1 + 3, 9, '#2a3348', v > 0 ? '+10' : fmt(v, 0));
+  }
+  const an = clamp(S.nd, -11, 11) * 6 * Math.PI / 180;
+  h += `<path d="M${gx} ${gy}L${(gx + (R - 6) * Math.sin(an)).toFixed(1)} ${(gy - (R - 6) * Math.cos(an)).toFixed(1)}" stroke="#d6453a" stroke-width="2.2" stroke-linecap="round"/><circle cx="${gx}" cy="${gy}" r="4" fill="#2a3348"/>`;
+  h += T(280, 366, 11, '#2a3348', 'G', 'middle', 'font-weight="500"');
+  h += T(gx, 388, 10, MUT, 'гальванометр', 'middle');
+  return h;
+}
+
+// ---------- lesson 2: generator ----------
+function generatorScene() {
+  const m = model(), ax = G2.ax, y0 = G2.y0, y1 = G2.y1;
+  let h = '';
+  // poles
+  h += `<rect x="90" y="110" width="60" height="120" rx="5" fill="${RED}" stroke="${INK}" stroke-width="2"/>` + T(120, 177, 22, INK, 'N', 'middle', 'font-weight="500"');
+  h += `<rect x="370" y="110" width="60" height="120" rx="5" fill="${C1}" stroke="${INK}" stroke-width="2"/>` + T(400, 177, 22, INK, 'S', 'middle', 'font-weight="500"');
+  for (let yy = 125; yy <= 215; yy += 22) h += `<path d="M152 ${yy}H368" stroke="${MUT}" stroke-width="1.1" stroke-dasharray="5 6" opacity=".55"/><path d="M${(ax - 70)} ${yy}l-7 -3.5v7z" fill="${MUT}" opacity=".7"/>`;
+  h += T(ax + 60, 104, 10, MUT, 'линии поля B →', 'middle');
+  // axis
+  h += `<path d="M${ax} 100V270" stroke="#a9b4c9" stroke-width="3"/>`;
+  // frame
+  const s = Math.sin(S.th), c = Math.cos(S.th), hw = G2.hw * s, frontish = c >= 0;
+  const xl = ax - Math.abs(hw), xr = ax + Math.abs(hw);
+  h += `<path d="M${xl.toFixed(1)} ${y0}H${xr.toFixed(1)}V${y1}H${xl.toFixed(1)}Z" fill="rgba(217,149,79,${(0.06 + 0.12 * Math.abs(s)).toFixed(2)})" stroke="${frontish ? CU : '#9c6a3a'}" stroke-width="${Math.abs(hw) < 2 ? 6 : 4}" stroke-linejoin="round"/>`;
+  if (Math.abs(s) > 0.25 && S.n > 0) {
+    const up = s > 0;
+    h += up ? arrow(xl, y0 + 70, xl, y0 + 25, CP, 2.6) + arrow(xr, y0 + 25, xr, y0 + 70, CP, 2.6) : arrow(xl, y0 + 25, xl, y0 + 70, CP, 2.6) + arrow(xr, y0 + 70, xr, y0 + 25, CP, 2.6);
+  }
+  // rings, brushes, wires, lamp
+  h += `<ellipse cx="${ax}" cy="252" rx="13" ry="4.5" fill="#b9c2d4" stroke="${INK}" stroke-width="1.4"/><ellipse cx="${ax}" cy="266" rx="13" ry="4.5" fill="#b9c2d4" stroke="${INK}" stroke-width="1.4"/>`;
+  h += `<rect x="${ax - 24}" y="248" width="10" height="8" fill="#5d6a86"/><rect x="${ax + 14}" y="262" width="10" height="8" fill="#5d6a86"/>`;
+  h += `<path d="M${ax - 24} 252H200V284H460V276M${ax + 24} 266H480V276" fill="none" stroke="#c46a5a" stroke-width="2.2"/>`;
+  const br = S.n > 0 ? clamp(m.Urms / 220, 0, 1.3) : 0, lx = 470, ly = 256;
+  if (br > 0.03) h += `<circle cx="${lx}" cy="${ly}" r="${(18 + 26 * Math.min(br, 1)).toFixed(1)}" fill="url(#glow)" opacity="${Math.min(1, br).toFixed(2)}"/>`;
+  h += `<circle cx="${lx}" cy="${ly}" r="14" fill="${br > 0.03 ? `rgba(255,226,150,${(0.25 + 0.7 * Math.min(br, 1)).toFixed(2)})` : '#2a3348'}" stroke="${INK}" stroke-width="1.8"/><rect x="${lx - 8}" y="${ly + 12}" width="16" height="10" rx="2" fill="#5d6a86" stroke="${INK}" stroke-width="1.4"/>`;
+  h += T(lx, ly - 24, 9, br > 1.1 ? RED : MUT, br > 1.1 ? 'перегрузка!' : 'лампа 220 В', 'middle', halo);
+  h += T(ax, 290, 9, MUT, reduce ? 'рамка показана в одном положении' : 'вращение показано замедленно', 'middle');
+  // graph e(t)
+  const gy = G2.gy, gx0 = G2.gx0, gx1 = G2.gx1;
+  h += `<rect x="36" y="300" width="448" height="98" rx="10" fill="#121a28" stroke="#26324a"/>`;
+  h += `<path d="M${gx0} ${gy}H${gx1}" stroke="${MUT}" stroke-width="1"/>`;
+  for (const v of [311, -311]) h += `<path d="M${gx0} ${(gy - v * G2.sc).toFixed(1)}H${gx1}" stroke="${OK}" stroke-width="1" stroke-dasharray="3 4" opacity=".7"/>`;
+  h += T(gx1 + 4, gy - 311 * G2.sc + 3, 8.5, OK, '311', 'start') + T(gx1 + 4, gy + 3, 8.5, MUT, '0', 'start');
+  let p = '';
+  for (let i = 0; i <= 240; i++) {
+    const t = i / 240 * G2.win, e = m.Em * Math.sin(2 * Math.PI * S.n * t), yy = clamp(gy - e * G2.sc, 302, 396);
+    p += (i ? 'L' : 'M') + (gx0 + (gx1 - gx0) * i / 240).toFixed(1) + ' ' + yy.toFixed(1);
+  }
+  h += `<path d="${p}" fill="none" stroke="${CP}" stroke-width="2"/>`;
+  for (let k = 0; k <= 80; k += 20) h += T(gx0 + (gx1 - gx0) * k / 80, 396, 8.5, MUT, k + (k === 80 ? ' мс' : ''));
+  if (S.n > 0) {
+    const td = ((S.th % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI) / (2 * Math.PI * S.n);
+    if (td <= G2.win) { const xd = gx0 + (gx1 - gx0) * td / G2.win, yd = clamp(gy - m.e * G2.sc, 302, 396); h += `<circle cx="${xd.toFixed(1)}" cy="${yd.toFixed(1)}" r="4.5" fill="${CP}" stroke="${INK}" stroke-width="1.4"/>`; }
+  }
+  h += T(46, 314, 9.5, '#a9b4c9', 'ЭДС e, В', 'start');
+  return h;
+}
+
+// ---------- lesson 3: transformer ----------
+function coilTurns(N, x, y0, y1, w) {
+  const n = Math.round(4 + 14 * Math.log(N / 6) / Math.log(2200 / 6));
+  let s = '';
+  for (let i = 0; i < n; i++) { const y = y0 + (y1 - y0) * i / (n - 1); s += `<path d="M${x - w / 2 - 6} ${(y + 3).toFixed(1)}L${x + w / 2 + 6} ${(y - 3).toFixed(1)}" stroke="${CU}" stroke-width="3.2" stroke-linecap="round"/>`; }
+  return s;
+}
+function transformerScene() {
+  const m = model(), Ls = L(), t = T3;
+  let h = '';
+  // core
+  h += `<path d="M${t.x0} ${t.y0}H${t.x1}V${t.y1}H${t.x0}ZM${t.x0 + t.th} ${t.y0 + t.th}V${t.y1 - t.th}H${t.x1 - t.th}V${t.y0 + t.th}Z" fill="#4a5470" fill-rule="evenodd" stroke="${INK}" stroke-width="2"/>`;
+  for (let yy = t.y0 + 6; yy < t.y1; yy += 6) h += `<path d="M${t.x0} ${yy}h${t.th}M${t.x1 - t.th} ${yy}h${t.th}" stroke="#3a4360" stroke-width="1"/>`;
+  // flux arrows in the core
+  const ph = m.ac ? Math.cos(S.ph) : 1, mag = Math.abs(ph);
+  if (mag > 0.05) {
+    const cx0 = t.x0 + t.th / 2, cx1 = t.x1 - t.th / 2, cy0 = t.y0 + t.th / 2, cy1 = t.y1 - t.th / 2, L0 = 22 * mag, dir = ph > 0 ? 1 : -1, col = CP;
+    const mx = (cx0 + cx1) / 2, my = (cy0 + cy1) / 2;
+    h += arrow(mx - dir * L0, cy0, mx + dir * L0, cy0, col, 3) + arrow(mx + dir * L0, cy1, mx - dir * L0, cy1, col, 3);
+    h += arrow(cx1, my - dir * L0, cx1, my + dir * L0, col, 3) + arrow(cx0, my + dir * L0, cx0, my - dir * L0, col, 3);
+  }
+  h += T((t.x0 + t.x1) / 2, t.y0 - 8, 10, CP, m.ac ? 'поток Ф меняется' : 'поток Ф постоянный', 'middle', halo);
+  // coils
+  h += coilTurns(S.N1, t.x0 + t.th / 2, t.y0 + 26, t.y1 - 26, t.th) + coilTurns(S.N2, t.x1 - t.th / 2, t.y0 + 26, t.y1 - 26, t.th);
+  h += T(t.x0 + t.th / 2, t.y1 + 20, 11, '#e8ecf4', `N₁ = ${S.N1}`, 'middle', halo) + T(t.x1 - t.th / 2, t.y1 + 20, 11, '#e8ecf4', `N₂ = ${S.N2}`, 'middle', halo);
+  // source
+  h += `<path d="M70 188V${t.y0 + 26}H${t.x0 - 8}M70 232V${t.y1 - 26}H${t.x0 - 8}" fill="none" stroke="#c46a5a" stroke-width="2.2"/>`;
+  h += `<circle cx="70" cy="210" r="24" fill="#1a2438" stroke="${m.ac ? CP : C1}" stroke-width="2.4"/>` + (m.ac ? `<path d="M56 210q7 -12 14 0t14 0" fill="none" stroke="${CP}" stroke-width="2.4"/>` : `<path d="M58 205h24M63 216h14" stroke="${C1}" stroke-width="2.6"/>`);
+  h += T(70, 252, 10.5, '#e8ecf4', `U₁ = ${Ls.U1} В`, 'middle', halo) + T(70, 266, 9.5, MUT, m.ac ? 'переменный, 50 Гц' : 'постоянный', 'middle', halo);
+  // voltmeter on the secondary
+  h += `<path d="M${t.x1 + 8} ${t.y0 + 26}H455V186M${t.x1 + 8} ${t.y1 - 26}H455V236" fill="none" stroke="#c46a5a" stroke-width="2.2"/>`;
+  const hit = m.ac && (Math.abs(m.U2 - 12) < 1e-9 || Math.abs(m.U2 - 1100) < 1e-9);
+  h += `<rect x="418" y="184" width="74" height="52" rx="8" fill="#e8ecf4" stroke="${INK}" stroke-width="2"/><rect x="424" y="190" width="62" height="24" rx="4" fill="#10171f"/>`;
+  h += T(455, 207, 13, hit ? OK : '#e8ecf4', nf(m.U2), 'middle', 'font-weight="500"') + T(455, 229, 9.5, '#2a3348', 'U₂, В', 'middle');
+  h += T(455, 256, 10, m.ac ? (m.U2 > Ls.U1 ? RED : OK) : MUT, m.ac ? (m.U2 > Ls.U1 ? 'повышающий' : m.U2 < Ls.U1 ? 'понижающий' : 'k = 1') : 'нет напряжения', 'middle', halo);
+  h += T(260, 352, 11, '#a9b4c9', `k = N₁ / N₂ = ${S.N1} / ${S.N2} = ${nf(Math.round(m.k * 100) / 100)}`, 'middle', halo);
+  return h;
+}
+
+// ---------- lesson 4: electromagnetic wave ----------
+const eX = e => W4.sx0 + (W4.sx1 - W4.sx0) * (e - 4) / 16;
+function wavesScene() {
+  const m = model(), y = W4.y, lamS = clamp(300 * Math.pow(0.86, S.e - 4), 34, 300), k = 2 * Math.PI / lamS;
+  let h = '';
+  // antenna
+  h += `<path d="M50 140V246" stroke="#a9b4c9" stroke-width="3"/><path d="M38 252h24" stroke="#a9b4c9" stroke-width="3"/>`;
+  for (const r of [10, 18]) h += `<path d="M${50 + r} ${y - r}a${r * 1.3} ${r * 1.3} 0 0 1 0 ${2 * r}" fill="none" stroke="${CP}" stroke-width="1.4" opacity=".6"/>`;
+  h += T(50, 268, 9.5, MUT, m.band.n === 'радиоволны' ? 'антенна' : 'источник', 'middle');
+  // axis of propagation
+  h += `<path d="M${W4.x0} ${y}H${W4.x1 + 10}" stroke="${MUT}" stroke-width="1.2"/>` + arrow(W4.x1 + 10, y, W4.x1 + 38, y, '#e8ecf4', 2.4) + T(W4.x1 + 30, y - 10, 11, '#e8ecf4', 'c', 'middle', halo);
+  let pe = '', pb = '', stems = '';
+  const N = Math.max(120, Math.round((W4.x1 - W4.x0) / lamS * 24));
+  for (let i = 0; i <= N; i++) {
+    const x = W4.x0 + (W4.x1 - W4.x0) * i / N, s = Math.sin(k * (x - W4.x0) - S.wph);
+    pe += (i ? 'L' : 'M') + x.toFixed(1) + ' ' + (y - 52 * s).toFixed(1);
+    const b = 40 * s; pb += (i ? 'L' : 'M') + (x + b * 0.55).toFixed(1) + ' ' + (y + b * 0.38).toFixed(1);
+  }
+  const step = Math.max(6, lamS / 10);
+  for (let x = W4.x0 + step; x < W4.x1; x += step) { const s = Math.sin(k * (x - W4.x0) - S.wph); stems += `M${x.toFixed(1)} ${y}V${(y - 52 * s).toFixed(1)}`; }
+  h += `<path d="${stems}" stroke="${CP}" stroke-width="1" opacity=".35"/>`;
+  h += `<path d="${pb}" fill="none" stroke="${C1}" stroke-width="2.2"/><path d="${pe}" fill="none" stroke="${CP}" stroke-width="2.4"/>`;
+  h += T(W4.x0 + 6, y - 60, 12, CP, 'E', 'start', halo + ' font-weight="500"') + T(W4.x0 + 30, y + 44, 12, C1, 'B', 'start', halo + ' font-weight="500"');
+  // wavelength bracket (on screen, not to scale)
+  if (lamS < W4.x1 - W4.x0 - 20) {
+    const xa = W4.x0 + ((S.wph / k) % lamS + lamS) % lamS + lamS / 4, xb = xa + lamS;
+    if (xb < W4.x1) h += `<path d="M${xa.toFixed(1)} ${y - 66}V${y - 58}M${xa.toFixed(1)} ${y - 62}H${xb.toFixed(1)}M${xb.toFixed(1)} ${y - 66}V${y - 58}" stroke="#e8ecf4" stroke-width="1.2"/>` + T((xa + xb) / 2, y - 70, 10, '#e8ecf4', 'λ', 'middle', halo);
+  }
+  h += T(260, 262, 13, '#e8ecf4', `λ = ${lamFmt(m.lam)} · ${lamCmp(m.lam)}`, 'middle', halo + ' font-weight="500"');
+  h += T(260, 280, 10, MUT, `${m.band.n}: ${EX[m.band.n]}`, 'middle', halo);
+  // spectrum scale
+  const sy = W4.sy;
+  let prevE = 4;
+  for (let i = 0; i < BANDS.length; i++) {
+    const b = BANDS[i], eEnd = b.min > 0 ? Math.log10(C_LIGHT / b.min) : 20, e1 = Math.min(eEnd, 20);
+    const xa = eX(prevE), xb = eX(e1);
+    h += `<rect x="${xa.toFixed(1)}" y="${sy}" width="${(xb - xa).toFixed(1)}" height="20" fill="${b.col === 'vis' ? 'url(#vis)' : b.col}" opacity="${b.col === 'vis' ? 1 : .55}"/>`;
+    const second = b.s === 'свет' || b.s === 'гамма';
+    h += T((xa + xb) / 2, sy + (second ? 46 : 33), 9, '#a9b4c9', b.s);
+    prevE = e1;
+  }
+  h += `<rect x="${W4.sx0}" y="${sy}" width="${W4.sx1 - W4.sx0}" height="20" fill="none" stroke="#26324a"/>`;
+  for (let e = 4; e <= 20; e += 4) h += `<path d="M${eX(e)} ${sy + 20}v5" stroke="${MUT}"/>` + T(eX(e), sy + 62, 9, MUT, '10' + sup(e) + (e === 20 ? ' Гц' : ''));
+  const xm = eX(S.e);
+  h += `<path d="M${xm.toFixed(1)} ${sy - 4}V${sy + 24}" stroke="#e8ecf4" stroke-width="2"/><path d="M${xm.toFixed(1)} ${sy - 3}l-6 -9h12z" fill="#e8ecf4" stroke="${INK}" stroke-width="1"/>`;
+  h += T(eX(8), sy - 8, 8.5, OK, 'FM', 'middle') + `<path d="M${eX(8)} ${sy - 4}v4" stroke="${OK}"/>`;
+  return h;
+}
+
+function hlBox(id) {
+  const lid = LID();
+  if (lid === 'faraday') return ({ mag: [S.mx - 72, 166, 144, 48], coil: [250, 136, 160, 110], galv: [260, 280, 140, 112], wires: [226, 226, 208, 112], field: [S.mx - 140, 112, 280, 156] })[id];
+  if (lid === 'generator') return ({ poles: [[84, 104, 72, 132], [364, 104, 72, 132]], frame: [174, 116, 172, 108], rings: [230, 244, 60, 32], lamp: [440, 222, 60, 64], graph: [34, 298, 452, 102] })[id];
+  if (lid === 'transformer') return ({ core: [144, 114, 232, 192], prim: [136, 138, 58, 144], sec: [326, 138, 58, 144], src: [40, 180, 60, 92], volt: [412, 178, 86, 86] })[id];
+  return ({ ant: [32, 134, 40, 140], ew: [64, 128, 416, 66], bw: [64, 186, 440, 50], cdir: [470, 172, 46, 30], scale: [24, 284, 472, 86] })[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = bg();
+  if (id === 'faraday') h += faradayScene();
+  else if (id === 'generator') h += generatorScene();
+  else if (id === 'transformer') h += transformerScene();
+  else h += wavesScene();
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1);
+    let bs = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (bs) {
+      if (!Array.isArray(bs[0])) bs = [bs];
+      const op = reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220)));
+      for (const b of bs) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${op.toFixed(2)}"/>`;
+    }
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+let drag = null, dirty = true;
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 520, hh / 430, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 425 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer ----------
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  const p = toSvg(e);
+  drag = { id: el.dataset.drag, off: p.x - S.mx };
+  S.go = null;
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const p = toSvg(e);
+  if (drag.id === 'mag') S.mx = clamp(p.x - drag.off, F1.xmin, F1.xc);
+});
+const endDrag = () => { if (!drag) return; drag = null; scene.classList.remove('grabbing'); dirty = true; };
+scene.addEventListener('pointerup', endDrag);
+scene.addEventListener('pointercancel', endDrag);
+
+// lesson 1
+function moveMag(to) { S.go = { to, sp: S.speed === 'fast' ? F1.fast : F1.slow }; }
+function flipMag() {
+  if (F1.xc - S.mx < 150) { toast('Сначала выньте магнит из катушки, потом переворачивайте.'); return; }
+  S.pol = -S.pol; renderTools(); buildScheme(); update();
+}
+function setTurns1(N) { if (N === S.N) return; S.N = N; renderTools(); buildScheme(); update(); }
+function cycleTurns() { const ts = L().turns; const N = ts[(ts.indexOf(S.N) + 1) % ts.length]; if (LID() === 'faraday') setTurns1(N); else setTurns2(N); }
+function stepFaraday(dt) {
+  if (S.go) {
+    const dx = S.go.to - S.mx, st = S.go.sp * dt;
+    if (Math.abs(dx) <= st) { S.mx = S.go.to; S.go = null; } else S.mx += Math.sign(dx) * st;
+  }
+  const vi = (S.mx - S.pmx) / dt; S.pmx = S.mx;
+  S.mv += (vi - S.mv) * (1 - Math.exp(-dt / 0.05));
+  if (Math.abs(S.mv) < 0.05 && vi === 0) S.mv = 0;
+  const g = gF(F1.xc - S.mx);
+  S.I = F1.K * (S.N / 200) * S.pol * g * (1 - g) / F1.w * S.mv;
+  if (Math.abs(S.I) < 1e-3) S.I = 0;
+  S.nd += (S.I - S.nd) * (reduce ? 1 : 1 - Math.exp(-dt / 0.09));
+  const thr = L().thr;
+  if (Math.abs(S.I) > 1) S.moved = true;
+  if (S.I > thr && !S.pos) { S.pos = true; toast(`Стрелка вправо на ${fmt(S.I, 1)} дел.: поток через катушку растёт.`); update(); }
+  if (S.I < -thr && !S.neg) { S.neg = true; toast(`Стрелка влево на ${fmt(-S.I, 1)} дел.: поток меняется в другую сторону, и ток тоже.`); update(); }
+  if (!drag && !S.go && Math.abs(S.mv) < 1) S.still += dt; else S.still = 0;
+  if (S.moved && !S.rest && S.still > 0.6 && F1.xc - S.mx < 35) { S.rest = true; toast('Магнит внутри, но стоит — поток не меняется, тока нет. Стрелка на нуле.'); update(); }
+}
+// lesson 2
+function setN(n) { n = clamp(Math.round(n / 5) * 5, 0, 60); if (n === S.n) return; S.n = n; afterGen(); }
+function setTurns2(N) { if (N === S.N) return; S.N = N; renderTools(); buildScheme(); afterGen(); }
+function afterGen() {
+  const m = model();
+  if (S.n === 50 && !S.done.generator && (m.Em < 300 || m.Em > 330)) toast(`Частота 50 Гц есть, а амплитуда ${Math.round(m.Em)} В. Подберите число витков.`);
+  update();
+}
+// lesson 3
+function setN1(N) { S.N1 = N; afterTr(); }
+function setN2(N) { S.N2 = N; afterTr(); }
+function cycleN(k) { const Ls = L(), arr = k === 1 ? Ls.n1s : Ls.n2s, cur = k === 1 ? S.N1 : S.N2, nx = arr[(arr.indexOf(cur) + 1) % arr.length]; if (k === 1) setN1(nx); else setN2(nx); }
+function setSrc(s) { if (s === S.src) return; S.src = s; if (s === 'dc' && !S.dc) { S.dc = true; toast('Постоянный ток: поток в сердечнике не меняется, и U₂ = 0.'); } afterTr(); }
+function afterTr() {
+  const m = model();
+  if (m.ac && Math.abs(m.U2 - 12) < 1e-9 && !S.g12) { S.g12 = true; toast(`220 × ${S.N2} / ${S.N1} = 12 В. Понижающий трансформатор, k = ${nf(m.k)}.`); }
+  if (m.ac && Math.abs(m.U2 - 1100) < 1e-9 && !S.gUp) { S.gUp = true; toast(`220 × ${S.N2} / ${S.N1} = 1100 В. Витков на выходе в 5 раз больше — напряжение в 5 раз выше.`); }
+  renderTools(); buildScheme(); update();
+}
+// lesson 4
+function setE(e) {
+  e = clamp(Math.round(e * 10) / 10, 4, 20); if (e === S.e) return; S.e = e;
+  const m = model();
+  if (Math.abs(m.lam - 3) < 1e-6 && !S.fm) { S.fm = true; toast('ν = 100 МГц, λ = 3 · 10⁸ / 10⁸ = 3 м. Это диапазон FM-радио.'); }
+  if (m.band.n === 'видимый свет' && !S.vis) { S.vis = true; toast(`Видимый свет: λ = ${lamFmt(m.lam)}. Узкая полоска шкалы — всё, что видит глаз.`); }
+  if (m.band.n === 'рентген' && !S.xr) { S.xr = true; toast(`Рентген: λ = ${lamFmt(m.lam)} — меньше размера молекул, поэтому лучи проходят сквозь ткани.`); }
+  update();
+}
+
+let last = performance.now(), liveT = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, Math.max(0.001, (t - last) / 1000)); last = t;
+  const id = LID();
+  if (id === 'faraday') { stepFaraday(dt); dirty = true; }
+  if (id === 'generator' && S.n > 0 && !reduce) { S.th += 2 * Math.PI * (S.n / 100) * dt; dirty = true; }
+  if (id === 'transformer' && !reduce) { S.ph += 2 * Math.PI * 0.5 * dt; dirty = true; }
+  if (id === 'emwaves' && !reduce) { S.wph += 3 * dt; dirty = true; }
+  if (t - liveT > 160 && (id === 'faraday' || id === 'generator')) { liveT = t; live(); }
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3600); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, cls) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}${cls ? ` class="${cls}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  let h = '';
+  if (id === 'faraday') h = B('in', 'Внести', undefined, 'rec') + B('out', 'Вынуть') + sep + B('slow', 'Медленно', S.speed === 'slow') + B('fast', 'Быстро', S.speed === 'fast') + sep + B('flip', 'Перевернуть') + B('turns', `${S.N} витков`);
+  if (id === 'generator') h = B('n-', 'n −') + B('n+', 'n +') + B('n0', 'Стоп') + sep + B('turns', `${S.N} витков`);
+  if (id === 'transformer') h = B('n1', `N₁ ${S.N1}`) + B('n2', `N₂ ${S.N2}`) + sep + B('ac', '~ Переменный', S.src === 'ac') + B('dc', '= Постоянный', S.src === 'dc');
+  if (id === 'emwaves') h = B('e-1', 'ν ÷10') + B('e-', 'ν −') + B('e+', 'ν +') + B('e+1', 'ν ×10');
+  tb.innerHTML = h;
+}
+function act(a) {
+  if (a === 'in') return moveMag(F1.xc);
+  if (a === 'out') return moveMag(F1.xmin);
+  if (a === 'slow' || a === 'fast') { S.speed = a; renderTools(); buildScheme(); return; }
+  if (a === 'flip') return flipMag();
+  if (a === 'turns') return cycleTurns();
+  if (a.startsWith('t-')) { const N = +a.slice(2); return LID() === 'faraday' ? setTurns1(N) : setTurns2(N); }
+  if (a === 'n-' || a === 'n+') return setN(S.n + (a === 'n-' ? -5 : 5));
+  if (a === 'n0') return setN(0);
+  if (a === 'n1') return cycleN(1);
+  if (a === 'n2') return cycleN(2);
+  if (a.startsWith('a-')) return setN1(+a.slice(2));
+  if (a.startsWith('b-')) return setN2(+a.slice(2));
+  if (a === 'ac' || a === 'dc') return setSrc(a);
+  if (a === 'e-1' || a === 'e+1') return setE(S.e + (a === 'e-1' ? -1 : 1));
+  if (a === 'e-' || a === 'e+') return setE(S.e + (a === 'e-' ? -0.1 : 0.1));
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  mag: IC('<rect x="3" y="12" width="14" height="10" rx="2" fill="#72d4e8"/><rect x="17" y="12" width="14" height="10" rx="2" fill="#ff8a73"/>'),
+  coil: IC('<path d="M7 7a3 10 0 0 1 0 20M12 7a3 10 0 0 1 0 20M17 7a3 10 0 0 1 0 20M22 7a3 10 0 0 1 0 20M27 7a3 10 0 0 1 0 20" fill="none" stroke="#d9954f" stroke-width="2.2"/>'),
+  galv: IC('<rect x="3" y="7" width="28" height="22" rx="4" fill="#e8ecf4"/><path d="M17 25L23 12" stroke="#d6453a" stroke-width="2"/><path d="M8 18a10 10 0 0 1 18 0" fill="none" stroke="#2a3348" stroke-width="1.4"/>'),
+  wires: IC('<path d="M4 8c0 18 26 18 26 0" fill="none" stroke="#c46a5a" stroke-width="2.4"/>'),
+  field: IC('<path d="M6 17c4-12 18-12 22 0M6 17c4 12 18 12 22 0" fill="none" stroke="#8b96ad" stroke-width="1.6" stroke-dasharray="3 3"/><rect x="9" y="14" width="16" height="6" rx="1" fill="#ff8a73"/>'),
+  poles: IC('<rect x="2" y="7" width="9" height="20" rx="2" fill="#ff8a73"/><rect x="23" y="7" width="9" height="20" rx="2" fill="#72d4e8"/><path d="M12 17h10" stroke="#8b96ad" stroke-dasharray="2 2"/>'),
+  frame: IC('<rect x="9" y="6" width="16" height="20" fill="none" stroke="#d9954f" stroke-width="3"/><path d="M17 3v29" stroke="#a9b4c9" stroke-width="2"/>'),
+  rings: IC('<ellipse cx="17" cy="13" rx="9" ry="3.5" fill="#b9c2d4"/><ellipse cx="17" cy="22" rx="9" ry="3.5" fill="#b9c2d4"/><rect x="2" y="10" width="6" height="6" fill="#5d6a86"/><rect x="26" y="19" width="6" height="6" fill="#5d6a86"/>'),
+  lamp: IC('<circle cx="17" cy="14" r="9" fill="#ffe296"/><rect x="12" y="22" width="10" height="7" rx="2" fill="#5d6a86"/>'),
+  graph: IC('<path d="M2 17h30" stroke="#8b96ad"/><path d="M2 17q4-14 8 0t8 0 8 0 6-6" fill="none" stroke="#ffb547" stroke-width="2.2"/>'),
+  core: IC('<path d="M4 6h26v22H4zM11 13v8h12v-8z" fill="#4a5470" fill-rule="evenodd"/>'),
+  prim: IC('<rect x="10" y="4" width="8" height="26" fill="#4a5470"/><path d="M7 9l14-2M7 14l14-2M7 19l14-2M7 24l14-2" stroke="#d9954f" stroke-width="2.4"/>'),
+  sec: IC('<rect x="14" y="4" width="8" height="26" fill="#4a5470"/><path d="M11 12l14-2M11 20l14-2" stroke="#d9954f" stroke-width="2.4"/>'),
+  src: IC('<circle cx="17" cy="17" r="12" fill="none" stroke="#ffb547" stroke-width="2.2"/><path d="M10 17q3.5-6 7 0t7 0" fill="none" stroke="#ffb547" stroke-width="2"/>'),
+  volt: IC('<rect x="3" y="8" width="28" height="19" rx="4" fill="#e8ecf4"/><rect x="7" y="11" width="20" height="8" rx="2" fill="#10171f"/>'),
+  ant: IC('<path d="M10 4v26M5 30h10" stroke="#a9b4c9" stroke-width="2.4"/><path d="M16 12a7 7 0 0 1 0 10M21 9a12 12 0 0 1 0 16" fill="none" stroke="#ffb547" stroke-width="1.6"/>'),
+  ew: IC('<path d="M2 17h30" stroke="#8b96ad"/><path d="M2 17q4-16 8 0t8 0 8 0 8 0" fill="none" stroke="#ffb547" stroke-width="2.2"/>'),
+  bw: IC('<path d="M2 17h30" stroke="#8b96ad"/><path d="M2 17q5 9 8 0t8 0 8 0 8 0" fill="none" stroke="#72d4e8" stroke-width="2.2"/>'),
+  cdir: IC('<path d="M4 17h20" stroke="#e8ecf4" stroke-width="2.4"/><path d="M31 17l-8-5v10z" fill="#e8ecf4"/>'),
+  scale: IC('<rect x="2" y="12" width="9" height="10" fill="#c3a8ff"/><rect x="11" y="12" width="7" height="10" fill="#ff8a73"/><rect x="18" y="12" width="3" height="10" fill="#f5f06a"/><rect x="21" y="12" width="6" height="10" fill="#9d7cff"/><rect x="27" y="12" width="5" height="10" fill="#72d4e8"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  const t = (ok, s) => `${s} ${ok ? '✓' : '—'}`;
+  if (id === 'faraday') return [t(m.pos, 'вправо >3'), t(m.neg, 'влево >3'), t(m.rest, 'магнит стоит внутри')].join(' · ');
+  if (id === 'generator') return [t(m.f === 50, `ν = ${m.f} Гц`), t(m.Em >= 300 && m.Em <= 330, `ℰₘ = ${Math.round(m.Em)} В`)].join(' · ');
+  if (id === 'transformer') return [t(m.g12, '12 В'), t(m.gUp, '1100 В'), t(m.dc, 'постоянный ток')].join(' · ');
+  return [t(m.fm, 'λ = 3 м'), t(m.vis, 'свет'), t(m.xr, 'рентген')].join(' · ');
+}
+
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+const chips = (lbl, arr, cur, pre, unit) => `<div class="ctl"><div class="lbl">${lbl}</div><div class="chips">${arr.map(v => `<button data-a="${pre}${v}" aria-pressed="${cur === v}">${v}${unit || ''}</button>`).join('')}</div></div>`;
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme'), Ls = L();
+  let h = '';
+  if (id === 'faraday') h = `<h2>Магнит и катушка</h2>` + slider('inX', 'Положение магнита', F1.xmin, F1.xc, 1, S.mx) +
+      `<div class="row"><button class="ghostbtn" data-a="in">Внести</button><button class="ghostbtn" data-a="out">Вынуть</button><button class="ghostbtn" data-a="flip">Перевернуть магнит</button></div>` +
+      `<div class="ctl"><div class="lbl">Скорость кнопок</div><div class="chips"><button data-a="slow" aria-pressed="${S.speed === 'slow'}">медленно</button><button data-a="fast" aria-pressed="${S.speed === 'fast'}">быстро</button></div></div>` +
+      chips('Витков в катушке', Ls.turns, S.N, 't-') +
+      `<dl class="reads"><div><dt>ток, дел.</dt><dd id="r1"></dd></div><div><dt>скорость</dt><dd id="r2"></dd></div><div><dt>поток Ф</dt><dd id="r3"></dd></div></dl>
+      <p class="note" style="margin-top:12px">К катушке обращён полюс ${S.pol > 0 ? 'N' : 'S'}. Поток показан в долях от наибольшего — когда магнит целиком внутри.</p>`;
+  if (id === 'generator') h = `<h2>Рамка в магнитном поле</h2>` + slider('inN', 'Обороты n, об/с', 0, 60, 5, S.n) + chips('Витков в рамке N', Ls.turns, S.N, 't-') +
+      `<dl class="reads"><div><dt>частота ν</dt><dd id="r1"></dd></div><div><dt>ℰₘ</dt><dd id="r2"></dd></div><div><dt>действ. U</dt><dd id="r3"></dd></div></dl>
+      <p class="note" style="margin-top:12px">B = ${nf(Ls.B)} Тл, площадь рамки S = ${nf(Ls.Sa)} м² (20 × 20 см). Цель: 50 Гц и амплитуда 300–330 В.</p>`;
+  if (id === 'transformer') h = `<h2>Две обмотки на сердечнике</h2>` +
+      `<div class="ctl"><div class="lbl">Род тока</div><div class="chips"><button data-a="ac" aria-pressed="${S.src === 'ac'}">~ переменный</button><button data-a="dc" aria-pressed="${S.src === 'dc'}">= постоянный</button></div></div>` +
+      chips('Первичная обмотка N₁', Ls.n1s, S.N1, 'a-') + chips('Вторичная обмотка N₂', Ls.n2s, S.N2, 'b-') +
+      `<dl class="reads"><div><dt>U₁</dt><dd>${Ls.U1} В</dd></div><div><dt>k</dt><dd id="r1"></dd></div><div><dt>U₂</dt><dd id="r2"></dd></div></dl>`;
+  if (id === 'emwaves') h = `<h2>Шкала электромагнитных волн</h2>` + slider('inE', 'Частота ν', 4, 20, 0.1, S.e) +
+      `<div class="row"><button class="ghostbtn" data-a="e-1">ν ÷10</button><button class="ghostbtn" data-a="e-">ν −</button><button class="ghostbtn" data-a="e+">ν +</button><button class="ghostbtn" data-a="e+1">ν ×10</button></div>` +
+      `<dl class="reads"><div><dt>частота ν</dt><dd id="r1"></dd></div><div><dt>длина λ</dt><dd id="r2"></dd></div><div><dt>диапазон</dt><dd id="r3"></dd></div></dl>
+      <p class="note" style="margin-top:12px">Ползунок логарифмический: шаг меняет частоту примерно на 26 %, а 10 шагов — ровно в 10 раз. Длина волны на площадке не в масштабе.</p>`;
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn); };
+  on('#inX', e => { S.go = null; S.mx = clamp(+e.target.value, F1.xmin, F1.xc); });
+  on('#inN', e => setN(+e.target.value));
+  on('#inE', e => setE(+e.target.value));
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => { act(b.dataset.a); if (/^(t|a|b)-|^(slow|fast|ac|dc)$/.test(b.dataset.a)) buildScheme(); });
+  updateScheme(model());
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (id === 'faraday') { set('#inXO', `${Math.round(F1.xc - S.mx)} мм до центра`); val('#inX', S.mx); set('#r1', sgn(m.I)); set('#r2', fmt(m.v / 10, 0) + ' см/с'); set('#r3', Math.round(m.g * 100) + ' %'); }
+  if (id === 'generator') { set('#inNO', S.n + ' об/с'); val('#inN', S.n); set('#r1', m.f + ' Гц'); set('#r2', Math.round(m.Em) + ' В'); set('#r3', Math.round(m.Urms) + ' В'); }
+  if (id === 'transformer') { set('#r1', nf(Math.round(m.k * 100) / 100)); set('#r2', nf(m.U2) + ' В'); }
+  if (id === 'emwaves') { set('#inEO', fHz(m.f)); val('#inE', S.e); set('#r1', fHz(m.f)); set('#r2', lamFmt(m.lam)); set('#r3', m.band.s); }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'faraday') return [
+    { id: 'mag', icon: ICON.mag, name: 'Полосовой магнит', spec: 'Северный полюс N — красный, южный S — синий. Его можно тянуть и переворачивать.' },
+    { id: 'coil', icon: ICON.coil, name: 'Катушка', spec: 'Много витков медного провода. Чем больше витков, тем больше ЭДС.' },
+    { id: 'galv', icon: ICON.galv, name: 'Гальванометр', spec: 'Чувствительный прибор для слабого тока. Ноль посередине, стрелка показывает и силу, и направление тока.' },
+    { id: 'wires', icon: ICON.wires, name: 'Провода', spec: 'Замыкают цепь: без замкнутой цепи ЭДС есть, а тока нет.' },
+    { id: 'field', icon: ICON.field, name: 'Линии поля магнита', spec: 'Выходят из N, входят в S. Сколько их проходит сквозь витки — это и есть магнитный поток.' }];
+  if (id === 'generator') return [
+    { id: 'poles', icon: ICON.poles, name: 'Полюса магнита', spec: 'Создают однородное поле B между собой, линии идут от N к S.' },
+    { id: 'frame', icon: ICON.frame, name: 'Рамка', spec: 'N витков провода площадью S. Вращается вокруг вертикальной оси.' },
+    { id: 'rings', icon: ICON.rings, name: 'Кольца и щётки', spec: 'Кольца вращаются вместе с рамкой, щётки скользят по ним и отводят ток.' },
+    { id: 'lamp', icon: ICON.lamp, name: 'Лампа 220 В', spec: 'Нагрузка. Светит в полную силу при действующем напряжении 220 В.' },
+    { id: 'graph', icon: ICON.graph, name: 'График ЭДС', spec: 'Синусоида e(t) за 80 мс. Точка — положение рамки сейчас.' }];
+  if (id === 'transformer') return [
+    { id: 'core', icon: ICON.core, name: 'Сердечник', spec: 'Из тонких стальных пластин. Собирает и проводит магнитный поток.' },
+    { id: 'prim', icon: ICON.prim, name: 'Первичная обмотка', spec: 'N₁ витков, подключена к источнику.' },
+    { id: 'sec', icon: ICON.sec, name: 'Вторичная обмотка', spec: 'N₂ витков, к ней подключают нагрузку.' },
+    { id: 'src', icon: ICON.src, name: 'Источник 220 В', spec: 'Переменный 50 Гц или постоянный — переключается.' },
+    { id: 'volt', icon: ICON.volt, name: 'Вольтметр', spec: 'Показывает напряжение U₂ на выходе.' }];
+  return [
+    { id: 'ant', icon: ICON.ant, name: 'Антенна', spec: 'Переменный ток в ней излучает волну.' },
+    { id: 'ew', icon: ICON.ew, name: 'Электрическое поле E', spec: 'Колеблется вверх-вниз.' },
+    { id: 'bw', icon: ICON.bw, name: 'Магнитное поле B', spec: 'Колеблется перпендикулярно E, в такт с ним.' },
+    { id: 'cdir', icon: ICON.cdir, name: 'Скорость c', spec: 'Волна бежит перпендикулярно E и B со скоростью 3 · 10⁸ м/с.' },
+    { id: 'scale', icon: ICON.scale, name: 'Шкала волн', spec: 'От радиоволн до гамма-лучей. Белая метка — текущая частота.' }];
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      (Ls.safe ? `<div class="safe"><b>Безопасность</b>${Ls.safe}</div>` : '') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}" id="ovState">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Что на площадке</h2><p class="note">Нажмите на деталь, чтобы найти её на площадке.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID(), Ls = L();
+  if (id === 'faraday') {
+    const leftN = m.I > 0;
+    return `<h2>Закон индукции</h2><div class="formula">ℰ = −N · ΔΦ / Δt</div><p class="note">ЭДС тем больше, чем больше витков N и чем быстрее меняется поток Φ. Ток I = ℰ / R, R — сопротивление цепи.</p>
+      <h3>Сейчас</h3><div class="steps">` + step('витков N', S.N) + step('скорость магнита', `${fmt(m.v / 10, 0)} см/с ${m.v > 1 ? '(вносим)' : m.v < -1 ? '(вынимаем)' : '(стоит)'}`) +
+      step('поток через катушку', `${Math.round(m.g * 100)} % от наибольшего`) + step('изменение потока', `${fmt(m.rate * 100, 0)} % в секунду`) +
+      step('показание', `${sgn(m.I)} дел.`, 'sum') + `</div>
+      <h3>Рассуждение</h3><div class="steps">` +
+      step('1. Магнит движется?', Math.abs(m.v) > 1 ? 'да' : 'нет') +
+      step('2. Поток меняется?', Math.abs(m.rate) > 0.005 ? 'да' : 'нет — тока нет') +
+      step('3. Направление тока', Math.abs(m.I) > 0.5 ? (m.I > 0 ? 'стрелка вправо' : 'стрелка влево') : '—') +
+      step('4. Правило Ленца', Math.abs(m.I) > 0.5 ? `у катушки слева полюс ${leftN ? 'N' : 'S'} — она ${m.v > 0 ? 'отталкивает' : 'притягивает'} магнит` : 'ток не идёт') + `</div>
+      <p class="note" style="margin-top:10px">Модель упрощённая: шкала гальванометра в условных делениях, поток — в процентах.</p>`;
+  }
+  if (id === 'generator') {
+    const w = m.w, Em = m.Em;
+    return `<h2>ЭДС генератора</h2><div class="formula">ℰₘ = N · B · S · ω</div><div class="formula">e = ℰₘ · sin ωt</div>
+      <h3>Сейчас</h3><div class="steps">` + step('частота ν = n', `${S.n} Гц`) + step('период T = 1 / ν', S.n ? `${nf(1000 / S.n)} мс` : '—') +
+      step('ω = 2π · n', `2 × 3,14 × ${S.n} = ${nf(Math.round(w * 10) / 10)} рад/с`) +
+      step('ℰₘ = N · B · S · ω', `${S.N} × ${nf(Ls.B)} × ${nf(Ls.Sa)} × ${nf(Math.round(w * 10) / 10)} = ${nf(Math.round(Em))} В`, 'sum') +
+      step('действующее U = ℰₘ / √2', `${nf(Math.round(Em))} / 1,41 = ${nf(Math.round(m.Urms))} В`) + `</div>
+      <h3>Цель</h3><div class="steps">` + step('частота', '50 Гц') + step('амплитуда', '300–330 В (в розетке 311 В)') + step('нужно витков', 'N = ℰₘ / (B · S · ω) = ?', 'sum') + `</div>`;
+  }
+  if (id === 'transformer') {
+    const P = 60;
+    let h = `<h2>Коэффициент трансформации</h2><div class="formula">U₁ / U₂ = N₁ / N₂ = k</div><div class="formula">U₂ = U₁ · N₂ / N₁</div>
+      <h3>Сейчас</h3><div class="steps">` + step('k = N₁ / N₂', `${S.N1} / ${S.N2} = ${nf(Math.round(m.k * 100) / 100)}`) +
+      step('U₂', m.ac ? `${Ls.U1} × ${S.N2} / ${S.N1} = ${nf(m.U2)} В` : 'поток не меняется → 0 В', 'sum') +
+      step('тип', !m.ac ? 'не работает' : m.k > 1 ? 'понижающий (k > 1)' : m.k < 1 ? 'повышающий (k < 1)' : 'k = 1') + `</div>`;
+    if (m.ac) h += `<h3>Токи при лампе ${P} Вт</h3><div class="steps">` + step('I₂ = P / U₂', `${P} / ${nf(m.U2)} = ${nf(Math.round(P / m.U2 * 1000) / 1000)} А`) + step('I₁ = P / U₁', `${P} / ${Ls.U1} = ${nf(Math.round(P / Ls.U1 * 1000) / 1000)} А`) + `</div><p class="note" style="margin-top:8px">Трансформатор считаем идеальным: мощность на входе и выходе одинакова. У настоящих КПД 95–99 %.</p>`;
+    return h;
+  }
+  return `<h2>Длина волны</h2><div class="formula">λ = c / ν</div><p class="note">c = 3 · 10⁸ м/с — скорость света в вакууме.</p>
+    <h3>Сейчас</h3><div class="steps">` + step('частота ν', `${fHz(m.f)} = ${sci(m.f)} Гц`) + step('λ = c / ν', `3·10⁸ / ${sci(m.f)} = ${lamFmt(m.lam)}`, 'sum') +
+    step('период T = 1 / ν', `${sci(1 / m.f)} с`) + step('диапазон', m.band.n) + step('сравнение', lamCmp(m.lam)) + `</div>
+    <h3>Границы диапазонов</h3><div class="steps">` + step('радиоволны', 'λ > 1 мм') + step('инфракрасное', '760 нм – 1 мм') + step('видимый свет', '380–760 нм') + step('ультрафиолет', '10–380 нм') + step('рентген', '0,01–10 нм') + step('гамма', '< 0,01 нм') + `</div>
+    <p class="note" style="margin-top:8px">Границы приблизительные: диапазоны плавно переходят один в другой.</p>`;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter');
+  if (id === 'faraday') el.innerHTML = `<div class="k">Гальванометр</div><div class="v ${Math.abs(m.I) > 3 ? 'ok' : ''}">${sgn(m.I)} дел.</div><div class="lr"><span>N</span><span>${S.N}</span></div><div class="lr"><span>к катушке</span><span>${S.pol > 0 ? 'N' : 'S'}</span></div>`;
+  else if (id === 'generator') el.innerHTML = `<div class="k">Генератор</div><div class="v ${m.f === 50 && m.Em >= 300 && m.Em <= 330 ? 'ok' : ''}">ℰₘ ${Math.round(m.Em)} В</div><div class="lr"><span>ν</span><span>${m.f} Гц</span></div><div class="lr"><span>e</span><span>${Math.round(m.e)} В</span></div>`;
+  else if (id === 'transformer') el.innerHTML = `<div class="k">Выход</div><div class="v ${m.ac && (Math.abs(m.U2 - 12) < 1e-9 || Math.abs(m.U2 - 1100) < 1e-9) ? 'ok' : ''}">U₂ ${nf(m.U2)} В</div><div class="lr"><span>N₁</span><span>${S.N1}</span></div><div class="lr"><span>N₂</span><span>${S.N2}</span></div>`;
+  else el.innerHTML = `<div class="k">Волна</div><div class="v">λ ${lamFmt(m.lam)}</div><div class="lr"><span>ν</span><span>${fHz(m.f)}</span></div><div class="lr"><span></span><span>${m.band.s}</span></div>`;
+}
+
+// cheap per-frame refresh for the moving lessons
+function live() {
+  const m = model();
+  renderMeter(m);
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function update() {
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Теперь вы знаете, откуда берётся ток в розетке и как работает связь!'), 1900);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  faraday: '<rect x="4" y="11" width="12" height="8" rx="1.5" fill="#72d4e8"/><rect x="16" y="11" width="12" height="8" rx="1.5" fill="#ff8a73"/><path d="M36 6a2.5 9 0 0 1 0 18M42 6a2.5 9 0 0 1 0 18M48 6a2.5 9 0 0 1 0 18M54 6a2.5 9 0 0 1 0 18" fill="none" stroke="#d9954f" stroke-width="2"/>',
+  generator: '<rect x="4" y="6" width="9" height="18" rx="2" fill="#ff8a73"/><rect x="53" y="6" width="9" height="18" rx="2" fill="#72d4e8"/><rect x="25" y="8" width="16" height="14" fill="none" stroke="#d9954f" stroke-width="2.2"/><path d="M33 3v25" stroke="#a9b4c9" stroke-width="1.6"/>',
+  transformer: '<path d="M14 4h38v22H14zM21 10v10h24V10z" fill="#4a5470" fill-rule="evenodd"/><path d="M12 9l12-2M12 14l12-2M12 19l12-2M12 24l12-2M42 13l12-2M42 20l12-2" stroke="#d9954f" stroke-width="1.8"/>',
+  emwaves: '<path d="M2 15h62" stroke="#3a4762"/><path d="M2 15q4-12 8 0t8 0 8 0 8 0 8 0 8 0 8 0" fill="none" stroke="#ffb547" stroke-width="2"/><path d="M2 15q4 7 8 0t8 0 8 0 8 0 8 0 8 0 8 0" fill="none" stroke="#72d4e8" stroke-width="1.6"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Lx, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Lx.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Lx.title}</span></span>
+      ${S.done[Lx.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  S.lesson = i; drag = null;
+  resetState(); save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L().task;
+  $('#hint').textContent = L().stage;
+  scene.setAttribute('aria-label', LID() === 'faraday' ? 'Магнит, катушка и гальванометр. Магнит можно тянуть.' : LID() === 'generator' ? 'Рамка вращается между полюсами магнита, внизу график ЭДС.' : LID() === 'transformer' ? 'Трансформатор: две обмотки на стальном сердечнике, источник и вольтметр.' : 'Электромагнитная волна и шкала частот.');
+  renderTools(); renderStrip(); buildScheme(); update();
+  const strip = $('#lessons'), cur = strip.querySelector('.lesson[aria-current="true"]');
+  if (cur) { const br = strip.getBoundingClientRect(), cr = cur.getBoundingClientRect(); strip.scrollLeft = Math.max(0, strip.scrollLeft + (cr.left - br.left) - (br.width - cr.width) / 2); }
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '';
+  if (id === 'faraday') now = `Полосовой магнит (к катушке обращён полюс ${S.pol > 0 ? 'N' : 'S'}) находится в ${Math.round(F1.xc - S.mx)} мм от центра катушки ${m.g > 0.9 ? '(внутри катушки)' : m.g < 0.1 ? '(далеко от катушки)' : '(частично входит в катушку)'}, скорость ${fmt(m.v / 10, 0)} см/с. Катушка ${S.N} витков подключена к гальванометру, показание ${sgn(m.I)} дел. (условные деления, ноль посередине). Поток через катушку ${Math.round(m.g * 100)} % от наибольшего. Отклонение вправо больше 3 делений ${S.pos ? 'получено' : 'не получено'}, влево ${S.neg ? 'получено' : 'не получено'}, опыт «магнит стоит внутри» ${S.rest ? 'сделан' : 'не сделан'}. Наводи вопросами: что должно меняться, чтобы шёл ток, от чего зависит его сила и направление.`;
+  if (id === 'generator') now = `Рамка из ${S.N} витков площадью ${nf(Ls.Sa)} м² вращается в поле B = ${nf(Ls.B)} Тл с частотой ${S.n} об/с. Частота тока ${m.f} Гц, ω = ${nf(Math.round(m.w * 10) / 10)} рад/с, амплитуда ЭДС ${Math.round(m.Em)} В, действующее напряжение ${Math.round(m.Urms)} В. Цель: 50 Гц и амплитуда 300–330 В. Нужное число витков не называй — наводи вопросами про формулу ℰₘ = NBSω.`;
+  if (id === 'transformer') now = `Трансформатор: N₁ = ${S.N1}, N₂ = ${S.N2}, источник ${m.ac ? 'переменный 220 В, 50 Гц' : 'постоянный 220 В'}. Напряжение на выходе U₂ = ${nf(m.U2)} В, k = ${nf(Math.round(m.k * 100) / 100)}. 12 В ${S.g12 ? 'получено' : 'не получено'}, 1100 В ${S.gUp ? 'получено' : 'не получено'}, опыт с постоянным током ${S.dc ? 'сделан' : 'не сделан'}. Готовые пары витков не называй — наводи вопросами про U₂ = U₁N₂/N₁.`;
+  if (id === 'emwaves') now = `Частота волны ${fHz(m.f)} (${sci(m.f)} Гц), длина волны ${lamFmt(m.lam)}, диапазон: ${m.band.n}. На экране бегущая волна: E и B колеблются перпендикулярно друг другу и направлению движения; внизу шкала электромагнитных волн. Найдено: λ = 3 м — ${S.fm ? 'да' : 'нет'}, видимый свет — ${S.vis ? 'да' : 'нет'}, рентген — ${S.xr ? 'да' : 'нет'}. Нужную частоту не называй — наводи вопросами про λ = c/ν.`;
+  return [
+    `Раздел: физика, 9 класс, электричество и магнетизм, тема «Электромагнитная индукция». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'} (${taskState(m)}).`,
+    `Сейчас на площадке: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Помогай наводящими вопросами, готовые ответы не выдавай.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { faraday: 'Почему ток есть, только пока магнит движется?', generator: 'Почему ток в розетке переменный?', transformer: 'Почему трансформатор не работает на постоянном токе?', emwaves: 'Чем свет отличается от радиоволн?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

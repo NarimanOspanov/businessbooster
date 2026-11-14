@@ -31,7 +31,7 @@ window.LUCH_SUBJECTS = {
       { id: 'linf', b: 'fn', g: 7, t: 'Линейная функция', items: ['Что такое функция', 'y = kx + b', 'Угловой коэффициент', 'Пересечение графиков'], req: ['coord', 'expr'], status: 'done', href: '/math/', lessons: 2, doneItems: 4 },
       { id: 'fquad', b: 'fn', g: 9, t: 'Квадратичная функция', items: ['Парабола', 'Вершина и ось симметрии', 'Сдвиги и растяжения графиков'], req: ['linf', 'quad'], status: 'done', href: '/math/', lessons: 3, doneItems: 3 },
       { id: 'trig', b: 'fn', g: 10, t: 'Тригонометрия', items: ['Единичная окружность', 'Основные формулы', 'Графики синуса и косинуса', 'Тригонометрические уравнения'], req: ['fquad', 'pyth'], status: 'done', href: '/labs/math-trig/', lessons: 4, doneItems: 4 },
-      { id: 'deriv', b: 'fn', g: 10, t: 'Производная', items: ['Скорость изменения и предел', 'Правила дифференцирования', 'Касательная', 'Исследование функции'], req: ['fquad'] },
+      { id: 'deriv', b: 'fn', g: 10, t: 'Производная', items: ['Скорость изменения и предел', 'Правила дифференцирования', 'Касательная', 'Исследование функции'], req: ['fquad'], status: 'done', href: '/labs/math-deriv/', lessons: 4, doneItems: 4 },
       { id: 'integ', b: 'fn', g: 11, t: 'Интеграл', items: ['Первообразная', 'Площадь под графиком', 'Формула Ньютона — Лейбница'], req: ['deriv'] },
 
       { id: 'shapes', b: 'geo', g: 5, t: 'Наглядная геометрия', items: ['Углы и транспортир', 'Периметр и площадь', 'Объём параллелепипеда', 'Окружность и круг'], req: ['num'], status: 'done', href: '/labs/math-shapes/', lessons: 4, doneItems: 4 },
@@ -89,7 +89,7 @@ window.LUCH_SUBJECTS = {
       { id: 'orgbase', b: 'org', g: 10, t: 'Основы органики', items: ['Почему углерод особенный', 'Строение органических молекул', 'Изомерия', 'Названия веществ'], req: ['bonds'], status: 'done', href: '/labs/chem-orgbase/', lessons: 4, doneItems: 4 },
       { id: 'hydro', b: 'org', g: 10, t: 'Углеводороды', items: ['Алканы', 'Алкены и алкины', 'Арены', 'Нефть и газ'], req: ['orgbase'], status: 'done', href: '/labs/chem-hydro/', lessons: 4, doneItems: 4 },
       { id: 'oxyorg', b: 'org', g: 10, t: 'Спирты, альдегиды, кислоты', items: ['Спирты', 'Альдегиды', 'Карбоновые кислоты', 'Сложные эфиры и жиры'], req: ['hydro'], status: 'done', href: '/labs/chem-oxyorg/', lessons: 4, doneItems: 4 },
-      { id: 'biomol', b: 'org', g: 11, t: 'Молекулы жизни', items: ['Углеводы', 'Аминокислоты и белки', 'Нуклеиновые кислоты'], req: ['oxyorg'] },
+      { id: 'biomol', b: 'org', g: 11, t: 'Молекулы жизни', items: ['Углеводы', 'Аминокислоты и белки', 'Нуклеиновые кислоты'], req: ['oxyorg'], status: 'done', href: '/labs/chem-biomol/', lessons: 3, doneItems: 3 },
       { id: 'polymers', b: 'org', g: 11, t: 'Полимеры', items: ['Пластмассы', 'Волокна', 'Каучук и резина', 'Переработка пластика'], req: ['hydro'] },
 
       { id: 'home', b: 'life', g: 8, t: 'Химия дома', items: ['Моющие средства', 'Кислоты и щёлочи на кухне', 'Бытовая безопасность'], req: ['classes'], status: 'done', href: '/labs/chem-home/', lessons: 3, doneItems: 3 },
@@ -118,7 +118,7 @@ window.LUCH_SUBJECTS = {
       { id: 'chemcell', b: 'cell', g: 10, t: 'Химия клетки', items: ['Вода и минеральные вещества', 'Белки', 'Углеводы и липиды', 'ДНК и РНК'], req: ['cellst'], status: 'done', href: '/labs/bio-chemcell/', lessons: 4, doneItems: 4 },
       { id: 'metab', b: 'cell', g: 10, t: 'Обмен веществ', items: ['Ферменты', 'Фотосинтез', 'Клеточное дыхание', 'АТФ — батарейка клетки'], req: ['chemcell'], status: 'done', href: '/labs/bio-metab/', lessons: 4, doneItems: 4 },
       { id: 'division', b: 'cell', g: 10, t: 'Деление клетки', items: ['Митоз', 'Мейоз', 'Жизненный цикл клетки'], req: ['chemcell'], status: 'done', href: '/labs/bio-division/', lessons: 3, doneItems: 3 },
-      { id: 'biotech', b: 'cell', g: 11, t: 'Биотехнологии', items: ['Генная инженерия', 'Клонирование', 'ПЦР-тесты', 'Биобезопасность'], req: ['division', 'mendel'] },
+      { id: 'biotech', b: 'cell', g: 11, t: 'Биотехнологии', items: ['Генная инженерия', 'Клонирование', 'ПЦР-тесты', 'Биобезопасность'], req: ['division', 'mendel'], status: 'done', href: '/labs/bio-biotech/', lessons: 4, doneItems: 4 },
 
       { id: 'micro', b: 'div', g: 7, t: 'Бактерии, грибы, вирусы', items: ['Бактерии', 'Грибы и лишайники', 'Вирусы', 'Микробы и здоровье'], req: ['cellst'], status: 'done', href: '/labs/bio-micro/', lessons: 4, doneItems: 4 },
       { id: 'plants', b: 'div', g: 7, t: 'Растения', items: ['Корень, стебель, лист', 'Цветок и плод', 'Водоросли, мхи, папоротники', 'Голосеменные и цветковые'], req: ['tissues'], status: 'done', href: '/labs/bio-plants/', lessons: 4, doneItems: 4 },

@@ -1,0 +1,1186 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по биологии, 11 класс: биотехнологии — генная инженерия, клонирование, ПЦР-тесты, биобезопасность.">
+<title>Биотехнологии</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --leaf:#5fbf6a;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-hit]{cursor:pointer}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+.scene .lbl{font-family:var(--font-body)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .v.bad{color:var(--warn)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--arm);transition:width .2s}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:19%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 15px/1.4 var(--font-mono);text-align:center;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+.feat{display:grid;gap:6px}
+.feat div{background:var(--surface-2);border-radius:10px;padding:9px 11px;font-size:13px;line-height:1.45;border-left:4px solid var(--line)}
+.feat b{display:block;font-weight:600;font-size:13.5px;margin-bottom:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 250px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M14 7C26 13 14 27 26 33M26 7C14 13 26 27 14 33" fill="none" stroke="var(--ok)" stroke-width="1.6" stroke-linecap="round"/><path d="M16 12h8M15 20h10M16 28h8" stroke="var(--fg)" stroke-width="1.3" stroke-linecap="round"/><circle cx="20" cy="20" r="2.6" fill="var(--force)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Биология · Биотехнологии</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#bio">Карта</a><a href="/physics/#bio">Биология</a><a href="/labs/bio-biotech/" aria-current="page">Биотехнологии</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Биотехнологии</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Лабораторный стол">
+    <svg class="scene" id="scene" role="img" aria-label="Лабораторный стол с опытом. Предметы можно нажимать и перетаскивать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const f = x => (Math.round(x * 10) / 10).toString();
+const ru = (x, d = 1) => x.toFixed(d).replace('.', ',');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const KEY = 'luch-bio-biotech';
+const OK = '#86e0a8', WARN = '#ff8a73', ORA = '#ffb547', CY = '#72d4e8', VIO = '#b48cff', PINK = '#ff8fb8', MUT = '#8b96ad', LIG = '#c9d3e6';
+const SUPD = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+const sup = n => String(n).split('').map(c => c === '-' ? '⁻' : SUPD[+c]).join('');
+function big(x) { if (x < 1e4) return String(Math.round(x)); const e = Math.floor(Math.log10(x)), m = x / Math.pow(10, e); return `${ru(m, 2)}·10${sup(e)}`; }
+
+// ---------- lesson 1: genetic engineering (insulin gene into a plasmid) ----------
+const ENZ = {
+  EcoRI: { site: 'GAATTC', cut: 1, c: CY, end: '5′-выступы AATT' },
+  BamHI: { site: 'GGATCC', cut: 1, c: VIO, end: '5′-выступы GATC' },
+  PstI: { site: 'CTGCAG', cut: 5, c: PINK, end: '3′-выступы TGCA' },
+};
+const COMP = { A: 'T', T: 'A', G: 'C', C: 'G' };
+const HS = [['EcoRI', 75], ['BamHI', 135], ['EcoRI', 195]];
+const PS = [['EcoRI', 270], ['BamHI', 20], ['PstI', 150]];
+const PX = 395, PY = 205, PR = 54;
+const AMP = [110, 200], ORI = [45, 75];
+const BAC = [[150, 312, 20], [205, 300, -30], [262, 318, 10], [318, 302, 40], [372, 322, -15], [175, 352, -40], [235, 362, 25], [292, 345, -10], [350, 364, 30], [405, 348, -35], [128, 338, 5], [440, 318, 15]];
+const TRF = [1, 4, 6, 9, 11];
+const PHN = ['ДНК испорчена', 'Исходные ДНК', 'Ген вырезан', 'Ген вставлен', 'Плазмида сшита', 'Бактерии с плазмидой', 'Колонии отобраны'];
+
+// ---------- lesson 2: cloning (Dolly) ----------
+const SHEEP = {
+  A: { x: 80, face: 'w', nc: '#ffd27a', n: 'Овца A · белая морда', s: 'порода финн-дорсет' },
+  B: { x: 260, face: 'b', nc: VIO, n: 'Овца B · черномордая', s: 'даёт яйцеклетку' },
+  C: { x: 440, face: 'b', nc: MUT, n: 'Овца C · черномордая', s: 'суррогатная мать' },
+};
+const SLX = [56, 156, 256, 356, 456], SLY = 305;
+const STEPS = [['cell', 'Клетка вымени'], ['enuc', 'Убрать ядро'], ['fuse', 'Импульс тока'], ['emb', 'Эмбрион'], ['impl', 'Пересадить']];
+
+// ---------- lesson 3: PCR ----------
+const NTHR = 1e11 / 9;
+const SAMP = [
+  { k: 'kp', n: 'К+ контроль', N0: 1e5, c: OK },
+  { k: 'kn', n: 'К− контроль', N0: 0, c: MUT },
+  { k: 'p1', n: 'Пациент 1', N0: 3e3, c: CY },
+  { k: 'p2', n: 'Пациент 2', N0: 0, c: ORA },
+  { k: 'p3', n: 'Пациент 3', N0: 15, c: VIO },
+];
+const ANS = { p1: '+', p2: '−', p3: '+' };
+const ctOf = N0 => N0 > 0 ? Math.log2(NTHR / N0) : null;
+const fluo = (n, N0, k) => 0.03 + 0.97 * (N0 > 0 ? 1 / (1 + 1e11 / (N0 * Math.pow(2, n))) : 0) + 0.006 * Math.sin(n * 1.7 + k * 2.3);
+const FT = 0.03 + 0.097;
+const STN = { ds: 'двойные цепи', ss: 'цепи разошлись', pr: 'праймеры сели' };
+
+// ---------- lesson 4: biosafety levels ----------
+const BUGS = [
+  { n: 'Пекарские дрожжи', s: 'гриб', L: 1, why: 'Дрожжи не вызывают болезней у здоровых людей — с ними пекут хлеб.', q: ['нет', '—', '—', 'не нужны'] },
+  { n: 'E. coli K-12', s: 'лабораторная бактерия', L: 1, why: 'Лабораторный штамм K-12 ослаблен и не приживается в кишечнике человека.', q: ['нет', '—', '—', 'не нужны'] },
+  { n: 'Сальмонелла', s: 'бактерия', L: 2, why: 'Сальмонелла вызывает кишечную инфекцию. Заражаются через пищу и руки, болезнь лечится.', q: ['да', 'средне: кишечная инфекция', 'через пищу и грязные руки', 'антибиотики'] },
+  { n: 'Вирус гриппа', s: 'сезонный', L: 2, why: 'Сезонный грипп — частая болезнь, обычно средней тяжести. Есть вакцина и лекарства.', q: ['да', 'обычно средне', 'капельно, при кашле', 'вакцина и лекарства'] },
+  { n: 'Палочка Коха', s: 'возбудитель туберкулёза', L: 3, why: 'Туберкулёз передаётся по воздуху, болезнь тяжёлая, лечится много месяцев.', q: ['да', 'тяжело, поражает лёгкие', 'по воздуху, хватает немногих бактерий', 'лечение 6 месяцев и дольше'] },
+  { n: 'Чумная палочка', s: 'возбудитель чумы', L: 3, why: 'Чума — тяжёлая инфекция, лёгочная форма передаётся по воздуху. Лечится антибиотиками, если начать рано.', q: ['да', 'очень тяжело', 'блохи грызунов; лёгочная форма — по воздуху', 'антибиотики, если начать рано'] },
+  { n: 'Вирус Эбола', s: 'вирус', L: 4, why: 'Эбола убивает примерно каждого второго заболевшего. Заражаются через кровь и выделения больного.', q: ['да', 'крайне тяжело, умирает около половины', 'кровь и выделения больного', 'вакцина только от одного вида, лечение ограничено'] },
+  { n: 'Вирус Марбург', s: 'вирус', L: 4, why: 'Марбург смертельно опасен, а вакцины и специального лечения пока нет.', q: ['да', 'крайне тяжело', 'кровь и выделения больного', 'вакцины и специального лечения нет'] },
+];
+const BINS = [
+  { c: OK, d: 'не опасны для здоровых', ppe: 'халат, перчатки' },
+  { c: CY, d: 'умеренная опасность', ppe: '+ бокс, автоклав' },
+  { c: ORA, d: 'тяжёлые, по воздуху', ppe: '+ респиратор, шлюз' },
+  { c: WARN, d: 'смертельные', ppe: '+ скафандр, душ' },
+];
+const QN = ['Болеет ли здоровый человек?', 'Насколько тяжело?', 'Как заражаются?', 'Лечение и вакцина'];
+
+const LESSONS = [
+  { id: 'ge', title: 'Генная инженерия: инсулин из бактерий',
+    text: ['Генная инженерия — перенос нужного гена из одного организма в другой. Так получают генетически модифицированные организмы (ГМО): бактерии, растения и животных с новыми свойствами. Первым лекарством, которое стали делать бактерии, был инсулин человека (1982 год).',
+           'Инструменты генного инженера — ферменты. Рестриктазы режут ДНК только в определённых участках и часто оставляют «липкие концы» — короткие одноцепочечные хвосты. Если ген и плазмиду разрезать одной рестриктазой, их липкие концы комплементарны и слипаются. Фермент лигаза сшивает их в одну молекулу.',
+           'Плазмида — маленькая кольцевая ДНК бактерии. Она служит вектором: доставляет ген в клетку. В плазмиде есть ген устойчивости к антибиотику. После трансформации бактерии сеют на среду с антибиотиком: выживают только те, кто получил плазмиду. Бактерии не умеют вырезать интроны, поэтому им дают ген без интронов — ДНК-копию, снятую с мРНК.'],
+    why: 'Почти весь инсулин для людей с диабетом сегодня делают генно-инженерные бактерии и дрожжи. Раньше его добывали из поджелудочной железы свиней и коров. Так же получают гормон роста, факторы свёртывания крови, вакцину от гепатита B. Этим заняты молекулярные биологи, биотехнологи, инженеры биофармацевтических заводов. В Казахстане такие исследования ведёт Национальный центр биотехнологии в Астане. Навык работы с ДНК ценят и в больничных лабораториях, и в фармкомпаниях по всему миру.',
+    task: 'Получите бактерии, которые делают инсулин человека: подберите рестриктазу, вырежьте ген, вставьте его в плазмиду, сшейте, введите в бактерии и отберите их на ампициллине.',
+    hint: 'Рестриктаза должна вырезать ген целиком и не испортить ген устойчивости к ампициллину (ampR) в плазмиде. Посмотрите, где стоят флажки участков на ДНК и на плазмиде.',
+    stage: 'Выберите рестриктазу внизу и нажмите «Резать». Вырезанный ген перетащите в разрыв плазмиды.',
+    enz: 'EcoRI',
+    check: m => m.phase >= 5 },
+  { id: 'clone', title: 'Клонирование: как родилась Долли',
+    text: ['Клон — генетически точная копия организма. В природе клоны встречаются часто: однояйцевые близнецы, растения из черенка или клубня, бактерии после деления.',
+           'Животных клонируют пересадкой ядра. Из клетки тела донора берут ядро с полным, диплоидным набором хромосом. Из яйцеклетки другой самки удаляют её собственное ядро. Ядро донора переносят в пустую яйцеклетку, а слабый импульс тока запускает деление. Эмбрион пересаживают суррогатной матери.',
+           'Так в 1996 году в Шотландии родилась овечка Долли — первое млекопитающее, клонированное из клетки взрослого животного (клетки вымени). Из 277 собранных яйцеклеток родился только один ягнёнок. Растения клонировать проще: из кусочка ткани на питательной среде выращивают тысячи одинаковых растений. Это микроклональное размножение.'],
+    why: 'Микроклональное размножение — промышленная технология. Так получают здоровый посадочный материал без вирусов: картофель, клубнику, яблони. В Казахстане такие лаборатории работают при аграрных университетах и семеноводческих хозяйствах. Клонируют и ценных животных: рекордных быков, верблюдов, служебных собак. Медицина изучает терапевтическое клонирование — выращивание тканей из собственных клеток пациента, чтобы не было отторжения. Клонирование человека запрещено законами многих стран, в том числе Казахстана.',
+    task: 'Клонируйте белоголовую овцу A: возьмите её клетку, подготовьте яйцеклетку, соедините их, вырастите эмбрион и пересадите суррогатной матери.',
+    hint: 'Сначала нажмите на овцу, чьей копией будет ягнёнок. Сливать можно только клетку донора и яйцеклетку без ядра. Гены ягнёнку даёт ядро.',
+    stage: 'Нажмите на овцу — донора ядра, потом выполняйте шаги кнопками внизу по порядку.',
+    check: m => m.born && m.donor === 'A' },
+  { id: 'pcr', title: 'ПЦР-тест: копировальная машина для ДНК',
+    text: ['ПЦР — полимеразная цепная реакция. Это копирование выбранного участка ДНК в пробирке. За один цикл число копий удваивается, и за 30 циклов из одной молекулы получается около миллиарда. Метод придумал Кэри Маллис в 1983 году, за него он получил Нобелевскую премию.',
+           'Цикл состоит из трёх шагов. Денатурация при 94–98 °C: цепи ДНК расходятся. Отжиг при 50–65 °C: праймеры — короткие кусочки ДНК — садятся на цепи и отмечают начало и конец участка. Синтез при 72 °C: ДНК-полимераза достраивает новые цепи от праймеров. Полимеразу берут у бактерии из горячих источников, поэтому она не разрушается при 95 °C.',
+           'В ПЦР-тесте ищут ДНК или РНК возбудителя (РНК вирусов сначала переписывают в ДНК). Прибор после каждого цикла измеряет свечение красителя. Номер цикла, на котором свечение пересекло порог, называют Ct. Чем больше возбудителя в пробе, тем раньше растёт кривая. Контроли К+ и К− проверяют, что реакция работает и что пробирки не загрязнены.'],
+    why: 'ПЦР — ежедневная работа врачей клинической лабораторной диагностики: тесты на COVID-19, гепатиты, ВИЧ, туберкулёз. Криминалисты по капле крови или волосу получают ДНК-профиль, тем же методом устанавливают отцовство. Ветеринарные и пищевые лаборатории проверяют мясо и зерно на инфекции и ГМО. В пандемию 2020 года в Казахстане быстро открыли много новых ПЦР-лабораторий, и лаборанты с навыком ПЦР стали одними из самых нужных специалистов.',
+    task: 'Проведите вручную 3 цикла ПЦР (1 → 8 копий). Затем запустите тест и определите для трёх пациентов: результат положительный или отрицательный.',
+    hint: 'Порядок шагов в цикле: 95 °C → 55 °C → 72 °C. В тесте положительной считают пробу, у которой кривая пересекла порог раньше 35-го цикла.',
+    stage: 'Меняйте температуру кнопками. В режиме «Тест пациентов» нажимайте на «?» у проб.',
+    mode: 'man',
+    check: m => m.man3 && m.allRight },
+  { id: 'bsl', title: 'Биобезопасность: уровни защиты',
+    text: ['Биобезопасность — правила, которые защищают людей и природу от опасных микробов и от неконтролируемого распространения ГМО. Микробиологические лаборатории делят на четыре уровня биобезопасности: от BSL-1 до BSL-4. Чем опаснее возбудитель, тем выше уровень.',
+           'Уровень зависит от того, болеет ли человек, насколько тяжело, как передаётся инфекция и есть ли лечение и вакцина. На BSL-1 хватает халата, перчаток и мытья рук. BSL-2 добавляет бокс биологической безопасности и автоклав. BSL-3 — изолированный блок с пониженным давлением и респираторы. BSL-4 — защитные костюмы с подачей воздуха, шлюзы и душ на выходе.',
+           'ГМО тоже проверяют. Новое ГМ-растение исследуют на аллергенность, токсичность и на переход генов к диким родственникам. В странах ЕАЭС, включая Казахстан, продукт с долей ГМО больше 0,9 % обязан иметь маркировку. Международные правила задают Картахенский протокол по биобезопасности и Конвенция о запрещении биологического оружия.'],
+    why: 'Специалист по биобезопасности, микробиолог, эпидемиолог, инженер чистых помещений — без этих профессий не работают больницы, фармзаводы и ПЦР-лаборатории. В Казахстане есть природные очаги чумы, поэтому здесь сильная научная школа: Казахский научный центр карантинных и зоонозных инфекций имени М. Айкимбаева и НИИ проблем биологической безопасности, где создали вакцину QazVac. В быту биобезопасность — это мытьё рук, правильное хранение еды и приём антибиотиков только по назначению врача и полным курсом.',
+    note: 'Дома и в школе нельзя выращивать микробы из пищи, почвы или с кожи людей: среди них могут оказаться возбудители болезней. Опыты с микроорганизмами проводят только в лаборатории, по инструкции и под присмотром.',
+    task: 'Распределите 8 карточек с организмами по уровням биобезопасности BSL-1 — BSL-4.',
+    hint: 'Спросите себя: болеет ли здоровый человек? Насколько тяжело? Передаётся ли по воздуху? Есть ли лечение и вакцина?',
+    stage: 'Перетащите карточку в нужную колонку. Нажмите на карточку — во вкладке «Расчёты» появятся вопросы-подсказки.',
+    check: m => m.placed === 8 },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null, hrs: 10 };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+function resetGE() { S.phase = 0; S.used = null; S.gx = 135; S.gy = 150; }
+function resetCl() { S.cl = { donor: null, cell: false, enuc: false, fuse: false, emb: false, impl: false, born: false }; }
+function resetMan() { Object.assign(S.pcr, { T: 25, cyc: 0, st: 'ds', hist: [25] }); }
+function resetRT() { Object.assign(S.pcr, { run: 0, runT: null, cls: { p1: '?', p2: '?', p3: '?' }, okT: false }); }
+function resetLesson() {
+  const L = LESSONS[S.lesson];
+  S.enz = L.enz || 'EcoRI'; resetGE();
+  resetCl();
+  S.pcr = { mode: L.mode || 'man', man3: false }; resetMan(); resetRT();
+  S.bsl = { pos: {}, err: 0, sel: -1 }; S.dpos = null;
+}
+
+// ---------- models ----------
+const placedN = () => Object.keys(S.bsl.pos).length;
+const allRight = () => Object.keys(ANS).every(k => S.pcr.cls[k] === ANS[k]);
+function model() {
+  const id = LID();
+  if (id === 'ge') return { kind: 'ge', phase: S.phase, enz: S.enz, used: S.used, hrs: S.hrs, N: Math.pow(2, 3 * S.hrs) };
+  if (id === 'clone') { const c = S.cl; return { kind: 'cl', donor: c.donor, born: c.born, steps: STEPS.filter(s => c[s[0]]).length }; }
+  if (id === 'pcr') { const p = S.pcr; return { kind: 'pcr', mode: p.mode, T: p.T, cyc: p.cyc, st: p.st, copies: Math.pow(2, p.cyc), run: p.run, man3: p.man3, allRight: allRight(), nCls: Object.values(p.cls).filter(v => v !== '?').length }; }
+  return { kind: 'bsl', placed: placedN(), err: S.bsl.err, sel: S.bsl.sel };
+}
+
+// ---------- lesson 1 actions ----------
+function cutDNA() {
+  if (S.phase < 0) return toast('Эта ДНК уже испорчена. Нажмите «Сбросить» и попробуйте другую рестриктазу.');
+  if (S.phase > 0) return toast('ДНК уже разрезана. Следующий шаг — вставить ген в плазмиду.');
+  S.used = S.enz;
+  if (S.enz === 'EcoRI') { S.phase = 1; S.gx = 135; S.gy = 150; toast('EcoRI вырезала ген целиком и раскрыла плазмиду. На концах — липкие концы AATT. Перетащите ген в разрыв плазмиды.'); }
+  else if (S.enz === 'BamHI') { S.phase = -1; toast('BamHI режет внутри гена инсулина — ген распался на две части. Нажмите «Сбросить» и выберите другую рестриктазу.'); }
+  else { S.phase = -1; toast('PstI не нашла своего участка в ДНК человека — ген не вырезан. Зато она разрезала ген ampR в плазмиде: отбирать бактерии будет нечем. Сбросьте и выберите другую.'); }
+  renderTools(); update();
+}
+function dropGene() {
+  if (Math.hypot(S.gx - PX, S.gy - (PY - PR)) < 46) { S.phase = 2; toast('Ген встал в разрыв: липкие концы AATT и TTAA спарились. Но цепи ещё не сшиты — нужна лигаза.'); renderTools(); update(); }
+  else dirty = true;
+}
+function ligate() {
+  if (S.phase === 2) { S.phase = 3; toast('Лигаза сшила сахарофосфатный остов. Получилась рекомбинантная плазмида.'); }
+  else if (S.phase === 1) toast('Сначала перетащите ген в разрыв плазмиды.');
+  else if (S.phase < 1) toast('Сначала разрежьте ДНК подходящей рестриктазой.');
+  else toast('Плазмида уже сшита.');
+  renderTools(); update();
+}
+function transform() {
+  if (S.phase === 3) { S.phase = 4; toast('Бактерии E. coli после обработки солями кальция и теплового шока захватывают плазмиды. Но плазмиду получила лишь часть клеток.'); }
+  else if (S.phase < 3) toast('Сначала соберите и сшейте рекомбинантную плазмиду.');
+  else toast('Плазмиды уже в бактериях.');
+  renderTools(); update();
+}
+function plate() {
+  if (S.phase === 4) { S.phase = 5; toast('На ампициллине выжили только бактерии с плазмидой: ген ampR их защищает. Каждая выросла в колонию и делает инсулин.'); }
+  else if (S.phase < 4) toast('Сначала введите плазмиды в бактерии.');
+  else toast('Колонии уже отобраны.');
+  renderTools(); update();
+}
+
+// ---------- lesson 2 actions ----------
+function clStep(k) {
+  const c = S.cl;
+  if (c.born) return toast('Ягнёнок уже родился. Чтобы повторить опыт, нажмите «Сбросить».');
+  if (k === 'cell') {
+    if (!c.donor) return toast('Сначала нажмите на овцу, чьё ядро возьмём.');
+    if (c.cell) return toast('Клетка донора уже взята.');
+    c.cell = true; toast(`Взята клетка вымени овцы ${c.donor}. В её ядре полный набор — 54 хромосомы.`);
+  }
+  if (k === 'enuc') {
+    if (c.enuc) return toast('Ядро яйцеклетки уже удалено.');
+    c.enuc = true; toast('Из яйцеклетки овцы B тонкой пипеткой удалили ядро. Собственных хромосом в ней больше нет.');
+  }
+  if (k === 'fuse') {
+    if (!c.cell || !c.enuc) return toast('Сливать пока нечего: нужны клетка донора и яйцеклетка без ядра.');
+    if (c.fuse) return toast('Клетки уже слиты.');
+    c.fuse = true; toast('Импульс тока слил клетки и запустил деление. Теперь в яйцеклетке ядро донора.');
+  }
+  if (k === 'emb') {
+    if (!c.fuse) return toast('Сначала соедините клетку донора и яйцеклетку импульсом тока.');
+    if (c.emb) return toast('Эмбрион уже вырос.');
+    c.emb = true; toast('Клетка делится митозом: 2, 4, 8, 16 клеток… Через несколько дней эмбрион готов к пересадке.');
+  }
+  if (k === 'impl') {
+    if (!c.emb) return toast('Пересаживать пока нечего: сначала нужен эмбрион.');
+    c.born = true; c.impl = true;
+    toast(c.donor === 'A' ? 'Через 5 месяцев родился ягнёнок с белой мордой — копия овцы A, как Долли!' : 'Родился черномордый ягнёнок — копия овцы B. А по заданию нужен клон белоголовой овцы A. Нажмите «Сбросить».');
+  }
+  update();
+}
+function pickDonor(d) {
+  if (S.cl.cell) return toast('Клетка уже взята. Чтобы сменить донора, нажмите «Сбросить».');
+  S.cl.donor = d; toast(`Донор ядра — овца ${d}.`); update();
+}
+
+// ---------- lesson 3 actions ----------
+function heat(T) {
+  const p = S.pcr;
+  if (p.mode !== 'man') return;
+  p.T = T; p.hist.push(T); if (p.hist.length > 15) p.hist.shift();
+  if (T >= 90) {
+    if (p.st === 'ds') { p.st = 'ss'; toast(`${T} °C: водородные связи между цепями рвутся, цепи ДНК расходятся.`); }
+    else toast('Цепи уже разделены. Теперь нужен отжиг праймеров.');
+  } else if (T >= 50 && T <= 65) {
+    if (p.st === 'ss') { p.st = 'pr'; toast(`${T} °C: праймеры сели на свои места на цепях.`); }
+    else if (p.st === 'ds') toast('Цепи не разошлись — праймерам некуда сесть. Сначала нагрейте до 95 °C.');
+    else toast('Праймеры уже сели. Нужна температура синтеза.');
+  } else if (T >= 68 && T <= 76) {
+    if (p.st === 'pr') {
+      p.st = 'ds'; p.cyc = Math.min(p.cyc + 1, 20);
+      if (p.cyc >= 3 && !p.man3) { p.man3 = true; toast('3 цикла: из одной молекулы стало 8. Теперь переходите к тесту пациентов.'); }
+      else toast(`${T} °C: полимераза достроила цепи. Цикл ${p.cyc}: копий ${big(Math.pow(2, p.cyc))}.`);
+    } else if (p.st === 'ss') toast('Полимераза не начнёт без праймера. Сначала остудите до 55 °C.');
+    else toast('Достраивать нечего: цепи и так двойные.');
+  } else if (T < 50) toast('Слишком холодно: праймеры садятся куда попало, получатся лишние копии. Для отжига нужно 50–65 °C.');
+  else toast('При этой температуре ничего полезного не происходит. Денатурация — 94–98 °C, отжиг — 50–65 °C, синтез — 72 °C.');
+  update();
+}
+function setMode(md) { S.pcr.mode = md; renderTools(); buildScheme(); update(); }
+function runRT() {
+  const p = S.pcr;
+  if (p.runT !== null) return;
+  if (p.run >= 40) return toast('Тест уже проведён. Чтобы повторить, нажмите «Сбросить».');
+  p.run = 0; p.runT = performance.now(); update();
+}
+function toggleCls(k) {
+  const p = S.pcr;
+  if (p.run < 40) return toast('Сначала запустите тест на 40 циклов.');
+  const o = ['?', '+', '−']; p.cls[k] = o[(o.indexOf(p.cls[k]) + 1) % 3];
+  if (allRight() && !p.okT) { p.okT = true; toast('Все пробы оценены верно. У пациента 3 возбудителя мало, кривая поздняя, но результат всё равно положительный.'); }
+  update();
+}
+
+// ---------- lesson 4 actions ----------
+const cardHome = i => [6 + (i % 4) * 128, 122 + Math.floor(i / 4) * 44];
+function binSlot(i) { const j = S.bsl.pos[i]; let k = 0; for (let n = 0; n < i; n++) if (S.bsl.pos[n] === j) k++; return [6 + (j - 1) * 128, 266 + k * 42]; }
+function place(i, lvl) {
+  const b = BUGS[i];
+  if (S.bsl.pos[i]) return;
+  S.bsl.sel = i;
+  if (lvl === b.L) { S.bsl.pos[i] = lvl; toast(placedN() === 8 ? 'Все карточки на своих местах!' : `Верно: BSL-${lvl}. ${b.why}`); }
+  else { S.bsl.err++; toast(lvl < b.L ? `Для «${b.n}» защиты мало. Подумайте: насколько тяжела болезнь и как она передаётся?` : `Для «${b.n}» это лишняя защита: такой уровень дороже и сложнее, чем нужно. Попробуйте ниже.`); }
+  update();
+}
+function dropCard(i, cx, cy) {
+  if (cy > 222 && cx >= 4 && cx <= 518) place(i, clamp(Math.floor((cx - 6) / 128), 0, 3) + 1);
+  else update();
+}
+function selCard(i) { S.bsl.sel = i; if (S.bsl.pos[i]) toast(BUGS[i].why); update(); }
+
+// ---------- drawing helpers ----------
+function bench() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4000" fill="url(#tile)"/>`;
+}
+const lbl = (x, y, s, size = 10.5, fill = MUT, anchor = 'middle', extra = '') => `<text class="lbl" x="${f(x)}" y="${f(y)}" font-size="${size}" fill="${fill}" text-anchor="${anchor}" ${extra}>${s}</text>`;
+const pol = (a, r) => [PX + r * Math.cos(a * Math.PI / 180), PY + r * Math.sin(a * Math.PI / 180)];
+function arcD(a0, a1, r) { const [x0, y0] = pol(a0, r), [x1, y1] = pol(a1, r); return `M${f(x0)} ${f(y0)}A${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${f(x1)} ${f(y1)}`; }
+function arcs(a0, a1, gaps) {
+  let segs = [[a0, a1]];
+  for (const [g0, g1] of gaps) { const out = []; for (const [s0, s1] of segs) { if (g1 <= s0 || g0 >= s1) out.push([s0, s1]); else { if (g0 > s0) out.push([s0, g0]); if (g1 < s1) out.push([g1, s1]); } } segs = out; }
+  return segs;
+}
+
+// ---------- lesson 1 scene ----------
+function geScene() {
+  let h = bench();
+  const ph = S.phase;
+  // human DNA
+  const cuts = ph === -1 ? HS.filter(s => s[0] === S.used).map(s => s[1]) : ph >= 1 ? [75, 195] : [];
+  const bnd = [20, ...cuts, 250], op = ph >= 1 ? 0.35 : 1;
+  h += `<g data-hit="dna">` + lbl(135, 122, 'ДНК человека с геном инсулина', 10.5, LIG, 'middle', 'font-weight="600"');
+  h += `<rect x="14" y="118" width="244" height="62" fill="transparent"/>`;
+  for (let i = 0; i < bnd.length - 1; i++) {
+    const a = bnd[i] + (i ? 4 : 0), c = bnd[i + 1] - (i < bnd.length - 2 ? 4 : 0);
+    if (ph >= 1 && i === 1) continue;
+    h += `<path d="M${a} 146H${c}M${a} 154H${c}" stroke="${MUT}" stroke-width="2" opacity="${op}"/>`;
+  }
+  if (ph <= 0) {
+    if (cuts.includes(135)) h += `<rect x="85" y="143" width="46" height="14" rx="3" fill="${ORA}" fill-opacity=".3" stroke="${WARN}"/><rect x="139" y="143" width="46" height="14" rx="3" fill="${ORA}" fill-opacity=".3" stroke="${WARN}"/><path d="M130 136L140 164M140 136L130 164" stroke="${WARN}" stroke-width="2"/>`;
+    else h += `<rect x="85" y="143" width="100" height="14" rx="3" fill="${ORA}" fill-opacity=".3" stroke="${ORA}"/>`;
+    h += lbl(135, 174, 'ген инсулина', 9.5, ORA);
+    HS.forEach(([e, x]) => { h += `<path d="M${x} 138V162" stroke="${ENZ[e].c}" stroke-width="2"/><path d="M${x} 138l8 3-8 3z" fill="${ENZ[e].c}"/>` + lbl(x, 133, e, 8.5, ENZ[e].c); });
+  }
+  h += `</g>`;
+  // plasmid
+  const site = ph === -1 ? PS.find(s => s[0] === S.used) : null;
+  const gaps = ph === 1 ? [[262, 278]] : ph >= 2 ? [[256, 284]] : site ? [[site[1] - 8, site[1] + 8]] : [];
+  h += `<g data-hit="plasmid"><circle cx="${PX}" cy="${PY}" r="${PR + 26}" fill="transparent"/>`;
+  if (!gaps.length) h += `<circle cx="${PX}" cy="${PY}" r="${PR}" fill="none" stroke="#3a4866" stroke-width="7"/>`;
+  else arcs(0, 360, gaps).forEach(([a, b]) => { h += `<path d="${arcD(a, b, PR)}" fill="none" stroke="#3a4866" stroke-width="7"/>`; });
+  arcs(AMP[0], AMP[1], gaps).forEach(([a, b]) => { h += `<path d="${arcD(a, b, PR)}" fill="none" stroke="${OK}" stroke-width="7"/>`; });
+  h += `<path d="${arcD(ORI[0], ORI[1], PR)}" fill="none" stroke="${MUT}" stroke-width="7"/>`;
+  if (ph >= 2) {
+    h += `<path d="${arcD(256, 284, PR)}" fill="none" stroke="${ORA}" stroke-width="9"/>`;
+    if (ph === 2) [256, 284].forEach(a => { const [x, y] = pol(a, PR); h += `<circle cx="${f(x)}" cy="${f(y)}" r="3.5" fill="#ffffff"/>`; });
+  }
+  PS.forEach(([e, a]) => {
+    if (ph >= 1 && e === 'EcoRI') return;
+    const [x0, y0] = pol(a, PR - 7), [x1, y1] = pol(a, PR + 7), [lx, ly] = pol(a, PR + 17);
+    h += `<path d="M${f(x0)} ${f(y0)}L${f(x1)} ${f(y1)}" stroke="${ENZ[e].c}" stroke-width="2"/>` + lbl(lx, ly + 3, e, 8.5, ENZ[e].c);
+  });
+  if (site) { const [x, y] = pol(site[1], PR); h += `<path d="M${f(x - 6)} ${f(y - 6)}l12 12m0-12l-12 12" stroke="${WARN}" stroke-width="2"/>`; }
+  if (ph >= 2) { const [x, y] = pol(270, PR + 17); h += lbl(x, y, 'ген инсулина', 9, ORA); }
+  { const [x, y] = pol(192, PR + 26); h += lbl(x, y, 'ampR', 9.5, OK, 'middle', 'font-weight="600"'); }
+  { const [x, y] = pol(60, PR + 15); h += lbl(x, y + 3, 'ori', 9, MUT); }
+  if (ph >= 3) h += lbl(PX, PY - 2, 'рекомбинантная', 9.5, LIG) + lbl(PX, PY + 11, 'плазмида', 9.5, LIG);
+  else h += lbl(PX, PY + 4, 'плазмида', 10, LIG);
+  h += `</g>`;
+  if (ph === 1) {
+    h += `<circle cx="${PX}" cy="${PY - PR}" r="24" fill="none" stroke="${ORA}" stroke-dasharray="4 4" opacity=".8"/>`;
+    const x = S.gx, y = S.gy;
+    h += `<g data-drag="gene"><rect x="${f(x - 68)}" y="${f(y - 20)}" width="136" height="46" fill="transparent"/>`;
+    h += `<path d="M${f(x - 60)} ${f(y - 4)}H${f(x + 54)}M${f(x - 54)} ${f(y + 4)}H${f(x + 60)}" stroke="${LIG}" stroke-width="2"/>`;
+    h += `<rect x="${f(x - 46)}" y="${f(y - 7)}" width="92" height="14" rx="3" fill="${ORA}" fill-opacity=".35" stroke="${ORA}"/>`;
+    h += lbl(x, y + 22, 'тяните в разрыв плазмиды', 9, ORA) + `</g>`;
+  }
+  // lower part
+  if (ph <= 3) {
+    const E = ENZ[S.enz], x0 = 212;
+    h += `<g data-hit="enz">` + lbl(260, 268, `Участок узнавания ${S.enz}`, 10.5, E.c, 'middle', 'font-weight="600"');
+    h += `<text x="${x0 - 8}" y="298" font-size="11" fill="${MUT}" text-anchor="end">5′ ···</text><text x="${x0 + 104}" y="298" font-size="11" fill="${MUT}">··· 3′</text>`;
+    h += `<text x="${x0 - 8}" y="322" font-size="11" fill="${MUT}" text-anchor="end">3′ ···</text><text x="${x0 + 104}" y="322" font-size="11" fill="${MUT}">··· 5′</text>`;
+    E.site.split('').forEach((b, i) => { h += `<text x="${x0 + i * 16 + 8}" y="298" font-size="15" font-weight="600" fill="${LIG}" text-anchor="middle">${b}</text><text x="${x0 + i * 16 + 8}" y="322" font-size="15" font-weight="600" fill="${LIG}" text-anchor="middle">${COMP[b]}</text>`; });
+    h += `<path d="M${x0 + E.cut * 16} 282V309H${x0 + (6 - E.cut) * 16}V330" fill="none" stroke="${E.c}" stroke-width="2"/>`;
+    h += lbl(260, 350, `Режет обе цепи со сдвигом → липкие концы, ${E.end}`, 9.5, MUT) + lbl(260, 365, 'Участок — палиндром: обе цепи читаются одинаково от 5′ к 3′', 9.5, MUT) + `</g>`;
+  } else {
+    h += `<g data-hit="dish"><ellipse cx="285" cy="336" rx="186" ry="55" fill="${ph === 5 ? 'rgba(255,213,120,.10)' : 'rgba(114,212,232,.06)'}" stroke="${ph === 5 ? '#c9a95a' : '#3a4866'}" stroke-width="1.5"/>`;
+    h += lbl(285, 404, ph === 5 ? 'чашка Петри: агар с ампициллином' : 'бактерии E. coli после трансформации', 9.5, LIG);
+    BAC.forEach(([x, y, r], i) => {
+      const tr = TRF.includes(i);
+      if (ph === 5 && tr) {
+        h += `<circle cx="${x}" cy="${y}" r="14" fill="#e8d9a8" fill-opacity=".85" stroke="#c9a95a"/>`;
+        for (let k = 0; k < 5; k++) { const a = k * 1.26 + i; h += `<circle cx="${f(x + Math.cos(a) * 20)}" cy="${f(y + Math.sin(a) * 11)}" r="2" fill="${ORA}"/>`; }
+      } else {
+        const dead = ph === 5;
+        h += `<g transform="translate(${x} ${y}) rotate(${r})" opacity="${dead ? 0.35 : 1}"><rect x="-13" y="-5.5" width="26" height="11" rx="5.5" fill="${LIG}" fill-opacity=".25" stroke="${LIG}"/>`;
+        if (tr) h += `<circle cx="0" cy="0" r="3" fill="none" stroke="${ORA}" stroke-width="1.6"/>`;
+        if (dead) h += `<path d="M-6-6L6 6M6-6L-6 6" stroke="${WARN}" stroke-width="1.6"/>`;
+        h += `</g>`;
+      }
+    });
+    if (ph === 5) h += lbl(40, 300, '• инсулин', 9, ORA, 'start');
+    h += `</g>`;
+  }
+  return h;
+}
+
+// ---------- lesson 2 scene ----------
+function sheep(x, y, face, k = 1) {
+  const fc = face === 'w' ? '#f4efe2' : '#2b2b31';
+  let s = '';
+  [-22, -10, 10, 22].forEach(dx => { s += `<path d="M${f(x + dx * k)} ${f(y + 14 * k)}V${f(y + 34 * k)}" stroke="#3a3a40" stroke-width="${f(3.5 * k)}" stroke-linecap="round"/>`; });
+  s += `<ellipse cx="${x}" cy="${y}" rx="${f(36 * k)}" ry="${f(21 * k)}" fill="#e9e4d8"/>`;
+  for (let i = -2; i <= 2; i++) s += `<circle cx="${f(x + i * 13 * k)}" cy="${f(y - 16 * k)}" r="${f(8 * k)}" fill="#e9e4d8"/>`;
+  s += `<ellipse cx="${f(x + 28 * k)}" cy="${f(y - 22 * k)}" rx="${f(7 * k)}" ry="${f(3 * k)}" fill="${fc}" stroke="#0e1520" stroke-width=".6"/>`;
+  s += `<ellipse cx="${f(x + 38 * k)}" cy="${f(y - 12 * k)}" rx="${f(11 * k)}" ry="${f(14 * k)}" fill="${fc}" stroke="#0e1520" stroke-width=".8"/>`;
+  s += `<circle cx="${f(x + 42 * k)}" cy="${f(y - 16 * k)}" r="${f(1.7 * k)}" fill="${face === 'w' ? '#222' : '#ddd'}"/>`;
+  return s;
+}
+const cellC = (x, y, r, stroke, fill) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="1.6"/>`;
+function cloneScene() {
+  let h = bench();
+  const c = S.cl, dn = c.donor ? SHEEP[c.donor] : null;
+  for (const id of ['A', 'B', 'C']) {
+    const sh = SHEEP[id], sel = c.donor === id;
+    h += `<g data-hit="sh${id}"><rect x="${sh.x - 56}" y="134" width="124" height="108" rx="12" fill="${sel ? 'rgba(255,181,71,.10)' : 'rgba(26,36,56,.45)'}" stroke="${sel ? ORA : '#26324a'}" stroke-width="${sel ? 2 : 1}"/>`;
+    h += sheep(sh.x, 172, sh.face) + `<circle cx="${sh.x - 44}" cy="146" r="4.5" fill="${sh.nc}"/>`;
+    h += lbl(sh.x + 6, 223, sh.n, 9.5, LIG, 'middle', 'font-weight="600"') + lbl(sh.x + 6, 236, sh.s, 9, MUT) + `</g>`;
+  }
+  for (let i = 0; i < 4; i++) h += `<path d="M${SLX[i] + 30} ${SLY}H${SLX[i + 1] - 30}" stroke="#56627d" stroke-width="1.5"/><path d="M${SLX[i + 1] - 30} ${SLY}l-6-3.5v7z" fill="#56627d"/>`;
+  const empty = (x, t) => `<circle cx="${x}" cy="${SLY}" r="24" fill="none" stroke="#3a4866" stroke-dasharray="4 4"/>` + lbl(x, SLY + 4, t, 11, '#56627d');
+  // slot 0: donor cell
+  h += `<g data-hit="sl0">` + (c.cell ? cellC(SLX[0], SLY, 20, PINK, 'rgba(255,143,184,.12)') + `<circle cx="${SLX[0]}" cy="${SLY}" r="8" fill="${dn.nc}"/>` : empty(SLX[0], '?'));
+  h += lbl(SLX[0], 346, 'клетка вымени', 9, LIG) + lbl(SLX[0], 358, c.donor ? `овцы ${c.donor}` : 'выберите донора', 8.5, MUT) + `</g>`;
+  // slot 1: egg
+  h += `<g data-hit="sl1">` + cellC(SLX[1], SLY, 25, '#ffd27a', 'rgba(255,210,122,.08)');
+  if (c.enuc) h += `<path d="M${SLX[1] + 34} ${SLY - 22}L${SLX[1] + 8} ${SLY - 4}" stroke="${LIG}" stroke-width="2"/><circle cx="${SLX[1]}" cy="${SLY}" r="7" fill="none" stroke="#56627d" stroke-dasharray="2 2"/>`;
+  else h += `<circle cx="${SLX[1]}" cy="${SLY}" r="7" fill="${VIO}"/>`;
+  h += lbl(SLX[1], 346, 'яйцеклетка', 9, LIG) + lbl(SLX[1], 358, c.enuc ? 'без ядра' : 'овцы B, с ядром', 8.5, MUT) + `</g>`;
+  // slot 2: fused
+  h += `<g data-hit="sl2">` + (c.fuse ? cellC(SLX[2], SLY, 25, '#ffd27a', 'rgba(255,210,122,.08)') + `<circle cx="${SLX[2]}" cy="${SLY}" r="8" fill="${dn.nc}"/><path d="M${SLX[2] + 16} ${SLY - 32}l-7 12h6l-7 12" fill="none" stroke="${ORA}" stroke-width="2"/>` : empty(SLX[2], '⚡'));
+  h += lbl(SLX[2], 346, 'слияние', 9, LIG) + lbl(SLX[2], 358, 'импульс тока', 8.5, MUT) + `</g>`;
+  // slot 3: embryo
+  h += `<g data-hit="sl3">`;
+  if (c.emb) { h += cellC(SLX[3], SLY, 25, '#ffd27a', 'rgba(255,210,122,.08)'); [[-8, -8], [8, -8], [-8, 8], [8, 8], [0, -13], [0, 13], [-13, 0], [13, 0]].forEach(([dx, dy]) => { h += `<circle cx="${SLX[3] + dx * 0.9}" cy="${SLY + dy * 0.9}" r="6.5" fill="rgba(255,210,122,.18)" stroke="#ffd27a" stroke-width=".8"/><circle cx="${SLX[3] + dx * 0.9}" cy="${SLY + dy * 0.9}" r="2" fill="${dn.nc}"/>`; }); }
+  else h += empty(SLX[3], '?');
+  h += lbl(SLX[3], 346, 'эмбрион', 9, LIG) + lbl(SLX[3], 358, 'делится митозом', 8.5, MUT) + `</g>`;
+  // slot 4: lamb
+  h += `<g data-hit="sl4">` + (c.born ? sheep(SLX[4] - 8, SLY + 2, dn.face, 0.6) : empty(SLX[4], '?'));
+  h += lbl(SLX[4], 346, 'ягнёнок', 9, LIG) + lbl(SLX[4], 358, 'вынашивает овца C', 8.5, MUT) + `</g>`;
+  const res = c.born ? (c.donor === 'A' ? 'Клон овцы A: белая морда, ядерные гены — от A' : 'Клон овцы B: чёрная морда, ядерные гены — от B') : `Ядро: ${c.donor ? 'овца ' + c.donor : '?'} · яйцеклетка: овца B · вынашивает: овца C`;
+  h += lbl(260, 388, res, 10.5, c.born ? (c.donor === 'A' ? OK : WARN) : LIG, 'middle', 'font-weight="600"');
+  return h;
+}
+
+// ---------- lesson 3 scene ----------
+function molecule(cx, cy, j, cyc, st) {
+  const top = j === 0 ? 'old' : j === 1 ? 'new' : 'new', bot = j === 0 ? (cyc === 0 ? 'old' : 'new') : j === 1 ? 'old' : 'new';
+  const col = s => s === 'old' ? LIG : OK;
+  const d = st === 'ds' ? 4 : 13;
+  let s = `<path d="M${cx - 48} ${cy - d}H${cx + 48}" stroke="${col(top)}" stroke-width="3" stroke-linecap="round"/><path d="M${cx - 48} ${cy + d}H${cx + 48}" stroke="${col(bot)}" stroke-width="3" stroke-linecap="round"/>`;
+  if (st === 'ds') for (let x = -42; x <= 42; x += 12) s += `<path d="M${cx + x} ${cy - 2}V${cy + 2}" stroke="#56627d"/>`;
+  if (st === 'pr') s += `<path d="M${cx + 30} ${cy - d + 6}H${cx + 48}" stroke="${ORA}" stroke-width="3" stroke-linecap="round"/><path d="M${cx - 48} ${cy + d - 6}H${cx - 30}" stroke="${ORA}" stroke-width="3" stroke-linecap="round"/>`;
+  return s;
+}
+const TX = i => 44 + i * 30, TY = T => 392 - (T - 20) / 80 * 64;
+function pcrManScene() {
+  let h = bench();
+  const p = S.pcr, cnt = Math.pow(2, p.cyc), n = Math.min(cnt, 8);
+  h += `<g data-hit="mol"><rect x="20" y="132" width="480" height="122" fill="transparent"/>`;
+  for (let j = 0; j < n; j++) h += molecule(75 + (j % 4) * 123, 160 + Math.floor(j / 4) * 70, j, p.cyc, p.st);
+  if (cnt > 8) h += lbl(260, 262, `+ ещё ${big(cnt - 8)} таких же копий`, 9.5, MUT);
+  h += `</g>`;
+  h += `<g data-hit="cnt">` + lbl(260, 286, `Копий участка ДНК: ${big(cnt)}`, 13, '#e8ecf4', 'middle', 'font-weight="600"') + lbl(260, 302, `цикл ${p.cyc} · ${STN[p.st]} · серые цепи — исходные, зелёные — новые`, 9.5, MUT) + `</g>`;
+  h += `<g data-hit="temp"><rect x="30" y="316" width="476" height="84" rx="8" fill="rgba(18,26,40,.6)" stroke="#26324a"/>`;
+  [[95, WARN], [72, OK], [55, CY]].forEach(([T, c]) => { h += `<path d="M44 ${f(TY(T))}H494" stroke="${c}" stroke-opacity=".35" stroke-dasharray="3 4"/><text x="40" y="${f(TY(T) + 3)}" font-size="8.5" fill="${c}" text-anchor="end">${T}°</text>`; });
+  let d = '';
+  p.hist.forEach((T, i) => { d += `${i ? 'L' : 'M'}${TX(i)} ${f(TY(T))}H${TX(i) + 30}`; });
+  h += `<path d="${d}" fill="none" stroke="#e8ecf4" stroke-width="2"/>` + lbl(500, 330, 'термоциклер: история нагрева', 8.5, MUT, 'end') + `</g>`;
+  return h;
+}
+const RX = n => 46 + n / 40 * 324, RY = F => 352 - F * 214;
+function pcrRtScene() {
+  let h = bench();
+  const p = S.pcr;
+  h += `<g data-hit="plot"><rect x="46" y="132" width="324" height="220" fill="rgba(18,26,40,.6)" stroke="#26324a"/>`;
+  for (let n = 0; n <= 40; n += 5) h += `<path d="M${f(RX(n))} 132V352" stroke="rgba(139,150,173,.10)"/><text x="${f(RX(n))}" y="365" font-size="8.5" fill="${MUT}" text-anchor="middle">${n}</text>`;
+  for (let F = 0; F <= 1.001; F += 0.25) h += `<text x="42" y="${f(RY(F) + 3)}" font-size="8.5" fill="${MUT}" text-anchor="end">${ru(F, 2)}</text>`;
+  h += lbl(370, 378, 'цикл', 9, MUT, 'end') + lbl(50, 145, 'свечение', 9, MUT, 'start');
+  h += `<path d="M${RX(35)} 132V352" stroke="${WARN}" stroke-opacity=".5" stroke-dasharray="2 3"/>` + lbl(RX(35) - 3, 145, '35', 8.5, WARN, 'end');
+  h += `</g><g data-hit="thr"><path d="M46 ${f(RY(FT))}H370" stroke="${ORA}" stroke-width="1.6" stroke-dasharray="6 4"/>` + lbl(366, RY(FT) - 5, 'порог', 9, ORA, 'end') + `</g>`;
+  SAMP.forEach((s, k) => {
+    if (p.run < 1) return;
+    let d = '';
+    for (let n = 0; n <= p.run; n++) d += `${n ? 'L' : 'M'}${f(RX(n))} ${f(RY(fluo(n, s.N0, k)))}`;
+    h += `<path d="${d}" fill="none" stroke="${s.c}" stroke-width="2"/>`;
+  });
+  h += `<g data-hit="rows">`;
+  SAMP.forEach((s, k) => {
+    const y = 134 + k * 44, ct = ctOf(s.N0), pat = s.k in ANS;
+    h += `<g ${pat ? `data-hit="cl-${s.k}"` : ''}><rect x="380" y="${y}" width="136" height="38" rx="8" fill="rgba(26,36,56,.7)" stroke="#26324a"/>`;
+    h += `<path d="M388 ${y + 13}H402" stroke="${s.c}" stroke-width="3"/>` + lbl(408, y + 16, s.n, 10, LIG, 'start', 'font-weight="600"');
+    h += `<text x="388" y="${y + 31}" font-size="9" fill="${MUT}">${p.run >= 40 ? (ct !== null && ct <= 40 ? 'Ct ' + ru(ct) : 'Ct нет') : 'Ct —'}</text>`;
+    if (pat) {
+      const v = p.cls[s.k], vc = v === '+' ? WARN : v === '−' ? OK : MUT;
+      h += `<rect x="482" y="${y + 18}" width="28" height="16" rx="5" fill="${v === '?' ? 'none' : vc}" stroke="${vc}"/><text x="496" y="${y + 30}" font-size="11" font-weight="600" fill="${v === '?' ? MUT : INK}" text-anchor="middle">${v}</text>`;
+    }
+    h += `</g>`;
+  });
+  h += `</g>`;
+  if (p.run < 1) h += lbl(208, 250, 'Нажмите «Запустить 40 циклов»', 11, MUT);
+  return h;
+}
+
+// ---------- lesson 4 scene ----------
+function card(i, x, y, sel, placed) {
+  const b = BUGS[i], c = placed ? BINS[b.L - 1].c : '#3a4866';
+  return `<rect x="${f(x)}" y="${f(y)}" width="124" height="38" rx="8" fill="#1a2438" stroke="${sel ? '#ffffff' : c}" stroke-width="${sel ? 2 : 1.3}"/>` +
+    lbl(x + 9, y + 16, b.n, 10.5, '#e8ecf4', 'start', 'font-weight="600"') + lbl(x + 9, y + 30, b.s, 8.5, MUT, 'start');
+}
+function bslScene() {
+  let h = bench();
+  const B = S.bsl;
+  BINS.forEach((bn, j) => {
+    const x = 6 + j * 128;
+    h += `<g data-hit="b${j}"><rect x="${x}" y="226" width="124" height="172" rx="10" fill="rgba(26,36,56,.45)" stroke="${bn.c}" stroke-opacity=".55"/>`;
+    h += `<text x="${x + 62}" y="245" font-size="12.5" font-weight="600" fill="${bn.c}" text-anchor="middle">BSL-${j + 1}</text>` + lbl(x + 62, 259, bn.d, 8.5, MUT) + lbl(x + 62, 388, bn.ppe, 8.5, LIG) + `</g>`;
+  });
+  BUGS.forEach((b, i) => {
+    if (S.dpos && S.dpos.i === i) return;
+    if (B.pos[i]) { const [x, y] = binSlot(i); h += `<g data-hit="c${i}">` + card(i, x, y, B.sel === i, true) + `</g>`; }
+    else { const [x, y] = cardHome(i); h += `<g data-drag="c${i}">` + card(i, x, y, B.sel === i, false) + `</g>`; }
+  });
+  if (S.dpos) h += `<g opacity=".92" pointer-events="none">` + card(S.dpos.i, S.dpos.x, S.dpos.y, true, false) + `</g>`;
+  return h;
+}
+
+function hlBox(id) {
+  const L = LID();
+  if (L === 'ge') return { dna: [12, 112, 248, 70], sites: [62, 124, 146, 44], plasmid: [PX - PR - 26, PY - PR - 26, 2 * PR + 52, 2 * PR + 52], amp: [PX - PR - 34, PY - 22, 56, 82], enz: S.phase >= 4 ? null : [140, 256, 240, 116], dish: S.phase >= 4 ? [94, 276, 382, 120] : null }[id] || null;
+  if (L === 'clone') return { sheepA: [20, 130, 132, 116], sheepB: [200, 130, 132, 116], sheepC: [380, 130, 132, 116], pipe: [24, 272, 472, 92], egg: [124, 272, 64, 92] }[id] || null;
+  if (L === 'pcr') {
+    if (S.pcr.mode === 'man') return { mol: [18, 130, 484, 128], cnt: [100, 270, 320, 40], temp: [26, 312, 484, 92] }[id] || null;
+    return { plot: [40, 126, 336, 258], thr: [42, RY(FT) - 8, 332, 16], rows: [376, 130, 144, 222] }[id] || null;
+  }
+  return { cards: [2, 118, 516, 90], bins: [2, 222, 516, 180], ppe: [2, 376, 516, 20] }[id] || null;
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = id === 'ge' ? geScene() : id === 'clone' ? cloneScene() : id === 'pcr' ? (S.pcr.mode === 'man' ? pcrManScene() : pcrRtScene()) : bslScene();
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${f(b[0])}" y="${f(b[1])}" width="${f(b[2])}" height="${f(b[3])}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 524, hh / 420, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 412 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag],[data-hit]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  const p = toSvg(e);
+  if (el.dataset.drag) {
+    const k = el.dataset.drag;
+    if (k === 'gene') drag = { key: 'gene', dx: S.gx - p.x, dy: S.gy - p.y, x: e.clientX, y: e.clientY, moved: false };
+    else { const i = +k.slice(1), hm = cardHome(i); drag = { key: 'card', i, dx: hm[0] - p.x, dy: hm[1] - p.y, x: e.clientX, y: e.clientY, moved: false }; }
+    scene.classList.add('grabbing');
+  } else drag = { hit: el.dataset.hit, x: e.clientX, y: e.clientY, moved: false };
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 5) drag.moved = true;
+  if (!drag.moved || !drag.key) return;
+  const p = toSvg(e);
+  if (drag.key === 'gene') { S.gx = clamp(p.x + drag.dx, 30, 490); S.gy = clamp(p.y + drag.dy, 120, 395); }
+  else S.dpos = { i: drag.i, x: p.x + drag.dx, y: p.y + drag.dy };
+  dirty = true;
+});
+function endDrag(cancel) {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing'); dirty = true;
+  if (d.key === 'gene') { if (cancel) return; if (d.moved) dropGene(); else toast('Перетащите ген в разрыв плазмиды — он отмечен пунктирным кругом.'); return; }
+  if (d.key === 'card') { const pos = S.dpos; S.dpos = null; if (cancel) return update(); if (!d.moved || !pos) selCard(d.i); else dropCard(d.i, pos.x + 62, pos.y + 19); return; }
+  if (cancel || d.moved || !d.hit) return;
+  tap(d.hit);
+}
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+function tap(id) {
+  const L = LID();
+  if (L === 'ge') {
+    if (id === 'dna') toast(S.phase >= 1 ? 'Остатки ДНК человека нам больше не нужны.' : 'Флажки — участки, которые узнают рестриктазы. Ген лежит между ними.');
+    if (id === 'plasmid') toast('Плазмида: ori — точка начала копирования, ampR — ген устойчивости к ампициллину.');
+    if (id === 'enz') toast('Рестриктаза узнаёт строго свою последовательность из 6 нуклеотидов.');
+    if (id === 'dish') toast(S.phase === 5 ? 'Ампициллин убил бактерии без плазмиды. Выжили только трансформированные.' : 'Кольцо внутри бактерии — полученная плазмида. Посейте бактерии на ампициллин.');
+  }
+  if (L === 'clone') {
+    if (id === 'shA') pickDonor('A');
+    if (id === 'shB') pickDonor('B');
+    if (id === 'shC') toast('Овца C — суррогатная мать. Она только вынашивает эмбрион и своих генов ему не передаёт.');
+    if (/^sl\d$/.test(id)) toast(['Из клетки вымени берут ядро с 54 хромосомами.', 'Яйцеклетка даёт цитоплазму и митохондрии, а её ядро удаляют.', 'Импульс тока сливает клетки и запускает деление.', 'Эмбрион растёт несколько дней в пробирке.', 'Ягнёнок получает ядерные гены только от донора ядра.'][+id.slice(2)]);
+  }
+  if (L === 'pcr') {
+    if (id.startsWith('cl-')) toggleCls(id.slice(3));
+    else if (id === 'thr') toast('Порог — уровень свечения заметно выше фона. Цикл, где кривая его пересекла, — Ct.');
+    else if (id === 'temp') toast('Каждая ступенька — одна выдержка. Цикл: 95 → 55 → 72 °C.');
+    else if (id === 'mol') toast('Серые цепи — исходные, зелёные — синтезированы в пробирке. Оранжевые кусочки — праймеры.');
+  }
+  if (L === 'bsl') {
+    if (/^c\d$/.test(id)) selCard(+id.slice(1));
+    if (/^b\d$/.test(id)) { const j = +id.slice(1); toast(`BSL-${j + 1}: ${BINS[j].d}. Защита: ${BINS[j].ppe.replace('+ ', 'всё, что ниже, и ')}.`); }
+  }
+}
+
+function loop(t) {
+  requestAnimationFrame(loop);
+  if (LID() === 'pcr' && S.pcr.runT !== null) {
+    const n = reduce ? 40 : Math.min(40, Math.max(0, Math.floor((t - S.pcr.runT) / 75)));
+    if (n !== S.pcr.run) { S.pcr.run = n; if (n >= 40) { S.pcr.runT = null; toast('40 циклов прошли. Посмотрите, где кривые пересекли порог, и оцените пробы пациентов.'); } update(); }
+  }
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3600); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, c) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${c ? `<i style="background:${c}"></i>` : ''}${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  let h = '';
+  if (id === 'ge') {
+    const ph = S.phase;
+    if (ph <= 0) h = Object.keys(ENZ).map(e => B('e-' + e, e, S.enz === e, ENZ[e].c)).join('') + sep + B('cut', 'Резать');
+    else h = [, B('lig', 'Лигаза'), B('lig', 'Лигаза'), B('trans', 'В бактерии'), B('amp', 'На ампициллин'), ''][ph];
+    h += sep + B('reset', 'Сбросить');
+  }
+  if (id === 'clone') h = STEPS.map((s, i) => B('s-' + s[0], `${i + 1}. ${s[1]}`, S.cl[s[0]])).join('') + sep + B('reset', 'Сбросить');
+  if (id === 'pcr') {
+    h = B('m-man', 'Вручную', S.pcr.mode === 'man') + B('m-rt', 'Тест пациентов', S.pcr.mode === 'rt') + sep;
+    h += S.pcr.mode === 'man' ? B('t95', '95 °C', undefined, WARN) + B('t55', '55 °C', undefined, CY) + B('t72', '72 °C', undefined, OK) : B('run', 'Запустить 40 циклов');
+    h += sep + B('reset', 'Сбросить');
+  }
+  if (id === 'bsl') h = [1, 2, 3, 4].map(j => B('p-' + j, `→ BSL-${j}`, undefined, BINS[j - 1].c)).join('') + sep + B('reset', 'Сбросить');
+  tb.innerHTML = h;
+  placeHint();
+}
+function placeHint() {
+  const hn = $('#hint'), st = $('#stage').getBoundingClientRect(), tb = $('#tools').getBoundingClientRect();
+  hn.style.visibility = LID() === 'pcr' || LID() === 'bsl' || tb.left - st.left < st.width * 0.19 + 30 ? 'hidden' : '';
+}
+addEventListener('resize', placeHint);
+function act(a) {
+  if (a.startsWith('e-')) { S.enz = a.slice(2); renderTools(); buildScheme(); return update(); }
+  if (a === 'cut') return cutDNA();
+  if (a === 'lig') return ligate();
+  if (a === 'trans') return transform();
+  if (a === 'amp') return plate();
+  if (a.startsWith('s-')) { clStep(a.slice(2)); return renderTools(); }
+  if (a.startsWith('d-')) return pickDonor(a.slice(2));
+  if (a.startsWith('m-')) return setMode(a.slice(2));
+  if (a === 't95') return heat(95);
+  if (a === 't55') return heat(55);
+  if (a === 't72') return heat(72);
+  if (a === 'hold') return heat(S.tset);
+  if (a === 'run') return runRT();
+  if (a.startsWith('p-')) { if (S.bsl.sel < 0 || S.bsl.pos[S.bsl.sel]) return toast('Сначала нажмите на карточку, которая ещё не на месте.'); return place(S.bsl.sel, +a.slice(2)); }
+  if (a === 'reset') {
+    const id = LID();
+    if (id === 'ge') resetGE();
+    if (id === 'clone') resetCl();
+    if (id === 'pcr') { if (S.pcr.mode === 'man') resetMan(); else resetRT(); }
+    if (id === 'bsl') { S.bsl = { pos: {}, err: 0, sel: -1 }; S.dpos = null; }
+    renderTools(); buildScheme(); update();
+  }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const dot = c => IC(`<circle cx="17" cy="17" r="11" fill="${c}" opacity=".85"/><circle cx="17" cy="17" r="4" fill="#0b1019"/>`);
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (m.kind === 'ge') return `Этап ${Math.max(0, m.phase)} из 5: ${PHN[m.phase + 1].toLowerCase()}`;
+  if (m.kind === 'cl') return `Шагов: ${m.steps} из 5 · донор ядра: ${m.donor ? 'овца ' + m.donor : 'не выбран'}`;
+  if (m.kind === 'pcr') return `Ручные циклы: ${Math.min(S.pcr.cyc, 3)}/3${m.man3 ? ' ✓' : ''} · пациенты: ${m.run >= 40 ? m.nCls + '/3 оценено' : 'тест не запущен'}`;
+  return `На местах: ${m.placed} из 8 · ошибок: ${m.err}`;
+}
+
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+const gb = (a, t) => `<button class="ghostbtn" data-a="${a}">${t}</button>`;
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'ge') h = `<h2>Генно-инженерный набор</h2><div class="ctl"><div class="lbl">Рестриктаза</div><div class="chips" id="eChips">${Object.keys(ENZ).map(e => `<button data-a="e-${e}">${e}</button>`).join('')}</div></div>
+    <div class="row">${gb('cut', 'Резать')}${gb('lig', 'Лигаза')}${gb('trans', 'В бактерии')}${gb('amp', 'На ампициллин')}${gb('reset', 'Сбросить')}</div>` +
+    slider('inHrs', 'Время роста колонии, ч', 1, 12, 1, S.hrs) +
+    `<dl class="reads"><div><dt>Рестриктаза</dt><dd id="r1"></dd></div><div><dt>Этап</dt><dd id="r2"></dd></div><div><dt>Клеток в колонии</dt><dd id="r3"></dd></div></dl>`;
+  if (id === 'clone') h = `<h2>Пересадка ядра</h2><div class="ctl"><div class="lbl">Донор ядра</div><div class="chips" id="dChips"><button data-a="d-A">Овца A (белая морда)</button><button data-a="d-B">Овца B (черномордая)</button></div></div>
+    <div class="row">${STEPS.map((s, i) => gb('s-' + s[0], `${i + 1}. ${s[1]}`)).join('')}${gb('reset', 'Сбросить')}</div>
+    <dl class="reads"><div><dt>Донор ядра</dt><dd id="r1"></dd></div><div><dt>Шагов</dt><dd id="r2"></dd></div><div><dt>Ягнёнок</dt><dd id="r3"></dd></div></dl>`;
+  if (id === 'pcr') {
+    h = `<h2>Амплификатор</h2><div class="ctl"><div class="chips" id="mChips"><button data-a="m-man">Вручную</button><button data-a="m-rt">Тест пациентов</button></div></div>`;
+    if (S.pcr.mode === 'man') h += slider('inT', 'Температура блока, °C', 40, 100, 1, S.tset) + `<div class="row">${gb('hold', 'Выдержать 30 с')}${gb('reset', 'Сбросить')}</div>
+      <dl class="reads"><div><dt>Цикл</dt><dd id="r1"></dd></div><div><dt>Копий</dt><dd id="r2"></dd></div><div><dt>Цепи</dt><dd id="r3"></dd></div></dl>`;
+    else h += `<div class="row">${gb('run', 'Запустить 40 циклов')}${gb('reset', 'Сбросить')}</div>
+      <dl class="reads"><div><dt>Цикл</dt><dd id="r1"></dd></div><div><dt>Оценено</dt><dd id="r2"></dd></div><div><dt>Граница</dt><dd id="r3">Ct ≤ 35</dd></div></dl>
+      <h3>Результаты пациентов</h3><div class="steps" id="clsList"></div>`;
+  }
+  if (id === 'bsl') h = `<h2>Сортировка</h2><p class="note">Выберите карточку здесь или на столе, затем уровень.</p><div class="ctl"><div class="lbl">Карточка</div><div class="chips" id="cChips">${BUGS.map((b, i) => `<button data-c="${i}">${b.n}</button>`).join('')}</div></div>
+    <div class="ctl"><div class="lbl">Уровень биобезопасности</div><div class="chips">${[1, 2, 3, 4].map(j => `<button data-a="p-${j}">BSL-${j}</button>`).join('')}</div></div>
+    <dl class="reads"><div><dt>На местах</dt><dd id="r1"></dd></div><div><dt>Ошибок</dt><dd id="r2"></dd></div><div><dt>Осталось</dt><dd id="r3"></dd></div></dl>`;
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', e => fn(+e.target.value)); };
+  on('#inHrs', v => { S.hrs = v; update(); });
+  on('#inT', v => { S.tset = v; update(); });
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+  el.querySelectorAll('[data-c]').forEach(b => b.onclick = () => selCard(+b.dataset.c));
+  el.querySelectorAll('[data-pc]').forEach(b => b.onclick = () => toggleCls(b.dataset.pc));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.innerHTML = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  const press = (s, fn) => el.querySelectorAll(s).forEach(b => b.setAttribute('aria-pressed', fn(b)));
+  if (m.kind === 'ge') {
+    press('#eChips button', b => b.dataset.a === 'e-' + S.enz);
+    set('#inHrsO', S.hrs + ' ч'); val('#inHrs', S.hrs);
+    set('#r1', S.phase === 0 ? S.enz : S.used || S.enz); set('#r2', `${Math.max(0, S.phase)} из 5`); set('#r3', big(m.N));
+  } else if (m.kind === 'cl') {
+    press('#dChips button', b => b.dataset.a === 'd-' + S.cl.donor);
+    set('#r1', S.cl.donor ? 'овца ' + S.cl.donor : '—'); set('#r2', `${m.steps} из 5`); set('#r3', S.cl.born ? (SHEEP[S.cl.donor].face === 'w' ? 'белая морда' : 'чёрная морда') : '—');
+  } else if (m.kind === 'pcr') {
+    press('#mChips button', b => b.dataset.a === 'm-' + S.pcr.mode);
+    if (S.pcr.mode === 'man') { set('#inTO', S.tset + ' °C'); val('#inT', S.tset); set('#r1', S.pcr.cyc); set('#r2', big(m.copies)); set('#r3', STN[S.pcr.st]); }
+    else {
+      set('#r1', `${m.run}/40`); set('#r2', `${m.nCls} из 3`);
+      set('#clsList', Object.keys(ANS).map(k => `<button class="step" style="width:100%;border:0;cursor:pointer;color:inherit" data-pc="${k}"><b>${SAMP.find(s => s.k === k).n}</b><span>${{ '?': '? — нажмите', '+': '+ положительный', '−': '− отрицательный' }[S.pcr.cls[k]]}</span></button>`).join(''));
+      el.querySelectorAll('[data-pc]').forEach(b => b.onclick = () => toggleCls(b.dataset.pc));
+    }
+  } else {
+    press('#cChips button', b => +b.dataset.c === S.bsl.sel);
+    el.querySelectorAll('#cChips button').forEach(b => { b.disabled = !!S.bsl.pos[+b.dataset.c]; b.style.opacity = b.disabled ? '.4' : ''; });
+    set('#r1', `${m.placed} из 8`); set('#r2', m.err); set('#r3', 8 - m.placed);
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'ge') return [
+    { id: 'dna', icon: dot(LIG), name: 'ДНК человека', spec: 'Фрагмент с геном инсулина. В генной инженерии берут ДНК-копию гена без интронов, полученную с мРНК обратной транскриптазой.' },
+    { id: 'sites', icon: dot(CY), name: 'Участки рестрикции', spec: 'Флажки — места, которые узнают рестриктазы. EcoRI стоит по краям гена, BamHI — внутри него.' },
+    { id: 'plasmid', icon: dot('#3a4866'), name: 'Плазмида-вектор', spec: 'Кольцевая ДНК бактерии. ori — точка начала копирования: без неё плазмида не размножится в клетке.' },
+    { id: 'amp', icon: dot(OK), name: 'Ген ampR', spec: 'Ген устойчивости к антибиотику ампициллину — маркер для отбора бактерий с плазмидой. Его нельзя разрезать.' },
+    { id: 'enz', icon: dot(ORA), name: 'Рестриктаза и липкие концы', spec: 'Фермент режет обе цепи со сдвигом и оставляет одноцепочечные хвосты, которые спариваются по принципу комплементарности.' },
+    { id: 'dish', icon: dot('#e8d9a8'), name: 'Бактерии E. coli', spec: 'Появятся после трансформации. На ампициллине выживают только бактерии с плазмидой.' }];
+  if (id === 'clone') return [
+    { id: 'sheepA', icon: dot('#ffd27a'), name: 'Овца A — белая морда', spec: 'Может быть донором ядра. Её клетка вымени — обычная клетка тела с 54 хромосомами.' },
+    { id: 'sheepB', icon: dot(VIO), name: 'Овца B — черномордая', spec: 'Даёт яйцеклетку. Тоже может быть донором ядра.' },
+    { id: 'sheepC', icon: dot(MUT), name: 'Овца C — суррогатная мать', spec: 'Вынашивает эмбрион пять месяцев, но генов ему не передаёт.' },
+    { id: 'egg', icon: dot('#ffd27a'), name: 'Яйцеклетка', spec: 'Её ядро удаляют. Остаются цитоплазма и митохондрии со своей небольшой ДНК.' },
+    { id: 'pipe', icon: dot(ORA), name: 'Ход клонирования', spec: 'Клетка донора → яйцеклетка без ядра → слияние током → эмбрион → суррогатная мать.' }];
+  if (id === 'pcr') return S.pcr.mode === 'man' ? [
+    { id: 'mol', icon: dot(OK), name: 'Молекулы ДНК', spec: 'Серые цепи — исходные, зелёные — новые. Оранжевые кусочки — праймеры.' },
+    { id: 'cnt', icon: dot(LIG), name: 'Счётчик копий', spec: 'После каждого полного цикла число копий удваивается.' },
+    { id: 'temp', icon: dot(WARN), name: 'График температур', spec: 'Амплификатор (термоциклер) быстро нагревает и охлаждает пробирки по программе.' }] : [
+    { id: 'plot', icon: dot(CY), name: 'Кривые накопления', spec: 'Свечение красителя растёт вместе с числом копий. Сначала его не видно на фоне, потом быстрый рост, потом плато.' },
+    { id: 'thr', icon: dot(ORA), name: 'Порог', spec: 'Уровень свечения заметно выше фона. Цикл пересечения — Ct.' },
+    { id: 'rows', icon: dot(VIO), name: 'Пробы и контроли', spec: 'К+ содержит ДНК возбудителя, К− — только воду. Нажимайте на пробы пациентов, чтобы поставить «+» или «−».' }];
+  return [
+    { id: 'cards', icon: dot(LIG), name: 'Карточки организмов', spec: 'Возбудители и безопасные лабораторные организмы. Их надо разложить по уровням.' },
+    { id: 'bins', icon: dot(ORA), name: 'Уровни BSL-1 — BSL-4', spec: 'Чем выше уровень, тем строже правила и дороже лаборатория.' },
+    { id: 'ppe', icon: dot(WARN), name: 'Средства защиты', spec: 'Каждый следующий уровень включает всё, что требуется на предыдущем, плюс новое.' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      (L.note ? `<div class="safe"><b>Безопасность</b>${L.note}</div>` : '') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    let h = `<h2>${{ ge: 'Что на столе', clone: 'Участники опыта', pcr: S.pcr.mode === 'man' ? 'Пробирка в амплификаторе' : 'ПЦР в реальном времени', bsl: 'Что на столе' }[L.id]}</h2><p class="note">Нажмите на строку, чтобы найти это на столе.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    if (L.id === 'ge') h += `<h3>Ферменты генного инженера</h3><div class="feat"><div style="border-left-color:${CY}"><b>Рестриктазы</b>«Молекулярные ножницы». Бактерии используют их для защиты от вирусов: режут чужую ДНК.</div><div style="border-left-color:${OK}"><b>Лигаза</b>«Молекулярный клей»: восстанавливает связи в остове ДНК между соседними нуклеотидами.</div><div style="border-left-color:${VIO}"><b>Обратная транскриптаза</b>Строит ДНК по матрице мРНК. Так получают ген без интронов для бактерий.</div></div>
+      <h3>Примеры ГМО</h3><div class="feat"><div style="border-left-color:${ORA}"><b>Бактерии и дрожжи</b>Инсулин, гормон роста, вакцина от гепатита B, ферменты для стиральных порошков и сыра.</div><div style="border-left-color:${ORA}"><b>Растения</b>Хлопчатник и кукуруза с геном белка, ядовитого для гусениц-вредителей; «золотой рис» с провитамином A.</div></div>`;
+    if (L.id === 'clone') h += `<h3>Виды клонирования</h3><div class="feat"><div style="border-left-color:${CY}"><b>Репродуктивное</b>Цель — получить новую особь, как Долли. Применяют для животных.</div><div style="border-left-color:${OK}"><b>Терапевтическое</b>Цель — получить стволовые клетки и ткани для лечения. Ребёнок не рождается.</div><div style="border-left-color:${ORA}"><b>Микроклональное размножение растений</b>Из кусочка ткани в пробирке выращивают тысячи одинаковых растений без вирусов.</div></div>
+      <h3>Ограничения</h3><div class="feat"><div style="border-left-color:${WARN}"><b>Низкий успех</b>Большинство эмбрионов-клонов гибнет. У выживших чаще бывают болезни.</div><div style="border-left-color:${WARN}"><b>Не полная копия</b>Митохондрии — от яйцеклетки, а характер, привычки и даже окраска пятен зависят и от среды.</div></div>`;
+    if (L.id === 'pcr') h += `<h3>Состав реакции</h3><div class="feat"><div style="border-left-color:${LIG}"><b>ДНК-матрица</b>Проба пациента: мазок, кровь, ткань.</div><div style="border-left-color:${ORA}"><b>Два праймера</b>Короткие одноцепочечные ДНК, около 20 нуклеотидов. Задают, какой участок копировать.</div><div style="border-left-color:${OK}"><b>Нуклеотиды и Taq-полимераза</b>«Кирпичики» и термостойкий фермент из бактерии Thermus aquaticus.</div><div style="border-left-color:${CY}"><b>Краситель или зонд</b>Светится, когда связан с двойной ДНК, — так прибор видит рост копий.</div></div>`;
+    if (L.id === 'bsl') h += `<h3>Уровни биобезопасности</h3><div class="feat">${BINS.map((b, j) => `<div style="border-left-color:${b.c}"><b>BSL-${j + 1} · ${b.d}</b>${['Учебные и пищевые микроорганизмы. Обычный стол, халат, перчатки, мытьё рук.', 'Больничные возбудители. Бокс биологической безопасности, автоклав, ограниченный доступ.', 'Опасные инфекции, передающиеся по воздуху. Отдельный блок, пониженное давление, респираторы, двойные двери.', 'Смертельные вирусы без лечения. Костюмы с подачей воздуха, шлюзы, душ на выходе, отдельное здание.'][j]}</div>`).join('')}</div>
+      <h3>Что проверяют у ГМО</h3><div class="feat"><div style="border-left-color:${VIO}"><b>Пищевая безопасность</b>Нет ли новых аллергенов и токсинов.</div><div style="border-left-color:${VIO}"><b>Экология</b>Не перейдёт ли ген к диким родственникам, не пострадают ли полезные насекомые.</div></div>`;
+    $('#pane-parts').innerHTML = h;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'ge') {
+    const E = ENZ[S.enz], tm = S.hrs * 60;
+    let h = `<h2>Расчёты генного инженера</h2><div class="formula">P(участок) = (1/4)⁶ = 1/4096</div><div class="steps">` +
+      step(`Участок ${S.enz}`, E.site) + step('Длина участка', '6 нуклеотидов') + step('Вероятность нужной буквы', '1/4 (A, T, G или C)') +
+      step('Вероятность всего участка', '(1/4)⁶ = 1/4096') + step('В среднем', '1 участок на ≈ 4 тыс. пар нуклеотидов', 'sum') + `</div>` +
+      `<p class="note" style="margin-top:8px">Поэтому в маленькой плазмиде участок нужной рестриктазы часто один, а в гене длиной около тысячи пар может не встретиться ни разу.</p>`;
+    h += `<h3>Рост колонии за ${S.hrs} ч</h3><div class="formula">N = 2^(t ÷ 20 мин)</div><div class="steps">` +
+      step('Время t', `${S.hrs} ч = ${tm} мин`) + step('Число делений', `${tm} ÷ 20 = ${tm / 20}`) + step('Клеток из одной бактерии', `2${sup(tm / 20)} ≈ ${big(m.N)}`, 'sum') + `</div>` +
+      `<p class="note" style="margin-top:8px">Это при идеальных условиях. На деле рост тормозит нехватка питания, поэтому инсулин выращивают в больших ферментёрах с подачей среды и воздуха.</p>`;
+    h += `<h3>Ход работы</h3><div class="steps">` + ['Выбрать рестриктазу', 'Вырезать ген и раскрыть плазмиду', 'Вставить ген (липкие концы)', 'Сшить лигазой', 'Ввести плазмиды в бактерии', 'Отобрать на ампициллине'].map((t, i) => step(`${i}. ${t}`, i === 0 ? (S.phase !== 0 ? S.used || '—' : S.enz) : S.phase >= i ? '✓' : '—')).join('') + `</div>`;
+    return h;
+  }
+  if (id === 'clone') {
+    const c = S.cl;
+    return `<h2>Хромосомы клона</h2><div class="formula">у овцы 2n = 54</div><div class="steps">` +
+      step('Обычное оплодотворение', 'n + n = 27 + 27 = 54') + step('Ядро клетки вымени (донор)', '2n = 54') + step('Яйцеклетка без ядра', '0') + step('Восстановленная клетка', '54 + 0 = 54', 'sum') + `</div>` +
+      `<h3>Чьи гены у ягнёнка</h3><div class="steps">` + step('Ядерная ДНК', c.donor ? `от овцы ${c.donor} (донор ядра)` : '? выберите донора') + step('Митохондриальная ДНК', 'от овцы B (яйцеклетка)') + step('Суррогатная мать C', 'генов не даёт') +
+      step('Морда ягнёнка', c.born ? (c.donor === 'A' ? 'белая, как у A' : 'чёрная, как у B') : '?', 'sum') + `</div>` +
+      `<h3>Успех опыта с Долли</h3><div class="formula">1 ÷ 277 × 100 % ≈ 0,36 %</div><div class="steps">` +
+      step('Слито клеток с яйцеклетками', '277') + step('Пересажено эмбрионов', '29 (29 ÷ 277 ≈ 10,5 %)') + step('Родилось ягнят', '1') + step('Успех от числа попыток', '≈ 0,36 %', 'sum') + `</div>` +
+      `<h3>Ход работы</h3><div class="steps">` + STEPS.map((s, i) => step(`${i + 1}. ${s[1]}`, c[s[0]] ? '✓' : '—')).join('') + `</div>`;
+  }
+  if (id === 'pcr') {
+    const p = S.pcr;
+    if (p.mode === 'man') {
+      let h = `<h2>Сколько копий</h2><div class="formula">N = N₀ · 2ⁿ</div><div class="steps">` + step('Начальное число молекул N₀', '1') + step('Пройдено циклов n', p.cyc);
+      for (let n = 0; n <= Math.max(3, p.cyc) && n <= 10; n++) h += step(`После ${n} ${n === 1 ? 'цикла' : 'циклов'}`, `1 · 2${sup(n)} = ${Math.pow(2, n)}${n <= p.cyc ? ' ✓' : ''}`);
+      h += step('Сейчас', big(Math.pow(2, p.cyc)), 'sum') + `</div>`;
+      h += `<h3>Целая реакция</h3><div class="steps">` + step('30 циклов', `2³⁰ ≈ ${big(Math.pow(2, 30))}`) + step('40 циклов', `2⁴⁰ ≈ ${big(Math.pow(2, 40))}`) + step('Время цикла', '≈ 1–2 мин') + step('Вся реакция', '≈ 1–1,5 ч', 'sum') + `</div>` +
+        `<p class="note" style="margin-top:8px">На практике удвоение не идеальное (эффективность 90–100 %), а к концу реакции кончаются праймеры и нуклеотиды — рост выходит на плато.</p>`;
+      return h;
+    }
+    let h = `<h2>Расшифровка теста</h2><div class="formula">Ct = log₂(N порог ÷ N₀)</div><div class="steps">` + step('Копий на пороге N порог', '≈ 1,1·10¹⁰') + step('Граница положительного', 'Ct ≤ 35');
+    SAMP.forEach(s => { const ct = ctOf(s.N0); h += step(s.n, p.run >= 40 ? (ct !== null ? `Ct ≈ ${ru(ct)}` : 'порог не пересечён') : 'тест не запущен'); });
+    h += `</div><h3>Сколько было возбудителя</h3><div class="formula">N₀ = N порог ÷ 2^Ct</div><div class="steps">`;
+    if (p.run >= 40) { const ct = ctOf(1e5); h += step('К+', `1,1·10¹⁰ ÷ 2^${ru(ct)} ≈ ${big(NTHR / Math.pow(2, ct))}`) + step('Разница Ct на 1', 'копий в 2 раза больше/меньше') + step('Разница Ct на 3,3', 'копий в 10 раз больше/меньше', 'sum'); }
+    else h += step('Сначала', 'запустите 40 циклов');
+    h += `</div><h3>Ваши выводы</h3><div class="steps">` + Object.keys(ANS).map(k => step(SAMP.find(s => s.k === k).n, p.cls[k] === '?' ? '?' : p.cls[k] === '+' ? 'положительный' : 'отрицательный')).join('') + step('Все верно?', allRight() ? 'да ✓' : 'пока нет', 'sum') + `</div>`;
+    return h;
+  }
+  const B = S.bsl;
+  if (B.sel < 0) return `<h2>Как выбрать уровень</h2><p class="note">Нажмите на карточку — здесь появится разбор по четырём вопросам.</p><div class="steps">` + QN.map((q, i) => step(`${i + 1}. ${q}`, '')).join('') + step('Итог', 'чем опаснее, тем выше уровень', 'sum') + `</div>`;
+  const b = BUGS[B.sel], pl = !!B.pos[B.sel];
+  return `<h2>${b.n}</h2><div class="formula">опасность → уровень защиты</div><div class="steps">` + QN.map((q, i) => step(`${i + 1}. ${q}`, b.q[i])).join('') + step('Уровень', pl ? `BSL-${b.L} ✓` : '? — решите сами', 'sum') + `</div>` +
+    `<p class="note" style="margin-top:8px">На местах ${placedN()} из 8.${pl ? ' ' + b.why : ''}</p>`;
+}
+
+function renderMeter(m) {
+  const el = $('#meter'), dn = S.done[LID()];
+  if (m.kind === 'ge') {
+    el.innerHTML = `<div class="k">Этап</div><div class="v ${S.phase < 0 ? 'bad' : dn ? 'ok' : ''}">${PHN[S.phase + 1]}</div>
+      <div class="lr"><span>фермент</span><span>${S.phase === 0 ? S.enz : S.used}</span></div><div class="lr"><span>колоний</span><span>${S.phase === 5 ? '5 из 12' : '—'}</span></div>
+      <div class="gauge"><b style="width:${Math.max(0, S.phase) * 20}%;${dn ? 'background:var(--ok)' : ''}"></b></div>`;
+  } else if (m.kind === 'cl') {
+    el.innerHTML = `<div class="k">Клонирование</div><div class="v ${dn ? 'ok' : ''}">шаг ${m.steps} из 5</div>
+      <div class="lr"><span>донор</span><span>${m.donor || '—'}</span></div><div class="lr"><span>ягнёнок</span><span>${m.born ? (m.donor === 'A' ? 'белый' : 'чёрный') : '—'}</span></div>
+      <div class="gauge"><b style="width:${m.steps * 20}%;${dn ? 'background:var(--ok)' : ''}"></b></div>`;
+  } else if (m.kind === 'pcr') {
+    if (m.mode === 'man') el.innerHTML = `<div class="k">Термоциклер</div><div class="v" style="color:${m.T >= 90 ? WARN : m.T >= 68 && m.T <= 76 ? OK : m.T >= 50 && m.T <= 65 ? CY : '#e8ecf4'}">${m.T} °C</div>
+      <div class="lr"><span>цикл</span><span>${m.cyc}</span></div><div class="lr"><span>копий</span><span>${big(m.copies)}</span></div>`;
+    else el.innerHTML = `<div class="k">ПЦР-тест</div><div class="v ${dn ? 'ok' : ''}">цикл ${m.run}/40</div>
+      <div class="lr"><span>оценено</span><span>${m.nCls} из 3</span></div><div class="gauge"><b style="width:${m.run / 40 * 100}%"></b></div>`;
+  } else {
+    el.innerHTML = `<div class="k">На местах</div><div class="v ${dn ? 'ok' : ''}">${m.placed} из 8</div>
+      <div class="lr"><span>ошибок</span><span>${m.err}</span></div><div class="gauge"><b style="width:${m.placed / 8 * 100}%;${dn ? 'background:var(--ok)' : ''}"></b></div>`;
+  }
+}
+
+function update() {
+  const m = model(), L = LESSONS[S.lesson];
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Вы прошли путь от гена в пробирке до правил биобезопасности!'), 2000);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  ge: '<circle cx="33" cy="15" r="10" fill="none" stroke="#3a4866" stroke-width="3"/><path d="M28 6.3A10 10 0 0 1 38 6.3" stroke="#ffb547" stroke-width="3.5" fill="none"/><path d="M24.3 20A10 10 0 0 1 23.2 12.5" stroke="#86e0a8" stroke-width="3" fill="none"/>',
+  clone: '<ellipse cx="20" cy="17" rx="10" ry="7" fill="#e9e4d8"/><ellipse cx="30" cy="13" rx="4" ry="5" fill="#f4efe2"/><path d="M36 16h6" stroke="#56627d"/><ellipse cx="50" cy="19" rx="6.5" ry="4.6" fill="#e9e4d8"/><ellipse cx="56.5" cy="16" rx="2.8" ry="3.5" fill="#f4efe2"/>',
+  pcr: '<path d="M6 25H60" stroke="#56627d"/><path d="M6 24C28 24 32 22 38 14S50 6 60 5" fill="none" stroke="#72d4e8" stroke-width="2"/><path d="M6 17H60" stroke="#ffb547" stroke-dasharray="3 2"/>',
+  bsl: '<rect x="6" y="18" width="11" height="8" rx="2" fill="#86e0a8"/><rect x="20" y="14" width="11" height="12" rx="2" fill="#72d4e8"/><rect x="34" y="9" width="11" height="17" rx="2" fill="#ffb547"/><rect x="48" y="4" width="11" height="22" rx="2" fill="#ff8a73"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i];
+  S.lesson = i; S.hl = null; drag = null; S.tset = 95;
+  resetLesson();
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const ls = $('#lessons'), cur = ls.querySelector('.lesson[aria-current="true"]');
+  if (cur) { const a = ls.getBoundingClientRect(), b = cur.getBoundingClientRect(); ls.scrollLeft += b.left - a.left - (a.width - b.width) / 2; }
+}
+
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '', guide = '';
+  if (id === 'ge') {
+    now = `На столе: фрагмент ДНК человека с геном инсулина (участки EcoRI по обоим краям гена, участок BamHI внутри гена) и плазмида-вектор с участками EcoRI, BamHI и PstI; PstI находится внутри гена устойчивости к ампициллину ampR. Выбрана рестриктаза ${S.enz}. Этап: ${PHN[S.phase + 1].toLowerCase()} (${Math.max(0, S.phase)} из 5)${S.phase === -1 ? `, ДНК испорчена рестриктазой ${S.used}` : ''}. Ползунок роста колонии: ${S.hrs} ч → ${big(m.N)} клеток из одной бактерии.`;
+    guide = 'Если рестриктаза ещё не выбрана верно, не называй её. Спрашивай: где режет каждая рестриктаза, что станет с геном, если разрез придётся на его середину, зачем плазмиде ген устойчивости к антибиотику и почему его нельзя резать.';
+  }
+  if (id === 'clone') {
+    const c = S.cl;
+    now = `Три овцы: A — белая морда (финн-дорсет), B — черномордая (даёт яйцеклетку), C — черномордая суррогатная мать. Донор ядра: ${c.donor ? 'овца ' + c.donor : 'не выбран'}. Выполнены шаги: ${STEPS.filter(s => c[s[0]]).map(s => s[1].toLowerCase()).join(', ') || 'ни одного'}. ${c.born ? `Родился ягнёнок с ${c.donor === 'A' ? 'белой' : 'чёрной'} мордой.` : 'Ягнёнок ещё не родился.'}`;
+    guide = 'Не выполняй шаги за ученика. Спрашивай: от кого ягнёнок получит ядерные гены, зачем удалять ядро яйцеклетки, сколько хромосом должно быть в восстановленной клетке, что даёт суррогатная мать.';
+  }
+  if (id === 'pcr') {
+    const p = S.pcr;
+    if (p.mode === 'man') now = `Режим «Вручную»: пробирка в амплификаторе, температура ${p.T} °C, состояние: ${STN[p.st]}, завершено циклов ${p.cyc}, копий ${big(m.copies)}. История температур: ${p.hist.join(', ')} °C.`;
+    else now = `Режим «Тест пациентов» (ПЦР в реальном времени): пройдено ${p.run} из 40 циклов, порог свечения отмечен линией. ${p.run >= 40 ? 'Ct на экране: ' + SAMP.map(s => { const ct = ctOf(s.N0); return `${s.n} — ${ct !== null ? ru(ct) : 'порог не пересечён'}`; }).join('; ') + '.' : 'Тест ещё не завершён.'} Отметки ученика: ${Object.keys(ANS).map(k => `${SAMP.find(s => s.k === k).n}: ${p.cls[k]}`).join(', ')}.`;
+    now += ` Ручные 3 цикла: ${p.man3 ? 'сделаны' : 'нет'}; все пациенты оценены верно: ${allRight() ? 'да' : 'нет'}.`;
+    guide = 'Не говори, какие пробы положительные. Спрашивай: что происходит при 95, 55 и 72 °C, что означает Ct, почему кривая пробы с большим количеством возбудителя растёт раньше, зачем нужны контроли К+ и К−.';
+  }
+  if (id === 'bsl') {
+    const B = S.bsl;
+    now = `Сортировка по уровням биобезопасности BSL-1 — BSL-4. На местах ${placedN()} из 8: ${BUGS.map((b, i) => B.pos[i] ? `${b.n} → BSL-${B.pos[i]}` : null).filter(Boolean).join(', ') || 'пока ничего'}. Ещё не размещены: ${BUGS.filter((b, i) => !B.pos[i]).map(b => b.n).join(', ') || 'нет'}. Ошибок: ${B.err}. Выбрана карточка: ${B.sel >= 0 ? BUGS[B.sel].n : 'нет'}.`;
+    guide = 'Не называй уровни для неразмещённых карточек. Помоги рассуждать по четырём вопросам: болеет ли здоровый человек, насколько тяжело, как передаётся, есть ли лечение и вакцина.';
+  }
+  return [
+    `Раздел: биология, 11 класс, тема «Биотехнологии» (Клетка и молекулы). Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Для тьютора: ${guide}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = { ge: 'Зачем резать ген и плазмиду одной рестриктазой?', clone: 'Почему клон похож на донора ядра, а не на суррогатную мать?', pcr: 'Что показывает число Ct в ПЦР-тесте?', bsl: 'Чем лаборатория BSL-3 отличается от BSL-2?' }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

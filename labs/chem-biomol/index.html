@@ -1,0 +1,948 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по химии, 11 класс: углеводы от глюкозы до крахмала и целлюлозы, аминокислоты и белки, нуклеиновые кислоты ДНК и РНК.">
+<title>Молекулы жизни</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /mechanics and /chemistry. Lab bench (SVG) on the left, lesson notebook on the right, lesson strip under the bench. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none;cursor:pointer}
+.scene.rot{cursor:grab}
+.scene.grabbing{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--liq);transition:width .2s}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.goals{display:grid;gap:6px;margin-top:10px}
+.goals div{display:flex;justify-content:space-between;gap:10px;background:var(--surface-2);border-radius:9px;padding:8px 11px;font-size:13.5px}
+.goals span{font:500 13px var(--font-mono);color:var(--muted)}
+.goals .on span{color:var(--ok)}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1500px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M20 8l10 6v12l-10 6-10-6V14z" fill="none" stroke="var(--fg)" stroke-width="2" stroke-linejoin="round"/><path d="M20 8V3M30 14l4-2.5M30 26l4 2.5M10 14l-4-2.5" stroke="var(--arm)" stroke-width="1.8" stroke-linecap="round"/><circle cx="20" cy="20" r="3.2" fill="var(--force)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Химия · Молекулы жизни</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#chem">Карта</a><a href="/physics/#chem">Химия</a><a href="/labs/chem-biomol/" aria-current="page">Молекулы жизни</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Биомолекулы</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Лабораторный стол: модели биомолекул и пробирки">
+    <svg class="scene" id="scene" role="img" aria-label="Модели углеводов, белков и нуклеиновых кислот. Звенья добавляются кнопками внизу, нажатие на звено убирает его."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const KEY = 'luch-chem-biomol';
+const SUBD = { '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉' };
+const low = s => String(s).replace(/\d/g, d => SUBD[d]);
+
+// ---------- lesson 1: carbohydrates. a = α-glucose, b = β-glucose, f = fructose ----------
+const MONO = { a: { s: 'α-Глк', name: 'α-глюкоза', col: '#ffb547' }, b: { s: 'β-Глк', name: 'β-глюкоза', col: '#86e0a8' }, f: { s: 'Фру', name: 'фруктоза', col: '#ff8a73' } };
+const G1 = [['red', 'сахар-восстановитель: красный осадок Cu₂O'], ['suc', 'сахароза: красного осадка нет'], ['starch', 'крахмал: синий с йодом'], ['cell', 'целлюлоза: йод не окрашивает']];
+const MAXC = 10;
+
+// ---------- lesson 2: amino acids. k: np nonpolar, p polar, ar aromatic, ch charged ----------
+const AA = [
+  { s: 'Гли', name: 'глицин', R: 'H', f: 'C₂H₅NO₂', M: 75, k: 'np' },
+  { s: 'Ала', name: 'аланин', R: 'CH₃', f: 'C₃H₇NO₂', M: 89, k: 'np' },
+  { s: 'Сер', name: 'серин', R: 'CH₂OH', f: 'C₃H₇NO₃', M: 105, k: 'p' },
+  { s: 'Цис', name: 'цистеин', R: 'CH₂SH', f: 'C₃H₇NO₂S', M: 121, k: 'p' },
+  { s: 'Фен', name: 'фенилаланин', R: 'CH₂–C₆H₅', f: 'C₉H₁₁NO₂', M: 165, k: 'ar' },
+  { s: 'Тир', name: 'тирозин', R: 'CH₂–C₆H₄OH', f: 'C₉H₁₁NO₃', M: 181, k: 'ar' },
+  { s: 'Лиз', name: 'лизин', R: '(CH₂)₄NH₂', f: 'C₆H₁₄N₂O₂', M: 146, k: 'ch' },
+  { s: 'Глу', name: 'глутаминовая к-та', R: '(CH₂)₂COOH', f: 'C₅H₉NO₄', M: 147, k: 'ch' },
+];
+const KCOL = { np: '#4f586d', p: '#2f7fa8', ar: '#8a5cc7', ch: '#c0563f' };
+const KNAME = { np: 'неполярный радикал', p: 'полярный радикал', ar: 'ароматическое кольцо', ch: 'заряжённая группа' };
+const TARGET = [1, 0, 2];
+const G2 = [['seq', 'трипептид Ала–Гли–Сер'], ['biu', 'биуретовая реакция: фиолетовый'], ['xan', 'ксантопротеиновая: жёлтый']];
+const MAXP = 7;
+
+// ---------- lesson 3: nucleic acids ----------
+const PAIR_DNA = { A: 'T', T: 'A', G: 'C', C: 'G' };
+const PAIR_RNA = { A: 'U', T: 'A', G: 'C', C: 'G' };
+const BCOL = { A: '#ff8a73', T: '#ffb547', G: '#86e0a8', C: '#72d4e8', U: '#c792ea' };
+const BNAME = { A: 'аденин', T: 'тимин', G: 'гуанин', C: 'цитозин', U: 'урацил' };
+const NB = 8;
+const G3 = [['dna', 'вторая цепь ДНК'], ['rna', 'иРНК по матрице'], ['hb', 'число водородных связей']];
+
+const LESSONS = [
+  { id: 'carbs', title: 'Углеводы: от глюкозы до крахмала',
+    text: ['Углеводы — природные вещества, состав многих из них отвечает формуле Cₙ(H₂O)ₘ. Моносахариды не гидролизуются: глюкоза и фруктоза C₆H₁₂O₆ — изомеры. Глюкоза — альдегидоспирт: в открытой форме у неё пять групп –OH и альдегидная группа, а в растворе она в основном замыкается в шестичленный цикл, α- или β-форму.',
+           'Дисахариды получаются из двух остатков моносахаридов с отщеплением воды: мальтоза — из двух α-глюкоз, сахароза — из глюкозы и фруктозы, C₁₂H₂₂O₁₁. В мальтозе осталась свободная полуацетальная группа, поэтому она, как и глюкоза, восстанавливает Cu(OH)₂ до красного Cu₂O. В сахарозе эти группы заняты связью, и красного осадка нет.',
+           'Полисахариды (C₆H₁₀O₅)ₙ — длинные цепи. Крахмал собран из α-глюкозы, его цепь закручивается в спираль, в которую входит йод, — отсюда синяя окраска. Целлюлоза собрана из β-глюкозы: соседние звенья перевёрнуты, цепь прямая, цепи слипаются водородными связями в прочные волокна, и йод их не окрашивает.'],
+    why: 'Технологи сахарных заводов Жамбылской и Алматинской областей получают сахарозу из сахарной свёклы и проверяют её чистоту. Йодная проба на крахмал — быстрый способ найти подделку в сметане, твороге или колбасе: так работают лаборатории контроля качества. Из целлюлозы делают бумагу, вату, вискозу, а врачи-эндокринологи и диетологи считают углеводы при диабете.',
+    safe: 'Раствор йода и щёлочь для Cu(OH)₂ берут в малых количествах и работают в очках. Пробирку при нагревании держат держателем и направляют отверстием от себя и соседей.',
+    task: 'Четыре цели: найдите сахар, который даёт красный осадок Cu₂O; соберите сахарозу и докажите, что она его не даёт; соберите крахмал (6+ звеньев) и проверьте йодом; соберите целлюлозу и проверьте йодом.',
+    hint: 'Звенья добавляются кнопками «+ α-Глк», «+ β-Глк», «+ Фру». Нажатие на звено на столе убирает его и всё после него. Опыты — кнопками «I₂» и «Cu(OH)₂ + t».',
+    stage: 'Добавляйте звенья кнопками. Нажмите на звено, чтобы его убрать.',
+    init: { chain: ['a'] },
+    check: m => m.got === 4 },
+  { id: 'proteins', title: 'Аминокислоты и белки',
+    text: ['Аминокислоты содержат две функциональные группы: аминогруппу –NH₂ (основную) и карбоксильную –COOH (кислотную). Поэтому они амфотерны: реагируют и с кислотами, и со щелочами, а в растворе существуют в виде биполярного иона ⁺H₃N–CHR–COO⁻. В белках человека встречаются 20 α-аминокислот, они различаются радикалом R.',
+           'Карбоксильная группа одной аминокислоты и аминогруппа другой соединяются с отщеплением воды. Возникает пептидная связь –CO–NH–. У цепи есть начало — N-конец со свободной –NH₂ — и конец с –COOH, поэтому Ала–Гли и Гли–Ала — разные вещества. Последовательность аминокислот — первичная структура белка.',
+           'Цепь сворачивается в спираль (вторичная структура), затем в клубок (третичная), иногда несколько цепей объединяются (четвертичная). При нагревании, действии кислот, спирта и солей тяжёлых металлов структура разрушается — это денатурация. Белки узнают по цветным реакциям: биуретовой (фиолетовая, нужны хотя бы две пептидные связи) и ксантопротеиновой (жёлтая, на ароматические кольца).'],
+    why: 'Лаборанты молочных комбинатов и мясокомбинатов определяют содержание белка в продуктах: от него зависят сорт и цена. Врачи-лаборанты по белку в анализах крови и мочи узнают о болезнях печени и почек. Биотехнологи выращивают инсулин и ферменты для стирального порошка, а спортивные диетологи рассчитывают, сколько белка нужно спортсмену.',
+    safe: 'Концентрированная азотная кислота вызывает глубокие ожоги и окрашивает кожу в жёлтый цвет — это та же ксантопротеиновая реакция. Работают только в перчатках, очках и под тягой.',
+    task: 'Три цели: соберите трипептид Ала–Гли–Сер именно в таком порядке; получите фиолетовую биуретовую реакцию; получите жёлтую ксантопротеиновую реакцию.',
+    hint: 'Аминокислоты добавляются к концу цепи кнопками внизу. Нажатие на остаток убирает его и всё после него. Для ксантопротеиновой реакции нужен остаток с бензольным кольцом.',
+    stage: 'Добавляйте аминокислоты кнопками. Нажмите на остаток, чтобы его убрать.',
+    init: { pep: [1] },
+    check: m => m.got === 3 },
+  { id: 'nucleic', title: 'Нуклеиновые кислоты: ДНК и РНК',
+    text: ['Нуклеиновые кислоты — полимеры из нуклеотидов. Каждый нуклеотид состоит из азотистого основания, пятиуглеродного сахара (в ДНК — дезоксирибоза, в РНК — рибоза) и остатка фосфорной кислоты. Сахар и фосфат чередуются и образуют «перила» цепи, а основания смотрят внутрь.',
+           'ДНК — двойная спираль из двух антипараллельных цепей. Основания соединяются по принципу комплементарности: аденин с тимином двумя водородными связями (A=T), гуанин с цитозином тремя (G≡C). Поэтому в любой ДНК A = T и G = C — это правило Чаргаффа.',
+           'При транскрипции по одной цепи ДНК, как по матрице, строится информационная РНК. РНК одноцепочечная, в ней вместо тимина урацил: напротив A матрицы встаёт U. По иРНК рибосома затем собирает белок — так информация переходит от ДНК к белку.'],
+    why: 'ПЦР-тесты на вирусы, генетические тесты на наследственные болезни, установление отцовства и криминалистическая экспертиза по ДНК — всё это работа генетиков и лаборантов, в том числе в Национальном центре биотехнологии в Астане. Селекционеры по ДНК-маркерам выводят сорта пшеницы и породы скота, а вакцины на основе иРНК разрабатывают молекулярные биологи.',
+    task: 'Три цели: достройте вторую цепь ДНК; постройте иРНК по матричной цепи; посчитайте, сколько водородных связей держат две цепи этого фрагмента вместе.',
+    hint: 'Нажмите на ячейку нижней цепи, затем на основание. Режимы переключаются кнопками «ДНК», «иРНК», «Связи». В режиме «Связи» выберите число кнопками «−» и «+» и нажмите «Проверить».',
+    stage: 'Нажмите на ячейку нижней цепи, затем на основание внизу.',
+    init: { mode: 'dna' },
+    check: m => m.got === 3 },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null,
+            got: {}, chain: [], test: null, ph: 1, pep: [], mode: 'dna', tpl: [], fill: { dna: [], rna: [] }, cur: 0, hbG: 16 };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+// ---------- model ----------
+function carbInfo(ch) {
+  const n = ch.length, allA = n > 0 && ch.every(x => x === 'a'), allB = n > 0 && ch.every(x => x === 'b');
+  const suc = n === 2 && ch.includes('a') && ch.includes('f');
+  let name = 'пусто', cls = '—';
+  if (n === 1) { name = MONO[ch[0]].name; cls = 'моносахарид'; }
+  else if (n === 2) { name = suc ? 'сахароза' : allA ? 'мальтоза' : 'целлобиоза'; cls = 'дисахарид'; }
+  else if (n > 2 && n < 6) { name = allA ? 'декстрин' : 'олигосахарид β-глюкозы'; cls = 'олигосахарид'; }
+  else if (n >= 6) { name = allA ? 'крахмал (амилоза)' : 'целлюлоза'; cls = 'полисахарид'; }
+  const f = n === 0 ? '—' : n === 1 ? 'C₆H₁₂O₆' : low(`C${6 * n}H${10 * n + 2}O${5 * n + 1}`);
+  return { n, allA, allB, suc, name, cls, f, M: n ? 162 * n + 18 : 0, water: Math.max(0, n - 1), reducing: n > 0 && n < 6 && !suc, helix: allA && n >= 6, fiber: allB && n >= 6 };
+}
+function pepInfo(p) {
+  const n = p.length, sumM = p.reduce((s, i) => s + AA[i].M, 0), bonds = Math.max(0, n - 1);
+  return { n, sumM, bonds, M: n ? sumM - 18 * bonds : 0, arom: p.some(i => AA[i].k === 'ar'), seq: p.map(i => AA[i].s).join('–') || '—', target: n === 3 && p.every((x, i) => x === TARGET[i]) };
+}
+const want = (mode, i) => (mode === 'rna' ? PAIR_RNA : PAIR_DNA)[S.tpl[i]];
+function naInfo() {
+  const res = {};
+  for (const md of ['dna', 'rna']) {
+    const F = S.fill[md]; let filled = 0, wrong = 0;
+    for (let i = 0; i < NB; i++) if (F[i]) { filled++; if (F[i] !== want(md, i)) wrong++; }
+    res[md] = { filled, wrong, ok: filled === NB && wrong === 0 };
+  }
+  const at = S.tpl.filter(b => b === 'A' || b === 'T').length, gc = NB - at;
+  return { ...res, at, gc, hb: 2 * at + 3 * gc };
+}
+function model() {
+  const id = LID();
+  if (id === 'carbs') { const I = carbInfo(S.chain); return { kind: 'carb', I, got: G1.filter(([k]) => S.got[k]).length }; }
+  if (id === 'proteins') { const P = pepInfo(S.pep); return { kind: 'pep', P, got: G2.filter(([k]) => S.got[k]).length }; }
+  return { kind: 'na', N: naInfo(), got: G3.filter(([k]) => S.got[k]).length };
+}
+
+// ---------- drawing helpers ----------
+const scene = $('#scene');
+const txt = (x, y, s, size, col, anchor = 'middle', w = 400) => `<text x="${x}" y="${y}" font-size="${size}" fill="${col}" text-anchor="${anchor}" font-weight="${w}">${s}</text>`;
+const seg = (p, q, col, w, dash) => `<path d="M${p[0].toFixed(1)} ${p[1].toFixed(1)}L${q[0].toFixed(1)} ${q[1].toFixed(1)}" stroke="${INK}" stroke-width="${w + 2.4}" stroke-linecap="round"/><path d="M${p[0].toFixed(1)} ${p[1].toFixed(1)}L${q[0].toFixed(1)} ${q[1].toFixed(1)}" stroke="${col}" stroke-width="${w}" stroke-linecap="round"${dash ? ` stroke-dasharray="${dash}"` : ''}/>`;
+function boardBg() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.05)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/><path d="M-2000 395H2520" stroke="#26324a" stroke-width="2"/>`;
+}
+function tubeSVG(id, x, y, w, h, layers, extra) {
+  const r = w / 2, yb = y + h, path = `M${x} ${y}V${yb - r}A${r} ${r} 0 0 0 ${x + w} ${yb - r}V${y}`;
+  let s = `<clipPath id="${id}"><path d="${path}Z"/></clipPath><path d="${path}Z" fill="rgba(160,190,230,.05)"/><g clip-path="url(#${id})">`;
+  let acc = yb;
+  for (const L of layers) { const hh = L.f * h; acc -= hh; s += `<rect x="${x}" y="${acc.toFixed(1)}" width="${w}" height="${(hh + 0.6).toFixed(1)}" fill="${L.col}" opacity="${L.op === undefined ? 0.85 : L.op}"/>`; }
+  s += (extra || '') + '</g>';
+  s += `<path d="${path}" fill="none" stroke="#c8d1e2" stroke-opacity=".75" stroke-width="2"/><path d="M${x - 4} ${y}h${w + 8}" stroke="#c8d1e2" stroke-width="2.4" stroke-linecap="round"/>`;
+  s += `<path d="M${x + 6} ${y + 10}V${yb - r - 4}" stroke="#fff" stroke-opacity=".12" stroke-width="3" stroke-linecap="round"/>`;
+  return s;
+}
+function burner(cx, y, on, t) {
+  const fl = reduce ? 0 : Math.sin(t / 90) * 2.5 + Math.sin(t / 37) * 1.2;
+  let s = `<rect x="${cx - 20}" y="${y + 12}" width="40" height="26" rx="8" fill="#2a3550" stroke="#56627d" stroke-width="1.5"/><rect x="${cx - 4}" y="${y + 4}" width="8" height="9" fill="#56627d"/>`;
+  if (on) s += `<path d="M${cx - 8} ${y + 4}Q${cx - 6} ${y - 14 + fl} ${cx} ${y - 26 + fl}Q${cx + 6} ${y - 14 - fl} ${cx + 8} ${y + 4}Z" fill="#ffb547" opacity=".85"/><path d="M${cx - 4} ${y + 4}Q${cx} ${y - 12 + fl} ${cx + 4} ${y + 4}Z" fill="#72d4e8" opacity=".8"/>`;
+  return s;
+}
+function bubbles(x, w, yb, hgt, t, n) {
+  let s = '';
+  for (let k = 0; k < n; k++) {
+    const bx = x + 6 + ((k * 37) % Math.max(8, w - 12)), by = yb - 4 - (((t / 9) + k * 29) % Math.max(10, hgt - 6)), r = 1.6 + (k % 3);
+    s += `<circle cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="${r}" fill="none" stroke="#e8ecf4" stroke-opacity=".7" stroke-width="1.2"/>`;
+  }
+  return s;
+}
+const TUBE = { x: 400, y: 168, w: 46, h: 160 };
+function testTube(r, heat, t, label) {
+  const T = TUBE;
+  let extra = heat && S.ph < 1 ? bubbles(T.x, T.w, T.y + T.h, T.h * 0.45, t, 5) : '';
+  return burner(T.x + T.w / 2, 340, heat && S.ph < 1, t) + tubeSVG('tt', T.x, T.y, T.w, T.h, r ? r.L : [], extra) + txt(T.x + T.w / 2, T.y - 12, label, 11, r ? '#ffb547' : '#8b96ad');
+}
+
+// ---------- lesson 1 ----------
+const cpos = i => { const row = Math.floor(i / 5), k = i % 5; return [row ? 60 + (4 - k) * 64 : 60 + k * 64, 205 + row * 92]; };
+function ringSVG(x, y, type, flip, i) {
+  const M = MONO[type], col = M.col, nV = type === 'f' ? 5 : 6, R = type === 'f' ? 19 : 21, a0 = flip ? Math.PI / 2 : -Math.PI / 2;
+  const pts = []; for (let k = 0; k < nV; k++) { const a = a0 + k * 2 * Math.PI / nV + (nV === 6 ? Math.PI / 6 : 0); pts.push([x + R * Math.cos(a), y + R * Math.sin(a)]); }
+  const d = 'M' + pts.map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join('L') + 'Z';
+  const o = pts[0];
+  return `<path d="${d}" fill="${col}" fill-opacity=".16" stroke="${INK}" stroke-width="5.4" stroke-linejoin="round"/><path d="${d}" fill="${col}" fill-opacity=".16" stroke="${col}" stroke-width="2.6" stroke-linejoin="round"/>` +
+    `<circle cx="${o[0].toFixed(1)}" cy="${o[1].toFixed(1)}" r="5" fill="#e5604f" stroke="${INK}" stroke-width="1.4"/>` +
+    txt(x, y + 3, M.s, 8, '#e8ecf4', 'middle', 600) + txt(x, y + (i >= 5 ? 40 : -30), String(i + 1), 9, '#56627d');
+}
+function carbResult(I, test, ph) {
+  if (test === 'i2') return I.helix ? { L: [{ f: 0.5, col: '#2b2f9e', op: 0.92 }], txt: 'Сине-фиолетовая окраска: йод вошёл в спираль крахмала', ok: true }
+    : { L: [{ f: 0.5, col: '#c98b2b', op: 0.45 }], txt: I.fiber ? 'Синей окраски нет: прямые цепи целлюлозы не образуют спираль' : 'Синей окраски нет — это просто цвет раствора йода', ok: I.fiber };
+  const sedi = c => [{ f: 0.08, col: c, op: 0.95 }, { f: 0.38, col: '#bfe0f4', op: 0.25 }];
+  if (I.reducing) return { L: sedi(ph < 0.35 ? '#6cb8ea' : ph < 0.65 ? '#e3c449' : '#b5442c'), txt: I.n === 1 && S.chain[0] === 'f' ? 'Кирпично-красный Cu₂O: в щелочной среде фруктоза тоже восстанавливает Cu(OH)₂' : 'Кирпично-красный осадок Cu₂O: свободная альдегидная (полуацетальная) группа', ok: true, heat: true };
+  if (I.suc) return { L: [{ f: 0.46, col: '#2563eb', op: 0.88 }], txt: 'Ярко-синий раствор, красного осадка нет: сахароза не восстанавливает Cu(OH)₂', ok: true, heat: true };
+  return { L: sedi(ph < 0.5 ? '#6cb8ea' : '#232326'), txt: 'Осадок почернел (CuO), красного Cu₂O нет: у длинной цепи почти нет свободных концов', heat: true };
+}
+function drawL1(m, t) {
+  const I = m.I;
+  let h = boardBg();
+  if (I.helix) h += `<path d="M30 168C70 150 110 186 150 168S230 150 270 168 330 186 350 170" fill="none" stroke="#ffb547" stroke-opacity=".35" stroke-width="2" stroke-dasharray="5 5"/>` + txt(190, 150, 'α-цепь закручивается в спираль', 10.5, '#ffb547');
+  if (I.fiber) h += `<path d="M28 168H352M28 336H352" stroke="#86e0a8" stroke-opacity=".35" stroke-width="2" stroke-dasharray="5 5"/>` + txt(190, 150, 'β-цепь прямая, звенья перевёрнуты', 10.5, '#86e0a8');
+  for (let i = 1; i < I.n; i++) {
+    const p = cpos(i - 1), q = cpos(i), mid = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2 + (S.chain[i] === 'b' && p[1] === q[1] ? (i % 2 ? 7 : -7) : 0)];
+    h += seg(p, mid, '#c8d1e2', 2.6) + seg(mid, q, '#c8d1e2', 2.6) + `<circle cx="${mid[0].toFixed(1)}" cy="${mid[1].toFixed(1)}" r="6.5" fill="#e5604f" stroke="${INK}" stroke-width="1.5"/>` + txt(mid[0].toFixed(1), (mid[1] + 3).toFixed(1), 'O', 8, '#fff', 'middle', 600);
+  }
+  S.chain.forEach((c, i) => { const p = cpos(i); h += ringSVG(p[0], p[1], c, c === 'b' && i % 2 === 1, i); });
+  if (!I.n) h += txt(190, 250, 'Добавьте моносахарид кнопками внизу', 13, '#8b96ad');
+  else h += txt(190, I.n > 5 ? 352 : 262, `${I.name} · ${I.f}`, 13, '#e8ecf4', 'middle', 500) + txt(190, I.n > 5 ? 370 : 280, `${I.cls}, M = ${I.M} г/моль`, 11, '#8b96ad');
+  let res = null;
+  if (S.test) res = carbResult(I, S.test, S.ph);
+  h += testTube(res, res && res.heat, t, S.test === 'i2' ? '+ I₂' : S.test === 'cu' ? '+ Cu(OH)₂, t' : 'пробирка');
+  h += txt(260, 393, !S.test ? 'Соберите молекулу и проведите опыт' : S.ph < 1 ? 'Идёт опыт…' : res.txt, 12.5, !S.test || S.ph < 1 ? '#8b96ad' : res.ok ? '#86e0a8' : '#e8ecf4');
+  return h;
+}
+
+// ---------- lesson 2 ----------
+const ppos = i => [44 + i * 48, i % 2 ? 196 : 228];
+function pepResult(P, test, ph) {
+  if (test === 'biu') return P.bonds >= 2 ? { L: [{ f: 0.48, col: ph < 0.5 ? '#4a8fe0' : '#7b3fbf', op: 0.85 }], txt: `Фиолетовая окраска: пептидных связей ${P.bonds} — биуретовая реакция есть`, ok: true }
+    : { L: [{ f: 0.48, col: '#4a8fe0', op: 0.8 }], txt: `Синий цвет, фиолетового нет: пептидных связей ${P.bonds}, а нужно хотя бы две` };
+  return P.arom ? { L: [{ f: 0.46, col: ph < 0.5 ? '#e9e1c8' : '#e3b62c', op: ph < 0.5 ? 0.35 : 0.85 }], txt: 'Жёлтая окраска: азотная кислота нитрует бензольные кольца', ok: true, heat: true }
+    : { L: [{ f: 0.46, col: '#e9e1c8', op: 0.35 }], txt: 'Жёлтой окраски нет: в цепи нет ароматических колец', heat: true };
+}
+function drawL2(m, t) {
+  const P = m.P;
+  let h = boardBg();
+  if (P.n) {
+    const a = ppos(0), b = ppos(P.n - 1);
+    h += seg([a[0] - 22, a[1]], a, '#c8d1e2', 2.4) + txt(a[0] - 26, a[1] + 4, 'H₂N', 11, '#72d4e8', 'end', 600);
+    h += seg(b, [b[0] + 22, b[1]], '#c8d1e2', 2.4) + txt(b[0] + 26, b[1] + 4, 'COOH', 11, '#ff8a73', 'start', 600);
+  }
+  for (let i = 1; i < P.n; i++) {
+    const p = ppos(i - 1), q = ppos(i);
+    h += seg(p, q, '#ffb547', 4.2);
+    if (i === 1) h += txt((p[0] + q[0]) / 2, 162, '–CO–NH–', 10, '#ffb547', 'middle', 600) + `<path d="M${(p[0] + q[0]) / 2} 166V${(p[1] + q[1]) / 2 - 6}" stroke="#ffb547" stroke-width="1" stroke-dasharray="2 2"/>`;
+  }
+  S.pep.forEach((k, i) => {
+    const p = ppos(i), A = AA[k], up = i % 2 === 1;
+    h += seg(p, [p[0], p[1] + (up ? -22 : 22)], '#8b96ad', 1.6);
+    h += txt(p[0], p[1] + (up ? -27 : 36), A.R, 8.5, A.k === 'ar' ? '#b48ef0' : '#8b96ad');
+    h += `<circle cx="${p[0]}" cy="${p[1]}" r="18.6" fill="${INK}"/><circle cx="${p[0]}" cy="${p[1]}" r="17" fill="${KCOL[A.k]}" stroke="rgba(255,255,255,.2)" stroke-width="1.2"/>` + txt(p[0], p[1] + 4, A.s, 10.5, '#fff', 'middle', 600);
+  });
+  if (!P.n) h += txt(190, 214, 'Добавьте аминокислоту кнопками внизу', 13, '#8b96ad');
+  else h += txt(190, 300, P.seq, 13.5, P.target ? '#86e0a8' : '#e8ecf4', 'middle', 500) + txt(190, 320, `${P.n === 1 ? 'аминокислота' : P.n === 2 ? 'дипептид' : P.n === 3 ? 'трипептид' : 'пептид из ' + P.n + ' остатков'} · связей –CO–NH–: ${P.bonds} · M = ${P.M} г/моль`, 11, '#8b96ad');
+  let res = null;
+  if (S.test) res = pepResult(P, S.test, S.ph);
+  h += testTube(res, res && res.heat, t, S.test === 'biu' ? '+ CuSO₄ + NaOH' : S.test === 'xan' ? '+ HNO₃, t' : 'пробирка');
+  h += txt(260, 393, !S.test ? 'Соберите пептид и проведите цветную реакцию' : S.ph < 1 ? 'Идёт опыт…' : res.txt, 12.5, !S.test || S.ph < 1 ? '#8b96ad' : res.ok ? '#86e0a8' : '#e8ecf4');
+  return h;
+}
+
+// ---------- lesson 3 ----------
+const nx = i => 70 + i * 54;
+function baseBox(x, y, b, ring, faded, wrong) {
+  const col = b ? BCOL[b] : '#26324a';
+  return `<rect x="${x - 19}" y="${y}" width="38" height="40" rx="7" fill="${b ? col : 'rgba(160,190,230,.05)'}" fill-opacity="${b ? (faded ? 0.35 : 0.85) : 1}" stroke="${ring ? '#ffb547' : wrong ? '#ff8a73' : b ? INK : '#56627d'}" stroke-width="${ring ? 3 : wrong ? 2.4 : 1.6}"${b || ring ? '' : ' stroke-dasharray="4 3"'}/>` +
+    (b ? txt(x, y + 26, b, 17, '#0b1019', 'middle', 700) : '');
+}
+function drawL3(m, t) {
+  const N = m.N, md = S.mode, show = md === 'hb' ? 'dna' : md, rna = show === 'rna';
+  let h = boardBg();
+  // template strand on top
+  h += `<path d="M${nx(0) - 24} 132H${nx(NB - 1) + 24}" stroke="#c8d1e2" stroke-width="3"/>` + txt(nx(0) - 30, 136, '5′', 12, '#8b96ad', 'end') + txt(nx(NB - 1) + 30, 136, '3′', 12, '#8b96ad', 'start');
+  h += txt(260, 116, md === 'dna' || md === 'hb' ? 'цепь ДНК' : 'матричная цепь ДНК', 11, '#8b96ad');
+  const yb = 286, col2 = rna ? '#ff8a73' : '#c8d1e2';
+  h += `<path d="M${nx(0) - 24} ${yb}H${nx(NB - 1) + 24}" stroke="${col2}" stroke-width="3"${rna ? ' stroke-dasharray="8 4"' : ''}/>` + txt(nx(0) - 30, yb + 4, '3′', 12, '#8b96ad', 'end') + txt(nx(NB - 1) + 30, yb + 4, '5′', 12, '#8b96ad', 'start');
+  h += txt(260, yb + 26, rna ? 'иРНК (рибоза, урацил вместо тимина)' : md === 'hb' ? 'вторая цепь ДНК' : 'вторая цепь ДНК (достройте)', 11, rna ? '#ff8a73' : '#8b96ad');
+  for (let i = 0; i < NB; i++) {
+    const x = nx(i), b = S.tpl[i], f = md === 'hb' ? want('dna', i) : S.fill[show][i], ok = f && f === want(show, i);
+    h += `<path d="M${x} 132V150M${x} ${yb}V270" stroke="#c8d1e2" stroke-width="2"/><circle cx="${x}" cy="132" r="5" fill="#ffb547" stroke="${INK}"/><circle cx="${x}" cy="${yb}" r="5" fill="${rna ? '#ff8a73' : '#ffb547'}" stroke="${INK}"/>`;
+    h += baseBox(x, 150, b, false, false, false);
+    h += baseBox(x, 230, f, md !== 'hb' && S.cur === i, false, f && !ok);
+    if (f && ok) { const n = (b === 'G' || b === 'C') ? 3 : 2; for (let k = 0; k < n; k++) { const dx = (k - (n - 1) / 2) * 9; h += `<path d="M${x + dx} 193V227" stroke="#e8ecf4" stroke-width="1.6" stroke-dasharray="3 3"/>`; } }
+    else if (f) h += txt(x, 215, '≠', 16, '#ff8a73', 'middle', 700);
+  }
+  let res;
+  if (md === 'hb') res = S.got.hb ? `Верно: ${N.hb} водородных связей` : `Посчитайте связи между цепями. Ваш ответ: ${S.hbG}`;
+  else { const D = N[show]; res = D.ok ? (rna ? '✓ иРНК построена верно' : '✓ Вторая цепь ДНК верна') : D.wrong ? `Ошибок: ${D.wrong} — они отмечены знаком ≠` : `Заполнено ${D.filled} из ${NB}`; }
+  h += txt(260, 360, res, 13, (md === 'hb' ? S.got.hb : N[show].ok) ? '#86e0a8' : N[show] && N[show].wrong && md !== 'hb' ? '#ff8a73' : '#e8ecf4', 'middle', 500);
+  h += txt(260, 382, 'A=T · G≡C · в РНК A=U', 11, '#8b96ad');
+  return h;
+}
+
+function hlBox(id) {
+  const L = LID();
+  if (L === 'carbs') {
+    if (id === 'ring') { const p = cpos(0); return [p[0] - 28, p[1] - 28, 56, 56]; }
+    if (id === 'bridge') { if (S.chain.length < 2) return null; const p = cpos(0), q = cpos(1); return [(p[0] + q[0]) / 2 - 14, p[1] - 14, 28, 28]; }
+    if (id === 'chain') return [24, 150, 330, 230];
+    if (id === 'tube') return [388, 150, 70, 196];
+    if (id === 'burner') return [392, 332, 62, 52];
+  }
+  if (L === 'proteins') {
+    if (id === 'res') { if (!S.pep.length) return null; const p = ppos(0); return [p[0] - 24, p[1] - 24, 48, 70]; }
+    if (id === 'bond') { if (S.pep.length < 2) return null; const p = ppos(0), q = ppos(1); return [p[0] + 10, 150, q[0] - p[0] - 20, 90]; }
+    if (id === 'nterm') { const p = ppos(0); return [p[0] - 64, p[1] - 16, 46, 32]; }
+    if (id === 'cterm') { if (!S.pep.length) return null; const p = ppos(S.pep.length - 1); return [p[0] + 20, p[1] - 16, 62, 32]; }
+    if (id === 'tube') return [388, 150, 70, 196];
+  }
+  if (L === 'nucleic') {
+    if (id === 'back') return [40, 118, 440, 28];
+    if (id === 'base') return [nx(0) - 24, 144, 48, 52];
+    if (id === 'hbond') return [nx(0) - 24, 190, 440, 42];
+    if (id === 'second') return [40, 224, 440, 100];
+    if (id === 'ends') return [20, 118, 40, 182];
+  }
+  return null;
+}
+
+function drawScene(t) {
+  const m = model(), id = LID();
+  let h = id === 'carbs' ? drawL1(m, t) : id === 'proteins' ? drawL2(m, t) : drawL3(m, t);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 520, hh / 410, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 405 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- actions ----------
+function addMono(x) {
+  const c = S.chain.concat(x), n = c.length;
+  if (n > MAXC) { toast(`В модели помещается ${MAXC} звеньев — этого хватит, чтобы увидеть полисахарид.`); return; }
+  if (c.includes('f') && !(n === 2 && c.includes('a') && c.includes('f')) && !(n === 1)) { toast('Фруктоза в этой модели соединяется только с α-глюкозой — получается сахароза. Длиннее цепь с ней не строим.'); return; }
+  if (n > 1 && !c.includes('f') && !c.every(y => y === c[0])) { toast('Крахмал собран только из α-глюкозы, целлюлоза — только из β-глюкозы. Смешивать формы в одной цепи нельзя.'); return; }
+  S.chain = c; S.test = null;
+  const I = carbInfo(c);
+  if (n >= 2) toast(`${I.name[0].toUpperCase() + I.name.slice(1)}: отщепилась ещё одна молекула воды, всего ${I.water}.`);
+  renderTools(); update();
+}
+function cutChain(i) { S.chain = S.chain.slice(0, i); S.test = null; renderTools(); update(); }
+function addAA(k) {
+  if (S.pep.length >= MAXP) { toast(`В модели помещается ${MAXP} остатков. Настоящие белки длиннее — от 50 до тысяч остатков.`); return; }
+  S.pep = S.pep.concat(k); S.test = null;
+  const P = pepInfo(S.pep);
+  if (P.target && !S.got.seq) { S.got.seq = true; toast('Есть: трипептид Ала–Гли–Сер! Две пептидные связи, выделилось 2 молекулы воды.'); }
+  else if (P.n === 3 && S.pep.join() === '2,0,1') toast('Это Сер–Гли–Ала: та же троица, но другое вещество. Цепь читают от N-конца.');
+  else if (P.n > 1) toast(`Новая пептидная связь –CO–NH–, отщепилась вода. Связей: ${P.bonds}.`);
+  renderTools(); update();
+}
+function cutPep(i) { S.pep = S.pep.slice(0, i); S.test = null; renderTools(); update(); }
+function runTest(k) {
+  const id = LID();
+  if (id === 'carbs' && !S.chain.length) { toast('Сначала соберите молекулу углевода.'); return; }
+  if (id === 'proteins' && !S.pep.length) { toast('Сначала соберите пептид.'); return; }
+  S.test = k; S.ph = reduce ? 1 : 0;
+  if (reduce) testDone(); else { renderTools(); update(); }
+}
+function testDone() {
+  const id = LID();
+  if (id === 'carbs') {
+    const I = carbInfo(S.chain), r = carbResult(I, S.test, 1);
+    let msg = r.txt + '.';
+    if (S.test === 'cu' && I.reducing && !S.got.red) { S.got.red = true; msg = 'Есть! ' + msg; }
+    if (S.test === 'cu' && I.suc && !S.got.suc) { S.got.suc = true; msg = 'Есть! ' + msg; }
+    if (S.test === 'i2' && I.helix && !S.got.starch) { S.got.starch = true; msg = 'Есть! ' + msg; }
+    if (S.test === 'i2' && I.fiber && !S.got.cell) { S.got.cell = true; msg = 'Есть! ' + msg; }
+    if (S.test === 'i2' && I.allA && I.n < 6) msg += ' Цепь пока коротка: для синей спирали добавьте звеньев.';
+    toast(msg);
+  } else {
+    const P = pepInfo(S.pep), r = pepResult(P, S.test, 1);
+    let msg = r.txt + '.';
+    if (S.test === 'biu' && P.bonds >= 2 && !S.got.biu) { S.got.biu = true; msg = 'Есть! ' + msg; }
+    if (S.test === 'xan' && P.arom && !S.got.xan) { S.got.xan = true; msg = 'Есть! ' + msg; }
+    toast(msg);
+  }
+  renderTools(); update();
+}
+function setMode(md) {
+  if (md === 'hb' && !S.got.dna) { toast('Сначала достройте вторую цепь ДНК — связи считают между готовыми цепями.'); return; }
+  S.mode = md; if (md !== 'hb') S.cur = Math.max(0, S.fill[md].findIndex(x => !x)); renderTools(); buildScheme(); update();
+}
+function putBase(b) {
+  const md = S.mode; if (md === 'hb') return;
+  if (md === 'dna' && b === 'U') { toast('Урацил бывает только в РНК.'); return; }
+  if (md === 'rna' && b === 'T') { toast('В РНК нет тимина — вместо него урацил U.'); return; }
+  S.fill[md][S.cur] = b;
+  const N = naInfo(), D = N[md];
+  if (D.ok && !S.got[md]) { S.got[md] = true; toast(md === 'dna' ? 'Есть: вторая цепь ДНК комплементарна первой!' : 'Есть: иРНК построена — напротив A встал U.'); }
+  else if (D.filled === NB && D.wrong) toast('Цепь заполнена, но есть ошибки — исправьте ячейки со знаком ≠.');
+  let nx2 = -1; for (let k = 1; k <= NB; k++) { const j = (S.cur + k) % NB; if (!S.fill[md][j]) { nx2 = j; break; } }
+  S.cur = nx2 >= 0 ? nx2 : Math.min(NB - 1, S.cur + 1);
+  renderTools(); update();
+}
+function backBase() {
+  const md = S.mode; if (md === 'hb') return;
+  if (!S.fill[md][S.cur] && S.cur > 0) S.cur--;
+  S.fill[md][S.cur] = null; renderTools(); update();
+}
+function checkHb() {
+  const N = naInfo();
+  if (S.hbG === N.hb) { if (!S.got.hb) { S.got.hb = true; } toast(`Верно! ${N.at} пар A=T по 2 связи и ${N.gc} пар G≡C по 3.`); }
+  else toast(S.hbG < N.hb ? 'Мало. Пары G≡C держатся тремя связями, а не двумя.' : 'Много. Пары A=T держатся только двумя связями.');
+  renderTools(); update();
+}
+
+function tap(p) {
+  const id = LID();
+  if (id === 'carbs') { S.chain.forEach((c, i) => { const q = cpos(i); if (Math.hypot(p.x - q[0], p.y - q[1]) < 26) cutChain(i); }); return; }
+  if (id === 'proteins') { for (let i = 0; i < S.pep.length; i++) { const q = ppos(i); if (Math.hypot(p.x - q[0], p.y - q[1]) < 24) { cutPep(i); return; } } return; }
+  if (S.mode !== 'hb' && p.y > 220 && p.y < 300) for (let i = 0; i < NB; i++) if (Math.abs(p.x - nx(i)) < 26) { S.cur = i; renderTools(); update(); return; }
+}
+
+let drag = null, dirty = true, liveT = 0;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => { e.preventDefault(); drag = { x: e.clientX, y: e.clientY, moved: false }; });
+scene.addEventListener('pointermove', e => { if (drag && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8) drag.moved = true; });
+scene.addEventListener('pointerup', e => { if (!drag) return; const d = drag; drag = null; if (!d.moved) tap(toSvg(e)); });
+scene.addEventListener('pointercancel', () => { drag = null; });
+
+let last = performance.now();
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  let anim = false;
+  if (S.test && S.ph < 1 && LID() !== 'nucleic') { S.ph = Math.min(1, S.ph + dt / 2); anim = true; if (S.ph >= 1) testDone(); }
+  if (S.hl) anim = true;
+  if (dirty || anim) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3200); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  if (id === 'carbs') tb.innerHTML = B('m-a', '+ α-Глк') + B('m-b', '+ β-Глк') + B('m-f', '+ Фру') + B('cut', '⌫') + B('clr', 'Очистить') + sep + B('t-i2', 'I₂', S.test === 'i2') + B('t-cu', 'Cu(OH)₂ + t', S.test === 'cu');
+  else if (id === 'proteins') tb.innerHTML = AA.map((A, k) => B('aa' + k, A.s)).join('') + B('cut', '⌫') + sep + B('t-biu', 'Биурет', S.test === 'biu') + B('t-xan', 'HNO₃ + t', S.test === 'xan');
+  else tb.innerHTML = B('md-dna', 'ДНК', S.mode === 'dna') + B('md-rna', 'иРНК', S.mode === 'rna') + B('md-hb', 'Связи', S.mode === 'hb') + sep +
+    (S.mode === 'hb' ? B('hb-', '−') + `<button disabled>${S.hbG}</button>` + B('hb+', '+') + B('hbc', 'Проверить')
+      : (S.mode === 'dna' ? 'ATGC' : 'AUGC').split('').map(b => B('b-' + b, b)).join('') + B('bk', '⌫'));
+}
+function act(a) {
+  if (a.startsWith('m-')) return addMono(a[2]);
+  if (a === 'cut') { if (LID() === 'carbs') { if (S.chain.length) cutChain(S.chain.length - 1); } else if (S.pep.length) cutPep(S.pep.length - 1); return; }
+  if (a === 'clr') return cutChain(0);
+  if (a.startsWith('t-')) return runTest(a.slice(2));
+  if (/^aa\d$/.test(a)) return addAA(+a[2]);
+  if (a.startsWith('md-')) return setMode(a.slice(3));
+  if (a.startsWith('b-')) return putBase(a[2]);
+  if (a === 'bk') return backBase();
+  if (a === 'hb-' || a === 'hb+') { S.hbG = clamp(S.hbG + (a === 'hb+' ? 1 : -1), 8, 40); renderTools(); update(); return; }
+  if (a === 'hbc') return checkHb();
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button[data-a]'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  ring: IC('<path d="M17 5l10 6v12l-10 6-10-6V11z" fill="#ffb547" fill-opacity=".2" stroke="#ffb547" stroke-width="2"/><circle cx="27" cy="11" r="3.4" fill="#e5604f"/>'),
+  bridge: IC('<path d="M3 17h28" stroke="#c8d1e2" stroke-width="2"/><circle cx="17" cy="17" r="5" fill="#e5604f"/><path d="M3 10v14M31 10v14" stroke="#ffb547" stroke-width="2"/>'),
+  chain: IC('<path d="M3 20C9 10 13 26 19 16S27 8 31 16" fill="none" stroke="#ffb547" stroke-width="2" stroke-dasharray="3 2"/><path d="M3 28h28" stroke="#86e0a8" stroke-width="2"/>'),
+  tube: IC('<path d="M12 4V25A5 5 0 0 0 22 25V4" fill="none" stroke="#c8d1e2" stroke-width="1.8"/><path d="M12.9 16H21.1V25A4 4 0 0 1 12.9 25Z" fill="#2b2f9e" opacity=".8"/>'),
+  burner: IC('<rect x="8" y="20" width="18" height="10" rx="4" fill="#2a3550" stroke="#56627d"/><path d="M13 19Q17 6 21 19Z" fill="#ffb547"/>'),
+  res: IC('<circle cx="17" cy="14" r="8" fill="#4f586d" stroke="#c8d1e2"/><path d="M17 22v8" stroke="#8b96ad" stroke-width="2"/><text x="17" y="17" font-size="7" fill="#fff" text-anchor="middle">Ала</text>'),
+  bond: IC('<path d="M4 17h26" stroke="#ffb547" stroke-width="4"/><circle cx="4" cy="17" r="3" fill="#4f586d"/><circle cx="30" cy="17" r="3" fill="#4f586d"/>'),
+  nterm: IC('<text x="17" y="21" font-size="11" fill="#72d4e8" text-anchor="middle" font-weight="600">H₂N</text>'),
+  cterm: IC('<text x="17" y="21" font-size="10" fill="#ff8a73" text-anchor="middle" font-weight="600">COOH</text>'),
+  back: IC('<path d="M3 12h28" stroke="#c8d1e2" stroke-width="2.4"/><g fill="#ffb547"><circle cx="8" cy="12" r="3"/><circle cx="17" cy="12" r="3"/><circle cx="26" cy="12" r="3"/></g><path d="M8 12v12M17 12v12M26 12v12" stroke="#c8d1e2"/>'),
+  base: IC('<rect x="7" y="7" width="20" height="20" rx="4" fill="#ff8a73"/><text x="17" y="22" font-size="13" fill="#0b1019" text-anchor="middle" font-weight="700">A</text>'),
+  hbond: IC('<rect x="5" y="2" width="24" height="9" rx="3" fill="#86e0a8"/><rect x="5" y="23" width="24" height="9" rx="3" fill="#72d4e8"/><path d="M10 12v10M17 12v10M24 12v10" stroke="#e8ecf4" stroke-dasharray="2 2"/>'),
+  second: IC('<path d="M3 26h28" stroke="#ff8a73" stroke-width="2.4" stroke-dasharray="5 3"/><rect x="6" y="8" width="9" height="12" rx="2" fill="#c792ea"/><rect x="19" y="8" width="9" height="12" rx="2" fill="#86e0a8"/>'),
+  ends: IC('<text x="9" y="15" font-size="10" fill="#8b96ad" text-anchor="middle">5′</text><text x="9" y="29" font-size="10" fill="#8b96ad" text-anchor="middle">3′</text><path d="M16 11h15M16 25h15" stroke="#c8d1e2" stroke-width="2"/><path d="M27 8l4 3-4 3M20 22l-4 3 4 3" fill="none" stroke="#c8d1e2"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+const goalsHTML = G => `<h3>Цели</h3><div class="goals">${G.map(([k, n]) => `<div class="${S.got[k] ? 'on' : ''}">${n[0].toUpperCase() + n.slice(1)}<span>${S.got[k] ? '✓ есть' : 'нет'}</span></div>`).join('')}</div>`;
+const GOALS = { carbs: G1, proteins: G2, nucleic: G3 };
+
+function taskState(m) {
+  const L = LESSONS[S.lesson], G = GOALS[L.id];
+  if (S.done[L.id]) return '✓ Выполнено';
+  return `Целей: ${m.got} из ${G.length}  ` + G.map(([k]) => S.got[k] ? '✓' : '·').join(' ');
+}
+
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'carbs') h = `<h2>Сборка углевода</h2>
+      <div class="ctl"><div class="lbl">Добавить звено</div><div class="chips">${Object.keys(MONO).map(k => `<button data-a="m-${k}">+ ${MONO[k].name}</button>`).join('')}<button data-a="cut">⌫ убрать</button></div></div>
+      <dl class="reads"><div><dt>Вещество</dt><dd id="r1"></dd></div><div><dt>Формула</dt><dd id="r2"></dd></div><div><dt>M, г/моль</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Опыт</div><div class="chips"><button data-a="t-i2" data-t="i2">Раствор йода I₂</button><button data-a="t-cu" data-t="cu">Cu(OH)₂ + нагрев</button></div></div>
+      <div id="goalBox"></div>`;
+  if (id === 'proteins') h = `<h2>Сборка пептида</h2>
+      <div class="ctl"><div class="lbl">Добавить аминокислоту</div><div class="chips">${AA.map((A, k) => `<button data-a="aa${k}">${A.s} · ${A.name}</button>`).join('')}<button data-a="cut">⌫ убрать</button></div></div>
+      <dl class="reads"><div><dt>Цепь</dt><dd id="r1"></dd></div><div><dt>Связей</dt><dd id="r2"></dd></div><div><dt>M, г/моль</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Цветная реакция</div><div class="chips"><button data-a="t-biu" data-t="biu">Биуретовая (CuSO₄ + NaOH)</button><button data-a="t-xan" data-t="xan">Ксантопротеиновая (HNO₃, t)</button></div></div>
+      <div id="goalBox"></div>`;
+  if (id === 'nucleic') h = `<h2>Матрица и копия</h2>
+      <div class="ctl"><div class="lbl">Режим</div><div class="chips"><button data-a="md-dna" data-m="dna">Вторая цепь ДНК</button><button data-a="md-rna" data-m="rna">иРНК</button><button data-a="md-hb" data-m="hb">Водородные связи</button></div></div>
+      <div class="ctl"><div class="lbl">Ячейка нижней цепи</div><div class="chips" id="cellChips">${Array.from({ length: NB }, (_, i) => `<button data-c="${i}">${i + 1}</button>`).join('')}</div></div>
+      <dl class="reads"><div><dt>Заполнено</dt><dd id="r1"></dd></div><div><dt>Ошибок</dt><dd id="r2"></dd></div><div><dt>Ваш ответ</dt><dd id="r3"></dd></div></dl>
+      <div class="row" id="naRow"></div>
+      <div id="goalBox"></div>`;
+  el.innerHTML = h;
+  el.querySelectorAll('.chips [data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+  el.querySelectorAll('#cellChips button').forEach(b => b.onclick = () => { if (S.mode === 'hb') return; S.cur = +b.dataset.c; renderTools(); update(); });
+  updateScheme(model());
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; };
+  if (id === 'carbs') { set('#r1', m.I.n ? m.I.name : '—'); set('#r2', m.I.f); set('#r3', m.I.M || '—'); el.querySelectorAll('[data-t]').forEach(b => b.setAttribute('aria-pressed', S.test === b.dataset.t)); }
+  if (id === 'proteins') { set('#r1', m.P.seq); set('#r2', m.P.bonds); set('#r3', m.P.M || '—'); el.querySelectorAll('[data-t]').forEach(b => b.setAttribute('aria-pressed', S.test === b.dataset.t)); }
+  if (id === 'nucleic') {
+    const D = S.mode === 'hb' ? null : m.N[S.mode];
+    set('#r1', D ? `${D.filled}/${NB}` : `${NB}/${NB}`); set('#r2', D ? D.wrong : 0); set('#r3', S.mode === 'hb' ? S.hbG : '—');
+    el.querySelectorAll('[data-m]').forEach(b => b.setAttribute('aria-pressed', S.mode === b.dataset.m));
+    el.querySelectorAll('#cellChips button').forEach(b => b.setAttribute('aria-pressed', S.mode !== 'hb' && S.cur === +b.dataset.c));
+    const row = el.querySelector('#naRow');
+    if (row) {
+      const want2 = S.mode === 'hb' ? '' : (S.mode === 'dna' ? 'ATGC' : 'AUGC');
+      const sig = S.mode + want2;
+      if (row.dataset.sig !== sig) {
+        row.dataset.sig = sig;
+        row.innerHTML = S.mode === 'hb' ? `<button class="ghostbtn" data-a="hb-">−</button><button class="ghostbtn" data-a="hb+">+</button><button class="ghostbtn" data-a="hbc">Проверить</button>`
+          : want2.split('').map(b => `<button class="ghostbtn" data-a="b-${b}">${b} · ${BNAME[b]}</button>`).join('') + `<button class="ghostbtn" data-a="bk">⌫</button>`;
+        row.querySelectorAll('[data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+      }
+    }
+  }
+  const g = el.querySelector('#goalBox'); if (g) g.innerHTML = goalsHTML(GOALS[id]);
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'carbs') return [
+    { id: 'ring', icon: ICON.ring, name: 'Цикл моносахарида', spec: 'Глюкоза в растворе замыкается в шестичленный цикл из пяти атомов C и одного O (красная точка). Фруктоза в сахарозе — пятичленный цикл. α и β различаются положением –OH у первого атома углерода.' },
+    { id: 'bridge', icon: ICON.bridge, name: 'Гликозидная связь C–O–C', spec: 'Мостик из атома кислорода между звеньями. При её образовании отщепляется молекула воды, при гидролизе вода снова присоединяется.' },
+    { id: 'chain', icon: ICON.chain, name: 'Форма цепи', spec: 'α-глюкозы дают изогнутую цепь, которая закручивается в спираль (крахмал). β-глюкозы через одну перевёрнуты, цепь прямая (целлюлоза).' },
+    { id: 'tube', icon: ICON.tube, name: 'Пробирка с пробой', spec: 'Сюда добавляют раствор йода или свежий гидроксид меди(II).' },
+    { id: 'burner', icon: ICON.burner, name: 'Нагревание', spec: 'Реакция с Cu(OH)₂ на альдегидную группу идёт только при нагревании.' }];
+  if (id === 'proteins') return [
+    { id: 'res', icon: ICON.res, name: 'Остаток аминокислоты', spec: 'Кружок — атом углерода с аминогруппой и карбоксилом, ниже или выше — радикал R. Цвет: серый — неполярный, синий — полярный, фиолетовый — ароматический, красный — заряжённый.' },
+    { id: 'bond', icon: ICON.bond, name: 'Пептидная связь –CO–NH–', spec: 'Возникает между –COOH одной аминокислоты и –NH₂ следующей, при этом отщепляется вода. На неё реагирует биуретовый реактив.' },
+    { id: 'nterm', icon: ICON.nterm, name: 'N-конец', spec: 'Свободная аминогруппа первого остатка. С неё начинают читать последовательность.' },
+    { id: 'cterm', icon: ICON.cterm, name: 'C-конец', spec: 'Свободная карбоксильная группа последнего остатка.' },
+    { id: 'tube', icon: ICON.tube, name: 'Пробирка для цветной реакции', spec: 'Биуретовая: CuSO₄ и NaOH, без нагрева. Ксантопротеиновая: концентрированная HNO₃ и нагревание.' }];
+  return [
+    { id: 'back', icon: ICON.back, name: 'Сахарофосфатный остов', spec: 'Чередование сахара (дезоксирибозы в ДНК, рибозы в РНК) и остатков фосфорной кислоты. Жёлтые точки — фосфаты.' },
+    { id: 'base', icon: ICON.base, name: 'Азотистые основания', spec: 'Аденин A, тимин T, гуанин G, цитозин C; в РНК вместо T — урацил U. Последовательность оснований и есть генетическая информация.' },
+    { id: 'hbond', icon: ICON.hbond, name: 'Водородные связи', spec: 'Пунктир между основаниями: A=T — две связи, G≡C — три. Они слабые по отдельности, но тысячи их прочно держат цепи вместе.' },
+    { id: 'second', icon: ICON.second, name: 'Вторая цепь / иРНК', spec: 'Строится по принципу комплементарности. Цепь иРНК нарисована пунктиром: она одиночная и после синтеза отходит от ДНК.' },
+    { id: 'ends', icon: ICON.ends, name: 'Концы 5′ и 3′', spec: 'Цепи антипараллельны: одна идёт от 5′ к 3′, другая — наоборот.' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      (L.safe ? `<div class="safe"><b>Безопасность</b>${L.safe}</div>` : '') +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Детали модели</h2><p class="note">Нажмите на деталь, чтобы найти её на столе.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'carbs') {
+    const I = m.I;
+    if (!I.n) return `<h2>Пока пусто</h2><p class="note">Добавьте звенья, и здесь появится расчёт формулы и молярной массы.</p>`;
+    let h = `<h2>${I.name[0].toUpperCase() + I.name.slice(1)}</h2><div class="formula">M = 180·n − 18·(n − 1)</div><div class="steps">` +
+      step('звеньев n', I.n) + step('молекул воды отщепилось', `n − 1 = ${I.water}`) +
+      step('M', `180·${I.n} − 18·${I.water} = ${I.M} г/моль`, 'sum') + step('формула', I.f) + `</div>`;
+    if (I.n >= 2 && !I.suc) h += `<p class="note" style="margin-top:10px">Короче: каждое звено внутри цепи — это C₆H₁₀O₅ (162 г/моль), плюс одна молекула воды на концах: 162·${I.n} + 18 = ${I.M}.</p>`;
+    const nn = I.n === 1 ? 1 : I.n;
+    h += `<h3>Гидролиз 100 г этого вещества</h3><div class="steps">` +
+      (I.n === 1 ? step('моносахарид', 'не гидролизуется') :
+        step('n(вещества)', `100 / ${I.M} = ${fmt(100 / I.M, 4)} моль`) +
+        step(I.suc ? 'получится глюкозы и фруктозы' : 'получится глюкозы', I.suc ? `по ${fmt(100 / I.M * 180, 1)} г` : `${fmt(100 / I.M, 4)} · ${nn} · 180 = ${fmt(100 / I.M * nn * 180, 1)} г`, 'sum') +
+        step('воды присоединится', `${fmt(100 / I.M * I.water * 18, 1)} г`)) + `</div>`;
+    h += `<h3>Как рассуждать про опыты</h3><div class="steps">` + step('свободный «альдегидный» конец есть?', I.reducing ? 'да → Cu₂O' : 'нет → без Cu₂O') + step('цепь α-глюкозы из 6+ звеньев?', I.helix ? 'да → синий с I₂' : 'нет → без синего') + `</div>`;
+    return h;
+  }
+  if (id === 'proteins') {
+    const P = m.P;
+    if (!P.n) return `<h2>Пока пусто</h2><p class="note">Добавьте аминокислоты, и здесь появится расчёт.</p>`;
+    return `<h2>${P.seq}</h2><div class="formula">M = ΣM(аминокислот) − 18·(n − 1)</div><div class="steps">` +
+      S.pep.map((k, i) => step(`${i + 1}. ${AA[k].name}, ${AA[k].f}`, `${AA[k].M} г/моль`)).join('') +
+      step('сумма', `${P.sumM} г/моль`) + step('пептидных связей = отщеплено воды', `${P.n} − 1 = ${P.bonds}`) +
+      step('M(пептида)', `${P.sumM} − 18·${P.bonds} = ${P.M} г/моль`, 'sum') + `</div>` +
+      `<h3>Цветные реакции</h3><div class="steps">` + step('пептидных связей ≥ 2?', P.bonds >= 2 ? `да (${P.bonds}) → фиолетовый` : `нет (${P.bonds}) → синий`) +
+      step('есть бензольное кольцо (Фен, Тир)?', P.arom ? 'да → жёлтый с HNO₃' : 'нет → без жёлтого') + `</div>` +
+      `<p class="note" style="margin-top:10px">Сколько разных трипептидов можно собрать из 20 аминокислот? 20·20·20 = 8000. Для белка из 100 остатков вариантов 20¹⁰⁰ — поэтому белков так много.</p>`;
+  }
+  const N = m.N, tplS = S.tpl.join('');
+  let h = `<h2>Фрагмент из ${NB} пар</h2><div class="formula" style="font-size:15px">5′-${tplS}-3′</div><div class="steps">` +
+    step('правило комплементарности', 'A–T, G–C; в РНК A–U') +
+    step('вторая цепь ДНК', S.got.dna ? `3′-${S.tpl.map(b => PAIR_DNA[b]).join('')}-5′` : `заполнено ${N.dna.filled}/${NB}, ошибок ${N.dna.wrong}`) +
+    step('иРНК', S.got.rna ? `3′-${S.tpl.map(b => PAIR_RNA[b]).join('')}-5′` : `заполнено ${N.rna.filled}/${NB}, ошибок ${N.rna.wrong}`) + `</div>`;
+  h += `<h3>Водородные связи</h3><div class="steps">` + step('пары A=T дают по 2 связи', 'N = 2·(A–T) + 3·(G–C)');
+  if (S.got.dna) h += step('пар A–T / G–C', `${N.at} / ${N.gc}`);
+  h += step('всего связей', S.got.hb ? `2·${N.at} + 3·${N.gc} = ${N.hb}` : 'посчитайте сами и проверьте в режиме «Связи»', S.got.hb ? 'sum' : '') + `</div>`;
+  h += `<h3>Размеры и правило Чаргаффа</h3><div class="steps">` + step('длина: пар · 0,34 нм', `${NB} · 0,34 = ${fmt(NB * 0.34, 2)} нм`) +
+    step('нуклеотидов в двух цепях', `${NB * 2}`) + step('M ≈ 345 г/моль на нуклеотид', `${NB * 2} · 345 ≈ ${NB * 2 * 345} г/моль`) +
+    (S.got.dna ? step('в двойной цепи A = T, G = C', `A+T = ${2 * N.at}, G+C = ${2 * N.gc} → ${fmt(N.gc / NB * 100, 1)} % GC`) : '') + `</div>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const el = $('#meter'), id = LID(), G = GOALS[id];
+  let k = '', v = '', rows = '';
+  if (id === 'carbs') { k = m.I.cls; v = m.I.n ? m.I.name : 'пусто'; rows = `<div class="lr"><span>звеньев</span><span>${m.I.n}</span></div><div class="lr"><span>M</span><span>${m.I.M || '—'}</span></div>`; }
+  else if (id === 'proteins') { k = 'Пептид'; v = m.P.n ? m.P.seq : 'пусто'; rows = `<div class="lr"><span>связей</span><span>${m.P.bonds}</span></div><div class="lr"><span>M</span><span>${m.P.M || '—'}</span></div>`; }
+  else { const D = S.mode === 'hb' ? null : m.N[S.mode]; k = { dna: 'Вторая цепь ДНК', rna: 'иРНК', hb: 'Водородные связи' }[S.mode]; v = D ? `${D.filled}/${NB}` : (S.got.hb ? m.N.hb : '? '); rows = `<div class="lr"><span>${D ? 'ошибок' : 'ответ'}</span><span>${D ? D.wrong : S.hbG}</span></div>`; }
+  el.innerHTML = `<div class="k">${k}</div><div class="v ${m.got === G.length ? 'ok' : ''}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v}</div>${rows}<div class="lr"><span>целей</span><span>${m.got}/${G.length}</span></div><div class="gauge"><b style="width:${(m.got / G.length * 100).toFixed(1)}%"></b></div>`;
+}
+
+function update() {
+  const L = LESSONS[S.lesson], m = model();
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Молекулы жизни освоены!'), 1600);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  carbs: '<g fill="#ffb547" fill-opacity=".2" stroke="#ffb547" stroke-width="1.4"><path d="M10 9l6 3.5v7L10 23l-6-3.5v-7z"/><path d="M30 9l6 3.5v7L30 23l-6-3.5v-7z"/></g><path d="M16 16h8" stroke="#c8d1e2"/><circle cx="20" cy="16" r="2" fill="#e5604f"/><path d="M46 6v16a3 3 0 0 0 6 0V6" fill="none" stroke="#c8d1e2"/><rect x="46.5" y="13" width="5" height="11" fill="#2b2f9e"/>',
+  proteins: '<path d="M8 18L20 12L32 18L44 12L56 18" stroke="#ffb547" stroke-width="2.4" fill="none"/><circle cx="8" cy="18" r="4.5" fill="#4f586d"/><circle cx="20" cy="12" r="4.5" fill="#2f7fa8"/><circle cx="32" cy="18" r="4.5" fill="#8a5cc7"/><circle cx="44" cy="12" r="4.5" fill="#c0563f"/><circle cx="56" cy="18" r="4.5" fill="#4f586d"/>',
+  nucleic: '<path d="M4 6H62M4 24H62" stroke="#c8d1e2" stroke-width="1.5"/><rect x="8" y="7" width="8" height="6" fill="#ff8a73"/><rect x="8" y="17" width="8" height="6" fill="#ffb547"/><rect x="22" y="7" width="8" height="6" fill="#86e0a8"/><rect x="22" y="17" width="8" height="6" fill="#72d4e8"/><rect x="36" y="7" width="8" height="6" fill="#72d4e8"/><rect x="36" y="17" width="8" height="6" fill="#86e0a8"/><rect x="50" y="7" width="8" height="6" fill="#ffb547"/><rect x="50" y="17" width="8" height="6" fill="#ff8a73"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function makeTpl() {
+  for (;;) {
+    const a = Array.from({ length: NB }, () => 'ATGC'[Math.floor(Math.random() * 4)]);
+    const at = a.filter(b => b === 'A' || b === 'T').length;
+    if (at >= 3 && at <= 5 && new Set(a).size === 4) return a;
+  }
+}
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i], init = JSON.parse(JSON.stringify(L.init || {}));
+  S.lesson = i; S.hl = null; drag = null;
+  S.got = {}; S.chain = []; S.test = null; S.ph = 1; S.pep = [];
+  S.mode = 'dna'; S.tpl = makeTpl(); S.fill = { dna: Array(NB).fill(null), rna: Array(NB).fill(null) }; S.cur = 0; S.hbG = 16;
+  Object.assign(S, init);
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const strip = $('#lessons'), cur = strip.querySelector('.lesson[aria-current="true"]');
+  if (cur) strip.scrollLeft = cur.getBoundingClientRect().left - strip.getBoundingClientRect().left + strip.scrollLeft - (strip.clientWidth - cur.offsetWidth) / 2;
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id, G = GOALS[id];
+  let now = '';
+  if (id === 'carbs') {
+    const I = m.I;
+    now = `Собрана цепь: ${S.chain.map(c => MONO[c].name).join(' + ') || 'пусто'} → ${I.n ? `${I.name} (${I.cls}), ${I.f}, M = ${I.M} г/моль, отщеплено воды ${I.water}` : 'ничего'}. ` +
+      `Опыт: ${!S.test ? 'не проводился' : S.ph < 1 ? 'идёт' : carbResult(I, S.test, 1).txt}. Не называй готовую последовательность звеньев для невыполненных целей — спрашивай про α/β-формы и свободную альдегидную группу.`;
+  }
+  if (id === 'proteins') {
+    const P = m.P;
+    now = `Собран пептид: ${P.seq} (от N-конца к C-концу), остатков ${P.n}, пептидных связей ${P.bonds}, M = ${P.M} г/моль, ароматические остатки: ${P.arom ? 'есть' : 'нет'}. ` +
+      `Опыт: ${!S.test ? 'не проводился' : S.ph < 1 ? 'идёт' : pepResult(P, S.test, 1).txt}. Помогай рассуждать о порядке остатков и условиях цветных реакций, а не диктуй кнопки.`;
+  }
+  if (id === 'nucleic') {
+    const N = m.N;
+    now = `Цепь ДНК на экране: 5′-${S.tpl.join('')}-3′. Режим: ${{ dna: 'достройка второй цепи ДНК', rna: 'построение иРНК по этой матрице', hb: 'подсчёт водородных связей' }[S.mode]}. ` +
+      `Вторая цепь ДНК: ${S.fill.dna.map(b => b || '_').join('')} (ошибок ${N.dna.wrong}). иРНК: ${S.fill.rna.map(b => b || '_').join('')} (ошибок ${N.rna.wrong}). ` +
+      `Ответ ученика про водородные связи: ${S.hbG}${S.got.hb ? ' — верно' : ''}. Не называй готовую комплементарную цепь и итоговое число связей — спрашивай, сколько связей у пары A=T и у G≡C.`;
+  }
+  return [
+    `Предмет: химия, 11 класс. Тема «Молекулы жизни» (органическая химия). Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Цели: ${G.map(([k, n]) => `${n} — ${S.got[k] ? 'есть' : 'нет'}`).join('; ')}. Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Веди ученика наводящими вопросами, а не готовыми ответами.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = {
+    carbs: 'Почему крахмал синеет от йода, а целлюлоза нет?', proteins: 'Почему при варке яйца белок становится твёрдым?',
+    nucleic: 'Чем РНК отличается от ДНК?',
+  }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

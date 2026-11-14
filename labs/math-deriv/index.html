@@ -1,0 +1,994 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по алгебре и началам анализа, 10 класс: производная как скорость изменения и предел, правила дифференцирования, касательная, исследование функции.">
+<title>Производная</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+
+.formula{font:500 17px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M7 31Q17 30 22 18T34 8" fill="none" stroke="var(--fg)" stroke-width="2" stroke-linecap="round"/><path d="M12 28L33 12" stroke="var(--force)" stroke-width="2" stroke-linecap="round"/><circle cx="22" cy="20.4" r="3" fill="var(--arm)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Математика · Производная</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#math">Карта</a><a href="/physics/#math">Математика</a><a href="./" aria-current="page">Производная</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Анализ</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Рабочее поле">
+    <svg class="scene" id="scene" role="img" aria-label="Рабочее поле: графики функций с секущей и касательной, график производной, прямая знаков. Точки и ползунки можно перетаскивать, промежутки — нажимать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const BLUE = '#5fb4d9', ORANGE = '#ffb547', RED = '#ff8a73', GREEN = '#86e0a8', MUTED = '#8b96ad', FG = '#e8ecf4', VIOL = '#b59cff';
+const ns = v => (v < 0 ? '−' : '') + Math.abs(v);
+const sd = (v, d = 3) => { if (Math.abs(v - Math.round(v)) < 1e-9) return ns(Math.round(v)); let s = Math.abs(v).toFixed(d).replace(/0+$/, '').replace(/\.$/, '').replace('.', ','); return (v < 0 && s !== '0' ? '−' : '') + s; };
+const par = (v, d = 3) => v < 0 ? '(' + sd(v, d) + ')' : sd(v, d);
+const snap = (v, st) => Math.round(v / st) * st;
+// y = kx + b written the school way
+function lin(k, b) {
+  let s = '';
+  if (k !== 0) s = (k === 1 ? '' : k === -1 ? '−' : sd(k)) + 'x';
+  if (b !== 0 || !s) s += s ? (b < 0 ? ' − ' : ' + ') + sd(Math.abs(b)) : sd(b);
+  return 'y = ' + s;
+}
+
+// lesson 1: s(t) = t², shrinking step h
+const H = [-1, -0.5, -0.1, -0.05, -0.01, -0.001, 0.001, 0.01, 0.05, 0.1, 0.5, 1];
+// lesson 2: functions and candidate derivatives
+const FN = [
+  { fs: 'x³ − 3x', rule: 'сумма и степень', f: x => x ** 3 - 3 * x, d: x => 3 * x * x - 3, xr: [-2.4, 2.4], yr: [-4.5, 4.5], dyr: [-4, 15], br: [],
+    opts: [['3x² − 3', x => 3 * x * x - 3], ['3x² − 3x', x => 3 * x * x - 3 * x], ['x² − 3', x => x * x - 3]], ok: 0,
+    form: '(xⁿ)′ = n·xⁿ⁻¹, (u + v)′ = u′ + v′', steps: [['(x³)′', '3x²'], ['(3x)′', '3'], ['f′(x)', '3x² − 3']] },
+  { fs: 'x²(x − 3)', rule: 'произведение', f: x => x * x * (x - 3), d: x => 3 * x * x - 6 * x, xr: [-1.5, 3.5], yr: [-7, 6], dyr: [-5, 16], br: [],
+    opts: [['2x', x => 2 * x], ['2x(x − 3) + x²', x => 3 * x * x - 6 * x], ['2x(x − 3)', x => 2 * x * (x - 3)]], ok: 1,
+    form: '(u·v)′ = u′v + uv′', steps: [['u = x²', 'u′ = 2x'], ['v = x − 3', 'v′ = 1'], ['u′v + uv′', '2x(x − 3) + x²'], ['f′(x)', '3x² − 6x']] },
+  { fs: 'x / (x + 1)', rule: 'частное', f: x => x / (x + 1), d: x => 1 / ((x + 1) * (x + 1)), xr: [-4, 3], yr: [-4, 5], dyr: [-2, 4.5], br: [-1],
+    opts: [['1', x => 1], ['−1/(x + 1)²', x => -1 / ((x + 1) * (x + 1))], ['1/(x + 1)²', x => 1 / ((x + 1) * (x + 1))]], ok: 2,
+    form: '(u/v)′ = (u′v − uv′) / v²', steps: [['u = x', 'u′ = 1'], ['v = x + 1', 'v′ = 1'], ['(u′v − uv′)/v²', '((x + 1) − x)/(x + 1)²'], ['f′(x)', '1/(x + 1)²']] },
+  { fs: '(2x − 1)³', rule: 'сложная функция', f: x => (2 * x - 1) ** 3, d: x => 6 * (2 * x - 1) ** 2, xr: [-0.5, 1.5], yr: [-9, 9], dyr: [-4, 26], br: [],
+    opts: [['6(2x − 1)²', x => 6 * (2 * x - 1) ** 2], ['3(2x − 1)²', x => 3 * (2 * x - 1) ** 2], ['6(2x − 1)', x => 6 * (2 * x - 1)]], ok: 0,
+    form: '(f(g(x)))′ = f′(g)·g′(x)', steps: [['внешняя: (g³)′', '3g² = 3(2x − 1)²'], ['внутренняя: (2x − 1)′', '2'], ['f′(x)', '3(2x − 1)² · 2 = 6(2x − 1)²']] },
+  { fs: 'sin 2x', rule: 'сложная функция', f: x => Math.sin(2 * x), d: x => 2 * Math.cos(2 * x), xr: [-3.2, 3.2], yr: [-1.7, 1.7], dyr: [-2.7, 2.7], br: [],
+    opts: [['cos 2x', x => Math.cos(2 * x)], ['2cos 2x', x => 2 * Math.cos(2 * x)], ['−2cos 2x', x => -2 * Math.cos(2 * x)]], ok: 1,
+    form: '(sin x)′ = cos x, (f(g))′ = f′(g)·g′', steps: [['внешняя: (sin g)′', 'cos g = cos 2x'], ['внутренняя: (2x)′', '2'], ['f′(x)', '2cos 2x']] },
+];
+// lesson 3: f(x) = 0,5x² − x − 1 and three tangents
+const F3 = x => 0.5 * x * x - x - 1, D3 = x => x - 1;
+const GOALS = [{ k: 0, lbl: 'горизонтальная' }, { k: 2, lbl: '∥ прямой y = 2x + 5' }, { k: -1, lbl: 'угол 135° с Ox' }];
+// lesson 4: functions to study
+const ST = [
+  { fs: 'x³ − 3x', f: x => x ** 3 - 3 * x, d: x => 3 * x * x - 3, ds: '3x² − 3', fac: '3(x − 1)(x + 1)', xr: [-2.5, 2.5], yr: [-4, 4], cp: [-1, 1], sg: [1, 2, 1], pt: [1, 2],
+    sum: ['возрастает на (−∞; −1] и [1; +∞)', 'убывает на [−1; 1]', 'x = −1 — максимум, f(−1) = 2', 'x = 1 — минимум, f(1) = −2'] },
+  { fs: '−x³ + 3x²', f: x => -(x ** 3) + 3 * x * x, d: x => -3 * x * x + 6 * x, ds: '−3x² + 6x', fac: '−3x(x − 2)', xr: [-1.5, 3.5], yr: [-3, 6], cp: [0, 2], sg: [2, 1, 2], pt: [2, 1],
+    sum: ['убывает на (−∞; 0] и [2; +∞)', 'возрастает на [0; 2]', 'x = 0 — минимум, f(0) = 0', 'x = 2 — максимум, f(2) = 4'] },
+  { fs: 'x³ − 3x² + 3x', f: x => x ** 3 - 3 * x * x + 3 * x, d: x => 3 * x * x - 6 * x + 3, ds: '3x² − 6x + 3', fac: '3(x − 1)²', xr: [-0.5, 2.5], yr: [-3, 5], cp: [1], sg: [1, 1], pt: [3],
+    sum: ['возрастает на всей прямой', 'x = 1: f′ = 0, но знак не меняется', 'экстремума нет, f(1) = 1'] },
+];
+const SGN = ['?', '+', '−'], PTN = ['?', 'максимум', 'минимум', 'не экстремум'];
+
+const LESSONS = [
+  { id: 'limit', title: 'Скорость изменения и предел',
+    text: ['Тело движется по закону s(t) = t² (метры, секунды). За время от t₀ до t₀ + h оно проходит путь Δs = s(t₀ + h) − s(t₀). Средняя скорость — Δs/Δt, где Δt = h. На графике это наклон секущей AB.',
+           'Уменьшаем h. Точка B подъезжает к A, секущая поворачивается и почти сливается с касательной. Средняя скорость приближается к одному числу — пределу отношения Δs/Δt при h → 0.',
+           'Этот предел и есть производная: f′(x₀) = lim (f(x₀ + h) − f(x₀)) / h при h → 0. Для s = t² получаем (2t₀h + h²) / h = 2t₀ + h → 2t₀. Подставить h = 0 сразу нельзя: на нуль не делят. Поэтому и нужен предел.'],
+    why: 'Спидометр показывает мгновенную скорость — производную пути по времени. Инженер следит за скоростью нагрева двигателя, экономист — за скоростью роста цен (инфляцией за месяц), врач — за тем, как быстро меняется сахар в крови. А нейросети учатся с помощью производных: программа смотрит, в какую сторону ошибка уменьшается быстрее всего.',
+    task: 'Уменьшите шаг h до 0,001 сначала справа (h > 0), потом слева (h < 0). К какому числу стремится средняя скорость?',
+    hint: 'Тяните ползунок h на поле или жмите «h −» и «h +». Точку A можно тянуть по графику: сравните предел при разных t₀.',
+    stage: 'Тяните ползунок h и точку A.',
+    t0: 1, hi: 11,
+    check: m => m.seen.r && m.seen.l },
+  { id: 'rules', title: 'Правила дифференцирования',
+    text: ['Считать предел каждый раз долго, поэтому есть таблица и правила. (xⁿ)′ = n·xⁿ⁻¹, (C)′ = 0, (kx + b)′ = k, (sin x)′ = cos x, (cos x)′ = −sin x.',
+           'Правила: (u + v)′ = u′ + v′, (C·u)′ = C·u′, (u·v)′ = u′v + uv′, (u/v)′ = (u′v − uv′) / v². Производная произведения — не произведение производных!',
+           'Сложная функция: (f(g(x)))′ = f′(g(x))·g′(x) — производная внешней функции умножается на производную внутренней. Проверить ответ можно графиком: значение f′(x) равно наклону касательной к графику f в той же точке.'],
+    why: 'Правила дифференцирования встроены в библиотеки, которые обучают нейросети (PyTorch, TensorFlow), — data scientist пользуется ими каждый день. Инженер-механик по формуле пути находит скорость и ускорение, экономист по функции издержек — предельные издержки: во сколько обойдётся выпуск ещё одной единицы товара. И задачи на производную регулярно встречаются на ЕНТ по профильной математике.',
+    task: 'Найдите производные всех пяти функций: выберите формулу f′(x), график которой ляжет точно на серые точки наклона.',
+    hint: 'Серые точки внизу — измеренный наклон касательной. Сначала примените правило в уме, потом выберите ответ. Тяните оранжевую точку, чтобы увидеть наклон в любом месте.',
+    stage: 'Тяните оранжевую точку по графику.',
+    fi: 0, px: 0.5,
+    check: m => m.nSolved === FN.length },
+  { id: 'tangent', title: 'Касательная и её уравнение',
+    text: ['Касательная к графику в точке x₀ — прямая, к которой график «прижимается» рядом с этой точкой. Её угловой коэффициент равен производной: k = f′(x₀) = tg α, где α — угол между касательной и положительным направлением оси Ox.',
+           'Уравнение касательной: y = f(x₀) + f′(x₀)(x − x₀). Для него нужны три числа: x₀, f(x₀) и f′(x₀).',
+           'У параллельных прямых равные угловые коэффициенты. Если k > 0, угол α острый, если k < 0 — тупой, при k = 0 касательная горизонтальна. Включите «Лупу»: вблизи точки касания график почти не отличить от прямой.'],
+    why: 'Касательная — лучшее приближение кривой прямой линией. Навигатор по текущей скорости прогнозирует, где машина окажется через секунду. Инженер-дорожник делает съезд с эстакады плавным, чтобы направление дороги не менялось скачком. Метод Ньютона, которым калькуляторы и программы находят корни уравнений, шагает по касательным.',
+    task: 'Найдите три точки касания: где касательная горизонтальна, где параллельна прямой y = 2x + 5 и где образует с осью Ox угол 135°.',
+    hint: 'Тяните точку по параболе и следите за k. Параллельные прямые — равные k. Для угла 135° вспомните, чему равен tg 135°.',
+    stage: 'Тяните точку касания по параболе.',
+    x0: -1.5, zoom: false,
+    check: m => m.got.every(Boolean) },
+  { id: 'study', title: 'Исследование функции',
+    text: ['Знак производной показывает поведение функции. Если f′(x) > 0 на промежутке, функция там возрастает. Если f′(x) < 0 — убывает.',
+           'Точки, где f′(x) = 0 или не существует, называют критическими. Если при переходе через такую точку f′ меняет знак с «+» на «−», это максимум, с «−» на «+» — минимум. Если знак не меняется, экстремума нет.',
+           'План: 1) найти f′(x); 2) решить f′(x) = 0; 3) отметить точки на прямой и найти знак f′ на каждом промежутке; 4) записать промежутки возрастания и убывания и точки экстремума.'],
+    why: 'Найти максимум или минимум — главная задача оптимизации. Предприниматель ищет цену, при которой прибыль наибольшая. Логист — маршрут с наименьшим расходом топлива. Инженер — размеры банки, на которую уйдёт меньше всего металла. Аналитики и data scientist’ы решают такие задачи каждый день, и начинается всё со знака производной.',
+    task: 'Исследуйте три функции: расставьте знаки f′ и определите тип каждой критической точки.',
+    hint: 'Нажимайте на промежутки прямой знаков: «?» → «+» → «−». Тяните точку по графику: цвет касательной подскажет знак f′. Под прямой нажимайте на критические точки.',
+    stage: 'Нажимайте на промежутки и точки.',
+    si: 0, px: -2,
+    check: m => m.nSolved === ST.length },
+];
+
+const KEY = 'luch-math-deriv';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null,
+            t0: 1, hi: 11, tan: false, seen: {},
+            fi: 0, px2: 0.5, picks: FN.map(() => -1), fsolved: {},
+            x0: -1.5, zoom: false, got: [false, false, false],
+            si: 0, px4: -2, sg: ST.map(s => s.sg.map(() => 0)), pt: ST.map(s => s.pt.map(() => 0)), ssolved: {} };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+const angleOf = k => { const a = Math.atan(k) * 180 / Math.PI; return a < 0 ? a + 180 : a; };
+
+function model() {
+  const id = LID();
+  if (id === 'limit') {
+    const t0 = S.t0, h = H[S.hi], s0 = t0 * t0, s1 = (t0 + h) * (t0 + h);
+    return { kind: id, t0, h, s0, s1, ds: s1 - s0, avg: 2 * t0 + h, v: 2 * t0, seen: S.seen, tan: S.tan };
+  }
+  if (id === 'rules') {
+    const F = FN[S.fi], x = S.px2, pk = S.picks[S.fi];
+    return { kind: id, fi: S.fi, F, x, y: F.f(x), k: F.d(x), pick: pk, right: pk === F.ok, nSolved: FN.filter((_, i) => S.fsolved[i]).length, solved: S.fsolved };
+  }
+  if (id === 'tangent') {
+    const x0 = S.x0, y0 = F3(x0), k = D3(x0);
+    return { kind: id, x0, y0, k, b: y0 - k * x0, alpha: angleOf(k), zoom: S.zoom, got: S.got, nGot: S.got.filter(Boolean).length };
+  }
+  const T = ST[S.si], x = S.px4, sg = S.sg[S.si], pt = S.pt[S.si];
+  const all = sg.every(v => v > 0) && pt.every(v => v > 0), right = sg.every((v, i) => v === T.sg[i]) && pt.every((v, i) => v === T.pt[i]);
+  return { kind: 'study', si: S.si, T, x, y: T.f(x), k: T.d(x), sg, pt, all, right, nSolved: ST.filter((_, i) => S.ssolved[i]).length, solved: S.ssolved };
+}
+
+// ---------- svg helpers (SVG units, 520 × 405) ----------
+const T = (x, y, s, txt, fill = MUTED, anchor = 'middle', extra = '') => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${s}" fill="${fill}" text-anchor="${anchor}" ${extra}>${txt}</text>`;
+const L = (x1, y1, x2, y2, col, w = 1, extra = '') => `<path d="M${(+x1).toFixed(1)} ${(+y1).toFixed(1)}L${(+x2).toFixed(1)} ${(+y2).toFixed(1)}" stroke="${col}" stroke-width="${w}" ${extra}/>`;
+const R = (x, y, w, h, fill, extra = '') => `<rect x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" width="${Math.max(0, +w).toFixed(1)}" height="${Math.max(0, +h).toFixed(1)}" fill="${fill}" ${extra}/>`;
+const C = (x, y, r, fill, extra = '') => `<circle cx="${(+x).toFixed(1)}" cy="${(+y).toFixed(1)}" r="${r}" fill="${fill}" ${extra}/>`;
+function backdrop() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.05)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+function chip(x, y, w, label, on, data, col, fs = 12) {
+  return `<g data-pick="${data}" style="cursor:pointer">${R(x, y - 14, w, 28, on ? (col || FG) : '#1a2438', `rx="8" stroke="${col || (on ? FG : '#33405c')}" stroke-width="1.3"`)}${T(x + w / 2, y + 4.5, fs, label, on ? '#0b1019' : (col || FG), 'middle', 'font-weight="500"')}</g>`;
+}
+function curve(f, x0, x1, X, Y, ylo, yhi, breaks = [], n = 320) {
+  let d = '', pen = false, px = null;
+  for (let i = 0; i <= n; i++) {
+    const x = x0 + (x1 - x0) * i / n, y = f(x);
+    const cross = px !== null && breaks.some(b => (px - b) * (x - b) <= 0);
+    if (!isFinite(y) || y < ylo || y > yhi || cross) { pen = false; px = x; continue; }
+    d += (pen ? 'L' : 'M') + X(x).toFixed(1) + ' ' + Y(y).toFixed(1); pen = true; px = x;
+  }
+  return d;
+}
+const clip = (id, x, y, w, h) => `<defs><clipPath id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}"/></clipPath></defs>`;
+const HALO = 'stroke="#0e1520" stroke-width="3.5" paint-order="stroke"';
+const frame = (x, y, w, h) => R(x, y, w, h, 'rgba(10,15,24,.5)', 'stroke="#26324a" rx="4"');
+
+// ---------- lesson 1: secant → tangent ----------
+const P1 = { x0: 40, x1: 490, y0: 104, y1: 296, xmin: -1, xmax: 4.5, ymin: -2, ymax: 17 };
+const X1 = x => P1.x0 + (x - P1.xmin) / (P1.xmax - P1.xmin) * (P1.x1 - P1.x0);
+const Y1 = y => P1.y1 - (y - P1.ymin) / (P1.ymax - P1.ymin) * (P1.y1 - P1.y0);
+const iX1 = px => (px - P1.x0) / (P1.x1 - P1.x0) * (P1.xmax - P1.xmin) + P1.xmin;
+const HS = { x0: 60, x1: 460, y: 334 };
+const hX = i => HS.x0 + i * (HS.x1 - HS.x0) / (H.length - 1);
+function limitSVG(m) {
+  let h = clip('clp1', P1.x0, P1.y0, P1.x1 - P1.x0, P1.y1 - P1.y0) + frame(P1.x0, P1.y0, P1.x1 - P1.x0, P1.y1 - P1.y0);
+  for (let x = 0; x <= 4; x++) { h += L(X1(x), P1.y0, X1(x), P1.y1, 'rgba(160,185,230,.08)'); if (x) h += T(X1(x), Y1(0) + 14, 9.5, x, '#6b7690'); }
+  for (let y = 4; y <= 16; y += 4) { h += L(P1.x0, Y1(y), P1.x1, Y1(y), 'rgba(160,185,230,.08)'); h += T(X1(0) - 5, Y1(y) + 3.5, 9.5, y, '#6b7690', 'end'); }
+  h += L(P1.x0, Y1(0), P1.x1, Y1(0), '#6b7690', 1.3) + L(X1(0), P1.y0, X1(0), P1.y1, '#6b7690', 1.1);
+  h += T(P1.x1 - 6, Y1(0) - 6, 10, 't, с', MUTED, 'end') + T(X1(0) + 6, P1.y0 + 12, 10, 's, м', MUTED, 'start');
+  h += `<path d="${curve(x => x * x, P1.xmin, P1.xmax, X1, Y1, P1.ymin - 2, P1.ymax + 2)}" fill="none" stroke="${FG}" stroke-width="2.2" clip-path="url(#clp1)"/>`;
+  h += T(X1(3.9), Y1(15.2) - 2, 11, 's = t²', FG, 'end', 'font-weight="500"');
+  const t0 = m.t0, t1 = t0 + m.h, close = Math.abs(m.h) <= 0.001;
+  if (m.tan) h += `<g clip-path="url(#clp1)">${L(X1(P1.xmin), Y1(m.s0 + m.v * (P1.xmin - t0)), X1(P1.xmax), Y1(m.s0 + m.v * (P1.xmax - t0)), GREEN, 1.6, 'stroke-dasharray="6 5"')}</g>`;
+  h += `<g clip-path="url(#clp1)">${L(X1(P1.xmin), Y1(m.s0 + m.avg * (P1.xmin - t0)), X1(P1.xmax), Y1(m.s0 + m.avg * (P1.xmax - t0)), close ? GREEN : BLUE, 2)}</g>`;
+  // legs Δt and Δs
+  h += L(X1(t0), Y1(m.s0), X1(t1), Y1(m.s0), ORANGE, 1.6, 'stroke-dasharray="4 3"') + L(X1(t1), Y1(m.s0), X1(t1), Y1(m.s1), ORANGE, 1.6, 'stroke-dasharray="4 3"');
+  if (Math.abs(m.h) >= 0.1) {
+    h += T((X1(t0) + X1(t1)) / 2, Y1(m.s0) + 14, 10, 'Δt', ORANGE);
+    h += T(X1(t1) + (m.h > 0 ? 6 : -6), (Y1(m.s0) + Y1(m.s1)) / 2 + 4, 10, 'Δs', ORANGE, m.h > 0 ? 'start' : 'end');
+  }
+  h += C(X1(t1), Y1(m.s1), 5, BLUE, `stroke="${INK}" stroke-width="1.3"`) + T(X1(t1) + (m.h > 0 ? 9 : -9), Y1(m.s1) - 8, 11, 'B', BLUE, m.h > 0 ? 'start' : 'end', 'font-weight="500"');
+  h += `<g data-drag="A">${C(X1(t0), Y1(m.s0), 20, 'transparent')}${C(X1(t0), Y1(m.s0), 7.5, ORANGE, `stroke="${INK}" stroke-width="1.6"`)}</g>`;
+  h += T(X1(t0) + (m.h > 0 ? -11 : 11), Y1(m.s0) - 9, 11, 'A', ORANGE, m.h > 0 ? 'end' : 'start', 'font-weight="500"');
+  h += T(X1(0) + 50, P1.y0 + 14, 10.5, close ? 'секущая ≈ касательная' : 'секущая AB', close ? GREEN : BLUE, 'start', HALO);
+  // slider h
+  h += T(HS.x0, HS.y - 16, 12, 'шаг h = Δt (h ≠ 0)', FG, 'start', 'font-weight="500"') + T(HS.x1, HS.y - 16, 12, 'h = ' + sd(m.h, 3) + ' с', ORANGE, 'end', 'font-weight="500"');
+  h += `<g data-drag="hs"><rect x="${HS.x0 - 14}" y="${HS.y - 16}" width="${HS.x1 - HS.x0 + 28}" height="34" fill="transparent"/>` + R(HS.x0, HS.y - 3, HS.x1 - HS.x0, 6, '#26324a', 'rx="3"');
+  H.forEach((v, i) => { h += L(hX(i), HS.y - 6, hX(i), HS.y + 6, Math.abs(v) === 0.001 ? GREEN : '#6b7690', 1.2); });
+  h += C(hX(S.hi), HS.y, 10, ORANGE, `stroke="${INK}" stroke-width="1.6"`) + `</g>`;
+  [[0, '−1', 'middle'], [2, '−0,1', 'middle'], [5, '−0,001', 'end'], [6, '0,001', 'start'], [9, '0,1', 'middle'], [11, '1', 'middle']].forEach(([i, s, a]) => { h += T(hX(i) + (a === 'end' ? 3 : a === 'start' ? -3 : 0), HS.y + 20, 9.5, s, '#6b7690', a); });
+  // result
+  h += T(260, 376, 11.5, `Δs/Δt = (s(${sd(t1, 3)}) − s(${sd(t0)})) / ${par(m.h)} = ${sd(m.avg, 4)} м/с`, close ? GREEN : FG, 'middle', 'font-weight="500"');
+  h += T(260, 398, 11, close ? `h → 0: средняя скорость → v(${sd(t0)}) = lim Δs/Δt` : `средняя скорость на отрезке [${sd(Math.min(t0, t1), 3)}; ${sd(Math.max(t0, t1), 3)}]`, close ? GREEN : MUTED);
+  return h;
+}
+
+// ---------- lesson 2: f and the slopes of f ----------
+const P2 = { x0: 40, x1: 490, ty0: 132, ty1: 224, by0: 238, by1: 328 };
+const X2 = x => P2.x0 + (x - FN[S.fi].xr[0]) / (FN[S.fi].xr[1] - FN[S.fi].xr[0]) * (P2.x1 - P2.x0);
+const iX2 = px => FN[S.fi].xr[0] + (px - P2.x0) / (P2.x1 - P2.x0) * (FN[S.fi].xr[1] - FN[S.fi].xr[0]);
+function rulesSVG(m) {
+  const F = m.F;
+  let h = '';
+  FN.forEach((f, i) => { const ok = !!m.solved[i]; h += chip(24 + i * 96, 88, 90, (ok ? '✓ ' : '') + 'f' + '₁₂₃₄₅'[i], m.fi === i, 'fn-' + i, ok ? GREEN : null, 11.5); });
+  h += T(260, 121, 13.5, `f(x) = ${F.fs}`, FG, 'middle', 'font-weight="500"') ;
+  const YT = y => P2.ty1 - (y - F.yr[0]) / (F.yr[1] - F.yr[0]) * (P2.ty1 - P2.ty0);
+  const YB = y => P2.by1 - (y - F.dyr[0]) / (F.dyr[1] - F.dyr[0]) * (P2.by1 - P2.by0);
+  h += clip('clpT', P2.x0, P2.ty0, P2.x1 - P2.x0, P2.ty1 - P2.ty0) + clip('clpB', P2.x0, P2.by0, P2.x1 - P2.x0, P2.by1 - P2.by0);
+  h += frame(P2.x0, P2.ty0, P2.x1 - P2.x0, P2.ty1 - P2.ty0) + frame(P2.x0, P2.by0, P2.x1 - P2.x0, P2.by1 - P2.by0);
+  h += `<rect x="${P2.x0}" y="${P2.ty0}" width="${P2.x1 - P2.x0}" height="${P2.by1 - P2.ty0}" fill="transparent" data-drag="probe"/>`;
+  if (F.yr[0] < 0 && F.yr[1] > 0) h += L(P2.x0, YT(0), P2.x1, YT(0), '#6b7690', 1);
+  if (F.dyr[0] < 0 && F.dyr[1] > 0) h += L(P2.x0, YB(0), P2.x1, YB(0), '#6b7690', 1);
+  if (F.xr[0] < 0 && F.xr[1] > 0) h += L(X2(0), P2.ty0, X2(0), P2.ty1, 'rgba(160,185,230,.2)') + L(X2(0), P2.by0, X2(0), P2.by1, 'rgba(160,185,230,.2)');
+  F.br.forEach(b => { h += L(X2(b), P2.ty0 + 3, X2(b), P2.by1 - 3, RED, 1, 'stroke-dasharray="3 4" opacity=".6"'); });
+  h += `<path d="${curve(F.f, F.xr[0], F.xr[1], X2, YT, F.yr[0] - 2, F.yr[1] + 2, F.br)}" fill="none" stroke="${BLUE}" stroke-width="2.2" clip-path="url(#clpT)"/>`;
+  h += T(P2.x0 + 6, P2.ty0 + 13, 10, 'y = f(x)', BLUE, 'start', HALO);
+  h += T(P2.x0 + 6, P2.by0 + 13, 10, 'наклон касательной', MUTED, 'start', HALO);
+  // measured slopes
+  for (let i = 0; i <= 32; i++) {
+    const x = F.xr[0] + (F.xr[1] - F.xr[0]) * (i + 0.5) / 33;
+    if (F.br.some(b => Math.abs(x - b) < 0.3)) continue;
+    const k = (F.f(x + 1e-4) - F.f(x - 1e-4)) / 2e-4;
+    if (k < F.dyr[0] || k > F.dyr[1]) continue;
+    h += C(X2(x), YB(k), 2.4, '#9aa6bf');
+  }
+  if (m.pick >= 0) {
+    const col = m.right ? GREEN : RED;
+    h += `<path d="${curve(F.opts[m.pick][1], F.xr[0], F.xr[1], X2, YB, F.dyr[0] - 3, F.dyr[1] + 3, F.br)}" fill="none" stroke="${col}" stroke-width="2" clip-path="url(#clpB)" opacity=".9"/>`;
+    h += T(P2.x1 - 6, P2.by0 + 13, 10, 'f′ = ' + F.opts[m.pick][0], col, 'end', 'font-weight="500" ' + HALO);
+  }
+  // probe and tangent
+  const w = (F.xr[1] - F.xr[0]) * 0.16;
+  h += `<g clip-path="url(#clpT)">${L(X2(m.x - w), YT(m.y - m.k * w), X2(m.x + w), YT(m.y + m.k * w), ORANGE, 2)}</g>`;
+  h += L(X2(m.x), YT(m.y), X2(m.x), YB(clamp(m.k, F.dyr[0], F.dyr[1])), ORANGE, 1, 'stroke-dasharray="3 4" opacity=".6"');
+  if (m.k >= F.dyr[0] && m.k <= F.dyr[1]) h += C(X2(m.x), YB(m.k), 5, ORANGE, `stroke="${INK}" stroke-width="1.3"`);
+  h += `<g data-drag="probe">${C(X2(m.x), YT(m.y), 18, 'transparent')}${C(X2(m.x), YT(clamp(m.y, F.yr[0], F.yr[1])), 7, ORANGE, `stroke="${INK}" stroke-width="1.5"`)}</g>`;
+  const right = X2(m.x) > 330;
+  h += T(X2(m.x) + (right ? -10 : 10), YB(clamp(m.k, F.dyr[0], F.dyr[1])) + (m.k > (F.dyr[0] + F.dyr[1]) / 2 ? 16 : -8), 10.5, `k = ${sd(m.k, 2)}`, ORANGE, right ? 'end' : 'start', 'font-weight="500" ' + HALO);
+  // options
+  F.opts.forEach((o, j) => { const on = m.pick === j; h += chip(24 + j * 160, 352, 152, 'f′ = ' + o[0], on, 'op-' + j, on ? (j === F.ok ? GREEN : RED) : null, 11); });
+  const msg = m.pick < 0 ? 'выберите f′(x) — её график ляжет поверх серых точек' : m.right ? `верно: (${F.fs})′ = ${F.opts[F.ok][0]} · правило: ${F.rule}` : 'не совпадает с наклонами — проверьте правило: ' + F.rule;
+  h += T(260, 384, 11.5, msg, m.pick < 0 ? MUTED : m.right ? GREEN : RED, 'middle', 'font-weight="500"');
+  h += T(260, 401, 11, `решено: ${m.nSolved} из ${FN.length}`, m.nSolved === FN.length ? GREEN : MUTED);
+  return h;
+}
+
+// ---------- lesson 3: tangent line ----------
+const P3 = { x0: 24, y0: 104, w: 304, h: 228 };
+const view3 = () => S.zoom ? { cx: S.x0, cy: F3(S.x0), u: 152 } : { cx: 1, cy: 0.5, u: 38 };
+function tangentSVG(m) {
+  const v = view3(), X = x => P3.x0 + P3.w / 2 + (x - v.cx) * v.u, Y = y => P3.y0 + P3.h / 2 - (y - v.cy) * v.u;
+  const xa = v.cx - P3.w / 2 / v.u, xb = v.cx + P3.w / 2 / v.u, ya = v.cy - P3.h / 2 / v.u, yb = v.cy + P3.h / 2 / v.u;
+  let h = T(260, 90, 13, 'f(x) = 0,5x² − x − 1,   f′(x) = x − 1', FG, 'middle', 'font-weight="500"');
+  h += clip('clp3', P3.x0, P3.y0, P3.w, P3.h) + frame(P3.x0, P3.y0, P3.w, P3.h);
+  h += `<rect x="${P3.x0}" y="${P3.y0}" width="${P3.w}" height="${P3.h}" fill="transparent" data-drag="pt"/>`;
+  const g = m.zoom ? 0.25 : 1;
+  let grid = '';
+  for (let x = Math.ceil(xa / g) * g; x <= xb; x += g) grid += L(X(x), P3.y0, X(x), P3.y0 + P3.h, 'rgba(160,185,230,.08)');
+  for (let y = Math.ceil(ya / g) * g; y <= yb; y += g) grid += L(P3.x0, Y(y), P3.x0 + P3.w, Y(y), 'rgba(160,185,230,.08)');
+  if (ya < 0 && yb > 0) grid += L(P3.x0, Y(0), P3.x0 + P3.w, Y(0), '#6b7690', 1.3);
+  if (xa < 0 && xb > 0) grid += L(X(0), P3.y0, X(0), P3.y0 + P3.h, '#6b7690', 1.1);
+  if (!m.zoom) for (let x = -2; x <= 4; x += 2) if (x) grid += T(X(x), Y(0) + 13, 9.5, ns(x), '#6b7690');
+  h += `<g clip-path="url(#clp3)">${grid}`;
+  // reference line y = 2x + 5
+  h += L(X(xa), Y(2 * xa + 5), X(xb), Y(2 * xb + 5), VIOL, 1.3, 'stroke-dasharray="5 5" opacity=".8"');
+  h += `<path d="${curve(F3, xa, xb, X, Y, ya - 1, yb + 1)}" fill="none" stroke="${BLUE}" stroke-width="2.4"/>`;
+  const hit = GOALS.findIndex(G => G.k === m.k), tc = hit >= 0 ? GREEN : ORANGE;
+  h += L(X(xa), Y(m.y0 + m.k * (xa - m.x0)), X(xb), Y(m.y0 + m.k * (xb - m.x0)), tc, 2);
+  // angle with Ox
+  if (m.k !== 0) {
+    const xc = m.x0 - m.y0 / m.k, cx = X(xc), cy = Y(0);
+    if (cx > P3.x0 + 4 && cx < P3.x0 + P3.w - 4 && cy > P3.y0 && cy < P3.y0 + P3.h) {
+      const a = m.alpha * Math.PI / 180, r = 20;
+      h += `<path d="M${(cx + r).toFixed(1)} ${cy.toFixed(1)}A${r} ${r} 0 0 0 ${(cx + r * Math.cos(a)).toFixed(1)} ${(cy - r * Math.sin(a)).toFixed(1)}" fill="none" stroke="${tc}" stroke-width="1.4"/>`;
+      h += T(cx + 31 * Math.cos(a / 2), cy - 31 * Math.sin(a / 2) + 4, 10.5, 'α', tc, 'middle', 'font-weight="500"');
+    }
+  }
+  h += `</g>`;
+  if (!m.zoom) h += T(X(-2.6) + 4, Y(1.4), 9.5, 'y = 2x + 5', VIOL, 'start');
+  if (m.zoom) h += T(P3.x0 + P3.w - 6, P3.y0 + 14, 10, 'лупа ×4', MUTED, 'end');
+  const px = X(m.x0), py = Y(m.y0);
+  h += `<g data-drag="pt">${C(px, py, 20, 'transparent')}${C(px, py, 7.5, ORANGE, `stroke="${INK}" stroke-width="1.6"`)}</g>`;
+  h += T(px - 11, py - 11, 10.5, `x₀ = ${sd(m.x0)}`, ORANGE, 'end', 'font-weight="500" ' + HALO);
+  // readouts
+  const RX = 344;
+  h += T(RX, 120, 12, `x₀ = ${sd(m.x0)}`, FG, 'start', 'font-weight="500"');
+  h += T(RX, 142, 12, `f(x₀) = ${sd(m.y0)}`, FG, 'start');
+  h += T(RX, 164, 12, `k = f′(x₀) = ${sd(m.k)}`, tc, 'start', 'font-weight="500"');
+  h += T(RX, 186, 12, `α = ${sd(m.alpha, 1)}°`, FG, 'start');
+  h += T(RX, 212, 10.5, 'касательная:', MUTED, 'start') + T(RX, 232, 12, lin(m.k, m.b), tc, 'start', 'font-weight="500"');
+  h += T(RX, 262, 10.5, 'найти точки, где касательная:', MUTED, 'start');
+  GOALS.forEach((G, i) => { h += T(RX, 284 + i * 20, 11.5, (m.got[i] ? '✓ ' : '○ ') + G.lbl, m.got[i] ? GREEN : FG, 'start'); });
+  h += T(260, 360, 12, `y = ${sd(m.y0)} + ${par(m.k)}(x − ${par(m.x0)})  →  ${lin(m.k, m.b)}`, tc, 'middle', 'font-weight="500"');
+  h += T(260, 382, 11, m.k === 0 ? 'k = 0: касательная параллельна оси Ox' : m.k > 0 ? 'k > 0: угол α острый, функция здесь возрастает' : 'k < 0: угол α тупой, функция здесь убывает', MUTED);
+  h += T(260, 401, 11, `найдено точек: ${m.nGot} из 3`, m.nGot === 3 ? GREEN : MUTED);
+  return h;
+}
+
+// ---------- lesson 4: sign chart ----------
+const P4 = { x0: 40, x1: 490, y0: 104, y1: 246, ly: 290 };
+const X4 = x => P4.x0 + (x - ST[S.si].xr[0]) / (ST[S.si].xr[1] - ST[S.si].xr[0]) * (P4.x1 - P4.x0);
+const iX4 = px => ST[S.si].xr[0] + (px - P4.x0) / (P4.x1 - P4.x0) * (ST[S.si].xr[1] - ST[S.si].xr[0]);
+const sgnCol = k => Math.abs(k) < 1e-9 ? ORANGE : k > 0 ? GREEN : RED;
+function studySVG(m) {
+  const Tf = m.T;
+  let h = '';
+  ST.forEach((s, i) => { const ok = !!m.solved[i]; h += chip(24 + i * 160, 80, 152, (ok ? '✓ ' : '') + s.fs, m.si === i, 'st-' + i, ok ? GREEN : null, 11.5); });
+  const Y = y => P4.y1 - (y - Tf.yr[0]) / (Tf.yr[1] - Tf.yr[0]) * (P4.y1 - P4.y0);
+  h += clip('clp4', P4.x0, P4.y0, P4.x1 - P4.x0, P4.y1 - P4.y0) + frame(P4.x0, P4.y0, P4.x1 - P4.x0, P4.y1 - P4.y0);
+  h += `<rect x="${P4.x0}" y="${P4.y0}" width="${P4.x1 - P4.x0}" height="${P4.y1 - P4.y0}" fill="transparent" data-drag="probe"/>`;
+  h += L(P4.x0, Y(0), P4.x1, Y(0), '#6b7690', 1.2);
+  if (Tf.xr[0] < 0 && Tf.xr[1] > 0) h += L(X4(0), P4.y0, X4(0), P4.y1, 'rgba(160,185,230,.25)');
+  for (let x = Math.ceil(Tf.xr[0]); x <= Tf.xr[1]; x++) h += L(X4(x), Y(0) - 3, X4(x), Y(0) + 3, '#6b7690') + (x ? T(X4(x), Y(0) + 13, 9, ns(x), '#6b7690') : '');
+  Tf.cp.forEach(c => { h += L(X4(c), P4.y0 + 2, X4(c), P4.ly, 'rgba(232,236,244,.25)', 1, 'stroke-dasharray="2 4"'); });
+  h += `<path d="${curve(Tf.f, Tf.xr[0], Tf.xr[1], X4, Y, Tf.yr[0] - 2, Tf.yr[1] + 2)}" fill="none" stroke="${BLUE}" stroke-width="2.3" clip-path="url(#clp4)"/>`;
+  h += T(P4.x0 + 6, P4.y0 + 13, 10, `f(x) = ${Tf.fs}`, BLUE, 'start');
+  Tf.cp.forEach(c => { h += C(X4(c), Y(Tf.f(c)), 3.5, FG); });
+  const w = (Tf.xr[1] - Tf.xr[0]) * 0.13, kc = sgnCol(m.k);
+  h += `<g clip-path="url(#clp4)">${L(X4(m.x - w), Y(m.y - m.k * w), X4(m.x + w), Y(m.y + m.k * w), kc, 2)}</g>`;
+  h += `<g data-drag="probe">${C(X4(m.x), Y(clamp(m.y, Tf.yr[0], Tf.yr[1])), 18, 'transparent')}${C(X4(m.x), Y(clamp(m.y, Tf.yr[0], Tf.yr[1])), 7, ORANGE, `stroke="${INK}" stroke-width="1.5"`)}</g>`;
+  h += T(P4.x1 - 6, P4.y0 + 13, 10, `f′(${sd(m.x, 2)}) = ${sd(m.k, 2)}`, kc, 'end', 'font-weight="500"');
+  // sign line
+  const bnd = [Tf.xr[0], ...Tf.cp, Tf.xr[1]];
+  h += T(P4.x0, P4.ly - 30, 10, `знак f′(x) = ${Tf.ds}`, MUTED, 'start', HALO);
+  for (let j = 0; j < bnd.length - 1; j++) {
+    const a = X4(bnd[j]), b = X4(bnd[j + 1]), v = m.sg[j], ok = m.all ? v === Tf.sg[j] : null;
+    const col = v === 0 ? MUTED : m.all ? (ok ? GREEN : RED) : v === 1 ? GREEN : RED;
+    h += `<g data-pick="sg-${j}" style="cursor:pointer">${R(a + 3, P4.ly - 22, b - a - 6, 44, v ? 'rgba(232,236,244,.05)' : 'rgba(255,181,71,.07)', `rx="7" stroke="${v ? '#33405c' : 'rgba(255,181,71,.45)'}" stroke-dasharray="${v ? '' : '4 3'}"`)}` +
+      T((a + b) / 2, P4.ly - 6, 17, SGN[v], col, 'middle', 'font-weight="500"') +
+      (v ? T((a + b) / 2, P4.ly + 16, 10, v === 1 ? 'f ↗' : 'f ↘', col) : T((a + b) / 2, P4.ly + 16, 9.5, 'нажмите', '#6b7690')) + `</g>`;
+  }
+  h += L(P4.x0, P4.ly, P4.x1, P4.ly, '#6b7690', 1.4, 'pointer-events="none"');
+  Tf.cp.forEach(c => { h += C(X4(c), P4.ly, 4.5, '#0e1520', `stroke="${FG}" stroke-width="1.6" pointer-events="none"`) + T(X4(c), P4.ly + 34, 10.5, ns(c), FG, 'middle', 'font-weight="500"'); });
+  h += `<path d="M${X4(m.x).toFixed(1)} ${P4.ly - 24}l-5 -8h10z" fill="${kc}" pointer-events="none"/>`;
+  // points
+  const n = Tf.cp.length, x0 = 260 - (n * 180 - 8) / 2;
+  Tf.cp.forEach((c, j) => {
+    const v = m.pt[j], ok = v === Tf.pt[j], col = v === 0 ? null : m.all ? (ok ? GREEN : RED) : v === 1 ? ORANGE : v === 2 ? BLUE : VIOL;
+    h += chip(x0 + j * 180, 352, 172, `x = ${ns(c)}: ${PTN[v]}`, v > 0, 'pt-' + j, col, 11.5);
+  });
+  let verdict = 'отметьте знаки на всех промежутках и все критические точки', vc = MUTED;
+  if (m.all) { if (m.right) { verdict = 'верно: ' + Tf.sum.slice(0, 2).join('; '); vc = GREEN; } else { verdict = 'есть ошибка: потяните точку по графику и проверьте знак f′'; vc = RED; } }
+  h += T(260, 384, 11.5, verdict, vc, 'middle', 'font-weight="500"');
+  h += T(260, 401, 11, `исследовано функций: ${m.nSolved} из ${ST.length}`, m.nSolved === ST.length ? GREEN : MUTED);
+  return h;
+}
+
+function hlBox(id) {
+  const lid = LID(), m = model();
+  if (lid === 'limit') return { curve: [34, 98, 462, 204], A: [X1(m.t0) - 20, Y1(m.s0) - 20, 40, 40], B: [X1(m.t0 + m.h) - 18, Y1(m.s1) - 18, 36, 36], secant: [34, 98, 462, 204], slider: [44, 304, 432, 62], result: [24, 362, 472, 44] }[id];
+  if (lid === 'rules') return { funcs: [18, 70, 484, 36], top: [34, 108, 462, 122], bottom: [34, 232, 462, 102], probe: [X2(m.x) - 20, 128, 40, 204], opts: [18, 334, 484, 36], verdict: [24, 370, 472, 38] }[id];
+  if (lid === 'tangent') return { plot: [18, 98, 316, 240], point: [P3.x0 + P3.w / 2 + (m.x0 - view3().cx) * view3().u - 20, P3.y0 + P3.h / 2 - (m.y0 - view3().cy) * view3().u - 20, 40, 40], ref: [18, 98, 316, 240], reads: [338, 104, 174, 138], goals: [338, 248, 174, 100], eq: [24, 344, 472, 64] }[id];
+  return { funcs: [18, 62, 484, 36], plot: [34, 98, 462, 154], line: [34, 252, 462, 82], pts: [18, 334, 484, 36], verdict: [24, 370, 472, 38] }[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID(), m = model();
+  let h = backdrop();
+  if (id === 'limit') h += limitSVG(m);
+  else if (id === 'rules') h += rulesSVG(m);
+  else if (id === 'tangent') h += tangentSVG(m);
+  else h += studySVG(m);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b && b[2] > 0) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let dirty = true;
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 520, hh / 410, 1.45);
+  const vw = w / s, vh = hh / s, vx = 260 - vw / 2, vy = 406 - vh;
+  scene.setAttribute('viewBox', `${vx.toFixed(1)} ${vy.toFixed(1)} ${vw.toFixed(1)} ${vh.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- actions ----------
+function setT0(v) { v = clamp(snap(v, 0.5), 0.5, 3); if (S.t0 === v) return; S.t0 = v; update(); }
+function setHi(i) {
+  i = clamp(Math.round(i), 0, H.length - 1); if (S.hi === i) return; S.hi = i;
+  const hv = H[i];
+  if (hv === 0.001 && !S.seen.r) { S.seen.r = true; toast(`Справа: Δs/Δt = ${sd(2 * S.t0 + hv, 4)} м/с — почти ${sd(2 * S.t0)}.`); }
+  if (hv === -0.001 && !S.seen.l) { S.seen.l = true; toast(`Слева: Δs/Δt = ${sd(2 * S.t0 + hv, 4)} м/с — тоже почти ${sd(2 * S.t0)}.`); }
+  update();
+}
+function setPx2(x) {
+  const F = FN[S.fi];
+  x = clamp(snap(x, 0.05), F.xr[0], F.xr[1]);
+  F.br.forEach(b => { if (Math.abs(x - b) < 0.1) x = b + (x < b ? -0.1 : 0.1); });
+  x = +x.toFixed(2);
+  if (S.px2 === x) return; S.px2 = x; update();
+}
+function setFi(i) { S.fi = clamp(i, 0, FN.length - 1); const F = FN[S.fi]; S.px2 = clamp(S.px2, F.xr[0], F.xr[1]); if (F.br.some(b => Math.abs(S.px2 - b) < 0.1)) S.px2 = 0.5; update(); if (S.tab === 'scheme') { buildScheme(); updateScheme(model()); } }
+function pickOpt(j) {
+  const F = FN[S.fi]; S.picks[S.fi] = j;
+  if (j === F.ok) { if (!S.fsolved[S.fi]) { S.fsolved[S.fi] = true; toast(`Верно: (${F.fs})′ = ${F.opts[j][0]}.`); } }
+  else toast('График не лёг на точки наклона. Проверьте правило: ' + F.rule + '.');
+  update();
+}
+function setX0(v) {
+  v = clamp(snap(v, 0.25), -2, 4); if (S.x0 === v) return; S.x0 = v;
+  const k = D3(v), i = GOALS.findIndex(G => G.k === k);
+  if (i >= 0 && !S.got[i]) { S.got[i] = true; toast(['Касательная горизонтальна: f′(x₀) = 0.', 'k = 2, как у прямой y = 2x + 5: прямые параллельны.', 'k = tg 135° = −1: угол с осью Ox равен 135°.'][i]); }
+  update();
+}
+function setZoom(z) { S.zoom = z; renderTools(); update(); if (S.tab === 'scheme') { buildScheme(); updateScheme(model()); } }
+function setPx4(x) { const Tf = ST[S.si]; x = +clamp(snap(x, 0.05), Tf.xr[0], Tf.xr[1]).toFixed(2); if (S.px4 === x) return; S.px4 = x; update(); }
+function setSi(i) { S.si = clamp(i, 0, ST.length - 1); const Tf = ST[S.si]; S.px4 = clamp(S.px4, Tf.xr[0], Tf.xr[1]); update(); if (S.tab === 'scheme') { buildScheme(); updateScheme(model()); } }
+function checkStudy() {
+  const Tf = ST[S.si], sg = S.sg[S.si], pt = S.pt[S.si];
+  if (sg.every(v => v > 0) && pt.every(v => v > 0)) {
+    const right = sg.every((v, i) => v === Tf.sg[i]) && pt.every((v, i) => v === Tf.pt[i]);
+    if (right && !S.ssolved[S.si]) { S.ssolved[S.si] = true; toast(`f(x) = ${Tf.fs} исследована верно.`); }
+    else if (!right) toast('Не сходится. Где f′ > 0 — функция растёт; смотрите, меняется ли знак в точке.');
+  }
+}
+function cycleSg(j) { const a = S.sg[S.si]; a[j] = (a[j] % 2) + 1; checkStudy(); update(); }
+function cyclePt(j) { const a = S.pt[S.si]; a[j] = (a[j] % 3) + 1; checkStudy(); update(); }
+function pick(p) {
+  if (p.startsWith('fn-')) setFi(+p.slice(3));
+  else if (p.startsWith('op-')) pickOpt(+p.slice(3));
+  else if (p.startsWith('st-')) setSi(+p.slice(3));
+  else if (p.startsWith('sg-')) cycleSg(+p.slice(3));
+  else if (p.startsWith('pt-')) cyclePt(+p.slice(3));
+}
+
+// ---------- pointer ----------
+let drag = null;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+function dragTo(d, p) {
+  const id = d.id, lid = LID();
+  if (id === 'A') setT0(iX1(p.x));
+  else if (id === 'hs') setHi((p.x - HS.x0) / (HS.x1 - HS.x0) * (H.length - 1));
+  else if (id === 'probe' && lid === 'rules') setPx2(iX2(p.x));
+  else if (id === 'probe' && lid === 'study') setPx4(iX4(p.x));
+  else if (id === 'pt') setX0(d.cx + (p.x - P3.x0 - P3.w / 2) / d.u);
+}
+scene.addEventListener('pointerdown', e => {
+  const pk = e.target.closest('[data-pick]'); if (pk) { e.preventDefault(); pick(pk.dataset.pick); return; }
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  const v = view3();
+  drag = { id: el.dataset.drag, cx: v.cx, u: v.u };
+  if (drag.id !== 'A' && !(drag.id === 'pt' && S.zoom)) dragTo(drag, toSvg(e));
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+});
+scene.addEventListener('pointermove', e => { if (drag) dragTo(drag, toSvg(e)); });
+const endDrag = () => { drag = null; scene.classList.remove('grabbing'); };
+scene.addEventListener('pointerup', endDrag);
+scene.addEventListener('pointercancel', endDrag);
+
+function loop(t) {
+  requestAnimationFrame(loop);
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2800); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pr) => `<button data-a="${k}"${pr === undefined ? '' : ` aria-pressed="${pr}"`}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    limit: B('t-', 't₀ −') + B('t+', 't₀ +') + sep + B('h-', 'h −') + B('h+', 'h +') + sep + B('tan', 'Касательная', S.tan),
+    rules: B('x-', 'x −') + B('x+', 'x +') + sep + B('f-', '‹ f') + B('f+', 'f ›'),
+    tangent: B('x0-', 'x₀ −') + B('x0+', 'x₀ +') + sep + B('zoom', 'Лупа', S.zoom),
+    study: B('x-', 'x −') + B('x+', 'x +') + sep + B('reset', 'Сбросить знаки'),
+  }[id];
+}
+function act(a) {
+  const id = LID();
+  if (a === 't-' || a === 't+') return setT0(S.t0 + (a === 't-' ? -0.5 : 0.5));
+  if (a === 'h-' || a === 'h+') return setHi(S.hi + (a === 'h-' ? -1 : 1));
+  if (a === 'tan') { S.tan = !S.tan; renderTools(); update(); return; }
+  if (a === 'x-' || a === 'x+') { const d = a === 'x-' ? -0.1 : 0.1; return id === 'rules' ? setPx2(S.px2 + d) : setPx4(S.px4 + d); }
+  if (a === 'f-' || a === 'f+') return setFi((S.fi + (a === 'f-' ? FN.length - 1 : 1)) % FN.length);
+  if (a === 'x0-' || a === 'x0+') return setX0(S.x0 + (a === 'x0-' ? -0.25 : 0.25));
+  if (a === 'zoom') return setZoom(!S.zoom);
+  if (a === 'reset') { S.sg[S.si] = ST[S.si].sg.map(() => 0); S.pt[S.si] = ST[S.si].pt.map(() => 0); update(); }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const TXT = (s, col = 'var(--fg)', fs = 10) => IC(`<text x="17" y="21" font-size="${fs}" fill="${col}" text-anchor="middle" font-family="monospace">${s}</text>`);
+const PAR = '<path d="M4 4Q12 40 30 22" fill="none" stroke="#5fb4d9" stroke-width="1.6"/>';
+const ICON = {
+  curve: IC('<path d="M4 30Q20 30 30 4" fill="none" stroke="#e8ecf4" stroke-width="1.6"/>'),
+  A: IC('<path d="M4 30Q20 30 30 4" fill="none" stroke="#8b96ad" stroke-width="1.2"/><circle cx="16" cy="26" r="4" fill="#ffb547"/>'),
+  B: IC('<path d="M4 30Q20 30 30 4" fill="none" stroke="#8b96ad" stroke-width="1.2"/><circle cx="25" cy="15" r="3.5" fill="#5fb4d9"/>'),
+  secant: IC('<path d="M4 30Q20 30 30 4" fill="none" stroke="#8b96ad" stroke-width="1.2"/><path d="M6 34L32 6" stroke="#5fb4d9" stroke-width="1.6"/>'),
+  slider: IC('<path d="M4 17H30" stroke="#26324a" stroke-width="3"/><circle cx="19" cy="17" r="4" fill="#ffb547"/>'),
+  result: TXT('Δs/Δt', 'var(--fg)', 8),
+  funcs: TXT('f₁…f₅', 'var(--fg)', 9),
+  top: IC(PAR),
+  bottom: IC('<g fill="#9aa6bf"><circle cx="6" cy="26" r="1.6"/><circle cx="12" cy="20" r="1.6"/><circle cx="18" cy="15" r="1.6"/><circle cx="24" cy="11" r="1.6"/><circle cx="30" cy="8" r="1.6"/></g>'),
+  probe: IC(PAR + '<path d="M6 20L26 14" stroke="#ffb547" stroke-width="1.5"/><circle cx="16" cy="17" r="3" fill="#ffb547"/>'),
+  opts: TXT('f′=?', '#86e0a8', 10),
+  verdict: TXT('✓', 'var(--ok)', 14),
+  plot: IC(PAR),
+  point: IC(PAR + '<circle cx="12" cy="22" r="3.5" fill="#ffb547"/>'),
+  ref: IC('<path d="M4 30L30 4" stroke="#b59cff" stroke-dasharray="3 3" stroke-width="1.4"/>'),
+  reads: TXT('k, α', 'var(--fg)', 10),
+  goals: TXT('○○○', 'var(--fg)', 9),
+  eq: TXT('y=kx+b', 'var(--fg)', 7.5),
+  line: IC('<path d="M3 20H31" stroke="#8b96ad" stroke-width="1.4"/><text x="9" y="15" font-size="10" fill="#86e0a8" font-family="monospace">+</text><text x="21" y="15" font-size="10" fill="#ff8a73" font-family="monospace">−</text>'),
+  pts: TXT('max', '#ffb547', 9),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const Ls = LESSONS[S.lesson];
+  if (S.done[Ls.id]) return '✓ Выполнено';
+  if (Ls.id === 'limit') return `h = ${sd(m.h)} · справа ${m.seen.r ? '✓' : '—'} · слева ${m.seen.l ? '✓' : '—'}`;
+  if (Ls.id === 'rules') return `решено ${m.nSolved} из ${FN.length} функций`;
+  if (Ls.id === 'tangent') return `k = ${sd(m.k)} · найдено ${m.nGot} из 3 точек`;
+  return `исследовано ${m.nSolved} из ${ST.length} функций`;
+}
+
+// ---------- Scheme tab ----------
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+const pbtn = (data, label, on) => `<button data-p="${data}" aria-pressed="${!!on}">${label}</button>`;
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'limit') h = `<h2>Секущая и шаг h</h2><dl class="reads"><div><dt>Δs</dt><dd id="r1"></dd></div><div><dt>Δs/Δt</dt><dd id="r2"></dd></div><div><dt>Предел</dt><dd id="r3"></dd></div></dl>` +
+    slider('inT', 'момент t₀, с', 0.5, 3, 0.5, S.t0) + slider('inH', 'шаг h, с', 0, H.length - 1, 1, S.hi) + `<div class="chips" style="margin-top:14px">${pbtn('tan', 'Показать касательную', S.tan)}</div>`;
+  if (id === 'rules') h = `<h2>Функция и её наклон</h2><div class="chips">${FN.map((f, i) => pbtn('fn-' + i, f.fs, S.fi === i)).join('')}</div>` +
+    `<dl class="reads"><div><dt>x</dt><dd id="r1"></dd></div><div><dt>f(x)</dt><dd id="r2"></dd></div><div><dt>наклон</dt><dd id="r3"></dd></div></dl>` +
+    `<div id="sX"></div><h3>Кандидаты f′(x)</h3><div class="chips" id="sOpts"></div>`;
+  if (id === 'tangent') h = `<h2>Точка касания</h2><dl class="reads"><div><dt>f(x₀)</dt><dd id="r1"></dd></div><div><dt>k</dt><dd id="r2"></dd></div><div><dt>α</dt><dd id="r3"></dd></div></dl>` +
+    slider('inX0', 'x₀', -2, 4, 0.25, S.x0) + `<p class="note" id="sEq" style="margin-top:12px"></p><div class="chips">${pbtn('zoom', 'Лупа ×4', S.zoom)}</div>`;
+  if (id === 'study') h = `<h2>Исследование</h2><div class="chips">${ST.map((s, i) => pbtn('st-' + i, s.fs, S.si === i)).join('')}</div>` +
+    `<dl class="reads"><div><dt>x</dt><dd id="r1"></dd></div><div><dt>f′(x)</dt><dd id="r2"></dd></div><div><dt>f</dt><dd id="r3"></dd></div></dl>` +
+    `<div id="sX"></div><h3>Знаки f′ на промежутках</h3><div class="chips" id="sSg"></div><h3>Критические точки</h3><div class="chips" id="sPt"></div>`;
+  el.innerHTML = h + '<div id="sDiag"></div>';
+  if (id === 'rules') el.querySelector('#sX').innerHTML = slider('inPx', 'x', FN[S.fi].xr[0], FN[S.fi].xr[1], 0.05, S.px2);
+  if (id === 'study') el.querySelector('#sX').innerHTML = slider('inPx', 'x', ST[S.si].xr[0], ST[S.si].xr[1], 0.05, S.px4);
+  const on = (sel, ev, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener(ev, fn); };
+  on('#inT', 'input', e => setT0(+e.target.value));
+  on('#inH', 'input', e => setHi(+e.target.value));
+  on('#inX0', 'input', e => setX0(+e.target.value));
+  on('#inPx', 'input', e => id === 'rules' ? setPx2(+e.target.value) : setPx4(+e.target.value));
+  el.querySelectorAll('[data-p]').forEach(b => b.onclick = () => {
+    const p = b.dataset.p;
+    if (p === 'tan') { S.tan = !S.tan; renderTools(); update(); }
+    else if (p === 'zoom') setZoom(!S.zoom);
+    else pick(p);
+    updateScheme(model());
+  });
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  if (!el.querySelector('#sDiag')) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  const press = (pre, cur) => el.querySelectorAll(`[data-p^="${pre}"]`).forEach(b => b.setAttribute('aria-pressed', b.dataset.p === pre + cur));
+  if (m.kind === 'limit') {
+    set('#r1', sd(m.ds, 4) + ' м'); set('#r2', sd(m.avg, 4)); set('#r3', sd(m.v) + ' м/с');
+    set('#inTO', sd(m.t0)); set('#inHO', sd(m.h)); val('#inT', m.t0); val('#inH', S.hi);
+    el.querySelectorAll('[data-p="tan"]').forEach(b => b.setAttribute('aria-pressed', S.tan));
+  } else if (m.kind === 'rules') {
+    set('#r1', sd(m.x, 2)); set('#r2', sd(m.y, 2)); set('#r3', sd(m.k, 2)); set('#inPxO', sd(m.x, 2)); val('#inPx', m.x); press('fn-', m.fi);
+    const box = el.querySelector('#sOpts');
+    box.innerHTML = m.F.opts.map((o, j) => `<button data-o="${j}" aria-pressed="${m.pick === j}">f′ = ${o[0]}</button>`).join('');
+    box.querySelectorAll('[data-o]').forEach(b => b.onclick = () => { pickOpt(+b.dataset.o); });
+  } else if (m.kind === 'tangent') {
+    set('#r1', sd(m.y0)); set('#r2', sd(m.k)); set('#r3', sd(m.alpha, 1) + '°'); set('#inX0O', sd(m.x0)); val('#inX0', m.x0);
+    set('#sEq', 'Касательная: ' + lin(m.k, m.b) + ' · найдено ' + m.nGot + ' из 3');
+    el.querySelectorAll('[data-p="zoom"]').forEach(b => b.setAttribute('aria-pressed', S.zoom));
+  } else {
+    set('#r1', sd(m.x, 2)); set('#r2', sd(m.k, 2)); set('#r3', Math.abs(m.k) < 1e-9 ? 'f′ = 0' : m.k > 0 ? 'растёт' : 'убывает'); set('#inPxO', sd(m.x, 2)); val('#inPx', m.x); press('st-', m.si);
+    const bnd = [-Infinity, ...m.T.cp, Infinity], iv = j => `(${isFinite(bnd[j]) ? ns(bnd[j]) : '−∞'}; ${isFinite(bnd[j + 1]) ? ns(bnd[j + 1]) : '+∞'})`;
+    const sb = el.querySelector('#sSg'), pb = el.querySelector('#sPt');
+    sb.innerHTML = m.sg.map((v, j) => `<button data-s="${j}" aria-pressed="${v > 0}">${iv(j)}: ${SGN[v]}</button>`).join('');
+    pb.innerHTML = m.pt.map((v, j) => `<button data-q="${j}" aria-pressed="${v > 0}">x = ${ns(m.T.cp[j])}: ${PTN[v]}</button>`).join('');
+    sb.querySelectorAll('[data-s]').forEach(b => b.onclick = () => cycleSg(+b.dataset.s));
+    pb.querySelectorAll('[data-q]').forEach(b => b.onclick = () => cyclePt(+b.dataset.q));
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'limit') return [
+    { id: 'curve', icon: ICON.curve, name: 'График пути', spec: 's = t²: сколько метров пройдено к моменту t. Кривая — значит, скорость меняется.' },
+    { id: 'A', icon: ICON.A, name: 'Точка A', spec: 'Момент t₀, в который ищем мгновенную скорость. Её можно тянуть.' },
+    { id: 'B', icon: ICON.B, name: 'Точка B', spec: 'Момент t₀ + h. При h → 0 подъезжает к A.' },
+    { id: 'secant', icon: ICON.secant, name: 'Секущая AB', spec: 'Её наклон — средняя скорость Δs/Δt. При малом h почти совпадает с касательной.' },
+    { id: 'slider', icon: ICON.slider, name: 'Шаг h', spec: 'От ±1 до ±0,001 с. Нуль пропущен: делить на нуль нельзя.' },
+    { id: 'result', icon: ICON.result, name: 'Средняя скорость', spec: 'Δs/Δt с подставленными числами.' }];
+  if (id === 'rules') return [
+    { id: 'funcs', icon: ICON.funcs, name: 'Пять функций', spec: 'На каждое правило: степень и сумма, произведение, частное, сложная функция, синус.' },
+    { id: 'top', icon: ICON.top, name: 'График f(x)', spec: 'Синяя кривая. Красный пунктир — точка, где функция не определена.' },
+    { id: 'probe', icon: ICON.probe, name: 'Касательная-зонд', spec: 'Оранжевая точка и касательная. Её наклон k переносится вниз.' },
+    { id: 'bottom', icon: ICON.bottom, name: 'Точки наклона', spec: 'Серые точки — измеренные наклоны касательной. Вместе они и есть график f′(x).' },
+    { id: 'opts', icon: ICON.opts, name: 'Кандидаты', spec: 'Три формулы для f′(x). Верная ляжет точно на точки.' },
+    { id: 'verdict', icon: ICON.verdict, name: 'Проверка', spec: 'Совпало ли и какое правило работает.' }];
+  if (id === 'tangent') return [
+    { id: 'plot', icon: ICON.plot, name: 'Парабола', spec: 'f(x) = 0,5x² − x − 1. Масштаб по осям одинаковый, поэтому углы честные.' },
+    { id: 'point', icon: ICON.point, name: 'Точка касания', spec: 'x₀ меняется с шагом 0,25. Касательная зеленеет в нужных точках.' },
+    { id: 'ref', icon: ICON.ref, name: 'Прямая y = 2x + 5', spec: 'Фиолетовый пунктир. Касательная, параллельная ей, имеет тот же наклон.' },
+    { id: 'reads', icon: ICON.reads, name: 'Числа', spec: 'x₀, f(x₀), k = f′(x₀), угол α и уравнение касательной.' },
+    { id: 'goals', icon: ICON.goals, name: 'Цели', spec: 'Три точки касания, которые нужно найти.' },
+    { id: 'eq', icon: ICON.eq, name: 'Уравнение', spec: 'y = f(x₀) + f′(x₀)(x − x₀) с подставленными числами.' }];
+  return [
+    { id: 'funcs', icon: ICON.funcs, name: 'Три функции', spec: 'У каждой своя картина знаков. Галочка — исследована.' },
+    { id: 'plot', icon: ICON.plot, name: 'График и зонд', spec: 'Касательная зелёная при f′ > 0, красная при f′ < 0, оранжевая при f′ = 0.' },
+    { id: 'line', icon: ICON.line, name: 'Прямая знаков', spec: 'Критические точки делят прямую на промежутки. Нажимайте, чтобы поставить знак f′.' },
+    { id: 'pts', icon: ICON.pts, name: 'Критические точки', spec: 'Где f′(x) = 0. Решите: максимум, минимум или не экстремум.' },
+    { id: 'verdict', icon: ICON.verdict, name: 'Вывод', spec: 'Появляется, когда всё отмечено.' }];
+}
+
+function renderPanes(m) {
+  const Ls = LESSONS[S.lesson], done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Модель</h2><p class="note">Из чего состоит рабочее поле. Нажмите на пункт, чтобы найти его.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'limit') {
+    const t0 = m.t0, h = m.h;
+    let r = `<h2>Скорость в момент t₀ = ${sd(t0)} с</h2><div class="formula">v(t₀) = lim<sub style="font-size:11px">h→0</sub> (s(t₀ + h) − s(t₀)) / h</div><h3>Сейчас h = ${sd(h)}</h3><div class="steps">` +
+      step('s(t₀)', `${sd(t0)}² = ${sd(m.s0, 6)} м`) + step('s(t₀ + h)', `${sd(t0 + h, 3)}² = ${sd(m.s1, 6)} м`) + step('Δs', `${sd(m.s1, 6)} − ${sd(m.s0, 6)} = ${sd(m.ds, 6)} м`) +
+      step('Δs / Δt', `${sd(m.ds, 6)} / ${par(h)} = ${sd(m.avg, 4)} м/с`, 'sum') + `</div><h3>Таблица: h → 0</h3><div class="steps">`;
+    [1, 0.1, 0.01, 0.001].forEach(v => { r += step(`h = ±${sd(v)}`, `${sd(2 * t0 + v, 4)} и ${sd(2 * t0 - v, 4)}`); });
+    r += `</div><h3>В общем виде</h3><div class="steps">` + step('(t₀ + h)² − t₀²', '2t₀h + h²') + step('делим на h', '2t₀ + h') + step('h → 0', `2t₀ = ${sd(2 * t0)} м/с`, 'sum') + `</div>`;
+    return r + `<p class="note" style="margin-top:10px">Справа и слева средние скорости подходят к одному числу — значит, предел существует. Это и есть s′(t₀).</p>`;
+  }
+  if (id === 'rules') {
+    const F = m.F;
+    let r = `<h2>f(x) = ${F.fs}</h2><div class="formula" style="font-size:15px">${F.form}</div><h3>Наклон в точке x = ${sd(m.x, 2)}</h3><div class="steps">` +
+      step('f(x)', sd(m.y, 3)) + step('измеренный наклон', `(f(x + 0,0001) − f(x − 0,0001)) / 0,0002 ≈ ${sd((F.f(m.x + 1e-4) - F.f(m.x - 1e-4)) / 2e-4, 3)}`, 'sum') + `</div>`;
+    if (m.pick >= 0) r += `<h3>Ваш кандидат</h3><div class="steps">` + step('f′ = ' + F.opts[m.pick][0], `при x = ${sd(m.x, 2)}: ${sd(F.opts[m.pick][1](m.x), 3)}`) + step('сравнение', m.right ? 'совпадает с наклоном ✓' : 'не совпадает', 'sum') + `</div>`;
+    if (m.solved[m.fi]) r += `<h3>Решение по правилу</h3><div class="steps">` + F.steps.map((s, i) => step(s[0], s[1], i === F.steps.length - 1 ? 'sum' : '')).join('') + `</div>`;
+    else r += `<p class="note" style="margin-top:10px">Правило: ${F.rule}. Решение по шагам откроется, когда выберете верную производную.</p>`;
+    return r;
+  }
+  if (id === 'tangent') {
+    let r = `<h2>Касательная в точке x₀ = ${sd(m.x0)}</h2><div class="formula" style="font-size:15px">y = f(x₀) + f′(x₀)(x − x₀)</div><h3>Три числа</h3><div class="steps">` +
+      step('f(x₀)', `0,5·${par(m.x0)}² − ${par(m.x0)} − 1 = ${sd(m.y0)}`) + step('f′(x)', '(0,5x²)′ − (x)′ − (1)′ = x − 1') + step('k = f′(x₀)', `${sd(m.x0)} − 1 = ${sd(m.k)}`) +
+      step('угол', `tg α = ${sd(m.k)} → α = ${sd(m.alpha, 1)}°`) + `</div><h3>Уравнение</h3><div class="steps">` +
+      step('подставляем', `y = ${sd(m.y0)} + ${par(m.k)}(x − ${par(m.x0)})`) + step('упрощаем', lin(m.k, m.b), 'sum') + `</div><h3>Найденные точки</h3><div class="steps">`;
+    const why = ['f′(x₀) = 0 → x₀ − 1 = 0 → x₀ = 1', 'k = 2 → x₀ − 1 = 2 → x₀ = 3', 'k = tg 135° = −1 → x₀ − 1 = −1 → x₀ = 0'];
+    GOALS.forEach((G, i) => { r += step(G.lbl, m.got[i] ? why[i] : 'ещё не найдена', i === 2 ? 'sum' : ''); });
+    return r + `</div>`;
+  }
+  const Tf = m.T;
+  let r = `<h2>f(x) = ${Tf.fs}</h2><div class="formula" style="font-size:15px">f′(x) = ${Tf.ds}</div><h3>Критические точки</h3><div class="steps">` +
+    step('f′(x) = 0', `${Tf.fac} = 0`) + step('x', Tf.cp.map(ns).join('; '), 'sum') + `</div><h3>Зонд в точке x = ${sd(m.x, 2)}</h3><div class="steps">` +
+    step('f′(x)', sd(m.k, 3)) + step('значит', Math.abs(m.k) < 1e-9 ? 'касательная горизонтальна' : m.k > 0 ? 'f′ > 0, функция растёт' : 'f′ < 0, функция убывает', 'sum') + `</div>`;
+  if (m.solved[m.si]) r += `<h3>Вывод</h3><div class="steps">` + Tf.sum.map((s, i) => step('', s, i === Tf.sum.length - 1 ? 'sum' : '')).join('') + `</div>`;
+  else r += `<p class="note" style="margin-top:10px">Подставьте в f′(x) любое число из промежутка — знак результата и есть знак f′ на всём промежутке. Вывод откроется, когда всё отмечено верно.</p>`;
+  return r;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter');
+  if (id === 'limit') el.innerHTML = `<div class="k">Средняя скорость</div><div class="v ${Math.abs(m.h) <= 0.001 ? 'ok' : ''}">${sd(m.avg, 4)} м/с</div><div class="lr"><span>h</span><span>${sd(m.h)}</span></div><div class="lr"><span>t₀</span><span>${sd(m.t0)} с</span></div>`;
+  else if (id === 'rules') el.innerHTML = `<div class="k">Наклон в x = ${sd(m.x, 2)}</div><div class="v">k = ${sd(m.k, 2)}</div><div class="lr"><span>f(x)</span><span>${sd(m.y, 2)}</span></div><div class="lr"><span>решено</span><span>${m.nSolved}/${FN.length}</span></div>`;
+  else if (id === 'tangent') el.innerHTML = `<div class="k">Касательная</div><div class="v ${GOALS.some(G => G.k === m.k) ? 'ok' : ''}">k = ${sd(m.k)}</div><div class="lr"><span>α</span><span>${sd(m.alpha, 1)}°</span></div><div class="lr"><span>найдено</span><span>${m.nGot}/3</span></div>`;
+  else el.innerHTML = `<div class="k">Знак f′</div><div class="v" style="color:${sgnCol(m.k)}">${Math.abs(m.k) < 1e-9 ? 'f′ = 0' : m.k > 0 ? 'f′ > 0 ↗' : 'f′ < 0 ↘'}</div><div class="lr"><span>x</span><span>${sd(m.x, 2)}</span></div><div class="lr"><span>решено</span><span>${m.nSolved}/${ST.length}</span></div>`;
+}
+
+function update() {
+  const m = model(), Ls = LESSONS[S.lesson];
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Производная освоена!'), 900);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  limit: '<path d="M6 27Q30 27 60 3" fill="none" stroke="#e8ecf4" stroke-width="1.4"/><path d="M10 30L50 6" stroke="#5fb4d9" stroke-width="1.4"/><circle cx="24" cy="22" r="2.6" fill="#ffb547"/><circle cx="44" cy="13" r="2.4" fill="#5fb4d9"/>',
+  rules: '<text x="33" y="20" font-size="11" fill="#e8ecf4" text-anchor="middle" font-family="monospace">(uv)′</text>',
+  tangent: '<path d="M6 4Q33 46 60 4" fill="none" stroke="#5fb4d9" stroke-width="1.5"/><path d="M8 30L46 8" stroke="#86e0a8" stroke-width="1.4"/><circle cx="24" cy="20.5" r="2.6" fill="#ffb547"/>',
+  study: '<path d="M4 24Q16 0 30 15T62 6" fill="none" stroke="#5fb4d9" stroke-width="1.5"/><text x="12" y="29" font-size="8" fill="#86e0a8" font-family="monospace">+</text><text x="30" y="29" font-size="8" fill="#ff8a73" font-family="monospace">−</text><text x="50" y="29" font-size="8" fill="#86e0a8" font-family="monospace">+</text>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Ls, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Ls.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Ls.title}</span></span>
+      ${S.done[Ls.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const Ls = LESSONS[i];
+  S.lesson = i; S.hl = null;
+  S.t0 = LESSONS[0].t0; S.hi = LESSONS[0].hi; S.tan = false; S.seen = {};
+  S.fi = LESSONS[1].fi; S.px2 = LESSONS[1].px; S.picks = FN.map(() => -1); S.fsolved = {};
+  S.x0 = LESSONS[2].x0; S.zoom = LESSONS[2].zoom; S.got = [false, false, false];
+  S.si = LESSONS[3].si; S.px4 = LESSONS[3].px; S.sg = ST.map(s => s.sg.map(() => 0)); S.pt = ST.map(s => s.pt.map(() => 0)); S.ssolved = {};
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = Ls.task;
+  $('#hint').textContent = Ls.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const st = $('#lessons'), cur = st.querySelector('.lesson[aria-current="true"]');
+  if (cur) { const sr = st.getBoundingClientRect(), cr = cur.getBoundingClientRect(); st.scrollLeft += (cr.left - sr.left) - (sr.width - cr.width) / 2; }
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = LESSONS[S.lesson], id = Ls.id;
+  let now = '';
+  if (id === 'limit') now = `График пути s(t) = t². Точка A при t₀ = ${sd(m.t0)} с, шаг h = ${sd(m.h)} с, точка B при t = ${sd(m.t0 + m.h, 3)} с. Δs = ${sd(m.ds, 6)} м, средняя скорость Δs/Δt = ${sd(m.avg, 4)} м/с (наклон секущей AB). ` +
+    `Касательная ${m.tan ? 'показана' : 'скрыта'}. Шаг 0,001 справа ${m.seen.r ? 'уже пройден' : 'ещё не пройден'}, слева ${m.seen.l ? 'уже пройден' : 'ещё не пройден'}.`;
+  if (id === 'rules') now = `Функция ${S.fi + 1} из ${FN.length}: f(x) = ${m.F.fs} (правило: ${m.F.rule}). Зонд в точке x = ${sd(m.x, 2)}: f(x) = ${sd(m.y, 3)}, наклон касательной ${sd(m.k, 3)}. ` +
+    `Кандидаты f′: ${m.F.opts.map(o => o[0]).join('; ')}. Ученик ${m.pick < 0 ? 'ещё не выбрал кандидата' : `выбрал f′ = ${m.F.opts[m.pick][0]} — ${m.right ? 'верно' : 'неверно'}`}. Решено ${m.nSolved} из ${FN.length}: ${FN.map((f, i) => f.fs + (m.solved[i] ? ' — решено' : ' — нет')).join('; ')}.`;
+  if (id === 'tangent') now = `f(x) = 0,5x² − x − 1, f′(x) = x − 1. Точка касания x₀ = ${sd(m.x0)}, f(x₀) = ${sd(m.y0)}, k = ${sd(m.k)}, угол с Ox ${sd(m.alpha, 1)}°, касательная ${lin(m.k, m.b)}. Лупа ${m.zoom ? 'включена' : 'выключена'}. ` +
+    `Цели: ${GOALS.map((G, i) => G.lbl + (m.got[i] ? ' — найдено' : ' — не найдено')).join('; ')}.`;
+  if (id === 'study') now = `Функция f(x) = ${m.T.fs}, f′(x) = ${m.T.ds}, критические точки x = ${m.T.cp.map(ns).join(' и ')}. Зонд в x = ${sd(m.x, 2)}: f′ = ${sd(m.k, 3)}. ` +
+    `Ученик поставил знаки f′ на промежутках: ${m.sg.map(v => SGN[v]).join(', ')}; точки: ${m.T.cp.map((c, j) => `x = ${ns(c)} — ${PTN[m.pt[j]]}`).join('; ')}${m.all ? (m.right ? ' (всё верно)' : ' (есть ошибка)') : ''}. Исследовано ${m.nSolved} из ${ST.length}.`;
+  return [
+    `Раздел: математика, 10 класс, алгебра и начала анализа, тема «Производная». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+    'Не называй готовые ответы (какая формула производной верна, нужные точки касания, знаки на промежутках, тип критических точек): веди ученика наводящими вопросами и проверяй его рассуждения.',
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = LESSONS[S.lesson], done = S.done[Ls.id];
+  const q = {
+    limit: 'Почему нельзя просто подставить h = 0?', rules: 'Как найти производную сложной функции?',
+    tangent: 'Как связаны производная и угол наклона касательной?', study: 'Как отличить максимум от минимума?',
+  }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где производная пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
