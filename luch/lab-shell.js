@@ -299,8 +299,8 @@
   }
   function stShell() {
     const el = document.createElement('div'); el.className = 'ls-stage'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Теория');
-    el.innerHTML = '<div class="frame"><div class="pic"><div class="ph"><span>Рисую картинку…</span></div></div>' +
-      '<div class="txt" data-noi18n><b></b><p>Готовлю рассказ… это займёт несколько секунд.</p></div>' +
+    el.innerHTML = '<div class="frame"><div class="pic"><div class="ph"><span>Готовлю лекцию…</span></div></div>' +
+      '<div class="txt" data-noi18n><b></b><p>Готовлю лекцию… это займёт несколько секунд.</p></div>' +
       '<div class="dots"></div>' +
       '<div class="ctl"><button class="ic" data-a="prev" aria-label="Назад">‹</button><button class="pp" data-a="pp"></button><button class="ic" data-a="next" aria-label="Дальше">›</button>' +
       '<span class="sp"></span><button class="ls-btn ghost" data-a="practice">К практике →</button><button class="ic x" data-a="close" aria-label="Закрыть">✕</button></div></div>';
@@ -367,7 +367,7 @@
     const me = st;
     let s; try { s = await fetchStory(); } catch (e) {
       if (st !== me) return;
-      st.el.querySelector('.txt').innerHTML = '<b>Теория</b><p>Не получилось подготовить рассказ. Попробуйте ещё раз чуть позже.</p>';
+      st.el.querySelector('.txt').innerHTML = '<b>Теория</b><p>Не получилось подготовить лекцию. Попробуйте ещё раз чуть позже.</p>';
       return;
     }
     if (st !== me) return;
