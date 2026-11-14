@@ -30,7 +30,7 @@ window.LUCH_SUBJECTS = {
       { id: 'coord', b: 'fn', g: 6, t: 'Координатная плоскость', items: ['Координаты точки', 'Графики зависимостей', 'Чтение графиков'], req: ['neg'], status: 'done', href: '/labs/math-coord/', lessons: 3, doneItems: 3 },
       { id: 'linf', b: 'fn', g: 7, t: 'Линейная функция', items: ['Что такое функция', 'y = kx + b', 'Угловой коэффициент', 'Пересечение графиков'], req: ['coord', 'expr'], status: 'done', href: '/math/', lessons: 2, doneItems: 4 },
       { id: 'fquad', b: 'fn', g: 9, t: 'Квадратичная функция', items: ['Парабола', 'Вершина и ось симметрии', 'Сдвиги и растяжения графиков'], req: ['linf', 'quad'], status: 'done', href: '/math/', lessons: 3, doneItems: 3 },
-      { id: 'trig', b: 'fn', g: 10, t: 'Тригонометрия', items: ['Единичная окружность', 'Основные формулы', 'Графики синуса и косинуса', 'Тригонометрические уравнения'], req: ['fquad', 'pyth'] },
+      { id: 'trig', b: 'fn', g: 10, t: 'Тригонометрия', items: ['Единичная окружность', 'Основные формулы', 'Графики синуса и косинуса', 'Тригонометрические уравнения'], req: ['fquad', 'pyth'], status: 'done', href: '/labs/math-trig/', lessons: 4, doneItems: 4 },
       { id: 'deriv', b: 'fn', g: 10, t: 'Производная', items: ['Скорость изменения и предел', 'Правила дифференцирования', 'Касательная', 'Исследование функции'], req: ['fquad'] },
       { id: 'integ', b: 'fn', g: 11, t: 'Интеграл', items: ['Первообразная', 'Площадь под графиком', 'Формула Ньютона — Лейбница'], req: ['deriv'] },
 
@@ -182,7 +182,7 @@ window.LUCH_SUBJECTS = {
       { id: 'media', b: 'tech', g: 6, t: 'Графика и медиа', items: ['Растровая и векторная графика', 'Звук и видео', 'Сжатие файлов'], req: ['info'], status: 'done', href: '/labs/cs-media/', lessons: 3, doneItems: 3 },
       { id: 'robot', b: 'tech', g: 7, t: 'Робототехника', items: ['Датчики', 'Моторы', 'Программирование робота'], req: ['blocks'], status: 'done', href: '/labs/cs-robot/', lessons: 3, doneItems: 3 },
       { id: 'ai', b: 'tech', g: 10, t: 'Искусственный интеллект', items: ['Машинное обучение', 'Нейросети', 'Как работают чат-боты', 'Этика ИИ'], req: ['analysis'], status: 'done', href: '/labs/cs-ai/', lessons: 4, doneItems: 4 },
-      { id: 'career', b: 'tech', g: 11, t: 'IT-профессии и стартапы', items: ['Кем работать в IT', 'Как устроен стартап', 'Цифровые сервисы и деньги'], req: ['ai', 'web'] },
+      { id: 'career', b: 'tech', g: 11, t: 'IT-профессии и стартапы', items: ['Кем работать в IT', 'Как устроен стартап', 'Цифровые сервисы и деньги'], req: ['ai', 'web'], status: 'done', href: '/labs/cs-career/', lessons: 3, doneItems: 3 },
     ],
   },
 };
