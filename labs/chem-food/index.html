@@ -1,0 +1,949 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по химии, 9 класс: еда и здоровье — качественные реакции на белки, жиры и углеводы, витамин C в соках и как лекарство действует в крови.">
+<title>Еда и здоровье</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /mechanics and /chemistry. Lab bench (SVG) on the left, lesson notebook on the right, lesson strip under the bench. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--liq);transition:width .2s}
+.gauge i{position:absolute;top:-4px;width:2px;height:14px;background:var(--force);transform:translateX(-50%)}
+.swatch{height:12px;border-radius:4px;margin-top:9px;border:1px solid rgba(255,255,255,.15)}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.meter .big{font:700 30px/1 var(--font-display);margin-top:8px;letter-spacing:.02em}
+.meter .big small{font:500 12px/1 var(--font-body);color:var(--muted);letter-spacing:0;margin-left:6px}
+.pairs{display:grid;gap:6px;margin-top:10px}
+.pairs label{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface-2);border-radius:9px;padding:7px 10px;font-size:13.5px}
+.pairs select{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:7px;padding:5px 8px;font:500 13px var(--font-mono)}
+.pairs select:disabled{color:var(--ok);opacity:1}
+.cnt{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;margin-top:10px}
+.cnt div{display:flex;align-items:center;justify-content:space-between;gap:6px;background:var(--surface-2);border-radius:9px;padding:6px 8px;font-size:13px}
+.cnt b{font:500 14px var(--font-mono)}
+.cnt button{width:30px;height:30px;border-radius:7px;background:var(--bg);border:1px solid var(--line);cursor:pointer;font:500 15px/1 var(--font-mono)}
+.vtab{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}
+.vtab span{background:var(--surface-2);border-radius:8px;padding:7px 4px;text-align:center;font:500 12px/1.3 var(--font-mono);color:var(--muted)}
+.vtab span b{display:block;color:var(--fg);font-size:15px}
+.vtab span.on{outline:2px solid var(--ok);color:var(--fg)}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><ellipse cx="20" cy="20" rx="14" ry="5.5" fill="none" stroke="var(--arm)" stroke-width="1.6"/><ellipse cx="20" cy="20" rx="14" ry="5.5" fill="none" stroke="var(--arm)" stroke-width="1.6" transform="rotate(60 20 20)"/><ellipse cx="20" cy="20" rx="14" ry="5.5" fill="none" stroke="var(--arm)" stroke-width="1.6" transform="rotate(-60 20 20)"/><circle cx="20" cy="20" r="3.2" fill="var(--force)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Химия · Еда и здоровье</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#chem">Карта</a><a href="/physics/#chem">Химия</a><a href="/labs/chem-food/" aria-current="page">Еда и здоровье</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Еда</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Лабораторный стол">
+    <svg class="scene" id="scene" role="img" aria-label="Лабораторный стол: пробирки с пробами еды и реактивы, колба для титрования соков йодом, график концентрации лекарства в крови. Предметы можно перетаскивать и нажимать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const KEY = 'luch-chem-food';
+const f1 = v => v.toFixed(1);
+const ru = (v, d = 1) => v.toFixed(d).replace('.', ',');
+const hh = h => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
+
+// ---------- lesson 1: proteins, fats, carbohydrates ----------
+// composition per 100 g of the food (approximate table values)
+const SM = [
+  { k: 'A', name: 'картофель', b: 2.0, z: 0.4, u: 16.3, starch: true, liq: '#e6dcc0', op: 0.8 },
+  { k: 'B', name: 'яичный белок', b: 11.1, z: 0.2, u: 0.7, starch: false, liq: '#eef0e0', op: 0.45 },
+  { k: 'C', name: 'подсолнечное масло', b: 0, z: 99.9, u: 0, starch: false, liq: '#f2d24a', op: 0.85 },
+  { k: 'D', name: 'нежирный творог', b: 18, z: 0.6, u: 1.8, starch: false, liq: '#f6f3ea', op: 0.9 },
+  { k: 'E', name: 'варёный рис', b: 2.7, z: 0.3, u: 28, starch: true, liq: '#efece2', op: 0.8 },
+  { k: 'F', name: 'сало', b: 2.4, z: 89, u: 0, starch: false, liq: '#f1e6c4', op: 0.85 },
+];
+const mainOf = s => s.b >= s.z && s.b >= s.u ? 'b' : s.z >= s.u ? 'z' : 'u';
+const CLS = { b: 'белок', z: 'жир', u: 'углевод' };
+const BINS = [{ k: 'b', t: 'БЕЛКИ', c: '#b88cf0' }, { k: 'z', t: 'ЖИРЫ', c: '#f2d24a' }, { k: 'u', t: 'УГЛЕВОДЫ', c: '#72d4e8' }];
+const RG = {
+  iod: { name: 'раствор йода', sh: 'йод', f: 'I₂', bottle: '#a8641e', pos: s => s.starch, posC: '#1d2470', negC: '#c98a2a', posT: 'тёмно-синий', negT: 'жёлто-бурый', what: 'крахмал' },
+  biu: { name: 'гидроксид меди(II)', sh: 'Cu(OH)₂', f: 'Cu(OH)₂', bottle: '#3f8fd6', pos: s => s.b >= 5, posC: '#7b3aa8', negC: '#58a6e0', posT: 'фиолетовый', negT: 'голубой', what: 'белок' },
+  pap: { name: 'фильтровальная бумага', sh: 'бумага', f: 'бумага', bottle: '#e8ecf4', pos: s => s.z >= 20, posC: '#d9b84a', negC: '#c8d1e2', posT: 'жирное пятно', negT: 'пятно высохло', what: 'жир' },
+};
+const RGK = ['iod', 'biu', 'pap'];
+const TX = i => 46 + i * 58, TY = 116;
+const RX = 452, RY = k => 114 + RGK.indexOf(k) * 54;
+const BX = i => 26 + i * 158, BY = 272;
+const kcal = s => 4 * s.b + 9 * s.z + 4 * s.u;
+
+// ---------- lesson 2: vitamin C titration ----------
+const JU = [
+  { k: 'or', name: 'Апельсиновый сок', sh: 'апельсин', mg: 48, c: '#f3a33a' },
+  { k: 'ap', name: 'Яблочный сок', sh: 'яблоко', mg: 4, c: '#e9cf7a' },
+  { k: 'cu', name: 'Сок чёрной смородины', sh: 'смородина', mg: 140, c: '#8a3a62' },
+  { k: 'bo', name: 'Апельсиновый сок после кипячения', sh: 'кипячёный', mg: 27, c: '#e0953f' },
+];
+const VOL = 10, MGD = 0.5, NEEDC = 70;
+// one drop of iodine solution oxidises 0.5 mg of ascorbic acid; 10 mL of juice → endpoint drop
+const endN = J => Math.floor(J.mg * VOL / 100 / MGD + 1e-9) + 1;
+const estMg = n => n * MGD * 100 / VOL;
+const JY = i => 120 + i * 58, FX = 236;
+
+// ---------- lesson 3: dose and time ----------
+const PK = { A: 12, ka: 1.5, half: 4, lo: 4, hi: 15, t0: 6, t1: 24, w0: 8, w1: 22, max: 4 };
+const KE = Math.LN2 / PK.half;
+const GX = h => 40 + (h - PK.t0) * 400 / (PK.t1 - PK.t0), GY = c => 330 - Math.min(c, 20) * 10;
+
+const LESSONS = [
+  { id: 'bju', title: 'Белки, жиры, углеводы',
+    text: ['Почти вся сухая часть еды — три класса органических веществ: белки, жиры и углеводы. Белки — строительный материал клеток. Жиры и углеводы — главное «топливо» организма.',
+           'Белки — полимеры из аминокислот, звенья соединены пептидной связью –CO–NH–. Жиры — сложные эфиры глицерина и жирных кислот. Углеводы — это глюкоза C₆H₁₂O₆, сахароза, крахмал (C₆H₁₀O₅)ₙ.',
+           'Их узнают по качественным реакциям. Йод окрашивает крахмал в тёмно-синий цвет. Белок с гидроксидом меди(II) в щелочной среде даёт фиолетовую окраску — это биуретовая реакция. Жир оставляет на бумаге прозрачное пятно, которое не высыхает.'],
+    why: 'Лаборанты пищевых заводов и санэпидконтроля проверяют продукты теми же реакциями: йодом находят крахмал, которым «загущают» сметану или йогурт. Диетологи и фитнес-тренеры считают белки, жиры и углеводы для меню и берут за это деньги. А дома табличка «Пищевая ценность» на упаковке перестаёт быть загадкой.',
+    safe: 'Гидроксид меди(II) получают из CuSO₄ и NaOH. Щёлочь едкая: работают в очках и перчатках. В лаборатории ничего не пробуют на вкус, даже картофель.',
+    task: 'Проверьте реактивами шесть проб A–F и разложите их по лоткам: белок, жир или углевод.',
+    hint: 'Йод ищет крахмал, Cu(OH)₂ — белок, бумага — жир. Пробирку можно положить в лоток только после проверки.',
+    stage: 'Выберите реактив и нажмите на пробирку (или перетащите реактив на неё). Затем перетащите пробирку в лоток.',
+    init: { rg: 'iod' },
+    check: m => m.nPlaced === SM.length },
+  { id: 'vit', title: 'Витамины: сколько C в соке',
+    text: ['Витамины — органические вещества, которые нужны организму в миллиграммах в сутки. Энергии они не дают, но без них не работают ферменты. Почти все витамины мы получаем с едой.',
+           'Водорастворимые витамины (C и группа B) не запасаются — их нужно получать каждый день. Жирорастворимые (A, D, E, K) усваиваются вместе с жирами и накапливаются в печени. Нехватка витамина C вызывает цингу, D — рахит, A — «куриную слепоту».',
+           'Витамин C — аскорбиновая кислота C₆H₈O₆, сильный восстановитель. Йод её окисляет: C₆H₈O₆ + I₂ → C₆H₆O₆ + 2HI. Пока в соке есть витамин, йод обесцвечивается. Витамин кончился — лишний йод окрашивает крахмал в синий. Это конец титрования.'],
+    why: 'Так определяют витамин C химики-аналитики пищевых лабораторий и фармацевты, которые проверяют витаминные препараты. Технологи соков знают, что витамин C разрушается при нагревании и на воздухе, поэтому сок греют быстро и закрыто. Дома это подсказывает: зимой квашеная капуста, шиповник и замороженная смородина дают больше витамина C, чем долго варёный компот.',
+    safe: 'Спиртовой раствор йода обжигает кожу и слизистые, его не пьют. Витамины в таблетках — тоже лекарство: избыток витаминов A и D опасен.',
+    task: 'Оттитруйте йодом все четыре сока и узнайте, в каком из них больше всего витамина C.',
+    hint: 'Капайте йод, пока раствор не посинеет. Чем больше капель ушло, тем больше витамина. Кнопка «+5» сама остановится на первой синей капле.',
+    stage: 'Выберите сок слева. Нажмите на бюретку — упадёт одна капля йода.',
+    init: { vs: 0 },
+    check: m => m.nMeas === JU.length },
+  { id: 'med', title: 'Как работают лекарства',
+    text: ['Лекарство — вещество, молекулы которого находят в организме «мишень»: фермент или рецептор. Молекула подходит к мишени, как ключ к замку, и меняет её работу. Аспирин (ацетилсалициловая кислота) блокирует фермент, который запускает боль и жар.',
+           'Таблетка растворяется в желудке и кишечнике, вещество всасывается в кровь. Печень его разрушает, почки выводят. Время, за которое концентрация в крови падает вдвое, называют периодом полувыведения.',
+           'Лекарство действует, только пока его концентрация выше минимальной действующей. Слишком много — начинается отравление. Поэтому в инструкции указаны доза и интервал между приёмами. Двойную дозу «чтобы быстрее помогло» пить нельзя.'],
+    why: 'С этими понятиями каждый день работают фармацевты в аптеках, врачи и химики-разработчики лекарств. В Казахстане есть фармзаводы — им нужны химики-технологи и специалисты по контролю качества. А дома это знание спасает от передозировки: многие порошки «от простуды» уже содержат парацетамол, и с отдельной таблеткой парацетамола дозу легко превысить.',
+    safe: 'Модель условная. Настоящую дозу назначает врач или указывает инструкция. Лекарства не принимают «за компанию», пропущенную дозу не удваивают, аптечку держат подальше от детей. При отравлении звоните 103 или 112.',
+    task: 'Расставьте таблетки так, чтобы с 8:00 до 22:00 концентрация была в зелёной зоне и ни разу не заходила в красную. Не больше 4 таблеток.',
+    hint: 'Лекарство начинает действовать не сразу. Если пить таблетки слишком часто, оно накапливается в крови.',
+    stage: 'Нажмите на график в нужный час или перетащите таблетку из упаковки. Нажмите на таблетку под графиком — она уберётся.',
+    init: { pills: [] },
+    check: m => m.ok },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null,
+            rg: 'iod', tests: {}, lastRg: {}, bin: {}, selT: null, wrong: 0,
+            vs: 0, vd: 0, vres: {}, anim: null,
+            pills: [], lastPill: null };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+function conc(t, pills) {
+  let c = 0;
+  for (const p of pills) { const d = t - p; if (d > 0) c += PK.A * (Math.exp(-KE * d) - Math.exp(-PK.ka * d)); }
+  return c;
+}
+function medModel() {
+  const pills = S.pills.slice().sort((a, b) => a - b), pts = [];
+  let mn = Infinity, tmn = PK.w0, mx = 0, tmx = PK.t0, tOn = null, tOff = null, under = 0;
+  for (let i = 0; i <= 180; i++) {
+    const t = PK.t0 + i * 0.1, c = conc(t, pills);
+    pts.push(c);
+    if (c > mx) { mx = c; tmx = t; }
+    if (c >= PK.lo && tOn === null) tOn = t;
+    if (c >= PK.lo) tOff = t;
+    if (t >= PK.w0 - 1e-6 && t <= PK.w1 + 1e-6) { if (c < mn) { mn = c; tmn = t; } if (c < PK.lo) under += 0.1; }
+  }
+  const n = pills.length, toxic = mx >= PK.hi, cover = mn >= PK.lo;
+  return { kind: 'med', pills, n, pts, mn, tmn, mx, tmx, tOn, tOff, under, toxic, cover, tooMany: n > PK.max, ok: n > 0 && n <= PK.max && cover && !toxic };
+}
+function model() {
+  const id = LID();
+  if (id === 'bju') return { kind: 'bju', rg: S.rg, sel: S.selT, nTested: SM.filter(s => S.tests[s.k] && Object.keys(S.tests[s.k]).length).length, nPlaced: SM.filter(s => S.bin[s.k]).length };
+  if (id === 'vit') { const J = JU[S.vs], N = endN(J); return { kind: 'vit', J, drops: S.vd, N, blue: S.vd >= N, left: Math.max(0, J.mg * VOL / 100 - S.vd * MGD), nMeas: JU.filter(j => S.vres[j.k]).length }; }
+  return medModel();
+}
+
+// ---------- scene ----------
+function bench() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="2360" fill="url(#tile)"/>
+    <rect x="-2000" y="360" width="4520" height="1200" fill="#1a2232"/>
+    <rect x="-2000" y="358" width="4520" height="4" fill="#2c3954"/>
+    <rect x="-2000" y="362" width="4520" height="2" fill="${INK}" opacity=".6"/>`;
+}
+
+// ----- lesson 1 -----
+function tubeColor(s) {
+  const r = S.lastRg[s.k];
+  if (!r || r === 'pap') return { c: s.liq, op: s.op };
+  const R = RG[r];
+  return { c: R.pos(s) ? R.posC : R.negC, op: 0.9 };
+}
+function tubeSVG(s, x, y, ghost) {
+  const i = SM.indexOf(s), col = tubeColor(s), sel = S.selT === i && !ghost;
+  let h = `<g ${ghost ? '' : `data-drag="tube-${i}"`}><rect x="${x - 22}" y="${y - 8}" width="44" height="${ghost ? 112 : 140}" fill="transparent"/>`;
+  if (sel) h += `<rect x="${x - 21}" y="${y - 8}" width="42" height="112" rx="10" fill="rgba(255,181,71,.07)" stroke="#ffb547" stroke-width="1.6" stroke-dasharray="4 3"/>`;
+  h += `<path d="M${x - 10} ${y} V${y + 82} A10 10 0 0 0 ${x + 10} ${y + 82} V${y}" fill="rgba(200,215,235,.07)" stroke="#c8d1e2" stroke-opacity=".75" stroke-width="1.5"/>`;
+  h += `<path d="M${x - 8.6} ${y + 40} V${y + 82} A8.6 8.6 0 0 0 ${x + 8.6} ${y + 82} V${y + 40} Z" fill="${col.c}" opacity="${col.op}"/>`;
+  if (S.lastRg[s.k] === 'biu' || S.lastRg[s.k] === 'iod') h += `<path d="M${x - 8.6} ${y + 40} H${x + 8.6}" stroke="#fff" stroke-opacity=".35"/>`;
+  h += `<rect x="${x - 13}" y="${y - 3}" width="26" height="5" rx="2" fill="#4a556c"/>`;
+  h += `<text x="${x}" y="${y + 24}" font-size="13" fill="#e8ecf4" text-anchor="middle" font-weight="500">${s.k}</text>`;
+  if (!ghost) {
+    // test result chips
+    RGK.forEach((r, j) => {
+      const cx = x - 13 + j * 13, cy = y + 108, t = S.tests[s.k] && S.tests[s.k][r];
+      const R = RG[r], pos = t && R.pos(s);
+      h += `<circle cx="${cx}" cy="${cy}" r="5.2" fill="${t ? (pos ? R.posC : '#26324a') : 'none'}" stroke="${t ? (pos ? '#e8ecf4' : '#5a6a88') : '#3a4762'}" stroke-width="1"/>`;
+      h += `<text x="${cx}" y="${cy + 2.6}" font-size="6.5" fill="${t && pos ? '#fff' : '#8b96ad'}" text-anchor="middle">${t ? (pos ? '+' : '−') : '·'}</text>`;
+    });
+  }
+  return h + '</g>';
+}
+function reagentSVG(k, x, y, ghost) {
+  const R = RG[k], act = S.rg === k && !ghost;
+  let h = `<g ${ghost ? '' : `data-drag="rg-${k}"`}><rect x="${x - 34}" y="${y - 6}" width="68" height="50" fill="transparent"/>`;
+  if (act) h += `<rect x="${x - 34}" y="${y - 6}" width="68" height="50" rx="10" fill="rgba(114,212,232,.08)" stroke="#72d4e8" stroke-width="1.6"/>`;
+  if (k === 'pap') {
+    h += `<rect x="${x - 14}" y="${y}" width="28" height="26" rx="2" fill="#f2efe6" transform="rotate(-6 ${x} ${y + 13})"/><rect x="${x - 12}" y="${y + 2}" width="28" height="26" rx="2" fill="#f7f5ee" stroke="#c8d1e2" stroke-width=".6"/>`;
+  } else {
+    h += `<rect x="${x - 4}" y="${y - 2}" width="8" height="8" rx="2" fill="#e06a4a"/><path d="M${x - 9} ${y + 6} H${x + 9} V${y + 26} Q${x + 9} ${y + 30} ${x + 5} ${y + 30} H${x - 5} Q${x - 9} ${y + 30} ${x - 9} ${y + 26} Z" fill="${R.bottle}" stroke="${INK}" stroke-width="1"/>`;
+  }
+  h += `<text x="${x}" y="${y + 40}" font-size="8.5" fill="${act ? '#72d4e8' : '#e8ecf4'}" text-anchor="middle">${R.sh}</text>`;
+  return h + '</g>';
+}
+function bjuSVG(m) {
+  let h = '';
+  // rack
+  h += `<rect x="18" y="${TY + 16}" width="370" height="8" rx="2" fill="#2c3954"/><rect x="18" y="${TY + 70}" width="370" height="6" rx="2" fill="#2c3954"/>`;
+  SM.forEach((s, i) => { h += S.bin[s.k] ? `<g opacity=".18">${tubeSVG(s, TX(i), TY, true)}</g>` : tubeSVG(s, TX(i), TY, false); });
+  h += `<text x="203" y="${TY + 128}" font-size="7.5" fill="#8b96ad" text-anchor="middle">кружки под пробиркой: йод · Cu(OH)₂ · бумага</text>`;
+  RGK.forEach(k => { h += reagentSVG(k, RX, RY(k), false); });
+  // bins
+  const hot = drag && drag.moved && drag.id.startsWith('tube-') ? binAt(drag.p) : -1;
+  BINS.forEach((B, i) => {
+    const x = BX(i);
+    h += `<rect x="${x}" y="${BY}" width="150" height="80" rx="12" fill="${hot === i ? 'rgba(114,212,232,.12)' : 'rgba(18,26,40,.8)'}" stroke="${hot === i ? '#72d4e8' : '#26324a'}" stroke-width="1.6"/>`;
+    h += `<rect x="${x + 12}" y="${BY + 10}" width="8" height="8" rx="2" fill="${B.c}"/><text x="${x + 26}" y="${BY + 18}" font-size="9.5" fill="#e8ecf4" font-weight="500">${B.t}</text>`;
+    const inside = SM.filter(s => S.bin[s.k] === B.k);
+    inside.forEach((s, j) => {
+      const cx = x + 26 + (j % 2) * 72, cy = BY + 40 + Math.floor(j / 2) * 22;
+      h += `<circle cx="${cx}" cy="${cy}" r="9" fill="${B.c}"/><text x="${cx}" y="${cy + 3.5}" font-size="10" fill="#0b1019" text-anchor="middle" font-weight="500">${s.k}</text><text x="${cx + 13}" y="${cy + 3}" font-size="7" fill="#c8d1e2">${s.name.split(' ').pop()}</text>`;
+    });
+    if (!inside.length) h += `<text x="${x + 75}" y="${BY + 52}" font-size="8" fill="#5a6a88" text-anchor="middle">перетащите пробирку</text>`;
+  });
+  // paper spot for the selected tube
+  if (m.sel !== null) {
+    const s = SM[m.sel], t = S.tests[s.k] && S.tests[s.k].pap;
+    if (t && S.lastRg[s.k] === 'pap') h += `<circle cx="${RX - 1}" cy="${RY('pap') + 14}" r="7" fill="${RG.pap.pos(s) ? '#d9b84a' : '#c8d1e2'}" opacity="${RG.pap.pos(s) ? 0.75 : 0.25}"/>`;
+  }
+  return h;
+}
+function binAt(p) { for (let i = 0; i < 3; i++) if (p.x > BX(i) - 6 && p.x < BX(i) + 156 && p.y > BY - 20 && p.y < BY + 90) return i; return -1; }
+function tubeAt(p) { for (let i = 0; i < SM.length; i++) if (Math.abs(p.x - TX(i)) < 24 && p.y > TY - 14 && p.y < TY + 116) return i; return -1; }
+
+// ----- lesson 2 -----
+function juiceSVG(J, i, x, y) {
+  const sel = S.vs === i, done = S.vres[J.k];
+  let h = `<g data-drag="ju-${i}"><rect x="${x - 34}" y="${y - 6}" width="96" height="54" fill="transparent"/>`;
+  if (sel) h += `<rect x="${x - 32}" y="${y - 4}" width="140" height="50" rx="10" fill="rgba(255,181,71,.07)" stroke="#ffb547" stroke-width="1.5"/>`;
+  h += `<rect x="${x - 6}" y="${y}" width="12" height="7" rx="2" fill="#4a556c"/><path d="M${x - 8} ${y + 7} H${x + 8} L${x + 12} ${y + 14} V${y + 40} Q${x + 12} ${y + 43} ${x + 9} ${y + 43} H${x - 9} Q${x - 12} ${y + 43} ${x - 12} ${y + 40} V${y + 14} Z" fill="${J.c}" stroke="${INK}" stroke-width="1"/>`;
+  h += `<text x="${x + 20}" y="${y + 18}" font-size="8.6" fill="#e8ecf4">${J.sh}</text>`;
+  h += `<text x="${x + 20}" y="${y + 32}" font-size="8" fill="${done ? '#86e0a8' : '#8b96ad'}">${done ? `${done} кап. ✓` : 'не измерен'}</text>`;
+  return h + '</g>';
+}
+function flaskColor(m) {
+  if (m.blue) return { c: '#1f2f8f', op: 0.92 };
+  return { c: m.J.c, op: 0.45 };
+}
+function vitSVG(m, t) {
+  let h = '';
+  JU.forEach((J, i) => { h += juiceSVG(J, i, 40, JY(i) - 4); });
+  // stand + burette
+  h += `<rect x="${FX + 40}" y="102" width="5" height="256" fill="#4a556c"/><rect x="${FX + 18}" y="352" width="60" height="6" rx="2" fill="#4a556c"/><rect x="${FX + 6}" y="146" width="38" height="5" fill="#4a556c"/>`;
+  h += `<g data-drag="burette"><rect x="${FX - 22}" y="96" width="44" height="130" fill="transparent"/>`;
+  h += `<rect x="${FX - 6}" y="100" width="12" height="104" rx="3" fill="rgba(200,215,235,.08)" stroke="#c8d1e2" stroke-opacity=".75" stroke-width="1.3"/>`;
+  const lvl = clamp(S.vd / 40, 0, 1) * 80;
+  h += `<rect x="${FX - 4.8}" y="${f1(112 + lvl)}" width="9.6" height="${f1(90 - lvl)}" fill="#a8641e" opacity=".85"/>`;
+  for (let k = 0; k <= 8; k++) h += `<path d="M${FX - 6} ${112 + k * 10}h4" stroke="#c8d1e2" stroke-width=".8" opacity=".7"/>`;
+  h += `<rect x="${FX - 10}" y="204" width="20" height="6" rx="2" fill="#e06a4a"/><path d="M${FX - 2} 210 L${FX} 222 L${FX + 2} 210" fill="#c8d1e2"/>`;
+  h += `<text x="${FX - 12}" y="110" font-size="8" fill="#e8ecf4" text-anchor="end">I₂</text></g>`;
+  // falling drop
+  if (S.anim && !reduce) { const k = (t - S.anim.t) / 450; if (k < 1) h += `<ellipse cx="${FX}" cy="${f1(226 + k * 40)}" rx="2.4" ry="3.2" fill="#a8641e"/>`; }
+  // flask
+  const col = flaskColor(m);
+  h += `<path d="M${FX - 10} 236 V270 L${FX - 48} 342 Q${FX - 52} 352 ${FX - 40} 352 H${FX + 40} Q${FX + 52} 352 ${FX + 48} 342 L${FX + 10} 270 V236" fill="rgba(200,215,235,.06)" stroke="#c8d1e2" stroke-opacity=".75" stroke-width="1.6"/>`;
+  h += `<path d="M${FX - 30} 306 L${FX - 47} 342 Q${FX - 50} 350 ${FX - 40} 350 H${FX + 40} Q${FX + 50} 350 ${FX + 47} 342 L${FX + 30} 306 Z" fill="${col.c}" opacity="${col.op}"/>`;
+  if (S.anim && !reduce && S.vd > 0 && !m.blue) { const k = (t - S.anim.t - 450) / 500; if (k > 0 && k < 1) h += `<circle cx="${FX}" cy="314" r="${f1(4 + 14 * k)}" fill="#a8641e" opacity="${f1(0.6 * (1 - k))}"/>`; }
+  h += `<text x="${FX}" y="372" font-size="8" fill="#8b96ad" text-anchor="middle">${VOL} мл сока + вода + крахмал</text>`;
+  h += `<text x="${FX + 58}" y="330" font-size="9" fill="${m.blue ? '#9fb0ff' : '#c8d1e2'}">${m.blue ? 'синий!' : 'йод исчезает'}</text>`;
+  // bar chart
+  const x0 = 352, y0 = 344;
+  h += `<text x="${x0}" y="238" font-size="8.5" fill="#c8d1e2">мг витамина C в 100 мл</text><path d="M${x0} 246 V${y0} H${x0 + 140}" fill="none" stroke="#5a6a88"/>`;
+  JU.forEach((J, i) => {
+    const n = S.vres[J.k], x = x0 + 8 + i * 34;
+    if (n) { const v = estMg(n), hgt = v / 150 * 90; h += `<rect x="${x}" y="${f1(y0 - hgt)}" width="22" height="${f1(hgt)}" rx="2" fill="${J.c}"/><text x="${x + 11}" y="${f1(y0 - hgt - 4)}" font-size="8" fill="#e8ecf4" text-anchor="middle">${v}</text>`; }
+    else h += `<text x="${x + 11}" y="${y0 - 4}" font-size="8" fill="#5a6a88" text-anchor="middle">?</text>`;
+    h += `<text x="${x + 11}" y="${y0 + 11}" font-size="6.6" fill="#8b96ad" text-anchor="middle">${J.sh.slice(0, 6)}</text>`;
+  });
+  return h;
+}
+
+// ----- lesson 3 -----
+function pillSVG(x, y, c) { return `<rect x="${f1(x - 8)}" y="${f1(y - 4)}" width="16" height="8" rx="4" fill="${c || '#f2f4f8'}" stroke="${INK}" stroke-width=".8"/><path d="M${f1(x)} ${f1(y - 4)}v8" stroke="#e06a4a" stroke-width="1"/>`; }
+function medSVG(m) {
+  let h = '';
+  const xa = GX(PK.t0), xb = GX(PK.t1);
+  h += `<g data-drag="plot"><rect x="${xa}" y="126" width="${xb - xa}" height="230" fill="transparent"/>`;
+  h += `<rect x="${xa}" y="${GY(20)}" width="${xb - xa}" height="${GY(PK.hi) - GY(20)}" fill="rgba(255,138,115,.14)"/>`;
+  h += `<rect x="${xa}" y="${GY(PK.hi)}" width="${xb - xa}" height="${GY(PK.lo) - GY(PK.hi)}" fill="rgba(134,224,168,.10)"/>`;
+  h += `<path d="M${xa} ${GY(PK.hi)}H${xb}" stroke="#ff8a73" stroke-dasharray="5 4"/><path d="M${xa} ${GY(PK.lo)}H${xb}" stroke="#86e0a8" stroke-dasharray="5 4"/>`;
+  h += `<text x="${xb - 4}" y="${GY(PK.hi) - 5}" font-size="8" fill="#ff8a73" text-anchor="end">опасная зона</text><text x="${xb - 4}" y="${GY(PK.lo) - 5}" font-size="8" fill="#86e0a8" text-anchor="end">лекарство действует</text><text x="${xb - 4}" y="${GY(PK.lo) + 12}" font-size="8" fill="#8b96ad" text-anchor="end">не действует</text>`;
+  // required window
+  h += `<rect x="${GX(PK.w0)}" y="${GY(20)}" width="${GX(PK.w1) - GX(PK.w0)}" height="${GY(0) - GY(20)}" fill="none" stroke="#ffb547" stroke-opacity=".5" stroke-dasharray="2 4"/>`;
+  // axes
+  h += `<path d="M${xa} ${GY(20)} V${GY(0)} H${xb}" fill="none" stroke="#8b96ad" stroke-width="1.2"/>`;
+  for (let c = 0; c <= 20; c += 5) h += `<text x="${xa - 5}" y="${GY(c) + 3}" font-size="7.5" fill="#8b96ad" text-anchor="end">${c}</text>`;
+  for (let t = PK.t0; t <= PK.t1; t += 2) h += `<path d="M${GX(t)} ${GY(0)}v4" stroke="#8b96ad"/><text x="${GX(t)}" y="${GY(0) + 26}" font-size="7.5" fill="#8b96ad" text-anchor="middle">${t}:00</text>`;
+  h += `<text x="${xa + 4}" y="${GY(20) + 10}" font-size="7.5" fill="#8b96ad">мг/л в крови</text>`;
+  // curve
+  let d = '';
+  m.pts.forEach((c, i) => { d += (i ? 'L' : 'M') + f1(GX(PK.t0 + i * 0.1)) + ' ' + f1(GY(c)); });
+  h += `<path d="${d}" fill="none" stroke="${m.toxic ? '#ff8a73' : '#72d4e8'}" stroke-width="2.4" stroke-linejoin="round"/>`;
+  if (m.n) {
+    h += `<circle cx="${f1(GX(m.tmx))}" cy="${f1(GY(m.mx))}" r="3.5" fill="${m.toxic ? '#ff8a73' : '#e8ecf4'}"/>`;
+    if (m.mn < PK.lo) h += `<circle cx="${f1(GX(m.tmn))}" cy="${f1(GY(m.mn))}" r="3.5" fill="#ffb547"/>`;
+  }
+  h += '</g>';
+  // pills on the time axis
+  const cnt = {};
+  S.pills.forEach((p, i) => {
+    const k = cnt[p] = (cnt[p] || 0) + 1, x = GX(p), y = GY(0) + 12 - (k - 1) * 0;
+    h += `<g data-drag="pill-${i}"><rect x="${f1(x - 11)}" y="${GY(0) + 2}" width="22" height="16" fill="transparent"/>${pillSVG(x + (k - 1) * 5, y + (k - 1) * -3, k > 1 ? '#ffb547' : '#f2f4f8')}</g>`;
+  });
+  // pill box
+  const bx = 470, by = 150;
+  h += `<g data-drag="box"><rect x="${bx - 26}" y="${by - 10}" width="52" height="96" fill="transparent"/><rect x="${bx - 20}" y="${by}" width="40" height="72" rx="6" fill="#e8ecf4"/><rect x="${bx - 20}" y="${by + 8}" width="40" height="14" fill="#4d7cf0"/><text x="${bx}" y="${by + 18}" font-size="7.5" fill="#fff" text-anchor="middle" font-weight="500">таблетки</text>`;
+  for (let k = 0; k < 3; k++) h += pillSVG(bx, by + 34 + k * 12);
+  h += `<text x="${bx}" y="${by + 86}" font-size="8" fill="#e8ecf4" text-anchor="middle">${m.n} из ${PK.max}</text></g>`;
+  return h;
+}
+const inPlot = p => p.x >= GX(PK.t0) - 10 && p.x <= GX(PK.t1) + 10 && p.y > 120 && p.y < 360;
+const hourAt = p => clamp(Math.round(PK.t0 + (p.x - GX(PK.t0)) * (PK.t1 - PK.t0) / 400), PK.t0, PK.t1 - 1);
+
+function hlBox(id) {
+  const m = model();
+  if (m.kind === 'bju') return { tubes: [16, 104, 376, 116], reag: [414, 104, 78, 166], chips: [16, 214, 376, 22], bins: [20, 266, 474, 92] }[id];
+  if (m.kind === 'vit') return { juices: [4, 106, 148, 228], burette: [FX - 26, 94, 56, 132], flask: [FX - 58, 228, 116, 130], chart: [344, 226, 152, 132] }[id];
+  return { plot: [34, 124, 412, 212], window: [GX(PK.w0) - 4, 124, GX(PK.w1) - GX(PK.w0) + 8, 212], pills: [34, 330, 412, 24], box: [444, 140, 52, 100], curve: [34, 124, 412, 212] }[id];
+}
+function ghostSVG(d) {
+  const p = d.p, id = d.id;
+  if (id.startsWith('tube-')) return tubeSVG(SM[+id.slice(5)], p.x, p.y - 50, true);
+  if (id.startsWith('rg-')) return reagentSVG(id.slice(3), p.x, p.y - 20, true);
+  if (id === 'box') return pillSVG(p.x, p.y);
+  return '';
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID(), m = model();
+  let h = bench();
+  if (id === 'bju') h += bjuSVG(m);
+  else if (id === 'vit') h += vitSVG(m, t);
+  else h += medSVG(m);
+  if (drag && drag.moved) h += `<g opacity=".9" pointer-events="none">${ghostSVG(drag)}</g>`;
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${f1(b[0])}" y="${f1(b[1])}" width="${f1(b[2])}" height="${f1(b[3])}" rx="10" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hgt = rc.height; if (!w || !hgt) return;
+  const s = Math.min(w / 500, hgt / 410, 1.7);
+  const vw = w / s, vh = hgt / s;
+  scene.setAttribute('viewBox', `${(258 - vw / 2).toFixed(1)} ${(405 - vh).toFixed(1)} ${vw.toFixed(1)} ${vh.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- dragging and tapping ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  drag = { id: el.dataset.drag, x: e.clientX, y: e.clientY, p: toSvg(e), p0: toSvg(e), moved: false };
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 6) drag.moved = true;
+  drag.p = toSvg(e); if (drag.moved) dirty = true;
+});
+const endDrag = cancel => {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing'); dirty = true;
+  if (cancel) return;
+  if (d.moved && d.id !== 'plot') drop(d.id, d.p); else tap(d.id, d.p0);
+};
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+function tap(id, p) {
+  if (id.startsWith('tube-')) return testTube(+id.slice(5), S.rg);
+  if (id.startsWith('rg-')) return setRg(id.slice(3));
+  if (id.startsWith('ju-')) return setJuice(+id.slice(3));
+  if (id === 'burette') return addIodine(1);
+  if (id === 'plot') return addPill(hourAt(p));
+  if (id.startsWith('pill-')) return removePill(+id.slice(5));
+  if (id === 'box') { toast('Перетащите таблетку на нужный час — или просто нажмите на график.'); return; }
+}
+function drop(id, p) {
+  if (id.startsWith('tube-')) { const b = binAt(p); if (b >= 0) placeTube(+id.slice(5), BINS[b].k); return; }
+  if (id.startsWith('rg-')) { const i = tubeAt(p); if (i >= 0) testTube(i, id.slice(3)); return; }
+  if (id === 'box') { if (inPlot(p)) addPill(hourAt(p)); return; }
+  if (id.startsWith('pill-')) { const i = +id.slice(5); if (inPlot(p)) { S.pills[i] = hourAt(p); S.lastPill = S.pills[i]; update(); } else removePill(i); return; }
+}
+
+// ----- actions -----
+function setRg(k) { S.rg = k; toast(`Реактив: ${RG[k].name}. Нажмите на пробирку.`); renderTools(); update(); return true; }
+function testTube(i, k) {
+  const s = SM[i]; S.selT = i;
+  if (S.bin[s.k]) { toast(`Проба ${s.k} уже в лотке.`); update(); return false; }
+  const R = RG[k], pos = R.pos(s);
+  S.tests[s.k] = S.tests[s.k] || {}; S.tests[s.k][k] = true; S.lastRg[s.k] = k;
+  toast(`Проба ${s.k}, ${R.sh}: ${pos ? R.posT : R.negT}. ${pos ? `Есть ${R.what}!` : `${cap(R.what)} не найден.`}`);
+  update(); return true;
+}
+const cap = s => s[0].toUpperCase() + s.slice(1);
+function placeTube(i, b) {
+  const s = SM[i]; S.selT = i;
+  if (S.bin[s.k]) return true;
+  if (!S.tests[s.k] || !Object.keys(S.tests[s.k]).length) { toast('Сначала проверьте пробу хотя бы одним реактивом.'); update(); return false; }
+  if (mainOf(s) !== b) { S.wrong++; toast(`Нет: в пробе ${s.k} главное вещество — не ${CLS[b]}. Проверьте другими реактивами.`); update(); return false; }
+  S.bin[s.k] = b; toast(`Верно! ${s.k} — ${s.name}, в нём больше всего: ${CLS[b]}.`); update(); return true;
+}
+function setJuice(i) { if (S.vs === i) return; S.vs = i; S.vd = 0; S.anim = null; toast(`В колбе ${VOL} мл: ${JU[i].name.toLowerCase()}, вода и крахмал.`); buildScheme(); update(); }
+function addIodine(n) {
+  const J = JU[S.vs], N = endN(J);
+  if (S.vd >= N) { toast('Раствор уже синий — титрование закончено. Выберите другой сок или нажмите «Заново».'); return false; }
+  const add = Math.min(n, N - S.vd);
+  S.vd += add; S.anim = { t: performance.now() };
+  if (S.vd >= N) {
+    S.vres[J.k] = N;
+    toast(`Посинело на ${N}-й капле! Витамин C в соке кончился: примерно ${estMg(N)} мг в 100 мл.`);
+  } else if (n === 1) toast(`Капля ${S.vd}: йод обесцветился — витамин C ещё есть.`);
+  else toast(`Капель: ${S.vd}. Раствор пока не синий.`);
+  update(); return true;
+}
+function addPill(h) {
+  if (S.pills.length >= 6) { toast('Слишком много таблеток — уберите лишние.'); return false; }
+  S.pills.push(h); S.lastPill = h;
+  const m = medModel();
+  if (S.pills.filter(x => x === h).length > 1) toast(`Две таблетки в ${h}:00 — это двойная доза. Смотрите на пик.`);
+  else if (m.toxic) toast('Концентрация зашла в опасную зону: лекарство накопилось.');
+  else toast(`Таблетка в ${h}:00. Эффект начнётся примерно через 20 минут.`);
+  update(); return true;
+}
+function removePill(i) { const h = S.pills[i]; S.pills.splice(i, 1); toast(`Таблетка в ${h}:00 убрана.`); update(); }
+
+let last = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const anim = !!S.hl || (!reduce && S.anim && t - S.anim.t < 1000 && LID() === 'vit');
+  if (dirty || anim) { drawScene(t); dirty = false; last = t; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3200); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    bju: RGK.map(k => B('rg-' + k, RG[k].sh, S.rg === k)).join('') + sep + B('reset', 'Заново'),
+    vit: B('d1', '+1 капля') + B('d5', '+5 капель') + sep + B('reset', 'Вылить'),
+    med: B('undo', 'Убрать последнюю') + B('reset', 'Заново'),
+  }[id];
+}
+function act(a) {
+  if (a.startsWith('rg-')) return setRg(a.slice(3));
+  if (a === 'd1') return addIodine(1);
+  if (a === 'd5') return addIodine(5);
+  if (a === 'undo') { if (S.pills.length) removePill(S.pills.length - 1); return; }
+  if (a === 'reset') {
+    if (LID() === 'bju') { S.tests = {}; S.lastRg = {}; S.bin = {}; S.selT = null; S.wrong = 0; }
+    else if (LID() === 'vit') { S.vd = 0; S.anim = null; }
+    else { S.pills = []; S.lastPill = null; }
+    buildScheme(); update();
+  }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  tubes: IC('<path d="M10 4v20a4 4 0 0 0 8 0V4" fill="none" stroke="#c8d1e2" stroke-width="1.4"/><path d="M11 15v9a3 3 0 0 0 6 0v-9z" fill="#7b3aa8"/><path d="M21 4v20a4 4 0 0 0 8 0V4" fill="none" stroke="#c8d1e2" stroke-width="1.4" opacity=".6"/>'),
+  reag: IC('<rect x="12" y="4" width="8" height="5" rx="1.5" fill="#e06a4a"/><path d="M9 9h14v18a3 3 0 0 1-3 3h-8a3 3 0 0 1-3-3z" fill="#a8641e"/>'),
+  chips: IC('<circle cx="8" cy="17" r="5" fill="#1d2470" stroke="#e8ecf4"/><circle cx="17" cy="17" r="5" fill="#26324a" stroke="#5a6a88"/><circle cx="26" cy="17" r="5" fill="none" stroke="#3a4762"/>'),
+  bins: IC('<rect x="3" y="9" width="28" height="18" rx="4" fill="none" stroke="#c8d1e2"/><circle cx="11" cy="19" r="4" fill="#b88cf0"/><circle cx="22" cy="19" r="4" fill="#f2d24a"/>'),
+  juices: IC('<path d="M12 6h10l3 6v17h-16v-17z" fill="#f3a33a"/><rect x="13" y="2" width="8" height="4" rx="1" fill="#4a556c"/>'),
+  burette: IC('<rect x="14" y="2" width="6" height="24" rx="2" fill="none" stroke="#c8d1e2"/><rect x="15" y="10" width="4" height="16" fill="#a8641e"/><rect x="12" y="26" width="10" height="3" fill="#e06a4a"/><path d="M16 29l1 4 1-4" fill="#c8d1e2"/>'),
+  flask: IC('<path d="M14 3v9L5 29h24L20 12V3" fill="none" stroke="#c8d1e2" stroke-width="1.4"/><path d="M9 22h16l3.5 7h-23z" fill="#1f2f8f"/>'),
+  chart: IC('<path d="M4 4v26h26" fill="none" stroke="#8b96ad"/><rect x="8" y="16" width="5" height="14" fill="#f3a33a"/><rect x="15" y="26" width="5" height="4" fill="#e9cf7a"/><rect x="22" y="8" width="5" height="22" fill="#8a3a62"/>'),
+  plot: IC('<path d="M4 4v26h26" fill="none" stroke="#8b96ad"/><path d="M5 28c4-16 8-14 11-10s5-8 8-6 4 4 6 4" fill="none" stroke="#72d4e8" stroke-width="2"/>'),
+  window: IC('<rect x="3" y="10" width="28" height="12" fill="rgba(134,224,168,.3)"/><rect x="3" y="4" width="28" height="6" fill="rgba(255,138,115,.35)"/><path d="M3 22h28" stroke="#86e0a8" stroke-dasharray="3 2"/>'),
+  curve: IC('<path d="M4 28c3-18 7-18 10-12s6 10 16 10" fill="none" stroke="#72d4e8" stroke-width="2"/><circle cx="11" cy="13" r="2.5" fill="#e8ecf4"/>'),
+  pills: IC('<rect x="5" y="13" width="24" height="10" rx="5" fill="#f2f4f8"/><path d="M17 13v10" stroke="#e06a4a"/>'),
+  box: IC('<rect x="8" y="4" width="18" height="27" rx="3" fill="#e8ecf4"/><rect x="8" y="8" width="18" height="6" fill="#4d7cf0"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (m.kind === 'bju') return `Проверено ${m.nTested} из ${SM.length} · в лотках ${m.nPlaced} из ${SM.length}`;
+  if (m.kind === 'vit') return `Соков измерено ${m.nMeas} из ${JU.length} · сейчас ${m.drops} кап.${m.blue ? ' · синий' : ''}`;
+  if (!m.n) return 'Таблеток пока нет';
+  return `Таблеток ${m.n}/${PK.max} · минимум ${ru(m.mn)} мг/л · пик ${ru(m.mx)} мг/л`;
+}
+
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'bju') h = `<h2>Пробирки и реактивы</h2><p class="note">Выберите реактив, затем проверьте пробу. Лоток выбирается в списке после хотя бы одной проверки.</p>
+      <div class="ctl"><div class="lbl">Реактив</div><div class="chips" id="rgChips">${RGK.map(k => `<button data-k="${k}" aria-pressed="${S.rg === k}">${RG[k].sh}</button>`).join('')}</div></div>
+      <div class="pairs">${SM.map((s, i) => `<label><span>Проба ${s.k} <output id="t${i}"></output></span><span><button class="ghostbtn" data-t="${i}" style="padding:5px 9px">Тест</button> <select data-b="${i}"><option value="">лоток</option>${BINS.map(B => `<option value="${B.k}">${CLS[B.k]}</option>`).join('')}</select></span></label>`).join('')}</div>
+      <dl class="reads"><div><dt>Проверено</dt><dd id="r1"></dd></div><div><dt>В лотках</dt><dd id="r2"></dd></div><div><dt>Ошибок</dt><dd id="r3"></dd></div></dl>`;
+  if (id === 'vit') h = `<h2>Титрование йодом</h2>
+      <div class="ctl"><div class="lbl">Сок в колбе</div><div class="chips" id="juChips">${JU.map((J, i) => `<button data-i="${i}" aria-pressed="${S.vs === i}">${J.sh}</button>`).join('')}</div></div>
+      <div class="row"><button class="ghostbtn" id="sD1">+1 капля I₂</button><button class="ghostbtn" id="sD5">+5 капель</button><button class="ghostbtn" id="sReset">Вылить</button></div>
+      <dl class="reads"><div><dt>Капель</dt><dd id="r1"></dd></div><div><dt>Цвет</dt><dd id="r2"></dd></div><div><dt>Измерено</dt><dd id="r3"></dd></div></dl>
+      <p class="note" style="margin-top:12px">Концентрация йода подобрана так, что 1 капля окисляет 0,5 мг витамина C.</p>`;
+  if (id === 'med') h = `<h2>Расписание приёма</h2><p class="note">Таблетка — одна доза. Час можно выбрать и здесь.</p>
+      <div class="ctl"><label for="hSel">Час приёма <output id="hOut"></output></label><input type="range" id="hSel" min="${PK.t0}" max="${PK.t1 - 1}" step="1" value="${S.lastPill || 7}"></div>
+      <div class="row"><button class="ghostbtn" id="sAdd">Добавить таблетку</button><button class="ghostbtn" id="sUndo">Убрать последнюю</button><button class="ghostbtn" id="sReset">Заново</button></div>
+      <dl class="reads"><div><dt>Таблеток</dt><dd id="r1"></dd></div><div><dt>Минимум</dt><dd id="r2"></dd></div><div><dt>Пик</dt><dd id="r3"></dd></div><div><dt>Действует с</dt><dd id="r4"></dd></div><div><dt>Без действия</dt><dd id="r5"></dd></div><div><dt>Т½</dt><dd>${PK.half} ч</dd></div></dl>`;
+  el.innerHTML = h;
+  const q = s => el.querySelector(s);
+  el.querySelectorAll('#rgChips button').forEach(b => b.onclick = () => setRg(b.dataset.k));
+  el.querySelectorAll('button[data-t]').forEach(b => b.onclick = e => { e.preventDefault(); testTube(+b.dataset.t, S.rg); });
+  el.querySelectorAll('select[data-b]').forEach(s => s.onchange = () => { if (!s.value) return; if (!placeTube(+s.dataset.b, s.value)) s.value = ''; });
+  el.querySelectorAll('#juChips button').forEach(b => b.onclick = () => setJuice(+b.dataset.i));
+  if (q('#sD1')) q('#sD1').onclick = () => addIodine(1);
+  if (q('#sD5')) q('#sD5').onclick = () => addIodine(5);
+  if (q('#sReset')) q('#sReset').onclick = () => act('reset');
+  if (q('#hSel')) { const r = q('#hSel'), o = q('#hOut'); const sh = () => { o.textContent = r.value + ':00'; }; sh(); r.oninput = sh; q('#sAdd').onclick = () => addPill(+r.value); q('#sUndo').onclick = () => act('undo'); }
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; };
+  if (m.kind === 'bju') {
+    SM.forEach((s, i) => {
+      const t = S.tests[s.k] || {};
+      set('#t' + i, RGK.filter(k => t[k]).map(k => `· ${RG[k].sh} ${RG[k].pos(s) ? '+' : '−'}`).join(' '));
+      const sel = el.querySelector(`select[data-b="${i}"]`); if (sel) { sel.disabled = !Object.keys(t).length || !!S.bin[s.k]; if (S.bin[s.k]) sel.value = S.bin[s.k]; }
+    });
+    el.querySelectorAll('#rgChips button').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === S.rg));
+    set('#r1', `${m.nTested} из 6`); set('#r2', `${m.nPlaced} из 6`); set('#r3', String(S.wrong));
+  } else if (m.kind === 'vit') {
+    set('#r1', String(m.drops)); set('#r2', m.blue ? 'синий' : 'не синий'); set('#r3', `${m.nMeas} из 4`);
+    el.querySelectorAll('#juChips button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.i === S.vs));
+  } else {
+    set('#r1', `${m.n} из ${PK.max}`); set('#r2', m.n ? `${ru(m.mn)} мг/л` : '—'); set('#r3', m.n ? `${ru(m.mx)} мг/л` : '—');
+    set('#r4', m.tOn !== null ? hh(m.tOn) : '—'); set('#r5', `${ru(m.under)} ч`);
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'bju') return [
+    { id: 'tubes', icon: ICON.tubes, name: 'Пробирки A–F', spec: 'Шесть проб еды, размешанных с водой. Что где — неизвестно: выясните реакциями.' },
+    { id: 'reag', icon: ICON.reag, name: 'Реактивы', spec: 'Йод I₂ — на крахмал. Cu(OH)₂ (CuSO₄ + NaOH) — на белок. Фильтровальная бумага — на жир.' },
+    { id: 'chips', icon: ICON.chips, name: 'Кружки результатов', spec: 'Под каждой пробиркой три кружка: йод, Cu(OH)₂, бумага. «+» — реакция есть, «−» — нет.' },
+    { id: 'bins', icon: ICON.bins, name: 'Лотки', spec: 'Белки, жиры, углеводы. Пробу кладут туда, какого вещества в ней больше всего.' }];
+  if (id === 'vit') return [
+    { id: 'juices', icon: ICON.juices, name: 'Соки', spec: 'Четыре сока. Один из них прокипятили 15 минут.' },
+    { id: 'burette', icon: ICON.burette, name: 'Бюретка с йодом', spec: 'Подаёт раствор йода по капле. Одна капля окисляет 0,5 мг аскорбиновой кислоты.' },
+    { id: 'flask', icon: ICON.flask, name: 'Колба', spec: '10 мл сока, вода и крахмальный клейстер — индикатор. Синий цвет значит: йод больше не расходуется.' },
+    { id: 'chart', icon: ICON.chart, name: 'Диаграмма', spec: 'Результаты в мг витамина C на 100 мл сока.' }];
+  return [
+    { id: 'plot', icon: ICON.plot, name: 'График концентрации', spec: 'Сколько вещества в литре крови в каждый час дня.' },
+    { id: 'window', icon: ICON.window, name: 'Терапевтическое окно', spec: 'Зелёная полоса от 4 до 15 мг/л. Ниже — не помогает, выше — отравление.' },
+    { id: 'curve', icon: ICON.curve, name: 'Кривая', spec: 'Подъём — всасывание из кишечника, спуск — работа печени и почек. Период полувыведения 4 ч.' },
+    { id: 'pills', icon: ICON.pills, name: 'Таблетки на шкале', spec: 'Время приёма. Две в один час — двойная доза. Нажмите, чтобы убрать.' },
+    { id: 'box', icon: ICON.box, name: 'Упаковка', spec: 'В инструкции: не больше 4 таблеток в сутки.' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      (L.safe ? `<div class="safe"><b>Безопасность</b>${L.safe}</div>` : '') +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Детали модели</h2><p class="note">Нажмите на деталь, чтобы найти её на столе.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  if (m.kind === 'bju') {
+    let h = `<h2>Энергия еды</h2><div class="formula">E = 4·Б + 9·Ж + 4·У ккал</div><p class="note">1 г белка или углеводов даёт около 4 ккал (17 кДж), 1 г жира — около 9 ккал (37 кДж).</p>`;
+    const s = m.sel !== null ? SM[m.sel] : null;
+    if (s && S.bin[s.k]) {
+      h += `<h3>Проба ${s.k}: ${s.name}, на 100 г</h3><div class="steps">` +
+        step('белки', `${ru(s.b)} г · 4 = ${ru(4 * s.b)} ккал`) + step('жиры', `${ru(s.z)} г · 9 = ${ru(9 * s.z)} ккал`) + step('углеводы', `${ru(s.u)} г · 4 = ${ru(4 * s.u)} ккал`) +
+        step('всего', `≈ ${Math.round(kcal(s))} ккал`, 'sum') + `</div>`;
+    } else if (s) {
+      const t = S.tests[s.k] || {};
+      h += `<h3>Проба ${s.k}: рассуждаем</h3><div class="steps">` +
+        RGK.map(k => step(`${RG[k].sh} → ${RG[k].what}`, t[k] ? (RG[k].pos(s) ? `${RG[k].posT}: есть` : `${RG[k].negT}: нет`) : 'не проверяли')).join('') +
+        step('вывод', 'положите пробу в лоток — откроется состав', 'sum') + `</div>`;
+    } else h += `<p class="note">Нажмите на пробирку — здесь появится разбор.</p>`;
+    h += `<h3>Реакции</h3><div class="steps">` + step('получение реактива', 'CuSO₄ + 2NaOH → Cu(OH)₂↓ + Na₂SO₄') + step('белок + Cu(OH)₂', 'фиолетовый комплекс (пептидные связи)') + step('крахмал + I₂', 'тёмно-синее окрашивание') + `</div>`;
+    h += `<p class="note" style="margin-top:10px">Состав — средние табличные значения, у разных продуктов он немного отличается.</p>`;
+    return h;
+  }
+  if (m.kind === 'vit') {
+    let h = `<h2>Сколько витамина C</h2><div class="formula">C₆H₈O₆ + I₂ → C₆H₆O₆ + 2HI</div><div class="steps">` +
+      step('сок', m.J.name) + step('капель до синего', m.blue ? String(m.drops) : `${m.drops}, ещё не синий`);
+    if (m.blue) {
+      const mg = m.drops * MGD, c = estMg(m.drops);
+      h += step('витамина в колбе', `${m.drops} · 0,5 = ${ru(mg)} мг`) + step('в 100 мл сока', `${ru(mg)} · 100 / ${VOL} ≈ ${c} мг`) +
+        step('стакан 200 мл', `≈ ${c * 2} мг`) + step('суточная норма подростка ≈ 70 мг', `≈ ${Math.round(NEEDC / c * 100)} мл сока`, 'sum');
+    } else h += step('вывод', 'капайте, пока раствор не посинеет', 'sum');
+    h += `</div><h3>Ваши измерения, мг в 100 мл</h3><div class="steps">${JU.map(J => step(J.name, S.vres[J.k] ? `≈ ${estMg(S.vres[J.k])}` : '?')).join('')}</div>`;
+    h += `<p class="note" style="margin-top:10px">Точность ±5 мг: последняя капля уже лишняя. Молярная масса C₆H₈O₆ — 176 г/моль, значит 0,5 мг — это 2,8 мкмоль, и столько же йода.</p>`;
+    return h;
+  }
+  let h = `<h2>Полувыведение</h2><div class="formula">C = C₀ · (½)<sup>t / T½</sup></div><div class="steps">` +
+    step('пик после одной таблетки', '≈ 8 мг/л через 1,6 ч') + step('через 4 ч после пика', '≈ 4 мг/л') + step('через 8 ч', '≈ 2 мг/л — уже не действует') + `</div>`;
+  if (m.n) {
+    h += `<h3>Ваше расписание</h3><div class="steps">` + step('приёмы', m.pills.map(p => p + ':00').join(', ')) +
+      step('начало действия', m.tOn !== null ? hh(m.tOn) : 'не достигнуто') +
+      step(`минимум с ${PK.w0}:00 до ${PK.w1}:00`, `${ru(m.mn)} мг/л ${m.mn >= PK.lo ? '≥' : '<'} ${PK.lo}`) +
+      step('пик за день', `${ru(m.mx)} мг/л ${m.toxic ? '≥' : '<'} ${PK.hi}`) +
+      step('таблеток', `${m.n} ${m.tooMany ? '>' : '≤'} ${PK.max}`) +
+      step('итог', m.ok ? 'всё в окне ✓' : m.toxic ? 'передозировка' : m.tooMany ? 'больше, чем разрешено' : `без действия ${ru(m.under)} ч`, 'sum') + `</div>`;
+  } else h += `<p class="note" style="margin-top:10px">Добавьте таблетку — здесь появится разбор.</p>`;
+  h += `<p class="note" style="margin-top:10px">Каждая следующая таблетка прибавляется к тому, что ещё осталось в крови. Поэтому при частых приёмах пики растут.</p>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const el = $('#meter');
+  if (m.kind === 'bju') {
+    const s = m.sel !== null ? SM[m.sel] : null, r = s && S.lastRg[s.k];
+    el.innerHTML = `<div class="k">Реактив</div><div class="v">${RG[m.rg].sh}</div>` +
+      `<div class="lr"><span>проба</span><span>${s ? s.k : '—'}</span></div><div class="lr"><span>результат</span><span>${r ? (RG[r].pos(s) ? '+' : '−') : '—'}</span></div>` +
+      `<div class="swatch" style="background:${r && r !== 'pap' ? (RG[r].pos(s) ? RG[r].posC : RG[r].negC) : 'transparent'}"></div>` +
+      `<div class="lr"><span>в лотках</span><span>${m.nPlaced}/6</span></div>`;
+  } else if (m.kind === 'vit') {
+    el.innerHTML = `<div class="k">Капель йода</div><div class="v ${m.blue ? 'ok' : ''}">${m.drops}${m.blue ? ' · синий' : ''}</div><div class="swatch" style="background:${flaskColor(m).c}"></div>` +
+      `<div class="lr"><span>сок</span><span>${m.J.sh}</span></div><div class="lr"><span>измерено</span><span>${m.nMeas}/4</span></div>`;
+  } else {
+    el.innerHTML = `<div class="k">Пик за день</div><div class="v ${m.ok ? 'ok' : ''}" style="color:${m.toxic ? 'var(--warn)' : ''}">${m.n ? ru(m.mx) + ' мг/л' : '—'}</div><div class="gauge"><b style="width:${(Math.min(m.mx, 20) / 20 * 100).toFixed(1)}%;background:${m.toxic ? 'var(--warn)' : 'var(--ok)'}"></b><i style="left:${PK.lo / 20 * 100}%"></i><i style="left:${PK.hi / 20 * 100}%"></i></div>` +
+      `<div class="lr"><span>минимум</span><span>${m.n ? ru(m.mn) : '—'}</span></div><div class="lr"><span>таблеток</span><span style="color:${m.tooMany ? 'var(--warn)' : 'inherit'}">${m.n}/${PK.max}</span></div>`;
+  }
+}
+
+function update() {
+  const m = model(), L = LESSONS[S.lesson];
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Тема «Еда и здоровье» освоена!');
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  bju: '<path d="M14 4v16a4 4 0 0 0 8 0V4" fill="none" stroke="#c8d1e2"/><path d="M15 12v8a3 3 0 0 0 6 0v-8z" fill="#1d2470"/><path d="M30 4v16a4 4 0 0 0 8 0V4" fill="none" stroke="#c8d1e2"/><path d="M31 12v8a3 3 0 0 0 6 0v-8z" fill="#7b3aa8"/><path d="M46 4v16a4 4 0 0 0 8 0V4" fill="none" stroke="#c8d1e2"/><path d="M47 12v8a3 3 0 0 0 6 0v-8z" fill="#f2d24a"/>',
+  vit: '<path d="M30 3v8L20 27h20L30 11z" fill="none" stroke="#c8d1e2"/><path d="M24 20h12l4 7H20z" fill="#1f2f8f"/><circle cx="12" cy="15" r="6" fill="#f3a33a"/><path d="M12 9v12M6 15h12" stroke="#c8711a" stroke-width=".8"/><circle cx="52" cy="15" r="3" fill="#8a3a62"/><circle cx="57" cy="19" r="3" fill="#8a3a62"/>',
+  med: '<rect x="3" y="9" width="60" height="9" fill="rgba(134,224,168,.25)"/><path d="M3 27c6-22 10-20 15-12s8-10 13-8 6 8 11 6 8-8 11-6 6 6 7 6" fill="none" stroke="#72d4e8" stroke-width="1.6"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i], init = JSON.parse(JSON.stringify(L.init || {}));
+  S.lesson = i; S.hl = null; drag = null;
+  S.rg = 'iod'; S.tests = {}; S.lastRg = {}; S.bin = {}; S.selT = null; S.wrong = 0;
+  S.vs = 0; S.vd = 0; S.vres = {}; S.anim = null;
+  S.pills = []; S.lastPill = null;
+  Object.assign(S, init);
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '';
+  if (id === 'bju') now = `Шесть пробирок A–F с пробами еды (что в какой — ученик не знает). Реактивы: раствор йода (на крахмал), гидроксид меди(II) Cu(OH)₂ (биуретовая реакция на белок), фильтровальная бумага (жирное пятно). Активный реактив: ${RG[S.rg].name}. Результаты проверок: ${SM.map(s => { const t = S.tests[s.k] || {}; const r = RGK.filter(k => t[k]).map(k => `${RG[k].sh} ${RG[k].pos(s) ? '+' : '−'}`); return `${s.k}: ${r.length ? r.join(', ') : 'не проверяли'}`; }).join('; ')}. Разложены по лоткам: ${SM.filter(s => S.bin[s.k]).map(s => `${s.k} — ${s.name} (${CLS[S.bin[s.k]]})`).join(', ') || 'пока ничего'}. Ошибок: ${S.wrong}. Не называй, что в непроверенных или неразложенных пробирках — помоги понять, о чём говорит каждая реакция.`;
+  if (id === 'vit') now = `Титрование соков раствором йода с крахмалом. Одна капля йода окисляет 0,5 мг витамина C, в колбе 10 мл сока. Сейчас в колбе: ${m.J.name}, добавлено ${m.drops} капель, раствор ${m.blue ? 'посинел — титрование окончено' : 'ещё не синий'}. Измерено: ${JU.filter(J => S.vres[J.k]).map(J => `${J.name} — ${S.vres[J.k]} капель, ≈${estMg(S.vres[J.k])} мг в 100 мл`).join('; ') || 'пока ничего'}. Не называй результаты неизмеренных соков — предложи провести опыт и подумать, почему кипячёный сок отличается.`;
+  if (id === 'med') now = `График концентрации условного лекарства в крови с 6:00 до 24:00. Одна таблетка даёт пик около 8 мг/л через 1,6 ч, период полувыведения 4 ч. Действует от ${PK.lo} мг/л, опасно от ${PK.hi} мг/л, не больше ${PK.max} таблеток. Нужно держать концентрацию в окне с ${PK.w0}:00 до ${PK.w1}:00. Сейчас таблетки в: ${m.pills.map(p => p + ':00').join(', ') || 'нет'}. Минимум в нужное время: ${m.n ? ru(m.mn) + ' мг/л в ' + hh(m.tmn) : '—'}, пик: ${m.n ? ru(m.mx) + ' мг/л в ' + hh(m.tmx) : '—'}, время без действия: ${ru(m.under)} ч. ${m.ok ? 'Задание выполнено.' : ''} Не давай готовое расписание — спрашивай, когда концентрация падает ниже нормы и почему растут пики. Напоминай, что настоящую дозу назначает врач.`;
+  return [
+    `Предмет: химия, 9 класс. Тема «Еда и здоровье». Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Веди ученика наводящими вопросами, а не готовыми ответами.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = { bju: 'Почему жир оставляет на бумаге пятно, а вода нет?', vit: 'Почему при кипячении витамина C становится меньше?', med: 'Почему нельзя выпить две таблетки сразу?' }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

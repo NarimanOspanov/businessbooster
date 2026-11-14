@@ -39,7 +39,7 @@ window.LUCH_SUBJECTS = {
       { id: 'tri', b: 'geo', g: 7, t: 'Треугольники', items: ['Признаки равенства', 'Равнобедренный треугольник', 'Сумма углов', 'Построения циркулем'], req: ['gbase'], status: 'done', href: '/labs/math-tri/', lessons: 4, doneItems: 4 },
       { id: 'quadr', b: 'geo', g: 8, t: 'Четырёхугольники', items: ['Параллелограмм', 'Прямоугольник, ромб, квадрат', 'Трапеция', 'Площади многоугольников'], req: ['tri'], status: 'done', href: '/labs/math-quadr/', lessons: 4, doneItems: 4 },
       { id: 'pyth', b: 'geo', g: 8, t: 'Пифагор и подобие', items: ['Теорема Пифагора', 'Подобные треугольники', 'Синус, косинус, тангенс угла'], req: ['quadr', 'roots'], status: 'done', href: '/labs/math-pyth/', lessons: 3, doneItems: 3 },
-      { id: 'circ', b: 'geo', g: 8, t: 'Окружность', items: ['Касательная', 'Вписанные углы', 'Вписанная и описанная окружность'], req: ['tri'] },
+      { id: 'circ', b: 'geo', g: 8, t: 'Окружность', items: ['Касательная', 'Вписанные углы', 'Вписанная и описанная окружность'], req: ['tri'], status: 'done', href: '/labs/math-circ/', lessons: 3, doneItems: 3 },
       { id: 'vect', b: 'geo', g: 9, t: 'Векторы и координаты', items: ['Векторы', 'Метод координат', 'Уравнение окружности и прямой'], req: ['pyth', 'coord'] },
       { id: 'stereo', b: 'geo', g: 10, t: 'Стереометрия', items: ['Аксиомы пространства', 'Параллельность и перпендикулярность', 'Углы и расстояния'], req: ['vect'] },
       { id: 'solids', b: 'geo', g: 11, t: 'Тела и объёмы', items: ['Призма и пирамида', 'Цилиндр, конус, шар', 'Площади поверхности', 'Объёмы тел'], req: ['stereo'] },
@@ -83,7 +83,7 @@ window.LUCH_SUBJECTS = {
       { id: 'oxy', b: 'inorg', g: 8, t: 'Кислород, водород, вода', items: ['Кислород и горение', 'Водород', 'Вода и её свойства', 'Состав воздуха'], req: ['equations'], status: 'done', href: '/labs/chem-oxy/', lessons: 4, doneItems: 4 },
       { id: 'classes', b: 'inorg', g: 8, t: 'Классы веществ', items: ['Оксиды', 'Кислоты', 'Основания', 'Соли', 'Как они превращаются друг в друга'], req: ['oxy', 'valence'], status: 'done', href: '/labs/chem-classes/', lessons: 5, doneItems: 5 },
       { id: 'nonmet', b: 'inorg', g: 9, t: 'Неметаллы', items: ['Галогены', 'Сера', 'Азот и аммиак', 'Фосфор', 'Углерод и кремний'], req: ['classes', 'table'], status: 'done', href: '/labs/chem-nonmet/', lessons: 5, doneItems: 5 },
-      { id: 'metals', b: 'inorg', g: 9, t: 'Металлы', items: ['Щелочные металлы', 'Кальций и магний', 'Алюминий', 'Железо', 'Сплавы'], req: ['classes', 'table'] },
+      { id: 'metals', b: 'inorg', g: 9, t: 'Металлы', items: ['Щелочные металлы', 'Кальций и магний', 'Алюминий', 'Железо', 'Сплавы'], req: ['classes', 'table'], status: 'done', href: '/labs/chem-metals/', lessons: 5, doneItems: 5 },
       { id: 'industry', b: 'inorg', g: 11, t: 'Химическое производство', items: ['Аммиак и серная кислота', 'Металлургия Казахстана', 'Минеральные удобрения'], req: ['nonmet', 'metals', 'kinetics'] },
 
       { id: 'orgbase', b: 'org', g: 10, t: 'Основы органики', items: ['Почему углерод особенный', 'Строение органических молекул', 'Изомерия', 'Названия веществ'], req: ['bonds'] },
@@ -93,7 +93,7 @@ window.LUCH_SUBJECTS = {
       { id: 'polymers', b: 'org', g: 11, t: 'Полимеры', items: ['Пластмассы', 'Волокна', 'Каучук и резина', 'Переработка пластика'], req: ['hydro'] },
 
       { id: 'home', b: 'life', g: 8, t: 'Химия дома', items: ['Моющие средства', 'Кислоты и щёлочи на кухне', 'Бытовая безопасность'], req: ['classes'], status: 'done', href: '/labs/chem-home/', lessons: 3, doneItems: 3 },
-      { id: 'food', b: 'life', g: 9, t: 'Еда и здоровье', items: ['Белки, жиры, углеводы', 'Витамины', 'Как работают лекарства'], req: ['classes'] },
+      { id: 'food', b: 'life', g: 9, t: 'Еда и здоровье', items: ['Белки, жиры, углеводы', 'Витамины', 'Как работают лекарства'], req: ['classes'], status: 'done', href: '/labs/chem-food/', lessons: 3, doneItems: 3 },
       { id: 'eco', b: 'life', g: 11, t: 'Химия и экология', items: ['Загрязнение воздуха и воды', 'Парниковый эффект', 'Зелёная химия'], req: ['nonmet', 'polymers'] },
     ],
   },
@@ -129,8 +129,8 @@ window.LUCH_SUBJECTS = {
       { id: 'body', b: 'human', g: 9, t: 'Опора и движение', items: ['Скелет', 'Мышцы', 'Осанка и травмы'], req: ['verts'], status: 'done', href: '/labs/bio-body/', lessons: 3, doneItems: 3 },
       { id: 'blood', b: 'human', g: 9, t: 'Кровь и сердце', items: ['Состав крови', 'Сердце', 'Сосуды и давление', 'Иммунитет и прививки'], req: ['body'], status: 'done', href: '/labs/bio-blood/', lessons: 4, doneItems: 4 },
       { id: 'digest', b: 'human', g: 9, t: 'Дыхание и питание', items: ['Лёгкие и дыхание', 'Пищеварение', 'Питание и витамины', 'Выделение'], req: ['blood'], status: 'done', href: '/labs/bio-digest/', lessons: 4, doneItems: 4 },
-      { id: 'nerves', b: 'human', g: 9, t: 'Мозг и чувства', items: ['Нейрон и рефлекс', 'Головной мозг', 'Зрение и слух', 'Сон и память'], req: ['body'] },
-      { id: 'hormones', b: 'human', g: 9, t: 'Гормоны и взросление', items: ['Железы внутренней секреции', 'Половое созревание', 'Рост организма'], req: ['nerves'] },
+      { id: 'nerves', b: 'human', g: 9, t: 'Мозг и чувства', items: ['Нейрон и рефлекс', 'Головной мозг', 'Зрение и слух', 'Сон и память'], req: ['body'], status: 'done', href: '/labs/bio-nerves/', lessons: 4, doneItems: 4 },
+      { id: 'hormones', b: 'human', g: 9, t: 'Гормоны и взросление', items: ['Железы внутренней секреции', 'Половое созревание', 'Рост организма'], req: ['nerves'], status: 'done', href: '/labs/bio-hormones/', lessons: 3, doneItems: 3 },
       { id: 'health', b: 'human', g: 9, t: 'Здоровье и первая помощь', items: ['Первая помощь', 'Вредные привычки', 'Гигиена и режим дня'], req: ['blood'] },
 
       { id: 'mendel', b: 'gen', g: 10, t: 'Законы наследственности', items: ['Гены и признаки', 'Законы Менделя', 'Решётка Пеннета', 'Наследование пола'], req: ['division'], status: 'part', href: '/biology/', lessons: 5, doneItems: 3 },

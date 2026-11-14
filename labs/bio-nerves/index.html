@@ -1,0 +1,1225 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по биологии, 9 класс: нейрон и рефлекторная дуга, отделы головного мозга, зрение и слух, сон и память.">
+<title>Мозг и чувства</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --leaf:#5fbf6a;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-hit]{cursor:pointer}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+.scene .lbl{font-family:var(--font-body)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .v.bad{color:var(--warn)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--arm);transition:width .2s}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:19%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 15px/1.4 var(--font-mono);text-align:center;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+.feat{display:grid;gap:6px}
+.feat div{background:var(--surface-2);border-radius:10px;padding:9px 11px;font-size:13px;line-height:1.45;border-left:4px solid var(--line)}
+.feat b{display:block;font-weight:600;font-size:13.5px;margin-bottom:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 250px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M12 27C7 26 6 20 9 17C8 12 13 9 17 10C19 7 25 7 27 10C31 10 34 14 32 18C35 21 33 27 28 27C26 30 21 30 20 28C18 30 14 29 12 27Z" fill="rgba(217,163,168,.28)" stroke="#d9a3a8" stroke-width="1.6" stroke-linejoin="round"/><path d="M20 11V28M14 16q3 2 6 1M26 15q-3 3-6 2M13 22q4 1 7-1M27 22q-3 1-7-1" fill="none" stroke="#d9a3a8" stroke-width="1.2" stroke-linecap="round"/><path d="M29 6l-3 6h4l-3 6" fill="none" stroke="var(--force)" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Биология · Мозг и чувства</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#bio">Карта</a><a href="/physics/#bio">Биология</a><a href="/labs/bio-nerves/" aria-current="page">Мозг и чувства</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Мозг</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Лабораторный стол">
+    <svg class="scene" id="scene" role="img" aria-label="Лабораторный стол с опытом. Предметы можно нажимать и перетаскивать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const f = x => (Math.round(x * 10) / 10).toString();
+const f3 = x => (Math.round(x * 1000) / 1000).toString();
+const ru = (x, d = 1) => x.toFixed(d).replace('.', ',');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const KEY = 'luch-bio-nerves';
+const BRAIN = '#d9a3a8';
+
+// ---------- lesson 1: reflex arc ----------
+const AP = {
+  rec: { name: 'Рецептор', c: '#ffb547', job: 'чувствительное окончание в коже пальца: превращает жар в нервный импульс' },
+  sen: { name: 'Чувствительный нейрон', c: '#72d4e8', job: 'несёт импульс от рецептора в спинной мозг; его тело лежит в спинномозговом узле рядом со спинным мозгом' },
+  int: { name: 'Вставочный нейрон', c: '#b48cff', job: 'лежит в сером веществе спинного мозга и передаёт импульс с чувствительного нейрона на двигательный' },
+  mot: { name: 'Двигательный нейрон', c: '#86e0a8', job: 'тело лежит в передних рогах серого вещества, длинный аксон идёт к мышце' },
+  eff: { name: 'Рабочий орган', c: '#ff8a73', job: 'мышца-сгибатель: сокращается и отдёргивает руку' },
+};
+const APK = ['rec', 'sen', 'int', 'mot', 'eff'];
+// slots in arc order; letters are scrambled on purpose
+const SLOTS = [
+  { k: 'rec', x: 142, y: 262, bx: 160, by: 282, L: 'В', where: 'в коже кончика пальца, над пламенем' },
+  { k: 'sen', x: 300, y: 176, bx: 300, by: 154, L: 'Д', where: 'в узелке на нерве у задней стороны спинного мозга' },
+  { k: 'int', x: 376, y: 232, bx: 400, by: 222, L: 'Б', where: 'в середине серого вещества спинного мозга' },
+  { k: 'mot', x: 366, y: 264, bx: 384, by: 284, L: 'Г', where: 'в переднем роге серого вещества, откуда отросток выходит к руке' },
+  { k: 'eff', x: 64, y: 214, bx: 64, by: 190, L: 'А', where: 'на предплечье, это мышца' },
+];
+const ARC = [[142, 262], [176, 236], [222, 204], [262, 186], [300, 176], [330, 186], [356, 200], [364, 208], [376, 232], [372, 250], [366, 264], [352, 274], [322, 290], [280, 300], [220, 304], [160, 288], [118, 252], [88, 226], [64, 214]];
+const SLOT_I = [0, 4, 8, 10, 18];
+const SU = (() => {
+  const c = [0]; for (let i = 1; i < ARC.length; i++) c.push(c[i - 1] + Math.hypot(ARC[i][0] - ARC[i - 1][0], ARC[i][1] - ARC[i - 1][1]));
+  return SLOT_I.map(i => c[i] / c[c.length - 1]);
+})();
+const LETTERS = SLOTS.map((s, i) => [s.L, i]).sort((a, b) => a[0].localeCompare(b[0], 'ru'));
+const NPARTS = {
+  dend: { name: 'Дендриты', spec: 'Короткие ветвистые отростки. Принимают сигналы и несут их к телу нейрона.' },
+  body: { name: 'Тело нейрона', spec: 'Содержит ядро. Скопления тел нейронов — это серое вещество мозга и нервные узлы.' },
+  axon: { name: 'Аксон', spec: 'Один длинный отросток (у двигательных нейронов — до 1 м). Несёт импульс от тела к другим клеткам.' },
+  myel: { name: 'Миелиновая оболочка', spec: 'Белая жировая «изоляция» аксона. Импульс перескакивает между перехватами и бежит до 120 м/с. Пучки таких аксонов — белое вещество.' },
+  syn: { name: 'Синапс', spec: 'Место контакта нейрона с другой клеткой. Импульс передаётся химически — медиатором, с задержкой около 0,5 мс.' },
+};
+
+// ---------- lesson 2: brain ----------
+const BR = {
+  front: { short: 'планы, решения, произвольные движения и речь', name: 'Лобная доля', c: '#ffb547', lx: 168, ly: 186, fn: 'планирование, решения, внимание, произвольные движения (двигательная зона у центральной борозды), речь (у правшей — в левом полушарии)' },
+  par: { short: 'чувство касания, боли и температуры', name: 'Теменная доля', c: '#72d4e8', lx: 290, ly: 160, fn: 'кожно-мышечная чувствительность: прикосновение, боль, температура, положение частей тела' },
+  temp: { short: 'слух и понимание речи', name: 'Височная доля', c: '#86e0a8', lx: 252, ly: 272, fn: 'слух и понимание речи; глубже лежит гиппокамп — он помогает запоминать' },
+  occ: { short: 'зрение', name: 'Затылочная доля', c: '#b48cff', lx: 380, ly: 214, fn: 'зрение: здесь кора разбирает форму, цвет и движение того, что видят глаза' },
+  cer: { short: 'равновесие и точность движений', name: 'Мозжечок', c: '#ff8a73', lx: 362, ly: 312, fn: 'координация и точность движений, равновесие, автоматические навыки (ходьба, езда на велосипеде)' },
+  stem: { short: 'дыхание, работа сердца, кашель и чихание', name: 'Продолговатый мозг', c: '#e7a6d8', lx: 336, ly: 372, fn: 'центры дыхания и работы сердца, защитные рефлексы: кашель, чихание, глотание, рвота' },
+};
+const BRK = ['front', 'par', 'temp', 'occ', 'cer', 'stem'];
+const BR_OUT = 'M96 236C88 170 140 118 220 112C300 104 384 124 410 186C424 226 412 270 380 284C356 292 336 286 318 288C296 292 276 306 250 312C214 318 176 314 156 296C140 284 124 280 110 270C100 262 98 250 96 236Z';
+const BR_POLY = {
+  front: 'M60 60H232L244 232L158 262L150 340H60Z',
+  par: 'M232 60H344L340 214L244 232Z',
+  occ: 'M344 60H460V340H340V214Z',
+  temp: 'M158 262L244 232L340 214V340H150Z',
+};
+const SIT = [
+  { a: 'Вратарь следит за мячом', b: 'и видит, куда он летит', r: 'occ' },
+  { a: 'Звенит звонок с урока —', b: 'вы его слышите', r: 'temp' },
+  { a: 'Кошка трётся о ногу —', b: 'вы чувствуете касание', r: 'par' },
+  { a: 'Вы обдумываете ответ', b: 'и решаете поднять руку', r: 'front' },
+  { a: 'Вы идёте по бревну', b: 'и не теряете равновесие', r: 'cer' },
+  { a: 'Вы спите, но дышите,', b: 'а от пылинки чихаете', r: 'stem' },
+];
+
+// ---------- lesson 3: eye and ear ----------
+const EYES = {
+  norm: { name: 'Норма', inv: 60, about: 'изображение далёких предметов попадает точно на сетчатку' },
+  myo: { name: 'Близорукость', inv: 57, about: 'глазное яблоко длиннее нормы: изображение далёких предметов получается перед сетчаткой' },
+  hyp: { name: 'Дальнозоркость', inv: 63, about: 'глазное яблоко короче нормы: изображение получается за сетчаткой' },
+};
+const EYK = ['norm', 'myo', 'hyp'];
+const OBJS = { book: { name: 'Книга', d: 0.25, txt: 'Мозг и чувства' }, sign: { name: 'Вывеска', d: 6, txt: 'АВТОБУС 37' } };
+const LX = 290, AXY = 236, KPX = 7.2;
+const CX0 = 206, CX1 = 486;
+const FT = 1000;
+const cochPos = fq => clamp(1 - Math.log10(fq / 165.4 + 0.88) / 2.1, 0, 1);
+const TPOS = cochPos(FT);
+
+// ---------- lesson 4: sleep and memory ----------
+const HX0 = 60, HX1 = 490, HPH = (HX1 - HX0) / 10;
+const HLV = { W: 116, R: 134, N1: 150, N2: 168, N3: 190 };
+const STN = { W: 'бодрствование', R: 'быстрый сон', N1: 'дремота', N2: 'неглубокий сон', N3: 'глубокий сон' };
+const MX0 = 60, MX1 = 490, MY0 = 356, MY1 = 246;
+const mx = d => MX0 + d / 7 * (MX1 - MX0);
+const my = r => MY0 - r * (MY0 - MY1);
+
+const LESSONS = [
+  { id: 'arc', title: 'Нейрон и рефлекс',
+    text: ['Нервная система построена из нейронов. У нейрона есть тело с ядром, короткие ветвистые дендриты и один длинный аксон. По отросткам бежит нервный импульс — слабый электрический сигнал. Нейроны передают его друг другу в синапсах.',
+           'Рефлекс — ответ организма на раздражение при участии нервной системы. Путь импульса называют рефлекторной дугой: рецептор → чувствительный нейрон → вставочный нейрон в спинном или головном мозге → двигательный нейрон → рабочий орган (мышца или железа).',
+           'Отдёргивание руки от огня — безусловный (врождённый) рефлекс. Его замыкает спинной мозг, поэтому рука отдёргивается раньше, чем вы осознаёте боль: сигнал в головной мозг приходит чуть позже.'],
+    why: 'Невролог стучит молоточком по колену и по тому, как работает рефлекс, понимает, где повреждены нервы или спинной мозг. Нейрохирурги Национального центра нейрохирургии в Астане оперируют позвоночник и нервы. Реабилитолог восстанавливает движения после травм и инсультов. Время реакции важно водителю, вратарю и киберспортсмену: оно складывается из того, как быстро бегут импульсы по нейронам.',
+    task: 'Назовите все пять звеньев рефлекторной дуги и нажмите «Коснуться огня»: рука должна отдёрнуться.',
+    hint: 'Ориентируйтесь по месту: что лежит в коже, что — в узелке у спинного мозга, что — в сером веществе, что — в мышце.',
+    stage: 'Нажмите букву на схеме, затем выберите звено внизу. Когда все пять названы, нажмите «Коснуться огня».',
+    v: 60, len: 1.2,
+    check: m => m.right === 5 && m.fired },
+  { id: 'brain', title: 'Головной мозг',
+    text: ['Головной мозг лежит в черепе и весит около 1,3–1,4 кг. Его отделы: продолговатый мозг, мост, мозжечок, средний и промежуточный мозг и большие полушария. Продолговатый мозг продолжает спинной мозг: в нём центры дыхания, работы сердца, кашля и чихания.',
+           'Мозжечок отвечает за равновесие и точность движений. Большие полушария покрыты корой — слоем серого вещества толщиной 2–4 мм со множеством борозд и извилин. Борозды делят каждое полушарие на четыре доли: лобную, теменную, височную и затылочную.',
+           'В коре есть зоны: зрительная — в затылочной доле, слуховая — в височной, кожно-мышечной чувствительности — в теменной, двигательная и зоны планирования — в лобной. Левое полушарие управляет правой половиной тела, правое — левой.'],
+    why: 'Нейрохирург и невролог по снимку МРТ и симптомам понимают, какой отдел мозга пострадал: если человек плохо видит после удара по затылку — задета затылочная доля. Врач скорой по слабости одной половины тела и нарушению речи распознаёт инсульт — каждая минута тут на счету. Нейропсихологи помогают детям с трудностями внимания и чтения. Шлем на самокате и велосипеде бережёт именно эти отделы.',
+    task: 'Для каждой из 6 ситуаций нажмите на отдел мозга, который в ней главный.',
+    hint: 'Зрение — в затылке, слух — у висков, касание — в темени, планы и решения — во лбу. Равновесие и дыхание — не в коре.',
+    stage: 'Прочитайте ситуацию над мозгом и нажмите на нужный отдел. Ошибка не страшна — попробуйте ещё раз.',
+    mass: 55, kcal: 2400,
+    check: m => m.solved === 6 },
+  { id: 'sense', title: 'Зрение и слух',
+    text: ['Анализатор состоит из рецепторов, нервного пути и зоны коры. Глаз — оптический прибор: роговица и хрусталик преломляют свет и строят на сетчатке уменьшенное перевёрнутое изображение. В сетчатке палочки работают в сумерках, колбочки различают цвета. Зрительный нерв несёт сигнал в затылочную долю.',
+           'Хрусталик меняет кривизну: чтобы рассмотреть близкий предмет, ресничная мышца сокращается и хрусталик становится выпуклее — это аккомодация. При близорукости изображение далёких предметов получается перед сетчаткой, помогают рассеивающие линзы (минус). При дальнозоркости — за сетчаткой, помогают собирающие (плюс).',
+           'Звук — колебания воздуха. Ушная раковина собирает их, барабанная перепонка колеблется, слуховые косточки (молоточек, наковальня, стремечко) усиливают колебания и передают их жидкости улитки. Волосковые клетки улитки — рецепторы: высокие звуки раздражают начало улитки, низкие — её верхушку. Сигнал идёт по слуховому нерву в височную долю.'],
+    why: 'Офтальмолог и оптометрист в салоне оптики проверяют зрение и подбирают очки и линзы — в Казахстане это востребованная работа, в Алматы есть Казахский НИИ глазных болезней. Сурдолог проверяет слух и настраивает слуховые аппараты, в том числе детям, которым ставят кохлеарные импланты. Звукорежиссёр и инженер-акустик работают с частотами каждый день. А зная, как устроены глаз и ухо, проще беречь их самому.',
+    safe: 'Не смотрите на солнце и сварку без защиты — сетчатка получает ожог без боли. Громкость в наушниках держите не выше 60 % и делайте перерывы: погибшие волосковые клетки улитки не восстанавливаются.',
+    task: 'Выполните три опыта: 1) наведите резкость на книгу в здоровом глазу; 2) подберите очки близорукому, чтобы он чётко видел вывеску; 3) подберите частоту, на которую откликается отмеченное место улитки.',
+    hint: 'Для близкого предмета хрусталик должен стать выпуклее. Близорукому нужен минус. В улитке высокие звуки ловит её начало, низкие — верхушка.',
+    stage: 'Кнопки «Хрусталик» и «Очки» меняют оптическую силу. Режим «Ухо» показывает развёрнутую улитку.',
+    check: m => m.near && m.myo && m.ear },
+  { id: 'sleep', title: 'Сон и память',
+    text: ['Сон — не выключение мозга, а его особая работа. За ночь повторяются циклы примерно по 90 минут. В каждом цикле сон углубляется до глубокого (медленного) сна, а потом наступает быстрый сон: глаза двигаются под веками, снятся яркие сны. В начале ночи больше глубокого сна, к утру — быстрого.',
+           'Во сне мозг переносит новое из кратковременной памяти в долговременную. Подростку нужно 8–10 часов сна. После бессонной ночи хуже внимание, реакция и запоминание.',
+           'Память — способность запоминать, хранить и воспроизводить информацию. Немецкий психолог Г. Эббингауз выяснил: больше всего забывается в первые сутки. Повторения с растущими промежутками («через день, через три дня…») запоминаются гораздо прочнее, чем зубрёжка за один вечер.'],
+    why: 'При подготовке к ЕНТ интервальные повторения (как в приложениях-карточках) экономят часы. Сомнолог лечит нарушения сна. Водителям-дальнобойщикам и пилотам законом ограничивают время за рулём и штурвалом: усталость и недосып — частая причина аварий. Учителя и методисты строят уроки так, чтобы материал повторялся через нужные промежутки.',
+    task: 'Подготовьтесь к контрольной через 7 дней: спите не меньше 8 часов, вставайте не позже 7:00 и расставьте повторения так, чтобы к контрольной помнить не меньше 80 %.',
+    hint: 'Первое повторение — когда уже немного забылось, следующие — с большими промежутками. Повторения в один вечер почти не помогают.',
+    stage: 'Меняйте длительность сна и время отбоя. Добавьте повторения и перетаскивайте их по дням.',
+    sleep: 7, bed: 23,
+    check: m => m.h >= 8 && m.wakeOk && m.R7 >= 0.8 },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+function resetLesson() {
+  const L = LESSONS[S.lesson];
+  // lesson 1
+  S.lab = Array(SLOTS.length).fill(null); S.cur = -1; S.curT = -1e9; S.fire = null; S.fired = false; S.firedT = -1e9; S.v = L.v || 60; S.len = L.len || 1.2;
+  // lesson 2
+  S.q = 0; S.miss = 0; S.flash = null; S.names = true; S.mass = L.mass || 55; S.kcal = L.kcal || 2400; S.part = null;
+  // lesson 3
+  S.mode = 'eye'; S.eye = 'norm'; S.obj = 'book'; S.acc = 0; S.gl = 0; S.fq = 250; S.got = { near: false, myo: false, ear: false };
+  // lesson 4
+  S.sleep = L.sleep || 7; S.bed = L.bed || 23; S.reps = [];
+}
+
+// ---------- models ----------
+function eyeOpt() {
+  const E = EYES[S.eye], O = OBJS[S.obj], P = 60 + S.acc + S.gl, need = 1 / O.d + E.inv, mis = P - need;
+  const vi = P - 1 / O.d, di = vi > 0 ? 1000 / vi : 999;
+  return { E, O, P, need, mis, sharp: Math.abs(mis) <= 0.3, di, dr: 1000 / E.inv };
+}
+function stageAt(min) {
+  const k = Math.floor(min / 90), x = min - k * 90, n3 = Math.max(0, 40 - 12 * k), rem = Math.min(30, 8 + 6 * k), n2b = 90 - 5 - 15 - n3 - rem;
+  if (x < 5) return 'N1'; if (x < 20) return 'N2'; if (x < 20 + n3) return 'N3'; if (x < 20 + n3 + n2b) return 'N2'; return 'R';
+}
+function memModel() {
+  const h = S.sleep, q = h >= 8 ? 1 + 0.03 * (h - 8) : 1 - 0.12 * (8 - h);
+  const reps = [...S.reps].sort((a, b) => a - b);
+  const seg = [{ t0: 0, S: q }], steps = [];
+  for (const d of reps) {
+    const c = seg[seg.length - 1], R = Math.exp(-(d - c.t0) / c.S), Sn = c.S * (1.5 + 2 * (1 - R)) * q;
+    steps.push({ d, R, S0: c.S, S: Sn }); seg.push({ t0: d, S: Sn });
+  }
+  const R = t => { let c = seg[0]; for (const s of seg) if (s.t0 <= t) c = s; return Math.exp(-(t - c.t0) / c.S); };
+  return { q, reps, seg, steps, R, R7: R(7) };
+}
+function model() {
+  const id = LID();
+  if (id === 'arc') {
+    let n = 0, r = 0; S.lab.forEach((a, i) => { if (a) { n++; if (a === SLOTS[i].k) r++; } });
+    const tc = S.len / S.v * 1000, ts = 3 * 0.5;
+    return { kind: 'arc', placed: n, right: r, fired: S.fired, tc, ts, t: tc + ts };
+  }
+  if (id === 'brain') { const pct = 1.35 / S.mass * 100, W = S.kcal * 0.2 * 4186 / 86400; return { kind: 'brain', solved: S.q, miss: S.miss, pct, W }; }
+  if (id === 'sense') {
+    const o = eyeOpt(), pos = cochPos(S.fq), earNow = Math.abs(pos - TPOS) <= 0.025;
+    const nearNow = S.eye === 'norm' && S.obj === 'book' && S.gl === 0 && o.sharp, myoNow = S.eye === 'myo' && S.obj === 'sign' && o.sharp;
+    return { kind: 'sense', o, pos, earNow, nearNow, myoNow, near: S.got.near || nearNow, myo: S.got.myo || myoNow, ear: S.got.ear || earNow };
+  }
+  const M = memModel(), wake = S.bed + S.sleep;
+  return { kind: 'sleep', M, h: S.sleep, wake, wakeOk: wake <= 31 + 1e-9, R7: M.R7, wst: stageAt(S.sleep * 60) };
+}
+const clock = h => { const x = ((h % 24) + 24) % 24, hh = Math.floor(x + 1e-9), mm = Math.round((x - hh) * 60); return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`; };
+const hz = v => v >= 1000 ? ru(v / 1000, v >= 10000 ? 0 : 1) + ' кГц' : Math.round(v) + ' Гц';
+const sg = v => (v > 0 ? '+' : v < 0 ? '−' : '') + ru(Math.abs(v), Math.abs(v) % 1 ? 1 : 0);
+
+// ---------- lesson 1 actions ----------
+function pickSlot(i) { S.cur = i; S.curT = performance.now(); renderTools(); update(); }
+function assign(k) {
+  if (S.cur < 0) { toast('Сначала нажмите букву на схеме.'); return; }
+  S.lab[S.cur] = k; S.fired = false;
+  const m = model();
+  if (m.placed < SLOTS.length) { for (let d = 1; d <= SLOTS.length; d++) { const j = (S.cur + d) % SLOTS.length; if (!S.lab[j]) { S.cur = j; S.curT = performance.now(); break; } } }
+  else toast('Все звенья названы. Нажмите «Коснуться огня» и проверьте дугу.');
+  renderTools(); update();
+}
+function fire() {
+  if (S.fire && S.fire.run) return;
+  const bad = SLOTS.findIndex((s, i) => S.lab[i] !== s.k);
+  S.fired = false;
+  S.fire = { t0: performance.now(), stop: bad < 0 ? 1 : SU[bad], ok: bad < 0, bad, run: true, u: 0 };
+  if (reduce) finishFire();
+  update();
+}
+function finishFire() {
+  const F = S.fire; F.run = false; F.u = F.stop;
+  if (F.ok) { S.fired = true; S.firedT = performance.now(); toast(`Рука отдёрнута! Импульс прошёл всю дугу примерно за ${Math.round(model().t)} мс.`); }
+  else toast(`Импульс дошёл до метки ${SLOTS[F.bad].L} и оборвался: ${S.lab[F.bad] ? 'там стоит не то звено' : 'это звено не названо'}.`);
+  update();
+}
+
+// ---------- lesson 2 actions ----------
+function pickRegion(k) {
+  S.part = k;
+  if (S.q >= SIT.length) { toast(`${BR[k].name}: ${BR[k].fn}.`); update(); return; }
+  const ok = SIT[S.q].r === k;
+  S.flash = { id: k, ok, t: performance.now() };
+  if (ok) { toast(`Верно: ${BR[k].name.toLowerCase()} — ${BR[k].short}.`); S.q++; }
+  else { S.miss++; toast(`${BR[k].name} отвечает за другое: ${BR[k].short}. Попробуйте ещё.`); }
+  update();
+}
+
+// ---------- lesson 3 actions ----------
+function setAcc(v) { S.acc = clamp(Math.round(v * 2) / 2, 0, 10); update(); }
+function setGl(v) { S.gl = clamp(Math.round(v), -4, 4); update(); }
+function setFq(v) { S.fq = clamp(Math.round(v), 20, 20000); update(); }
+
+// ---------- lesson 4 actions ----------
+function addRep() {
+  if (S.reps.length >= 3) { toast('Больше трёх повторений не нужно — расставьте эти удачнее.'); return; }
+  const last = S.reps.length ? Math.max(...S.reps) : 0;
+  S.reps.push(clamp(last + 0.5, 0.25, 6.75)); renderTools(); update();
+}
+function delRep() { if (!S.reps.length) return; S.reps.pop(); renderTools(); update(); }
+function setSleep(v) { S.sleep = clamp(Math.round(v * 2) / 2, 5, 10); update(); }
+function cycleBed() { S.bed = S.bed >= 24 ? 21 : S.bed + 1; renderTools(); update(); }
+
+// ---------- drawing helpers ----------
+const ol = (d, fill, stroke, w = 2.2, extra = '') => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${w + 2.6}" stroke-linejoin="round" stroke-linecap="round"/><path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round" ${extra}/>`;
+function bench() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4000" fill="url(#tile)"/>`;
+}
+const lbl = (x, y, s, size = 10.5, fill = '#8b96ad', anchor = 'middle', extra = '') => `<text class="lbl" x="${f(x)}" y="${f(y)}" font-size="${size}" fill="${fill}" text-anchor="${anchor}" ${extra}>${s}</text>`;
+function polyAt(pts, u) {
+  let L = 0; const seg = [];
+  for (let i = 1; i < pts.length; i++) { const l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); seg.push(l); L += l; }
+  let d = u * L;
+  for (let i = 0; i < seg.length; i++) { if (d <= seg[i]) { const k = d / seg[i]; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * k, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * k]; } d -= seg[i]; }
+  return pts[pts.length - 1];
+}
+const pathOf = pts => pts.map((p, i) => (i ? 'L' : 'M') + p[0] + ' ' + p[1]).join('');
+
+// ---------- lesson 1 scene ----------
+function arcScene(t) {
+  let h = bench();
+  const lift = S.fired ? (reduce ? 1 : clamp((t - S.firedT) / 260, 0, 1)) * 26 : 0;
+  // candle
+  h += `<g data-hit="fire"><rect x="122" y="296" width="36" height="66" rx="5" fill="#efe6d2" stroke="${INK}" stroke-width="2"/><path d="M140 296v-8" stroke="#2a3550" stroke-width="2"/>`;
+  const fl = reduce ? 0 : Math.sin(t / 90) * 1.5;
+  h += `<path d="M140 ${f(256 + fl)}C150 270 150 284 140 290C130 284 130 270 140 ${f(256 + fl)}Z" fill="#ffb547" stroke="#ff8a73" stroke-width="1.5"/><path d="M140 272C145 279 145 285 140 288C135 285 135 279 140 272Z" fill="#fff3c4"/></g>`;
+  // spinal cord
+  h += `<g data-hit="cord"><ellipse cx="400" cy="236" rx="64" ry="52" fill="#e9e1d4" stroke="${INK}" stroke-width="2"/>`;
+  h += `<path d="M400 222C384 200 372 194 362 198C352 204 360 214 370 218C380 224 382 232 376 242C366 254 354 262 360 270C368 278 388 264 400 252C412 264 432 278 440 270C446 262 434 254 424 242C418 232 420 224 430 218C440 214 448 204 438 198C428 194 416 200 400 222Z" fill="#a99a90" stroke="#7d6f67" stroke-width="1.2"/>`;
+  h += `<circle cx="400" cy="236" r="3.5" fill="#3a4762"/></g>`;
+  h += lbl(400, 306, 'спинной мозг (разрез)', 10) + lbl(470, 196, 'спина', 9, '#56627d') + lbl(470, 290, 'живот', 9, '#56627d');
+  // dorsal root ganglion and nerve trunks
+  h += `<path d="${pathOf(ARC.slice(0, 8))}" stroke="#2a3550" stroke-width="9" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+  h += `<path d="${pathOf(ARC.slice(10))}" stroke="#2a3550" stroke-width="9" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+  h += `<ellipse cx="300" cy="176" rx="16" ry="11" fill="#3a4762" stroke="${INK}" stroke-width="1.6"/>`;
+  // neurons (coloured when named right is NOT shown; use neutral)
+  h += `<path d="${pathOf(ARC.slice(0, 8))}" stroke="#c9d3e6" stroke-width="2" fill="none" stroke-linejoin="round"/>`;
+  h += `<path d="${pathOf(ARC.slice(7, 11))}" stroke="#c9d3e6" stroke-width="2" fill="none" stroke-linejoin="round"/>`;
+  h += `<path d="${pathOf(ARC.slice(10))}" stroke="#c9d3e6" stroke-width="2" fill="none" stroke-linejoin="round"/>`;
+  h += `<circle cx="300" cy="176" r="5" fill="#c9d3e6"/><circle cx="376" cy="232" r="4.5" fill="#c9d3e6"/><circle cx="366" cy="264" r="5.5" fill="#c9d3e6"/>`;
+  // arm
+  h += `<g data-hit="hand" transform="translate(0 ${f(-lift)})">`;
+  h += ol('M-40 194L96 212Q118 216 128 232L150 258Q154 268 144 270Q138 270 132 264L116 252Q104 246 92 250L-40 246Z', '#c79a7c', '#d9ad8f', 1.6);
+  h += `<ellipse cx="54" cy="218" rx="34" ry="11" fill="${S.fired ? '#e0555d' : '#b5535b'}" stroke="${INK}" stroke-width="1.4"/>`;
+  h += `<path d="M30 214q24 -5 48 0" stroke="#7c2f3c" stroke-width="1" fill="none"/></g>`;
+  h += lbl(40, 262, S.fired ? 'мышца сократилась' : 'предплечье', 10, S.fired ? '#86e0a8' : '#8b96ad');
+  // impulse
+  if (S.fire) {
+    const F = S.fire, u = F.run ? Math.min(F.stop, (t - F.t0) / 1500) : F.stop;
+    F.u = u;
+    if (u > 0.002) {
+      const pts = []; for (let k = 0; k <= 60; k++) { const q = u * k / 60; pts.push(polyAt(ARC, q)); }
+      h += `<path d="${pts.map((p, i) => (i ? 'L' : 'M') + f(p[0]) + ' ' + f(p[1])).join('')}" stroke="#ffb547" stroke-width="3" fill="none" stroke-linejoin="round" opacity=".85" pointer-events="none"/>`;
+    }
+    const [x, y] = polyAt(ARC, u);
+    h += `<circle cx="${f(x)}" cy="${f(y)}" r="9" fill="rgba(255,181,71,.25)" pointer-events="none"/><circle cx="${f(x)}" cy="${f(y)}" r="4.5" fill="#fff3c4" stroke="#ffb547" stroke-width="2" pointer-events="none"/>`;
+    if (!F.run && !F.ok) h += `<text x="${f(x)}" y="${f(y - 12)}" font-size="13" font-weight="700" fill="#ff8a73" text-anchor="middle">✗</text>`;
+  }
+  // slots
+  SLOTS.forEach((s, i) => {
+    const a = S.lab[i], sel = S.cur === i;
+    if (sel) h += `<circle cx="${s.bx}" cy="${s.by}" r="16" fill="none" stroke="#ffb547" stroke-width="2" opacity="${reduce ? 1 : f3(.5 + .5 * Math.abs(Math.sin((t - S.curT) / 260)))}" pointer-events="none"/>`;
+    h += `<path d="M${s.x} ${s.y}L${s.bx} ${s.by}" stroke="#56627d" stroke-width="1" stroke-dasharray="2 2" pointer-events="none"/>`;
+    h += `<g data-hit="sl${i}"><circle cx="${s.bx}" cy="${s.by}" r="17" fill="transparent"/><circle cx="${s.bx}" cy="${s.by}" r="11" fill="${a ? AP[a].c : '#1a2438'}" stroke="${sel ? '#ffb547' : INK}" stroke-width="${sel ? 2.4 : 1.4}"/>`;
+    h += `<text x="${s.bx}" y="${s.by + 4}" font-size="11" font-weight="600" fill="${a ? INK : '#e8ecf4'}" text-anchor="middle">${s.L}</text></g>`;
+  });
+  // neuron sketch
+  const NY = 372;
+  h += `<g data-hit="n-dend">`; for (const [dx, dy] of [[-22, -12], [-24, 2], [-20, 13], [-12, -16], [-10, 16]]) h += `<path d="M216 ${NY}l${dx} ${dy}" stroke="#c9d3e6" stroke-width="1.6"/>`; h += `</g>`;
+  h += `<g data-hit="n-body"><circle cx="218" cy="${NY}" r="10" fill="#8f86c8" stroke="${INK}" stroke-width="1.4"/><circle cx="218" cy="${NY}" r="3.5" fill="#3a2f6a"/></g>`;
+  h += `<g data-hit="n-axon"><path d="M228 ${NY}H436" stroke="#c9d3e6" stroke-width="2"/></g>`;
+  h += `<g data-hit="n-myel">`; for (let x = 244; x < 420; x += 30) h += `<rect x="${x}" y="${NY - 5}" width="24" height="10" rx="5" fill="#efe6d2" stroke="${INK}" stroke-width="1"/>`; h += `</g>`;
+  h += `<g data-hit="n-syn"><path d="M436 ${NY}l10 -10M436 ${NY}l12 0M436 ${NY}l10 10" stroke="#c9d3e6" stroke-width="1.6"/><circle cx="447" cy="${NY - 10}" r="3" fill="#ffb547"/><circle cx="449" cy="${NY}" r="3" fill="#ffb547"/><circle cx="447" cy="${NY + 10}" r="3" fill="#ffb547"/></g>`;
+  h += lbl(218, NY - 18, 'нейрон:', 9.5, '#8b96ad') + lbl(332, NY - 12, 'аксон в миелине', 9) + lbl(470, NY + 4, 'синапс', 9, '#8b96ad', 'start');
+  h += lbl(200, NY + 22, S.cur >= 0 ? `Метка ${SLOTS[S.cur].L}: ${S.lab[S.cur] ? AP[S.lab[S.cur]].name.toLowerCase() : 'что здесь?'}` : 'Рефлекторная дуга', 12, S.cur >= 0 && S.lab[S.cur] ? AP[S.lab[S.cur]].c : '#e8ecf4', 'middle', 'font-weight="600"');
+  return h;
+}
+
+// ---------- lesson 2 scene ----------
+function brainScene(t) {
+  let h = bench();
+  const fl = S.flash && t - S.flash.t < 700 ? S.flash : null;
+  const fillOf = k => {
+    const solvedK = SIT.slice(0, S.q).some(s => s.r === k);
+    if (fl && fl.id === k) return [fl.ok ? '#86e0a8' : '#ff8a73', .8];
+    if (S.part === k && S.q >= SIT.length) return [BR[k].c, .75];
+    return [BR[k].c, solvedK ? .55 : .2];
+  };
+  // stem and cerebellum first
+  const [cs, os] = fillOf('stem');
+  h += `<g data-hit="br-stem">` + ol('M274 292C270 318 276 336 290 346L294 404H316L316 346C326 332 326 312 316 292Z', BRAIN, '#b98488', 1.6) + `<path d="M274 292C270 318 276 336 290 346L294 404H316L316 346C326 332 326 312 316 292Z" fill="${cs}" opacity="${os}"/></g>`;
+  const [cc, oc] = fillOf('cer');
+  h += `<g data-hit="br-cer"><ellipse cx="358" cy="304" rx="52" ry="28" fill="${BRAIN}" stroke="${INK}" stroke-width="2.4"/><ellipse cx="358" cy="304" rx="52" ry="28" fill="${cc}" opacity="${oc}"/>`;
+  for (let k = -2; k <= 2; k++) h += `<path d="M${314 + Math.abs(k) * 4} ${304 + k * 8}Q358 ${300 + k * 8 + 6} ${402 - Math.abs(k) * 4} ${304 + k * 8}" stroke="#a87478" stroke-width="1" fill="none"/>`;
+  h += `</g>`;
+  // cerebrum
+  h += `<clipPath id="brClip"><path d="${BR_OUT}"/></clipPath>`;
+  h += `<path d="${BR_OUT}" fill="none" stroke="${INK}" stroke-width="5"/>`;
+  h += `<g clip-path="url(#brClip)">`;
+  for (const k of ['front', 'par', 'temp', 'occ']) { const [c, o] = fillOf(k); h += `<g data-hit="br-${k}"><path d="${BR_POLY[k]}" fill="${BRAIN}"/><path d="${BR_POLY[k]}" fill="${c}" opacity="${o}"/></g>`; }
+  // gyri
+  const G = ['M120 200q20 -24 46 -10t40 -20', 'M110 240q30 -10 50 6', 'M150 150q24 10 40 -6', 'M270 130q10 30 34 22', 'M290 190q22 -10 36 6', 'M360 150q10 20 30 16', 'M370 240q20 -6 30 10', 'M190 290q30 -8 60 4', 'M260 260q30 -10 60 0', 'M180 210q20 10 36 -4'];
+  for (const d of G) h += `<path d="${d}" stroke="#a87478" stroke-width="1.6" fill="none" pointer-events="none"/>`;
+  h += `<path d="M232 112L244 232" stroke="#7d5054" stroke-width="2.6" fill="none" pointer-events="none"/>`;
+  h += `<path d="M158 262L244 232L332 218" stroke="#7d5054" stroke-width="2.6" fill="none" pointer-events="none"/>`;
+  h += `</g><path d="${BR_OUT}" fill="none" stroke="#b98488" stroke-width="1.6" pointer-events="none"/>`;
+  if (S.names) for (const k of BRK) { const w = BR[k].name.toLowerCase().split(' '), c = k === 'stem' ? '#e7a6d8' : '#1a1220', an = k === 'stem' ? 'start' : 'middle', ex = 'font-weight="600" pointer-events="none"'; h += k === 'occ' || k === 'stem' ? lbl(BR[k].lx, BR[k].ly - 6, w[0], 10.5, c, an, ex) + lbl(BR[k].lx, BR[k].ly + 7, w[1], 10.5, c, an, ex) : lbl(BR[k].lx, BR[k].ly, w.join(' '), 10.5, c, an, ex); }
+  if (S.names) h += `<path d="M318 368H330" stroke="#8b96ad" pointer-events="none"/>`;
+  h += lbl(78, 128, '← лоб', 10, '#56627d', 'start') + lbl(440, 128, 'затылок →', 10, '#56627d', 'end');
+  // situation card
+  if (S.q < SIT.length) {
+    const s = SIT[S.q];
+    h += `<rect x="176" y="62" width="256" height="40" rx="10" fill="rgba(18,26,40,.92)" stroke="#ffb547"/>`;
+    h += lbl(304, 78, `${S.q + 1} из ${SIT.length}: ${s.a}`, 11.5, '#e8ecf4', 'middle', 'font-weight="600"') + lbl(304, 94, s.b, 11.5, '#e8ecf4', 'middle', 'font-weight="600"');
+  } else h += `<rect x="176" y="62" width="256" height="40" rx="10" fill="rgba(18,26,40,.92)" stroke="#86e0a8"/>` + lbl(304, 79, 'Все ситуации разобраны!', 12, '#86e0a8', 'middle', 'font-weight="600"') + lbl(304, 94, 'Нажимайте на отделы — узнаете, что они делают', 9.5, '#8b96ad');
+  return h;
+}
+
+// ---------- lesson 3 scene ----------
+function eyeScene() {
+  let h = bench();
+  const o = eyeOpt(), retX = LX + KPX * o.dr, ex0 = LX - 22, ecx = (ex0 + retX) / 2, erx = (retX - ex0) / 2, ery = 76;
+  // object
+  const isBook = S.obj === 'book', xo = isBook ? 150 : 46, yo = AXY - 30;
+  h += `<g data-hit="obj">`;
+  if (isBook) h += `<rect x="134" y="${AXY - 30}" width="32" height="30" rx="2" fill="#5b7fd6" stroke="${INK}" stroke-width="1.6"/><path d="M150 ${AXY - 30}V${AXY}" stroke="#e8ecf4" stroke-width="1.2"/><path d="M138 ${AXY - 22}h8M138 ${AXY - 16}h8M154 ${AXY - 22}h8M154 ${AXY - 16}h8" stroke="#e8ecf4" stroke-width="1"/>`;
+  else h += `<rect x="20" y="${AXY - 40}" width="56" height="20" rx="3" fill="#2f9e5a" stroke="${INK}" stroke-width="1.6"/><text x="48" y="${AXY - 26}" font-size="7.5" fill="#fff" text-anchor="middle" font-weight="600">АВТОБУС 37</text><path d="M48 ${AXY - 20}V${AXY + 30}" stroke="#8b96ad" stroke-width="2"/>`;
+  h += `</g>`;
+  h += `<path d="M10 ${AXY}H${LX - 30}" stroke="#26324a" stroke-dasharray="4 4"/>`;
+  h += lbl(xo, AXY + 46, isBook ? '25 см' : '6 м (не в масштабе)', 10);
+  if (!isBook) h += lbl(150, AXY - 4, '≈', 16, '#56627d');
+  // glasses
+  if (S.gl) {
+    const gx = LX - 60, w = 7 + Math.abs(S.gl) * 1.5;
+    const d = S.gl < 0 ? `M${gx - w} ${AXY - 34}H${gx + w}Q${gx + 2} ${AXY} ${gx + w} ${AXY + 34}H${gx - w}Q${gx - 2} ${AXY} ${gx - w} ${AXY - 34}Z` : `M${gx} ${AXY - 34}Q${gx + w * 2} ${AXY} ${gx} ${AXY + 34}Q${gx - w * 2} ${AXY} ${gx} ${AXY - 34}Z`;
+    h += `<g data-hit="glass"><path d="${d}" fill="rgba(114,212,232,.25)" stroke="#72d4e8" stroke-width="1.6"/></g>` + lbl(gx, AXY - 44, `очки ${sg(S.gl)} дптр`, 10, '#72d4e8');
+  }
+  // eyeball
+  h += `<g data-hit="ball"><ellipse cx="${f(ecx)}" cy="${AXY}" rx="${f(erx)}" ry="${ery}" fill="#f1ece4" stroke="${INK}" stroke-width="2.4"/><ellipse cx="${f(ecx)}" cy="${AXY}" rx="${f(erx - 6)}" ry="${ery - 6}" fill="#1c2638" opacity=".9"/></g>`;
+  // retina arc
+  const arcP = (a0, a1) => `M${f(ecx + (erx - 6) * Math.cos(a0))} ${f(AXY + (ery - 6) * Math.sin(a0))}A${f(erx - 6)} ${ery - 6} 0 0 1 ${f(ecx + (erx - 6) * Math.cos(a1))} ${f(AXY + (ery - 6) * Math.sin(a1))}`;
+  h += `<g data-hit="retina"><path d="${arcP(-1.1, 1.1)}" stroke="#e0555d" stroke-width="5" fill="none"/></g>`;
+  // nerve
+  h += `<g data-hit="nerve"><path d="M${f(retX - 4)} ${AXY + 8}Q${f(retX + 30)} ${AXY + 14} 520 ${AXY + 30}" stroke="#e7d6a6" stroke-width="10" fill="none" stroke-linecap="round"/></g>`;
+  h += lbl(486, AXY + 54, 'зрительный нерв', 9.5) + lbl(486, AXY + 66, '→ затылочная доля', 9.5);
+  // cornea + iris
+  h += `<g data-hit="cornea"><path d="M${ex0 + 6} ${AXY - 40}Q${ex0 - 14} ${AXY} ${ex0 + 6} ${AXY + 40}" stroke="#9fd8ea" stroke-width="3" fill="rgba(159,216,234,.18)"/></g>`;
+  h += `<g data-hit="iris"><path d="M${LX - 4} ${AXY - 52}V${AXY - 30}M${LX - 4} ${AXY + 30}V${AXY + 52}" stroke="#7a5a3a" stroke-width="5" stroke-linecap="round"/></g>`;
+  // lens
+  const lrx = 5 + S.acc * 0.9;
+  h += `<g data-hit="lens"><ellipse cx="${LX}" cy="${AXY}" rx="${f(lrx)}" ry="28" fill="rgba(232,236,244,.75)" stroke="${INK}" stroke-width="1.4"/></g>`;
+  // rays
+  const xi = LX + KPX * clamp(o.di, 3, 60), yi = AXY + 8;
+  for (const ly of [-24, 0, 24]) {
+    const L = [LX, AXY + ly];
+    h += `<path d="M${xo} ${yo}L${L[0]} ${L[1]}" stroke="#ffb547" stroke-width="1.3" opacity=".8" pointer-events="none"/>`;
+    const k = (retX - L[0]) / (xi - L[0]), ry = L[1] + (yi - L[1]) * k;
+    h += `<path d="M${L[0]} ${L[1]}L${f(retX)} ${f(ry)}" stroke="#ffb547" stroke-width="1.3" opacity=".9" pointer-events="none"/>`;
+  }
+  const spread = Math.abs(48 * (1 - (retX - LX) / (xi - LX)));
+  h += `<path d="M${f(retX - 2)} ${f(yi - spread / 2 - 1.5)}V${f(yi + spread / 2 + 1.5)}" stroke="${o.sharp ? '#86e0a8' : '#ff8a73'}" stroke-width="4" stroke-linecap="round" pointer-events="none"/>`;
+  if (xi < retX - 3) h += `<circle cx="${f(xi)}" cy="${yi}" r="2.5" fill="#fff3c4" pointer-events="none"/>`;
+  h += lbl(f(ecx), AXY - ery - 10, `${EYES[S.eye].name} · сила глаза ${ru(o.P, 1)} дптр`, 11, '#e8ecf4', 'middle', 'font-weight="600"');
+  h += lbl(f(ecx), AXY + ery + 18, o.sharp ? 'фокус на сетчатке' : o.mis > 0 ? 'фокус перед сетчаткой' : 'фокус за сетчаткой', 10.5, o.sharp ? '#86e0a8' : '#ff8a73');
+  // what the eye sees
+  const blur = Math.min(5, Math.abs(o.mis) * 2.2);
+  h += `<defs><filter id="seeBlur" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="${f3(blur)}"/></filter></defs>`;
+  h += `<g data-hit="view"><rect x="16" y="318" width="200" height="66" rx="10" fill="#f6f1e8" stroke="${INK}" stroke-width="2"/>`;
+  h += `<text x="116" y="${isBook ? 356 : 358}" font-size="${isBook ? 17 : 21}" font-weight="700" fill="#1a2438" text-anchor="middle" filter="url(#seeBlur)" font-family="Golos Text, sans-serif">${OBJS[S.obj].txt}</text></g>`;
+  h += lbl(116, 400, 'так видит глаз', 9.5);
+  return h;
+}
+function earScene(t) {
+  let h = bench();
+  const ph = reduce ? 0 : t / 1000;
+  // sound waves
+  const wl = clamp(8 + 30 * (1 - cochPos(S.fq)), 8, 38);
+  for (let k = 0; k < 4; k++) { const x = 10 + ((k * wl + ph * 40) % (wl * 4)); h += `<path d="M${f(x)} ${AXY - 22}q8 22 0 44" stroke="#72d4e8" stroke-width="1.4" fill="none" opacity=".6" pointer-events="none"/>`; }
+  // pinna and canal
+  h += `<g data-hit="pinna">` + ol(`M66 ${AXY - 70}C30 ${AXY - 72} 26 ${AXY - 20} 40 ${AXY}C50 ${AXY + 16} 40 ${AXY + 40} 56 ${AXY + 60}C66 ${AXY + 70} 80 ${AXY + 56} 76 ${AXY + 30}L76 ${AXY - 50}Z`, '#c79a7c', '#d9ad8f', 1.6) + `</g>`;
+  h += `<g data-hit="canal"><path d="M70 ${AXY - 10}H150V${AXY + 10}H70Z" fill="#8a6650" stroke="${INK}" stroke-width="1.4"/></g>`;
+  const dv = Math.sin(ph * 30) * 1.5;
+  h += `<g data-hit="drum"><path d="M150 ${AXY - 18}Q${f(156 + dv)} ${AXY} 150 ${AXY + 18}" stroke="#e8ecf4" stroke-width="3" fill="none"/></g>`;
+  h += `<g data-hit="oss"><path d="M156 ${AXY}l10 -10l10 4" stroke="#efe6d2" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M176 ${AXY - 6}l8 10" stroke="#efe6d2" stroke-width="4" stroke-linecap="round"/><path d="M184 ${AXY + 4}h12M196 ${AXY - 4}v16" stroke="#efe6d2" stroke-width="3" stroke-linecap="round"/></g>`;
+  h += lbl(82, AXY - 16, 'проход', 9, '#8b96ad', 'start') + lbl(150, AXY + 34, 'перепонка', 9) + lbl(182, AXY - 30, 'косточки', 9);
+  // cochlea (unrolled)
+  const hw = x => 22 - 8 * (x - CX0) / (CX1 - CX0);
+  let top = '', bot = '';
+  for (let x = CX0; x <= CX1; x += 10) { top += (x === CX0 ? 'M' : 'L') + x + ' ' + f(AXY - hw(x)); bot = 'L' + x + ' ' + f(AXY + hw(x)) + bot; }
+  h += `<g data-hit="coch"><path d="${top}${bot.replace(/^L/, 'L')}Z" fill="#3a4762" stroke="${INK}" stroke-width="2"/></g>`;
+  // tonotopy ticks
+  for (const v of [16000, 4000, 1000, 250, 50]) { const x = CX0 + cochPos(v) * (CX1 - CX0); h += `<path d="M${f(x)} ${AXY + 24}v6" stroke="#8b96ad"/><text x="${f(x)}" y="${AXY + 42}" font-size="9" fill="#8b96ad" text-anchor="middle">${hz(v)}</text>`; }
+  h += lbl(CX0 + 4, AXY + 58, 'начало улитки', 9, '#56627d', 'start') + lbl(CX1, AXY + 58, 'верхушка', 9, '#56627d', 'end');
+  // target
+  const tx = CX0 + TPOS * (CX1 - CX0);
+  h += `<g data-hit="target"><path d="M${f(tx)} ${AXY - 30}l-7 -11h14z" fill="#ffb547" stroke="${INK}"/></g>` + lbl(tx, AXY - 48, 'это место', 10, '#ffb547');
+  // basilar membrane wave
+  const pos = cochPos(S.fq), xp = CX0 + pos * (CX1 - CX0);
+  let d = '';
+  for (let x = CX0 + 2; x <= CX1 - 2; x += 2) {
+    const w = x < xp ? 46 : 12, e = Math.exp(-Math.pow((x - xp) / w, 2)), y = AXY + 9 * e * Math.sin((x - CX0) / 6 - ph * 8);
+    d += (x === CX0 + 2 ? 'M' : 'L') + x + ' ' + f(y);
+  }
+  h += `<path d="${d}" stroke="#ffb547" stroke-width="2" fill="none" pointer-events="none"/>`;
+  h += `<circle cx="${f(xp)}" cy="${AXY}" r="3" fill="#fff3c4" pointer-events="none"/>`;
+  // nerve
+  h += `<g data-hit="anerve"><path d="M${f(xp)} ${AXY + 16}Q${f(xp)} ${AXY + 80} 330 ${AXY + 96}" stroke="#e7d6a6" stroke-width="3" fill="none" opacity=".8"/></g>`;
+  h += lbl(330, AXY + 112, 'слуховой нерв → височная доля', 10);
+  const hit = Math.abs(pos - TPOS) <= 0.025;
+  h += lbl(346, AXY - 94, `Звук ${hz(S.fq)}`, 15, hit ? '#86e0a8' : '#e8ecf4', 'middle', 'font-weight="600"');
+  h += lbl(346, AXY - 76, hit ? 'колеблется отмеченное место' : pos > TPOS ? 'пик ближе к верхушке — звук ниже нужного' : 'пик ближе к началу — звук выше нужного', 10, hit ? '#86e0a8' : '#8b96ad');
+  return h;
+}
+
+// ---------- lesson 4 scene ----------
+function sleepScene() {
+  let h = bench();
+  const m = model(), M = m.M;
+  // hypnogram
+  h += lbl(HX1, 100, `Ночь: отбой ${clock(S.bed)}, подъём ${clock(m.wake)} · ${ru(S.sleep, 1)} ч`, 11.5, m.wakeOk ? '#e8ecf4' : '#ff8a73', 'end', 'font-weight="600"');
+  h += `<g data-hit="hyp"><rect x="${HX0 - 6}" y="108" width="${HX1 - HX0 + 12}" height="92" rx="8" fill="rgba(18,26,40,.6)" stroke="#26324a"/>`;
+  for (const k of ['W', 'R', 'N1', 'N2', 'N3']) h += `<text x="${HX0 - 10}" y="${HLV[k] + 3}" font-size="8.5" fill="#8b96ad" text-anchor="end">${k === 'W' ? 'бодр.' : k === 'R' ? 'БДГ' : k === 'N3' ? 'глуб.' : k}</text>`;
+  h += `</g>`;
+  const tot = S.sleep * 60;
+  let d = `M${HX0} ${HLV.W}`, prev = 'W', rem = '';
+  for (let mn = 0; mn <= tot; mn += 5) {
+    const st = stageAt(mn), x = HX0 + mn / 60 * HPH;
+    if (st !== prev) { d += `H${f(x)}V${HLV[st]}`; prev = st; }
+    if (st === 'R') rem += `<path d="M${f(x)} ${HLV.R}h${f(5 / 60 * HPH)}" stroke="#ff8a73" stroke-width="4"/>`;
+  }
+  const wx = HX0 + S.sleep * HPH;
+  d += `H${f(wx)}V${HLV.W}`;
+  h += `<path d="${d}" stroke="#72d4e8" stroke-width="1.8" fill="none" pointer-events="none"/>` + rem;
+  for (let k = 1; k * 1.5 <= S.sleep; k++) { const x = HX0 + k * 1.5 * HPH; h += `<path d="M${f(x)} 110V198" stroke="#26324a" stroke-dasharray="2 3" pointer-events="none"/>`; }
+  for (let k = 0; k <= 10; k++) { const x = HX0 + k * HPH; h += `<text x="${f(x)}" y="212" font-size="8.5" fill="#56627d" text-anchor="middle">${clock(S.bed + k).slice(0, 2)}</text>`; }
+  h += `<g data-hit="wake"><path d="M${f(wx)} 106V200" stroke="${m.wakeOk ? '#86e0a8' : '#ff8a73'}" stroke-width="2"/><circle cx="${f(wx)}" cy="106" r="4" fill="${m.wakeOk ? '#86e0a8' : '#ff8a73'}"/></g>`;
+  // memory curve
+  h += lbl(MX1, 232, `Память: доля выученного · к контрольной ${Math.round(M.R7 * 100)} %`, 11.5, M.R7 >= 0.8 ? '#86e0a8' : '#e8ecf4', 'end', 'font-weight="600"');
+  h += `<g data-hit="mem"><rect x="${MX0 - 6}" y="${MY1 - 6}" width="${MX1 - MX0 + 12}" height="${MY0 - MY1 + 12}" rx="8" fill="rgba(18,26,40,.6)" stroke="#26324a"/>`;
+  for (const r of [0.5, 1]) h += `<path d="M${MX0} ${f(my(r))}H${MX1}" stroke="#26324a" stroke-dasharray="2 4"/><text x="${MX0 - 8}" y="${f(my(r) + 3)}" font-size="8.5" fill="#8b96ad" text-anchor="end">${r * 100}%</text>`;
+  h += `</g>`;
+  h += `<g data-hit="thr"><path d="M${MX0} ${f(my(0.8))}H${MX1}" stroke="#86e0a8" stroke-width="1.4" stroke-dasharray="7 4"/>` + lbl(MX0 + 4, my(0.8) - 4, '80 %', 9, '#86e0a8', 'start') + `</g>`;
+  let c = '';
+  for (let i = 0; i <= 280; i++) { const tt = i / 40; c += (i ? 'L' : 'M') + f(mx(tt)) + ' ' + f(my(M.R(tt))); }
+  h += `<path d="${c}" stroke="#ffb547" stroke-width="2.4" fill="none" pointer-events="none"/>`;
+  h += `<path d="M${MX0} ${MY0}H${MX1}" stroke="#8b96ad" stroke-width="1.2"/>`;
+  for (let dd = 0; dd <= 7; dd++) h += `<text x="${f(mx(dd))}" y="${MY0 + 13}" font-size="8.5" fill="#8b96ad" text-anchor="middle">${dd === 0 ? 'выучил' : dd === 7 ? 'к/р' : 'д.' + dd}</text>`;
+  h += `<g data-hit="exam"><path d="M${MX1} ${MY1 - 4}V${MY0}" stroke="#ff8a73" stroke-width="1.6" stroke-dasharray="4 3"/><circle cx="${MX1}" cy="${f(my(M.R7))}" r="4.5" fill="${M.R7 >= 0.8 ? '#86e0a8' : '#ff8a73'}" stroke="${INK}"/></g>`;
+  // repetition handles
+  S.reps.forEach((r, i) => {
+    const x = mx(r), sel = drag && drag.key === 'rep' + i;
+    h += `<path d="M${f(x)} ${MY1}V${MY0 + 18}" stroke="#b48cff" stroke-width="1.2" stroke-dasharray="3 3" pointer-events="none"/>`;
+    h += `<g data-drag="rep${i}"><rect x="${f(x - 22)}" y="${MY0 + 18}" width="44" height="30" fill="transparent"/><rect x="${f(x - 17)}" y="${MY0 + 22}" width="34" height="18" rx="5" fill="#b48cff" stroke="${sel ? '#e8ecf4' : INK}" stroke-width="${sel ? 2 : 1.2}"/><text x="${f(x)}" y="${MY0 + 35}" font-size="9.5" font-weight="600" fill="${INK}" text-anchor="middle">${ru(r, r % 1 ? 2 : 0).replace(/,?0+$/, '')} д</text></g>`;
+  });
+  if (!S.reps.length) h += lbl((MX0 + MX1) / 2, MY0 + 36, 'Добавьте повторение кнопкой «+ повторение»', 10.5);
+  return h;
+}
+
+function hlBox(id) {
+  const L = LID();
+  if (L === 'arc') {
+    const i = SLOTS.findIndex(s => s.k === id); if (i >= 0) return [SLOTS[i].x - 20, SLOTS[i].y - 20, 40, 40];
+    return { 'n-dend': [190, 354, 30, 36], 'n-body': [206, 360, 24, 24], 'n-axon': [228, 362, 210, 20], 'n-myel': [240, 362, 184, 20], 'n-syn': [430, 356, 26, 32], cord: [332, 180, 136, 112], fire: [118, 250, 44, 116] }[id] || null;
+  }
+  if (L === 'brain') return { front: [96, 112, 150, 186], par: [232, 106, 112, 128], temp: [156, 214, 186, 104], occ: [338, 120, 80, 168], cer: [304, 274, 108, 60], stem: [266, 288, 62, 116], mid: [262, 222, 80, 70] }[id] || null;
+  if (L === 'sense') {
+    const o = eyeOpt(), retX = LX + KPX * o.dr;
+    if (S.mode === 'eye') return { cornea: [LX - 44, AXY - 46, 30, 92], lens: [LX - 14, AXY - 34, 28, 68], iris: [LX - 12, AXY - 58, 16, 116], retina: [retX - 34, AXY - 66, 40, 132], nerve: [retX - 6, AXY + 2, 520 - retX + 6, 40], glass: [LX - 82, AXY - 40, 44, 80], view: [12, 314, 208, 74] }[id] || null;
+    return { pinna: [24, AXY - 74, 58, 140], canal: [68, AXY - 14, 86, 28], drum: [142, AXY - 22, 18, 44], oss: [152, AXY - 16, 50, 34], coch: [CX0 - 4, AXY - 26, CX1 - CX0 + 8, 52], anerve: [290, AXY + 14, 120, 106] }[id] || null;
+  }
+  return { hyp: [HX0 - 10, 104, HX1 - HX0 + 20, 100], mem: [MX0 - 10, MY1 - 10, MX1 - MX0 + 20, MY0 - MY1 + 20], thr: [MX0 - 4, my(0.8) - 8, MX1 - MX0 + 8, 16], exam: [MX1 - 12, MY1 - 8, 24, MY0 - MY1 + 12], rep: [MX0 - 6, MY0 + 16, MX1 - MX0 + 12, 34] }[id] || null;
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = id === 'arc' ? arcScene(t) : id === 'brain' ? brainScene(t) : id === 'sense' ? (S.mode === 'eye' ? eyeScene() : earScene(t)) : sleepScene();
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${f(b[0])}" y="${f(b[1])}" width="${f(b[2])}" height="${f(b[3])}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 510, hh / 410, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 405 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag],[data-hit]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  if (el.dataset.drag) { drag = { key: el.dataset.drag, x: e.clientX, y: e.clientY, moved: false }; scene.classList.add('grabbing'); }
+  else drag = { hit: el.dataset.hit, x: e.clientX, y: e.clientY, moved: false };
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 5) drag.moved = true;
+  if (!drag.key || !drag.moved) return;
+  const p = toSvg(e), i = +drag.key.slice(3);
+  const day = clamp(Math.round((p.x - MX0) / (MX1 - MX0) * 7 * 4) / 4, 0.25, 6.75);
+  if (S.reps[i] !== day) { S.reps[i] = day; update(); }
+  dirty = true;
+});
+function endDrag(cancel) {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing'); dirty = true;
+  if (d.key && d.moved) update();
+  if (cancel || d.moved || !d.hit) return;
+  tap(d.hit);
+}
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+function tap(id) {
+  const L = LID();
+  if (L === 'arc') {
+    if (id.startsWith('sl')) pickSlot(+id.slice(2));
+    else if (id.startsWith('n-')) toast(`${NPARTS[id.slice(2)].name}. ${NPARTS[id.slice(2)].spec}`);
+    else if (id === 'fire') fire();
+    else if (id === 'cord') toast('Спинной мозг в разрезе: снаружи белое вещество (отростки нейронов), внутри серое вещество в форме бабочки (тела нейронов).');
+    else if (id === 'hand') toast('Рука с мышцей-сгибателем на предплечье.');
+  }
+  if (L === 'brain' && id.startsWith('br-')) pickRegion(id.slice(3));
+  if (L === 'sense') {
+    const T = { obj: 'Предмет, на который смотрит глаз. Переключайте книгу и вывеску внизу.', ball: 'Глазное яблоко. Его длина решает, где получится изображение.', retina: 'Сетчатка: палочки (сумеречное зрение) и колбочки (цвет). Изображение на ней уменьшенное и перевёрнутое.', nerve: 'Зрительный нерв несёт импульсы в затылочную долю коры. Там, где он выходит, — слепое пятно.', cornea: 'Роговица — прозрачная «передняя линза» глаза. Она преломляет свет сильнее всего.', iris: 'Радужка с отверстием — зрачком. На ярком свету зрачок сужается.', lens: 'Хрусталик — эластичная линза. Ресничная мышца меняет его кривизну.', glass: S.gl < 0 ? 'Рассеивающая линза (минус) — для близоруких.' : 'Собирающая линза (плюс) — для дальнозорких.', view: 'Так видит этот глаз: если фокус не на сетчатке, картинка размыта.', pinna: 'Ушная раковина собирает звук и направляет его в слуховой проход.', canal: 'Наружный слуховой проход ведёт к барабанной перепонке.', drum: 'Барабанная перепонка колеблется вместе с воздухом.', oss: 'Молоточек, наковальня и стремечко — самые маленькие кости тела. Они усиливают колебания примерно в 20 раз.', coch: 'Улитка, «развёрнутая» в полосу. Внутри жидкость и основная мембрана с волосковыми клетками.', target: 'Отмеченное место улитки. Подберите звук, который раскачает именно его.', anerve: 'Слуховой нерв несёт сигнал в височную долю коры.' }[id];
+    if (T) toast(T);
+  }
+  if (L === 'sleep') {
+    const T = { hyp: 'Гипнограмма: так за ночь меняется глубина сна. Красным — быстрый сон (БДГ).', wake: `Подъём в ${clock(model().wake)} — в фазе «${STN[model().wst]}».`, mem: 'Кривая забывания: какая доля выученного ещё помнится.', thr: 'Цель — не меньше 80 % к контрольной.', exam: 'День контрольной.' }[id];
+    if (T) toast(T);
+  }
+}
+
+let lastT = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  lastT = t;
+  let anim = false;
+  const id = LID();
+  if (id === 'arc') {
+    anim = (S.cur >= 0 && !reduce) || !reduce;
+    if (S.fire && S.fire.run && (t - S.fire.t0) / 1500 >= S.fire.stop) finishFire();
+    if (S.fired && t - S.firedT < 400) anim = true;
+  }
+  if (id === 'brain' && S.flash && t - S.flash.t < 800) anim = true;
+  if (id === 'sense' && S.mode === 'ear' && !reduce) anim = true;
+  if (S.hl) anim = true;
+  if (dirty || anim) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3400); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, c) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${c ? `<i style="background:${c}"></i>` : ''}${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  const cur = S.cur >= 0 ? S.lab[S.cur] : null;
+  let h = '';
+  if (id === 'arc') h = APK.map(k => B('ap-' + k, AP[k].name, cur === k, AP[k].c)).join('') + sep + B('fire', 'Коснуться огня') + B('reset', 'Сбросить');
+  if (id === 'brain') h = B('names', 'Подписи', S.names) + B('reset', 'Сначала');
+  if (id === 'sense') {
+    h = B('m-eye', 'Глаз', S.mode === 'eye') + B('m-ear', 'Ухо', S.mode === 'ear') + sep;
+    if (S.mode === 'eye') h += EYK.map(k => B('eye-' + k, EYES[k].name, S.eye === k)).join('') + sep + B('ob-book', 'Книга 25 см', S.obj === 'book') + B('ob-sign', 'Вывеска 6 м', S.obj === 'sign') + sep + B('a-', 'Хрусталик −') + B('a+', 'Хрусталик +') + sep + B('g-', 'Очки −1') + B('g+', 'Очки +1');
+    else h += B('f-', 'Ниже ÷1,25') + B('f+', 'Выше ×1,25');
+  }
+  if (id === 'sleep') h = B('h-', 'Сон −30 мин') + B('h+', 'Сон +30 мин') + B('bed', 'Отбой ' + clock(S.bed)) + sep + B('rep+', '+ повторение', undefined, '#b48cff') + B('rep-', '− повторение');
+  tb.innerHTML = h;
+  placeHint();
+}
+function placeHint() {
+  const hn = $('#hint'), st = $('#stage').getBoundingClientRect(), tb = $('#tools').getBoundingClientRect();
+  hn.style.visibility = tb.left - st.left < st.width * 0.19 + 30 ? 'hidden' : '';
+}
+addEventListener('resize', placeHint);
+function act(a) {
+  if (a.startsWith('ap-')) return assign(a.slice(3));
+  if (a === 'fire') return fire();
+  if (a === 'reset') { resetLesson(); renderTools(); buildScheme(); update(); return; }
+  if (a === 'names') { S.names = !S.names; renderTools(); update(); return; }
+  if (a === 'm-eye' || a === 'm-ear') { S.mode = a.slice(2); renderTools(); buildScheme(); update(); return; }
+  if (a.startsWith('eye-')) { S.eye = a.slice(4); renderTools(); update(); return; }
+  if (a.startsWith('ob-')) { S.obj = a.slice(3); renderTools(); update(); return; }
+  if (a === 'a-') return setAcc(S.acc - 0.5);
+  if (a === 'a+') return setAcc(S.acc + 0.5);
+  if (a === 'g-') return setGl(S.gl - 1);
+  if (a === 'g+') return setGl(S.gl + 1);
+  if (a === 'f-') return setFq(S.fq / 1.25);
+  if (a === 'f+') return setFq(S.fq * 1.25);
+  if (a === 'h-') return setSleep(S.sleep - 0.5);
+  if (a === 'h+') return setSleep(S.sleep + 0.5);
+  if (a === 'bed') return cycleBed();
+  if (a === 'rep+') return addRep();
+  if (a === 'rep-') return delRep();
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const dot = c => IC(`<circle cx="17" cy="17" r="11" fill="${c}" opacity=".85"/><circle cx="17" cy="17" r="4" fill="#0b1019"/>`);
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (m.kind === 'arc') return `Названо звеньев: ${m.placed} из 5 · ${S.fire && S.fire.run ? 'импульс бежит…' : m.fired ? 'рука отдёрнута' : 'рука у огня'}`;
+  if (m.kind === 'brain') return `Разобрано ситуаций: ${m.solved} из 6 · ошибок ${m.miss}`;
+  if (m.kind === 'sense') return `Книга ${m.near ? '✓' : '·'} · очки близорукому ${m.myo ? '✓' : '·'} · улитка ${m.ear ? '✓' : '·'}`;
+  return `Сон ${ru(m.h, 1)} ч · подъём ${clock(m.wake)} · к контрольной ${Math.round(m.R7 * 100)} %`;
+}
+
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'arc') h = `<h2>Скорость рефлекса</h2><p class="note">Скорость импульса зависит от толщины аксона и миелина. Расчёт — на вкладке «Расчёты».</p>` +
+    slider('inV', 'Скорость импульса, м/с', 1, 120, 1, S.v) + slider('inLen', 'Длина пути импульса, м', 0.4, 2, 0.1, S.len) +
+    `<dl class="reads"><div><dt>По нервам</dt><dd id="r1"></dd></div><div><dt>Синапсы</dt><dd id="r2"></dd></div><div><dt>Итого</dt><dd id="r3"></dd></div></dl>
+    <div class="ctl"><div class="lbl">Метка на схеме</div><div class="chips" id="slChips">${LETTERS.map(([l, i]) => `<button data-i="${i}">${l}</button>`).join('')}</div></div>
+    <div class="ctl"><div class="lbl">Это…</div><div class="chips" id="apChips">${APK.map(k => `<button data-k="${k}">${AP[k].name}</button>`).join('')}</div></div>
+    <div class="row"><button class="ghostbtn" data-a="fire">Коснуться огня</button><button class="ghostbtn" data-a="reset">Сбросить</button></div>`;
+  if (id === 'brain') h = `<h2>Мозг и энергия</h2><p class="note">Мозг тяжёлый не сам по себе — он очень «прожорливый». Посчитаем для вас.</p>` +
+    slider('inMass', 'Масса тела, кг', 30, 100, 1, S.mass) + slider('inKcal', 'Энергия за сутки, ккал', 1500, 3500, 50, S.kcal) +
+    `<dl class="reads"><div><dt>Мозг от массы</dt><dd id="r1"></dd></div><div><dt>Мощность мозга</dt><dd id="r2"></dd></div><div><dt>Разобрано</dt><dd id="r3"></dd></div></dl>
+    <div class="ctl"><div class="lbl">Отдел</div><div class="chips" id="brChips">${BRK.map(k => `<button data-k="${k}">${BR[k].name}</button>`).join('')}</div></div>
+    <div class="row"><button class="ghostbtn" data-a="names" id="namesBtn">Подписи</button></div>`;
+  if (id === 'sense') {
+    h = `<h2>${S.mode === 'eye' ? 'Оптика глаза' : 'Улитка'}</h2><div class="ctl"><div class="lbl">Режим</div><div class="chips" id="modeChips"><button data-k="eye">Глаз</button><button data-k="ear">Ухо</button></div></div>`;
+    if (S.mode === 'eye') h += `<div class="ctl"><div class="lbl">Глаз</div><div class="chips" id="eyeChips">${EYK.map(k => `<button data-k="${k}">${EYES[k].name}</button>`).join('')}</div></div>
+      <div class="ctl"><div class="lbl">Предмет</div><div class="chips" id="objChips"><button data-k="book">Книга 25 см</button><button data-k="sign">Вывеска 6 м</button></div></div>` +
+      slider('inAcc', 'Аккомодация хрусталика, дптр', 0, 10, 0.5, S.acc) + slider('inGl', 'Очки, дптр', -4, 4, 1, S.gl) +
+      `<dl class="reads"><div><dt>Сила глаза</dt><dd id="r1"></dd></div><div><dt>Нужно</dt><dd id="r2"></dd></div><div><dt>Резкость</dt><dd id="r3"></dd></div></dl>`;
+    else h += slider('inFq', 'Частота звука', 1.3, 4.3, 0.01, Math.log10(S.fq)) +
+      `<dl class="reads"><div><dt>Частота</dt><dd id="r1"></dd></div><div><dt>От начала</dt><dd id="r2"></dd></div><div><dt>Длина волны</dt><dd id="r3"></dd></div></dl>`;
+  }
+  if (id === 'sleep') h = `<h2>Режим и повторения</h2>` + slider('inSleep', 'Сон, часов', 5, 10, 0.5, S.sleep) +
+    `<div class="ctl"><div class="lbl">Отбой</div><div class="chips" id="bedChips">${[21, 22, 23, 24].map(v => `<button data-v="${v}">${clock(v)}</button>`).join('')}</div></div>` +
+    [0, 1, 2].map(i => slider('inRep' + i, `Повторение ${i + 1}, день`, 0.25, 6.75, 0.25, S.reps[i] ?? 1)).join('') +
+    `<dl class="reads"><div><dt>Подъём</dt><dd id="r1"></dd></div><div><dt>Циклов сна</dt><dd id="r2"></dd></div><div><dt>К контрольной</dt><dd id="r3"></dd></div></dl>
+    <div class="row"><button class="ghostbtn" data-a="rep+">+ повторение</button><button class="ghostbtn" data-a="rep-">− повторение</button></div>`;
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', e => fn(+e.target.value)); };
+  on('#inV', v => { S.v = v; update(); });
+  on('#inLen', v => { S.len = v; update(); });
+  on('#inMass', v => { S.mass = v; update(); });
+  on('#inKcal', v => { S.kcal = v; update(); });
+  on('#inAcc', v => setAcc(v));
+  on('#inGl', v => setGl(v));
+  on('#inFq', v => setFq(Math.pow(10, v)));
+  on('#inSleep', v => setSleep(v));
+  [0, 1, 2].forEach(i => on('#inRep' + i, v => { while (S.reps.length <= i) S.reps.push(v); S.reps[i] = v; renderTools(); update(); }));
+  el.querySelectorAll('#slChips button').forEach(b => b.onclick = () => pickSlot(+b.dataset.i));
+  el.querySelectorAll('#apChips button').forEach(b => b.onclick = () => assign(b.dataset.k));
+  el.querySelectorAll('#brChips button').forEach(b => b.onclick = () => pickRegion(b.dataset.k));
+  el.querySelectorAll('#modeChips button').forEach(b => b.onclick = () => act('m-' + b.dataset.k));
+  el.querySelectorAll('#eyeChips button').forEach(b => b.onclick = () => act('eye-' + b.dataset.k));
+  el.querySelectorAll('#objChips button').forEach(b => b.onclick = () => act('ob-' + b.dataset.k));
+  el.querySelectorAll('#bedChips button').forEach(b => b.onclick = () => { S.bed = +b.dataset.v; renderTools(); update(); });
+  el.querySelectorAll('.row [data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  const press = (s, fn) => el.querySelectorAll(s).forEach(b => b.setAttribute('aria-pressed', fn(b)));
+  if (m.kind === 'arc') {
+    set('#inVO', S.v + ' м/с'); val('#inV', S.v); set('#inLenO', ru(S.len, 1) + ' м'); val('#inLen', S.len);
+    set('#r1', ru(m.tc, 1) + ' мс'); set('#r2', ru(m.ts, 1) + ' мс'); set('#r3', ru(m.t, 1) + ' мс');
+    press('#slChips button', b => +b.dataset.i === S.cur);
+    press('#apChips button', b => S.cur >= 0 && S.lab[S.cur] === b.dataset.k);
+  } else if (m.kind === 'brain') {
+    set('#inMassO', S.mass + ' кг'); val('#inMass', S.mass); set('#inKcalO', S.kcal + ' ккал'); val('#inKcal', S.kcal);
+    set('#r1', ru(m.pct, 1) + ' %'); set('#r2', '≈ ' + Math.round(m.W) + ' Вт'); set('#r3', `${m.solved} из 6`);
+    press('#brChips button', b => b.dataset.k === S.part);
+    el.querySelectorAll('#namesBtn').forEach(b => b.setAttribute('aria-pressed', S.names));
+  } else if (m.kind === 'sense') {
+    press('#modeChips button', b => b.dataset.k === S.mode);
+    if (S.mode === 'eye') {
+      const o = m.o;
+      press('#eyeChips button', b => b.dataset.k === S.eye); press('#objChips button', b => b.dataset.k === S.obj);
+      set('#inAccO', '+' + ru(S.acc, 1)); val('#inAcc', S.acc); set('#inGlO', S.gl ? sg(S.gl) : 'без очков'); val('#inGl', S.gl);
+      set('#r1', ru(o.P, 1) + ' дптр'); set('#r2', ru(o.need, 1) + ' дптр'); set('#r3', o.sharp ? 'чётко' : 'размыто');
+    } else {
+      set('#inFqO', hz(S.fq)); val('#inFq', Math.log10(S.fq));
+      set('#r1', hz(S.fq)); set('#r2', ru(m.pos * 35, 1) + ' мм'); set('#r3', 340 / S.fq >= 1 ? ru(340 / S.fq, 2) + ' м' : Math.round(34000 / S.fq) + ' см');
+    }
+  } else {
+    set('#inSleepO', ru(S.sleep, 1) + ' ч'); val('#inSleep', S.sleep);
+    press('#bedChips button', b => +b.dataset.v === S.bed);
+    [0, 1, 2].forEach(i => { set(`#inRep${i}O`, S.reps[i] !== undefined ? 'день ' + ru(S.reps[i], 2) : 'нет'); if (S.reps[i] !== undefined) val('#inRep' + i, S.reps[i]); });
+    set('#r1', clock(m.wake)); set('#r2', ru(S.sleep / 1.5, 1)); set('#r3', Math.round(m.R7 * 100) + ' %');
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'arc') return [
+    ...APK.map(k => ({ id: k, icon: dot(AP[k].c), name: AP[k].name, spec: AP[k].job[0].toUpperCase() + AP[k].job.slice(1) + '.' })),
+    { id: 'cord', icon: IC('<ellipse cx="17" cy="17" rx="14" ry="11" fill="#e9e1d4"/><path d="M17 15C13 9 9 9 9 12C9 15 13 15 13 18C11 21 9 23 11 24C13 25 15 21 17 20C19 21 21 25 23 24C25 23 23 21 21 18C21 15 25 15 25 12C25 9 21 9 17 15Z" fill="#a99a90"/>'), name: 'Спинной мозг', spec: 'Серое вещество (тела нейронов) в форме бабочки, вокруг белое вещество — проводящие пути в головной мозг и обратно.' },
+    ...Object.keys(NPARTS).map(k => ({ id: 'n-' + k, icon: dot(k === 'myel' ? '#efe6d2' : k === 'syn' ? '#ffb547' : k === 'body' ? '#8f86c8' : '#c9d3e6'), name: NPARTS[k].name, spec: NPARTS[k].spec }))];
+  if (id === 'brain') return [
+    ...BRK.map(k => ({ id: k, icon: dot(BR[k].c), name: BR[k].name, spec: BR[k].fn[0].toUpperCase() + BR[k].fn.slice(1) + '.' })),
+    { id: 'mid', icon: dot('#8b96ad'), name: 'Средний и промежуточный мозг', spec: 'Спрятаны под полушариями. Средний мозг — ориентировочные рефлексы на свет и звук. Промежуточный (таламус и гипоталамус) — передача сигналов в кору, голод, жажда, температура тела, работа желёз.' }];
+  if (id === 'sense') return S.mode === 'eye' ? [
+    { id: 'cornea', icon: dot('#9fd8ea'), name: 'Роговица', spec: 'Прозрачная передняя часть оболочки глаза. Преломляет свет сильнее всего — около 40 дптр из 60.' },
+    { id: 'iris', icon: dot('#7a5a3a'), name: 'Радужка и зрачок', spec: 'Радужка — окрашенная мышечная диафрагма. Зрачок в ней сужается на свету и расширяется в темноте.' },
+    { id: 'lens', icon: dot('#e8ecf4'), name: 'Хрусталик', spec: 'Двояковыпуклая эластичная линза. Ресничная мышца делает её выпуклее для близких предметов (аккомодация).' },
+    { id: 'retina', icon: dot('#e0555d'), name: 'Сетчатка', spec: 'Около 120 млн палочек (сумерки) и 6 млн колбочек (цвет). Жёлтое пятно — место самого чёткого зрения.' },
+    { id: 'nerve', icon: dot('#e7d6a6'), name: 'Зрительный нерв', spec: 'Несёт импульсы в затылочную долю. Место его выхода — слепое пятно, там нет рецепторов.' },
+    { id: 'glass', icon: dot('#72d4e8'), name: 'Очки', spec: 'Минус — рассеивающие линзы при близорукости, плюс — собирающие при дальнозоркости.' },
+    { id: 'view', icon: dot('#f6f1e8'), name: 'Что видит глаз', spec: 'Чем дальше фокус от сетчатки, тем сильнее размыта картинка.' }] : [
+    { id: 'pinna', icon: dot('#c79a7c'), name: 'Наружное ухо', spec: 'Ушная раковина и слуховой проход собирают и проводят звук. В проходе — сера, она защищает от пыли.' },
+    { id: 'drum', icon: dot('#e8ecf4'), name: 'Барабанная перепонка', spec: 'Тонкая перепонка между наружным и средним ухом. Колеблется со звуком.' },
+    { id: 'oss', icon: dot('#efe6d2'), name: 'Слуховые косточки', spec: 'Молоточек, наковальня, стремечко в среднем ухе. Слуховая (евстахиева) труба выравнивает давление — поэтому в самолёте помогает глотать.' },
+    { id: 'coch', icon: dot('#3a4762'), name: 'Улитка', spec: 'Внутреннее ухо. Длина около 35 мм. Волосковые клетки — рецепторы слуха. Рядом — вестибулярный аппарат (органы равновесия).' },
+    { id: 'anerve', icon: dot('#e7d6a6'), name: 'Слуховой нерв', spec: 'Несёт импульсы в слуховую зону височной доли.' }];
+  return [
+    { id: 'hyp', icon: dot('#72d4e8'), name: 'Гипнограмма', spec: 'Ступени сна за ночь: дремота (N1), неглубокий (N2), глубокий (N3) и быстрый сон (БДГ). Цикл — около 90 минут.' },
+    { id: 'mem', icon: dot('#ffb547'), name: 'Кривая забывания', spec: 'Упрощённая модель: доля выученного падает как e^(−t/S). Чем больше «прочность» S, тем медленнее забывание.' },
+    { id: 'rep', icon: dot('#b48cff'), name: 'Повторения', spec: 'Каждое повторение возвращает к 100 % и увеличивает прочность. Сильнее всего — если успели немного забыть.' },
+    { id: 'thr', icon: dot('#86e0a8'), name: 'Цель 80 %', spec: 'Столько надо помнить к контрольной.' },
+    { id: 'exam', icon: dot('#ff8a73'), name: 'Контрольная', spec: 'Через 7 дней после урока.' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      (L.safe ? `<div class="safe"><b>Безопасность</b>${L.safe}</div>` : '') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    let h = `<h2>${{ arc: 'Дуга и нейрон', brain: 'Отделы мозга', sense: S.mode === 'eye' ? 'Строение глаза' : 'Строение уха', sleep: 'Что на графиках' }[L.id]}</h2><p class="note">Нажмите на строку, чтобы найти это на столе.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    if (L.id === 'arc') h += `<h3>Два вида рефлексов</h3><div class="feat"><div style="border-left-color:#86e0a8"><b>Безусловные</b>Врождённые, одинаковые у всех людей: отдёргивание руки, коленный, мигательный, сосательный.</div><div style="border-left-color:#72d4e8"><b>Условные</b>Вырабатываются в течение жизни при участии коры (опыты И. П. Павлова): слюна при запахе любимой еды, реакция на школьный звонок.</div></div>`;
+    if (L.id === 'sleep') h += `<h3>Виды памяти</h3><div class="feat"><div style="border-left-color:#ffb547"><b>Кратковременная</b>Секунды—минуты, около 7 ± 2 элементов (номер телефона, который сейчас набираете).</div><div style="border-left-color:#86e0a8"><b>Долговременная</b>Годы. Перенос туда идёт при повторении и во сне.</div></div>`;
+    $('#pane-parts').innerHTML = h;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => {
+      S.hl = { id: b.dataset.id, t: performance.now() };
+      if (L.id === 'brain' && BR[b.dataset.id]) S.part = b.dataset.id;
+      dirty = true;
+    });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'arc') {
+    let h = `<h2>Сколько длится рефлекс</h2><div class="formula">t = L ÷ v + n · 0,5 мс</div><div class="steps">` +
+      step('Путь импульса L', ru(S.len, 1) + ' м') + step('Скорость v', S.v + ' м/с') +
+      step('Проведение по нервам', `${ru(S.len, 1)} ÷ ${S.v} = ${ru(m.tc / 1000, 4)} с = ${ru(m.tc, 1)} мс`) +
+      step('Синапсов n', '3 (чувств. → вставочн. → двигат. → мышца)') + step('Задержка в синапсах', `3 × 0,5 = ${ru(m.ts, 1)} мс`) +
+      step('Рефлекс до начала сокращения', `≈ ${ru(m.t, 1)} мс`, 'sum') + `</div>`;
+    h += `<p class="note" style="margin-top:8px">Толстые аксоны в миелине проводят импульс со скоростью до 120 м/с, тонкие без миелина — 0,5–2 м/с. Попробуйте поставить 1 м/с.</p>`;
+    h += `<h3>Сравним с осознанной реакцией</h3><div class="steps">` + step('Рефлекс через спинной мозг', `≈ ${Math.round(m.t)} мс`) + step('Увидел — решил — нажал', '≈ 200–250 мс') + step('Почему медленнее', 'много синапсов в коре', 'sum') + `</div>`;
+    h += `<h3>Ваши ответы</h3><div class="steps">` + LETTERS.map(([l, i]) => step(`Метка ${l}`, S.lab[i] ? AP[S.lab[i]].name : '—')).join('') +
+      step('Проверка', S.fired ? 'дуга замкнута ✓' : S.fire && !S.fire.run && !S.fire.ok ? `обрыв у метки ${SLOTS[S.fire.bad].L}` : 'нажмите «Коснуться огня»', 'sum') + `</div>`;
+    return h;
+  }
+  if (id === 'brain') {
+    const E = S.kcal * 4186, W = m.W;
+    return `<h2>Мозг: 2 % массы, 20 % энергии</h2><div class="steps">` +
+      step('Масса мозга', '≈ 1,35 кг') + step('Масса тела', S.mass + ' кг') + step('Доля мозга', `1,35 ÷ ${S.mass} × 100 % ≈ ${ru(m.pct, 1)} %`) + `</div>` +
+      `<h3>Мощность мозга</h3><div class="formula">P = 0,2 · E ÷ t</div><div class="steps">` +
+      step('Энергия за сутки E', `${S.kcal} ккал = ${S.kcal} × 4186 ≈ ${ru(E / 1e6, 1)} МДж`) + step('Мозгу ≈ 20 %', `≈ ${ru(E * 0.2 / 1e6, 2)} МДж`) +
+      step('Секунд в сутках t', '86 400 с') + step('Мощность', `≈ ${Math.round(W)} Вт`, 'sum') + `</div>` +
+      `<p class="note" style="margin-top:8px">Это как неяркая лампочка — и так круглые сутки, даже во сне. Нейронов в мозге около 86 млрд, у каждого — тысячи синапсов.</p>` +
+      `<h3>Ход решения</h3><div class="steps">` + SIT.map((s, i) => step(`${i + 1}. ${s.a} ${s.b}`, i < S.q ? BR[s.r].name : '?')).join('') + step('Ошибок', String(S.miss), 'sum') + `</div>`;
+  }
+  if (id === 'sense') {
+    let h = '';
+    if (S.mode === 'eye') {
+      const o = m.o;
+      h += `<h2>Где получится изображение</h2><div class="formula">1/d + 1/f = D</div><div class="steps">` +
+        step('Расстояние до предмета d', o.O.d < 1 ? `${o.O.d * 100} см = ${o.O.d} м` : `${o.O.d} м`) + step('1/d', `${ru(1 / o.O.d, 2)} дптр`) +
+        step('Глубина глаза f (до сетчатки)', `${ru(o.dr, 1)} мм → 1/f = ${o.E.inv} дптр`) + step('Нужная сила D', `${ru(1 / o.O.d, 2)} + ${o.E.inv} = ${ru(o.need, 2)} дптр`) + `</div>` +
+        `<h3>Что есть сейчас</h3><div class="steps">` + step('Глаз в покое', '60 дптр') + step('Аккомодация', '+' + ru(S.acc, 1) + ' дптр') + step('Очки', (S.gl ? sg(S.gl) : '0') + ' дптр') +
+        step('Сумма', `${ru(o.P, 1)} дптр`) + step('Разница с нужной', `${o.mis >= 0 ? '+' : '−'}${ru(Math.abs(o.mis), 2)} дптр`) +
+        step('Итог', o.sharp ? 'чётко (разница ≤ 0,3)' : o.mis > 0 ? 'фокус перед сетчаткой' : 'фокус за сетчаткой', 'sum') + `</div>` +
+        `<p class="note" style="margin-top:8px">Модель упрощённая: глаз считаем одной линзой. ${EYES[S.eye].name}: ${EYES[S.eye].about}. Хрусталик может добавить только плюс, поэтому избыток силы глаза убирают минусовыми очками.</p>`;
+    } else {
+      h += `<h2>Звук ${hz(S.fq)}</h2><div class="formula">λ = v ÷ ν</div><div class="steps">` +
+        step('Скорость звука в воздухе v', '340 м/с') + step('Частота ν', `${Math.round(S.fq)} Гц`) + step('Длина волны', `340 ÷ ${Math.round(S.fq)} ≈ ${ru(340 / S.fq, 3)} м`) + `</div>` +
+        `<h3>Место в улитке</h3><div class="steps">` + step('Длина улитки', '≈ 35 мм') + step('Пик колебаний от начала', `≈ ${ru(m.pos * 35, 1)} мм`) +
+        step('Отмеченное место', `≈ ${ru(TPOS * 35, 1)} мм`) + step('Попадание', m.earNow ? 'да ✓' : 'нет', 'sum') + `</div>` +
+        `<p class="note" style="margin-top:8px">Человек слышит примерно от 20 Гц до 20 кГц. С возрастом и от громкой музыки первыми гибнут клетки в начале улитки — пропадают высокие звуки.</p>`;
+    }
+    h += `<h3>Опыты урока</h3><div class="steps">` + step('1. Книга в здоровом глазу', m.near ? 'резко ✓' : '—') + step('2. Очки близорукому', m.myo ? 'вывеска видна ✓' : '—') + step('3. Место в улитке', m.ear ? 'найдено ✓' : '—') + `</div>`;
+    return h;
+  }
+  const M = m.M;
+  let h = `<h2>Ночь</h2><div class="steps">` + step('Отбой', clock(S.bed)) + step('Сон', ru(S.sleep, 1) + ' ч') + step('Подъём', `${clock(m.wake)}${m.wakeOk ? '' : ' — опоздание!'}`) +
+    step('Циклов по 90 мин', `${S.sleep * 60} ÷ 90 ≈ ${ru(S.sleep / 1.5, 1)}`) + step('Проснулись в фазе', STN[m.wst]) + step('Коэффициент сна k', ru(M.q, 2), 'sum') + `</div>`;
+  h += `<h3>Память</h3><div class="formula">R = e^(−t / S)</div><div class="steps">` + step('Начальная прочность S', `1 сут × k = ${ru(M.q, 2)}`);
+  M.steps.forEach((s, i) => { h += step(`Повтор ${i + 1}, день ${ru(s.d, 2)}`, `помнили ${Math.round(s.R * 100)} % → S = ${ru(s.S0, 2)} × (1,5 + 2 × ${ru(1 - s.R, 2)}) × k = ${ru(s.S, 2)}`); });
+  const last = M.seg[M.seg.length - 1];
+  h += step('К контрольной (день 7)', `e^(−${ru(7 - last.t0, 2)} / ${ru(last.S, 2)}) = ${Math.round(M.R7 * 100)} %`, 'sum') + `</div>`;
+  h += `<p class="note" style="margin-top:8px">Модель упрощённая, но главное в ней верно: прочность растёт сильнее, если повторить, когда уже немного забылось, а недосып ослабляет запоминание.</p>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const el = $('#meter');
+  if (m.kind === 'arc') {
+    el.innerHTML = `<div class="k">Рефлекторная дуга</div><div class="v ${S.done.arc ? 'ok' : ''}">${m.placed} / 5</div>
+      <div class="gauge"><b style="width:${(m.placed / 5 * 100).toFixed(1)}%"></b></div>
+      <div class="lr"><span>импульс</span><span>${S.fire && S.fire.run ? 'бежит' : m.fired ? 'дошёл' : S.fire ? 'обрыв' : '—'}</span></div><div class="lr"><span>время</span><span>${ru(m.t, 1)} мс</span></div>`;
+  } else if (m.kind === 'brain') {
+    el.innerHTML = `<div class="k">Ситуации</div><div class="v ${S.done.brain ? 'ok' : ''}">${m.solved} / 6</div>
+      <div class="gauge"><b style="width:${(m.solved / 6 * 100).toFixed(1)}%"></b></div>
+      <div class="lr"><span>ошибок</span><span>${m.miss}</span></div><div class="lr"><span>мозг</span><span>≈ ${Math.round(m.W)} Вт</span></div>`;
+  } else if (m.kind === 'sense') {
+    if (S.mode === 'eye') { const o = m.o; el.innerHTML = `<div class="k">${EYES[S.eye].name}</div><div class="v ${o.sharp ? 'ok' : 'bad'}">${o.sharp ? 'чётко' : 'размыто'}</div><div class="lr"><span>сила</span><span>${ru(o.P, 1)} дптр</span></div><div class="lr"><span>нужно</span><span>${ru(o.need, 1)}</span></div><div class="lr"><span>опыты</span><span>${m.near ? '✓' : '·'} ${m.myo ? '✓' : '·'} ${m.ear ? '✓' : '·'}</span></div>`; }
+    else el.innerHTML = `<div class="k">Звук</div><div class="v ${m.earNow ? 'ok' : ''}">${hz(S.fq)}</div><div class="lr"><span>пик</span><span>${ru(m.pos * 35, 1)} мм</span></div><div class="lr"><span>опыты</span><span>${m.near ? '✓' : '·'} ${m.myo ? '✓' : '·'} ${m.ear ? '✓' : '·'}</span></div>`;
+  } else {
+    el.innerHTML = `<div class="k">К контрольной</div><div class="v ${m.R7 >= 0.8 ? 'ok' : 'bad'}">${Math.round(m.R7 * 100)} %</div>
+      <div class="gauge"><b style="width:${(m.R7 * 100).toFixed(1)}%"></b></div>
+      <div class="lr"><span>сон</span><span>${ru(m.h, 1)} ч</span></div><div class="lr"><span>подъём</span><span>${clock(m.wake)}</span></div><div class="lr"><span>повторов</span><span>${S.reps.length}</span></div>`;
+  }
+}
+
+function update() {
+  let m = model(); const L = LESSONS[S.lesson];
+  if (m.kind === 'sense') {
+    const was = { ...S.got };
+    if (m.nearNow) S.got.near = true; if (m.myoNow) S.got.myo = true; if (m.earNow) S.got.ear = true;
+    if (!S.done.sense) {
+      if (S.got.near && !was.near) toast('Опыт 1 готов: хрусталик стал выпуклее, книга в фокусе.');
+      else if (S.got.myo && !was.myo) toast('Опыт 2 готов: минусовые очки сдвинули фокус на сетчатку.');
+      else if (S.got.ear && !was.ear) toast('Опыт 3 готов: это место улитки отвечает примерно на 1000 Гц.');
+    }
+  }
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Вы разобрались, как работают мозг и чувства!');
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  arc: '<path d="M6 22L20 12L34 8L46 14L44 22L30 26L14 26" stroke="#c9d3e6" stroke-width="1.6" fill="none"/><circle cx="6" cy="22" r="3" fill="#ffb547"/><circle cx="34" cy="8" r="3" fill="#72d4e8"/><ellipse cx="50" cy="17" rx="10" ry="9" fill="#e9e1d4"/><circle cx="14" cy="26" r="3" fill="#ff8a73"/>',
+  brain: '<path d="M14 18C12 10 20 5 32 5C46 5 54 10 54 18C54 24 48 26 40 25C34 27 24 27 18 24C15 22 14 20 14 18Z" fill="#d9a3a8"/><path d="M30 5L32 18M18 21L32 18L44 16" stroke="#7d5054" stroke-width="1.2" fill="none"/><ellipse cx="46" cy="25" rx="7" ry="3.5" fill="#ff8a73"/>',
+  sense: '<ellipse cx="22" cy="15" rx="12" ry="10" fill="#f1ece4"/><ellipse cx="13" cy="15" rx="2" ry="6" fill="#e8ecf4" stroke="#56627d"/><path d="M33 9a12 10 0 0 1 0 12" stroke="#e0555d" stroke-width="2" fill="none"/><path d="M42 15h20" stroke="#3a4762" stroke-width="7"/><path d="M42 15q4 -4 8 0t8 0" stroke="#ffb547" stroke-width="1.4" fill="none"/>',
+  sleep: '<path d="M4 6H10V12H14V20H24V12H30V6H34V14H40V20H48V8H56V6" stroke="#72d4e8" stroke-width="1.4" fill="none"/><path d="M4 28Q16 18 22 22T40 26Q48 26 62 24" stroke="#ffb547" stroke-width="1.4" fill="none"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i];
+  S.lesson = i; S.hl = null; drag = null;
+  resetLesson();
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '', guide = '';
+  if (id === 'arc') {
+    now = `Схема: рука над пламенем свечи, нервы идут к спинному мозгу в разрезе (серое вещество-бабочка внутри, белое снаружи). На дуге 5 меток с буквами: ` +
+      SLOTS.map((s, i) => `метка ${s.L} — ${s.where}; ответ ученика: ${S.lab[i] ? AP[S.lab[i]].name.toLowerCase() : 'нет'}`).join('; ') +
+      `. Названо ${m.placed} из 5. Импульс: ${S.fire && S.fire.run ? 'бежит по дуге' : m.fired ? 'прошёл всю дугу, рука отдёрнута' : S.fire ? 'оборвался у метки ' + SLOTS[S.fire.bad].L : 'ещё не запускали'}. Расчёт: путь ${ru(S.len, 1)} м, скорость ${S.v} м/с, время рефлекса ≈ ${ru(m.t, 1)} мс. Внизу нарисован нейрон: дендриты, тело, аксон в миелине, синапс.`;
+    guide = 'Не называй, какое звено стоит у каждой буквы. Спрашивай, где лежит тело чувствительного нейрона, что находится в сером веществе, куда идёт отросток из передних рогов.';
+  }
+  if (id === 'brain') {
+    now = `Схема головного мозга сбоку (лоб слева): лобная, теменная, височная, затылочная доли, мозжечок, ствол с продолговатым мозгом. Подписи ${S.names ? 'включены' : 'выключены'}. ` +
+      (S.q < SIT.length ? `Сейчас ситуация ${S.q + 1} из 6: «${SIT[S.q].a} ${SIT[S.q].b}».` : 'Все 6 ситуаций разобраны.') + ` Разобрано ${S.q}, ошибок ${S.miss}. Расчёт: масса тела ${S.mass} кг, мозг ≈ ${ru(m.pct, 1)} % массы, мощность ≈ ${Math.round(m.W)} Вт при ${S.kcal} ккал в сутки.`;
+    guide = 'Не называй отдел для текущей ситуации. Спрашивай, какое чувство или действие тут главное и какая зона коры (или не кора) за него отвечает.';
+  }
+  if (id === 'sense') {
+    const o = m.o;
+    now = S.mode === 'eye' ? `Режим «Глаз»: ${EYES[S.eye].name.toLowerCase()} (${EYES[S.eye].about}). Предмет: ${OBJS[S.obj].name.toLowerCase()} на ${S.obj === 'book' ? '25 см' : '6 м'}. Аккомодация хрусталика +${ru(S.acc, 1)} дптр, очки ${S.gl ? sg(S.gl) + ' дптр' : 'нет'}. Сила глаза ${ru(o.P, 1)} дптр, нужно ${ru(o.need, 2)} дптр, изображение ${o.sharp ? 'на сетчатке, чётко' : o.mis > 0 ? 'перед сетчаткой, размыто' : 'за сетчаткой, размыто'}.`
+      : `Режим «Ухо»: наружное ухо, перепонка, косточки, развёрнутая улитка. Звук ${hz(S.fq)}, пик колебаний в ${ru(m.pos * 35, 1)} мм от начала улитки, отмеченное место — в ${ru(TPOS * 35, 1)} мм (${m.earNow ? 'попали' : 'не попали'}).`;
+    now += ` Опыты: книга в здоровом глазу — ${m.near ? 'готово' : 'нет'}, очки близорукому для вывески — ${m.myo ? 'готово' : 'нет'}, место в улитке — ${m.ear ? 'готово' : 'нет'}.`;
+    guide = 'Не называй готовые числа (сколько дптр или герц). Спрашивай: каким должен стать хрусталик для близкого предмета, где фокус у близорукого, какие звуки ловит начало и верхушка улитки.';
+  }
+  if (id === 'sleep') {
+    const M = m.M;
+    now = `Сверху гипнограмма ночи: отбой ${clock(S.bed)}, сон ${ru(S.sleep, 1)} ч, подъём ${clock(m.wake)} (${m.wakeOk ? 'успевает к 7:00' : 'позже 7:00'}), проснулся в фазе «${STN[m.wst]}», циклов ≈ ${ru(S.sleep / 1.5, 1)}. Снизу кривая забывания за 7 дней до контрольной. Повторения: ${M.reps.length ? M.reps.map(r => 'день ' + ru(r, 2)).join(', ') : 'нет'}. К контрольной помнит ${Math.round(M.R7 * 100)} % (нужно ≥ 80 %), коэффициент сна ${ru(M.q, 2)}.`;
+    guide = 'Не называй готовые дни повторений. Спрашивай, когда забывание самое быстрое и почему повторения в один вечер слабее, чем через растущие промежутки. Напомни про норму сна подростка.';
+  }
+  return [
+    `Раздел: биология, 9 класс, тема «Мозг и чувства» (Человек). Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Для тьютора: ${guide}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = { arc: 'Почему рука отдёргивается раньше, чем становится больно?', brain: 'Почему при травме левого полушария слабеет правая рука?', sense: 'Почему близоруким нужны минусовые очки?', sleep: 'Зачем повторять через растущие промежутки?' }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
