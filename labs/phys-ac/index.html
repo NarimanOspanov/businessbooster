@@ -1,0 +1,955 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по физике, 11 класс: колебательный контур, переменный ток в цепи с R, C и L, радиосвязь.">
+<title>Переменный ток</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.meter .lr .ok{color:var(--ok)}
+.meter .lr .bad{color:var(--warn)}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button.rec{color:var(--force)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 230px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M5 20q4-13 7.5 0t7.5 0 7.5 0 7.5 0" fill="none" stroke="var(--force)" stroke-width="2.4" stroke-linecap="round"/><path d="M5 20q4 9 7.5 0t7.5 0 7.5 0 7.5 0" fill="none" stroke="var(--arm)" stroke-width="1.8" stroke-linecap="round" opacity=".85"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Физика · Переменный ток</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/">Карта</a><a href="/physics/">Физика</a><a href="/labs/phys-ac/" aria-current="page">Переменный ток</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Ток ~</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Опытная площадка">
+    <svg class="scene" id="scene" role="img" aria-label="Площадка для опытов с переменным током."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const nf = x => fmt(x, Math.abs(x - Math.round(x)) < 1e-9 ? 0 : (Math.abs(x * 10 - Math.round(x * 10)) < 1e-9 ? 1 : 2));
+const sig3 = x => { const v = Number(x.toPrecision(3)); return String(v).replace('.', ','); };
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const C1 = '#72d4e8', CP = '#ffb547', OK = '#86e0a8', RED = '#ff8a73', CU = '#d9954f', MUT = '#8b96ad', WIRE = '#c46a5a';
+const TAU = 2 * Math.PI;
+
+const LESSONS = [
+  { id: 'lc', title: 'Колебательный контур',
+    text: ['Колебательный контур — конденсатор и катушка, замкнутые друг на друга. Зарядим конденсатор от батареи и переключим его на катушку. Конденсатор начнёт разряжаться, но ток не может вырасти мгновенно: мешает самоиндукция катушки.',
+           'Когда конденсатор разрядился, ток наибольший и вся энергия перешла в магнитное поле катушки. Ток не обрывается: катушка поддерживает его и перезаряжает конденсатор в обратную сторону. Потом всё повторяется. Энергия электрического поля Cu²/2 переходит в энергию магнитного поля Li²/2 и обратно — это свободные электромагнитные колебания.',
+           'Период задаёт формула Томсона: T = 2π√(LC). Чем больше индуктивность и ёмкость, тем медленнее колебания. У настоящих проводов есть сопротивление R, энергия уходит в тепло, и колебания затухают.'],
+    why: 'Колебательный контур есть в каждом радиоприёмнике, телефоне и роутере — он выделяет нужную частоту. На нём работают генераторы передатчиков, металлоискатели, бесконтактные транспортные и банковские карты: в карте спрятан контур, который настроен на частоту считывателя. Инженеры-электроники и радиотехники рассчитывают такие контуры, когда разрабатывают и чинят связь, медицинские приборы и автомобильную электронику.',
+    safe: 'Большие конденсаторы долго держат заряд даже в выключенном приборе — например, в микроволновке или блоке питания телевизора. Не разбирайте такие приборы: разряд может быть смертельным.',
+    task: 'Зарядите конденсатор и переключите его на катушку. Поставьте паузу, когда почти вся энергия в катушке (W_L ≥ 90 %). Затем подберите L и C, чтобы частота была около 1 кГц (950–1050 Гц).',
+    hint: 'Ключ переключают кнопками или нажатием на него на схеме. Момент удобно ловить кнопкой «Шаг ⅛T»: энергия уходит в катушку за четверть периода. ν = 1 / (2π√(LC)) — подбирайте произведение L·C.',
+    stage: 'Нажмите на ключ, чтобы переключить его.',
+    U0: 10, slow: 1000, L0: 40, C0: 10, Ls: [10, 25, 40, 100], Cs: [1, 2.5, 5, 10, 20], Rs: [0, 5, 20],
+    check: m => m.launched && m.caught && m.f >= 950 && m.f <= 1050 },
+  { id: 'ac', title: 'Переменный ток: R, C и L',
+    text: ['Переменный ток меняется по синусоиде: u = Uₘ sin ωt, где ω = 2πν. В сети Казахстана частота 50 Гц, а «220 В» — действующее значение. Амплитуда в √2 раз больше: Uₘ ≈ 311 В. Действующее значение — такое постоянное напряжение, которое выделило бы в резисторе столько же тепла.',
+           'В резисторе ток и напряжение колеблются в одной фазе, сопротивление R от частоты не зависит. Через конденсатор переменный ток идёт, потому что он всё время перезаряжается. Ток опережает напряжение на четверть периода (90°), а ёмкостное сопротивление X_C = 1 / (ωC) падает с ростом частоты.',
+           'В катушке самоиндукция мешает току меняться, и ток отстаёт от напряжения на 90°. Индуктивное сопротивление X_L = ωL растёт с частотой. Действующий ток I = U / X. В идеальных конденсаторе и катушке тепло не выделяется: энергия только перекачивается туда и обратно.'],
+    why: 'Электрики считают сопротивление цепей на частоте 50 Гц, когда подбирают кабели и автоматы. На заводах ставят батареи конденсаторов, чтобы компенсировать реактивную мощность двигателей — так предприятие меньше платит за электроэнергию. Дроссели и конденсаторы фильтруют помехи в зарядках, усилителях и инверторах солнечных станций. Инженер-энергетик, электромонтажник, разработчик электроники — профессии с хорошим заработком.',
+    safe: 'Напряжение сети 220 В опасно для жизни. Не открывайте розетки и щитки: работы с сетью делает только электрик с допуском.',
+    task: 'Подключите по очереди резистор, конденсатор и катушку и сравните сдвиг фаз. Затем найдите частоту, при которой через конденсатор идёт действующий ток 4,4 А, и частоту, при которой такой же ток идёт через катушку.',
+    hint: 'При 50 Гц у всех трёх элементов сопротивление 100 Ом и ток 2,2 А. Чтобы ток вырос вдвое, сопротивление должно стать вдвое меньше. X_C = 1/(ωC) падает с частотой, X_L = ωL растёт.',
+    stage: 'Выбирайте элемент и меняйте частоту.',
+    U: 220, R: 100, Cf: 3.1831e-5, Lh: 0.31831, nu0: 50,
+    check: m => m.seenR && m.c44 && m.l44 },
+  { id: 'radio', title: 'Радиосвязь',
+    text: ['Звук — колебания с частотой от 20 Гц до 20 кГц. Такие медленные колебания антенна почти не излучает. Поэтому передатчик создаёт высокочастотные колебания — несущую, например 1000 кГц, — и меняет их амплитуду в такт со звуком. Это амплитудная модуляция (АМ).',
+           'Волны всех станций доходят до антенны приёмника и наводят в ней слабые токи. Колебательный контур выделяет одну станцию: когда его собственная частота 1/(2π√(LC)) совпадает с частотой станции, наступает резонанс. Настроить приёмник — значит подобрать ёмкость конденсатора.',
+           'Динамик не успевает за током высокой частоты: в среднем ток равен нулю, и мембрана стоит. Детектор (диод) пропускает ток только в одну сторону, а фильтр сглаживает импульсы. Остаётся огибающая — исходный звук. Первые опыты радиосвязи провели А. С. Попов и Г. Маркони в 1895 году, а АМ-радиовещание появилось в 1920-х.'],
+    why: 'На радиоволнах работают мобильная связь, Wi-Fi, GPS, спутниковое ТВ и навигация самолётов. Пилоты и авиадиспетчеры до сих пор говорят по радио с амплитудной модуляцией на частотах 118–137 МГц. Инженеры связи настраивают базовые станции операторов, радиомонтажники ставят антенны на вышках и на вахтовых посёлках, где связь идёт через спутник. Специалисты по телекоммуникациям нужны в каждом регионе Казахстана.',
+    task: 'Настройте приёмник на станцию 2 (1000 кГц), включите детектор и добейтесь звука в динамике. Потом выключите модуляцию на передатчике и посмотрите, что изменится.',
+    hint: 'Тяните стрелку шкалы или меняйте ёмкость C. Чем больше C, тем ниже частота контура. Нужен резонанс не меньше 90 %. Без детектора динамик молчит.',
+    stage: 'Тяните стрелку шкалы приёмника.',
+    Lr: 250e-6, C0: 200, Q: 25, st: [600, 1000, 1400], tones: [1.2, 2, 3.2], target: 1, mdepth: 0.6,
+    check: m => m.gotSound && m.noMod },
+];
+
+const LS_KEY = 'luch-phys-ac';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+
+function resetState() {
+  const Ls = L();
+  Object.assign(S, {
+    Lm: Ls.L0 || 40, Cu: 10, R: 0, sw: 'coil', q: 0, i: 0, tt: 0, hist: [], run: !reduce, launched: false, caught: false,
+    el: 'R', nu: Ls.nu0 || 50, seenR: false, seenC: false, seenL: false, c44: false, l44: false, ph: 0,
+    C: 200, mod: true, det: false, gotSound: false, noMod: false, f1k: false, hl: null,
+  });
+  if (Ls.id === 'lc') S.Cu = Ls.C0;
+  if (Ls.id === 'radio') S.C = Ls.C0;
+  if (Ls.id === 'ac') S.seenR = true;
+}
+resetState();
+
+const respAt = (nu, nu0, Q) => 1 / Math.sqrt(1 + Q * Q * (nu / nu0 - nu0 / nu) ** 2);
+const radioNu = C => 1 / (TAU * Math.sqrt(LESSONS[2].Lr * C * 1e-12)) / 1000;   // kHz
+const radioC = nu => 1 / (TAU * TAU * (nu * 1000) ** 2 * LESSONS[2].Lr) * 1e12;   // pF
+
+function model() {
+  const id = LID(), Ls = L();
+  if (id === 'lc') {
+    const Lh = S.Lm * 1e-3, Cf = S.Cu * 1e-6, w = 1 / Math.sqrt(Lh * Cf), f = w / TAU, q0 = Cf * Ls.U0, Im = Ls.U0 * Math.sqrt(Cf / Lh);
+    const WC = S.q * S.q / (2 * Cf), WL = Lh * S.i * S.i / 2, W0 = Cf * Ls.U0 * Ls.U0 / 2, Wt = WC + WL;
+    return { kind: id, Lh, Cf, w, f, T: 1 / f, q0, Im, WC, WL, W0, Wt, share: Wt > 0 ? WL / Wt : 0, uC: S.q / Cf, q: S.q, i: S.i, launched: S.launched, caught: S.caught };
+  }
+  if (id === 'ac') {
+    const w = TAU * S.nu, X = S.el === 'R' ? Ls.R : S.el === 'C' ? 1 / (w * Ls.Cf) : w * Ls.Lh, I = Ls.U / X, phi = S.el === 'C' ? 90 : S.el === 'L' ? -90 : 0;
+    return { kind: id, w, X, I, Im: I * Math.SQRT2, Um: Ls.U * Math.SQRT2, phi, T: 1 / S.nu, seenR: S.seenR, c44: S.c44, l44: S.l44 };
+  }
+  const nu0 = radioNu(S.C), resp = Ls.st.map(s => respAt(s, nu0, Ls.Q)), mk = Ls.st.map((s, k) => (k !== Ls.target || S.mod) ? Ls.mdepth : 0);
+  const audio = resp.reduce((a, r, k) => a + r * mk[k], 0), tuned = resp[Ls.target] >= 0.9;
+  return { kind: id, nu0, lam: 3e8 / (nu0 * 1000), resp, mk, audio: S.det ? audio : 0, tuned, gotSound: S.gotSound, noMod: S.noMod };
+}
+
+// ---------- drawing helpers ----------
+const T = (x, y, s, fill, txt, anchor = 'middle', extra = '') => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${s}" fill="${fill}" text-anchor="${anchor}" ${extra}>${txt}</text>`;
+const halo = `paint-order="stroke" stroke="${INK}" stroke-width="3"`;
+function arrow(x1, y1, x2, y2, col, w = 3) {
+  const a = Math.atan2(y2 - y1, x2 - x1), L2 = Math.hypot(x2 - x1, y2 - y1); if (L2 < 1) return '';
+  const hl = Math.min(10, L2 * 0.8), hx = x2 - hl * Math.cos(a), hy = y2 - hl * Math.sin(a);
+  const p1 = `${(hx + 5 * Math.sin(a)).toFixed(1)} ${(hy - 5 * Math.cos(a)).toFixed(1)}`, p2 = `${(hx - 5 * Math.sin(a)).toFixed(1)} ${(hy + 5 * Math.cos(a)).toFixed(1)}`;
+  return `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${hx.toFixed(1)} ${hy.toFixed(1)}" stroke="${col}" stroke-width="${w}" stroke-linecap="round"/><path d="M${x2.toFixed(1)} ${y2.toFixed(1)}L${p1}L${p2}Z" fill="${col}"/>`;
+}
+const bg = () => `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern>
+  <radialGradient id="glow"><stop offset="0" stop-color="#ffe7a8" stop-opacity=".9"/><stop offset="1" stop-color="#ffb547" stop-opacity="0"/></radialGradient></defs>
+  <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+const box = (x, y, w, h, label) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" fill="#121a28" stroke="#26324a"/>` + (label ? T(x + 6, y + 11, 8.5, '#a9b4c9', label, 'start') : '');
+function wpath(x0, x1, fn, n = 160) {
+  let p = '';
+  for (let k = 0; k <= n; k++) { const u = k / n; p += (k ? 'L' : 'M') + (x0 + (x1 - x0) * u).toFixed(1) + ' ' + fn(u).toFixed(1); }
+  return p;
+}
+
+// ---------- lesson 1: LC circuit ----------
+const LC = { yt: 112, yb: 250, xb: 70, xc: 200, xl: 330, cp1: 165, cp2: 179, gx0: 50, gx1: 470, gy: 338, ga: 46, win: 0.008 };
+function lcScene() {
+  const m = model(), g = LC;
+  let h = '';
+  const toBat = S.sw === 'bat';
+  // wires
+  h += `<path d="M150 ${g.yt}H${g.xb}V168M${g.xb} 180V${g.yb}H${g.xl}V215M${g.xc} ${g.yt}V${g.cp1}M${g.xc} ${g.cp2}V${g.yb}M250 ${g.yt}H${g.xl}V140" fill="none" stroke="${WIRE}" stroke-width="2.4"/>`;
+  // battery
+  h += `<path d="M${g.xb - 18} 168H${g.xb + 18}" stroke="#e8ecf4" stroke-width="2.4"/><path d="M${g.xb - 9} 180H${g.xb + 9}" stroke="#e8ecf4" stroke-width="5"/>`;
+  h += T(g.xb - 24, 166, 11, '#e8ecf4', '+', 'middle') + T(g.xb + 34, 178, 10, '#a9b4c9', `${L().U0} В`, 'start', halo);
+  // capacitor with charges and field
+  const qa = clamp(m.q / m.q0, -1.05, 1.05), nq = Math.round(Math.abs(qa) * 5);
+  h += `<path d="M${g.xc - 28} ${g.cp1}H${g.xc + 28}M${g.xc - 28} ${g.cp2}H${g.xc + 28}" stroke="#e8ecf4" stroke-width="3.4"/>`;
+  for (let k = 0; k < nq; k++) {
+    const x = g.xc - 20 + 40 * (nq === 1 ? 0.5 : k / (nq - 1));
+    h += T(x, g.cp1 - 5, 11, qa > 0 ? RED : C1, qa > 0 ? '+' : '−') + T(x, g.cp2 + 13, 11, qa > 0 ? C1 : RED, qa > 0 ? '−' : '+');
+    h += `<path d="M${x.toFixed(1)} ${g.cp1 + 2}V${g.cp2 - 2}" stroke="${C1}" stroke-width="1.4" opacity="${(0.3 + 0.6 * Math.abs(qa)).toFixed(2)}"/>`;
+  }
+  h += T(g.xc - 36, (g.cp1 + g.cp2) / 2 + 4, 11, '#e8ecf4', 'C', 'end', halo);
+  // coil with field
+  const ia = clamp(Math.abs(m.i) / m.Im, 0, 1.05);
+  if (ia > 0.04) for (const [rx, ry] of [[34, 58], [52, 74]]) h += `<ellipse cx="${g.xl}" cy="177" rx="${rx}" ry="${ry}" fill="none" stroke="${CP}" stroke-width="1.2" stroke-dasharray="4 5" opacity="${(0.55 * ia).toFixed(2)}"/>`;
+  for (let k = 0; k < 7; k++) {
+    const y = 146 + k * 10.5;
+    h += `<ellipse cx="${g.xl}" cy="${y.toFixed(1)}" rx="15" ry="5.5" fill="none" stroke="${CU}" stroke-width="3"/>`;
+    if (ia > 0.04) h += `<ellipse cx="${g.xl}" cy="${y.toFixed(1)}" rx="15" ry="5.5" fill="none" stroke="${CP}" stroke-width="3" opacity="${(0.85 * ia).toFixed(2)}"/>`;
+  }
+  h += T(g.xl + 24, 182, 11, '#e8ecf4', 'L', 'start', halo);
+  // switch (tap)
+  const tx = toBat ? 150 : 250;
+  h += `<g data-tap="sw"><rect x="132" y="${g.yt - 26}" width="136" height="50" fill="transparent"/>`;
+  h += `<circle cx="150" cy="${g.yt}" r="4.5" fill="${toBat ? CP : '#2a3348'}" stroke="#e8ecf4" stroke-width="1.6"/><circle cx="250" cy="${g.yt}" r="4.5" fill="${!toBat ? CP : '#2a3348'}" stroke="#e8ecf4" stroke-width="1.6"/>`;
+  h += `<path d="M${g.xc} ${g.yt}L${tx} ${g.yt - 7}" stroke="#e8ecf4" stroke-width="3.4" stroke-linecap="round"/><circle cx="${g.xc}" cy="${g.yt}" r="5" fill="#e8ecf4"/>`;
+  h += T(150, g.yt + 18, 9, toBat ? CP : MUT, 'заряд', 'middle', halo) + T(250, g.yt + 18, 9, !toBat ? CP : MUT, 'катушка', 'middle', halo) + `</g>`;
+  // current arrows (i > 0: charge flows onto the top plate)
+  if (!toBat && ia > 0.06) {
+    const len = 10 + 26 * ia, d = m.i > 0 ? 1 : -1;
+    h += arrow(265 - d * len / 2, g.yb, 265 + d * len / 2, g.yb, CP, 2.6) + arrow(290 + d * len / 2, g.yt, 290 - d * len / 2, g.yt, CP, 2.6);
+    h += T(265, g.yb - 9, 9.5, CP, 'i', 'middle', halo);
+  }
+  if (S.R > 0) h += `<rect x="112" y="${g.yb - 7}" width="40" height="14" rx="2" fill="#2a3348" stroke="${WIRE}" stroke-width="2"/>` + T(132, g.yb + 22, 9.5, '#a9b4c9', `R = ${S.R} Ом`, 'middle', halo);
+  // energy bars
+  const bx = [388, 446], base = 236, hm = 104, W0 = m.W0;
+  const vals = [[m.WC, C1, 'W_C'], [m.WL, CP, 'W_L']];
+  vals.forEach(([w, col, lb], k) => {
+    const hh = clamp(w / W0, 0, 1.05) * hm;
+    h += `<rect x="${bx[k]}" y="${base - hm}" width="38" height="${hm}" rx="4" fill="#121a28" stroke="#26324a"/>`;
+    h += `<rect x="${bx[k]}" y="${(base - hh).toFixed(1)}" width="38" height="${hh.toFixed(1)}" rx="4" fill="${col}" opacity=".85"/>`;
+    h += T(bx[k] + 19, base + 14, 10.5, col, lb, 'middle', halo);
+    h += T(bx[k] + 19, base + 27, 9.5, '#a9b4c9', m.Wt > 1e-9 ? Math.round((k ? m.share : 1 - m.share) * 100) + ' %' : '0 %', 'middle', halo);
+  });
+  h += T(445, base - hm - 8, 9.5, MUT, 'энергия', 'middle', halo);
+  // graph
+  h += box(36, 270, 448, 130);
+  h += `<path d="M${g.gx0} ${g.gy}H${g.gx1}" stroke="${MUT}" stroke-width="1"/>`;
+  let pq = '', pi = '';
+  const hs = S.hist;
+  for (let k = 0; k < hs.length; k++) {
+    const x = g.gx1 - (S.tt - hs[k][0]) / g.win * (g.gx1 - g.gx0); if (x < g.gx0) continue;
+    pq += (pq ? 'L' : 'M') + x.toFixed(1) + ' ' + (g.gy - g.ga * clamp(hs[k][1], -1.2, 1.2)).toFixed(1);
+    pi += (pi ? 'L' : 'M') + x.toFixed(1) + ' ' + (g.gy - g.ga * clamp(hs[k][2], -1.2, 1.2)).toFixed(1);
+  }
+  if (pq) h += `<path d="${pq}" fill="none" stroke="${C1}" stroke-width="2"/><path d="${pi}" fill="none" stroke="${CP}" stroke-width="2"/>`;
+  h += T(46, 283, 9.5, C1, 'заряд q', 'start') + T(100, 283, 9.5, CP, 'ток i', 'start') + T(474, 283, 9, MUT, `время замедлено в ${L().slow} раз`, 'end');
+  for (let k = 0; k <= 8; k += 2) h += T(g.gx1 - (g.gx1 - g.gx0) * k / 8, 396, 8.5, MUT, k ? '−' + k + (k === 8 ? ' мс' : '') : 'сейчас', k === 8 ? 'start' : k === 0 ? 'end' : 'middle');
+  return h;
+}
+
+// ---------- lesson 2: AC circuit ----------
+function acScene() {
+  const m = model(), Ls = L();
+  let h = '';
+  const yt = 110, yb = 250, xs = 70, xa = 330, cy = 180;
+  const el = S.el, gapL = el === 'C' ? 194 : el === 'R' ? 170 : 163, gapR = el === 'C' ? 206 : el === 'R' ? 230 : 237;
+  h += `<path d="M${xs} 156V${yt}H${gapL}M${gapR} ${yt}H${xa}V158M${xa} 202V${yb}H${xs}V204" fill="none" stroke="${WIRE}" stroke-width="2.4"/>`;
+  // source
+  h += `<circle cx="${xs}" cy="${cy}" r="24" fill="#1a2438" stroke="${CP}" stroke-width="2.4"/><path d="M56 ${cy}q7 -12 14 0t14 0" fill="none" stroke="${CP}" stroke-width="2.4"/>`;
+  h += T(xs + 32, cy - 6, 10.5, '#e8ecf4', `U = ${Ls.U} В`, 'start', halo) + T(xs + 32, cy + 9, 10, MUT, `ν = ${S.nu} Гц`, 'start', halo);
+  // element
+  if (el === 'R') h += `<rect x="170" y="${yt - 9}" width="60" height="18" rx="2" fill="#2a3348" stroke="#e8ecf4" stroke-width="2"/>` + T(200, yt + 28, 10.5, '#e8ecf4', 'R = 100 Ом', 'middle', halo);
+  if (el === 'C') h += `<path d="M194 ${yt - 18}V${yt + 18}M206 ${yt - 18}V${yt + 18}" stroke="#e8ecf4" stroke-width="4"/>` + T(200, yt + 32, 10.5, '#e8ecf4', 'C = 31,8 мкФ', 'middle', halo);
+  if (el === 'L') { let p = `M163 ${yt}`; for (let k = 0; k < 5; k++) p += 'a7.4 9 0 0 1 14.8 0'; h += `<path d="${p}" fill="none" stroke="${CU}" stroke-width="3.2"/>` + T(200, yt + 28, 10.5, '#e8ecf4', 'L = 0,318 Гн', 'middle', halo); }
+  h += T(200, yt + 46, 10, MUT, `X = ${nf(Math.round(m.X * 10) / 10)} Ом`, 'middle', halo);
+  // ammeter
+  const ok = (el === 'C' || el === 'L') && Math.abs(m.I - 4.4) < 0.05;
+  h += `<circle cx="${xa}" cy="${cy}" r="22" fill="#e8ecf4" stroke="${INK}" stroke-width="2"/>` + T(xa, cy + 5, 14, '#2a3348', 'A', 'middle', 'font-weight="500"');
+  h += T(xa - 30, cy + 4, 12, ok ? OK : '#e8ecf4', `${fmt(m.I, 2)} А`, 'end', halo + ' font-weight="500"');
+  // instantaneous current arrow on the bottom wire
+  const th = S.ph, ii = Math.sin(th + m.phi * Math.PI / 180), ia = Math.abs(ii) * clamp(m.I / 4.4, 0.25, 1);
+  if (ia > 0.08) { const len = 8 + 30 * ia, d = ii > 0 ? -1 : 1; h += arrow(200 - d * len / 2, yb, 200 + d * len / 2, yb, C1, 2.6) + T(200, yb - 9, 9.5, C1, 'i', 'middle', halo); }
+  // phasors
+  const pcx = 430, pcy = 180, r = 50, ri = r * clamp(m.I / 8.8, 0.12, 1);
+  h += `<circle cx="${pcx}" cy="${pcy}" r="${r}" fill="none" stroke="#26324a" stroke-dasharray="3 4"/><path d="M${pcx - r - 6} ${pcy}H${pcx + r + 6}M${pcx} ${pcy - r - 6}V${pcy + r + 6}" stroke="#3a4762"/>`;
+  const ua = th, ib = th + m.phi * Math.PI / 180;
+  const ux = pcx + r * Math.cos(ua), uy = pcy - r * Math.sin(ua), ix = pcx + ri * Math.cos(ib), iy = pcy - ri * Math.sin(ib);
+  h += `<path d="M${ux.toFixed(1)} ${uy.toFixed(1)}H${pcx + r + 14}M${ix.toFixed(1)} ${iy.toFixed(1)}H${pcx + r + 14}" stroke="#a9b4c9" stroke-width="1" stroke-dasharray="2 3" opacity=".6"/>`;
+  h += arrow(pcx, pcy, ux, uy, CP, 2.6) + arrow(pcx, pcy, ix, iy, C1, 2.6);
+  h += `<circle cx="${pcx + r + 14}" cy="${uy.toFixed(1)}" r="3.5" fill="${CP}"/><circle cx="${pcx + r + 14}" cy="${iy.toFixed(1)}" r="3.5" fill="${C1}"/>`;
+  h += T(ux + 8 * Math.cos(ua), uy - 8 * Math.sin(ua) + 4, 11, CP, 'U', 'middle', halo + ' font-weight="500"') + T(ix + 9 * Math.cos(ib), iy - 9 * Math.sin(ib) + 4, 11, C1, 'I', 'middle', halo + ' font-weight="500"');
+  h += T(pcx, pcy + r + 22, 10, '#a9b4c9', m.phi > 0 ? 'ток опережает на 90°' : m.phi < 0 ? 'ток отстаёт на 90°' : 'ток и напряжение в фазе', 'middle', halo);
+  // graph u(t), i(t) over two periods
+  const gx0 = 50, gx1 = 470, gy = 340;
+  h += box(36, 270, 448, 130);
+  h += `<path d="M${gx0} ${gy}H${gx1}" stroke="${MUT}" stroke-width="1"/>`;
+  const ai = 44 * clamp(m.I / 8.8, 0.1, 1);
+  h += `<path d="${wpath(gx0, gx1, u => gy - 44 * Math.sin(4 * Math.PI * u))}" fill="none" stroke="${CP}" stroke-width="2"/>`;
+  h += `<path d="${wpath(gx0, gx1, u => gy - ai * Math.sin(4 * Math.PI * u + m.phi * Math.PI / 180))}" fill="none" stroke="${C1}" stroke-width="2"/>`;
+  const cu = ((th % (4 * Math.PI)) + 4 * Math.PI) % (4 * Math.PI) / (4 * Math.PI), xc = gx0 + (gx1 - gx0) * cu;
+  h += `<path d="M${xc.toFixed(1)} 290V392" stroke="#e8ecf4" stroke-width="1" opacity=".5"/><circle cx="${xc.toFixed(1)}" cy="${(gy - 44 * Math.sin(th)).toFixed(1)}" r="4" fill="${CP}" stroke="${INK}"/><circle cx="${xc.toFixed(1)}" cy="${(gy - ai * Math.sin(th + m.phi * Math.PI / 180)).toFixed(1)}" r="4" fill="${C1}" stroke="${INK}"/>`;
+  const Tms = 1000 / S.nu;
+  ['0', 'T/2', 'T', '3T/2', '2T'].forEach((lb, k) => { h += T(gx0 + (gx1 - gx0) * k / 4, 397, 8.5, MUT, lb); });
+  h += T(46, 283, 9.5, CP, 'напряжение u', 'start') + T(130, 283, 9.5, C1, 'ток i', 'start') + T(474, 283, 9, MUT, `T = ${sig3(Tms)} мс`, 'end');
+  return h;
+}
+
+// ---------- lesson 3: radio ----------
+const DIAL = { x0: 40, x1: 480, f0: 500, f1: 1700, y: 368 };
+const dX = nu => DIAL.x0 + (DIAL.x1 - DIAL.x0) * (nu - DIAL.f0) / (DIAL.f1 - DIAL.f0);
+function radioScene() {
+  const m = model(), Ls = L(), t = S.ph, tg = Ls.target;
+  const NC = 16, aud = (k, u) => Math.sin(TAU * Ls.tones[k] * u - 2.4 * t + k), car = u => Math.sin(TAU * NC * u - 6 * t);
+  let h = '';
+  // transmitter
+  h += T(40, 118, 10, '#e8ecf4', `Передатчик станции 2 · ${Ls.st[tg]} кГц`, 'start', halo);
+  const yA = 124, hA = 62, mA = yA + hA / 2;
+  h += box(40, yA, 110, hA, 'звук') + box(176, yA, 110, hA, 'несущая') + box(312, yA, 110, hA, S.mod ? 'АМ-сигнал' : 'без модуляции');
+  h += `<path d="${wpath(46, 144, u => mA + 4 - 18 * aud(tg, u))}" fill="none" stroke="${OK}" stroke-width="2"/>`;
+  h += `<path d="${wpath(182, 280, u => mA + 4 - 18 * car(u), 220)}" fill="none" stroke="${C1}" stroke-width="1.6"/>`;
+  const mt = S.mod ? Ls.mdepth : 0, sc = 22 / (1 + Ls.mdepth);
+  h += `<path d="${wpath(318, 416, u => mA + 4 - sc * (1 + mt * aud(tg, u)) * car(u), 220)}" fill="none" stroke="${CP}" stroke-width="1.6"/>`;
+  if (S.mod) h += `<path d="${wpath(318, 416, u => mA + 4 - sc * (1 + mt * aud(tg, u)))}" fill="none" stroke="${OK}" stroke-width="1" stroke-dasharray="3 3" opacity=".8"/>`;
+  h += T(163, mA + 8, 16, '#a9b4c9', '×', 'middle') + arrow(290, mA + 4, 308, mA + 4, '#a9b4c9', 1.6);
+  // tower
+  h += `<path d="M458 ${yA + hA}L466 ${yA + 6}L474 ${yA + hA}M461 ${yA + 40}H471M463 ${yA + 22}H469" fill="none" stroke="#a9b4c9" stroke-width="2"/><path d="M426 ${mA + 4}H460" stroke="${WIRE}" stroke-width="2"/>`;
+  for (const rr of [9, 17, 25]) h += `<path d="M${466 + rr * 0.7} ${yA + 6 - rr * 0.7}a${rr} ${rr} 0 0 1 0 ${rr * 1.4}" fill="none" stroke="${CP}" stroke-width="1.3" opacity="${(0.75 - rr / 50).toFixed(2)}"/>`;
+  // receiver
+  h += T(40, 210, 10, '#e8ecf4', `Приёмник · контур настроен на ${Math.round(m.nu0)} кГц`, 'start', halo);
+  const yB = 216, hB = 62, mB = yB + hB / 2 + 4;
+  h += `<path d="M24 ${yB + hB}V${yB + 8}M18 ${yB + 8}l6 8 6 -8" fill="none" stroke="#a9b4c9" stroke-width="2"/><path d="M24 ${yB + 40}H52" stroke="${WIRE}" stroke-width="2"/>`;
+  // LC icon
+  h += `<g><rect x="52" y="${yB}" width="54" height="${hB}" rx="8" fill="#121a28" stroke="#26324a"/>`;
+  for (let k = 0; k < 4; k++) h += `<ellipse cx="68" cy="${yB + 18 + k * 9}" rx="8" ry="3.5" fill="none" stroke="${CU}" stroke-width="2"/>`;
+  h += `<path d="M84 ${yB + 26}H100M84 ${yB + 34}H100M92 ${yB + 22}l8 -8" stroke="#e8ecf4" stroke-width="2"/><path d="M96 ${yB + 14}l4 0 0 4" fill="none" stroke="#e8ecf4" stroke-width="1.6"/>`;
+  h += T(79, yB + hB - 6, 8.5, '#a9b4c9', `C ${fmt(S.C, 1)}`, 'middle') + `</g>`;
+  // signal in the circuit
+  const env = u => m.resp.reduce((a, r, k) => a + r * (1 + m.mk[k] * aud(k, u)), 0);
+  const scB = 24 / (1 + Ls.mdepth);
+  h += box(114, yB, 124, hB, 'ток в контуре');
+  const maxR = Math.max(...m.resp);
+  h += `<path d="${wpath(120, 232, u => clamp(mB - scB * env(u) * car(u), yB + 14, yB + hB - 2), 240)}" fill="none" stroke="${maxR > 0.5 ? CP : MUT}" stroke-width="1.5"/>`;
+  // detector (tap)
+  h += `<g data-tap="det"><rect x="244" y="${yB}" width="48" height="${hB}" rx="8" fill="${S.det ? 'rgba(134,224,168,.08)' : 'transparent'}" stroke="${S.det ? OK : '#26324a'}" stroke-dasharray="${S.det ? '' : '4 4'}"/>`;
+  h += `<path d="M250 ${mB - 4}H286" stroke="${WIRE}" stroke-width="2"/><path d="M262 ${mB - 13}V${mB + 5}L276 ${mB - 4}Z" fill="${S.det ? OK : '#5d6a86'}"/><path d="M277 ${mB - 13}V${mB + 5}" stroke="${S.det ? OK : '#5d6a86'}" stroke-width="2.4"/>`;
+  h += T(268, yB + 12, 8.5, S.det ? OK : MUT, 'детектор', 'middle') + T(268, yB + hB - 6, 8.5, S.det ? OK : MUT, S.det ? 'вкл' : 'выкл', 'middle') + `</g>`;
+  // after detector
+  h += box(298, yB, 124, hB, S.det ? 'после детектора' : 'в динамик идёт ВЧ');
+  if (S.det) {
+    h += `<path d="${wpath(304, 416, u => clamp(mB + 10 - scB * Math.max(0, env(u) * car(u)), yB + 14, yB + hB - 2), 240)}" fill="none" stroke="${CP}" stroke-width="1" opacity=".45"/>`;
+    h += `<path d="${wpath(304, 416, u => clamp(mB + 10 - scB * env(u), yB + 14, yB + hB - 2))}" fill="none" stroke="${OK}" stroke-width="2"/>`;
+  } else {
+    h += `<path d="${wpath(304, 416, u => clamp(mB - scB * env(u) * car(u), yB + 14, yB + hB - 2), 240)}" fill="none" stroke="${MUT}" stroke-width="1.2" opacity=".6"/>` + `<path d="M304 ${mB}H416" stroke="#e8ecf4" stroke-width="1" stroke-dasharray="3 3"/>` + T(360, yB + hB - 4, 8, '#a9b4c9', 'в среднем 0', 'middle', halo);
+  }
+  // speaker
+  const lvl = clamp(m.audio / Ls.mdepth, 0, 1.2), cone = reduce ? 0 : 3 * lvl * Math.sin(t * 40);
+  h += `<path d="M428 ${mB}H440" stroke="${WIRE}" stroke-width="2"/><rect x="440" y="${mB - 9}" width="10" height="18" fill="#5d6a86" stroke="${INK}"/><path d="M${450 + cone} ${mB - 9}L${468 + cone} ${mB - 22}V${mB + 22}L${450 + cone} ${mB + 9}Z" fill="#a9b4c9" stroke="${INK}" stroke-width="1.4"/>`;
+  if (lvl > 0.05) for (const rr of [8, 15]) h += `<path d="M${476 + rr * 0.5} ${mB - rr}a${rr * 1.2} ${rr * 1.2} 0 0 1 0 ${rr * 2}" fill="none" stroke="${OK}" stroke-width="1.6" opacity="${(lvl * (1 - rr / 30)).toFixed(2)}"/>`;
+  const hear = !S.det ? 'тишина' : lvl < 0.05 ? (m.resp[tg] > 0.5 ? 'ровный ток, тишина' : 'тишина') : m.resp[tg] >= 0.9 ? 'звук станции 2' : m.resp[tg] >= Math.max(m.resp[0], m.resp[2]) ? 'тихо, с шумом' : 'другая станция';
+  h += T(470, yB + hB + 14, 9.5, lvl > 0.05 && m.resp[tg] >= 0.9 ? OK : '#a9b4c9', hear, 'middle', halo);
+  // dial
+  h += `<g data-drag="dial"><rect x="${DIAL.x0 - 14}" y="300" width="${DIAL.x1 - DIAL.x0 + 28}" height="104" fill="transparent"/>`;
+  h += box(DIAL.x0 - 10, 302, DIAL.x1 - DIAL.x0 + 20, 98) + T(DIAL.x1 + 4, 313, 8.5, '#a9b4c9', 'шкала приёмника, кГц', 'end');
+  h += `<path d="${wpath(DIAL.x0, DIAL.x1, u => DIAL.y - 46 * respAt(DIAL.f0 + (DIAL.f1 - DIAL.f0) * u, m.nu0, Ls.Q), 400)}" fill="rgba(255,181,71,.08)" stroke="${CP}" stroke-width="1.6"/>`;
+  h += `<path d="M${DIAL.x0} ${DIAL.y}H${DIAL.x1}" stroke="${MUT}"/>`;
+  for (let f = 500; f <= 1700; f += 100) h += `<path d="M${dX(f).toFixed(1)} ${DIAL.y}v${f % 200 === 0 ? 6 : 3}" stroke="${MUT}"/>` + (f % 200 === 0 && !L().st.includes(f) ? T(dX(f), DIAL.y + 17, 8.5, MUT, f) : '');
+  Ls.st.forEach((s, k) => { const x = dX(s); h += `<rect x="${(x - 3).toFixed(1)}" y="${DIAL.y - 6}" width="6" height="6" fill="${k === tg ? OK : '#c3a8ff'}"/>` + T(x, DIAL.y + 17, 8.5, k === tg ? OK : '#c3a8ff', s, 'middle') + T(x, DIAL.y + 28, 8.5, k === tg ? OK : '#c3a8ff', `ст. ${k + 1}`, 'middle'); });
+  const xn = dX(clamp(m.nu0, DIAL.f0, DIAL.f1));
+  h += `<path d="M${xn.toFixed(1)} 316V${DIAL.y + 6}" stroke="#e8ecf4" stroke-width="2"/><circle cx="${xn.toFixed(1)}" cy="314" r="7" fill="#e8ecf4" stroke="${INK}" stroke-width="1.6"/></g>`;
+  return h;
+}
+
+function hlBox(id) {
+  const lid = LID();
+  if (lid === 'lc') return ({ bat: [36, 150, 76, 46], sw: [130, 80, 140, 44], cap: [160, 150, 80, 46], coil: [306, 132, 60, 92], res: [104, 236, 56, 34], bars: [378, 116, 120, 152], graph: [34, 268, 452, 134] })[id];
+  if (lid === 'ac') return ({ src: [40, 150, 60, 60], el: [156, 80, 88, 50], amm: [296, 152, 68, 56], phasor: [372, 122, 128, 136], graph: [34, 268, 452, 134] })[id];
+  return ({ tx: [34, 106, 456, 86], lc: [48, 212, 62, 70], rx: [110, 212, 132, 70], det: [240, 212, 56, 70], spk: [424, 212, 76, 84], dial: [26, 298, 468, 106] })[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = bg();
+  if (id === 'lc') h += lcScene();
+  else if (id === 'ac') h += acScene();
+  else h += radioScene();
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1);
+    const b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) {
+      const op = reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220)));
+      h += `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${op.toFixed(2)}"/>`;
+    }
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+let drag = null, dirty = true;
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 520, hh / 430, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 425 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer ----------
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+function dialTo(x) { const nu = DIAL.f0 + (DIAL.f1 - DIAL.f0) * (clamp(x, DIAL.x0, DIAL.x1) - DIAL.x0) / (DIAL.x1 - DIAL.x0); setC(radioC(nu)); }
+scene.addEventListener('pointerdown', e => {
+  const tp = e.target.closest('[data-tap]');
+  if (tp) { e.preventDefault(); if (tp.dataset.tap === 'sw') setSw(S.sw === 'bat' ? 'coil' : 'bat'); if (tp.dataset.tap === 'det') setDet(!S.det); return; }
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  drag = { id: el.dataset.drag };
+  if (drag.id === 'dial') dialTo(toSvg(e).x);
+});
+scene.addEventListener('pointermove', e => { if (drag && drag.id === 'dial') dialTo(toSvg(e).x); });
+const endDrag = () => { if (!drag) return; drag = null; scene.classList.remove('grabbing'); dirty = true; };
+scene.addEventListener('pointerup', endDrag);
+scene.addEventListener('pointercancel', endDrag);
+
+// ---------- lesson 1 ----------
+function lcIntegrate(dts) {
+  const Lh = S.Lm * 1e-3, Cf = S.Cu * 1e-6, w = 1 / Math.sqrt(Lh * Cf), n = Math.max(1, Math.ceil(dts * w / 0.01)), hh = dts / n;
+  for (let k = 0; k < n; k++) { S.i += (-(S.q / Cf) - S.R * S.i) / Lh * hh; S.q += S.i * hh; }
+}
+function pushHist() {
+  const m = model();
+  S.hist.push([S.tt, S.q / m.q0, S.i / m.Im]);
+  while (S.hist.length > 2 && S.hist[0][0] < S.tt - LC.win * 1.05) S.hist.shift();
+}
+function stepLC(dt) {
+  const Ls = L(), Cf = S.Cu * 1e-6;
+  if (S.sw === 'bat') {
+    const qt = Cf * Ls.U0;
+    S.q = reduce ? qt : S.q + (qt - S.q) * (1 - Math.exp(-dt / 0.12));
+    if (Math.abs(S.q - qt) < qt * 1e-3) S.q = qt;
+    S.i = 0;
+  }
+  if (S.run) {
+    const dts = dt / Ls.slow;
+    const n = Math.max(1, Math.ceil(dts / (TAU * Math.sqrt(S.Lm * 1e-3 * Cf) / 60)));
+    for (let k = 0; k < n; k++) { if (S.sw === 'coil') lcIntegrate(dts / n); S.tt += dts / n; pushHist(); }
+  }
+}
+function setSw(to) {
+  if (to === S.sw) return;
+  const Ls = L(), q0 = S.Cu * 1e-6 * Ls.U0;
+  if (to === 'bat') { S.i = 0; toast('Ключ на батарее: конденсатор заряжается до 10 В.'); }
+  if (to === 'coil') {
+    if (Math.abs(S.q) >= 0.5 * q0 && !S.launched) { S.launched = true; toast('Конденсатор замкнут на катушку — пошли колебания.'); }
+    else if (Math.abs(S.q) < 0.05 * q0) toast('Конденсатор не заряжен — колебаний не будет. Сначала зарядите его.');
+  }
+  S.sw = to; renderTools(); buildScheme(); update();
+}
+function checkCaught() {
+  const m = model();
+  if (S.sw === 'coil' && S.launched && !S.caught && m.Wt > 0.05 * m.W0 && m.share >= 0.9) {
+    S.caught = true; toast(`Поймали: W_L = ${Math.round(m.share * 100)} %. Конденсатор разряжен, ток наибольший.`);
+  }
+}
+function togglePause() { S.run = !S.run; if (!S.run) checkCaught(); renderTools(); buildScheme(); update(); }
+function stepEighth() {
+  const m = model(), dts = m.T / 8;
+  for (let k = 0; k < 20; k++) { if (S.sw === 'coil') lcIntegrate(dts / 20); S.tt += dts / 20; pushHist(); }
+  S.run = false; checkCaught(); renderTools(); buildScheme(); update();
+}
+// keep the oscillation phase and energy share when L or C changes (as if the same battery charged the new circuit)
+function rescaleLC(fn) { const m0 = model(), a = S.q / m0.q0, b = S.i / m0.Im; fn(); const m1 = model(); S.q = a * m1.q0; S.i = b * m1.Im; }
+function setLm(v) { v = clamp(Math.round(v / 5) * 5, 5, 100); if (v === S.Lm) return; rescaleLC(() => { S.Lm = v; }); afterLC(); }
+function setCu(v) { v = clamp(Math.round(v * 2) / 2, 0.5, 20); if (v === S.Cu) return; rescaleLC(() => { S.Cu = v; }); afterLC(); }
+function afterLC() { const m = model(); if (m.f >= 950 && m.f <= 1050 && !S.done.lc && !S.f1k) { S.f1k = true; toast(`ν = ${Math.round(m.f)} Гц — около 1 кГц.`); } renderTools(); buildScheme(); update(); }
+function cyc(arr, cur) { const k = arr.indexOf(cur); return arr[(k + 1) % arr.length] ?? arr[0]; }
+// ---------- lesson 2 ----------
+function setEl(e) {
+  if (e === S.el) return; S.el = e;
+  if (e === 'C' && !S.seenC) { S.seenC = true; toast('Конденсатор: ток опережает напряжение на четверть периода.'); }
+  if (e === 'L' && !S.seenL) { S.seenL = true; toast('Катушка: ток отстаёт от напряжения на четверть периода.'); }
+  if (e === 'R' && !S.seenR) { S.seenR = true; }
+  afterAC();
+}
+function setNu(v) { v = clamp(Math.round(v / 5) * 5, 5, 500); if (v === S.nu) return; S.nu = v; afterAC(); }
+function afterAC() {
+  const m = model();
+  if (S.el === 'C' && Math.abs(m.I - 4.4) < 0.05 && !S.c44) { S.c44 = true; toast(`ν = ${S.nu} Гц: X_C = ${nf(Math.round(m.X))} Ом, ток 4,4 А. Частота выросла — сопротивление конденсатора упало.`); }
+  if (S.el === 'L' && Math.abs(m.I - 4.4) < 0.05 && !S.l44) { S.l44 = true; toast(`ν = ${S.nu} Гц: X_L = ${nf(Math.round(m.X))} Ом, ток 4,4 А. Для катушки частоту пришлось уменьшить.`); }
+  renderTools(); buildScheme(); update();
+}
+// ---------- lesson 3 ----------
+function setC(c) { c = clamp(Math.round(c * 10) / 10, 40, 300); if (c === S.C) return; S.C = c; afterRadio(); }
+function setDet(v) { S.det = v; afterRadio(); }
+function setMod(v) { S.mod = v; afterRadio(); }
+function afterRadio() {
+  const m = model();
+  if (m.tuned && S.det && S.mod && !S.gotSound) { S.gotSound = true; toast('Резонанс со станцией 2: детектор выделил огибающую — динамик звучит.'); }
+  if (m.tuned && S.det && !S.mod && !S.noMod) { S.noMod = true; toast('Без модуляции амплитуда несущей постоянна: после детектора ровный ток, звука нет.'); }
+  renderTools(); buildScheme(); update();
+}
+
+let last = performance.now(), liveT = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, Math.max(0.001, (t - last) / 1000)); last = t;
+  const id = LID();
+  if (id === 'lc') { stepLC(dt); dirty = true; }
+  if (id === 'ac' && !reduce) { S.ph += TAU * 0.35 * dt; dirty = true; }
+  if (id === 'radio' && !reduce) { S.ph += dt; dirty = true; }
+  if (t - liveT > 160 && id === 'lc') { liveT = t; live(); }
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3600); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools'), Ls = L();
+  const B = (k, label, pressed, cls) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}${cls ? ` class="${cls}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  let h = '';
+  if (id === 'lc') h = B('bat', 'Зарядить', S.sw === 'bat', 'rec') + B('coil', 'На катушку', S.sw === 'coil') + sep + B('run', S.run ? 'Пауза' : 'Пуск') + B('step', 'Шаг ⅛T') + sep + B('Lc', `L ${nf(S.Lm)} мГн`) + B('Cc', `C ${nf(S.Cu)} мкФ`) + B('Rc', `R ${S.R} Ом`);
+  if (id === 'ac') h = B('eR', 'Резистор', S.el === 'R') + B('eC', 'Конденсатор', S.el === 'C') + B('eL', 'Катушка', S.el === 'L') + sep + B('nu-', 'ν −') + B('nu+', 'ν +') + B('nu50', '50 Гц');
+  if (id === 'radio') h = B('c-', 'C −') + B('c+', 'C +') + sep + B('mod', 'Модуляция', S.mod) + B('det', 'Детектор', S.det);
+  tb.innerHTML = h;
+}
+function act(a) {
+  const Ls = L();
+  if (a === 'bat' || a === 'coil') return setSw(a);
+  if (a === 'run') return togglePause();
+  if (a === 'step') return stepEighth();
+  if (a === 'Lc') return setLm(cyc(Ls.Ls, S.Lm));
+  if (a === 'Cc') return setCu(cyc(Ls.Cs, S.Cu));
+  if (a === 'Rc') { S.R = cyc(Ls.Rs, S.R); renderTools(); buildScheme(); return update(); }
+  if (a.startsWith('r-')) { S.R = +a.slice(2); renderTools(); buildScheme(); return update(); }
+  if (a === 'eR' || a === 'eC' || a === 'eL') return setEl(a[1]);
+  if (a === 'nu-' || a === 'nu+') return setNu(S.nu + (a === 'nu-' ? -5 : 5));
+  if (a === 'nu50') return setNu(50);
+  if (a === 'c-' || a === 'c+') return setC(S.C + (a === 'c-' ? -0.5 : 0.5));
+  if (a === 'mod') return setMod(!S.mod);
+  if (a === 'det') return setDet(!S.det);
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  bat: IC('<path d="M6 13h22" stroke="#e8ecf4" stroke-width="2"/><path d="M11 20h12" stroke="#e8ecf4" stroke-width="4"/>'),
+  sw: IC('<circle cx="7" cy="22" r="3" fill="#e8ecf4"/><circle cx="27" cy="22" r="3" fill="none" stroke="#e8ecf4" stroke-width="1.6"/><path d="M7 22L25 12" stroke="#e8ecf4" stroke-width="2.4"/>'),
+  cap: IC('<path d="M6 12h22M6 22h22" stroke="#e8ecf4" stroke-width="3"/><path d="M12 13v8M17 13v8M22 13v8" stroke="#72d4e8" stroke-width="1.2"/>'),
+  coil: IC('<ellipse cx="17" cy="9" rx="9" ry="3.5" fill="none" stroke="#d9954f" stroke-width="2.2"/><ellipse cx="17" cy="16" rx="9" ry="3.5" fill="none" stroke="#d9954f" stroke-width="2.2"/><ellipse cx="17" cy="23" rx="9" ry="3.5" fill="none" stroke="#d9954f" stroke-width="2.2"/>'),
+  res: IC('<path d="M2 17h7M25 17h7" stroke="#c46a5a" stroke-width="2"/><rect x="9" y="12" width="16" height="10" rx="1" fill="#2a3348" stroke="#e8ecf4" stroke-width="1.6"/>'),
+  bars: IC('<rect x="6" y="8" width="9" height="20" fill="#72d4e8"/><rect x="19" y="20" width="9" height="8" fill="#ffb547"/>'),
+  graph: IC('<path d="M2 17h30" stroke="#8b96ad"/><path d="M2 17q4-14 8 0t8 0 8 0 8 0" fill="none" stroke="#72d4e8" stroke-width="2"/><path d="M2 17q4 10 8 0t8 0 8 0 8 0" fill="none" stroke="#ffb547" stroke-width="1.6" transform="translate(4 0)"/>'),
+  src: IC('<circle cx="17" cy="17" r="12" fill="none" stroke="#ffb547" stroke-width="2.2"/><path d="M10 17q3.5-6 7 0t7 0" fill="none" stroke="#ffb547" stroke-width="2"/>'),
+  el: IC('<rect x="3" y="13" width="9" height="8" fill="#2a3348" stroke="#e8ecf4"/><path d="M15 10v14M19 10v14" stroke="#e8ecf4" stroke-width="2"/><path d="M22 17a2.5 3 0 0 1 5 0a2.5 3 0 0 1 5 0" fill="none" stroke="#d9954f" stroke-width="2"/>'),
+  amm: IC('<circle cx="17" cy="17" r="12" fill="#e8ecf4"/><text x="17" y="22" font-size="13" text-anchor="middle" fill="#2a3348" font-family="monospace">A</text>'),
+  phasor: IC('<circle cx="17" cy="17" r="12" fill="none" stroke="#3a4762" stroke-dasharray="2 2"/><path d="M17 17L28 12" stroke="#ffb547" stroke-width="2.4"/><path d="M17 17L13 6" stroke="#72d4e8" stroke-width="2.4"/>'),
+  tx: IC('<path d="M10 30L17 4L24 30M12 22h10M14 14h6" fill="none" stroke="#a9b4c9" stroke-width="2"/><path d="M24 8a6 6 0 0 1 0 8" fill="none" stroke="#ffb547" stroke-width="1.6"/>'),
+  lc: IC('<ellipse cx="11" cy="11" rx="6" ry="2.6" fill="none" stroke="#d9954f" stroke-width="2"/><ellipse cx="11" cy="17" rx="6" ry="2.6" fill="none" stroke="#d9954f" stroke-width="2"/><ellipse cx="11" cy="23" rx="6" ry="2.6" fill="none" stroke="#d9954f" stroke-width="2"/><path d="M21 14h10M21 20h10M22 25l9-14" stroke="#e8ecf4" stroke-width="2"/>'),
+  rx: IC('<path d="M2 17h30" stroke="#8b96ad"/><path d="M2 17q1-8 2 0t2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0" fill="none" stroke="#ffb547" stroke-width="1.6"/>'),
+  det: IC('<path d="M3 17h28" stroke="#c46a5a" stroke-width="2"/><path d="M11 9v16l13-8z" fill="#86e0a8"/><path d="M24 9v16" stroke="#86e0a8" stroke-width="2.4"/>'),
+  spk: IC('<rect x="4" y="12" width="7" height="10" fill="#5d6a86"/><path d="M11 12l10-7v24l-10-7z" fill="#a9b4c9"/><path d="M25 11a8 8 0 0 1 0 12" fill="none" stroke="#86e0a8" stroke-width="1.8"/>'),
+  dial: IC('<path d="M3 24h28" stroke="#8b96ad"/><path d="M3 24Q14 23 17 6Q20 23 31 24" fill="none" stroke="#ffb547" stroke-width="1.8"/><path d="M17 4v24" stroke="#e8ecf4" stroke-width="1.6"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  const t = (ok, s) => `${s} ${ok ? '✓' : '—'}`;
+  if (id === 'lc') return [t(m.launched, 'колебания'), t(m.caught, 'W_L ≥ 90 %'), t(m.f >= 950 && m.f <= 1050, `ν = ${Math.round(m.f)} Гц`)].join(' · ');
+  if (id === 'ac') return [t(S.seenR && S.seenC && S.seenL, 'R, C, L'), t(m.c44, 'C: 4,4 А'), t(m.l44, 'L: 4,4 А')].join(' · ');
+  return [t(m.tuned, 'резонанс'), t(m.gotSound, 'звук'), t(m.noMod, 'без модуляции')].join(' · ');
+}
+
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme'), Ls = L();
+  let h = '';
+  if (id === 'lc') h = `<h2>Контур LC</h2>` +
+      `<div class="ctl"><div class="lbl">Ключ</div><div class="chips"><button data-a="bat" aria-pressed="${S.sw === 'bat'}">к батарее (заряд)</button><button data-a="coil" aria-pressed="${S.sw === 'coil'}">к катушке</button></div></div>` +
+      `<div class="row"><button class="ghostbtn" data-a="run">${S.run ? 'Пауза' : 'Пуск'}</button><button class="ghostbtn" data-a="step">Шаг ⅛T</button></div>` +
+      slider('inL', 'Индуктивность L', 5, 100, 5, S.Lm) + slider('inC', 'Ёмкость C', 0.5, 20, 0.5, S.Cu) +
+      `<div class="ctl"><div class="lbl">Сопротивление проводов R</div><div class="chips">${Ls.Rs.map(r => `<button data-a="r-${r}" aria-pressed="${S.R === r}">${r} Ом</button>`).join('')}</div></div>` +
+      `<dl class="reads"><div><dt>частота ν</dt><dd id="r1"></dd></div><div><dt>период T</dt><dd id="r2"></dd></div><div><dt>W_L</dt><dd id="r3"></dd></div></dl>
+      <p class="note" style="margin-top:12px">Батарея ${Ls.U0} В. Время на площадке замедлено в ${Ls.slow} раз, на графике подписано настоящее время.</p>`;
+  if (id === 'ac') h = `<h2>Цепь переменного тока</h2>` +
+      `<div class="ctl"><div class="lbl">Элемент в цепи</div><div class="chips"><button data-a="eR" aria-pressed="${S.el === 'R'}">резистор 100 Ом</button><button data-a="eC" aria-pressed="${S.el === 'C'}">конденсатор 31,8 мкФ</button><button data-a="eL" aria-pressed="${S.el === 'L'}">катушка 0,318 Гн</button></div></div>` +
+      slider('inNu', 'Частота ν', 5, 500, 5, S.nu) +
+      `<dl class="reads"><div><dt>сопротивл. X</dt><dd id="r1"></dd></div><div><dt>ток I</dt><dd id="r2"></dd></div><div><dt>сдвиг фаз</dt><dd id="r3"></dd></div></dl>
+      <p class="note" style="margin-top:12px">Источник: действующее напряжение ${Ls.U} В, амплитуда ${Math.round(Ls.U * Math.SQRT2)} В. Амперметр показывает действующий ток.</p>`;
+  if (id === 'radio') h = `<h2>Передатчик и приёмник</h2>` + slider('inCr', 'Ёмкость контура C, пФ', 40, 300, 0.5, S.C) +
+      `<div class="row"><button class="ghostbtn" data-a="c-">C − 0,5</button><button class="ghostbtn" data-a="c+">C + 0,5</button></div>` +
+      `<div class="ctl"><div class="lbl">Передатчик и детектор</div><div class="chips"><button data-a="mod" aria-pressed="${S.mod}">модуляция</button><button data-a="det" aria-pressed="${S.det}">детектор</button></div></div>` +
+      `<dl class="reads"><div><dt>контур ν₀</dt><dd id="r1"></dd></div><div><dt>волна λ</dt><dd id="r2"></dd></div><div><dt>резонанс ст. 2</dt><dd id="r3"></dd></div></dl>
+      <p class="note" style="margin-top:12px">Катушка приёмника L = 250 мкГн. Станции: ${Ls.st.join(', ')} кГц. Колебания на площадке нарисованы условно — настоящая несущая в тысячи раз чаще звука.</p>`;
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn); };
+  on('#inL', e => setLm(+e.target.value));
+  on('#inC', e => setCu(+e.target.value));
+  on('#inNu', e => setNu(+e.target.value));
+  on('#inCr', e => setC(+e.target.value));
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+  updateScheme(model());
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (id === 'lc') { set('#inLO', nf(S.Lm) + ' мГн'); set('#inCO', nf(S.Cu) + ' мкФ'); val('#inL', S.Lm); val('#inC', S.Cu); set('#r1', Math.round(m.f) + ' Гц'); set('#r2', sig3(m.T * 1000) + ' мс'); set('#r3', Math.round(m.share * 100) + ' %'); }
+  if (id === 'ac') { set('#inNuO', S.nu + ' Гц'); val('#inNu', S.nu); set('#r1', nf(Math.round(m.X * 10) / 10) + ' Ом'); set('#r2', fmt(m.I, 2) + ' А'); set('#r3', m.phi > 0 ? '+90°' : m.phi < 0 ? '−90°' : '0°'); }
+  if (id === 'radio') { set('#inCrO', fmt(S.C, 1) + ' пФ'); val('#inCr', S.C); set('#r1', Math.round(m.nu0) + ' кГц'); set('#r2', Math.round(m.lam) + ' м'); set('#r3', Math.round(m.resp[1] * 100) + ' %'); }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'lc') return [
+    { id: 'bat', icon: ICON.bat, name: 'Батарея 10 В', spec: 'Заряжает конденсатор, когда ключ стоит слева.' },
+    { id: 'sw', icon: ICON.sw, name: 'Ключ-переключатель', spec: 'Подключает конденсатор либо к батарее, либо к катушке. Нажмите на него на схеме.' },
+    { id: 'cap', icon: ICON.cap, name: 'Конденсатор C', spec: 'Две пластины. Знаки — заряд пластин, голубые линии — электрическое поле. Энергия Cu²/2.' },
+    { id: 'coil', icon: ICON.coil, name: 'Катушка L', spec: 'Самоиндукция не даёт току меняться скачком. Пунктир — магнитное поле, его энергия Li²/2.' },
+    { id: 'res', icon: ICON.res, name: 'Сопротивление R', spec: 'Появляется, если выбрать R > 0. Из-за него колебания затухают.' },
+    { id: 'bars', icon: ICON.bars, name: 'Столбики энергии', spec: 'Доли энергии в конденсаторе и в катушке. В идеальном контуре их сумма постоянна.' },
+    { id: 'graph', icon: ICON.graph, name: 'График q(t) и i(t)', spec: 'Последние 8 мс. Ток наибольший, когда заряд проходит через ноль.' }];
+  if (id === 'ac') return [
+    { id: 'src', icon: ICON.src, name: 'Источник переменного напряжения', spec: '220 В действующее, частоту можно менять.' },
+    { id: 'el', icon: ICON.el, name: 'Элемент цепи', spec: 'Резистор, конденсатор или катушка. При 50 Гц у каждого сопротивление 100 Ом.' },
+    { id: 'amm', icon: ICON.amm, name: 'Амперметр', spec: 'Показывает действующее значение тока I = U / X.' },
+    { id: 'phasor', icon: ICON.phasor, name: 'Векторная диаграмма', spec: 'Векторы U и I вращаются с угловой скоростью ω. Угол между ними — сдвиг фаз.' },
+    { id: 'graph', icon: ICON.graph, name: 'Графики u(t) и i(t)', spec: 'Два периода. По оси — доли периода T.' }];
+  return [
+    { id: 'tx', icon: ICON.tx, name: 'Передатчик', spec: 'Звук × несущая = АМ-сигнал. Антенна излучает его в эфир.' },
+    { id: 'lc', icon: ICON.lc, name: 'Колебательный контур', spec: 'Катушка и конденсатор переменной ёмкости. Выделяет станцию по резонансу.' },
+    { id: 'rx', icon: ICON.rx, name: 'Ток в контуре', spec: 'Сумма сигналов станций, каждый ослаблен по резонансной кривой.' },
+    { id: 'det', icon: ICON.det, name: 'Детектор', spec: 'Диод и фильтр. Пропускают ток в одну сторону и выделяют огибающую. Нажмите, чтобы включить.' },
+    { id: 'spk', icon: ICON.spk, name: 'Динамик', spec: 'Мембрана повторяет только медленные изменения тока — звук.' },
+    { id: 'dial', icon: ICON.dial, name: 'Шкала настройки', spec: 'Стрелка — частота контура, кривая — резонанс. Тяните стрелку.' }];
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      (Ls.safe ? `<div class="safe"><b>Безопасность</b>${Ls.safe}</div>` : '') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}" id="ovState">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Что на площадке</h2><p class="note">Нажмите на деталь, чтобы найти её на площадке.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+const sq = x => String(Number(x.toPrecision(3))).replace('.', ',');
+function calcHTML(m) {
+  const id = LID(), Ls = L();
+  if (id === 'lc') {
+    const LC2 = m.Lh * m.Cf;
+    return `<h2>Формула Томсона</h2><div class="formula">T = 2π√(LC)</div><div class="formula">Cu²/2 + Li²/2 = const</div>
+      <h3>Сейчас</h3><div class="steps">` +
+      step('L · C', `${sq(m.Lh)} Гн × ${sq(m.Cf * 1e6)}·10⁻⁶ Ф = ${sq(LC2 * 1e8)}·10⁻⁸ с²`) +
+      step('√(LC)', `${sq(Math.sqrt(LC2) * 1e4)}·10⁻⁴ с`) +
+      step('T = 2π√(LC)', `${sq(m.T * 1000)} мс`) +
+      step('ν = 1 / T', `${Math.round(m.f)} Гц`, 'sum') + `</div>
+      <h3>Энергия</h3><div class="steps">` +
+      step('W = CU²/2', `${sq(m.Cf * 1e6)}·10⁻⁶ × ${Ls.U0}² / 2 = ${sq(m.W0 * 1000)} мДж`) +
+      step('qₘ = CU', `${sq(m.q0 * 1e6)} мкКл`) +
+      step('Iₘ = U√(C/L)', `${sq(m.Im)} А`) +
+      step('сейчас u на C', `${fmt(m.uC, 2)} В`) +
+      step('сейчас ток i', `${fmt(m.i * 1000, 1)} мА`) +
+      step('W_C + W_L', `${sq(m.WC * 1000 + 1e-12)} + ${sq(m.WL * 1000 + 1e-12)} мДж`, 'sum') + `</div>
+      <p class="note" style="margin-top:10px">${S.R > 0 ? `R = ${S.R} Ом: энергия уходит в тепло, колебания затухают.` : 'R = 0: идеальный контур, полная энергия не меняется.'} Цель: ν от 950 до 1050 Гц — какое произведение L·C для этого нужно?</p>`;
+  }
+  if (id === 'ac') {
+    const w = m.w;
+    let xs;
+    if (S.el === 'R') xs = step('X = R', '100 Ом (от частоты не зависит)', 'sum');
+    else if (S.el === 'C') xs = step('X_C = 1 / (ωC)', `1 / (${sq(w)} × 3,18·10⁻⁵) = ${nf(Math.round(m.X * 10) / 10)} Ом`, 'sum');
+    else xs = step('X_L = ωL', `${sq(w)} × 0,318 = ${nf(Math.round(m.X * 10) / 10)} Ом`, 'sum');
+    return `<h2>Закон Ома для переменного тока</h2><div class="formula">I = U / X</div><div class="formula">ω = 2πν</div>
+      <h3>Сейчас</h3><div class="steps">` +
+      step('ω = 2π · ν', `2 × 3,14 × ${S.nu} = ${sq(w)} рад/с`) + xs +
+      step('I = U / X', `${Ls.U} / ${nf(Math.round(m.X * 10) / 10)} = ${fmt(m.I, 2)} А`, 'sum') +
+      step('Iₘ = I · √2', `${fmt(m.Im, 2)} А`) +
+      step('Uₘ = U · √2', `${Math.round(m.Um)} В`) +
+      step('сдвиг фаз', m.phi > 0 ? 'ток опережает на 90°' : m.phi < 0 ? 'ток отстаёт на 90°' : '0°') + `</div>
+      <h3>Цель</h3><div class="steps">` + step('нужный ток', '4,4 А') + step('нужное X', `${Ls.U} / 4,4 = 50 Ом`, 'sum') + step('конденсатор', 'X_C в 2 раза меньше → ν = ?') + step('катушка', 'X_L в 2 раза меньше → ν = ?') + `</div>
+      <p class="note" style="margin-top:8px">Средняя мощность: на резисторе P = I²R, на идеальных конденсаторе и катушке — ноль.</p>`;
+  }
+  const C = S.C * 1e-12;
+  return `<h2>Настройка приёмника</h2><div class="formula">ν₀ = 1 / (2π√(LC))</div><div class="formula">λ = c / ν</div>
+    <h3>Сейчас</h3><div class="steps">` +
+    step('L · C', `2,5·10⁻⁴ × ${fmt(S.C, 1)}·10⁻¹² = ${sq(Ls.Lr * C * 1e16)}·10⁻¹⁶ с²`) +
+    step('ν₀', `1 / (6,28 × ${sq(Math.sqrt(Ls.Lr * C) * 1e8)}·10⁻⁸) = ${Math.round(m.nu0)} кГц`, 'sum') +
+    step('λ = c / ν₀', `3·10⁸ / ${sq(m.nu0 * 1000)} = ${Math.round(m.lam)} м`) +
+    Ls.st.map((s, k) => step(`отклик на ст. ${k + 1} (${s} кГц)`, Math.round(m.resp[k] * 100) + ' %')).join('') + `</div>
+    <h3>Цепочка</h3><div class="steps">` +
+    step('1. Передатчик', S.mod ? 'амплитуда несущей меняется со звуком' : 'модуляция выключена — амплитуда постоянна') +
+    step('2. Контур', m.tuned ? 'резонанс со станцией 2' : 'не настроен на станцию 2') +
+    step('3. Детектор', S.det ? 'выделяет огибающую' : 'выключен — среднее значение тока 0') +
+    step('4. Динамик', m.audio > 0.03 ? 'звучит' : 'молчит', 'sum') + `</div>
+    <p class="note" style="margin-top:8px">Чем больше C, тем ниже частота контура: ν₀ ~ 1/√C. Добротность контура Q = ${Ls.Q}.</p>`;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter');
+  if (id === 'lc') el.innerHTML = `<div class="k">Контур</div><div class="v ${m.f >= 950 && m.f <= 1050 ? 'ok' : ''}">ν ${Math.round(m.f)} Гц</div><div class="lr"><span>T</span><span>${sig3(m.T * 1000)} мс</span></div><div class="lr"><span>W_L</span><span class="${m.share >= 0.9 ? 'ok' : ''}">${Math.round(m.share * 100)} %</span></div>`;
+  else if (id === 'ac') el.innerHTML = `<div class="k">Амперметр</div><div class="v ${S.el !== 'R' && Math.abs(m.I - 4.4) < 0.05 ? 'ok' : ''}">I ${fmt(m.I, 2)} А</div><div class="lr"><span>X</span><span>${nf(Math.round(m.X))} Ом</span></div><div class="lr"><span>φ</span><span>${m.phi > 0 ? '+90°' : m.phi < 0 ? '−90°' : '0°'}</span></div>`;
+  else el.innerHTML = `<div class="k">Приёмник</div><div class="v ${m.tuned ? 'ok' : ''}">${Math.round(m.nu0)} кГц</div><div class="lr"><span>λ</span><span>${Math.round(m.lam)} м</span></div><div class="lr"><span>ст. 2</span><span class="${m.tuned ? 'ok' : ''}">${Math.round(m.resp[1] * 100)} %</span></div>`;
+}
+
+function live() {
+  const m = model();
+  renderMeter(m);
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function update() {
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Теперь вы знаете, как колебания в контуре превращаются в радио!'), 1900);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  lc: '<path d="M6 8h20M6 22h20" stroke="#e8ecf4" stroke-width="2.4"/><path d="M10 10v10M16 10v10M22 10v10" stroke="#72d4e8" stroke-width="1"/><ellipse cx="46" cy="9" rx="9" ry="3" fill="none" stroke="#d9954f" stroke-width="2"/><ellipse cx="46" cy="15" rx="9" ry="3" fill="none" stroke="#d9954f" stroke-width="2"/><ellipse cx="46" cy="21" rx="9" ry="3" fill="none" stroke="#d9954f" stroke-width="2"/>',
+  ac: '<path d="M2 15h62" stroke="#3a4762"/><path d="M2 15q5-13 10 0t10 0 10 0 10 0 10 0 10 0" fill="none" stroke="#ffb547" stroke-width="2"/><path d="M7 15q5-9 10 0t10 0 10 0 10 0 10 0" fill="none" stroke="#72d4e8" stroke-width="1.6"/>',
+  radio: '<path d="M8 28L14 4L20 28" fill="none" stroke="#a9b4c9" stroke-width="1.8"/><path d="M22 8a7 7 0 0 1 0 10M27 5a12 12 0 0 1 0 16" fill="none" stroke="#ffb547" stroke-width="1.5"/><path d="M38 15q1.5-9 3 0t3 0 3 0 3 0 3 0 3 0 3 0 3 0" fill="none" stroke="#86e0a8" stroke-width="1.6"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Lx, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Lx.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Lx.title}</span></span>
+      ${S.done[Lx.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  S.lesson = i; drag = null;
+  resetState(); save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L().task;
+  $('#hint').textContent = L().stage;
+  scene.setAttribute('aria-label', LID() === 'lc' ? 'Колебательный контур: батарея, ключ, конденсатор и катушка, столбики энергии и график заряда и тока.' : LID() === 'ac' ? 'Цепь переменного тока с резистором, конденсатором или катушкой, векторная диаграмма и графики тока и напряжения.' : 'Радиопередатчик с модуляцией и приёмник с контуром, детектором, динамиком и шкалой настройки.');
+  renderTools(); renderStrip(); buildScheme(); update();
+  const strip = $('#lessons'), cur = strip.querySelector('.lesson[aria-current="true"]');
+  if (cur) { const br = strip.getBoundingClientRect(), cr = cur.getBoundingClientRect(); strip.scrollLeft = Math.max(0, strip.scrollLeft + (cr.left - br.left) - (br.width - cr.width) / 2); }
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '';
+  if (id === 'lc') now = `Колебательный контур: L = ${nf(S.Lm)} мГн, C = ${nf(S.Cu)} мкФ, сопротивление проводов R = ${S.R} Ом, батарея ${Ls.U0} В. Ключ ${S.sw === 'bat' ? 'на батарее (конденсатор заряжается)' : 'на катушке'}, симуляция ${S.run ? 'идёт (замедлено в 1000 раз)' : 'на паузе'}. Частота ${Math.round(m.f)} Гц, период ${sig3(m.T * 1000)} мс. Напряжение на конденсаторе ${fmt(m.uC, 2)} В, ток ${fmt(m.i * 1000, 1)} мА, энергия в катушке ${Math.round(m.share * 100)} % от текущей полной. Колебания запущены — ${S.launched ? 'да' : 'нет'}, момент W_L ≥ 90 % пойман — ${S.caught ? 'да' : 'нет'}. Цель по частоте 950–1050 Гц. Нужные L и C не называй — наводи вопросами про формулу Томсона.`;
+  if (id === 'ac') now = `Цепь переменного тока 220 В. Включён элемент: ${S.el === 'R' ? 'резистор 100 Ом' : S.el === 'C' ? 'конденсатор 31,8 мкФ' : 'катушка 0,318 Гн'}, частота ${S.nu} Гц. Сопротивление X = ${nf(Math.round(m.X * 10) / 10)} Ом, действующий ток ${fmt(m.I, 2)} А, сдвиг фаз тока относительно напряжения ${m.phi > 0 ? '+90° (опережает)' : m.phi < 0 ? '−90° (отстаёт)' : '0'}. Просмотрены: резистор ${S.seenR ? 'да' : 'нет'}, конденсатор ${S.seenC ? 'да' : 'нет'}, катушка ${S.seenL ? 'да' : 'нет'}. Ток 4,4 А через конденсатор ${S.c44 ? 'получен' : 'не получен'}, через катушку ${S.l44 ? 'получен' : 'не получен'}. Нужные частоты не называй — наводи вопросами про X_C = 1/(ωC) и X_L = ωL.`;
+  if (id === 'radio') now = `Передатчик станции 2 (1000 кГц), модуляция ${S.mod ? 'включена' : 'выключена'}. Ещё есть станции 1 (600 кГц) и 3 (1400 кГц). Приёмник: L = 250 мкГн, C = ${fmt(S.C, 1)} пФ, частота контура ${Math.round(m.nu0)} кГц, λ = ${Math.round(m.lam)} м. Отклик контура на станции: ${m.resp.map((r, k) => `ст. ${k + 1} — ${Math.round(r * 100)} %`).join(', ')}. Детектор ${S.det ? 'включён' : 'выключен'}, динамик ${m.audio > 0.03 ? 'звучит' : 'молчит'}. Звук станции 2 получен — ${S.gotSound ? 'да' : 'нет'}, опыт без модуляции — ${S.noMod ? 'сделан' : 'не сделан'}. Нужную ёмкость не называй — наводи вопросами про резонанс и формулу Томсона.`;
+  return [
+    `Раздел: физика, 11 класс, электричество и магнетизм, тема «Переменный ток». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'} (${taskState(m)}).`,
+    `Сейчас на площадке: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Помогай наводящими вопросами, готовые ответы не выдавай.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { lc: 'Почему ток не прекращается, когда конденсатор разрядился?', ac: 'Как переменный ток проходит через конденсатор, если между пластинами диэлектрик?', radio: 'Зачем нужна несущая частота, почему не передать звук напрямую?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

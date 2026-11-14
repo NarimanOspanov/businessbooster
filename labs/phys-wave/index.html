@@ -1,0 +1,1049 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по волновой оптике: дисперсия в призме, интерференция в опыте Юнга, дифракционная решётка и поляризация света.">
+<title>Волновая оптика</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry. Optical bench (SVG) on the left, lesson notebook on the right, lesson strip under the bench. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--liq);transition:width .2s}
+.gauge i{position:absolute;top:-4px;width:2px;height:14px;background:var(--force);transform:translateX(-50%)}
+.swatch{height:12px;border-radius:4px;margin-top:9px;border:1px solid rgba(255,255,255,.15)}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+<style>
+.scene{touch-action:none}
+.step b{flex:none}
+.step span{min-width:0;overflow-wrap:anywhere}
+.ansrow{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.ansrow button{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 11px;font:500 13px/1 var(--font-mono);cursor:pointer;color:var(--fg)}
+.ansrow button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.spec{height:10px;border-radius:3px;margin-top:9px;border:1px solid rgba(255,255,255,.12)}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M20 9L31 29H9Z" fill="none" stroke="var(--fg)" stroke-width="2" stroke-linejoin="round"/><path d="M4 22L15 19" stroke="var(--fg)" stroke-width="1.8"/><path d="M26 19L37 23" stroke="#ff5a4a" stroke-width="1.6"/><path d="M26 19L37 26" stroke="#5fd17a" stroke-width="1.6"/><path d="M26 19L36 29" stroke="#8a6bff" stroke-width="1.6"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Физика · Волновая оптика</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/">Карта</a><a href="/physics/">Физика</a><a href="/labs/phys-wave/" aria-current="page">Волновая оптика</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Волны света</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Оптическая скамья">
+    <svg class="scene" id="scene" role="img" aria-label="Оптическая скамья. Приборы можно двигать и вращать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const RAD = Math.PI / 180, DEG = 180 / Math.PI;
+const r1 = x => Math.round(x * 10) / 10;
+
+// wavelength (nm) → visible colour (approximation of the CIE curve, brightened for a dark stage)
+function wlColor(l) {
+  let r = 0, g = 0, b = 0;
+  if (l < 440) { r = (440 - l) / 60; b = 1; }
+  else if (l < 490) { g = (l - 440) / 50; b = 1; }
+  else if (l < 510) { g = 1; b = (510 - l) / 20; }
+  else if (l < 580) { r = (l - 510) / 70; g = 1; }
+  else if (l < 645) { r = 1; g = (645 - l) / 65; }
+  else r = 1;
+  const f = l < 420 ? 0.55 + 0.45 * (l - 380) / 40 : l > 680 ? 0.75 + 0.25 * (750 - l) / 70 : 1;
+  const c = v => Math.round(255 * Math.pow(clamp(v * f, 0, 1), 0.8) * 0.85 + 38).toString(16).padStart(2, '0');
+  return '#' + c(r) + c(g) + c(b);
+}
+
+// ---------- physics constants ----------
+const GLASS = { crown: { name: 'крон', A: 1.5046, B: 0.00420 }, flint: { name: 'флинт', A: 1.5980, B: 0.00890 } }; // формула Коши n = A + B/λ², λ в мкм
+const APEX = 60;                                   // преломляющий угол призмы, °
+const MODES = { white: { name: 'белый', wl: [700, 620, 580, 530, 490, 450, 410] }, red: { name: 'красный', wl: [700] }, green: { name: 'зелёный', wl: [530] }, violet: { name: 'фиолетовый', wl: [410] } };
+const SLIT_A = 0.02;                               // ширина каждой щели в опыте Юнга, мм
+const LASERS = { red: { name: 'красный', wl: 650 }, green: { name: 'зелёный', wl: 532 }, x: { name: '«?»', wl: 450 } };
+const ANSWERS = [430, 450, 470, 490];
+const nGlass = (g, lam) => { const c = GLASS[g], u = lam / 1000; return c.A + c.B / (u * u); };
+
+const LESSONS = [
+  { id: 'disp', title: 'Дисперсия: призма и спектр',
+    text: ['Белый свет — смесь волн разной длины: от красных (около 700 нм) до фиолетовых (около 400 нм). В вакууме все они летят с одной скоростью c, а в стекле — с разной.',
+           'Дисперсия — зависимость показателя преломления от длины волны, то есть от цвета. В стекле n у фиолетового света больше, чем у красного. Поэтому призма отклоняет фиолетовые лучи сильнее и раскладывает белый луч в спектр. Так в 1666 году сделал Ньютон.',
+           'Угол отклонения луча призмой δ = i + β − A. Здесь i — угол падения, β — угол выхода из второй грани, A — преломляющий угол призмы (у нас 60°).'],
+    why: 'Спектрометр раскладывает свет почти как призма: по спектру химики и экологи узнают состав сплава, воды или дыма из трубы. Такие приборы стоят в заводских лабораториях металлургических комбинатов Казахстана. Оптики рассчитывают объективы смартфонов и камер так, чтобы дисперсия не давала цветной каймы на фото. Инженеры связи борются с дисперсией в оптоволокне — она «размывает» сигнал. А радуга — та же дисперсия, только в каплях воды.',
+    task: 'Поставьте угол падения 50° и пропустите через призму белый свет, а потом только красный и только фиолетовый. Какой цвет отклоняется сильнее?',
+    hint: 'Тащите фонарь — меняется угол падения, точно — кнопками «i ±1°». Цвет света — кнопки внизу сцены. Углы отклонения — на вкладке «Расчёты».',
+    stage: 'Тащите фонарь — меняется i.',
+    init: { inc: 40, mode: 'white', glass: 'crown' },
+    check: m => !!(S.seen.white && S.seen.red && S.seen.violet) },
+  { id: 'interf', title: 'Интерференция: опыт Юнга',
+    text: ['Интерференция — сложение волн, при котором в одних местах они усиливают друг друга, а в других гасят. Устойчивая картина получается только от когерентных волн: одной частоты и с постоянной разностью фаз. В опыте Юнга лазерный пучок падает на две узкие щели, и они становятся двумя согласованными источниками.',
+           'В точку экрана волны от щелей приходят с разностью хода Δ. Если Δ = kλ (целое число длин волн), гребень встречает гребень — светлая полоса. Если Δ = (k + ½)λ, гребень встречает впадину — тёмная полоса.',
+           'Расстояние между соседними светлыми полосами Δx = λL / d. Оно растёт с длиной волны и расстоянием до экрана L и уменьшается, если щели раздвинуть.'],
+    why: 'Лазерные интерферометры измеряют перемещения с точностью до долей микрона: ими настраивают станки с ЧПУ и проверяют детали в машиностроении. Просветляющее покрытие на очках и объективах — тонкая плёнка, в которой отражённые волны гасят друг друга, поэтому стекло не бликует. Голограммы на банковских картах и купюрах защищают от подделки тоже благодаря интерференции. А детектор LIGO по интерференции поймал гравитационные волны — за это дали Нобелевскую премию 2017 года.',
+    safe: 'Лазерный луч нельзя направлять в глаза — ни свои, ни чужие, даже указку. Отражение от зеркала или стекла тоже опасно.',
+    task: 'Настройте опыт так, чтобы светлые полосы шли через 3 мм, и поставьте датчик на второй светлый максимум от центра.',
+    hint: 'Подберите λ, L и d по формуле Δx = λL / d. Второй светлый максимум — там, где разность хода Δ = 2λ. Тащите экран (меняется L) и датчик на нём.',
+    stage: 'Тащите экран — меняется L. Датчик на экране тоже двигается.',
+    init: { lam: 650, d: 0.25, L: 1.5, px: 0 },
+    check: m => Math.abs(m.dx - 3) < 1e-6 && Math.abs(Math.abs(m.k) - 2) <= 0.1 },
+  { id: 'diffr', title: 'Дифракция: решётка',
+    text: ['Дифракция — огибание волнами препятствий, отклонение от прямолинейного пути. Она заметна, когда щель или препятствие сравнимы с длиной волны. Поэтому свет за очень узкой щелью расходится веером, а не идёт тонким лучом.',
+           'Дифракционная решётка — пластинка с сотнями штрихов на каждом миллиметре. Расстояние между соседними щелями d называют периодом решётки. Волны от всех щелей усиливают друг друга только в избранных направлениях: d · sin φ = kλ, где k = 0, ±1, ±2… — порядок максимума.',
+           'Чем больше длина волны, тем больше угол φ. Решётка тоже раскладывает белый свет в спектр, но, в отличие от призмы, сильнее отклоняет красный. А измерив угол, можно найти длину волны.'],
+    why: 'Спектрометр с дифракционной решёткой — главный прибор астронома: по спектру звезды узнают её состав и скорость. Такие же приборы работают в лабораториях, которые проверяют руду, нефтепродукты и питьевую воду. Инженеры оптоволоконной связи решётками разделяют десятки каналов с разной длиной волны в одном волокне. А радужный блеск диска CD или DVD — это тоже решётка: дорожки идут с шагом около 1,6 мкм.',
+    safe: 'Не смотрите в лазер и в его зеркальные отражения. Наблюдают пятна на экране или через зрительную трубу с ослабляющим фильтром.',
+    task: 'Определите длину волны лазера «?»: наведите трубу на максимум 1-го порядка, посчитайте λ и выберите ответ.',
+    hint: 'Сначала проверьте метод на лазере с известной λ. Период решётки d = 1 / N. Для первого порядка λ = d · sin φ. Точнее всего — с решёткой на 600 штрихов на миллиметр.',
+    stage: 'Тащите зрительную трубу по лимбу.',
+    init: { laser: 'red', N: 300, tel: 0, ans: null, found: false },
+    check: m => S.ans === 450 && S.found },
+  { id: 'polar', title: 'Поляризация и закон Малюса',
+    text: ['Свет — поперечная волна: вектор напряжённости электрического поля E колеблется перпендикулярно лучу. У лампы и Солнца направление колебаний E беспорядочно меняется — такой свет называют естественным.',
+           'Поляроид пропускает только колебания вдоль своей оси. После него свет поляризован, а его интенсивность вдвое меньше. Следующий поляроид (анализатор) пропускает долю cos²φ, где φ — угол между осями: I = I₁ cos²φ. Это закон Малюса. При φ = 90° свет гаснет полностью.',
+           'Поляризация доказывает, что световые волны поперечные: продольную волну поворот поляроида не ослабил бы.'],
+    why: 'Поляризационные очки рыбаков и водителей гасят блики от воды и мокрого асфальта: отражённый свет частично поляризован. Экран телефона или монитора (LCD) — это два поляризатора и жидкий кристалл между ними, который поворачивает плоскость поляризации. Инженеры-прочнисты смотрят прозрачные модели деталей между поляроидами и видят, где копится напряжение. Фотографы ставят поляризационный фильтр, чтобы небо было глубже, а витрины не отражали.',
+    task: 'Скрещенные поляроиды не пропускают свет. Вставьте между ними третий и поверните его так, чтобы на датчик попало как можно больше света.',
+    hint: 'Тащите поляроид за край — поворачивается его ось. Свет ослабевает на каждом поляроиде по закону Малюса. При каком угле произведение cos²φ₁ · cos²φ₂ самое большое?',
+    stage: 'Вращайте поляроиды: тащите за край.',
+    init: { mid: false, a2: 0, a3: 90 },
+    check: m => S.mid && Math.abs(((S.a3 % 180) + 180) % 180 - 90) < 0.5 && m.I3 >= 12.48 },
+];
+
+const LS_KEY = 'luch-phys-wave';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null, seen: {},
+            inc: 40, mode: 'white', glass: 'crown', lam: 650, d: 0.25, L: 1.5, px: 0, laser: 'red', N: 300, tel: 0, ans: null, found: false, mid: false, a2: 0, a3: 90 };
+const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+// ---------- lesson 1: ray tracing through a 60° prism ----------
+const PR = [[250, 130], [340, 285.885], [160, 285.885]];   // top, bottom-right, bottom-left
+const EDGES = [[0, 1], [1, 2], [2, 0]];                    // right face, base, left face
+const P1 = { x: 205, y: 207.94 };                          // where the beam meets the left face
+const NIN = { x: Math.cos(30 * RAD), y: Math.sin(30 * RAD) }; // inward normal of the left face
+const SCR = { x: 470, y0: 112, y1: 392 };
+const dirFromInc = i => ({ x: Math.cos((30 - i) * RAD), y: Math.sin((30 - i) * RAD) });
+function refr(d, n, eta) {
+  const ci = -(n.x * d.x + n.y * d.y), k = 1 - eta * eta * (1 - ci * ci);
+  if (k < 0) return null;
+  const f = eta * ci - Math.sqrt(k);
+  return { x: eta * d.x + f * n.x, y: eta * d.y + f * n.y };
+}
+function outN(e) { const [a, b] = EDGES[e], ex = PR[b][0] - PR[a][0], ey = PR[b][1] - PR[a][1], L = Math.hypot(ex, ey); return { x: ey / L, y: -ex / L }; }
+function hitEdge(p, t, skip) {
+  let best = null;
+  for (let e = 0; e < 3; e++) {
+    if (e === skip) continue;
+    const a = PR[EDGES[e][0]], b = PR[EDGES[e][1]], ex = b[0] - a[0], ey = b[1] - a[1], den = t.x * ey - t.y * ex;
+    if (Math.abs(den) < 1e-12) continue;
+    const s = ((a[0] - p.x) * ey - (a[1] - p.y) * ex) / den, u = ((a[0] - p.x) * t.y - (a[1] - p.y) * t.x) / den;
+    if (s > 1e-6 && u >= 0 && u <= 1 && (!best || s < best.s)) best = { s, e };
+  }
+  return best;
+}
+function trace(i, lam, g) {
+  const d = dirFromInc(i), n = nGlass(g, lam);
+  let t = refr(d, { x: -NIN.x, y: -NIN.y }, 1 / n), p = P1, skip = 2, tir = 0, out = null, exitE = -1;
+  const pts = [P1];
+  for (let k = 0; k < 5 && t; k++) {
+    const h = hitEdge(p, t, skip); if (!h) break;
+    const q = { x: p.x + h.s * t.x, y: p.y + h.s * t.y }; pts.push(q);
+    const no = outN(h.e), r = refr(t, { x: -no.x, y: -no.y }, n);
+    if (r) { out = { p: q, d: r }; exitE = h.e; break; }
+    const dt = t.x * no.x + t.y * no.y; t = { x: t.x - 2 * dt * no.x, y: t.y - 2 * dt * no.y }; tir++; p = q; skip = h.e;
+  }
+  const dev = out ? Math.acos(clamp(d.x * out.d.x + d.y * out.d.y, -1, 1)) * DEG : null;
+  // the same numbers by the school formulas
+  const g1 = Math.asin(Math.sin(i * RAD) / n) * DEG, g2 = APEX - g1, sb = n * Math.sin(g2 * RAD);
+  return { lam, n, pts, out, tir, exitE, dev, ok: !!out && tir === 0 && exitE === 0, g1, g2, sb, beta: sb <= 1 ? Math.asin(sb) * DEG : null };
+}
+
+// ---------- lesson 2: Young's double slit (small-angle approximation) ----------
+function young(x) {   // x in mm on the screen → relative intensity
+  const k = S.d * x / S.L * 1000 / S.lam, u = Math.PI * SLIT_A * x / S.L * 1000 / S.lam;
+  const env = Math.abs(u) < 1e-9 ? 1 : (Math.sin(u) / u) ** 2;
+  return Math.cos(Math.PI * k) ** 2 * env;
+}
+
+// ---------- lesson 3: grating ----------
+const gratD = () => 1000 / S.N;                  // period in µm
+const orders = lam => { const d = gratD(), km = Math.floor(d * 1000 / lam), o = []; for (let k = -km; k <= km; k++) { const s = k * lam / (d * 1000); if (Math.abs(s) < 1) o.push({ k, phi: Math.asin(s) * DEG }); } return o; };
+function bright(lam, phi) { const d = gratD(), s = Math.sin(phi * RAD); let b = 0; for (const o of orders(lam)) b = Math.max(b, Math.exp(-(((s - o.k * lam / (d * 1000)) / 0.004) ** 2)) * (o.k === 0 ? 1 : 0.9)); return b; }
+
+// ---------- lesson 4: polaroids ----------
+const cos2 = a => Math.cos(a * RAD) ** 2;
+function polar() {
+  const I1 = 50, I2 = S.mid ? I1 * cos2(S.a2) : I1, I3 = I2 * cos2(S.a3 - (S.mid ? S.a2 : 0));
+  return { I1, I2, I3 };
+}
+
+function model() {
+  const id = LID();
+  if (id === 'disp') {
+    const rays = MODES[S.mode].wl.map(l => trace(S.inc, l, S.glass));
+    return { kind: 'disp', rays, red: trace(S.inc, 700, S.glass), vio: trace(S.inc, 410, S.glass), ok: rays.every(r => r.ok) };
+  }
+  if (id === 'interf') {
+    const dx = S.lam * S.L / S.d / 1000, delta = S.d * S.px / S.L * 1000;
+    return { kind: 'interf', dx, delta, k: delta / S.lam, I: young(S.px) };
+  }
+  if (id === 'diffr') {
+    const lam = LASERS[S.laser].wl, o = orders(lam), p1 = o.find(q => q.k === 1);
+    return { kind: 'diffr', lam, d: gratD(), o, B: bright(lam, S.tel), phi1: p1 ? p1.phi : null };
+  }
+  return Object.assign({ kind: 'polar' }, polar());
+}
+
+// ---------- drawing ----------
+const ol = (d, fill, stroke, w = 2.2, extra = '') => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${w + 2.6}" stroke-linejoin="round" stroke-linecap="round"/><path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round" ${extra}/>`;
+const P = (x, y) => `${x.toFixed(1)} ${y.toFixed(1)}`;
+
+function room() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.05)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="2400" fill="url(#tile)"/>
+    <rect x="-2000" y="398" width="4520" height="1200" fill="#151c2a"/><rect x="-2000" y="396" width="4520" height="3" fill="#2c3954"/>`;
+}
+function laserBody(x, y, col) {
+  return ol(`M${x} ${y - 9}h56v18h-56z`, '#2a3348', '#56627d', 1.6) + `<rect x="${x + 56}" y="${y - 4}" width="6" height="8" fill="#8a96b0" stroke="${INK}"/><circle cx="${x + 12}" cy="${y}" r="3" fill="${col}"/><text x="${x + 32}" y="${y + 3}" font-size="7.5" fill="#8b96ad" text-anchor="middle">ЛАЗЕР</text>`;
+}
+
+function dispScene(m) {
+  let h = '';
+  const d = dirFromInc(S.inc), L0 = { x: P1.x - d.x * 150, y: P1.y - d.y * 150 }, ang = Math.atan2(d.y, d.x) * DEG;
+  // screen
+  h += ol(`M${SCR.x} ${SCR.y0}h10V${SCR.y1}h-10z`, '#d8dee8', '#eef2f8', 1.4);
+  h += ol(`M${SCR.x + 2} ${SCR.y1}v4h6v-4`, '#3a4762', '#56627d', 1.2);
+  // incoming white beam
+  const beamCol = S.mode === 'white' ? '#fff8e6' : wlColor(MODES[S.mode].wl[0]);
+  h += `<path d="M${P(L0.x + d.x * 4, L0.y + d.y * 4)}L${P(P1.x, P1.y)}" stroke="${beamCol}" stroke-width="3.2" opacity=".9"/>`;
+  // normal and angle
+  h += `<path d="M${P(P1.x - NIN.x * 64, P1.y - NIN.y * 64)}L${P(P1.x + NIN.x * 34, P1.y + NIN.y * 34)}" stroke="#8b96ad" stroke-width="1.1" stroke-dasharray="4 4"/>`;
+  const u0 = { x: -NIN.x, y: -NIN.y }, u1 = { x: -d.x, y: -d.y }, R = 30, sw = u0.x * u1.y - u0.y * u1.x > 0 ? 1 : 0;
+  h += `<path d="M${P(P1.x + R * u0.x, P1.y + R * u0.y)}A${R} ${R} 0 0 ${sw} ${P(P1.x + R * u1.x, P1.y + R * u1.y)}" fill="none" stroke="#ffb547" stroke-width="1.4"/>`;
+  const mx = u0.x + u1.x, my = u0.y + u1.y, ml = Math.hypot(mx, my) || 1;
+  h += `<text x="${(P1.x + 42 * mx / ml).toFixed(1)}" y="${(P1.y + 42 * my / ml + 3).toFixed(1)}" font-size="10" fill="#ffb547" text-anchor="middle">i</text>`;
+  // prism glass
+  h += `<path d="M${PR.map(p => p.join(' ')).join('L')}Z" fill="rgba(170,215,255,.13)"/>`;
+  // rays inside and out
+  h += `<g style="mix-blend-mode:screen">`;
+  for (const r of m.rays) {
+    const c = wlColor(r.lam);
+    h += `<path d="${r.pts.map((p, i) => (i ? 'L' : 'M') + P(p.x, p.y)).join('')}" stroke="${c}" stroke-width="1.6" fill="none" opacity=".85"/>`;
+    if (r.out) {
+      const o = r.out; let s = 600;
+      if (o.d.x > 0) { const sx = (SCR.x - o.p.x) / o.d.x, y = o.p.y + sx * o.d.y; if (y >= SCR.y0 && y <= SCR.y1) s = sx; }
+      const e = { x: o.p.x + o.d.x * s, y: o.p.y + o.d.y * s };
+      h += `<path d="M${P(o.p.x, o.p.y)}L${P(e.x, e.y)}" stroke="${c}" stroke-width="2.2" opacity=".9"/>`;
+      if (s < 600) h += `<rect x="${SCR.x}" y="${(e.y - 1.6).toFixed(1)}" width="10" height="3.2" fill="${c}"/>`;
+    }
+  }
+  h += `</g>`;
+  h += ol(`M${PR.map(p => p.join(' ')).join('L')}Z`, 'none', '#9fb3d1', 2.2);
+  h += `<path d="M236 160L196 232" stroke="#fff" stroke-opacity=".12" stroke-width="5" stroke-linecap="round"/>`;
+  h += `<text x="250" y="270" font-size="9" fill="#8b96ad" text-anchor="middle">${GLASS[S.glass].name}, A = 60°</text>`;
+  if (!m.ok) h += `<text x="250" y="312" font-size="10" fill="#ff8a73" text-anchor="middle">${m.rays.some(r => r.ok) ? 'часть лучей' : 'луч'} не выходит: полное отражение</text>`;
+  // lamp
+  h += `<g transform="translate(${P(L0.x, L0.y)}) rotate(${ang.toFixed(1)})" data-drag="lamp"><rect x="-58" y="-22" width="72" height="44" fill="transparent"/>` +
+       ol('M-50 -10h40l8 -5v30l-8 -5h-40z', '#2a3348', '#56627d', 1.6) + `<rect x="-1" y="-14" width="4" height="28" rx="1" fill="${beamCol}" opacity=".9"/>` +
+       `<path d="M-40 -10v20M-30 -10v20" stroke="#3a4762" stroke-width="2"/></g>`;
+  h += `<text x="${(L0.x - 30 * d.x).toFixed(1)}" y="${(L0.y - 30 * d.y + 26).toFixed(1)}" font-size="9" fill="#8b96ad" text-anchor="middle">i = ${S.inc}°</text>`;
+  return h;
+}
+
+const YS = { cy: 240, plate: 150, mm: 10 };
+const screenX = () => 220 + (S.L - 1) * 90;
+let patCache = { key: '', svg: '' };
+function interfScene(m, t) {
+  const SX = screenX(), cy = YS.cy, s = (12 + S.d * 60) / 2, col = wlColor(S.lam);
+  let h = laserBody(18, cy, col);
+  h += `<path d="M80 ${cy}H${YS.plate}" stroke="${col}" stroke-width="4" opacity=".9"/>`;
+  // wavefronts from two slits
+  const sp = 10 + (S.lam - 400) / 30, ph = reduce ? 0.3 : (t / 700) % 1;
+  h += `<defs><clipPath id="wv"><rect x="${YS.plate + 6}" y="70" width="${(SX - YS.plate - 6).toFixed(1)}" height="340"/></clipPath></defs><g clip-path="url(#wv)" fill="none" stroke="${col}" stroke-width="1.1">`;
+  for (const yy of [cy - s, cy + s]) for (let k = 0; ; k++) { const r = (k + ph) * sp; if (r > SX - YS.plate + 40) break; h += `<circle cx="${YS.plate + 3}" cy="${yy.toFixed(1)}" r="${r.toFixed(1)}" opacity="${(0.32 * (1 - r / (SX - YS.plate + 60))).toFixed(2)}"/>`; }
+  h += `</g>`;
+  // slit plate
+  h += ol(`M${YS.plate} 140H${YS.plate + 6}V${(cy - s - 2).toFixed(1)}H${YS.plate}Z`, '#3a4762', '#56627d', 1.2);
+  h += ol(`M${YS.plate} ${(cy - s + 2).toFixed(1)}H${YS.plate + 6}V${(cy + s - 2).toFixed(1)}H${YS.plate}Z`, '#3a4762', '#56627d', 1.2);
+  h += ol(`M${YS.plate} ${(cy + s + 2).toFixed(1)}H${YS.plate + 6}V340H${YS.plate}Z`, '#3a4762', '#56627d', 1.2);
+  h += `<text x="${YS.plate + 3}" y="132" font-size="8.5" fill="#8b96ad" text-anchor="middle">d = ${fmt(S.d, 2)} мм</text>`;
+  // L dimension
+  h += `<path d="M${YS.plate + 3} 372H${SX}" stroke="#8b96ad" stroke-width="1"/><path d="M${YS.plate + 3} 367v10M${SX} 367v10" stroke="#8b96ad" stroke-width="1"/><text x="${((YS.plate + SX) / 2).toFixed(1)}" y="388" font-size="9" fill="#8b96ad" text-anchor="middle">L = ${fmt(S.L, 1)} м</text>`;
+  // screen with the fringe pattern
+  const key = [S.lam, S.d, S.L].join('|');
+  if (patCache.key !== key) {
+    let p = '', g = '';
+    for (let i = -140; i < 140; i++) { const x = (i + 0.5) / 10, I = young(x); if (I > 0.02) p += `<rect x="0" y="${(-(i + 1)).toFixed(0)}" width="8" height="1.05" opacity="${I.toFixed(2)}"/>`; g += (g ? 'L' : 'M') + (12 + I * 62).toFixed(1) + ' ' + (-(i + 0.5)).toFixed(1); }
+    patCache = { key, svg: `<g fill="${col}">${p}</g><path d="${g}" fill="none" stroke="${col}" stroke-width="1.2" opacity=".8"/><path d="M12 -140V140" stroke="#26324a"/>` };
+  }
+  h += `<g data-drag="screen"><rect x="${SX - 8}" y="92" width="96" height="300" fill="transparent"/>` + ol(`M${SX} 96h8V384h-8z`, '#1b2232', '#56627d', 1.2) +
+       `<g transform="translate(${SX} ${cy})">${patCache.svg}</g></g>`;
+  // probe and the two paths
+  const yp = cy - S.px * YS.mm;
+  h += `<path d="M${YS.plate + 6} ${(cy - s).toFixed(1)}L${SX} ${yp.toFixed(1)}M${YS.plate + 6} ${(cy + s).toFixed(1)}L${SX} ${yp.toFixed(1)}" stroke="#ffb547" stroke-width="1" stroke-dasharray="3 3" opacity=".8"/>`;
+  h += `<g data-drag="probe"><rect x="${SX - 26}" y="${(yp - 12).toFixed(1)}" width="30" height="24" fill="transparent"/>` + ol(`M${SX - 1} ${yp.toFixed(1)}l-12 -7v14z`, '#ffb547', '#ffd08a', 1.3) + `</g>`;
+  h += `<text x="${SX - 16}" y="${(yp - 11).toFixed(1)}" font-size="8.5" fill="#ffb547" text-anchor="end">${fmt(S.px, 1)} мм</text>`;
+  return h;
+}
+
+const GR = { x: 170, y: 225, R: 165 };
+const polarPt = (phi, r) => ({ x: GR.x + r * Math.cos(phi * RAD), y: GR.y - r * Math.sin(phi * RAD) });
+function diffrScene(m) {
+  const col = wlColor(m.lam);
+  let h = `<rect x="${GR.x + 24}" y="40" width="400" height="360" fill="transparent" data-drag="tel"/>`;
+  h += laserBody(16, GR.y, col);
+  h += `<path d="M78 ${GR.y}H${GR.x}" stroke="${col}" stroke-width="4" opacity=".9"/>`;
+  // protractor
+  let arc = '';
+  for (let a = -75; a <= 75; a++) {
+    const L = a % 10 === 0 ? 10 : a % 5 === 0 ? 6 : 3, p = polarPt(a, GR.R), q = polarPt(a, GR.R + L);
+    arc += `M${P(p.x, p.y)}L${P(q.x, q.y)}`;
+    if (a % 10 === 0) { const tl = polarPt(a, GR.R + 20); h += `<text x="${tl.x.toFixed(1)}" y="${(tl.y + 3).toFixed(1)}" font-size="8" fill="#8b96ad" text-anchor="middle">${Math.abs(a)}</text>`; }
+  }
+  const pa = polarPt(-75, GR.R), pb = polarPt(75, GR.R);
+  h += `<path d="M${P(pa.x, pa.y)}A${GR.R} ${GR.R} 0 0 0 ${P(pb.x, pb.y)}" fill="none" stroke="#56627d" stroke-width="1.4"/><path d="${arc}" stroke="#56627d" stroke-width="1"/>`;
+  // diffraction orders
+  h += `<g style="mix-blend-mode:screen">`;
+  for (const o of m.o) {
+    if (Math.abs(o.phi) > 78) continue;
+    const e = polarPt(o.phi, GR.R + 34), lb = polarPt(o.phi, GR.R + 44);
+    h += `<path d="M${GR.x} ${GR.y}L${P(e.x, e.y)}" stroke="${col}" stroke-width="${o.k === 0 ? 2.4 : 1.8}" opacity="${o.k === 0 ? 0.85 : 0.6}"/><circle cx="${e.x.toFixed(1)}" cy="${e.y.toFixed(1)}" r="3.4" fill="${col}"/>`;
+    if (Math.abs(o.k) <= 3) h += `<text x="${lb.x.toFixed(1)}" y="${(lb.y + 3).toFixed(1)}" font-size="8" fill="${col}" text-anchor="middle">${o.k}</text>`;
+  }
+  h += `</g>`;
+  // grating
+  let hatch = ''; for (let y = 152; y <= 298; y += 4) hatch += `M${GR.x - 3} ${y}h6`;
+  h += ol(`M${GR.x - 4} 148h8V302h-8z`, 'rgba(170,215,255,.15)', '#9fb3d1', 1.4) + `<path d="${hatch}" stroke="#c8d6ec" stroke-width=".6" opacity=".7"/>`;
+  h += `<text x="${GR.x}" y="140" font-size="8.5" fill="#8b96ad" text-anchor="middle">${S.N} штр/мм</text>`;
+  // telescope
+  const a = -S.tel, p0 = polarPt(S.tel, 110);
+  h += `<path d="M${GR.x} ${GR.y}L${P(p0.x, p0.y)}" stroke="#56627d" stroke-width="3"/>`;
+  h += `<g transform="translate(${P(GR.x, GR.y)}) rotate(${a.toFixed(2)})" data-drag="tel"><rect x="100" y="-16" width="96" height="32" fill="transparent"/>` +
+       ol('M108 -8h62v16h-62z', '#2a3348', '#8a96b0', 1.6) + ol('M170 -5h16v10h-16z', '#3a4762', '#a9b4c9', 1.4) + `<path d="M108 0h-4" stroke="#ffb547" stroke-width="2"/></g>`;
+  h += `<circle cx="${GR.x}" cy="${GR.y}" r="4" fill="#ffb547" stroke="${INK}" stroke-width="1.2"/>`;
+  return h;
+}
+
+const PZ = { y: 225, rx: 26, ry: 82, x1: 150, x2: 270, x3: 390, det: 470 };
+function polaroid(cx, th, id, label, on) {
+  const s = Math.sin(th * RAD), c = Math.cos(th * RAD), X = (x, y) => (cx + x * PZ.rx).toFixed(1), Y = (x, y) => (PZ.y - y * PZ.ry).toFixed(1);
+  let lines = '';
+  for (const o of [-0.66, -0.33, 0, 0.33, 0.66]) { const x0 = o * c - 1.2 * s, y0 = -o * s - 1.2 * c, x1 = o * c + 1.2 * s, y1 = -o * s + 1.2 * c; lines += `M${X(x0, y0)} ${Y(x0, y0)}L${X(x1, y1)} ${Y(x1, y1)}`; }
+  let h = `<g data-drag="${id}"><ellipse cx="${cx}" cy="${PZ.y}" rx="${PZ.rx + 10}" ry="${PZ.ry + 10}" fill="transparent"/>`;
+  h += `<clipPath id="cl${id}"><ellipse cx="${cx}" cy="${PZ.y}" rx="${PZ.rx}" ry="${PZ.ry}"/></clipPath>`;
+  h += `<ellipse cx="${cx}" cy="${PZ.y}" rx="${PZ.rx}" ry="${PZ.ry}" fill="rgba(120,130,150,.28)"/>`;
+  h += `<path d="${lines}" clip-path="url(#cl${id})" stroke="#c8d6ec" stroke-width="1" opacity=".45"/>`;
+  h += ol(`M${cx - PZ.rx} ${PZ.y}a${PZ.rx} ${PZ.ry} 0 1 0 ${2 * PZ.rx} 0a${PZ.rx} ${PZ.ry} 0 1 0 ${-2 * PZ.rx} 0`, 'none', on ? '#a9b4c9' : '#56627d', 2.4);
+  h += `<path d="M${X(-s, -c)} ${Y(-s, -c)}L${X(s, c)} ${Y(s, c)}" stroke="#ffb547" stroke-width="2"/>`;
+  h += `<circle cx="${X(s, c)}" cy="${Y(s, c)}" r="5" fill="#ffb547" stroke="${INK}" stroke-width="1.4"/>`;
+  h += `</g><text x="${cx}" y="${PZ.y + PZ.ry + 22}" font-size="8.5" fill="#8b96ad" text-anchor="middle">${label}</text><text x="${cx}" y="${PZ.y + PZ.ry + 34}" font-size="8.5" fill="#ffb547" text-anchor="middle">ось ${Math.round(((th % 180) + 180) % 180)}°</text>`;
+  return h;
+}
+function eGlyph(cx, th, amp) {   // E-vector in the same oblique projection as the polaroids
+  if (amp < 0.02) return `<circle cx="${cx}" cy="${PZ.y}" r="1.6" fill="#56627d"/>`;
+  const L = 52 * amp, s = Math.sin(th * RAD), c = Math.cos(th * RAD), ax = cx + s * L * PZ.rx / PZ.ry, ay = PZ.y - c * L, bx = cx - s * L * PZ.rx / PZ.ry, by = PZ.y + c * L;
+  return `<path d="M${P(bx, by)}L${P(ax, ay)}" stroke="#72d4e8" stroke-width="2"/><circle cx="${ax.toFixed(1)}" cy="${ay.toFixed(1)}" r="2.4" fill="#72d4e8"/><circle cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="2.4" fill="#72d4e8"/>`;
+}
+function polarScene(m) {
+  const y = PZ.y, seg = (x0, x1, I) => `<rect x="${x0}" y="${y - 5}" width="${x1 - x0}" height="10" fill="#fff4d6" opacity="${(0.08 + 0.85 * I / 100).toFixed(2)}"/>`;
+  let h = seg(70, PZ.x1, 100) + seg(PZ.x1, PZ.x3, S.mid ? m.I1 : m.I1);
+  if (S.mid) h = seg(70, PZ.x1, 100) + seg(PZ.x1, PZ.x2, m.I1) + seg(PZ.x2, PZ.x3, m.I2);
+  h += seg(PZ.x3, PZ.det - 14, m.I3);
+  // lamp
+  h += ol('M24 205h44v40h-44z', '#2a3348', '#56627d', 1.6) + `<circle cx="62" cy="225" r="8" fill="#fff4d6"/><text x="46" y="262" font-size="8.5" fill="#8b96ad" text-anchor="middle">лампа</text>`;
+  // natural light: many directions
+  for (const a of [0, 45, 90, 135]) h += eGlyph(105, a, 0.5);
+  h += polaroid(PZ.x1, 0, 'p1', 'поляризатор', false);
+  if (S.mid) { h += eGlyph(210, 0, Math.sqrt(m.I1 / 100)); h += polaroid(PZ.x2, S.a2, 'p2', 'средний', true); h += eGlyph(330, S.a2, Math.sqrt(m.I2 / 100)); }
+  else {
+    h += eGlyph(270, 0, Math.sqrt(m.I1 / 100));
+    h += `<g data-drag="slot"><ellipse cx="${PZ.x2}" cy="${y}" rx="${PZ.rx + 6}" ry="${PZ.ry + 6}" fill="transparent"/><ellipse cx="${PZ.x2}" cy="${y}" rx="${PZ.rx}" ry="${PZ.ry}" fill="none" stroke="#56627d" stroke-width="1.4" stroke-dasharray="5 5"/></g><text x="${PZ.x2}" y="${y + PZ.ry + 22}" font-size="8.5" fill="#8b96ad" text-anchor="middle">место для поляроида</text>`;
+  }
+  h += polaroid(PZ.x3, S.a3, 'p3', 'анализатор', true);
+  h += eGlyph(430, S.a3, Math.sqrt(m.I3 / 100));
+  // detector
+  const glow = clamp(m.I3 / 50, 0, 1);
+  h += ol(`M${PZ.det - 12} 196h40v58h-40z`, '#2a3348', '#56627d', 1.6) + `<rect x="${PZ.det - 12}" y="210" width="6" height="30" fill="#fff4d6" opacity="${(0.15 + 0.85 * glow).toFixed(2)}"/>`;
+  h += `<rect x="${PZ.det - 3}" y="214" width="28" height="22" rx="2" fill="#0d1a14" stroke="${INK}"/><text x="${PZ.det + 11}" y="228.5" font-size="8.5" fill="#86e0a8" text-anchor="middle">${fmt(m.I3, 1)}</text>`;
+  h += `<text x="${PZ.det + 8}" y="270" font-size="8.5" fill="#8b96ad" text-anchor="middle">датчик, %</text>`;
+  return h;
+}
+
+function hlBox(id) {
+  if (id === 'lamp') { const d = dirFromInc(S.inc), x = P1.x - d.x * 150, y = P1.y - d.y * 150; return [x - 62, y - 30, 80, 60]; }
+  if (id === 'tel') { const p = polarPt(S.tel, 150); return [p.x - 46, p.y - 46, 92, 92]; }
+  if (id === 'screen') { const SX = screenX(); return [SX - 6, 90, 96, 300]; }
+  if (id === 'probe') { const SX = screenX(), yp = YS.cy - S.px * YS.mm; return [SX - 20, yp - 14, 26, 28]; }
+  return {
+    prism: [152, 122, 196, 172], normal: [P1.x - 70, P1.y - 50, 112, 90], scr: [462, 104, 26, 296],
+    laser2: [12, 226, 72, 28], plate: [140, 126, 30, 222],
+    laser3: [10, 211, 72, 28], grating: [160, 132, 22, 176], prot: [GR.x + 10, 40, 200, 370],
+    lamp4: [18, 198, 56, 70], p1: [116, 133, 68, 200], p2: [236, 133, 68, 200], p3: [356, 133, 68, 200], det: [454, 190, 52, 86],
+  }[id] || null;
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID(), m = model();
+  let h = room();
+  if (id === 'disp') h += dispScene(m);
+  else if (id === 'interf') h += interfScene(m, t);
+  else if (id === 'diffr') h += diffrScene(m);
+  else h += polarScene(m);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2]}" height="${b[3]}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}" pointer-events="none"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 500, hh / 400, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 402 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer: drag lamp, screen, probe, telescope, polaroids ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+function applyDrag(id, p) {
+  if (id === 'lamp') { const dx = P1.x - p.x, dy = P1.y - p.y; if (Math.hypot(dx, dy) < 20) return; S.inc = clamp(Math.round(30 - Math.atan2(dy, dx) * DEG), 5, 85); }
+  else if (id === 'probe') S.px = clamp(r1((YS.cy - p.y) / YS.mm), -14, 14);
+  else if (id === 'screen') S.L = clamp(r1(1 + (p.x - 220) / 90), 1, 3);
+  else if (id === 'tel') { const a = Math.atan2(GR.y - p.y, p.x - GR.x) * DEG; S.tel = clamp(r1(a), -75, 75); }
+  else if (id === 'p2' || id === 'p3') {
+    const cx = id === 'p2' ? PZ.x2 : PZ.x3, x = (p.x - cx) / PZ.rx, y = (PZ.y - p.y) / PZ.ry;
+    if (Math.hypot(x, y) < 0.3) return;
+    const a = Math.round(((Math.atan2(x, y) * DEG) % 180 + 180) % 180) % 180;
+    if (id === 'p2') S.a2 = a; else S.a3 = a;
+  } else return;
+  update();
+}
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  const id = el.dataset.drag; e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  drag = { id, x: e.clientX, y: e.clientY, moved: false };
+  if (id === 'slot') { act('mid'); return; }
+  if (id === 'p1') { toast('Первый поляроид закреплён: его ось вертикальна.'); return; }
+  if (id !== 'screen') applyDrag(id, toSvg(e));
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 4) drag.moved = true;
+  if (drag.moved) applyDrag(drag.id, toSvg(e));
+});
+const endDrag = () => { if (!drag) return; drag = null; scene.classList.remove('grabbing'); dirty = true; };
+scene.addEventListener('pointerup', endDrag);
+scene.addEventListener('pointercancel', endDrag);
+
+let lastDraw = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const anim = !!S.hl || (!reduce && LID() === 'interf' && t - lastDraw > 40);
+  if (dirty || anim) { drawScene(t); dirty = false; lastDraw = t; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    disp: ['white', 'red', 'green', 'violet'].map(k => B('m-' + k, k === 'white' ? 'Белый' : k === 'red' ? 'Красный' : k === 'green' ? 'Зелёный' : 'Фиолет.', S.mode === k)).join('') + sep + B('i-', 'i −1°') + B('i+', 'i +1°') + sep + B('g-crown', 'Крон', S.glass === 'crown') + B('g-flint', 'Флинт', S.glass === 'flint'),
+    interf: B('lam-', 'λ −') + B('lam+', 'λ +') + sep + B('d-', 'd −') + B('d+', 'd +') + sep + B('L-', 'L −') + B('L+', 'L +') + sep + B('x+', 'Датчик ▲') + B('x-', '▼'),
+    diffr: B('las-red', '650 нм', S.laser === 'red') + B('las-green', '532 нм', S.laser === 'green') + B('las-x', 'Лазер «?»', S.laser === 'x') + sep + B('N-', 'N −') + B('N+', 'N +') + sep + B('t-', '−0,1°') + B('t+', '+0,1°'),
+    polar: B('mid', S.mid ? 'Убрать средний' : 'Вставить средний') + sep + (S.mid ? B('a2-', 'Ср. −1°') + B('a2+', 'Ср. +1°') + sep : '') + B('a3-', 'Ан. −1°') + B('a3+', 'Ан. +1°'),
+  }[id];
+}
+function act(a) {
+  if (a.startsWith('m-')) { S.mode = a.slice(2); renderTools(); }
+  else if (a === 'i-' || a === 'i+') S.inc = clamp(S.inc + (a === 'i+' ? 1 : -1), 5, 85);
+  else if (a.startsWith('g-')) { S.glass = a.slice(2); renderTools(); }
+  else if (a === 'lam-' || a === 'lam+') S.lam = clamp(S.lam + (a === 'lam+' ? 10 : -10), 400, 700);
+  else if (a === 'd-' || a === 'd+') S.d = clamp(Math.round((S.d + (a === 'd+' ? 0.05 : -0.05)) * 100) / 100, 0.1, 0.5);
+  else if (a === 'L-' || a === 'L+') S.L = clamp(r1(S.L + (a === 'L+' ? 0.1 : -0.1)), 1, 3);
+  else if (a === 'x-' || a === 'x+') S.px = clamp(r1(S.px + (a === 'x+' ? 0.1 : -0.1)), -14, 14);
+  else if (a.startsWith('las-')) { S.laser = a.slice(4); renderTools(); }
+  else if (a === 'N-' || a === 'N+') S.N = clamp(S.N + (a === 'N+' ? 100 : -100), 100, 600);
+  else if (a === 't-' || a === 't+') S.tel = clamp(r1(S.tel + (a === 't+' ? 0.1 : -0.1)), -75, 75);
+  else if (a.startsWith('ans-')) {
+    const v = +a.slice(4);
+    if (!S.found) { toast('Сначала наведите трубу на максимум 1-го порядка лазера «?».'); return; }
+    S.ans = v; if (v !== 450) toast('Не сходится. Пересчитайте: λ = d · sin φ.');
+  }
+  else if (a === 'mid') { S.mid = !S.mid; S.a2 = 0; renderTools(); buildScheme(); }
+  else if (a === 'a2-' || a === 'a2+') S.a2 = ((S.a2 + (a === 'a2+' ? 1 : -1)) % 180 + 180) % 180;
+  else if (a === 'a3-' || a === 'a3+') S.a3 = ((S.a3 + (a === 'a3+' ? 1 : -1)) % 180 + 180) % 180;
+  else return;
+  update();
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  lamp: IC('<path d="M4 12h16l5-3v16l-5-3H4z" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M27 17h5" stroke="#fff4d6" stroke-width="2"/>'),
+  prism: IC('<path d="M17 5L30 28H4Z" fill="rgba(170,215,255,.15)" stroke="var(--fg)" stroke-width="1.6"/><path d="M24 17l8 4M24 17l8 7" stroke="#ff5a4a"/><path d="M24 17l7 9" stroke="#8a6bff"/>'),
+  normal: IC('<path d="M6 28L28 6" stroke="var(--muted)" stroke-width="1.4" stroke-dasharray="3 3"/><path d="M4 12L17 17" stroke="var(--fg)" stroke-width="1.8"/>'),
+  screen: IC('<rect x="14" y="4" width="6" height="26" fill="#d8dee8"/><rect x="14" y="14" width="6" height="2" fill="#ff5a4a"/><rect x="14" y="17" width="6" height="2" fill="#8a6bff"/>'),
+  laser: IC('<rect x="3" y="12" width="20" height="10" rx="2" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M23 17h9" stroke="#ff5a4a" stroke-width="2"/>'),
+  slits: IC('<path d="M15 3v11M15 16v2M15 20v11" stroke="var(--fg)" stroke-width="3"/><path d="M19 15q6 2 0 4M19 15q10 2 0 4" fill="none" stroke="var(--arm)" stroke-width="1"/>'),
+  probe: IC('<path d="M26 17l-12-7v14z" fill="var(--force)"/>'),
+  grating: IC('<rect x="14" y="4" width="6" height="26" fill="none" stroke="var(--fg)" stroke-width="1.4"/><path d="M15 7h4M15 10h4M15 13h4M15 16h4M15 19h4M15 22h4M15 25h4" stroke="var(--muted)"/>'),
+  tel: IC('<path d="M5 25L27 10" stroke="var(--fg)" stroke-width="5"/><path d="M27 10l4-3" stroke="var(--muted)" stroke-width="3"/>'),
+  prot: IC('<path d="M6 30A24 24 0 0 1 30 6" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M8 22l3 1M13 14l2 2M21 8l1 3" stroke="var(--muted)"/>'),
+  pol: IC('<ellipse cx="17" cy="17" rx="7" ry="14" fill="rgba(120,130,150,.3)" stroke="var(--fg)" stroke-width="1.5"/><path d="M17 4v26" stroke="var(--force)" stroke-width="1.8"/>'),
+  det: IC('<rect x="8" y="8" width="18" height="18" rx="2" fill="none" stroke="var(--fg)" stroke-width="1.6"/><rect x="12" y="13" width="10" height="7" fill="#0d1a14"/><path d="M14 17h6" stroke="var(--ok)" stroke-width="1.4"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+const deg = (x, n = 1) => fmt(x, n) + '°';
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (L.id === 'disp') {
+    const f = k => (S.seen[k] ? '✓' : '—');
+    return `i = ${S.inc}° · белый ${f('white')} · красный ${f('red')} · фиолетовый ${f('violet')}` + (S.inc !== 50 ? ' · нужен угол 50°' : !m.ok ? ' · луч не выходит' : '');
+  }
+  if (L.id === 'interf') return `Δx = ${fmt(m.dx, 2)} мм · датчик: Δ = ${fmt(m.k, 2)}λ`;
+  if (L.id === 'diffr') return `Лазер ${LASERS[S.laser].name} · труба ${deg(S.tel)} · ` + (S.found ? 'максимум 1-го порядка «?» найден' : 'максимум «?» не найден') + (S.ans && S.ans !== 450 ? ` · ответ ${S.ans} нм не подходит` : '');
+  return S.mid ? `На датчик: ${fmt(m.I3, 1)} % от I₀` : 'Средний поляроид не вставлен · на датчик ' + fmt(m.I3, 1) + ' %';
+}
+
+// ---------- Scheme tab ----------
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+const chips = (id, list, cur) => `<div class="chips" id="${id}">${list.map(([v, l]) => `<button data-v="${v}" aria-pressed="${v === String(cur)}">${l}</button>`).join('')}</div>`;
+function nChart() {
+  const g = S.glass, lo = nGlass(g, 700), hi = nGlass(g, 400), X = l => 14 + (l - 400) / 300 * 100, Y = n => 50 - (n - lo) / (hi - lo) * 40;
+  let d = ''; for (let l = 400; l <= 700; l += 10) d += (d ? 'L' : 'M') + X(l).toFixed(1) + ' ' + Y(nGlass(g, l)).toFixed(1);
+  let h = `<svg class="diag" viewBox="0 0 120 64" role="img" aria-label="Показатель преломления стекла от длины волны"><defs><linearGradient id="sp">${[400, 450, 500, 550, 600, 650, 700].map((l, i) => `<stop offset="${i / 6}" stop-color="${wlColor(l)}"/>`).join('')}</linearGradient></defs>`;
+  h += `<rect x="14" y="54" width="100" height="3" fill="url(#sp)"/><path d="${d}" fill="none" stroke="#e8ecf4" stroke-width=".8"/>`;
+  h += `<text x="12" y="${Y(hi) + 1.2}" font-size="3.4" fill="#8b96ad" text-anchor="end">${fmt(hi, 3)}</text><text x="12" y="${Y(lo) + 1.2}" font-size="3.4" fill="#8b96ad" text-anchor="end">${fmt(lo, 3)}</text>`;
+  h += `<text x="14" y="62" font-size="3.4" fill="#8b96ad">400 нм</text><text x="114" y="62" font-size="3.4" fill="#8b96ad" text-anchor="end">700 нм</text><text x="64" y="7" font-size="3.4" fill="#8b96ad" text-anchor="middle">n(λ), стекло ${GLASS[g].name}</text>`;
+  for (const l of MODES[S.mode].wl) h += `<circle cx="${X(l).toFixed(1)}" cy="${Y(nGlass(g, l)).toFixed(1)}" r="1.5" fill="${wlColor(l)}" stroke="#04070d" stroke-width=".3"/>`;
+  return h + `</svg>`;
+}
+function youngChart() {
+  const X = x => 60 + x * 3.9;
+  let d = ''; for (let i = -140; i <= 140; i++) { const x = i / 10; d += (d ? 'L' : 'M') + X(x).toFixed(1) + ' ' + (44 - young(x) * 32).toFixed(1); }
+  let h = `<svg class="diag" viewBox="0 0 120 56" role="img" aria-label="Распределение яркости на экране"><path d="M5 44H115M60 10V44" stroke="#26324a" stroke-width=".4"/>`;
+  h += `<path d="${d}" fill="none" stroke="${wlColor(S.lam)}" stroke-width=".7"/>`;
+  for (const x of [-10, -5, 0, 5, 10]) h += `<text x="${X(x)}" y="50" font-size="3.2" fill="#8b96ad" text-anchor="middle">${x}</text>`;
+  h += `<text x="115" y="54" font-size="3.2" fill="#8b96ad" text-anchor="end">x, мм</text><text x="6" y="8" font-size="3.2" fill="#8b96ad">I / Iмакс</text>`;
+  h += `<path d="M${X(S.px).toFixed(1)} 8V44" stroke="#ffb547" stroke-width=".5" stroke-dasharray="1 1"/><circle cx="${X(S.px).toFixed(1)}" cy="${(44 - young(S.px) * 32).toFixed(1)}" r="1.4" fill="#ffb547"/>`;
+  return h + `</svg>`;
+}
+function malusChart(m) {
+  const vsMid = S.mid, X = a => 12 + a / 180 * 100, Y = I => 46 - I / 50 * 36;
+  let d = ''; for (let a = 0; a <= 180; a += 2) { const I = vsMid ? 50 * cos2(a) * cos2(S.a3 - a) : 50 * cos2(a); d += (d ? 'L' : 'M') + X(a).toFixed(1) + ' ' + Y(I).toFixed(1); }
+  const cur = vsMid ? S.a2 : S.a3;
+  let h = `<svg class="diag" viewBox="0 0 120 58" role="img" aria-label="Интенсивность на датчике от угла поворота"><path d="M12 46H112M12 10V46" stroke="#26324a" stroke-width=".4"/>`;
+  h += `<path d="${d}" fill="none" stroke="#72d4e8" stroke-width=".8"/>`;
+  for (const a of [0, 45, 90, 135, 180]) h += `<text x="${X(a)}" y="52" font-size="3.2" fill="#8b96ad" text-anchor="middle">${a}°</text>`;
+  h += `<text x="10" y="${Y(50) + 1}" font-size="3.2" fill="#8b96ad" text-anchor="end">50</text><text x="10" y="${Y(0) + 1}" font-size="3.2" fill="#8b96ad" text-anchor="end">0</text>`;
+  h += `<text x="112" y="57" font-size="3.2" fill="#8b96ad" text-anchor="end">ось ${vsMid ? 'среднего' : 'анализатора'}</text><text x="14" y="7" font-size="3.2" fill="#8b96ad">I на датчике, % от I₀</text>`;
+  h += `<circle cx="${X(cur).toFixed(1)}" cy="${Y(m.I3).toFixed(1)}" r="1.5" fill="#ffb547"/>`;
+  return h + `</svg>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'disp') h = `<h2>Призма и спектр</h2><div id="sDiag"></div>
+      <dl class="reads"><div><dt>n</dt><dd id="r1"></dd></div><div><dt>δ</dt><dd id="r2"></dd></div><div><dt>δф − δк</dt><dd id="r3"></dd></div></dl>` +
+      slider('inInc', 'Угол падения i', 5, 85, 1, S.inc) +
+      `<div class="ctl"><div class="lbl">Свет</div>${chips('modeChips', [['white', 'Белый'], ['red', 'Красный 700 нм'], ['green', 'Зелёный 530 нм'], ['violet', 'Фиолетовый 410 нм']], S.mode)}</div>
+       <div class="ctl"><div class="lbl">Стекло</div>${chips('glassChips', [['crown', 'Крон'], ['flint', 'Флинт']], S.glass)}</div>`;
+  if (id === 'interf') h = `<h2>Картина на экране</h2><div id="sDiag"></div>
+      <dl class="reads"><div><dt>Δx</dt><dd id="r1"></dd></div><div><dt>Δ / λ</dt><dd id="r2"></dd></div><div><dt>I</dt><dd id="r3"></dd></div></dl>` +
+      slider('inLam', 'Длина волны λ', 400, 700, 10, S.lam) + slider('inD', 'Расстояние между щелями d', 0.1, 0.5, 0.05, S.d) +
+      slider('inL', 'До экрана L', 1, 3, 0.1, S.L) + slider('inX', 'Датчик x', -14, 14, 0.1, S.px);
+  if (id === 'diffr') h = `<h2>Гониометр</h2>
+      <dl class="reads"><div><dt>d</dt><dd id="r1"></dd></div><div><dt>φ трубы</dt><dd id="r2"></dd></div><div><dt>Яркость</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Лазер</div>${chips('lasChips', [['red', 'Красный 650 нм'], ['green', 'Зелёный 532 нм'], ['x', 'Лазер «?»']], S.laser)}</div>` +
+      slider('inN', 'Штрихов на 1 мм, N', 100, 600, 100, S.N) + slider('inTel', 'Угол трубы φ', -75, 75, 0.1, S.tel) +
+      `<div class="ctl"><div class="lbl">Ответ: λ лазера «?»</div><div class="ansrow" id="ansS">${ANSWERS.map(v => `<button data-ans="${v}" aria-pressed="${S.ans === v}">${v} нм</button>`).join('')}</div></div>`;
+  if (id === 'polar') h = `<h2>Закон Малюса</h2><div id="sDiag"></div>
+      <dl class="reads"><div><dt>после 1-го</dt><dd id="r1"></dd></div><div><dt>${S.mid ? 'после ср.' : '—'}</dt><dd id="r2"></dd></div><div><dt>датчик</dt><dd id="r3"></dd></div></dl>` +
+      (S.mid ? slider('inA2', 'Ось среднего поляроида', 0, 179, 1, S.a2) : '') + slider('inA3', 'Ось анализатора', 0, 179, 1, S.a3) +
+      `<div class="row"><button class="ghostbtn" data-a="mid">${S.mid ? 'Убрать средний поляроид' : 'Вставить средний поляроид'}</button></div>`;
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', e => { fn(+e.target.value); update(); }); };
+  on('#inInc', v => S.inc = v); on('#inLam', v => S.lam = v); on('#inD', v => S.d = Math.round(v * 100) / 100); on('#inL', v => S.L = r1(v)); on('#inX', v => S.px = r1(v));
+  on('#inN', v => S.N = v); on('#inTel', v => S.tel = r1(v)); on('#inA2', v => S.a2 = v); on('#inA3', v => S.a3 = v);
+  el.querySelectorAll('#modeChips button').forEach(b => b.onclick = () => act('m-' + b.dataset.v));
+  el.querySelectorAll('#glassChips button').forEach(b => b.onclick = () => act('g-' + b.dataset.v));
+  el.querySelectorAll('#lasChips button').forEach(b => b.onclick = () => act('las-' + b.dataset.v));
+  el.querySelectorAll('#ansS button').forEach(b => b.onclick = () => act('ans-' + b.dataset.ans));
+  el.querySelectorAll('.row [data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  const pr = (s, cur) => el.querySelectorAll(s + ' button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === String(cur)));
+  const dg = el.querySelector('#sDiag');
+  if (m.kind === 'disp') {
+    dg.innerHTML = nChart();
+    const one = m.rays.length === 1 ? m.rays[0] : null;
+    set('#r1', one ? fmt(one.n, 4) : `${fmt(m.red.n, 3)}…${fmt(m.vio.n, 3)}`);
+    set('#r2', one ? (one.ok ? deg(one.dev) : 'не выходит') : (m.ok ? `${fmt(m.red.dev, 1)}…${fmt(m.vio.dev, 1)}°` : 'не выходит'));
+    set('#r3', m.red.ok && m.vio.ok ? deg(m.vio.dev - m.red.dev, 2) : '—');
+    set('#inIncO', S.inc + '°'); val('#inInc', S.inc); pr('#modeChips', S.mode); pr('#glassChips', S.glass);
+  } else if (m.kind === 'interf') {
+    dg.innerHTML = youngChart();
+    set('#r1', fmt(m.dx, 2) + ' мм'); set('#r2', fmt(m.k, 2)); set('#r3', fmt(m.I * 100, 0) + ' %');
+    set('#inLamO', S.lam + ' нм'); set('#inDO', fmt(S.d, 2) + ' мм'); set('#inLO', fmt(S.L, 1) + ' м'); set('#inXO', fmt(S.px, 1) + ' мм');
+    val('#inLam', S.lam); val('#inD', S.d); val('#inL', S.L); val('#inX', S.px);
+  } else if (m.kind === 'diffr') {
+    set('#r1', fmt(m.d, 3) + ' мкм'); set('#r2', deg(S.tel)); set('#r3', fmt(m.B * 100, 0) + ' %');
+    set('#inNO', S.N); set('#inTelO', deg(S.tel)); val('#inN', S.N); val('#inTel', S.tel); pr('#lasChips', S.laser);
+    el.querySelectorAll('#ansS button').forEach(b => b.setAttribute('aria-pressed', S.ans === +b.dataset.ans));
+  } else {
+    dg.innerHTML = malusChart(m);
+    set('#r1', fmt(m.I1, 1) + ' %'); set('#r2', S.mid ? fmt(m.I2, 1) + ' %' : '—'); set('#r3', fmt(m.I3, 1) + ' %');
+    set('#inA2O', S.a2 + '°'); set('#inA3O', S.a3 + '°'); val('#inA2', S.a2); val('#inA3', S.a3);
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'disp') return [
+    { id: 'lamp', icon: ICON.lamp, name: 'Фонарь со светофильтрами', spec: 'Даёт узкий пучок белого света. Светофильтр пропускает только один цвет: красный 700 нм, зелёный 530 нм или фиолетовый 410 нм.' },
+    { id: 'prism', icon: ICON.prism, name: 'Стеклянная призма', spec: 'Преломляющий угол A = 60°. Крон — обычное оптическое стекло (n ≈ 1,52), флинт содержит свинец: n больше и дисперсия сильнее.' },
+    { id: 'normal', icon: ICON.normal, name: 'Нормаль и угол падения', spec: 'Пунктир — перпендикуляр к грани. Угол падения i отсчитывают от нормали, а не от поверхности.' },
+    { id: 'scr', icon: ICON.screen, name: 'Экран', spec: 'На нём видно, куда пришёл каждый цвет. Фиолетовая полоска ниже красной: её отклонило сильнее.' }];
+  if (id === 'interf') return [
+    { id: 'laser2', icon: ICON.laser, name: 'Лазер', spec: 'Источник когерентного света одной длины волны. Длину волны можно менять от 400 до 700 нм.' },
+    { id: 'plate', icon: ICON.slits, name: 'Две щели', spec: `Ширина каждой щели ${fmt(SLIT_A, 2)} мм, расстояние между ними d — от 0,1 до 0,5 мм. За щелями волны расходятся и накладываются.` },
+    { id: 'screen', icon: ICON.screen, name: 'Экран и график яркости', spec: 'Полосы на экране и кривая яркости справа. Экран можно отодвигать: L от 1 до 3 м. Чертёж по L не в масштабе.' },
+    { id: 'probe', icon: ICON.probe, name: 'Датчик', spec: 'Меряет яркость в точке x и считает разность хода Δ от двух щелей до неё.' }];
+  if (id === 'diffr') return [
+    { id: 'laser3', icon: ICON.laser, name: 'Лазеры', spec: 'Красный 650 нм, зелёный 532 нм и лазер «?» с неизвестной длиной волны.' },
+    { id: 'grating', icon: ICON.grating, name: 'Дифракционная решётка', spec: 'N штрихов на 1 мм, период d = 1/N. Например, 300 штр/мм → d ≈ 3,33 мкм.' },
+    { id: 'tel', icon: ICON.tel, name: 'Зрительная труба', spec: 'Вращается вокруг решётки. Когда в неё попадает максимум, в окуляре яркое пятно на перекрестье.' },
+    { id: 'prot', icon: ICON.prot, name: 'Лимб', spec: 'Шкала углов от −75° до +75°, отсчёт от направления лазера. Труба читает угол с точностью 0,1°.' }];
+  return [
+    { id: 'lamp4', icon: ICON.lamp, name: 'Лампа', spec: 'Даёт естественный свет: E колеблется во всех направлениях поперёк луча.' },
+    { id: 'p1', icon: ICON.pol, name: 'Поляризатор', spec: 'Ось вертикальна и закреплена. Пропускает половину интенсивности, свет за ним поляризован.' },
+    { id: 'p2', icon: ICON.pol, name: 'Средний поляроид', spec: 'Вставляется между двумя другими. Его ось можно вращать.' },
+    { id: 'p3', icon: ICON.pol, name: 'Анализатор', spec: 'Второй поляроид. По закону Малюса пропускает долю cos²φ от падающего на него света.' },
+    { id: 'det', icon: ICON.det, name: 'Датчик', spec: 'Показывает интенсивность в процентах от I₀ — света лампы.' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    const extra = L.id === 'diffr' ? `<div class="lbl" style="font-size:13px;font-weight:500;margin-top:6px">Ваш ответ: λ лазера «?»</div><div class="ansrow" id="ansO">${ANSWERS.map(v => `<button data-ans="${v}" aria-pressed="${S.ans === v}">${v} нм</button>`).join('')}</div>` : '';
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      (L.safe ? `<div class="safe"><b>Безопасность</b>${L.safe}</div>` : '') +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p>${extra}<div class="state ${done ? 'done' : ''}" style="margin-top:8px">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+    $('#pane-overview').querySelectorAll('#ansO button').forEach(b => b.onclick = () => act('ans-' + b.dataset.ans));
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Приборы</h2><p class="note">Что стоит на оптической скамье. Нажмите на прибор, чтобы найти его.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function prismSteps(r) {
+  const c = wlColor(r.lam);
+  let h = `<h3 style="color:${c}">λ = ${r.lam} нм</h3><div class="steps">` +
+    step('n = A + B/λ²', `${fmt(GLASS[S.glass].A, 4)} + ${fmt(GLASS[S.glass].B, 4)} / ${fmt(r.lam / 1000, 2)}² = ${fmt(r.n, 4)}`) +
+    step('sin γ₁ = sin i / n', `${fmt(Math.sin(S.inc * RAD), 4)} / ${fmt(r.n, 4)} → γ₁ = ${deg(r.g1, 2)}`) +
+    step('γ₂ = A − γ₁', `60° − ${deg(r.g1, 2)} = ${deg(r.g2, 2)}`) +
+    step('sin β = n · sin γ₂', `${fmt(r.n, 4)} × ${fmt(Math.sin(r.g2 * RAD), 4)} = ${fmt(r.sb, 4)}`);
+  if (r.beta === null) h += step('итог', 'sin β > 1 — полное отражение, луч не выходит', 'sum');
+  else h += step('β', deg(r.beta, 2)) + step('δ = i + β − A', `${S.inc}° + ${deg(r.beta, 2)} − 60° = ${deg(S.inc + r.beta - APEX, 2)}`, 'sum');
+  return h + `</div>`;
+}
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'disp') {
+    let h = `<h2>Ход луча в призме</h2><div class="formula">sin i = n · sin γ<br>δ = i + β − A</div><p class="note">i — угол падения на первую грань, γ₁ и γ₂ — углы внутри стекла, β — угол выхода из второй грани. Для призмы γ₁ + γ₂ = A.</p>`;
+    const list = S.mode === 'white' ? [m.red, m.vio] : m.rays;
+    h += list.map(prismSteps).join('');
+    if (S.mode === 'white' && m.red.ok && m.vio.ok) h += `<h3>Ширина спектра</h3><div class="steps">` + step('δф − δк', `${deg(m.vio.dev, 2)} − ${deg(m.red.dev, 2)} = ${deg(m.vio.dev - m.red.dev, 2)}`, 'sum') + `</div><p class="note" style="margin-top:10px">У фиолетового света n больше, поэтому он отклоняется сильнее.</p>`;
+    return h;
+  }
+  if (id === 'interf') {
+    const dmm = S.d, Lm = S.L;
+    return `<h2>Опыт Юнга</h2><div class="formula">Δx = λL / d<br>Δ ≈ d · x / L</div><p class="note">Максимум: Δ = kλ. Минимум: Δ = (k + ½)λ. Формулы верны, пока x много меньше L.</p>
+      <h3>Ширина полосы</h3><div class="steps">` +
+      step('λ', `${S.lam} нм = ${fmt(S.lam / 1000, 2)} · 10⁻⁶ м`) + step('d', `${fmt(dmm, 2)} мм = ${fmt(dmm, 2)} · 10⁻³ м`) + step('L', `${fmt(Lm, 1)} м`) +
+      step('Δx = λL / d', `${fmt(S.lam / 1000, 2)}·10⁻⁶ × ${fmt(Lm, 1)} / ${fmt(dmm, 2)}·10⁻³ = ${fmt(m.dx, 2)} мм`, 'sum') + `</div>
+      <h3>Датчик в точке x = ${fmt(S.px, 1)} мм</h3><div class="steps">` +
+      step('Δ = d · x / L', `${fmt(dmm, 2)}·10⁻³ × ${fmt(S.px, 1)}·10⁻³ / ${fmt(Lm, 1)} = ${fmt(m.delta, 0)} нм`) +
+      step('Δ / λ', `${fmt(m.delta, 0)} / ${S.lam} = ${fmt(m.k, 2)}`) +
+      step('итог', Math.abs(m.k - Math.round(m.k)) < 0.1 ? `почти целое → светлая полоса (k = ${Math.round(Math.abs(m.k))})` : Math.abs(Math.abs(m.k % 1) - 0.5) < 0.1 ? 'половина λ → тёмная полоса' : 'между максимумом и минимумом', 'sum') + `</div>
+      <p class="note" style="margin-top:10px">Яркость ${fmt(m.I * 100, 0)} % от центральной. Она медленно спадает к краям, потому что сами щели имеют ширину ${fmt(SLIT_A, 2)} мм.</p>`;
+  }
+  if (id === 'diffr') {
+    const sp = Math.sin(Math.abs(S.tel) * RAD), meas = m.d * 1000 * sp;
+    let h = `<h2>Дифракционная решётка</h2><div class="formula">d · sin φ = kλ</div><h3>Решётка</h3><div class="steps">` +
+      step('d = 1 / N', `1 / ${S.N} мм = ${fmt(m.d, 3)} мкм`) + `</div>`;
+    if (S.laser !== 'x') {
+      h += `<h3>Лазер ${LASERS[S.laser].wl} нм: где максимумы</h3><div class="steps">` +
+        step('k макс', `${fmt(m.d * 1000, 0)} / ${m.lam} → ${Math.floor(m.d * 1000 / m.lam)}`) +
+        m.o.filter(o => o.k > 0).slice(0, 4).map(o => step(`k = ${o.k}: sin φ = kλ / d`, `${fmt(o.k * m.lam / 1000 / m.d, 4)} → φ = ${deg(o.phi, 2)}`)).join('') + `</div>`;
+    }
+    h += `<h3>Измерение по трубе (считаем, что k = 1)</h3><div class="steps">` +
+      step('φ трубы', deg(Math.abs(S.tel))) + step('sin φ', fmt(sp, 4)) +
+      step('λ = d · sin φ', `${fmt(m.d, 3)} мкм × ${fmt(sp, 4)} = ${fmt(meas, 0)} нм`, 'sum') + `</div>
+      <p class="note" style="margin-top:10px">${m.B > 0.5 ? 'Труба стоит на максимуме — измерению можно верить, если это действительно 1-й порядок.' : 'Сейчас труба не на максимуме: число выше ничего не значит.'} Чем больше угол, тем меньше относительная ошибка — поэтому берут решётку с большим N.</p>`;
+    return h;
+  }
+  let h = `<h2>Закон Малюса</h2><div class="formula">I = I₁ · cos²φ</div><p class="note">φ — угол между осями двух соседних поляроидов. Естественный свет первый поляроид ослабляет ровно вдвое.</p><div class="steps">` +
+    step('после поляризатора', 'I₁ = I₀ / 2 = 50 %');
+  if (S.mid) {
+    h += step(`средний: φ = ${S.a2}°`, `50 × cos²${S.a2}° = 50 × ${fmt(cos2(S.a2), 3)} = ${fmt(m.I2, 2)} %`);
+    const ph = ((S.a3 - S.a2) % 180 + 180) % 180;
+    h += step(`анализатор: φ = ${ph}°`, `${fmt(m.I2, 2)} × cos²${ph}° = ${fmt(m.I2, 2)} × ${fmt(cos2(ph), 3)} = ${fmt(m.I3, 2)} %`, 'sum');
+  } else h += step(`анализатор: φ = ${S.a3}°`, `50 × cos²${S.a3}° = 50 × ${fmt(cos2(S.a3), 3)} = ${fmt(m.I3, 2)} %`, 'sum');
+  h += `</div><p class="note" style="margin-top:10px">${S.mid ? 'С тремя поляроидами: I = I₀/2 · cos²θ · cos²(90° − θ) = I₀/8 · sin²2θ.' : 'Скрещенные поляроиды (φ = 90°): cos²90° = 0, свет не проходит.'}</p>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter'), ok = !!S.done[id];
+  if (m.kind === 'disp') {
+    const one = m.rays.length === 1 ? m.rays[0] : null;
+    const v = one ? (one.ok ? `δ = ${deg(one.dev)}` : 'не выходит') : (m.red.ok && m.vio.ok ? `Δδ = ${deg(m.vio.dev - m.red.dev, 2)}` : 'не выходит');
+    el.innerHTML = `<div class="k">${one ? 'Отклонение' : 'Ширина спектра'}</div><div class="v ${ok ? 'ok' : ''}">${v}</div>
+      <div class="spec" style="background:${one ? wlColor(one.lam) : 'linear-gradient(90deg,' + [700, 620, 580, 530, 490, 450, 410].map(wlColor).join(',') + ')'}"></div>
+      <div class="lr"><span>i</span><span>${S.inc}°</span></div>`;
+  } else if (m.kind === 'interf') {
+    el.innerHTML = `<div class="k">Полосы</div><div class="v ${ok ? 'ok' : ''}">Δx = ${fmt(m.dx, 2)} мм</div>
+      <div class="gauge"><b style="width:${(m.I * 100).toFixed(1)}%;background:${wlColor(S.lam)}"></b></div><div class="lr"><span>датчик Δ</span><span>${fmt(m.k, 2)}λ</span></div>`;
+  } else if (m.kind === 'diffr') {
+    let near = null; for (const o of m.o) if (!near || Math.abs(o.phi - S.tel) < Math.abs(near.phi - S.tel)) near = o;
+    const off = near ? clamp((near.phi - S.tel) * 12, -40, 40) : 99, c = wlColor(m.lam);
+    el.innerHTML = `<div class="k">Окуляр трубы</div><div class="v ${ok ? 'ok' : ''}">φ = ${deg(S.tel)}</div>
+      <svg viewBox="0 0 100 46" aria-hidden="true"><circle cx="50" cy="23" r="21" fill="#04070d" stroke="#56627d"/>${Math.abs(off) < 30 ? `<circle cx="${(50 - off).toFixed(1)}" cy="23" r="${(4 + 3 * m.B).toFixed(1)}" fill="${c}" opacity="${(0.25 + 0.75 * m.B).toFixed(2)}"/>` : ''}<path d="M29 23h42M50 2v42" stroke="#8b96ad" stroke-width=".6"/></svg>
+      <div class="lr"><span>яркость</span><span>${fmt(m.B * 100, 0)} %</span></div>`;
+  } else {
+    el.innerHTML = `<div class="k">Датчик</div><div class="v ${ok ? 'ok' : ''}">${fmt(m.I3, 1)} % I₀</div>
+      <div class="gauge"><b style="width:${(m.I3 * 2).toFixed(1)}%;background:#fff4d6"></b><i style="left:25%"></i></div><div class="lr"><span>${S.mid ? '3 поляроида' : '2 поляроида'}</span><span>0…50 %</span></div>`;
+  }
+}
+
+function update() {
+  const m = model(), L = LESSONS[S.lesson];
+  if (L.id === 'disp' && S.inc === 50 && m.ok && ['white', 'red', 'violet'].includes(S.mode) && !S.seen[S.mode]) { S.seen[S.mode] = true; toast(`Записано: ${MODES[S.mode].name} свет при i = 50°.`); }
+  if (L.id === 'diffr' && S.laser === 'x' && m.phi1 !== null && Math.abs(Math.abs(S.tel) - m.phi1) <= 0.2 && !S.found) { S.found = true; toast('Максимум 1-го порядка в перекрестье. Запишите угол.'); }
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Волновая оптика пройдена!');
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  disp: '<path d="M33 5L43 25H23Z" fill="rgba(170,215,255,.15)" stroke="#e8ecf4" stroke-width="1.1"/><path d="M6 19L28 15" stroke="#fff4d6" stroke-width="1.3"/><path d="M38 15L62 19" stroke="#ff5a4a"/><path d="M38 15L61 23" stroke="#5fd17a"/><path d="M38 15L59 27" stroke="#8a6bff"/>',
+  interf: '<path d="M18 3v10M18 15v1M18 18v9" stroke="#e8ecf4" stroke-width="2"/>' + [0, 1, 2, 3, 4, 5, 6].map(i => `<rect x="52" y="${2 + i * 4}" width="6" height="2" fill="#ff5a4a" opacity="${i === 3 ? 1 : 0.7}"/>`).join('') + '<path d="M21 14L51 9M21 17L51 9" stroke="#ffb547" stroke-width=".7"/>',
+  diffr: '<path d="M14 4v22" stroke="#e8ecf4" stroke-width="2" stroke-dasharray="1 1"/><path d="M2 15H14" stroke="#5fd17a" stroke-width="1.3"/><path d="M14 15H62M14 15L60 4M14 15L60 26" stroke="#5fd17a"/>',
+  polar: '<path d="M4 15H62" stroke="#fff4d6" stroke-width="1.6" opacity=".5"/><ellipse cx="20" cy="15" rx="4" ry="11" fill="rgba(120,130,150,.4)" stroke="#e8ecf4"/><ellipse cx="44" cy="15" rx="4" ry="11" fill="rgba(120,130,150,.4)" stroke="#e8ecf4"/><path d="M20 5v20" stroke="#ffb547"/><path d="M41 15h6" stroke="#ffb547"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i];
+  S.lesson = i; S.hl = null; S.seen = {}; drag = null;
+  Object.assign(S, L.init);
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const st = $('#lessons'), cur = st.querySelector('.lesson[aria-current="true"]');
+  if (cur) { const a = st.getBoundingClientRect(), b = cur.getBoundingClientRect(); st.scrollLeft += (b.left - a.left) - (a.width - b.width) / 2; }
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '';
+  if (id === 'disp') {
+    const r = x => x.ok ? `n = ${fmt(x.n, 4)}, отклонение δ = ${deg(x.dev, 2)}` : 'полное отражение на второй грани, луч не выходит';
+    now = `Призма из стекла ${GLASS[S.glass].name}, преломляющий угол 60°. Угол падения i = ${S.inc}°. Свет: ${MODES[S.mode].name}. Красный 700 нм: ${r(m.red)}. Фиолетовый 410 нм: ${r(m.vio)}. Записаны при i = 50°: белый ${S.seen.white ? 'да' : 'нет'}, красный ${S.seen.red ? 'да' : 'нет'}, фиолетовый ${S.seen.violet ? 'да' : 'нет'}.`;
+  }
+  if (id === 'interf') now = `Опыт Юнга: λ = ${S.lam} нм, расстояние между щелями d = ${fmt(S.d, 2)} мм, до экрана L = ${fmt(S.L, 1)} м. Ширина полосы Δx = ${fmt(m.dx, 2)} мм (нужно 3 мм). Датчик в точке x = ${fmt(S.px, 1)} мм, разность хода Δ = ${fmt(m.delta, 0)} нм = ${fmt(m.k, 2)}λ, яркость ${fmt(m.I * 100, 0)} % от центральной.`;
+  if (id === 'diffr') now = `Решётка ${S.N} штрихов/мм (d = ${fmt(m.d, 3)} мкм). Включён лазер ${S.laser === 'x' ? '«?» с неизвестной длиной волны (её нельзя называть ученику: пусть измерит угол и посчитает сам)' : LASERS[S.laser].wl + ' нм'}. Зрительная труба на угле ${deg(S.tel)}, яркость в окуляре ${fmt(m.B * 100, 0)} %. Максимум 1-го порядка лазера «?» найден: ${S.found ? 'да' : 'нет'}. Выбранный ответ: ${S.ans ? S.ans + ' нм' + (S.ans === 450 ? ' (верно)' : ' (неверно)') : 'нет'}. Варианты ответа: ${ANSWERS.join(', ')} нм.`;
+  if (id === 'polar') now = `Лампа даёт естественный свет I₀ = 100 %. Поляризатор с вертикальной осью (0°) → 50 %. ${S.mid ? `Средний поляроид вставлен, ось ${S.a2}° → ${fmt(m.I2, 1)} %. ` : 'Среднего поляроида нет. '}Анализатор, ось ${S.a3}° → на датчике ${fmt(m.I3, 1)} % от I₀. Максимум с тремя поляроидами при скрещенных крайних — 12,5 %.`;
+  return [
+    `Раздел: физика, 11 класс, волновая оптика. Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на скамье: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+    'Веди ученика наводящими вопросами, не давай готовый ответ сразу.',
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = {
+    disp: 'Почему фиолетовый свет преломляется сильнее красного?', interf: 'Почему нужны именно две щели от одного лазера?',
+    diffr: 'Чем спектр решётки отличается от спектра призмы?', polar: 'Как третий поляроид может добавить света?',
+  }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
