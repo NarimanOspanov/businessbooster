@@ -134,7 +134,7 @@ window.LUCH_SUBJECTS = {
       { id: 'health', b: 'human', g: 9, t: 'Здоровье и первая помощь', items: ['Первая помощь', 'Вредные привычки', 'Гигиена и режим дня'], req: ['blood'], status: 'done', href: '/labs/bio-health/', lessons: 3, doneItems: 3 },
 
       { id: 'mendel', b: 'gen', g: 10, t: 'Законы наследственности', items: ['Гены и признаки', 'Законы Менделя', 'Решётка Пеннета', 'Наследование пола'], req: ['division'], status: 'part', href: '/biology/', lessons: 5, doneItems: 3 },
-      { id: 'variation', b: 'gen', g: 10, t: 'Изменчивость', items: ['Мутации', 'Модификации', 'Наследственные болезни'], req: ['mendel'] },
+      { id: 'variation', b: 'gen', g: 10, t: 'Изменчивость', items: ['Мутации', 'Модификации', 'Наследственные болезни'], req: ['mendel'], status: 'done', href: '/labs/bio-variation/', lessons: 3, doneItems: 3 },
       { id: 'selection', b: 'gen', g: 11, t: 'Селекция', items: ['Сорта и породы', 'Гибридизация', 'Селекция микроорганизмов'], req: ['variation'] },
       { id: 'evolution', b: 'gen', g: 11, t: 'Эволюция', items: ['Дарвин и естественный отбор', 'Вид и видообразование', 'Доказательства эволюции'], req: ['variation', 'verts'] },
       { id: 'origin', b: 'gen', g: 11, t: 'Происхождение жизни и человека', items: ['Как появилась жизнь', 'Этапы развития жизни', 'Эволюция человека'], req: ['evolution'] },
@@ -166,7 +166,7 @@ window.LUCH_SUBJECTS = {
       { id: 'func', b: 'prog', g: 8, t: 'Функции и списки', items: ['Функции', 'Списки', 'Строки', 'Поиск ошибок'], req: ['python'], status: 'done', href: '/labs/cs-func/', lessons: 4, doneItems: 4 },
       { id: 'algos', b: 'prog', g: 9, t: 'Алгоритмы обработки', items: ['Поиск', 'Сортировки', 'Сложность алгоритма', 'Рекурсия'], req: ['func'], status: 'done', href: '/labs/cs-algos/', lessons: 4, doneItems: 4 },
       { id: 'oop', b: 'prog', g: 10, t: 'Структуры данных и ООП', items: ['Словари и множества', 'Классы и объекты', 'Работа с файлами'], req: ['algos'], status: 'done', href: '/labs/cs-oop/', lessons: 3, doneItems: 3 },
-      { id: 'project', b: 'prog', g: 11, t: 'Свой проект', items: ['Веб-приложение или бот', 'Git и работа в команде', 'Тестирование', 'Презентация проекта'], req: ['oop', 'web'] },
+      { id: 'project', b: 'prog', g: 11, t: 'Свой проект', items: ['Веб-приложение или бот', 'Git и работа в команде', 'Тестирование', 'Презентация проекта'], req: ['oop', 'web'], status: 'done', href: '/labs/cs-project/', lessons: 4, doneItems: 4 },
 
       { id: 'binary', b: 'data', g: 6, t: 'Системы счисления', items: ['Двоичная система', 'Перевод чисел', 'Шестнадцатеричная система'], req: ['info'], status: 'done', href: '/informatics/', lessons: 5, doneItems: 3 },
       { id: 'sheets', b: 'data', g: 7, t: 'Электронные таблицы', items: ['Формулы', 'Ссылки на ячейки', 'Диаграммы', 'Сортировка и фильтр'], req: ['pc'], status: 'done', href: '/labs/cs-sheets/', lessons: 4, doneItems: 4 },

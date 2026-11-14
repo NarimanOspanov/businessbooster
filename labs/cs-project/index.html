@@ -1,0 +1,937 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по информатике: свой проект — бот или веб-приложение, Git и работа в команде, тестирование, защита проекта.">
+<link rel="icon" href="data:,">
+<title>Свой проект</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /mechanics and /chemistry. Project scene (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--liq);transition:width .2s}
+.gauge i{position:absolute;top:-4px;width:2px;height:14px;background:var(--force);transform:translateX(-50%)}
+.swatch{height:12px;border-radius:4px;margin-top:9px;border:1px solid rgba(255,255,255,.15)}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.scene{touch-action:manipulation}
+.scene [data-a]{cursor:pointer}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="var(--force)"/><circle cx="12" cy="28" r="3" fill="var(--arm)"/><circle cx="28" cy="20" r="3" fill="var(--fg)"/><path d="M12 15v10M12 15q0 5 13 5" fill="none" stroke="var(--fg)" stroke-width="2" stroke-linecap="round"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Информатика · Свой проект</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#cs">Карта</a><a href="/physics/#cs">Информатика</a><a href="/labs/cs-project/" aria-current="page">Проект</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Проект</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Рабочий стол лаборатории">
+    <svg class="scene" id="scene" role="img" aria-label="Интерактивная сцена проекта: элементы можно нажимать"></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const KEY = 'luch-cs-project';
+const mmss = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+
+// ---------- lesson 1: client → server → database ----------
+const CARDS = {
+  tg: { name: 'Telegram', sub: 'клиент: приложение', kind: 'client' },
+  web: { name: 'Браузер', sub: 'клиент: сайт', kind: 'client' },
+  srv: { name: 'Сервер', sub: 'Python, обработчики', kind: 'server' },
+  db: { name: 'База данных', sub: 'SQLite, таблица tasks', kind: 'db' },
+};
+const TODO = ['Купить хлеб', 'Сдать проект', 'Позвонить бабушке', 'Повторить SQL'];
+
+// ---------- lesson 3: leap year tests ----------
+const YEARS = [2023, 2024, 1900, 2000, 2100, 1996];
+const VERS = [
+  { id: 'ref', name: 'Эталон', code: 'y%4==0 and (y%100!=0 or y%400==0)', short: 'тимлид', f: y => y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0) },
+  { id: 'A', name: 'Версия A', code: 'y % 4 == 0', short: 'y % 4 == 0', f: y => y % 4 === 0 },
+  { id: 'B', name: 'Версия B', code: 'y%4==0 and y%100!=0', short: 'y%4==0 and y%100!=0', f: y => y % 4 === 0 && y % 100 !== 0 },
+  { id: 'C', name: 'Версия C', code: 'y % 400 == 0', short: 'y % 400 == 0', f: y => y % 400 === 0 },
+];
+const MAXT = 4;
+
+// ---------- lesson 4: pitch ----------
+const SLIDES = [
+  { id: 'problem', name: 'Проблема', short: 'Проблема', sec: 40, col: '#ff8a73', what: 'кому и чем плохо без вашего бота' },
+  { id: 'demo', name: 'Живое демо', short: 'Демо', sec: 90, col: '#ffb547', what: 'бот работает прямо на экране' },
+  { id: 'arch', name: 'Как устроено', short: 'Устройство', sec: 50, col: '#72d4e8', what: 'клиент, сервер, база данных' },
+  { id: 'tests', name: 'Тесты и качество', short: 'Тесты', sec: 30, col: '#86e0a8', what: 'как вы проверяли, что всё работает' },
+  { id: 'users', name: 'Первые пользователи', short: 'Польз.', sec: 40, col: '#b7a6ff', what: 'сколько людей попробовали, что сказали' },
+  { id: 'team', name: 'Команда и роли', short: 'Команда', sec: 30, col: '#9fb3d1', what: 'кто что делал' },
+  { id: 'next', name: 'Что дальше', short: 'Планы', sec: 30, col: '#e8ecf4', what: 'планы и чем жюри может помочь' },
+  { id: 'code', name: 'Весь код на слайде', short: 'Код', sec: 90, col: '#56627d', trap: true, what: '200 строк мелким шрифтом' },
+  { id: 'sorry', name: '«Мы не успели…»', short: 'Не успели', sec: 30, col: '#56627d', trap: true, what: 'извинения за недоделки' },
+];
+const SL = id => SLIDES.find(s => s.id === id);
+const LIMIT = 300, MINT = 240;
+
+const LESSONS = [
+  { id: 'app', title: 'Бот или веб-приложение',
+    text: ['Почти любой проект — бот в Telegram или сайт — устроен одинаково. Клиент (приложение Telegram или браузер) отправляет запрос. Сервер — ваша программа на Python — находит нужный обработчик и готовит ответ.',
+           'Чтобы данные не пропали после перезапуска, сервер хранит их в базе данных: добавляет строку командой INSERT и читает командой SELECT. Ответ идёт обратно той же дорогой.',
+           'Бот и сайт отличаются только клиентом. Сервер и база у них могут быть общими.'],
+    why: 'Так устроены Kaspi, Kolesa, eGov и тысячи Telegram-ботов для кафе, школ и салонов. Простой бот для записи клиентов фрилансер делает на заказ, а junior backend-разработчик в Казахстане обычно начинает с 300–500 тыс. ₸ в месяц. Работающий бот — сильная строка в портфолио при поступлении и на первой работе.',
+    safe: 'Токен бота — это пароль. Не вписывайте его прямо в код и не публикуйте: храните в файле .env, который не попадает в Git.',
+    task: 'Соберите цепочку клиент → сервер → база данных. Добавьте задачу командой /add и получите её в ответ на /list.',
+    hint: 'Нажмите на карточку внизу — она встанет в первое свободное звено. Нажмите на звено, чтобы освободить его. Команды отправляйте кнопками на панели.',
+    stage: 'Нажимайте карточки, чтобы собрать цепочку. Команды — на панели внизу.',
+    init: { chain: [null, null, null], tasks: [], log: [], nreq: 0, listOK: false, last: null },
+    check: m => m.listOK },
+  { id: 'git', title: 'Git: ветки и слияние',
+    text: ['Git хранит историю проекта как цепочку коммитов — снимков кода с подписью, кто и что поменял. Ветка — это подвижная метка на коммите. HEAD показывает, где вы сейчас.',
+           'Новую функцию делают в отдельной ветке, чтобы не сломать рабочую main. Пока вы пишете код, коллега тоже отправляет коммиты на GitHub. git pull забирает их, git merge сливает ветки, git push отправляет ваши коммиты на сервер.',
+           'Если обе ветки ушли вперёд, Git создаёт коммит слияния с двумя родителями. Если двое правили одну и ту же строку, будет конфликт — его решают вручную.'],
+    why: 'Git — обязательный навык любого программиста: на собеседовании в банк, в Kaspi или в стартап из Astana Hub про ветки и pull request спросят почти наверняка. Через GitHub команда из трёх школьников пишет один проект и ничего не теряет. А история коммитов — портфолио, которое видит работодатель.',
+    safe: 'Перед первым коммитом добавьте .env с токенами и паролями в .gitignore. Что попало на GitHub, считайте опубликованным.',
+    task: 'Создайте ветку feature и сделайте в ней 2 коммита. Затем в main заберите коммит коллеги (git pull), слейте feature и отправьте main на GitHub (git push).',
+    hint: 'Коммит коллеги появится на GitHub, пока вы работаете в feature. Сливать и пушить нужно, стоя на main. Если push отклонён — на GitHub есть то, чего нет у вас.',
+    stage: 'Кнопки внизу — команды git. Кружки — коммиты, метки — ветки.',
+    init: { commits: [{ id: 'a1f', msg: 'Каркас бота', lane: 'main', p: [], who: 'вы' }, { id: 'b27', msg: 'Команда /start', lane: 'main', p: ['a1f'], who: 'вы' }],
+            refs: { main: 'b27' }, origin: 'b27', head: 'main', term: ['$ git clone github.com/team/todo-bot', 'Клонировано: 2 коммита'] },
+    check: m => m.gitOK },
+  { id: 'test', title: 'Тесты ловят ошибки',
+    text: ['Тест — маленькая программа: вызывает функцию с известным входом и сравнивает ответ с ожидаемым, например assert is_leap(2024) == True. Тесты запускают после каждого изменения — так ошибку находят за минуту, а не от пользователей.',
+           'Хороший тест бьёт по граничным случаям. Год високосный, если делится на 4, но не на 100. Исключение: делится на 400 — снова високосный.',
+           'У тимлида верная функция is_leap, а у трёх стажёров — по одной ошибке. Ваш набор тестов должен проходить на эталоне и падать на каждой ошибочной версии.'],
+    why: 'Тестировщик (QA-инженер) — одна из самых частых первых профессий в IT: junior QA в Казахстане нередко начинает с 250–400 тыс. ₸. Банки и маркетплейсы не выпускают обновление, пока не пройдут тысячи автотестов. А в своём проекте тесты экономят ночи перед сдачей.',
+    task: 'Наберите не больше 3 тестов, которые проходят на эталоне и ловят все три ошибочные версии. Запустите тесты.',
+    hint: 'Для года слева выберите верный ответ: «да» — високосный, «нет» — обычный. Подумайте, на каком годе правило «просто делится на 4» ошибается.',
+    stage: 'Выберите ожидаемый ответ для годов слева и нажмите «Запустить тесты».',
+    init: { suite: [], exp: {}, ran: null },
+    check: m => m.testOK },
+  { id: 'pitch', title: 'Защита проекта',
+    text: ['На защите у вас 5 минут, а жюри видит проект впервые. Сначала — проблема: кому и чем плохо без вашего продукта. Потом сразу демо: живой бот убеждает лучше любых слов.',
+           'После демо коротко расскажите, как всё устроено и как вы проверяли качество. В конце — что дальше. Стена кода на слайде и извинения за недоделки только съедают время.',
+           'Репетируйте с таймером: вслух всегда выходит дольше, чем кажется.'],
+    why: 'Умение за 5 минут объяснить, зачем нужен продукт, ценят везде: на питч-днях Astana Hub, на хакатонах с призовым фондом, на собеседовании, при защите проекта на конкурсе или гранте. Продакт-менеджеры и тимлиды делают такие выступления каждую неделю.',
+    task: 'Соберите выступление на 4–5 минут, которое выполняет все 6 критериев жюри.',
+    hint: 'Нажмите на карточку — слайд встанет в конец выступления. Нажмите на блок в таймлайне — он уберётся. Все хорошие слайды вместе дают 5:10, значит, один придётся убрать.',
+    stage: 'Нажимайте карточки слайдов. Таймлайн сверху — ваше выступление.',
+    init: { seq: [] },
+    check: m => m.crit.every(c => c.ok) },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null, anim: null };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+let st = {};                                    // state of the current lesson
+const resetLesson = () => { st = JSON.parse(JSON.stringify(LESSONS[S.lesson].init)); st.addN = 0; st.featN = 0; st.mainN = 0; st.mate = null; S.anim = null; };
+
+// ---------- lesson 1 model ----------
+const chainOK = () => st.chain[0] && CARDS[st.chain[0]].kind === 'client' && st.chain[1] === 'srv' && st.chain[2] === 'db';
+function sendCmd(cmd) {
+  const c = st.chain, client = c[0] && CARDS[c[0]].kind === 'client' ? c[0] : null;
+  st.nreq++;
+  const text = cmd === 'add' ? TODO[st.addN % TODO.length] : '';
+  const ask = client === 'web' ? { start: 'Открыть сайт', add: `Кнопка «Добавить»: ${text}`, list: 'Кнопка «Мои задачи»' }[cmd]
+                               : { start: '/start', add: `/add ${text}`, list: '/list' }[cmd];
+  const req = client === 'web' ? { start: 'GET /', add: 'POST /api/tasks', list: 'GET /api/tasks' }[cmd] : `update: "${ask}"`;
+  const tr = { cmd, client, ask, req, text, hops: [0], fail: null, reply: '', sql: null };
+  if (!client) { tr.fail = 'Нет клиента в первом звене: запрос некому отправить.'; tr.hops = []; }
+  else if (c[1] !== 'srv') { tr.fail = 'Во втором звене нет сервера: команду некому обработать.'; tr.hops = [0, 1]; }
+  else if (cmd === 'start') { tr.hops = [0, 1, 0]; tr.reply = client === 'web' ? 'Страница «Мои дела» загружена' : 'Привет! Я бот-список дел. /add — добавить, /list — показать.'; }
+  else if (c[2] !== 'db') { tr.fail = 'В третьем звене нет базы данных: задачу негде хранить.'; tr.hops = [0, 1, 2]; }
+  else if (cmd === 'add') {
+    st.tasks.push(text); st.addN++; tr.hops = [0, 1, 2, 1, 0];
+    tr.sql = `INSERT INTO tasks(text) VALUES ('${text}')`;
+    tr.reply = `Добавил: «${text}». Всего задач: ${st.tasks.length}`;
+  } else {
+    tr.hops = [0, 1, 2, 1, 0]; tr.sql = 'SELECT id, text FROM tasks';
+    tr.reply = st.tasks.length ? st.tasks.map((t, i) => `${i + 1}. ${t}`).join(' · ') : 'Список пуст';
+    if (st.tasks.length) st.listOK = true;
+  }
+  st.last = tr;
+  st.log.push({ who: 'you', t: ask }); st.log.push({ who: tr.fail ? 'err' : 'bot', t: tr.fail ? 'Ошибка: ' + tr.fail : tr.reply });
+  st.log = st.log.slice(-4);
+  S.anim = reduce || !tr.hops.length ? null : { t0: performance.now(), hops: tr.hops, fail: !!tr.fail };
+  if (tr.fail) toast(tr.fail);
+  update();
+}
+function placeCard(id) {
+  if (st.chain.includes(id)) { st.chain[st.chain.indexOf(id)] = null; update(); return; }
+  const i = st.chain.indexOf(null);
+  if (i < 0) { toast('Все звенья заняты. Нажмите на звено, чтобы освободить его.'); return; }
+  st.chain[i] = id; update();
+}
+
+// ---------- lesson 2 model ----------
+const IDS = ['a1f', 'b27', 'c3d', 'd48', 'e5a', 'f6b', '07c', '18d', '29e', '3af', '4b0', '5c1'];
+const FMSG = ['Команда /add', 'Команда /list', 'Хранение в SQLite', 'Опечатка в ответе'];
+const MMSG = ['Правка README', 'Обновлён .gitignore'];
+const C = id => st.commits.find(c => c.id === id);
+function anc(id) { const s = new Set(), q = [id]; while (q.length) { const x = q.pop(); if (!x || s.has(x)) continue; s.add(x); q.push(...C(x).p); } return s; }
+function say(cmd, out) { st.term.push('$ ' + cmd); if (out) st.term.push(out); st.term = st.term.slice(-6); }
+function newCommit(msg, lane, p, who) {
+  if (st.commits.length >= IDS.length) return null;
+  const id = IDS[st.commits.length]; st.commits.push({ id, msg, lane, p, who: who || 'вы' }); return id;
+}
+function mergeInto(br, src, msg) {
+  const tgt = st.refs[br];
+  if (anc(tgt).has(src)) return 'Already up to date.';
+  if (anc(src).has(tgt)) { st.refs[br] = src; return `Fast-forward: main → ${src}`; }
+  const id = newCommit(msg, 'main', [tgt, src]); if (!id) return null;
+  st.refs[br] = id; return `Merge made by the 'ort' strategy → ${id}`;
+}
+function git(a) {
+  const H = st.head;
+  if (a === 'branch') {
+    if (!st.refs.feature) { st.refs.feature = st.refs[H]; st.head = 'feature'; say('git switch -c feature', "Switched to a new branch 'feature'"); }
+    else { st.head = H === 'main' ? 'feature' : 'main'; say('git switch ' + st.head, `Switched to branch '${st.head}'`); }
+  }
+  if (a === 'commit') {
+    const feat = H === 'feature', msg = feat ? FMSG[st.featN % FMSG.length] : MMSG[st.mainN % MMSG.length];
+    const id = newCommit(msg, H, [st.refs[H]]);
+    if (!id) { toast('Для опыта коммитов хватит. Нажмите «Заново», если запутались.'); return; }
+    st.refs[H] = id; feat ? st.featN++ : st.mainN++;
+    say(`git commit -m "${msg}"`, `[${H} ${id}] ${msg}`);
+    if (feat && !st.mate) {
+      const mid = newCommit('Команда /help', 'main', [st.origin], 'Айгерим'); st.mate = mid; st.origin = mid;
+      st.term.push(`🔔 Айгерим отправила коммит ${mid} в main на GitHub`); st.term = st.term.slice(-6);
+      toast('Айгерим отправила свой коммит в main на GitHub.');
+    }
+  }
+  if (a === 'pull') {
+    if (H !== 'main') { say('git pull', 'У feature нет копии на GitHub. Коллега пушила в main — переключитесь на main.'); }
+    else { const r = mergeInto('main', st.origin, "Merge branch 'main' of github"); if (r === null) return toast('Для опыта коммитов хватит. Нажмите «Заново».'); say('git pull', r); }
+  }
+  if (a === 'merge') {
+    if (!st.refs.feature) say('git merge feature', "merge: feature - not something we can merge (ветки ещё нет)");
+    else if (H !== 'main') say('git merge feature', 'Вы и так на feature. Сливают, стоя на main: git switch main.');
+    else { const r = mergeInto('main', st.refs.feature, "Merge branch 'feature'"); if (r === null) return toast('Для опыта коммитов хватит. Нажмите «Заново».'); say('git merge feature', r); }
+  }
+  if (a === 'push') {
+    if (H !== 'main') { st.originFeature = st.refs.feature; say('git push -u origin feature', 'Ветка feature опубликована на GitHub (для pull request).'); }
+    else if (anc(st.refs.main).has(st.origin)) {
+      const was = st.origin; st.origin = st.refs.main;
+      say('git push', was === st.origin ? 'Everything up-to-date' : `main → main (${was}..${st.origin})`);
+    } else say('git push', '! [rejected] main → main (fetch first): на GitHub есть коммиты, которых у вас нет');
+  }
+  update();
+}
+function gitModel() {
+  const main = anc(st.refs.main), featIn = st.commits.filter(c => c.lane === 'feature' && main.has(c.id)).length;
+  const gitOK = !!st.mate && main.has(st.mate) && featIn >= 2 && st.origin === st.refs.main;
+  return { featIn, mateIn: !!st.mate && main.has(st.mate), synced: st.origin === st.refs.main, gitOK };
+}
+
+// ---------- lesson 3 model ----------
+function setExp(y, v) {
+  if (st.exp[y] === v) { delete st.exp[y]; st.suite = st.suite.filter(x => x !== y); }
+  else {
+    if (!(y in st.exp) && st.suite.length >= MAXT) { toast(`В этом опыте не больше ${MAXT} тестов. Уберите лишний.`); return; }
+    if (!(y in st.exp)) st.suite.push(y);
+    st.exp[y] = v;
+  }
+  st.ran = null; update();
+}
+function runTests() {
+  if (!st.suite.length) { toast('Сначала добавьте хотя бы один тест.'); return; }
+  st.ran = VERS.map(v => st.suite.map(y => v.f(y) === st.exp[y]));
+  update();
+}
+function testModel() {
+  const r = st.ran, refOK = r ? r[0].every(Boolean) : null, caught = r ? r.slice(1).filter(row => row.some(x => !x)).length : 0;
+  return { refOK, caught, n: st.suite.length, testOK: !!r && refOK && caught === 3 && st.suite.length <= 3 };
+}
+
+// ---------- lesson 4 model ----------
+function crit(seq) {
+  const i = id => seq.indexOf(id), total = seq.reduce((a, id) => a + SL(id).sec, 0);
+  return [
+    { t: 'Начало — проблема', ok: seq[0] === 'problem' },
+    { t: 'Есть живое демо', ok: i('demo') >= 0 },
+    { t: '«Как устроено» — после демо', ok: i('demo') >= 0 && i('arch') > i('demo') },
+    { t: 'Финал — «Что дальше»', ok: seq.length > 0 && seq[seq.length - 1] === 'next' },
+    { t: 'Без слайдов-ловушек', ok: seq.length > 0 && !seq.some(id => SL(id).trap) },
+    { t: 'Время от 4:00 до 5:00', ok: total >= MINT && total <= LIMIT },
+  ];
+}
+function toggleSlide(id) {
+  const k = st.seq.indexOf(id);
+  if (k >= 0) st.seq.splice(k, 1); else st.seq.push(id);
+  update();
+}
+
+function model() {
+  const id = LID();
+  if (id === 'app') return { kind: 'app', ok: chainOK(), listOK: st.listOK };
+  if (id === 'git') return Object.assign({ kind: 'git' }, gitModel());
+  if (id === 'test') return Object.assign({ kind: 'test' }, testModel());
+  const total = st.seq.reduce((a, s) => a + SL(s).sec, 0);
+  return { kind: 'pitch', total, crit: crit(st.seq) };
+}
+
+// ---------- drawing ----------
+const T = (x, y, s, size, fill, extra = '') => `<text x="${x}" y="${y}" font-size="${size}" fill="${fill}" ${extra}>${s}</text>`;
+const box = (x, y, w, h, fill, stroke, extra = '') => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="9" fill="${fill}" stroke="${stroke}" stroke-width="1.6" ${extra}/>`;
+const SLOT = [20, 190, 360], SLW = 140;
+const clip = (s, n) => s.length > n ? s.slice(0, n - 1) + '…' : s;
+
+function drawApp(t) {
+  let h = box(14, 98, 492, 120, '#0e1520', '#26324a');
+  h += T(26, 116, (st.chain[0] === 'web' ? 'Окно браузера' : 'Чат с ботом') + ' · последние сообщения', 10, '#8b96ad');
+  if (!st.log.length) h += T(26, 150, 'Пока пусто. Отправьте команду кнопками на панели внизу.', 11, '#8b96ad');
+  st.log.forEach((m, i) => {
+    const y = 136 + i * 20, col = m.who === 'you' ? '#ffb547' : m.who === 'err' ? '#ff8a73' : '#86e0a8';
+    h += T(26, y, (m.who === 'you' ? 'Вы: ' : m.who === 'err' ? '⚠ ' : 'Ответ: ') + esc(clip(m.t, 74)), 11, col);
+  });
+  // chain
+  for (let i = 0; i < 2; i++) { const x = SLOT[i] + SLW; h += `<path d="M${x + 4} 266h22M${x + 20} 261l6 5-6 5M${x + 26} 278h-22M${x + 10} 273l-6 5 6 5" stroke="#8b96ad" stroke-width="1.6" fill="none"/>`; }
+  st.chain.forEach((cid, i) => {
+    const x = SLOT[i], c = cid ? CARDS[cid] : null;
+    h += `<g data-a="slot:${i}" style="cursor:pointer">` + box(x, 236, SLW, 74, c ? '#1a2438' : 'rgba(26,36,56,.35)', c ? '#9fb3d1' : '#26324a', c ? '' : 'stroke-dasharray="5 4"');
+    h += T(x + 10, 252, `звено ${i + 1}`, 9, '#8b96ad');
+    if (c) {
+      h += T(x + 10, 272, c.name, 14, '#e8ecf4', 'font-weight="500"') + T(x + 10, 288, c.sub, 9.5, '#8b96ad');
+      if (cid === 'db') h += T(x + 10, 302, `tasks: ${st.tasks.length} ${st.tasks.length === 1 ? 'строка' : st.tasks.length >= 2 && st.tasks.length <= 4 ? 'строки' : 'строк'}`, 9.5, '#72d4e8');
+    } else h += T(x + 10, 280, 'пусто', 12, '#56627d');
+    h += `</g>`;
+  });
+  // packet
+  if (S.anim) {
+    const A = S.anim, hop = 380, k = Math.max(0, (t - A.t0) / hop), n = A.hops.length - 1;
+    if (k >= n + 0.6) S.anim = null;
+    else {
+      const j = Math.min(n, Math.floor(k)), f = j >= n ? 0 : k - j, a = A.hops[j], b = A.hops[Math.min(n, j + 1)];
+      const cx = SLOT[a] + SLW / 2 + (SLOT[b] - SLOT[a]) * f, back = b < a || (j > 0 && A.hops[j] < A.hops[j - 1]);
+      const red = A.fail && j >= n;
+      h += `<circle cx="${cx.toFixed(1)}" cy="${back ? 318 : 230}" r="6" fill="${red ? '#ff8a73' : back ? '#86e0a8' : '#ffb547'}" stroke="${INK}" stroke-width="1.5"/>`;
+    }
+  }
+  // cards
+  h += T(14, 334, 'Карточки (нажмите, чтобы поставить в цепочку)', 10, '#8b96ad');
+  Object.entries(CARDS).forEach(([id, c], i) => {
+    const x = 10 + i * 128, used = st.chain.includes(id);
+    h += `<g data-a="card:${id}" style="cursor:pointer" opacity="${used ? 0.4 : 1}">` + box(x, 342, 116, 50, '#121a28', used ? '#26324a' : '#56627d');
+    h += T(x + 10, 362, c.name, 12.5, '#e8ecf4', 'font-weight="500"') + T(x + 10, 380, used ? 'в цепочке' : c.sub, 9, '#8b96ad') + `</g>`;
+  });
+  return h;
+}
+
+const GX = i => 64 + i * 39, LANE = { main: 262, feature: 340 };
+function drawGit() {
+  let h = box(14, 98, 492, 110, '#070b12', '#26324a');
+  st.term.forEach((l, i) => h += T(24, 116 + i * 16, esc(clip(l, 76)), 10, l.startsWith('$') ? '#e8ecf4' : l.startsWith('!') ? '#ff8a73' : l.startsWith('🔔') ? '#ffb547' : '#86e0a8'));
+  // lanes
+  for (const [ln, y] of Object.entries(LANE)) {
+    if (ln === 'feature' && !st.refs.feature) continue;
+    h += `<path d="M50 ${y}H510" stroke="#26324a" stroke-width="1" stroke-dasharray="3 4"/>` + T(6, y + 4, ln, 10, '#8b96ad');
+  }
+  const pos = {}; st.commits.forEach((c, i) => pos[c.id] = [GX(i), LANE[c.lane]]);
+  const local = new Set([...anc(st.refs.main), ...(st.refs.feature ? anc(st.refs.feature) : [])]);
+  st.commits.forEach(c => c.p.forEach(p => {
+    const [x1, y1] = pos[p], [x2, y2] = pos[c.id], dash = local.has(c.id) ? '' : 'stroke-dasharray="4 4"';
+    h += y1 === y2 ? `<path d="M${x1} ${y1}H${x2}" stroke="#56627d" stroke-width="2.4" ${dash}/>` : `<path d="M${x1} ${y1}C${x1 + 24} ${y1} ${x2 - 24} ${y2} ${x2} ${y2}" fill="none" stroke="#56627d" stroke-width="2.4" ${dash}/>`;
+  }));
+  st.commits.forEach(c => {
+    const [x, y] = pos[c.id], loc = local.has(c.id), mrg = c.p.length > 1;
+    const fill = !loc ? '#0e1520' : c.who !== 'вы' ? '#b7a6ff' : c.lane === 'feature' ? '#72d4e8' : '#ffb547';
+    h += `<circle cx="${x}" cy="${y}" r="${mrg ? 11 : 9}" fill="${fill}" stroke="${loc ? INK : '#b7a6ff'}" stroke-width="2" ${loc ? '' : 'stroke-dasharray="3 2"'}/>`;
+    if (mrg) h += `<circle cx="${x}" cy="${y}" r="4" fill="${INK}"/>`;
+    h += T(x, y + (c.lane === 'main' ? 24 : -15), c.id, 8.5, '#8b96ad', 'text-anchor="middle"');
+  });
+  // tags: above for main lane, below for feature lane; stacked by row so they never overlap
+  const tags = [['main', st.refs.main], ['feature', st.refs.feature], ['origin/main', st.origin], ['origin/feature', st.originFeature]].filter(x => x[1]);
+  const rows = { main: 0, feature: 0 };
+  tags.forEach(([name, id]) => {
+    const [x, y] = pos[id], lane = C(id).lane, k = rows[lane]++;
+    const label = (st.head === name ? 'HEAD → ' : '') + name, w = label.length * 6.1 + 12, remote = name.startsWith('origin');
+    const ty = lane === 'main' ? y - 30 - k * 18 : y + 28 + k * 18, tx = clamp(x - w / 2, 4, 516 - w);
+    h += `<rect x="${tx.toFixed(1)}" y="${ty - 11}" width="${w.toFixed(1)}" height="15" rx="4" fill="${remote ? '#0e1520' : name === 'main' ? '#ffb547' : '#72d4e8'}" stroke="${remote ? '#b7a6ff' : INK}" stroke-width="1.2"/>`;
+    h += T((tx + w / 2).toFixed(1), ty, label, 10, remote ? '#b7a6ff' : '#0b1019', 'text-anchor="middle" font-weight="500"');
+  });
+  h += T(14, 398, '● ваш   ● в feature   ● коллеги   ◌ только на GitHub', 9.5, '#8b96ad');
+  return h;
+}
+
+const MX = j => 350 + j * 40, MY = r => 154 + r * 44;
+function drawTest() {
+  let h = T(14, 112, 'Год → високосный?', 11, '#8b96ad');
+  YEARS.forEach((y, i) => {
+    const yy = 122 + i * 42, on = y in st.exp;
+    h += box(8, yy, 224, 34, on ? '#1a2438' : '#121a28', on ? '#9fb3d1' : '#26324a');
+    h += T(20, yy + 23, y, 16, '#e8ecf4', 'font-weight="500"');
+    [[true, 'да', 104], [false, 'нет', 166]].forEach(([v, lab, x]) => {
+      const sel = st.exp[y] === v;
+      h += `<g data-a="exp:${y}:${v ? 1 : 0}" style="cursor:pointer"><rect x="${x}" y="${yy + 5}" width="56" height="24" rx="6" fill="${sel ? '#e8ecf4' : '#0e1520'}" stroke="${sel ? '#e8ecf4' : '#56627d'}" stroke-width="1.4"/>` + T(x + 28, yy + 21, lab, 12, sel ? '#0b1019' : '#e8ecf4', 'text-anchor="middle"') + `</g>`;
+    });
+  });
+  // matrix
+  h += T(250, 112, `Набор тестов: ${st.suite.length} из ${MAXT}`, 11, '#8b96ad');
+  st.suite.forEach((y, j) => h += T(MX(j) + 17, 138, y, 10, '#e8ecf4', 'text-anchor="middle"') + T(MX(j) + 17, 148, st.exp[y] ? 'да' : 'нет', 8.5, '#8b96ad', 'text-anchor="middle"'));
+  VERS.forEach((v, r) => {
+    const y = MY(r), row = st.ran ? st.ran[r] : null, bad = row && row.some(x => !x);
+    let col = '#e8ecf4', note = v.id === 'ref' ? 'тимлид' : 'стажёр';
+    if (row) { if (v.id === 'ref') { col = bad ? '#ff8a73' : '#86e0a8'; note = bad ? 'упал! тест неверный' : 'все тесты прошли'; } else { col = bad ? '#86e0a8' : '#ff8a73'; note = bad ? 'ошибка поймана' : 'ошибка не поймана'; } }
+    h += T(250, y + 13, v.name, 12, col, 'font-weight="500"') + T(250, y + 26, note, 8.5, col);
+    for (let j = 0; j < MAXT; j++) {
+      const x = MX(j);
+      if (j >= st.suite.length) { h += `<rect x="${x}" y="${y}" width="34" height="30" rx="5" fill="none" stroke="#26324a" stroke-dasharray="3 3"/>`; continue; }
+      const res = row ? row[j] : null;
+      h += `<rect x="${x}" y="${y}" width="34" height="30" rx="5" fill="${res === null ? '#1a2438' : res ? 'rgba(134,224,168,.22)' : 'rgba(255,138,115,.25)'}" stroke="${res === null ? '#26324a' : res ? '#86e0a8' : '#ff8a73'}" stroke-width="1.4"/>`;
+      h += T(x + 17, y + 20, res === null ? '·' : res ? '✓' : '✗', 13, res === null ? '#8b96ad' : res ? '#86e0a8' : '#ff8a73', 'text-anchor="middle"');
+    }
+  });
+  const m = testModel();
+  h += T(250, 340, st.ran ? `Поймано ошибок: ${m.caught} из 3 · эталон ${m.refOK ? 'проходит' : 'падает'}` : 'Тесты ещё не запускали', 10.5, st.ran ? (m.testOK ? '#86e0a8' : '#e8ecf4') : '#8b96ad');
+  h += `<g data-a="run" style="cursor:pointer">` + box(250, 352, 256, 38, '#e8ecf4', '#e8ecf4') + T(378, 376, '▶ Запустить тесты', 13, '#0b1019', 'text-anchor="middle" font-weight="600"') + `</g>`;
+  return h;
+}
+
+const TX = s => 20 + s * 4 / 3;                // 80 units per minute
+function drawPitch() {
+  const m = model();
+  let h = T(14, 108, 'Ваше выступление', 11, '#8b96ad');
+  h += `<rect x="${TX(MINT)}" y="116" width="${TX(LIMIT) - TX(MINT)}" height="54" fill="rgba(134,224,168,.08)"/>`;
+  h += `<rect x="20" y="122" width="480" height="40" rx="6" fill="#0e1520" stroke="#26324a"/>`;
+  let s = 0;
+  st.seq.forEach((id, k) => {
+    const d = SL(id), x0 = TX(s), x1 = Math.min(TX(s + d.sec), 500); s += d.sec;
+    if (x0 >= 500) return;
+    h += `<g data-a="tl:${k}" style="cursor:pointer"><rect x="${x0.toFixed(1)}" y="124" width="${Math.max(2, x1 - x0 - 2).toFixed(1)}" height="36" rx="4" fill="${d.col}" opacity="${d.trap ? 0.9 : 0.85}" stroke="${INK}" stroke-width="1.2"/>`;
+    if (x1 - x0 > 26) h += T(((x0 + x1) / 2).toFixed(1), 146, clip(d.short, Math.floor((x1 - x0) / 6.2)), 10, d.trap ? '#e8ecf4' : '#0b1019', 'text-anchor="middle" font-weight="500"');
+    h += `</g>`;
+  });
+  if (m.total > 360) h += T(496, 146, '+', 14, '#ff8a73', 'text-anchor="end"');
+  for (let mn = 0; mn <= 6; mn++) h += `<path d="M${TX(mn * 60)} 162v5" stroke="#56627d"/>` + T(TX(mn * 60), 180, mn + ':00' + (mn === 5 ? ' лимит' : ''), 9, mn === 5 ? '#ff8a73' : '#8b96ad', 'text-anchor="middle"');
+  h += `<path d="M${TX(LIMIT)} 116v52" stroke="#ff8a73" stroke-width="2"/>`;
+  h += T(500, 108, `итого ${mmss(m.total)}`, 11, m.total > LIMIT ? '#ff8a73' : m.total >= MINT ? '#86e0a8' : '#e8ecf4', 'text-anchor="end"');
+  // pool
+  h += T(14, 200, 'Слайды (нажмите, чтобы добавить или убрать)', 10, '#8b96ad');
+  SLIDES.forEach((d, i) => {
+    const x = 8 + (i % 3) * 170, y = 208 + Math.floor(i / 3) * 44, k = st.seq.indexOf(d.id);
+    h += `<g data-a="sl:${d.id}" style="cursor:pointer" opacity="${k >= 0 ? 0.45 : 1}">` + box(x, y, 162, 38, '#121a28', k >= 0 ? '#26324a' : '#56627d');
+    h += `<rect x="${x + 7}" y="${y + 9}" width="6" height="20" rx="2" fill="${d.col}"/>`;
+    h += T(x + 20, y + 17, esc(d.name), 11, '#e8ecf4', 'font-weight="500"') + T(x + 20, y + 31, k >= 0 ? `№${k + 1} в выступлении` : mmss(d.sec), 9, '#8b96ad') + `</g>`;
+  });
+  // jury criteria
+  m.crit.forEach((c, i) => h += T(14 + (i % 2) * 256, 352 + Math.floor(i / 2) * 17, (c.ok ? '✓ ' : '○ ') + c.t, 10.5, c.ok ? '#86e0a8' : '#8b96ad'));
+  return h;
+}
+
+function hlBox(id) {
+  return {
+    chat: [10, 94, 500, 128], c0: [SLOT[0] - 4, 232, SLW + 8, 82], c1: [SLOT[1] - 4, 232, SLW + 8, 82], c2: [SLOT[2] - 4, 232, SLW + 8, 82], cards: [4, 324, 512, 74],
+    term: [10, 94, 500, 118], graph: [2, 220, 516, 160], tags: [40, 210, 476, 40], legend: [8, 386, 300, 18],
+    cand: [4, 98, 232, 300], matrix: [244, 98, 272, 230], run: [246, 330, 264, 64],
+    timeline: [10, 96, 500, 90], pool: [4, 190, 512, 148], criteria: [6, 338, 510, 58],
+  }[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.05)" stroke-width="1.5"/></pattern></defs><rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+  h += id === 'app' ? drawApp(t) : id === 'git' ? drawGit() : id === 'test' ? drawTest() : drawPitch();
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="10" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 520, h: 405 }, dirty = true;
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 524, hh / 410, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 405 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+scene.addEventListener('click', e => { const el = e.target.closest('[data-a]'); if (el) act(el.dataset.a); });
+
+function loop(t) {
+  requestAnimationFrame(loop);
+  if (dirty || S.anim || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+
+function toolsHTML() {
+  const id = LID(), B = (k, label) => `<button data-a="${k}">${label}</button>`, sep = '<span class="sep"></span>';
+  if (id === 'app') return B('cmd:start', '/start') + B('cmd:add', '/add задача') + B('cmd:list', '/list') + sep + B('clear', 'Очистить цепочку');
+  if (id === 'git') return B('git:branch', !st.refs.feature ? 'switch -c feature' : st.head === 'main' ? 'switch feature' : 'switch main') + B('git:commit', 'commit') + B('git:pull', 'pull') + B('git:merge', 'merge feature') + B('git:push', 'push') + sep + B('reset', 'Заново');
+  if (id === 'test') return B('run', 'Запустить тесты') + sep + B('clear', 'Убрать все тесты');
+  return B('undo', 'Убрать последний') + sep + B('clear', 'Очистить');
+}
+function renderTools() { $('#tools').innerHTML = toolsHTML(); }
+function act(a) {
+  const [k, x, y] = a.split(':');
+  if (k === 'card') return placeCard(x);
+  if (k === 'slot') { if (st.chain[+x]) { st.chain[+x] = null; update(); } else toast('Звено пустое. Нажмите на карточку внизу.'); return; }
+  if (k === 'cmd') return sendCmd(x);
+  if (k === 'git') return git(x);
+  if (k === 'exp') return setExp(+x, y === '1');
+  if (k === 'run') return runTests();
+  if (k === 'sl') return toggleSlide(x);
+  if (k === 'tl') { st.seq.splice(+x, 1); update(); return; }
+  if (k === 'undo') { st.seq.pop(); update(); return; }
+  if (k === 'reset') { resetLesson(); update(); return; }
+  if (k === 'clear') {
+    if (LID() === 'app') st.chain = [null, null, null];
+    if (LID() === 'test') { st.suite = []; st.exp = {}; st.ran = null; }
+    if (LID() === 'pitch') st.seq = [];
+    update();
+  }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  chat: IC('<rect x="4" y="6" width="26" height="18" rx="4" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M10 24l-2 6 7-6" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M9 13h16M9 18h10" stroke="var(--force)" stroke-width="1.6"/>'),
+  client: IC('<rect x="9" y="3" width="16" height="28" rx="3" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M13 10h8M13 15h6" stroke="var(--arm)" stroke-width="1.6"/>'),
+  server: IC('<rect x="5" y="6" width="24" height="9" rx="2" fill="none" stroke="var(--fg)" stroke-width="1.6"/><rect x="5" y="19" width="24" height="9" rx="2" fill="none" stroke="var(--fg)" stroke-width="1.6"/><circle cx="10" cy="10.5" r="1.4" fill="var(--ok)"/><circle cx="10" cy="23.5" r="1.4" fill="var(--ok)"/>'),
+  db: IC('<ellipse cx="17" cy="8" rx="10" ry="4" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M7 8v18q0 4 10 4t10-4V8M7 17q0 4 10 4t10-4" fill="none" stroke="var(--fg)" stroke-width="1.6"/>'),
+  cards: IC('<rect x="3" y="11" width="13" height="16" rx="2" fill="none" stroke="var(--fg)" stroke-width="1.5"/><rect x="18" y="7" width="13" height="16" rx="2" fill="none" stroke="var(--muted)" stroke-width="1.5"/>'),
+  term: IC('<rect x="3" y="6" width="28" height="22" rx="3" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M8 13l4 3-4 3M15 20h7" fill="none" stroke="var(--ok)" stroke-width="1.6"/>'),
+  graph: IC('<path d="M5 12h24M11 12q4 0 6 10h6q3 0 6-10" fill="none" stroke="var(--muted)" stroke-width="1.6"/><circle cx="8" cy="12" r="3" fill="var(--force)"/><circle cx="20" cy="22" r="3" fill="var(--arm)"/><circle cx="28" cy="12" r="3" fill="var(--force)"/>'),
+  tag: IC('<path d="M4 10h16l8 7-8 7H4z" fill="var(--force)" opacity=".85"/><circle cx="9" cy="17" r="2" fill="var(--bg)"/>'),
+  remote: IC('<path d="M9 24a6 6 0 010-12 8 8 0 0115-2 6 6 0 011 14z" fill="none" stroke="#b7a6ff" stroke-width="1.6"/>'),
+  merge: IC('<circle cx="9" cy="8" r="3" fill="var(--force)"/><circle cx="25" cy="8" r="3" fill="var(--arm)"/><circle cx="17" cy="26" r="4" fill="var(--force)"/><path d="M9 11q0 8 8 11M25 11q0 8-8 11" fill="none" stroke="var(--muted)" stroke-width="1.6"/>'),
+  cand: IC('<rect x="4" y="5" width="26" height="8" rx="2" fill="none" stroke="var(--fg)" stroke-width="1.5"/><rect x="4" y="16" width="26" height="8" rx="2" fill="none" stroke="var(--fg)" stroke-width="1.5"/><rect x="20" y="17.5" width="8" height="5" rx="1" fill="var(--fg)"/>'),
+  matrix: IC('<rect x="4" y="5" width="11" height="11" rx="2" fill="var(--ok)" opacity=".5"/><rect x="18" y="5" width="11" height="11" rx="2" fill="var(--ok)" opacity=".5"/><rect x="4" y="19" width="11" height="11" rx="2" fill="var(--warn)" opacity=".6"/><rect x="18" y="19" width="11" height="11" rx="2" fill="var(--ok)" opacity=".5"/>'),
+  run: IC('<path d="M11 7l15 10-15 10z" fill="var(--fg)"/>'),
+  timeline: IC('<rect x="3" y="12" width="9" height="10" fill="#ff8a73"/><rect x="12" y="12" width="12" height="10" fill="#ffb547"/><rect x="24" y="12" width="7" height="10" fill="#72d4e8"/><path d="M27 7v20" stroke="var(--warn)" stroke-width="1.6"/>'),
+  pool: IC('<rect x="3" y="5" width="12" height="10" rx="2" fill="none" stroke="var(--fg)" stroke-width="1.4"/><rect x="19" y="5" width="12" height="10" rx="2" fill="none" stroke="var(--fg)" stroke-width="1.4"/><rect x="3" y="19" width="12" height="10" rx="2" fill="none" stroke="var(--fg)" stroke-width="1.4"/><rect x="19" y="19" width="12" height="10" rx="2" fill="none" stroke="var(--muted)" stroke-width="1.4"/>'),
+  criteria: IC('<path d="M6 10l3 3 5-6M6 22l3 3 5-6" fill="none" stroke="var(--ok)" stroke-width="1.8"/><path d="M18 10h11M18 22h11" stroke="var(--fg)" stroke-width="1.6"/>'),
+};
+function partsList() {
+  const id = LID();
+  if (id === 'app') return [
+    { id: 'chat', icon: ICON.chat, name: 'Окно клиента', spec: 'Что видит пользователь: его команды и ответы бота или страницы сайта.' },
+    { id: 'c0', icon: ICON.client, name: 'Клиент', spec: 'Приложение Telegram или браузер. Сам ничего не хранит и не считает — только отправляет запрос и показывает ответ.' },
+    { id: 'c1', icon: ICON.server, name: 'Сервер с обработчиками', spec: 'Ваша программа на Python (например, aiogram или Flask). Роутер смотрит на команду и вызывает нужную функцию-обработчик.' },
+    { id: 'c2', icon: ICON.db, name: 'База данных', spec: 'Таблица tasks в SQLite: строки переживают перезапуск сервера. Сервер говорит с ней на языке SQL.' },
+    { id: 'cards', icon: ICON.cards, name: 'Карточки компонентов', spec: 'Два варианта клиента, сервер и база. Клиент можно поменять — остальная цепочка останется той же.' }];
+  if (id === 'git') return [
+    { id: 'term', icon: ICON.term, name: 'Терминал', spec: 'Здесь видно каждую команду git и ответ Git. Красная строка — отказ, его надо прочитать.' },
+    { id: 'graph', icon: ICON.graph, name: 'Граф коммитов', spec: 'Кружок — коммит, линия ведёт к родителю. Верхняя дорожка — main, нижняя — feature.' },
+    { id: 'tags', icon: ICON.tag, name: 'Метки веток и HEAD', spec: 'Ветка — просто имя, указывающее на коммит. При коммите метка текущей ветки (где HEAD) сдвигается вперёд.' },
+    { id: 'graph', icon: ICON.remote, name: 'origin — копия на GitHub', spec: 'Фиолетовая метка origin/main показывает, что лежит на сервере. Пунктирный кружок — коммит, который есть только там.' },
+    { id: 'graph', icon: ICON.merge, name: 'Коммит слияния', spec: 'Кружок с точкой: у него два родителя. Появляется, когда обе ветки ушли вперёд.' }];
+  if (id === 'test') return [
+    { id: 'cand', icon: ICON.cand, name: 'Тесты-кандидаты', spec: 'Каждый год — один тест: assert is_leap(год) == ожидаемое. «да» — True, «нет» — False.' },
+    { id: 'matrix', icon: ICON.matrix, name: 'Таблица прогонов', spec: 'Строки — версии функции, столбцы — ваши тесты. ✓ — ответ функции совпал с ожидаемым, ✗ — не совпал.' },
+    { id: 'matrix', icon: ICON.server, name: 'Четыре версии is_leap', spec: 'Эталон: y%4==0 and (y%100!=0 or y%400==0). A: y%4==0. B: y%4==0 and y%100!=0. C: y%400==0.' },
+    { id: 'run', icon: ICON.run, name: 'Запуск тестов', spec: 'Как pytest или GitHub Actions: прогоняет все тесты на всех версиях и показывает итог.' }];
+  return [
+    { id: 'timeline', icon: ICON.timeline, name: 'Таймлайн выступления', spec: 'Ширина блока — время слайда. Зелёная зона — от 4 до 5 минут, красная черта — лимит.' },
+    { id: 'pool', icon: ICON.pool, name: 'Карточки слайдов', spec: 'Семь полезных слайдов и две ловушки. Время указано с учётом того, что вы говорите вслух.' },
+    { id: 'criteria', icon: ICON.criteria, name: 'Критерии жюри', spec: 'Шесть правил хорошей защиты. Зелёная галочка — правило выполнено.' }];
+}
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+const reads = arr => `<dl class="reads">${arr.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>`;
+const btns = arr => `<div class="row">${arr.map(([a, l, p]) => `<button class="ghostbtn" data-a="${a}"${p !== undefined ? ` aria-pressed="${p}"` : ''}>${l}</button>`).join('')}</div>`;
+
+function schemeHTML(m) {
+  const id = LID();
+  if (id === 'app') return `<h2>Цепочка запроса</h2>` + reads([['Цепочка', m.ok ? 'верна' : 'не собрана'], ['В базе', st.tasks.length + ' зад.'], ['Запросов', st.nreq]]) +
+    `<div class="ctl"><div class="lbl">Поставить или убрать компонент</div><div class="chips">${Object.entries(CARDS).map(([k, c]) => `<button data-a="card:${k}" aria-pressed="${st.chain.includes(k)}">${c.name}</button>`).join('')}</div></div>` +
+    `<p class="note" style="margin-top:10px">Сейчас: ${st.chain.map((c, i) => `${i + 1} — ${c ? CARDS[c].name : 'пусто'}`).join(' → ')}</p>` +
+    `<div class="ctl"><div class="lbl">Отправить команду</div></div>` + btns([['cmd:start', '/start'], ['cmd:add', '/add задача'], ['cmd:list', '/list'], ['clear', 'Очистить цепочку']]);
+  if (id === 'git') {
+    return `<h2>Состояние репозитория</h2>` + reads([['HEAD', st.head], ['main', st.refs.main], ['feature', st.refs.feature || '—'], ['origin/main', st.origin], ['Коммитов', st.commits.length], ['Синхр.', m.synced ? 'да' : 'нет']]) +
+      btns([['git:branch', !st.refs.feature ? 'git switch -c feature' : 'git switch ' + (st.head === 'main' ? 'feature' : 'main')], ['git:commit', 'git commit'], ['git:pull', 'git pull'], ['git:merge', 'git merge feature'], ['git:push', 'git push'], ['reset', 'Заново']]) +
+      `<h3>Коммиты</h3><div class="steps">${st.commits.map(c => step(`${c.id} · ${esc(c.msg)}`, `${c.who}, ${c.lane}${c.p.length ? ' ← ' + c.p.join(' + ') : ''}`)).join('')}</div>`;
+  }
+  if (id === 'test') {
+    return `<h2>Набор тестов</h2>` + reads([['Тестов', `${m.n} / ${MAXT}`], ['Поймано', st.ran ? `${m.caught} / 3` : '—'], ['Эталон', st.ran ? (m.refOK ? 'проходит' : 'падает') : '—']]) +
+      YEARS.map(y => `<div class="ctl"><div class="lbl">is_leap(${y}) == ?</div><div class="chips"><button data-a="exp:${y}:1" aria-pressed="${st.exp[y] === true}">True — да</button><button data-a="exp:${y}:0" aria-pressed="${st.exp[y] === false}">False — нет</button></div></div>`).join('') +
+      btns([['run', '▶ Запустить тесты'], ['clear', 'Убрать все']]);
+  }
+  return `<h2>План выступления</h2>` + reads([['Время', mmss(m.total)], ['Слайдов', st.seq.length], ['Критерии', `${m.crit.filter(c => c.ok).length} / 6`]]) +
+    `<div class="ctl"><div class="lbl">Слайды</div><div class="chips">${SLIDES.map(d => `<button data-a="sl:${d.id}" aria-pressed="${st.seq.includes(d.id)}">${esc(d.name)} · ${mmss(d.sec)}</button>`).join('')}</div></div>` +
+    `<h3>Критерии жюри</h3><div class="steps">${m.crit.map(c => step(c.t, c.ok ? '✓' : '—', c.ok ? 'sum' : '')).join('')}</div>` + btns([['undo', 'Убрать последний'], ['clear', 'Очистить']]);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'app') {
+    const tr = st.last;
+    let h = `<h2>Путь запроса</h2><div class="formula">клиент → сервер → БД → сервер → клиент</div>`;
+    if (!tr) return h + `<p class="note">Отправьте любую команду — здесь появится разбор по шагам.</p>`;
+    h += `<h3>Последний запрос</h3><div class="steps">` + step('1. Клиент отправляет', esc(tr.req || '—'));
+    if (!tr.client) return h + step('Итог', 'запрос не ушёл: нет клиента', 'sum') + `</div>`;
+    if (tr.fail && !tr.hops.includes(2) && tr.hops.length === 2) return h + step('2. Звено 2', esc(st.chain[1] ? CARDS[st.chain[1]].name : 'пусто') + ' — не сервер') + step('Итог', 'ошибка', 'sum') + `</div>`;
+    const handler = { start: 'cmd_start()', add: 'cmd_add(text)', list: 'cmd_list()' }[tr.cmd];
+    h += step('2. Роутер сервера', `${tr.cmd === 'start' ? (tr.client === 'web' ? 'GET /' : '/start') : tr.client === 'web' ? tr.req : '/' + tr.cmd} → ${handler}`);
+    if (tr.cmd === 'start') return h + step('3. Ответ', esc(tr.reply), 'sum') + `</div><p class="note" style="margin-top:10px">Приветствию база не нужна: сервер отвечает сам.</p>`;
+    if (tr.fail) return h + step('3. Звено 3', esc(st.chain[2] ? CARDS[st.chain[2]].name : 'пусто') + ' — не база') + step('Итог', 'ошибка: данные негде хранить', 'sum') + `</div>`;
+    h += step('3. Запрос к базе (SQL)', esc(tr.sql)) + step('4. База вернула', tr.cmd === 'add' ? 'OK, 1 строка добавлена' : `строк: ${st.tasks.length}`) + step('5. Ответ клиенту', esc(clip(tr.reply, 60)), 'sum') + `</div>`;
+    return h + `<p class="note" style="margin-top:10px">Сайт и бот отправляют разные запросы (HTTP или update от Telegram), но сервер вызывает те же функции и ту же базу.</p>`;
+  }
+  if (id === 'git') {
+    const mA = anc(st.refs.main), f = st.refs.feature;
+    let base = null; if (f) { const fA = anc(f); base = st.commits.filter(c => mA.has(c.id) && fA.has(c.id)).map(c => c.id).pop(); }
+    let h = `<h2>Что сделает Git</h2><div class="formula">merge-base(main, feature)</div><div class="steps">` +
+      step('main указывает на', st.refs.main) + step('feature указывает на', f || 'ветки нет') + step('общий предок', base || '—');
+    if (f) {
+      const kind = mA.has(f) ? 'нечего сливать: feature уже в main' : base === st.refs.main ? 'fast-forward: main просто сдвинется на ' + f : 'коммит слияния с двумя родителями';
+      h += step('git merge feature даст', kind, 'sum');
+    }
+    h += `</div><h3>Синхронизация с GitHub</h3><div class="steps">` + step('origin/main', st.origin) +
+      step('коммит коллеги в вашей main', st.mate ? (m.mateIn ? 'да' : 'нет — нужен git pull') : 'ещё не появился') +
+      step('коммитов feature в main', `${m.featIn} из ${st.commits.filter(c => c.lane === 'feature').length}`) +
+      step('git push сейчас', anc(st.refs.main).has(st.origin) ? (m.synced ? 'нечего отправлять' : 'пройдёт') : 'отклонят: сначала pull', 'sum') + `</div>`;
+    return h + `<p class="note" style="margin-top:10px">Правило: push проходит, только если ваша main содержит всё, что уже есть на GitHub.</p>`;
+  }
+  if (id === 'test') {
+    let h = `<h2>Как работает тест</h2><div class="formula">assert is_leap(y) == ожидаемое</div><p class="note">Тест проходит (✓), если функция вернула то же, что вы ожидали. Ошибка версии поймана, если хотя бы один тест на ней упал.</p>`;
+    if (!st.suite.length) return h + `<p class="note">Выберите ожидаемый ответ хотя бы для одного года.</p>`;
+    h += `<h3>Ваши тесты</h3>`;
+    st.suite.forEach(y => {
+      h += `<div class="steps" style="margin-bottom:10px">` + step(`is_leap(${y}) == ${st.exp[y] ? 'True' : 'False'}`, 'ожидание');
+      if (st.ran) VERS.forEach((v, r) => { const out = v.f(y); h += step(`${v.name}: ${esc(v.code)}`, `${out ? 'True' : 'False'} ${out === st.exp[y] ? '✓' : '✗'}`); });
+      else h += step('результаты', 'запустите тесты');
+      h += `</div>`;
+    });
+    if (st.ran) h += `<div class="steps">` + step('эталон', m.refOK ? 'все тесты прошли' : 'есть падения: проверьте ожидания') + step('поймано ошибок', `${m.caught} из 3`) + step('тестов', `${m.n} (нужно не больше 3)`, 'sum') + `</div>`;
+    return h;
+  }
+  let h = `<h2>Хронометраж</h2><div class="formula">Σ t(слайдов) ≤ 5:00</div><div class="steps">`;
+  let s = 0;
+  st.seq.forEach((d, i) => { s += SL(d).sec; h += step(`${i + 1}. ${esc(SL(d).name)}`, `${mmss(SL(d).sec)} → ${mmss(s)}`); });
+  if (!st.seq.length) h += step('слайдов нет', '0:00');
+  h += step('итого', `${mmss(m.total)} ${m.total > LIMIT ? `— перебор ${mmss(m.total - LIMIT)}` : m.total < MINT ? `— до 4:00 не хватает ${mmss(MINT - m.total)}` : '— в норме'}`, 'sum') + `</div>`;
+  h += `<h3>Проверка критериев</h3><div class="steps">${m.crit.map(c => step(c.t, c.ok ? '✓ да' : 'нет')).join('')}</div>`;
+  return h + `<p class="note" style="margin-top:10px">Около 130 слов в минуту — нормальный темп речи. На 40 секунд проблемы — примерно 90 слов.</p>`;
+}
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (m.kind === 'app') return `Цепочка: ${st.chain.filter(Boolean).length}/3 · задач в базе: ${st.tasks.length}`;
+  if (m.kind === 'git') return `HEAD: ${st.head} · feature в main: ${m.featIn}/2 · коммит коллеги: ${m.mateIn ? 'есть' : 'нет'} · GitHub: ${m.synced ? 'синхр.' : 'отстаёт'}`;
+  if (m.kind === 'test') return st.ran ? `Тестов ${m.n} · поймано ${m.caught}/3 · эталон ${m.refOK ? '✓' : '✗'}` : `Тестов ${m.n} · не запущены`;
+  return `${mmss(m.total)} · критериев ${m.crit.filter(c => c.ok).length}/6`;
+}
+
+function renderMeter(m) {
+  const el = $('#meter'), ok = !!S.done[LID()];
+  if (m.kind === 'app') el.innerHTML = `<div class="k">Цепочка</div><div class="v ${m.ok ? 'ok' : ''}">${m.ok ? 'работает' : 'не собрана'}</div><div class="lr"><span>в базе</span><span>${st.tasks.length}</span></div><div class="lr"><span>запросов</span><span>${st.nreq}</span></div>`;
+  else if (m.kind === 'git') el.innerHTML = `<div class="k">HEAD</div><div class="v ${ok ? 'ok' : ''}">${st.head}</div><div class="lr"><span>коммитов</span><span>${st.commits.length}</span></div><div class="lr"><span>GitHub</span><span>${m.synced ? 'синхр.' : 'отстаёт'}</span></div>`;
+  else if (m.kind === 'test') el.innerHTML = `<div class="k">Поймано ошибок</div><div class="v ${ok ? 'ok' : ''}">${st.ran ? m.caught : '—'} / 3</div><div class="lr"><span>тестов</span><span>${m.n}/${MAXT}</span></div><div class="lr"><span>эталон</span><span>${st.ran ? (m.refOK ? '✓' : '✗') : '—'}</span></div>`;
+  else el.innerHTML = `<div class="k">Время</div><div class="v ${m.total >= MINT && m.total <= LIMIT ? 'ok' : ''}">${mmss(m.total)} / 5:00</div><div class="gauge"><b style="width:${clamp(m.total / 360 * 100, 0, 100).toFixed(1)}%;background:${m.total > LIMIT ? 'var(--warn)' : 'var(--liq)'}"></b><i style="left:${(LIMIT / 360 * 100).toFixed(1)}%"></i></div><div class="lr"><span>критерии</span><span>${m.crit.filter(c => c.ok).length}/6</span></div>`;
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      (L.safe ? `<div class="safe"><b>Безопасность</b>${L.safe}</div>` : '') +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Из чего состоит опыт</h2><p class="note">Нажмите на элемент, чтобы найти его на сцене.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') {
+    const el = $('#pane-scheme'); el.innerHTML = schemeHTML(m);
+    el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+  }
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function update() {
+  const m = model(), L = LESSONS[S.lesson];
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Проект готов к защите!');
+  }
+  renderMeter(m); renderTools();
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  app: '<rect x="4" y="9" width="14" height="12" rx="2" fill="none" stroke="#e8ecf4" stroke-width="1.2"/><rect x="26" y="9" width="14" height="12" rx="2" fill="none" stroke="#e8ecf4" stroke-width="1.2"/><ellipse cx="55" cy="10" rx="7" ry="2.5" fill="none" stroke="#e8ecf4" stroke-width="1.2"/><path d="M48 10v10q0 2.5 7 2.5t7-2.5V10" fill="none" stroke="#e8ecf4" stroke-width="1.2"/><path d="M19 15h6M41 15h6" stroke="#8b96ad"/><circle cx="33" cy="6" r="2" fill="#ffb547"/>',
+  git: '<path d="M6 10h54M18 10q6 0 9 10h12q4 0 8-10" fill="none" stroke="#8b96ad" stroke-width="1.3"/><circle cx="10" cy="10" r="3" fill="#ffb547"/><circle cx="24" cy="10" r="3" fill="#ffb547"/><circle cx="33" cy="20" r="3" fill="#72d4e8"/><circle cx="42" cy="20" r="3" fill="#72d4e8"/><circle cx="52" cy="10" r="3.6" fill="#ffb547"/>',
+  test: '<rect x="6" y="5" width="12" height="9" rx="2" fill="#86e0a8" opacity=".6"/><rect x="21" y="5" width="12" height="9" rx="2" fill="#86e0a8" opacity=".6"/><rect x="36" y="5" width="12" height="9" rx="2" fill="#86e0a8" opacity=".6"/><rect x="6" y="17" width="12" height="9" rx="2" fill="#ff8a73" opacity=".7"/><rect x="21" y="17" width="12" height="9" rx="2" fill="#86e0a8" opacity=".6"/><rect x="36" y="17" width="12" height="9" rx="2" fill="#ff8a73" opacity=".7"/><path d="M53 13l4 4 6-8" fill="none" stroke="#86e0a8" stroke-width="1.6"/>',
+  pitch: '<rect x="6" y="11" width="10" height="9" fill="#ff8a73"/><rect x="16" y="11" width="18" height="9" fill="#ffb547"/><rect x="34" y="11" width="10" height="9" fill="#72d4e8"/><rect x="44" y="11" width="7" height="9" fill="#e8ecf4"/><path d="M55 6v19" stroke="#ff8a73" stroke-width="1.4"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i];
+  S.lesson = i; S.hl = null; resetLesson(); save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderStrip(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'), ls = $('#lessons');
+  if (cur) { const dx = cur.getBoundingClientRect().left - ls.getBoundingClientRect().left; if (dx < 0 || dx + cur.offsetWidth > ls.clientWidth) ls.scrollLeft += dx - 8; }
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '';
+  if (id === 'app') now = `Цепочка из трёх звеньев: ${st.chain.map((c, i) => `${i + 1} — ${c ? CARDS[c].name : 'пусто'}`).join(', ')}. Правильная цепочка: клиент (Telegram или браузер) → сервер → база данных; цепочка ${m.ok ? 'собрана верно' : 'пока не верна'}. В базе ${st.tasks.length} задач${st.tasks.length ? ': ' + st.tasks.join(', ') : ''}. Последние сообщения: ${st.log.map(x => (x.who === 'you' ? 'ученик: ' : 'ответ: ') + x.t).join(' | ') || 'нет'}. Нужен успешный /list, который вернёт хотя бы одну задачу.`;
+  if (id === 'git') now = `Репозиторий: HEAD на ${st.head}. main → ${st.refs.main}, feature → ${st.refs.feature || 'ещё нет'}, origin/main (GitHub) → ${st.origin}. Коммиты: ${st.commits.map(c => `${c.id} «${c.msg}» (${c.who}, ${c.lane}, родители: ${c.p.join('+') || 'нет'})`).join('; ')}. Коммитов из feature в main: ${m.featIn}. Коммит коллеги ${st.mate ? (m.mateIn ? 'уже в локальной main' : 'есть только на GitHub') : 'ещё не появился (появится после первого коммита в feature)'}. main и GitHub ${m.synced ? 'совпадают' : 'расходятся'}. Последние строки терминала: ${st.term.slice(-3).join(' | ')}.`;
+  if (id === 'test') now = `Функция is_leap(y). Эталон: y%4==0 and (y%100!=0 or y%400==0). Версии стажёров: A — y%4==0, B — y%4==0 and y%100!=0, C — y%400==0. Годы-кандидаты: ${YEARS.join(', ')}. Ученик выбрал тесты: ${st.suite.map(y => `is_leap(${y}) == ${st.exp[y] ? 'True' : 'False'}`).join('; ') || 'пока ни одного'}. ${st.ran ? `Прогон: эталон ${m.refOK ? 'проходит все тесты' : 'падает — значит, какое-то ожидание неверно'}; поймано ошибочных версий ${m.caught} из 3.` : 'Тесты после последнего изменения не запускались.'} Это задача-головоломка: не называй сразу нужные годы, помогай вопросами (какое правило нарушает каждая версия, на каком годе это видно).`;
+  if (id === 'pitch') now = `Слайды-кандидаты: ${SLIDES.map(d => `${d.name} ${mmss(d.sec)}${d.trap ? ' (ловушка)' : ''}`).join(', ')}. Выступление ученика по порядку: ${st.seq.map(s => SL(s).name).join(' → ') || 'пусто'}, итого ${mmss(m.total)} (нужно 4:00–5:00). Критерии: ${m.crit.map(c => c.t + ' — ' + (c.ok ? 'да' : 'нет')).join('; ')}.`;
+  return [
+    `Раздел: информатика, 11 класс, тема «Свой проект». Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Направляй ученика вопросами, не делай задание за него.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = {
+    app: 'Зачем боту база данных, если можно хранить задачи в переменной?', git: 'Чем merge отличается от fast-forward?',
+    test: 'Почему тест на 2023 год здесь бесполезен?', pitch: 'Почему демо лучше показывать в начале?',
+  }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, с чего начать задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,843 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по физике, 9 класс: импульс тела, закон сохранения импульса, реактивное движение.">
+<title>Импульс</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.meter .lr .ok{color:var(--ok)}
+.meter .lr .bad{color:var(--warn)}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button.rec{color:var(--force)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 230px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><rect x="5" y="20" width="12" height="10" rx="2" fill="var(--arm)"/><rect x="23" y="17" width="12" height="13" rx="2" fill="var(--fg)"/><path d="M6 13h11" stroke="var(--force)" stroke-width="2.4" stroke-linecap="round"/><path d="M21 13l-5-3.5v7z" fill="var(--force)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Физика · Импульс</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/">Карта</a><a href="/physics/">Физика</a><a href="/labs/phys-momentum/" aria-current="page">Импульс</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Импульс</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Опытная площадка">
+    <svg class="scene" id="scene" role="img" aria-label="Площадка для опытов с импульсом. Стрелки скоростей можно тянуть."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const nf = x => fmt(x, Math.abs(x - Math.round(x)) < 1e-9 ? 0 : (Math.abs(x * 10 - Math.round(x * 10)) < 1e-9 ? 1 : 2));
+const big = x => Math.round(x).toLocaleString('ru-RU').replace('-', '−');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const C1 = '#72d4e8', C2 = '#c3a8ff', CP = '#ffb547', OK = '#86e0a8';
+
+const LESSONS = [
+  { id: 'impulse', title: 'Импульс тела',
+    text: ['Импульс тела — это произведение его массы на скорость: p = m · v. Единица импульса — килограмм-метр в секунду, кг·м/с.',
+           'Импульс — векторная величина. Он направлен туда же, куда скорость. Если тележка едет влево, против оси x, проекция её импульса отрицательная.',
+           'Лёгкое тело может иметь такой же импульс, как тяжёлое, если едет быстрее. Изменить импульс может только сила: изменение импульса равно импульсу силы, Δp = F · t.'],
+    why: 'Инженеры на краш-тестах считают импульс машины: чем он больше и чем короче удар, тем больше сила F = Δp / t. Поэтому подушки безопасности и сминаемый капот удлиняют удар. Водителю фуры на трассе Алматы — Астана нужна гораздо большая дистанция, чем легковушке: при той же скорости импульс в десятки раз больше. Тренеры по хоккею и боксу ставят удар так, чтобы передать шайбе или сопернику побольше импульса.',
+    task: 'Получите импульс 12 кг·м/с на двух тележках разной массы. Потом пустите тележку влево с импульсом −6 кг·м/с.',
+    hint: 'Массу выбирайте кнопками, скорость меняйте, перетаскивая кружок на конце голубой стрелки. Импульс p = m · v, минус значит «влево».',
+    stage: 'Выберите массу и тяните конец голубой стрелки.',
+    masses: [1, 2, 3, 4, 6], m0: 1, v0: 2, pNeed: 12, pNeg: -6,
+    check: m => m.n >= 2 && m.neg },
+  { id: 'conserve', title: 'Закон сохранения импульса',
+    text: ['Если тела действуют только друг на друга, а внешние силы уравновешены, систему называют замкнутой. Сумма импульсов тел замкнутой системы не меняется: m₁v₁ + m₂v₂ = m₁v₁′ + m₂v₂′.',
+           'При ударе тележки толкают друг друга с равными по модулю и противоположными силами — это третий закон Ньютона. Сколько импульса потеряла одна тележка, столько получила другая.',
+           'Если тележки сцепились, дальше они едут вместе: v = (m₁v₁ + m₂v₂) / (m₁ + m₂). При упругом ударе они разлетаются, но сумма импульсов остаётся той же.'],
+    why: 'Автоэксперты полиции и страховых компаний по следам на дороге восстанавливают скорости машин до столкновения — по закону сохранения импульса. На сортировочных станциях вагоны сцепляются на ходу, и составитель поездов следит, чтобы скорость удара была безопасной. Бильярдист, который бьёт шар «в лоб», останавливает свой шар и передаёт весь импульс другому.',
+    task: 'В режиме «Сцепка» добейтесь, чтобы после удара тележки поехали вместе ровно 1 м/с. Затем в режиме «Упругий» ударьте неподвижную тележку такой же массы.',
+    hint: 'Импульс пары после удара (m₁ + m₂) · 1 должен равняться m₁v₁ + m₂v₂ до удара. Массы меняйте кнопками m₁ и m₂, скорости — тяните кружки на стрелках. При упругом ударе одинаковых тележек следите за первой.',
+    stage: 'Тяните стрелки скоростей, затем «Пуск».',
+    masses: [1, 2, 3, 4, 6], track: 10,
+    check: m => m.stick && m.eq },
+  { id: 'jet', title: 'Реактивное движение',
+    text: ['Реактивное движение возникает, когда от тела отделяется и отлетает его часть. Ракета выбрасывает назад раскалённый газ, а сама летит вперёд. Опора ей не нужна, поэтому ракета разгоняется и в космосе.',
+           'До старта ракета и топливо покоятся, их общий импульс равен нулю. После выброса он тоже равен нулю: mг · vг = M · v. Импульсы газа и ракеты равны по модулю и направлены в противоположные стороны.',
+           'Отсюда v = mг · vг / M. Ракета разгоняется сильнее, если выбросить больше газа или выбросить его быстрее. Так же плавают кальмары и медузы: они выталкивают воду назад.'],
+    why: 'С Байконура стартуют ракеты: инженеры-баллистики по закону сохранения импульса рассчитывают, сколько топлива нужно, чтобы вывести корабль на орбиту, — каждый лишний килограмм стоит больших денег. Реактивные двигатели стоят на всех пассажирских самолётах, и авиатехники в аэропортах Казахстана — востребованная и хорошо оплачиваемая профессия. Отдача пожарного ствола, который рвётся из рук, — то же явление, и пожарных учат его держать.',
+    task: 'Разгоните ракету массой 1000 кг до 600 м/с одним выбросом газа. Сделайте это двумя разными способами.',
+    hint: 'Нужно, чтобы mг · vг = 1000 · 600. Меняйте массу газа и его скорость, затем нажмите «Запуск». Газ здесь вылетает сразу одной порцией — это упрощённая модель.',
+    stage: 'Задайте порцию газа и его скорость, затем «Запуск».',
+    M: 1000, vNeed: 600, mg0: 100, ug0: 1000,
+    check: m => m.n >= 2 },
+];
+
+const LS_KEY = 'luch-phys-momentum';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+
+// ---------- geometry (SVG units; the scene is 520 × 405) ----------
+const A1 = { gy: 330, cx: 260, kv: 20, kp: 5, yv: 250, yp: 190 };        // lesson 1: 1 м/с = 20 units, 1 кг·м/с = 5 units
+const B2 = { gy: 245, x0: 30, k: 46, kv: 13, z: 220, kp: 3.2 };          // lesson 2: track 10 m, 1 m = 46 units
+const X2 = x => B2.x0 + B2.k * x;
+const ch2 = m => 18 + m * 4;                                              // cart height by mass
+const R3 = { y: 205, x0: 230, len: 120, kp: 1e-4, ks: 1 / 25, T: 2.2 };  // lesson 3: rocket
+
+function resetState() {
+  const Ls = L();
+  Object.assign(S, {
+    m: Ls.m0 || 1, v: Ls.v0 || 2, hits: {}, neg: false, phase: 0,
+    m1: 2, m2: 2, v1: 3, v2: 0, mode: 'stick', x1: 1, x2: 6, u1: 3, u2: 0, run: false, t: 0, tc: null, res: null, stick: false, eq: false,
+    mg: Ls.mg0 || 100, ug: Ls.ug0 || 1000, fly: false, lt: 0, last: null, combos: {}, hl: null,
+  });
+}
+resetState();
+
+const vr3 = () => S.mg * S.ug / L().M;
+
+function model() {
+  const id = LID();
+  if (id === 'impulse') return { kind: id, m: S.m, v: S.v, p: S.m * S.v, n: Object.keys(S.hits).length, neg: S.neg };
+  if (id === 'conserve') {
+    const P = S.m1 * S.v1 + S.m2 * S.v2;
+    return { kind: id, P, p1: S.m1 * S.u1, p2: S.m2 * S.u2, vc: P / (S.m1 + S.m2), stick: S.stick, eq: S.eq, res: S.res };
+  }
+  return { kind: id, mg: S.mg, ug: S.ug, v: vr3(), pg: S.mg * S.ug, n: Object.keys(S.combos).length, last: S.last };
+}
+
+// ---------- drawing helpers ----------
+const T = (x, y, s, fill, txt, anchor = 'middle', extra = '') => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${s}" fill="${fill}" text-anchor="${anchor}" ${extra}>${txt}</text>`;
+const halo = `paint-order="stroke" stroke="${INK}" stroke-width="3"`;
+function arrow(x1, y1, x2, y2, col, w = 3) {
+  const a = Math.atan2(y2 - y1, x2 - x1), L2 = Math.hypot(x2 - x1, y2 - y1); if (L2 < 1) return '';
+  const hl = Math.min(12, L2 * 0.8), hx = x2 - hl * Math.cos(a), hy = y2 - hl * Math.sin(a);
+  const p1 = `${(hx + 6 * Math.sin(a)).toFixed(1)} ${(hy - 6 * Math.cos(a)).toFixed(1)}`, p2 = `${(hx - 6 * Math.sin(a)).toFixed(1)} ${(hy + 6 * Math.cos(a)).toFixed(1)}`;
+  return `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${hx.toFixed(1)} ${hy.toFixed(1)}" stroke="${INK}" stroke-width="${w + 2.6}" stroke-linecap="round"/><path d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${hx.toFixed(1)} ${hy.toFixed(1)}" stroke="${col}" stroke-width="${w}" stroke-linecap="round"/><path d="M${x2.toFixed(1)} ${y2.toFixed(1)}L${p1}L${p2}Z" fill="${col}" stroke="${INK}" stroke-width="1.2" stroke-linejoin="round"/>`;
+}
+function bg(space) {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,${space ? 0 : .06})" stroke-width="1.5"/></pattern>
+    <pattern id="hatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0V10" stroke="#2e3b57" stroke-width="3"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+const ground = y => `<rect x="-2000" y="${y}" width="4520" height="1200" fill="#151e2e"/><rect x="-2000" y="${y}" width="4520" height="12" fill="url(#hatch)"/><path d="M-2000 ${y}H2520" stroke="#3a4762" stroke-width="2"/>`;
+function cart(x, yb, w, h, col, label, phase) {
+  let s = `<rect x="${x.toFixed(1)}" y="${(yb - 12 - h).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${col}" stroke="${INK}" stroke-width="2.2"/>` + T(x + w / 2, yb - 12 - h / 2 + 4, 10, INK, label, 'middle', 'font-weight="500"');
+  for (const wx of [x + 11, x + w - 11]) {
+    const a = -phase;
+    s += `<circle cx="${wx.toFixed(1)}" cy="${yb - 7}" r="7" fill="#2a3348" stroke="${INK}" stroke-width="1.8"/><path d="M${(wx + 5 * Math.cos(a)).toFixed(1)} ${(yb - 7 + 5 * Math.sin(a)).toFixed(1)}L${(wx - 5 * Math.cos(a)).toFixed(1)} ${(yb - 7 - 5 * Math.sin(a)).toFixed(1)}" stroke="#8b96ad" stroke-width="1.4"/>`;
+  }
+  return s;
+}
+const knob = (id, x, y, col) => `<g data-drag="${id}"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="18" fill="transparent"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7" fill="${INK}" stroke="${col}" stroke-width="2.4"/></g>`;
+
+// ---------- lesson 1: one cart ----------
+function impulseScene() {
+  const Ls = L(), gy = A1.gy, cx = A1.cx, p = S.m * S.v;
+  let h = ground(gy);
+  // moving floor marks show the motion
+  for (let i = -2; i < 24; i++) { const xx = 20 + ((i * 26 - S.phase * 24) % 520 + 520) % 520; h += `<path d="M${xx.toFixed(1)} ${gy + 6}h12" stroke="#3a4762" stroke-width="3"/>`; }
+  // axis
+  h += `<path d="M60 ${gy + 40}H470" stroke="#8b96ad" stroke-width="1.4"/><path d="M476 ${gy + 40}l-8 -4v8z" fill="#8b96ad"/>` + T(476, gy + 58, 10, '#8b96ad', 'x');
+  for (let k = -6; k <= 6; k += 2) h += `<path d="M${cx + k * A1.kv} ${gy + 36}v8" stroke="#8b96ad"/>` + T(cx + k * A1.kv, gy + 58, 9, '#8b96ad', fmt(k, 0));
+  h += T(cx + 6 * A1.kv + 4, gy + 74, 9, '#8b96ad', 'v, м/с', 'end');
+  // cart
+  const w = 40 + S.m * 10, hgt = 16 + S.m * 6;
+  h += cart(cx - w / 2, gy, w, hgt, '#5d6a86', `${S.m} кг`, S.phase * 2.2);
+  // velocity
+  const vy = A1.yv;
+  h += `<path d="M${cx} ${gy - 12 - hgt}V${vy}" stroke="#3a4762" stroke-dasharray="3 4"/>`;
+  if (Math.abs(S.v) > 0) h += arrow(cx, vy, cx + S.v * A1.kv, vy, C1, 3);
+  h += T(cx + S.v * A1.kv + (S.v >= 0 ? 14 : -14), vy + 4, 11, C1, `v = ${nf(S.v)} м/с`, S.v >= 0 ? 'start' : 'end', halo);
+  h += knob('v', cx + S.v * A1.kv, vy, C1);
+  // momentum
+  const py = A1.yp, hit = Math.abs(p - Ls.pNeed) < 1e-9 || Math.abs(p - Ls.pNeg) < 1e-9;
+  h += `<path d="M${cx} ${vy - 10}V${py - 10}" stroke="#3a4762" stroke-dasharray="3 4"/>`;
+  if (Math.abs(p) > 0) h += arrow(cx, py, cx + p * A1.kp, py, CP, 5);
+  h += T(cx + p * A1.kp / 2, py - 14, 12, hit ? OK : CP, `p = ${nf(p)} кг·м/с`, 'middle', halo + ' font-weight="500"');
+  // targets on the momentum scale
+  h += `<path d="M${cx + Ls.pNeed * A1.kp} ${py - 8}v16M${cx + Ls.pNeg * A1.kp} ${py - 8}v16" stroke="${OK}" stroke-width="1.4" stroke-dasharray="3 3"/>`;
+  h += T(cx + Ls.pNeed * A1.kp, py + 22, 9, OK, '12') + T(cx + Ls.pNeg * A1.kp, py + 22, 9, OK, '−6');
+  return h;
+}
+
+// ---------- lesson 2: two carts ----------
+function conserveScene() {
+  const gy = B2.gy, m = model();
+  let h = ground(gy);
+  // rails and ruler
+  h += `<path d="M${X2(0)} ${gy - 1}H${X2(10)}" stroke="#4a5876" stroke-width="3"/>`;
+  for (let k = 0; k <= 10; k++) h += `<path d="M${X2(k)} ${gy + 14}v${k % 5 ? 4 : 8}" stroke="#8b96ad"/>` + (k % 5 ? '' : T(X2(k), gy + 34, 9, '#8b96ad', k + (k === 10 ? ' м' : '')));
+  const w = B2.k, h1 = ch2(S.m1), h2 = ch2(S.m2);
+  const xa = X2(S.x1), xb = X2(S.x2);
+  // bumper or plasticine
+  if (S.mode === 'stick') h += `<path d="M${xb} ${gy - 18}c-7 -2 -7 -12 0 -14" fill="#d9a35f" stroke="${INK}" stroke-width="1.4"/>`;
+  else h += `<path d="M${xa + w} ${gy - 22}l4 -3 -4 -3 4 -3 -4 -3 4 -3" fill="none" stroke="#a9b4c9" stroke-width="1.6"/>`;
+  h += `<g>${cart(xa, gy, w, h1, C1, `${S.m1} кг`, S.x1 * 2.6)}</g><g>${cart(xb, gy, w, h2, C2, `${S.m2} кг`, S.x2 * 2.6)}</g>`;
+  // velocities
+  const vy1 = gy - 24 - h1, vy2 = gy - 24 - h2;
+  const u1 = S.run || S.res ? S.u1 : S.v1, u2 = S.run || S.res ? S.u2 : S.v2;
+  if (Math.abs(u1) > 1e-6) h += arrow(xa + w / 2, vy1, xa + w / 2 + u1 * B2.kv, vy1, C1, 2.6);
+  if (Math.abs(u2) > 1e-6) h += arrow(xb + w / 2, vy2, xb + w / 2 + u2 * B2.kv, vy2, C2, 2.6);
+  h += T(xa + w / 2, vy1 - 14, 10, C1, `${nf(u1)} м/с`, 'middle', halo) + T(xb + w / 2, vy2 - 14, 10, C2, `${nf(u2)} м/с`, 'middle', halo);
+  if (!S.run && !S.res) h += knob('v1', xa + w / 2 + S.v1 * B2.kv, vy1, C1) + knob('v2', xb + w / 2 + S.v2 * B2.kv, vy2, C2);
+  // momentum bars: before and after
+  const z = B2.z, kp = B2.kp, top = gy + 52;
+  h += `<rect x="20" y="${top - 6}" width="480" height="128" rx="10" fill="#121a28" stroke="#26324a"/>`;
+  h += `<path d="M${z} ${top}V${top + 116}" stroke="#8b96ad" stroke-width="1.2"/>`;
+  const row = (y, lab, p1, p2, col) => {
+    let s = T(34, y + 14, 10, '#a9b4c9', lab, 'start');
+    s += (Math.abs(p1) > 1e-6 ? arrow(z, y + 4, z + p1 * kp, y + 4, C1, 2.4) : '') + (Math.abs(p2) > 1e-6 ? arrow(z, y + 15, z + p2 * kp, y + 15, C2, 2.4) : '');
+    s += (Math.abs(p1 + p2) > 1e-6 ? arrow(z, y + 29, z + (p1 + p2) * kp, y + 29, col, 4) : '');
+    s += T(496, y + 8, 9, C1, `p₁ ${nf(p1)}`, 'end') + T(496, y + 19, 9, C2, `p₂ ${nf(p2)}`, 'end') + T(496, y + 33, 10, col, `Σ ${nf(p1 + p2)}`, 'end', 'font-weight="500"');
+    return s;
+  };
+  h += row(top + 4, 'до', S.m1 * S.v1, S.m2 * S.v2, CP);
+  if (S.tc !== null || S.res) h += row(top + 62, 'после', S.m1 * S.u1, S.m2 * S.u2, OK);
+  else h += T(34, top + 76, 10, '#a9b4c9', 'после', 'start') + T(z + 20, top + 80, 10, '#8b96ad', 'удара ещё не было', 'start');
+  h += T(496, top + 113, 9, '#8b96ad', 'импульсы в кг·м/с · вправо — плюс', 'end');
+  return h;
+}
+
+// ---------- lesson 3: rocket in space ----------
+const STARS = Array.from({ length: 70 }, (_, i) => { const a = Math.sin(i * 12.9898) * 43758.5453, b = Math.sin(i * 78.233) * 12543.123; return [(a - Math.floor(a)) * 600 - 40, (b - Math.floor(b)) * 380 + 10, 0.6 + ((a * 7) % 1 + 1) % 1 * 1.2]; });
+function jetScene() {
+  const Ls = L(), y = R3.y, v = vr3();
+  let h = '';
+  for (const [x, yy, r] of STARS) h += `<circle cx="${x.toFixed(1)}" cy="${yy.toFixed(1)}" r="${r.toFixed(1)}" fill="#a9b4c9" opacity=".55"/>`;
+  const t = S.fly || S.last ? S.lt : 0;
+  const rx = R3.x0 + (S.fly || S.last ? (S.last ? S.last.v : v) * R3.ks * t : 0);
+  const gv = S.last ? S.last.ug : S.ug, gm = S.last ? S.last.mg : S.mg;
+  const gd = Math.min(gv * t / 15, 150), gx = R3.x0 - 6 - gd;
+  // rocket body pointing right; x = tail
+  const L0 = R3.len, x = rx;
+  h += `<g>`;
+  h += `<path d="M${x + 14} ${y - 18}L${x - 4} ${y - 34}L${x + 4} ${y - 18}ZM${x + 14} ${y + 18}L${x - 4} ${y + 34}L${x + 4} ${y + 18}Z" fill="#ff8a73" stroke="${INK}" stroke-width="1.6"/>`;
+  h += `<path d="M${x} ${y - 18}H${x + L0 - 30}Q${x + L0} ${y - 14} ${x + L0 + 14} ${y}Q${x + L0} ${y + 14} ${x + L0 - 30} ${y + 18}H${x}Z" fill="#d6dbe6" stroke="${INK}" stroke-width="2.2"/>`;
+  h += `<circle cx="${x + L0 - 22}" cy="${y}" r="7" fill="#3c6f8a" stroke="${INK}" stroke-width="1.6"/>`;
+  // fuel portion (before launch) inside the tail
+  if (!S.fly && !S.last) { const fw = 10 + S.mg / 500 * 46; h += `<rect x="${x + 6}" y="${y - 12}" width="${fw.toFixed(1)}" height="24" rx="3" fill="${CP}" stroke="${INK}" stroke-width="1.4"/>` + T(x + 6 + fw / 2, y + 4, 9, INK, `${S.mg}`, 'middle', 'font-weight="500"'); }
+  h += `<path d="M${x} ${y - 10}l-8 -4v28l8 -4z" fill="#5d6a86" stroke="${INK}" stroke-width="1.4"/>`;
+  h += T(x + L0 / 2 + 6, y + 36, 10, '#e8ecf4', `${Ls.M} кг`, 'middle', halo);
+  h += `</g>`;
+  // gas cloud
+  if (S.fly || S.last) {
+    const r = 8 + Math.sqrt(gm) * 0.9, sp = 1 + gd / 150 * 0.8, op = (0.6 - gd / 150 * 0.3).toFixed(2);
+    for (let i = 0; i < 6; i++) { const ox = Math.cos(i * 2.1) * r * 0.6 * sp, oy = Math.sin(i * 2.9) * r * 0.5 * sp; h += `<circle cx="${(gx - r + ox).toFixed(1)}" cy="${(y + oy).toFixed(1)}" r="${(r * 0.7).toFixed(1)}" fill="${i % 2 ? '#ff8a73' : CP}" opacity="${op}"/>`; }
+    h += T(gx - r, y + r + 22, 10, CP, `газ ${gm} кг · ${gv} м/с ←`, 'middle', halo);
+    if (S.fly && t < 0.35) h += `<path d="M${x - 8} ${y - 9}L${x - 40 - t * 60} ${y}L${x - 8} ${y + 9}Z" fill="#fff2dc" opacity=".8"/>`;
+    h += T(x + L0 / 2, y + 54, 11, S.last && Math.abs(S.last.v - Ls.vNeed) < 1e-9 ? OK : C1, `v = ${nf(S.last ? S.last.v : v)} м/с`, 'middle', halo + ' font-weight="500"');
+  } else {
+    h += T(R3.x0 + L0 / 2, y - 60, 10.5, '#a9b4c9', 'до старта ракета и топливо покоятся: p = 0', 'middle', halo);
+  }
+  // momentum plate: both arrows from one zero point
+  const on = S.fly || S.last, vv = S.last ? S.last.v : v, pr = on ? vv * Ls.M : 0, pg = on ? gm * gv : 0, py = y + 62, z = 260;
+  h += `<rect x="30" y="${py}" width="460" height="128" rx="10" fill="#121a28" stroke="#26324a"/>`;
+  h += T(46, py + 22, 10.5, '#a9b4c9', `газ: mг = ${S.mg} кг, vг = ${S.ug} м/с`, 'start') + T(474, py + 22, 10.5, OK, `цель ${Ls.vNeed} м/с`, 'end');
+  h += `<path d="M${z} ${py + 34}V${py + 92}" stroke="#8b96ad" stroke-width="1.2"/>` + T(z, py + 104, 9, '#8b96ad', '0');
+  if (pr > 0) h += arrow(z, py + 50, z + pr * R3.kp, py + 50, C1, 4);
+  if (pg > 0) h += arrow(z, py + 76, z - pg * R3.kp, py + 76, CP, 4);
+  h += T(z + 8 + pr * R3.kp, py + 54, 10, C1, `ракета +${big(pr)}`, 'start', halo) + T(z - 8 - pg * R3.kp, py + 80, 10, CP, `газ −${big(pg)}`, 'end', halo);
+  h += T(46, py + 118, 10.5, '#e8ecf4', `сумма импульсов: ${on ? big(pr) + ' − ' + big(pg) + ' = 0' : '0'} кг·м/с`, 'start');
+  return h;
+}
+
+function hlBox(id) {
+  const lid = LID();
+  if (lid === 'impulse') { const w = 40 + S.m * 10, hg = 16 + S.m * 6, p = S.m * S.v; return ({ cart: [A1.cx - w / 2 - 6, A1.gy - 18 - hg, w + 12, hg + 18], vel: [Math.min(A1.cx, A1.cx + S.v * A1.kv) - 12, A1.yv - 14, Math.abs(S.v * A1.kv) + 24, 28], mom: [Math.min(A1.cx, A1.cx + p * A1.kp) - 10, A1.yp - 30, Math.abs(p * A1.kp) + 20, 58], axis: [56, A1.gy + 30, 428, 50] })[id]; }
+  if (lid === 'conserve') return ({ c1: [X2(S.x1) - 6, B2.gy - 18 - ch2(S.m1), B2.k + 12, ch2(S.m1) + 22], c2: [X2(S.x2) - 6, B2.gy - 18 - ch2(S.m2), B2.k + 12, ch2(S.m2) + 22], bump: [X2(S.mode === 'stick' ? S.x2 : S.x1 + 1) - 12, B2.gy - 40, 24, 30], bars: [20, B2.gy + 46, 480, 128], ruler: [X2(0) - 10, B2.gy + 8, X2(10) - X2(0) + 30, 32] })[id];
+  const x = R3.x0;
+  return ({ rocket: [x - 10, R3.y - 38, R3.len + 30, 76], fuel: [x + 2, R3.y - 16, 64, 32], gas: [x - 200, R3.y - 40, 196, 90], arrows: [100, R3.y + 96, 320, 60], plate: [30, R3.y + 62, 460, 128] })[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = bg(id === 'jet');
+  if (id === 'impulse') h += impulseScene();
+  else if (id === 'conserve') h += conserveScene();
+  else h += jetScene();
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// fit the scene: 520 × 405 units, centred, content at the bottom
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 520, hh / 430, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 425 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  drag = { id: el.dataset.drag };
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const p = toSvg(e);
+  if (drag.id === 'v') setV((p.x - A1.cx) / A1.kv);
+  else if (drag.id === 'v1') setV1((p.x - (X2(S.x1) + B2.k / 2)) / B2.kv);
+  else if (drag.id === 'v2') setV2((p.x - (X2(S.x2) + B2.k / 2)) / B2.kv);
+});
+const endDrag = () => { if (!drag) return; drag = null; scene.classList.remove('grabbing'); dirty = true; };
+scene.addEventListener('pointerup', endDrag);
+scene.addEventListener('pointercancel', endDrag);
+
+// lesson 1
+function setM(m) { if (m === S.m) return; S.m = m; checkP(); renderTools(); update(); }
+function setV(v) {
+  v = clamp(Math.round(v * 2) / 2, -6, 6); if (v === S.v) return;
+  S.v = v; checkP(); update();
+}
+function checkP() {
+  const Ls = L(), p = S.m * S.v;
+  if (Math.abs(p - Ls.pNeed) < 1e-9 && !S.hits[S.m]) {
+    S.hits[S.m] = S.v;
+    const n = Object.keys(S.hits).length;
+    toast(n === 1 ? `${S.m} кг × ${nf(S.v)} м/с = 12 кг·м/с. Теперь другая масса.` : `И снова 12: ${S.m} × ${nf(S.v)}. Лёгкой тележке нужна большая скорость.`);
+  }
+  if (Math.abs(p - Ls.pNeg) < 1e-9 && !S.neg) { S.neg = true; toast(`p = ${S.m} × (${nf(S.v)}) = −6 кг·м/с: импульс направлен влево.`); }
+}
+// lesson 2
+function stopRun() { S.run = false; S.t = 0; S.tc = null; S.res = null; S.x1 = 1; S.x2 = 6; S.u1 = S.v1; S.u2 = S.v2; }
+function setV1(v) { if (S.run) return; v = clamp(Math.round(v), 0, 6); if (v === S.v1 && !S.res) return; S.v1 = v; stopRun(); update(); }
+function setV2(v) { if (S.run) return; v = clamp(Math.round(v), -4, 4); if (v === S.v2 && !S.res) return; S.v2 = v; stopRun(); update(); }
+function cycleM(k) {
+  if (S.run) return;
+  const ms = L().masses, key = k === 1 ? 'm1' : 'm2';
+  S[key] = ms[(ms.indexOf(S[key]) + 1) % ms.length]; stopRun(); renderTools(); buildScheme(); update();
+}
+function setM2(k, m) { if (S.run) return; S[k === 1 ? 'm1' : 'm2'] = m; stopRun(); renderTools(); buildScheme(); update(); }
+function setMode(md) { if (S.run || md === S.mode) return; S.mode = md; stopRun(); renderTools(); buildScheme(); update(); }
+function launch2() {
+  if (S.run) return;
+  stopRun();
+  if (S.v1 <= S.v2) { toast('Первая тележка не догонит вторую: её скорость должна быть больше.'); update(); return; }
+  S.run = true; renderTools();
+  if (reduce) { while (S.run) step2(0.02); }
+}
+function step2(dt) {
+  const n = Math.max(1, Math.ceil(dt / 0.004)), h = dt / n;
+  for (let i = 0; i < n && S.run; i++) {
+    S.x1 += S.u1 * h; S.x2 += S.u2 * h; S.t += h;
+    if (S.tc === null && S.x1 + 1 >= S.x2) {
+      S.x1 = S.x2 - 1; S.tc = S.t;
+      const m1 = S.m1, m2 = S.m2, v1 = S.v1, v2 = S.v2;
+      if (S.mode === 'stick') { S.u1 = S.u2 = (m1 * v1 + m2 * v2) / (m1 + m2); }
+      else { S.u1 = ((m1 - m2) * v1 + 2 * m2 * v2) / (m1 + m2); S.u2 = ((m2 - m1) * v2 + 2 * m1 * v1) / (m1 + m2); }
+    }
+    const out = (S.x1 > 11 || S.x1 < -2) && (S.x2 > 11 || S.x2 < -2);
+    if ((S.tc !== null && S.t - S.tc > 2.2) || S.t > 8 || out) { S.run = false; finish2(); }
+  }
+}
+function finish2() {
+  const m = model();
+  S.res = { mode: S.mode, m1: S.m1, m2: S.m2, v1: S.v1, v2: S.v2, u1: S.u1, u2: S.u2 };
+  if (S.mode === 'stick' && Math.abs(S.u1 - 1) < 1e-9) { if (!S.stick) { S.stick = true; toast(`Вместе ровно 1 м/с: ${nf(m.P)} кг·м/с до и (${S.m1} + ${S.m2}) × 1 после.`); } }
+  else if (S.mode === 'stick') toast(`После сцепки ${nf(S.u1)} м/с, а нужно 1 м/с.`);
+  if (S.mode === 'elastic') {
+    if (S.m1 === S.m2 && S.v2 === 0) { if (!S.eq) { S.eq = true; toast('Первая тележка остановилась, а вторая уехала с её скоростью: весь импульс перешёл.'); } }
+    else toast(`Упругий удар: ${nf(S.u1)} и ${nf(S.u2)} м/с. Сумма импульсов та же: ${nf(m.P)}.`);
+  }
+  renderTools(); update();
+}
+// lesson 3
+function setMg(v) { if (S.fly) return; v = clamp(Math.round(v / 50) * 50, 50, 500); if (v === S.mg && !S.last) return; S.mg = v; S.last = null; S.lt = 0; update(); }
+function setUg(v) { if (S.fly) return; v = clamp(Math.round(v / 500) * 500, 500, 3000); if (v === S.ug && !S.last) return; S.ug = v; S.last = null; S.lt = 0; update(); }
+function launch3() {
+  if (S.fly) return;
+  S.last = null; S.lt = 0; S.fly = true; renderTools();
+  if (reduce) { S.lt = R3.T; S.fly = false; finish3(); }
+}
+function finish3() {
+  const Ls = L(), v = vr3();
+  S.last = { mg: S.mg, ug: S.ug, v };
+  if (Math.abs(v - Ls.vNeed) < 1e-9) {
+    const key = S.mg + '×' + S.ug, fresh = !S.combos[key];
+    S.combos[key] = true;
+    const n = Object.keys(S.combos).length;
+    toast(fresh ? (n === 1 ? `${S.mg} × ${S.ug} = 600 000 = 1000 × 600. Есть 600 м/с! Теперь другим способом.` : `Снова 600 м/с, но с другой порцией газа: ${S.mg} кг по ${S.ug} м/с.`) : 'Этот способ уже был. Попробуйте другую массу газа.');
+  } else toast(`Ракета набрала ${nf(v)} м/с, а нужно ${Ls.vNeed} м/с. Импульс газа нужен ${v > Ls.vNeed ? 'меньше' : 'больше'}.`);
+  renderTools(); update();
+}
+
+let last = performance.now();
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  const id = LID();
+  if (id === 'impulse' && S.v !== 0 && !reduce) { S.phase += dt * S.v; dirty = true; }
+  if (id === 'conserve' && S.run) { step2(dt); update(); }
+  if (id === 'jet' && S.fly) { S.lt += dt; if (S.lt >= R3.T) { S.lt = R3.T; S.fly = false; finish3(); } dirty = true; }
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3400); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, cls) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}${cls ? ` class="${cls}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  let h = '';
+  if (id === 'impulse') h = L().masses.map(m => B('m-' + m, m + ' кг', S.m === m)).join('') + sep + B('v-', 'v −') + B('v+', 'v +') + B('v0', 'Стоп');
+  if (id === 'conserve') h = B('m1', `m₁ ${S.m1} кг`) + B('m2', `m₂ ${S.m2} кг`) + sep + B('stick', 'Сцепка', S.mode === 'stick') + B('elastic', 'Упругий', S.mode === 'elastic') + sep + B('go', S.run ? 'Едут…' : 'Пуск', undefined, 'rec') + B('reset', 'Сброс');
+  if (id === 'jet') h = B('mg-', 'mг −') + B('mg+', 'mг +') + sep + B('ug-', 'vг −') + B('ug+', 'vг +') + sep + B('fire', S.fly ? 'Летит…' : 'Запуск', undefined, 'rec') + B('reset', 'Сброс');
+  tb.innerHTML = h;
+}
+function act(a) {
+  const id = LID();
+  if (a === 'reset') {
+    if (id === 'conserve') { if (S.run) return; stopRun(); }
+    if (id === 'jet') { if (S.fly) return; S.last = null; S.lt = 0; }
+    renderTools(); update(); return;
+  }
+  if (a.startsWith('m-')) return setM(+a.slice(2));
+  if (a === 'v-' || a === 'v+') return setV(S.v + (a === 'v-' ? -0.5 : 0.5));
+  if (a === 'v0') return setV(0);
+  if (a === 'm1') return cycleM(1);
+  if (a === 'm2') return cycleM(2);
+  if (a.startsWith('a-')) return setM2(1, +a.slice(2));
+  if (a.startsWith('b-')) return setM2(2, +a.slice(2));
+  if (a === 'stick' || a === 'elastic') return setMode(a);
+  if (a === 'go') return launch2();
+  if (a === 'mg-' || a === 'mg+') return setMg(S.mg + (a === 'mg-' ? -50 : 50));
+  if (a === 'ug-' || a === 'ug+') return setUg(S.ug + (a === 'ug-' ? -500 : 500));
+  if (a === 'fire') return launch3();
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  cart: IC('<rect x="4" y="10" width="26" height="13" rx="3" fill="#5d6a86"/><circle cx="10" cy="26" r="4" fill="#2a3348"/><circle cx="24" cy="26" r="4" fill="#2a3348"/>'),
+  vel: IC('<path d="M3 17h20" stroke="#72d4e8" stroke-width="3"/><path d="M31 17l-9-5v10z" fill="#72d4e8"/>'),
+  mom: IC('<path d="M3 17h20" stroke="#ffb547" stroke-width="5"/><path d="M32 17l-10-6v12z" fill="#ffb547"/>'),
+  axis: IC('<path d="M2 20h28" stroke="var(--muted)" stroke-width="2"/><path d="M32 20l-5-3v6z" fill="var(--muted)"/><path d="M8 17v6M17 17v6M26 17v6" stroke="var(--muted)" stroke-width="1.4"/>'),
+  c1: IC('<rect x="4" y="10" width="26" height="13" rx="3" fill="#72d4e8"/><circle cx="10" cy="26" r="4" fill="#2a3348"/><circle cx="24" cy="26" r="4" fill="#2a3348"/>'),
+  c2: IC('<rect x="4" y="8" width="26" height="15" rx="3" fill="#c3a8ff"/><circle cx="10" cy="26" r="4" fill="#2a3348"/><circle cx="24" cy="26" r="4" fill="#2a3348"/>'),
+  bump: IC('<path d="M10 9l6 3-6 3 6 3-6 3 6 3" fill="none" stroke="#a9b4c9" stroke-width="2"/><path d="M26 10c-6 0-6 14 0 14" fill="#d9a35f"/>'),
+  bars: IC('<path d="M8 4v26" stroke="var(--muted)"/><path d="M8 10h14M8 16h8M8 24h20" stroke="#ffb547" stroke-width="3"/>'),
+  ruler: IC('<path d="M2 14h30" stroke="var(--muted)" stroke-width="2"/><path d="M4 14v8M12 14v5M20 14v8M28 14v5" stroke="var(--muted)" stroke-width="1.6"/>'),
+  rocket: IC('<path d="M5 12h16q8 1 11 5q-3 4-11 5H5z" fill="#d6dbe6"/><path d="M8 12L3 6v6zM8 22l-5 6v-6z" fill="#ff8a73"/>'),
+  fuel: IC('<rect x="6" y="10" width="22" height="14" rx="3" fill="#ffb547"/>'),
+  gas: IC('<circle cx="12" cy="17" r="7" fill="#ffb547" opacity=".7"/><circle cx="20" cy="14" r="6" fill="#ff8a73" opacity=".7"/><circle cx="19" cy="21" r="5" fill="#ffb547" opacity=".7"/>'),
+  arrows: IC('<path d="M17 11h12" stroke="#72d4e8" stroke-width="3"/><path d="M33 11l-6-4v8z" fill="#72d4e8"/><path d="M17 23H5" stroke="#ffb547" stroke-width="3"/><path d="M1 23l6-4v8z" fill="#ffb547"/>'),
+  plate: IC('<rect x="3" y="9" width="28" height="16" rx="4" fill="none" stroke="var(--muted)" stroke-width="1.6"/><path d="M8 15h14M8 20h10" stroke="var(--muted)" stroke-width="1.6"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+const sg = x => x < 0 ? `(${nf(x)})` : nf(x);
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  const t = (ok, s) => `${s} ${ok ? '✓' : '—'}`;
+  if (id === 'impulse') return [`12 кг·м/с: ${m.n} из 2 масс`, t(m.neg, '−6 кг·м/с')].join(' · ');
+  if (id === 'conserve') return [t(m.stick, 'Сцепка 1 м/с'), t(m.eq, 'Упругий удар одинаковых')].join(' · ');
+  return `600 м/с: ${m.n} из 2 способов` + (S.last ? ` · последний запуск ${nf(S.last.v)} м/с` : '');
+}
+
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'impulse') h = `<h2>Тележка на дороге</h2><div class="ctl"><div class="lbl">Масса тележки</div><div class="chips">${L().masses.map(m => `<button data-a="m-${m}" aria-pressed="${S.m === m}">${m} кг</button>`).join('')}</div></div>` +
+      slider('inV', 'Скорость v (минус — влево)', -6, 6, 0.5, S.v) +
+      `<dl class="reads"><div><dt>масса m</dt><dd id="r1"></dd></div><div><dt>скорость v</dt><dd id="r2"></dd></div><div><dt>импульс p</dt><dd id="r3"></dd></div></dl>`;
+  if (id === 'conserve') h = `<h2>Удар двух тележек</h2>` +
+      `<div class="ctl"><div class="lbl">Вид удара</div><div class="chips"><button data-a="stick" aria-pressed="${S.mode === 'stick'}">сцепка</button><button data-a="elastic" aria-pressed="${S.mode === 'elastic'}">упругий</button></div></div>` +
+      `<div class="ctl"><div class="lbl">Масса m₁ (голубая)</div><div class="chips">${L().masses.map(m => `<button data-a="a-${m}" aria-pressed="${S.m1 === m}">${m} кг</button>`).join('')}</div></div>` +
+      `<div class="ctl"><div class="lbl">Масса m₂ (сиреневая)</div><div class="chips">${L().masses.map(m => `<button data-a="b-${m}" aria-pressed="${S.m2 === m}">${m} кг</button>`).join('')}</div></div>` +
+      slider('inV1', 'Скорость v₁', 0, 6, 1, S.v1) + slider('inV2', 'Скорость v₂ (минус — навстречу)', -4, 4, 1, S.v2) +
+      `<dl class="reads"><div><dt>Σp до</dt><dd id="r1"></dd></div><div><dt>v₁′</dt><dd id="r2"></dd></div><div><dt>v₂′</dt><dd id="r3"></dd></div></dl>
+      <div class="row"><button class="ghostbtn" data-a="go">Пуск</button><button class="ghostbtn" data-a="reset">Сброс</button></div>
+      <p class="note" style="margin-top:12px">Трения нет: тележки на гладких рельсах, внешние силы уравновешены.</p>`;
+  if (id === 'jet') h = `<h2>Ракета в космосе</h2>` + slider('inMg', 'Масса газа mг', 50, 500, 50, S.mg) + slider('inUg', 'Скорость газа vг', 500, 3000, 500, S.ug) +
+      `<dl class="reads"><div><dt>масса ракеты</dt><dd>${L().M} кг</dd></div><div><dt>p газа</dt><dd id="r1"></dd></div><div><dt>v ракеты</dt><dd id="r2"></dd></div></dl>
+      <div class="row"><button class="ghostbtn" data-a="fire">Запуск</button><button class="ghostbtn" data-a="reset">Сброс</button></div>
+      <p class="note" style="margin-top:12px">M — масса ракеты после выброса газа. Скорости — относительно места, где ракета стояла до старта. У настоящей ракеты газ вылетает постепенно, и расчёт сложнее.</p>`;
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn); };
+  on('#inV', e => setV(+e.target.value));
+  on('#inV1', e => setV1(+e.target.value));
+  on('#inV2', e => setV2(+e.target.value));
+  on('#inMg', e => setMg(+e.target.value));
+  on('#inUg', e => setUg(+e.target.value));
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => { act(b.dataset.a); if (/^(m|a|b)-|^stick$|^elastic$/.test(b.dataset.a)) buildScheme(); });
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (id === 'impulse') { set('#inVO', nf(S.v) + ' м/с'); val('#inV', S.v); set('#r1', S.m + ' кг'); set('#r2', nf(S.v) + ' м/с'); set('#r3', nf(m.p)); }
+  if (id === 'conserve') { set('#inV1O', nf(S.v1) + ' м/с'); val('#inV1', S.v1); set('#inV2O', nf(S.v2) + ' м/с'); val('#inV2', S.v2); set('#r1', nf(m.P)); set('#r2', S.res ? nf(S.res.u1) + ' м/с' : '—'); set('#r3', S.res ? nf(S.res.u2) + ' м/с' : '—'); }
+  if (id === 'jet') { set('#inMgO', S.mg + ' кг'); val('#inMg', S.mg); set('#inUgO', S.ug + ' м/с'); val('#inUg', S.ug); set('#r1', big(m.pg)); set('#r2', nf(m.v) + ' м/с'); }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'impulse') return [
+    { id: 'cart', icon: ICON.cart, name: 'Тележка', spec: 'Масса от 1 до 6 кг. Чем тяжелее, тем она больше.' },
+    { id: 'vel', icon: ICON.vel, name: 'Скорость v', spec: 'Голубая стрелка. Тяните кружок на её конце: вправо — плюс, влево — минус.' },
+    { id: 'mom', icon: ICON.mom, name: 'Импульс p', spec: 'Оранжевая стрелка: p = m · v. Всегда направлена как скорость.' },
+    { id: 'axis', icon: ICON.axis, name: 'Ось x', spec: 'Задаёт, какое направление считать положительным.' }];
+  if (id === 'conserve') return [
+    { id: 'c1', icon: ICON.c1, name: 'Тележка 1', spec: 'Голубая, налетает слева со скоростью v₁.' },
+    { id: 'c2', icon: ICON.c2, name: 'Тележка 2', spec: 'Сиреневая. Может стоять или ехать навстречу.' },
+    { id: 'bump', icon: ICON.bump, name: 'Пружина или пластилин', spec: 'Пружина — удар упругий, тележки разлетаются. Пластилин — тележки сцепляются.' },
+    { id: 'bars', icon: ICON.bars, name: 'Импульсы до и после', spec: 'Тонкие стрелки — импульсы тележек, толстая — их сумма. Сумма не меняется.' },
+    { id: 'ruler', icon: ICON.ruler, name: 'Рельсы 10 м', spec: 'Гладкие: трения нет, система замкнутая.' }];
+  return [
+    { id: 'rocket', icon: ICON.rocket, name: 'Ракета 1000 кг', spec: 'Её масса M после выброса газа.' },
+    { id: 'fuel', icon: ICON.fuel, name: 'Порция топлива', spec: 'Сгорает и вылетает назад газом массой mг.' },
+    { id: 'gas', icon: ICON.gas, name: 'Газ', spec: 'Летит назад со скоростью vг.' },
+    { id: 'arrows', icon: ICON.arrows, name: 'Стрелки импульсов', spec: 'Импульсы ракеты и газа равны по длине и смотрят в разные стороны.' },
+    { id: 'plate', icon: ICON.plate, name: 'Табло', spec: 'Показывает, что сумма импульсов осталась нулевой.' }];
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Что на площадке</h2><p class="note">Нажмите на деталь, чтобы найти её на площадке.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID(), Ls = L();
+  if (id === 'impulse') {
+    return `<h2>Импульс тела</h2><div class="formula">p = m · v</div><p class="note">m — масса в кг, v — скорость в м/с, p — импульс в кг·м/с. Знак показывает направление.</p>
+      <h3>Сейчас</h3><div class="steps">` + step('масса m', `${S.m} кг`) + step('скорость v', `${nf(S.v)} м/с`) + step('импульс', `p = ${S.m} × ${sg(S.v)} = ${nf(m.p)} кг·м/с`, 'sum') + `</div>
+      <h3>Цель 12 кг·м/с</h3><div class="steps">` + step('масса', `${S.m} кг`) + step('скорость', 'v = p / m = ?', 'sum') +
+      Object.keys(S.hits).map(k => step(`найдено: ${k} кг`, `${k} × ${nf(S.hits[k])} = 12`)).join('') + `</div>
+      <h3>Импульс силы</h3><p class="note">Чтобы разогнать тележку ${S.m} кг из покоя до ${nf(Math.abs(S.v))} м/с, нужен импульс силы F · t = ${nf(Math.abs(m.p))} Н·с. Например, ${S.v !== 0 ? `${nf(Math.abs(m.p) / 2)} Н в течение 2 с` : 'никакой — тележка стоит'}.</p>`;
+  }
+  if (id === 'conserve') {
+    const r = S.res, P = m.P, M = S.m1 + S.m2;
+    let h = `<h2>Сохранение импульса</h2><div class="formula">m₁v₁ + m₂v₂ = m₁v₁′ + m₂v₂′</div><p class="note">Штрих ′ — скорость после удара. Вправо — плюс.</p>
+      <h3>До удара</h3><div class="steps">` + step('p₁', `${S.m1} × ${sg(S.v1)} = ${nf(S.m1 * S.v1)}`) + step('p₂', `${S.m2} × ${sg(S.v2)} = ${nf(S.m2 * S.v2)}`) + step('сумма', `${nf(P)} кг·м/с`, 'sum') + `</div>`;
+    if (S.mode === 'stick') h += `<h3>Сцепка</h3><div class="steps">` + step('масса пары', `${S.m1} + ${S.m2} = ${M} кг`) + step('общая скорость', `v = ${nf(P)} / ${M} = ${nf(P / M)} м/с`, 'sum') + step('цель', '1 м/с') + `</div>`;
+    else h += `<h3>Упругий удар</h3><div class="steps">` + step('v₁′', `((m₁ − m₂)v₁ + 2m₂v₂) / (m₁ + m₂) = ${nf(((S.m1 - S.m2) * S.v1 + 2 * S.m2 * S.v2) / M)} м/с`) + step('v₂′', `((m₂ − m₁)v₂ + 2m₁v₁) / (m₁ + m₂) = ${nf(((S.m2 - S.m1) * S.v2 + 2 * S.m1 * S.v1) / M)} м/с`) + `</div><p class="note" style="margin-top:8px">Эти формулы получаются, если сохраняются и импульс, и кинетическая энергия. В 9 классе их не заучивают — достаточно видеть, что сумма импульсов та же.</p>`;
+    if (r) h += `<h3>После удара (опыт)</h3><div class="steps">` + step('p₁′', `${r.m1} × ${sg(r.u1)} = ${nf(r.m1 * r.u1)}`) + step('p₂′', `${r.m2} × ${sg(r.u2)} = ${nf(r.m2 * r.u2)}`) + step('сумма', `${nf(r.m1 * r.u1 + r.m2 * r.u2)} кг·м/с`, 'sum') + `</div>`;
+    return h;
+  }
+  return `<h2>Реактивное движение</h2><div class="formula">mг · vг = M · v</div><div class="formula">v = mг · vг / M</div><p class="note">До старта сумма импульсов 0, после выброса тоже 0.</p>
+    <h3>Сейчас</h3><div class="steps">` + step('импульс газа', `${S.mg} × ${S.ug} = ${big(m.pg)} кг·м/с`) + step('масса ракеты M', `${Ls.M} кг`) + step('скорость ракеты', `v = ${big(m.pg)} / ${Ls.M} = ${nf(m.v)} м/с`, 'sum') + `</div>
+    <h3>Цель</h3><div class="steps">` + step('v', `${Ls.vNeed} м/с`) + step('нужный импульс газа', `${Ls.M} × ${Ls.vNeed} = ?`, 'sum') + `</div>` +
+    (Object.keys(S.combos).length ? `<h3>Найденные способы</h3><div class="steps">` + Object.keys(S.combos).map(k => step(k.replace('×', ' кг × ') + ' м/с', '600 м/с')).join('') + `</div>` : '');
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter');
+  if (id === 'impulse') el.innerHTML = `<div class="k">Импульс</div><div class="v ${Math.abs(m.p - 12) < 1e-9 || Math.abs(m.p + 6) < 1e-9 ? 'ok' : ''}">p = ${nf(m.p)}</div><div class="lr"><span>m</span><span>${S.m} кг</span></div><div class="lr"><span>v</span><span>${nf(S.v)} м/с</span></div>`;
+  else if (id === 'conserve') el.innerHTML = `<div class="k">Сумма импульсов</div><div class="v">${nf(m.p1 + m.p2)}</div><div class="lr"><span>p₁</span><span>${nf(m.p1)}</span></div><div class="lr"><span>p₂</span><span>${nf(m.p2)}</span></div>`;
+  else el.innerHTML = `<div class="k">Ракета</div><div class="v ${S.last && Math.abs(S.last.v - L().vNeed) < 1e-9 ? 'ok' : ''}">v = ${nf(S.last ? S.last.v : (S.fly ? m.v : 0))} м/с</div><div class="lr"><span>mг</span><span>${S.mg} кг</span></div><div class="lr"><span>vг</span><span>${S.ug} м/с</span></div>`;
+}
+
+function update() {
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Теперь вы понимаете, как летают ракеты!'), 1800);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  impulse: '<path d="M2 26h62" stroke="#3a4762" stroke-width="2"/><rect x="8" y="14" width="18" height="9" rx="2" fill="#5d6a86"/><path d="M28 10h20" stroke="#ffb547" stroke-width="3"/><path d="M54 10l-7-4v8z" fill="#ffb547"/><path d="M28 19h10" stroke="#72d4e8" stroke-width="2"/><path d="M42 19l-5-3v6z" fill="#72d4e8"/>',
+  conserve: '<path d="M2 26h62" stroke="#3a4762" stroke-width="2"/><rect x="10" y="15" width="16" height="9" rx="2" fill="#72d4e8"/><rect x="34" y="12" width="16" height="12" rx="2" fill="#c3a8ff"/><path d="M10 7h12" stroke="#ffb547" stroke-width="2"/><path d="M26 7l-4-3v6z" fill="#ffb547"/>',
+  jet: '<path d="M26 10h20q8 1 12 5q-4 4-12 5H26z" fill="#d6dbe6"/><path d="M30 10l-5-5v5zM30 20l-5 5v-5z" fill="#ff8a73"/><circle cx="14" cy="15" r="6" fill="#ffb547" opacity=".7"/><circle cx="8" cy="13" r="4" fill="#ff8a73" opacity=".7"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Lx, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Lx.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Lx.title}</span></span>
+      ${S.done[Lx.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  S.lesson = i; drag = null;
+  resetState(); save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L().task;
+  $('#hint').textContent = L().stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  // centre the active card by scrolling only the strip, never the page
+  const strip = $('#lessons'), cur = strip.querySelector('.lesson[aria-current="true"]');
+  if (cur) { const br = strip.getBoundingClientRect(), cr = cur.getBoundingClientRect(); strip.scrollLeft = Math.max(0, strip.scrollLeft + (cr.left - br.left) - (br.width - cr.width) / 2); }
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '';
+  if (id === 'impulse') now = `Тележка массой ${S.m} кг едет со скоростью ${nf(S.v)} м/с (минус — влево). Импульс p = ${nf(m.p)} кг·м/с. Импульс 12 кг·м/с получен для масс: ${Object.keys(S.hits).length ? Object.keys(S.hits).map(k => k + ' кг').join(', ') : 'пока ни для одной'}; импульс −6 кг·м/с ${S.neg ? 'получен' : 'ещё не получен'}. Нужные скорости не называй — наводи вопросами про p = m · v и знак скорости.`;
+  if (id === 'conserve') now = `Две тележки на гладких рельсах, режим удара «${S.mode === 'stick' ? 'сцепка (пластилин)' : 'упругий (пружина)'}». Голубая m₁ = ${S.m1} кг, v₁ = ${nf(S.v1)} м/с; сиреневая m₂ = ${S.m2} кг, v₂ = ${nf(S.v2)} м/с. Сумма импульсов до удара ${nf(m.P)} кг·м/с. ${S.res ? `Последний опыт (${S.res.mode === 'stick' ? 'сцепка' : 'упругий'}): после удара v₁′ = ${nf(S.res.u1)} м/с, v₂′ = ${nf(S.res.u2)} м/с.` : S.run ? 'Тележки сейчас едут.' : 'Опыт ещё не запускали.'} Сцепка с общей скоростью 1 м/с ${S.stick ? 'получена' : 'не получена'}; упругий удар одинаковых тележек по неподвижной ${S.eq ? 'сделан' : 'не сделан'}. Готовые массы и скорости не называй.`;
+  if (id === 'jet') now = `Ракета массой 1000 кг в космосе. Порция газа mг = ${S.mg} кг, скорость газа vг = ${S.ug} м/с. Импульс газа ${big(m.pg)} кг·м/с, ракета после выброса получит ${nf(m.v)} м/с. ${S.last ? `Последний запуск: ${nf(S.last.v)} м/с.` : S.fly ? 'Ракета сейчас летит.' : 'Запуска ещё не было.'} Цель 600 м/с найдена способами: ${Object.keys(S.combos).length ? Object.keys(S.combos).join(', ') : 'пока ни одним'} (нужно два разных). Готовые пары чисел не называй — наводи вопросами про mг · vг = M · v.`;
+  return [
+    `Раздел: физика, 9 класс, механика, тема «Импульс». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'} (${taskState(m)}).`,
+    `Сейчас на площадке: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Помогай наводящими вопросами, готовые ответы не выдавай.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { impulse: 'Чем импульс отличается от скорости?', conserve: 'Почему при ударе сумма импульсов не меняется?', jet: 'Как ракета разгоняется в пустоте, если ей не от чего оттолкнуться?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
