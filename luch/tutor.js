@@ -226,20 +226,20 @@
   const LOCALE = { ru: 'ru-RU', en: 'en-US', kk: 'kk-KZ', es: 'es-ES' }[lang] || 'ru-RU';
 
   const btn = document.createElement('button');
-  btn.className = 'lt-btn'; btn.type = 'button'; btn.setAttribute('aria-label', 'Спросить репетитора');
-  btn.innerHTML = `${AV}<span>Спросить репетитора<small>текстом или голосом</small></span>`;
+  btn.className = 'lt-btn'; btn.type = 'button'; btn.setAttribute('aria-label', 'Спросить наставника');
+  btn.innerHTML = `${AV}<span>Спросить наставника<small>голосом или текстом</small></span>`;
   const panel = document.createElement('section');
-  panel.className = 'lt-panel'; panel.hidden = true; panel.setAttribute('aria-label', 'ИИ-репетитор');
+  panel.className = 'lt-panel'; panel.hidden = true; panel.setAttribute('aria-label', 'ИИ-наставник');
   panel.innerHTML = `
-    <div class="lt-head">${AV}<div class="lt-sp"><b>Репетитор</b><span>видит экран</span></div>
+    <div class="lt-head">${AV}<div class="lt-sp"><b>Наставник</b><span>видит экран</span></div>
       <button class="lt-ib" id="lt-vm" type="button" aria-pressed="false" title="Разговор голосом">${WAVE}<span class="lt-tx">Голосом</span></button>
-      <button class="lt-ib" id="lt-bd" type="button" title="Доска: рисовать и показывать репетитору">✎<span class="lt-tx">Доска</span></button>
+      <button class="lt-ib" id="lt-bd" type="button" title="Доска: рисовать и показывать наставнику">✎<span class="lt-tx">Доска</span></button>
       <button class="lt-ib" id="lt-close" type="button" aria-label="Свернуть">✕</button></div>
     <div class="lt-log" id="lt-log" aria-live="polite"></div>
     <div class="lt-sug" id="lt-sug"></div>
     <form class="lt-form" id="lt-form">
       <button class="lt-mic" id="lt-mic" type="button" aria-label="Надиктовать вопрос" title="Надиктовать вопрос">${MIC}</button>
-      <textarea id="lt-in" rows="1" placeholder="Спросите что угодно про опыт…" aria-label="Вопрос репетитору"></textarea>
+      <textarea id="lt-in" rows="1" placeholder="Спросите что угодно…" aria-label="Вопрос наставнику"></textarea>
       <button class="lt-send" id="lt-send" type="submit" aria-label="Отправить"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M3 9h11M9.5 4.5L14 9l-4.5 4.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button></form>
     <div class="lt-voice" id="lt-voice" hidden>
       <button class="lt-orb" id="lt-orb" type="button" data-s="idle" aria-label="Говорить"><svg width="30" height="30" viewBox="0 0 18 18" aria-hidden="true"><rect x="6" y="1.5" width="6" height="10" rx="3" fill="#0b1019"/><path d="M3.5 8.5a5.5 5.5 0 0 0 11 0M9 14v2.5" stroke="#0b1019" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg></button>
@@ -289,7 +289,7 @@
     log.innerHTML = '';
     if (!chat.length) {
       const h = document.createElement('div'); h.className = 'lt-hello';
-      h.innerHTML = '<b>Привет! Я твой репетитор 🙂</b>Я вижу, какой урок открыт и что происходит в опыте, могу показать нужное место на странице и нарисовать объяснение на доске. Спрашивай что угодно — глупых вопросов не бывает. Можно написать, надиктовать или поговорить голосом (кнопка «Голосом»), можно по-казахски. А на доске можно рисовать самому и показать мне рисунок.';
+      h.innerHTML = '<b>Привет! Я твой наставник 🙂</b>Я вижу, какой урок открыт и что происходит в опыте, могу показать нужное место на странице и нарисовать объяснение на доске. Спрашивай что угодно — глупых вопросов не бывает. Можно написать, надиктовать или поговорить голосом (кнопка «Голосом»), можно по-казахски. А на доске можно рисовать самому и показать мне рисунок.';
       log.appendChild(h);
     }
     chat.forEach(m => bubble(m.role, m.content, m.role === 'assistant'));
@@ -486,10 +486,10 @@
       wrap.innerHTML = `<div class="lt-bh"><b>Доска</b>
           <div class="lt-pens" role="group" aria-label="Мел">${['#f4f1e8', '#ffd166', '#7fd4ff', '#ff8fa3'].map(c => `<button type="button" data-c="${c}" style="--c:${c}" aria-label="Мел ${c}"></button>`).join('')}</div>
           <button class="lt-ib" data-a="clear" type="button" title="Стереть мой рисунок">Стереть</button>
-          <button class="lt-ib" data-a="send" type="button" title="Отправить рисунок репетитору">Спросить про рисунок</button>
+          <button class="lt-ib" data-a="send" type="button" title="Отправить рисунок наставнику">Спросить про рисунок</button>
           <button class="lt-ib" data-a="close" type="button" aria-label="Закрыть доску">✕</button></div>
         <div class="lt-bb"><svg viewBox="0 0 480 300" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><defs><marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#f4f1e8"/></marker></defs><g class="lt-layer"></g></svg><canvas></canvas></div>
-        <div class="lt-bf">Рисуйте пальцем или мышкой — репетитор увидит рисунок, если нажать «Спросить про рисунок».</div>`;
+        <div class="lt-bf">Рисуйте пальцем или мышкой — наставник увидит рисунок, если нажать «Спросить про рисунок».</div>`;
       document.body.appendChild(wrap);
       svg = wrap.querySelector('svg'); layer = wrap.querySelector('.lt-layer'); cv = wrap.querySelector('canvas'); cx = cv.getContext('2d');
       const pens = wrap.querySelector('.lt-pens');
@@ -637,7 +637,7 @@
     try { heard = await dict.p; inp.value = (before + heard).trim(); }
     catch (e) { flash(micError(e)); }
     dict = null; mic.classList.remove('rec'); mic.setAttribute('aria-label', 'Надиктовать вопрос');
-    inp.placeholder = 'Спросите что угодно про опыт…'; inp.dispatchEvent(new Event('input'));
+    inp.placeholder = 'Спросите что угодно…'; inp.dispatchEvent(new Event('input'));
     if (heard) { dictated = true; form.requestSubmit(); } else inp.focus();
   });
   function flash(msg) { const d = bubble('assistant', msg); d.style.opacity = '.8'; scroll(); }
@@ -783,7 +783,7 @@
         if (!store.get('luch-guide-tour')) {
           store.set('luch-guide-tour', '1');
           show('Это лаборатория. Слева — опыт: всё можно двигать руками. В рамке — задание урока.', [['Понятно →', () => {
-            show('Справа: «Теория» — объяснение, «Практика» — управление и расчёты, «ДЗ» — задачи на дом. А я помогаю, если что-то непонятно.', [['Начать урок', () => lessonTip(true)]], { force: true, el: document.querySelector('.ls-tabs') });
+            show('Справа: «Теория» — объяснение, «Практика» — управление и расчёты, «ДЗ» — задачи на дом. А я рядом, если что-то непонятно.', [['Начать урок', () => lessonTip(true)]], { force: true, el: document.querySelector('.ls-tabs') });
           }]], { force: true, el: taskEl() });
         } else lessonTip(true);
       }, 1300);
@@ -819,7 +819,7 @@
         gradeAsk();
       }, 1200);
       function gradeAsk() {
-        show('Привет! Я твой репетитор. В каком ты классе? Подберу, с чего начать.', [['5–6', () => pick(5)], ['7', () => pick(7)], ['8', () => pick(8)], ['9', () => pick(9)], ['10–11', () => pick(10)]], { force: true });
+        show('Привет! Я твой наставник. Объясню любую тему просто — на опытах и картинках. С чего начнём?', [['🎓 Учусь в школе', () => show('В каком ты классе? Подберу, с чего начать.', [['5–6', () => pick(5)], ['7', () => pick(7)], ['8', () => pick(8)], ['9', () => pick(9)], ['10–11', () => pick(10)]], { force: true, speak: true })], ['💡 Хочу разобраться в теме', () => show('Скажи, что хочешь понять — например, «как работает электричество», — или выбери тему на карте.', [], { force: true, el: document.getElementById('subjects') })]], { force: true });
       }
       function pick(g) {
         store.set('luch-grade', g);
