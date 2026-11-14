@@ -42,13 +42,13 @@ window.LUCH_SUBJECTS = {
       { id: 'circ', b: 'geo', g: 8, t: 'Окружность', items: ['Касательная', 'Вписанные углы', 'Вписанная и описанная окружность'], req: ['tri'], status: 'done', href: '/labs/math-circ/', lessons: 3, doneItems: 3 },
       { id: 'vect', b: 'geo', g: 9, t: 'Векторы и координаты', items: ['Векторы', 'Метод координат', 'Уравнение окружности и прямой'], req: ['pyth', 'coord'], status: 'done', href: '/labs/math-vect/', lessons: 3, doneItems: 3 },
       { id: 'stereo', b: 'geo', g: 10, t: 'Стереометрия', items: ['Аксиомы пространства', 'Параллельность и перпендикулярность', 'Углы и расстояния'], req: ['vect'], status: 'done', href: '/labs/math-stereo/', lessons: 3, doneItems: 3 },
-      { id: 'solids', b: 'geo', g: 11, t: 'Тела и объёмы', items: ['Призма и пирамида', 'Цилиндр, конус, шар', 'Площади поверхности', 'Объёмы тел'], req: ['stereo'] },
+      { id: 'solids', b: 'geo', g: 11, t: 'Тела и объёмы', items: ['Призма и пирамида', 'Цилиндр, конус, шар', 'Площади поверхности', 'Объёмы тел'], req: ['stereo'], status: 'done', href: '/labs/math-solids/', lessons: 4, doneItems: 4 },
 
       { id: 'data', b: 'prob', g: 6, t: 'Данные и диаграммы', items: ['Таблицы', 'Столбчатые и круговые диаграммы', 'Среднее арифметическое'], req: ['frac'], status: 'done', href: '/labs/math-data/', lessons: 3, doneItems: 3 },
       { id: 'comb', b: 'prob', g: 9, t: 'Комбинаторика', items: ['Правило умножения', 'Перестановки', 'Сочетания', 'Треугольник Паскаля'], req: ['num'], status: 'done', href: '/labs/math-comb/', lessons: 4, doneItems: 4 },
       { id: 'probab', b: 'prob', g: 9, t: 'Вероятность', items: ['Случайные события', 'Классическая вероятность', 'Сложение и умножение вероятностей'], req: ['comb', 'frac'], status: 'done', href: '/labs/math-probab/', lessons: 3, doneItems: 3 },
       { id: 'stat', b: 'prob', g: 10, t: 'Статистика', items: ['Медиана и мода', 'Разброс и дисперсия', 'Выборки и опросы', 'Как графики вводят в заблуждение'], req: ['data', 'probab'], status: 'done', href: '/labs/math-stat/', lessons: 4, doneItems: 4 },
-      { id: 'rv', b: 'prob', g: 11, t: 'Случайные величины', items: ['Математическое ожидание', 'Биномиальное распределение', 'Закон больших чисел'], req: ['stat'] },
+      { id: 'rv', b: 'prob', g: 11, t: 'Случайные величины', items: ['Математическое ожидание', 'Биномиальное распределение', 'Закон больших чисел'], req: ['stat'], status: 'done', href: '/labs/math-rv/', lessons: 3, doneItems: 3 },
     ],
   },
 

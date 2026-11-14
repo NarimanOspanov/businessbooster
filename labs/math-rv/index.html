@@ -1,0 +1,884 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по математике, 11 класс: математическое ожидание, биномиальное распределение, закон больших чисел.">
+<title>Случайные величины</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--liq);transition:width .2s}
+.gauge i{position:absolute;top:-4px;width:2px;height:14px;background:var(--force);transform:translateX(-50%)}
+.swatch{height:12px;border-radius:4px;margin-top:9px;border:1px solid rgba(255,255,255,.15)}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.dtab{width:100%;border-collapse:collapse;font-size:13px;margin:4px 0 0}
+.dtab th,.dtab td{border:1px solid var(--line);padding:7px 8px;text-align:left}
+.dtab th{font:600 10.5px/1.2 var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:var(--surface-2)}
+.dtab td.n{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.dtab tr.tot td{font-weight:600}
+.dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:7px;vertical-align:-1px}
+.chips .lbl2{font-size:12.5px;color:var(--muted);align-self:center;margin-right:2px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M8 30H32" stroke="var(--fg)" stroke-width="2"/><path d="M17 31l3-6 3 6z" fill="var(--force)"/><rect x="9" y="18" width="5" height="11" fill="var(--arm)"/><rect x="17.5" y="12" width="5" height="12" fill="var(--arm)"/><rect x="26" y="21" width="5" height="8" fill="var(--arm)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Математика · Случайные величины</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#math">Карта</a><a href="/physics/#math">Математика</a><a href="./" aria-current="page">Случайные величины</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Случайные величины</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Рабочее поле">
+    <svg class="scene" id="scene" role="img" aria-label="Рабочее поле: колесо удачи с распределением выигрыша, распределение Бернулли и график среднего при бросках кубика. Столбики можно тянуть и выбирать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const trim = (x, n = 2) => { const s = fmt(x, n); return s.includes(',') ? s.replace(/(,d*?)0+$/, '$1').replace(/,$/, '') : s; };
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const sum = a => a.reduce((s, x) => s + x, 0);
+
+// ---------- lesson 1: wheel of fortune ----------
+const PRIZES = [0, 100, 200, 500, 1000];
+const PCOL = ['#2c3852', '#5fb4d9', '#c79bff', '#ffb547', '#86e0a8'];
+const PRICE = 150, SECT = 20, FAIR = PRICE * SECT; // Σ x·k must be 3000
+
+// ---------- lesson 2: Bernoulli ----------
+function binC(n, k) { if (k < 0 || k > n) return 0; let r = 1; for (let i = 1; i <= k; i++) r = r * (n - k + i) / i; return Math.round(r); }
+const binP = (n, p, k) => binC(n, k) * p ** k * (1 - p) ** (n - k);
+
+const LESSONS = [
+  { id: 'mean', title: 'Математическое ожидание',
+    text: ['Случайная величина X — число, которое зависит от случая: выигрыш в игре, число попаданий, очки на кубике. Закон распределения — это таблица: какие значения xᵢ принимает X и с какими вероятностями pᵢ. Сумма всех pᵢ равна 1.',
+           'Математическое ожидание — среднее «с весами»: E(X) = x₁p₁ + x₂p₂ + … + xₙpₙ. Это средний выигрыш за одну игру, если играть очень много раз. Само значение E(X) может и не выпадать ни разу.',
+           'Наглядно: поставьте столбики вероятностей на линейку как грузы. Линейка уравновесится ровно в точке E(X). Игра честная, если ожидаемый выигрыш равен цене участия.'],
+    why: 'На математическом ожидании построены страхование, банки и лотереи. Актуарий страховой компании считает ожидаемую выплату по полису ОСАГО и ставит цену чуть выше — разница и есть доход компании. Лотереи и букмекеры всегда делают ожидаемый выигрыш меньше цены билета, поэтому «в долгую» игрок проигрывает. Инвестор сравнивает проекты по ожидаемой доходности, а менеджер интернет-магазина — по ожидаемой прибыли с заказа с учётом возвратов.',
+    task: 'Попытка стоит 150 тг. Сделайте игру честной: E(X) = 150 тг. Хотя бы один сектор с джекпотом 1000 тг должен остаться.',
+    hint: 'Тяните столбики 100, 200, 500 и 1000: новые сектора забираются у пустых (0 тг). Всего секторов 20, значит сумма «приз × число секторов» должна быть 150 · 20 = 3000.',
+    stage: 'Тяните столбики вверх-вниз. Нажмите на колесо, чтобы крутить.',
+    cnt: [12, 4, 2, 1, 1],
+    check: m => m.sxk === FAIR && m.k[4] >= 1 },
+  { id: 'binom', title: 'Биномиальное распределение',
+    text: ['Схема Бернулли: один и тот же опыт повторяют n раз, и опыты не влияют друг на друга. В каждом опыте «успех» случается с вероятностью p, «неудача» — с вероятностью q = 1 − p.',
+           'X — число успехов в серии. Оно бывает 0, 1, …, n, а вероятности даёт формула Бернулли: P(X = k) = Cₙᵏ · pᵏ · qⁿ⁻ᵏ. Здесь Cₙᵏ — сколькими способами можно выбрать, в каких k опытах был успех.',
+           'Итоги у биномиального распределения простые: E(X) = np, D(X) = npq. Самое вероятное число успехов лежит рядом с np.'],
+    why: 'Формулой Бернулли контролёр качества оценивает, сколько бракованных деталей будет в партии, а риск-аналитик банка — сколько заёмщиков из сотни не вернут кредит. Авиакомпании продают билетов чуть больше, чем мест: они считают, сколько пассажиров не придут. Эпидемиолог прогнозирует число заболевших. А ещё формула честно показывает, почему тест «наугад» почти невозможно написать на высокий балл.',
+    task: 'Тест из 10 вопросов, у каждого 4 варианта ответа. Ученик отвечает наугад. Настройте модель (n и p) и нажмите на столбик с самым вероятным числом верных ответов.',
+    hint: 'Один вопрос — один опыт, успех — угадать ответ. Сколько всего опытов и какова вероятность угадать один ответ из четырёх? n и p меняются кнопками внизу или ползунками во вкладке «Схема».',
+    stage: 'Нажмите на столбик, чтобы выбрать k.',
+    n: 5, pp: 50,
+    check: m => m.n === 10 && m.pp === 25 && m.sel === 2 },
+  { id: 'lln', title: 'Закон больших чисел',
+    text: ['Один бросок кубика непредсказуем: может выпасть и 1, и 6. Но среднее многих независимых бросков ведёт себя очень спокойно.',
+           'Закон больших чисел: с ростом n среднее арифметическое x̄ = (X₁ + … + Xₙ) : n приближается к математическому ожиданию E(X). Для кубика E = (1 + 2 + … + 6) : 6 = 3,5.',
+           'Насколько близко? Типичное отклонение среднего равно σ : √n. Чтобы уменьшить его в 10 раз, нужно в 100 раз больше бросков.'],
+    why: 'На законе больших чисел держится страхование: один случай предсказать нельзя, а по 100 000 полисов выплаты почти точно равны ожиданию. Поэтому казино не проигрывает «в долгую», а социолог доверяет опросу тысячи человек. Аналитики приложений банков и маркетплейсов проводят A/B-тесты и считают, сколько пользователей нужно, чтобы разница не оказалась случайностью. Инженер по надёжности так же оценивает средний срок службы деталей.',
+    task: 'Бросьте кубик не меньше 1000 раз так, чтобы среднее отличалось от 3,5 меньше чем на 0,1.',
+    hint: 'Жмите +100 или +1000. Сначала линия скачет, потом «прилипает» к E = 3,5. Если среднее не попало в зелёный коридор — бросайте ещё.',
+    stage: 'Ось n логарифмическая: 1, 10, 100, 1000, 10 000.',
+    mode: 'die',
+    check: m => m.mode === 'die' && m.N >= 1000 && Math.abs(m.mean - 3.5) < 0.1 },
+];
+
+const KEY = 'luch-math-rv';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null,
+            cnt: [], ang: 9, anim: null, spins: 0, won: 0, lastWin: null, lastSec: -1,
+            n: 5, pp: 50, sel: null, freq: [], series: 0, row: null,
+            mode: 'die', N: 0, sumX: 0, path: [], faces: [], lastRolls: [], pend: 0 };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+function model() {
+  const id = LID();
+  if (id === 'mean') {
+    const k = S.cnt.slice(), p = k.map(c => c / SECT), xk = k.map((c, i) => c * PRIZES[i]), sxk = sum(xk), E = sxk / SECT;
+    const D = sum(k.map((c, i) => c / SECT * (PRIZES[i] - E) ** 2));
+    return { kind: id, k, p, xk, sxk, E, D, sd: Math.sqrt(D), gain: E - PRICE, spins: S.spins, avg: S.spins ? S.won / S.spins : null };
+  }
+  if (id === 'binom') {
+    const n = S.n, pp = S.pp, p = pp / 100, P = [];
+    for (let k = 0; k <= n; k++) P.push(binP(n, p, k));
+    const mx = Math.max(...P), modes = P.map((v, k) => k).filter(k => P[k] > mx - 1e-12);
+    const emp = S.series ? S.freq.map(f => f / S.series) : null;
+    const empMean = S.series ? sum(S.freq.map((f, k) => f * k)) / S.series : null;
+    return { kind: id, n, pp, p, q: 1 - p, P, modes, E: n * p, D: n * p * (1 - p), sel: S.sel, emp, empMean, series: S.series, row: S.row };
+  }
+  const die = S.mode === 'die', N = S.N, mean = N ? S.sumX / N : null, E = die ? 3.5 : 0.5, D = die ? 35 / 12 : 0.25, eps = die ? 0.1 : 0.05;
+  return { kind: 'lln', mode: S.mode, die, N, sumX: S.sumX, mean, E, D, sd: Math.sqrt(D), eps, dev: N ? Math.abs(mean - E) : null, faces: S.faces.slice(), se: N ? Math.sqrt(D / N) : null };
+}
+
+// ---------- scene geometry (SVG units, ~520 × 405) ----------
+const WH = { cx: 112, cy: 236, r: 84 };
+const CH1 = { x0: 238, x1: 490, base: 316, top: 142 };
+const bx1 = v => CH1.x0 + (CH1.x1 - CH1.x0) * v / 1000;
+const CH2 = { x0: 60, x1: 484, base: 322, top: 176 };
+const PL = { x0: 66, x1: 484, top: 150, base: 322 };
+const NMAX = 10000;
+
+const T = (x, y, s, txt, fill = '#8b96ad', anchor = 'middle', extra = '') => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${s}" fill="${fill}" text-anchor="${anchor}" ${extra}>${txt}</text>`;
+function backdrop() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+
+// angle in degrees, clockwise from the top
+const pol = (a, r) => [WH.cx + r * Math.sin(a * Math.PI / 180), WH.cy - r * Math.cos(a * Math.PI / 180)];
+function sectorPath(a1, a2) {
+  const [x1, y1] = pol(a1, WH.r), [x2, y2] = pol(a2, WH.r);
+  return `M${WH.cx} ${WH.cy}L${x1.toFixed(2)} ${y1.toFixed(2)}A${WH.r} ${WH.r} 0 0 1 ${x2.toFixed(2)} ${y2.toFixed(2)}Z`;
+}
+const sectorsOf = k => { const s = []; k.forEach((c, i) => { for (let j = 0; j < c; j++) s.push(i); }); return s; };
+
+function meanSVG(m) {
+  let h = T(WH.cx, 132, 10.5, 'колесо: 20 равных секторов', '#8b96ad');
+  const secs = sectorsOf(m.k);
+  secs.forEach((pi, j) => {
+    const lit = S.lastSec === j && !S.anim;
+    h += `<path d="${sectorPath(j * 18, j * 18 + 18)}" fill="${PCOL[pi]}" stroke="${lit ? '#e8ecf4' : INK}" stroke-width="${lit ? 2.2 : 1.3}" opacity="${S.lastSec >= 0 && !S.anim && !lit ? .62 : 1}"/>`;
+  });
+  let j = 0;
+  m.k.forEach((c, i) => {
+    if (c) {
+      const mid = (j + c / 2) * 18, [x, y] = pol(mid, WH.r * 0.64);
+      let rot = mid - 90; if (mid > 180) rot += 180;
+      h += T(x, y + 3.5, c >= 2 ? 11 : 9.5, PRIZES[i], i === 0 ? '#8b96ad' : INK, 'middle', `font-weight="600" transform="rotate(${rot.toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)})"`);
+    }
+    j += c;
+  });
+  h += `<circle cx="${WH.cx}" cy="${WH.cy}" r="${WH.r + 3}" fill="none" stroke="#a9b4c9" stroke-width="2"/>`;
+  h += `<g transform="rotate(${S.ang.toFixed(2)} ${WH.cx} ${WH.cy})"><path d="M${WH.cx} ${WH.cy}V${WH.cy - WH.r + 22}" stroke="#e8ecf4" stroke-width="3" stroke-linecap="round"/><path d="M${WH.cx} ${WH.cy - WH.r + 6}l-7 17h14z" fill="#e8ecf4" stroke="${INK}" stroke-width="1.2"/></g>`;
+  h += `<circle cx="${WH.cx}" cy="${WH.cy}" r="9" fill="#1a2438" stroke="#e8ecf4" stroke-width="2"/>`;
+  h += T(WH.cx, 348, 11, `цена попытки: ${PRICE} тг`, '#ff8a73', 'middle', 'font-weight="500"');
+  h += T(WH.cx, 366, 10.5, S.lastWin === null ? 'нажмите на колесо' : `выпало: ${S.lastWin} тг`, S.lastWin === null ? '#8b96ad' : '#e8ecf4');
+  h += T(WH.cx, 384, 10, m.spins ? `попыток ${m.spins}, в среднем ${trim(m.avg, 1)} тг` : '', '#8b96ad');
+
+  // distribution as weights on a beam
+  const { x0, x1, base, top } = CH1, H = base - top;
+  h += T((x0 + x1) / 2, 114, 10.5, 'распределение выигрыша X, тг', '#e8ecf4');
+  const px = bx1(PRICE);
+  h += `<path d="M${px} ${top - 4}V${base}" stroke="#ff8a73" stroke-width="1.6" stroke-dasharray="5 4"/>` + T(px, top - 8, 9.5, `цена ${PRICE}`, '#ff8a73');
+  m.k.forEach((c, i) => {
+    const x = bx1(PRIZES[i]), hh = m.p[i] * H, act = drag && drag.i === i;
+    if (i > 0) h += `<rect data-bar="${i}" x="${x - 12}" y="${top - 20}" width="24" height="${H + 22}" fill="transparent"/>`;
+    if (hh > 0) h += `<rect x="${x - 9}" y="${(base - hh).toFixed(1)}" width="18" height="${hh.toFixed(1)}" rx="2" fill="${i === 0 ? '#56627d' : PCOL[i]}" stroke="${act ? '#e8ecf4' : INK}" stroke-width="${act ? 2 : 1.4}"/>`;
+    if (i > 0) h += `<path d="M${x - 6} ${(base - hh - 5).toFixed(1)}h12" stroke="${act ? '#ffb547' : '#e8ecf4'}" stroke-width="2.4" stroke-linecap="round"/>`;
+    h += T(x, base - hh - (i > 0 ? 10 : 5), 8.5, trim(m.p[i], 2), '#e8ecf4');
+  });
+  h += `<path d="M${x0 - 14} ${base}H${x1 + 12}" stroke="#a9b4c9" stroke-width="3"/>`;
+  m.k.forEach((c, i) => { h += T(bx1(PRIZES[i]), base + 14, 9, PRIZES[i], '#8b96ad'); });
+  const ex = bx1(m.E), fair = m.sxk === FAIR;
+  h += `<path d="M${ex.toFixed(1)} ${base + 19}l-8 14h16z" fill="${fair ? '#86e0a8' : '#ffb547'}" stroke="${INK}" stroke-width="1.2"/>`;
+  h += T(clamp(ex, x0 + 20, x1 - 24), base + 47, 11, `E(X) = ${trim(m.E, 2)} тг`, fair ? '#86e0a8' : '#ffb547', 'middle', 'font-weight="600"');
+  h += T((x0 + x1) / 2, base + 66, 10, m.gain === 0 ? 'игра честная' : m.gain < 0 ? `в среднем игрок теряет ${trim(-m.gain, 2)} тг за попытку` : `в среднем игрок получает +${trim(m.gain, 2)} тг за попытку`, '#8b96ad');
+  return h;
+}
+
+function binomSVG(m) {
+  const n = m.n, cw = Math.min(24, 440 / n), x0r = 260 - n * cw / 2;
+  let h = '';
+  for (let i = 0; i < n; i++) {
+    const x = x0r + i * cw + 2, w = cw - 4, r = m.row ? m.row[i] : null;
+    const fill = r === null ? '#1a2438' : r ? 'rgba(134,224,168,.22)' : 'rgba(255,138,115,.18)', st = r === null ? '#3a4866' : r ? '#86e0a8' : '#ff8a73';
+    h += `<rect x="${x.toFixed(1)}" y="108" width="${w.toFixed(1)}" height="24" rx="5" fill="${fill}" stroke="${st}" stroke-width="1.3"/>`;
+    h += T(x + w / 2, 124.5, w > 14 ? 12 : 9, r === null ? '?' : r ? '✓' : '✗', st, 'middle', 'font-weight="600"');
+  }
+  const succ = m.row ? m.row.filter(Boolean).length : 0;
+  h += T(260, 150, 10.5, m.row ? `последняя серия: ${succ} ${succ === 1 ? 'успех' : succ >= 2 && succ <= 4 ? 'успеха' : 'успехов'} из ${n}` : `n = ${n} опытов, нажмите «Серия»`, m.row ? '#e8ecf4' : '#8b96ad');
+
+  const { x0, x1, base, top } = CH2, H = base - top, slot = (x1 - x0) / (n + 1);
+  const peak = Math.max(...m.P, ...(m.emp || [0]));
+  const ymax = Math.max(0.1, Math.ceil(peak * 10 - 1e-9) / 10), stepv = ymax <= 0.3 ? 0.05 : 0.1;
+  const vy = v => base - v / ymax * H;
+  for (let t = 0; t <= ymax + 1e-9; t += stepv) {
+    const y = vy(t);
+    h += `<path d="M${x0} ${y.toFixed(1)}H${x1}" stroke="${t === 0 ? '#a9b4c9' : 'rgba(169,180,201,.13)'}"/>` + T(x0 - 6, y + 3.5, 9, trim(t, 2), '#8b96ad', 'end');
+  }
+  h += T(x0 - 6, top - 10, 10, 'P', '#e8ecf4', 'end', 'font-style="italic"');
+  const lbl = n <= 12;
+  for (let k = 0; k <= n; k++) {
+    const cx = x0 + slot * (k + 0.5), v = m.P[k], y = vy(v), sel = m.sel === k;
+    h += `<rect x="${(cx - slot * 0.34).toFixed(1)}" y="${y.toFixed(1)}" width="${(slot * 0.68).toFixed(1)}" height="${(base - y).toFixed(1)}" rx="2" fill="${sel ? '#72d4e8' : '#5fb4d9'}" fill-opacity="${sel ? 1 : .72}" stroke="${sel ? '#e8ecf4' : INK}" stroke-width="${sel ? 2 : 1.3}"/>`;
+    if (lbl || sel) h += T(cx, y - 5, sel ? 10 : 8.5, trim(v, sel ? 3 : 2), sel ? '#72d4e8' : '#e8ecf4', 'middle', sel ? 'font-weight="600"' : '');
+    if (m.emp) { const ey = vy(m.emp[k]); h += `<path d="M${(cx - slot * 0.42).toFixed(1)} ${ey.toFixed(1)}h${(slot * 0.84).toFixed(1)}" stroke="#ffb547" stroke-width="2.4"/>`; }
+    h += T(cx, base + 14, n > 15 ? 8.5 : 10, k, sel ? '#72d4e8' : '#8b96ad');
+  }
+  h += `<rect data-chart="1" x="${x0}" y="${top - 30}" width="${x1 - x0}" height="${H + 50}" fill="transparent"/>`;
+  const ex = x0 + slot * (m.E + 0.5);
+  h += `<path d="M${ex.toFixed(1)} ${base + 20}l-7 12h14z" fill="#ffb547" stroke="${INK}" stroke-width="1.2"/>` + T(clamp(ex, x0 + 40, x1 - 40), base + 46, 10.5, `E(X) = np = ${trim(m.E, 2)}`, '#ffb547', 'middle', 'font-weight="600"');
+  h += T(x1, base + 30, 9.5, 'k', '#8b96ad', 'end', 'font-style="italic"');
+  if (m.emp) h += `<path d="M${x1 - 150} ${base + 62}h14" stroke="#ffb547" stroke-width="2.4"/>` + T(x1 - 132, base + 66, 9.5, `частота в ${m.series} сериях`, '#8b96ad', 'start');
+  return h;
+}
+
+const lx = n => PL.x0 + (PL.x1 - PL.x0) * Math.log10(n) / 4;
+function llnSVG(m) {
+  const { x0, x1, top, base } = PL, lo = m.die ? 1 : 0, hi = m.die ? 6 : 1;
+  const my = v => base - (v - lo) / (hi - lo) * (base - top);
+  let h = '';
+  // last throws
+  const L = S.lastRolls, w = 22;
+  const rx0 = 300 - (10 * (w + 5)) / 2;
+  h += T(rx0 - 8, 123, 10, 'последние:', '#8b96ad', 'end');
+  for (let i = 0; i < 10; i++) {
+    const v = L[L.length - 10 + i], x = rx0 + i * (w + 5), y = 106;
+    if (v === undefined) { h += `<rect x="${x}" y="${y}" width="${w}" height="${w}" rx="5" fill="none" stroke="#26324a" stroke-dasharray="3 3"/>`; continue; }
+    if (m.die) {
+      h += `<rect x="${x}" y="${y}" width="${w}" height="${w}" rx="5" fill="#e8ecf4" stroke="${INK}"/>`;
+      const P = { 1: [[.5, .5]], 2: [[.27, .27], [.73, .73]], 3: [[.25, .25], [.5, .5], [.75, .75]], 4: [[.27, .27], [.73, .27], [.27, .73], [.73, .73]], 5: [[.25, .25], [.75, .25], [.5, .5], [.25, .75], [.75, .75]], 6: [[.27, .23], [.73, .23], [.27, .5], [.73, .5], [.27, .77], [.73, .77]] }[v];
+      P.forEach(([a, b]) => { h += `<circle cx="${(x + a * w).toFixed(1)}" cy="${(y + b * w).toFixed(1)}" r="2" fill="${INK}"/>`; });
+    } else {
+      h += `<circle cx="${x + w / 2}" cy="${y + w / 2}" r="${w / 2}" fill="${v ? '#ffb547' : '#a9b4c9'}" stroke="${INK}"/>` + T(x + w / 2, y + w / 2 + 4, 10, v ? 'О' : 'Р', INK, 'middle', 'font-weight="600"');
+    }
+  }
+  // axes
+  const yt = m.die ? [1, 2, 3, 4, 5, 6] : [0, 0.25, 0.5, 0.75, 1];
+  yt.forEach(t => { const y = my(t); h += `<path d="M${x0} ${y.toFixed(1)}H${x1}" stroke="rgba(169,180,201,.13)"/>` + T(x0 - 7, y + 3.5, 9.5, trim(t, 2), '#8b96ad', 'end'); });
+  [1, 10, 100, 1000, 10000].forEach(n => { const x = lx(n); h += `<path d="M${x.toFixed(1)} ${base}v5" stroke="#a9b4c9"/>` + T(x, base + 17, 9.5, n === 10000 ? '10 000' : n, '#8b96ad'); });
+  h += `<path d="M${x0} ${top - 6}V${base}H${x1 + 6}" fill="none" stroke="#a9b4c9" stroke-width="1.8"/>`;
+  h += T(x1 + 4, base + 32, 10, 'n — число бросков', '#8b96ad', 'end') + T(x0 - 7, top - 12, 10, 'x̄', '#e8ecf4', 'end');
+  // ±eps band, 2σ/√n funnel, E line
+  h += `<rect x="${x0}" y="${my(m.E + m.eps).toFixed(1)}" width="${x1 - x0}" height="${(my(m.E - m.eps) - my(m.E + m.eps)).toFixed(1)}" fill="rgba(134,224,168,.12)"/>`;
+  let fu = '', fd = '';
+  for (let k = 0; k <= 80; k++) { const n = 10 ** (k / 20), d = 2 * m.sd / Math.sqrt(n), x = lx(n).toFixed(1); fu += `${k ? 'L' : 'M'}${x} ${my(clamp(m.E + d, lo, hi)).toFixed(1)}`; fd += `${k ? 'L' : 'M'}${x} ${my(clamp(m.E - d, lo, hi)).toFixed(1)}`; }
+  h += `<path d="${fu}" fill="none" stroke="#c79bff" stroke-width="1.3" stroke-dasharray="4 4" opacity=".8"/><path d="${fd}" fill="none" stroke="#c79bff" stroke-width="1.3" stroke-dasharray="4 4" opacity=".8"/>`;
+  h += `<path d="M${x0} ${my(m.E).toFixed(1)}H${x1}" stroke="#86e0a8" stroke-width="1.6" stroke-dasharray="7 4"/>` + T(x1, my(m.E) - 6 - (m.eps * (base - top) / (hi - lo)), 10, `E = ${trim(m.E, 2)}`, '#86e0a8', 'end', 'font-weight="600"');
+  // running mean
+  const P = S.path;
+  if (P.length) {
+    let d = '', n = 1;
+    while (n <= P.length) {
+      d += `${n === 1 ? 'M' : 'L'}${lx(n).toFixed(1)} ${my(P[n - 1]).toFixed(1)}`;
+      n = n < 100 ? n + 1 : Math.max(n + 1, Math.floor(n * 1.015));
+    }
+    if ((d.match(/[ML]/g) || []).length && n - 1 !== P.length) d += `L${lx(P.length).toFixed(1)} ${my(P[P.length - 1]).toFixed(1)}`;
+    h += `<path d="${d}" fill="none" stroke="#72d4e8" stroke-width="2" stroke-linejoin="round"/>`;
+    const ok = m.dev < m.eps;
+    h += `<circle cx="${lx(P.length).toFixed(1)}" cy="${my(P[P.length - 1]).toFixed(1)}" r="5" fill="${ok ? '#86e0a8' : '#ffb547'}" stroke="${INK}" stroke-width="1.5"/>`;
+  } else h += T((x0 + x1) / 2, (top + base) / 2, 11, 'бросков пока не было — нажмите +1 или +100', '#8b96ad');
+  return h;
+}
+
+function hlBox(id) {
+  const lid = LID();
+  if (lid === 'mean') return { wheel: [WH.cx - WH.r - 10, WH.cy - WH.r - 10, 2 * WH.r + 20, 2 * WH.r + 20], needle: [WH.cx - 14, WH.cy - WH.r - 4, 28, WH.r + 18],
+    bars: [CH1.x0 - 18, CH1.top - 24, CH1.x1 - CH1.x0 + 34, CH1.base - CH1.top + 26], beam: [CH1.x0 - 20, CH1.base - 6, CH1.x1 - CH1.x0 + 38, 60],
+    price: [bx1(PRICE) - 28, CH1.top - 22, 56, CH1.base - CH1.top + 24], log: [WH.cx - 96, 334, 192, 58] }[id];
+  if (lid === 'binom') return { row: [30, 100, 460, 58], bars: [CH2.x0 - 4, CH2.top - 14, CH2.x1 - CH2.x0 + 8, CH2.base - CH2.top + 30], emp: [CH2.x0 - 4, CH2.top - 14, CH2.x1 - CH2.x0 + 8, CH2.base - CH2.top + 14],
+    yaxis: [CH2.x0 - 40, CH2.top - 24, 42, CH2.base - CH2.top + 30], mark: [CH2.x0, CH2.base + 14, CH2.x1 - CH2.x0, 40] }[id];
+  return { dice: [150, 98, 330, 40], path: [PL.x0 - 4, PL.top - 8, PL.x1 - PL.x0 + 8, PL.base - PL.top + 12], eline: [PL.x0 - 4, PL.top - 8, PL.x1 - PL.x0 + 8, PL.base - PL.top + 12],
+    funnel: [PL.x0 - 4, PL.top - 8, PL.x1 - PL.x0 + 8, PL.base - PL.top + 12], xaxis: [PL.x0 - 12, PL.base - 2, PL.x1 - PL.x0 + 24, 40] }[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID(), m = model();
+  let h = backdrop();
+  h += { mean: meanSVG, binom: binomSVG, lln: llnSVG }[id](m);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 500, hh / 420, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 414 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- actions ----------
+function setCount(i, k) {
+  if (i < 1 || i > 4) return;
+  const others = sum(S.cnt.slice(1)) - S.cnt[i];
+  k = clamp(Math.round(k), 0, SECT - others);
+  if (k === S.cnt[i]) return;
+  S.cnt[i] = k; S.cnt[0] = SECT - sum(S.cnt.slice(1));
+  S.spins = 0; S.won = 0; S.lastWin = null; S.lastSec = -1;
+  update();
+}
+function spin(times) {
+  if (S.anim) return;
+  const secs = sectorsOf(S.cnt);
+  if (times > 1) {
+    let s = 0;
+    for (let i = 0; i < times; i++) { s = Math.floor(Math.random() * SECT); S.won += PRIZES[secs[s]]; }
+    S.spins += times; S.lastSec = s; S.lastWin = PRIZES[secs[s]]; S.ang = s * 18 + 9; update(); return;
+  }
+  const s = Math.floor(Math.random() * SECT), target = s * 18 + 9, cur = ((S.ang % 360) + 360) % 360;
+  const a1 = S.ang + 720 + ((target - cur + 360) % 360);
+  const fin = () => { S.anim = null; S.ang = a1 % 360; S.spins++; S.won += PRIZES[secs[s]]; S.lastWin = PRIZES[secs[s]]; S.lastSec = s; update(); };
+  if (reduce) { S.ang = a1; fin(); return; }
+  S.lastSec = -1; S.anim = { a0: S.ang, a1, t0: performance.now(), dur: 1100, fin };
+}
+
+function resetBinomRuns() { S.freq = Array(S.n + 1).fill(0); S.series = 0; S.row = null; }
+function setN(n) { n = clamp(n, 1, 20); if (n === S.n) return; S.n = n; if (S.sel !== null && S.sel > n) S.sel = null; resetBinomRuns(); renderTools(); update(); }
+function setP(pp) { pp = clamp(Math.round(pp / 5) * 5, 5, 95); if (pp === S.pp) return; S.pp = pp; resetBinomRuns(); renderTools(); update(); }
+function series(times) {
+  const p = S.pp / 100;
+  for (let t = 0; t < times; t++) {
+    const row = []; for (let i = 0; i < S.n; i++) row.push(Math.random() < p);
+    S.freq[row.filter(Boolean).length]++; S.series++; S.row = row;
+  }
+  update();
+}
+
+function rollOne() {
+  if (S.N >= NMAX) return false;
+  const v = S.mode === 'die' ? 1 + Math.floor(Math.random() * 6) : (Math.random() < 0.5 ? 1 : 0);
+  S.N++; S.sumX += v; S.path.push(S.sumX / S.N);
+  S.faces[S.mode === 'die' ? v - 1 : v]++;
+  S.lastRolls.push(v); if (S.lastRolls.length > 10) S.lastRolls.shift();
+  return true;
+}
+function roll(k) {
+  if (S.N + S.pend >= NMAX) { toast('Хватит: 10 000 бросков — предел этой модели. Нажмите «Заново».'); }
+  k = Math.min(k, NMAX - S.N - S.pend);
+  if (k <= 0) return;
+  if (reduce || k <= 10) { for (let i = 0; i < k; i++) rollOne(); update(); return; }
+  S.pend += k;
+}
+function resetLLN() { S.N = 0; S.sumX = 0; S.path = []; S.pend = 0; S.lastRolls = []; S.faces = Array(S.mode === 'die' ? 6 : 2).fill(0); }
+
+// ---------- pointer ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+const barFromY = (i, y) => setCount(i, (CH1.base - y) / (CH1.base - CH1.top) * SECT);
+
+scene.addEventListener('pointerdown', e => {
+  const id = LID(), p = toSvg(e);
+  const grab = () => { e.preventDefault(); try { scene.setPointerCapture(e.pointerId); } catch (er) {} scene.classList.add('grabbing'); };
+  if (id === 'mean') {
+    const b = e.target.closest('[data-bar]');
+    if (b) { grab(); drag = { i: +b.dataset.bar }; barFromY(drag.i, p.y); dirty = true; return; }
+    if (Math.hypot(p.x - WH.cx, p.y - WH.cy) < WH.r + 6) { spin(1); return; }
+    if (Math.abs(p.x - bx1(0)) < 12 && p.y > CH1.top - 20 && p.y < CH1.base) toast('Пустые сектора (0 тг) — всё, что осталось от 20. Тяните другие столбики.');
+    return;
+  }
+  if (id === 'binom' && e.target.closest('[data-chart]')) {
+    const slot = (CH2.x1 - CH2.x0) / (S.n + 1), k = clamp(Math.floor((p.x - CH2.x0) / slot), 0, S.n);
+    S.sel = S.sel === k ? null : k; update();
+  }
+});
+scene.addEventListener('pointermove', e => { if (!drag) return; barFromY(drag.i, toSvg(e).y); });
+const endDrag = () => { if (!drag) return; drag = null; scene.classList.remove('grabbing'); dirty = true; };
+scene.addEventListener('pointerup', endDrag);
+scene.addEventListener('pointercancel', endDrag);
+
+function loop(t) {
+  requestAnimationFrame(loop);
+  if (S.anim) {
+    const k = clamp((t - S.anim.t0) / S.anim.dur, 0, 1), ease = 1 - (1 - k) ** 3;
+    S.ang = S.anim.a0 + (S.anim.a1 - S.anim.a0) * ease; dirty = true;
+    if (k >= 1) S.anim.fin();
+  }
+  if (S.pend > 0) {
+    const k = Math.max(3, Math.ceil(S.pend / 14));
+    for (let i = 0; i < k && S.pend > 0; i++) { rollOne(); S.pend--; }
+    update();
+  }
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed === undefined ? '' : ` aria-pressed="${pressed}"`}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    mean: B('spin', '▶ Крутить') + B('spin100', '×100 попыток') + sep + B('reset', 'Заново'),
+    binom: B('nm', 'n −') + B('np', 'n +') + sep + B('pm', 'p −') + B('pp', 'p +') + sep + B('ser', '▶ Серия') + B('ser100', '×100') + sep + B('reset', 'Заново'),
+    lln: B('r1', '+1') + B('r10', '+10') + B('r100', '+100') + B('r1000', '+1000') + sep + B('die', 'Кубик', S.mode === 'die') + B('coin', 'Монета', S.mode === 'coin') + sep + B('reset', 'Заново'),
+  }[id];
+}
+function act(a) {
+  const L = LESSONS[S.lesson];
+  if (a === 'reset') {
+    if (L.id === 'mean') { S.cnt = L.cnt.slice(); S.spins = 0; S.won = 0; S.lastWin = null; S.lastSec = -1; }
+    if (L.id === 'binom') { S.n = L.n; S.pp = L.pp; S.sel = null; resetBinomRuns(); }
+    if (L.id === 'lln') resetLLN();
+    renderTools(); buildScheme(); update(); return;
+  }
+  if (a === 'spin') return spin(1);
+  if (a === 'spin100') return spin(100);
+  if (a === 'nm' || a === 'np') return setN(S.n + (a === 'np' ? 1 : -1));
+  if (a === 'pm' || a === 'pp') return setP(S.pp + (a === 'pp' ? 5 : -5));
+  if (a === 'ser') return series(1);
+  if (a === 'ser100') return series(100);
+  if (a[0] === 'r' && a !== 'reset') return roll(+a.slice(1));
+  if (a === 'die' || a === 'coin') { if (S.mode !== a) { S.mode = a; resetLLN(); } renderTools(); buildScheme(); update(); }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model()); dirty = true;
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  wheel: IC('<circle cx="17" cy="17" r="13" fill="#2c3852" stroke="#a9b4c9"/><path d="M17 17V4A13 13 0 0 1 29.4 13Z" fill="#86e0a8"/><path d="M17 17L29.4 13A13 13 0 0 1 26 26.5Z" fill="#ffb547"/><path d="M17 17L26 26.5A13 13 0 0 1 14 29.7Z" fill="#5fb4d9"/>'),
+  needle: IC('<path d="M17 28V8" stroke="var(--fg)" stroke-width="2.4"/><path d="M17 4l-5 9h10z" fill="var(--fg)"/><circle cx="17" cy="28" r="3" fill="#1a2438" stroke="var(--fg)"/>'),
+  bars: IC('<path d="M3 29h28" stroke="#a9b4c9" stroke-width="2"/><rect x="5" y="9" width="5" height="20" fill="#56627d"/><rect x="12" y="19" width="5" height="10" fill="#5fb4d9"/><rect x="19" y="23" width="5" height="6" fill="#c79bff"/><rect x="26" y="25" width="5" height="4" fill="#86e0a8"/>'),
+  beam: IC('<path d="M3 16h28" stroke="#a9b4c9" stroke-width="3"/><path d="M13 18l-6 11h12z" fill="#ffb547"/>'),
+  price: IC('<path d="M17 3v28" stroke="#ff8a73" stroke-width="2" stroke-dasharray="4 3"/>'),
+  log: IC('<text x="17" y="22" font-size="11" fill="var(--fg)" text-anchor="middle" font-family="monospace">тг</text>'),
+  row: IC('<rect x="2" y="11" width="9" height="12" rx="2" fill="rgba(134,224,168,.22)" stroke="#86e0a8"/><rect x="12.5" y="11" width="9" height="12" rx="2" fill="rgba(255,138,115,.18)" stroke="#ff8a73"/><rect x="23" y="11" width="9" height="12" rx="2" fill="rgba(134,224,168,.22)" stroke="#86e0a8"/>'),
+  bbars: IC('<path d="M3 29h28" stroke="#a9b4c9" stroke-width="1.6"/><rect x="5" y="22" width="5" height="7" fill="#5fb4d9"/><rect x="12" y="10" width="5" height="19" fill="#72d4e8"/><rect x="19" y="14" width="5" height="15" fill="#5fb4d9"/><rect x="26" y="24" width="5" height="5" fill="#5fb4d9"/>'),
+  emp: IC('<rect x="9" y="12" width="16" height="18" fill="#5fb4d9" opacity=".6"/><path d="M6 15h22" stroke="#ffb547" stroke-width="3"/>'),
+  yaxis: IC('<path d="M10 4v26" stroke="#a9b4c9" stroke-width="2"/><path d="M14 9h4M14 17h4M14 25h4" stroke="var(--muted)"/><text x="25" y="13" font-size="9" fill="var(--fg)" font-family="monospace">P</text>'),
+  mark: IC('<path d="M17 12l-7 12h14z" fill="#ffb547"/>'),
+  dice: IC('<rect x="6" y="6" width="22" height="22" rx="5" fill="#e8ecf4"/><circle cx="12" cy="12" r="2" fill="#04070d"/><circle cx="17" cy="17" r="2" fill="#04070d"/><circle cx="22" cy="22" r="2" fill="#04070d"/>'),
+  path: IC('<path d="M3 8L8 26L12 12L16 21L20 15L25 18L31 17" fill="none" stroke="#72d4e8" stroke-width="2"/>'),
+  eline: IC('<path d="M3 17h28" stroke="#86e0a8" stroke-width="2" stroke-dasharray="5 3"/>'),
+  funnel: IC('<path d="M3 4Q12 15 31 15M3 30Q12 19 31 19" fill="none" stroke="#c79bff" stroke-width="1.6" stroke-dasharray="3 3"/>'),
+  xaxis: IC('<path d="M3 20h28" stroke="#a9b4c9" stroke-width="1.6"/><text x="17" y="31" font-size="8" fill="var(--muted)" text-anchor="middle" font-family="monospace">1 10 100</text>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+const sgn = x => trim(x, 2).replace(/^(?!−)(?!0$)/, '+');
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (L.id === 'mean') return `E(X) = ${trim(m.E, 2)} ${m.sxk === FAIR ? '✓' : '✗'} · джекпот ${m.k[4] >= 1 ? '✓' : '✗'}`;
+  if (L.id === 'binom') return `n = ${m.n} · p = ${trim(m.p, 2)} · выбран столбик: ${m.sel === null ? '—' : 'k = ' + m.sel}`;
+  return `${m.die ? 'кубик' : 'монета ✗'} · бросков ${m.N}${m.N >= 1000 ? ' ✓' : '/1000'} · |x̄ − 3,5| ${m.N && m.die ? '= ' + trim(m.dev, 3) + (m.dev < 0.1 ? ' ✓' : ' ✗') : '—'}`;
+}
+
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'mean') h = `<h2>Колесо удачи</h2><p class="note">20 равных секторов. Пустые сектора (0 тг) — всё, что осталось. Вероятность приза = число его секторов : 20.</p>
+      <dl class="reads"><div><dt>E(X)</dt><dd id="r1"></dd></div><div><dt>σ</dt><dd id="r2"></dd></div><div><dt>Пустых</dt><dd id="r3"></dd></div></dl>` +
+      [1, 2, 3, 4].map(i => slider('inK' + i, `Сектора «${PRIZES[i]} тг»`, 0, 20, 1, S.cnt[i])).join('') +
+      `<div class="row"><button class="ghostbtn" id="sSpin">▶ Крутить</button><button class="ghostbtn" id="sSpin100">×100 попыток</button></div>`;
+  if (id === 'binom') h = `<h2>Схема Бернулли</h2>
+      <dl class="reads"><div><dt>E = np</dt><dd id="r1"></dd></div><div><dt>D = npq</dt><dd id="r2"></dd></div><div><dt>P(X = k)</dt><dd id="r3"></dd></div></dl>` +
+      slider('inN', 'Число опытов n', 1, 20, 1, S.n) + slider('inP', 'Вероятность успеха p', 5, 95, 5, S.pp) +
+      `<div class="row"><button class="ghostbtn" id="sSer">▶ Серия из n опытов</button><button class="ghostbtn" id="sSer100">×100 серий</button></div>`;
+  if (id === 'lln') h = `<h2>Броски</h2>
+      <dl class="reads"><div><dt>Бросков</dt><dd id="r1"></dd></div><div><dt>x̄</dt><dd id="r2"></dd></div><div><dt>|x̄ − E|</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Случайная величина</div><div class="chips"><button data-m="die">очки на кубике</button><button data-m="coin">монета: орёл = 1</button></div></div>
+      <div class="row"><button class="ghostbtn" data-r="1">+1</button><button class="ghostbtn" data-r="10">+10</button><button class="ghostbtn" data-r="100">+100</button><button class="ghostbtn" data-r="1000">+1000</button></div>`;
+  el.innerHTML = h;
+  [1, 2, 3, 4].forEach(i => { const x = el.querySelector('#inK' + i); if (x) x.addEventListener('input', e => setCount(i, +e.target.value)); });
+  const on = (s, f) => { const x = el.querySelector(s); if (x) x.onclick = f; };
+  on('#sSpin', () => spin(1)); on('#sSpin100', () => spin(100)); on('#sSer', () => series(1)); on('#sSer100', () => series(100));
+  const n = el.querySelector('#inN'); if (n) n.addEventListener('input', e => setN(+e.target.value));
+  const p = el.querySelector('#inP'); if (p) p.addEventListener('input', e => setP(+e.target.value));
+  el.querySelectorAll('[data-m]').forEach(b => b.onclick = () => act(b.dataset.m));
+  el.querySelectorAll('[data-r]').forEach(b => b.onclick = () => roll(+b.dataset.r));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (m.kind === 'mean') {
+    [1, 2, 3, 4].forEach(i => { set(`#inK${i}O`, `${m.k[i]} → p = ${trim(m.p[i], 2)}`); val('#inK' + i, m.k[i]); });
+    set('#r1', trim(m.E, 2) + ' тг'); set('#r2', trim(m.sd, 0)); set('#r3', m.k[0]);
+  } else if (m.kind === 'binom') {
+    set('#inNO', m.n); val('#inN', m.n); set('#inPO', trim(m.p, 2)); val('#inP', m.pp);
+    set('#r1', trim(m.E, 2)); set('#r2', trim(m.D, 3)); set('#r3', m.sel === null ? 'выберите k' : trim(m.P[m.sel], 4));
+  } else {
+    set('#r1', m.N); set('#r2', m.N ? trim(m.mean, 3) : '—'); set('#r3', m.N ? trim(m.dev, 3) : '—');
+    el.querySelectorAll('[data-m]').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === m.mode));
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'mean') return [
+    { id: 'wheel', icon: ICON.wheel, name: 'Колесо из 20 секторов', spec: 'Все сектора равны, поэтому каждый выпадает с вероятностью 1/20. Цвет — размер приза.' },
+    { id: 'needle', icon: ICON.needle, name: 'Стрелка', spec: 'Останавливается на случайном секторе. Выигрыш X — случайная величина.' },
+    { id: 'bars', icon: ICON.bars, name: 'Закон распределения', spec: 'Над каждым призом xᵢ — его вероятность pᵢ. Столбики можно тянуть. Сумма всех pᵢ всегда 1.' },
+    { id: 'beam', icon: ICON.beam, name: 'Линейка и опора E(X)', spec: 'Если столбики — грузы на линейке, то она уравновешена ровно над E(X). Зелёная опора — игра честная.' },
+    { id: 'price', icon: ICON.price, name: 'Цена попытки', spec: '150 тг. Если E(X) левее — в среднем игрок теряет, правее — выигрывает.' },
+    { id: 'log', icon: ICON.log, name: 'Журнал попыток', spec: 'Сколько раз крутили и средний выигрыш. При большом числе попыток он близок к E(X).' }];
+  if (id === 'binom') return [
+    { id: 'row', icon: ICON.row, name: 'Серия опытов', spec: 'n независимых опытов. Зелёная галочка — успех, красный крестик — неудача.' },
+    { id: 'bars', icon: ICON.bbars, name: 'Столбики P(X = k)', spec: 'Вероятность ровно k успехов по формуле Бернулли. Нажмите на столбик — он выделится и покажет точное значение.' },
+    { id: 'emp', icon: ICON.emp, name: 'Оранжевые риски', spec: 'Частота, с которой k успехов выпало в проведённых сериях. Чем больше серий, тем ближе к столбикам.' },
+    { id: 'yaxis', icon: ICON.yaxis, name: 'Ось вероятностей', spec: 'Масштаб подстраивается под самый высокий столбик.' },
+    { id: 'mark', icon: ICON.mark, name: 'Метка E(X) = np', spec: 'Математическое ожидание числа успехов. Самые высокие столбики — рядом с ней.' }];
+  return [
+    { id: 'dice', icon: ICON.dice, name: 'Последние броски', spec: 'Десять последних результатов: очки кубика или орёл (1) / решка (0).' },
+    { id: 'path', icon: ICON.path, name: 'Линия среднего x̄', spec: 'Среднее всех бросков после каждого нового броска. Точка в конце — текущее значение.' },
+    { id: 'eline', icon: ICON.eline, name: 'E(X) и коридор', spec: 'Зелёная пунктирная линия — математическое ожидание, светлая полоса — допуск ±0,1 (для монеты ±0,05).' },
+    { id: 'funnel', icon: ICON.funnel, name: 'Воронка 2σ/√n', spec: 'Почти всегда (около 95 %) среднее лежит внутри неё. Воронка сужается, как 1/√n.' },
+    { id: 'xaxis', icon: ICON.xaxis, name: 'Логарифмическая ось n', spec: 'Каждое деление — в 10 раз больше бросков. Так видны и первые броски, и десятая тысяча.' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Модель</h2><p class="note">Из чего состоит рабочее поле. Нажмите на пункт, чтобы найти его.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  if (m.kind === 'mean') {
+    return `<h2>Математическое ожидание</h2><div class="formula" style="font-size:15px">E(X) = x₁p₁ + x₂p₂ + … + xₙpₙ</div><h3>Закон распределения</h3><div class="steps">` +
+      m.k.map((c, i) => step(`x = ${PRIZES[i]} тг`, `p = ${c}/20 = ${trim(m.p[i], 2)}`)).join('') + step('сумма p', `${sum(m.k)}/20 = 1`, 'sum') +
+      `</div><h3>Слагаемые xᵢpᵢ</h3><div class="steps">` +
+      m.k.map((c, i) => step(`${PRIZES[i]} · ${trim(m.p[i], 2)}`, trim(PRIZES[i] * m.p[i], 2))).join('') +
+      step('E(X)', `${m.sxk} : 20 = ${trim(m.E, 2)} тг`, 'sum') + `</div><h3>Сравнение с ценой</h3><div class="steps">` +
+      step('E(X) − цена', `${trim(m.E, 2)} − ${PRICE} = ${sgn(m.gain)} тг`, 'sum') +
+      step('за 1000 попыток', `${sgn(m.gain * 1000)} тг игроку`) + `</div><h3>Разброс</h3><div class="steps">` +
+      step('D(X) = Σ pᵢ(xᵢ − E)²', trim(m.D, 1)) + step('σ = √D', `≈ ${trim(m.sd, 1)} тг`) + `</div>` +
+      (m.spins ? `<h3>Опыт</h3><div class="steps">` + step('попыток', m.spins) + step('средний выигрыш', `${trim(m.avg, 1)} тг`, 'sum') + step('E(X)', `${trim(m.E, 2)} тг`) + `</div>` : '') +
+      `<p class="note" style="margin-top:10px">Множитель 20 удобен: E(X) = (Σ приз × число секторов) : 20. Чтобы E(X) было 150, сумма должна быть 3000.</p>`;
+  }
+  if (m.kind === 'binom') {
+    const k = m.sel === null ? 0 : m.sel, C = binC(m.n, k);
+    return `<h2>Формула Бернулли</h2><div class="formula" style="font-size:15px">P(X = k) = Cₙᵏ · pᵏ · qⁿ⁻ᵏ</div><h3>${m.sel === null ? 'Пример: k = 0 (выберите столбик)' : 'Для выбранного k = ' + k}</h3><div class="steps">` +
+      step('n, p, q', `${m.n}; ${trim(m.p, 2)}; ${trim(m.q, 2)}`) +
+      step(`C(${m.n}, ${k})`, `${m.n}! : (${k}! · ${m.n - k}!) = ${C}`) +
+      step(`p^${k}`, `${trim(m.p, 2)}^${k} = ${trim(m.p ** k, 6)}`) +
+      step(`q^${m.n - k}`, `${trim(m.q, 2)}^${m.n - k} = ${trim(m.q ** (m.n - k), 6)}`) +
+      step(`P(X = ${k})`, `${C} · ${trim(m.p ** k, 6)} · ${trim(m.q ** (m.n - k), 6)} ≈ ${trim(m.P[k], 4)}`, 'sum') +
+      `</div><h3>Числовые характеристики</h3><div class="steps">` +
+      step('E(X) = np', `${m.n} · ${trim(m.p, 2)} = ${trim(m.E, 2)}`, 'sum') + step('D(X) = npq', `${m.n} · ${trim(m.p, 2)} · ${trim(m.q, 2)} = ${trim(m.D, 4)}`) + step('σ = √D', `≈ ${trim(Math.sqrt(m.D), 3)}`) +
+      step('сумма всех P', trim(sum(m.P), 4)) + `</div>` +
+      (m.series ? `<h3>Опыт</h3><div class="steps">` + step('серий', m.series) + step('среднее число успехов', trim(m.empMean, 3), 'sum') + step('теория np', trim(m.E, 2)) + `</div>` : '') +
+      `<p class="note" style="margin-top:10px">Cₙᵏ считает, сколько разных «расстановок» k успехов среди n опытов. У каждой расстановки вероятность одинакова: pᵏqⁿ⁻ᵏ.</p>`;
+  }
+  const f = m.faces, nm = m.die ? ['1', '2', '3', '4', '5', '6'] : ['решка (0)', 'орёл (1)'], pe = m.die ? 1 / 6 : 0.5;
+  const cheb = m.N ? Math.min(1, m.D / (m.N * m.eps ** 2)) : null;
+  return `<h2>Среднее и ожидание</h2><div class="formula" style="font-size:15px">x̄ = (X₁ + … + Xₙ) : n → E(X)</div><h3>Сейчас</h3><div class="steps">` +
+    step('бросков n', m.N) + step('сумма', m.sumX) + step('x̄', m.N ? `${m.sumX} : ${m.N} = ${trim(m.mean, 4)}` : '—', 'sum') +
+    step('E(X)', m.die ? '(1 + … + 6) : 6 = 3,5' : '0 · ½ + 1 · ½ = 0,5') + step('|x̄ − E|', m.N ? trim(m.dev, 4) : '—', 'sum') +
+    `</div><h3>Насколько близко</h3><div class="steps">` +
+    step('D(X)', m.die ? '91/6 − 3,5² = 35/12 ≈ 2,917' : '0,5 − 0,5² = 0,25') + step('σ', `≈ ${trim(m.sd, 3)}`) +
+    step('σ : √n', m.N ? `${trim(m.sd, 3)} : √${m.N} ≈ ${trim(m.se, 4)}` : '—') +
+    step(`Чебышёв: P(|x̄ − E| ≥ ${trim(m.eps, 2)})`, m.N ? `≤ D : (n·ε²) = ${trim(cheb, 3)}` : '—') +
+    `</div><h3>Частоты</h3><div class="steps">` +
+    f.map((c, i) => step(nm[i], m.N ? `${c} → ${trim(c / m.N, 3)} (теория ${trim(pe, 3)})` : '—')).join('') + `</div>
+    <p class="note" style="margin-top:10px">Неравенство Чебышёва даёт грубую, но гарантированную оценку: при росте n вероятность отклонения больше ε стремится к нулю. Это и есть закон больших чисел.</p>`;
+}
+
+function renderMeter(m) {
+  const el = $('#meter'), ok = !!S.done[LID()];
+  if (m.kind === 'mean') el.innerHTML = `<div class="k">Ожидание</div><div class="v ${ok ? 'ok' : ''}">E ${trim(m.E, 1)} тг</div><div class="lr"><span>цена</span><span>${PRICE}</span></div><div class="lr"><span>попыток</span><span>${m.spins}</span></div><div class="lr"><span>среднее</span><span>${m.spins ? trim(m.avg, 1) : '—'}</span></div>`;
+  else if (m.kind === 'binom') el.innerHTML = `<div class="k">Бернулли</div><div class="v ${ok ? 'ok' : ''}">n ${m.n} · p ${trim(m.p, 2)}</div><div class="lr"><span>E = np</span><span>${trim(m.E, 2)}</span></div><div class="lr"><span>D = npq</span><span>${trim(m.D, 2)}</span></div><div class="lr"><span>серий</span><span>${m.series}</span></div>`;
+  else el.innerHTML = `<div class="k">Среднее</div><div class="v ${ok ? 'ok' : ''}">x̄ ${m.N ? trim(m.mean, 3) : '—'}</div><div class="lr"><span>n</span><span>${m.N}</span></div><div class="lr"><span>E</span><span>${trim(m.E, 2)}</span></div><div class="lr"><span>σ/√n</span><span>${m.N ? trim(m.se, 3) : '—'}</span></div>`;
+}
+
+function update() {
+  const m = model(), L = LESSONS[S.lesson];
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Случай теперь под контролем!');
+  } else if (L.id === 'binom' && !S.done[L.id] && m.n === 10 && m.pp === 25 && m.sel !== null && !binomHinted[m.sel]) {
+    binomHinted[m.sel] = true; toast('Модель верная. Это не самый высокий столбик — сравните соседей.');
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+const binomHinted = {};
+
+const MINI = {
+  mean: '<path d="M6 20h54" stroke="#a9b4c9" stroke-width="2"/><rect x="9" y="6" width="6" height="14" fill="#56627d"/><rect x="19" y="12" width="6" height="8" fill="#5fb4d9"/><rect x="38" y="15" width="6" height="5" fill="#ffb547"/><rect x="54" y="16" width="5" height="4" fill="#86e0a8"/><path d="M24 22l-4 7h8z" fill="#ffb547"/>',
+  binom: '<path d="M4 26h58" stroke="#56627d"/><rect x="8" y="22" width="6" height="4" fill="#5fb4d9"/><rect x="16" y="14" width="6" height="12" fill="#5fb4d9"/><rect x="24" y="6" width="6" height="20" fill="#72d4e8"/><rect x="32" y="9" width="6" height="17" fill="#5fb4d9"/><rect x="40" y="17" width="6" height="9" fill="#5fb4d9"/><rect x="48" y="23" width="6" height="3" fill="#5fb4d9"/>',
+  lln: '<path d="M4 15h58" stroke="#86e0a8" stroke-dasharray="3 2"/><path d="M4 4L9 26L14 8L19 21L25 11L32 18L40 13L50 16L62 15" fill="none" stroke="#72d4e8" stroke-width="1.6"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i];
+  S.lesson = i; S.hl = null; drag = null; S.anim = null; S.pend = 0;
+  S.cnt = (LESSONS[0].cnt).slice(); S.ang = 9; S.spins = 0; S.won = 0; S.lastWin = null; S.lastSec = -1;
+  S.n = LESSONS[1].n; S.pp = LESSONS[1].pp; S.sel = null; resetBinomRuns();
+  S.mode = LESSONS[2].mode; resetLLN();
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const st = $('#lessons'), cur = st.querySelector('.lesson[aria-current="true"]');
+  if (cur) { const sr = st.getBoundingClientRect(), cr = cur.getBoundingClientRect(); st.scrollLeft += (cr.left - sr.left) - (sr.width - cr.width) / 2; }
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '';
+  if (id === 'mean') now = `Колесо удачи из 20 равных секторов, попытка стоит ${PRICE} тг. Число секторов по призам: ${m.k.map((c, i) => `${PRIZES[i]} тг — ${c}`).join(', ')}. Вероятности: ${m.p.map((p, i) => `P(X=${PRIZES[i]}) = ${trim(p, 2)}`).join(', ')}. E(X) = ${trim(m.E, 2)} тг (сумма «приз × сектора» = ${m.sxk}, нужно 3000), D(X) ≈ ${trim(m.D, 0)}, σ ≈ ${trim(m.sd, 0)} тг. Игроку в среднем ${sgn(m.gain)} тг за попытку. Попыток сделано: ${m.spins}${m.spins ? `, средний выигрыш ${trim(m.avg, 1)} тг` : ''}.`;
+  if (id === 'binom') now = `Схема Бернулли: n = ${m.n}, p = ${trim(m.p, 2)}, q = ${trim(m.q, 2)}. На экране столбики P(X = k) для k = 0…${m.n}. E(X) = np = ${trim(m.E, 2)}, D = npq = ${trim(m.D, 3)}. Ученик выбрал столбик: ${m.sel === null ? 'нет' : `k = ${m.sel}, P = ${trim(m.P[m.sel], 4)}`}. Проведено серий: ${m.series}${m.series ? `, среднее число успехов ${trim(m.empMean, 2)}` : ''}. Модель для задачи настроена верно: ${m.n === 10 && m.pp === 25 ? 'да' : 'нет'}.`;
+  if (id === 'lln') now = `Случайная величина: ${m.die ? 'очки на игральном кубике, E = 3,5, D = 35/12' : 'монета (орёл = 1, решка = 0), E = 0,5, D = 0,25'}. Сделано бросков: ${m.N}${m.N ? `, сумма ${m.sumX}, среднее x̄ = ${trim(m.mean, 4)}, отклонение от E ${trim(m.dev, 4)}, σ/√n ≈ ${trim(m.se, 4)}` : ''}. На графике линия x̄ по мере роста n (логарифмическая ось), линия E, коридор ±${trim(m.eps, 2)} и воронка ±2σ/√n.`;
+  return [
+    `Раздел: математика, 11 класс, «Случайные величины» (вероятность и статистика). Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+    'Не называй готовый ответ (нужное число секторов, верные n и p, номер столбика): веди ученика наводящими вопросами и проверяй его рассуждения.',
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = { mean: 'Почему лотерея всегда выгодна организатору?', binom: 'Откуда в формуле Бернулли число сочетаний?', lln: 'Почему одно среднее за 10 бросков ничего не доказывает?' }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

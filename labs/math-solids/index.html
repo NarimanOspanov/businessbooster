@@ -1,0 +1,960 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по математике, 11 класс: призма и пирамида, тела вращения, развёртки и площади поверхности, объёмы тел.">
+<title>Тела и объёмы</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG solids in parallel projection) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --violet:#b79cff;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab}
+.scene.grabbing{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.meter .lr .ok{color:var(--ok)}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:22%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+input[type=range]:disabled{opacity:.35}
+
+.formula{font:500 17px/1.35 var(--font-mono);text-align:center;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px;overflow-wrap:anywhere}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted);flex:none;max-width:45%}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;min-width:0}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 290px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><ellipse cx="14" cy="11" rx="7" ry="2.6" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M7 11V28M21 11V28" stroke="var(--fg)" stroke-width="1.6"/><path d="M7 28A7 2.6 0 0 0 21 28" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M7 21A7 2.6 0 0 0 21 21V28A7 2.6 0 0 1 7 28Z" fill="var(--liq)" opacity=".7"/><path d="M24 10H34L29 30Z" fill="var(--force)" opacity=".85"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Математика · Тела и объёмы</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#math">Карта</a><a href="/physics/#math">Математика</a><a href="./" aria-current="page">Тела и объёмы</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Тела</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Рабочее поле">
+    <svg class="scene" id="scene" role="img" aria-label="Рабочее поле: пространственные тела в параллельной проекции. Тела можно вращать, менять их размеры, вращать плоские фигуры вокруг оси и переливать воду."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const trim = (x, n = 3) => fmt(x, n).replace(/(,\d*?)0+$/, '$1').replace(/,$/, '') || '0';
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d', CY_ = '#72d4e8', VI = '#b79cff', OR = '#ffb547', GR = '#86e0a8', FG = '#e8ecf4', MU = '#8b96ad', RD = '#ff8a73', LQ = '#5fb4d9';
+const DEG = Math.PI / 180, PI = Math.PI;
+
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+
+const FIGN = { rect: 'прямоугольник', tri: 'прямоугольный треугольник', semi: 'полукруг' };
+const BODYN = { rect: 'цилиндр', tri: 'конус', semi: 'шар' };
+const SOLIDN = { cyl: 'цилиндр', cone: 'конус', ball: 'шар' };
+
+const LESSONS = [
+  { id: 'poly', title: 'Призма и пирамида',
+    text: ['Многогранник — тело, ограниченное многоугольниками. Это его грани, их стороны — рёбра, а концы рёбер — вершины.',
+           'У призмы два равных основания в параллельных плоскостях, а боковые грани — параллелограммы. У прямой призмы это прямоугольники. У пирамиды одно основание, а боковые грани — треугольники с общей вершиной.',
+           'Если основание — n-угольник, то у призмы 2n вершин, 3n рёбер и n + 2 грани, а у пирамиды n + 1 вершина, 2n рёбер и n + 1 грань. Для любого выпуклого многогранника верна формула Эйлера: В − Р + Г = 2.'],
+    why: 'Архитектор и конструктор думают многогранниками: каркас дома, ферма моста, крыша-пирамида над павильоном. Чертёжник и 3D-моделлер считают вершины и рёбра — из них состоит любая модель в игре или в САПР. Упаковщик и технолог на заводе собирают коробки из развёрток-призм: меньше картона — дешевле упаковка. Знаменитый «Дворец мира и согласия» в Астане — это пирамида.',
+    task: 'Соберите многогранник, у которого 8 граней и 18 рёбер.',
+    hint: 'Сначала выберите вид: призма или пирамида. Потом подумайте, сколько рёбер даёт одна сторона основания у призмы (3n) и у пирамиды (2n).',
+    stage: 'Выберите вид тела и число сторон основания. Тащите поле — тело вращается.',
+    yaw: -24, pitch: 20, type: 'prism', n: 4,
+    check: m => m.F === 8 && m.E === 18 },
+  { id: 'round', title: 'Цилиндр, конус, шар',
+    text: ['Тело вращения получается, когда плоская фигура вращается вокруг прямой — оси. Каждая точка фигуры описывает окружность с центром на оси.',
+           'Прямоугольник, вращаясь вокруг стороны, даёт цилиндр. Прямоугольный треугольник, вращаясь вокруг катета, даёт конус: второй катет — радиус основания r, гипотенуза — образующая l. Полукруг, вращаясь вокруг диаметра, даёт шар.',
+           'Сечение тела вращения плоскостью через ось называют осевым. У цилиндра это прямоугольник 2r × h, у конуса — равнобедренный треугольник, у шара — большой круг. В конусе l² = r² + h² по теореме Пифагора.'],
+    why: 'Токарь на станке делает именно тела вращения: заготовка крутится, резец срезает лишнее — так получаются валы, втулки, болты. Гончар формует посуду на круге. Инженеры-нефтяники Атырау и Мангистау работают с цилиндрическими резервуарами и трубами, а конструкторы — с коническими воронками и бункерами для зерна на элеваторах.',
+    task: 'Вращением получите конус с радиусом основания 3 и образующей 5.',
+    hint: 'Конус даёт прямоугольный треугольник, повёрнутый на полный оборот 360°. Образующая — гипотенуза: l² = r² + h². Какой должна быть высота?',
+    stage: 'Выберите фигуру, задайте размеры и угол поворота. Тащите поле — меняется вид.',
+    yaw: -30, pitch: 18, fig: 'rect', r: 2, h: 5, a: 0,
+    check: m => m.fig === 'tri' && Math.abs(m.r - 3) < 1e-9 && Math.abs(m.l - 5) < 1e-9 && m.a >= 360 },
+  { id: 'area', title: 'Площади поверхности',
+    text: ['Площадь поверхности тела удобно считать по развёртке — фигуре, которая получится, если поверхность разрезать и разложить на плоскости.',
+           'Боковая поверхность цилиндра разворачивается в прямоугольник 2πr × h, поэтому S бок = 2πrh. Боковая поверхность конуса — круговой сектор радиуса l, его дуга равна длине окружности основания 2πr. Отсюда S бок = πrl, а угол сектора равен 360° · r : l.',
+           'Полная поверхность — боковая плюс основания: у цилиндра 2πr(r + h), у конуса πr(r + l). Сферу развернуть на плоскость без разрывов нельзя, её площадь S = 4πR² — как у четырёх больших кругов.'],
+    why: 'Технолог упаковки считает, сколько жести уйдёт на банку и бумаги на этикетку — это площадь боковой поверхности цилиндра. Жестянщик и кровельщик раскраивают конусы для водостоков и куполов по развёртке-сектору. Маляр и сметчик считают краску по площади: литр краски покрывает 8–10 м², и ошибка в формуле — это лишние деньги заказчика.',
+    task: 'Подберите конус, у которого развёртка боковой поверхности — полукруг.',
+    hint: 'Полукруг — это сектор в 180°. Угол сектора равен 360° · r : l. Каким должно быть отношение l к r?',
+    stage: 'Выберите тело и размеры. Слева тело, справа его развёртка.',
+    yaw: -30, pitch: 20, solid: 'cyl', r: 2, h: 4,
+    check: m => m.solid === 'cone' && Math.abs(m.theta - 180) <= 1.5 },
+  { id: 'volume', title: 'Объёмы тел',
+    text: ['Объём призмы и цилиндра равен площади основания, умноженной на высоту: V = S·h, у цилиндра V = πr²h.',
+           'Объём пирамиды и конуса в три раза меньше, чем у призмы и цилиндра с тем же основанием и высотой: V = ⅓·S·h, у конуса V = ⅓πr²h. Объём шара V = 4/3·πR³.',
+           'Архимед открыл красивое отношение. Возьмём цилиндр, у которого радиус R и высота 2R, а также конус и шар тех же размеров. Их объёмы относятся как 1 : 2 : 3 — конус, шар, цилиндр. Проверим водой.'],
+    why: 'Инженер-технолог считает объёмы цистерн, силосов для зерна и бетона для фундамента — от этого зависит, сколько заказать и заплатить. Бармен, кондитер и фасовщик знают, сколько порций выйдет из ёмкости. Логист считает, сколько кубометров груза войдёт в вагон. Нефтяник переводит уровень нефти в резервуаре в кубометры и тонны.',
+    task: 'Наполните цилиндр водой ровно доверху, использовав хотя бы один конус и хотя бы один шар.',
+    hint: 'Все три тела одного размера: радиус R, высота 2R. Посмотрите, какую часть цилиндра заполняет один конус, и сравните с шаром. Если перелили — вылейте и начните снова.',
+    stage: 'Наливайте воду из конуса и шара в цилиндр. Тащите поле — меняется вид.',
+    yaw: -20, pitch: 22, R: 3,
+    check: m => m.thirds === 3 && !m.spilled && m.cones >= 1 && m.balls >= 1 },
+];
+
+const KEY = 'luch-math-solids';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null,
+            yaw: -24, pitch: 20, type: 'prism', n: 4, fig: 'rect', r: 2, h: 5, a: 0, anim: false,
+            solid: 'cyl', R: 3, thirds: 0, cones: 0, balls: 0, spilled: false, lvl: 0 };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+// ---------- models ----------
+function polyCounts(type, n) {
+  return type === 'prism' ? { V: 2 * n, E: 3 * n, F: n + 2 } : { V: n + 1, E: 2 * n, F: n + 1 };
+}
+function model() {
+  const id = LID();
+  if (id === 'poly') return { kind: id, type: S.type, n: S.n, ...polyCounts(S.type, S.n) };
+  if (id === 'round') {
+    const r = S.r, h = S.fig === 'semi' ? 2 * r : S.h, l = Math.hypot(S.r, S.h);
+    const V = S.fig === 'rect' ? PI * r * r * h : S.fig === 'tri' ? PI * r * r * h / 3 : 4 / 3 * PI * r ** 3;
+    return { kind: id, fig: S.fig, r, h, l: S.fig === 'tri' ? l : NaN, a: S.a, full: S.a >= 360, V };
+  }
+  if (id === 'area') {
+    const r = S.r, h = S.h, l = Math.hypot(r, h), so = S.solid;
+    const Sb = so === 'cyl' ? 2 * PI * r * h : so === 'cone' ? PI * r * l : 4 * PI * r * r;
+    const Sbase = so === 'cyl' ? 2 * PI * r * r : so === 'cone' ? PI * r * r : 0;
+    return { kind: id, solid: so, r, h, l, theta: so === 'cone' ? 360 * r / l : NaN, Sb, Sbase, Sfull: Sb + Sbase };
+  }
+  const R = S.R, Vc = 2 * PI * R ** 3;
+  return { kind: id, R, thirds: S.thirds, cones: S.cones, balls: S.balls, spilled: S.spilled, Vcyl: Vc, Vcone: Vc / 3, Vball: 2 * Vc / 3, Vwater: Vc * S.thirds / 3 };
+}
+
+// ---------- projection (parallel, like in a school drawing) ----------
+let K = 80, ZC = 0, OX = 0, OY = 0;
+const CX = 260, CY = 214;
+let VW = null;
+function view() {
+  const y = S.yaw * DEG, p = S.pitch * DEG;
+  VW = { c: Math.cos(y), s: Math.sin(y), cp: Math.cos(p), sp: Math.sin(p) };
+  VW.w = [-VW.s * VW.cp, -VW.c * VW.cp, VW.sp];  // direction to the viewer
+}
+function P(q) {
+  const x = q[0], y = q[1], z = q[2] - ZC;
+  const u = x * VW.c - y * VW.s, v = x * VW.s + y * VW.c;
+  return { x: CX + OX + u * K, y: CY + OY - (v * VW.sp + z * VW.cp) * K, d: -v * VW.cp + z * VW.sp };
+}
+const T = (x, y, s, txt, fill = MU, anchor = 'middle', extra = '') => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${s}" fill="${fill}" text-anchor="${anchor}" ${extra}>${txt}</text>`;
+const pth = (pts, close) => pts.map((p, i) => (i ? 'L' : 'M') + p.x.toFixed(1) + ' ' + p.y.toFixed(1)).join('') + (close ? 'Z' : '');
+const seg = (a, b, col, w = 1.6, extra = '') => `<path d="M${a.x.toFixed(1)} ${a.y.toFixed(1)}L${b.x.toFixed(1)} ${b.y.toFixed(1)}" stroke="${col}" stroke-width="${w}" stroke-linecap="round" ${extra}/>`;
+const dotS = (a, col, r = 4.5) => `<circle cx="${a.x.toFixed(1)}" cy="${a.y.toFixed(1)}" r="${r}" fill="${col}" stroke="${INK}" stroke-width="1.6"/>`;
+function backdrop() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.05)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+// screen points of named parts, for the highlight in the «Детали» tab
+let HLP = {};
+const reg = (id, pts) => { (HLP[id] = HLP[id] || []).push(...pts); };
+
+function hull(pts) {
+  const p = pts.map(q => ({ x: q.x, y: q.y })).sort((a, b) => a.x - b.x || a.y - b.y);
+  if (p.length < 3) return p;
+  const cr = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const lo = [], up = [];
+  for (const q of p) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
+  for (let i = p.length - 1; i >= 0; i--) { const q = p[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+  return lo.slice(0, -1).concat(up.slice(0, -1));
+}
+function onHull(q, H) {
+  for (let i = 0; i < H.length; i++) {
+    const a = H[i], b = H[(i + 1) % H.length], dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy || 1;
+    const s = clamp(((q.x - a.x) * dx + (q.y - a.y) * dy) / L2, 0, 1);
+    if (Math.hypot(q.x - a.x - s * dx, q.y - a.y - s * dy) < 0.7) return true;
+  }
+  return false;
+}
+const ring = (z, r, N = 72, a0 = 0, a1 = 2 * PI) => { const o = []; for (let i = 0; i < N; i++) { const t = a0 + (a1 - a0) * i / (N - (a1 - a0 >= 2 * PI - 1e-9 ? 0 : 1)); o.push(P([r * Math.cos(t), r * Math.sin(t), z])); } return o; };
+// a polyline along a ring: solid where visible, dashed where hidden
+function rimSVG(pts, vis, col, w = 1.6) {
+  let solid = '', dash = '';
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i], b = pts[(i + 1) % pts.length], s = `M${a.x.toFixed(1)} ${a.y.toFixed(1)}L${b.x.toFixed(1)} ${b.y.toFixed(1)}`;
+    if (vis[i] && vis[(i + 1) % pts.length]) solid += s; else dash += s;
+  }
+  return (dash ? `<path d="${dash}" stroke="${col}" stroke-width="${w * 0.8}" stroke-dasharray="5 4" opacity=".7" fill="none"/>` : '') +
+         `<path d="${solid}" stroke="${col}" stroke-width="${w}" fill="none" stroke-linecap="round"/>`;
+}
+// body of revolution standing on z = 0: cylinder, cone (apex up), cup-cone (apex down) or ball
+function revBody(kind, r, h, o = {}) {
+  const col = o.col || '#c3cbdb', fill = o.fill || 'rgba(114,212,232,.07)';
+  let out = '';
+  if (kind === 'ball') {
+    const c = P([0, 0, r]), eq = ring(r, r), vis = eq.map(q => q.d - c.d >= -1e-9);
+    out += `<circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="${(r * K).toFixed(1)}" fill="${fill}"/>`;
+    out += rimSVG(eq, vis, col, 1.2) + `<circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="${(r * K).toFixed(1)}" fill="none" stroke="${INK}" stroke-width="4.6"/><circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="${(r * K).toFixed(1)}" fill="none" stroke="${col}" stroke-width="2"/>`;
+    if (o.id) reg(o.id, [{ x: c.x - r * K, y: c.y - r * K }, { x: c.x + r * K, y: c.y + r * K }]);
+    return out;
+  }
+  const cup = kind === 'cup';
+  const low = cup ? [P([0, 0, 0])] : ring(0, r);
+  const high = kind === 'cyl' || cup ? ring(h, r) : [P([0, 0, h])];
+  const H = hull(low.concat(high));
+  out += `<path d="${pth(H, true)}" fill="${fill}"/>`;
+  if (o.inside) out += o.inside;
+  out += `<path d="${pth(H, true)}" fill="none" stroke="${INK}" stroke-width="4.6" stroke-linejoin="round"/><path d="${pth(H, true)}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round"/>`;
+  if (!cup) out += rimSVG(low, low.map(q => onHull(q, H)), col, 2);
+  if (high.length > 1) out += rimSVG(high, high.map(() => true), col, 2);
+  if (o.id) reg(o.id, H);
+  return out;
+}
+
+// ---------- lesson 1: prism / pyramid ----------
+function polyGeom(type, n) {
+  const R = 1.55, H = 2.3, a0 = -PI / 2 + PI / n;
+  const B = [], Tp = [];
+  for (let i = 0; i < n; i++) { const t = a0 + 2 * PI * i / n; B.push([R * Math.cos(t), R * Math.sin(t), 0]); Tp.push([R * Math.cos(t), R * Math.sin(t), H]); }
+  const apex = [0, 0, H], faces = [];
+  faces.push({ v: B.slice().reverse(), n: [0, 0, -1], kind: 'base' });
+  if (type === 'prism') faces.push({ v: Tp.slice(), n: [0, 0, 1], kind: 'top' });
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n, v = type === 'prism' ? [B[i], B[j], Tp[j], Tp[i]] : [B[i], B[j], apex];
+    let nr = cross(sub(v[1], v[0]), sub(v[2], v[0]));
+    const c = v.reduce((s, q) => [s[0] + q[0], s[1] + q[1], s[2] + q[2]], [0, 0, 0]);
+    if (dot(nr, [c[0], c[1], 0]) < 0) nr = nr.map(x => -x);
+    faces.push({ v, n: nr, kind: 'lat', i });
+  }
+  const edges = [];
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n, fb = 0, fl = (type === 'prism' ? 2 : 1) + i, flPrev = (type === 'prism' ? 2 : 1) + (i + n - 1) % n;
+    edges.push({ a: B[i], b: B[j], f: [fb, fl], kind: 'base' });
+    if (type === 'prism') { edges.push({ a: Tp[i], b: Tp[j], f: [1, fl], kind: 'top' }); edges.push({ a: B[i], b: Tp[i], f: [flPrev, fl], kind: 'lat' }); }
+    else edges.push({ a: B[i], b: apex, f: [flPrev, fl], kind: 'lat' });
+  }
+  return { B, Tp, apex, faces, edges, H };
+}
+function polySVG(m) {
+  K = 78; ZC = 1.15; OX = 0; OY = 4;
+  const G = polyGeom(m.type, m.n), front = G.faces.map(f => dot(f.n, VW.w) > 1e-9);
+  let h = '';
+  // ground shadow
+  const sh = G.B.map(q => P([q[0] * 1.08, q[1] * 1.08, -0.02]));
+  h += `<path d="${pth(sh, true)}" fill="rgba(0,0,0,.22)"/>`;
+  G.faces.forEach((f, i) => {
+    if (!front[i]) return;
+    const pts = f.v.map(P), isBase = f.kind === 'base' || f.kind === 'top', hi = f.kind === 'lat' && f.i === 0;
+    h += `<path d="${pth(pts, true)}" fill="${isBase ? 'rgba(255,181,71,.16)' : hi ? 'rgba(183,156,255,.2)' : 'rgba(114,212,232,.06)'}"/>`;
+  });
+  // base is seen from below only rarely: show its tint through as hatching when hidden
+  if (!front[0]) h += `<path d="${pth(G.B.map(P), true)}" fill="rgba(255,181,71,.07)"/>`;
+  const lat0 = G.faces.find(f => f.kind === 'lat' && f.i === 0);
+  reg('lat', lat0.v.map(P)); reg('base', G.B.map(P));
+  G.edges.forEach(e => {
+    const vis = e.f.some(i => front[i]), a = P(e.a), b = P(e.b);
+    if (!vis) h += seg(a, b, MU, 1.3, 'stroke-dasharray="5 4" opacity=".75"');
+    if (e.kind === 'lat') reg('edge', [a, b]);
+  });
+  // height
+  const top = m.type === 'prism' ? [0, 0, G.H] : G.apex;
+  h += seg(P([0, 0, 0]), P(top), GR, 1.6, 'stroke-dasharray="4 3"') + dotS(P([0, 0, 0]), GR, 2.6);
+  reg('height', [P([0, 0, 0]), P(top)]);
+  G.edges.forEach(e => {
+    const vis = e.f.some(i => front[i]); if (!vis) return;
+    const a = P(e.a), b = P(e.b), col = e.kind === 'lat' ? '#c3cbdb' : OR;
+    h += seg(a, b, INK, 4.6) + seg(a, b, col, 2);
+  });
+  const vs = m.type === 'prism' ? G.B.concat(G.Tp) : G.B.concat([G.apex]);
+  vs.forEach(q => { h += dotS(P(q), FG, 3); });
+  if (m.type === 'pyramid') { const a = P(G.apex); h += dotS(a, VI, 5); reg('apex', [{ x: a.x - 6, y: a.y - 6 }, { x: a.x + 6, y: a.y + 6 }]); h += T(a.x, a.y - 12, 12, 'S', VI, 'middle', 'font-weight="600"'); }
+  else reg('apex', G.Tp.map(P));
+  const ok = m.F === 8 && m.E === 18;
+  h += T(CX, 398, 12, `${m.type === 'prism' ? 'призма' : 'пирамида'}, n = ${m.n}: В = ${m.V}, Р = ${m.E}, Г = ${m.F}`, ok ? GR : FG, 'middle', 'font-weight="500"');
+  return h;
+}
+
+// ---------- lesson 2: a flat figure rotates about the axis ----------
+function profile(fig, r, h) {
+  if (fig === 'rect') return [[0, 0], [r, 0], [r, h], [0, h]];
+  if (fig === 'tri') return [[0, 0], [r, 0], [0, h]];
+  const o = []; for (let i = 0; i <= 36; i++) { const t = PI * i / 36; o.push([r * Math.sin(t), r - r * Math.cos(t)]); } return o;
+}
+const at = (pr, phi) => pr.map(([rho, z]) => P([rho * Math.cos(phi), rho * Math.sin(phi), z]));
+function roundSVG(m) {
+  K = 30; ZC = m.h / 2; OX = 0; OY = 6;
+  const pr = profile(m.fig, m.r, m.h), A = m.a * DEG;
+  let h = '';
+  // axis
+  const ax0 = P([0, 0, -0.9]), ax1 = P([0, 0, m.h + 0.9]);
+  h += seg(ax0, ax1, GR, 1.4, 'stroke-dasharray="8 4 2 4"') + T(ax1.x + 8, ax1.y + 4, 11, 'ось', GR, 'start');
+  reg('axis', [ax0, ax1]);
+  if (m.full) h += revBody(m.fig === 'rect' ? 'cyl' : m.fig === 'tri' ? 'cone' : 'ball', m.r, m.h, { id: 'body', fill: 'rgba(114,212,232,.1)' });
+  // swept wireframe: parallels (circles of the vertices) and generators every 20°
+  if (A > 0) {
+    const N = Math.max(2, Math.ceil(m.a / 5) + 1);
+    const lats = m.fig === 'semi' ? [30, 60, 90, 120, 150].map(d => [m.r * Math.sin(d * DEG), m.r - m.r * Math.cos(d * DEG)]) : pr.filter(([rho]) => rho > 0);
+    lats.forEach(([rho, z]) => { const arc = ring(z, rho, N, 0, A); h += `<path d="${pth(arc)}" fill="none" stroke="${CY_}" stroke-width="1.3" opacity=".75"/>`; reg('arcs', arc); });
+    const gen = m.fig === 'rect' ? [[m.r, 0], [m.r, m.h]] : m.fig === 'tri' ? [[m.r, 0], [0, m.h]] : pr;
+    for (let d = 20; d < m.a; d += 20) h += `<path d="${pth(at(gen, d * DEG))}" fill="none" stroke="${CY_}" stroke-width="1" opacity=".35"/>`;
+  }
+  // start position (ghost) and the figure now
+  const g0 = at(pr, 0); h += `<path d="${pth(g0, true)}" fill="none" stroke="${MU}" stroke-width="1.2" stroke-dasharray="4 3"/>`;
+  reg('start', g0);
+  const g = at(pr, A);
+  h += `<path d="${pth(g, true)}" fill="rgba(255,181,71,.28)" stroke="${OR}" stroke-width="2.2" stroke-linejoin="round"/>`;
+  reg('profile', g);
+  // labels on the profile
+  if (m.fig !== 'semi') {
+    const mid = (p, q) => ({ x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 });
+    const pr0 = P([m.r * Math.cos(A), m.r * Math.sin(A), 0]), o = P([0, 0, 0]), top = P([0, 0, m.h]);
+    const sd = pr0.x >= o.x ? 1 : -1, far = sd > 0 ? 'start' : 'end', near = sd > 0 ? 'end' : 'start';
+    const mr = mid(o, pr0); h += T(mr.x, mr.y + 15, 11.5, 'r = ' + trim(m.r, 1), OR, 'middle', 'font-weight="500"');
+    const mh = mid(o, top); h += T(mh.x - sd * 8, mh.y + 4, 11.5, 'h = ' + trim(m.h, 1), OR, near, 'font-weight="500"');
+    if (m.fig === 'tri') { const ml = mid(pr0, top); h += T(ml.x + sd * 10, ml.y, 11.5, 'l = ' + trim(m.l, 2), VI, far, 'font-weight="500"'); }
+    else { const mo = mid(pr0, P([m.r * Math.cos(A), m.r * Math.sin(A), m.h])); h += T(mo.x + sd * 8, mo.y + 4, 11.5, 'h', OR, far); }
+  } else { const c = P([0, 0, m.r]), e = P([m.r * Math.cos(A), m.r * Math.sin(A), m.r]); h += seg(c, e, OR, 1.4) + T((c.x + e.x) / 2, (c.y + e.y) / 2 - 7, 11.5, 'R = ' + trim(m.r, 1), OR, 'middle', 'font-weight="500"'); }
+  const ok = !!S.done.round || LESSONS[1].check(m);
+  h += T(CX, 398, 12, m.full ? `${FIGN[m.fig]} → ${BODYN[m.fig]}` : `${FIGN[m.fig]}, поворот ${Math.round(m.a)}°`, ok ? GR : FG, 'middle', 'font-weight="500"');
+  return h;
+}
+
+// ---------- lesson 3: a solid and its net ----------
+function areaSVG(m) {
+  let h = '';
+  // the solid on the left
+  const kind = m.solid === 'cyl' ? 'cyl' : m.solid === 'cone' ? 'cone' : 'ball', hh = m.solid === 'ball' ? 2 * m.r : m.h;
+  K = Math.min(56 / m.r, 210 / hh, 60); ZC = hh / 2; OX = -102; OY = 18;
+  h += revBody(kind, m.r, m.h, { id: 'body', fill: 'rgba(114,212,232,.1)' });
+  if (m.solid !== 'ball') {
+    const RD3 = [m.r * VW.c, -m.r * VW.s, 0], o = P([0, 0, 0]), e = P(RD3);
+    h += seg(o, e, OR, 1.4) + T((o.x + e.x) / 2, (o.y + e.y) / 2 - 5, 10.5, 'r', OR);
+    const t = P([0, 0, m.h]); h += seg(o, t, GR, 1.3, 'stroke-dasharray="4 3"') + T(o.x - 6, (o.y + t.y) / 2, 10.5, 'h', GR, 'end');
+    if (m.solid === 'cone') { const q = e; h += seg(q, t, VI, 1.8) + T((q.x + t.x) / 2 + 8, (q.y + t.y) / 2, 10.5, 'l', VI, 'start'); }
+  } else { const c = P([0, 0, m.r]), e = P([m.r, 0, m.r]); h += seg(c, e, OR, 1.4) + T((c.x + e.x) / 2, c.y - 6, 10.5, 'R', OR); }
+  h += T(CX + OX, 398 - 22, 11, SOLIDN[m.solid], MU);
+  // the net on the right, in its own 2D coordinates
+  const box = { x: 238, y: 74, w: 192, h: 290 };
+  let shapes = [], bb;
+  if (m.solid === 'cyl') {
+    const W = 2 * PI * m.r;
+    bb = { x0: -W / 2, x1: W / 2, y0: -m.h / 2 - 2 * m.r, y1: m.h / 2 + 2 * m.r };
+    shapes = s => `<rect x="${s.X(-W / 2)}" y="${s.Y(-m.h / 2)}" width="${(W * s.k).toFixed(1)}" height="${(m.h * s.k).toFixed(1)}" fill="rgba(183,156,255,.2)" stroke="${VI}" stroke-width="2"/>` +
+      `<circle cx="${s.X(0)}" cy="${s.Y(-m.h / 2 - m.r)}" r="${(m.r * s.k).toFixed(1)}" fill="rgba(255,181,71,.18)" stroke="${OR}" stroke-width="2"/>` +
+      `<circle cx="${s.X(0)}" cy="${s.Y(m.h / 2 + m.r)}" r="${(m.r * s.k).toFixed(1)}" fill="rgba(255,181,71,.18)" stroke="${OR}" stroke-width="2"/>` +
+      T(s.X(0), +s.Y(-m.h / 2) + 14, 10.5, '2πr ≈ ' + fmt(W, 1), VI) + T(+s.X(W / 2) - 5, s.Y(0), 10.5, 'h', VI, 'end');
+    m._side = [[-W / 2, -m.h / 2], [W / 2, m.h / 2]]; m._bases = [[-m.r, -m.h / 2 - 2 * m.r], [m.r, m.h / 2 + 2 * m.r]];
+  } else if (m.solid === 'cone') {
+    const th = m.theta * DEG, a0 = PI / 2 - th / 2, pts = [[0, 0]];
+    for (let i = 0; i <= 60; i++) { const t = a0 + th * i / 60; pts.push([m.l * Math.cos(t), m.l * Math.sin(t)]); }
+    const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+    bb = { x0: Math.min(...xs, -m.r), x1: Math.max(...xs, m.r), y0: Math.min(...ys), y1: m.l + 2 * m.r };
+    shapes = s => {
+      const e0 = pts[1], e1 = pts[pts.length - 1];
+      return `<path d="M${s.X(0)} ${s.Y(0)}L${s.X(e0[0])} ${s.Y(e0[1])}A${(m.l * s.k).toFixed(1)} ${(m.l * s.k).toFixed(1)} 0 ${th > PI ? 1 : 0} 1 ${s.X(e1[0])} ${s.Y(e1[1])}Z" fill="rgba(183,156,255,.2)" stroke="${VI}" stroke-width="2" stroke-linejoin="round"/>` +
+        `<circle cx="${s.X(0)}" cy="${s.Y(m.l + m.r)}" r="${(m.r * s.k).toFixed(1)}" fill="rgba(255,181,71,.18)" stroke="${OR}" stroke-width="2"/>` +
+        `<path d="M${s.X(0)} ${s.Y(0)}L${s.X(0)} ${s.Y(m.l)}" stroke="${VI}" stroke-width="1" stroke-dasharray="3 3" opacity=".7"/>` +
+        T(+s.X(0) + 6, +s.Y(m.l / 2), 10.5, 'l', VI, 'start') + T(s.X(0), +s.Y(0) - 8, 11, Math.round(m.theta) + '°', Math.abs(m.theta - 180) <= 1.5 ? GR : FG, 'middle', 'font-weight="600"');
+    };
+    m._side = [[bb.x0, bb.y0], [bb.x1, m.l]]; m._bases = [[-m.r, m.l], [m.r, m.l + 2 * m.r]];
+  } else {
+    bb = { x0: -2 * m.r - 0.2, x1: 2 * m.r + 0.2, y0: -2 * m.r - 0.2, y1: 2 * m.r + 0.2 };
+    shapes = s => [[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([i, j]) => `<circle cx="${s.X(i * (m.r + 0.1))}" cy="${s.Y(j * (m.r + 0.1))}" r="${(m.r * s.k).toFixed(1)}" fill="rgba(183,156,255,.16)" stroke="${VI}" stroke-width="1.6" stroke-dasharray="5 4"/>`).join('') +
+      T(s.X(0), +s.Y(2 * m.r) + 30, 10.5, '4 больших круга', VI);
+    m._side = [[bb.x0, bb.y0], [bb.x1, bb.y1]]; m._bases = null;
+  }
+  const k = Math.min(box.w / (bb.x1 - bb.x0), box.h / (bb.y1 - bb.y0));
+  const cx = box.x + box.w / 2 - (bb.x0 + bb.x1) / 2 * k, cy = box.y + box.h / 2 - (bb.y0 + bb.y1) / 2 * k;
+  const s = { k, X: x => (cx + x * k).toFixed(1), Y: y => (cy + y * k).toFixed(1) };
+  h += shapes(s);
+  const toS = ([x, y]) => ({ x: +s.X(x), y: +s.Y(y) });
+  reg('side', m._side.map(toS)); if (m._bases) reg('bases', m._bases.map(toS));
+  h += T(box.x + box.w / 2, 398 - 22, 11, m.solid === 'ball' ? 'сфера не развёртывается' : 'развёртка', MU);
+  const ok = !!S.done.area || LESSONS[2].check(m);
+  h += T(CX, 398, 12, m.solid === 'cone' ? `сектор ${fmt(m.theta, 1)}° · S бок ≈ ${fmt(m.Sb, 1)}` : m.solid === 'ball' ? `S сферы = 4πR² ≈ ${fmt(m.Sb, 1)}` : `S бок ≈ ${fmt(m.Sb, 1)} · S полн ≈ ${fmt(m.Sfull, 1)}`, ok ? GR : FG, 'middle', 'font-weight="500"');
+  return h;
+}
+
+// ---------- lesson 4: water from a cone and a ball into a cylinder ----------
+function volumeSVG(m) {
+  let h = '';
+  K = 46; ZC = 1; OY = 14;
+  const lab = (txt, sub, col) => { const p = P([0, 0, -0.05]); return T(p.x, 330, 11.5, txt, col, 'middle', 'font-weight="600"') + T(p.x, 346, 10.5, sub, MU); };
+  // cone (cup, apex down) full of water
+  OX = -125;
+  h += revBody('cup', 1, 2, { id: 'cone', col: OR, fill: 'rgba(95,180,217,.45)' });
+  h += `<path d="${pth(ring(2, 1))}Z" fill="rgba(95,180,217,.35)"/>`;
+  h += lab('конус', 'r = R, h = 2R', OR) + T(P([0, 0, 2.6]).x, P([0, 0, 2.6]).y, 11, 'конусов: ' + m.cones, MU);
+  // ball full of water
+  OX = -10;
+  h += revBody('ball', 1, 2, { id: 'ball', col: VI, fill: 'rgba(95,180,217,.45)' });
+  h += lab('шар', 'радиус R', VI) + T(P([0, 0, 2.6]).x, P([0, 0, 2.6]).y, 11, 'шаров: ' + m.balls, MU);
+  // cylinder with water level
+  OX = 112;
+  const L = clamp(S.lvl, 0, 1) * 2;
+  let water = '';
+  if (L > 0.005) {
+    const b = ring(0, 1), t = ring(L, 1), Hw = hull(b.concat(t));
+    water = `<path d="${pth(Hw, true)}" fill="rgba(95,180,217,.5)"/><path d="${pth(t, true)}" fill="rgba(140,205,235,.55)" stroke="${LQ}" stroke-width="1.2"/>`;
+    reg('water', Hw);
+  }
+  h += revBody('cyl', 1, 2, { id: 'cyl', col: '#c3cbdb', fill: 'rgba(114,212,232,.05)', inside: water });
+  // marks of thirds on the front of the glass
+  const fw = Math.hypot(VW.w[0], VW.w[1]) || 1;
+  for (const k of [1, 2]) { const q = P([VW.w[0] / fw, VW.w[1] / fw, 2 * k / 3]); h += `<path d="M${(q.x - 7).toFixed(1)} ${q.y.toFixed(1)}h14" stroke="${MU}" stroke-width="1.4"/>` + T(q.x + 10, q.y + 4, 10, k + '/3', MU, 'start'); }
+  h += lab('цилиндр', 'r = R, h = 2R', '#c3cbdb');
+  if (m.spilled) { const p = P([0, 0, 2.3]); h += T(p.x, p.y - 4, 12, 'перелилось!', RD, 'middle', 'font-weight="600"'); }
+  const ok = !!S.done.volume || LESSONS[3].check(m);
+  h += T(CX, 398, 12, `налито: ${m.thirds === 0 ? '0' : m.thirds === 3 ? 'полный цилиндр' : m.thirds + '/3 цилиндра'}${m.spilled ? ', часть пролилась' : ''}`, ok ? GR : m.spilled ? RD : FG, 'middle', 'font-weight="500"');
+  return h;
+}
+
+function hlBox(id) {
+  const pts = HLP[id]; if (!pts || !pts.length) return null;
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y), pad = 12;
+  const x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad;
+  return [x0, y0, Math.max(...xs) + pad - x0, Math.max(...ys) + pad - y0];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  view(); HLP = {};
+  const id = LID(), m = model();
+  let h = backdrop();
+  h += id === 'poly' ? polySVG(m) : id === 'round' ? roundSVG(m) : id === 'area' ? areaSVG(m) : volumeSVG(m);
+  OX = 0; OY = 0;
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b && b[2] > 0) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VBOX = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 360, hh / 410, 1.7);
+  VBOX = { w: w / s, h: hh / s }; VBOX.x = 260 - VBOX.w / 2; VBOX.y = 408 - VBOX.h;
+  scene.setAttribute('viewBox', `${VBOX.x.toFixed(1)} ${VBOX.y.toFixed(1)} ${VBOX.w.toFixed(1)} ${VBOX.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- state changes ----------
+function setView(yaw, pitch) {
+  S.yaw = ((yaw + 540) % 360) - 180; S.pitch = clamp(pitch, 5, 70);
+  dirty = true; updateScheme();
+}
+function setN(n) { n = clamp(Math.round(n), 3, 10); if (n !== S.n) { S.n = n; update(); } }
+function setR(v) { const id = LID(); v = id === 'round' ? clamp(Math.round(v * 2) / 2, 1, 5) : clamp(Math.round(v * 10) / 10, 1, 5); if (v !== S.r) { S.r = v; update(); } }
+function setH(v) { const id = LID(); v = id === 'round' ? clamp(Math.round(v * 2) / 2, 1, 8) : clamp(Math.round(v * 10) / 10, 1, 10); if (v !== S.h) { S.h = v; update(); } }
+function setA(v) { v = clamp(Math.round(v), 0, 360); S.anim = false; if (v !== S.a) { S.a = v; update(); } }
+function setRR(v) { v = clamp(Math.round(v * 2) / 2, 1, 5); if (v !== S.R) { S.R = v; update(); } }
+function pour(what) {
+  const add = what === 'cone' ? 1 : 2;
+  if (what === 'cone') S.cones++; else S.balls++;
+  if (S.thirds + add > 3) { S.thirds = 3; S.spilled = true; toast('Перелилось через край! Нажмите «Вылить» и попробуйте снова.'); }
+  else S.thirds += add;
+  update();
+}
+
+// ---------- pointer: drag rotates the view ----------
+let ptr = null, dirty = true;
+scene.addEventListener('pointerdown', e => {
+  e.preventDefault(); try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  ptr = { cx: e.clientX, cy: e.clientY, yaw: S.yaw, pitch: S.pitch, moved: false };
+});
+scene.addEventListener('pointermove', e => {
+  if (!ptr) return;
+  const dx = e.clientX - ptr.cx, dy = e.clientY - ptr.cy;
+  if (!ptr.moved && Math.abs(dx) + Math.abs(dy) > 6) ptr.moved = true;
+  if (ptr.moved) setView(ptr.yaw - dx * 0.45, ptr.pitch + dy * 0.35);
+});
+const endPtr = () => { if (!ptr) return; ptr = null; scene.classList.remove('grabbing'); dirty = true; };
+scene.addEventListener('pointerup', endPtr);
+scene.addEventListener('pointercancel', endPtr);
+
+let lastT = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - (lastT || t)) / 1000); lastT = t;
+  if (S.anim && LID() === 'round') {
+    S.a = Math.min(360, S.a + 150 * dt);
+    if (S.a >= 360) { S.a = 360; S.anim = false; update(); } else { dirty = true; updateScheme(); renderMeter(model()); }
+  }
+  if (LID() === 'volume') {
+    const target = S.thirds / 3;
+    if (Math.abs(S.lvl - target) > 1e-4) { S.lvl = reduce ? target : S.lvl + (target - S.lvl) * Math.min(1, dt * 4) + Math.sign(target - S.lvl) * Math.min(Math.abs(target - S.lvl), dt * 0.05); dirty = true; }
+  }
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2800); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed === undefined ? '' : ` aria-pressed="${pressed}"`}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  const rot = B('rl', '⟲ 15°') + B('rr', '⟳ 15°');
+  tb.innerHTML = {
+    poly: B('prism', 'Призма', S.type === 'prism') + B('pyramid', 'Пирамида', S.type === 'pyramid') + sep + B('n-', 'n −1') + B('n+', 'n +1') + sep + rot,
+    round: B('f-rect', 'Прямоуг.', S.fig === 'rect') + B('f-tri', 'Треуг.', S.fig === 'tri') + B('f-semi', 'Полукруг', S.fig === 'semi') + sep + B('spin', 'Вращать ⟳') + B('a0', '0°'),
+    area: B('s-cyl', 'Цилиндр', S.solid === 'cyl') + B('s-cone', 'Конус', S.solid === 'cone') + B('s-ball', 'Шар', S.solid === 'ball') + sep + rot,
+    volume: B('pour-cone', 'Налить конус') + B('pour-ball', 'Налить шар') + sep + B('empty', 'Вылить'),
+  }[id];
+}
+function resetLesson() {
+  const Ls = LESSONS[S.lesson];
+  S.yaw = Ls.yaw; S.pitch = Ls.pitch; S.anim = false;
+  if (Ls.type) { S.type = Ls.type; S.n = Ls.n; }
+  if (Ls.fig) { S.fig = Ls.fig; S.r = Ls.r; S.h = Ls.h; S.a = Ls.a; }
+  if (Ls.solid) { S.solid = Ls.solid; S.r = Ls.r; S.h = Ls.h; }
+  if (Ls.R) { S.R = Ls.R; S.thirds = 0; S.cones = 0; S.balls = 0; S.spilled = false; S.lvl = 0; }
+}
+function act(a) {
+  if (a === 'rl' || a === 'rr') { setView(S.yaw + (a === 'rl' ? -15 : 15), S.pitch); return; }
+  if (a === 'prism' || a === 'pyramid') { S.type = a; renderTools(); update(); return; }
+  if (a === 'n-' || a === 'n+') { setN(S.n + (a === 'n-' ? -1 : 1)); return; }
+  if (a.startsWith('f-')) { S.fig = a.slice(2); S.a = 0; S.anim = false; renderTools(); buildScheme(); update(); return; }
+  if (a === 'spin') { if (S.a >= 360) S.a = 0; if (reduce) { S.a = 360; update(); } else S.anim = true; return; }
+  if (a === 'a0') { setA(0); return; }
+  if (a.startsWith('s-')) { S.solid = a.slice(2); renderTools(); buildScheme(); update(); return; }
+  if (a === 'pour-cone') { pour('cone'); return; }
+  if (a === 'pour-ball') { pour('ball'); return; }
+  if (a === 'empty') { S.thirds = 0; S.cones = 0; S.balls = 0; S.spilled = false; update(); }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const PRISM_I = '<path d="M6 12L14 8H28L20 12ZM6 12V28H20V12M20 28L28 24V8" fill="none" stroke="var(--line)" stroke-width="1.3" stroke-linejoin="round"/>';
+const ICON = {
+  base: IC(PRISM_I + '<path d="M6 28H20L28 24" fill="none" stroke="var(--force)" stroke-width="2.4"/>'),
+  lat: IC(PRISM_I + '<path d="M6 12H20V28H6Z" fill="rgba(183,156,255,.35)" stroke="var(--violet)" stroke-width="1.6"/>'),
+  edge: IC(PRISM_I + '<path d="M20 12V28" stroke="var(--fg)" stroke-width="2.6"/>'),
+  apex: IC('<path d="M5 28L17 6L29 28Z" fill="none" stroke="var(--line)" stroke-width="1.3"/><circle cx="17" cy="6" r="3.5" fill="var(--violet)"/>'),
+  height: IC('<path d="M5 28L17 6L29 28Z" fill="none" stroke="var(--line)" stroke-width="1.3"/><path d="M17 6V28" stroke="var(--ok)" stroke-width="2" stroke-dasharray="3 2"/>'),
+  axis: IC('<path d="M17 3V31" stroke="var(--ok)" stroke-width="2" stroke-dasharray="6 3 2 3"/>'),
+  profile: IC('<path d="M17 28H27L17 8Z" fill="rgba(255,181,71,.35)" stroke="var(--force)" stroke-width="1.8"/><path d="M17 3V31" stroke="var(--ok)" stroke-width="1.2"/>'),
+  start: IC('<path d="M17 28H27L17 8Z" fill="none" stroke="var(--muted)" stroke-width="1.4" stroke-dasharray="3 2"/>'),
+  arcs: IC('<ellipse cx="17" cy="24" rx="12" ry="4" fill="none" stroke="var(--arm)" stroke-width="1.6"/><ellipse cx="17" cy="12" rx="12" ry="4" fill="none" stroke="var(--arm)" stroke-width="1.2" opacity=".6"/>'),
+  body: IC('<ellipse cx="17" cy="8" rx="10" ry="3.5" fill="none" stroke="var(--fg)" stroke-width="1.5"/><path d="M7 8V26A10 3.5 0 0 0 27 26V8" fill="rgba(114,212,232,.15)" stroke="var(--fg)" stroke-width="1.5"/>'),
+  side: IC('<rect x="3" y="11" width="28" height="12" fill="rgba(183,156,255,.3)" stroke="var(--violet)" stroke-width="1.6"/>'),
+  bases: IC('<circle cx="17" cy="7" r="5" fill="rgba(255,181,71,.25)" stroke="var(--force)" stroke-width="1.6"/><circle cx="17" cy="27" r="5" fill="rgba(255,181,71,.25)" stroke="var(--force)" stroke-width="1.6"/>'),
+  cone: IC('<ellipse cx="17" cy="8" rx="11" ry="3.5" fill="rgba(95,180,217,.5)" stroke="var(--force)" stroke-width="1.5"/><path d="M6 8L17 30L28 8" fill="rgba(95,180,217,.3)" stroke="var(--force)" stroke-width="1.5"/>'),
+  ball: IC('<circle cx="17" cy="17" r="12" fill="rgba(95,180,217,.4)" stroke="var(--violet)" stroke-width="1.6"/>'),
+  cyl: IC('<ellipse cx="17" cy="7" rx="11" ry="3.5" fill="none" stroke="var(--fg)" stroke-width="1.5"/><path d="M6 7V27A11 3.5 0 0 0 28 27V7" fill="none" stroke="var(--fg)" stroke-width="1.5"/>'),
+  water: IC('<path d="M6 17A11 3.5 0 0 0 28 17V27A11 3.5 0 0 1 6 27Z" fill="rgba(95,180,217,.6)"/><ellipse cx="17" cy="17" rx="11" ry="3.5" fill="rgba(140,205,235,.6)"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const Ls = LESSONS[S.lesson];
+  if (S.done[Ls.id]) return '✓ Выполнено';
+  if (m.kind === 'poly') return `граней ${m.F} · рёбер ${m.E}`;
+  if (m.kind === 'round') return m.full ? `${BODYN[m.fig]}: r = ${trim(m.r, 1)}${m.fig === 'tri' ? ', l = ' + trim(m.l, 2) : ''}` : `${FIGN[m.fig]}, поворот ${Math.round(m.a)}°`;
+  if (m.kind === 'area') return m.solid === 'cone' ? `угол сектора ${fmt(m.theta, 1)}°` : `${SOLIDN[m.solid]}: S бок ≈ ${fmt(m.Sb, 1)}`;
+  return m.spilled ? 'перелилось — вылейте воду' : `налито ${m.thirds}/3 · конусов ${m.cones}, шаров ${m.balls}`;
+}
+
+// ---------- Scheme tab ----------
+function ctlSpec() {
+  const id = LID();
+  const v = [['sYaw', 'Поворот вокруг вертикали, °', -180, 180, 1, () => Math.round(S.yaw), x => setView(x, S.pitch)],
+             ['sPitch', 'Наклон взгляда сверху, °', 5, 70, 1, () => Math.round(S.pitch), x => setView(S.yaw, x)]];
+  if (id === 'poly') return [['sN', 'Сторон основания n', 3, 10, 1, () => S.n, setN], ...v];
+  if (id === 'round') return [['sR', S.fig === 'semi' ? 'Радиус полукруга R' : 'Радиус r (нижний катет / сторона)', 1, 5, 0.5, () => S.r, setR],
+    ['sH', 'Высота h (вдоль оси)', 1, 8, 0.5, () => S.h, setH, S.fig === 'semi'], ['sA', 'Угол поворота, °', 0, 360, 5, () => Math.round(S.a), setA], ...v];
+  if (id === 'area') return [['sR', 'Радиус r', 1, 5, 0.1, () => S.r, setR], ['sH', 'Высота h', 1, 10, 0.1, () => S.h, setH, S.solid === 'ball'], ...v];
+  return [['sRR', 'Радиус R, см', 1, 5, 0.5, () => S.R, setRR], ...v];
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  const title = { poly: 'Многогранник', round: 'Вращение фигуры', area: 'Тело и развёртка', volume: 'Цилиндр, конус и шар' }[id];
+  const heads = { poly: ['Вершин', 'Рёбер', 'Граней'], round: ['Тело', 'Поворот', 'Объём'], area: ['S бок', 'S осн', 'S полн'], volume: ['V цил', 'V воды', 'Налито'] }[id];
+  el.innerHTML = `<h2>${title}</h2><dl class="reads">${heads.map((t, i) => `<div><dt>${t}</dt><dd id="r${i + 1}"></dd></div>`).join('')}</dl>` +
+    ctlSpec().map(([sid, label, mn, mx, st, get, , dis]) => `<div class="ctl"><label for="${sid}">${label} <output id="${sid}O"></output></label><input type="range" id="${sid}" min="${mn}" max="${mx}" step="${st}" value="${get()}"${dis ? ' disabled' : ''}></div>`).join('') +
+    `<p class="note" style="margin-top:12px">${id === 'round' && S.fig === 'semi' ? 'У полукруга высота тела равна 2R, ползунок h не нужен. ' : id === 'area' && S.solid === 'ball' ? 'У шара есть только радиус. ' : ''}Повернуть вид можно и пальцем: тащите рабочее поле.</p>`;
+  ctlSpec().forEach(([sid, , , , , , set]) => el.querySelector('#' + sid).addEventListener('input', e => set(+e.target.value)));
+  updateScheme();
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  m = m || model();
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; };
+  ctlSpec().forEach(([sid, , , , st, get]) => { const x = el.querySelector('#' + sid); if (!x) return; set('#' + sid + 'O', st < 1 ? trim(get(), 1) : String(Math.round(get())).replace('-', '−')); if (document.activeElement !== x) x.value = get(); });
+  if (m.kind === 'poly') { set('#r1', m.V); set('#r2', m.E); set('#r3', m.F); }
+  else if (m.kind === 'round') { set('#r1', m.full ? BODYN[m.fig] : '—'); set('#r2', Math.round(m.a) + '°'); set('#r3', m.full ? fmt(m.V, 1) : '—'); }
+  else if (m.kind === 'area') { set('#r1', fmt(m.Sb, 1)); set('#r2', fmt(m.Sbase, 1)); set('#r3', fmt(m.Sfull, 1)); }
+  else { set('#r1', fmt(m.Vcyl, 1) + ' см³'); set('#r2', fmt(m.Vwater, 1) + ' см³'); set('#r3', m.thirds + '/3'); }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'poly') return [
+    { id: 'base', icon: ICON.base, name: 'Основание', spec: S.type === 'prism' ? 'Два равных n-угольника в параллельных плоскостях (оранжевые рёбра).' : 'Один n-угольник (оранжевые рёбра).' },
+    { id: 'lat', icon: ICON.lat, name: 'Боковая грань', spec: S.type === 'prism' ? 'У прямой призмы — прямоугольник. Одна выделена фиолетовым.' : 'Треугольник с вершиной S. Одна выделена фиолетовым.' },
+    { id: 'edge', icon: ICON.edge, name: 'Боковые рёбра', spec: S.type === 'prism' ? 'Параллельны и равны между собой, их n штук.' : 'Сходятся в вершине S, их n штук.' },
+    { id: 'apex', icon: ICON.apex, name: S.type === 'prism' ? 'Верхнее основание' : 'Вершина пирамиды S', spec: S.type === 'prism' ? 'Копия нижнего, сдвинутая вдоль бокового ребра.' : 'Общая точка всех боковых граней.' },
+    { id: 'height', icon: ICON.height, name: 'Высота', spec: 'Перпендикуляр между основаниями (у пирамиды — из вершины на основание). Пунктир зелёным.' }];
+  if (id === 'round') return [
+    { id: 'axis', icon: ICON.axis, name: 'Ось вращения', spec: 'Прямая, вокруг которой поворачивается фигура. Она же ось тела.' },
+    { id: 'profile', icon: ICON.profile, name: 'Вращаемая фигура', spec: 'Оранжевая. Её сторона на оси остаётся на месте.' },
+    { id: 'start', icon: ICON.start, name: 'Начальное положение', spec: 'Пунктир — откуда фигура начала поворот.' },
+    { id: 'arcs', icon: ICON.arcs, name: 'Следы вершин', spec: 'Каждая точка фигуры чертит дугу окружности с центром на оси.' },
+    { id: 'body', icon: ICON.body, name: 'Тело вращения', spec: 'Появляется после полного оборота 360°.' }];
+  if (id === 'area') return [
+    { id: 'body', icon: ICON.body, name: 'Тело', spec: 'Слева. r — радиус основания, h — высота, l — образующая конуса.' },
+    { id: 'side', icon: ICON.side, name: 'Развёртка боковой поверхности', spec: S.solid === 'cyl' ? 'Прямоугольник 2πr × h.' : S.solid === 'cone' ? 'Сектор радиуса l, длина дуги 2πr.' : 'У сферы её нет: площадь равна площади четырёх больших кругов.' },
+    { id: 'bases', icon: ICON.bases, name: 'Основания', spec: S.solid === 'cyl' ? 'Два круга радиуса r.' : S.solid === 'cone' ? 'Один круг радиуса r.' : 'У шара оснований нет.' }];
+  return [
+    { id: 'cone', icon: ICON.cone, name: 'Конус-ковш', spec: 'Радиус R, высота 2R. Полон воды.' },
+    { id: 'ball', icon: ICON.ball, name: 'Шар-ковш', spec: 'Полый шар радиуса R, полон воды.' },
+    { id: 'cyl', icon: ICON.cyl, name: 'Цилиндр', spec: 'Радиус R, высота 2R. Шар вписан в него точно.' },
+    { id: 'water', icon: ICON.water, name: 'Вода в цилиндре', spec: 'Метки на стенке — 1/3 и 2/3 высоты.' }];
+}
+
+function renderPanes(m) {
+  const Ls = LESSONS[S.lesson], done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Модель</h2><p class="note">Из чего состоит рабочее поле. Нажмите на пункт, чтобы найти его.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const pi = x => fmt(PI * x, 2);
+  if (m.kind === 'poly') {
+    const pr = m.type === 'prism';
+    let h = `<h2>Считаем элементы</h2><div class="formula">В − Р + Г = 2</div><h3>${pr ? 'Призма' : 'Пирамида'}, основание — ${m.n}-угольник</h3><div class="steps">` +
+      step('вершины В', pr ? `2n = 2·${m.n} = ${m.V}` : `n + 1 = ${m.n} + 1 = ${m.V}`) +
+      step('рёбра Р', pr ? `3n = 3·${m.n} = ${m.E}` : `2n = 2·${m.n} = ${m.E}`) +
+      step('грани Г', pr ? `n + 2 = ${m.n} + 2 = ${m.F}` : `n + 1 = ${m.n} + 1 = ${m.F}`) +
+      step('Эйлер: В − Р + Г', `${m.V} − ${m.E} + ${m.F} = ${m.V - m.E + m.F}`, 'sum') + `</div>`;
+    h += `<h3>Откуда формулы</h3><div class="steps">` +
+      (pr ? step('рёбра', `${m.n} внизу + ${m.n} вверху + ${m.n} боковых`) + step('грани', `${m.n} боковых + 2 основания`)
+          : step('рёбра', `${m.n} в основании + ${m.n} боковых`) + step('грани', `${m.n} боковых + 1 основание`)) + `</div>`;
+    h += `<h3>Цель задания</h3><div class="steps">` + step('нужно', 'Г = 8, Р = 18') + step('сейчас', `Г = ${m.F}, Р = ${m.E}`, 'sum') + `</div>`;
+    return h + `<p class="note" style="margin-top:10px">Подсказка без ответа: составьте уравнение по рёбрам для каждого вида тела и проверьте, сходится ли число граней.</p>`;
+  }
+  if (m.kind === 'round') {
+    let h = `<h2>Тело вращения</h2><div class="formula">${{ rect: 'V = πr²h', tri: 'V = ⅓πr²h', semi: 'V = 4/3·πR³' }[m.fig]}</div><h3>Фигура</h3><div class="steps">` +
+      step('фигура', FIGN[m.fig]) + step('поворот', `${Math.round(m.a)}° из 360°`) + step('получится', m.full ? BODYN[m.fig] : 'пока часть тела', 'sum') + `</div>`;
+    if (m.fig === 'rect') h += `<h3>Цилиндр</h3><div class="steps">` + step('осевое сечение', `${trim(2 * m.r, 1)} × ${trim(m.h, 1)}`) + step('V = πr²h', `π·${trim(m.r, 1)}²·${trim(m.h, 1)} ≈ ${fmt(m.V, 1)}`, 'sum') + `</div>`;
+    if (m.fig === 'tri') h += `<h3>Конус</h3><div class="steps">` + step('l² = r² + h²', `${trim(m.r, 1)}² + ${trim(m.h, 1)}² = ${trim(m.r * m.r + m.h * m.h, 2)}`) + step('l', `√${trim(m.r * m.r + m.h * m.h, 2)} ≈ ${fmt(m.l, 2)}`) +
+      step('осевое сечение', `треугольник ${trim(2 * m.r, 1)}, ${fmt(m.l, 2)}, ${fmt(m.l, 2)}`) + step('V = ⅓πr²h', `⅓·π·${trim(m.r, 1)}²·${trim(m.h, 1)} ≈ ${fmt(m.V, 1)}`, 'sum') + `</div>`;
+    if (m.fig === 'semi') h += `<h3>Шар</h3><div class="steps">` + step('радиус', `R = ${trim(m.r, 1)}`) + step('осевое сечение', `большой круг, S = πR² ≈ ${pi(m.r * m.r)}`) + step('V = 4/3·πR³', `≈ ${fmt(m.V, 1)}`, 'sum') + `</div>`;
+    return h + `<p class="note" style="margin-top:10px">Вращаем фигуру вокруг стороны, лежащей на оси. Каждая её точка рисует окружность, радиус которой равен расстоянию от точки до оси.</p>`;
+  }
+  if (m.kind === 'area') {
+    const r = trim(m.r, 1), hh = trim(m.h, 1);
+    if (m.solid === 'cyl') return `<h2>Поверхность цилиндра</h2><div class="formula">S = 2πr(r + h)</div><h3>Развёртка</h3><div class="steps">` +
+      step('ширина = 2πr', `2·π·${r} ≈ ${fmt(2 * PI * m.r, 2)}`) + step('высота', hh) + step('S бок = 2πrh', `2·π·${r}·${hh} ≈ ${fmt(m.Sb, 2)}`) +
+      step('2 основания: 2πr²', `2·π·${r}² ≈ ${fmt(m.Sbase, 2)}`) + step('S полн', `≈ ${fmt(m.Sfull, 2)}`, 'sum') + `</div>`;
+    if (m.solid === 'cone') return `<h2>Поверхность конуса</h2><div class="formula">S = πr(r + l)</div><h3>Образующая</h3><div class="steps">` +
+      step('l = √(r² + h²)', `√(${r}² + ${hh}²) ≈ ${fmt(m.l, 3)}`) + `</div><h3>Развёртка</h3><div class="steps">` +
+      step('дуга сектора = 2πr', `≈ ${fmt(2 * PI * m.r, 2)}`) + step('угол = 360°·r : l', `360·${r} : ${fmt(m.l, 3)} ≈ ${fmt(m.theta, 1)}°`) +
+      step('S бок = πrl', `π·${r}·${fmt(m.l, 3)} ≈ ${fmt(m.Sb, 2)}`) + step('основание πr²', `≈ ${fmt(m.Sbase, 2)}`) + step('S полн', `≈ ${fmt(m.Sfull, 2)}`, 'sum') + `</div>` +
+      `<p class="note" style="margin-top:10px">Угол сектора: дуга 2πr — такая же часть всей окружности 2πl, какую часть угол составляет от 360°.</p>`;
+    return `<h2>Площадь сферы</h2><div class="formula">S = 4πR²</div><div class="steps">` + step('R', r) + step('большой круг πR²', `≈ ${fmt(PI * m.r * m.r, 2)}`) + step('S = 4πR²', `≈ ${fmt(m.Sb, 2)}`, 'sum') + `</div>` +
+      `<p class="note" style="margin-top:10px">Сферу нельзя разложить на плоскости без разрывов и растяжений — поэтому все карты Земли что-то искажают.</p>`;
+  }
+  const R = trim(m.R, 1);
+  let h = `<h2>Объёмы, R = ${R} см</h2><div class="formula">конус : шар : цилиндр = 1 : 2 : 3</div><div class="steps">` +
+    step('цилиндр πR²·2R = 2πR³', `2·π·${R}³ ≈ ${fmt(m.Vcyl, 1)} см³`) +
+    step('конус ⅓πR²·2R = ⅔πR³', `≈ ${fmt(m.Vcone, 1)} см³`) +
+    step('шар 4/3·πR³', `≈ ${fmt(m.Vball, 1)} см³`) + `</div>`;
+  h += `<h3>Что налито</h3><div class="steps">` + step('конусов', m.cones) + step('шаров', m.balls) +
+    step('вода', m.spilled ? 'больше объёма цилиндра — пролилось' : `${fmt(m.Vwater, 1)} см³ = ${m.thirds}/3 цилиндра`, 'sum') + `</div>`;
+  return h + `<p class="note" style="margin-top:10px">То же для многогранников: пирамида заполняет ровно ⅓ призмы с тем же основанием и высотой.</p>`;
+}
+
+function renderMeter(m) {
+  const el = $('#meter'), ok = !!S.done[LID()];
+  if (m.kind === 'poly') el.innerHTML = `<div class="k">${m.type === 'prism' ? 'Призма' : 'Пирамида'}, n = ${m.n}</div><div class="v ${ok ? 'ok' : ''}">Г ${m.F} · Р ${m.E}</div><div class="lr"><span>вершин</span><span>${m.V}</span></div><div class="lr"><span>В−Р+Г</span><span>${m.V - m.E + m.F}</span></div>`;
+  else if (m.kind === 'round') el.innerHTML = `<div class="k">Поворот</div><div class="v ${ok ? 'ok' : ''}">${Math.round(m.a)}°</div><div class="lr"><span>тело</span><span>${m.full ? BODYN[m.fig] : '—'}</span></div><div class="lr"><span>${m.fig === 'tri' ? 'l' : 'r'}</span><span>${m.fig === 'tri' ? fmt(m.l, 2) : trim(m.r, 1)}</span></div>`;
+  else if (m.kind === 'area') el.innerHTML = `<div class="k">${m.solid === 'cone' ? 'Угол сектора' : 'S полн'}</div><div class="v ${ok ? 'ok' : ''}">${m.solid === 'cone' ? fmt(m.theta, 1) + '°' : fmt(m.Sfull, 1)}</div><div class="lr"><span>S бок</span><span>${fmt(m.Sb, 1)}</span></div><div class="lr"><span>${m.solid === 'cone' ? 'l : r' : 'r'}</span><span>${m.solid === 'cone' ? fmt(m.l / m.r, 2) : trim(m.r, 1)}</span></div>`;
+  else el.innerHTML = `<div class="k">Вода в цилиндре</div><div class="v ${ok ? 'ok' : ''}">${m.spilled ? 'пролилось' : m.thirds + '/3'}</div><div class="lr"><span>конусов</span><span>${m.cones}</span></div><div class="lr"><span>шаров</span><span>${m.balls}</span></div>`;
+}
+
+function update() {
+  const m = model(), Ls = LESSONS[S.lesson];
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Архимед бы гордился!'), 700);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  poly: '<path d="M12 11L20 6H34L26 11ZM12 11V25H26V11M26 25L34 20V6" fill="none" stroke="#8b96ad" stroke-width="1.2"/><path d="M40 25L48 5L56 25Z" fill="rgba(183,156,255,.25)" stroke="#b79cff" stroke-width="1.3"/>',
+  round: '<path d="M33 3V28" stroke="#86e0a8" stroke-width="1" stroke-dasharray="3 2"/><path d="M33 24H44L33 7Z" fill="rgba(255,181,71,.35)" stroke="#ffb547" stroke-width="1.3"/><ellipse cx="33" cy="24" rx="11" ry="3.5" fill="none" stroke="#72d4e8" stroke-width="1.1"/>',
+  area: '<path d="M10 24L18 6L26 24" fill="none" stroke="#8b96ad" stroke-width="1.2"/><ellipse cx="18" cy="24" rx="8" ry="2.5" fill="none" stroke="#8b96ad" stroke-width="1.2"/><path d="M46 5L36 20A12 12 0 0 0 56 20Z" fill="rgba(183,156,255,.3)" stroke="#b79cff" stroke-width="1.3"/>',
+  volume: '<path d="M8 8H22L15 24Z" fill="rgba(95,180,217,.5)" stroke="#ffb547" stroke-width="1.2"/><path d="M40 6V24H56V6" fill="none" stroke="#e8ecf4" stroke-width="1.2"/><path d="M40 14H56V24H40Z" fill="rgba(95,180,217,.55)"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Ls, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Ls.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Ls.title}</span></span>
+      ${S.done[Ls.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const Ls = LESSONS[i];
+  S.lesson = i; S.hl = null; ptr = null;
+  resetLesson();
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = Ls.task;
+  $('#hint').textContent = Ls.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const st = $('#lessons'), cur = st.querySelector('.lesson[aria-current="true"]');
+  if (cur) { const sr = st.getBoundingClientRect(), cr = cur.getBoundingClientRect(); st.scrollLeft += (cr.left - sr.left) - (sr.width - cr.width) / 2; }
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = LESSONS[S.lesson], id = Ls.id;
+  let now = '';
+  if (id === 'poly') now = `На экране ${m.type === 'prism' ? 'прямая призма' : 'пирамида'}, основание — правильный ${m.n}-угольник. Вершин ${m.V}, рёбер ${m.E}, граней ${m.F}; В − Р + Г = ${m.V - m.E + m.F}. Ученик переключает призму/пирамиду и число сторон n от 3 до 10.`;
+  if (id === 'round') now = `Фигура «${FIGN[m.fig]}» вращается вокруг оси (своей стороны${m.fig === 'semi' ? ' — диаметра' : ''}). r = ${trim(m.r, 1)}${m.fig === 'semi' ? '' : ', h = ' + trim(m.h, 1)}${m.fig === 'tri' ? ', образующая l ≈ ' + fmt(m.l, 2) : ''}. Повёрнута на ${Math.round(m.a)}° из 360°. ${m.full ? 'Получилось тело: ' + BODYN[m.fig] + ', объём ≈ ' + fmt(m.V, 1) + '.' : 'Тело ещё не замкнулось.'}`;
+  if (id === 'area') now = `Тело: ${SOLIDN[m.solid]}, r = ${trim(m.r, 1)}${m.solid === 'ball' ? '' : ', h = ' + trim(m.h, 1)}. Рядом развёртка. ${m.solid === 'cone' ? `Образующая l ≈ ${fmt(m.l, 2)}, угол сектора развёртки ≈ ${fmt(m.theta, 1)}°. ` : ''}S бок ≈ ${fmt(m.Sb, 2)}, S полн ≈ ${fmt(m.Sfull, 2)}.`;
+  if (id === 'volume') now = `Три тела одного размера (R = ${trim(m.R, 1)} см): конус-ковш (r = R, h = 2R), шар радиуса R и цилиндр (r = R, h = 2R). Ученик наливает воду из конуса и шара в цилиндр. Налито конусов ${m.cones}, шаров ${m.balls}, в цилиндре ${m.thirds}/3 объёма${m.spilled ? ', вода перелилась через край' : ''}.`;
+  return [
+    `Раздел: математика, 11 класс, геометрия, тема «Тела и объёмы». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+    'Не называй готовый ответ (какой многогранник нужен, какая высота конуса, какое отношение l : r, сколько и чего наливать): веди ученика наводящими вопросами и проверяй его рассуждения.',
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = LESSONS[S.lesson], done = S.done[Ls.id];
+  const q = {
+    poly: 'Почему у призмы рёбер в три раза больше, чем сторон основания?',
+    round: 'Какая фигура даст конус и вокруг какой стороны её вращать?',
+    area: 'Почему угол сектора развёртки конуса равен 360° · r : l?',
+    volume: 'Почему объём конуса в три раза меньше объёма цилиндра?',
+  }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
