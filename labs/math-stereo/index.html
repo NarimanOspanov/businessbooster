@@ -1,0 +1,884 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по математике, 10 класс: аксиомы стереометрии и сечения куба, взаимное расположение прямых в пространстве, углы и расстояния.">
+<title>Стереометрия</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG cube in parallel projection) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --violet:#b79cff;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab}
+.scene.grabbing{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.meter .lr .ok{color:var(--ok)}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:22%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+
+.formula{font:500 17px/1.35 var(--font-mono);text-align:center;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px;overflow-wrap:anywhere}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted);flex:none;max-width:45%}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;min-width:0}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 290px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M9 15L22 15L31 9L18 9Z" fill="var(--force)" opacity=".85"/><path d="M9 15V30H22V15M22 30L31 24V9" fill="none" stroke="var(--fg)" stroke-width="2" stroke-linejoin="round"/><path d="M9 30L18 24L31 24M18 24V9" fill="none" stroke="var(--arm)" stroke-width="1.4" stroke-dasharray="2 2"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Математика · Стереометрия</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#math">Карта</a><a href="/physics/#math">Математика</a><a href="./" aria-current="page">Стереометрия</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Стерео</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Рабочее поле">
+    <svg class="scene" id="scene" role="img" aria-label="Рабочее поле: куб ABCDA₁B₁C₁D₁ в параллельной проекции. Куб можно вращать, на нём можно отмечать точки и рёбра."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const trim = (x, n = 3) => fmt(x, n).replace(/,?0+$/, '') || '0';
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d', CY_ = '#72d4e8', VI = '#b79cff', OR = '#ffb547', GR = '#86e0a8', FG = '#e8ecf4', MU = '#8b96ad', RD = '#ff8a73';
+const DEG = Math.PI / 180;
+
+// ---------- 3D vectors ----------
+const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const mul = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const len = a => Math.hypot(a[0], a[1], a[2]);
+const unit = a => mul(a, 1 / (len(a) || 1));
+
+// ---------- the cube ABCDA1B1C1D1 (model units: edge = 2) ----------
+const VP = { A: [0, 0, 0], B: [2, 0, 0], C: [2, 2, 0], D: [0, 2, 0], A1: [0, 0, 2], B1: [2, 0, 2], C1: [2, 2, 2], D1: [0, 2, 2] };
+const VN = Object.keys(VP);
+const nm = k => k.replace('1', '₁');
+const EDGES = [['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'A'], ['A1', 'B1'], ['B1', 'C1'], ['C1', 'D1'], ['D1', 'A1'], ['A', 'A1'], ['B', 'B1'], ['C', 'C1'], ['D', 'D1']];
+const eid = e => e[0] + '-' + e[1];
+const ename = e => nm(e[0]) + nm(e[1]);
+const EBY = Object.fromEntries(EDGES.map(e => [eid(e), e]));
+const FACES = [
+  { n: [0, 0, -1], v: ['A', 'B', 'C', 'D'] }, { n: [0, 0, 1], v: ['A1', 'B1', 'C1', 'D1'] },
+  { n: [0, -1, 0], v: ['A', 'B', 'B1', 'A1'] }, { n: [0, 1, 0], v: ['D', 'C', 'C1', 'D1'] },
+  { n: [-1, 0, 0], v: ['A', 'D', 'D1', 'A1'] }, { n: [1, 0, 0], v: ['B', 'C', 'C1', 'B1'] }];
+FACES.forEach(f => { f.name = f.v.map(nm).join(''); });
+const EFACES = Object.fromEntries(EDGES.map(e => [eid(e), FACES.map((f, i) => f.v.includes(e[0]) && f.v.includes(e[1]) ? i : -1).filter(i => i >= 0)]));
+// points that can be picked in lesson 1: 8 vertices + 12 edge midpoints
+const PTS = {};
+VN.forEach(k => { PTS[k] = { id: k, p: VP[k], name: nm(k), vert: true }; });
+EDGES.forEach(e => { const id = 'm' + eid(e); PTS[id] = { id, p: mul(add(VP[e[0]], VP[e[1]]), 0.5), name: 'сер. ' + ename(e), vert: false }; });
+
+// lesson 2: the fixed line AB and the target edges (perpendicular to AB, no common points)
+function relation(e) {
+  const u1 = VP.A, d1 = sub(VP.B, VP.A), u2 = VP[e[0]], d2 = sub(VP[e[1]], VP[e[0]]);
+  const cr = cross(d1, d2), ang = Math.acos(clamp(Math.abs(dot(d1, d2)) / (len(d1) * len(d2)), 0, 1)) / DEG;
+  let rel;
+  if (len(cr) < 1e-9) rel = len(cross(d1, sub(u2, u1))) < 1e-9 ? 'same' : 'par';
+  else rel = Math.abs(dot(sub(u2, u1), cr)) < 1e-9 ? 'cross' : 'skew';
+  return { rel, ang: Math.round(ang * 100) / 100, d2 };
+}
+const RELN = { same: 'совпадает с AB', par: 'параллельна AB', cross: 'пересекает AB', skew: 'скрещивается с AB' };
+const TARGET2 = EDGES.filter(e => { const r = relation(e); return r.rel === 'skew' && Math.abs(r.ang - 90) < 1e-6; }).map(eid);
+
+// lesson 3: cube with edge 6 cm, M on CC1 (CM = t)
+const EDGE_CM = 6, AC_CM = EDGE_CM * Math.SQRT2;
+const phiOf = t => Math.atan(t / AC_CM) / DEG;
+
+const LESSONS = [
+  { id: 'axioms', title: 'Аксиомы пространства и сечения',
+    text: ['Стереометрия изучает фигуры в пространстве. Основные понятия — точка, прямая и плоскость. Их главные свойства принимают без доказательства — это аксиомы.',
+           'А1: через три точки, не лежащие на одной прямой, проходит плоскость, и притом только одна. А2: если две точки прямой лежат в плоскости, то вся прямая лежит в этой плоскости. А3: если две плоскости имеют общую точку, то они пересекаются по прямой, проходящей через эту точку.',
+           'На аксиомах держится построение сечений. Плоскость режет каждую грань куба по отрезку (А3), а две точки сечения на одной грани соединяют прямой (А2). Сечение куба бывает треугольником, четырёхугольником, пятиугольником или шестиугольником.'],
+    why: 'Инженер-конструктор и технолог по 3D-модели строят сечения детали: так видны толщина стенок и полости. Врач-рентгенолог читает КТ и МРТ — это серии сечений тела плоскостями. Геолог по разрезам видит пласты угля и руды — так в Казахстане ищут месторождения. А штатив фотографа и геодезиста стоит на трёх ногах неспроста: три точки задают одну плоскость, и он не качается.',
+    task: 'Отметьте на кубе три точки так, чтобы плоскость через них дала в сечении правильный шестиугольник.',
+    hint: 'Выбирайте среди середин рёбер. Шестиугольник получится, только если плоскость пересечёт все шесть граней. Если три точки лежат на одной прямой, плоскость не задана.',
+    stage: 'Нажимайте на вершины и середины рёбер. Тащите пустое место — куб вращается.',
+    yaw: -28, pitch: 22,
+    check: m => m.regular6 },
+  { id: 'lines', title: 'Параллельность и перпендикулярность',
+    text: ['Две прямые в пространстве могут пересекаться, быть параллельными или скрещиваться. Параллельные лежат в одной плоскости и не имеют общих точек. Скрещивающиеся не лежат ни в одной общей плоскости: общих точек нет, но и параллельности нет.',
+           'Угол между скрещивающимися прямыми находят переносом: одну прямую сдвигают параллельно, пока она не пересечёт другую. Если этот угол 90°, прямые перпендикулярны — даже когда они не пересекаются.',
+           'Признак перпендикулярности прямой и плоскости: если прямая перпендикулярна двум пересекающимся прямым плоскости, то она перпендикулярна всей плоскости. Ребро AA₁ ⟂ AB и AA₁ ⟂ AD, поэтому AA₁ ⟂ грани ABCD.'],
+    why: 'Строитель и прораб ставят колонны по отвесу — перпендикулярно плоскости перекрытия, иначе стены дадут трещины. Монтажник прокладывает трубы и кабели по скрещивающимся трассам, чтобы они не задевали друг друга. BIM-проектировщик в Астане ищет в 3D-модели здания, где трубы и балки пересекаются, а где скрещиваются, — каждая найденная коллизия экономит стройке миллионы тенге.',
+    task: 'Отметьте все рёбра куба, которые перпендикулярны прямой AB, но не имеют с ней общих точек.',
+    hint: 'Такие рёбра скрещиваются с AB: они не параллельны ей и не пересекают её. Угол проверяйте переносом — сдвиньте ребро параллельно до точки на AB.',
+    stage: 'Нажимайте на рёбра, чтобы отметить их. Тащите пустое место — куб вращается.',
+    yaw: -28, pitch: 22,
+    check: m => m.ok },
+  { id: 'angles', title: 'Углы и расстояния',
+    text: ['Расстояние от точки до плоскости — длина перпендикуляра, опущенного из точки на плоскость. Любая наклонная из той же точки длиннее перпендикуляра.',
+           'Проекция наклонной — отрезок от основания перпендикуляра до основания наклонной. Угол между прямой и плоскостью — это угол между прямой и её проекцией. Теорема о трёх перпендикулярах: прямая в плоскости, перпендикулярная проекции наклонной, перпендикулярна и самой наклонной.',
+           'В кубе MC ⟂ ABCD, значит, AC — проекция наклонной AM, а ∠MAC — угол между AM и основанием. Из прямоугольного треугольника AMC: tg φ = MC : AC, где AC = a√2 — диагональ квадрата.'],
+    why: 'Геодезист находит высоту здания или опоры ЛЭП по углу наклона и расстоянию — это тот же прямоугольный треугольник. Инженер-строитель задаёт уклон пандуса (не круче 1 : 12, около 5°) и кровли. Монтажник солнечных станций на юге Казахстана ставит панели под расчётным углом к горизонту: правильный угол — больше энергии и больше дохода. Пилот заходит на посадку по глиссаде под углом около 3° к плоскости полосы.',
+    task: 'Куб с ребром 6 см. Поставьте точку M на ребре CC₁ так, чтобы прямая AM образовала с плоскостью основания угол 30°.',
+    hint: 'Включите «Проекция»: AC — проекция AM на основание. tg φ = CM : AC, а AC = 6√2 ≈ 8,49 см. Сколько должно быть CM при tg 30° ≈ 0,577?',
+    stage: 'Тащите точку M вдоль ребра CC₁. Тащите пустое место — куб вращается.',
+    yaw: -28, pitch: 22, t: 2,
+    check: m => Math.abs(m.phi - 30) < 0.25 },
+];
+
+const KEY = 'luch-math-stereo';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null,
+            yaw: -28, pitch: 22, sel: [], marked: [], last: null, t: 2, proj: false };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+// ---------- lesson 1: section of the cube by the plane through 3 points ----------
+function classify(P) {
+  const n = P.length, SD = P.map((p, i) => sub(P[(i + 1) % n], p)), L = SD.map(len);
+  const eq = (a, b) => Math.abs(a - b) < 1e-6, par = (a, b) => len(cross(a, b)) < 1e-6;
+  const ang = i => { const a = mul(SD[(i + n - 1) % n], -1), b = SD[i]; return Math.acos(clamp(dot(a, b) / (len(a) * len(b)), -1, 1)) / DEG; };
+  const A = P.map((_, i) => ang(i));
+  const allEq = L.every(l => eq(l, L[0])), rt = A.some(a => Math.abs(a - 90) < 1e-6);
+  if (n === 3) {
+    if (allEq) return 'правильный треугольник';
+    const iso = eq(L[0], L[1]) || eq(L[1], L[2]) || eq(L[0], L[2]);
+    return rt ? (iso ? 'равнобедренный прямоугольный треугольник' : 'прямоугольный треугольник') : iso ? 'равнобедренный треугольник' : 'треугольник';
+  }
+  if (n === 4) {
+    const p1 = par(SD[0], SD[2]), p2 = par(SD[1], SD[3]);
+    if (p1 && p2) return allEq && rt ? 'квадрат' : rt ? 'прямоугольник' : allEq ? 'ромб' : 'параллелограмм';
+    if (p1 || p2) return eq(p1 ? L[1] : L[0], p1 ? L[3] : L[2]) ? 'равнобедренная трапеция' : 'трапеция';
+    return 'четырёхугольник';
+  }
+  if (n === 5) return 'пятиугольник';
+  if (n === 6) return allEq && A.every(a => Math.abs(a - 120) < 1e-6) ? 'правильный шестиугольник' : 'шестиугольник';
+  return n + '-угольник';
+}
+function section(ids) {
+  const ps = ids.map(id => PTS[id].p);
+  if (ps.length < 3) return { k: ps.length };
+  const nr = cross(sub(ps[1], ps[0]), sub(ps[2], ps[0]));
+  if (len(nr) < 1e-9) return { k: 3, col: true };
+  const poly = [], inEdges = [];
+  const sd = q => dot(nr, sub(q, ps[0]));
+  const addp = q => { if (!poly.some(r => len(sub(r, q)) < 1e-6)) poly.push(q); };
+  for (const e of EDGES) {
+    const u = VP[e[0]], v = VP[e[1]], su = sd(u), sv = sd(v), zu = Math.abs(su) < 1e-9, zv = Math.abs(sv) < 1e-9;
+    if (zu && zv) { addp(u); addp(v); inEdges.push(eid(e)); }
+    else if (zu) addp(u);
+    else if (zv) addp(v);
+    else if (su * sv < 0) addp(add(u, mul(sub(v, u), su / (su - sv))));
+  }
+  const c = mul(poly.reduce((a, b) => add(a, b), [0, 0, 0]), 1 / poly.length);
+  const e1 = unit(sub(poly[0], c)), e2 = unit(cross(nr, e1));
+  const an = q => Math.atan2(dot(sub(q, c), e2), dot(sub(q, c), e1));
+  poly.sort((a, b) => an(a) - an(b));
+  const shape = classify(poly);
+  return { k: 3, col: false, nr, poly, inEdges, shape, regular6: shape === 'правильный шестиугольник' };
+}
+// name of a point of the cube surface: vertex, midpoint of an edge or a point on an edge
+function ptName(q) {
+  for (const k of VN) if (len(sub(VP[k], q)) < 1e-6) return nm(k);
+  for (const e of EDGES) {
+    const u = VP[e[0]], v = VP[e[1]], d = sub(v, u), s = dot(sub(q, u), d) / dot(d, d);
+    if (s > 0 && s < 1 && len(sub(add(u, mul(d, s)), q)) < 1e-6) return Math.abs(s - 0.5) < 1e-6 ? 'сер. ' + ename(e) : 'на ' + ename(e);
+  }
+  return 'внутри';
+}
+const faceOf = (p, q) => FACES.find(f => { const ax = f.n.findIndex(x => x !== 0), val = f.n[ax] > 0 ? 2 : 0; return Math.abs(p[ax] - val) < 1e-6 && Math.abs(q[ax] - val) < 1e-6; });
+const lenA = l => { const r = l / 2; return Math.abs(r - Math.round(r)) < 1e-6 ? (Math.round(r) === 1 ? 'a' : Math.round(r) + 'a') : '≈ ' + fmt(r, 2) + 'a'; };
+
+function model() {
+  const id = LID();
+  if (id === 'axioms') {
+    const s = section(S.sel);
+    return { kind: id, sel: S.sel.slice(), ...s, regular6: !!s.regular6 };
+  }
+  if (id === 'lines') {
+    const set = new Set(S.marked), ok = set.size === TARGET2.length && TARGET2.every(k => set.has(k));
+    const right = S.marked.filter(k => TARGET2.includes(k)).length;
+    return { kind: id, marked: S.marked.slice(), last: S.last, lr: S.last ? relation(EBY[S.last]) : null, ok, right, wrong: S.marked.length - right };
+  }
+  const t = S.t, phi = phiOf(t);
+  return { kind: id, t, phi, tg: t / AC_CM, AM: Math.hypot(AC_CM, t), MB: Math.hypot(EDGE_CM, t), proj: S.proj };
+}
+
+// ---------- projection (parallel, like in a school drawing) ----------
+const K = 82, CX = 260, CY = 214;
+let VW = null;
+function view() {
+  const y = S.yaw * DEG, p = S.pitch * DEG;
+  VW = { c: Math.cos(y), s: Math.sin(y), cp: Math.cos(p), sp: Math.sin(p) };
+}
+function P(q) {
+  const x = q[0] - 1, y = q[1] - 1, z = q[2] - 1;
+  const u = x * VW.c - y * VW.s, v = x * VW.s + y * VW.c;
+  return { x: CX + u * K, y: CY - (v * VW.sp + z * VW.cp) * K, d: -v * VW.cp + z * VW.sp };
+}
+const front = f => { const v = f.n[0] * VW.s + f.n[1] * VW.c; return -v * VW.cp + f.n[2] * VW.sp > 1e-9; };
+const T = (x, y, s, txt, fill = MU, anchor = 'middle', extra = '') => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${s}" fill="${fill}" text-anchor="${anchor}" ${extra}>${txt}</text>`;
+const seg = (a, b, col, w = 1.6, extra = '') => { const A = P(a), B = P(b); return `<path d="M${A.x.toFixed(1)} ${A.y.toFixed(1)}L${B.x.toFixed(1)} ${B.y.toFixed(1)}" stroke="${col}" stroke-width="${w}" stroke-linecap="round" ${extra}/>`; };
+const segInk = (a, b, col, w) => seg(a, b, INK, w + 2.6) + seg(a, b, col, w);
+const dot2 = (q, col, r = 4.5, sw = 2) => { const A = P(q); return `<circle cx="${A.x.toFixed(1)}" cy="${A.y.toFixed(1)}" r="${r}" fill="${col}" stroke="${INK}" stroke-width="${sw}"/>`; };
+function labelAt(q, txt, col, size = 12.5, dist = 15) {
+  const A = P(q), dx = A.x - CX, dy = A.y - CY, L = Math.hypot(dx, dy) || 1;
+  return T(A.x + dx / L * dist, A.y + dy / L * dist + 4, size, txt, col, 'middle', 'font-weight="500"');
+}
+function backdrop() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.05)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+// cube: front faces tinted, hidden edges dashed
+function cubeSVG(opt = {}) {
+  let h = '';
+  const fr = FACES.map(front);
+  FACES.forEach((f, i) => { if (!fr[i]) return; const pts = f.v.map(k => P(VP[k])); h += `<path d="M${pts.map(p => p.x.toFixed(1) + ' ' + p.y.toFixed(1)).join('L')}Z" fill="rgba(114,212,232,.045)"/>`; });
+  const vis = e => EFACES[eid(e)].some(i => fr[i]);
+  EDGES.forEach(e => { if (!vis(e) && !(opt.skip && opt.skip.has(eid(e)))) h += seg(VP[e[0]], VP[e[1]], MU, 1.3, 'stroke-dasharray="5 4" opacity=".75"'); });
+  h += opt.mid || '';
+  EDGES.forEach(e => { if (vis(e) && !(opt.skip && opt.skip.has(eid(e)))) h += seg(VP[e[0]], VP[e[1]], INK, 4.6) + seg(VP[e[0]], VP[e[1]], '#c3cbdb', 2); });
+  return h;
+}
+function vLabels(col = FG) { return VN.map(k => labelAt(VP[k], nm(k), col)).join(''); }
+
+// ---------- lesson drawings ----------
+function axiomsSVG(m) {
+  let mid = '';
+  if (m.poly) {
+    const col = m.regular6 ? GR : OR, pts = m.poly.map(P);
+    mid += `<path d="M${pts.map(p => p.x.toFixed(1) + ' ' + p.y.toFixed(1)).join('L')}Z" fill="${m.regular6 ? 'rgba(134,224,168,.2)' : 'rgba(255,181,71,.18)'}" stroke="${col}" stroke-width="2.4" stroke-linejoin="round"/>`;
+  }
+  let h = cubeSVG({ mid });
+  if (m.inEdges) m.inEdges.forEach(k => { const e = EBY[k]; h += segInk(VP[e[0]], VP[e[1]], GR, 2.6); });
+  if (m.poly) m.poly.forEach(q => { if (!S.sel.some(id => len(sub(PTS[id].p, q)) < 1e-6)) h += dot2(q, m.regular6 ? GR : OR, 3.6, 1.6); });
+  Object.values(PTS).forEach(pt => { if (!S.sel.includes(pt.id)) h += dot2(pt.p, pt.vert ? '#c3cbdb' : '#5d6b86', pt.vert ? 4 : 3.4, 1.6); });
+  if (m.col) for (let i = 0; i < 3; i++) for (let j = i + 1; j < 3; j++) {
+    const a = PTS[S.sel[i]].p, b = PTS[S.sel[j]].p, d = sub(b, a);
+    h += seg(sub(a, mul(d, 3)), add(b, mul(d, 3)), RD, 1.6, 'stroke-dasharray="6 4"');
+  }
+  S.sel.forEach((id, i) => {
+    const q = P(PTS[id].p);
+    h += `<circle cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="11" fill="none" stroke="${OR}" stroke-width="1.2" opacity=".6"/>` + dot2(PTS[id].p, OR, 6.5, 2) + T(q.x, q.y + 3.5, 9, i + 1, '#0b1019', 'middle', 'font-weight="600"');
+  });
+  h += vLabels();
+  const cap = m.k < 3 ? `отмечено точек: ${m.k} из 3` : m.col ? 'точки на одной прямой — плоскость не задана' : `сечение: ${m.shape}`;
+  h += T(CX, 398, 12, cap, m.regular6 ? GR : m.col ? RD : FG, 'middle', 'font-weight="500"');
+  return h;
+}
+function linesSVG(m) {
+  const skip = new Set(['A-B', ...m.marked]);
+  let h = cubeSVG({ skip });
+  const fr = FACES.map(front);
+  m.marked.forEach(k => { const e = EBY[k], vis = EFACES[k].some(i => fr[i]); h += vis ? segInk(VP[e[0]], VP[e[1]], VI, 3) : seg(VP[e[0]], VP[e[1]], VI, 2.6, 'stroke-dasharray="6 4"'); });
+  if (m.last) {  // parallel transfer of the last edge to point A or B (shows the angle)
+    const e = EBY[m.last], d = sub(VP[e[1]], VP[e[0]]), r = m.lr;
+    if (r.rel === 'skew') {
+      const base = len(cross(sub(VP[e[0]], VP.A), d)) <= len(cross(sub(VP[e[0]], VP.B), d)) ? 'A' : 'B';
+      const from = VP[base], to = add(from, d);
+      h += seg(from, to, VI, 1.6, 'stroke-dasharray="3 3" opacity=".85"') + dot2(to, VI, 3, 1.4);
+    }
+  }
+  h += segInk(VP.A, VP.B, OR, 3.6) + labelAt(mul(add(VP.A, VP.B), 0.5), 'AB', OR, 12, 18);
+  h += vLabels();
+  const cap = m.last ? `${ename(EBY[m.last])}: ${RELN[m.lr.rel]}, угол ${trim(m.lr.ang, 1)}°` : 'нажмите на ребро';
+  h += T(CX, 398, 12, cap, FG, 'middle', 'font-weight="500"');
+  return h;
+}
+const Mpt = t => [2, 2, t / EDGE_CM * 2];
+function anglesSVG(m) {
+  const M = Mpt(m.t), ok = !!S.done.angles || Math.abs(m.phi - 30) < 0.25;
+  let h = cubeSVG();
+  h += labelAt(mul(add(VP.A, VP.B), 0.5), '6 см', MU, 10.5, 16);
+  if (m.proj) {
+    h += segInk(VP.A, VP.C, CY_, 2.2) + segInk(VP.C, M, GR, 2.6) + seg(VP.B, M, VI, 1.4, 'stroke-dasharray="4 3"');
+    // right angle at C (between CA and CM) and at B (between BA and BM)
+    const ra = (o, a, b) => { const s = 0.22, u = mul(unit(sub(a, o)), s), w = mul(unit(sub(b, o)), s); const p1 = P(add(o, u)), p2 = P(add(add(o, u), w)), p3 = P(add(o, w)); return `<path d="M${p1.x.toFixed(1)} ${p1.y.toFixed(1)}L${p2.x.toFixed(1)} ${p2.y.toFixed(1)}L${p3.x.toFixed(1)} ${p3.y.toFixed(1)}" fill="none" stroke="${FG}" stroke-width="1.2"/>`; };
+    if (m.t > 0.3) h += ra(VP.C, VP.A, M) + ra(VP.B, VP.A, M);
+    // angle arc at A in the plane ACC1A1
+    const eAC = unit(sub(VP.C, VP.A)), r = 0.55;
+    let d = '';
+    for (let i = 0; i <= 16; i++) { const th = m.phi * DEG * i / 16, q = P(add(VP.A, add(mul(eAC, r * Math.cos(th)), [0, 0, r * Math.sin(th)]))); d += (i ? 'L' : 'M') + q.x.toFixed(1) + ' ' + q.y.toFixed(1); }
+    h += `<path d="${d}" fill="none" stroke="${OR}" stroke-width="1.8"/>`;
+    const th = m.phi * DEG / 2, q = P(add(VP.A, add(mul(eAC, 0.85 * Math.cos(th)), [0, 0, 0.85 * Math.sin(th)])));
+    h += T(q.x + 4, q.y + 4, 11.5, 'φ', OR, 'middle', 'font-weight="600"');
+  }
+  h += segInk(VP.A, M, ok ? GR : OR, 2.8);
+  h += seg(VP.C, VP.C1, 'rgba(255,181,71,.35)', 9);  // track of M
+  const q = P(M);
+  h += `<circle cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="18" fill="transparent"/><circle cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="11" fill="none" stroke="${OR}" stroke-width="1" opacity=".55"/>` + dot2(M, OR, 7, 2);
+  h += T(q.x + 16, q.y + 4, 12.5, 'M', OR, 'start', 'font-weight="600"');
+  h += vLabels();
+  h += T(CX, 398, 12, `CM = ${fmt(m.t, 1)} см · φ = ${fmt(m.phi, 1)}°`, ok ? GR : FG, 'middle', 'font-weight="500"');
+  return h;
+}
+
+function bboxPts(pts, pad = 14) {
+  const ps = pts.map(P), xs = ps.map(p => p.x), ys = ps.map(p => p.y);
+  const x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad;
+  return [x0, y0, Math.max(...xs) + pad - x0, Math.max(...ys) + pad - y0];
+}
+function hlBox(id) {
+  const allV = VN.map(k => VP[k]), M = Mpt(S.t);
+  const B = {
+    cube: () => bboxPts(allV, 20), verts: () => bboxPts(allV, 24),
+    mids: () => bboxPts(Object.values(PTS).filter(p => !p.vert).map(p => p.p), 12),
+    sel: () => S.sel.length ? bboxPts(S.sel.map(k => PTS[k].p), 18) : null,
+    sect: () => { const s = section(S.sel); return s.poly ? bboxPts(s.poly) : null; },
+    hidden: () => { const fr = FACES.map(front), hid = EDGES.filter(e => !EFACES[eid(e)].some(i => fr[i])); return hid.length ? bboxPts(hid.flatMap(e => [VP[e[0]], VP[e[1]]])) : null; },
+    ab: () => bboxPts([VP.A, VP.B]),
+    marked: () => S.marked.length ? bboxPts(S.marked.flatMap(k => [VP[EBY[k][0]], VP[EBY[k][1]]])) : null,
+    mpt: () => bboxPts([M], 18), cc: () => bboxPts([VP.C, VP.C1]), am: () => bboxPts([VP.A, M]),
+    ac: () => bboxPts([VP.A, VP.C]), mc: () => bboxPts([VP.C, M]), phi: () => bboxPts([VP.A], 30), mb: () => bboxPts([VP.B, M]),
+  };
+  return B[id] ? B[id]() : null;
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  view();
+  const id = LID(), m = model();
+  let h = backdrop();
+  h += id === 'axioms' ? axiomsSVG(m) : id === 'lines' ? linesSVG(m) : anglesSVG(m);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b && b[2] > 0) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VBOX = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 360, hh / 410, 1.7);
+  VBOX = { w: w / s, h: hh / s }; VBOX.x = 260 - VBOX.w / 2; VBOX.y = 408 - VBOX.h;
+  scene.setAttribute('viewBox', `${VBOX.x.toFixed(1)} ${VBOX.y.toFixed(1)} ${VBOX.w.toFixed(1)} ${VBOX.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- state changes ----------
+function pickPoint(id) {
+  const i = S.sel.indexOf(id);
+  if (i >= 0) S.sel.splice(i, 1);
+  else { S.sel.push(id); if (S.sel.length > 3) S.sel.shift(); }
+  update();
+}
+function toggleEdge(k) {
+  if (k === 'A-B') { toast('AB — данная прямая. Отмечайте другие рёбра.'); return; }
+  const i = S.marked.indexOf(k);
+  if (i >= 0) { S.marked.splice(i, 1); S.last = k; }
+  else { S.marked.push(k); S.last = k; }
+  update();
+}
+function setT(t) { t = clamp(Math.round(t * 10) / 10, 0, EDGE_CM); if (t !== S.t) { S.t = t; update(); } }
+function setView(yaw, pitch) {
+  S.yaw = ((yaw + 540) % 360) - 180; S.pitch = clamp(pitch, 5, 75);
+  dirty = true; updateScheme();
+}
+
+// ---------- pointer: drag empty space rotates, tap picks ----------
+let ptr = null, dirty = true;
+const toSvg = e => { const p = scene.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; const c = scene.getScreenCTM(); return c ? p.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+function segDist(p, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy || 1, s = clamp(((p.x - a.x) * dx + (p.y - a.y) * dy) / L2, 0, 1);
+  return { d: Math.hypot(p.x - a.x - s * dx, p.y - a.y - s * dy), s };
+}
+function nearM(p) {
+  view();
+  const q = P(Mpt(S.t));
+  return Math.hypot(p.x - q.x, p.y - q.y) < 24 || segDist(p, P(VP.C), P(VP.C1)).d < 12;
+}
+function dragM(p) { setT(segDist(p, P(VP.C), P(VP.C1)).s * EDGE_CM); }
+function tap(p) {
+  view();
+  const id = LID();
+  if (id === 'axioms') {
+    let best = null, bs = Infinity;
+    for (const pt of Object.values(PTS)) { const q = P(pt.p), d = Math.hypot(p.x - q.x, p.y - q.y), sc = d - q.d * 2; if (d < 20 && sc < bs) { bs = sc; best = pt.id; } }
+    if (best) pickPoint(best);
+  } else if (id === 'lines') {
+    let best = null, bs = 14;
+    for (const e of EDGES) { const r = segDist(p, P(VP[e[0]]), P(VP[e[1]])); if (r.d < bs) { bs = r.d; best = eid(e); } }
+    if (best) toggleEdge(best);
+  }
+}
+scene.addEventListener('pointerdown', e => {
+  const p = toSvg(e);
+  e.preventDefault(); try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  if (LID() === 'angles' && nearM(p)) { ptr = { mode: 'M' }; dragM(p); return; }
+  ptr = { mode: 'rot', cx: e.clientX, cy: e.clientY, p, yaw: S.yaw, pitch: S.pitch, moved: false };
+});
+scene.addEventListener('pointermove', e => {
+  if (!ptr) return;
+  if (ptr.mode === 'M') { dragM(toSvg(e)); return; }
+  const dx = e.clientX - ptr.cx, dy = e.clientY - ptr.cy;
+  if (!ptr.moved && Math.abs(dx) + Math.abs(dy) > 6) ptr.moved = true;
+  if (ptr.moved) setView(ptr.yaw - dx * 0.45, ptr.pitch + dy * 0.35);
+});
+const endPtr = e => {
+  if (!ptr) return;
+  const was = ptr; ptr = null; scene.classList.remove('grabbing'); dirty = true;
+  if (e.type === 'pointerup' && was.mode === 'rot' && !was.moved) tap(was.p);
+};
+scene.addEventListener('pointerup', endPtr);
+scene.addEventListener('pointercancel', endPtr);
+
+function loop(t) {
+  requestAnimationFrame(loop);
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2800); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed === undefined ? '' : ` aria-pressed="${pressed}"`}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  const rot = B('rl', '⟲ 15°') + B('rr', '⟳ 15°') + B('view', 'Вид');
+  tb.innerHTML = {
+    axioms: rot + sep + B('clear', 'Очистить'),
+    lines: rot + sep + B('clear', 'Снять отметки'),
+    angles: B('proj', 'Проекция', S.proj) + B('t-', 'M −0,1') + B('t+', 'M +0,1') + sep + rot,
+  }[id];
+}
+function resetLesson() {
+  const Ls = LESSONS[S.lesson];
+  S.yaw = Ls.yaw; S.pitch = Ls.pitch; S.sel = []; S.marked = []; S.last = null; S.proj = false;
+  if (Ls.t !== undefined) S.t = Ls.t;
+}
+function act(a) {
+  if (a === 'rl' || a === 'rr') { setView(S.yaw + (a === 'rl' ? -15 : 15), S.pitch); return; }
+  if (a === 'view') { const Ls = LESSONS[S.lesson]; setView(Ls.yaw, Ls.pitch); return; }
+  if (a === 'clear') { S.sel = []; S.marked = []; S.last = null; update(); return; }
+  if (a === 'proj') { S.proj = !S.proj; renderTools(); update(); if (S.proj) toast('MC — перпендикуляр, AC — проекция, ∠MAC = φ.'); return; }
+  if (a === 't-' || a === 't+') setT(S.t + (a === 't-' ? -0.1 : 0.1));
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const CUBE_I = (c = 'var(--fg)') => `<path d="M5 12H21V28H5ZM5 12L13 6H29L21 12M29 6V22L21 28" fill="none" stroke="${c}" stroke-width="1.4" stroke-linejoin="round"/>`;
+const ICON = {
+  cube: IC(CUBE_I()),
+  verts: IC(CUBE_I('var(--line)') + '<circle cx="5" cy="12" r="2.4" fill="var(--fg)"/><circle cx="21" cy="28" r="2.4" fill="var(--fg)"/><circle cx="29" cy="6" r="2.4" fill="var(--fg)"/>'),
+  mids: IC(CUBE_I('var(--line)') + '<circle cx="13" cy="12" r="2.2" fill="var(--muted)"/><circle cx="21" cy="20" r="2.2" fill="var(--muted)"/><circle cx="25" cy="25" r="2.2" fill="var(--muted)"/>'),
+  sel: IC('<circle cx="10" cy="22" r="4" fill="var(--force)"/><circle cx="24" cy="24" r="4" fill="var(--force)"/><circle cx="18" cy="9" r="4" fill="var(--force)"/>'),
+  sect: IC(CUBE_I('var(--line)') + '<path d="M13 12L21 17L25 25L17 28L5 22L5 16Z" fill="rgba(134,224,168,.3)" stroke="var(--ok)" stroke-width="1.6"/>'),
+  hidden: IC('<path d="M5 28L13 22H29M13 22V6" fill="none" stroke="var(--muted)" stroke-width="1.4" stroke-dasharray="3 2"/>'),
+  ab: IC(CUBE_I('var(--line)') + '<path d="M5 28H21" stroke="var(--force)" stroke-width="3"/>'),
+  marked: IC(CUBE_I('var(--line)') + '<path d="M29 6V22M13 6H29" stroke="var(--violet)" stroke-width="3"/>'),
+  mpt: IC('<path d="M24 4V30" stroke="var(--line)" stroke-width="5"/><circle cx="24" cy="14" r="4.5" fill="var(--force)"/>'),
+  cc: IC('<path d="M17 4V30" stroke="var(--fg)" stroke-width="2"/><circle cx="17" cy="30" r="2.4" fill="var(--fg)"/><circle cx="17" cy="4" r="2.4" fill="var(--fg)"/>'),
+  am: IC('<path d="M4 28L30 8" stroke="var(--force)" stroke-width="2.4"/>'),
+  ac: IC('<path d="M4 28H30" stroke="var(--arm)" stroke-width="2.4"/><path d="M4 28L30 8" stroke="var(--line)" stroke-width="1.4"/>'),
+  mc: IC('<path d="M28 28V8" stroke="var(--ok)" stroke-width="2.4"/><path d="M4 28H28M23 28V23H28" stroke="var(--muted)" stroke-width="1.2" fill="none"/>'),
+  phi: IC('<path d="M4 28H30M4 28L28 12" stroke="var(--fg)" stroke-width="1.4"/><path d="M16 28A12 12 0 0 0 14 21.5" fill="none" stroke="var(--force)" stroke-width="2"/>'),
+  mb: IC('<path d="M6 28L28 8" stroke="var(--violet)" stroke-width="2" stroke-dasharray="3 2"/><path d="M6 28H28" stroke="var(--muted)" stroke-width="1.2"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const Ls = LESSONS[S.lesson];
+  if (S.done[Ls.id]) return '✓ Выполнено';
+  if (m.kind === 'axioms') return m.k < 3 ? `отмечено точек: ${m.k}/3` : m.col ? 'точки на одной прямой' : `сечение: ${m.shape}`;
+  if (m.kind === 'lines') return `отмечено рёбер: ${m.marked.length}`;
+  return `CM = ${fmt(m.t, 1)} см · φ = ${fmt(m.phi, 1)}°`;
+}
+
+// ---------- Scheme tab ----------
+function ctlSpec() {
+  const id = LID();
+  const v = [['sYaw', 'Поворот вокруг вертикали, °', -180, 180, 1, () => Math.round(S.yaw), x => setView(x, S.pitch)],
+             ['sPitch', 'Наклон взгляда сверху, °', 5, 75, 1, () => Math.round(S.pitch), x => setView(S.yaw, x)]];
+  if (id === 'angles') return [['sT', 'CM, см', 0, EDGE_CM, 0.1, () => S.t, x => setT(x)], ...v];
+  return v;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  const title = { axioms: 'Плоскость через три точки', lines: 'Рёбра и прямая AB', angles: 'Наклонная AM' }[id];
+  const heads = { axioms: ['Точек', 'Сторон', 'Фигура'], lines: ['Отмечено', 'Последнее', 'Угол'], angles: ['CM', 'φ', 'AM'] }[id];
+  el.innerHTML = `<h2>${title}</h2><dl class="reads">${heads.map((t, i) => `<div><dt>${t}</dt><dd id="r${i + 1}"></dd></div>`).join('')}</dl>` +
+    ctlSpec().map(([sid, label, mn, mx, st, get]) => `<div class="ctl"><label for="${sid}">${label} <output id="${sid}O"></output></label><input type="range" id="${sid}" min="${mn}" max="${mx}" step="${st}" value="${get()}"></div>`).join('') +
+    `<p class="note" style="margin-top:12px">${id === 'angles' ? 'Ползунок CM делает то же, что перетаскивание точки M. ' : ''}Повернуть куб можно и пальцем: тащите пустое место на рабочем поле.</p>`;
+  ctlSpec().forEach(([sid, , , , , , set]) => el.querySelector('#' + sid).addEventListener('input', e => set(+e.target.value)));
+  updateScheme();
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  m = m || model();
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; };
+  ctlSpec().forEach(([sid, , , , st, get]) => { const x = el.querySelector('#' + sid); if (!x) return; set('#' + sid + 'O', st < 1 ? fmt(get(), 1) : trim(get(), 0)); if (document.activeElement !== x) x.value = get(); });
+  if (m.kind === 'axioms') { set('#r1', m.k); set('#r2', m.poly ? m.poly.length : '—'); set('#r3', m.poly ? m.shape : m.col ? 'нет плоскости' : '—'); }
+  else if (m.kind === 'lines') { set('#r1', m.marked.length); set('#r2', m.last ? ename(EBY[m.last]) : '—'); set('#r3', m.lr ? trim(m.lr.ang, 1) + '°' : '—'); }
+  else { set('#r1', fmt(m.t, 1) + ' см'); set('#r2', fmt(m.phi, 1) + '°'); set('#r3', fmt(m.AM, 2) + ' см'); }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'axioms') return [
+    { id: 'cube', icon: ICON.cube, name: 'Куб ABCDA₁B₁C₁D₁', spec: 'Нижнее основание ABCD, верхнее A₁B₁C₁D₁. Вращайте его, чтобы увидеть со всех сторон.' },
+    { id: 'verts', icon: ICON.verts, name: 'Вершины', spec: '8 точек, которые можно отмечать.' },
+    { id: 'mids', icon: ICON.mids, name: 'Середины рёбер', spec: '12 маленьких точек — их тоже можно отмечать.' },
+    { id: 'sel', icon: ICON.sel, name: 'Отмеченные точки 1, 2, 3', spec: 'Задают плоскость (А1). Четвёртая точка заменяет самую старую.' },
+    { id: 'sect', icon: ICON.sect, name: 'Сечение', spec: 'Многоугольник, по которому плоскость режет куб. Каждая сторона лежит в своей грани.' },
+    { id: 'hidden', icon: ICON.hidden, name: 'Невидимые рёбра', spec: 'Рисуются пунктиром — так принято в стереометрии.' }];
+  if (id === 'lines') return [
+    { id: 'ab', icon: ICON.ab, name: 'Прямая AB', spec: 'Данная прямая. С ней сравнивают все остальные рёбра.' },
+    { id: 'marked', icon: ICON.marked, name: 'Отмеченные рёбра', spec: 'Фиолетовые. Нажмите ещё раз, чтобы снять отметку.' },
+    { id: 'cube', icon: ICON.cube, name: 'Рёбра куба', spec: '12 рёбер: каждое либо параллельно AB, либо пересекает её, либо скрещивается с ней.' },
+    { id: 'hidden', icon: ICON.hidden, name: 'Перенос и невидимые рёбра', spec: 'Тонкий фиолетовый пунктир — скрещивающееся ребро, перенесённое к AB, чтобы увидеть угол.' }];
+  return [
+    { id: 'mpt', icon: ICON.mpt, name: 'Точка M', spec: 'Скользит по ребру CC₁ от C (CM = 0) до C₁ (CM = 6 см).' },
+    { id: 'cc', icon: ICON.cc, name: 'Ребро CC₁', spec: 'Перпендикулярно основанию ABCD.' },
+    { id: 'am', icon: ICON.am, name: 'Наклонная AM', spec: 'Её угол с основанием нужно сделать 30°.' },
+    { id: 'ac', icon: ICON.ac, name: 'Проекция AC', spec: 'Диагональ основания: AC = 6√2 ≈ 8,49 см. Видна в режиме «Проекция».' },
+    { id: 'mc', icon: ICON.mc, name: 'Перпендикуляр MC', spec: 'Расстояние от M до плоскости основания.' },
+    { id: 'phi', icon: ICON.phi, name: 'Угол φ = ∠MAC', spec: 'Угол между прямой AM и плоскостью основания.' },
+    { id: 'mb', icon: ICON.mb, name: 'Отрезок MB', spec: 'По теореме о трёх перпендикулярах MB ⟂ AB: это расстояние от M до прямой AB.' }];
+}
+
+function renderPanes(m) {
+  const Ls = LESSONS[S.lesson], done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Модель</h2><p class="note">Из чего состоит рабочее поле. Нажмите на пункт, чтобы найти его.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  if (m.kind === 'axioms') {
+    let h = `<h2>Построение сечения</h2><div class="formula">3 точки не на одной прямой → 1 плоскость</div><h3>Шаг 1. Точки</h3><div class="steps">` +
+      (m.sel.length ? m.sel.map((id, i) => step('точка ' + (i + 1), PTS[id].name)).join('') : step('точки', 'ещё не отмечены'));
+    if (m.k < 3) return h + `</div><p class="note" style="margin-top:10px">Нужны три точки. Две точки задают только прямую: через неё проходит бесконечно много плоскостей.</p>`;
+    if (m.col) return h + step('на одной прямой?', 'да', 'sum') + `</div><p class="note" style="margin-top:10px">Через прямую проходит бесконечно много плоскостей, поэтому сечение не определено. Замените одну точку.</p>`;
+    h += step('на одной прямой?', 'нет → плоскость единственна (А1)', 'sum') + `</div>`;
+    const n = m.poly.length;
+    h += `<h3>Шаг 2. Стороны сечения по граням</h3><div class="steps">` +
+      m.poly.map((p, i) => { const q = m.poly[(i + 1) % n], f = faceOf(p, q); return step(`${ptName(p)} — ${ptName(q)}`, `в грани ${f ? f.name : '?'}, ${lenA(len(sub(q, p)))}`); }).join('') + `</div>`;
+    if (m.inEdges.length) h += `<p class="note" style="margin-top:10px">Рёбра ${m.inEdges.map(k => ename(EBY[k])).join(', ')} целиком лежат в плоскости: две их точки в ней (А2).</p>`;
+    h += `<h3>Шаг 3. Итог</h3><div class="steps">` + step('граней пересечено', n) + step('сечение', m.shape, 'sum') + `</div>`;
+    return h + `<p class="note" style="margin-top:10px">a — ребро куба. Число сторон сечения равно числу граней, которые пересекает плоскость: от 3 до 6.</p>`;
+  }
+  if (m.kind === 'lines') {
+    let h = `<h2>Прямые в пространстве</h2><div class="formula">cos φ = |a·b| : (|a|·|b|)</div>`;
+    if (!m.last) h += `<p class="note">Нажмите на ребро — здесь появится разбор: как оно расположено относительно AB и какой угол между ними.</p>`;
+    else {
+      const e = EBY[m.last], r = m.lr, d = r.d2.map(x => x / 2), shared = e.includes('A') || e.includes('B');
+      const dv = `(${d.map(x => trim(x, 0)).join('; ')})`;
+      h += `<h3>${ename(e)} и AB</h3><div class="steps">` +
+        step('направление AB', '(1; 0; 0)') + step('направление ' + ename(e), dv) +
+        step('параллельны?', r.rel === 'par' ? 'да: направления коллинеарны' : 'нет') +
+        (r.rel !== 'par' ? step('общая точка?', shared ? `да: ${nm(e.includes('A') ? 'A' : 'B')}` : 'нет') : '') +
+        (r.rel === 'skew' ? step('одна плоскость?', 'нет → скрещиваются') : '') +
+        step('вывод', RELN[r.rel], 'sum') + `</div>`;
+      h += `<h3>Угол</h3><div class="steps">` +
+        step('a·b', `1·${trim(d[0], 0)} + 0·${trim(d[1], 0)} + 0·${trim(d[2], 0)} = ${trim(d[0], 0)}`) +
+        step('cos φ', `|${trim(d[0], 0)}| : (1·1) = ${trim(Math.abs(d[0]), 0)}`) + step('φ', trim(r.ang, 1) + '°', 'sum') + `</div>`;
+    }
+    h += `<h3>Ваш выбор</h3><div class="steps">` + step('отмечено рёбер', m.marked.length ? m.marked.map(k => ename(EBY[k])).join(', ') : '—') + `</div>`;
+    return h + `<p class="note" style="margin-top:10px">Координаты в единицах ребра: A(0; 0; 0), B(1; 0; 0), D(0; 1; 0), A₁(0; 0; 1). Для угла между прямыми берут модуль скалярного произведения: угол не больше 90°.</p>`;
+  }
+  const tg30 = Math.tan(30 * DEG);
+  let h = `<h2>Угол между прямой и плоскостью</h2><div class="formula">tg φ = MC : AC</div><h3>Треугольник AMC (∠C = 90°)</h3><div class="steps">` +
+    step('AC = a√2', `6·√2 ≈ ${fmt(AC_CM, 2)} см`) + step('MC = CM', `${fmt(m.t, 1)} см`) +
+    step('tg φ = MC : AC', `${fmt(m.t, 1)} : ${fmt(AC_CM, 2)} ≈ ${fmt(m.tg, 3)}`) +
+    step('φ', `≈ ${fmt(m.phi, 1)}°`, 'sum') + `</div>`;
+  h += `<h3>Сравнение с 30°</h3><div class="steps">` + step('tg 30° = 1 : √3', `≈ ${fmt(tg30, 3)}`) +
+    step('сейчас', m.tg < tg30 - 0.004 ? 'угол меньше 30° — поднимите M' : m.tg > tg30 + 0.004 ? 'угол больше 30° — опустите M' : 'угол 30° ✓', 'sum') + `</div>`;
+  h += `<h3>Расстояния от M</h3><div class="steps">` +
+    step('до плоскости ABCD', `MC = ${fmt(m.t, 1)} см`) +
+    step('AM = √(AC² + MC²)', `√(72 + ${fmt(m.t * m.t, 2)}) ≈ ${fmt(m.AM, 2)} см`) +
+    step('до прямой AB: MB', `√(6² + ${fmt(m.t, 1)}²) ≈ ${fmt(m.MB, 2)} см`, 'sum') + `</div>`;
+  return h + `<p class="note" style="margin-top:10px">Почему MB — расстояние до AB: CB ⟂ AB, а CB — проекция MB. По теореме о трёх перпендикулярах MB ⟂ AB.</p>`;
+}
+
+function renderMeter(m) {
+  const el = $('#meter'), ok = !!S.done[LID()];
+  if (m.kind === 'axioms') el.innerHTML = `<div class="k">Сечение</div><div class="v ${m.regular6 ? 'ok' : ''}">${m.poly ? m.shape : m.col ? 'нет плоскости' : '—'}</div><div class="lr"><span>точек</span><span>${m.k}/3</span></div><div class="lr"><span>сторон</span><span>${m.poly ? m.poly.length : '—'}</span></div>`;
+  else if (m.kind === 'lines') el.innerHTML = `<div class="k">Последнее ребро</div><div class="v ${ok ? 'ok' : ''}">${m.last ? ename(EBY[m.last]) : '—'}</div><div class="lr"><span>с AB</span><span>${m.lr ? { same: 'совп.', par: 'паралл.', cross: 'пересек.', skew: 'скрещ.' }[m.lr.rel] : '—'}</span></div><div class="lr"><span>угол</span><span>${m.lr ? trim(m.lr.ang, 1) + '°' : '—'}</span></div>`;
+  else el.innerHTML = `<div class="k">Угол φ</div><div class="v ${ok ? 'ok' : ''}">${fmt(m.phi, 1)}°</div><div class="lr"><span>CM</span><span>${fmt(m.t, 1)} см</span></div><div class="lr"><span>AM</span><span>${fmt(m.AM, 2)} см</span></div>`;
+}
+
+function update() {
+  const m = model(), Ls = LESSONS[S.lesson];
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Стереометрия покорена!'), 700);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  axioms: '<path d="M14 10H34V27H14ZM14 10L24 4H44L34 10M44 4V21L34 27" fill="none" stroke="#8b96ad" stroke-width="1.2"/><path d="M24 10L34 15L39 24L29 27L14 21L14 14Z" fill="rgba(134,224,168,.3)" stroke="#86e0a8" stroke-width="1.3"/>',
+  lines: '<path d="M14 10H34V27H14ZM14 10L24 4H44L34 10M44 4V21L34 27" fill="none" stroke="#8b96ad" stroke-width="1.2"/><path d="M14 27H34" stroke="#ffb547" stroke-width="2.4"/><path d="M44 4V21" stroke="#b79cff" stroke-width="2.4"/>',
+  angles: '<path d="M14 10H34V27H14ZM14 10L24 4H44L34 10M44 4V21L34 27" fill="none" stroke="#8b96ad" stroke-width="1.2"/><path d="M14 27L44 21" stroke="#72d4e8" stroke-width="1.3"/><path d="M14 27L44 12" stroke="#ffb547" stroke-width="2"/><circle cx="44" cy="12" r="2.4" fill="#ffb547"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Ls, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Ls.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Ls.title}</span></span>
+      ${S.done[Ls.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const Ls = LESSONS[i];
+  S.lesson = i; S.hl = null; ptr = null;
+  resetLesson();
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = Ls.task;
+  $('#hint').textContent = Ls.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const st = $('#lessons'), cur = st.querySelector('.lesson[aria-current="true"]');
+  if (cur) { const sr = st.getBoundingClientRect(), cr = cur.getBoundingClientRect(); st.scrollLeft += (cr.left - sr.left) - (sr.width - cr.width) / 2; }
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = LESSONS[S.lesson], id = Ls.id;
+  let now = '';
+  if (id === 'axioms') now = `Куб ABCDA₁B₁C₁D₁ (основание ABCD, над A вершина A₁ и т. д.), его можно вращать. Ученик отмечает вершины и середины рёбер. Отмечено: ${m.sel.length ? m.sel.map(k => PTS[k].name).join(', ') : 'ничего'}. ` +
+    (m.k < 3 ? 'Плоскость ещё не задана.' : m.col ? 'Три точки лежат на одной прямой — плоскость не определена.' : `Сечение: ${m.shape}, вершины сечения: ${m.poly.map(ptName).join(', ')}.`);
+  if (id === 'lines') now = `Куб ABCDA₁B₁C₁D₁, выделена прямая AB. Ученик отметил рёбра: ${m.marked.length ? m.marked.map(k => ename(EBY[k])).join(', ') : 'пока ни одного'}. Верно отмечено ${m.right}, лишних ${m.wrong}, всего нужных рёбер ${TARGET2.length}. ` +
+    (m.last ? `Последнее нажатое ребро ${ename(EBY[m.last])}: ${RELN[m.lr.rel]}, угол с AB ${trim(m.lr.ang, 1)}°.` : '');
+  if (id === 'angles') now = `Куб ABCDA₁B₁C₁D₁ с ребром 6 см. Точка M на ребре CC₁, CM = ${fmt(m.t, 1)} см. AC = 6√2 ≈ 8,49 см, tg φ = CM : AC ≈ ${fmt(m.tg, 3)}, угол между AM и плоскостью основания φ ≈ ${fmt(m.phi, 1)}°, AM ≈ ${fmt(m.AM, 2)} см, расстояние от M до AB (отрезок MB) ≈ ${fmt(m.MB, 2)} см. Режим «Проекция» ${m.proj ? 'включён' : 'выключен'}.`;
+  return [
+    `Раздел: математика, 10 класс, геометрия, тема «Стереометрия». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+    'Не называй готовый ответ (какие точки дают правильный шестиугольник, какие рёбра нужно отметить, какое должно быть CM): веди ученика наводящими вопросами и проверяй его рассуждения.',
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = LESSONS[S.lesson], done = S.done[Ls.id];
+  const q = {
+    axioms: 'Почему через три точки на одной прямой нельзя провести единственную плоскость?',
+    lines: 'Как отличить скрещивающиеся прямые от параллельных?',
+    angles: 'Почему угол между прямой и плоскостью ищут через проекцию?',
+  }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

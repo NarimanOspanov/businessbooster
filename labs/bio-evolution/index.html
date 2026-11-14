@@ -1,0 +1,854 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по биологии, 11 класс: эволюция — естественный отбор, вид и видообразование, доказательства эволюции.">
+<title>Эволюция</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --leaf:#5fbf6a;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-hit]{cursor:pointer}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+.scene .lbl{font-family:var(--font-body)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .v.bad{color:var(--warn)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--arm);transition:width .2s}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:19%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 15px/1.4 var(--font-mono);text-align:center;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+.feat{display:grid;gap:6px}
+.feat div{background:var(--surface-2);border-radius:10px;padding:9px 11px;font-size:13px;line-height:1.45;border-left:4px solid var(--line)}
+.feat b{display:block;font-weight:600;font-size:13.5px;margin-bottom:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 250px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M14 7C26 13 14 27 26 33M26 7C14 13 26 27 14 33" fill="none" stroke="var(--ok)" stroke-width="1.6" stroke-linecap="round"/><path d="M16 12h8M15 20h10M16 28h8" stroke="var(--fg)" stroke-width="1.3" stroke-linecap="round"/><circle cx="20" cy="20" r="2.6" fill="var(--force)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Биология · Эволюция</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#bio">Карта</a><a href="/physics/#bio">Биология</a><a href="/labs/bio-evolution/" aria-current="page">Эволюция</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Эволюция</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Лабораторный стол">
+    <svg class="scene" id="scene" role="img" aria-label="Лабораторный стол с опытом. Предметы можно нажимать и перетаскивать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const f = x => (Math.round(x * 10) / 10).toString();
+const ru = (x, d = 1) => x.toFixed(d).replace('.', ',');
+const pc = x => Math.round(x * 100) + ' %';
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const KEY = 'luch-bio-evolution';
+const OK = '#86e0a8', WARN = '#ff8a73', ORA = '#ffb547', CY = '#72d4e8', VIO = '#b48cff', PINK = '#ff8fb8';
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+function wrap(s, n) { const out = []; let l = ''; for (const w of s.split(' ')) { if (l && (l + ' ' + w).length > n) { out.push(l); l = w; } else l = l ? l + ' ' + w : w; } if (l) out.push(l); return out; }
+
+// ---------- lesson 1: peppered moth ----------
+const BARK = { clean: { n: 'Чистая кора', s: 'чистая светлая кора берёзы' }, soot: { n: 'Закопчённая кора', s: 'кора, покрытая сажей' } };
+const NM = 40;
+const dark = q => 1 - (1 - q) * (1 - q);
+const MOTHS = (() => { const r = rng(7), a = []; for (let i = 0; i < NM; i++) { const c = i % 5, w = Math.floor(i / 5); a.push({ x: 60 + c * 34 + r() * 12, y: 136 + w * 32 + r() * 12, a: (r() - 0.5) * 50, k: r() }); } const ord = a.map((m, i) => i).sort((i, j) => a[i].k - a[j].k); ord.forEach((i, r2) => { a[i].rank = r2; }); return a; })();
+const BARKMARK = (() => { const r = rng(19), a = []; for (let i = 0; i < 46; i++) { const x = 46 + r() * 160; a.push({ x, y: 124 + r() * 266, w: Math.min(6 + r() * 20, 220 - x), l: r() < 0.35 }); } return a; })();
+
+// ---------- lesson 2: finches on two islands ----------
+const FOOD = { small: { n: 'Мелкие семена', opt: 7 }, mixed: { n: 'Разные семена', opt: 9.5 }, large: { n: 'Крупные твёрдые', opt: 12 } };
+const FK = ['small', 'mixed', 'large'];
+const RIof = D => 1 - Math.exp(-D / 12);
+const YEARS = 50000;
+
+// ---------- lesson 3: evidence cards ----------
+const CATS = [
+  { id: 'paleo', n: 'Палеонтологические', l: ['Палеонто-', 'логия'], c: ORA },
+  { id: 'anat', n: 'Сравнительно-анатомические', l: ['Сравнит.', 'анатомия'], c: CY },
+  { id: 'embr', n: 'Эмбриологические', l: ['Эмбрио-', 'логия'], c: PINK },
+  { id: 'mol', n: 'Молекулярно-генетические', l: ['Молекулы', 'и гены'], c: VIO },
+  { id: 'geo', n: 'Биогеографические', l: ['Биогео-', 'графия'], c: OK },
+];
+const CARDS = [
+  { id: 'arch', cat: 'paleo', s: 'Археоптерикс', t: 'Археоптерикс', d: 'Ископаемое животное с перьями и крыльями, но с зубами, когтями на крыльях и длинным хвостом из позвонков.', why: 'Ископаемая переходная форма между пресмыкающимися и птицами.' },
+  { id: 'limb', cat: 'anat', s: 'Рука–крыло–ласт', t: 'Рука, крыло и ласт', d: 'Рука человека, крыло летучей мыши и ласт кита построены из одних и тех же костей: плечо, предплечье, кисть.', why: 'Гомологичные органы: общее происхождение, разные функции.' },
+  { id: 'gill', cat: 'embr', s: 'Зародыши', t: 'Жаберные дуги у зародыша', d: 'У ранних зародышей рыбы, ящерицы, курицы и человека есть жаберные дуги и хвост. Сначала они очень похожи.', why: 'Закон зародышевого сходства К. Бэра: зародыши позвоночных на ранних стадиях похожи.' },
+  { id: 'code', cat: 'mol', s: 'Единый код', t: 'Единый генетический код', d: 'У бактерии, гриба, дуба и человека одни и те же кодоны шифруют одни и те же аминокислоты.', why: 'Общий код — след общего происхождения всего живого.' },
+  { id: 'marsup', cat: 'geo', s: 'Сумчатые', t: 'Сумчатые Австралии', d: 'Кенгуру, коалы и вомбаты живут только в Австралии, которая очень давно отделилась от других материков.', why: 'В изоляции на отдельном материке эволюция шла своим путём.' },
+  { id: 'horse', cat: 'paleo', s: 'Предки лошади', t: 'Предки лошади', d: 'В слоях горных пород от древних к молодым: пятипалый зверёк размером с лису, потом трёхпалые формы, потом однопалая лошадь.', why: 'Филогенетический ряд — цепочка ископаемых форм, сменявших друг друга.' },
+  { id: 'rud', cat: 'anat', s: 'Аппендикс', t: 'Аппендикс и копчик', d: 'У человека есть червеобразный отросток слепой кишки и копчик — несколько сросшихся хвостовых позвонков.', why: 'Рудименты — органы, утратившие прежнее значение. Достались от предков.' },
+  { id: 'tad', cat: 'embr', s: 'Головастик', t: 'Головастик лягушки', d: 'Головастик дышит жабрами, у него есть боковая линия, хвост и двухкамерное сердце — как у рыбы.', why: 'Биогенетический закон Мюллера — Геккеля: в развитии особи кратко повторяются черты предков.' },
+  { id: 'cyt', cat: 'mol', s: 'Цитохром c', t: 'Белок цитохром c', d: 'У человека и шимпанзе этот белок совпадает полностью, а у человека и тунца отличается в 21 аминокислоте из 104.', why: 'Чем ближе родство, тем меньше различий в белках и ДНК.' },
+  { id: 'finch', cat: 'geo', s: 'Вьюрки', t: 'Галапагосские вьюрки', d: 'На островах Галапагос живут свои виды вьюрков. Все они похожи на вьюрков с ближайшего материка — Южной Америки.', why: 'Жители островов произошли от переселенцев с материка.' },
+];
+const CATI = id => CATS.findIndex(c => c.id === id);
+const BX = i => 6 + i * 102, BY = 272, BW = 96, BH = 126;
+
+const LESSONS = [
+  { id: 'darwin', title: 'Дарвин и естественный отбор',
+    text: ['Чарлз Дарвин в книге «Происхождение видов» (1859) объяснил, как меняются живые организмы. Особи одного вида немного различаются, и многие различия наследуются. Потомков рождается гораздо больше, чем может выжить, поэтому между ними идёт борьба за существование.',
+           'Чаще выживают и оставляют потомство те, чьи признаки лучше подходят к условиям среды. Это естественный отбор. Из поколения в поколение полезный признак встречается всё чаще. Движущие силы эволюции по Дарвину: наследственная изменчивость, борьба за существование и естественный отбор.',
+           'Классический пример — берёзовая пяденица в Англии. В XIX веке сажа заводов покрыла стволы, и птицы стали чаще находить светлых бабочек. За несколько десятилетий тёмная форма почти вытеснила светлую. Когда воздух очистили, светлых снова стало больше.'],
+    why: 'Врач-инфекционист и эпидемиолог каждый день видят естественный отбор: антибиотик убивает чувствительных бактерий, а устойчивые выживают и размножаются. Поэтому антибиотики пьют только по назначению и полным курсом, а против вирусов их не пьют вовсе. Агроном знает, что вредители привыкают к одному яду, и чередует препараты — так борются, например, с саранчой на юге Казахстана. Вирусологи следят, как отбор создаёт новые штаммы гриппа, и обновляют вакцины каждый год. А селекционер использует тот же принцип, только отбирает сам — это искусственный отбор.',
+    task: 'Закоптите кору и ведите отбор поколение за поколением, пока тёмных бабочек не станет не меньше 80 %.',
+    hint: 'Тёмная окраска наследуется: её аллель C доминантный. Птицы склёвывают заметных бабочек. Чем больше сила отбора s, тем быстрее идёт процесс. При s = 0 ничего не меняется.',
+    stage: 'Нажмите на бабочку: заметна ли она птице? Кнопки внизу меняют кору и запускают поколения.',
+    bark: 'clean', q0: 0.02, s0: 0.3,
+    check: m => m.bark === 'soot' && m.D >= 0.8 },
+  { id: 'species', title: 'Вид и видообразование',
+    text: ['Вид — совокупность особей, похожих по строению, которые свободно скрещиваются между собой, дают плодовитое потомство и занимают общий ареал. Вид узнают по нескольким критериям: морфологическому, генетическому (число и форма хромосом), физиологическому, экологическому, географическому. Главный признак вида — репродуктивная изоляция: с другими видами особи не скрещиваются или их гибриды бесплодны.',
+           'Вид состоит из популяций — групп особей, которые долго живут на одной территории и скрещиваются в основном между собой. Популяция — элементарная единица эволюции: именно в ней накапливаются изменения.',
+           'Новые виды чаще возникают при географической изоляции. Популяцию разделяют горы, море или река, и обмен генами прекращается. В разных условиях отбор меняет части популяции по-разному, накапливаются мутации. Через тысячи поколений различия так велики, что при встрече особи уже не скрещиваются. Бывает и экологическое видообразование на одной территории: из-за разной пищи или разного времени размножения.'],
+    why: 'Зоологи и ботаники заповедников Казахстана — Аксу-Жабаглы, Алтын-Эмеля, Иле-Алатау — описывают виды и их популяции, чтобы их сохранить. Популяции сайгака учёные считают с самолётов и дронов, и от этих данных зависят законы об охране. Генетик определяет вид по короткому участку ДНК (ДНК-штрихкод): так ветеринарная служба и таможня отличают охраняемый вид от разрешённого. А дикая яблоня Сиверса из Заилийского Алатау — предок культурных яблок; селекционеры ищут в её популяциях гены устойчивости к болезням.',
+    task: 'Разделите популяцию вьюрков проливом и получите два вида (изоляция ≥ 90 %). Потом откройте перешеек и проверьте: птицы живут рядом, но не скрещиваются.',
+    hint: 'Поднимите уровень моря. Разная пища на островах быстрее разводит клювы. Если открыть перешеек слишком рано, популяции снова сольются.',
+    stage: 'Нажмите на остров — сменится корм. Нажмите на море — вода поднимется или опустится.',
+    sea: 'low',
+    check: m => m.species && m.sea === 'low' && m.contact >= 1 },
+  { id: 'proofs', title: 'Доказательства эволюции',
+    text: ['Эволюцию трудно увидеть за одну жизнь, но её следы видны повсюду. Учёные собирают доказательства из разных наук, и все они согласуются друг с другом.',
+           'Палеонтология изучает ископаемые остатки: переходные формы и филогенетические ряды. Сравнительная анатомия находит гомологичные органы, рудименты и атавизмы. Эмбриология показывает сходство зародышей позвоночных.',
+           'Молекулярная биология сравнивает ДНК и белки: чем ближе родство, тем меньше различий. Биогеография объясняет, почему на изолированных островах и материках живут свои особые виды.'],
+    why: 'Геолог-палеонтолог по крошечным ископаемым раковинам определяет возраст слоёв в скважине — так нефтяники Атырау и Мангистау решают, где бурить дальше. В горах Каратау нашли знаменитые отпечатки юрских насекомых, рыб и растений — это работа для палеонтологов и музеев. Биоинформатик сравнивает геномы и находит родство организмов. Фармакологи испытывают лекарства на мышах именно потому, что их белки похожи на наши: общий предок у нас был около 80 млн лет назад. А эмбриологи в центрах ЭКО каждый день наблюдают первые стадии развития зародыша человека.',
+    task: 'Разложите 10 карточек-фактов по пяти группам доказательств эволюции.',
+    hint: 'Спросите себя, о чём факт: об ископаемых, о строении органов взрослых, о развитии зародыша, о молекулах или о расселении по планете?',
+    stage: 'Перетащите карточку в корзину или просто нажмите на нужную корзину.',
+    check: m => m.placedN === CARDS.length },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+function resetLesson() {
+  const L = LESSONS[S.lesson];
+  S.bark = L.bark || 'clean'; S.s = L.s0 === undefined ? 0.3 : L.s0; S.q = L.q0 || 0.02; S.gen = 0; S.hist = [{ D: dark(S.q), b: S.bark }]; S.eat = null;
+  S.sea = L.sea || 'low'; S.fL = 'mixed'; S.fR = 'mixed'; S.bl = 9.5; S.br = 9.5; S.D = 0; S.t = 0; S.species = false; S.contact = 0; S.merged = 0;
+  S.placed = {}; S.miss = 0; S.wrong = null; S.cardPos = { x: 260, y: 190 };
+}
+
+// ---------- models ----------
+function fit1() { const wd = S.bark === 'soot' ? 1 : 1 - S.s, wl = S.bark === 'soot' ? 1 - S.s : 1, D = dark(S.q); return { wd, wl, D, wbar: D * wd + (1 - D) * wl }; }
+function gens(n) {
+  for (let i = 0; i < n; i++) {
+    const w = fit1(), nd = Math.round(w.D * NM), nl = NM - nd;
+    S.eat = { d: Math.round(nd * (1 - w.wd)), nd, l: Math.round(nl * (1 - w.wl)), nl };
+    S.q = clamp(S.q * w.wd / w.wbar, 0.005, 0.995); S.gen++;
+    S.hist.push({ D: dark(S.q), b: S.bark }); if (S.hist.length > 81) S.hist.shift();
+  }
+  update();
+}
+function setBark(b) { S.bark = b; if (S.hist.length) S.hist[S.hist.length - 1].b = b; S.eat = null; renderTools(); buildScheme(); update(); }
+
+const optL = () => FOOD[S.fL].opt, optR = () => FOOD[S.fR].opt;
+function steps(n) {
+  let msg = '';
+  for (let i = 0; i < n; i++) {
+    const ri = RIof(S.D);
+    if (S.sea === 'high' || ri >= 0.9) {
+      S.bl += 0.35 * (optL() - S.bl); S.br += 0.35 * (optR() - S.br);
+      S.D += 1 + 1.5 * Math.abs(S.bl - S.br);
+      if (S.sea === 'low') S.contact++;
+    } else {
+      const was = S.D, a = (S.bl + S.br) / 2, o = (optL() + optR()) / 2;
+      S.bl = S.br = a + 0.35 * (o - a); S.D *= 0.3;
+      if (was > 2) { S.merged++; msg = 'Перешеек открыт, а изоляция ещё неполная: птицы скрещиваются, и различия смешиваются.'; }
+    }
+    S.t++;
+    if (!S.species && RIof(S.D) >= 0.9) { S.species = true; msg = 'Изоляция больше 90 %: гибриды почти бесплодны. Это уже два разных вида!'; }
+  }
+  if (msg) toast(msg);
+  update();
+}
+function setSea(s) { S.sea = s; renderTools(); buildScheme(); update(); }
+function cycleFood(side) { const k = side === 'L' ? 'fL' : 'fR'; S[k] = FK[(FK.indexOf(S[k]) + 1) % 3]; buildScheme(); update(); }
+
+const curCard = () => CARDS.find(c => S.placed[c.id] === undefined) || null;
+function place(k) {
+  const c = curCard(); if (!c) return;
+  if (CATS[k].id === c.cat) { S.placed[c.id] = k; toast(`Верно: ${CATS[k].n.toLowerCase()}. ${c.why}`); }
+  else { S.miss++; S.wrong = { k, t: performance.now() }; toast(`Не та группа. ${LESSONS[2].hint}`); }
+  S.cardPos = { x: 260, y: 190 };
+  buildScheme(); update();
+}
+
+function model() {
+  const id = LID();
+  if (id === 'darwin') { const w = fit1(); return { kind: 'sel', D: w.D, q: S.q, w, bark: S.bark, s: S.s, gen: S.gen }; }
+  if (id === 'species') return { kind: 'spec', ri: RIof(S.D), sea: S.sea, species: S.species, contact: S.contact, diff: Math.abs(S.bl - S.br), D: S.D };
+  const placedN = Object.keys(S.placed).length;
+  return { kind: 'proof', placedN, cur: curCard(), miss: S.miss };
+}
+
+// ---------- scenes ----------
+function bench() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4000" fill="url(#tile)"/>`;
+}
+const lbl = (x, y, s, size = 10.5, fill = '#8b96ad', anchor = 'middle', extra = '') => `<text class="lbl" x="${f(x)}" y="${f(y)}" font-size="${size}" fill="${fill}" text-anchor="${anchor}" ${extra}>${s}</text>`;
+
+function moth(x, y, a, isDark, id) {
+  const fill = isDark ? '#24221f' : '#e6e2d4', st = isDark ? '#4a463e' : '#9c9785', sp = isDark ? '#3a3732' : '#5a564c';
+  return `<g transform="translate(${f(x)} ${f(y)}) rotate(${f(a)})" data-hit="${id}">
+    <path d="M0 -2L-13 -7Q-16 3 -3 7Z M0 -2L13 -7Q16 3 3 7Z" fill="${fill}" stroke="${st}" stroke-width=".8"/>
+    <circle cx="-7" cy="-1" r="1.2" fill="${sp}"/><circle cx="7" cy="-1" r="1.2" fill="${sp}"/><circle cx="-5" cy="3" r=".9" fill="${sp}"/><circle cx="5" cy="3" r=".9" fill="${sp}"/>
+    <ellipse cx="0" cy="0" rx="1.8" ry="6" fill="${isDark ? '#14130f' : '#8f8a78'}"/></g>`;
+}
+function darwinScene() {
+  let h = bench();
+  const soot = S.bark === 'soot', D = dark(S.q), nd = Math.round(D * NM);
+  h += `<rect x="40" y="118" width="186" height="282" rx="10" fill="${soot ? '#33312e' : '#dcdacf'}" stroke="#56627d" data-hit="trunk"/>`;
+  BARKMARK.forEach(b => {
+    if (b.l && !soot) h += `<ellipse cx="${f(b.x)}" cy="${f(b.y)}" rx="${f(b.w * 0.7)}" ry="5" fill="#a9b394" opacity=".55" pointer-events="none"/>`;
+    else h += `<rect x="${f(b.x)}" y="${f(b.y)}" width="${f(b.w)}" height="2.6" rx="1.3" fill="${soot ? '#1c1b19' : '#3f3c35'}" pointer-events="none"/>`;
+  });
+  MOTHS.forEach((m, i) => { h += moth(m.x, m.y, m.a, m.rank < nd, 'm' + i); });
+  // bird
+  h += `<g transform="translate(244 128)" data-hit="bird"><path d="M0 0Q14 -14 30 -4Q40 -10 46 -6Q40 2 30 4Q14 10 0 0Z" fill="#7d6a52" stroke="#c9b48f" stroke-width="1"/><path d="M-9 -2L1 -5L1 1Z" fill="${ORA}"/><circle cx="6" cy="-3" r="1.6" fill="#0b1019"/></g>`;
+  h += lbl(133, 412, BARK[S.bark].n, 11, soot ? ORA : '#c9d3e6');
+  // graph
+  const gx = 290, gw = 214, gy0 = 372, gh = 196, n = S.hist.length, span = Math.max(30, n - 1);
+  h += `<rect x="${gx - 12}" y="${gy0 - gh - 26}" width="${gw + 24}" height="${gh + 56}" rx="10" fill="rgba(11,16,25,.55)" stroke="#26324a" data-hit="graph"/>`;
+  h += lbl(gx, gy0 - gh - 10, 'Доля тёмных бабочек', 10.5, '#c9d3e6', 'start');
+  for (const p of [0, 0.5, 1]) h += `<path d="M${gx} ${f(gy0 - p * gh)}H${gx + gw}" stroke="#26324a"/>` + lbl(gx - 4, gy0 - p * gh + 3, Math.round(p * 100), 9, '#56627d', 'end');
+  h += `<path d="M${gx} ${f(gy0 - 0.8 * gh)}H${gx + gw}" stroke="${OK}" stroke-dasharray="4 4" opacity=".7"/>` + lbl(gx + gw, gy0 - 0.8 * gh - 4, 'цель 80 %', 9, OK, 'end');
+  const X = i => gx + i * gw / span, Y = d => gy0 - d * gh;
+  if (n > 1) h += `<polyline points="${S.hist.map((p, i) => `${f(X(i))},${f(Y(p.D))}`).join(' ')}" fill="none" stroke="${CY}" stroke-width="2"/>`;
+  S.hist.forEach((p, i) => { h += `<circle cx="${f(X(i))}" cy="${f(Y(p.D))}" r="2.6" fill="${p.b === 'soot' ? ORA : '#e6e2d4'}"/>`; });
+  h += lbl(gx + gw / 2, gy0 + 16, `поколения → (сейчас ${S.gen})`, 9.5, '#8b96ad');
+  if (S.eat) h += lbl(gx + gw / 2, gy0 + 34, `птицы съели: светлых ${S.eat.l} из ${S.eat.nl}, тёмных ${S.eat.d} из ${S.eat.nd}`, 9.5, '#c9d3e6');
+  return h;
+}
+
+function finch(x, y, beak, col, dir) {
+  const bd = beak * 0.8, bl = beak * 0.95;
+  return `<g transform="translate(${f(x)} ${f(y)}) scale(${dir} 1)" pointer-events="none">
+    <path d="M-10 2L-22 -2L-20 6Z" fill="${col}" opacity=".85"/><ellipse cx="0" cy="2" rx="12" ry="8.5" fill="${col}"/><circle cx="9" cy="-5" r="6.5" fill="${col}"/>
+    <path d="M14 ${f(-5 - bd / 2)}L${f(14 + bl)} -4L14 ${f(-5 + bd / 2)}Z" fill="#3a3530" stroke="#c9b48f" stroke-width=".6"/><circle cx="10.5" cy="-7" r="1.4" fill="#0b1019"/>
+    <path d="M-2 10V14M3 10V14" stroke="#8b96ad" stroke-width="1.2"/></g>`;
+}
+function seeds(cx, cy, food) {
+  let h = '';
+  const r = rng(food === 'small' ? 3 : food === 'large' ? 5 : 9);
+  for (let i = 0; i < 9; i++) {
+    const x = cx - 40 + r() * 80, y = cy + r() * 12, big = food === 'large' || (food === 'mixed' && i % 2);
+    h += big ? `<ellipse cx="${f(x)}" cy="${f(y)}" rx="4.5" ry="3.2" fill="#8a6a3d" stroke="#c9b48f" stroke-width=".6"/>` : `<circle cx="${f(x)}" cy="${f(y)}" r="1.7" fill="#d9c58f"/>`;
+  }
+  return h;
+}
+const mix = (a, b, k) => { const p = s => [1, 3, 5].map(i => parseInt(s.substr(i, 2), 16)); const A = p(a), B = p(b); return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * k).toString(16).padStart(2, '0')).join(''); };
+function speciesScene() {
+  let h = bench();
+  const high = S.sea === 'high', ri = RIof(S.D), colL = '#c98a4b', colR = mix('#c98a4b', '#8fa6c8', ri);
+  h += `<rect x="0" y="140" width="520" height="262" rx="12" fill="${high ? '#123a55' : '#15334a'}" stroke="#26324a" data-hit="sea"/>`;
+  for (let i = 0; i < 6; i++) h += `<path d="M${30 + i * 85} ${160 + (i % 2) * 210}q8 -5 16 0t16 0" fill="none" stroke="#2f6688" stroke-width="1.5" pointer-events="none"/>`;
+  const isl = (cx, side, food) => `<path d="M${cx - 112} 290C${cx - 112} 220 ${cx - 60} 196 ${cx} 196C${cx + 66} 196 ${cx + 110} 232 ${cx + 110} 290C${cx + 110} 350 ${cx + 60} 382 ${cx} 382C${cx - 64} 382 ${cx - 112} 352 ${cx - 112} 290Z" fill="#35553a" stroke="#c8b07a" stroke-width="5" data-hit="is${side}"/>` +
+    lbl(cx, 222, side === 'L' ? 'Остров А' : 'Остров Б', 11, '#e8ecf4', 'middle', 'pointer-events="none"') + lbl(cx, 236, 'корм: ' + FOOD[food].n.toLowerCase(), 9.5, '#c9d3e6', 'middle', 'pointer-events="none"') + seeds(cx, 340, food);
+  if (!high) h += `<path d="M196 268H324V312H196Z" fill="#35553a" stroke="#c8b07a" stroke-width="4" data-hit="sea"/>`;
+  h += isl(126, 'L', S.fL) + isl(394, 'R', S.fR);
+  if (!high) h += `<path d="M206 270H314V310H206Z" fill="#35553a" pointer-events="none"/>`;
+  const PL = [[80, 268], [130, 258], [172, 280], [92, 312], [146, 304]], PR = PL.map(([x, y]) => [x + 268, y]);
+  PL.forEach(([x, y]) => { h += finch(x, y, S.bl, colL, 1); });
+  PR.forEach(([x, y]) => { h += finch(x, y, S.br, colR, -1); });
+  h += lbl(126, 372, `клюв ${ru(S.bl)} мм`, 10.5, '#e8ecf4', 'middle', 'pointer-events="none"') + lbl(394, 372, `клюв ${ru(S.br)} мм`, 10.5, '#e8ecf4', 'middle', 'pointer-events="none"');
+  h += lbl(260, 160, high ? 'Пролив: птицы не перелетают через море' : 'Перешеек: птицы свободно летают', 10.5, high ? CY : ORA, 'middle', 'pointer-events="none"');
+  if (!high) h += lbl(260, 294, S.species ? 'не скрещиваются' : 'скрещиваются', 10, S.species ? OK : '#e8ecf4', 'middle', 'pointer-events="none"');
+  h += lbl(260, 420, `прошло ${S.t * YEARS / 1000} тыс. лет`, 10, '#8b96ad');
+  return h;
+}
+
+function proofScene(t) {
+  let h = bench();
+  const c = curCard();
+  CATS.forEach((k, i) => {
+    const wr = S.wrong && S.wrong.k === i && t - S.wrong.t < 900;
+    h += `<g data-hit="b${i}"><rect x="${BX(i)}" y="${BY}" width="${BW}" height="${BH}" rx="10" fill="${wr ? 'rgba(255,138,115,.16)' : 'rgba(11,16,25,.6)'}" stroke="${wr ? WARN : k.c}" stroke-width="${wr ? 2.4 : 1.4}"/>`;
+    h += `<rect x="${BX(i)}" y="${BY}" width="${BW}" height="5" rx="2.5" fill="${k.c}"/>`;
+    h += lbl(BX(i) + BW / 2, BY + 21, k.l[0], 11.5, '#e8ecf4') + lbl(BX(i) + BW / 2, BY + 35, k.l[1], 11.5, '#e8ecf4');
+    CARDS.filter(cd => S.placed[cd.id] === i).forEach((cd, j) => {
+      h += `<rect x="${BX(i) + 6}" y="${BY + 46 + j * 32}" width="${BW - 12}" height="26" rx="6" fill="${k.c}" fill-opacity=".18" stroke="${k.c}" stroke-opacity=".6"/>` + lbl(BX(i) + BW / 2, BY + 63 + j * 32, cd.s, 9, '#e8ecf4');
+    });
+    h += '</g>';
+  });
+  h += lbl(260, 420, `разложено ${Object.keys(S.placed).length} из ${CARDS.length} · ошибок ${S.miss}`, 10, '#8b96ad');
+  if (!c) return h + lbl(260, 190, 'Все карточки разложены!', 15, OK) + lbl(260, 212, 'Доказательства из разных наук говорят об одном — об эволюции.', 10.5, '#c9d3e6');
+  const { x, y } = S.cardPos, w = 272, hh = 140, lines = wrap(c.d, 37).slice(0, 5);
+  const left = CARDS.length - Object.keys(S.placed).length;
+  for (let i = Math.min(left - 1, 3); i >= 1; i--) h += `<rect x="${f(260 - w / 2 + i * 4)}" y="${f(190 - hh / 2 + i * 4)}" width="${w}" height="${hh}" rx="12" fill="#1a2438" stroke="#26324a"/>`;
+  h += `<g data-drag="card"><rect x="${f(x - w / 2)}" y="${f(y - hh / 2)}" width="${w}" height="${hh}" rx="12" fill="#121a28" stroke="${drag && drag.key === 'card' ? ORA : '#8b96ad'}" stroke-width="1.6"/>`;
+  h += lbl(x - w / 2 + 14, y - hh / 2 + 24, esc(c.t), 14, '#e8ecf4', 'start', 'font-weight="600"');
+  lines.forEach((ln, i) => { h += lbl(x - w / 2 + 14, y - hh / 2 + 46 + i * 16.5, esc(ln), 12, '#c9d3e6', 'start'); });
+  h += `<path d="M${f(x + w / 2 - 22)} ${f(y + hh / 2 - 18)}h10M${f(x + w / 2 - 22)} ${f(y + hh / 2 - 13)}h10" stroke="#56627d" stroke-width="1.6" stroke-linecap="round"/></g>`;
+  return h;
+}
+
+function hlBox(id) {
+  const L = LID();
+  if (L === 'darwin') return { trunk: [36, 114, 194, 290], moth: [36, 114, 194, 290], bird: [232, 110, 66, 40], graph: [272, 142, 250, 266] }[id] || null;
+  if (L === 'species') return { isL: [8, 190, 238, 196], isR: [278, 190, 238, 196], sea: [190, 150, 140, 168], beak: [70, 244, 120, 40], seed: [80, 330, 96, 30] }[id] || null;
+  return { card: [128, 122, 264, 140], bins: [2, 268, 516, 134], counter: [140, 406, 240, 20] }[id] || null;
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = id === 'darwin' ? darwinScene() : id === 'species' ? speciesScene() : proofScene(t);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${f(b[0])}" y="${f(b[1])}" width="${f(b[2])}" height="${f(b[3])}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 524, hh / 430, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 428 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag],[data-hit]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  if (el.dataset.drag) { const p = toSvg(e); drag = { key: el.dataset.drag, ox: p.x - S.cardPos.x, oy: p.y - S.cardPos.y, x: e.clientX, y: e.clientY, moved: false }; scene.classList.add('grabbing'); }
+  else drag = { hit: el.dataset.hit, x: e.clientX, y: e.clientY, moved: false };
+  dirty = true;
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 5) drag.moved = true;
+  if (drag.key === 'card' && drag.moved) { const p = toSvg(e); S.cardPos = { x: p.x - drag.ox, y: p.y - drag.oy }; dirty = true; }
+});
+function binAt(p) { for (let i = 0; i < CATS.length; i++) if (p.x >= BX(i) - 4 && p.x <= BX(i) + BW + 4 && p.y >= BY - 30 && p.y <= BY + BH + 10) return i; return -1; }
+function endDrag(cancel) {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing'); dirty = true;
+  if (d.key === 'card') {
+    if (!cancel && d.moved) { const b = binAt(S.cardPos); if (b >= 0) return place(b); }
+    S.cardPos = { x: 260, y: 190 };
+    if (!cancel && !d.moved) toast('Перетащите карточку в корзину нужной группы или нажмите на корзину.');
+    return;
+  }
+  if (cancel || d.moved || !d.hit) return;
+  tap(d.hit);
+}
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+function tap(id) {
+  const L = LID();
+  if (L === 'darwin') {
+    if (/^m\d+$/.test(id)) {
+      const m = MOTHS[+id.slice(1)], dk = m.rank < Math.round(dark(S.q) * NM), soot = S.bark === 'soot';
+      toast(dk === soot ? `${dk ? 'Тёмную' : 'Светлую'} бабочку на ${soot ? 'тёмной' : 'светлой'} коре почти не видно — птица её, скорее всего, пропустит.` : `${dk ? 'Тёмная' : 'Светлая'} бабочка на ${soot ? 'тёмной' : 'светлой'} коре заметна издалека — лёгкая добыча для птицы.`);
+    }
+    if (id === 'bird') toast('Птицы — фактор отбора. Они ищут бабочек глазами и чаще ловят заметных.');
+    if (id === 'trunk') toast(S.bark === 'soot' ? 'Сажа убила лишайники и сделала кору тёмной.' : 'Светлая кора берёзы с лишайниками — так было до заводов.');
+    if (id === 'graph') toast('График показывает, как от поколения к поколению меняется доля тёмных бабочек.');
+  }
+  if (L === 'species') {
+    if (id === 'isL') cycleFood('L');
+    if (id === 'isR') cycleFood('R');
+    if (id === 'sea') setSea(S.sea === 'high' ? 'low' : 'high');
+  }
+  if (L === 'proofs' && /^b\d$/.test(id)) place(+id.slice(1));
+}
+
+function loop(t) {
+  requestAnimationFrame(loop);
+  let anim = !!S.hl;
+  if (LID() === 'proofs' && S.wrong && t - S.wrong.t < 1000) anim = true;
+  if (dirty || anim) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3600); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, c) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${c ? `<i style="background:${c}"></i>` : ''}${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    darwin: B('k-clean', 'Чистая кора', S.bark === 'clean', '#dcdacf') + B('k-soot', 'Сажа', S.bark === 'soot', '#33312e') + sep + B('g1', '+1 поколение') + B('g10', '+10') + sep + B('reset', 'Сбросить'),
+    species: B('s-low', 'Перешеек', S.sea === 'low', '#c8b07a') + B('s-high', 'Пролив', S.sea === 'high', '#2f6688') + sep + B('t1', '+50 тыс. лет') + B('t5', '+250 тыс.') + sep + B('reset', 'Сбросить'),
+    proofs: B('reset', 'Начать заново'),
+  }[id];
+  placeHint();
+}
+function placeHint() {
+  const hn = $('#hint'), st = $('#stage').getBoundingClientRect(), tb = $('#tools').getBoundingClientRect();
+  hn.style.visibility = tb.left - st.left < st.width * 0.19 + 30 ? 'hidden' : '';
+}
+addEventListener('resize', placeHint);
+function act(a) {
+  if (a === 'k-clean' || a === 'k-soot') return setBark(a.slice(2));
+  if (a === 'g1') return gens(1);
+  if (a === 'g10') return gens(10);
+  if (a === 's-low' || a === 's-high') return setSea(a.slice(2));
+  if (a === 't1') return steps(1);
+  if (a === 't5') return steps(5);
+  if (a.startsWith('p-')) return place(+a.slice(2));
+  if (a === 'reset') { const keep = LID() === 'darwin' ? S.s : null; resetLesson(); if (keep !== null) S.s = keep; renderTools(); buildScheme(); update(); }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const dot = c => IC(`<circle cx="17" cy="17" r="11" fill="${c}" opacity=".85"/><circle cx="17" cy="17" r="4" fill="#0b1019"/>`);
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (m.kind === 'sel') return `Кора: ${S.bark === 'soot' ? 'с сажей' : 'чистая'} · тёмных ${pc(m.D)} · поколение ${m.gen}`;
+  if (m.kind === 'spec') return `Изоляция ${pc(m.ri)} · ${m.species ? 'два вида ✓' : 'один вид'} · ${m.sea === 'high' ? 'пролив' : 'перешеек'}${m.species && m.sea === 'low' ? ' · проверка: ' + (m.contact ? '✓' : 'сделайте шаг') : ''}`;
+  return `Разложено ${m.placedN} из ${CARDS.length} · ошибок ${m.miss}`;
+}
+
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'darwin') h = `<h2>Условия отбора</h2>
+    <div class="ctl"><div class="lbl">Кора деревьев</div><div class="chips" id="kChips"><button data-k="clean">Чистая</button><button data-k="soot">С сажей</button></div></div>` +
+    slider('inS', 'Сила отбора s (доля заметных, которых съедят)', 0, 0.6, 0.05, S.s) +
+    `<div class="row"><button class="ghostbtn" data-a="g1">+1 поколение</button><button class="ghostbtn" data-a="g10">+10 поколений</button><button class="ghostbtn" data-a="reset">Сбросить</button></div>
+    <dl class="reads"><div><dt>Поколение</dt><dd id="r1"></dd></div><div><dt>Тёмных</dt><dd id="r2"></dd></div><div><dt>Аллель C</dt><dd id="r3"></dd></div></dl>`;
+  else if (id === 'species') h = `<h2>Острова и море</h2>
+    <div class="ctl"><div class="lbl">Уровень моря</div><div class="chips" id="seaChips"><button data-v="low">Низкий: перешеек</button><button data-v="high">Высокий: пролив</button></div></div>
+    <div class="ctl"><div class="lbl">Корм на острове А</div><div class="chips" id="fLChips">${FK.map(k => `<button data-v="${k}">${FOOD[k].n}</button>`).join('')}</div></div>
+    <div class="ctl"><div class="lbl">Корм на острове Б</div><div class="chips" id="fRChips">${FK.map(k => `<button data-v="${k}">${FOOD[k].n}</button>`).join('')}</div></div>
+    <div class="row"><button class="ghostbtn" data-a="t1">+50 тыс. лет</button><button class="ghostbtn" data-a="t5">+250 тыс. лет</button><button class="ghostbtn" data-a="reset">Сбросить</button></div>
+    <dl class="reads"><div><dt>Клювы А / Б</dt><dd id="r1"></dd></div><div><dt>Изоляция</dt><dd id="r2"></dd></div><div><dt>Гибриды</dt><dd id="r3"></dd></div></dl>`;
+  else h = `<h2>Куда отнести карточку</h2><p class="note" id="curC"></p><div class="row" style="flex-direction:column;align-items:stretch">${CATS.map((c, i) => `<button class="ghostbtn" data-a="p-${i}" style="text-align:left;border-left:4px solid ${c.c}">${c.n}</button>`).join('')}</div>
+    <dl class="reads"><div><dt>Разложено</dt><dd id="r1"></dd></div><div><dt>Ошибок</dt><dd id="r2"></dd></div><div><dt>Осталось</dt><dd id="r3"></dd></div></dl>`;
+  el.innerHTML = h;
+  const inS = el.querySelector('#inS'); if (inS) inS.addEventListener('input', e => { S.s = +e.target.value; update(); });
+  el.querySelectorAll('#kChips button').forEach(b => b.onclick = () => setBark(b.dataset.k));
+  el.querySelectorAll('#seaChips button').forEach(b => b.onclick = () => setSea(b.dataset.v));
+  el.querySelectorAll('#fLChips button').forEach(b => b.onclick = () => { S.fL = b.dataset.v; update(); });
+  el.querySelectorAll('#fRChips button').forEach(b => b.onclick = () => { S.fR = b.dataset.v; update(); });
+  el.querySelectorAll('.row [data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.innerHTML = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  const press = (s, fn) => el.querySelectorAll(s).forEach(b => b.setAttribute('aria-pressed', fn(b)));
+  if (m.kind === 'sel') {
+    set('#inSO', ru(S.s, 2)); val('#inS', S.s); press('#kChips button', b => b.dataset.k === S.bark);
+    set('#r1', m.gen); set('#r2', pc(m.D)); set('#r3', ru(m.q, 3));
+  } else if (m.kind === 'spec') {
+    press('#seaChips button', b => b.dataset.v === S.sea); press('#fLChips button', b => b.dataset.v === S.fL); press('#fRChips button', b => b.dataset.v === S.fR);
+    set('#r1', `${ru(S.bl)} / ${ru(S.br)}`); set('#r2', pc(m.ri)); set('#r3', `плодовиты ${pc(1 - m.ri)}`);
+  } else {
+    set('#curC', m.cur ? `Сейчас: <b>${m.cur.t}</b>. ${m.cur.d}` : 'Все карточки разложены.');
+    set('#r1', `${m.placedN}/${CARDS.length}`); set('#r2', m.miss); set('#r3', CARDS.length - m.placedN);
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'darwin') return [
+    { id: 'trunk', icon: dot('#dcdacf'), name: 'Ствол берёзы', spec: 'Среда обитания. Чистая кора светлая, с лишайниками. После заводской сажи — тёмная.' },
+    { id: 'moth', icon: dot('#e6e2d4'), name: 'Бабочки: светлые и тёмные', spec: '40 бабочек берёзовой пяденицы. Тёмную окраску даёт доминантный аллель C, светлую — генотип cc. Окраска наследуется.' },
+    { id: 'bird', icon: dot('#7d6a52'), name: 'Птица', spec: 'Фактор отбора. Склёвывает бабочек, заметных на коре. Доля съеденных заметных — сила отбора s.' },
+    { id: 'graph', icon: dot(CY), name: 'График поколений', spec: 'Доля тёмных бабочек в каждом поколении. Точки: белые — чистая кора, оранжевые — с сажей.' }];
+  if (id === 'species') return [
+    { id: 'isL', icon: dot('#35553a'), name: 'Острова А и Б', spec: 'Нажмите на остров, чтобы сменить корм. Корм задаёт, какой клюв выгоднее.' },
+    { id: 'sea', icon: dot('#2f6688'), name: 'Перешеек или пролив', spec: 'Низкое море открывает перешеек — птицы летают между островами и скрещиваются. Высокое море — географическая изоляция.' },
+    { id: 'beak', icon: dot('#c98a4b'), name: 'Вьюрки и их клювы', spec: 'Толщина клюва — наследственный признак. Отбор сдвигает средний клюв к лучшему для местного корма.' },
+    { id: 'seed', icon: dot('#8a6a3d'), name: 'Семена', spec: 'Мелкие семена удобнее брать тонким клювом (около 7 мм), крупные твёрдые раскалывает толстый (около 12 мм).' }];
+  return [
+    { id: 'card', icon: dot('#8b96ad'), name: 'Карточка-факт', spec: 'Один научный факт. Её можно перетащить в корзину.' },
+    { id: 'bins', icon: dot(ORA), name: 'Пять групп доказательств', spec: 'Палеонтологические, сравнительно-анатомические, эмбриологические, молекулярно-генетические, биогеографические.' },
+    { id: 'counter', icon: dot(OK), name: 'Счёт', spec: 'Сколько карточек разложено и сколько было ошибок.' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    let h = `<h2>${{ darwin: 'Опыт с пяденицей', species: 'Архипелаг вьюрков', proofs: 'Сортировка фактов' }[L.id]}</h2><p class="note">Нажмите на строку, чтобы найти это на столе.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    if (L.id === 'darwin') h += `<h3>Движущие силы эволюции</h3><div class="feat"><div style="border-left-color:${CY}"><b>Наследственная изменчивость</b>Особи различаются, и часть различий передаётся потомкам. Источник — мутации и комбинации генов.</div><div style="border-left-color:${ORA}"><b>Борьба за существование</b>Потомков больше, чем ресурсов. Бывает внутривидовая (самая острая), межвидовая и с условиями среды.</div><div style="border-left-color:${OK}"><b>Естественный отбор</b>Выживание и размножение наиболее приспособленных. Результат — приспособленность и новые виды.</div></div>
+      <h3>Формы естественного отбора</h3><div class="feat"><div style="border-left-color:${VIO}"><b>Движущий</b>Условия меняются, и средний признак сдвигается в одну сторону. Пример — тёмные пяденицы, устойчивость бактерий к антибиотикам.</div><div style="border-left-color:${VIO}"><b>Стабилизирующий</b>Условия постоянны, и отбор убирает крайние формы. Пример — у новорождённых чаще выживают дети со средней массой тела.</div><div style="border-left-color:${VIO}"><b>Разрывающий (дизруптивный)</b>Выгодны обе крайние формы, а средняя проигрывает. Может разделить популяцию на две.</div></div>
+      <h3>Искусственный отбор</h3><p class="note">Его ведёт человек и отбирает признаки, полезные себе. Так выведены породы казахской белоголовой коровы и казахской тонкорунной овцы, сорта пшеницы и яблок.</p>`;
+    if (L.id === 'species') h += `<h3>Критерии вида</h3><div class="feat"><div style="border-left-color:${CY}"><b>Морфологический</b>Сходство внешнего и внутреннего строения.</div><div style="border-left-color:${VIO}"><b>Генетический</b>Одинаковый набор хромосом (кариотип). У человека 46, у шимпанзе 48.</div><div style="border-left-color:${ORA}"><b>Физиологический</b>Сходство процессов жизнедеятельности, особенно размножения.</div><div style="border-left-color:${OK}"><b>Экологический</b>Общие условия жизни и место в экосистеме.</div><div style="border-left-color:${PINK}"><b>Географический</b>Общий ареал — область распространения.</div></div><p class="note" style="margin-top:8px">Один критерий не доказывает вид: бывают виды-двойники, похожие внешне. Решают несколько критериев вместе.</p>
+      <h3>Пути видообразования</h3><div class="feat"><div style="border-left-color:${CY}"><b>Географическое</b>Популяции разделены преградой: горами, морем, рекой. Так возникли виды галапагосских вьюрков.</div><div style="border-left-color:${OK}"><b>Экологическое</b>Популяции живут на одной территории, но в разных условиях: разная пища или время размножения. Пример — формы севанской форели, нерестящиеся в разное время и в разных местах.</div></div>`;
+    if (L.id === 'proofs') h += `<h3>Группы доказательств</h3><div class="feat">` + CATS.map(c => `<div style="border-left-color:${c.c}"><b>${c.n}</b>${{ paleo: 'Ископаемые остатки: переходные формы и филогенетические ряды.', anat: 'Гомологичные органы, рудименты, атавизмы.', embr: 'Сходство зародышей, повторение черт предков в развитии.', mol: 'Общий генетический код, сходство ДНК и белков.', geo: 'Особая флора и фауна изолированных островов и материков.' }[c.id]}</div>`).join('') + `</div>
+      <h3>Гомологичные и аналогичные</h3><div class="feat"><div style="border-left-color:${CY}"><b>Гомологичные органы</b>Одинаковое строение и происхождение, разные функции: рука, крыло, ласт. Говорят о родстве.</div><div style="border-left-color:${ORA}"><b>Аналогичные органы</b>Одинаковая функция, разное происхождение: крыло бабочки и крыло птицы. Возникли из-за сходных условий жизни, родства не доказывают.</div></div>`;
+    $('#pane-parts').innerHTML = h;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+const CYT = [['Шимпанзе', 0], ['Макака-резус', 1], ['Лошадь', 12], ['Курица', 13], ['Тунец', 21], ['Дрожжи', 44]];
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'darwin') {
+    const w = m.w, q2 = clamp(m.q * w.wd / w.wbar, 0.005, 0.995);
+    let h = `<h2>Следующее поколение</h2><div class="formula">q′ = q · w<sub>тёмн</sub> ÷ w̄</div><div class="steps">` +
+      step('Поколение', m.gen) + step('Частота аллеля C (тёмный) q', ru(m.q, 3)) +
+      step('Доля тёмных D = 1 − (1 − q)²', `1 − ${ru(1 - m.q, 3)}² = ${ru(m.D, 3)}`) +
+      step('Выживаемость тёмных w<sub>тёмн</sub>', S.bark === 'soot' ? '1' : `1 − ${ru(S.s, 2)} = ${ru(w.wd, 2)}`) +
+      step('Выживаемость светлых w<sub>светл</sub>', S.bark === 'soot' ? `1 − ${ru(S.s, 2)} = ${ru(w.wl, 2)}` : '1') +
+      step('Средняя w̄ = D·w<sub>тёмн</sub> + (1 − D)·w<sub>светл</sub>', `${ru(m.D, 3)}·${ru(w.wd, 2)} + ${ru(1 - m.D, 3)}·${ru(w.wl, 2)} = ${ru(w.wbar, 3)}`) +
+      step('q′', `${ru(m.q, 3)} · ${ru(w.wd, 2)} ÷ ${ru(w.wbar, 3)} = ${ru(q2, 3)}`) +
+      step('Тёмных в следующем поколении', `${ru(dark(m.q), 3)} → ${ru(dark(q2), 3)} (${pc(dark(q2))})`, 'sum') + `</div>`;
+    h += `<p class="note" style="margin-top:8px">Почему q′ = q · w<sub>тёмн</sub> ÷ w̄: аллель C есть только у тёмных бабочек (CC и Cc), поэтому он выживает вместе с ними. Отбор действует на признак, а меняет частоту аллеля. Модель упрощённая: популяция большая, мутации редкие.</p>`;
+    h += `<h3>Как было в Англии</h3><div class="steps">` + step('1848 г., Манчестер', 'первая тёмная бабочка') + step('Около 1895 г.', '≈ 98 % тёмных') + step('После 1956 г. (закон о чистом воздухе)', 'тёмных всё меньше') + step('Сейчас', 'тёмные редки', 'sum') + `</div>`;
+    return h;
+  }
+  if (id === 'species') {
+    const ri = m.ri, gain = 1 + 1.5 * m.diff;
+    let h = `<h2>Расхождение популяций</h2><div class="formula">RI = 1 − e<sup>−D/12</sup></div><div class="steps">` +
+      step('Прошло времени', `${S.t} × 50 тыс. = ${S.t * 50} тыс. лет`) +
+      step('Лучший клюв: А / Б', `${ru(optL())} / ${ru(optR())} мм`) +
+      step('Клюв сейчас: А / Б', `${ru(S.bl, 2)} / ${ru(S.br, 2)} мм`) +
+      step('Шаг отбора', `b + 0,35 · (лучший − b)`) +
+      step('Разница клювов', ru(m.diff, 2) + ' мм') +
+      step('Генетические различия D', ru(m.D, 1)) +
+      step('Прирост D за шаг при изоляции', `1 + 1,5 · ${ru(m.diff, 2)} = ${ru(gain, 2)}`) +
+      step('Изоляция RI', `1 − e<sup>−${ru(m.D, 1)}/12</sup> = ${ru(ri, 2)} (${pc(ri)})`) +
+      step('Плодовитость гибридов', `1 − ${ru(ri, 2)} = ${pc(1 - ri)}`, 'sum') + `</div>`;
+    h += `<p class="note" style="margin-top:8px">Модель упрощённая, числа условные. «1» в приросте — мутации, которые накапливаются случайно даже в одинаковых условиях. Слагаемое с разницей клювов — вклад отбора. Пока перешеек открыт и изоляция меньше 90 %, гены перемешиваются, и различия D почти исчезают.</p>`;
+    h += `<h3>Как видно, что это два вида</h3><div class="steps">` + step('1. Изоляция', S.sea === 'high' ? 'пролив ✓' : 'перешеек') + step('2. Различия', m.diff >= 2 ? 'клювы разные ✓' : 'клювы похожи') + step('3. Гибриды', ri >= 0.9 ? 'почти бесплодны ✓' : 'плодовиты') + step('4. Встреча на перешейке', m.species && S.sea === 'low' && m.contact ? 'не скрещиваются ✓' : 'не проверено', 'sum') + `</div>`;
+    return h;
+  }
+  let h = `<h2>Как рассуждать</h2><div class="steps">` +
+    step('1. Это ископаемые остатки?', 'палеонтология') + step('2. Это строение органов взрослых?', 'сравнительная анатомия') + step('3. Это развитие зародыша?', 'эмбриология') +
+    step('4. Это ДНК, белки, генетический код?', 'молекулярная биология') + step('5. Это где живут организмы на Земле?', 'биогеография') + `</div>`;
+  const pl = CARDS.filter(c => S.placed[c.id] !== undefined);
+  if (pl.length) h += `<h3>Уже разложено</h3><div class="steps">` + pl.map(c => step(c.t, CATS[S.placed[c.id]].n)).join('') + `</div>`;
+  h += `<h3>Цитохром c: различия с человеком</h3><div class="formula">доля = различий ÷ 104 × 100 %</div><div class="steps">` +
+    CYT.map(([n, d]) => step(n, `${d} аминокислот · ${ru(d / 104 * 100, 1)} %`)).join('') + `</div><p class="note" style="margin-top:8px">Цитохром c — белок дыхания клеток из 104 аминокислот. Числа приближённые и в разных источниках немного различаются. Порядок важен: чем дальше родство, тем больше различий.</p>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const el = $('#meter'), dn = S.done[LID()];
+  if (m.kind === 'sel') {
+    el.innerHTML = `<div class="k">Тёмные бабочки</div><div class="v ${dn ? 'ok' : ''}">${pc(m.D)}</div>
+      <div class="lr"><span>поколение</span><span>${m.gen}</span></div><div class="lr"><span>кора</span><span>${S.bark === 'soot' ? 'сажа' : 'чистая'}</span></div><div class="lr"><span>отбор s</span><span>${ru(S.s, 2)}</span></div>
+      <div class="gauge"><b style="width:${Math.round(m.D * 100)}%;${dn ? 'background:var(--ok)' : ''}"></b></div>`;
+  } else if (m.kind === 'spec') {
+    el.innerHTML = `<div class="k">Изоляция</div><div class="v ${m.species ? 'ok' : ''}">${pc(m.ri)}</div>
+      <div class="lr"><span>клювы</span><span>${ru(S.bl)} / ${ru(S.br)}</span></div><div class="lr"><span>гибриды</span><span>${pc(1 - m.ri)}</span></div><div class="lr"><span>видов</span><span>${m.species ? 2 : 1}</span></div>
+      <div class="gauge"><b style="width:${Math.round(m.ri * 100)}%;${m.species ? 'background:var(--ok)' : ''}"></b></div>`;
+  } else {
+    el.innerHTML = `<div class="k">Разложено</div><div class="v ${dn ? 'ok' : ''}">${m.placedN} из ${CARDS.length}</div>
+      <div class="lr"><span>ошибок</span><span>${m.miss}</span></div><div class="lr"><span>осталось</span><span>${CARDS.length - m.placedN}</span></div>
+      <div class="gauge"><b style="width:${m.placedN * 10}%;${dn ? 'background:var(--ok)' : ''}"></b></div>`;
+  }
+}
+
+function update() {
+  const m = model(), L = LESSONS[S.lesson];
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Вы разобрались, как работает эволюция!'), 1800);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  darwin: '<rect x="6" y="2" width="22" height="26" rx="3" fill="#33312e"/><path d="M17 12L9 9Q8 15 15 16Z M17 12L25 9Q26 15 19 16Z" fill="#e6e2d4"/><path d="M34 24L42 20L50 12L60 6" fill="none" stroke="#72d4e8" stroke-width="2"/><circle cx="60" cy="6" r="2" fill="#ffb547"/>',
+  species: '<rect x="1" y="2" width="64" height="26" rx="4" fill="#15334a"/><ellipse cx="17" cy="16" rx="14" ry="10" fill="#35553a" stroke="#c8b07a"/><ellipse cx="49" cy="16" rx="14" ry="10" fill="#35553a" stroke="#c8b07a"/><circle cx="15" cy="15" r="3.5" fill="#c98a4b"/><circle cx="51" cy="15" r="3.5" fill="#8fa6c8"/>',
+  proofs: '<rect x="4" y="16" width="10" height="12" rx="2" fill="none" stroke="#ffb547"/><rect x="16" y="16" width="10" height="12" rx="2" fill="none" stroke="#72d4e8"/><rect x="28" y="16" width="10" height="12" rx="2" fill="none" stroke="#ff8fb8"/><rect x="40" y="16" width="10" height="12" rx="2" fill="none" stroke="#b48cff"/><rect x="52" y="16" width="10" height="12" rx="2" fill="none" stroke="#86e0a8"/><rect x="22" y="2" width="22" height="11" rx="2" fill="#1a2438" stroke="#8b96ad"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i];
+  S.lesson = i; S.hl = null; drag = null;
+  resetLesson();
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const ls = $('#lessons'), cur = ls.querySelector('.lesson[aria-current="true"]');
+  if (cur) { const a = ls.getBoundingClientRect(), b = cur.getBoundingClientRect(); ls.scrollLeft += b.left - a.left - (a.width - b.width) / 2; }
+}
+
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '', guide = '';
+  if (id === 'darwin') {
+    now = `Модель берёзовой пяденицы: ствол берёзы, на нём 40 бабочек, рядом птица и график доли тёмных бабочек по поколениям. Кора: ${BARK[S.bark].s}. Сила отбора s = ${ru(S.s, 2)}. Поколение ${m.gen}. Частота аллеля тёмной окраски C (доминантный) q = ${ru(m.q, 3)}, доля тёмных бабочек ${pc(m.D)}. Выживаемость: тёмных ${ru(m.w.wd, 2)}, светлых ${ru(m.w.wl, 2)}.${S.eat ? ` В последнем поколении птицы съели светлых ${S.eat.l} из ${S.eat.nl}, тёмных ${S.eat.d} из ${S.eat.nd}.` : ''}`;
+    guide = 'Спрашивай, какая бабочка заметнее на такой коре, кто здесь фактор отбора, что будет при s = 0 и почему меняется частота аллеля, хотя птица «видит» только окраску. Не делай за ученика, пусть сам нажимает кнопки.';
+  }
+  if (id === 'species') {
+    now = `Модель видообразования: два острова (А и Б) с вьюрками. Уровень моря: ${S.sea === 'high' ? 'высокий, между островами пролив (географическая изоляция)' : 'низкий, острова соединены перешейком'}. Корм: А — ${FOOD[S.fL].n.toLowerCase()}, Б — ${FOOD[S.fR].n.toLowerCase()}. Средний клюв: А ${ru(S.bl, 1)} мм, Б ${ru(S.br, 1)} мм. Генетические различия D = ${ru(m.D, 1)}, репродуктивная изоляция ${pc(m.ri)}, плодовитость гибридов ${pc(1 - m.ri)}. Прошло ${S.t * 50} тыс. лет. Два вида: ${m.species ? 'да' : 'нет'}. Проверка встречей на перешейке после образования видов: ${m.contact ? 'пройдена' : 'не проведена'}. Модель упрощённая, числа условные.`;
+    guide = 'Не говори порядок нажатий. Спрашивай: что мешает популяциям обмениваться генами, почему разный корм ускоряет расхождение, что будет, если открыть перешеек рано, какой критерий вида главный.';
+  }
+  if (id === 'proofs') {
+    const c = curCard();
+    now = `Игра-сортировка: 10 карточек с фактами раскладываются по пяти группам доказательств эволюции (палеонтологические, сравнительно-анатомические, эмбриологические, молекулярно-генетические, биогеографические). Разложено ${m.placedN} из 10, ошибок ${m.miss}. ${c ? `Текущая карточка: «${c.t}» — ${c.d}` : 'Все карточки разложены.'}`;
+    guide = 'Не называй группу для текущей карточки. Спроси, о чём этот факт: об ископаемых, о строении взрослых органов, о зародышах, о молекулах или о расселении по Земле. Можно объяснить разницу гомологичных и аналогичных органов, рудиментов и атавизмов.';
+  }
+  return [
+    `Раздел: биология, 11 класс, тема «Эволюция» (Наследственность и эволюция). Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Для тьютора: ${guide}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = { darwin: 'Почему птицы меняют окраску бабочек, хотя не трогают их гены?', species: 'Почему разделённые популяции становятся разными видами?', proofs: 'Чем гомологичные органы отличаются от аналогичных?' }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

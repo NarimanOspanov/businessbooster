@@ -1,0 +1,908 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по химии, 11 класс: очищаем воздух и воду города, моделируем парниковый эффект и сравниваем атомную экономию промышленных синтезов.">
+<title>Химия и экология</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /mechanics and /chemistry. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:pointer}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:6px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.meter .lr .bad{color:var(--warn)}
+.meter .lr .good{color:var(--ok)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--liq);transition:width .2s}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1.2 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 16px/1.4 var(--font-mono);text-align:center;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:124px;padding:8px}
+  .meter .v{font-size:13px}
+  .meter .lr{font-size:10px}
+  .task{max-width:calc(100% - 152px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 240px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><ellipse cx="20" cy="20" rx="14" ry="5.5" fill="none" stroke="var(--arm)" stroke-width="1.6"/><ellipse cx="20" cy="20" rx="14" ry="5.5" fill="none" stroke="var(--arm)" stroke-width="1.6" transform="rotate(60 20 20)"/><ellipse cx="20" cy="20" rx="14" ry="5.5" fill="none" stroke="var(--arm)" stroke-width="1.6" transform="rotate(-60 20 20)"/><circle cx="20" cy="20" r="3.2" fill="var(--force)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Химия · Химия и экология</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#chem">Карта</a><a href="/physics/#chem">Химия</a><a href="/labs/chem-eco/" aria-current="page">Экология</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Экология</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Модель">
+    <svg class="scene" id="scene" role="img" aria-label="Модель города, атмосферы или химического реактора. На объекты можно нажимать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const KEY = 'luch-chem-eco';
+const SUBD = { '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉' };
+const low = s => String(s).replace(/\d/g, d => SUBD[d]);
+const fx = (v, d = 1) => v.toFixed(d).replace('.', ',');
+const mix = (a, b, k) => { const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); const A = p(a), B = p(b); return '#' + A.map((x, i) => Math.round(x + (B[i] - x) * clamp(k, 0, 1)).toString(16).padStart(2, '0')).join(''); };
+
+// ---------- lesson 1: city air and water ----------
+const BUDGET = 13;
+const MEAS = [
+  { k: 'scrub', name: 'Сероочистка', obj: 'ТЭЦ', cost: 3, real: true, tip: 'Сероочистка: известняк связывает SO₂ — 2CaCO₃ + 2SO₂ + O₂ → 2CaSO₄ + 2CO₂. Получается гипс, выброс SO₂ падает в 10 раз.' },
+  { k: 'filter', name: 'Электрофильтр', obj: 'ТЭЦ', cost: 2, real: true, tip: 'Электрофильтр: заряженные пластины притягивают частицы золы и сажи. Улавливает до 99 % пыли.' },
+  { k: 'stack', name: 'Высокая труба', obj: 'ТЭЦ', cost: 2, real: false, tip: 'Труба выше — над городом дым реже. Но выбросы те же: ветер уносит SO₂ к соседям, и там он выпадает кислотным дождём.' },
+  { k: 'gas', name: 'Газ в дома', obj: 'частный сектор', cost: 3, real: true, tip: 'Газ вместо угля: CH₄ + 2O₂ → CO₂ + 2H₂O. Метан горит почти без сажи и без SO₂.' },
+  { k: 'cat', name: 'Нейтрализатор', obj: 'автомобили', cost: 2, real: true, tip: 'Каталитический нейтрализатор: на платине и родии 2CO + 2NO → 2CO₂ + N₂. Выброс оксидов азота падает в 5 раз.' },
+  { k: 'treat', name: 'Очистка стоков', obj: 'завод', cost: 3, real: true, tip: 'Известковое молоко нейтрализует кислоту и осаждает медь: Cu²⁺ + 2OH⁻ → Cu(OH)₂↓. Осадок отделяют.' },
+  { k: 'dilute', name: 'Разбавить сток', obj: 'завод', cost: 2, real: false, tip: 'Сток разбавили водой: концентрация ниже, но масса меди и кислоты в реке та же. Норма сброса считается по массе.' },
+];
+const MK = k => MEAS.find(x => x.k === k);
+
+// ---------- lesson 2: greenhouse effect ----------
+const C0 = 280, M0 = 722, LAMBDA = 0.8, T0 = 14;
+const PRESETS = [
+  { k: '1750', name: '1750 год', c: 280, m: 722 },
+  { k: '1960', name: '1960 год', c: 315, m: 1250 },
+  { k: 'now', name: 'Сегодня', c: 420, m: 1900 },
+  { k: '2100', name: '2100, если не сокращать', c: 800, m: 2600 },
+];
+const forcing = (c, m) => { const fc = 5.35 * Math.log(c / C0), fm = 0.036 * (Math.sqrt(m) - Math.sqrt(M0)); return { fc, fm, f: fc + fm, dT: LAMBDA * (fc + fm) }; };
+
+// ---------- lesson 3: atom economy ----------
+const MR = { C2H4: 28, H2O: 18, C2H5OH: 46, C2H5Cl: 64.5, NaOH: 40, NaCl: 58.5, Cl2: 71, 'Ca(OH)2': 74, C2H4O: 44, CaCl2: 111, O2: 32, CH3COOH: 60, CH3OH: 32, CO: 28 };
+const TGT = [
+  { id: 'eth', name: 'этанол', f: 'C2H5OH', best: 0, routes: [
+    { name: 'Гидратация этилена', re: [[1, 'C2H4'], [1, 'H2O']], pr: [1, 'C2H5OH'], ws: [], cond: 'катализатор H₃PO₄, 300 °C, 7 МПа' },
+    { name: 'Хлорэтан + щёлочь', re: [[1, 'C2H5Cl'], [1, 'NaOH']], pr: [1, 'C2H5OH'], ws: [[1, 'NaCl']], cond: 'водный раствор щёлочи, нагревание' } ] },
+  { id: 'eo', name: 'оксид этилена', f: 'C2H4O', best: 1, routes: [
+    { name: 'Хлоргидринный способ', re: [[1, 'C2H4'], [1, 'Cl2'], [1, 'Ca(OH)2']], pr: [1, 'C2H4O'], ws: [[1, 'CaCl2'], [1, 'H2O']], cond: 'хлор, затем гашёная известь' },
+    { name: 'Прямое окисление', re: [[2, 'C2H4'], [1, 'O2']], pr: [2, 'C2H4O'], ws: [], cond: 'серебряный катализатор, 250 °C' } ] },
+  { id: 'ac', name: 'уксусная кислота', f: 'CH3COOH', best: 1, routes: [
+    { name: 'Окисление этанола', re: [[1, 'C2H5OH'], [1, 'O2']], pr: [1, 'CH3COOH'], ws: [[1, 'H2O']], cond: 'уксуснокислые бактерии или катализатор' },
+    { name: 'Карбонилирование метанола', re: [[1, 'CH3OH'], [1, 'CO']], pr: [1, 'CH3COOH'], ws: [], cond: 'родиевый или иридиевый катализатор, 150–200 °C' } ] },
+];
+const sp = ([n, f]) => (n > 1 ? n + ' ' : '') + low(f);
+const eqOf = R => R.re.map(sp).join(' + ') + ' → ' + [R.pr, ...R.ws].map(sp).join(' + ');
+const massOf = list => list.reduce((s, [n, f]) => s + n * MR[f], 0);
+const aeOf = R => massOf([R.pr]) / massOf(R.re) * 100;
+
+const LESSONS = [
+  { id: 'pollution', title: 'Загрязнение воздуха и воды',
+    text: ['Главные загрязнители воздуха города — оксид серы(IV) SO₂, оксиды азота NO и NO₂, угарный газ CO и мелкая пыль PM2,5. SO₂ и пыль дают уголь на ТЭЦ и в печах, оксиды азота — моторы и любое горение при высокой температуре.',
+           'В воздухе SO₂ и NO₂ окисляются и растворяются в каплях: 2SO₂ + O₂ → 2SO₃, SO₃ + H₂O → H₂SO₄; 4NO₂ + O₂ + 2H₂O → 4HNO₃. Так выпадают кислотные дожди: pH ниже 5,6.',
+           'Воду загрязняют кислые стоки, ионы тяжёлых металлов (Cu²⁺, Pb²⁺, Hg²⁺), нефтепродукты. Для каждого вещества есть ПДК — предельно допустимая концентрация. Предприятию ставят норму выброса, чтобы ПДК не превышалась.'],
+    why: 'Зимний смог Алматы и Астаны — это сажа и SO₂ от угля, поэтому ТЭЦ-2 Алматы переводят на газ, а частные дома газифицируют. Инженеры-экологи на заводах, лаборанты «Казгидромета», технологи очистных сооружений считают выбросы каждый день. Ошибка стоит денег: штрафы за превышение норм в Казахстане исчисляются миллионами тенге.',
+    safe: 'Не сжигайте мусор и пластик в печи или во дворе: выделяются CO, сажа и ядовитые хлорорганические вещества. Печь закрывайте заслонкой только после полного прогорания углей — иначе угарный газ CO пойдёт в дом.',
+    task: 'В бюджете 13 ед. выберите меры так, чтобы все выбросы города стали не выше нормы, а сток — нейтральным (pH 6,5–8,5).',
+    hint: 'Нажимайте на карточки мер вверху. Смотрите, какой показатель меняет каждая мера. Не всякая дорогая мера уменьшает выброс.',
+    stage: 'Нажмите карточку меры — включить или выключить. Нажмите на объект города, чтобы узнать, что он выбрасывает.',
+    init: {},
+    check: m => m.ok },
+  { id: 'greenhouse', title: 'Парниковый эффект',
+    text: ['Солнечный свет почти свободно проходит сквозь атмосферу и нагревает Землю. Тёплая поверхность сама излучает — но уже инфракрасные лучи. Их поглощают молекулы H₂O, CO₂, CH₄ и снова излучают во все стороны, в том числе обратно вниз.',
+           'Это парниковый эффект. Без него средняя температура Земли была бы около −18 °C, а с ним — около +14 °C. Опасен не сам эффект, а его усиление: с 1750 года CO₂ вырос с 280 до 420 ppm, метан — с 0,72 до 1,9 ppm.',
+           'Источники CO₂ — сжигание угля, нефти, газа, производство цемента, вырубка лесов. Метан даёт скот, рисовые поля, свалки и утечки газа. Молекула CH₄ удерживает тепло в 25–30 раз сильнее, чем CO₂ (за 100 лет).'],
+    why: 'Климатологи «Казгидромета» и гляциологи следят за ледниками Заилийского Алатау: ледник Туюксу за 60 лет заметно отступил, а это вода для Алматы. В Казахстане работает система квот на выбросы CO₂ для крупных заводов, и специалисты по углеродной отчётности (ESG) сегодня востребованы в банках и компаниях. Агрономам важно понимать климат: засухи бьют по урожаю пшеницы.',
+    task: 'Поставьте сегодняшний состав атмосферы (CO₂ 420 ppm, CH₄ 1900 ppb). Затем, не меняя метан, найдите уровень CO₂, при котором потепление 1,4–1,5 °C.',
+    hint: 'Кнопка «Сегодня» ставит нужный состав. Потом уменьшайте CO₂ кнопкой «−CO₂» и следите за ΔT на градуснике.',
+    stage: 'Жёлтые стрелки — солнечный свет, красные — инфракрасное излучение Земли. Состав атмосферы — кнопки внизу или ползунки на вкладке «Схема».',
+    init: { co2: 280, ch4: 722 },
+    check: m => m.seen && m.ch4 >= 1850 && m.ch4 <= 1950 && m.dT >= 1.4 && m.dT <= 1.5 },
+  { id: 'green', title: 'Зелёная химия',
+    text: ['Зелёная химия — это 12 принципов: лучше не создавать отходы, чем потом их очищать. Использовать безопасные вещества, катализаторы, возобновляемое сырьё, тратить меньше энергии.',
+           'Простая мера «зелёности» — атомная экономия: какая доля массы всех реагентов попала в нужный продукт. АЭ = M(продукта) : ΣM(реагентов) · 100 %. Реакции присоединения дают 100 %, реакции обмена и замещения всегда оставляют побочные вещества.',
+           'Вторая мера — E-фактор: сколько килограммов отходов приходится на 1 кг продукта. В нефтехимии он около 0,1, а в производстве лекарств бывает 25–100.'],
+    why: 'В Атырау KPI выпускает полипропилен, нефтехимики Казахстана строят заводы полиэтилена. Технолог, который выбрал путь синтеза без отходов, экономит компании сырьё, плату за утилизацию и штрафы. Те же принципы нужны в фармацевтике, пищевой химии и в стартапах по переработке пластика.',
+    safe: 'Хлор Cl₂ и хлорэтан ядовиты, этилен и оксид этилена горючи и взрывоопасны. Такие синтезы проводят только на заводах в закрытых аппаратах, не в школе и не дома.',
+    task: 'Для трёх продуктов запустите оба пути синтеза и выберите более зелёный путь по атомной экономии.',
+    hint: 'Нажмите на колбу — реакция пойдёт, и атомы разойдутся по ящикам «Продукт» и «Отходы». Сравните оба пути, потом нажмите «Этот путь зеленее».',
+    stage: 'Продукт — кнопки вверху панели, пути — «Путь 1» и «Путь 2». Нажмите на колбу, чтобы запустить реакцию.',
+    init: { tgt: 0, route: 0 },
+    check: m => TGT.every(t => m.pick[t.id] === t.best) },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null,
+            meas: {}, info: null, co2: 280, ch4: 722, seen: false, tgt: 0, route: 0, ran: {}, pick: {}, wrong: 0, anim: null };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+function model() {
+  const id = LID();
+  if (id === 'pollution') {
+    const on = S.meas;
+    const src = { so2tec: 2.4 * (on.scrub ? 0.1 : 1), no2tec: 0.6, no2car: 1.2 * (on.cat ? 0.2 : 1), pmtec: 1.0 * (on.filter ? 0.05 : 1), pmhome: 1.5 * (on.gas ? 0.1 : 1) };
+    const so2 = src.so2tec, no2 = src.no2tec + src.no2car, pm = src.pmtec + src.pmhome, cu = 3.0 * (on.treat ? 0.05 : 1);
+    const ph = on.treat ? 7.5 : 2.8 + (on.dilute ? 0.5 : 0);
+    const spent = MEAS.reduce((s, x) => s + (on[x.k] ? x.cost : 0), 0);
+    const acid = 0.9 * so2 + 0.4 * no2, rain = 5.6 - Math.log10(1 + 3 * acid);
+    const ind = [['SO₂', so2], ['NO₂', no2], ['пыль', pm], ['Cu²⁺', cu]];
+    const good = ind.filter(x => x[1] <= 1.0001).length + (ph >= 6.5 && ph <= 8.5 ? 1 : 0);
+    return { kind: 'pol', src, so2, no2, pm, cu, ph, spent, rain, ind, good, ok: good === 5 };
+  }
+  if (id === 'greenhouse') { const F = forcing(S.co2, S.ch4); return { kind: 'gh', co2: S.co2, ch4: S.ch4, ...F, T: T0 + F.dT, seen: S.seen }; }
+  const T = TGT[S.tgt], R = T.routes[S.route], mr = massOf(R.re), mp = massOf([R.pr]), mw = massOf(R.ws);
+  return { kind: 'gc', T, R, mr, mp, mw, ae: mp / mr * 100, ef: mw / mp, ran: S.ran, pick: S.pick };
+}
+
+// ---------- scene ----------
+const GY = 360;
+function backdrop(sky) {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.05)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="2360" fill="${sky || 'url(#tile)'}"/>
+    <rect x="-2000" y="${GY}" width="4520" height="1200" fill="#1a2232"/>
+    <rect x="-2000" y="${GY - 2}" width="4520" height="4" fill="#2c3954"/>`;
+}
+
+// ----- lesson 1 -----
+const TOK = { w: 118, h: 30, rows: [{ y: 100, xs: [10, 136, 262, 388], ks: ['scrub', 'filter', 'stack', 'gas'] }, { y: 136, xs: [73, 199, 325], ks: ['cat', 'treat', 'dilute'] }] };
+const OBJ = { tec: [24, 230, 116, 132], homes: [156, 300, 120, 62], road: [282, 318, 120, 44], factory: [406, 290, 96, 72], river: [-40, 380, 600, 22] };
+function puffs(x, y, n, amt, col, t, dx, spread, seed) {
+  if (amt <= 0.02) return '';
+  let h = '';
+  for (let i = 0; i < n; i++) {
+    const ph = reduce ? i / n : ((t / 2600 + i / n + seed) % 1);
+    const px = x + dx * ph * 60 + Math.sin(i * 2.3 + seed * 7) * spread * ph, py = y - ph * 70, r = 4 + ph * 12 * Math.min(1.4, 0.5 + amt * 0.4);
+    h += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${r.toFixed(1)}" fill="${col}" opacity="${(Math.min(0.75, amt * 0.32) * (1 - ph * 0.8)).toFixed(2)}"/>`;
+  }
+  return h;
+}
+function polSVG(m, t) {
+  const on = S.meas;
+  const air = (m.so2 + m.no2 + m.pm) / 3;
+  let h = `<rect x="-2000" y="-400" width="4520" height="${GY + 400}" fill="#8a7a55" opacity="${clamp((air - 0.6) * 0.09, 0, 0.18).toFixed(3)}"/>`;
+  // tokens
+  for (const row of TOK.rows) row.ks.forEach((k, i) => {
+    const M = MK(k), x = row.xs[i], y = row.y, a = !!on[k];
+    h += `<g data-drag="m-${k}"><rect x="${x}" y="${y}" width="${TOK.w}" height="${TOK.h}" rx="8" fill="${a ? '#16261f' : '#121a28'}" stroke="${a ? '#86e0a8' : '#3a4762'}" stroke-width="1.5"/>` +
+      `<text x="${x + 10}" y="${y + 13}" font-size="10" fill="${a ? '#86e0a8' : '#e8ecf4'}" font-weight="500">${a ? '✓ ' : ''}${M.name}</text>` +
+      `<text x="${x + 10}" y="${y + 24}" font-size="8" fill="#8b96ad">${M.obj} · ${M.cost} ед.</text></g>`;
+  });
+  // TEC
+  const stackTop = on.stack ? 170 : 236;
+  h += `<g data-drag="o-tec"><rect x="30" y="292" width="88" height="68" fill="#2a3448" stroke="#3a4762"/><rect x="40" y="304" width="12" height="12" fill="#ffb547" opacity=".5"/><rect x="60" y="304" width="12" height="12" fill="#ffb547" opacity=".5"/><rect x="80" y="304" width="12" height="12" fill="#ffb547" opacity=".35"/>` +
+    `<path d="M104 292L108 ${stackTop}H120L124 292Z" fill="#3a4560" stroke="#4a5778"/><rect x="107" y="${stackTop + 8}" width="14" height="5" fill="#c94f43" opacity=".8"/>` +
+    (on.scrub ? `<rect x="122" y="318" width="16" height="42" rx="3" fill="#24443a" stroke="#86e0a8"/>` : '') + (on.filter ? `<rect x="10" y="322" width="18" height="38" rx="2" fill="#24443a" stroke="#86e0a8"/>` : '') + `</g>`;
+  h += puffs(114, stackTop, 7, m.so2 + m.src.pmtec + 0.3, mix('#9aa3b5', '#c9b56a', m.so2 / 2.4), t, 0.9, 10, 0.1);
+  // homes
+  for (let i = 0; i < 3; i++) {
+    const x = 162 + i * 38;
+    h += `<g data-drag="o-homes"><rect x="${x}" y="330" width="30" height="30" fill="#2f3a52" stroke="#3a4762"/><path d="M${x - 3} 330L${x + 15} 314L${x + 33} 330Z" fill="#5a4636"/><rect x="${x + 21}" y="312" width="6" height="12" fill="#4a3d33"/><rect x="${x + 6}" y="338" width="8" height="8" fill="#ffb547" opacity=".55"/></g>`;
+    h += puffs(x + 24, 312, 4, m.src.pmhome, '#59606d', t, 0.5, 6, 0.3 + i * 0.21);
+  }
+  if (on.gas) h += `<path d="M150 356H280" stroke="#e6c63a" stroke-width="2.4" stroke-dasharray="6 4"/>`;
+  // road + cars
+  h += `<g data-drag="o-road"><rect x="286" y="346" width="112" height="14" fill="#252c3b"/><path d="M290 353H394" stroke="#8b96ad" stroke-dasharray="6 6" stroke-width="1"/>`;
+  for (let i = 0; i < 2; i++) {
+    const cx = 290 + ((reduce ? i * 0.5 : (t / 5200 + i * 0.5) % 1) * 96);
+    h += `<rect x="${cx.toFixed(1)}" y="${i ? 349 : 340}" width="20" height="9" rx="3" fill="${i ? '#4d7cf0' : '#e5533f'}"/><circle cx="${(cx + 5).toFixed(1)}" cy="${i ? 358 : 349}" r="2" fill="${INK}"/><circle cx="${(cx + 15).toFixed(1)}" cy="${i ? 358 : 349}" r="2" fill="${INK}"/>`;
+    h += puffs(cx - 2, i ? 354 : 345, 3, m.src.no2car, mix('#8b96ad', '#a0603a', 0.6), t, -0.4, 4, 0.5 + i * 0.3);
+  }
+  h += `</g>`;
+  // factory + pipe
+  h += `<g data-drag="o-factory"><rect x="412" y="304" width="84" height="56" fill="#2a3448" stroke="#3a4762"/><path d="M412 304l14-14v14l14-14v14l14-14v14" fill="#2a3448" stroke="#3a4762"/><rect x="478" y="262" width="10" height="42" fill="#3a4560"/>` +
+    `<path d="M452 360V384" stroke="#6b7690" stroke-width="5"/>` + (on.treat ? `<rect x="440" y="336" width="26" height="22" rx="3" fill="#24443a" stroke="#86e0a8"/><path d="M445 352h16" stroke="#86e0a8" stroke-width="1.2"/>` : '') + `</g>`;
+  // river
+  const dirt = clamp((m.cu / 3) * 0.6 + (m.ph < 6.5 ? 0.4 * (6.5 - m.ph) / 3.7 : 0), 0, 1);
+  h += `<g data-drag="o-river"><rect x="-2000" y="382" width="4520" height="20" fill="${mix('#3f8fc4', '#6f8a3c', dirt)}" opacity=".85"/>`;
+  if (dirt > 0.05) h += `<ellipse cx="${on.dilute ? 470 : 456}" cy="390" rx="${on.dilute ? 60 : 30}" ry="7" fill="#9bbf3a" opacity="${(dirt * (on.dilute ? 0.35 : 0.6)).toFixed(2)}"/>`;
+  h += `</g>`;
+  // labels
+  h += `<text x="74" y="376" font-size="9" fill="#8b96ad" text-anchor="middle">ТЭЦ · уголь</text><text x="219" y="376" font-size="9" fill="#8b96ad" text-anchor="middle">частный сектор</text><text x="342" y="376" font-size="9" fill="#8b96ad" text-anchor="middle">дорога</text><text x="454" y="376" font-size="9" fill="#8b96ad" text-anchor="middle">медный завод</text>`;
+  h += `<text x="260" y="198" font-size="10" fill="${m.rain < 5 ? '#ff8a73' : '#8b96ad'}" text-anchor="middle">дождь: pH ≈ ${fx(m.rain)} ${m.rain < 5 ? '· кислотный' : ''}</text>`;
+  if (m.rain < 5.3 && !reduce) for (let i = 0; i < 10; i++) { const x = 150 + i * 23, y = 210 + ((t / 900 + i * 0.37) % 1) * 70; h += `<path d="M${x} ${y.toFixed(1)}l-2 7" stroke="${mix('#72d4e8', '#ff8a73', clamp((5.6 - m.rain) / 1.2, 0, 1))}" stroke-width="1.2" opacity=".55"/>`; }
+  return h;
+}
+
+// ----- lesson 2 -----
+let rngS = 7;
+const rng = () => { rngS = (rngS * 16807) % 2147483647; return (rngS - 1) / 2147483646; };
+const MOLS = (() => { rngS = 7; const a = []; for (let i = 0; i < 60; i++) a.push({ x: 24 + rng() * 420, y: 168 + rng() * 140, r: rng() * 6.28 }); return a; })();
+const nMol = (c, m) => ({ co2: Math.round(c / 28), ch4: Math.round(m / 300), h2o: 6 });
+const PH = { list: [], last: 0, prev: 0 };
+function pAbs(m) { return clamp(0.32 + 0.09 * m.f, 0.1, 0.92); }
+function stepPhotons(t, m) {
+  const dt = Math.min(60, t - (PH.prev || t)); PH.prev = t;
+  if (t - PH.last > 260) { PH.last = t; PH.list.push({ k: 'sun', x: 70 + Math.random() * 370, y: 70 }); }
+  const pa = pAbs(m);
+  for (const p of PH.list) {
+    if (p.k === 'sun') { p.y += 0.24 * dt; if (p.y >= GY - 2) { p.k = 'ir'; p.y = GY - 2; p.ya = Math.random() < pa ? 175 + Math.random() * 130 : -1; } }
+    else if (p.k === 'ir') { p.y -= 0.2 * dt; if (p.ya > 0 && p.y <= p.ya) { p.k = 'back'; p.flash = t; } if (p.y < 40) p.dead = true; }
+    else { p.y += 0.2 * dt; if (p.y >= GY - 2) p.dead = true; }
+  }
+  PH.list = PH.list.filter(p => !p.dead).slice(-80);
+}
+function ghSVG(m, t) {
+  let h = '';
+  const n = nMol(m.co2, m.ch4);
+  // atmosphere band
+  h += `<rect x="-2000" y="160" width="4520" height="160" fill="rgba(114,212,232,${(0.03 + 0.012 * m.f).toFixed(3)})"/><text x="12" y="174" font-size="8.5" fill="#8b96ad">атмосфера</text>`;
+  // sun
+  h += `<g data-drag="o-sun"><circle cx="40" cy="126" r="18" fill="#ffd36b"/><circle cx="40" cy="126" r="25" fill="none" stroke="#ffd36b" stroke-opacity=".35" stroke-width="3"/></g>`;
+  // mountain with glacier
+  const snow = clamp(1 - m.dT / 4, 0.04, 1), py = 262, sh = 46 * snow;
+  h += `<g data-drag="o-ice"><path d="M296 ${GY}L360 ${py}L430 ${GY}Z" fill="#33405a"/><path d="M360 ${py}L${(360 - sh * 64 / 98).toFixed(1)} ${(py + sh).toFixed(1)}L${(360 + sh * 70 / 98).toFixed(1)} ${(py + sh).toFixed(1)}Z" fill="#eef4fb"/></g>`;
+  // ground
+  h += `<g data-drag="o-ground"><rect x="-2000" y="${GY - 2}" width="4520" height="8" fill="${mix('#2f6b4a', '#b0703a', clamp(m.dT / 4, 0, 1))}"/></g>`;
+  // molecules
+  let k = 0;
+  const mol = (type) => { const p = MOLS[k++ % MOLS.length], c = Math.cos(p.r) * 6, s = Math.sin(p.r) * 6;
+    if (type === 'co2') return `<circle cx="${(p.x - c).toFixed(1)}" cy="${(p.y - s).toFixed(1)}" r="3.4" fill="#e5533f"/><circle cx="${(p.x + c).toFixed(1)}" cy="${(p.y + s).toFixed(1)}" r="3.4" fill="#e5533f"/><circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.8" fill="#4f586d" stroke="#8b96ad" stroke-width=".6"/>`;
+    if (type === 'ch4') return `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.8" fill="#4f586d" stroke="#8b96ad" stroke-width=".6"/>` + [0, 1, 2, 3].map(j => `<circle cx="${(p.x + Math.cos(p.r + j * 1.57) * 5.5).toFixed(1)}" cy="${(p.y + Math.sin(p.r + j * 1.57) * 5.5).toFixed(1)}" r="2.2" fill="#eef2f8"/>`).join('');
+    return `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.6" fill="#e5533f" opacity=".7"/><circle cx="${(p.x - 4).toFixed(1)}" cy="${(p.y + 3.5).toFixed(1)}" r="2" fill="#eef2f8" opacity=".7"/><circle cx="${(p.x + 4).toFixed(1)}" cy="${(p.y + 3.5).toFixed(1)}" r="2" fill="#eef2f8" opacity=".7"/>`; };
+  h += '<g data-drag="o-gas">';
+  for (let i = 0; i < n.h2o; i++) h += mol('h2o');
+  for (let i = 0; i < n.ch4; i++) h += mol('ch4');
+  for (let i = 0; i < n.co2 && k < MOLS.length; i++) h += mol('co2');
+  h += '</g>';
+  // photons
+  if (reduce) {
+    for (let i = 0; i < 6; i++) { const x = 90 + i * 60; h += `<path d="M${x} 90V${GY - 6}" stroke="#ffd36b" stroke-width="1.6" opacity=".7"/><path d="M${x} ${GY - 6}l-3 -6h6z" fill="#ffd36b"/>`; }
+    const nb = Math.round(pAbs(m) * 6);
+    for (let i = 0; i < 6; i++) { const x = 110 + i * 60, back = i < nb; h += `<path d="M${x} ${GY - 4}V${back ? 230 : 60}" stroke="#ff8a73" stroke-width="1.6" stroke-dasharray="4 3"/>` + (back ? `<path d="M${x + 8} 232V${GY - 6}" stroke="#ff8a73" stroke-width="1.6" stroke-dasharray="4 3" opacity=".7"/>` : `<path d="M${x} 60l-3 6h6z" fill="#ff8a73"/>`); }
+  } else {
+    for (const p of PH.list) {
+      if (p.k === 'sun') h += `<path d="M${p.x.toFixed(1)} ${(p.y - 14).toFixed(1)}V${p.y.toFixed(1)}" stroke="#ffd36b" stroke-width="2" stroke-linecap="round"/>`;
+      else { const dir = p.k === 'ir' ? 1 : -1; let d = `M${p.x.toFixed(1)} ${p.y.toFixed(1)}`; for (let j = 1; j <= 6; j++) d += `L${(p.x + Math.sin(j * 1.6) * 3).toFixed(1)} ${(p.y + dir * j * 2.6).toFixed(1)}`; h += `<path d="${d}" fill="none" stroke="#ff8a73" stroke-width="1.6" opacity="${p.k === 'back' ? 0.75 : 1}"/>`; }
+      if (p.flash && t - p.flash < 300) h += `<circle cx="${p.x.toFixed(1)}" cy="${p.ya.toFixed(1)}" r="${(4 + (t - p.flash) / 40).toFixed(1)}" fill="none" stroke="#ffb547" opacity="${(1 - (t - p.flash) / 300).toFixed(2)}"/>`;
+    }
+  }
+  // thermometer
+  const tx = 486, top = 178, bot = 334, Tn = clamp((m.T - 10) / 10, 0, 1);
+  h += `<g data-drag="o-therm"><rect x="${tx - 7}" y="${top}" width="14" height="${bot - top + 6}" rx="7" fill="#121a28" stroke="#3a4762"/><circle cx="${tx}" cy="${bot + 14}" r="12" fill="${m.dT > 2 ? '#ff8a73' : '#ffb547'}"/>` +
+    `<rect x="${tx - 3.5}" y="${(bot - Tn * (bot - top - 6)).toFixed(1)}" width="7" height="${(Tn * (bot - top - 6) + 10).toFixed(1)}" fill="${m.dT > 2 ? '#ff8a73' : '#ffb547'}"/>`;
+  for (let v = 10; v <= 20; v += 2) { const y = bot - (v - 10) / 10 * (bot - top - 6); h += `<path d="M${tx - 12} ${y.toFixed(1)}h5" stroke="#8b96ad"/><text x="${tx - 15}" y="${(y + 3).toFixed(1)}" font-size="8" fill="#8b96ad" text-anchor="end">${v}°</text>`; }
+  h += `</g><text x="${tx}" y="${top - 8}" font-size="10" fill="#e8ecf4" text-anchor="middle">${fx(m.T)} °C</text>`;
+  h += `<text x="250" y="${GY + 22}" font-size="11" fill="${m.dT > 2 ? '#ff8a73' : m.dT > 1.5 ? '#ffb547' : '#86e0a8'}" text-anchor="middle">потепление ΔT = +${fx(m.dT, 2)} °C</text>`;
+  h += `<text x="250" y="${GY + 38}" font-size="9" fill="#8b96ad" text-anchor="middle">CO₂ ${m.co2} ppm · CH₄ ${m.ch4} ppb</text>`;
+  return h;
+}
+
+// ----- lesson 3 -----
+const FL = { x: 260, y: 268 }, PB = { x: 404, y: 196, w: 108, h: 68 }, WB = { x: 404, y: 278, w: 108, h: 68 };
+function pill(x, y, label, mass, col, w = 96) {
+  return `<rect x="${(x - w / 2).toFixed(1)}" y="${(y - 12).toFixed(1)}" width="${w}" height="24" rx="12" fill="${col}" fill-opacity=".2" stroke="${col}" stroke-width="1.4"/><text x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}" font-size="10.5" fill="#e8ecf4" text-anchor="middle">${label} · ${fx(mass, mass % 1 ? 1 : 0)}</text>`;
+}
+const ease = k => k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+function gcSVG(m, t) {
+  let h = '';
+  const T = m.T, R = m.R, key = T.id + S.route, ran = !!S.ran[key];
+  let p = ran ? 1 : 0;
+  if (S.anim && S.anim.key === key) { p = reduce ? 1 : clamp((t - S.anim.t) / 1600, 0, 1); if (p >= 1) { S.anim = null; finishRun(key); } }
+  h += `<text x="260" y="104" font-size="11" fill="#ffb547" text-anchor="middle" font-weight="500">Цель: ${T.name} ${low(T.f)} · путь ${S.route + 1}: ${R.name}</text>`;
+  h += `<text x="260" y="122" font-size="10.5" fill="#e8ecf4" text-anchor="middle">${eqOf(R)}</text>`;
+  h += `<text x="260" y="137" font-size="8.5" fill="#8b96ad" text-anchor="middle">${R.cond}</text>`;
+  const both = S.ran[T.id + 0] && S.ran[T.id + 1], picked = S.pick[T.id] !== undefined;
+  if (picked) h += `<text x="260" y="160" font-size="10" fill="#86e0a8" text-anchor="middle">✓ выбран зелёный путь: ${T.routes[S.pick[T.id]].name}</text>`;
+  else if (both) h += `<g data-drag="pick"><rect x="190" y="146" width="140" height="24" rx="8" fill="#16261f" stroke="#86e0a8"/><text x="260" y="162" font-size="10.5" fill="#86e0a8" text-anchor="middle">Этот путь зеленее</text></g>`;
+  // reactor
+  h += `<g data-drag="flask"><path d="M${FL.x - 14} ${FL.y - 64}V${FL.y - 30}L${FL.x - 46} ${FL.y + 32}Q${FL.x - 50} ${FL.y + 44} ${FL.x - 38} ${FL.y + 44}H${FL.x + 38}Q${FL.x + 50} ${FL.y + 44} ${FL.x + 46} ${FL.y + 32}L${FL.x + 14} ${FL.y - 30}V${FL.y - 64}Z" fill="rgba(95,180,217,.08)" stroke="#8b96ad" stroke-width="1.6"/>` +
+    `<path d="M${FL.x - 36} ${FL.y + 14}H${FL.x + 36}L${FL.x + 46} ${FL.y + 32}Q${FL.x + 50} ${FL.y + 44} ${FL.x + 38} ${FL.y + 44}H${FL.x - 38}Q${FL.x - 50} ${FL.y + 44} ${FL.x - 46} ${FL.y + 32}Z" fill="${p > 0 && p < 1 ? '#5fb4d9' : '#3a5a78'}" opacity=".55"/>` +
+    `<text x="${FL.x}" y="${FL.y + 6}" font-size="9" fill="#8b96ad" text-anchor="middle">${ran ? 'ещё раз' : 'нажми —'}</text><text x="${FL.x}" y="${FL.y + 17}" font-size="9" fill="#8b96ad" text-anchor="middle">${ran ? '' : 'запуск'}</text></g>`;
+  // bins
+  h += `<g data-drag="o-prod"><rect x="${PB.x}" y="${PB.y}" width="${PB.w}" height="${PB.h}" rx="12" fill="rgba(134,224,168,.06)" stroke="#86e0a8" stroke-width="1.4"/><text x="${PB.x + 8}" y="${PB.y + 14}" font-size="9" fill="#86e0a8">ПРОДУКТ</text></g>`;
+  h += `<g data-drag="o-waste"><rect x="${WB.x}" y="${WB.y}" width="${WB.w}" height="${WB.h}" rx="12" fill="rgba(139,150,173,.06)" stroke="#8b96ad" stroke-width="1.4"/><text x="${WB.x + 8}" y="${WB.y + 14}" font-size="9" fill="#8b96ad">ОТХОДЫ</text>${R.ws.length ? '' : `<text x="${WB.x + WB.w / 2}" y="${WB.y + 44}" font-size="9" fill="#5a6580" text-anchor="middle">${p >= 1 ? 'пусто ✓' : ''}</text>`}</g>`;
+  // reagents column
+  h += `<text x="64" y="${190 - 4}" font-size="9" fill="#8b96ad" text-anchor="middle">РЕАГЕНТЫ</text>`;
+  const a1 = ease(clamp(p / 0.5, 0, 1)), a2 = ease(clamp((p - 0.5) / 0.5, 0, 1));
+  h += '<g data-drag="o-reag">';
+  R.re.forEach((r, i) => { const x0 = 64, y0 = 210 + i * 36; const x = x0 + (FL.x - x0) * a1, y = y0 + (FL.y + 20 - y0) * a1; if (p < 0.5) h += pill(x, y, sp(r), r[0] * MR[r[1]], '#72d4e8', 104 - a1 * 30); });
+  h += '</g>';
+  if (p >= 0.5) {
+    const outs = [[R.pr, PB, '#86e0a8'], ...R.ws.map((w, i) => [w, { x: WB.x, y: WB.y + i * 26 - 13 + (R.ws.length === 1 ? 13 : 0), w: WB.w, h: WB.h }, '#8b96ad'])];
+    outs.forEach(([r, B, col]) => { const tx = B.x + B.w / 2, ty = B.y + 40; const x = FL.x + (tx - FL.x) * a2, y = FL.y + 20 + (ty - FL.y - 20) * a2; h += pill(x, y, sp(r), r[0] * MR[r[1]], col, 100); });
+  }
+  // atom economy bar
+  const bx = 40, bw = 440, by = GY - 14;
+  if (p >= 1) {
+    const g = bw * m.ae / 100;
+    h += `<g data-drag="o-bar"><rect x="${bx}" y="${by}" width="${bw}" height="10" rx="5" fill="#3a4762"/><rect x="${bx}" y="${by}" width="${g.toFixed(1)}" height="10" rx="5" fill="#86e0a8"/></g>`;
+    h += `<text x="260" y="${GY + 20}" font-size="11.5" fill="${m.ae > 99 ? '#86e0a8' : m.ae > 60 ? '#ffb547' : '#ff8a73'}" text-anchor="middle" font-weight="500">атомная экономия ${fx(m.ae)} % · отходов ${fx(m.ef, 2)} кг на 1 кг</text>`;
+  } else h += `<g data-drag="o-bar"><rect x="${bx}" y="${by}" width="${bw}" height="10" rx="5" fill="#26324a" stroke="#3a4762" stroke-dasharray="4 4"/></g><text x="260" y="${GY + 20}" font-size="10" fill="#8b96ad" text-anchor="middle">атомная экономия — после реакции</text>`;
+  // route summary
+  const rs = [0, 1].map(i => { const k = T.id + i; return `путь ${i + 1}: ${S.ran[k] ? fx(aeOf(T.routes[i])) + ' %' : '—'}`; }).join(' · ');
+  h += `<text x="260" y="${GY + 36}" font-size="9" fill="#8b96ad" text-anchor="middle">${rs}</text>`;
+  return h;
+}
+
+function hlBox(id) {
+  return {
+    tec: OBJ.tec, homes: OBJ.homes, road: OBJ.road, factory: OBJ.factory, river: [0, 378, 520, 28], tokens: [4, 94, 512, 76],
+    sun: [12, 98, 56, 56], ground: [0, GY - 8, 520, 20], gas: [16, 158, 440, 164], therm: [462, 166, 46, 196], ice: [292, 256, 142, 108],
+    reag: [8, 180, 114, 120], flask: [FL.x - 54, FL.y - 70, 108, 120], prod: [PB.x - 4, PB.y - 4, PB.w + 8, PB.h + 8], waste: [WB.x - 4, WB.y - 4, WB.w + 8, WB.h + 8], bar: [34, GY - 20, 452, 46],
+  }[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID(), m = model();
+  let h = backdrop();
+  if (id === 'pollution') h += polSVG(m, t);
+  else if (id === 'greenhouse') { if (!reduce) stepPhotons(t, m); h += ghSVG(m, t); }
+  else h += gcSVG(m, t);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="10" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 520, hh / 420, 1.7);
+  const vw = w / s, vh = hh / s;
+  scene.setAttribute('viewBox', `${(260 - vw / 2).toFixed(1)} ${(412 - vh).toFixed(1)} ${vw.toFixed(1)} ${vh.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- tapping ----------
+let press = null, dirty = true;
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  press = { id: el.dataset.drag, x: e.clientX, y: e.clientY };
+});
+scene.addEventListener('pointerup', e => {
+  if (!press) return;
+  const p = press; press = null;
+  if (Math.hypot(e.clientX - p.x, e.clientY - p.y) < 14) tap(p.id);
+});
+scene.addEventListener('pointercancel', () => { press = null; });
+
+const INFO = {
+  tec: 'ТЭЦ на угле: SO₂ (сера из угля), зола и сажа, оксиды азота. Даёт тепло и свет всему городу.',
+  homes: 'Частные дома топят углём: низкие трубы, нет фильтров. Зимой это главный источник смога.',
+  road: 'Автомобили: NO и NO₂ (азот воздуха окисляется в горячем моторе), угарный газ CO.',
+  factory: 'Медный завод: кислые стоки с ионами Cu²⁺. Медь ядовита для рыб уже в микрограммах на литр.',
+  river: 'Река. Её состав проверяют по ПДК для рыбохозяйственных водоёмов — они строже питьевых.',
+  sun: 'Солнце излучает в основном видимый свет. Атмосфера его почти не задерживает.',
+  ground: 'Нагретая поверхность излучает инфракрасные лучи — их поглощают парниковые газы.',
+  gas: 'Красно-серые — CO₂, серый с белыми — CH₄, бледные — водяной пар H₂O.',
+  therm: 'Средняя температура у поверхности. Без парниковых газов было бы −18 °C.',
+  ice: 'Ледник. При потеплении он отступает — так уже происходит в Заилийском Алатау.',
+  reag: 'Исходные вещества. Числа — массы по уравнению, г на моль реакции.',
+  prod: 'Нужное вещество. Его масса — числитель в атомной экономии.',
+  waste: 'Побочные вещества. Их надо утилизировать или продать, иначе это отходы.',
+  bar: 'Зелёная часть полосы — доля массы реагентов, попавшая в продукт.',
+};
+function tap(id) {
+  if (id.startsWith('m-')) return toggleMeas(id.slice(2));
+  if (id === 'flask') return runRoute();
+  if (id === 'pick') return pickRoute();
+  if (id.startsWith('o-')) { const k = id.slice(2); S.hl = { id: k, t: performance.now() }; S.info = k; if (INFO[k]) toast(INFO[k]); dirty = true; }
+}
+
+function toggleMeas(k) {
+  const M = MK(k); if (!M) return false;
+  if (S.meas[k]) { delete S.meas[k]; update(); return true; }
+  const spent = model().spent;
+  if (spent + M.cost > BUDGET) { toast(`Не хватает бюджета: потрачено ${spent} из ${BUDGET} ед., мера стоит ${M.cost}. Отключите менее полезную меру.`); return false; }
+  S.meas[k] = true; toast(M.tip); update(); return true;
+}
+function setGas(c, m) {
+  S.co2 = clamp(Math.round(c / 5) * 5, 250, 1000); S.ch4 = clamp(Math.round(m / 50) * 50, 700, 3000);
+  if (S.co2 >= 415 && S.co2 <= 425 && S.ch4 >= 1850 && S.ch4 <= 1950 && !S.seen) { S.seen = true; const F = forcing(S.co2, S.ch4); toast(`Сегодняшний состав: равновесное потепление +${fx(F.dT, 2)} °C. Теперь уменьшайте CO₂.`); }
+  update();
+}
+function setTgt(i) { S.tgt = clamp(i, 0, TGT.length - 1); S.route = 0; S.anim = null; renderTools(); buildScheme(); update(); }
+function setRoute(i) { S.route = clamp(i, 0, 1); S.anim = null; renderTools(); update(); }
+function runRoute() {
+  const key = TGT[S.tgt].id + S.route;
+  if (S.anim) return false;
+  S.anim = { key, t: performance.now() };
+  if (reduce) { S.anim = null; finishRun(key); }
+  dirty = true; return true;
+}
+function finishRun(key) {
+  const first = !S.ran[key]; S.ran[key] = true;
+  const R = TGT[S.tgt].routes[S.route];
+  if (first) toast(`Атомная экономия: ${fx(aeOf(R))} %. ${R.ws.length ? 'Побочные вещества: ' + R.ws.map(sp).join(', ') + '.' : 'Все атомы реагентов в продукте!'}`);
+  update();
+}
+function pickRoute() {
+  const T = TGT[S.tgt];
+  if (!(S.ran[T.id + 0] && S.ran[T.id + 1])) { toast('Сначала запустите оба пути и сравните атомную экономию.'); return false; }
+  if (S.pick[T.id] !== undefined) return true;
+  if (S.route !== T.best) { S.wrong++; toast(`У этого пути атомная экономия ${fx(aeOf(T.routes[S.route]))} %, а у другого — ${fx(aeOf(T.routes[1 - S.route]))} %. Сравните ещё раз.`); update(); return false; }
+  S.pick[T.id] = S.route; toast(`Верно: ${T.routes[S.route].name} — ${fx(aeOf(T.routes[S.route]))} %, без лишних отходов.`); update(); return true;
+}
+
+let last = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const id = LID();
+  const anim = !!S.hl || !!S.anim || (!reduce && (id === 'pollution' || id === 'greenhouse') && t - last > 40);
+  if (dirty || anim) { drawScene(t); dirty = false; last = t; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3200); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    pollution: B('reset', 'Снять все меры'),
+    greenhouse: PRESETS.slice(0, 3).map(p => B('pre-' + p.k, p.k === 'now' ? 'Сегодня' : p.k)).join('') + sep + B('c-', '−CO₂') + B('c+', '+CO₂') + sep + B('m-', '−CH₄') + B('m+', '+CH₄'),
+    green: TGT.map((T, i) => B('t-' + i, T.name, S.tgt === i)).join('') + sep + B('r-0', 'Путь 1', S.route === 0) + B('r-1', 'Путь 2', S.route === 1) + sep + B('run', 'Запустить'),
+  }[id];
+}
+function act(a) {
+  if (a === 'reset') { S.meas = {}; update(); return; }
+  if (a.startsWith('pre-')) { const p = PRESETS.find(x => x.k === a.slice(4)); return setGas(p.c, p.m); }
+  if (a === 'c-' || a === 'c+') return setGas(S.co2 + (a === 'c+' ? 5 : -5), S.ch4);
+  if (a === 'm-' || a === 'm+') return setGas(S.co2, S.ch4 + (a === 'm+' ? 50 : -50));
+  if (a.startsWith('t-')) return setTgt(+a.slice(2));
+  if (a.startsWith('r-')) return setRoute(+a.slice(2));
+  if (a === 'run') return runRoute();
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  tec: IC('<rect x="5" y="16" width="18" height="14" fill="#2a3448" stroke="#8b96ad"/><path d="M22 30V8h5v22" fill="#3a4560" stroke="#8b96ad"/><circle cx="26" cy="5" r="3" fill="#9aa3b5" opacity=".7"/>'),
+  homes: IC('<rect x="8" y="16" width="18" height="14" fill="#2f3a52" stroke="#8b96ad"/><path d="M5 16L17 6L29 16Z" fill="#5a4636"/><circle cx="24" cy="5" r="3" fill="#59606d"/>'),
+  road: IC('<rect x="3" y="20" width="28" height="9" fill="#252c3b"/><rect x="8" y="14" width="13" height="7" rx="2" fill="#e5533f"/><circle cx="5" cy="15" r="2.5" fill="#a0603a" opacity=".7"/>'),
+  factory: IC('<rect x="4" y="14" width="22" height="14" fill="#2a3448" stroke="#8b96ad"/><path d="M16 28v5" stroke="#6b7690" stroke-width="3"/><rect x="24" y="5" width="4" height="10" fill="#3a4560"/>'),
+  river: IC('<path d="M2 18q8-6 15 0t15 0v10H2Z" fill="#3f8fc4"/><circle cx="20" cy="22" r="4" fill="#9bbf3a" opacity=".6"/>'),
+  tokens: IC('<rect x="3" y="8" width="28" height="9" rx="3" fill="#16261f" stroke="#86e0a8"/><rect x="3" y="20" width="28" height="9" rx="3" fill="#121a28" stroke="#3a4762"/>'),
+  sun: IC('<circle cx="17" cy="17" r="8" fill="#ffd36b"/><circle cx="17" cy="17" r="13" fill="none" stroke="#ffd36b" stroke-opacity=".4" stroke-width="2"/>'),
+  ground: IC('<rect x="2" y="24" width="30" height="6" fill="#2f6b4a"/><path d="M10 23V8M22 23V8" stroke="#ff8a73" stroke-width="1.6" stroke-dasharray="3 2"/>'),
+  gas: IC('<circle cx="10" cy="17" r="3.5" fill="#e5533f"/><circle cx="17" cy="17" r="4" fill="#4f586d"/><circle cx="24" cy="17" r="3.5" fill="#e5533f"/>'),
+  therm: IC('<rect x="14" y="4" width="6" height="20" rx="3" fill="none" stroke="#8b96ad"/><rect x="15.5" y="12" width="3" height="14" fill="#ffb547"/><circle cx="17" cy="27" r="5" fill="#ffb547"/>'),
+  ice: IC('<path d="M3 30L17 6L31 30Z" fill="#33405a"/><path d="M17 6L12 15H22Z" fill="#eef4fb"/>'),
+  reag: IC('<rect x="4" y="8" width="26" height="8" rx="4" fill="none" stroke="#72d4e8"/><rect x="4" y="20" width="26" height="8" rx="4" fill="none" stroke="#72d4e8"/>'),
+  flask: IC('<path d="M13 4v9L5 28h24L21 13V4Z" fill="rgba(95,180,217,.2)" stroke="#8b96ad"/>'),
+  prod: IC('<rect x="4" y="8" width="26" height="20" rx="4" fill="none" stroke="#86e0a8"/><rect x="8" y="16" width="18" height="6" rx="3" fill="#86e0a8" opacity=".5"/>'),
+  waste: IC('<rect x="4" y="8" width="26" height="20" rx="4" fill="none" stroke="#8b96ad"/><rect x="8" y="16" width="18" height="6" rx="3" fill="#8b96ad" opacity=".5"/>'),
+  bar: IC('<rect x="3" y="14" width="28" height="7" rx="3.5" fill="#3a4762"/><rect x="3" y="14" width="18" height="7" rx="3.5" fill="#86e0a8"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (L.id === 'pollution') return `В норме ${m.good} из 5 · бюджет ${m.spent}/${BUDGET} ед.`;
+  if (L.id === 'greenhouse') return `${m.seen ? 'Сегодняшний состав ✓' : 'Сначала — сегодняшний состав'} · ΔT = +${fx(m.dT, 2)} °C`;
+  return `Выбрано зелёных путей: ${TGT.filter(t => S.pick[t.id] !== undefined).length} из 3`;
+}
+
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'pollution') h = `<h2>Пульт эколога</h2>
+      <dl class="reads"><div><dt>Бюджет</dt><dd id="r1"></dd></div><div><dt>В норме</dt><dd id="r2"></dd></div><div><dt>Дождь pH</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Меры</div><div class="chips" id="mChips">${MEAS.map(x => `<button data-k="${x.k}">${x.name} · ${x.cost}</button>`).join('')}</div></div>
+      <h3>Выбросы и сброс (× норма)</h3><div class="steps" id="iList"></div>`;
+  if (id === 'greenhouse') h = `<h2>Состав атмосферы</h2>
+      <dl class="reads"><div><dt>ΔF, Вт/м²</dt><dd id="r1"></dd></div><div><dt>ΔT</dt><dd id="r2"></dd></div><div><dt>T Земли</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><label for="sC">CO₂, ppm <output id="oC"></output></label><input type="range" id="sC" min="250" max="1000" step="5"></div>
+      <div class="ctl"><label for="sM">CH₄, ppb <output id="oM"></output></label><input type="range" id="sM" min="700" max="3000" step="50"></div>
+      <div class="ctl"><div class="lbl">Эпохи</div><div class="chips" id="pChips">${PRESETS.map(p => `<button data-k="${p.k}">${p.name}</button>`).join('')}</div></div>
+      <p class="note" style="margin-top:12px">ppm — молекул на миллион молекул воздуха, ppb — на миллиард.</p>`;
+  if (id === 'green') h = `<h2>Выбор пути синтеза</h2>
+      <dl class="reads"><div><dt>АЭ</dt><dd id="r1"></dd></div><div><dt>E-фактор</dt><dd id="r2"></dd></div><div><dt>Выбрано</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Продукт</div><div class="chips" id="tChips">${TGT.map((T, i) => `<button data-i="${i}">${T.name}</button>`).join('')}</div></div>
+      <div class="ctl"><div class="lbl">Путь</div><div class="chips" id="rChips">${[0, 1].map(i => `<button data-i="${i}">Путь ${i + 1}: ${TGT[S.tgt].routes[i].name}</button>`).join('')}</div></div>
+      <div class="row"><button class="ghostbtn" id="bRun">Запустить реакцию</button><button class="ghostbtn" id="bPick">Этот путь зеленее</button></div>`;
+  el.innerHTML = h;
+  el.querySelectorAll('#mChips button').forEach(b => b.onclick = () => toggleMeas(b.dataset.k));
+  const sC = el.querySelector('#sC'), sM = el.querySelector('#sM');
+  if (sC) { sC.value = S.co2; sM.value = S.ch4; sC.oninput = () => setGas(+sC.value, S.ch4); sM.oninput = () => setGas(S.co2, +sM.value); }
+  el.querySelectorAll('#pChips button').forEach(b => b.onclick = () => { const p = PRESETS.find(x => x.k === b.dataset.k); setGas(p.c, p.m); });
+  el.querySelectorAll('#tChips button').forEach(b => b.onclick = () => setTgt(+b.dataset.i));
+  el.querySelectorAll('#rChips button').forEach(b => b.onclick = () => { setRoute(+b.dataset.i); });
+  const bR = el.querySelector('#bRun'), bP = el.querySelector('#bPick');
+  if (bR) { bR.onclick = runRoute; bP.onclick = pickRoute; }
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; };
+  if (m.kind === 'pol') {
+    set('#r1', `${m.spent}/${BUDGET}`); set('#r2', `${m.good} из 5`); set('#r3', fx(m.rain));
+    el.querySelectorAll('#mChips button').forEach(b => b.setAttribute('aria-pressed', !!S.meas[b.dataset.k]));
+    const li = el.querySelector('#iList'); if (li) li.innerHTML = m.ind.map(([n, v]) => step(n, `${fx(v, 2)} ${v <= 1.0001 ? '✓' : '✗'}`)).join('') + step('pH стока (норма 6,5–8,5)', `${fx(m.ph)} ${m.ph >= 6.5 && m.ph <= 8.5 ? '✓' : '✗'}`);
+  } else if (m.kind === 'gh') {
+    set('#r1', '+' + fx(m.f, 2)); set('#r2', '+' + fx(m.dT, 2) + '°'); set('#r3', fx(m.T) + '°');
+    set('#oC', String(m.co2)); set('#oM', String(m.ch4));
+    const sC = el.querySelector('#sC'), sM = el.querySelector('#sM');
+    if (sC && +sC.value !== m.co2) sC.value = m.co2; if (sM && +sM.value !== m.ch4) sM.value = m.ch4;
+    el.querySelectorAll('#pChips button').forEach(b => { const p = PRESETS.find(x => x.k === b.dataset.k); b.setAttribute('aria-pressed', p.c === m.co2 && p.m === m.ch4); });
+  } else {
+    const ran = !!S.ran[m.T.id + S.route];
+    set('#r1', ran ? fx(m.ae) + ' %' : '?'); set('#r2', ran ? fx(m.ef, 2) : '?'); set('#r3', `${TGT.filter(t => S.pick[t.id] !== undefined).length} из 3`);
+    el.querySelectorAll('#tChips button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.i === S.tgt));
+    el.querySelectorAll('#rChips button').forEach(b => { b.setAttribute('aria-pressed', +b.dataset.i === S.route); b.textContent = `Путь ${+b.dataset.i + 1}: ${m.T.routes[+b.dataset.i].name}`; });
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'pollution') return [
+    { id: 'tokens', name: 'Карточки мер', spec: 'Меры защиты и их цена. Включённая мера — зелёная. Бюджет — 13 ед.' },
+    { id: 'tec', name: 'ТЭЦ на угле', spec: 'Источник SO₂, золы и части оксидов азота. Сероочистка и электрофильтр стоят прямо на ней.' },
+    { id: 'homes', name: 'Частный сектор', spec: 'Печи на угле: сажа и пыль PM2,5 у самой земли, где мы дышим.' },
+    { id: 'road', name: 'Автомобили', spec: 'Выхлоп: NO, NO₂, CO. Нейтрализатор превращает их в N₂ и CO₂.' },
+    { id: 'factory', name: 'Медный завод', spec: 'Кислые стоки с ионами меди. Очистка — нейтрализация и осаждение гидроксида.' },
+    { id: 'river', name: 'Река', spec: 'Цвет показывает загрязнение: зелёное пятно — сток с медью и кислотой.' }];
+  if (id === 'greenhouse') return [
+    { id: 'sun', name: 'Солнце', spec: 'Видимый свет проходит атмосферу и греет поверхность.' },
+    { id: 'ground', name: 'Поверхность Земли', spec: 'Отдаёт тепло инфракрасными лучами (красные волнистые стрелки).' },
+    { id: 'gas', name: 'Парниковые газы', spec: 'H₂O, CO₂, CH₄ поглощают ИК-лучи и излучают часть вниз. Число молекул на рисунке растёт с концентрацией.' },
+    { id: 'therm', name: 'Градусник', spec: 'Средняя температура поверхности: 14 °C в 1750 году плюс потепление ΔT.' },
+    { id: 'ice', name: 'Ледник', spec: 'Тает при потеплении. Ледники Алатау питают реки и Алматы водой.' }];
+  return [
+    { id: 'reag', name: 'Реагенты', spec: 'Исходные вещества и их массы по уравнению реакции.' },
+    { id: 'flask', name: 'Реактор', spec: 'Нажмите — реакция пойдёт. Масса сохраняется: всё, что вошло, выйдет.' },
+    { id: 'prod', name: 'Продукт', spec: 'То, ради чего строят завод.' },
+    { id: 'waste', name: 'Отходы', spec: 'Побочные вещества. Пустой ящик — признак зелёной реакции.' },
+    { id: 'bar', name: 'Полоса атомной экономии', spec: 'Зелёная доля — масса продукта от массы всех реагентов.' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      (L.safe ? `<div class="safe"><b>Безопасность</b>${L.safe}</div>` : '') +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Детали модели</h2><p class="note">Нажмите на деталь, чтобы найти её на сцене.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${ICON[p.id]}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  if (m.kind === 'pol') {
+    const on = S.meas;
+    let h = `<h2>Баланс выбросов</h2><div class="formula">показатель = выброс : норма<br>в норме, если ≤ 1</div><h3>Воздух</h3><div class="steps">` +
+      step('SO₂: ТЭЦ', `2,4${on.scrub ? ' × 0,1' : ''} = ${fx(m.so2, 2)}`) +
+      step('NO₂: ТЭЦ + машины', `0,6 + 1,2${on.cat ? ' × 0,2' : ''} = ${fx(m.no2, 2)}`) +
+      step('пыль: ТЭЦ + печи', `1,0${on.filter ? ' × 0,05' : ''} + 1,5${on.gas ? ' × 0,1' : ''} = ${fx(m.pm, 2)}`) + `</div>`;
+    h += `<h3>Вода</h3><div class="steps">` + step('Cu²⁺: завод', `3,0${on.treat ? ' × 0,05' : ''} = ${fx(m.cu, 2)}`) +
+      step('pH стока', on.treat ? 'нейтрализован: 7,5' : on.dilute ? '2,8 → 3,3 (разбавили, кислота та же)' : '2,8 — сильно кислый') + `</div>`;
+    h += `<h3>Кислотный дождь (модель)</h3><div class="steps">` + step('кислотность a = 0,9·SO₂ + 0,4·NO₂', fx(0.9 * m.so2 + 0.4 * m.no2, 2)) + step('pH = 5,6 − lg(1 + 3a)', fx(m.rain, 2), 'sum') + `</div>`;
+    h += `<h3>Бюджет</h3><div class="steps">` + MEAS.filter(x => on[x.k]).map(x => step(x.name, x.cost + ' ед.')).join('') + step('итого', `${m.spent} из ${BUDGET} ед.`, 'sum') + `</div>`;
+    h += `<p class="note" style="margin-top:10px">Чистый дождь тоже слегка кислый, pH ≈ 5,6: в нём растворён CO₂ из воздуха. Кислотным считают дождь с pH ниже 5,6.</p>`;
+    return h;
+  }
+  if (m.kind === 'gh') {
+    let h = `<h2>Расчёт потепления</h2><div class="formula">ΔF = 5,35·ln(C/280) + 0,036·(√M − √722)<br>ΔT = 0,8 · ΔF</div><h3>Сейчас</h3><div class="steps">` +
+      step('вклад CO₂', `5,35·ln(${m.co2}/280) = ${fx(m.fc, 2)} Вт/м²`) +
+      step('вклад CH₄', `0,036·(√${m.ch4} − √722) = ${fx(m.fm, 2)} Вт/м²`) +
+      step('ΔF всего', `${fx(m.f, 2)} Вт/м²`) +
+      step('ΔT = 0,8 · ΔF', `+${fx(m.dT, 2)} °C`) +
+      step('T Земли = 14 + ΔT', `${fx(m.T, 1)} °C`, 'sum') + `</div>`;
+    h += `<h3>Ориентиры</h3><div class="steps">${step('без парниковых газов', '−18 °C')}${step('цель Парижского соглашения', '≤ 1,5–2 °C')}${step('удвоение CO₂ (560 ppm)', '≈ +3 °C')}</div>`;
+    h += `<p class="note" style="margin-top:10px">ΔF — радиационное воздействие: сколько ватт на каждый квадратный метр Земли «задерживает» добавка газа. Модель даёт равновесное потепление. Реально пока измерено около +1,2–1,3 °C: океан прогревается медленно, а аэрозоли немного охлаждают.</p>`;
+    return h;
+  }
+  const T = m.T, R = m.R, ran = !!S.ran[T.id + S.route];
+  let h = `<h2>${T.name}: путь ${S.route + 1}</h2><div class="formula">${eqOf(R)}</div><h3>Массы по уравнению</h3><div class="steps">` +
+    R.re.map(r => step(sp(r), `${r[0] > 1 ? r[0] + ' · ' : ''}${fx(MR[r[1]], MR[r[1]] % 1 ? 1 : 0)} = ${fx(r[0] * MR[r[1]], (r[0] * MR[r[1]]) % 1 ? 1 : 0)} г`)).join('') +
+    step('Σ реагентов', fx(m.mr, m.mr % 1 ? 1 : 0) + ' г') + step('продукт ' + sp(R.pr), fx(m.mp, 0) + ' г') + step('побочные', R.ws.length ? fx(m.mw, m.mw % 1 ? 1 : 0) + ' г' : '0 г') + `</div>`;
+  h += `<h3>Атомная экономия</h3><div class="steps">` +
+    step('АЭ = m(продукта) : Σm · 100 %', ran ? `${fx(m.mp, 0)} : ${fx(m.mr, m.mr % 1 ? 1 : 0)} · 100 = ${fx(m.ae)} %` : 'запустите реакцию') +
+    step('E-фактор = m(отходов) : m(продукта)', ran ? fx(m.ef, 2) : '?', 'sum') + `</div>`;
+  h += `<h3>Сравнение</h3><div class="steps">` + TGT.map(t => step(t.name, [0, 1].map(i => S.ran[t.id + i] ? fx(aeOf(t.routes[i])) + '%' : '—').join(' / ') + (S.pick[t.id] !== undefined ? ' ✓' : ''))).join('') + `</div>`;
+  h += `<p class="note" style="margin-top:10px">Атомная экономия — не единственный критерий. Важны и выход реакции, температура, ядовитость веществ, возобновляемость сырья. Например, уксус для еды получают брожением спирта — это безопасно и из растительного сырья.</p>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const el = $('#meter');
+  if (m.kind === 'pol') {
+    el.innerHTML = `<div class="k">Город · × норма</div>` + m.ind.map(([n, v]) => `<div class="lr"><span>${n}</span><span class="${v <= 1.0001 ? 'good' : 'bad'}">${fx(v, 2)}</span></div>`).join('') +
+      `<div class="lr"><span>pH стока</span><span class="${m.ph >= 6.5 && m.ph <= 8.5 ? 'good' : 'bad'}">${fx(m.ph)}</span></div><div class="gauge"><b style="width:${(m.spent / BUDGET * 100).toFixed(1)}%;background:${m.spent === BUDGET ? 'var(--force)' : 'var(--liq)'}"></b></div><div class="lr"><span>бюджет</span><span>${m.spent}/${BUDGET}</span></div>`;
+  } else if (m.kind === 'gh') {
+    el.innerHTML = `<div class="k">Потепление</div><div class="v ${m.dT <= 1.5 ? 'ok' : ''}">+${fx(m.dT, 2)} °C</div><div class="lr"><span>CO₂</span><span>${m.co2} ppm</span></div><div class="lr"><span>CH₄</span><span>${m.ch4} ppb</span></div><div class="lr"><span>ΔF</span><span>${fx(m.f, 2)} Вт/м²</span></div>`;
+  } else {
+    const ran = !!S.ran[m.T.id + S.route];
+    el.innerHTML = `<div class="k">Атомная экономия</div><div class="v ${ran && m.ae > 99 ? 'ok' : ''}">${ran ? fx(m.ae) + ' %' : '?'}</div><div class="gauge"><b style="width:${ran ? m.ae.toFixed(1) : 0}%;background:var(--ok)"></b></div><div class="lr"><span>E-фактор</span><span>${ran ? fx(m.ef, 2) : '?'}</span></div><div class="lr"><span>выбрано</span><span>${TGT.filter(t => S.pick[t.id] !== undefined).length} из 3</span></div>`;
+  }
+}
+
+function update() {
+  const m = model(), L = LESSONS[S.lesson];
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Тема «Химия и экология» пройдена!'), 1400);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  pollution: '<rect x="6" y="14" width="14" height="14" fill="#2a3448"/><rect x="16" y="5" width="4" height="10" fill="#3a4560"/><circle cx="22" cy="5" r="3.5" fill="#c9b56a" opacity=".7"/><rect x="0" y="27" width="66" height="3" fill="#3f8fc4"/><rect x="40" y="16" width="16" height="11" fill="#2a3448"/><ellipse cx="48" cy="28" rx="7" ry="2" fill="#9bbf3a"/>',
+  greenhouse: '<circle cx="9" cy="8" r="5" fill="#ffd36b"/><path d="M20 3V26" stroke="#ffd36b" stroke-width="1.4"/><path d="M32 26V12l4 0V26" fill="none" stroke="#ff8a73" stroke-width="1.4"/><circle cx="34" cy="10" r="2.4" fill="#e5533f"/><circle cx="46" cy="14" r="2.4" fill="#4f586d"/><rect x="56" y="5" width="4" height="18" rx="2" fill="#ffb547"/><rect x="0" y="26" width="66" height="4" fill="#2f6b4a"/>',
+  green: '<path d="M22 4v7L14 26h18L24 11V4Z" fill="rgba(95,180,217,.25)" stroke="#8b96ad"/><rect x="40" y="6" width="22" height="9" rx="4" fill="none" stroke="#86e0a8"/><rect x="40" y="18" width="22" height="9" rx="4" fill="none" stroke="#8b96ad"/><rect x="2" y="12" width="10" height="7" rx="3" fill="none" stroke="#72d4e8"/>',
+};
+function renderStrip() {
+  const strip = $('#lessons');
+  strip.innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  strip.querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i], init = JSON.parse(JSON.stringify(L.init || {}));
+  S.lesson = i; S.hl = null; press = null;
+  S.meas = {}; S.info = null; S.co2 = 280; S.ch4 = 722; S.seen = false; S.tgt = 0; S.route = 0; S.ran = {}; S.pick = {}; S.wrong = 0; S.anim = null; PH.list = [];
+  Object.assign(S, init);
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const strip = $('#lessons'), cur = strip.querySelector('.lesson[aria-current="true"]');
+  if (cur) strip.scrollLeft = cur.offsetLeft - strip.offsetLeft - (strip.clientWidth - cur.offsetWidth) / 2;
+}
+
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '';
+  if (id === 'pollution') now = `Модель города: ТЭЦ на угле, частный сектор с печами, дорога с машинами, медный завод со стоком в реку. Меры (название, цена): ${MEAS.map(x => `${x.name} ${x.cost}`).join(', ')}; бюджет ${BUDGET} ед. Включены: ${MEAS.filter(x => S.meas[x.k]).map(x => x.name).join(', ') || 'ничего'}, потрачено ${m.spent}. Показатели (выброс/норма): SO₂ ${fx(m.so2, 2)}, NO₂ ${fx(m.no2, 2)}, пыль ${fx(m.pm, 2)}, Cu²⁺ ${fx(m.cu, 2)}; pH стока ${fx(m.ph)}; pH дождя по модели ${fx(m.rain)}. В норме ${m.good} из 5. Не говори прямо, какие меры бесполезны — спрашивай, уменьшает ли мера массу выброса или только разносит/разбавляет его.`;
+  if (id === 'greenhouse') now = `Модель парникового эффекта: CO₂ ${m.co2} ppm, CH₄ ${m.ch4} ppb. ΔF(CO₂) = ${fx(m.fc, 2)}, ΔF(CH₄) = ${fx(m.fm, 2)}, всего ${fx(m.f, 2)} Вт/м²; равновесное потепление ΔT = 0,8·ΔF = ${fx(m.dT, 2)} °C, температура ${fx(m.T)} °C. Сегодняшний состав ${m.seen ? 'уже устанавливался' : 'ещё не устанавливался'}. Задача: при метане 1850–1950 ppb найти CO₂, при котором ΔT 1,4–1,5 °C. Не называй ответ — подскажи, как считать через формулу или подбирать кнопками.`;
+  if (id === 'green') { const T = m.T; now = `Сравнение путей синтеза. Продукт: ${T.name}. Путь ${S.route + 1}: ${T.routes[S.route].name}, уравнение ${eqOf(T.routes[S.route]).replace(/[₀-₉]/g, d => '₀₁₂₃₄₅₆₇₈₉'.indexOf(d))}. ${S.ran[T.id + S.route] ? `Атомная экономия ${fx(m.ae)} %, E-фактор ${fx(m.ef, 2)}.` : 'Реакция ещё не запущена.'} Уже выбраны зелёные пути для: ${TGT.filter(t => S.pick[t.id] !== undefined).map(t => t.name).join(', ') || 'ничего'}. Ошибок выбора: ${S.wrong}. Не говори, какой путь зеленее, пока ученик не запустил оба — помоги посчитать атомную экономию.`; }
+  return [
+    `Предмет: химия, 11 класс. Тема «Химия и экология». Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Веди ученика наводящими вопросами, а не готовыми ответами.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = { pollution: 'Почему высокая труба не решает проблему кислотных дождей?', greenhouse: 'Почему метан опаснее CO₂, если его в воздухе меньше?', green: 'Почему реакции присоединения дают 100 % атомной экономии?' }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

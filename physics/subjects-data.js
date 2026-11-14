@@ -41,7 +41,7 @@ window.LUCH_SUBJECTS = {
       { id: 'pyth', b: 'geo', g: 8, t: 'Пифагор и подобие', items: ['Теорема Пифагора', 'Подобные треугольники', 'Синус, косинус, тангенс угла'], req: ['quadr', 'roots'], status: 'done', href: '/labs/math-pyth/', lessons: 3, doneItems: 3 },
       { id: 'circ', b: 'geo', g: 8, t: 'Окружность', items: ['Касательная', 'Вписанные углы', 'Вписанная и описанная окружность'], req: ['tri'], status: 'done', href: '/labs/math-circ/', lessons: 3, doneItems: 3 },
       { id: 'vect', b: 'geo', g: 9, t: 'Векторы и координаты', items: ['Векторы', 'Метод координат', 'Уравнение окружности и прямой'], req: ['pyth', 'coord'], status: 'done', href: '/labs/math-vect/', lessons: 3, doneItems: 3 },
-      { id: 'stereo', b: 'geo', g: 10, t: 'Стереометрия', items: ['Аксиомы пространства', 'Параллельность и перпендикулярность', 'Углы и расстояния'], req: ['vect'] },
+      { id: 'stereo', b: 'geo', g: 10, t: 'Стереометрия', items: ['Аксиомы пространства', 'Параллельность и перпендикулярность', 'Углы и расстояния'], req: ['vect'], status: 'done', href: '/labs/math-stereo/', lessons: 3, doneItems: 3 },
       { id: 'solids', b: 'geo', g: 11, t: 'Тела и объёмы', items: ['Призма и пирамида', 'Цилиндр, конус, шар', 'Площади поверхности', 'Объёмы тел'], req: ['stereo'] },
 
       { id: 'data', b: 'prob', g: 6, t: 'Данные и диаграммы', items: ['Таблицы', 'Столбчатые и круговые диаграммы', 'Среднее арифметическое'], req: ['frac'], status: 'done', href: '/labs/math-data/', lessons: 3, doneItems: 3 },
@@ -94,7 +94,7 @@ window.LUCH_SUBJECTS = {
 
       { id: 'home', b: 'life', g: 8, t: 'Химия дома', items: ['Моющие средства', 'Кислоты и щёлочи на кухне', 'Бытовая безопасность'], req: ['classes'], status: 'done', href: '/labs/chem-home/', lessons: 3, doneItems: 3 },
       { id: 'food', b: 'life', g: 9, t: 'Еда и здоровье', items: ['Белки, жиры, углеводы', 'Витамины', 'Как работают лекарства'], req: ['classes'], status: 'done', href: '/labs/chem-food/', lessons: 3, doneItems: 3 },
-      { id: 'eco', b: 'life', g: 11, t: 'Химия и экология', items: ['Загрязнение воздуха и воды', 'Парниковый эффект', 'Зелёная химия'], req: ['nonmet', 'polymers'] },
+      { id: 'eco', b: 'life', g: 11, t: 'Химия и экология', items: ['Загрязнение воздуха и воды', 'Парниковый эффект', 'Зелёная химия'], req: ['nonmet', 'polymers'], status: 'done', href: '/labs/chem-eco/', lessons: 3, doneItems: 3 },
     ],
   },
 
@@ -136,7 +136,7 @@ window.LUCH_SUBJECTS = {
       { id: 'mendel', b: 'gen', g: 10, t: 'Законы наследственности', items: ['Гены и признаки', 'Законы Менделя', 'Решётка Пеннета', 'Наследование пола'], req: ['division'], status: 'part', href: '/biology/', lessons: 5, doneItems: 3 },
       { id: 'variation', b: 'gen', g: 10, t: 'Изменчивость', items: ['Мутации', 'Модификации', 'Наследственные болезни'], req: ['mendel'], status: 'done', href: '/labs/bio-variation/', lessons: 3, doneItems: 3 },
       { id: 'selection', b: 'gen', g: 11, t: 'Селекция', items: ['Сорта и породы', 'Гибридизация', 'Селекция микроорганизмов'], req: ['variation'], status: 'done', href: '/labs/bio-selection/', lessons: 3, doneItems: 3 },
-      { id: 'evolution', b: 'gen', g: 11, t: 'Эволюция', items: ['Дарвин и естественный отбор', 'Вид и видообразование', 'Доказательства эволюции'], req: ['variation', 'verts'] },
+      { id: 'evolution', b: 'gen', g: 11, t: 'Эволюция', items: ['Дарвин и естественный отбор', 'Вид и видообразование', 'Доказательства эволюции'], req: ['variation', 'verts'], status: 'done', href: '/labs/bio-evolution/', lessons: 3, doneItems: 3 },
       { id: 'origin', b: 'gen', g: 11, t: 'Происхождение жизни и человека', items: ['Как появилась жизнь', 'Этапы развития жизни', 'Эволюция человека'], req: ['evolution'] },
 
       { id: 'env', b: 'eco', g: 8, t: 'Организм и среда', items: ['Факторы среды', 'Приспособления', 'Биоритмы'], req: ['plants'], status: 'done', href: '/labs/bio-env/', lessons: 3, doneItems: 3 },
