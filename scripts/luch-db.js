@@ -172,6 +172,17 @@ CREATE TABLE luch.lesson_story (
   created_at  DATETIME2(0)  NOT NULL CONSTRAINT DF_luch_story_created DEFAULT SYSUTCDATETIME()
 );
 
+-- Картинки к «Истории урока»: по одной на раздел, рисует ИИ один раз.
+IF OBJECT_ID('luch.story_image', 'U') IS NULL
+CREATE TABLE luch.story_image (
+  story_key   NVARCHAR(300)  NOT NULL,
+  idx         TINYINT        NOT NULL,
+  mime        VARCHAR(40)    NOT NULL,
+  data        VARBINARY(MAX) NOT NULL,
+  created_at  DATETIME2(0)   NOT NULL CONSTRAINT DF_luch_story_image_created DEFAULT SYSUTCDATETIME(),
+  CONSTRAINT PK_luch_story_image PRIMARY KEY (story_key, idx)
+);
+
 MERGE luch.languages AS t USING (VALUES ('ru', N'Русский', 1), ('kk', N'Қазақша', 2), ('en', N'English', 3), ('es', N'Español', 4)) AS s(code, name, sort)
   ON t.code = s.code
   WHEN NOT MATCHED THEN INSERT (code, name, sort, is_active) VALUES (s.code, s.name, s.sort, CASE WHEN s.code = 'ru' THEN 1 ELSE 0 END);

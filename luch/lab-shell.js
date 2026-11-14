@@ -38,7 +38,7 @@
   .ls-toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:80;background:var(--fg,#e8ecf4);color:var(--bg,#0b1019);border-radius:12px;padding:12px 14px;font:500 14px var(--font-body,sans-serif);box-shadow:0 10px 30px -8px rgba(0,0,0,.6);display:flex;gap:10px;align-items:center;max-width:calc(100vw - 32px);flex-wrap:wrap}
   .ls-toast a{color:inherit;font-weight:600}
   `;
-  const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+  const css1 = document.createElement('style'); css1.textContent = css; document.head.appendChild(css1);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   // ---------- вкладки ----------
@@ -198,12 +198,6 @@
   .ls-story .play i{width:42px;height:42px;flex:none;border-radius:50%;background:var(--accent,#ffb547);display:grid;place-items:center;color:#0b1019;font-style:normal;font-size:16px}
   .ls-story .play b{display:block;font:600 15px/1.25 var(--font-body,"Golos Text",sans-serif)}
   .ls-story .play small{display:block;font:500 12px/1.35 var(--font-mono,monospace);color:var(--muted,#8b96ad);margin-top:3px}
-  .ls-story .cap{margin-top:12px;font-size:14.5px;line-height:1.55}
-  .ls-story .cap b{display:block;font:600 11px/1 var(--font-body,sans-serif);letter-spacing:.12em;text-transform:uppercase;color:var(--accent,#ffb547);margin-bottom:6px}
-  .ls-story .dots{display:flex;gap:5px;margin-top:10px}
-  .ls-story .dots span{flex:1;height:3px;border-radius:2px;background:var(--line,#26324a)}
-  .ls-story .dots span.on{background:var(--accent,#ffb547)}
-  .ls-story .go{margin-top:12px}
   .ls-start{position:fixed;inset:0;z-index:70;display:grid;place-items:center;background:rgba(5,8,14,.72);padding:16px}
   .ls-start .card{width:min(440px,100%);background:var(--surface,#121a28);border:1px solid var(--line,#26324a);border-radius:20px;padding:24px;box-shadow:0 30px 80px -20px rgba(0,0,0,.8);color:var(--fg,#e8ecf4)}
   .ls-start .k{font:500 11px/1.4 var(--font-mono,monospace);letter-spacing:.1em;text-transform:uppercase;color:var(--muted,#8b96ad)}
@@ -211,7 +205,46 @@
   .ls-start p{margin:0 0 18px;color:var(--muted,#8b96ad);font-size:14.5px;line-height:1.55}
   .ls-start .acts{display:flex;flex-direction:column;gap:8px}
   .ls-start .ls-btn{padding:13px 16px;font-size:15px;border-radius:12px}
-  .ls-start .ls-btn.main{background:var(--accent,#ffb547)}`;
+  .ls-start .ls-btn.main{background:var(--accent,#ffb547)}
+  .ls-stage{position:fixed;inset:0;z-index:72;display:grid;place-items:center;background:rgba(5,8,14,.86);padding:16px;animation:ls-in .25s ease}
+  @keyframes ls-in{from{opacity:0}}
+  .ls-stage .frame{width:min(920px,100%,calc((100vh - 290px) * 1.78));min-width:min(560px,100%);max-height:100%;display:flex;flex-direction:column;background:var(--surface,#121a28);border:1px solid var(--line,#26324a);border-radius:20px;overflow:hidden;box-shadow:0 30px 90px -20px rgba(0,0,0,.9);color:var(--fg,#e8ecf4)}
+  .ls-stage .pic{position:relative;aspect-ratio:16/9;background:linear-gradient(120deg,#1a2438,#22304a,#1a2438);background-size:200% 100%;animation:ls-shim 2.4s linear infinite;overflow:hidden;flex:none}
+  .ls-stage .pic.has{animation:none;background:#0b1019}
+  @keyframes ls-shim{to{background-position:-200% 0}}
+  .ls-stage .ph{position:absolute;inset:0;display:grid;place-items:center;font:500 12px/1 var(--font-mono,monospace);letter-spacing:.12em;text-transform:uppercase;color:var(--muted,#8b96ad)}
+  .ls-stage .pic.has .ph{display:none}
+  .ls-stage .pic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .8s ease;transform-origin:50% 50%}
+  .ls-stage .pic img.on{opacity:1;animation:ls-kb 18s ease-out forwards}
+  .ls-stage.paused .pic img.on{animation-play-state:paused}
+  @keyframes ls-kb{from{transform:scale(1)}to{transform:scale(1.09) translate(-1%,-1%)}}
+  .ls-stage.done .pic img.on{animation:none}
+  .ls-stage .txt{padding:16px 20px 4px;overflow:auto;min-height:0}
+  .ls-stage .txt b{display:block;font:600 12px/1 var(--font-body,sans-serif);letter-spacing:.12em;text-transform:uppercase;color:var(--accent,#ffb547);margin-bottom:8px}
+  .ls-stage .txt p{margin:0;font-size:16.5px;line-height:1.55;text-wrap:pretty}
+  .ls-stage .end{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .ls-stage .end .ls-btn{padding:12px 16px;font-size:15px;border-radius:12px}
+  .ls-stage .end .main{background:var(--accent,#ffb547)}
+  .ls-stage .dots{display:flex;gap:6px;padding:12px 20px 0}
+  .ls-stage .dots button{flex:1;height:5px;border:0;border-radius:3px;background:var(--line,#26324a);cursor:pointer;padding:0}
+  .ls-stage .dots button.on{background:var(--accent,#ffb547)}
+  .ls-stage .dots button.cur{box-shadow:0 0 0 2px rgba(255,181,71,.25)}
+  .ls-stage .ctl{display:flex;align-items:center;gap:8px;padding:12px 16px 16px}
+  .ls-stage .ctl .sp{flex:1}
+  .ls-stage .ic{width:44px;height:44px;border-radius:12px;border:1px solid var(--line,#26324a);background:var(--surface-2,#1a2438);color:var(--fg,#e8ecf4);font-size:20px;cursor:pointer;flex:none}
+  .ls-stage .pp{height:44px;padding:0 18px;border-radius:12px;border:0;background:var(--accent,#ffb547);color:#0b1019;font:600 15px/1 var(--font-body,sans-serif);cursor:pointer;display:inline-flex;align-items:center;gap:8px;flex:none}
+  .ls-stage.done .pp,.ls-stage.done [data-a="next"]{visibility:hidden}
+  .ls-stage .ctl .ls-btn{height:44px;padding:0 14px;border-radius:12px}
+  .ls-stage button:focus-visible{outline:2px solid var(--accent,#ffb547);outline-offset:2px}
+  @media (max-width:600px){
+    .ls-stage{padding:0;place-items:stretch}
+    .ls-stage .frame{border-radius:0;border:0;height:100%}
+    .ls-stage .txt{flex:1}
+    .ls-stage .txt p{font-size:16px}
+    .ls-stage .pp span{display:none}
+    .ls-stage .ctl{padding-bottom:max(16px,env(safe-area-inset-bottom))}
+  }
+  @media (prefers-reduced-motion:reduce){.ls-stage .pic img.on{animation:none}.ls-stage{animation:none}}`;
   document.head.appendChild(css2);
   const story = document.createElement('div'); story.className = 'ls-story';
   sub.after(story);
@@ -219,7 +252,7 @@
   const reelBtn = () => P('overview') && P('overview').querySelector('[data-reel]');
   const taskBox = () => [...document.querySelectorAll('[class*="task"]')].find(e => e.offsetParent && !e.closest('.ls-story,.ls-start,#pane-hw,.lt-panel,.lt-tip') && e.getBoundingClientRect().width > 120);
   const toPractice = () => { stopStory(); openTab('scheme'); const t = taskBox(); if (t && window.LuchTutor && window.LuchTutor.highlight) window.LuchTutor.highlight(t); };
-  let sRun = 0, sAudio = null, cache = {};
+  let cache = {};
   const storyKey = () => location.pathname + '|' + lessonIdx();
   function fetchStory() {
     const k = storyKey();
@@ -232,35 +265,120 @@
     story.innerHTML = `<button type="button" class="play" data-a="story"><i>▶</i><span><b>${reel ? 'Начнём с теории: видео и история' : 'Начнём с теории: история урока'}</b><small>что это · зачем нужно · как работает · немного истории</small></span></button>` +
       (reel ? `<div class="acts" style="display:flex;gap:6px;margin-top:10px"><button class="ls-btn" data-a="reel">▶ Смотреть видео</button><button class="ls-btn ghost" data-a="story">Послушать историю</button></div>` : '');
   }
-  function stopStory() { sRun++; try { sAudio && sAudio.pause(); } catch (e) {} }
+  // Плеер «Истории урока»: картинка на раздел + голос + подпись. Пауза доступна всегда.
+  const imgUrl = i => '/api/tutor/story/img?k=' + encodeURIComponent(storyKey() + '|' + LANG2) + '&i=' + i;
   const tts = text => fetch('/api/tutor/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) }).then(r => r.ok ? r.blob() : null).catch(() => null);
-  async function playStory() {
-    const my = ++sRun;
-    if (!sAudio) sAudio = new Audio();
-    sAudio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA='; sAudio.play().catch(() => {});
-    story.innerHTML = `<div class="cap"><b>История урока</b>Готовлю рассказ… это займёт несколько секунд.</div><div class="acts" style="margin-top:10px"><button class="ls-btn ghost" data-a="stop">Остановить</button></div>`;
-    let s; try { s = await fetchStory(); } catch (e) { if (my === sRun) story.innerHTML = `<div class="cap"><b>История урока</b>Не получилось подготовить рассказ.</div><button class="ls-btn" data-a="story" style="margin-top:10px">Ещё раз</button>`; return; }
-    const secs = s.sections; let next = tts(secs[0].text);
-    for (let i = 0; i < secs.length; i++) {
-      if (my !== sRun) return;
-      story.innerHTML = `<div class="cap" data-noi18n><b>${esc(secs[i].title)}</b>${esc(secs[i].text)}</div><div class="dots">${secs.map((x, k) => `<span class="${k <= i ? 'on' : ''}"></span>`).join('')}</div>
-        <div class="acts" style="display:flex;gap:6px;margin-top:10px"><button class="ls-btn ghost" data-a="stop">Остановить</button><button class="ls-btn ghost" data-a="practice">К практике →</button></div>`;
-      if (secs[i].board && window.LuchTutor && window.LuchTutor.board) window.LuchTutor.board.draw(secs[i].board);
-      const blob = await next; if (i + 1 < secs.length) next = tts(secs[i + 1].text);
-      if (my !== sRun) return;
-      if (blob && blob.size > 100) { const u = URL.createObjectURL(blob); await new Promise(res => { sAudio.onended = sAudio.onerror = res; sAudio.src = u; sAudio.play().catch(res); }); URL.revokeObjectURL(u); }
-      else await new Promise(r => setTimeout(r, 5000));
+  let st = null; // { el, secs, i, paused, audio, voice:[promise], timer, run }
+  function stopStory() {
+    if (!st) return;
+    st.run = -1; clearTimeout(st.timer);
+    try { st.audio.pause(); st.audio.removeAttribute('src'); } catch (e) {}
+    (st.url || []).forEach(u => u && URL.revokeObjectURL(u));
+    st.el.remove(); removeEventListener('keydown', stKeys, true); st = null;
+  }
+  function stKeys(e) {
+    if (!st) return;
+    if (e.key === 'Escape') { e.preventDefault(); stopStory(); }
+    else if (e.key === ' ' && !/INPUT|TEXTAREA/.test(e.target.tagName)) { e.preventDefault(); togglePause(); }
+    else if (e.key === 'ArrowRight') stGo(st.i + 1);
+    else if (e.key === 'ArrowLeft') stGo(Math.max(0, st.i - 1));
+  }
+  function stPaint() {
+    const el = st.el, pp = el.querySelector('[data-a="pp"]');
+    pp.innerHTML = st.paused ? '▶ <span>Продолжить</span>' : '❚❚ <span>Пауза</span>';
+    pp.setAttribute('aria-label', st.paused ? 'Продолжить' : 'Пауза');
+    el.classList.toggle('paused', st.paused);
+  }
+  function togglePause() {
+    if (!st || st.i >= st.secs.length) return;
+    st.paused = !st.paused;
+    if (st.paused) { try { st.audio.pause(); } catch (e) {} clearTimeout(st.timer); }
+    else if (st.audio.src && !st.audio.ended && st.audio.currentTime > 0) st.audio.play().catch(() => {});
+    else stGo(st.i);
+    stPaint();
+  }
+  function stShell() {
+    const el = document.createElement('div'); el.className = 'ls-stage'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'История урока');
+    el.innerHTML = '<div class="frame"><div class="pic"><div class="ph"><span>Рисую картинку…</span></div></div>' +
+      '<div class="txt" data-noi18n><b></b><p>Готовлю рассказ… это займёт несколько секунд.</p></div>' +
+      '<div class="dots"></div>' +
+      '<div class="ctl"><button class="ic" data-a="prev" aria-label="Назад">‹</button><button class="pp" data-a="pp"></button><button class="ic" data-a="next" aria-label="Дальше">›</button>' +
+      '<span class="sp"></span><button class="ls-btn ghost" data-a="practice">К практике →</button><button class="ic x" data-a="close" aria-label="Закрыть">✕</button></div></div>';
+    el.addEventListener('click', e => {
+      if (e.target === el) return stopStory();
+      const b = e.target.closest('[data-a]'); if (!b || !st) return;
+      const a = b.dataset.a;
+      if (a === 'pp') togglePause();
+      else if (a === 'prev') stGo(Math.max(0, st.i - 1));
+      else if (a === 'next') stGo(st.i + 1);
+      else if (a === 'dot') stGo(+b.dataset.i);
+      else if (a === 'close') stopStory();
+      else if (a === 'again') stGo(0);
+      else if (a === 'practice') toPractice();
+    });
+    return el;
+  }
+  function stGo(i) {
+    if (!st) return;
+    const my = ++st.run; clearTimeout(st.timer);
+    try { st.audio.pause(); } catch (e) {}
+    st.i = i; st.paused = false;
+    const el = st.el, secs = st.secs, pic = el.querySelector('.pic'), txt = el.querySelector('.txt');
+    el.querySelector('.dots').innerHTML = secs.map((x, k) => '<button data-a="dot" data-i="' + k + '" class="' + (k < i ? 'on' : k === i ? 'on cur' : '') + '" aria-label="' + esc(x.title) + '"></button>').join('');
+    if (i >= secs.length) { // конец
+      el.classList.add('done');
+      txt.innerHTML = '<b>Теория пройдена</b><p>Теперь самое интересное — попробуй сам в опыте.</p><div class="end"><button class="ls-btn main" data-a="practice">Теперь попробуй сам →</button><button class="ls-btn ghost" data-a="again">Послушать ещё раз</button></div>';
+      return stPaint();
     }
-    if (my !== sRun) return;
-    story.innerHTML = `<div class="cap"><b>Теория пройдена</b>Теперь самое интересное — попробуй сам в опыте.</div><button class="ls-btn go" data-a="practice">Теперь попробуй сам →</button> <button class="ls-btn ghost go" data-a="story">Послушать ещё раз</button>`;
+    el.classList.remove('done');
+    const sec = secs[i];
+    txt.innerHTML = '<b>' + esc(sec.title) + '</b><p>' + esc(sec.text) + '</p>';
+    // картинка: плавная смена, лёгкий наезд камеры
+    const old = pic.querySelector('img.on');
+    const im = new Image(); im.alt = ''; im.decoding = 'async';
+    im.onload = () => { if (!st || st.i !== i) return; pic.appendChild(im); requestAnimationFrame(() => { im.classList.add('on'); if (old) old.classList.remove('on'); setTimeout(() => old && old.remove(), 900); pic.classList.add('has'); }); };
+    im.onerror = () => { if (st && st.i === i && !pic.querySelector('img')) pic.classList.remove('has'); };
+    im.src = imgUrl(i);
+    if (!old) pic.classList.remove('has');
+    stPaint();
+    // голос
+    const v = st.voice[i] || (st.voice[i] = tts(sec.text));
+    if (i + 1 < secs.length && !st.voice[i + 1]) st.voice[i + 1] = tts(secs[i + 1].text);
+    v.then(blob => {
+      if (!st || st.run !== my) return;
+      const nextUp = () => { if (st && st.run === my && !st.paused) stGo(i + 1); };
+      if (blob && blob.size > 100) {
+        st.url = st.url || []; st.url[i] = st.url[i] || URL.createObjectURL(blob);
+        st.audio.onended = () => setTimeout(nextUp, 700);
+        st.audio.onerror = () => { st.timer = setTimeout(nextUp, 6000); };
+        st.audio.src = st.url[i];
+        if (!st.paused) st.audio.play().catch(() => { st.paused = true; stPaint(); });
+      } else st.timer = setTimeout(nextUp, 7000);
+    });
+  }
+  async function playStory() {
+    stopStory();
+    const audio = new Audio();
+    // разблокируем звук сразу по нажатию (на телефонах иначе не заиграет)
+    audio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA='; audio.play().catch(() => {});
+    st = { el: stShell(), secs: [], i: 0, paused: false, audio, voice: [], run: 0 };
+    document.body.appendChild(st.el); addEventListener('keydown', stKeys, true);
+    st.el.querySelector('[data-a="pp"]').innerHTML = '❚❚ <span>Пауза</span>';
+    const me = st;
+    let s; try { s = await fetchStory(); } catch (e) {
+      if (st !== me) return;
+      st.el.querySelector('.txt').innerHTML = '<b>История урока</b><p>Не получилось подготовить рассказ. Попробуйте ещё раз чуть позже.</p>';
+      return;
+    }
+    if (st !== me) return;
+    st.secs = s.sections; stGo(0);
+    st.el.querySelector('[data-a="pp"]').focus();
   }
   story.addEventListener('click', e => {
     const b = e.target.closest('[data-a]'); if (!b) return;
     const a = b.dataset.a;
     if (a === 'story') playStory();
     else if (a === 'reel') { stopStory(); const r = reelBtn(); if (r) r.click(); }
-    else if (a === 'stop') { stopStory(); storyIdle(); }
-    else if (a === 'practice') { if (window.LuchTutor && window.LuchTutor.board) window.LuchTutor.board.hide(); toPractice(); }
   });
   const syncStory = () => { story.hidden = group !== 'theory'; };
   new MutationObserver(syncStory).observe(bar, { attributes: true, subtree: true, attributeFilter: ['aria-selected'] });
@@ -293,9 +411,9 @@
     return true;
   }
   // готовим историю заранее, пока человек читает карточку
-  const prep = () => { if (!reelBtn()) fetchStory().catch(() => {}); };
+  const prep = () => { if (!reelBtn()) fetchStory().then(j => j.sections.forEach((x, i) => { new Image().src = imgUrl(i); })).catch(() => {}); };
   setTimeout(() => { startCard(); prep(); }, 300);
   if (lessonsBox) { let t2 = 0; new MutationObserver(() => { clearTimeout(t2); t2 = setTimeout(() => { stopStory(); storyIdle(); startCard(); prep(); }, 400); }).observe(lessonsBox, { attributes: true, subtree: true, attributeFilter: ['aria-current'] }); }
 
-  window.LuchShell = { lessonIdx, lessonUrl, openHw, openTab, startPending: () => startShown, storyPlaying: () => !!story.querySelector('[data-a="stop"]') };
+  window.LuchShell = { lessonIdx, lessonUrl, openHw, openTab, startPending: () => startShown, storyPlaying: () => !!st };
 })();

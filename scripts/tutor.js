@@ -234,6 +234,7 @@ function handle(req, res, deps) {
   if (p === "/api/tutor/stt") return handleStt(req, res, deps);
   if (p === "/api/tutor/hw") return handleHw(req, res, deps);
   if (p === "/api/tutor/story") return handleStory(req, res, deps);
+  if (p === "/api/tutor/story/img") return handleStoryImg(req, res, deps);
   return handleChat(req, res, deps);
 }
 function handleTts(req, res, { readBody, clientIp }) {
@@ -362,7 +363,8 @@ const STORY = [
   "3) «Как это работает» — суть механизма, 2–3 фразы. Для этого раздела нарисуй схему на доске: поле board — SVG-элементы без тега <svg> на холсте 480×300 (line, path, circle, ellipse, rect, polyline, polygon, text). Цвета мела: #f4f1e8, #ffd166, #7fd4ff, #ff8fa3, #9be89b; линии stroke-width 2–3, fill=\"none\" кроме точек; текст font-size 16–22. Стрелка: marker-end=\"url(#arr)\". Не больше 20 элементов.",
   "4) «Немного истории» — кто и как это открыл или придумал, один яркий проверенный факт (имя, век или год). Если точных данных нет — скажи в общем, без выдуманных имён и дат.",
   "Каждый раздел (кроме board) — 1–3 коротких живых предложения, без формул в LaTeX; формулы словами или простым текстом. Текст будет звучать голосом.",
-  "Ответь только JSON: {\"sections\":[{\"title\":\"Что это\",\"text\":\"…\"},{\"title\":\"Зачем это нужно\",\"text\":\"…\"},{\"title\":\"Как это работает\",\"text\":\"…\",\"board\":\"…\"},{\"title\":\"Немного истории\",\"text\":\"…\"}]}",
+  "К каждому разделу — поле img: сюжет иллюстрации, которую покажут, пока звучит текст (1–2 предложения: кто/что в кадре, где, что происходит). Конкретная живая сцена по смыслу раздела; для истории — сам учёный или изобретатель за работой в своей эпохе. Без надписей, схем и формул.",
+  "Ответь только JSON: {\"sections\":[{\"title\":\"Что это\",\"text\":\"…\",\"img\":\"…\"},{\"title\":\"Зачем это нужно\",\"text\":\"…\",\"img\":\"…\"},{\"title\":\"Как это работает\",\"text\":\"…\",\"img\":\"…\",\"board\":\"…\"},{\"title\":\"Немного истории\",\"text\":\"…\",\"img\":\"…\"}]}",
 ].join("\n");
 const storyMem = new Map();
 async function storyGet(key) {
@@ -400,7 +402,7 @@ function handleStory(req, res, { readBody, clientIp }) {
       if (!p) {
         p = (async () => {
           const j = jsonOf(await oneShot(STORY + langRule(b.lang), "Урок:\n" + String(b.context || "").slice(0, MAX_CTX)));
-          const sections = (j.sections || []).slice(0, 4).map((s) => ({ title: String(s.title || ""), text: String(s.text || ""), board: s.board ? String(s.board).slice(0, 6000) : undefined }));
+          const sections = (j.sections || []).slice(0, 4).map((s) => ({ title: String(s.title || ""), text: String(s.text || ""), img: s.img ? String(s.img).slice(0, 600) : undefined, board: s.board ? String(s.board).slice(0, 6000) : undefined }));
           if (sections.length < 3) throw new Error("story: few sections");
           const v = { sections };
           await storyPut(key, v);
@@ -411,6 +413,74 @@ function handleStory(req, res, { readBody, clientIp }) {
       send(200, await p);
     } catch (e) { console.log("[story] " + (e && e.message)); send(502, { error: "Не получилось подготовить историю. Попробуйте ещё раз." }); }
   })().catch(() => { try { send(500, { error: "error" }); } catch { /* уже ответили */ } });
+}
+
+// ---------- картинки к «Истории урока» ----------
+// GET /api/tutor/story/img?k=<ключ истории с языком>&i=<раздел> → JPEG ~960px.
+// Рисует Gemini один раз, сжимаем ffmpeg и храним в luch.story_image; дальше отдаём из кэша.
+const STORY_IMAGE_MODEL = process.env.LUCH_IMAGE_MODEL || process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image";
+const IMG_STYLE = "Яркая познавательная иллюстрация к уроку. Цифровая живопись в стиле современной иллюстрированной энциклопедии: мягкий свет, тёплые сочные цвета, понятные формы, широкий кадр. Никаких надписей, букв, цифр и подписей на картинке.";
+const imgMem = new Map(), imgPending = new Map();
+function shrinkJpeg(buf) {
+  let ff; try { ff = require("ffmpeg-static"); } catch { ff = "ffmpeg"; }
+  return new Promise((resolve) => {
+    const p = require("child_process").spawn(ff, ["-hide_banner", "-loglevel", "error", "-i", "pipe:0", "-vf", "scale='min(960,iw)':-2", "-q:v", "6", "-f", "mjpeg", "pipe:1"]);
+    const out = []; p.stdout.on("data", (d) => out.push(d));
+    p.on("error", () => resolve(buf)); p.stdin.on("error", () => {});
+    p.on("close", (code) => { const o = Buffer.concat(out); resolve(code === 0 && o.length > 1000 ? o : buf); });
+    p.stdin.end(buf);
+  });
+}
+async function imgGet(key, i) {
+  const ck = key + "#" + i;
+  if (imgMem.has(ck)) return imgMem.get(ck);
+  try {
+    const sql = require("mssql"), pool = await db().getPool();
+    const r = await pool.request().input("k", sql.NVarChar(300), key).input("i", sql.TinyInt, i).query("SELECT mime, data FROM luch.story_image WHERE story_key = @k AND idx = @i");
+    if (r.recordset[0]) { const v = { mime: r.recordset[0].mime, data: r.recordset[0].data }; imgRemember(ck, v); return v; }
+  } catch (e) { console.log("[story img db] " + (e && e.message)); }
+  return null;
+}
+function imgRemember(ck, v) { imgMem.set(ck, v); if (imgMem.size > 80) imgMem.delete(imgMem.keys().next().value); }
+async function imgMake(key, i, sec) {
+  const scene = sec.img || (sec.title + ". " + sec.text);
+  const j = await gemini(STORY_IMAGE_MODEL, {
+    contents: [{ role: "user", parts: [{ text: IMG_STYLE + "\nСюжет: " + scene }] }],
+    generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: "16:9" } },
+  }, 120000);
+  const parts = (((j.candidates || [])[0] || {}).content || {}).parts || [];
+  const im = parts.find((p) => p.inline_data || p.inlineData);
+  if (!im) throw new Error("no image");
+  const v = { mime: "image/jpeg", data: await shrinkJpeg(Buffer.from((im.inline_data || im.inlineData).data, "base64")) };
+  imgRemember(key + "#" + i, v);
+  try {
+    const sql = require("mssql"), pool = await db().getPool();
+    await pool.request().input("k", sql.NVarChar(300), key).input("i", sql.TinyInt, i).input("m", sql.VarChar(40), v.mime).input("d", sql.VarBinary(sql.MAX), v.data)
+      .query("IF NOT EXISTS (SELECT 1 FROM luch.story_image WHERE story_key = @k AND idx = @i) INSERT luch.story_image (story_key, idx, mime, data) VALUES (@k, @i, @m, @d)");
+  } catch (e) { console.log("[story img db write] " + (e && e.message)); }
+  return v;
+}
+function handleStoryImg(req, res, { clientIp }) {
+  const u = new URL(req.url, "http://x"), key = String(u.searchParams.get("k") || "").slice(0, 300), i = parseInt(u.searchParams.get("i"), 10);
+  const fail = (code, msg) => { res.writeHead(code, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" }); res.end(msg); };
+  if (!/^\/[\w\-/]*\|\d+\|\w+$/.test(key) || !(i >= 0 && i < 4)) return fail(400, "bad");
+  (async () => {
+    let v = await imgGet(key, i);
+    if (!v) {
+      const story = await storyGet(key);
+      if (!story || !story.sections[i]) return fail(404, "no story");
+      const ck = key + "#" + i;
+      let p = imgPending.get(ck);
+      if (!p) {
+        const block = allowed(clientIp(req));
+        if (block) return fail(429, block);
+        p = imgMake(key, i, story.sections[i]); imgPending.set(ck, p); p.finally(() => imgPending.delete(ck)).catch(() => {});
+      }
+      v = await p;
+    }
+    res.writeHead(200, { "Content-Type": v.mime, "Content-Length": v.data.length, "Cache-Control": "public, max-age=31536000, immutable" });
+    res.end(v.data);
+  })().catch((e) => { console.log("[story img] " + (e && e.message)); try { fail(502, "error"); } catch { /* уже ответили */ } });
 }
 
 // ---------- перевод интерфейса страниц «Луча» ----------
