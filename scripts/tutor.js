@@ -13,7 +13,7 @@ const PER_DAY = Number(process.env.TUTOR_PER_DAY) || 3000;   // вопросов
 const MAX_MSG = 2000, MAX_CTX = 4000, MAX_TURNS = 24;
 
 const SYSTEM = [
-  "Ты — добрый репетитор на сайте интерактивных опытов «Луч»: физика, математика, химия, биология, информатика. С тобой говорят школьники 5–11 классов и их родители.",
+  "Ты — добрый репетитор на сайте интерактивных опытов Labiq: физика, математика, химия, биология, информатика. С тобой говорят школьники 5–11 классов и их родители.",
   "Характер: тёплый, терпеливый, спокойный. Говоришь мягко и дружелюбно, радуешься успехам ученика, хвалишь за попытку, никогда не стыдишь и не раздражаешься. Если ученик ошибся — «почти!», «хорошая мысль, давай проверим», а не «неправильно».",
   "Ученик сейчас на странице с интерактивным опытом. Ниже, в блоке «Что сейчас на экране», — точное состояние опыта: урок, задание, числа. Опирайся на эти числа, когда объясняешь, и ссылайся на то, что ученик видит.",
   "Как отвечать:",
@@ -152,11 +152,11 @@ function voiceAllowed(ip) {
   if (voiceHits.size > 5000) for (const [k, v] of voiceHits) if (!v.some((t) => now - t < 3600e3)) voiceHits.delete(k);
   return true;
 }
-async function gemini(model, body) {
+async function gemini(model, body, ms = 30000) {
   const key = keyFrom("GEMINI_API_KEY", ".gemini-key");
   if (!key) throw new Error("no_model_key");
   const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
-    method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key }, body: JSON.stringify(body), signal: AbortSignal.timeout(30000),
+    method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key }, body: JSON.stringify(body), signal: AbortSignal.timeout(ms),
   });
   const text = await res.text();
   if (!res.ok) throw new Error("gemini_" + res.status + ": " + text.slice(0, 200));
@@ -373,8 +373,8 @@ async function i18nToDb(lang, rows) {
 }
 async function i18nModel(lang, texts) {
   const system = [
-    "You translate the interface and lesson texts of «Луч», an interactive school learning site (physics, maths, chemistry, biology, computer science, grades 5–11), from Russian into " + I18N_LANGS[lang] + ".",
-    "Rules: natural, friendly language for school students; keep numbers, units (convert unit abbreviations to the target language's standard ones: Н→N, см→cm, кг→kg, с→s), formulas, chemical formulas, symbols, emoji, punctuation at the edges and leading/trailing spaces exactly as in the source. Keep proper names of Kazakhstan places/companies. Translate the name of the site «Луч» as «Luch». If a string is a single letter/variable or has nothing to translate, return it unchanged.",
+    "You translate the interface and lesson texts of Labiq, an interactive school learning site (physics, maths, chemistry, biology, computer science, grades 5–11), from Russian into " + I18N_LANGS[lang] + ".",
+    "Rules: natural, friendly language for school students; keep numbers, units (convert unit abbreviations to the target language's standard ones: Н→N, см→cm, кг→kg, с→s), formulas, chemical formulas, symbols, emoji, punctuation at the edges and leading/trailing spaces exactly as in the source. Keep proper names of Kazakhstan places/companies. The site name is Labiq (also written «Луч» in old texts): always write it as Labiq. If a string is a single letter/variable or has nothing to translate, return it unchanged.",
     "Placeholders like {0}, {1} stand for numbers: keep every placeholder exactly once, unchanged (you may move it if the target grammar needs it).",
     "Input: a JSON array of strings. Output: ONLY a JSON array of the same length with translations in the same order.",
   ].join("\n");
@@ -382,7 +382,7 @@ async function i18nModel(lang, texts) {
   let out = "";
   if (keyFrom("GEMINI_API_KEY", ".gemini-key")) {
     const j = await gemini(I18N_MODEL, { systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts: [{ text: user }] }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 16000, responseMimeType: "application/json" } });
+      generationConfig: { temperature: 0.2, maxOutputTokens: 16000, responseMimeType: "application/json" } }, 90000);
     const c = ((j.candidates || [])[0] || {}).content;
     out = c && c.parts ? c.parts.map((p) => (p.thought ? "" : p.text || "")).join("") : "";
   } else {
@@ -404,16 +404,19 @@ async function translate(lang, texts) {
     try { for (const r of await i18nFromDb(lang, miss)) i18nMem.set(lang + ":" + r.src_hash, r.dst); } catch (e) { console.log("[i18n db] " + (e && e.message)); }
     texts.forEach((t, i) => { const v = i18nMem.get(lang + ":" + hashes[i]); if (v !== undefined) res[i] = v; else if (!need.some((n) => n.h === hashes[i])) need.push({ h: hashes[i], s: t }); });
   }
-  for (let k = 0; k < need.length; k += 60) {
-    const part = need.slice(k, k + 60);
+  const parts = [];
+  for (let k = 0; k < need.length; k += 30) parts.push(need.slice(k, k + 30));
+  const one = async (part) => {
     const key = lang + ":" + part.map((p) => p.h).join(",");
     let p = i18nPending.get(key);
-    if (!p) { p = i18nModel(lang, part.map((x) => x.s)); i18nPending.set(key, p); p.finally(() => i18nPending.delete(key)); }
-    const tr = await p;
+    if (!p) { p = i18nModel(lang, part.map((x) => x.s)); i18nPending.set(key, p); p.finally(() => i18nPending.delete(key)).catch(() => {}); }
+    let tr;
+    try { tr = await p; } catch (e) { console.log("[i18n] " + (e && e.message)); return; }
     const rows = part.map((x, i) => ({ h: x.h, s: x.s, d: tr[i] }));
     rows.forEach((r) => i18nMem.set(lang + ":" + r.h, r.d));
     i18nToDb(lang, rows).catch((e) => console.log("[i18n db write] " + (e && e.message)));
-  }
+  };
+  for (let k = 0; k < parts.length; k += 4) await Promise.all(parts.slice(k, k + 4).map(one));
   return texts.map((t, i) => (res[i] !== undefined ? res[i] : i18nMem.get(lang + ":" + hashes[i]) ?? t));
 }
 function handleI18n(req, res, { readBody, clientIp }) {

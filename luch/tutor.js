@@ -1,4 +1,4 @@
-// Окно ИИ-репетитора «Луч» в правом нижнем углу.
+// Окно ИИ-репетитора Labiq в правом нижнем углу.
 // Два голосовых режима: микрофон в поле ввода (надиктовать вопрос, ответ текстом)
 // и «Голосом» — живой разговор: ученик говорит, репетитор отвечает вслух и снова слушает.
 // Страница может задать window.LUCH_CONTEXT() — текст о том, что сейчас на экране,
@@ -76,23 +76,26 @@
   }
   let saveT = 0;
   const save = () => { clearTimeout(saveT); saveT = setTimeout(() => { const arr = [...cache].slice(-6000); store.set(KEY, JSON.stringify(arr)); }, 800); };
-  let flushT = 0, first = true;
+  let flushT = 0, first = true, running = 0;
   const kick = () => { if (!flushT) flushT = setTimeout(flush, 90); };
   async function flush() {
     flushT = 0;
-    const batch = [...queue].filter(k => !inflight.has(k)).slice(0, 150);
-    queue.clear();
-    if (!batch.length) { reveal(); return; }
+    if (running >= 3) { kick(); return; }
+    const batch = [...queue].filter(k => !inflight.has(k)).slice(0, 40);
+    batch.forEach(k => queue.delete(k));
+    if (!batch.length) { if (!running) reveal(); return; }
+    running++; if (queue.size) kick();
     batch.forEach(k => inflight.add(k));
     try {
       const r = await fetch('/api/luch/i18n', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang, texts: batch }) });
       const j = await r.json();
       if (r.ok && Array.isArray(j.tr)) { batch.forEach((k, i) => { const t = j.tr[i]; cache.set(k, t); done.add(t); }); save(); }
     } catch (e) {}
-    batch.forEach(k => inflight.delete(k));
+    batch.forEach(k => inflight.delete(k)); running--;
     const ws = [...waiting]; waiting.clear();
     ws.forEach(n => { if (n.isConnected) (n.nodeType === 3 ? textNode(n) : attrs(n)); });
-    if (queue.size) kick(); else reveal();
+    { const tt = lookup(document.title); if (tt) document.title = tt; }
+    if (queue.size) kick(); else if (!running) reveal();
   }
   function reveal() { if (first) { first = false; document.documentElement.classList.remove('li-wait'); } }
   // первая отрисовка: прячем страницу, пока не подставим перевод (не дольше 2,5 с)

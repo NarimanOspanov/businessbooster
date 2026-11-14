@@ -124,7 +124,7 @@
     document.body.appendChild(t); setTimeout(() => t.remove(), ms);
   }
   bar.querySelector('.ls-share').addEventListener('click', async () => {
-    const url = lessonUrl(), title = (lessonTitle() || document.title) + ' — интерактивный урок «Луч»';
+    const url = lessonUrl(), title = (lessonTitle() || document.title) + ' — интерактивный урок Labiq';
     if (navigator.share && matchMedia('(pointer:coarse)').matches) { try { await navigator.share({ title, text: title, url }); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
     let copied = false;
     try { await navigator.clipboard.writeText(url); copied = true; } catch (e) {}
