@@ -1,0 +1,1173 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по электрохимии: ряд активности металлов, гальванический элемент и батарейка, электролиз и закон Фарадея, коррозия и защита металлов.">
+<link rel="icon" href="data:,">
+<title>Электрохимия</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /mechanics and /optics. Lab bench (SVG) on the left, lesson notebook on the right, lesson strip under the bench. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--liq);transition:width .2s}
+.gauge i{position:absolute;top:-4px;width:2px;height:14px;background:var(--force);transform:translateX(-50%)}
+.swatch{height:12px;border-radius:4px;margin-top:9px;border:1px solid rgba(255,255,255,.15)}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.grid{width:100%;border-collapse:separate;border-spacing:3px;margin-top:10px;font:500 12px/1.2 var(--font-mono)}
+.grid th{font-weight:500;color:var(--muted);padding:4px 2px;text-align:center}
+.grid td{background:var(--surface-2);border-radius:6px;text-align:center;padding:7px 2px;color:var(--muted)}
+.grid td.y{color:var(--ok)}
+.grid td.own{opacity:.35}
+.grid td.cur{outline:2px solid var(--force)}
+.toggles{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M8 16v16h10V16M22 16v16h10V16" fill="none" stroke="var(--fg)" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 22h8v9H9zM23 22h8v9h-8z" fill="var(--arm)" opacity=".55"/><path d="M11 12V27M29 12V27" stroke="var(--force)" stroke-width="2.4"/><path d="M11 12V7h18v5" fill="none" stroke="var(--fg)" stroke-width="1.6"/><path d="M15 20v-3h10v3" fill="none" stroke="var(--ok)" stroke-width="2"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Химия · Электрохимия</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#chem">Карта</a><a href="/physics/#chem">Химия</a><a href="/labs/chem-electro/" aria-current="page">Электрохимия</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Электрохимия</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Лабораторный стол">
+    <svg class="scene" id="scene" role="img" aria-label="Лабораторный стол: стаканы с растворами, пластинки металлов, гальванический элемент, электролизёр и пробирка с гвоздём. Предметы можно перетаскивать и нажимать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const sgn = (x, n = 2) => (x > 1e-9 ? '+' : '') + fmt(x, n);
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const KEY = 'luch-chem-electro';
+
+// ---------- chemistry data ----------
+// Standard electrode potentials E°(Mⁿ⁺/M), V, 25 °C
+const MET = {
+  Mg: { name: 'магний', gen: 'магния', E: -2.37, col: '#d4d9e1', ion: 'Mg²⁺', z: 2, M: 24, salt: 'MgSO₄', sol: '#dfe7ee', sa: 0.16 },
+  Zn: { name: 'цинк', gen: 'цинка', E: -0.76, col: '#a7b4c3', ion: 'Zn²⁺', z: 2, M: 65, salt: 'ZnSO₄', sol: '#dfe7ee', sa: 0.16 },
+  Fe: { name: 'железо', gen: 'железа', E: -0.44, col: '#6f7782', ion: 'Fe²⁺', z: 2, M: 56, salt: 'FeSO₄', sol: '#9fd08f', sa: 0.32 },
+  Cu: { name: 'медь', gen: 'меди', E: 0.34, col: '#d9824f', ion: 'Cu²⁺', z: 2, M: 64, salt: 'CuSO₄', sol: '#2f86e0', sa: 0.5 },
+  Ag: { name: 'серебро', gen: 'серебра', E: 0.80, col: '#e6e9ee', ion: 'Ag⁺', z: 1, M: 108, salt: 'AgNO₃', sol: '#dfe7ee', sa: 0.14 },
+};
+const ICOL = { Zn: '#dfe7ee', Fe: '#9fd08f', Cu: '#2f86e0', Ag: '#dfe7ee', H: '#dfe7ee' };
+const SERIES = [['Li', -3.04], ['K', -2.93], ['Ca', -2.87], ['Na', -2.71], ['Mg', -2.37], ['Al', -1.66], ['Zn', -0.76], ['Fe', -0.44], ['Ni', -0.25], ['Sn', -0.14], ['Pb', -0.13], ['H', 0], ['Cu', 0.34], ['Hg', 0.79], ['Ag', 0.80], ['Pt', 1.19], ['Au', 1.50]];
+// lesson 1: four plates × five solutions
+const PLATES = ['Zn', 'Fe', 'Cu', 'Ag'];
+const SOLS = [
+  { id: 'ZnSO4', f: 'ZnSO₄', ion: 'Zn', E: -0.76, col: '#dfe7ee', a: 0.16 },
+  { id: 'FeSO4', f: 'FeSO₄', ion: 'Fe', E: -0.44, col: '#9fd08f', a: 0.34 },
+  { id: 'HCl', f: 'HCl', ion: 'H', E: 0, col: '#dfe7ee', a: 0.16 },
+  { id: 'CuSO4', f: 'CuSO₄', ion: 'Cu', E: 0.34, col: '#2f86e0', a: 0.5 },
+  { id: 'AgNO3', f: 'AgNO₃', ion: 'Ag', E: 0.80, col: '#dfe7ee', a: 0.14 },
+];
+const reacts = (p, s) => p !== s.ion && MET[p].E < s.E;
+function eq1(p, s) {
+  if (p === s.ion) return `${p} + ${s.f}: металл и ионы одни и те же — ничего не меняется`;
+  if (!reacts(p, s)) return `${p} + ${s.f} → реакция не идёт`;
+  if (s.ion === 'H') return `${p} + 2HCl → ${p}Cl₂ + H₂↑`;
+  if (s.ion === 'Ag') return `${p} + 2AgNO₃ → ${p}(NO₃)₂ + 2Ag↓`;
+  return `${p} + ${s.ion}SO₄ → ${p}SO₄ + ${s.ion}↓`;
+}
+// lesson 3: electrolysis with graphite electrodes
+const F = 96500;
+const ELY = [
+  { id: 'CuSO4', f: 'CuSO₄', name: 'раствор CuSO₄', cat: 'Cu', an: 'O2', sol: '#2f86e0', a: 0.5,
+    hc: 'Cu²⁺ + 2e⁻ → Cu', ha: '2H₂O − 4e⁻ → O₂↑ + 4H⁺', sum: '2CuSO₄ + 2H₂O → 2Cu + O₂↑ + 2H₂SO₄',
+    why: ['Медь стоит в ряду правее водорода — её ионы восстанавливаются легче воды.', 'SO₄²⁻ — кислородсодержащий анион, он не окисляется. Окисляется вода, выделяется O₂.'] },
+  { id: 'CuCl2', f: 'CuCl₂', name: 'раствор CuCl₂', cat: 'Cu', an: 'Cl2', sol: '#2fa6a0', a: 0.45,
+    hc: 'Cu²⁺ + 2e⁻ → Cu', ha: '2Cl⁻ − 2e⁻ → Cl₂↑', sum: 'CuCl₂ → Cu + Cl₂↑',
+    why: ['Медь правее водорода — на катоде оседает медь.', 'Cl⁻ — бескислородный анион, он окисляется сам: выделяется хлор.'] },
+  { id: 'NaCl', f: 'NaCl', name: 'раствор NaCl', cat: 'H2', an: 'Cl2', sol: '#dfe7ee', a: 0.16,
+    hc: '2H₂O + 2e⁻ → H₂↑ + 2OH⁻', ha: '2Cl⁻ − 2e⁻ → Cl₂↑', sum: '2NaCl + 2H₂O → H₂↑ + Cl₂↑ + 2NaOH',
+    why: ['Натрий левее алюминия — его ионы в воде не восстанавливаются. Восстанавливается вода: H₂ и OH⁻ (малиновый фенолфталеин у катода).', 'Cl⁻ окисляется сам: выделяется хлор.'] },
+  { id: 'Na2SO4', f: 'Na₂SO₄', name: 'раствор Na₂SO₄', cat: 'H2', an: 'O2', sol: '#dfe7ee', a: 0.16,
+    hc: '2H₂O + 2e⁻ → H₂↑ + 2OH⁻', ha: '2H₂O − 4e⁻ → O₂↑ + 4H⁺', sum: '2H₂O → 2H₂↑ + O₂↑',
+    why: ['Na⁺ не восстанавливается — на катоде водород.', 'SO₄²⁻ не окисляется — на аноде кислород. По сути разлагается вода, соль только проводит ток.'] },
+  { id: 'melt', f: 'NaCl (расплав)', name: 'расплав NaCl', cat: 'Na', an: 'Cl2', sol: '#ff9a3c', a: 0.5,
+    hc: 'Na⁺ + e⁻ → Na', ha: '2Cl⁻ − 2e⁻ → Cl₂↑', sum: '2NaCl → 2Na + Cl₂↑',
+    why: ['Воды нет — восстанавливаться больше некому, на катоде получается натрий.', 'Cl⁻ окисляется: хлор. Так натрий получают в промышленности (при 600–800 °C).'] },
+];
+const GAS = { H2: { f: 'H₂', z: 2, col: '#f2f6fb' }, O2: { f: 'O₂', z: 4, col: '#f2f6fb' }, Cl2: { f: 'Cl₂', z: 2, col: '#d8e86a' } };
+// lesson 4: corrosion
+const ENVS = [
+  { id: 'dry', name: 'Сухой воздух', short: 'сухо', rate: 0, water: false, o2: true, salt: false },
+  { id: 'water', name: 'Вода и воздух', short: 'вода', rate: 1, water: true, o2: true, salt: false },
+  { id: 'salt', name: 'Солёная вода', short: 'соль', rate: 2.5, water: true, o2: true, salt: true },
+  { id: 'boiled', name: 'Кипячёная вода под маслом', short: 'без O₂', rate: 0, water: true, o2: false, salt: false },
+];
+const envOf = id => ENVS.find(e => e.id === id);
+
+const LESSONS = [
+  { id: 'series', title: 'Ряд активности металлов',
+    text: ['Металлы в реакциях отдают электроны, но одни делают это охотнее других. Если выстроить их по этой «охоте», получится электрохимический ряд напряжений: Li, K, Ca, Na, Mg, Al, Zn, Fe, Ni, Sn, Pb, (H), Cu, Hg, Ag, Pt, Au.',
+           'Правило: металл вытесняет из раствора соли металлы, стоящие правее него. Металлы левее водорода вытесняют водород из растворов кислот (HCl, разбавленная H₂SO₄). Самые активные — Li, K, Ca, Na — сначала реагируют с водой, для них правило не работает.',
+           'У каждого металла есть стандартный электродный потенциал E°. Чем он меньше, тем легче металл отдаёт электроны: у цинка −0,76 В, у меди +0,34 В.'],
+    why: 'На медных заводах Балхаша и Жезказгана медь из растворов можно осаждать железным ломом — это и есть вытеснение: Fe + CuSO₄ → FeSO₄ + Cu. Металлург и химик-технолог по ряду активности решают, какой металл чем вытеснить, а ювелир понимает, почему серебро не тускнеет в кислоте, а железо ржавеет. Ряд — одна из самых частых тем в ЕНТ по химии.',
+    safe: 'Нитрат серебра оставляет на коже чёрные пятна, медный купорос ядовит, соляная кислота едкая. Работают в перчатках и очках, пластинки берут пинцетом.',
+    task: 'Опустите каждую из четырёх пластинок во все «чужие» растворы — это 16 опытов — и найдите, где идёт реакция.',
+    hint: 'Выберите пластинку на панели внизу (Zn, Fe, Cu, Ag), перетащите её в стакан или просто нажмите на стакан. Таблица опытов — на вкладке «Схема».',
+    stage: 'Тащите пластинку в стакан или нажмите на стакан.',
+    init: { plate: 'Zn', at: null, tested: {} },
+    check: m => m.n === 16 },
+  { id: 'cell', title: 'Гальванический элемент и батарейка',
+    text: ['Гальванический элемент превращает энергию окислительно-восстановительной реакции в электрический ток. Две разные пластинки стоят в растворах своих солей, а растворы соединены солевым мостиком (трубка с раствором KNO₃).',
+           'Более активный металл — анод (−). Он отдаёт электроны и растворяется: Zn − 2e⁻ → Zn²⁺. Электроны по проводу бегут к катоду (+), где их забирают ионы менее активного металла: Cu²⁺ + 2e⁻ → Cu. Мостик пропускает ионы и замыкает цепь внутри.',
+           'ЭДС элемента = E°(катода) − E°(анода). У медно-цинкового элемента Даниэля 0,34 − (−0,76) = 1,10 В. Пальчиковая батарейка — тоже гальванический элемент: цинк и оксид марганца(IV), около 1,5 В. Элементы, соединённые последовательно, дают батарею: напряжения складываются.'],
+    why: 'Батарейки и аккумуляторы стоят в телефонах, часах, машинах, электросамокатах. Инженер-электрохимик разрабатывает новые аккумуляторы, автоэлектрик проверяет их напряжение, инженер солнечных и ветровых станций (их всё больше в Казахстане) подбирает накопители энергии. А тебе это поможет не путать плюс и минус и понимать, почему севшую батарейку нельзя просто «подзарядить».',
+    safe: 'Батарейки не разбирают, не бросают в огонь и не замыкают проводом накоротко — нагреются и могут потечь. Севшие сдают в контейнеры для батареек: в них цинк, марганец, иногда ртуть и литий.',
+    task: 'Соберите элемент, на котором вольтметр показывает не меньше +1,50 В, и зажгите лампочку.',
+    hint: 'Нажмите на пластинку — сменится металл (и раствор вокруг). Опустите солевой мостик в стаканы и замкните ключ. Плюс вольтметра подключён к правой пластинке.',
+    stage: 'Нажмите на пластинку, чтобы сменить металл. Мостик тащите в стаканы.',
+    init: { L: 'Zn', R: 'Cu', bridge: false, sw: false, n: 1 },
+    check: m => m.bridge && m.sw && m.E >= 1.5 - 1e-9 },
+  { id: 'electrolysis', title: 'Электролиз',
+    text: ['Электролиз — окислительно-восстановительная реакция, которую «толкает» внешний источник тока. На катоде (−) идёт восстановление, на аноде (+) — окисление. Электроды здесь графитовые, сами они не растворяются.',
+           'Что выделится на катоде в водном растворе: металлы правее водорода (Cu, Ag) — сам металл; металлы от Al и левее — водород из воды; между ними — металл и водород вместе. На аноде: Cl⁻, Br⁻, I⁻ окисляются сами, а SO₄²⁻, NO₃⁻ — нет, тогда окисляется вода и выделяется O₂.',
+           'Сколько вещества выделится, говорит закон Фарадея: m = M · I · t / (z · F). Здесь I — сила тока, t — время в секундах, z — сколько электронов нужно на одну частицу, F = 96 500 Кл/моль — заряд моля электронов.'],
+    why: 'На «Казцинке» в Усть-Каменогорске цинк получают электролизом, на Балхашском заводе так очищают медь до 99,99 %, а Павлодарский алюминиевый завод получает алюминий электролизом расплава. Гальваник покрывает детали хромом, никелем и золотом. Технолог считает по закону Фарадея, сколько металла даст ток за смену, — от этого зависят план и зарплата цеха.',
+    safe: 'Хлор ядовит: электролиз хлоридов проводят только под тягой и недолго. Источник тока низковольтный, но электроды в растворе не трогают руками, пока ток включён.',
+    task: 'Получите на катоде 0,64 г меди (точность ±0,01 г).',
+    hint: 'Сначала выберите раствор, из которого вообще может выделиться медь. Потом подберите силу тока и время. Формула — на вкладке «Расчёты», ползунки — на «Схеме».',
+    stage: 'Нажмите на источник тока, чтобы включить или выключить его.',
+    init: { ely: 'NaCl', I: 1, t: 0, run: false },
+    check: m => m.cat === 'Cu' && Math.abs(m.mass - 0.64) <= 0.01 + 1e-9 },
+  { id: 'corrosion', title: 'Коррозия',
+    text: ['Коррозия — самопроизвольное разрушение металла средой. Ржавление железа — электрохимическая коррозия: на поверхности работают крошечные гальванические элементы. Железо окисляется: Fe − 2e⁻ → Fe²⁺, а кислород в воде принимает электроны: O₂ + 2H₂O + 4e⁻ → 4OH⁻. Дальше получается ржавчина Fe₂O₃ · nH₂O.',
+           'Нужны и вода, и кислород. Соль в воде — электролит, она ускоряет коррозию. Контакт с менее активным металлом (медью) ускоряет её ещё сильнее: железо становится анодом.',
+           'Защита — покрытия (краска, лак, слой цинка) и протекторная защита: к железу крепят более активный металл, цинк или магний. Теперь анод — он, и разрушается протектор, а не железо.'],
+    why: 'Инженер-коррозионист защищает нефтепроводы и газопроводы: к трубам подключают протекторы или ток катодной защиты, иначе труба в земле сгниёт за несколько лет. Морские платформы на Каспии и корпуса судов обвешивают цинковыми и алюминиевыми протекторами. Автомаляр знает, почему кузов ржавеет от зимних реагентов на дорогах, а дома ты поймёшь, почему не стоит ставить медный кран на стальную трубу без переходника.',
+    safe: 'Ржавчину счищают в перчатках и очках. Поранился ржавым гвоздём — промой рану и сходи к врачу: может понадобиться прививка от столбняка.',
+    task: 'Гвоздь лежит в солёной воде. Защитите его, не закрывая краской, так, чтобы за 14 дней не появилось ни пятна ржавчины.',
+    hint: 'Попробуйте сначала прикрутить медную проволоку и сравните. Металл можно перетащить к гвоздю или просто нажать на него. Время — кнопка «Пуск» или ползунок на «Схеме».',
+    stage: 'Тащите цинк или медь к гвоздю. «Пуск» — пошли дни.',
+    init: { env: 'salt', contact: 'none', paint: false, days: 0, run: false },
+    check: m => m.env === 'salt' && m.contact === 'zn' && !m.paint && m.days >= 14 && m.rust === 0 },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+function model() {
+  const id = LID();
+  if (id === 'series') {
+    const s = S.at === null ? null : SOLS[S.at];
+    const n = Object.keys(S.tested).filter(k => { const [p, si] = k.split('-'); return p !== SOLS[+si].ion; }).length;
+    const found = Object.keys(S.tested).filter(k => { const [p, si] = k.split('-'); return reacts(p, SOLS[+si]); }).length;
+    return { kind: 'series', p: S.plate, s, r: s ? reacts(S.plate, s) : false, n, found };
+  }
+  if (id === 'cell') {
+    const eL = MET[S.L].E, eR = MET[S.R].E, emf = eR - eL;
+    const E = S.bridge ? emf : 0, closed = S.bridge && S.sw && Math.abs(emf) > 1e-9;
+    const an = emf > 1e-9 ? 'L' : emf < -1e-9 ? 'R' : null;
+    return { kind: 'cell', eL, eR, emf, E, bridge: S.bridge, sw: S.sw, closed, an, glow: closed ? clamp(Math.abs(emf) / 1.5, 0, 1) : 0, n: S.n };
+  }
+  if (id === 'electrolysis') {
+    const e = ELY.find(x => x.id === S.ely), q = S.I * S.t * 60, ne = q / F;
+    const M = { Cu: 64, Na: 23 }[e.cat] || 0, z = { Cu: 2, Na: 1 }[e.cat] || 0;
+    const mass = M ? M * ne / z : 0;
+    const gc = e.cat === 'H2' ? ne / 2 : 0, ga = ne / GAS[e.an].z;
+    return { kind: 'ely', e, cat: e.cat, I: S.I, t: S.t, q, ne, mass, M, z, Vc: gc * 22.4, Va: ga * 22.4, run: S.run };
+  }
+  const env = envOf(S.env);
+  let f = 1, why = 'нет контакта с другим металлом';
+  if (S.paint) { f = 0; why = 'краска не пускает воду и кислород к железу'; }
+  else if (S.contact === 'zn') { f = 0; why = 'цинк активнее железа — он анод и растворяется вместо железа'; }
+  else if (S.contact === 'cu') { f = 2; why = 'медь менее активна — анодом становится железо, оно ржавеет быстрее'; }
+  const rate = env.rate * f, rust = Math.min(100, 2.5 * rate * S.days);
+  const znLoss = S.contact === 'zn' ? Math.min(100, 2.5 * env.rate * 1.2 * S.days) : 0;
+  return { kind: 'cor', env: S.env, E: env, contact: S.contact, paint: S.paint, days: S.days, f, rate, rust, znLoss, why, run: S.run };
+}
+
+// ---------- scene geometry (SVG units; the bench top is y = 360) ----------
+const L1X = [60, 160, 260, 360, 460], L1TOP = 262, L1LIQ = 292, L1BOT = 356;
+const C2 = { lx: 110, rx: 410, lcx: 130, rcx: 390, top: 236, liq: 262, bot: 356, wire: 96, elTop: 160, elBot: 336 };
+const BR = { placed: [260, 222], lifted: [260, 148] };
+const NAIL = { x: 260, top: 140, bot: 330 };
+const ATT = { zn: [260, 248], cu: [260, 288] }, REST4 = { zn: [80, 300], cu: [440, 300] };
+
+let P = {};
+function target(k) {
+  const id = LID();
+  if (id === 'series') return S.at === null ? [260, 214] : [L1X[S.at], 348];
+  if (id === 'cell') return S.bridge ? BR.placed : BR.lifted;
+  if (id === 'corrosion') return S.contact === k ? ATT[k] : REST4[k];
+  return [0, 0];
+}
+function resetProps() {
+  P = {}; const id = LID();
+  const keys = id === 'series' ? ['plate'] : id === 'cell' ? ['bridge'] : id === 'corrosion' ? ['zn', 'cu'] : [];
+  for (const k of keys) { const [x, y] = target(k); P[k] = { x, y }; }
+}
+
+const ol = (d, fill, stroke, w = 2.2, extra = '') => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${w + 2.6}" stroke-linejoin="round" stroke-linecap="round"/><path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round" ${extra}/>`;
+const GLASS = 'rgba(200,225,255,.08)', GLASS_S = '#9fb3d1';
+const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+const mix = (a, b, k) => { const A = hex(a), B = hex(b); return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * k).toString(16).padStart(2, '0')).join(''); };
+const RND = []; { let s = 11; const r = () => (s = (s * 16807) % 2147483647) / 2147483647; for (let i = 0; i < 120; i++) RND.push([r(), r(), r()]); }
+
+function bench() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="2360" fill="url(#tile)"/>
+    <rect x="-2000" y="360" width="4520" height="1200" fill="#1a2232"/>
+    <rect x="-2000" y="358" width="4520" height="4" fill="#2c3954"/>
+    <rect x="-2000" y="362" width="4520" height="2" fill="${INK}" opacity=".6"/>`;
+}
+// a beaker: centre cx, half-width hw, top y0, bottom y1
+function beaker(cx, hw, y0, y1, liqY, col, a, extra = '') {
+  const x0 = cx - hw, x1 = cx + hw;
+  let h = `<path d="M${x0 + 2} ${liqY}H${x1 - 2}V${y1 - 6}Q${x1 - 2} ${y1} ${x1 - 8} ${y1}H${x0 + 8}Q${x0 + 2} ${y1} ${x0 + 2} ${y1 - 6}Z" fill="${col}" opacity="${a}"/>`;
+  h += `<rect x="${x0 + 2}" y="${liqY}" width="${2 * hw - 4}" height="2" fill="#fff" opacity=".28"/>` + extra;
+  const d = `M${x0 - 5} ${y0}L${x0} ${y0 + 5}V${y1 - 6}Q${x0} ${y1 + 1} ${x0 + 7} ${y1 + 1}H${x1 - 7}Q${x1} ${y1 + 1} ${x1} ${y1 - 6}V${y0 + 5}L${x1 + 4} ${y0}`;
+  h += `<path d="${d}Z" fill="${GLASS}"/>` + ol(d, 'none', GLASS_S, 2.2);
+  h += `<path d="M${x0 + 7} ${y0 + 14}V${y1 - 12}" stroke="#fff" stroke-opacity=".13" stroke-width="4" stroke-linecap="round"/>`;
+  return h;
+}
+const bubbles = (x, y0, y1, n, t, col, spread = 8, r = 2.2, seed = 0) => {
+  let h = '';
+  for (let i = 0; i < n; i++) {
+    const R = RND[(i + seed) % RND.length], L = y0 - y1, y = y0 - ((t * 0.05 * (0.6 + R[2]) + R[0] * L) % L), xx = x + (R[1] - 0.5) * spread * 2 + (reduce ? 0 : Math.sin(t / 200 + i) * 1.2);
+    h += `<circle cx="${xx.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r * (0.6 + R[2] * 0.7)).toFixed(1)}" fill="none" stroke="${col}" stroke-width="1" opacity=".85"/>`;
+  }
+  return h;
+};
+
+// ----- lesson 1 -----
+function plateSVG(o, inSol, t) {
+  const p = S.plate, c = MET[p].col;
+  let h = `<g transform="translate(${o.x.toFixed(1)} ${o.y.toFixed(1)})" data-drag="plate"><rect x="-22" y="-128" width="44" height="134" fill="transparent"/>`;
+  h += ol('M-8 -118H8V0H-8Z', c, mix(c, '#ffffff', 0.35), 1.6);
+  h += `<path d="M-4 -112V-6" stroke="#fff" stroke-opacity=".25" stroke-width="2.5"/>`;
+  h += `<rect x="-11" y="-108" width="22" height="16" rx="3" fill="#e8ecf4" stroke="${INK}" stroke-width="1.3"/><text y="-96" font-size="10.5" fill="#0b1019" text-anchor="middle" font-weight="500">${p}</text>`;
+  if (inSol) {
+    const s = SOLS[S.at], depth = o.y - L1LIQ;
+    if (reacts(p, s) && depth > 4) {
+      if (s.ion === 'H') h += bubbles(0, -2, -depth + 2, 9, t, '#e8f4ff', 7, 1.8);
+      else {
+        const dc = MET[s.ion].col;
+        h += `<path d="M-9 ${-depth + 3}H9V0H-9Z" fill="${dc}" opacity=".9"/>`;
+        for (let i = 0; i < 16; i++) { const R = RND[i]; const yy = -R[0] * (depth - 4); if (s.ion === 'Ag') h += `<path d="M${R[1] > 0.5 ? 9 : -9} ${yy.toFixed(1)}l${R[1] > 0.5 ? 4 + R[2] * 4 : -4 - R[2] * 4} ${(-2 - R[2] * 3).toFixed(1)}" stroke="#f4f6fa" stroke-width="1.3"/>`; else h += `<circle cx="${(R[1] * 16 - 8).toFixed(1)}" cy="${yy.toFixed(1)}" r="${(1 + R[2] * 1.6).toFixed(1)}" fill="${mix(dc, '#000000', 0.25)}"/>`; }
+      }
+    }
+  }
+  return h + `</g>`;
+}
+function seriesScene(t) {
+  let h = '';
+  SOLS.forEach((s, i) => {
+    const cx = L1X[i], cur = S.at === i, r = cur && reacts(S.plate, s);
+    const col = r && s.ion !== 'H' ? mix(s.col, ICOL[S.plate] || '#dfe7ee', 0.45) : s.col;
+    h += `<g data-drag="bk${i}"><rect x="${cx - 44}" y="${L1TOP - 30}" width="88" height="${L1BOT - L1TOP + 34}" fill="transparent"/>`;
+    h += beaker(cx, 38, L1TOP, L1BOT, L1LIQ, col, s.a);
+    h += `</g><text x="${cx}" y="378" font-size="11" fill="#e8ecf4" text-anchor="middle">${s.f}</text>`;
+    const k = S.plate + '-' + i;
+    let badge = '', bc = '#8b96ad';
+    if (S.plate === s.ion) badge = 'своя соль';
+    else if (S.tested[k]) { badge = reacts(S.plate, s) ? 'реакция' : 'нет'; bc = reacts(S.plate, s) ? '#86e0a8' : '#8b96ad'; }
+    if (badge) h += `<text x="${cx}" y="${L1TOP - 10}" font-size="9.5" fill="${bc}" text-anchor="middle">${badge}</text>`;
+  });
+  h += plateSVG(P.plate, S.at !== null && !(drag && drag.id === 'plate'), t);
+  return h;
+}
+
+// ----- lesson 2 -----
+function electrode(x, metal, role, glowAn) {
+  const c = MET[metal].col;
+  let h = `<g data-drag="el${x === C2.lx ? 'L' : 'R'}"><rect x="${x - 22}" y="${C2.elTop - 4}" width="44" height="${C2.elBot - C2.elTop + 8}" fill="transparent"/>`;
+  h += ol(`M${x - 9} ${C2.elTop}H${x + 9}V${C2.elBot}H${x - 9}Z`, c, mix(c, '#ffffff', 0.35), 1.6);
+  h += `<rect x="${x - 13}" y="${C2.elTop + 30}" width="26" height="16" rx="3" fill="#e8ecf4" stroke="${INK}" stroke-width="1.3"/><text x="${x}" y="${C2.elTop + 42}" font-size="10.5" fill="#0b1019" text-anchor="middle" font-weight="500">${metal}</text>`;
+  if (role) h += `<text x="${x}" y="${C2.elTop + 62}" font-size="13" fill="${role === '−' ? '#72d4e8' : '#ff8a73'}" text-anchor="middle" font-weight="500">${role}</text>`;
+  return h + `</g>`;
+}
+function bridgeSVG(o) {
+  const d = 'M-90 90V12Q-90 0 -78 0H78Q90 0 90 12V90';
+  let h = `<g transform="translate(${o.x.toFixed(1)} ${o.y.toFixed(1)})" data-drag="bridge"><path d="${d}" stroke="transparent" stroke-width="30" fill="none"/><rect x="-100" y="-22" width="200" height="40" fill="transparent"/>`;
+  h += `<path d="${d}" fill="none" stroke="${INK}" stroke-width="17"/><path d="${d}" fill="none" stroke="#c4d2e6" stroke-width="14"/><path d="${d}" fill="none" stroke="#e9eef6" stroke-width="9" opacity=".8"/>`;
+  h += `<text x="0" y="26" font-size="9" fill="#8b96ad" text-anchor="middle">KNO₃</text>`;
+  return h + `</g>`;
+}
+function cellScene(t) {
+  const m = model();
+  let h = '';
+  const roleL = m.an === 'L' ? '−' : m.an === 'R' ? '+' : '', roleR = m.an === 'R' ? '−' : m.an === 'L' ? '+' : '';
+  h += beaker(C2.lcx, 62, C2.top, C2.bot, C2.liq, MET[S.L].sol, MET[S.L].sa);
+  h += beaker(C2.rcx, 62, C2.top, C2.bot, C2.liq, MET[S.R].sol, MET[S.R].sa);
+  // wires: left electrode → switch → lamp → right electrode
+  h += ol(`M${C2.lx} ${C2.elTop}V${C2.wire}H${C2.rx}V${C2.elTop}`, 'none', '#c9a35a', 2.2);
+  // switch at x 180
+  h += `<g data-drag="sw" transform="translate(26 0)"><rect x="150" y="${C2.wire - 30}" width="64" height="44" fill="transparent"/><rect x="160" y="${C2.wire - 6}" width="44" height="12" fill="#121a28"/>`;
+  h += `<circle cx="164" cy="${C2.wire}" r="3.5" fill="#e8ecf4"/><circle cx="200" cy="${C2.wire}" r="3.5" fill="#e8ecf4"/>`;
+  h += m.sw ? ol(`M164 ${C2.wire}L200 ${C2.wire - 2}`, 'none', '#ffb547', 2.6) : ol(`M164 ${C2.wire}L196 ${C2.wire - 20}`, 'none', '#ffb547', 2.6);
+  h += `<text x="182" y="${C2.wire + 20}" font-size="9" fill="#8b96ad" text-anchor="middle">ключ</text></g>`;
+  // lamp at x 330
+  const g = m.glow;
+  if (g > 0) h += `<circle cx="330" cy="${C2.wire - 2}" r="${(16 + 16 * g).toFixed(1)}" fill="#ffd36b" opacity="${(0.12 + 0.25 * g).toFixed(2)}"/>`;
+  h += `<rect x="316" y="${C2.wire - 6}" width="28" height="12" fill="#121a28"/>`;
+  h += ol(`M330 ${C2.wire - 18}m-11 0a11 11 0 1 0 22 0a11 11 0 1 0 -22 0`, g > 0 ? mix('#3a4762', '#ffe08a', g) : 'rgba(200,225,255,.1)', GLASS_S, 1.6);
+  h += `<path d="M324 ${C2.wire - 4}V${C2.wire - 14}l3 -6 3 5 3 -5 3 6V${C2.wire - 4}" fill="none" stroke="${g > 0 ? '#fff4c9' : '#8b96ad'}" stroke-width="1.2"/>`;
+  h += ol(`M322 ${C2.wire - 6}h16v8h-16z`, '#56627d', '#8a96b0', 1.2);
+  h += `<text x="330" y="${C2.wire + 20}" font-size="9" fill="#8b96ad" text-anchor="middle">лампочка</text>`;
+  // voltmeter across the cell
+  h += `<g transform="translate(0 38)"><path d="M${C2.lx} 92H226M294 92H${C2.rx}" stroke="#8b96ad" stroke-width="1.3" stroke-dasharray="3 2"/>`;
+  h += `<circle cx="${C2.lx}" cy="92" r="2.5" fill="#8b96ad"/><circle cx="${C2.rx}" cy="92" r="2.5" fill="#8b96ad"/>`;
+  h += ol('M226 76h68v32h-68z', '#1b2333', '#56627d', 1.6);
+  h += `<rect x="232" y="81" width="56" height="17" rx="2" fill="#0d1a14"/><text x="284" y="94" font-size="11" fill="${m.E >= 1.5 - 1e-9 ? '#86e0a8' : '#e8ecf4'}" text-anchor="end">${fmt(m.E, 2)} В</text>`;
+  h += `<text x="229" y="106" font-size="7" fill="#ff8a73">−</text><text x="291" y="106" font-size="7" fill="#ff8a73" text-anchor="end">+</text><text x="260" y="106" font-size="7" fill="#8b96ad" text-anchor="middle">V</text></g>`;
+  h += electrode(C2.lx, S.L, roleL) + electrode(C2.rx, S.R, roleR);
+  // electrons running in the outer wire, from anode to cathode
+  if (m.closed) {
+    const path = [[C2.lx, C2.elTop], [C2.lx, C2.wire], [C2.rx, C2.wire], [C2.rx, C2.elTop]], seg = [], len = [];
+    let tot = 0; for (let i = 0; i < 3; i++) { const l = Math.hypot(path[i + 1][0] - path[i][0], path[i + 1][1] - path[i][1]); seg.push(l); tot += l; }
+    for (let k = 0; k < 14; k++) {
+      let s = ((reduce ? 0 : t * 0.06) + k * tot / 14) % tot; if (m.an === 'R') s = tot - s;
+      let i = 0; while (i < 2 && s > seg[i]) { s -= seg[i]; i++; }
+      const a = path[i], b = path[i + 1], f = s / seg[i], x = a[0] + (b[0] - a[0]) * f, y = a[1] + (b[1] - a[1]) * f;
+      h += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.6" fill="#72d4e8"/>`;
+    }
+    h += `<text x="260" y="${C2.wire - 10}" font-size="9" fill="#72d4e8" text-anchor="middle">${m.an === 'L' ? 'e⁻ →' : '← e⁻'}</text>`;
+  }
+  h += bridgeSVG(P.bridge);
+  h += `<text x="${C2.lcx}" y="378" font-size="10.5" fill="#e8ecf4" text-anchor="middle">${S.L} | ${MET[S.L].salt}</text><text x="${C2.rcx}" y="378" font-size="10.5" fill="#e8ecf4" text-anchor="middle">${S.R} | ${MET[S.R].salt}</text>`;
+  const rl = r => r === '−' ? 'анод (−)' : r === '+' ? 'катод (+)' : '';
+  h += `<text x="${C2.lcx}" y="393" font-size="9.5" fill="#8b96ad" text-anchor="middle">${rl(roleL)}</text><text x="${C2.rcx}" y="393" font-size="9.5" fill="#8b96ad" text-anchor="middle">${rl(roleR)}</text>`;
+  return h;
+}
+
+// ----- lesson 3 -----
+function elyScene(t) {
+  const m = model(), e = m.e, melt = e.id === 'melt';
+  let h = '';
+  const cx = 260, hw = 120, top = 200, bot = 356, liq = 224, xc = 200, xa = 320;
+  let col = e.sol, a = e.a;
+  if (e.cat === 'Cu') a = e.a * clamp(1 - m.mass / 6.4, 0.25, 1);
+  let extra = '';
+  if (e.cat === 'H2' && m.t > 0) extra += `<ellipse cx="${xc}" cy="290" rx="${(24 + Math.min(30, m.t)).toFixed(1)}" ry="62" fill="#e0408f" opacity="${clamp(m.t / 10, 0, 0.45).toFixed(2)}"/>`;
+  if (melt) { h += `<ellipse cx="${cx}" cy="${bot}" rx="${hw + 30}" ry="12" fill="#ff7a2a" opacity=".18"/>`; }
+  h += beaker(cx, hw, top, bot, liq, col, a, extra);
+  // electrodes
+  for (const [x, lab] of [[xc, 'катод −'], [xa, 'анод +']]) {
+    h += ol(`M${x - 7} 140H${x + 7}V330H${x - 7}Z`, '#3b4150', '#5b6378', 1.4);
+    h += `<text x="${x + (x === xc ? -12 : 12)}" y="160" font-size="9.5" fill="${lab[0] === 'к' ? '#72d4e8' : '#ff8a73'}" text-anchor="${x === xc ? 'end' : 'start'}">${lab}</text>`;
+  }
+  // cathode deposit
+  if (e.cat === 'Cu' && m.mass > 0) { const w = Math.min(5, 0.6 + m.mass * 1.1); h += `<path d="M${xc - 7 - w} ${liq + 4}H${xc + 7 + w}V330H${xc - 7 - w}Z" fill="#d9824f" opacity=".95" stroke="${INK}" stroke-width=".8"/>`; for (let i = 0; i < 18; i++) { const R = RND[i]; h += `<circle cx="${(xc - 7 - w + R[1] * (14 + 2 * w)).toFixed(1)}" cy="${(liq + 6 + R[0] * 100).toFixed(1)}" r="${(0.8 + R[2]).toFixed(1)}" fill="#a85a30"/>`; } }
+  if (e.cat === 'Na' && m.mass > 0) { const n = Math.min(7, 1 + Math.floor(m.mass)); for (let i = 0; i < n; i++) h += `<ellipse cx="${xc - 26 + i * 9 + (i % 2) * 3}" cy="${liq + 1}" rx="5" ry="2.6" fill="#dfe4ea" stroke="${INK}" stroke-width=".8"/>`; }
+  // gas bubbles
+  if (m.run) {
+    if (e.cat === 'H2') h += bubbles(xc, 326, liq + 2, 12, t, GAS.H2.col, 11, 2.2, 3);
+    if (e.cat === 'Cu' || e.cat === 'Na') {}
+    h += bubbles(xa, 326, liq + 2, e.an === 'O2' ? 7 : 12, t, GAS[e.an].col, 11, 2.2, 40);
+  } else if (m.t > 0) {
+    if (e.cat === 'H2') h += bubbles(xc, 326, liq + 2, 4, 0, GAS.H2.col, 10, 2, 3);
+    h += bubbles(xa, 326, liq + 2, 3, 0, GAS[e.an].col, 10, 2, 40);
+  }
+  if (e.an === 'Cl2' && m.t > 0) h += `<ellipse cx="${xa}" cy="${top - 6}" rx="26" ry="10" fill="#d8e86a" opacity="${clamp(m.t / 40, 0.08, 0.3).toFixed(2)}"/>`;
+  // power supply
+  h += `<g data-drag="pwr"><rect x="196" y="28" width="128" height="82" fill="transparent"/>`;
+  h += ol('M204 36h112v62h-112z', '#1b2333', '#56627d', 1.8);
+  h += `<rect x="212" y="44" width="70" height="30" rx="2" fill="#0d1a14"/><text x="276" y="57" font-size="10" fill="#86e0a8" text-anchor="end">${fmt(m.I, 1)} А</text><text x="276" y="70" font-size="10" fill="#86e0a8" text-anchor="end">${fmt(m.t, 0)} мин</text>`;
+  h += `<circle cx="300" cy="58" r="9" fill="${m.run ? '#86e0a8' : '#3a4762'}" stroke="${INK}" stroke-width="1.4"/><path d="M300 52v5M296 54.5a5.5 5.5 0 1 0 8 0" fill="none" stroke="${m.run ? '#0b1019' : '#e8ecf4'}" stroke-width="1.4"/>`;
+  h += `<circle cx="222" cy="86" r="4" fill="#72d4e8"/><text x="232" y="90" font-size="9" fill="#72d4e8">−</text><circle cx="298" cy="86" r="4" fill="#ff8a73"/><text x="284" y="90" font-size="9" fill="#ff8a73">+</text></g>`;
+  h += ol(`M222 90V116H${xc}V140`, 'none', '#c9a35a', 2) + ol(`M298 90V116H${xa}V140`, 'none', '#c9a35a', 2);
+  if (m.run) for (let k = 0; k < 4; k++) { const f = ((reduce ? 0 : t * 0.0015) + k / 4) % 1; h += `<circle cx="${(222 - (222 - xc) * clamp(f * 2 - 0.8, 0, 1)).toFixed(1)}" cy="${(90 + clamp(f * 2, 0, 1) * 26 + clamp(f * 2 - 1.6, 0, 0.4) * 60).toFixed(1)}" r="2.2" fill="#72d4e8"/>`; }
+  h += `<text x="262" y="${bot - 8}" font-size="10" fill="#e8ecf4" text-anchor="middle">${e.f}</text>`;
+  h += `<text x="140" y="378" font-size="9.5" fill="#72d4e8">катод: ${e.hc}</text><text x="140" y="393" font-size="9.5" fill="#ff8a73">анод: ${e.ha}</text>`;
+  return h;
+}
+
+// ----- lesson 4 -----
+function zincSVG(o, att, loss) {
+  const k = 1 - loss / 100 * 0.6;
+  let h = `<g transform="translate(${o.x.toFixed(1)} ${o.y.toFixed(1)})" data-drag="zn"><rect x="-26" y="-44" width="52" height="88" fill="transparent"/>`;
+  if (att) { h += ol(`M-12 -9H12V9H-12Z`, '#a7b4c3', '#c9d3e0', 1.4); if (loss > 0) for (let i = 0; i < Math.min(14, loss / 3); i++) { const R = RND[i + 50]; h += `<circle cx="${(R[0] * 22 - 11).toFixed(1)}" cy="${(R[1] * 16 - 8).toFixed(1)}" r="${(1 + R[2]).toFixed(1)}" fill="#f4f6f8"/>`; } }
+  else h += ol(`M-${(7 * k).toFixed(1)} -38H${(7 * k).toFixed(1)}V38H-${(7 * k).toFixed(1)}Z`, '#a7b4c3', '#c9d3e0', 1.4) + `<text y="52" font-size="10" fill="#e8ecf4" text-anchor="middle">Zn</text>`;
+  return h + `</g>`;
+}
+function copperSVG(o, att) {
+  let h = `<g transform="translate(${o.x.toFixed(1)} ${o.y.toFixed(1)})" data-drag="cu"><rect x="-26" y="-44" width="52" height="88" fill="transparent"/>`;
+  if (att) { let d = ''; for (let i = 0; i < 4; i++) d += `M-9 ${-7 + i * 4.5}Q0 ${-4 + i * 4.5} 9 ${-7 + i * 4.5}`; h += `<path d="${d}" fill="none" stroke="${INK}" stroke-width="4.2"/><path d="${d}" fill="none" stroke="#d9824f" stroke-width="2.4"/>`; }
+  else { let d = 'M0 -40'; for (let i = 0; i < 8; i++) d += `Q${i % 2 ? -10 : 10} ${-35 + i * 9} 0 ${-30 + i * 9}`; h += `<path d="${d}" fill="none" stroke="${INK}" stroke-width="4.4"/><path d="${d}" fill="none" stroke="#d9824f" stroke-width="2.4"/><text y="52" font-size="10" fill="#e8ecf4" text-anchor="middle">Cu</text>`; }
+  return h + `</g>`;
+}
+function corScene(t) {
+  const m = model(), env = m.E, x0 = 228, x1 = 292, top = 110, bot = 346, liq = 196;
+  let h = '';
+  // rack
+  h += ol('M180 352h160v8H180z', '#2a3348', '#3a4762', 1.4) + ol('M196 180h128v8H196z', '#2a3348', '#3a4762', 1.4) + ol('M200 188V352M320 188V352', 'none', '#3a4762', 2.4);
+  // liquid / desiccant
+  const tube = `M${x0} ${top}V${bot - 32}Q${x0} ${bot} 260 ${bot}Q${x1} ${bot} ${x1} ${bot - 32}V${top}`;
+  if (env.water) {
+    const c = env.salt ? '#cfe3f2' : '#9fcbe8';
+    h += `<path d="M${x0 + 2} ${liq}V${bot - 32}Q${x0 + 2} ${bot - 2} 260 ${bot - 2}Q${x1 - 2} ${bot - 2} ${x1 - 2} ${bot - 32}V${liq}Z" fill="${c}" opacity=".35"/>`;
+    if (!env.o2) h += `<rect x="${x0 + 2}" y="${liq - 12}" width="${x1 - x0 - 4}" height="12" fill="#e6c25a" opacity=".55"/>`;
+    if (env.salt) for (let i = 0; i < 10; i++) { const R = RND[i + 70]; h += `<rect x="${(x0 + 6 + R[0] * 52).toFixed(1)}" y="${(liq + 10 + R[1] * 120).toFixed(1)}" width="2" height="2" fill="#fff" opacity=".5"/>`; }
+  } else {
+    for (let i = 0; i < 26; i++) { const R = RND[i + 20]; h += `<circle cx="${(x0 + 8 + R[0] * 48).toFixed(1)}" cy="${(bot - 6 - R[1] * 26).toFixed(1)}" r="${(3 + R[2] * 2).toFixed(1)}" fill="#e9edf2" stroke="${INK}" stroke-width=".6"/>`; }
+    h += `<rect x="${x0 + 3}" y="${top + 2}" width="${x1 - x0 - 6}" height="16" rx="4" fill="#f2efe6" opacity=".9"/>`;
+  }
+  // nail
+  const nc = m.paint ? '#4f7bd6' : '#8a929c';
+  h += `<g data-drag="nail"><rect x="236" y="${NAIL.top - 12}" width="48" height="${NAIL.bot - NAIL.top + 20}" fill="transparent"/>`;
+  h += ol(`M257 ${NAIL.top}H263V${NAIL.bot - 14}L260 ${NAIL.bot}L257 ${NAIL.bot - 14}Z`, nc, mix(nc, '#ffffff', 0.3), 1.2);
+  h += ol(`M250 ${NAIL.top - 6}H270V${NAIL.top}H250Z`, nc, mix(nc, '#ffffff', 0.3), 1.2);
+  // rust spots in the wet part of the nail
+  if (m.rust > 0) {
+    const n = Math.round(m.rust * 0.5), wetTop = env.water ? liq : NAIL.top;
+    for (let i = 0; i < n; i++) { const R = RND[i]; h += `<circle cx="${(256.5 + R[0] * 7).toFixed(1)}" cy="${(wetTop + 4 + R[1] * (NAIL.bot - wetTop - 18)).toFixed(1)}" r="${(1.6 + R[2] * 2.2).toFixed(1)}" fill="${R[2] > 0.5 ? '#9a4a1c' : '#c0652a'}" opacity=".9"/>`; }
+    const fl = Math.round(m.rust / 8); for (let i = 0; i < fl; i++) { const R = RND[i + 90]; h += `<circle cx="${(244 + R[0] * 32).toFixed(1)}" cy="${(bot - 4 - R[1] * 6).toFixed(1)}" r="1.8" fill="#b35a24"/>`; }
+  }
+  h += `</g>`;
+  h += `<path d="${tube}" fill="${GLASS}"/>` + ol(tube, 'none', GLASS_S, 2.2) + `<path d="M${x0 + 8} ${top + 16}V${bot - 34}" stroke="#fff" stroke-opacity=".13" stroke-width="4" stroke-linecap="round"/>`;
+  for (const k of ['zn', 'cu']) {
+    const o = P[k], att = S.contact === k && !(drag && drag.id === k);
+    h += k === 'zn' ? zincSVG(o, att, m.znLoss) : copperSVG(o, att);
+  }
+  h += `<text x="260" y="378" font-size="10.5" fill="#e8ecf4" text-anchor="middle">${env.name}</text>`;
+  h += `<text x="260" y="393" font-size="9.5" fill="#8b96ad" text-anchor="middle">день ${m.days}</text>`;
+  return h;
+}
+
+function hlBox(id) {
+  const o = P[id];
+  return {
+    plate: o ? [o.x - 14, o.y - 124, 28, 130] : null, sols: [16, 254, 488, 110], hcl: [216, 254, 88, 110],
+    elL: [C2.lx - 16, C2.elTop - 6, 32, C2.elBot - C2.elTop + 12], elR: [C2.rx - 16, C2.elTop - 6, 32, C2.elBot - C2.elTop + 12],
+    bridge: o ? [o.x - 100, o.y - 20, 200, 114] : null, volt: [220, 108, 80, 44], lamp: [310, 64, 40, 52], sw: [178, 70, 60, 40], beakers: [62, 230, 396, 132],
+    pwr: [198, 30, 124, 74], cathode: [188, 126, 24, 210], anode: [308, 126, 24, 210], cell: [134, 194, 252, 168],
+    tube: [222, 104, 76, 248], nail: [244, 126, 32, 210], zn: o ? [o.x - 22, o.y - 44, 44, 92] : null, cu: o ? [o.x - 22, o.y - 44, 44, 92] : null,
+  }[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = bench();
+  if (id === 'series') h += seriesScene(t);
+  else if (id === 'cell') h += cellScene(t);
+  else if (id === 'electrolysis') h += elyScene(t);
+  else h += corScene(t);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 500, hh / 410, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 405 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer: drag props, tap things ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  const id = el.dataset.drag; e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  const o = P[id];
+  const p = toSvg(e);
+  if (!o) { drag = { id, x: e.clientX, y: e.clientY, px: p.x, py: p.y, moved: false }; return; }
+  drag = { id, dx: o.x - p.x, dy: o.y - p.y, x: e.clientX, y: e.clientY, px: p.x, py: p.y, moved: false };
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 5) drag.moved = true;
+  const o = P[drag.id]; if (!o || !drag.moved) return;
+  const p = toSvg(e);
+  o.x = clamp(p.x + drag.dx, VB.x + 10, VB.x + VB.w - 10); o.y = clamp(p.y + drag.dy, VB.y + 10, 356);
+  dirty = true;
+});
+const endDrag = cancel => {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing');
+  if (cancel) { dirty = true; return; }
+  const o = P[d.id], id = d.id;
+  if (d.moved && o) {
+    if (id === 'plate') { const i = L1X.findIndex(cx => Math.abs(o.x - cx) < 40 && o.y > L1TOP + 10 && o.y < 372); if (i >= 0) dip(i); else { S.at = null; update(); } }
+    if (id === 'bridge') { setBridge(Math.abs(o.x - BR.placed[0]) < 70 && o.y > 180 && o.y < 280); }
+    if (id === 'zn' || id === 'cu') { setContact(Math.abs(o.x - NAIL.x) < 50 && o.y > 170 && o.y < 350 ? id : (S.contact === id ? 'none' : S.contact)); }
+  } else if (!d.moved) tap(id, d);
+  dirty = true;
+};
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+function tap(id, d) {
+  if (id.startsWith('bk')) return dip(+id.slice(2));
+  if (id === 'plate' && d) { const i = L1X.findIndex(cx => Math.abs(d.px - cx) < 44 && d.py > L1TOP - 30); if (i >= 0 && i !== S.at) return dip(i); }
+  if (id === 'plate') return toast(S.at === null ? 'Перетащите пластинку в стакан или нажмите на стакан.' : 'Нажмите на другой стакан или перетащите пластинку.');
+  if (id === 'elL' || id === 'elR') return cycleMetal(id === 'elL' ? 'L' : 'R');
+  if (id === 'bridge') return setBridge(!S.bridge);
+  if (id === 'sw') return act('sw');
+  if (id === 'pwr') return act('run');
+  if (id === 'zn' || id === 'cu') return setContact(S.contact === id ? 'none' : id);
+  if (id === 'nail') return toast(S.paint ? 'Гвоздь покрашен — краска закрывает железо от воды и воздуха.' : 'Это стальной гвоздь. Прикрутите к нему цинк или медь.');
+}
+
+function dip(i) {
+  S.at = i; const s = SOLS[i], p = S.plate;
+  if (p === s.ion) toast(`${MET[p].name[0].toUpperCase() + MET[p].name.slice(1)} в растворе своей же соли — ничего не происходит.`);
+  else { S.tested[p + '-' + i] = true; toast(reacts(p, s) ? (s.ion === 'H' ? `${p} в ${s.f}: пошли пузырьки водорода` : `${p} в ${s.f}: на пластинке оседает ${MET[s.ion].name}`) : `${p} в ${s.f}: ничего не происходит`); }
+  update();
+}
+const CYC = ['Mg', 'Zn', 'Fe', 'Cu', 'Ag'];
+function cycleMetal(side) { const i = CYC.indexOf(S[side]); S[side] = CYC[(i + 1) % CYC.length]; buildScheme(); renderTools(); update(); }
+function setBridge(v) { S.bridge = v; if (!v) toast('Мостик поднят: цепь внутри разорвана, тока нет.'); renderTools(); update(); }
+function setContact(c) {
+  if (c !== S.contact) { S.contact = c; S.days = 0; S.run = false; toast(c === 'zn' ? 'Цинк прикручен к гвоздю. Опыт начат заново.' : c === 'cu' ? 'Медная проволока на гвозде. Опыт начат заново.' : 'Гвоздь без контакта. Опыт начат заново.'); }
+  renderTools(); buildScheme(); update();
+}
+
+let last = performance.now(), lastDraw = 0, acc = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  let anim = false;
+  for (const [k, o] of Object.entries(P)) {
+    if (drag && drag.id === k) continue;
+    const [tx, ty] = target(k);
+    const nx = reduce ? tx : o.x + (tx - o.x) * Math.min(1, dt * 10), ny = reduce ? ty : o.y + (ty - o.y) * Math.min(1, dt * 10);
+    if (Math.abs(nx - o.x) + Math.abs(ny - o.y) > 0.05) anim = true; else { o.x = tx; o.y = ty; continue; }
+    o.x = nx; o.y = ny;
+  }
+  const id = LID();
+  if (S.run && (id === 'electrolysis' || id === 'corrosion')) {
+    acc += dt; const stepT = id === 'electrolysis' ? 0.2 : 0.3;
+    while (acc >= stepT) {
+      acc -= stepT;
+      if (id === 'electrolysis') { if (S.t >= 60) { S.run = false; toast('Таймер дошёл до 60 минут.'); renderTools(); break; } S.t += 1; }
+      else { if (S.days >= 30) { S.run = false; toast('Прошло 30 дней.'); renderTools(); break; } S.days += 1; }
+      update();
+    }
+  } else acc = 0;
+  let live = false;
+  if (!reduce) {
+    if (id === 'series' && S.at !== null && SOLS[S.at].ion === 'H' && reacts(S.plate, SOLS[S.at])) live = true;
+    if (id === 'cell' && S.bridge && S.sw && S.L !== S.R) live = true;
+    if (id === 'electrolysis' && S.run) live = true;
+  }
+  if (S.hl) anim = true;
+  if (dirty || anim || (live && t - lastDraw > 33)) { drawScene(t); dirty = false; lastDraw = t; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  const e = id === 'electrolysis' ? ELY.find(x => x.id === S.ely) : null;
+  tb.innerHTML = {
+    series: () => PLATES.map(p => B('pl-' + p, p, S.plate === p)).join('') + sep + B('out', 'Вынуть'),
+    cell: () => B('cL', 'Слева: ' + S.L) + B('cR', 'Справа: ' + S.R) + sep + B('br', 'Мостик', S.bridge) + B('sw', 'Ключ', S.sw),
+    electrolysis: () => B('ely', e.f) + sep + B('i-', 'I −') + B('i+', 'I +') + sep + B('run', S.run ? 'Пауза' : 'Пуск', S.run) + B('reset', 'Заново'),
+    corrosion: () => B('env', envOf(S.env).short) + B('paint', 'Краска', S.paint) + sep + B('run', S.run ? 'Пауза' : 'Пуск', S.run) + B('reset', 'Заново'),
+  }[id]();
+}
+function act(a) {
+  const id = LID();
+  if (a.startsWith('pl-')) { S.plate = a.slice(3); S.at = null; renderTools(); buildScheme(); update(); return; }
+  if (a === 'out') { S.at = null; update(); return; }
+  if (a === 'cL') return cycleMetal('L');
+  if (a === 'cR') return cycleMetal('R');
+  if (a === 'br') return setBridge(!S.bridge);
+  if (a === 'sw') { S.sw = !S.sw; renderTools(); buildScheme(); update(); return; }
+  if (a === 'ely') { const i = ELY.findIndex(x => x.id === S.ely); return setEly(ELY[(i + 1) % ELY.length].id); }
+  if (a === 'i-' || a === 'i+') { S.I = clamp(Math.round((S.I + (a === 'i+' ? 0.5 : -0.5)) * 10) / 10, 0.5, 5); update(); return; }
+  if (a === 'run') {
+    if (id === 'electrolysis' && !S.run && S.t >= 60) S.t = 0;
+    if (id === 'corrosion' && !S.run && S.days >= 30) S.days = 0;
+    S.run = !S.run; renderTools(); update(); return;
+  }
+  if (a === 'reset') { S.run = false; if (id === 'electrolysis') S.t = 0; else S.days = 0; renderTools(); update(); return; }
+  if (a === 'env') { const i = ENVS.findIndex(x => x.id === S.env); return setEnv(ENVS[(i + 1) % ENVS.length].id); }
+  if (a === 'paint') { S.paint = !S.paint; S.days = 0; S.run = false; toast(S.paint ? 'Гвоздь покрыт краской. Опыт начат заново.' : 'Краску сняли. Опыт начат заново.'); renderTools(); buildScheme(); update(); return; }
+}
+function setEly(v) { if (v === S.ely) return; S.ely = v; S.t = 0; S.run = false; toast(`Новый электролизёр: ${ELY.find(x => x.id === v).name}. Таймер на нуле.`); renderTools(); buildScheme(); update(); }
+function setEnv(v) { if (v === S.env) return; S.env = v; S.days = 0; S.run = false; toast(`${envOf(v).name}. Опыт начат заново.`); renderTools(); buildScheme(); update(); }
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  plate: IC('<rect x="13" y="3" width="8" height="28" fill="#a7b4c3" stroke="var(--fg)" stroke-width="1"/><rect x="13" y="20" width="8" height="11" fill="#d9824f"/>'),
+  cups: IC('<path d="M3 12l1 16h7l1-16M13 12l1 16h7l1-16M23 12l1 16h7l1-16" fill="none" stroke="var(--fg)" stroke-width="1.4"/><rect x="5" y="19" width="5" height="8" fill="#9fd08f"/><rect x="15" y="19" width="5" height="8" fill="#2f86e0"/><rect x="25" y="19" width="5" height="8" fill="#dfe7ee" opacity=".5"/>'),
+  hcl: IC('<path d="M10 8l1 20h12l1-20" fill="none" stroke="var(--fg)" stroke-width="1.5"/><circle cx="15" cy="22" r="2" fill="none" stroke="var(--fg)"/><circle cx="19" cy="17" r="1.5" fill="none" stroke="var(--fg)"/><circle cx="16" cy="13" r="1.2" fill="none" stroke="var(--fg)"/>'),
+  el: IC('<rect x="13" y="3" width="8" height="28" fill="#d9824f" stroke="var(--fg)" stroke-width="1"/>'),
+  elZ: IC('<rect x="13" y="3" width="8" height="28" fill="#a7b4c3" stroke="var(--fg)" stroke-width="1"/>'),
+  bridge: IC('<path d="M7 30V10q0-4 4-4h12q4 0 4 4v20" fill="none" stroke="#c4d2e6" stroke-width="4"/>'),
+  volt: IC('<rect x="4" y="9" width="26" height="16" rx="2" fill="none" stroke="var(--fg)" stroke-width="1.6"/><text x="17" y="21" font-size="9" fill="var(--ok)" text-anchor="middle" font-family="monospace">1,1</text>'),
+  lamp: IC('<circle cx="17" cy="13" r="8" fill="#ffe08a" opacity=".8"/><rect x="13" y="21" width="8" height="6" fill="var(--muted)"/>'),
+  sw: IC('<circle cx="7" cy="20" r="2.5" fill="var(--fg)"/><circle cx="27" cy="20" r="2.5" fill="var(--fg)"/><path d="M7 20L25 10" stroke="var(--force)" stroke-width="2.4"/>'),
+  beakers: IC('<path d="M3 10v18h12V10M19 10v18h12V10" fill="none" stroke="var(--fg)" stroke-width="1.4"/><rect x="4" y="17" width="10" height="10" fill="#dfe7ee" opacity=".4"/><rect x="20" y="17" width="10" height="10" fill="#2f86e0" opacity=".6"/>'),
+  pwr: IC('<rect x="4" y="8" width="26" height="18" rx="2" fill="none" stroke="var(--fg)" stroke-width="1.6"/><rect x="7" y="11" width="13" height="7" fill="#0d1a14"/><circle cx="25" cy="15" r="2.5" fill="var(--ok)"/><circle cx="9" cy="23" r="1.6" fill="var(--arm)"/><circle cx="25" cy="23" r="1.6" fill="var(--warn)"/>'),
+  rod: IC('<rect x="13" y="3" width="8" height="28" fill="#3b4150" stroke="var(--fg)" stroke-width="1"/>'),
+  rodCu: IC('<rect x="13" y="3" width="8" height="28" fill="#3b4150" stroke="var(--fg)" stroke-width="1"/><rect x="11" y="14" width="12" height="17" fill="#d9824f"/>'),
+  cell: IC('<path d="M4 8v20h26V8" fill="none" stroke="var(--fg)" stroke-width="1.5"/><rect x="5" y="14" width="24" height="13" fill="#2f86e0" opacity=".5"/>'),
+  tube: IC('<path d="M12 3v24q0 4 5 4t5-4V3" fill="none" stroke="var(--fg)" stroke-width="1.5"/><path d="M13 14h8v13q0 3-4 3t-4-3z" fill="#9fcbe8" opacity=".5"/>'),
+  nail: IC('<path d="M12 5h10M16 5v20l1 5 1-5V5" fill="#8a929c" stroke="var(--fg)" stroke-width="1.2"/><circle cx="16" cy="18" r="1.5" fill="#c0652a"/>'),
+  zn: IC('<rect x="13" y="4" width="8" height="26" fill="#a7b4c3" stroke="var(--fg)" stroke-width="1"/>'),
+  cu: IC('<path d="M17 3q8 3 0 6t0 6t0 6t0 6t0 5" fill="none" stroke="#d9824f" stroke-width="2.2"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (L.id === 'series') return `Опытов ${m.n} из 16 · реакций найдено ${m.found}`;
+  if (L.id === 'cell') {
+    if (!m.bridge) return `${S.L}/${S.R} · мостик не опущен, 0 В`;
+    return `U = ${sgn(m.E)} В · ${m.sw ? (m.glow > 0 ? 'лампа горит' : 'лампа не горит') : 'ключ разомкнут'}`;
+  }
+  if (L.id === 'electrolysis') return `${m.e.f} · ${fmt(m.I, 1)} А × ${m.t} мин · ${m.cat === 'Cu' || m.cat === 'Na' ? `m(${m.cat}) = ${fmt(m.mass, 3)} г` : 'металл не выделяется'}`;
+  return `${m.E.short} · ${m.contact === 'zn' ? 'с цинком' : m.contact === 'cu' ? 'с медью' : 'без контакта'}${m.paint ? ' · краска' : ''} · день ${m.days} · ржавчина ${fmt(m.rust, 0)} %`;
+}
+
+function seriesSVG() {
+  const W = 120, step0 = (W - 8) / (SERIES.length - 1);
+  let h = `<svg class="diag" viewBox="0 0 ${W} 40" role="img" aria-label="Электрохимический ряд напряжений металлов">`;
+  h += `<path d="M4 18H116" stroke="#26324a" stroke-width="1"/><text x="4" y="37" font-size="3.4" fill="#8b96ad">← активнее, легче отдают e⁻</text><text x="116" y="37" font-size="3.4" fill="#8b96ad" text-anchor="end">благородные →</text>`;
+  SERIES.forEach(([s, e], i) => {
+    const x = 4 + i * step0, ours = PLATES.includes(s) || s === 'H', cur = LID() === 'series' ? s === S.plate : LID() === 'cell' ? (s === S.L || s === S.R) : false;
+    h += `<circle cx="${x.toFixed(2)}" cy="18" r="${cur ? 2.2 : 1.4}" fill="${cur ? '#ffb547' : ours ? '#72d4e8' : '#56627d'}"/>`;
+    h += `<text x="${x.toFixed(2)}" y="12" font-size="${ours ? 3.8 : 3.2}" fill="${ours ? '#e8ecf4' : '#8b96ad'}" text-anchor="middle">${s === 'H' ? '(H)' : s}</text>`;
+    if (ours || cur) h += `<text x="${x.toFixed(2)}" y="${i % 2 ? 29.5 : 25}" font-size="2.8" fill="#8b96ad" text-anchor="middle">${fmt(e, 2)}</text>`;
+  });
+  return h + `</svg>`;
+}
+function aaSVG() {
+  return `<svg class="diag" viewBox="0 0 120 52" role="img" aria-label="Разрез пальчиковой батарейки">
+    <rect x="18" y="12" width="72" height="28" rx="3" fill="#a7b4c3"/><rect x="21" y="15" width="66" height="22" rx="2" fill="#3b3a35"/>
+    <rect x="23" y="17" width="62" height="18" rx="2" fill="#6b6a5a"/><rect x="26" y="24" width="56" height="4" fill="#1d2230"/>
+    <rect x="90" y="21" width="5" height="10" rx="1" fill="#c8d1e2"/><text x="99" y="28" font-size="5" fill="#ff8a73">+</text><text x="12" y="28" font-size="5" fill="#72d4e8">−</text>
+    <text x="18" y="8" font-size="3.5" fill="#8b96ad">цинковый стакан — анод (−)</text><text x="48" y="48" font-size="3.5" fill="#8b96ad" text-anchor="middle">MnO₂ + графит — катод (+), между ними паста-электролит</text>
+    <path d="M54 26l20 -18" stroke="#8b96ad" stroke-width=".3"/><text x="75" y="7" font-size="3.3" fill="#8b96ad">графитовый стержень</text></svg>`;
+}
+function rustSVG(m) {
+  const X = d => 10 + d * 3.4, Y = r => 46 - r * 0.38;
+  let h = `<svg class="diag" viewBox="0 0 120 54" role="img" aria-label="График ржавчины по дням">`;
+  h += `<rect x="10" y="8" width="102" height="38" fill="none" stroke="#26324a" stroke-width=".5"/><text x="8" y="10" font-size="3.2" fill="#8b96ad" text-anchor="end">100%</text><text x="8" y="47" font-size="3.2" fill="#8b96ad" text-anchor="end">0</text>`;
+  for (const d of [0, 7, 14, 21, 30]) h += `<text x="${X(d)}" y="51.5" font-size="3.2" fill="#8b96ad" text-anchor="middle">${d}</text>`;
+  h += `<path d="M${X(14)} 8V46" stroke="#ffb547" stroke-width=".4" stroke-dasharray="1.2 1.2"/>`;
+  const env = m.E, line = (rate, col, lab, dy) => { const pts = []; for (let d = 0; d <= 30; d++) pts.push(`${X(d).toFixed(1)} ${Y(Math.min(100, 2.5 * rate * d)).toFixed(1)}`); return `<path d="M${pts.join('L')}" fill="none" stroke="${col}" stroke-width=".6" stroke-dasharray="1.4 1"/><text x="${X(30) - 1}" y="${(Y(Math.min(100, 2.5 * rate * 30)) + dy).toFixed(1)}" font-size="3" fill="${col}" text-anchor="end">${lab}</text>`; };
+  h += line(env.rate * 2, '#ff8a73', 'с медью', -1.2) + line(env.rate, '#8b96ad', 'без контакта', 3.4) + line(0, '#86e0a8', 'с цинком / краска', -1.2);
+  const pts = []; for (let d = 0; d <= m.days; d++) pts.push(`${X(d).toFixed(1)} ${Y(Math.min(100, 2.5 * m.rate * d)).toFixed(1)}`);
+  if (pts.length > 1) h += `<path d="M${pts.join('L')}" fill="none" stroke="#ffb547" stroke-width="1"/>`;
+  h += `<circle cx="${X(m.days).toFixed(1)}" cy="${Y(m.rust).toFixed(1)}" r="1.5" fill="#ffb547"/>`;
+  return h + `</svg>`;
+}
+
+// ---------- Scheme tab ----------
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+const chips = (key, list, cur) => `<div class="chips" data-key="${key}">${list.map(([v, l]) => `<button data-v="${v}" aria-pressed="${v === cur}">${l}</button>`).join('')}</div>`;
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'series') h = `<h2>Таблица опытов</h2><p class="note">Строки — пластинки, столбцы — растворы. «✓» — реакция идёт, «—» — нет, «·» — ещё не пробовали.</p><div id="sGrid"></div>
+      <div class="ctl"><div class="lbl">Пластинка</div>${chips('plate', PLATES.map(p => [p, `${p} · ${MET[p].name}`]), S.plate)}</div>
+      <div class="ctl"><div class="lbl">Опустить в</div>${chips('dip', SOLS.map((s, i) => [String(i), s.f]), S.at === null ? '' : String(S.at))}</div>
+      <h3>Ряд напряжений</h3><div id="sDiag"></div>`;
+  if (id === 'cell') h = `<h2>Схема элемента</h2><div id="sDiag"></div>
+      <dl class="reads"><div><dt>ЭДС</dt><dd id="r1"></dd></div><div><dt>Анод</dt><dd id="r2"></dd></div><div><dt>Катод</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Левая пластинка</div>${chips('L', CYC.map(x => [x, x]), S.L)}</div>
+      <div class="ctl"><div class="lbl">Правая пластинка</div>${chips('R', CYC.map(x => [x, x]), S.R)}</div>
+      <div class="toggles"><button class="ghostbtn" data-a="br">${S.bridge ? 'Поднять мостик' : 'Опустить мостик'}</button><button class="ghostbtn" data-a="sw">${S.sw ? 'Разомкнуть ключ' : 'Замкнуть ключ'}</button></div>
+      <h3>Батарея из элементов</h3><p class="note">Если соединить элементы последовательно (плюс одного к минусу другого), напряжения складываются.</p>` +
+      slider('inN', 'Элементов подряд', 1, 4, 1, S.n) + `<dl class="reads"><div><dt>Один</dt><dd id="r4"></dd></div><div><dt>Батарея</dt><dd id="r5"></dd></div><div><dt>Хватит на</dt><dd id="r6"></dd></div></dl>
+      <h3>Пальчиковая батарейка в разрезе</h3>${aaSVG()}`;
+  if (id === 'electrolysis') h = `<h2>Электролизёр</h2>
+      <dl class="reads"><div><dt>Катод</dt><dd id="r1"></dd></div><div><dt>Анод</dt><dd id="r2"></dd></div><div><dt>Заряд</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Электролит</div>${chips('ely', ELY.map(e => [e.id, e.f]), S.ely)}</div>` +
+      slider('inI', 'Сила тока I', 0.5, 5, 0.5, S.I) + slider('inT', 'Время t', 0, 60, 1, S.t) +
+      `<div class="row"><button class="ghostbtn" data-a="run">${S.run ? 'Пауза' : 'Пуск'}</button><button class="ghostbtn" data-a="reset">Заново</button></div>
+      <dl class="reads"><div><dt>m на катоде</dt><dd id="r4"></dd></div><div><dt>V газа (катод)</dt><dd id="r5"></dd></div><div><dt>V газа (анод)</dt><dd id="r6"></dd></div></dl><p class="note">Объёмы газов — при нормальных условиях.</p>`;
+  if (id === 'corrosion') h = `<h2>Ржавчина по дням</h2><div id="sDiag"></div><p class="note" style="margin-top:8px">Оранжевая линия — ваш гвоздь. Пунктиры — как пошло бы в этой же среде с медью, без контакта и с цинком.</p>
+      <dl class="reads"><div><dt>Ржавчина</dt><dd id="r1"></dd></div><div><dt>Цинк съеден</dt><dd id="r2"></dd></div><div><dt>Скорость</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Среда</div>${chips('env', ENVS.map(e => [e.id, e.name]), S.env)}</div>
+      <div class="ctl"><div class="lbl">Что прикручено к гвоздю</div>${chips('contact', [['none', 'Ничего'], ['zn', 'Цинк'], ['cu', 'Медь']], S.contact)}</div>
+      <div class="toggles"><button class="ghostbtn" data-a="paint">${S.paint ? 'Снять краску' : 'Покрасить гвоздь'}</button><button class="ghostbtn" data-a="run">${S.run ? 'Пауза' : 'Пуск'}</button></div>` +
+      slider('inD', 'Прошло дней', 0, 30, 1, S.days);
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn); };
+  on('#inN', e => { S.n = +e.target.value; update(); });
+  on('#inI', e => { S.I = +e.target.value; update(); });
+  on('#inT', e => { S.t = +e.target.value; S.run = false; renderTools(); update(); });
+  on('#inD', e => { S.days = +e.target.value; S.run = false; renderTools(); update(); });
+  el.querySelectorAll('.chips[data-key] button').forEach(b => b.onclick = () => {
+    const k = b.parentElement.dataset.key, v = b.dataset.v;
+    if (k === 'plate') act('pl-' + v);
+    else if (k === 'dip') dip(+v);
+    else if (k === 'L' || k === 'R') { S[k] = v; buildScheme(); renderTools(); update(); }
+    else if (k === 'ely') setEly(v);
+    else if (k === 'env') setEnv(v);
+    else if (k === 'contact') setContact(v);
+  });
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => { act(b.dataset.a); buildScheme(); renderPanes(model()); });
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  const press = (key, cur) => el.querySelectorAll(`.chips[data-key="${key}"] button`).forEach(b => b.setAttribute('aria-pressed', b.dataset.v === cur));
+  const d = el.querySelector('#sDiag');
+  if (m.kind === 'series') {
+    let g = `<table class="grid"><tr><th></th>${SOLS.map(s => `<th>${s.f}</th>`).join('')}</tr>`;
+    for (const p of PLATES) g += `<tr><th>${p}</th>${SOLS.map((s, i) => { const own = p === s.ion, k = p + '-' + i, tst = S.tested[k], cur = p === S.plate && S.at === i; return `<td class="${own ? 'own' : tst && reacts(p, s) ? 'y' : ''}${cur ? ' cur' : ''}">${own ? '×' : tst ? (reacts(p, s) ? '✓' : '—') : '·'}</td>`; }).join('')}</tr>`;
+    el.querySelector('#sGrid').innerHTML = g + '</table>';
+    if (d) d.innerHTML = seriesSVG();
+    press('plate', S.plate); press('dip', S.at === null ? '' : String(S.at));
+  } else if (m.kind === 'cell') {
+    if (d) d.innerHTML = seriesSVG();
+    set('#r1', sgn(m.emf) + ' В'); set('#r2', m.an ? (m.an === 'L' ? S.L : S.R) : '—'); set('#r3', m.an ? (m.an === 'L' ? S.R : S.L) : '—');
+    const one = Math.abs(m.emf), tot = one * S.n;
+    set('#inNO', String(S.n)); val('#inN', S.n); set('#r4', fmt(one, 2) + ' В'); set('#r5', fmt(tot, 2) + ' В');
+    set('#r6', tot >= 3 - 0.2 ? 'пульт, фонарик' : tot >= 1.3 ? 'часы, лампочку' : tot > 0 ? 'светодиод не зажжёт' : '—');
+    press('L', S.L); press('R', S.R);
+  } else if (m.kind === 'ely') {
+    const e = m.e, gas = g => GAS[g].f;
+    set('#r1', e.cat === 'H2' ? 'H₂' : e.cat); set('#r2', gas(e.an)); set('#r3', Math.round(m.q).toLocaleString('ru-RU') + ' Кл');
+    set('#inIO', fmt(S.I, 1) + ' А'); set('#inTO', S.t + ' мин'); val('#inI', S.I); val('#inT', S.t);
+    set('#r4', e.cat === 'Cu' || e.cat === 'Na' ? fmt(m.mass, 3) + ' г' : '—'); set('#r5', e.cat === 'H2' ? fmt(m.Vc * 1000, 0) + ' мл' : '—'); set('#r6', fmt(m.Va * 1000, 0) + ' мл');
+    press('ely', S.ely);
+  } else {
+    if (d) d.innerHTML = rustSVG(m);
+    set('#r1', fmt(m.rust, 0) + ' %'); set('#r2', m.contact === 'zn' ? fmt(m.znLoss, 0) + ' %' : '—'); set('#r3', m.rate === 0 ? '0' : '×' + fmt(m.rate, 1));
+    set('#inDO', S.days + ' дн.'); val('#inD', S.days);
+    press('env', S.env); press('contact', S.contact);
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'series') return [
+    { id: 'plate', icon: ICON.plate, name: 'Металлическая пластинка', spec: 'Цинк, железо, медь или серебро, начищенные наждачкой. Если металл вытесняет ионы из раствора, на пластинке оседает другой металл: медь — рыжим налётом, серебро — блестящими иголками.' },
+    { id: 'sols', icon: ICON.cups, name: 'Растворы солей', spec: 'ZnSO₄ и AgNO₃ бесцветные, FeSO₄ бледно-зелёный (ионы Fe²⁺), CuSO₄ синий (ионы Cu²⁺). Когда ионы меди уходят на пластинку, синий цвет бледнеет.' },
+    { id: 'hcl', icon: ICON.hcl, name: 'Соляная кислота HCl', spec: 'Разбавленная. Металлы левее водорода вытесняют из неё водород — видны пузырьки. Медь и серебро в ней не растворяются.' }];
+  if (id === 'cell') return [
+    { id: 'elL', icon: ICON.elZ, name: 'Левая пластинка (электрод)', spec: 'Стоит в растворе своей соли. Нажмите, чтобы сменить металл: Mg, Zn, Fe, Cu, Ag.' },
+    { id: 'elR', icon: ICON.el, name: 'Правая пластинка', spec: 'К ней подключён плюс вольтметра. Если вольтметр показывает минус — значит, плюс на самом деле слева.' },
+    { id: 'beakers', icon: ICON.beakers, name: 'Полуэлементы', spec: 'Металл в растворе своих ионов. Растворы не смешивают, иначе ионы меди сразу осядут на цинке и ток не пойдёт по проводу.' },
+    { id: 'bridge', icon: ICON.bridge, name: 'Солевой мостик', spec: 'Трубка с раствором KNO₃ в геле. Ионы K⁺ и NO₃⁻ ходят по ней и сохраняют растворы нейтральными. Поднимешь — ток прекратится.' },
+    { id: 'volt', icon: ICON.volt, name: 'Вольтметр', spec: 'Показывает ЭДС элемента. Плюс подключён к правой пластинке.' },
+    { id: 'sw', icon: ICON.sw, name: 'Ключ', spec: 'Замыкает внешнюю цепь: по проводу бегут электроны от анода к катоду.' },
+    { id: 'lamp', icon: ICON.lamp, name: 'Лампочка 1,5 В', spec: 'Горит в полный накал при 1,5 В. При меньшем напряжении светится тускло.' }];
+  if (id === 'electrolysis') return [
+    { id: 'pwr', icon: ICON.pwr, name: 'Источник постоянного тока', spec: 'Держит заданную силу тока от 0,5 до 5 А и считает минуты. Минус идёт на катод, плюс — на анод. Нажмите на него, чтобы включить.' },
+    { id: 'cathode', icon: ICON.rodCu, name: 'Катод (−)', spec: 'Графитовый стержень. Сюда приходят электроны, здесь идёт восстановление: оседает металл или выделяется водород.' },
+    { id: 'anode', icon: ICON.rod, name: 'Анод (+)', spec: 'Инертный графит. Здесь забирают электроны — идёт окисление: выделяется хлор или кислород.' },
+    { id: 'cell', icon: ICON.cell, name: 'Электролизёр', spec: '200 мл раствора 0,5 моль/л (или тигель с расплавом NaCl). В растворы Na-солей добавлен фенолфталеин: у катода он краснеет от ионов OH⁻.' }];
+  return [
+    { id: 'tube', icon: ICON.tube, name: 'Пробирка', spec: 'Сухой воздух (на дне хлорид кальция — он поглощает влагу), вода, солёная вода или кипячёная вода под слоем масла — в ней почти нет кислорода.' },
+    { id: 'nail', icon: ICON.nail, name: 'Стальной гвоздь', spec: 'Железо с небольшой добавкой углерода. Ржавчина появляется только там, где есть и вода, и кислород.' },
+    { id: 'zn', icon: ICON.zn, name: 'Цинковая полоска (протектор)', spec: 'Цинк активнее железа (E° −0,76 В против −0,44 В). В паре с железом он становится анодом и растворяется сам, покрываясь белым налётом.' },
+    { id: 'cu', icon: ICON.cu, name: 'Медная проволока', spec: 'Медь менее активна (E° +0,34 В). В паре с ней анодом становится железо, и оно ржавеет быстрее.' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      `<div class="safe"><b>Безопасность</b>${L.safe}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Оборудование</h2><p class="note">Что стоит на столе. Нажмите на предмет, чтобы найти его.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'series') {
+    let h = `<h2>Пойдёт ли реакция?</h2><div class="formula">Me + соль → ?</div><p class="note">Сравните E° металла пластинки и E° ионов в растворе. Если у пластинки E° меньше — она отдаёт электроны, реакция идёт.</p>`;
+    if (!m.s) return h + `<p class="note">Опустите пластинку в стакан — здесь появится разбор.</p>`;
+    const p = m.p, s = m.s, ep = MET[p].E, es = s.E;
+    h += `<h3>${p} в ${s.f}</h3><div class="steps">` + step(`E°(${MET[p].ion}/${p})`, fmt(ep, 2) + ' В') + step(s.ion === 'H' ? 'E°(2H⁺/H₂)' : `E°(${MET[s.ion].ion}/${s.ion})`, fmt(es, 2) + ' В');
+    if (p === s.ion) h += step('вывод', 'тот же металл — обмена нет', 'sum') + `</div>`;
+    else {
+      h += step('сравнение', `${fmt(ep, 2)} ${ep < es ? '<' : '>'} ${fmt(es, 2)}`) + step('вывод', m.r ? `${p} активнее — вытесняет ${s.ion === 'H' ? 'водород' : MET[s.ion].name}` : `${p} менее активен — реакции нет`, 'sum') + `</div>`;
+      h += `<h3>Уравнение</h3><div class="steps">` + step('', eq1(p, s));
+      if (m.r) {
+        const zs = s.ion === 'H' ? 1 : MET[s.ion].z, k = 2 / zs;
+        h += step('окисление', `${p}⁰ − 2e⁻ → ${p}²⁺`) + step('восстановление', s.ion === 'H' ? '2H⁺ + 2e⁻ → H₂⁰' : `${k > 1 ? k : ''}${MET[s.ion].ion} + 2e⁻ → ${k > 1 ? k : ''}${s.ion}⁰`);
+        h += step('ЭДС пары', `${fmt(es, 2)} − (${fmt(ep, 2)}) = ${fmt(es - ep, 2)} В`, 'sum');
+      }
+      h += `</div>`;
+    }
+    return h;
+  }
+  if (id === 'cell') {
+    const an = m.an === 'L' ? S.L : m.an === 'R' ? S.R : null, ca = m.an === 'L' ? S.R : m.an === 'R' ? S.L : null;
+    let h = `<h2>ЭДС элемента</h2><div class="formula">ЭДС = E°(катод) − E°(анод)</div><p class="note">Анод — металл с меньшим E°. Вольтметр показывает E°(правой) − E°(левой) при опущенном мостике.</p><h3>Сейчас</h3><div class="steps">` +
+      step(`E°(${S.L}), слева`, fmt(m.eL, 2) + ' В') + step(`E°(${S.R}), справа`, fmt(m.eR, 2) + ' В');
+    if (!an) return h + step('вывод', 'металлы одинаковые — ЭДС 0, тока нет', 'sum') + `</div>`;
+    const A = MET[an], C = MET[ca], k = 2 / C.z;
+    h += step('анод (−)', `${an}: ${an} − ${A.z}e⁻ → ${A.ion}`) + step('катод (+)', `${ca}: ${C.ion} + ${C.z}e⁻ → ${ca}`) +
+      step('ЭДС', `${fmt(C.E, 2)} − (${fmt(A.E, 2)}) = ${fmt(C.E - A.E, 2)} В`) + step('вольтметр (+ справа)', `${fmt(m.eR, 2)} − (${fmt(m.eL, 2)}) = ${sgn(m.emf)} В${m.bridge ? '' : ', но мостик поднят: 0 В'}`, 'sum') + `</div>`;
+    h += `<h3>Суммарная реакция</h3><div class="steps">` + step('', `${an} + ${k > 1 ? k : ''}${C.ion} → ${A.ion} + ${k > 1 ? k : ''}${ca}`) + `</div>`;
+    h += `<h3>Батарея</h3><div class="steps">` + step('элементов подряд', String(S.n)) + step('U = n · ЭДС', `${S.n} × ${fmt(Math.abs(m.emf), 2)} = ${fmt(S.n * Math.abs(m.emf), 2)} В`, 'sum') + `</div>`;
+    return h + `<p class="note" style="margin-top:10px">Числа E° — для стандартных условий (растворы 1 моль/л, 25 °C). В настоящем опыте вольтметр покажет чуть меньше.</p>`;
+  }
+  if (id === 'electrolysis') {
+    const e = m.e, ts = m.t * 60;
+    let h = `<h2>Закон Фарадея</h2><div class="formula">m = M · I · t / (z · F)</div><p class="note">F = 96 500 Кл/моль. Время — в секундах. Объём газа: V = n · 22,4 л/моль.</p>`;
+    h += `<h3>Что выделяется и почему</h3><div class="steps">` + step('катод (−)', e.hc) + step('анод (+)', e.ha) + step('итог', e.sum, 'sum') + `</div>`;
+    h += `<p class="note" style="margin-top:8px">${e.why.join(' ')}</p>`;
+    h += `<h3>Сейчас</h3><div class="steps">` + step('t', `${m.t} мин × 60 = ${ts} с`) + step('q = I · t', `${fmt(m.I, 1)} × ${ts} = ${Math.round(m.q).toLocaleString('ru-RU')} Кл`) + step('n(e⁻) = q / F', `${Math.round(m.q).toLocaleString('ru-RU')} / 96 500 = ${fmt(m.ne, 4)} моль`);
+    if (m.M) h += step(`m(${e.cat}) = M · n(e⁻) / z`, `${m.M} × ${fmt(m.ne, 4)} / ${m.z} = ${fmt(m.mass, 3)} г`, 'sum');
+    if (e.cat === 'H2') h += step('V(H₂) = n(e⁻)/2 · 22,4', `${fmt(m.Vc, 3)} л`, 'sum');
+    h += step(`V(${GAS[e.an].f}) = n(e⁻)/${GAS[e.an].z} · 22,4`, `${fmt(m.Va, 3)} л`) + `</div>`;
+    if (LID() === 'electrolysis' && !S.done.electrolysis) h += `<h3>Как выйти на задание</h3><p class="note">Выразите из формулы произведение I · t: I · t = m · z · F / M. Подставьте m = 0,64 г, z = 2, M = 64 и подберите ток и время.</p>`;
+    return h;
+  }
+  const env = m.E;
+  let h = `<h2>Ржавеет или нет</h2><div class="formula">4Fe + 3O₂ + 2nH₂O → 2Fe₂O₃·nH₂O</div><p class="note">Проверяем условия по шагам — как инженер-коррозионист.</p><div class="steps">` +
+    step('вода есть?', env.water ? 'да' : 'нет — CaCl₂ всё высушил') + step('кислород есть?', env.o2 ? 'да' : 'почти нет — масло не пускает воздух') +
+    step('электролит (соль)?', env.salt ? 'да — ток ионов идёт легче, ×2,5' : 'нет') +
+    step('контакт / покрытие', m.why) + step('скорость (условно)', `${fmt(env.rate, 1)} × ${m.f} = ${fmt(m.rate, 1)}`) +
+    step('ржавчина за ' + m.days + ' дн.', `${fmt(m.rust, 0)} % поверхности`, 'sum') + `</div>`;
+  if (m.contact !== 'none' && !m.paint && env.water) {
+    const a = m.contact === 'zn' ? 'Zn' : 'Fe', c = m.contact === 'zn' ? 'Fe' : 'Cu';
+    h += `<h3>Гальваническая пара</h3><div class="steps">` + step(`E°(${a})`, fmt(MET[a].E, 2) + ' В — анод, растворяется') + step(`E°(${c})`, fmt(MET[c].E, 2) + ' В — катод, на нём O₂ берёт e⁻') +
+      step('анод', `${a} − 2e⁻ → ${a}²⁺`) + step('катод', 'O₂ + 2H₂O + 4e⁻ → 4OH⁻', 'sum') + `</div>`;
+  }
+  return h + `<p class="note" style="margin-top:10px">Скорость в уроке условная: важен не точный процент, а то, что ускоряет коррозию и что её останавливает.</p>`;
+}
+
+function renderMeter(m) {
+  const el = $('#meter'), id = LID(), ok = !!S.done[id];
+  if (m.kind === 'series') {
+    el.innerHTML = `<div class="k">Опыт</div><div class="v ${m.s && m.r ? 'ok' : ''}">${m.s ? `${m.p} + ${m.s.f}` : `${m.p} · вынута`}</div><div class="lr"><span>${m.s ? (m.p === m.s.ion ? 'своя соль' : m.r ? 'реакция идёт' : 'реакции нет') : 'в стакан'}</span><span>${m.n}/16</span></div>`;
+  } else if (m.kind === 'cell') {
+    el.innerHTML = `<div class="k">Вольтметр</div><div class="v ${m.E >= 1.5 - 1e-9 ? 'ok' : ''}">U = ${sgn(m.E)} В</div>
+      <div class="gauge"><b style="width:${clamp(Math.max(0, m.E) / 3.5 * 100, 0, 100).toFixed(1)}%"></b><i style="left:${(1.5 / 3.5 * 100).toFixed(1)}%"></i></div>
+      <div class="lr"><span>${S.L} | ${S.R}</span><span>${m.glow > 0 ? 'лампа ✓' : 'лампа ✗'}</span></div>`;
+  } else if (m.kind === 'ely') {
+    const has = m.cat === 'Cu' || m.cat === 'Na';
+    el.innerHTML = `<div class="k">На катоде</div><div class="v ${ok ? 'ok' : ''}">${has ? `${fmt(m.mass, 3)} г ${m.cat}` : 'H₂, металла нет'}</div>
+      <div class="gauge"><b style="width:${clamp((m.cat === 'Cu' ? m.mass : 0) / 1.2 * 100, 0, 100).toFixed(1)}%"></b><i style="left:${(0.64 / 1.2 * 100).toFixed(1)}%"></i></div>
+      <div class="lr"><span>${fmt(m.I, 1)} А</span><span>${m.t} мин</span></div>`;
+  } else {
+    el.innerHTML = `<div class="k">Ржавчина</div><div class="v ${m.rust === 0 && m.days >= 14 ? 'ok' : ''}">${fmt(m.rust, 0)} %</div>
+      <div class="gauge"><b style="width:${m.rust.toFixed(1)}%;background:#c0652a"></b></div><div class="lr"><span>день ${m.days}</span><span>${m.contact === 'zn' ? 'Zn' : m.contact === 'cu' ? 'Cu' : '—'}${m.paint ? ' · краска' : ''}</span></div>`;
+  }
+}
+
+function update() {
+  const m = model(), L = LESSONS[S.lesson];
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Электрохимия пройдена!');
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  series: '<path d="M8 12v14h12V12M26 12v14h12V12M44 12v14h12V12" fill="none" stroke="#e8ecf4" stroke-width="1.1"/><rect x="9" y="17" width="10" height="9" fill="#9fd08f" opacity=".6"/><rect x="27" y="17" width="10" height="9" fill="#2f86e0" opacity=".7"/><rect x="45" y="17" width="10" height="9" fill="#dfe7ee" opacity=".4"/><rect x="30" y="3" width="4" height="21" fill="#a7b4c3"/><rect x="30" y="17" width="4" height="7" fill="#d9824f"/>',
+  cell: '<path d="M4 14v13h22V14M40 14v13h22V14" fill="none" stroke="#e8ecf4" stroke-width="1.1"/><rect x="5" y="19" width="20" height="8" fill="#dfe7ee" opacity=".35"/><rect x="41" y="19" width="20" height="8" fill="#2f86e0" opacity=".6"/><path d="M11 24V4H55V24" fill="none" stroke="#c9a35a" stroke-width="1.1"/><rect x="9" y="12" width="4" height="13" fill="#a7b4c3"/><rect x="53" y="12" width="4" height="13" fill="#d9824f"/><path d="M20 26V16H46V26" fill="none" stroke="#c4d2e6" stroke-width="2.4"/><circle cx="33" cy="4" r="3.4" fill="#ffe08a"/>',
+  electrolysis: '<path d="M14 10v17h38V10" fill="none" stroke="#e8ecf4" stroke-width="1.1"/><rect x="15" y="15" width="36" height="12" fill="#2f86e0" opacity=".55"/><rect x="23" y="5" width="4" height="20" fill="#3b4150"/><rect x="22" y="15" width="6" height="10" fill="#d9824f"/><rect x="39" y="5" width="4" height="20" fill="#3b4150"/><circle cx="41" cy="18" r="1.3" fill="none" stroke="#fff" stroke-width=".7"/><circle cx="42" cy="13" r="1" fill="none" stroke="#fff" stroke-width=".7"/><path d="M25 5V2H41V5" fill="none" stroke="#c9a35a" stroke-width="1"/>',
+  corrosion: '<path d="M27 2v22q0 5 6 5t6-5V2" fill="none" stroke="#e8ecf4" stroke-width="1.1"/><path d="M28 11h10v13q0 4-5 4t-5-4z" fill="#cfe3f2" opacity=".4"/><path d="M31 4h4M33 4v20" stroke="#8a929c" stroke-width="2"/><circle cx="33" cy="16" r="1.4" fill="#c0652a"/><circle cx="33" cy="21" r="1.2" fill="#9a4a1c"/><rect x="10" y="10" width="4" height="16" fill="#a7b4c3"/><path d="M52 8q4 2 0 4t0 4t0 4" fill="none" stroke="#d9824f" stroke-width="1.4"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i];
+  S.lesson = i; S.hl = null; drag = null; acc = 0;
+  Object.assign(S, JSON.parse(JSON.stringify(L.init)));
+  save(); resetProps();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const strip = $('#lessons'), cur = strip.querySelector('.lesson[aria-current="true"]');
+  if (cur) strip.scrollLeft = cur.offsetLeft - strip.offsetLeft - (strip.clientWidth - cur.offsetWidth) / 2;
+}
+
+// ---------- for the AI tutor ----------
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '';
+  if (id === 'series') {
+    const res = Object.keys(S.tested).map(k => { const [p, si] = k.split('-'); return `${p} в ${SOLS[+si].f} — ${reacts(p, SOLS[+si]) ? 'реакция' : 'нет'}`; });
+    now = `Пластинки: Zn, Fe, Cu, Ag. Растворы: ZnSO₄, FeSO₄, HCl, CuSO₄, AgNO₃. Выбрана пластинка ${m.p}${m.s ? `, опущена в ${m.s.f}: ${m.p === m.s.ion ? 'своя соль, изменений нет' : m.r ? 'реакция идёт (' + eq1(m.p, m.s) + ')' : 'реакции нет'}` : ', сейчас вынута'}. Проведено опытов ${m.n} из 16, найдено реакций ${m.found}. Результаты: ${res.join('; ') || 'пока нет'}. Не называй, в каких оставшихся парах будет реакция, — пусть ученик предскажет по ряду напряжений.`;
+  }
+  if (id === 'cell') now = `Слева ${S.L} в ${MET[S.L].salt} (E° ${fmt(m.eL, 2)} В), справа ${S.R} в ${MET[S.R].salt} (E° ${fmt(m.eR, 2)} В). Солевой мостик ${S.bridge ? 'опущен' : 'поднят'}, ключ ${S.sw ? 'замкнут' : 'разомкнут'}. Вольтметр (плюс справа) показывает ${sgn(m.E)} В; ЭДС пары ${fmt(Math.abs(m.emf), 2)} В. ${m.an ? `Анод — ${m.an === 'L' ? S.L : S.R}, катод — ${m.an === 'L' ? S.R : S.L}.` : 'Металлы одинаковые.'} Лампочка ${m.glow > 0 ? 'горит' : 'не горит'}. Батарея из ${S.n} элементов дала бы ${fmt(S.n * Math.abs(m.emf), 2)} В.`;
+  if (id === 'electrolysis') now = `Электролиз: ${m.e.name}, графитовые электроды. Катод: ${m.e.hc}. Анод: ${m.e.ha}. Сила тока ${fmt(m.I, 1)} А, время ${m.t} мин (${m.t * 60} с), заряд ${Math.round(m.q)} Кл, n(e⁻) = ${fmt(m.ne, 4)} моль. ${m.M ? `На катоде выделилось ${fmt(m.mass, 3)} г ${m.cat}.` : 'Металл на катоде не выделяется.'} Источник ${m.run ? 'работает' : 'выключен'}. Не называй готовые значения тока и времени для задания — помоги вывести I · t из формулы Фарадея.`;
+  if (id === 'corrosion') now = `Пробирка: ${m.E.name}. К гвоздю ${m.contact === 'zn' ? 'прикручен цинк' : m.contact === 'cu' ? 'прикручена медная проволока' : 'ничего не прикручено'}${m.paint ? ', гвоздь покрашен' : ''}. Прошло ${m.days} дней, ржавчиной покрыто ${fmt(m.rust, 0)} % поверхности${m.contact === 'zn' ? `, цинка растворилось ${fmt(m.znLoss, 0)} %` : ''}. Причина: ${m.why}. Скорость в модели условная.`;
+  return [
+    `Раздел: химия, 11 класс, электрохимия. Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на столе: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Направляй ученика вопросами, а не готовыми ответами.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = {
+    series: 'Почему медь не вытесняет водород из кислоты?', cell: 'Зачем нужен солевой мостик?',
+    electrolysis: 'Почему из раствора NaCl на катоде идёт водород, а не натрий?', corrosion: 'Почему цинк защищает железо, а медь — наоборот?',
+  }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,990 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по химии, 11 класс: подбираем режим синтеза аммиака и контактного получения серной кислоты, размещаем металлургические заводы Казахстана на карте и рассчитываем дозу минеральных удобрений.">
+<title>Химическое производство</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /mechanics and /chemistry. Lab bench (SVG) on the left, lesson notebook on the right, lesson strip under the bench. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--liq);transition:width .2s}
+.gauge i{position:absolute;top:-4px;width:2px;height:14px;background:var(--force);transform:translateX(-50%)}
+.swatch{height:12px;border-radius:4px;margin-top:9px;border:1px solid rgba(255,255,255,.15)}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.cnt{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;margin-top:10px}
+.cnt div{display:flex;align-items:center;justify-content:space-between;gap:6px;background:var(--surface-2);border-radius:9px;padding:6px 8px;font-size:13px}
+.cnt b{font:500 14px var(--font-mono);min-width:44px;display:inline-block;text-align:center}
+.cnt button{width:30px;height:30px;border-radius:7px;background:var(--bg);border:1px solid var(--line);cursor:pointer;font:500 15px/1 var(--font-mono)}
+.pairs{display:grid;gap:6px;margin-top:10px}
+.pairs label{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface-2);border-radius:9px;padding:7px 10px;font-size:13.5px}
+.pairs select{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:7px;padding:5px 8px;font:500 13px var(--font-body);max-width:58%}
+.pairs select:disabled{color:var(--ok);opacity:1}
+.chk2{display:flex;align-items:center;gap:8px;font-size:13.5px;margin-top:12px}
+.chk2 input{accent-color:var(--force);width:18px;height:18px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><ellipse cx="20" cy="20" rx="14" ry="5.5" fill="none" stroke="var(--arm)" stroke-width="1.6"/><ellipse cx="20" cy="20" rx="14" ry="5.5" fill="none" stroke="var(--arm)" stroke-width="1.6" transform="rotate(60 20 20)"/><ellipse cx="20" cy="20" rx="14" ry="5.5" fill="none" stroke="var(--arm)" stroke-width="1.6" transform="rotate(-60 20 20)"/><circle cx="20" cy="20" r="3.2" fill="var(--force)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Химия · Химическое производство</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#chem">Карта</a><a href="/physics/#chem">Химия</a><a href="/labs/chem-industry/" aria-current="page">Производство</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Производство</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Лабораторный стол">
+    <svg class="scene" id="scene" role="img" aria-label="Модель химического производства. Точку на графике, карточки и мешки можно перетаскивать и нажимать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const KEY = 'luch-chem-industry';
+const SUBD = { '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉' };
+const low = s => String(s).replace(/\d/g, d => SUBD[d]);
+const fx = (v, d = 1) => (+v).toFixed(d).replace('.', ',');
+const R = 8.314;
+
+// ---------- lesson 1: two reactors ----------
+// equilibrium mole % of NH3 (stoichiometric N2 : H2 = 1 : 3), handbook data, rounded
+const NH3_T = [300, 400, 500, 600, 700];
+const NH3_P = [10, 100, 200, 300, 600, 1000];
+const NH3_X = [
+  [14.7, 52.0, 66.7, 71.0, 84.2, 92.6],
+  [3.9, 25.1, 38.7, 47.0, 65.2, 79.8],
+  [1.2, 10.6, 18.3, 24.4, 42.2, 57.5],
+  [0.5, 4.5, 8.3, 13.8, 23.1, 31.4],
+  [0.2, 2.2, 4.1, 7.0, 12.5, 17.0],
+];
+// equilibrium conversion SO2 -> SO3 at 1 atm, %, typical gas from burning sulfur
+const SO3_T = [300, 350, 400, 450, 500, 550, 600, 650, 700];
+const SO3_X = [99.8, 99.6, 99.2, 97.5, 93.5, 85.6, 73.7, 58, 43];
+const interp1 = (xs, ys, x) => {
+  if (x <= xs[0]) return ys[0];
+  for (let i = 1; i < xs.length; i++) if (x <= xs[i]) { const k = (x - xs[i - 1]) / (xs[i] - xs[i - 1]); return ys[i - 1] + (ys[i] - ys[i - 1]) * k; }
+  return ys[ys.length - 1];
+};
+const nh3Eq = (T, P) => {
+  const lp = NH3_P.map(Math.log);
+  const row = NH3_X.map(r => interp1(lp, r, Math.log(P)));
+  return interp1(NH3_T, row, T);
+};
+const so3Eq = (T, P) => { const x1 = interp1(SO3_T, SO3_X, T), r = x1 / (100 - x1) * Math.sqrt(P); return 100 * r / (1 + r); };
+const PLANT = {
+  nh3: { name: 'колонна синтеза аммиака', short: 'NH₃', eq: 'N₂ + 3H₂ ⇌ 2NH₃ + 92 кДж', cat: 'железо (Fe с добавками K₂O, Al₂O₃)', Pmin: 50, Pmax: 1000, Pstep: 50, unit: 'атм', goal: 25,
+    yname: 'NH₃ в газе на выходе', A: 2.5, Ea: 80000, Pref: 200, Ea0: 160000 },
+  so3: { name: 'контактный аппарат (SO₂ → SO₃)', short: 'SO₃', eq: '2SO₂ + O₂ ⇌ 2SO₃ + 198 кДж', cat: 'оксид ванадия(V) V₂O₅', Pmin: 1, Pmax: 10, Pstep: 1, unit: 'атм', goal: 95,
+    yname: 'степень превращения SO₂', A: 5, Ea: 90000, Pref: 1, Ea0: 180000 },
+};
+function reactor(pl, T, P, cat) {
+  const D = PLANT[pl], TK = T + 273, arr = Ea => Math.exp(-Ea / R * (1 / TK - 1 / 723));
+  const xeq = pl === 'nh3' ? nh3Eq(T, P) : so3Eq(T, P);
+  let k = cat ? D.A * arr(D.Ea) : D.A * 1e-4 * arr(D.Ea0);
+  if (pl === 'so3' && cat) k /= 1 + Math.exp(-(T - 410) / 8); // V2O5 "lights off" only above ~400 °C
+  k *= Math.sqrt(P / D.Pref);
+  const out = xeq * (1 - Math.exp(-k));
+  return { xeq, k, out, appr: 1 - Math.exp(-k) };
+}
+const TMIN = 300, TMAX = 700;
+
+// ---------- lesson 2: metallurgy map ----------
+const CITIES = [
+  { id: 'tem', name: 'Темиртау', lon: 73.0, lat: 50.05, dx: 7, dy: 12, a: 'start', bx: 15, by: -3 },
+  { id: 'ast', name: 'Астана', lon: 71.45, lat: 51.17, dx: -7, dy: -5, a: 'end' },
+  { id: 'bal', name: 'Балхаш', lon: 74.98, lat: 46.85, dx: 7, dy: 4, a: 'start' },
+  { id: 'jez', name: 'Жезказган', lon: 67.7, lat: 47.8, dx: 0, dy: 15, a: 'middle' },
+  { id: 'pav', name: 'Павлодар', lon: 76.95, lat: 52.29, dx: 7, dy: -4, a: 'start' },
+  { id: 'ukg', name: 'Усть-Каменогорск', lon: 82.6, lat: 49.95, dx: 0, dy: 15, a: 'middle' },
+  { id: 'akt', name: 'Актобе', lon: 57.17, lat: 50.28, dx: 0, dy: 15, a: 'middle' },
+  { id: 'atr', name: 'Атырау', lon: 51.92, lat: 47.1, dx: 0, dy: 15, a: 'middle' },
+  { id: 'alm', name: 'Алматы', lon: 76.9, lat: 43.25, dx: 0, dy: 15, a: 'middle' },
+];
+const METALS = [
+  { s: 'Fe', name: 'железо и сталь', ok: ['tem'], plant: 'металлургический комбинат Qarmet, Темиртау', ore: 'Fe₂O₃', oreName: 'гематит (руда Рудного и Лисаковска)', eq: 'Fe₂O₃ + 3CO → 2Fe + 3CO₂',
+    method: 'пирометаллургия: восстановление угарным газом и коксом в доменной печи, затем сталь в конвертере', Mo: 160, Mm: 112, c: '#c58a5c',
+    tip: 'Домне нужен кокс. Ищите город рядом с коксующимся углём Караганды.' },
+  { s: 'Cu', name: 'медь', ok: ['bal', 'jez'], plant: 'медеплавильные заводы Kazakhmys в Балхаше и Жезказгане', ore: 'Cu₂S', oreName: 'халькозин (сульфидная руда)', eq: 'Cu₂S + O₂ → 2Cu + SO₂',
+    method: 'пирометаллургия: плавка сульфидов, затем электролитическая очистка; SO₂ из печей идёт на серную кислоту', Mo: 160, Mm: 128, c: '#d9895b',
+    tip: 'Медь плавят прямо у медных рудников в центре страны: у большого озера или в степи Улытау.' },
+  { s: 'Al', name: 'алюминий', ok: ['pav'], plant: 'Казахстанский электролизный завод, Павлодар', ore: 'Al₂O₃', oreName: 'глинозём из бокситов Костанайской области', eq: '2Al₂O₃ → 4Al + 3O₂',
+    method: 'электрометаллургия: электролиз Al₂O₃ в расплаве криолита при ~950 °C', Mo: 102, Mm: 54, c: '#b5c0d3',
+    tip: 'Электролизу нужно очень много электричества. Ищите город на Иртыше у электростанций Экибастуза.' },
+  { s: 'Zn', name: 'цинк и свинец', ok: ['ukg'], plant: '«Казцинк», Усть-Каменогорск', ore: 'ZnS', oreName: 'сфалерит, полиметаллические руды Рудного Алтая', eq: '2ZnS + 3O₂ → 2ZnO + 2SO₂',
+    method: 'обжиг сульфида, растворение ZnO в серной кислоте и электролиз раствора ZnSO₄ (гидрометаллургия)', Mo: 97, Mm: 65, c: '#9fb4d9',
+    tip: 'Полиметаллические руды — на Рудном Алтае, на самом востоке страны.' },
+  { s: 'Cr', name: 'хром (феррохром)', ok: ['akt'], plant: 'Актюбинский завод ферросплавов (ERG)', ore: 'FeCr₂O₄', oreName: 'хромит из Хромтау', eq: 'FeCr₂O₄ + 4C → Fe + 2Cr + 4CO',
+    method: 'пирометаллургия: восстановление углеродом в рудно-термической электропечи', Mo: 224, Mm: 104, c: '#7ad1b5',
+    tip: 'Хромовую руду добывают в Хромтау на западе. Завод — в ближайшем областном центре.' },
+];
+const cityOf = id => CITIES.find(c => c.id === id);
+
+// ---------- lesson 3: fertilizers ----------
+const FERT = [
+  { id: 'urea', f: 'CO(NH2)2', name: 'карбамид', M: 60, N: 28, P: 0, K: 0, c: '#e8ecf4' },
+  { id: 'an', f: 'NH4NO3', name: 'аммиачная селитра', M: 80, N: 28, P: 0, K: 0, c: '#9fc3f0' },
+  { id: 'map', f: 'NH4H2PO4', name: 'аммофос', M: 115, N: 14, P: 71, K: 0, c: '#f0c46a' },
+  { id: 'sp', f: 'Ca(H2PO4)2', name: 'двойной суперфосфат', short: 'суперфосфат', M: 234, N: 0, P: 142, K: 0, c: '#d8b08a' },
+  { id: 'kcl', f: 'KCl', name: 'хлорид калия', M: 74.5, N: 0, P: 0, K: 47, c: '#e58a9a' },
+];
+const NORM = { N: 60, P: 40, K: 30 };
+const NUT = [{ k: 'N', name: 'N', full: 'азот' }, { k: 'P', name: 'P₂O₅', full: 'фосфор' }, { k: 'K', name: 'K₂O', full: 'калий' }];
+const FSTEP = 10, FMAX = 300;
+
+const LESSONS = [
+  { id: 'reactors', title: 'Аммиак и серная кислота: режим',
+    text: ['Завод подчиняется тем же законам, что и пробирка, только считает деньги. Аммиак получают из азота воздуха и водорода: N₂ + 3H₂ ⇌ 2NH₃ + 92 кДж. Реакция обратимая, экзотермическая, и газов справа меньше, чем слева.',
+           'По принципу Ле Шателье выход растёт при охлаждении и сжатии. Но на холоде реакция идёт очень медленно. Поэтому выбирают компромисс: 400–500 °C, 200–300 атм (20–30 МПа) и железный катализатор. За один проход реагирует лишь часть газа: аммиак сжижают в конденсаторе, а остаток снова гонят в колонну.',
+           'Серную кислоту получают контактным способом: S или FeS₂ → SO₂ → SO₃ → H₂SO₄. Главная стадия 2SO₂ + O₂ ⇌ 2SO₃ идёт на катализаторе V₂O₅ при 400–500 °C. SO₃ поглощают не водой, а концентрированной серной кислотой: с водой получается стойкий кислотный туман. Образуется олеум, его разбавляют до нужной крепости.'],
+    why: '«КазАзот» в Актау делает аммиак и аммиачную селитру. Сернокислотные цеха работают при медеплавильных и цинковых заводах Балхаша и Усть-Каменогорска: там кислоту делают из SO₂ печей, а не выбрасывают его. Много кислоты нужно Казатомпрому для подземного выщелачивания урана. Технолог и оператор установки каждый день держат температуру, давление и катализатор в нужном окне: удачный режим — это тысячи тонн продукта, ошибка — брак или авария.',
+    safe: 'Аммиак ядовит, серная кислота обугливает кожу и ткани. Разбавляя, льют кислоту в воду тонкой струйкой, а не воду в кислоту. При утечке газа уходят в сторону, откуда дует ветер.',
+    task: 'Подберите режим двух аппаратов: колонна синтеза — не меньше 25 % NH₃ на выходе при давлении до 300 атм; контактный аппарат — не меньше 95 % превращения SO₂ и верный поглотитель SO₃.',
+    hint: 'Тяните точку по графику — меняется температура. Холодно — медленно (оранжевая кривая низко), жарко — равновесие уходит влево (голубая кривая падает). Без катализатора на выходе почти ничего.',
+    stage: 'Тяните точку по графику или жмите кнопки снизу. Аппарат переключается кнопками NH₃ / SO₃.',
+    init: {},
+    check: m => !!(m.ok1 && m.ok1.nh3 && m.ok1.so3) },
+  { id: 'metallurgy', title: 'Металлургия Казахстана',
+    text: ['В природе металлы почти всегда связаны: в оксидах и сульфидах руды. Металлургия восстанавливает металл из соединения: Mⁿ⁺ + ne⁻ → M. Восстановителем служат кокс C, угарный газ CO, водород, активный металл или электрический ток.',
+           'Пирометаллургия работает при высокой температуре: в доменной печи Fe₂O₃ восстанавливают угарным газом. Сульфидные руды сначала обжигают, а SO₂ превращают в серную кислоту. Электрометаллургия использует ток: так получают алюминий из глинозёма и очищают медь и цинк. Гидрометаллургия переводит металл в раствор и выделяет его оттуда.',
+           'Казахстан — первый в мире по добыче урана, один из лидеров по запасам хромовых руд, крупный производитель меди, цинка, стали, алюминия и ферросплавов. Заводы строят рядом с рудой, углём и дешёвой электроэнергией.'],
+    why: 'Металлургические комбинаты — главные работодатели Темиртау, Балхаша, Жезказгана, Усть-Каменогорска, Павлодара и Актобе. Металлург, электролизник, инженер-технолог, лаборант-аналитик, эколог предприятия получают зарплату выше средней по региону. Металлы — вторая после нефти статья экспорта страны.',
+    task: 'Разместите пять металлов на карте у городов, где их выплавляют, и разберите способ получения каждого.',
+    hint: 'Нажмите карточку — на вкладке «Расчёты» будет руда и уравнение. Подумайте, что нужно заводу: уголь, электричество или руда рядом.',
+    stage: 'Тяните карточку металла к городу. Или нажмите карточку, потом город.',
+    init: {},
+    check: m => m.placed === METALS.length },
+  { id: 'fertilizers', title: 'Удобрения: считаем дозу',
+    text: ['Растениям нужны три главных элемента питания: азот N — для роста листьев и белков, фосфор P — для корней, цветения и семян, калий K — для прочных стеблей и устойчивости к засухе. Урожай уносит их из почвы, и их возвращают удобрениями.',
+           'Питательный элемент в удобрении считают в пересчёте: азот — как N, фосфор — как P₂O₅, калий — как K₂O. В аммиачной селитре NH₄NO₃: w(N) = 2 · 14 / 80 = 0,35, то есть 35 %. Значит, в 10 кг селитры 3,5 кг азота.',
+           'Урожай ограничивает тот элемент, которого не хватает сильнее всего (закон минимума Либиха): бочка наполняется до самой короткой доски. Избыток тоже вреден: нитраты вымываются в реки и копятся в овощах. Поэтому дозу считают по анализу почвы.'],
+    why: 'Агроном и агрохимик рассчитывают дозы для полей Северного Казахстана — главного зернового региона страны. Верная доза окупается прибавкой урожая, лишняя — деньги на ветер и вред воде. Удобрения выпускают «Казфосфат» в Таразе (аммофос, фосфорные удобрения) и «КазАзот» в Актау (аммиачная селитра).',
+    safe: 'Аммиачная селитра при сильном нагреве и загрязнении горючим может взорваться — так случилось в порту Бейрута в 2020 году. Её хранят сухой, отдельно от топлива. С удобрениями работают в перчатках.',
+    task: 'Внесите на 1 га пшеницы норму: N — 60 кг, P₂O₅ — 40 кг, K₂O — 30 кг (допуск ±10 %).',
+    hint: 'Начните с фосфора: аммофос даёт и P₂O₅, и немного азота. Калий — хлоридом калия. Остаток азота добавьте карбамидом или селитрой.',
+    stage: 'Тяните мешок на поле: +10 кг на гектар. Нажатие выбирает мешок, кнопки снизу добавляют и убирают.',
+    init: {},
+    check: m => m.normOk },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const fresh = () => ({ plant: 'nh3', nh3: { T: 600, P: 100, cat: false }, so3: { T: 600, P: 1, cat: false, abs: 'water' }, ok1: {},
+  mp: {}, msel: null, wrong: 0, ore: 10, fert: { urea: 0, an: 0, map: 0, sp: 0, kcl: 0 }, fsel: 'map' });
+const S = Object.assign({ lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null }, fresh());
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+function nutrients() {
+  const r = { N: 0, P: 0, K: 0 };
+  for (const F of FERT) { const kg = S.fert[F.id]; r.N += kg * F.N / F.M; r.P += kg * F.P / F.M; r.K += kg * F.K / F.M; }
+  return r;
+}
+function model() {
+  const id = LID();
+  if (id === 'reactors') {
+    const pl = S.plant, st = S[pl], r = reactor(pl, st.T, st.P, st.cat);
+    const goalOk = r.out >= PLANT[pl].goal && (pl === 'nh3' ? st.P <= 300 : st.abs === 'acid');
+    return { kind: 'rx', pl, st, r, D: PLANT[pl], goalOk, ok1: S.ok1 };
+  }
+  if (id === 'metallurgy') return { kind: 'map', placed: Object.keys(S.mp).length, sel: S.msel };
+  const n = nutrients(), rel = { N: n.N / NORM.N, P: n.P / NORM.P, K: n.K / NORM.K };
+  const normOk = NUT.every(x => Math.abs(rel[x.k] - 1) <= 0.1 + 1e-9);
+  const over = NUT.filter(x => rel[x.k] > 1.25).map(x => x.k);
+  let y = Math.min(1, rel.N, rel.P, rel.K); if (over.length) y *= 0.8;
+  const lim = NUT.reduce((a, x) => rel[x.k] < rel[a.k] ? x : a, NUT[0]);
+  return { kind: 'fert', n, rel, normOk, over, y, lim };
+}
+
+// ---------- scene ----------
+function bench() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern>
+    <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0V6" stroke="rgba(255,255,255,.25)" stroke-width="2"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="2360" fill="url(#tile)"/>
+    <rect x="-2000" y="360" width="4520" height="1200" fill="#1a2232"/>
+    <rect x="-2000" y="358" width="4520" height="4" fill="#2c3954"/>
+    <rect x="-2000" y="362" width="4520" height="2" fill="${INK}" opacity=".6"/>`;
+}
+
+// ----- lesson 1 -----
+const COL = { x: 34, y: 128, w: 78, h: 228 };
+const PL = { x0: 222, x1: 494, y0: 330, y1: 150 };
+const tx = T => PL.x0 + (T - TMIN) / (TMAX - TMIN) * (PL.x1 - PL.x0);
+const yv = v => PL.y0 - v / 100 * (PL.y0 - PL.y1);
+const xT = x => clamp(Math.round((TMIN + (x - PL.x0) / (PL.x1 - PL.x0) * (TMAX - TMIN)) / 5) * 5, TMIN, TMAX);
+function heatCol(T) { const k = clamp((T - 300) / 400, 0, 1); const r = Math.round(40 + k * 150), g = Math.round(52 + k * 40), b = Math.round(78 - k * 40); return `rgb(${r},${g},${b})`; }
+function rxSVG(m, t) {
+  const { pl, st, r, D } = m;
+  let h = '';
+  // column
+  h += `<rect x="${COL.x - 1.5}" y="${COL.y - 1.5}" width="${COL.w + 3}" height="${COL.h + 3}" rx="22" fill="${INK}"/>`;
+  h += `<rect x="${COL.x}" y="${COL.y}" width="${COL.w}" height="${COL.h}" rx="20" fill="#16202f" stroke="#3a4762" stroke-width="2"/>`;
+  h += `<rect x="${COL.x + 6}" y="${COL.y + 6}" width="${COL.w - 12}" height="${COL.h - 12}" rx="15" fill="${heatCol(st.T)}" opacity=".35"/>`;
+  [176, 236, 296].forEach(y => {
+    h += st.cat ? `<rect x="${COL.x + 8}" y="${y}" width="${COL.w - 16}" height="24" rx="4" fill="${pl === 'nh3' ? '#6d6f7a' : '#c88a2e'}"/><rect x="${COL.x + 8}" y="${y}" width="${COL.w - 16}" height="24" rx="4" fill="url(#hatch)"/>`
+      : `<rect x="${COL.x + 8}" y="${y}" width="${COL.w - 16}" height="24" rx="4" fill="none" stroke="#5a6680" stroke-dasharray="4 4"/>`;
+  });
+  // molecules rising through the column; share of product = outlet value
+  const N = 26, share = clamp(r.out / 100, 0, 1);
+  for (let i = 0; i < N; i++) {
+    const x = COL.x + 14 + ((i * 37) % (COL.w - 28));
+    const ph = reduce ? i * 31 : t / 1000 * (18 + st.T / 25) + i * 31;
+    const y = COL.y + COL.h - 14 - (ph % (COL.h - 28));
+    const prog = 1 - (y - COL.y) / COL.h; // higher in the column = more reacted
+    const isP = ((i * 0.618) % 1) < share * clamp(prog * 1.6, 0, 1);
+    h += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${isP ? 4.2 : 3.2}" fill="${isP ? '#ffb547' : '#9fc3f0'}" opacity=".95"/>`;
+  }
+  h += `<text x="${COL.x + COL.w / 2}" y="${COL.y - 10}" font-size="10" fill="#e8ecf4" text-anchor="middle" font-weight="500">${pl === 'nh3' ? 'колонна' : 'контактный аппарат'}</text>`;
+  h += `<text x="${COL.x + COL.w / 2}" y="${COL.y + COL.h + 17}" font-size="9" fill="#8b96ad" text-anchor="middle">${st.T} °C · ${st.P} атм</text>`;
+  // inlet & outlet pipes
+  h += `<path d="M2 ${COL.y + COL.h - 30}H${COL.x}" stroke="#5a6680" stroke-width="6"/><text x="3" y="${COL.y + COL.h - 38}" font-size="7.5" fill="#8b96ad">${pl === 'nh3' ? 'N₂+3H₂' : 'SO₂+O₂'}</text>`;
+  h += `<path d="M${COL.x + COL.w / 2} ${COL.y}V${COL.y - 4}" stroke="none"/>`;
+  h += `<path d="M${COL.x + COL.w} ${COL.y + 30}H150V246" stroke="#5a6680" stroke-width="6" fill="none"/>`;
+  // separator: condenser (NH3) or absorber (SO3)
+  const sx = 132, sy = 246, sw = 40, sh = 108;
+  h += `<rect x="${sx}" y="${sy}" width="${sw}" height="${sh}" rx="9" fill="#121a28" stroke="#3a4762" stroke-width="2"/>`;
+  if (pl === 'nh3') {
+    const lv = clamp(r.out / 40, 0, 1) * (sh - 16);
+    h += `<rect x="${sx + 4}" y="${(sy + sh - 4 - lv).toFixed(1)}" width="${sw - 8}" height="${lv.toFixed(1)}" rx="5" fill="#b88cf0" opacity=".75"/>`;
+    h += `<text x="${sx + sw / 2}" y="${sy - 22}" font-size="8.5" fill="#8b96ad" text-anchor="middle">конденсатор</text><text x="${sx + sw / 2}" y="${sy - 11}" font-size="8.5" fill="#b88cf0" text-anchor="middle">NH₃ (ж)</text>`;
+    // recycle arrow
+    h += `<path d="M${sx + 6} ${sy + 12}H${COL.x + COL.w + 6}" stroke="#72d4e8" stroke-width="1.6" stroke-dasharray="4 4" fill="none" marker-end="none"/><text x="${(sx + COL.x + COL.w) / 2 + 3}" y="${sy + 7}" font-size="7.5" fill="#72d4e8" text-anchor="middle">возврат</text>`;
+  } else {
+    const acid = st.abs === 'acid';
+    h += `<rect x="${sx + 4}" y="${sy + 60}" width="${sw - 8}" height="${sh - 64}" rx="5" fill="${acid ? '#e6c63a' : '#5fb4d9'}" opacity=".55"/>`;
+    if (!acid) for (let i = 0; i < 9; i++) { const ph = reduce ? i * 13 : t / 60 + i * 13; h += `<circle cx="${sx + 8 + (i * 11) % (sw - 16)}" cy="${(sy + 56 - (ph % 60)).toFixed(1)}" r="3" fill="#e8ecf4" opacity=".45"/>`; }
+    h += `<text x="${sx + sw / 2}" y="${sy - 22}" font-size="8.5" fill="#8b96ad" text-anchor="middle">поглотитель</text><text x="${sx + sw / 2}" y="${sy - 11}" font-size="8.5" fill="${acid ? '#86e0a8' : '#ff8a73'}" text-anchor="middle">${acid ? '98 % H₂SO₄' : 'вода: туман!'}</text>`;
+  }
+  // plot
+  const hot = drag && (drag.id === 'plot' || drag.id === 'tmark');
+  h += `<g data-drag="plot"><rect x="${PL.x0 - 8}" y="${PL.y1 - 10}" width="${PL.x1 - PL.x0 + 16}" height="${PL.y0 - PL.y1 + 20}" rx="10" fill="${hot ? 'rgba(114,212,232,.06)' : 'rgba(18,26,40,.65)'}" stroke="${hot ? '#72d4e8' : '#26324a'}"/>`;
+  for (let v = 0; v <= 100; v += 25) h += `<path d="M${PL.x0} ${yv(v)}H${PL.x1}" stroke="#26324a" stroke-width="1"/><text x="${PL.x0 - 4}" y="${yv(v) + 3}" font-size="7.5" fill="#8b96ad" text-anchor="end">${v}</text>`;
+  for (let T = TMIN; T <= TMAX; T += 100) h += `<text x="${tx(T)}" y="${PL.y0 + 13}" font-size="7.5" fill="#8b96ad" text-anchor="middle">${T}</text>`;
+  h += `<text x="${PL.x1}" y="${PL.y0 + 24}" font-size="7.5" fill="#8b96ad" text-anchor="end">температура, °C</text><text x="${PL.x0}" y="${PL.y1 - 15}" font-size="7.5" fill="#8b96ad">%</text>`;
+  // goal band
+  h += `<path d="M${PL.x0} ${yv(D.goal)}H${PL.x1}" stroke="#86e0a8" stroke-width="1.2" stroke-dasharray="5 4"/><text x="${PL.x1 - 2}" y="${yv(D.goal) - 4}" font-size="7.5" fill="#86e0a8" text-anchor="end">цель ${D.goal} %</text>`;
+  let pe = '', po = '';
+  for (let T = TMIN; T <= TMAX; T += 5) {
+    const q = reactor(pl, T, st.P, st.cat);
+    pe += `${T === TMIN ? 'M' : 'L'}${tx(T).toFixed(1)} ${yv(q.xeq).toFixed(1)}`;
+    po += `${T === TMIN ? 'M' : 'L'}${tx(T).toFixed(1)} ${yv(q.out).toFixed(1)}`;
+  }
+  h += `<path d="${pe}" fill="none" stroke="#72d4e8" stroke-width="1.8" stroke-dasharray="6 4"/><path d="${po}" fill="none" stroke="#ffb547" stroke-width="2.4"/>`;
+  h += `<text x="${PL.x0}" y="${PL.y0 + 24}" font-size="7.5" fill="#72d4e8">- - равновесие</text><text x="${PL.x0 + 84}" y="${PL.y0 + 24}" font-size="7.5" fill="#ffb547">— на выходе</text></g>`;
+  const mx = tx(st.T), my = yv(r.out);
+  h += `<path d="M${mx.toFixed(1)} ${PL.y0}V${my.toFixed(1)}" stroke="#ffb547" stroke-opacity=".4" stroke-dasharray="2 3"/>`;
+  h += `<g data-drag="tmark"><circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="14" fill="transparent"/><circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="7" fill="${m.goalOk ? '#86e0a8' : '#ffb547'}" stroke="${INK}" stroke-width="2"/></g>`;
+  h += `<text x="${clamp(mx, PL.x0 + 30, PL.x1 - 30).toFixed(1)}" y="${(my > PL.y1 + 30 ? my - 12 : my + 20).toFixed(1)}" font-size="10" fill="${m.goalOk ? '#86e0a8' : '#e8ecf4'}" text-anchor="middle" font-weight="500">${fx(r.out)} %</text>`;
+  return h;
+}
+
+// ----- lesson 2 -----
+const MAP = { x0: 18, y0: 120, kx: 9, ky: 13.4 };
+const proj = (lon, lat) => ({ x: MAP.x0 + (lon - 46.5) * MAP.kx, y: MAP.y0 + (55.5 - lat) * MAP.ky });
+const KZ = [[46.6,48.5],[47.5,50.4],[48.7,50.6],[50.8,51.6],[52.3,51.8],[54.6,51.0],[55.7,50.6],[58.3,51.1],[59.6,50.6],[61.4,50.8],[61.7,51.3],[60.0,51.9],[61.0,52.9],[62.1,53.0],[61.2,53.9],[65.2,54.6],[69.0,55.4],[70.8,55.1],[71.2,54.1],[73.5,54.0],[73.7,53.4],[76.3,54.0],[76.9,53.6],[77.8,53.3],[80.0,51.0],[81.5,50.8],[83.4,51.0],[85.0,50.0],[86.8,49.8],[87.3,49.1],[85.6,48.1],[85.6,47.0],[83.0,47.2],[82.3,45.5],[80.0,45.0],[80.4,43.0],[80.2,42.2],[79.0,42.9],[76.0,43.0],[74.2,43.2],[73.5,42.4],[71.0,42.3],[70.4,41.5],[69.0,41.4],[68.4,40.6],[66.6,41.1],[66.5,42.0],[66.0,42.0],[66.1,43.0],[64.9,43.7],[62.0,43.5],[61.0,44.4],[58.5,45.6],[56.0,45.0],[56.0,41.3],[55.0,41.3],[53.0,42.1],[52.4,41.7],[52.8,42.9],[51.3,43.2],[50.3,44.4],[51.3,44.5],[51.0,45.0],[53.0,45.3],[53.2,46.2],[51.2,47.0],[49.1,46.4],[48.6,46.6],[48.0,47.7]];
+const KZPATH = KZ.map((p, i) => { const q = proj(p[0], p[1]); return `${i ? 'L' : 'M'}${q.x.toFixed(1)} ${q.y.toFixed(1)}`; }).join('') + 'Z';
+const CARD = { x: 450, w: 88, h: 36, y0: 132, gap: 42 };
+const cardY = i => CARD.y0 + i * CARD.gap;
+function nearCity(p) {
+  let best = null, bd = 26;
+  for (const c of CITIES) { const q = proj(c.lon, c.lat), d = Math.hypot(p.x - q.x, p.y - q.y); if (d < bd) { bd = d; best = c; } }
+  return best;
+}
+function metalCard(M, x, y, placed, sel) {
+  return `<rect x="${(x - CARD.w / 2 - 1.3).toFixed(1)}" y="${(y - 1.3).toFixed(1)}" width="${CARD.w + 2.6}" height="${CARD.h + 2.6}" rx="9" fill="${INK}"/>` +
+    `<rect x="${(x - CARD.w / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${CARD.w}" height="${CARD.h}" rx="8" fill="${placed ? '#16261f' : sel ? '#fff4dc' : '#e8ecf4'}" stroke="${placed ? '#86e0a8' : 'none'}"/>` +
+    `<circle cx="${(x - CARD.w / 2 + 17).toFixed(1)}" cy="${(y + CARD.h / 2).toFixed(1)}" r="12" fill="${M.c}"/><text x="${(x - CARD.w / 2 + 17).toFixed(1)}" y="${(y + CARD.h / 2 + 4).toFixed(1)}" font-size="11" fill="#0b1019" text-anchor="middle" font-weight="500">${M.s}</text>` +
+    `<text x="${(x - CARD.w / 2 + 34).toFixed(1)}" y="${(y + 15).toFixed(1)}" font-size="8.5" fill="${placed ? '#86e0a8' : '#0b1019'}" font-weight="500">${M.name.split(' ')[0]}</text>` +
+    `<text x="${(x - CARD.w / 2 + 34).toFixed(1)}" y="${(y + 27).toFixed(1)}" font-size="7.5" fill="${placed ? '#8b96ad' : '#4a556c'}">${placed ? cityOf(S.mp[M.s]).name.slice(0, 11) : 'руда ' + M.ore}</text>`;
+}
+function mapSVG() {
+  let h = '';
+  h += `<path d="${KZPATH}" fill="#16202f" stroke="#3a4762" stroke-width="1.6" stroke-linejoin="round"/>`;
+  const q1 = proj(48.6, 44.6);
+  h += `<text x="${q1.x.toFixed(1)}" y="${q1.y.toFixed(1)}" font-size="7" fill="#5a6680" text-anchor="middle">Каспий</text>`;
+  const bl = proj(75.5, 46.4); h += `<ellipse cx="${bl.x.toFixed(1)}" cy="${bl.y.toFixed(1)}" rx="16" ry="3" fill="#2b4a66" transform="rotate(-12 ${bl.x.toFixed(1)} ${bl.y.toFixed(1)})"/>`;
+  const dragM = drag && drag.moved && drag.id.startsWith('mc-');
+  const hotC = dragM ? nearCity(drag.p) : null;
+  for (const c of CITIES) {
+    const q = proj(c.lon, c.lat), on = Object.keys(S.mp).filter(s => S.mp[s] === c.id);
+    const hot = hotC && hotC.id === c.id;
+    h += `<g data-drag="city-${c.id}"><circle cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="13" fill="transparent"/><circle cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="${hot ? 8 : 5}" fill="${hot ? '#72d4e8' : on.length ? '#86e0a8' : '#e8ecf4'}" stroke="${INK}" stroke-width="1.5"/>` +
+      `<text x="${(q.x + c.dx).toFixed(1)}" y="${(q.y + c.dy).toFixed(1)}" font-size="8" fill="${on.length ? '#86e0a8' : '#c8d1e2'}" text-anchor="${c.a}">${c.name}</text></g>`;
+    on.forEach((s, i) => { const M = METALS.find(x => x.s === s), bx = q.x + (c.bx || 0) + i * 15, by = q.y + (c.by || -15); h += `<circle cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="7" fill="${M.c}" stroke="${INK}"/><text x="${bx.toFixed(1)}" y="${(by + 2.5).toFixed(1)}" font-size="7" fill="#0b1019" text-anchor="middle" font-weight="500">${s}</text>`; });
+  }
+  METALS.forEach((M, i) => {
+    if (drag && drag.moved && drag.id === 'mc-' + M.s) return;
+    h += `<g data-drag="mc-${M.s}">${metalCard(M, CARD.x, cardY(i), !!S.mp[M.s], S.msel === M.s)}</g>`;
+  });
+  return h;
+}
+
+// ----- lesson 3 -----
+const SACK = { x: 60, w: 84, h: 38, y0: 126, gap: 44 };
+const sackY = i => SACK.y0 + i * SACK.gap;
+const FIELD = { x0: 122, x1: 372, top: 150, soil: 336 };
+const BAR = { xs: [404, 440, 476], w: 26, base: 340, h100: 140 };
+const inField = p => p.x > FIELD.x0 - 6 && p.x < FIELD.x1 + 6 && p.y > FIELD.top - 10 && p.y < 362;
+function sackSVG(F, x, y, sel) {
+  return `<path d="M${(x - SACK.w / 2 + 6).toFixed(1)} ${y.toFixed(1)}h${SACK.w - 12}l6 ${SACK.h}h${-SACK.w}z" fill="${INK}" transform="translate(0 1.3)"/>` +
+    `<path d="M${(x - SACK.w / 2 + 6).toFixed(1)} ${y.toFixed(1)}h${SACK.w - 12}l6 ${SACK.h}h${-SACK.w}z" fill="${sel ? '#fff4dc' : '#e8ecf4'}" stroke="${sel ? '#ffb547' : 'none'}" stroke-width="1.6"/>` +
+    `<rect x="${(x - SACK.w / 2 + 6).toFixed(1)}" y="${y.toFixed(1)}" width="${SACK.w - 12}" height="5" fill="${F.c}"/>` +
+    `<text x="${x.toFixed(1)}" y="${(y + 19).toFixed(1)}" font-size="${F.f.length > 8 ? 9 : 10.5}" fill="#0b1019" text-anchor="middle" font-weight="500">${low(F.f)}</text>` +
+    `<text x="${x.toFixed(1)}" y="${(y + 31).toFixed(1)}" font-size="7.2" fill="#4a556c" text-anchor="middle">${F.short || F.name}</text>`;
+}
+function fertSVG(m, t) {
+  let h = '';
+  const hot = drag && drag.moved && drag.id.startsWith('sk-') && inField(drag.p);
+  h += `<rect x="${FIELD.x0}" y="${FIELD.top}" width="${FIELD.x1 - FIELD.x0}" height="${360 - FIELD.top}" rx="12" fill="${hot ? 'rgba(114,212,232,.07)' : 'rgba(18,26,40,.35)'}" stroke="${hot ? '#72d4e8' : '#26324a'}" stroke-dasharray="6 6"/>`;
+  h += `<rect x="${FIELD.x0 + 4}" y="${FIELD.soil}" width="${FIELD.x1 - FIELD.x0 - 8}" height="${358 - FIELD.soil}" rx="4" fill="#4a3727"/>`;
+  h += `<text x="${(FIELD.x0 + FIELD.x1) / 2}" y="${FIELD.top + 16}" font-size="9" fill="#8b96ad" text-anchor="middle">поле пшеницы · 1 га</text>`;
+  const over = m.over.length > 0, ok = m.normOk;
+  const col = ok ? '#86e0a8' : over ? '#c9a24a' : m.y < 0.6 ? '#b8b26a' : '#8ccf7a';
+  const ht = 26 + 120 * m.y;
+  for (let i = 0; i < 15; i++) {
+    const x = FIELD.x0 + 18 + i * ((FIELD.x1 - FIELD.x0 - 36) / 14);
+    const sw = reduce ? 0 : Math.sin(t / 900 + i * 0.7) * 3;
+    const top = FIELD.soil - ht * (0.9 + ((i * 0.37) % 0.2));
+    h += `<path d="M${x.toFixed(1)} ${FIELD.soil}Q${(x + sw / 2).toFixed(1)} ${((FIELD.soil + top) / 2).toFixed(1)} ${(x + sw).toFixed(1)} ${top.toFixed(1)}" stroke="${col}" stroke-width="2" fill="none"/>`;
+    if (m.y > 0.35) h += `<ellipse cx="${(x + sw).toFixed(1)}" cy="${(top - 6).toFixed(1)}" rx="3.2" ry="${(5 + 4 * m.y).toFixed(1)}" fill="${over ? '#c9a24a' : '#e6c63a'}"/>`;
+  }
+  if (over) h += `<text x="${(FIELD.x0 + FIELD.x1) / 2}" y="${FIELD.top + 30}" font-size="9" fill="#ff8a73" text-anchor="middle">избыток ${m.over.map(k => NUT.find(x => x.k === k).name).join(', ')}: вымывание и ожог корней</text>`;
+  h += `<text x="${(FIELD.x0 + FIELD.x1) / 2}" y="378" font-size="10" fill="${ok ? '#86e0a8' : '#e8ecf4'}" text-anchor="middle" font-weight="500">урожай ${Math.round(m.y * 100)} % от возможного</text>`;
+  // bars (Liebig staves)
+  h += `<rect x="${BAR.xs[0] - 10}" y="${BAR.base - BAR.h100 * 1.5 - 8}" width="${BAR.xs[2] + BAR.w - BAR.xs[0] + 20}" height="${BAR.h100 * 1.5 + 26}" rx="10" fill="rgba(18,26,40,.6)" stroke="#26324a"/>`;
+  const y90 = BAR.base - BAR.h100 * 0.9, y110 = BAR.base - BAR.h100 * 1.1;
+  h += `<rect x="${BAR.xs[0] - 6}" y="${y110}" width="${BAR.xs[2] + BAR.w - BAR.xs[0] + 12}" height="${y90 - y110}" fill="rgba(134,224,168,.14)"/><path d="M${BAR.xs[0] - 6} ${BAR.base - BAR.h100}H${BAR.xs[2] + BAR.w + 6}" stroke="#86e0a8" stroke-dasharray="4 3"/>`;
+  NUT.forEach((x, i) => {
+    const r = m.rel[x.k], hh = Math.min(r, 1.5) * BAR.h100, X = BAR.xs[i];
+    const c = Math.abs(r - 1) <= 0.1 + 1e-9 ? '#86e0a8' : r > 1.1 ? '#ff8a73' : '#c58a5c';
+    h += `<rect x="${X}" y="${(BAR.base - hh).toFixed(1)}" width="${BAR.w}" height="${hh.toFixed(1)}" rx="3" fill="${c}"/>`;
+    h += `<text x="${X + BAR.w / 2}" y="${BAR.base + 12}" font-size="8.5" fill="#e8ecf4" text-anchor="middle">${x.name}</text>`;
+    h += `<text x="${X + BAR.w / 2}" y="${(BAR.base - hh - 4).toFixed(1)}" font-size="7.5" fill="#8b96ad" text-anchor="middle">${Math.round(m.n[x.k])}</text>`;
+  });
+  h += `<text x="${(BAR.xs[0] + BAR.xs[2] + BAR.w) / 2}" y="${BAR.base - BAR.h100 * 1.5 - 14}" font-size="8" fill="#8b96ad" text-anchor="middle">кг/га · норма = линия</text>`;
+  FERT.forEach((F, i) => {
+    const kg = S.fert[F.id];
+    h += `<g data-drag="sk-${F.id}">${sackSVG(F, SACK.x, sackY(i), S.fsel === F.id)}</g>`;
+    if (kg) h += `<text x="${SACK.x + SACK.w / 2 + 6}" y="${sackY(i) + 6}" font-size="8" fill="#ffb547" font-weight="500">${kg}</text>`;
+  });
+  return h;
+}
+
+function hlBox(id) {
+  const c1 = proj(46.5, 55.5);
+  return {
+    col: [COL.x - 6, COL.y - 6, COL.w + 12, COL.h + 12], cat: [COL.x + 2, 170, COL.w - 4, 156], sep: [126, 220, 52, 140],
+    plot: [PL.x0 - 12, PL.y1 - 14, PL.x1 - PL.x0 + 24, PL.y0 - PL.y1 + 28], tmark: [tx(S[S.plant].T) - 14, PL.y1 - 6, 28, PL.y0 - PL.y1 + 12],
+    goal: [PL.x0 - 4, yv(PLANT[S.plant].goal) - 8, PL.x1 - PL.x0 + 8, 16],
+    map: [c1.x - 4, c1.y - 4, 40.8 * MAP.kx + 8, 14.9 * MAP.ky + 8], cards: [CARD.x - CARD.w / 2 - 6, CARD.y0 - 6, CARD.w + 12, CARD.gap * 4 + CARD.h + 12],
+    cities: [c1.x + (71 - 46.5) * MAP.kx, c1.y + (55.5 - 53) * MAP.ky, 13 * MAP.kx, 7 * MAP.ky],
+    sacks: [SACK.x - SACK.w / 2 - 4, SACK.y0 - 6, SACK.w + 12, SACK.gap * 4 + SACK.h + 12], field: [FIELD.x0 - 4, FIELD.top - 4, FIELD.x1 - FIELD.x0 + 8, 214],
+    bars: [BAR.xs[0] - 12, BAR.base - BAR.h100 * 1.5 - 10, BAR.xs[2] + BAR.w - BAR.xs[0] + 24, BAR.h100 * 1.5 + 30],
+  }[id];
+}
+
+function ghostSVG(d) {
+  const p = d.p, id = d.id;
+  if (id.startsWith('mc-')) { const M = METALS.find(x => x.s === id.slice(3)); return M ? metalCard(M, p.x, p.y - CARD.h / 2, false, true) : ''; }
+  if (id.startsWith('sk-')) { const F = FERT.find(x => x.id === id.slice(3)); return F ? sackSVG(F, p.x, p.y - SACK.h / 2, true) : ''; }
+  return '';
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID(), m = model();
+  let h = bench();
+  if (id === 'reactors') h += rxSVG(m, t);
+  else if (id === 'metallurgy') h += mapSVG();
+  else h += fertSVG(m, t);
+  if (drag && drag.moved) { const g = ghostSVG(drag); if (g) h += `<g opacity=".92" pointer-events="none">${g}</g>`; }
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="10" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 510, hh / 410, 1.7);
+  const vw = w / s, vh = hh / s;
+  scene.setAttribute('viewBox', `${(258 - vw / 2).toFixed(1)} ${(395 - vh).toFixed(1)} ${vw.toFixed(1)} ${vh.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- dragging and tapping ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+const live = id => id === 'plot' || id === 'tmark';
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  drag = { id: el.dataset.drag, x: e.clientX, y: e.clientY, p: toSvg(e), moved: false };
+  if (live(drag.id)) setT(xT(drag.p.x));
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 6 && !drag.id.startsWith('city-')) drag.moved = true;
+  drag.p = toSvg(e);
+  if (live(drag.id)) setT(xT(drag.p.x));
+  else if (drag.moved) dirty = true;
+});
+const endDrag = cancel => {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing'); dirty = true;
+  if (cancel || live(d.id)) { update(); return; }
+  if (d.moved) drop(d.id, d.p); else tap(d.id);
+};
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+function tap(id) {
+  if (id.startsWith('mc-')) { const s = id.slice(3); if (S.mp[s]) { S.msel = s; update(); return; } S.msel = S.msel === s ? null : s; update(); return; }
+  if (id.startsWith('city-')) { if (S.msel && !S.mp[S.msel]) placeMetal(S.msel, id.slice(5)); else { const c = cityOf(id.slice(5)); toast(S.msel ? `${c.name}: здесь уже всё на месте.` : `${c.name}. Сначала выберите карточку металла справа.`); } return; }
+  if (id.startsWith('sk-')) { S.fsel = id.slice(3); renderTools(); update(); return; }
+}
+function drop(id, p) {
+  if (id.startsWith('mc-')) { const s = id.slice(3), c = nearCity(p); if (c && !S.mp[s]) placeMetal(s, c.id); return; }
+  if (id.startsWith('sk-')) { S.fsel = id.slice(3); renderTools(); if (inField(p)) addFert(S.fsel, FSTEP); else update(); }
+}
+
+// lesson 1 actions
+function setT(T) { const st = S[S.plant]; T = clamp(T, TMIN, TMAX); if (st.T === T) return; st.T = T; update(); }
+function setP(P) { const D = PLANT[S.plant], st = S[S.plant]; st.P = clamp(Math.round(P / D.Pstep) * D.Pstep, D.Pmin, D.Pmax); update(); }
+function setPlant(pl) { S.plant = pl; renderTools(); buildScheme(); update(); }
+function toggleCat() { const st = S[S.plant]; st.cat = !st.cat; toast(st.cat ? `Катализатор загружен: ${PLANT[S.plant].cat}.` : 'Катализатор убран. Равновесие то же, но скорость упала почти до нуля.'); renderTools(); update(); }
+function toggleAbs() { const st = S.so3; st.abs = st.abs === 'acid' ? 'water' : 'acid'; toast(st.abs === 'acid' ? 'SO₃ поглощает 98 % серная кислота — получается олеум.' : 'SO₃ + вода: реакция идёт так бурно, что образуется туман из капель кислоты. Он уходит в трубу.'); renderTools(); update(); }
+
+// lesson 2 actions
+function placeMetal(s, cid) {
+  const M = METALS.find(x => x.s === s), c = cityOf(cid); if (!M || !c || S.mp[s]) return false;
+  S.msel = s;
+  if (!M.ok.includes(cid)) { S.wrong++; toast(`Не ${c.name}. ${M.tip}`); update(); return false; }
+  S.mp[s] = cid; toast(`Верно: ${M.name} — ${c.name}. ${M.eq}`); update(); return true;
+}
+// lesson 3 actions
+function addFert(fid, d) {
+  const v = S.fert[fid] + d;
+  if (v < 0) return false;
+  if (v > FMAX) { toast('Больше 300 кг на гектар одного удобрения не вносят.'); return false; }
+  S.fert[fid] = v; update(); return true;
+}
+
+let last = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const anim = !!S.hl;
+  const moving = !reduce && (LID() === 'reactors' || LID() === 'fertilizers') && t - last > 50;
+  if (dirty || anim || moving) { drawScene(t); dirty = false; last = t; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2800); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  if (id === 'reactors') {
+    const st = S[S.plant];
+    tb.innerHTML = B('pl-nh3', 'NH₃', S.plant === 'nh3') + B('pl-so3', 'SO₃', S.plant === 'so3') + sep + B('t-', '−10 °C') + B('t+', '+10 °C') + sep + B('p-', '−P') + B('p+', '+P') + sep +
+      B('cat', 'Катализатор', st.cat) + (S.plant === 'so3' ? B('abs', st.abs === 'acid' ? 'Поглотитель: H₂SO₄' : 'Поглотитель: вода') : '');
+  } else if (id === 'metallurgy') tb.innerHTML = B('reset', 'Начать заново');
+  else {
+    const F = FERT.find(x => x.id === S.fsel);
+    tb.innerHTML = B('f-', '−10 кг') + B('fcur', low(F.f)) + B('f+', '+10 кг') + sep + B('freset', 'Очистить поле');
+  }
+}
+function act(a) {
+  if (a.startsWith('pl-')) return setPlant(a.slice(3));
+  if (a === 't-' || a === 't+') return setT(S[S.plant].T + (a === 't+' ? 10 : -10));
+  if (a === 'p-' || a === 'p+') return setP(S[S.plant].P + (a === 'p+' ? 1 : -1) * PLANT[S.plant].Pstep);
+  if (a === 'cat') return toggleCat();
+  if (a === 'abs') return toggleAbs();
+  if (a === 'reset') { S.mp = {}; S.msel = null; S.wrong = 0; buildScheme(); update(); return; }
+  if (a === 'f-' || a === 'f+') return addFert(S.fsel, a === 'f+' ? FSTEP : -FSTEP);
+  if (a === 'fcur') { const F = FERT.find(x => x.id === S.fsel); toast(`${F.name[0].toUpperCase() + F.name.slice(1)}: ${S.fert[F.id]} кг/га.`); return; }
+  if (a === 'freset') { for (const k in S.fert) S.fert[k] = 0; update(); }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  col: IC('<rect x="10" y="3" width="14" height="28" rx="6" fill="none" stroke="var(--muted)" stroke-width="1.6"/><circle cx="15" cy="22" r="2" fill="#9fc3f0"/><circle cx="19" cy="12" r="2.4" fill="#ffb547"/>'),
+  cat: IC('<rect x="7" y="8" width="20" height="6" rx="2" fill="#6d6f7a"/><rect x="7" y="20" width="20" height="6" rx="2" fill="#c88a2e"/>'),
+  sep: IC('<rect x="10" y="5" width="14" height="25" rx="4" fill="none" stroke="var(--muted)" stroke-width="1.6"/><rect x="12" y="18" width="10" height="10" rx="2" fill="#b88cf0"/>'),
+  plot: IC('<path d="M5 6V29H30" stroke="var(--muted)" fill="none"/><path d="M6 9Q16 12 29 27" stroke="#72d4e8" stroke-dasharray="3 2" fill="none"/><path d="M6 28Q14 26 18 16Q22 12 29 26" stroke="#ffb547" stroke-width="2" fill="none"/>'),
+  tmark: IC('<circle cx="17" cy="17" r="7" fill="#ffb547"/><path d="M5 17H29" stroke="var(--muted)" stroke-dasharray="2 2"/>'),
+  goal: IC('<path d="M4 17H30" stroke="#86e0a8" stroke-width="2" stroke-dasharray="4 3"/>'),
+  map: IC('<path d="M4 14L10 9L20 7L30 12L28 22L18 26L8 24Z" fill="#16202f" stroke="var(--muted)"/>'),
+  cities: IC('<circle cx="12" cy="15" r="3.5" fill="#e8ecf4"/><circle cx="23" cy="20" r="3.5" fill="#86e0a8"/>'),
+  cards: IC('<rect x="5" y="9" width="24" height="16" rx="3" fill="#e8ecf4"/><circle cx="11" cy="17" r="4" fill="#d9895b"/>'),
+  sacks: IC('<path d="M9 7h16l3 21H6z" fill="#e8ecf4"/><rect x="9" y="7" width="16" height="3" fill="#f0c46a"/>'),
+  field: IC('<rect x="4" y="25" width="26" height="5" fill="#4a3727"/><path d="M10 25V12M17 25V10M24 25V12" stroke="#86e0a8" stroke-width="2"/>'),
+  bars: IC('<rect x="6" y="14" width="6" height="16" fill="#c58a5c"/><rect x="14" y="8" width="6" height="22" fill="#86e0a8"/><rect x="22" y="4" width="6" height="26" fill="#ff8a73"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (m.kind === 'rx') return `NH₃: ${S.ok1.nh3 ? 'режим найден ✓' : 'ещё нет'} · SO₃: ${S.ok1.so3 ? 'режим найден ✓' : 'ещё нет'}`;
+  if (m.kind === 'map') return `На карте ${m.placed} из ${METALS.length} · ошибок ${S.wrong}`;
+  return `N ${Math.round(m.n.N)} · P₂O₅ ${Math.round(m.n.P)} · K₂O ${Math.round(m.n.K)} кг/га`;
+}
+
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'reactors') {
+    const D = PLANT[S.plant], st = S[S.plant];
+    h = `<h2>Режим: ${D.name}</h2>
+      <dl class="reads"><div><dt>Равновесие</dt><dd id="r1"></dd></div><div><dt>На выходе</dt><dd id="r2"></dd></div><div><dt>Скорость k·τ</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Аппарат</div><div class="chips" id="plChips"><button data-p="nh3" aria-pressed="${S.plant === 'nh3'}">Синтез NH₃</button><button data-p="so3" aria-pressed="${S.plant === 'so3'}">Контактный SO₃</button></div></div>
+      <div class="ctl"><label for="sT">Температура <output id="oT"></output></label><input type="range" id="sT" min="${TMIN}" max="${TMAX}" step="5" value="${st.T}"></div>
+      <div class="ctl"><label for="sP">Давление <output id="oP"></output></label><input type="range" id="sP" min="${D.Pmin}" max="${D.Pmax}" step="${D.Pstep}" value="${st.P}"></div>
+      <label class="chk2"><input type="checkbox" id="cCat" ${st.cat ? 'checked' : ''}> Катализатор: ${D.cat}</label>` +
+      (S.plant === 'so3' ? `<div class="ctl"><div class="lbl">Чем поглощать SO₃</div><div class="chips" id="absChips"><button data-v="water" aria-pressed="${st.abs === 'water'}">вода</button><button data-v="acid" aria-pressed="${st.abs === 'acid'}">98 % H₂SO₄</button></div></div>` : '') +
+      `<p class="note" style="margin-top:12px">Голубая кривая — сколько продукта было бы при равновесии. Оранжевая — сколько успевает получиться за время прохода газа через катализатор.</p>`;
+  }
+  if (id === 'metallurgy') {
+    h = `<h2>Металлы и города</h2><p class="note">Выберите город для каждого металла. Верный ответ закрепится.</p>
+      <div class="pairs">${METALS.map(M => `<label>${M.s} · ${M.name}<select data-s="${M.s}" ${S.mp[M.s] ? 'disabled' : ''}><option value="">—</option>${CITIES.map(c => `<option value="${c.id}" ${S.mp[M.s] === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}</select></label>`).join('')}</div>
+      <dl class="reads"><div><dt>Верно</dt><dd id="r1"></dd></div><div><dt>Ошибок</dt><dd id="r2"></dd></div><div><dt>Металл</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Металл для расчёта</div><div class="chips" id="mChips">${METALS.map(M => `<button data-s="${M.s}">${M.s}</button>`).join('')}</div></div>
+      <div class="ctl"><label for="sOre">Масса чистого сырья <output id="oOre"></output></label><input type="range" id="sOre" min="1" max="100" step="1" value="${S.ore}"></div>`;
+  }
+  if (id === 'fertilizers') {
+    h = `<h2>Доза на 1 гектар</h2>
+      <dl class="reads"><div><dt>N</dt><dd id="r1"></dd></div><div><dt>P₂O₅</dt><dd id="r2"></dd></div><div><dt>K₂O</dt><dd id="r3"></dd></div></dl>
+      <div class="cnt">${FERT.map(F => `<div><span>${low(F.f)} · ${F.name}</span><span><button data-f="${F.id}" data-d="-1" aria-label="Убрать 10 кг: ${F.name}">−</button> <b id="c-${F.id}"></b> <button data-f="${F.id}" data-d="1" aria-label="Добавить 10 кг: ${F.name}">+</button></span></div>`).join('')}</div>
+      <p class="note" style="margin-top:12px">Норма: N 60, P₂O₅ 40, K₂O 30 кг/га. Шаг — 10 кг удобрения.</p>`;
+  }
+  el.innerHTML = h;
+  el.querySelectorAll('#plChips button').forEach(b => b.onclick = () => setPlant(b.dataset.p));
+  const sT = el.querySelector('#sT'); if (sT) sT.oninput = () => setT(+sT.value);
+  const sP = el.querySelector('#sP'); if (sP) sP.oninput = () => setP(+sP.value);
+  const cc = el.querySelector('#cCat'); if (cc) cc.onchange = () => { if (cc.checked !== S[S.plant].cat) toggleCat(); };
+  el.querySelectorAll('#absChips button').forEach(b => b.onclick = () => { if (S.so3.abs !== b.dataset.v) toggleAbs(); });
+  el.querySelectorAll('.pairs select').forEach(s => s.onchange = () => { if (!s.value) return; const ok = placeMetal(s.dataset.s, s.value); if (ok) s.disabled = true; else s.value = ''; });
+  el.querySelectorAll('#mChips button').forEach(b => b.onclick = () => { S.msel = b.dataset.s; update(); });
+  const so = el.querySelector('#sOre'); if (so) so.oninput = () => { S.ore = +so.value; update(); };
+  el.querySelectorAll('.cnt button[data-f]').forEach(b => b.onclick = () => { S.fsel = b.dataset.f; renderTools(); addFert(b.dataset.f, +b.dataset.d * FSTEP); });
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; };
+  if (m.kind === 'rx') {
+    set('#r1', fx(m.r.xeq) + ' %'); set('#r2', fx(m.r.out) + ' %'); set('#r3', m.r.k < 0.01 ? '≈ 0' : fx(m.r.k, 2));
+    set('#oT', m.st.T + ' °C'); set('#oP', `${m.st.P} атм ≈ ${fx(m.st.P * 0.101325, m.st.P < 20 ? 2 : 1)} МПа`);
+    const sT = el.querySelector('#sT'); if (sT && +sT.value !== m.st.T) sT.value = m.st.T;
+    const sP = el.querySelector('#sP'); if (sP && +sP.value !== m.st.P) sP.value = m.st.P;
+    const cc = el.querySelector('#cCat'); if (cc) cc.checked = m.st.cat;
+    el.querySelectorAll('#absChips button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === S.so3.abs));
+  } else if (m.kind === 'map') {
+    const M = METALS.find(x => x.s === S.msel);
+    set('#r1', `${m.placed} / ${METALS.length}`); set('#r2', String(S.wrong)); set('#r3', M ? `${fx(S.ore * M.Mm / M.Mo)} т ${M.s}` : '—');
+    set('#oOre', M ? `${S.ore} т ${M.ore}` : `${S.ore} т`);
+    el.querySelectorAll('#mChips button').forEach(b => b.setAttribute('aria-pressed', b.dataset.s === S.msel));
+  } else {
+    set('#r1', `${fx(m.n.N)} / 60`); set('#r2', `${fx(m.n.P)} / 40`); set('#r3', `${fx(m.n.K)} / 30`);
+    FERT.forEach(F => set('#c-' + F.id, S.fert[F.id] + ' кг'));
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'reactors') return [
+    { id: 'col', icon: ICON.col, name: S.plant === 'nh3' ? 'Колонна синтеза' : 'Контактный аппарат', spec: 'Стальной аппарат, через который идёт газ. Голубые точки — исходные газы, оранжевые — продукт. Цвет внутри показывает нагрев.' },
+    { id: 'cat', icon: ICON.cat, name: 'Слои катализатора', spec: S.plant === 'nh3' ? 'Губчатое железо с добавками K₂O и Al₂O₃. Ускоряет и прямую, и обратную реакцию, поэтому равновесие не сдвигает.' : 'V₂O₅ на пористом носителе. Начинает работать примерно с 400 °C («зажигание»). Равновесие не сдвигает.' },
+    { id: 'sep', icon: ICON.sep, name: S.plant === 'nh3' ? 'Конденсатор и возврат газа' : 'Поглотительная башня', spec: S.plant === 'nh3' ? 'При охлаждении аммиак сжижается (кипит при −33 °C), а N₂ и H₂ — нет. Их снова гонят в колонну: так из сырья в итоге получают почти весь аммиак.' : 'SO₃ поглощают 98 %-й серной кислотой: SO₃ + H₂SO₄ → H₂S₂O₇ (олеум). Затем олеум разбавляют водой до H₂SO₄.' },
+    { id: 'plot', icon: ICON.plot, name: 'График выхода', spec: 'Голубая пунктирная — равновесный выход: падает с нагревом, ведь реакция экзотермическая. Оранжевая — реальный выход: на холоде реакция не успевает.' },
+    { id: 'tmark', icon: ICON.tmark, name: 'Рабочая точка', spec: 'Текущая температура. Тяните её вдоль графика. Давление меняют кнопками −P / +P.' },
+    { id: 'goal', icon: ICON.goal, name: 'Цель', spec: 'Зелёная линия — выход, который нужен по заданию.' }];
+  if (id === 'metallurgy') return [
+    { id: 'map', icon: ICON.map, name: 'Карта Казахстана', spec: 'Схема без масштаба. Точки — города с металлургией и без неё.' },
+    { id: 'cities', icon: ICON.cities, name: 'Города', spec: 'Зелёная точка — сюда уже поставлен металл. Нажмите город после выбора карточки.' },
+    { id: 'cards', icon: ICON.cards, name: 'Карточки металлов', spec: 'Металл и его руда. Нажмите — на вкладке «Расчёты» появятся уравнение, способ и выход металла.' }];
+  return [
+    { id: 'sacks', icon: ICON.sacks, name: 'Мешки удобрений', spec: 'Азотные: карбамид, аммиачная селитра. Фосфорные: двойной суперфосфат. Комплексное: аммофос (N и P). Калийное: хлорид калия.' },
+    { id: 'field', icon: ICON.field, name: 'Поле', spec: 'Высота колосьев — урожай. Его ограничивает элемент, которого меньше всего относительно нормы.' },
+    { id: 'bars', icon: ICON.bars, name: 'Доски бочки Либиха', spec: 'Столбики — внесено N, P₂O₅, K₂O. Зелёная полоса — норма ±10 %. Красный — избыток.' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      (L.safe ? `<div class="safe"><b>Безопасность</b>${L.safe}</div>` : '') +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Детали модели</h2><p class="note">Нажмите на деталь, чтобы найти её на столе.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  if (m.kind === 'rx') {
+    const { pl, st, r, D } = m;
+    let h = `<h2>${D.name[0].toUpperCase() + D.name.slice(1)}</h2><div class="formula">${D.eq}</div><h3>Принцип Ле Шателье</h3><div class="steps">` +
+      step('реакция', 'экзотермическая (Q > 0)') + step('нагрев', 'равновесие ← влево') +
+      step('газов слева → справа', pl === 'nh3' ? '4 моль → 2 моль' : '3 моль → 2 моль') + step('сжатие', 'равновесие → вправо') +
+      step('катализатор', 'равновесие не сдвигает, ускоряет') + `</div>`;
+    h += `<h3>Сейчас</h3><div class="steps">` +
+      step('температура, давление', `${st.T} °C, ${st.P} атм`) +
+      step('равновесный выход x_равн', fx(r.xeq) + ' %') +
+      step('скорость за проход k·τ', (r.k < 0.01 ? '≈ 0' : fx(r.k, 2)) + (st.cat ? '' : ' (нет катализатора)')) +
+      step('доля пути к равновесию 1 − e^(−kτ)', fx(r.appr * 100) + ' %') +
+      step('выход = x_равн · (1 − e^(−kτ))', `${fx(r.xeq)} · ${fx(r.appr, 3)} = ${fx(r.out)} %`, 'sum') + `</div>`;
+    h += `<h3>Условие задания</h3><div class="steps">` +
+      step(D.yname, `${fx(r.out)} % ${r.out >= D.goal ? '≥' : '<'} ${D.goal} %`) +
+      (pl === 'nh3' ? step('давление ≤ 300 атм', st.P <= 300 ? 'да ✓' : 'нет: дорогие компрессоры и толстые стенки') : step('поглотитель', st.abs === 'acid' ? '98 % H₂SO₄ ✓' : 'вода — туман, потери SO₃')) +
+      step('итог', m.goalOk ? 'режим подходит ✓' : 'ищите дальше', 'sum') + `</div>`;
+    if (pl === 'so3') h += `<h3>Сколько кислоты из серы</h3><div class="formula">S → SO₂ → SO₃ → H₂SO₄</div><div class="steps">${step('n(S) = n(H₂SO₄)', 'по сере 1 : 1')}${step('из 1 т серы', '1 т · 98 / 32 = 3,06 т H₂SO₄', 'sum')}</div><p class="note" style="margin-top:10px">Это теоретический выход. На заводе получают около 97–99 % от него.</p>`;
+    else h += `<h3>Сколько аммиака из азота</h3><div class="steps">${step('N₂ + 3H₂ → 2NH₃', '28 г → 34 г')}${step('из 1 т N₂', '1 т · 34 / 28 = 1,21 т NH₃', 'sum')}</div><p class="note" style="margin-top:10px">Благодаря возврату непрореагировавшего газа почти весь азот в итоге становится аммиаком.</p>`;
+    h += `<p class="note" style="margin-top:10px">Равновесные данные — справочные, округлены; скорость — упрощённая модель Аррениуса.</p>`;
+    return h;
+  }
+  if (m.kind === 'map') {
+    const M = METALS.find(x => x.s === m.sel);
+    if (!M) return `<h2>Как рассуждать</h2><div class="steps">${step('1. Что за руда?', 'оксид или сульфид')}${step('2. Чем восстановить?', 'C, CO или ток')}${step('3. Что нужно заводу?', 'руда, уголь, электричество', 'sum')}</div><p class="note" style="margin-top:10px">Нажмите карточку металла — здесь появится её разбор.</p>`;
+    const w = M.Mm / M.Mo, placed = !!S.mp[M.s];
+    let h = `<h2>${M.s} · ${M.name}</h2><div class="formula">${M.eq}</div><div class="steps">` +
+      step('руда', `${M.ore} — ${M.oreName}`) + step('способ', M.method) +
+      step('где', placed ? M.plant + ' ✓' : 'найдите на карте', 'sum') + `</div>`;
+    h += `<h3>Выход металла</h3><div class="steps">` +
+      step(`w(${M.s}) в ${M.ore}`, `${M.Mm} / ${M.Mo} = ${fx(w * 100)} %`) +
+      step('масса сырья', `${S.ore} т`) +
+      step('масса металла (теор.)', `${S.ore} · ${fx(w, 3)} = ${fx(S.ore * w)} т`, 'sum') + `</div><p class="note" style="margin-top:10px">Массу сырья меняйте на вкладке «Схема». Реальная руда содержит пустую породу, поэтому металла из неё намного меньше.</p>`;
+    return h;
+  }
+  let h = `<h2>Расчёт дозы</h2><div class="formula">m(элемента) = m(удобрения) · w</div><h3>Массовые доли</h3><div class="steps">` +
+    FERT.map(F => step(`${low(F.f)} (M = ${String(F.M).replace('.', ',')})`, [F.N ? `N ${fx(F.N / F.M * 100)} %` : '', F.P ? `P₂O₅ ${fx(F.P / F.M * 100)} %` : '', F.K ? `K₂O ${fx(F.K / F.M * 100)} %` : ''].filter(Boolean).join(' · '))).join('') + `</div>`;
+  const used = FERT.filter(F => S.fert[F.id]);
+  h += `<h3>Внесено на 1 га</h3><div class="steps">` + (used.length ? used.map(F => { const kg = S.fert[F.id]; return step(`${F.name}, ${kg} кг`, [F.N ? `N ${fx(kg * F.N / F.M)}` : '', F.P ? `P₂O₅ ${fx(kg * F.P / F.M)}` : '', F.K ? `K₂O ${fx(kg * F.K / F.M)}` : ''].filter(Boolean).join(' · ')); }).join('') : step('пока ничего', '—')) +
+    NUT.map(x => step(`итого ${x.name}`, `${fx(m.n[x.k])} из ${NORM[x.k]} кг (${Math.round(m.rel[x.k] * 100)} %)${Math.abs(m.rel[x.k] - 1) <= 0.1 + 1e-9 ? ' ✓' : ''}`, 'sum')).join('') + `</div>`;
+  h += `<p class="note" style="margin-top:10px">Доли посчитаны для чистых веществ. В заводском аммофосе около 12 % N и 52 % P₂O₅, в хлористом калии около 60 % K₂O — из-за примесей. P₂O₅: на 1 атом P приходится 142 / 2 = 71 г; K₂O: на 1 атом K — 94 / 2 = 47 г.</p>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const el = $('#meter');
+  if (m.kind === 'rx') {
+    el.innerHTML = `<div class="k">${m.D.short} · на выходе</div><div class="v ${m.goalOk ? 'ok' : ''}">${fx(m.r.out)} %</div><div class="lr"><span>равновесие</span><span>${fx(m.r.xeq)} %</span></div><div class="lr"><span>${m.st.T} °C</span><span>${m.st.P} атм</span></div><div class="gauge"><b style="width:${clamp(m.r.out, 0, 100).toFixed(1)}%;background:${m.goalOk ? 'var(--ok)' : 'var(--liq)'}"></b><i style="left:${m.D.goal}%"></i></div>`;
+  } else if (m.kind === 'map') {
+    el.innerHTML = `<div class="k">Карта</div><div class="v ${m.placed === METALS.length ? 'ok' : ''}">${m.placed} из ${METALS.length}</div><div class="gauge"><b style="width:${(m.placed / METALS.length * 100).toFixed(1)}%"></b></div><div class="lr"><span>ошибок</span><span>${S.wrong}</span></div>`;
+  } else {
+    el.innerHTML = `<div class="k">Урожай</div><div class="v ${m.normOk ? 'ok' : ''}">${Math.round(m.y * 100)} %</div>` + NUT.map(x => `<div class="lr"><span>${x.name}</span><span>${Math.round(m.n[x.k])}/${NORM[x.k]}</span></div>`).join('');
+  }
+}
+
+function update() {
+  const m = model(), L = LESSONS[S.lesson];
+  if (m.kind === 'rx' && m.goalOk && !S.ok1[m.pl]) {
+    S.ok1[m.pl] = true;
+    toast(m.pl === 'nh3' ? `Режим найден: ${fx(m.r.out)} % NH₃ при ${m.st.T} °C и ${m.st.P} атм. Теперь контактный аппарат.` : `Режим найден: ${fx(m.r.out)} % SO₂ → SO₃ при ${m.st.T} °C, SO₃ поглощает серная кислота.`);
+  }
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Химическое производство освоено!');
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  reactors: '<rect x="6" y="3" width="12" height="24" rx="5" fill="none" stroke="#8b96ad" stroke-width="1.4"/><circle cx="12" cy="20" r="2" fill="#9fc3f0"/><circle cx="12" cy="10" r="2.4" fill="#ffb547"/><path d="M24 5V27H62" stroke="#3a4762" fill="none"/><path d="M25 7Q40 10 61 25" stroke="#72d4e8" stroke-dasharray="3 2" fill="none"/><path d="M25 26Q34 24 38 14Q44 9 61 22" stroke="#ffb547" stroke-width="1.6" fill="none"/>',
+  metallurgy: '<path d="M6 14L16 7L34 5L56 9L60 18L48 25L28 26L12 23Z" fill="#16202f" stroke="#8b96ad"/><circle cx="40" cy="13" r="3" fill="#c58a5c"/><circle cx="44" cy="20" r="3" fill="#d9895b"/><circle cx="52" cy="11" r="3" fill="#b5c0d3"/><circle cx="18" cy="13" r="3" fill="#7ad1b5"/>',
+  fertilizers: '<rect x="4" y="24" width="40" height="4" fill="#4a3727"/><path d="M10 24V12M18 24V10M26 24V12M34 24V11" stroke="#86e0a8" stroke-width="1.6"/><rect x="48" y="14" width="4" height="14" fill="#86e0a8"/><rect x="54" y="10" width="4" height="18" fill="#86e0a8"/><rect x="60" y="17" width="4" height="11" fill="#c58a5c"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i], init = JSON.parse(JSON.stringify(L.init || {}));
+  S.lesson = i; S.hl = null; drag = null;
+  Object.assign(S, fresh(), init);
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const strip = $('#lessons'), cur = strip.querySelector('.lesson[aria-current="true"]');
+  if (cur) strip.scrollLeft = cur.offsetLeft - strip.offsetLeft - (strip.clientWidth - cur.offsetWidth) / 2;
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '';
+  if (id === 'reactors') {
+    const D = m.D, st = m.st;
+    now = `Модель промышленного аппарата: ${D.name}, реакция ${D.eq}. Режим: ${st.T} °C, ${st.P} атм, катализатор ${st.cat ? 'загружен (' + D.cat + ')' : 'не загружен'}${m.pl === 'so3' ? `, SO₃ поглощает ${st.abs === 'acid' ? '98 % серная кислота' : 'вода (образуется кислотный туман — неверно)'}` : ''}. Равновесный выход ${fx(m.r.xeq)} %, относительная скорость за проход k·τ = ${fx(m.r.k, 3)}, выход на выходе аппарата ${fx(m.r.out)} % (цель ${D.goal} %${m.pl === 'nh3' ? ', давление не выше 300 атм' : ''}). На графике голубая кривая — равновесный выход от температуры, оранжевая — реальный. Режим для NH₃ ${S.ok1.nh3 ? 'уже найден' : 'не найден'}, для SO₃ ${S.ok1.so3 ? 'уже найден' : 'не найден'}. Не называй готовую температуру — спрашивай, что делает нагрев с равновесием и со скоростью и зачем катализатор.`;
+  }
+  if (id === 'metallurgy') {
+    const M = METALS.find(x => x.s === S.msel);
+    now = `Карта Казахстана с городами: ${CITIES.map(c => c.name).join(', ')}. Ученик ставит пять металлов (Fe, Cu, Al, Zn, Cr) к городам, где их выплавляют. Уже верно: ${METALS.filter(x => S.mp[x.s]).map(x => `${x.s} — ${cityOf(S.mp[x.s]).name}`).join(', ') || 'ничего'}. Ошибок: ${S.wrong}. ${M ? `Выбрана карточка ${M.s} (${M.name}), руда ${M.ore}, ${M.eq}; масса сырья для расчёта ${S.ore} т, теоретически металла ${fx(S.ore * M.Mm / M.Mo)} т.` : ''} Не называй города для ещё не размещённых металлов — наводи вопросами: что нужно заводу (руда, уголь, электричество), где добывают руду.`;
+  }
+  if (id === 'fertilizers') {
+    now = `Поле пшеницы 1 га. Внесено: ${FERT.filter(F => S.fert[F.id]).map(F => `${F.name} ${F.f} ${S.fert[F.id]} кг`).join(', ') || 'ничего'}. Это даёт N ${fx(m.n.N)} кг, P₂O₅ ${fx(m.n.P)} кг, K₂O ${fx(m.n.K)} кг при норме 60/40/30 (допуск ±10 %). Урожай модели ${Math.round(m.y * 100)} %, ограничивает ${m.lim.full}. ${m.over.length ? 'Есть избыток: ' + m.over.join(', ') + '.' : ''} Удобрения добавляются по 10 кг. Не давай готовый набор мешков — помоги посчитать массовые доли и что добавить.`;
+  }
+  return [
+    `Предмет: химия, 11 класс. Тема «Химическое производство». Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Веди ученика наводящими вопросами, а не готовыми ответами.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = { reactors: 'Почему аммиак не синтезируют при комнатной температуре, если там выход больше?', metallurgy: 'Почему алюминий получают электролизом, а железо — углём?', fertilizers: 'Как посчитать, сколько азота в мешке карбамида?' }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

@@ -78,13 +78,13 @@ window.LUCH_SUBJECTS = {
       { id: 'solutions', b: 'react', g: 8, t: 'Растворы', items: ['Растворимость', 'Массовая доля', 'Молярная концентрация', 'Как приготовить раствор'], req: ['mole'], status: 'done', href: '/chemistry/', lessons: 3, doneItems: 4 },
       { id: 'ions', b: 'react', g: 9, t: 'Электролиты и ионы', items: ['Электролитическая диссоциация', 'Ионные уравнения', 'Кислотность и pH'], req: ['solutions', 'bonds'], status: 'part', href: '/chemistry/', lessons: 2, doneItems: 0 },
       { id: 'kinetics', b: 'react', g: 10, t: 'Скорость и равновесие', items: ['Скорость реакции', 'Катализаторы', 'Химическое равновесие', 'Принцип Ле Шателье'], req: ['ions'], status: 'done', href: '/labs/chem-kinetics/', lessons: 4, doneItems: 4 },
-      { id: 'electro', b: 'react', g: 11, t: 'Электрохимия', items: ['Ряд активности металлов', 'Гальванический элемент и батарейка', 'Электролиз', 'Коррозия'], req: ['redox', 'ions'] },
+      { id: 'electro', b: 'react', g: 11, t: 'Электрохимия', items: ['Ряд активности металлов', 'Гальванический элемент и батарейка', 'Электролиз', 'Коррозия'], req: ['redox', 'ions'], status: 'done', href: '/labs/chem-electro/', lessons: 4, doneItems: 4 },
 
       { id: 'oxy', b: 'inorg', g: 8, t: 'Кислород, водород, вода', items: ['Кислород и горение', 'Водород', 'Вода и её свойства', 'Состав воздуха'], req: ['equations'], status: 'done', href: '/labs/chem-oxy/', lessons: 4, doneItems: 4 },
       { id: 'classes', b: 'inorg', g: 8, t: 'Классы веществ', items: ['Оксиды', 'Кислоты', 'Основания', 'Соли', 'Как они превращаются друг в друга'], req: ['oxy', 'valence'], status: 'done', href: '/labs/chem-classes/', lessons: 5, doneItems: 5 },
       { id: 'nonmet', b: 'inorg', g: 9, t: 'Неметаллы', items: ['Галогены', 'Сера', 'Азот и аммиак', 'Фосфор', 'Углерод и кремний'], req: ['classes', 'table'], status: 'done', href: '/labs/chem-nonmet/', lessons: 5, doneItems: 5 },
       { id: 'metals', b: 'inorg', g: 9, t: 'Металлы', items: ['Щелочные металлы', 'Кальций и магний', 'Алюминий', 'Железо', 'Сплавы'], req: ['classes', 'table'], status: 'done', href: '/labs/chem-metals/', lessons: 5, doneItems: 5 },
-      { id: 'industry', b: 'inorg', g: 11, t: 'Химическое производство', items: ['Аммиак и серная кислота', 'Металлургия Казахстана', 'Минеральные удобрения'], req: ['nonmet', 'metals', 'kinetics'] },
+      { id: 'industry', b: 'inorg', g: 11, t: 'Химическое производство', items: ['Аммиак и серная кислота', 'Металлургия Казахстана', 'Минеральные удобрения'], req: ['nonmet', 'metals', 'kinetics'], status: 'done', href: '/labs/chem-industry/', lessons: 3, doneItems: 3 },
 
       { id: 'orgbase', b: 'org', g: 10, t: 'Основы органики', items: ['Почему углерод особенный', 'Строение органических молекул', 'Изомерия', 'Названия веществ'], req: ['bonds'], status: 'done', href: '/labs/chem-orgbase/', lessons: 4, doneItems: 4 },
       { id: 'hydro', b: 'org', g: 10, t: 'Углеводороды', items: ['Алканы', 'Алкены и алкины', 'Арены', 'Нефть и газ'], req: ['orgbase'], status: 'done', href: '/labs/chem-hydro/', lessons: 4, doneItems: 4 },
@@ -140,7 +140,7 @@ window.LUCH_SUBJECTS = {
       { id: 'origin', b: 'gen', g: 11, t: 'Происхождение жизни и человека', items: ['Как появилась жизнь', 'Этапы развития жизни', 'Эволюция человека'], req: ['evolution'] },
 
       { id: 'env', b: 'eco', g: 8, t: 'Организм и среда', items: ['Факторы среды', 'Приспособления', 'Биоритмы'], req: ['plants'], status: 'done', href: '/labs/bio-env/', lessons: 3, doneItems: 3 },
-      { id: 'ecosys', b: 'eco', g: 10, t: 'Экосистемы', items: ['Пищевые цепи', 'Круговорот веществ', 'Устойчивость экосистем'], req: ['env', 'metab'] },
+      { id: 'ecosys', b: 'eco', g: 10, t: 'Экосистемы', items: ['Пищевые цепи', 'Круговорот веществ', 'Устойчивость экосистем'], req: ['env', 'metab'], status: 'done', href: '/labs/bio-ecosys/', lessons: 3, doneItems: 3 },
       { id: 'biosphere', b: 'eco', g: 11, t: 'Биосфера', items: ['Учение Вернадского', 'Природные зоны планеты', 'Человек и биосфера'], req: ['ecosys', 'evolution'] },
       { id: 'protect', b: 'eco', g: 11, t: 'Охрана природы', items: ['Красная книга', 'Заповедники Казахстана', 'Устойчивое развитие'], req: ['biosphere'] },
     ],
