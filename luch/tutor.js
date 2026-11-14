@@ -743,22 +743,29 @@
       hide(); lastAt = Date.now();
       tip = document.createElement('div'); tip.className = 'lt-tip'; tip.setAttribute('role', 'status');
       const mic = canListen && o.mic !== false ? `<button type="button" class="mic" data-k="mic">🎤 Ответить голосом</button>` : '';
-      tip.innerHTML = `<button type="button" class="x" aria-label="Закрыть">✕</button><p>${esc(text)}</p><div class="row">${mic}${chips.map((c, i) => `<button type="button" data-k="${i}">${esc(c[0])}</button>`).join('')}</div>`;
+      // сам наставник вслух не говорит — только по кнопке «Послушать»
+      const listen = `<button type="button" data-k="say" aria-label="Послушать">🔊</button>`;
+      tip.innerHTML = `<button type="button" class="x" aria-label="Закрыть">✕</button><p>${esc(text)}</p><div class="row">${mic}${chips.map((c, i) => `<button type="button" data-k="${i}">${esc(c[0])}</button>`).join('')}${listen}</div>`;
       tip.addEventListener('click', e => {
         const b = e.target.closest('button'); if (!b) return;
         unlockAudio();
-        if (b.classList.contains('x')) { hide(); speaker.stop(); closes++; return; }
+        if (b.classList.contains('x')) { hide(); closes++; return; }
+        if (b.dataset.k === 'say') { speaker.stop(); speaker.add(tip.querySelector('p').textContent); speaker.end(); return; }
         if (b.dataset.k === 'mic') return talk(text);
         const c = chips[+b.dataset.k]; hide(); if (c && c[1]) c[1]();
       });
       document.body.appendChild(tip);
       if (o.el) highlightEl(o.el);
-      if (o.speak !== false) sayAloud(tip);
     }
     btn.addEventListener('click', hide);
     // звук разрешается только после касания страницы
     addEventListener('pointerdown', e => { if (!e.target.closest('.lt-tip')) unlockAudio(); }, { once: true, capture: true });
-    ['pointerdown', 'keydown', 'input'].forEach(ev => addEventListener(ev, e => { if (!e.target.closest || !e.target.closest('.lt-panel,.lt-tip,.lt-btn')) lastAct = Date.now(); }, { capture: true, passive: true }));
+    // любое действие в интерфейсе убирает облачко (и его озвучку), чтобы оно не мешало
+    ['pointerdown', 'keydown', 'input'].forEach(ev => addEventListener(ev, e => {
+      if (e.target.closest && e.target.closest('.lt-panel,.lt-tip,.lt-btn')) return;
+      lastAct = Date.now();
+      if (tip) { hide(); if (panel.hidden) speaker.stop(); }
+    }, { capture: true, passive: true }));
 
     // ----- лаборатория -----
     function lab() {
@@ -834,7 +841,7 @@
         const item = matchMedia('(max-width:760px)').matches ? document.querySelector(`#list details[data-id="${cand.dataset.id}"]`) : cand;
         if (item && item.tagName === 'DETAILS') item.open = true;
         const go = () => { const a = document.querySelector('#side a.cta') || (item && item.querySelector('a.cta')); if (a) location.href = a.href; };
-        show(`Начни с темы «${name}». Открыть первый урок?`, [['Открыть', go], ['Другой предмет', () => highlightEl(document.getElementById('subjects'))]], { force: true, el: item });
+        show(`Начни с темы «${name}». Открыть первый урок?`, [['Перейти к урокам', go], ['Другой предмет', () => highlightEl(document.getElementById('subjects'))]], { force: true, el: item });
       }
       return true;
     }
