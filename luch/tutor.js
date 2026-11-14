@@ -121,6 +121,25 @@
   if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
 })();
 
+// ---------- дата и время справа в шапке ----------
+(() => {
+  const mount = () => {
+    const header = document.querySelector('header'); if (!header || header.querySelector('.oe-clock')) return;
+    const st = document.createElement('style');
+    st.textContent = `.oe-clock{flex:none;text-align:right;font:500 12px/1.45 "IBM Plex Mono",ui-monospace,monospace;color:var(--muted,#8b96ad);font-variant-numeric:tabular-nums;letter-spacing:.02em}
+      .oe-clock b{display:block;font-weight:500;color:var(--fg,#e8ecf4);font-size:13px}
+      @media (max-width:600px){.oe-clock{display:none}}`;
+    document.head.appendChild(st);
+    const c = document.createElement('div'); c.className = 'oe-clock'; c.setAttribute('aria-hidden', 'true'); c.dataset.noi18n = '';
+    header.appendChild(c);
+    const M = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+    const p2 = n => String(n).padStart(2, '0');
+    const tick = () => { const d = new Date(); c.innerHTML = `${d.getDate()} ${M[d.getMonth()]} ${d.getFullYear()}<b>${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}</b>`; };
+    tick(); setInterval(tick, 1000);
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount); else mount();
+})();
+
 (() => {
   if (window.__luchTutor) return; window.__luchTutor = true;
   const KEY = 'luch-tutor-chat';
