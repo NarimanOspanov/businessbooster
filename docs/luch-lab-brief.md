@@ -29,7 +29,8 @@ Header nav: «Карта» → `/physics/#<subject>` (for physics just `/physics
 ## Quality bar
 - Works at phone width (375px): no horizontal scroll, 16px gutters, touch dragging works (pointer events, `touch-action` set on draggable areas). Respects `prefers-reduced-motion`.
 - No external libraries except Google Fonts and, if 3D genuinely helps, three.js r128 from cdnjs. No reels/video.
-- No console errors.
+- No console errors. Add `<link rel="icon" href="data:,">` in head (the server has no favicon).
+- On load never scroll the page: if you center the active lesson card, scroll only the strip horizontally (`strip.scrollLeft = …`), not `scrollIntoView` (it scrolls the whole page down on phones).
 
 ## Verify, then report
 1. Extract the inline script and run `node --check` on it.

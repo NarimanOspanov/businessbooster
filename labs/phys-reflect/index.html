@@ -1,0 +1,929 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по физике, 8 класс: закон отражения света, изображение в плоском зеркале, какое зеркало нужно, чтобы увидеть себя в полный рост.">
+<title>Отражение света</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene [data-click]{cursor:pointer}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.meter .lr .ok{color:var(--ok)}
+.meter .lr .bad{color:var(--warn)}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button.rec{color:var(--force)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+.meter svg{display:block;width:64px;height:64px;margin:8px auto 0}
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter svg{width:48px;height:48px}
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M6 30H34" stroke="var(--arm)" stroke-width="2.4" stroke-linecap="round"/><path d="M20 30V9" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="2 2"/><path d="M8 12L20 29L32 12" fill="none" stroke="var(--force)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M33.5 9.5l-1 6.5-4.5-3z" fill="var(--force)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Физика · Отражение света</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/">Карта</a><a href="/physics/">Физика</a><a href="/labs/phys-reflect/" aria-current="page">Отражение</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Зеркала</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Опытная площадка">
+    <svg class="scene" id="scene" role="img" aria-label="Площадка для опытов с отражением света. Лазер, свечи, глаз, края зеркала и человека можно перетаскивать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const RAD = Math.PI / 180;
+
+const LESSONS = [
+  { id: 'law', title: 'Закон отражения',
+    text: ['Луч упал на зеркало и отразился. В точке падения проводят перпендикуляр к зеркалу — его называют нормалью. Угол падения α — это угол между падающим лучом и нормалью. Угол отражения β — угол между отражённым лучом и нормалью. Углы отсчитывают от нормали, а не от поверхности зеркала.',
+           'Закон отражения: падающий луч, отражённый луч и нормаль лежат в одной плоскости, а угол отражения равен углу падения: β = α. Если луч падает отвесно (α = 0°), он возвращается назад по тому же пути.',
+           'Ход лучей обратим: луч, пущенный навстречу отражённому, уйдёт по пути падающего. Гладкая поверхность отражает параллельный пучок тоже параллельно — это зеркальное отражение. Шероховатая поверхность (бумага, стена) рассеивает свет во все стороны. Поэтому лист бумаги видно с любого места в классе.'],
+    why: 'Закон отражения работает в перископах, зеркалах автомобиля, фарах и лазерных уровнях. На солнечных станциях с зеркалами-гелиостатами инженеры поворачивают каждое зеркало так, чтобы отражённый солнечный луч попал точно в приёмник. Расчёт углов здесь — ежедневная работа. Установщики видеонаблюдения и охранной сигнализации отражают луч датчика зеркальцем, чтобы «обойти» угол. А в бильярде шар, отскочивший от борта, уходит примерно под тем же углом — так играют «от борта».',
+    task: 'Поворачивайте лазер и попадите отражённым лучом во все 3 мишени на стене по очереди.',
+    hint: 'Тащите лазер по дуге или нажимайте «α −1°» и «α +1°». Отражённый луч уходит под тем же углом к нормали. Чем ниже мишень, тем более пологим должен быть луч.',
+    safe: 'Не направляйте лазерную указку в глаза людям и животным, в том числе через зеркало: отражённый луч так же опасен, как прямой.',
+    stage: 'Тащите лазер по дуге.',
+    a0: 20,
+    check: m => m.hits >= 3 },
+  { id: 'image', title: 'Изображение в зеркале',
+    text: ['Глаз видит предмет там, откуда к нему приходят лучи. После отражения лучи от свечи расходятся так, будто вышли из точки за зеркалом. На самом деле лучей там нет: сходятся только их продолжения (пунктир). Такое изображение называют мнимым.',
+           'Опыт со стеклом. Стекло отражает часть света и пропускает остальной. Поэтому видно и изображение горящей свечи, и вторую, незажжённую свечу за стеклом. Поставьте вторую свечу туда, где видно изображение, и она как будто «загорится».',
+           'Изображение в плоском зеркале мнимое, прямое и равно предмету по размеру. Оно стоит за зеркалом на таком же расстоянии, как предмет перед ним: f = d. Предмет и изображение симметричны относительно зеркала. Поэтому правая рука в зеркале выглядит левой, а надпись читается задом наперёд.'],
+    why: 'На капоте машин скорой помощи слово пишут зеркально: водитель впереди читает его в зеркале заднего вида правильно. Дизайнеры интерьеров вешают зеркало во всю стену, и маленькая комната кажется вдвое глубже: изображение «стоит» за стеной на том же расстоянии. Суфлёр перед камерой ведущего новостей работает как наше стекло: ведущий читает текст в наклонном стекле, а камера снимает его сквозь это стекло.',
+    task: 'Поставьте вторую свечу за стеклом так, чтобы она «загорелась». Сделайте это дважды при разных расстояниях до горящей свечи (разница не меньше 3 см).',
+    hint: 'Тащите свечи по столу. Пунктирные продолжения лучей сходятся там, где изображение. Сверьте расстояния по линейке на столе.',
+    safe: 'Если повторяете опыт дома, ставьте свечу на устойчивую подставку подальше от бумаги, штор и волос и задуйте её после опыта.',
+    stage: 'Тащите свечи и глаз.',
+    d0: 10, x20: 16,
+    check: m => m.matches >= 2 },
+  { id: 'full', title: 'Зеркало в полный рост',
+    text: ['Каждую точку себя мы видим по лучу, который отразился от зеркала и попал в глаз. По закону отражения луч от макушки отражается посередине по высоте между макушкой и глазами. Луч от ступней — посередине между полом и глазами.',
+           'Значит, чтобы увидеть себя целиком, хватит зеркала длиной в половину роста. Его верхний край должен быть на полпути от глаз до макушки, а нижний — на половине высоты глаз над полом.',
+           'Отойдите от зеркала — и видимая часть тела не изменится. Зеркало всегда вдвое ближе к вам, чем ваше изображение, поэтому оно «закрывает» ровно половину изображения по высоте.'],
+    why: 'Продавцы мебели и дизайнеры знают это правило: в прихожую хватит зеркала около 90 см, если правильно его повесить. Не надо переплачивать за зеркало в 1,8 м. Мастера, которые ставят зеркала в спортзалах и танцевальных студиях, рассчитывают высоту крепления под рост учеников. А в магазине одежды зеркало берут с запасом, чтобы себя видели и высокие, и невысокие покупатели.',
+    task: 'Повесьте зеркало так, чтобы человек увидел себя с головы до ног. Сделайте его как можно короче: не длиннее половины роста + 3 см.',
+    hint: 'Тащите верхний и нижний края зеркала. Зелёный луч дошёл до глаза, красный прошёл мимо зеркала. Потом отойдите от зеркала: изменилось ли то, что видно?',
+    stage: 'Тащите края зеркала и человека.',
+    H0: 170, top0: 150, bot0: 100, dist0: 80,
+    check: m => m.full && m.len <= m.H / 2 + 3 },
+];
+
+const LS_KEY = 'luch-phys-reflect';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+let drag = null, dirty = true, lastUpd = 0;
+
+// ---------- geometry (SVG units; scene 520 wide, bottom at 430) ----------
+// lesson 1: mirror on the floor, wall on the right; 10 units = 1 cm
+const G1 = { ox: 260, oy: 360, R: 170, pr: 140, wx: 470, wtop: 150, k: 10 };
+const TG = [50, 62, 74];
+// lesson 2: glass plate at px, table at floor; 10 units = 1 cm
+const G2 = { px: 260, floor: 380, k: 10, ch: 6, ptop: 200 };
+// lesson 3: mirror on the wall at wx, floor at 400; 1.6 units = 1 cm
+const G3 = { wx: 290, floor: 400, k: 1.6 };
+
+function resetState() {
+  const Ls = L();
+  Object.assign(S, {
+    alpha: Ls.a0 == null ? 20 : Ls.a0, ti: 0, hitLog: [], prot: true,
+    d: Ls.d0 || 10, x2: Ls.x20 || 16, ex: 60, ey: 190, rays: true, matches: [], lastMatch: null,
+    H: Ls.H0 || 170, top: Ls.top0 || 150, bot: Ls.bot0 || 100, dist: Ls.dist0 || 80, distSeen: null, distTold: false,
+    hl: null,
+  });
+}
+
+// ---------- lesson 1: law of reflection ----------
+const wallH = a => a <= 0 ? Infinity : (G1.wx - G1.ox) / G1.k / Math.tan(a * RAD); // hit height on the wall, cm
+const tgH = i => wallH(TG[i]);
+function setAlpha(v) { S.alpha = clamp(Math.round(v), 0, 85); dirty = true; }
+function laserPos() { const a = S.alpha * RAD; return [G1.ox - G1.R * Math.sin(a), G1.oy - G1.R * Math.cos(a)]; }
+
+// ---------- lesson 2: candle and glass ----------
+const c1x = () => G2.px - S.d * G2.k;
+const c2x = () => G2.px + S.x2 * G2.k;
+const flameY = () => G2.floor - G2.ch * G2.k - 10;
+const matched = () => Math.abs(S.x2 - S.d) < 0.01;
+function setD(v) { S.d = clamp(Math.round(v * 2) / 2, 3, 20); dirty = true; }
+function setX2(v) { S.x2 = clamp(Math.round(v * 2) / 2, 1, 22); dirty = true; }
+function eyeRays() {
+  // two rays from the flame tip to the top and bottom of the pupil; reflection point on the plate
+  const P = [c1x(), flameY()], Pi = [2 * G2.px - P[0], P[1]];
+  return [-5, 5].map(o => {
+    const E = [S.ex, S.ey + o], t = (G2.px - E[0]) / (Pi[0] - E[0]), My = E[1] + t * (Pi[1] - E[1]);
+    return { P, Pi, E, M: [G2.px, My], ok: My >= G2.ptop && My <= G2.floor };
+  });
+}
+
+// ---------- lesson 3: full-length mirror ----------
+const eyeH = () => S.H - 12;
+function vis3() {
+  const e = eyeH(), H = S.H;
+  const lo = clamp(2 * S.bot - e, 0, H), hi = clamp(2 * S.top - e, 0, H);
+  const full = 2 * S.bot - e <= 0.5 && 2 * S.top - e >= H - 0.5;
+  return { e, lo, hi: Math.max(lo, hi), full, len: S.top - S.bot, needTop: (H + e) / 2, needBot: e / 2, seen: Math.max(0, hi - lo) };
+}
+const px3 = () => G3.wx - S.dist * G3.k;
+const y3 = cm => G3.floor - cm * G3.k;
+function setTop(v) { S.top = clamp(Math.round(v), S.bot + 5, 200); dirty = true; }
+function setBot(v) { S.bot = clamp(Math.round(v), 0, S.top - 5); dirty = true; }
+function setDist(v) { S.dist = clamp(Math.round(v / 5) * 5, 40, 120); dirty = true; }
+
+function model() {
+  const id = LID();
+  if (id === 'law') return { kind: id, hits: S.ti, a: S.alpha, b: S.alpha, h: wallH(S.alpha) };
+  if (id === 'image') return { kind: id, matches: S.matches.length, on: matched(), d: S.d, x2: S.x2 };
+  const v = vis3(); return { kind: id, H: S.H, ...v };
+}
+function track() {
+  const id = LID();
+  if (id === 'law' && S.ti < 3 && S.alpha === TG[S.ti]) {
+    S.hitLog.push({ a: S.alpha, h: wallH(S.alpha) });
+    S.ti++;
+    toast(S.ti < 3 ? `Попадание ${S.ti} из 3! α = ${S.alpha}°, β = ${S.alpha}°. Следующая мишень ниже.` : `Все 3 мишени! Каждый раз угол отражения был равен углу падения.`);
+  }
+  if (id === 'image') {
+    if (matched()) {
+      if (S.lastMatch !== S.d) {
+        S.lastMatch = S.d;
+        const far = S.matches.every(x => Math.abs(x - S.d) >= 3);
+        if (far) { S.matches.push(S.d); toast(`Свеча «загорелась»! Изображение за стеклом в ${fmt(S.d, 1)} см — столько же, сколько от свечи до стекла.`); }
+        else toast('Совпало, но расстояние почти то же. Передвиньте горящую свечу хотя бы на 3 см и повторите.');
+      }
+    } else S.lastMatch = null;
+  }
+  if (id === 'full') {
+    const v = vis3();
+    if (S.distSeen == null) S.distSeen = S.dist;
+    else if (S.dist !== S.distSeen && v.seen > 0) { S.distSeen = S.dist; if (!S.distTold) { S.distTold = true; toast('Человек отошёл, а видимая часть тела не изменилась. Расстояние до зеркала не важно!'); } }
+  }
+}
+
+// ---------- drawing helpers ----------
+const T = (x, y, s, fill, txt, anchor = 'middle', extra = '') => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${s}" fill="${fill}" text-anchor="${anchor}" ${extra}>${txt}</text>`;
+const halo = `paint-order="stroke" stroke="${INK}" stroke-width="3"`;
+const f1 = x => (+x).toFixed(1);
+const ln = (a, b, c, w = 1.5, extra = '') => `<path d="M${f1(a[0])} ${f1(a[1])}L${f1(b[0])} ${f1(b[1])}" stroke="${c}" stroke-width="${w}" fill="none" ${extra}/>`;
+function bg() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern>
+    <pattern id="hatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0V10" stroke="#2e3b57" stroke-width="3"/></pattern>
+    <pattern id="mhatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0V6" stroke="#5d6a86" stroke-width="1.5"/></pattern>
+    <linearGradient id="mirG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#dff3ff"/><stop offset=".5" stop-color="#9fc6e0"/><stop offset="1" stop-color="#d6ecfa"/></linearGradient>
+    <radialGradient id="glow"><stop offset="0" stop-color="#ffe9a0" stop-opacity=".85"/><stop offset=".45" stop-color="#ffd54a" stop-opacity=".28"/><stop offset="1" stop-color="#ffd54a" stop-opacity="0"/></radialGradient>
+    <marker id="arR" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ff6a55"/></marker>
+    <marker id="arY" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ffd54a"/></marker>
+    <marker id="arG" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#86e0a8"/></marker>
+    <marker id="arM" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#8b96ad"/></marker></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+const ground = y => `<rect x="-2000" y="${y}" width="4520" height="1200" fill="#151e2e"/><rect x="-2000" y="${y}" width="4520" height="12" fill="url(#hatch)"/><path d="M-2000 ${y}H2520" stroke="#3a4762" stroke-width="2"/>`;
+const arcPath = (cx, cy, r, a1, a2) => { // angles from the upward vertical, degrees, clockwise positive
+  const p = a => [cx + r * Math.sin(a * RAD), cy - r * Math.cos(a * RAD)];
+  const [x1, y1] = p(a1), [x2, y2] = p(a2);
+  return `M${f1(x1)} ${f1(y1)}A${r} ${r} 0 0 ${a2 > a1 ? 1 : 0} ${f1(x2)} ${f1(y2)}`;
+};
+
+// ---------- lesson 1 scene ----------
+function lawScene(tm) {
+  const g = G1, a = S.alpha, [lx, ly] = laserPos();
+  let h = '';
+  // protractor
+  if (S.prot) {
+    h += `<path d="M${g.ox - g.pr} ${g.oy}A${g.pr} ${g.pr} 0 0 1 ${g.ox + g.pr} ${g.oy}z" fill="rgba(114,212,232,.05)" stroke="rgba(114,212,232,.35)" stroke-width="1"/>`;
+    for (let t = -90; t <= 90; t += 5) {
+      const big = t % 10 === 0, r1 = g.pr - (big ? 10 : 5), s = Math.sin(t * RAD), c = Math.cos(t * RAD);
+      h += ln([g.ox + r1 * s, g.oy - r1 * c], [g.ox + g.pr * s, g.oy - g.pr * c], 'rgba(114,212,232,.5)', 1);
+      if (big && Math.abs(t) < 90 && t % 30 === 0) h += T(g.ox + (g.pr - 20) * s, g.oy - (g.pr - 20) * c + 3, 8.5, '#72d4e8', Math.abs(t) + '°');
+    }
+  }
+  // wall + targets
+  h += `<rect x="${g.wx}" y="${g.wtop}" width="14" height="${g.oy - g.wtop}" fill="#26324a" stroke="#3a4762"/>`;
+  h += T(g.wx + 7, g.wtop - 8, 9.5, '#c8d0dd', 'стена', 'middle', halo);
+  TG.forEach((ta, i) => {
+    const y = g.oy - tgH(i) * g.k, done = i < S.ti, cur = i === S.ti;
+    if (!done && !cur) return;
+    const col = done ? '#86e0a8' : '#ffb547';
+    const pr = cur && !reduce ? (1.5 * Math.sin(tm / 260)).toFixed(2) : 0;
+    h += `<g><circle cx="${g.wx}" cy="${f1(y)}" r="${f1(9 + +pr)}" fill="${INK}" stroke="${col}" stroke-width="2"/><circle cx="${g.wx}" cy="${f1(y)}" r="5" fill="none" stroke="${col}" stroke-width="1.5"/><circle cx="${g.wx}" cy="${f1(y)}" r="1.8" fill="${col}"/></g>`;
+    h += T(g.wx - 14, y + 3, 9, col, done ? '✓' : `мишень ${i + 1}`, 'end', halo);
+  });
+  // mirror on the floor
+  h += ground(g.oy + 8);
+  h += `<rect x="${g.ox - 150}" y="${g.oy}" width="300" height="8" fill="url(#mirG)"/><rect x="${g.ox - 150}" y="${g.oy + 8}" width="300" height="5" fill="url(#mhatch)"/>`;
+  h += T(g.ox + 120, g.oy + 26, 9.5, '#c8d0dd', 'зеркало', 'middle', halo);
+  // normal
+  h += `<path d="M${g.ox} ${g.oy}V${g.oy - g.pr - 20}" stroke="#e8ecf4" stroke-width="1" stroke-dasharray="5 4" opacity=".75"/>` + T(g.ox, g.oy - g.pr - 26, 9.5, '#e8ecf4', 'нормаль', 'middle', halo);
+  // rays
+  const a1 = a * RAD, far = 600;
+  let ex = g.ox + far * Math.sin(a1), ey = g.oy - far * Math.cos(a1);
+  if (a > 0) { const t = (g.wx - g.ox) / Math.sin(a1), wy = g.oy - t * Math.cos(a1); if (wy >= g.wtop) { ex = g.wx; ey = wy; } }
+  const glowL = (p, q) => ln(p, q, 'rgba(255,90,74,.25)', 6, 'stroke-linecap="round"');
+  h += glowL([lx, ly], [g.ox, g.oy]) + glowL([g.ox, g.oy], [ex, ey]);
+  const mid = (p, q, k = 0.55) => [p[0] + (q[0] - p[0]) * k, p[1] + (q[1] - p[1]) * k];
+  h += ln([lx, ly], mid([lx, ly], [g.ox, g.oy]), '#ff6a55', 2, 'marker-end="url(#arR)"') + ln([lx, ly], [g.ox, g.oy], '#ff6a55', 2);
+  h += ln([g.ox, g.oy], mid([g.ox, g.oy], [ex, ey], 0.35), '#ff6a55', 2, 'marker-end="url(#arR)"') + ln([g.ox, g.oy], [ex, ey], '#ff6a55', 2);
+  if (ex === g.wx) h += `<circle cx="${g.wx}" cy="${f1(ey)}" r="3" fill="#ffb3a6"/>`;
+  // angle arcs
+  if (a >= 4) {
+    h += `<path d="${arcPath(g.ox, g.oy, 46, -a, 0)}" fill="none" stroke="#ffd54a" stroke-width="1.6"/><path d="${arcPath(g.ox, g.oy, 54, 0, a)}" fill="none" stroke="#86e0a8" stroke-width="1.6"/>`;
+    const am = a / 2 * RAD;
+    h += T(g.ox - 64 * Math.sin(am) - 4, g.oy - 64 * Math.cos(am) + 4, 11, '#ffd54a', 'α', 'middle', halo);
+    h += T(g.ox + 72 * Math.sin(am) + 4, g.oy - 72 * Math.cos(am) + 4, 11, '#86e0a8', 'β', 'middle', halo);
+  }
+  h += `<circle cx="${g.ox}" cy="${g.oy}" r="3" fill="#e8ecf4"/>` + T(g.ox - 10, g.oy + 22, 9, '#c8d0dd', 'O', 'middle', halo);
+  // laser
+  h += `<g data-drag="laser"><circle cx="${f1(lx)}" cy="${f1(ly)}" r="26" fill="transparent"/><g transform="translate(${f1(lx)} ${f1(ly)}) rotate(${f1(90 - a)})"><rect x="-38" y="-7" width="38" height="14" rx="3" fill="#3a4762" stroke="#8b96ad" stroke-width="1.2"/><rect x="-6" y="-4" width="6" height="8" fill="#5d6a86"/><circle cx="-26" cy="0" r="2.2" fill="#ff6a55"/></g></g>`;
+  h += T(lx - 30, ly - 14, 9.5, '#e8ecf4', 'лазер', 'middle', halo);
+  if (!drag && S.ti === 0 && a === LESSONS[0].a0) h += T(lx - 40, ly + 24, 9, '#ffb547', '↻ тяните', 'middle', halo);
+  return h;
+}
+
+// ---------- lesson 2 scene ----------
+function candle(x, lit, ghost, tm) {
+  const g = G2, top = g.floor - g.ch * g.k, op = ghost ? ' opacity=".5" pointer-events="none"' : '';
+  let h = `<g${op}><rect x="${f1(x - 8)}" y="${top}" width="16" height="${g.ch * g.k}" rx="2" fill="${ghost ? 'none' : '#e9e1cf'}" stroke="${ghost ? '#e9e1cf' : INK}" stroke-width="1.2" ${ghost ? 'stroke-dasharray="4 3"' : ''}/>`;
+  h += `<path d="M${f1(x)} ${top}v-5" stroke="#2b2f3a" stroke-width="1.6"/>`;
+  if (lit) {
+    const fl = !reduce && !ghost ? Math.sin(tm / 90) * 0.8 : 0;
+    h += `<circle cx="${f1(x)}" cy="${top - 12}" r="${ghost ? 20 : 26}" fill="url(#glow)"/><path d="M${f1(x)} ${f1(top - 24 - fl)}C${f1(x + 7)} ${top - 12} ${f1(x + 5)} ${top - 3} ${f1(x)} ${top - 3}C${f1(x - 5)} ${top - 3} ${f1(x - 7)} ${top - 12} ${f1(x)} ${f1(top - 24 - fl)}z" fill="#ffcf4a" stroke="#ff9f2e" stroke-width="1"/><ellipse cx="${f1(x)}" cy="${top - 8}" rx="2" ry="4" fill="#fff4c2"/>`;
+  }
+  return h + '</g>';
+}
+function imageScene(tm) {
+  const g = G2, x1 = c1x(), x2 = c2x(), xi = 2 * g.px - x1, on = matched();
+  let h = '';
+  // ruler on the table
+  h += ground(g.floor);
+  for (let c = 0; c <= 22; c++) {
+    for (const s of [-1, 1]) {
+      if (c === 0 && s === 1) continue;
+      const x = g.px + s * c * g.k, big = c % 5 === 0;
+      h += ln([x, g.floor], [x, g.floor + (big ? 9 : 5)], '#8b96ad', 1);
+      if (big && c > 0) h += T(x, g.floor + 19, 8.5, '#8b96ad', c);
+    }
+  }
+  // candles behind the plate (seen through the glass)
+  h += `<g data-drag="c2"><rect x="${f1(x2 - 18)}" y="${g.floor - g.ch * g.k - 30}" width="36" height="${g.ch * g.k + 30}" fill="transparent"/>${candle(x2, false, false, tm)}</g>`;
+  // the image of the lit candle
+  h += candle(xi, true, true, tm);
+  if (on) h += `<circle cx="${f1(x2)}" cy="${flameY() + 2}" r="30" fill="url(#glow)" pointer-events="none"/>`;
+  h += T(x2, g.floor - g.ch * g.k - 40, 9.5, on ? '#86e0a8' : '#c8d0dd', on ? '«горит»!' : 'вторая свеча', 'middle', halo);
+  if (!on) h += T(xi, g.floor - g.ch * g.k - 54, 9, '#ffd54a', 'изображение', 'middle', halo);
+  // rays
+  if (S.rays) {
+    for (const r of eyeRays()) {
+      if (!r.ok) { h += ln(r.P, r.M, '#ff8a73', 1, 'stroke-dasharray="3 3" opacity=".6"'); continue; }
+      const mid = [(r.P[0] + r.M[0]) / 2, (r.P[1] + r.M[1]) / 2], mid2 = [(r.M[0] + r.E[0]) / 2, (r.M[1] + r.E[1]) / 2];
+      h += ln(r.P, r.M, '#ffd54a', 1.4) + ln(r.P, mid, '#ffd54a', 1.4, 'marker-end="url(#arY)"');
+      h += ln(r.M, r.E, '#ffd54a', 1.4) + ln(r.M, mid2, '#ffd54a', 1.4, 'marker-end="url(#arY)"');
+      h += ln(r.M, r.Pi, '#ffd54a', 1, 'stroke-dasharray="4 4" opacity=".75"');
+    }
+  }
+  // glass plate on a stand
+  h += `<rect x="${g.px - 3}" y="${g.ptop}" width="6" height="${g.floor - g.ptop}" fill="rgba(160,210,240,.28)" stroke="#9fc6e0" stroke-width="1.2"/><rect x="${g.px - 14}" y="${g.floor - 6}" width="28" height="6" rx="2" fill="#3a4762"/>`;
+  h += T(g.px, g.ptop - 10, 9.5, '#9fc6e0', 'стекло', 'middle', halo);
+  // the lit candle
+  h += `<g data-drag="c1"><rect x="${f1(x1 - 18)}" y="${g.floor - g.ch * g.k - 30}" width="36" height="${g.ch * g.k + 30}" fill="transparent"/>${candle(x1, true, false, tm)}</g>`;
+  h += T(x1, g.floor - g.ch * g.k - 40, 9.5, '#e8ecf4', 'свеча', 'middle', halo);
+  // eye
+  const ex = S.ex, ey = S.ey, sees = eyeRays().some(r => r.ok);
+  h += `<g data-drag="eye"><circle cx="${ex}" cy="${ey}" r="22" fill="transparent"/><path d="M${ex - 14} ${ey}Q${ex} ${ey - 13} ${ex + 14} ${ey}Q${ex} ${ey + 13} ${ex - 14} ${ey}z" fill="#e8ecf4" stroke="${INK}" stroke-width="1.2"/><circle cx="${ex + 3}" cy="${ey}" r="5" fill="#5f7d92"/><circle cx="${ex + 4}" cy="${ey}" r="2.2" fill="${INK}"/></g>`;
+  h += T(ex, ey - 18, 9.5, '#c8d0dd', 'глаз', 'middle', halo);
+  if (!sees && S.rays) h += T(ex, ey + 28, 9, '#ff8a73', 'лучи мимо стекла', 'middle', halo);
+  // distances
+  const yd = g.floor + 34;
+  h += `<path d="M${f1(x1)} ${yd}H${g.px}" stroke="#8b96ad" stroke-width="1" marker-start="url(#arM)" marker-end="url(#arM)"/>` + T((x1 + g.px) / 2, yd - 4, 9, '#c8d0dd', `d = ${fmt(S.d, 1)} см`, 'middle', halo);
+  h += `<path d="M${g.px} ${yd + 14}H${f1(x2)}" stroke="#8b96ad" stroke-width="1" marker-start="url(#arM)" marker-end="url(#arM)"/>` + T((x2 + g.px) / 2, yd + 10, 9, '#c8d0dd', `${fmt(S.x2, 1)} см`, 'middle', halo);
+  return h;
+}
+
+// ---------- lesson 3 scene ----------
+function personSVG(x, H, dir, extra = '') {
+  const k = G3.k, y = cm => G3.floor - cm * k;
+  const hr = 10 * k, hc = y(H - 11), sh = y(H - 27), hip = y(H * 0.52), c = '#c8d0dd';
+  return `<g ${extra}><circle cx="${f1(x)}" cy="${f1(hc)}" r="${f1(hr * 0.95)}" fill="#3a4762" stroke="${c}" stroke-width="1.6"/>` +
+    `<circle cx="${f1(x + dir * 8)}" cy="${f1(y(H - 12))}" r="2" fill="${c}"/>` +
+    `<path d="M${f1(x)} ${f1(hc + hr)}L${f1(x)} ${f1(hip)}M${f1(x)} ${f1(sh)}L${f1(x - 10)} ${f1(hip + 4)}M${f1(x)} ${f1(sh)}L${f1(x + 10)} ${f1(hip + 4)}M${f1(x)} ${f1(hip)}L${f1(x - 9)} ${f1(y(0))}M${f1(x)} ${f1(hip)}L${f1(x + 9)} ${f1(y(0))}" stroke="${c}" stroke-width="3.2" stroke-linecap="round" fill="none"/></g>`;
+}
+function fullScene() {
+  const g = G3, v = vis3(), x = px3(), xi = 2 * g.wx - x, e = v.e, xe = x + 8;
+  let h = '';
+  // wall
+  h += `<rect x="${g.wx}" y="${y3(220)}" width="16" height="${220 * g.k}" fill="#1c2638" stroke="#26324a"/>`;
+  // image (faint) and the part that is seen (bright)
+  h += `<defs><clipPath id="visclip"><rect x="${g.wx}" y="${f1(y3(v.hi))}" width="400" height="${f1(Math.max(0, (v.hi - v.lo) * g.k))}"/></clipPath></defs>`;
+  h += personSVG(xi, S.H, -1, 'opacity=".22"') + personSVG(xi, S.H, -1, 'clip-path="url(#visclip)" opacity=".9"');
+  h += T(xi, y3(S.H) - 10, 9.5, '#c8d0dd', 'изображение', 'middle', halo);
+  h += ground(g.floor);
+  // person
+  h += `<g data-drag="person"><rect x="${f1(x - 22)}" y="${f1(y3(S.H) - 4)}" width="44" height="${f1(S.H * g.k + 4)}" fill="transparent"/>${personSVG(x, S.H, 1)}</g>`;
+  // rays from the head top and from the feet
+  const ray = (cm, label) => {
+    const m = (cm + e) / 2, ok = m >= S.bot && m <= S.top, P = [xe, y3(cm)], M = [g.wx, y3(m)], E = [xe, y3(e)], Pi = [2 * g.wx - xe, y3(cm)];
+    const c = ok ? '#86e0a8' : '#ff8a73';
+    let s = ln(P, M, c, 1.4, ok ? '' : 'stroke-dasharray="4 3"');
+    if (ok) s += ln(M, E, c, 1.4) + ln(M, [(M[0] + E[0]) / 2, (M[1] + E[1]) / 2], c, 1.4, 'marker-end="url(#arG)"') + ln(M, Pi, c, 1, 'stroke-dasharray="4 4" opacity=".6"');
+    return s;
+  };
+  h += ray(S.H, 'макушка') + ray(0, 'ступни');
+  // mirror on the wall
+  const yt = y3(S.top), yb = y3(S.bot);
+  h += `<g data-drag="mirror"><rect x="${g.wx - 6}" y="${f1(yt)}" width="10" height="${f1(yb - yt)}" fill="url(#mirG)" stroke="#d6ecfa" stroke-width="1"/></g>`;
+  h += `<g data-drag="mtop"><rect x="${g.wx - 20}" y="${f1(yt - 10)}" width="40" height="20" fill="transparent"/><rect x="${g.wx - 10}" y="${f1(yt - 3)}" width="18" height="6" rx="2" fill="#ffb547"/></g>`;
+  h += `<g data-drag="mbot"><rect x="${g.wx - 20}" y="${f1(yb - 10)}" width="40" height="20" fill="transparent"/><rect x="${g.wx - 10}" y="${f1(yb - 3)}" width="18" height="6" rx="2" fill="#ffb547"/></g>`;
+  h += T(g.wx + 22, yt + 3, 9, '#ffb547', `${S.top} см`, 'start', halo) + T(g.wx + 22, yb + 3, 9, '#ffb547', `${S.bot} см`, 'start', halo);
+  h += T(g.wx - 10, (yt + yb) / 2 + 3, 9.5, '#d6ecfa', 'зеркало', 'end', halo);
+  // distance
+  const yd = g.floor + 22;
+  h += `<path d="M${f1(x)} ${yd}H${g.wx}" stroke="#8b96ad" stroke-width="1" marker-start="url(#arM)" marker-end="url(#arM)"/>` + T((x + g.wx) / 2, yd - 4, 9, '#c8d0dd', `${S.dist} см`, 'middle', halo);
+  h += T(x, y3(S.H) - 10, 9.5, '#e8ecf4', `рост ${S.H} см`, 'middle', halo);
+  return h;
+}
+
+function hlBox(id) {
+  const lid = LID();
+  if (lid === 'law') {
+    const [lx, ly] = laserPos(), g = G1;
+    return ({ laser: [lx - 30, ly - 24, 50, 48], mirror: [g.ox - 154, g.oy - 4, 308, 20], normal: [g.ox - 8, g.oy - g.pr - 30, 16, g.pr + 34], O: [g.ox - 10, g.oy - 10, 20, 20], prot: [g.ox - g.pr - 4, g.oy - g.pr - 4, 2 * g.pr + 8, g.pr + 8], wall: [g.wx - 20, g.wtop - 4, 40, g.oy - g.wtop + 8], angles: [g.ox - 80, g.oy - 80, 160, 80] })[id];
+  }
+  if (lid === 'image') {
+    const g = G2, top = g.floor - g.ch * g.k - 30;
+    return ({ c1: [c1x() - 18, top, 36, g.floor - top], c2: [c2x() - 18, top, 36, g.floor - top], img: [2 * g.px - c1x() - 18, top, 36, g.floor - top], plate: [g.px - 10, g.ptop - 4, 20, g.floor - g.ptop + 8], eye: [S.ex - 18, S.ey - 14, 36, 28], rays: [c1x(), Math.min(S.ey, flameY()) - 20, 2 * g.px - 2 * c1x(), Math.abs(S.ey - flameY()) + 40], ruler: [40, g.floor - 2, 440, 26] })[id];
+  }
+  const g = G3, x = px3();
+  return ({ person: [x - 20, y3(S.H) - 6, 40, S.H * g.k + 8], mirror: [g.wx - 10, y3(S.top) - 6, 20, (S.top - S.bot) * g.k + 12], image: [2 * g.wx - x - 20, y3(S.H) - 6, 40, S.H * g.k + 8], rays: [x, y3(S.H) - 4, g.wx - x, S.H * g.k + 8], wall: [g.wx - 2, y3(220), 20, 220 * g.k] })[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = bg();
+  if (id === 'law') h += lawScene(t);
+  else if (id === 'image') h += imageScene(t);
+  else h += fullScene(t);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 520, hh / 440, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 430 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer ----------
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+const throttled = () => { const n = performance.now(); if (n - lastUpd > 120) { lastUpd = n; update(); } };
+const laserAt = p => setAlpha(Math.atan2(G1.ox - p.x, G1.oy - p.y) / RAD);
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]');
+  const p = toSvg(e);
+  const lid = LID();
+  if (!el && !(lid === 'law' && p.x < G1.ox && p.y < G1.oy)) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  const id = el ? el.dataset.drag : 'laser';
+  if (id === 'laser') { drag = { id }; laserAt(p); update(); }
+  else if (id === 'c1') drag = { id, dx: p.x - c1x() };
+  else if (id === 'c2') drag = { id, dx: p.x - c2x() };
+  else if (id === 'eye') drag = { id, dx: p.x - S.ex, dy: p.y - S.ey };
+  else if (id === 'person') drag = { id, dx: p.x - px3() };
+  else if (id === 'mtop') drag = { id, dy: p.y - y3(S.top) };
+  else if (id === 'mbot') drag = { id, dy: p.y - y3(S.bot) };
+  else if (id === 'mirror') drag = { id, y0: p.y, top: S.top, bot: S.bot };
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const p = toSvg(e), k = G2.k;
+  if (drag.id === 'laser') laserAt(p);
+  else if (drag.id === 'c1') setD((G2.px - (p.x - drag.dx)) / k);
+  else if (drag.id === 'c2') setX2((p.x - drag.dx - G2.px) / k);
+  else if (drag.id === 'eye') { S.ex = clamp(Math.round(p.x - drag.dx), 10, 240); S.ey = clamp(Math.round(p.y - drag.dy), 90, 330); dirty = true; }
+  else if (drag.id === 'person') setDist((G3.wx - (p.x - drag.dx)) / G3.k);
+  else if (drag.id === 'mtop') setTop((G3.floor - (p.y - drag.dy)) / G3.k);
+  else if (drag.id === 'mbot') setBot((G3.floor - (p.y - drag.dy)) / G3.k);
+  else if (drag.id === 'mirror') {
+    const dcm = Math.round((drag.y0 - p.y) / G3.k), len = drag.top - drag.bot;
+    S.bot = clamp(drag.bot + dcm, 0, 200 - len); S.top = S.bot + len; dirty = true;
+  }
+  throttled();
+});
+const endDrag = () => {
+  if (!drag) return;
+  drag = null; scene.classList.remove('grabbing');
+  update();
+};
+scene.addEventListener('pointerup', endDrag);
+scene.addEventListener('pointercancel', endDrag);
+
+function loop(t) {
+  requestAnimationFrame(loop);
+  if (!reduce && (LID() === 'image' || (LID() === 'law' && S.ti < 3))) dirty = true;
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3600); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, cls, dis) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}${cls ? ` class="${cls}"` : ''}${dis ? ' disabled' : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  let h = '';
+  if (id === 'law') h = B('a-', 'α −1°') + B('a+', 'α +1°') + B('a0', 'Отвесно') + sep + B('prot', 'Транспортир', S.prot, 'rec') + sep + B('reset', 'Сброс');
+  if (id === 'image') h = B('d-', 'Свеча ←') + B('d+', 'Свеча →') + sep + B('x-', '← Вторая') + B('x+', 'Вторая →') + sep + B('rays', 'Лучи', S.rays, 'rec') + sep + B('reset', 'Сброс');
+  if (id === 'full') h = B('t+', 'Верх ↑') + B('t-', 'Верх ↓') + B('b+', 'Низ ↑') + B('b-', 'Низ ↓') + sep + B('near', 'Ближе') + B('far', 'Дальше') + sep + B('reset', 'Сброс');
+  tb.innerHTML = h;
+}
+function act(a) {
+  if (a === 'reset') { resetState(); S.hl = null; renderTools(); buildScheme(); update(); return; }
+  // lesson 1
+  if (a === 'a-' || a === 'a+') { setAlpha(S.alpha + (a === 'a+' ? 1 : -1)); update(); return; }
+  if (a === 'a0') { setAlpha(0); toast('Луч падает отвесно: α = 0°, β = 0°. Он вернулся назад по тому же пути.'); update(); return; }
+  if (a === 'prot') { S.prot = !S.prot; renderTools(); buildScheme(); update(); return; }
+  // lesson 2
+  if (a === 'd-' || a === 'd+') { setD(S.d + (a === 'd-' ? 0.5 : -0.5)); update(); return; }
+  if (a === 'x-' || a === 'x+') { setX2(S.x2 + (a === 'x+' ? 0.5 : -0.5)); update(); return; }
+  if (a === 'rays') { S.rays = !S.rays; renderTools(); buildScheme(); update(); return; }
+  // lesson 3
+  if (a === 't+' || a === 't-') { setTop(S.top + (a === 't+' ? 1 : -1)); update(); return; }
+  if (a === 'b+' || a === 'b-') { setBot(S.bot + (a === 'b+' ? 1 : -1)); update(); return; }
+  if (a === 'near' || a === 'far') { setDist(S.dist + (a === 'far' ? 10 : -10)); update(); return; }
+  if (a.startsWith('H:')) { S.H = +a.slice(2); S.distTold = false; buildScheme(); update(); return; }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.disabled) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons for the parts list ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  laser: IC('<rect x="3" y="12" width="20" height="10" rx="2" fill="#3a4762" stroke="#8b96ad"/><path d="M23 17H32" stroke="#ff6a55" stroke-width="2"/>'),
+  mirror: IC('<rect x="3" y="20" width="28" height="5" fill="#bcd2e4"/><path d="M3 27h28" stroke="#5d6a86" stroke-width="3" stroke-dasharray="2 2"/>'),
+  normal: IC('<path d="M17 4V28" stroke="#e8ecf4" stroke-dasharray="3 3"/><path d="M4 28H30" stroke="#bcd2e4" stroke-width="3"/>'),
+  point: IC('<path d="M5 6L17 26L29 6" fill="none" stroke="#ff6a55" stroke-width="1.6"/><circle cx="17" cy="26" r="3" fill="#e8ecf4"/>'),
+  prot: IC('<path d="M3 26A14 14 0 0 1 31 26z" fill="none" stroke="#72d4e8"/><path d="M17 26V14M10 26l2-6M24 26l-2-6" stroke="#72d4e8"/>'),
+  wall: IC('<rect x="20" y="3" width="8" height="28" fill="#26324a" stroke="#3a4762"/><circle cx="20" cy="14" r="5" fill="none" stroke="#ffb547" stroke-width="2"/>'),
+  angles: IC('<path d="M17 28V6" stroke="#e8ecf4" stroke-dasharray="2 2"/><path d="M6 10L17 28L28 10" fill="none" stroke="#ff6a55"/><path d="M12 18A10 10 0 0 1 17 18" fill="none" stroke="#ffd54a" stroke-width="2"/><path d="M17 18A10 10 0 0 1 22 18" fill="none" stroke="#86e0a8" stroke-width="2"/>'),
+  candle: IC('<rect x="13" y="14" width="8" height="17" fill="#e9e1cf"/><path d="M17 3C21 8 20 12 17 12S13 8 17 3z" fill="#ffcf4a"/>'),
+  candle2: IC('<rect x="13" y="14" width="8" height="17" fill="#e9e1cf"/><path d="M17 14v-3" stroke="#2b2f3a" stroke-width="1.5"/>'),
+  img: IC('<rect x="13" y="14" width="8" height="17" fill="none" stroke="#e9e1cf" stroke-dasharray="3 2"/><path d="M17 3C21 8 20 12 17 12S13 8 17 3z" fill="#ffcf4a" opacity=".6"/>'),
+  plate: IC('<rect x="14" y="3" width="6" height="28" fill="rgba(160,210,240,.35)" stroke="#9fc6e0"/>'),
+  eye: IC('<path d="M4 17Q17 6 30 17Q17 28 4 17z" fill="#e8ecf4"/><circle cx="18" cy="17" r="5" fill="#5f7d92"/><circle cx="19" cy="17" r="2" fill="#04070d"/>'),
+  rays: IC('<path d="M3 26L17 10L4 6" fill="none" stroke="#ffd54a" stroke-width="1.4"/><path d="M17 10L31 26" stroke="#ffd54a" stroke-dasharray="3 3"/><path d="M17 3V31" stroke="#9fc6e0" stroke-width="2"/>'),
+  ruler: IC('<rect x="2" y="12" width="30" height="10" fill="#151e2e" stroke="#3a4762"/><path d="M6 12v4M11 12v6M16 12v4M21 12v6M26 12v4" stroke="#8b96ad"/>'),
+  person: IC('<circle cx="17" cy="7" r="4" fill="#3a4762" stroke="#c8d0dd"/><path d="M17 11V21M17 14l-5 6M17 14l5 6M17 21l-4 10M17 21l4 10" stroke="#c8d0dd" stroke-width="2" stroke-linecap="round"/>'),
+  wmirror: IC('<rect x="13" y="6" width="8" height="18" fill="#bcd2e4"/><rect x="11" y="4" width="12" height="4" rx="1" fill="#ffb547"/><rect x="11" y="22" width="12" height="4" rx="1" fill="#ffb547"/>'),
+  pimg: IC('<g opacity=".55"><circle cx="17" cy="7" r="4" fill="none" stroke="#c8d0dd"/><path d="M17 11V21M17 21l-4 10M17 21l4 10" stroke="#c8d0dd" stroke-width="2"/></g>'),
+  vrays: IC('<path d="M8 4L28 12L8 20" fill="none" stroke="#86e0a8" stroke-width="1.5"/><path d="M8 31L28 26L8 20" fill="none" stroke="#ff8a73" stroke-width="1.5" stroke-dasharray="3 2"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  if (id === 'law') return `мишени ${m.hits}/3 · α = ${S.alpha}°`;
+  if (id === 'image') return `совпадений ${m.matches}/2 · вторая свеча ${m.on ? '«горит»' : 'не горит'}`;
+  return `${m.full ? 'виден целиком' : `видно ${fmt(m.seen, 0)} из ${S.H} см`} · зеркало ${m.len} см`;
+}
+
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'law') h = `<h2>Лазер и зеркало</h2>` + slider('inA', 'Угол падения α, °', 0, 85, 1, S.alpha) +
+      `<dl class="reads"><div><dt>угол α</dt><dd id="r1"></dd></div><div><dt>угол β</dt><dd id="r2"></dd></div><div><dt>мишени</dt><dd id="r3"></dd></div></dl>
+      <div class="row"><button class="ghostbtn" data-a="prot">${S.prot ? 'Убрать транспортир' : 'Показать транспортир'}</button><button class="ghostbtn" data-a="a0">Отвесно</button><button class="ghostbtn" data-a="reset">Сброс</button></div>
+      <p class="note" style="margin-top:12px">Зеркало лежит на полу. Стена стоит в 21 см от точки падения O. Высоту попадания луча на стену отсчитывают от зеркала.</p>`;
+  if (id === 'image') h = `<h2>Свечи и стекло</h2>` + slider('inD', 'Горящая свеча: до стекла d, см', 3, 20, 0.5, S.d) + slider('inX', 'Вторая свеча: за стеклом, см', 1, 22, 0.5, S.x2) +
+      `<dl class="reads"><div><dt>d</dt><dd id="r1"></dd></div><div><dt>вторая</dt><dd id="r2"></dd></div><div><dt>совпадений</dt><dd id="r3"></dd></div></dl>
+      <div class="row"><button class="ghostbtn" data-a="rays">${S.rays ? 'Скрыть лучи' : 'Показать лучи'}</button><button class="ghostbtn" data-a="reset">Сброс</button></div>
+      <p class="note" style="margin-top:12px">Свечи одинаковые, высотой ${G2.ch} см. Линейка на столе размечена в сантиметрах от стекла. Глаз можно перетаскивать.</p>`;
+  if (id === 'full') h = `<h2>Человек и зеркало</h2><div class="ctl"><div class="lbl">Рост человека</div><div class="chips">${[130, 170, 190].map(v => `<button data-a="H:${v}" aria-pressed="${S.H === v}">${v} см</button>`).join('')}</div></div>` +
+      slider('inT', 'Верхний край зеркала, см', 5, 200, 1, S.top) + slider('inB', 'Нижний край зеркала, см', 0, 195, 1, S.bot) + slider('inS', 'От человека до зеркала, см', 40, 120, 5, S.dist) +
+      `<dl class="reads"><div><dt>длина</dt><dd id="r1"></dd></div><div><dt>видно</dt><dd id="r2"></dd></div><div><dt>глаза</dt><dd id="r3"></dd></div></dl>
+      <div class="row"><button class="ghostbtn" data-a="reset">Сброс</button></div>
+      <p class="note" style="margin-top:12px">Высоты отсчитаны от пола. Глаза примерно на 12 см ниже макушки.</p>`;
+  el.innerHTML = h;
+  const on = (sel, fn2) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn2); };
+  on('#inA', e => { setAlpha(+e.target.value); update(); });
+  on('#inD', e => { setD(+e.target.value); update(); });
+  on('#inX', e => { setX2(+e.target.value); update(); });
+  on('#inT', e => { setTop(+e.target.value); update(); });
+  on('#inB', e => { setBot(+e.target.value); update(); });
+  on('#inS', e => { setDist(+e.target.value); update(); });
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => { act(b.dataset.a); buildScheme(); });
+  updateScheme(model());
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (id === 'law') { set('#inAO', S.alpha + '°'); val('#inA', S.alpha); set('#r1', S.alpha + '°'); set('#r2', S.alpha + '°'); set('#r3', `${m.hits}/3`); }
+  if (id === 'image') { set('#inDO', fmt(S.d, 1)); val('#inD', S.d); set('#inXO', fmt(S.x2, 1)); val('#inX', S.x2); set('#r1', `${fmt(S.d, 1)} см`); set('#r2', `${fmt(S.x2, 1)} см`); set('#r3', `${m.matches}/2`); }
+  if (id === 'full') { set('#inTO', S.top); val('#inT', S.top); set('#inBO', S.bot); val('#inB', S.bot); set('#inSO', S.dist); val('#inS', S.dist); set('#r1', `${m.len} см`); set('#r2', m.full ? 'целиком' : `${fmt(m.seen, 0)} см`); set('#r3', `${m.e} см`); }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'law') return [
+    { id: 'laser', icon: ICON.laser, name: 'Лазер', spec: 'Даёт узкий пучок — почти идеальный луч. Его можно поворачивать вокруг точки падения.' },
+    { id: 'mirror', icon: ICON.mirror, name: 'Плоское зеркало', spec: 'Гладкая отражающая поверхность. Штриховка снизу — непрозрачная задняя сторона.' },
+    { id: 'O', icon: ICON.point, name: 'Точка падения O', spec: 'Сюда приходит падающий луч и отсюда уходит отражённый.' },
+    { id: 'normal', icon: ICON.normal, name: 'Нормаль', spec: 'Перпендикуляр к зеркалу в точке падения. От неё отсчитывают оба угла.' },
+    { id: 'angles', icon: ICON.angles, name: 'Углы α и β', spec: 'Жёлтая дуга — угол падения α, зелёная — угол отражения β.' },
+    { id: 'prot', icon: ICON.prot, name: 'Транспортир', spec: 'Шкала отсчитана от нормали: 0° — отвесно, 90° — вдоль зеркала.' },
+    { id: 'wall', icon: ICON.wall, name: 'Стена с мишенями', spec: 'В 21 см от точки O. Мишени появляются по одной.' }];
+  if (id === 'image') return [
+    { id: 'c1', icon: ICON.candle, name: 'Горящая свеча', spec: 'Предмет. Её лучи падают на стекло и отражаются.' },
+    { id: 'plate', icon: ICON.plate, name: 'Стеклянная пластина', spec: 'Работает как полупрозрачное зеркало: часть света отражает, часть пропускает.' },
+    { id: 'img', icon: ICON.img, name: 'Изображение свечи', spec: 'Мнимое: лучей там нет, сходятся только их продолжения.' },
+    { id: 'c2', icon: ICON.candle2, name: 'Вторая свеча', spec: 'Незажжённая, стоит за стеклом. Совпадёт с изображением — будет казаться горящей.' },
+    { id: 'eye', icon: ICON.eye, name: 'Глаз', spec: 'Видит изображение там, откуда, как ему кажется, пришли лучи.' },
+    { id: 'rays', icon: ICON.rays, name: 'Лучи и продолжения', spec: 'Сплошные — настоящие лучи света. Пунктир — их продолжения за стекло.' },
+    { id: 'ruler', icon: ICON.ruler, name: 'Линейка на столе', spec: 'Расстояния от стекла в сантиметрах в обе стороны.' }];
+  return [
+    { id: 'person', icon: ICON.person, name: 'Человек', spec: 'Глаза на 12 см ниже макушки. Его можно отодвигать от зеркала.' },
+    { id: 'mirror', icon: ICON.wmirror, name: 'Зеркало на стене', spec: 'Оранжевые ручки — верхний и нижний края. Само зеркало тоже можно двигать вверх-вниз.' },
+    { id: 'rays', icon: ICON.vrays, name: 'Лучи от макушки и ступней', spec: 'Зелёный луч отразился и попал в глаз. Красный пунктир — луч прошёл мимо зеркала.' },
+    { id: 'image', icon: ICON.pimg, name: 'Изображение', spec: 'Яркая часть — то, что человек видит в зеркале. Бледная — то, что не видно.' },
+    { id: 'wall', icon: ICON.wall, name: 'Стена', spec: 'Высоты краёв зеркала отсчитаны от пола.' }];
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      (Ls.safe ? `<div class="safe"><b>Безопасность</b>${Ls.safe}</div>` : '') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Что на площадке</h2><p class="note">Нажмите на деталь, чтобы найти её на площадке.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'law') {
+    const a = S.alpha, hW = wallH(a), onWall = isFinite(hW) && hW <= (G1.oy - G1.wtop) / G1.k;
+    return `<h2>Углы при отражении</h2><div class="formula">β = α</div><div class="steps">` +
+      step('угол падения α (от нормали)', `${a}°`) +
+      step('угол отражения β = α', `${a}°`, 'sum') +
+      step('угол луча с зеркалом: 90° − α', `90° − ${a}° = ${90 - a}°`) +
+      step('между падающим и отражённым: 2α', `2 · ${a}° = ${2 * a}°`) + `</div>
+      <h3>Куда попадёт луч на стене</h3><div class="formula">h = s / tg β</div><div class="steps">` +
+      step('от точки O до стены s', '21 см') +
+      (a === 0 ? step('β = 0°', 'луч идёт отвесно вверх и на стену не попадает', 'sum')
+        : step('tg β', `tg ${a}° = ${fmt(Math.tan(a * RAD), 3)}`) + step('h = s / tg β', `21 / ${fmt(Math.tan(a * RAD), 3)} = ${fmt(hW, 1)} см${onWall ? '' : ' (выше стены)'}`, 'sum')) + `</div>
+      <h3>Журнал попаданий</h3><div class="steps">` +
+      (S.hitLog.length ? S.hitLog.map((r, i) => step(`мишень ${i + 1}, высота ${fmt(r.h, 1)} см`, `α = ${r.a}°, β = ${r.a}°`)).join('') : step('пока пусто', 'попадите в мишень')) + `</div>
+      <p class="note" style="margin-top:10px">Частая ошибка — мерить угол от поверхности зеркала. Тогда получится 90° − α, а не α.</p>`;
+  }
+  if (id === 'image') {
+    const err = S.x2 - S.d;
+    return `<h2>Где изображение</h2><div class="formula">f = d,  h′ = h</div><div class="steps">` +
+      step('от свечи до стекла d', `${fmt(S.d, 1)} см`) +
+      step('изображение за стеклом f = d', `${fmt(S.d, 1)} см`, 'sum') +
+      step('высота свечи h', `${G2.ch} см`) + step('высота изображения h′ = h', `${G2.ch} см`) +
+      step('от свечи до её изображения 2d', `2 · ${fmt(S.d, 1)} = ${fmt(2 * S.d, 1)} см`) + `</div>
+      <h3>Вторая свеча</h3><div class="steps">` +
+      step('стоит за стеклом', `${fmt(S.x2, 1)} см`) +
+      step('отличие от f', Math.abs(err) < 0.01 ? '0 — совпала, «горит»' : `${fmt(Math.abs(err), 1)} см ${err > 0 ? 'дальше' : 'ближе'}`, 'sum') + `</div>
+      <h3>Опыты</h3><div class="steps">` +
+      (S.matches.length ? S.matches.map((x, i) => step(`опыт ${i + 1}`, `d = ${fmt(x, 1)} см → f = ${fmt(x, 1)} см`)).join('') : step('пока пусто', 'совместите свечу с изображением')) + `</div>
+      <p class="note" style="margin-top:10px">Изображение мнимое (лучи там не сходятся), прямое, такого же размера и симметрично свече относительно стекла.</p>`;
+  }
+  const v = vis3(), H = S.H;
+  return `<h2>Какое зеркало нужно</h2><div class="formula">ℓ = H / 2</div><div class="steps">` +
+    step('рост H', `${H} см`) + step('высота глаз e', `${v.e} см`) +
+    step('верхний край ≥ (H + e) / 2', `(${H} + ${v.e}) / 2 = ${fmt(v.needTop, 0)} см`) +
+    step('нижний край ≤ e / 2', `${v.e} / 2 = ${fmt(v.needBot, 0)} см`) +
+    step('наименьшая длина ℓ', `${fmt(v.needTop, 0)} − ${fmt(v.needBot, 0)} = ${fmt(H / 2, 0)} см`, 'sum') + `</div>
+    <h3>Сейчас</h3><div class="steps">` +
+    step('край зеркала: верх / низ', `${S.top} / ${S.bot} см`) +
+    step('длина зеркала', `${v.len} см`) +
+    step('видно от 2·низ − e до 2·верх − e', `от ${fmt(v.lo, 0)} до ${fmt(v.hi, 0)} см`) +
+    step('итог', v.full ? 'виден целиком' : `видно ${fmt(v.seen, 0)} см из ${H}`, 'sum') +
+    step('расстояние до зеркала', `${S.dist} см — в формулы не входит`) + `</div>`;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter');
+  if (id === 'law') {
+    el.innerHTML = `<div class="k">Углы</div><div class="v">α = ${S.alpha}°</div><div class="lr"><span>β</span><span class="ok">${S.alpha}°</span></div>` +
+      `<div class="lr"><span>к зеркалу</span><span>${90 - S.alpha}°</span></div><div class="lr"><span>мишени</span><span class="${m.hits === 3 ? 'ok' : ''}">${m.hits}/3</span></div>`;
+  } else if (id === 'image') {
+    el.innerHTML = `<div class="k">Вторая свеча</div><div class="v ${m.on ? 'ok' : ''}">${m.on ? '«горит»' : 'не горит'}</div>` +
+      `<div class="lr"><span>d</span><span>${fmt(S.d, 1)} см</span></div><div class="lr"><span>вторая</span><span>${fmt(S.x2, 1)} см</span></div><div class="lr"><span>опыты</span><span class="${m.matches >= 2 ? 'ok' : ''}">${m.matches}/2</span></div>`;
+  } else {
+    el.innerHTML = `<div class="k">В зеркале видно</div><div class="v ${m.full ? 'ok' : ''}">${m.full ? 'целиком' : fmt(m.seen, 0) + ' см'}</div>` +
+      `<div class="lr"><span>от–до</span><span>${fmt(m.lo, 0)}–${fmt(m.hi, 0)}</span></div><div class="lr"><span>длина</span><span class="${m.len <= m.H / 2 + 3 ? 'ok' : 'bad'}">${m.len} см</span></div><div class="lr"><span>до зеркала</span><span>${S.dist} см</span></div>`;
+  }
+}
+
+function update() {
+  track();
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Теперь вы знаете, как работает зеркало!'), 1800);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  law: '<path d="M8 28H58" stroke="#bcd2e4" stroke-width="2.5"/><path d="M33 28V4" stroke="#e8ecf4" stroke-dasharray="2 2" opacity=".6"/><path d="M14 6L33 27L52 6" fill="none" stroke="#ff6a55" stroke-width="1.6"/>',
+  image: '<path d="M33 2V29" stroke="#9fc6e0" stroke-width="2"/><rect x="16" y="16" width="5" height="13" fill="#e9e1cf"/><path d="M18.5 8c3 4 2 7 0 7s-3-3 0-7z" fill="#ffcf4a"/><rect x="45" y="16" width="5" height="13" fill="none" stroke="#e9e1cf" stroke-dasharray="2 2"/><path d="M47.5 8c3 4 2 7 0 7s-3-3 0-7z" fill="#ffcf4a" opacity=".5"/>',
+  full: '<circle cx="18" cy="6" r="3.5" fill="none" stroke="#c8d0dd"/><path d="M18 10V19M18 19l-3 10M18 19l3 10" stroke="#c8d0dd" stroke-width="1.6"/><rect x="38" y="8" width="4" height="13" fill="#bcd2e4"/><path d="M20 4L40 8L20 9M20 29L40 21L20 13" fill="none" stroke="#86e0a8" stroke-width="1"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Lx, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Lx.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Lx.title}</span></span>
+      ${S.done[Lx.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  S.lesson = i; drag = null;
+  resetState(); save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L().task;
+  $('#hint').textContent = L().stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '';
+  if (id === 'law') { const hW = wallH(S.alpha); now = `Плоское зеркало лежит на полу, лазер слева светит в точку O, справа в 21 см от O вертикальная стена с мишенями. Угол падения α = ${S.alpha}°, угол отражения β = ${S.alpha}°, угол луча с поверхностью зеркала ${90 - S.alpha}°. Отражённый луч ${S.alpha === 0 ? 'идёт отвесно вверх' : `попадает на высоту ${fmt(hW, 1)} см над зеркалом`}. Поражено мишеней: ${m.hits} из 3${m.hits < 3 ? `, текущая мишень на высоте ${fmt(tgH(m.hits), 1)} см` : ''}. Транспортир ${S.prot ? 'показан' : 'скрыт'}. Не называй нужный угол — наведи: от чего отсчитывают углы, что будет с точкой попадания, если увеличить α, как связаны высота, 21 см и тангенс.`; }
+  if (id === 'image') { const sees = eyeRays().some(r => r.ok); now = `Опыт со стеклянной пластиной на столе. Горящая свеча (высота ${G2.ch} см) стоит в d = ${fmt(S.d, 1)} см перед стеклом, незажжённая вторая свеча — в ${fmt(S.x2, 1)} см за стеклом. Вторая свеча ${m.on ? 'совпала с изображением и кажется горящей' : 'не совпадает с изображением'}. Лучи ${S.rays ? 'показаны' : 'скрыты'}; глаз ${sees ? 'видит изображение' : 'не видит изображение, лучи проходят мимо стекла'}. Засчитано опытов с разными расстояниями: ${m.matches} из 2${S.matches.length ? ` (d = ${S.matches.map(x => fmt(x, 1)).join(' и ')} см)` : ''}. Не говори сразу, куда ставить вторую свечу — наведи вопросами про симметрию и пунктирные продолжения лучей.`; }
+  if (id === 'full') { const v = vis3(); now = `Человек ростом ${S.H} см (глаза на ${v.e} см) стоит в ${S.dist} см от зеркала на стене. Края зеркала: верх ${S.top} см, низ ${S.bot} см от пола, длина ${v.len} см. Человек видит себя от ${fmt(v.lo, 0)} до ${fmt(v.hi, 0)} см (${v.full ? 'целиком' : 'не целиком'}). Условие длины: не больше ${fmt(S.H / 2 + 3, 0)} см — ${v.len <= S.H / 2 + 3 ? 'выполнено' : 'не выполнено'}. Нужные высоты краёв не называй — наведи: где отражается луч от макушки и от ступней, зависит ли это от расстояния до зеркала.`; }
+  return [
+    `Раздел: физика, 8 класс, тема «Отражение света» (оптика). Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'} (${taskState(m)}).`,
+    `Сейчас на площадке: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Помогай наводящими вопросами, готовые ответы не выдавай.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { law: 'Почему углы считают от нормали, а не от зеркала?', image: 'Почему изображение в зеркале называют мнимым?', full: 'Почему не важно, как далеко стоять от зеркала?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

@@ -77,7 +77,7 @@ window.LUCH_SUBJECTS = {
       { id: 'mole', b: 'react', g: 8, t: 'Количество вещества', items: ['Моль и число Авогадро', 'Молярная масса', 'Молярный объём газов', 'Расчёты по уравнениям'], req: ['equations'], status: 'done', href: '/labs/chem-mole/', lessons: 4, doneItems: 4 },
       { id: 'solutions', b: 'react', g: 8, t: 'Растворы', items: ['Растворимость', 'Массовая доля', 'Молярная концентрация', 'Как приготовить раствор'], req: ['mole'], status: 'done', href: '/chemistry/', lessons: 3, doneItems: 4 },
       { id: 'ions', b: 'react', g: 9, t: 'Электролиты и ионы', items: ['Электролитическая диссоциация', 'Ионные уравнения', 'Кислотность и pH'], req: ['solutions', 'bonds'], status: 'part', href: '/chemistry/', lessons: 2, doneItems: 0 },
-      { id: 'kinetics', b: 'react', g: 10, t: 'Скорость и равновесие', items: ['Скорость реакции', 'Катализаторы', 'Химическое равновесие', 'Принцип Ле Шателье'], req: ['ions'] },
+      { id: 'kinetics', b: 'react', g: 10, t: 'Скорость и равновесие', items: ['Скорость реакции', 'Катализаторы', 'Химическое равновесие', 'Принцип Ле Шателье'], req: ['ions'], status: 'done', href: '/labs/chem-kinetics/', lessons: 4, doneItems: 4 },
       { id: 'electro', b: 'react', g: 11, t: 'Электрохимия', items: ['Ряд активности металлов', 'Гальванический элемент и батарейка', 'Электролиз', 'Коррозия'], req: ['redox', 'ions'] },
 
       { id: 'oxy', b: 'inorg', g: 8, t: 'Кислород, водород, вода', items: ['Кислород и горение', 'Водород', 'Вода и её свойства', 'Состав воздуха'], req: ['equations'], status: 'done', href: '/labs/chem-oxy/', lessons: 4, doneItems: 4 },
@@ -131,7 +131,7 @@ window.LUCH_SUBJECTS = {
       { id: 'digest', b: 'human', g: 9, t: 'Дыхание и питание', items: ['Лёгкие и дыхание', 'Пищеварение', 'Питание и витамины', 'Выделение'], req: ['blood'], status: 'done', href: '/labs/bio-digest/', lessons: 4, doneItems: 4 },
       { id: 'nerves', b: 'human', g: 9, t: 'Мозг и чувства', items: ['Нейрон и рефлекс', 'Головной мозг', 'Зрение и слух', 'Сон и память'], req: ['body'], status: 'done', href: '/labs/bio-nerves/', lessons: 4, doneItems: 4 },
       { id: 'hormones', b: 'human', g: 9, t: 'Гормоны и взросление', items: ['Железы внутренней секреции', 'Половое созревание', 'Рост организма'], req: ['nerves'], status: 'done', href: '/labs/bio-hormones/', lessons: 3, doneItems: 3 },
-      { id: 'health', b: 'human', g: 9, t: 'Здоровье и первая помощь', items: ['Первая помощь', 'Вредные привычки', 'Гигиена и режим дня'], req: ['blood'] },
+      { id: 'health', b: 'human', g: 9, t: 'Здоровье и первая помощь', items: ['Первая помощь', 'Вредные привычки', 'Гигиена и режим дня'], req: ['blood'], status: 'done', href: '/labs/bio-health/', lessons: 3, doneItems: 3 },
 
       { id: 'mendel', b: 'gen', g: 10, t: 'Законы наследственности', items: ['Гены и признаки', 'Законы Менделя', 'Решётка Пеннета', 'Наследование пола'], req: ['division'], status: 'part', href: '/biology/', lessons: 5, doneItems: 3 },
       { id: 'variation', b: 'gen', g: 10, t: 'Изменчивость', items: ['Мутации', 'Модификации', 'Наследственные болезни'], req: ['mendel'] },
@@ -176,7 +176,7 @@ window.LUCH_SUBJECTS = {
 
       { id: 'safe', b: 'net', g: 5, t: 'Интернет и безопасность', items: ['Поиск информации', 'Надёжные пароли', 'Цифровой след', 'Как распознать фейк'], req: ['pc'], status: 'done', href: '/labs/cs-safe/', lessons: 4, doneItems: 4 },
       { id: 'networks', b: 'net', g: 8, t: 'Компьютерные сети', items: ['Как устроен интернет', 'IP-адреса и DNS', 'Протоколы'], req: ['binary', 'safe'], status: 'done', href: '/labs/cs-networks/', lessons: 3, doneItems: 3 },
-      { id: 'web', b: 'net', g: 9, t: 'Создание сайтов', items: ['HTML', 'CSS', 'Основы JavaScript', 'Публикация сайта'], req: ['networks', 'python'] },
+      { id: 'web', b: 'net', g: 9, t: 'Создание сайтов', items: ['HTML', 'CSS', 'Основы JavaScript', 'Публикация сайта'], req: ['networks', 'python'], status: 'done', href: '/labs/cs-web/', lessons: 4, doneItems: 4 },
       { id: 'cyber', b: 'net', g: 10, t: 'Кибербезопасность', items: ['Шифрование', 'Атаки и защита', 'Этичный хакинг'], req: ['networks', 'logic'] },
 
       { id: 'media', b: 'tech', g: 6, t: 'Графика и медиа', items: ['Растровая и векторная графика', 'Звук и видео', 'Сжатие файлов'], req: ['info'], status: 'done', href: '/labs/cs-media/', lessons: 3, doneItems: 3 },

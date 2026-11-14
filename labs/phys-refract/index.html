@@ -1,0 +1,839 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по физике, 8 класс: закон преломления света, показатель преломления, полное внутреннее отражение и световоды.">
+<title>Преломление света</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene [data-click]{cursor:pointer}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.meter .lr .ok{color:var(--ok)}
+.meter .lr .bad{color:var(--warn)}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button.rec{color:var(--force)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+.meter svg{display:block;width:64px;height:64px;margin:8px auto 0}
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter svg{width:48px;height:48px}
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><rect x="3" y="20" width="34" height="17" fill="rgba(95,180,217,.25)"/><path d="M4 20H36" stroke="var(--liq)" stroke-width="2"/><path d="M20 5V35" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="2 2"/><path d="M8 7L20 20L26 34" fill="none" stroke="var(--force)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Физика · Преломление света</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/">Карта</a><a href="/physics/">Физика</a><a href="/labs/phys-refract/" aria-current="page">Преломление</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Преломление</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Опытная площадка">
+    <svg class="scene" id="scene" role="img" aria-label="Площадка для опытов с преломлением света. Лазер можно поворачивать, перетаскивая его по дуге."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const RAD = Math.PI / 180;
+
+const LESSONS = [
+  { id: 'law', title: 'Закон преломления',
+    text: ['На границе двух прозрачных сред луч света меняет направление. Это преломление. Углы, как и при отражении, отсчитывают от нормали — перпендикуляра к границе в точке падения. Угол падения α — в первой среде, угол преломления γ — во второй.',
+           'Закон преломления: падающий луч, преломлённый луч и нормаль лежат в одной плоскости, а отношение синусов углов для двух данных сред постоянно: sin α / sin γ = n. Число n — относительный показатель преломления. Для перехода из воздуха в воду n ≈ 1,33.',
+           'Свет в воде идёт медленнее, чем в воздухе. Поэтому при входе в воду луч прижимается к нормали: γ < α. Луч, упавший отвесно (α = 0°), не преломляется. Часть света всё равно отражается от поверхности — это слабый отражённый луч.'],
+    why: 'Из-за преломления предмет в воде кажется ближе к поверхности, чем есть: рыбаки и подводные фотографы делают на это поправку. Оптики и офтальмологи подбирают очки и контактные линзы: линза работает именно на преломлении. Инженеры, которые прокладывают оптоволокно (в Казахстане это десятки тысяч километров линий связи), рассчитывают, как луч идёт в стекле. А спасатели на водоёмах предупреждают: дно кажется мельче, чем на самом деле, — из-за этого люди прыгают в воду и травмируются.',
+    task: 'Поворачивайте лазер и попадите преломлённым лучом во все 3 монетки на дне по очереди.',
+    hint: 'Тащите лазер по дуге или нажимайте «α −1°» и «α +1°». Пунктир показывает, куда пошёл бы луч без преломления. Настоящий луч в воде идёт круче — ближе к нормали.',
+    safe: 'Не направляйте лазерную указку в глаза людям и животным. Блики от воды и стекла тоже опасны.',
+    stage: 'Тащите лазер по дуге.',
+    a0: 20,
+    check: m => m.hits >= 3 },
+  { id: 'measure', title: 'Измеряем показатель n',
+    text: ['Классический опыт: узкий луч падает в центр плоской грани полуцилиндра. Внутри он преломляется, а из круглой грани выходит без излома — он идёт по радиусу, то есть вдоль нормали. Поэтому угол γ удобно мерить по круговой шкале.',
+           'Для каждого вещества отношение sin α / sin γ своё и не зависит от угла падения. Это показатель преломления вещества относительно воздуха: у воды 1,33, у стекла около 1,5, у сапфира 1,77, у алмаза 2,42.',
+           'Чем больше n, тем сильнее луч прижимается к нормали и тем медленнее в веществе идёт свет: n = c / v. В алмазе свет идёт почти в 2,5 раза медленнее, чем в вакууме.'],
+    why: 'Измерением показателя преломления (рефрактометрией) пользуются ювелиры и геммологи: так отличают алмаз от стекла и фианита. Рефрактометр стоит на сахарных и молочных заводах и у пчеловодов: по n узнают, сколько сахара в соке или воды в мёде. Автомеханики тем же прибором проверяют антифриз и электролит в аккумуляторе.',
+    task: 'Узнайте, из чего сделан брусок X: запишите два замера при углах α, которые отличаются хотя бы на 10°, посчитайте n и выберите вещество.',
+    hint: 'Выберите «Брусок X», поставьте угол, нажмите «Записать замер». Расчёт n — во вкладке «Расчёты». Ответ выберите под заданием во вкладке «Обзор».',
+    stage: 'Тащите лазер по дуге.',
+    a0: 30, mat0: 'X',
+    check: m => m.meas >= 2 && m.answer === 'X' },
+  { id: 'tir', title: 'Полное отражение',
+    text: ['Теперь свет идёт наоборот: из стекла в воздух. Луч выходит в среду с меньшим показателем преломления и отклоняется от нормали: угол преломления β больше угла падения α. Чем больше α, тем ярче отражённый луч внутри стекла и тем слабее преломлённый.',
+           'При некотором угле падения преломлённый луч скользит вдоль границы (β = 90°). Этот угол называют предельным углом полного отражения: sin αпр = 1 / n. Если угол падения больше предельного, свет совсем не выходит наружу и весь отражается обратно. Это полное внутреннее отражение.',
+           'Полное отражение бывает только при переходе в среду с меньшим показателем преломления. На нём работают световоды: свет идёт внутри тонкой стеклянной нити, отражаясь от её стенок, и почти не теряется. На нём же «играет» огранённый алмаз.'],
+    why: 'Оптоволоконный интернет — это полное внутреннее отражение: по стеклянной нити тоньше волоса свет несёт данные на десятки километров. Монтажники и сварщики оптоволокна — востребованная профессия в Казахстане, где связь тянут в сёла. Врачи-эндоскописты осматривают желудок через гибкий световод. Ювелиры гранят алмаз так, чтобы свет полностью отражался внутри и выходил к глазу — отсюда «игра» камня.',
+    task: 'Найдите предельный угол полного отражения для стекла и для воды: наименьший целый угол α, при котором преломлённый луч исчезает.',
+    hint: 'Медленно увеличивайте α кнопкой «α +1°» и следите за лучом над границей. Потом переключите вещество на «Вода» и повторите.',
+    stage: 'Тащите лазер по дуге под границей.',
+    a0: 20, mat0: 'glass',
+    check: m => m.found >= 2 },
+];
+
+const LS_KEY = 'luch-phys-refract';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+let drag = null, dirty = true, lastUpd = 0;
+
+// ---------- physics ----------
+const MATS = {
+  water: { name: 'Вода', n: 1.33, fill: 'rgba(95,180,217,.22)', edge: '#5fb4d9' },
+  glass: { name: 'Стекло', n: 1.5, fill: 'rgba(170,215,235,.18)', edge: '#bfe3f2' },
+  X: { name: 'Брусок X', n: 1.77, fill: 'rgba(120,140,235,.22)', edge: '#9fb0ff' },
+};
+const ANSWERS = [['water', 'Вода, 1,33'], ['glass', 'Стекло, 1,5'], ['X', 'Сапфир, 1,77'], ['diamond', 'Алмаз, 2,42']];
+// angle of refraction (degrees) for light going from n1 into n2; NaN = total internal reflection
+const snell = (a, n1, n2) => { const s = n1 / n2 * Math.sin(a * RAD); return s > 1 ? NaN : Math.asin(s) / RAD; };
+// Fresnel reflectance for unpolarised light
+function fres(a, n1, n2) {
+  const si = Math.sin(a * RAD), st = n1 / n2 * si; if (st >= 1) return 1;
+  const ci = Math.cos(a * RAD), ct = Math.sqrt(1 - st * st);
+  const rs = ((n1 * ci - n2 * ct) / (n1 * ci + n2 * ct)) ** 2, rp = ((n1 * ct - n2 * ci) / (n1 * ct + n2 * ci)) ** 2;
+  return (rs + rp) / 2;
+}
+const critA = n => Math.asin(1 / n) / RAD;
+
+// ---------- geometry (SVG units; scene 520 wide, bottom at 430) ----------
+// lesson 1: water tank, surface at oy, depth D cm, 10 units = 1 cm
+const G1 = { ox: 190, oy: 250, R: 145, D: 10, k: 10, n: 1.33, x0: 20, x1: 500 };
+const TG = [30, 50, 70];
+// lessons 2 and 3: semicylinder below the flat face through O, radius r
+const G2 = { ox: 260, oy: 215, r: 125, R: 150 };
+const G3 = { ox: 260, oy: 185, r: 130, R: 165 };
+
+function resetState() {
+  const Ls = L();
+  Object.assign(S, {
+    alpha: Ls.a0 == null ? 20 : Ls.a0, ti: 0, hitLog: [], prot: true,
+    mat: Ls.mat0 || 'glass', meas: [], answer: null, wrong: null,
+    found: {}, hl: null,
+  });
+}
+function setAlpha(v) { S.alpha = clamp(Math.round(v), 0, LID() === 'law' ? 85 : 89); dirty = true; }
+const gamma1 = () => snell(S.alpha, 1, G1.n);
+const hitX = a => G1.D * Math.tan(snell(a, 1, G1.n) * RAD); // cm from the point under O
+const gamma2 = () => snell(S.alpha, 1, MATS[S.mat].n);
+const beta3 = () => snell(S.alpha, MATS[S.mat].n, 1);
+const goodMeas = () => {
+  const xs = S.meas.filter(r => r.mat === 'X' && r.a >= 5).map(r => r.a);
+  if (!xs.length) return 0;
+  return Math.max(...xs) - Math.min(...xs) >= 10 ? 2 : 1;
+};
+function laserPos() {
+  const a = S.alpha * RAD, id = LID();
+  if (id === 'law') return [G1.ox - G1.R * Math.sin(a), G1.oy - G1.R * Math.cos(a)];
+  if (id === 'measure') return [G2.ox - G2.R * Math.sin(a), G2.oy - G2.R * Math.cos(a)];
+  return [G3.ox - G3.R * Math.sin(a), G3.oy + G3.R * Math.cos(a)];
+}
+
+function model() {
+  const id = LID();
+  if (id === 'law') return { kind: id, hits: S.ti, a: S.alpha, g: gamma1(), x: hitX(S.alpha) };
+  if (id === 'measure') return { kind: id, meas: goodMeas(), answer: S.answer, a: S.alpha, g: gamma2(), mat: S.mat };
+  const b = beta3();
+  return { kind: id, found: ['glass', 'water'].filter(k => S.found[k]).length, a: S.alpha, b, total: isNaN(b), mat: S.mat, R: fres(S.alpha, MATS[S.mat].n, 1) };
+}
+function track() {
+  const id = LID();
+  if (id === 'law' && S.ti < 3 && S.alpha === TG[S.ti]) {
+    S.hitLog.push({ a: S.alpha, g: gamma1(), x: hitX(S.alpha) });
+    S.ti++;
+    toast(S.ti < 3 ? `Монетка ${S.ti} из 3! α = ${S.alpha}°, а в воде γ ≈ ${fmt(gamma1(), 0)}°. Следующая дальше.` : 'Все 3 монетки! Каждый раз луч в воде шёл ближе к нормали: γ < α.');
+  }
+  if (id === 'tir') {
+    const c = critA(MATS[S.mat].n);
+    if (!S.found[S.mat] && S.alpha >= c && S.alpha - 1 < c) {
+      S.found[S.mat] = true;
+      toast(`${MATS[S.mat].name}: при ${S.alpha}° преломлённый луч исчез, а при ${S.alpha - 1}° ещё был. Предельный угол ≈ ${fmt(c, 1)}°.`);
+    }
+  }
+}
+
+// ---------- drawing helpers ----------
+const T = (x, y, s, fill, txt, anchor = 'middle', extra = '') => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${s}" fill="${fill}" text-anchor="${anchor}" ${extra}>${txt}</text>`;
+const halo = `paint-order="stroke" stroke="${INK}" stroke-width="3"`;
+const f1 = x => (+x).toFixed(1);
+const ln = (a, b, c, w = 1.5, extra = '') => `<path d="M${f1(a[0])} ${f1(a[1])}L${f1(b[0])} ${f1(b[1])}" stroke="${c}" stroke-width="${w}" fill="none" ${extra}/>`;
+// point at distance len from o, at angle ang (deg) from the vertical; down = measured from the downward vertical
+const dirPt = (o, ang, len, down) => [o[0] + len * Math.sin(ang * RAD), o[1] + (down ? 1 : -1) * len * Math.cos(ang * RAD)];
+function bg() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern>
+    <marker id="arR" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ff6a55"/></marker></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+const arcPath = (cx, cy, r, a1, a2, down) => {
+  const p = a => dirPt([cx, cy], a, r, down);
+  const [x1, y1] = p(a1), [x2, y2] = p(a2);
+  const sweep = (a2 > a1) !== !!down ? 1 : 0;
+  return `M${f1(x1)} ${f1(y1)}A${r} ${r} 0 0 ${sweep} ${f1(x2)} ${f1(y2)}`;
+};
+// a ray with a soft glow and an arrow; op = brightness 0..1
+function beam(p, q, op = 1, arrowAt = 0.5) {
+  if (op < 0.02) return '';
+  const o = clamp(op, 0, 1).toFixed(2), mid = [p[0] + (q[0] - p[0]) * arrowAt, p[1] + (q[1] - p[1]) * arrowAt];
+  return `<g opacity="${o}" pointer-events="none">` + ln(p, q, 'rgba(255,90,74,.25)', 6, 'stroke-linecap="round"') + ln(p, q, '#ff6a55', 2) + ln(p, mid, '#ff6a55', 2, 'marker-end="url(#arR)"') + '</g>';
+}
+function laserSVG(lx, ly, rot) {
+  return `<g data-drag="laser"><circle cx="${f1(lx)}" cy="${f1(ly)}" r="26" fill="transparent"/><g transform="translate(${f1(lx)} ${f1(ly)}) rotate(${f1(rot)})"><rect x="-38" y="-7" width="38" height="14" rx="3" fill="#3a4762" stroke="#8b96ad" stroke-width="1.2"/><rect x="-6" y="-4" width="6" height="8" fill="#5d6a86"/><circle cx="-26" cy="0" r="2.2" fill="#ff6a55"/></g></g>`;
+}
+function angleArcs(o, a, g, aDown, gDown, la = 'α', lg = 'γ') {
+  let h = '';
+  if (a >= 4) {
+    h += `<path d="${arcPath(o[0], o[1], 44, -a, 0, aDown)}" fill="none" stroke="#ffd54a" stroke-width="1.6"/>`;
+    const p = dirPt(o, -a / 2, 60, aDown); h += T(p[0] - 3, p[1] + 4, 11, '#ffd54a', la, 'middle', halo);
+  }
+  if (isFinite(g) && g >= 3) {
+    h += `<path d="${arcPath(o[0], o[1], 52, 0, g, gDown)}" fill="none" stroke="#86e0a8" stroke-width="1.6"/>`;
+    const p = dirPt(o, g / 2, 68, gDown); h += T(p[0] + 3, p[1] + 4, 11, '#86e0a8', lg, 'middle', halo);
+  }
+  return h;
+}
+function protractor(o, r) {
+  let h = `<circle cx="${o[0]}" cy="${o[1]}" r="${r}" fill="none" stroke="rgba(114,212,232,.3)" stroke-width="1"/>`;
+  for (let t = 0; t < 360; t += 5) {
+    const big = t % 10 === 0, r1 = r - (big ? 9 : 5), s = Math.sin(t * RAD), c = Math.cos(t * RAD);
+    h += ln([o[0] + r1 * s, o[1] - r1 * c], [o[0] + r * s, o[1] - r * c], 'rgba(114,212,232,.5)', 1);
+    if (t % 30 === 0 && t % 90 !== 0) { const u = t % 180, lab = Math.min(u, 180 - u); h += T(o[0] + (r + 11) * s, o[1] - (r + 11) * c + 3, 8.5, '#72d4e8', lab + '°'); }
+  }
+  return h;
+}
+
+// ---------- lesson 1 scene: laser into a water tank ----------
+function lawScene(tm) {
+  const g = G1, a = S.alpha, gm = gamma1(), [lx, ly] = laserPos(), O = [g.ox, g.oy], yb = g.oy + g.D * g.k;
+  let h = '';
+  if (S.prot) {
+    h += `<path d="M${g.ox - 120} ${g.oy}A120 120 0 0 1 ${g.ox + 120} ${g.oy}" fill="rgba(114,212,232,.04)" stroke="rgba(114,212,232,.35)" stroke-width="1"/>`;
+    for (let t = -90; t <= 90; t += 5) {
+      const big = t % 10 === 0, r1 = 120 - (big ? 10 : 5), s = Math.sin(t * RAD), c = Math.cos(t * RAD);
+      h += ln([g.ox + r1 * s, g.oy - r1 * c], [g.ox + 120 * s, g.oy - 120 * c], 'rgba(114,212,232,.5)', 1);
+      if (big && Math.abs(t) < 90 && t % 30 === 0) h += T(g.ox + 101 * s, g.oy - 101 * c + 3, 8.5, '#72d4e8', Math.abs(t) + '°');
+    }
+  }
+  // tank with water
+  h += `<rect x="${g.x0}" y="${g.oy}" width="${g.x1 - g.x0}" height="${yb - g.oy}" fill="rgba(95,180,217,.2)"/>`;
+  h += `<path d="M${g.x0} ${g.oy - 30}V${yb + 8}H${g.x1}V${g.oy - 30}" fill="none" stroke="#8b96ad" stroke-width="3"/>`;
+  h += ln([g.x0, g.oy], [g.x1, g.oy], '#5fb4d9', 2);
+  h += `<rect x="${g.x0}" y="${yb}" width="${g.x1 - g.x0}" height="8" fill="#2a3346"/>`;
+  h += T(g.x1 - 12, g.oy + 18, 9.5, '#5fb4d9', 'вода', 'end', halo) + T(g.x1 - 12, g.oy - 8, 9.5, '#c8d0dd', 'воздух', 'end', halo);
+  h += ln([g.x0 + 12, g.oy], [g.x0 + 12, yb], '#8b96ad', 1) + T(g.x0 + 18, (g.oy + yb) / 2 + 3, 9, '#c8d0dd', `${g.D} см`, 'start', halo);
+  // coins
+  TG.forEach((ta, i) => {
+    const x = g.ox + hitX(ta) * g.k, done = i < S.ti, cur = i === S.ti;
+    if (!done && !cur) return;
+    const col = done ? '#86e0a8' : '#ffb547', pr = cur && !reduce ? 1.2 * Math.sin(tm / 260) : 0;
+    h += `<ellipse cx="${f1(x)}" cy="${yb - 3}" rx="${f1(9 + pr)}" ry="3.5" fill="${done ? 'rgba(134,224,168,.35)' : '#c99a2e'}" stroke="${col}" stroke-width="1.6"/>`;
+    h += T(x, yb + 22, 9, col, done ? '✓' : `монетка ${i + 1}`, 'middle', halo);
+  });
+  // normal
+  h += `<path d="M${g.ox} ${g.oy - 135}V${yb}" stroke="#e8ecf4" stroke-width="1" stroke-dasharray="5 4" opacity=".7"/>` + T(g.ox, g.oy - 141, 9.5, '#e8ecf4', 'нормаль', 'middle', halo);
+  // rays: incident, refracted, weak reflected, and the dashed 'no refraction' guide
+  const R = fres(a, 1, g.n);
+  h += beam([lx, ly], O, 1, 0.55);
+  const Q = dirPt(O, gm, (yb - g.oy) / Math.cos(gm * RAD), true);
+  h += beam(O, Q, 1 - R, 0.5) + `<circle cx="${f1(Q[0])}" cy="${f1(Q[1])}" r="3" fill="#ffb3a6"/>`;
+  h += beam(O, dirPt(O, a, 135, false), 0.12 + 0.9 * Math.sqrt(R), 0.4);
+  if (a >= 3) h += ln(O, dirPt(O, a, Math.min(220, (yb - g.oy) / Math.cos(a * RAD)), true), '#ff8a73', 1.2, 'stroke-dasharray="4 4" opacity=".55"');
+  h += angleArcs(O, a, gm, false, true);
+  h += `<circle cx="${g.ox}" cy="${g.oy}" r="3" fill="#e8ecf4"/>`;
+  h += laserSVG(lx, ly, 90 - a) + T(lx - 30, ly - 14, 9.5, '#e8ecf4', 'лазер', 'middle', halo);
+  if (!drag && S.ti === 0 && a === LESSONS[0].a0) h += T(lx - 40, ly + 24, 9, '#ffb547', '↻ тяните', 'middle', halo);
+  return h;
+}
+
+// ---------- lessons 2-3: semicylinder ----------
+function semi(g, mat) {
+  const M = MATS[mat];
+  return `<path d="M${g.ox - g.r} ${g.oy}A${g.r} ${g.r} 0 0 0 ${g.ox + g.r} ${g.oy}Z" fill="${M.fill}" stroke="${M.edge}" stroke-width="1.6"/>`;
+}
+function measureScene() {
+  const g = G2, a = S.alpha, gm = gamma2(), [lx, ly] = laserPos(), O = [g.ox, g.oy], n = MATS[S.mat].n;
+  let h = '';
+  if (S.prot) h += protractor(O, 165);
+  h += semi(g, S.mat) + ln([g.ox - g.r - 30, g.oy], [g.ox + g.r + 30, g.oy], '#3a4762', 1);
+  h += T(g.ox - g.r + 34, g.oy + 40, 10, MATS[S.mat].edge, S.mat === 'X' ? 'брусок X' : MATS[S.mat].name.toLowerCase(), 'middle', halo);
+  h += `<path d="M${g.ox} ${g.oy - 185}V${g.oy + 200}" stroke="#e8ecf4" stroke-width="1" stroke-dasharray="5 4" opacity=".7"/>` + T(g.ox + 6, g.oy - 181, 9.5, '#e8ecf4', 'нормаль', 'start', halo);
+  const R = fres(a, 1, n);
+  h += beam([lx, ly], O, 1, 0.55);
+  const E = dirPt(O, gm, g.r, true), F = dirPt(O, gm, 200, true);
+  h += beam(O, E, 1 - R, 0.5) + beam(E, F, 1 - R, 0.5);
+  h += beam(O, dirPt(O, a, 150, false), 0.12 + 0.9 * Math.sqrt(R), 0.4);
+  h += angleArcs(O, a, gm, false, true);
+  h += `<circle cx="${g.ox}" cy="${g.oy}" r="3" fill="#e8ecf4"/>` + T(g.ox - 10, g.oy + 16, 9, '#c8d0dd', 'O', 'middle', halo);
+  h += laserSVG(lx, ly, 90 - a) + T(lx - 30, ly - 14, 9.5, '#e8ecf4', 'лазер', 'middle', halo);
+  return h;
+}
+function tirScene() {
+  const g = G3, a = S.alpha, b = beta3(), [lx, ly] = laserPos(), O = [g.ox, g.oy], n = MATS[S.mat].n, R = fres(a, n, 1);
+  let h = '';
+  if (S.prot) h += protractor(O, 178);
+  h += semi(g, S.mat) + ln([g.ox - g.r - 30, g.oy], [g.ox + g.r + 30, g.oy], '#3a4762', 1);
+  h += T(g.ox + g.r - 30, g.oy + 40, 10, MATS[S.mat].edge, MATS[S.mat].name.toLowerCase(), 'middle', halo) + T(g.ox - g.r + 20, g.oy - 10, 9.5, '#c8d0dd', 'воздух', 'middle', halo);
+  h += `<path d="M${g.ox} ${g.oy - 205}V${g.oy + 205}" stroke="#e8ecf4" stroke-width="1" stroke-dasharray="5 4" opacity=".7"/>` + T(g.ox + 6, g.oy - 200, 9.5, '#e8ecf4', 'нормаль', 'start', halo);
+  // marks of critical angles that were already found
+  for (const k of ['glass', 'water']) if (S.found[k]) {
+    const c = critA(MATS[k].n), p1 = dirPt(O, -c, 84, true), p2 = dirPt(O, -c, 118, true), p3 = dirPt(O, -c, 124, true);
+    h += ln(p1, p2, '#86e0a8', 1.6) + T(p3[0] - 2, p3[1] + 4, 8.5, '#86e0a8', `αпр ${MATS[k].name.toLowerCase()}`, 'end', halo);
+  }
+  const E = dirPt(O, -a, g.r, true);
+  h += beam([lx, ly], E, 1, 0.5) + beam(E, O, 1, 0.5);
+  const Rq = dirPt(O, a, g.r, true), rop = 0.12 + 0.88 * Math.sqrt(R);
+  h += beam(O, Rq, rop, 0.5) + beam(Rq, dirPt(O, a, 215, true), rop, 0.5);
+  if (!isNaN(b)) h += beam(O, dirPt(O, b, 200, false), 1 - R, 0.45);
+  else h += T(g.ox + 60, g.oy - 26, 10, '#ffb547', 'наружу свет не выходит', 'start', halo);
+  h += angleArcs(O, a, isNaN(b) ? NaN : b, true, false, 'α', 'β');
+  h += `<circle cx="${g.ox}" cy="${g.oy}" r="3" fill="#e8ecf4"/>` + T(g.ox - 10, g.oy - 8, 9, '#c8d0dd', 'O', 'middle', halo);
+  h += laserSVG(lx, ly, a - 90) + T(lx - 30, ly + 22, 9.5, '#e8ecf4', 'лазер', 'middle', halo);
+  return h;
+}
+
+function hlBox(id) {
+  const lid = LID(), [lx, ly] = laserPos();
+  if (lid === 'law') {
+    const g = G1, yb = g.oy + g.D * g.k;
+    return ({ laser: [lx - 30, ly - 24, 50, 48], water: [g.x0, g.oy - 4, g.x1 - g.x0, yb - g.oy + 8], normal: [g.ox - 8, g.oy - 135, 16, yb - g.oy + 135], O: [g.ox - 10, g.oy - 10, 20, 20], coins: [g.ox, yb - 12, g.x1 - g.ox, 20], ghost: [g.ox, g.oy, 240, yb - g.oy], refl: [g.ox, g.oy - 135, 135, 135], prot: [g.ox - 124, g.oy - 124, 248, 124] })[id];
+  }
+  const g = lid === 'measure' ? G2 : G3;
+  return ({ laser: [lx - 30, ly - 24, 50, 48], block: [g.ox - g.r - 4, g.oy - 4, 2 * g.r + 8, g.r + 8], normal: [g.ox - 8, g.oy - 205, 16, 410], O: [g.ox - 10, g.oy - 10, 20, 20], prot: lid === 'measure' ? [g.ox - 169, g.oy - 169, 338, 338] : [g.ox - 182, g.oy - 182, 364, 364], out: lid === 'measure' ? [g.ox, g.oy, 160, 215] : [g.ox, g.oy - 200, 200, 200], refl: lid === 'measure' ? [g.ox, g.oy - 150, 150, 150] : [g.ox, g.oy, 160, 215] })[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = bg();
+  if (id === 'law') h += lawScene(t);
+  else if (id === 'measure') h += measureScene(t);
+  else h += tirScene(t);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 520, hh / 440, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 430 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer ----------
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+const throttled = () => { const n = performance.now(); if (n - lastUpd > 120) { lastUpd = n; update(); } };
+const geo = () => LID() === 'law' ? G1 : LID() === 'measure' ? G2 : G3;
+function laserAt(p) {
+  const g = geo();
+  if (LID() === 'tir') setAlpha(Math.atan2(g.ox - p.x, p.y - g.oy) / RAD);
+  else setAlpha(Math.atan2(g.ox - p.x, g.oy - p.y) / RAD);
+}
+function inLaserZone(p) { const g = geo(); return p.x < g.ox && (LID() === 'tir' ? p.y > g.oy : p.y < g.oy); }
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'), p = toSvg(e);
+  if (!el && !inLaserZone(p)) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  drag = { id: 'laser' }; laserAt(p); update();
+});
+scene.addEventListener('pointermove', e => { if (!drag) return; laserAt(toSvg(e)); throttled(); });
+const endDrag = () => { if (!drag) return; drag = null; scene.classList.remove('grabbing'); update(); };
+scene.addEventListener('pointerup', endDrag);
+scene.addEventListener('pointercancel', endDrag);
+
+function loop(t) {
+  requestAnimationFrame(loop);
+  if (!reduce && LID() === 'law' && S.ti < 3) dirty = true;
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3800); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, cls) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}${cls ? ` class="${cls}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  let h = B('a-', 'α −1°') + B('a+', 'α +1°');
+  if (id === 'law') h += B('a0', 'Отвесно') + sep + B('prot', 'Транспортир', S.prot, 'rec') + sep + B('reset', 'Сброс');
+  if (id === 'measure') h += sep + ['water', 'glass', 'X'].map(k => B('m:' + k, MATS[k].name, S.mat === k)).join('') + sep + B('rec', 'Записать замер', undefined, 'rec');
+  if (id === 'tir') h += sep + ['glass', 'water'].map(k => B('m:' + k, MATS[k].name, S.mat === k)).join('') + sep + B('reset', 'Сброс');
+  tb.innerHTML = h;
+}
+function act(a) {
+  if (a === 'reset') { resetState(); renderTools(); buildScheme(); update(); return; }
+  if (a === 'a-' || a === 'a+') { setAlpha(S.alpha + (a === 'a+' ? 1 : -1)); update(); return; }
+  if (a === 'a0') { setAlpha(0); toast('Луч падает отвесно: α = 0°, γ = 0°. Он не преломляется.'); update(); return; }
+  if (a === 'prot') { S.prot = !S.prot; renderTools(); buildScheme(); update(); return; }
+  if (a.startsWith('m:')) { S.mat = a.slice(2); renderTools(); buildScheme(); update(); return; }
+  if (a === 'rec') {
+    if (S.alpha < 5) { toast('При α около 0° синусы почти нулевые — замер неточный. Возьмите угол побольше.'); return; }
+    S.meas.push({ mat: S.mat, a: S.alpha, g: gamma2() });
+    if (S.meas.length > 8) S.meas.shift();
+    toast(`Записано: ${MATS[S.mat].name.toLowerCase()}, α = ${S.alpha}°, γ = ${fmt(gamma2(), 1)}°. Расчёт — во вкладке «Расчёты».`);
+    update(); return;
+  }
+  if (a.startsWith('ans:')) {
+    if (goodMeas() < 2) { toast('Сначала два замера бруска X при углах, которые отличаются хотя бы на 10°.'); return; }
+    const k = a.slice(4);
+    if (k === 'X') { S.answer = 'X'; S.wrong = null; toast('Верно! n ≈ 1,77 — это сапфир.'); }
+    else { S.wrong = k; toast('Не сходится с вашими замерами. Сравните посчитанное n со справочником.'); }
+    update(); return;
+  }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.disabled) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons for the parts list ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  laser: IC('<rect x="3" y="12" width="20" height="10" rx="2" fill="#3a4762" stroke="#8b96ad"/><path d="M23 17H32" stroke="#ff6a55" stroke-width="2"/>'),
+  water: IC('<rect x="3" y="14" width="28" height="16" fill="rgba(95,180,217,.3)"/><path d="M3 14H31" stroke="#5fb4d9" stroke-width="2"/><path d="M3 6V31H31V6" fill="none" stroke="#8b96ad" stroke-width="2"/>'),
+  normal: IC('<path d="M17 3V31" stroke="#e8ecf4" stroke-dasharray="3 3"/><path d="M3 17H31" stroke="#5fb4d9" stroke-width="2"/>'),
+  point: IC('<path d="M5 4L17 17L22 30" fill="none" stroke="#ff6a55" stroke-width="1.6"/><circle cx="17" cy="17" r="3" fill="#e8ecf4"/>'),
+  coins: IC('<ellipse cx="17" cy="22" rx="10" ry="4" fill="#c99a2e" stroke="#ffb547"/><path d="M5 28H29" stroke="#2a3346" stroke-width="3"/>'),
+  ghost: IC('<path d="M17 6L17 17L30 30" fill="none" stroke="#ff8a73" stroke-dasharray="3 3"/><path d="M17 17L23 31" stroke="#ff6a55" stroke-width="1.6"/>'),
+  refl: IC('<path d="M4 4L17 20L30 4" fill="none" stroke="#ff6a55" stroke-width="1.4" opacity=".6"/><path d="M3 20H31" stroke="#5fb4d9" stroke-width="2"/>'),
+  prot: IC('<circle cx="17" cy="17" r="13" fill="none" stroke="#72d4e8"/><path d="M17 4v4M17 26v4M4 17h4M26 17h4" stroke="#72d4e8"/>'),
+  block: IC('<path d="M3 12A14 14 0 0 0 31 12Z" fill="rgba(170,215,235,.25)" stroke="#bfe3f2"/>'),
+  out: IC('<path d="M17 20L29 4" stroke="#ff6a55" stroke-width="1.6"/><path d="M3 20H31" stroke="#bfe3f2" stroke-width="2"/>'),
+  inner: IC('<path d="M5 31L17 17L29 31" fill="none" stroke="#ff6a55" stroke-width="1.6"/><path d="M3 17H31" stroke="#bfe3f2" stroke-width="2"/>'),
+  down: IC('<path d="M8 3L17 14L22 31" fill="none" stroke="#ff6a55" stroke-width="1.6"/><path d="M3 14H31" stroke="#bfe3f2" stroke-width="2"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  if (id === 'law') return `монетки ${m.hits}/3 · α = ${S.alpha}°`;
+  if (id === 'measure') return `замеры бруска X ${m.meas}/2 · ${S.answer ? 'вещество найдено' : 'вещество не выбрано'}`;
+  return `найдено углов ${m.found}/2 · ${m.total ? 'полное отражение' : 'луч выходит'}`;
+}
+
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function matChips(list) {
+  return `<div class="ctl"><div class="lbl">Вещество</div><div class="chips">${list.map(k => `<button data-a="m:${k}" aria-pressed="${S.mat === k}">${MATS[k].name}</button>`).join('')}</div></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'law') h = `<h2>Лазер и аквариум</h2>` + slider('inA', 'Угол падения α, °', 0, 85, 1, S.alpha) +
+      `<dl class="reads"><div><dt>угол α</dt><dd id="r1"></dd></div><div><dt>угол γ</dt><dd id="r2"></dd></div><div><dt>монетки</dt><dd id="r3"></dd></div></dl>
+      <div class="row"><button class="ghostbtn" data-a="prot">${S.prot ? 'Убрать транспортир' : 'Показать транспортир'}</button><button class="ghostbtn" data-a="a0">Отвесно</button><button class="ghostbtn" data-a="reset">Сброс</button></div>
+      <p class="note" style="margin-top:12px">Глубина воды ${G1.D} см, показатель преломления воды n = 1,33. Расстояние по дну отсчитывают от точки прямо под O.</p>`;
+  if (id === 'measure') h = `<h2>Полуцилиндр на шкале</h2>` + matChips(['water', 'glass', 'X']) + slider('inA', 'Угол падения α, °', 0, 89, 1, S.alpha) +
+      `<dl class="reads"><div><dt>угол α</dt><dd id="r1"></dd></div><div><dt>угол γ</dt><dd id="r2"></dd></div><div><dt>замеры X</dt><dd id="r3"></dd></div></dl>
+      <div class="row"><button class="ghostbtn" data-a="rec">Записать замер</button><button class="ghostbtn" data-a="prot">${S.prot ? 'Убрать шкалу' : 'Показать шкалу'}</button><button class="ghostbtn" data-a="reset">Сброс</button></div>
+      <p class="note" style="margin-top:12px">Угол γ показан с точностью 0,1° — как будто вы очень аккуратно сняли его со шкалы.</p>`;
+  if (id === 'tir') h = `<h2>Из вещества в воздух</h2>` + matChips(['glass', 'water']) + slider('inA', 'Угол падения α (внутри), °', 0, 89, 1, S.alpha) +
+      `<dl class="reads"><div><dt>угол α</dt><dd id="r1"></dd></div><div><dt>угол β</dt><dd id="r2"></dd></div><div><dt>отражается</dt><dd id="r3"></dd></div></dl>
+      <div class="row"><button class="ghostbtn" data-a="prot">${S.prot ? 'Убрать шкалу' : 'Показать шкалу'}</button><button class="ghostbtn" data-a="reset">Сброс</button></div>
+      <p class="note" style="margin-top:12px">Свет входит в полуцилиндр через круглую грань по радиусу и не преломляется. Преломление — только на плоской грани в точке O. «Отражается» — доля света, которая ушла в отражённый луч.</p>`;
+  el.innerHTML = h;
+  const x = el.querySelector('#inA'); if (x) x.addEventListener('input', e => { setAlpha(+e.target.value); update(); });
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => { act(b.dataset.a); buildScheme(); });
+  updateScheme(model());
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  set('#inAO', S.alpha + '°'); val('#inA', S.alpha); set('#r1', S.alpha + '°');
+  if (id === 'law') { set('#r2', fmt(m.g, 1) + '°'); set('#r3', `${m.hits}/3`); }
+  if (id === 'measure') { set('#r2', fmt(m.g, 1) + '°'); set('#r3', `${m.meas}/2`); }
+  if (id === 'tir') { set('#r2', m.total ? 'нет' : fmt(m.b, 1) + '°'); set('#r3', fmt(m.R * 100, 0) + ' %'); }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'law') return [
+    { id: 'laser', icon: ICON.laser, name: 'Лазер', spec: 'Даёт узкий пучок. Поворачивается вокруг точки падения O.' },
+    { id: 'water', icon: ICON.water, name: 'Аквариум с водой', spec: 'Глубина 10 см. Над водой — воздух. Граница сред — поверхность воды.' },
+    { id: 'O', icon: ICON.point, name: 'Точка падения O', spec: 'Здесь луч переходит из воздуха в воду и меняет направление.' },
+    { id: 'normal', icon: ICON.normal, name: 'Нормаль', spec: 'Перпендикуляр к поверхности воды в точке O. От неё отсчитывают α и γ.' },
+    { id: 'ghost', icon: ICON.ghost, name: 'Пунктир «без преломления»', spec: 'Куда пошёл бы луч, если бы не преломился. Настоящий луч идёт круче.' },
+    { id: 'refl', icon: ICON.refl, name: 'Слабый отражённый луч', spec: 'Часть света всегда отражается от границы. При больших углах — заметно больше.' },
+    { id: 'coins', icon: ICON.coins, name: 'Монетки на дне', spec: 'Цели. Появляются по одной.' },
+    { id: 'prot', icon: ICON.prot, name: 'Транспортир', spec: 'Шкала отсчитана от нормали.' }];
+  const isM = id === 'measure';
+  return [
+    { id: 'laser', icon: ICON.laser, name: 'Лазер', spec: isM ? 'Светит из воздуха в центр плоской грани.' : 'Светит изнутри: луч входит через круглую грань по радиусу и не преломляется.' },
+    { id: 'block', icon: ICON.block, name: isM ? 'Полуцилиндр' : 'Полуцилиндр (кювета)', spec: isM ? 'Вода в полукруглой кювете, стекло или неизвестный брусок X.' : 'Стекло или вода в полукруглой кювете. Свет идёт из вещества в воздух.' },
+    { id: 'O', icon: ICON.point, name: 'Точка O', spec: 'Центр плоской грани. Только здесь луч преломляется.' },
+    { id: 'normal', icon: ICON.normal, name: 'Нормаль', spec: 'Перпендикуляр к плоской грани через O.' },
+    { id: 'prot', icon: ICON.prot, name: 'Круговая шкала', spec: 'Углы от нормали: 0° — вдоль нормали, 90° — вдоль грани.' },
+    isM ? { id: 'out', icon: ICON.down, name: 'Преломлённый луч', spec: 'Внутри вещества. Из круглой грани выходит без излома.' } : { id: 'out', icon: ICON.out, name: 'Преломлённый луч', spec: 'Выходит в воздух под углом β > α. За предельным углом исчезает.' },
+    { id: 'refl', icon: isM ? ICON.refl : ICON.inner, name: 'Отражённый луч', spec: isM ? 'Слабый, уходит обратно в воздух.' : 'Остаётся внутри. Ярче при больших углах, а за предельным углом забирает весь свет.' }];
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    let extra = '';
+    if (Ls.id === 'measure') extra = `<div class="ctl" style="margin-top:4px"><div class="lbl">Из чего брусок X?</div><div class="chips">${ANSWERS.map(([k, t]) => `<button data-ans="${k}" aria-pressed="${S.answer === k || S.wrong === k}">${t}</button>`).join('')}</div></div>`;
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      (Ls.safe ? `<div class="safe"><b>Безопасность</b>${Ls.safe}</div>` : '') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div>${extra}<p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+    $('#pane-overview').querySelectorAll('[data-ans]').forEach(b => b.onclick = () => act('ans:' + b.dataset.ans));
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Что на площадке</h2><p class="note">Нажмите на деталь, чтобы найти её на площадке.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+const sinS = x => fmt(Math.sin(x * RAD), 3);
+function calcHTML(m) {
+  const id = LID(), a = S.alpha;
+  if (id === 'law') {
+    const g = m.g;
+    return `<h2>Угол преломления</h2><div class="formula">sin α / sin γ = n</div><div class="steps">` +
+      step('угол падения α', `${a}°`) + step('sin α', sinS(a)) + step('n (воздух → вода)', '1,33') +
+      step('sin γ = sin α / n', `${sinS(a)} / 1,33 = ${fmt(Math.sin(a * RAD) / 1.33, 3)}`) +
+      step('γ = arcsin(sin γ)', `${fmt(g, 1)}°`, 'sum') +
+      step('луч повернул на α − γ', `${fmt(a - g, 1)}°`) + `</div>
+      <h3>Куда луч попадёт на дне</h3><div class="formula">x = h · tg γ</div><div class="steps">` +
+      step('глубина h', `${G1.D} см`) +
+      step('x = h · tg γ', `${G1.D} · ${fmt(Math.tan(g * RAD), 3)} = ${fmt(m.x, 1)} см`, 'sum') +
+      step('без преломления: h · tg α', `${G1.D} · ${fmt(Math.tan(a * RAD), 3)} = ${fmt(G1.D * Math.tan(a * RAD), 1)} см`) + `</div>
+      <h3>Журнал попаданий</h3><div class="steps">` +
+      (S.hitLog.length ? S.hitLog.map((r, i) => step(`монетка ${i + 1}, x = ${fmt(r.x, 1)} см`, `α = ${r.a}°, γ = ${fmt(r.g, 1)}°`)).join('') : step('пока пусто', 'попадите в монетку')) + `</div>
+      <p class="note" style="margin-top:10px">Синусы берут из таблицы или считают на калькуляторе в режиме градусов (DEG).</p>`;
+  }
+  if (id === 'measure') {
+    const g = m.g, nOf = r => Math.sin(r.a * RAD) / Math.sin(r.g * RAD);
+    const list = S.meas.map((r, i) => step(`${i + 1}. ${MATS[r.mat].name.toLowerCase()}: α = ${r.a}°, γ = ${fmt(r.g, 1)}°`, `${sinS(r.a)} / ${sinS(r.g)} = ${fmt(nOf(r), 2)}`)).join('');
+    const xs = S.meas.filter(r => r.mat === 'X'), avg = xs.length ? xs.reduce((s, r) => s + nOf(r), 0) / xs.length : NaN;
+    return `<h2>Показатель преломления</h2><div class="formula">n = sin α / sin γ</div><div class="steps">` +
+      step('вещество', MATS[S.mat].name) + step('α и γ', `${a}° и ${fmt(g, 1)}°`) +
+      (a < 5 ? step('n', 'при α ≈ 0° не посчитать: 0 / 0', 'sum') : step('sin α / sin γ', `${sinS(a)} / ${sinS(g)}`) + step('n', fmt(Math.sin(a * RAD) / Math.sin(g * RAD), 2), 'sum')) + `</div>
+      <h3>Записанные замеры</h3><div class="steps">` + (list || step('пока пусто', 'нажмите «Записать замер»')) +
+      (xs.length ? step('среднее n для бруска X', fmt(avg, 2), 'sum') : '') + `</div>
+      <h3>Справочник</h3><div class="steps">` + step('вода', '1,33') + step('стекло', '≈ 1,5') + step('сапфир', '1,77') + step('алмаз', '2,42') + `</div>
+      <p class="note" style="margin-top:10px">Скорость света в веществе v = c / n, где c = 300 000 км/с. В воде: 300 000 / 1,33 ≈ 226 000 км/с.</p>`;
+  }
+  const n = MATS[S.mat].n, sb = n * Math.sin(a * RAD), c = critA(n);
+  return `<h2>Из вещества в воздух</h2><div class="formula">sin β = n · sin α</div><div class="steps">` +
+    step('вещество, n', `${MATS[S.mat].name}, ${fmt(n, 2)}`) + step('угол падения α (внутри)', `${a}°`) +
+    step('sin β = n · sin α', `${fmt(n, 2)} · ${sinS(a)} = ${fmt(sb, 3)}`) +
+    (sb > 1 ? step('итог', 'sin β > 1 — такого угла нет: полное отражение', 'sum') : step('β = arcsin(sin β)', `${fmt(m.b, 1)}°`, 'sum')) +
+    step('доля отражённого света', `${fmt(m.R * 100, 0)} %`) + `</div>
+    <h3>Предельный угол</h3><div class="formula">sin αпр = 1 / n</div><div class="steps">` +
+    ['glass', 'water'].map(k => S.found[k] ? step(MATS[k].name, `arcsin(1 / ${fmt(MATS[k].n, 2)}) = ${fmt(critA(MATS[k].n), 1)}°`) : step(MATS[k].name, 'найдите опытом')).join('') + `</div>
+    <p class="note" style="margin-top:10px">${S.found[S.mat] ? `Для вещества «${MATS[S.mat].name.toLowerCase()}» при α > ${fmt(c, 1)}° свет полностью отражается внутрь.` : 'Подсказка: полное отражение начинается, когда n · sin α становится больше 1.'}</p>`;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter');
+  if (id === 'law') {
+    el.innerHTML = `<div class="k">Углы</div><div class="v">α = ${S.alpha}°</div><div class="lr"><span>γ</span><span class="ok">${fmt(m.g, 1)}°</span></div>` +
+      `<div class="lr"><span>по дну</span><span>${fmt(m.x, 1)} см</span></div><div class="lr"><span>монетки</span><span class="${m.hits === 3 ? 'ok' : ''}">${m.hits}/3</span></div>`;
+  } else if (id === 'measure') {
+    el.innerHTML = `<div class="k">${MATS[S.mat].name}</div><div class="v">α = ${S.alpha}°</div><div class="lr"><span>γ</span><span class="ok">${fmt(m.g, 1)}°</span></div>` +
+      `<div class="lr"><span>замеры X</span><span class="${m.meas >= 2 ? 'ok' : ''}">${m.meas}/2</span></div><div class="lr"><span>ответ</span><span class="${S.answer ? 'ok' : ''}">${S.answer ? 'сапфир' : '—'}</span></div>`;
+  } else {
+    el.innerHTML = `<div class="k">${MATS[S.mat].name} → воздух</div><div class="v ${m.total ? 'ok' : ''}">${m.total ? 'полное отр.' : 'β = ' + fmt(m.b, 1) + '°'}</div>` +
+      `<div class="lr"><span>α</span><span>${S.alpha}°</span></div><div class="lr"><span>отражается</span><span>${fmt(m.R * 100, 0)} %</span></div><div class="lr"><span>найдено</span><span class="${m.found >= 2 ? 'ok' : ''}">${m.found}/2</span></div>`;
+  }
+}
+
+function update() {
+  track();
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Теперь вы знаете, как преломляется свет и почему работает оптоволокно!'), 1900);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  law: '<rect x="2" y="15" width="62" height="14" fill="rgba(95,180,217,.3)"/><path d="M2 15H64" stroke="#5fb4d9" stroke-width="1.5"/><path d="M33 2V29" stroke="#e8ecf4" stroke-dasharray="2 2" opacity=".6"/><path d="M14 2L33 15L40 29" fill="none" stroke="#ff6a55" stroke-width="1.6"/>',
+  measure: '<path d="M13 9A20 20 0 0 0 53 9Z" fill="rgba(120,140,235,.3)" stroke="#9fb0ff"/><path d="M18 1L33 9L39 28" fill="none" stroke="#ff6a55" stroke-width="1.6"/>',
+  tir: '<path d="M13 9A20 20 0 0 0 53 9Z" fill="rgba(170,215,235,.25)" stroke="#bfe3f2"/><path d="M16 26L33 9L50 26" fill="none" stroke="#ff6a55" stroke-width="1.6"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Lx, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Lx.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Lx.title}</span></span>
+      ${S.done[Lx.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  S.lesson = i; drag = null;
+  resetState(); save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L().task;
+  $('#hint').textContent = L().stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '';
+  if (id === 'law') now = `Аквариум с водой глубиной ${G1.D} см (n = 1,33), лазер в воздухе светит в точку O на поверхности. Угол падения α = ${S.alpha}°, угол преломления γ = ${fmt(m.g, 1)}°, луч попадает на дно в ${fmt(m.x, 1)} см от точки под O (без преломления было бы ${fmt(G1.D * Math.tan(S.alpha * RAD), 1)} см). Собрано монеток: ${m.hits} из 3${m.hits < 3 ? `, текущая монетка лежит в ${fmt(hitX(TG[m.hits]), 1)} см от точки под O` : ''}. Не называй нужный угол — наведи вопросами: от чего отсчитывают углы, как γ зависит от α, как связаны глубина, расстояние и тангенс.`;
+  if (id === 'measure') now = `Полуцилиндр на круговой шкале, лазер светит из воздуха в центр плоской грани. Вещество: ${MATS[S.mat].name}. α = ${S.alpha}°, γ = ${fmt(m.g, 1)}°. Записанные замеры: ${S.meas.length ? S.meas.map(r => `${MATS[r.mat].name.toLowerCase()} α=${r.a}° γ=${fmt(r.g, 1)}°`).join('; ') : 'нет'}. Годных замеров бруска X: ${m.meas} из 2. Вещество бруска X ${S.answer ? 'определено верно' : 'ещё не определено'}${S.wrong ? ' (была неверная попытка)' : ''}. Не называй, из чего брусок X, — помоги посчитать n = sin α / sin γ и сравнить со справочником.`;
+  if (id === 'tir') now = `Свет идёт из вещества «${MATS[S.mat].name}» (n = ${fmt(MATS[S.mat].n, 2)}) в воздух через плоскую грань полуцилиндра. Угол падения α = ${S.alpha}°. ${m.total ? 'Преломлённого луча нет — полное отражение.' : `Угол преломления β = ${fmt(m.b, 1)}°.`} Отражается ${fmt(m.R * 100, 0)} % света. Предельный угол найден: стекло — ${S.found.glass ? 'да' : 'нет'}, вода — ${S.found.water ? 'да' : 'нет'}. Не называй значения предельных углов, пока ученик их не нашёл, — наведи: что происходит с β при росте α, когда n · sin α становится больше 1.`;
+  return [
+    `Раздел: физика, 8 класс, тема «Преломление света» (оптика). Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'} (${taskState(m)}).`,
+    `Сейчас на площадке: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Помогай наводящими вопросами, готовые ответы не выдавай.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { law: 'Почему ложка в стакане кажется сломанной?', measure: 'Почему в алмазе свет идёт медленнее?', tir: 'Как работает оптоволоконный интернет?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
