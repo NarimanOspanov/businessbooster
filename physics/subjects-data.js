@@ -25,14 +25,14 @@ window.LUCH_SUBJECTS = {
       { id: 'quad', b: 'alg', g: 8, t: 'Квадратные уравнения', items: ['Дискриминант', 'Теорема Виета', 'Дробно-рациональные уравнения', 'Задачи на движение и работу'], req: ['roots'], status: 'done', href: '/labs/math-quad/', lessons: 4, doneItems: 4 },
       { id: 'ineq', b: 'alg', g: 9, t: 'Неравенства', items: ['Линейные неравенства', 'Квадратные неравенства', 'Метод интервалов', 'Системы неравенств'], req: ['quad'], status: 'done', href: '/labs/math-ineq/', lessons: 4, doneItems: 4 },
       { id: 'seq', b: 'alg', g: 9, t: 'Прогрессии', items: ['Числовые последовательности', 'Арифметическая прогрессия', 'Геометрическая прогрессия', 'Сложные проценты и вклады'], req: ['expr'], status: 'done', href: '/labs/math-seq/', lessons: 4, doneItems: 4 },
-      { id: 'explog', b: 'alg', g: 11, t: 'Степени и логарифмы', items: ['Корень n-й степени', 'Показательная функция', 'Логарифмы', 'Показательные и логарифмические уравнения'], req: ['ineq', 'fquad'] },
+      { id: 'explog', b: 'alg', g: 11, t: 'Степени и логарифмы', items: ['Корень n-й степени', 'Показательная функция', 'Логарифмы', 'Показательные и логарифмические уравнения'], req: ['ineq', 'fquad'], status: 'done', href: '/labs/math-explog/', lessons: 4, doneItems: 4 },
 
       { id: 'coord', b: 'fn', g: 6, t: 'Координатная плоскость', items: ['Координаты точки', 'Графики зависимостей', 'Чтение графиков'], req: ['neg'], status: 'done', href: '/labs/math-coord/', lessons: 3, doneItems: 3 },
       { id: 'linf', b: 'fn', g: 7, t: 'Линейная функция', items: ['Что такое функция', 'y = kx + b', 'Угловой коэффициент', 'Пересечение графиков'], req: ['coord', 'expr'], status: 'done', href: '/math/', lessons: 2, doneItems: 4 },
       { id: 'fquad', b: 'fn', g: 9, t: 'Квадратичная функция', items: ['Парабола', 'Вершина и ось симметрии', 'Сдвиги и растяжения графиков'], req: ['linf', 'quad'], status: 'done', href: '/math/', lessons: 3, doneItems: 3 },
       { id: 'trig', b: 'fn', g: 10, t: 'Тригонометрия', items: ['Единичная окружность', 'Основные формулы', 'Графики синуса и косинуса', 'Тригонометрические уравнения'], req: ['fquad', 'pyth'], status: 'done', href: '/labs/math-trig/', lessons: 4, doneItems: 4 },
       { id: 'deriv', b: 'fn', g: 10, t: 'Производная', items: ['Скорость изменения и предел', 'Правила дифференцирования', 'Касательная', 'Исследование функции'], req: ['fquad'], status: 'done', href: '/labs/math-deriv/', lessons: 4, doneItems: 4 },
-      { id: 'integ', b: 'fn', g: 11, t: 'Интеграл', items: ['Первообразная', 'Площадь под графиком', 'Формула Ньютона — Лейбница'], req: ['deriv'] },
+      { id: 'integ', b: 'fn', g: 11, t: 'Интеграл', items: ['Первообразная', 'Площадь под графиком', 'Формула Ньютона — Лейбница'], req: ['deriv'], status: 'done', href: '/labs/math-integ/', lessons: 3, doneItems: 3 },
 
       { id: 'shapes', b: 'geo', g: 5, t: 'Наглядная геометрия', items: ['Углы и транспортир', 'Периметр и площадь', 'Объём параллелепипеда', 'Окружность и круг'], req: ['num'], status: 'done', href: '/labs/math-shapes/', lessons: 4, doneItems: 4 },
       { id: 'gbase', b: 'geo', g: 7, t: 'Начала геометрии', items: ['Точки, прямые, отрезки', 'Смежные и вертикальные углы', 'Параллельные прямые', 'Как доказывать'], req: ['shapes'], status: 'done', href: '/labs/math-gbase/', lessons: 4, doneItems: 4 },
@@ -141,7 +141,7 @@ window.LUCH_SUBJECTS = {
 
       { id: 'env', b: 'eco', g: 8, t: 'Организм и среда', items: ['Факторы среды', 'Приспособления', 'Биоритмы'], req: ['plants'], status: 'done', href: '/labs/bio-env/', lessons: 3, doneItems: 3 },
       { id: 'ecosys', b: 'eco', g: 10, t: 'Экосистемы', items: ['Пищевые цепи', 'Круговорот веществ', 'Устойчивость экосистем'], req: ['env', 'metab'], status: 'done', href: '/labs/bio-ecosys/', lessons: 3, doneItems: 3 },
-      { id: 'biosphere', b: 'eco', g: 11, t: 'Биосфера', items: ['Учение Вернадского', 'Природные зоны планеты', 'Человек и биосфера'], req: ['ecosys', 'evolution'] },
+      { id: 'biosphere', b: 'eco', g: 11, t: 'Биосфера', items: ['Учение Вернадского', 'Природные зоны планеты', 'Человек и биосфера'], req: ['ecosys', 'evolution'], status: 'done', href: '/labs/bio-biosphere/', lessons: 3, doneItems: 3 },
       { id: 'protect', b: 'eco', g: 11, t: 'Охрана природы', items: ['Красная книга', 'Заповедники Казахстана', 'Устойчивое развитие'], req: ['biosphere'] },
     ],
   },

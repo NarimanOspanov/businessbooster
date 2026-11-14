@@ -1,0 +1,952 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по физике, 10 класс: идеальный газ, уравнение Менделеева — Клапейрона, изопроцессы.">
+<title>Молекулярная физика</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.meter .lr .ok{color:var(--ok)}
+.meter .lr .bad{color:var(--warn)}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button.rec{color:var(--force)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 230px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><rect x="8" y="9" width="24" height="23" rx="3" fill="none" stroke="var(--muted)" stroke-width="2"/><circle cx="14" cy="16" r="2.4" fill="var(--arm)"/><circle cx="24" cy="14" r="2.4" fill="var(--force)"/><circle cx="19" cy="24" r="2.4" fill="var(--arm)"/><circle cx="27" cy="26" r="2.4" fill="var(--force)"/><path d="M14 16l5 3" stroke="var(--arm)" stroke-width="1.4"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Физика · Молекулярная физика</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/">Карта</a><a href="/physics/">Физика</a><a href="/labs/phys-mkt/" aria-current="page">МКТ</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Газы</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Опытная площадка">
+    <svg class="scene" id="scene" role="img" aria-label="Площадка для опытов с газом: сосуд с молекулами, баллон с манометром, цилиндр с поршнем и график p(V)."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const nf = x => fmt(x, Math.abs(x - Math.round(x)) < 1e-9 ? 0 : (Math.abs(x * 10 - Math.round(x * 10)) < 1e-9 ? 1 : 2));
+const SUP = { '-': '⁻', '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹' };
+const sci = (x, d = 2) => {
+  if (x === 0) return '0';
+  let e = Math.floor(Math.log10(Math.abs(x))), m = x / 10 ** e;
+  if (Math.abs(+m.toFixed(d)) >= 10) { m /= 10; e++; }
+  return fmt(m, d) + '·10' + String(e).split('').map(c => SUP[c]).join('');
+};
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d', MUT = '#8b96ad';
+const C1 = '#72d4e8', CP = '#ffb547', OK = '#86e0a8', WARN = '#ff8a73', VIO = '#c3a8ff';
+const kB = 1.38e-23, NA = 6.02e23, R = 8.31;
+
+const LESSONS = [
+  { id: 'ideal', title: 'Идеальный газ',
+    text: ['Идеальный газ — это модель. Молекулы считают точками, которые не притягиваются друг к другу и взаимодействуют только при упругих ударах. Так хорошо описываются разреженные газы, например воздух в комнате.',
+           'Давление газа — это результат ударов молекул о стенки. Основное уравнение МКТ: p = ⅓ m₀ n v², где m₀ — масса молекулы, n — концентрация, v² — средний квадрат скорости. Иначе: p = ⅔ n Ē.',
+           'Температура — мера средней кинетической энергии молекул: Ē = 3/2 kT, k = 1,38·10⁻²³ Дж/К. Отсюда p = nkT: давление растёт, если молекул больше или если они быстрее.'],
+    why: 'Инженеры-технологи газоперерабатывающих заводов в Атырау и на Карачаганаке рассчитывают трубы и ёмкости по давлению газа. Метеорологи Казгидромета по давлению воздуха предсказывают погоду. На заводах микросхем и в вакуумных печах откачивают газ, чтобы молекулы не мешали. А в жару давление в шинах растёт — шиномонтажник знает, почему.',
+    task: 'Удвойте давление газа двумя способами: добавьте молекул, не меняя температуру, а потом нагрейте газ, не меняя число молекул.',
+    hint: 'Начало: 40 точек и 300 K. Давление p = nkT пропорционально и концентрации, и температуре. Кнопки N и T — внизу площадки, «Сброс» возвращает начало.',
+    stage: 'Меняйте число молекул N и температуру T. Следите за манометром.',
+    N0: 40, T0: 300,
+    check: m => m.byN && m.byT },
+  { id: 'mendeleev', title: 'Уравнение Менделеева — Клапейрона',
+    text: ['Состояние газа задают три параметра: давление p, объём V и температура T. Они связаны уравнением Менделеева — Клапейрона: pV = (m / M) · RT = νRT.',
+           'Здесь ν — количество вещества в молях, M — молярная масса (кислород 0,032 кг/моль), R = 8,31 Дж/(моль·К) — универсальная газовая постоянная. Температуру берут в кельвинах: T = t + 273, объём — в м³: 1 л = 0,001 м³.',
+           'При одинаковых p, V и T в сосуде одинаковое число молей любого газа (закон Авогадро). А вот массы разные: моль гелия в 8 раз легче моля кислорода.'],
+    why: 'Сварщики работают с баллонами аргона на 40 л и 15 МПа и по манометру понимают, сколько газа осталось. В больницах так считают запас медицинского кислорода. На газозаправках для машин на метане (АГНКС) газ хранят под давлением около 20 МПа. Инженеры по промышленной безопасности проверяют баллоны и следят, чтобы давление не превысило допустимое.',
+    safe: 'Баллоны не нагревают и не оставляют на солнце: давление растёт вместе с температурой. Вентиль кислородного баллона нельзя смазывать маслом — возможен пожар. Заправляют баллоны только специалисты.',
+    task: 'Заправьте 40-литровый баллон кислородом до 15 МПа (допуск ±0,3 МПа) при 27 °C. Затем смените газ на гелий, заправьте до того же давления и сравните массы на весах.',
+    hint: 'Компрессор подаёт газ порциями по 10 или 50 моль. Смена газа или объёма — это новый пустой баллон. Давление p = νRT / V, масса m = νM.',
+    stage: 'Качайте газ компрессором, меняйте газ, объём и температуру.',
+    V0: 40, t0: 27, pNeed: 15, tol: 0.3,
+    check: m => m.o2 && m.he },
+  { id: 'iso', title: 'Изопроцессы',
+    text: ['Изопроцесс — это процесс, в котором масса газа и один из параметров p, V или T не меняются. Тогда из уравнения pV / T = const получаются три простых закона.',
+           'Изотермический процесс, T = const: pV = const (закон Бойля — Мариотта). Сожмёте газ втрое — давление вырастет втрое. График p(V) — гипербола, её называют изотермой.',
+           'Изобарный процесс, p = const: V / T = const (закон Гей-Люссака). Изохорный, V = const: p / T = const (закон Шарля). На графике p(V) изобара — горизонтальная прямая, изохора — вертикальная.'],
+    why: 'Водолазов и дайверов учат закону Бойля — Мариотта: на глубине 10 м давление вдвое больше, и воздух в лёгких сжимается вдвое. Инженеры по холодильникам и кондиционерам сжимают и расширяют газ в компрессорах. Зимой при −30 °C давление в шинах заметно меньше, чем летом, — это изохорный процесс, и водители в Казахстане подкачивают шины по сезону. Аэростат и тепловая воздушная камера работают на изобарном расширении.',
+    task: 'Из одного начального состояния (100 кПа, 3 л, 300 K) проведите три процесса: изотермическое сжатие до 300 кПа, изобарное нагревание до 4,5 л и изохорное нагревание до 200 кПа.',
+    hint: 'Выберите процесс кнопками внизу. Тяните точку на графике или поршень (в изотерме), либо жмите − и +. При смене процесса газ возвращается в начальное состояние.',
+    stage: 'Выберите процесс и тяните точку на графике p(V).',
+    check: m => m.isoT && m.isoP && m.isoV },
+];
+
+const LS_KEY = 'luch-phys-mkt';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+
+// ---------- lesson 1: ideal gas in a 1-litre box ----------
+const BX = { x: 30, y: 140, w: 270, h: 230 }, PR = 3.2, SIG0 = 55;   // SIG0: velocity component spread at 300 K, units/s
+const ND = 2.5e20, V1 = 1e-3, M_N2 = 0.028, m0N2 = M_N2 / NA;          // one dot = 2.5·10²⁰ molecules of nitrogen, box 1 l
+const GW = BX.w - 2 * PR, GH = BX.h - 2 * PR;
+const pth = (N, T) => N * ND * kB * T / V1;                            // Pa
+const expRate = (N, T) => N * (2 * SIG0 * SIG0 * T / 300) * (GW + GH) / (GW * GH);
+const CAL = pth(40, 300) / expRate(40, 300);                           // wall-hit rate → pascals
+function gauss() { let u = 0; while (!u) u = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * Math.random()); }
+function addParts(n) {
+  for (let i = 0; i < n; i++) S.parts.push({ x: BX.x + PR + Math.random() * GW, y: BX.y + PR + Math.random() * GH, vx: gauss() * SIG0, vy: gauss() * SIG0 });
+}
+function normParts() {
+  const n = S.parts.length; if (!n) return;
+  let s = 0; for (const p of S.parts) s += p.vx * p.vx + p.vy * p.vy;
+  const k = Math.sqrt(2 * SIG0 * SIG0 * S.T / 300 * n / s);
+  for (const p of S.parts) { p.vx *= k; p.vy *= k; }
+}
+
+// ---------- lesson 2: gas cylinder ----------
+const GASES = {
+  O2: { name: 'кислород', f: 'O₂', M: 0.032, col: '#5fb4d9', txt: INK },
+  N2: { name: 'азот', f: 'N₂', M: 0.028, col: '#2b303b', txt: '#e8ecf4' },
+  Ar: { name: 'аргон', f: 'Ar', M: 0.040, col: '#9aa3b2', txt: INK },
+  He: { name: 'гелий', f: 'He', M: 0.004, col: '#9a6a45', txt: '#f3e6d8' },
+};
+const GKEYS = ['O2', 'N2', 'Ar', 'He'];
+const VOLS = [5, 10, 20, 40, 50];
+const PMAX = 20;   // the compressor stops at 20 MPa
+const pMPa = (nu, tc, V) => nu * R * (tc + 273) / (V * 1e-3) / 1e6;
+const hash = i => { const a = Math.sin(i * 12.9898 + 4.1) * 43758.5453; return a - Math.floor(a); };
+
+// ---------- lesson 3: piston and p(V) graph; pV/T = 1 кПа·л/К ----------
+const CB = 345, CK = 24, CXL = 50, CXR = 150;                         // cylinder inner bottom, units per litre, inner walls
+const GX0 = 205, GY0 = 345, GKV = 36, GKP = 0.48;                      // graph origin, units per litre, units per kPa
+const MODES = { T: { name: 'изотерма', law: 'T = const', col: C1 }, P: { name: 'изобара', law: 'p = const', col: CP }, V: { name: 'изохора', law: 'V = const', col: VIO } };
+const TARGET = { T: [1, 300], P: [4.5, 100], V: [3, 200] };
+const p3 = () => S.T3 / S.V3;
+
+function resetState() {
+  const Ls = L();
+  Object.assign(S, {
+    N: Ls.N0 || 40, T: Ls.T0 || 300, parts: [], meas: 0, byN: false, byT: false,
+    gas: 'O2', V: Ls.V0 || 40, tc: Ls.t0 || 27, nu: 0, hits: {}, ph: 0, pumpT: 0,
+    mode: 'T', V3: 3, T3: 300, rng: { T: [3, 3], P: [3, 3], V: [100, 100] }, isoT: false, isoP: false, isoV: false, cyl: [], hl: null,
+  });
+  addParts(S.N); normParts(); S.meas = expRate(S.N, S.T);
+  for (let i = 0; i < 24; i++) S.cyl.push({ x: Math.random(), y: 4 + Math.random() * 60, vx: gauss() * 0.45, vy: gauss() * 45 });
+}
+resetState();
+
+function model() {
+  const id = LID();
+  if (id === 'ideal') {
+    const p = pth(S.N, S.T), p0 = pth(L().N0, L().T0);
+    return { kind: id, N: S.N, T: S.T, p, pk: p / 1000, pm: S.meas * CAL / 1000, ratio: p / p0, n: S.N * ND / V1, E: 1.5 * kB * S.T, v: Math.sqrt(3 * kB * S.T / m0N2), byN: S.byN, byT: S.byT };
+  }
+  if (id === 'mendeleev') {
+    const g = GASES[S.gas], p = pMPa(S.nu, S.tc, S.V);
+    return { kind: id, gas: S.gas, g, nu: S.nu, V: S.V, tc: S.tc, T: S.tc + 273, p, mass: S.nu * g.M, o2: !!S.hits.O2, he: !!S.hits.He, cond: S.V === 40 && S.tc === 27 };
+  }
+  return { kind: id, mode: S.mode, V: S.V3, T: S.T3, p: p3(), isoT: S.isoT, isoP: S.isoP, isoV: S.isoV };
+}
+
+// ---------- drawing helpers ----------
+const T = (x, y, s, fill, txt, anchor = 'middle', extra = '') => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${s}" fill="${fill}" text-anchor="${anchor}" ${extra}>${txt}</text>`;
+const halo = `paint-order="stroke" stroke="${INK}" stroke-width="3"`;
+const hex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
+const mix = (a, b, t) => { const A = hex(a), B = hex(b); return 'rgb(' + A.map((v, i) => Math.round(v + (B[i] - v) * clamp(t, 0, 1))).join(',') + ')'; };
+const heat = t => t < 0.5 ? mix(C1, CP, t * 2) : mix(CP, WARN, (t - 0.5) * 2);
+function bg() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+const knob = (id, x, y, col) => `<g data-drag="${id}"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="18" fill="transparent"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7" fill="${INK}" stroke="${col}" stroke-width="2.4"/></g>`;
+const polar = (cx, cy, r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+function dial(cx, cy, r, max, val, opts) {
+  // 240° dial from lower-left to lower-right, clockwise
+  const a0 = Math.PI * 5 / 6, sw = Math.PI * 4 / 3, ang = v => a0 + sw * clamp(v / max, 0, 1);
+  const arc = (v1, v2, col, w) => { const [x1, y1] = polar(cx, cy, r - 6, ang(v1)), [x2, y2] = polar(cx, cy, r - 6, ang(v2)); return `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)}A${r - 6} ${r - 6} 0 ${ang(v2) - ang(v1) > Math.PI ? 1 : 0} 1 ${x2.toFixed(1)} ${y2.toFixed(1)}" fill="none" stroke="${col}" stroke-width="${w}"/>`; };
+  let h = `<circle cx="${cx}" cy="${cy}" r="${r + 6}" fill="#2a3348" stroke="${INK}" stroke-width="2"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="#e8ecf4" stroke="${INK}" stroke-width="1.5"/>`;
+  for (const z of opts.zones || []) h += arc(z[0], z[1], z[2], 6);
+  for (let v = 0; v <= max + 1e-9; v += opts.minor) {
+    const major = Math.abs(v / opts.major - Math.round(v / opts.major)) < 1e-6;
+    const [x1, y1] = polar(cx, cy, r - 2, ang(v)), [x2, y2] = polar(cx, cy, r - (major ? 11 : 7), ang(v));
+    h += `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${x2.toFixed(1)} ${y2.toFixed(1)}" stroke="${INK}" stroke-width="${major ? 1.6 : 1}"/>`;
+    if (major) { const [tx, ty] = polar(cx, cy, r - 21, ang(v)); h += T(tx, ty + 3.5, 9, INK, nf(v)); }
+  }
+  for (const mk of opts.marks || []) { const [x1, y1] = polar(cx, cy, r + 1, ang(mk[0])), [x2, y2] = polar(cx, cy, r - 14, ang(mk[0])); h += `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${x2.toFixed(1)} ${y2.toFixed(1)}" stroke="${mk[1]}" stroke-width="3"/>`; }
+  h += T(cx, cy + r * 0.42, 9, '#4a5876', opts.unit);
+  const [nx, ny] = polar(cx, cy, r - 10, ang(val));
+  h += `<path d="M${cx} ${cy}L${nx.toFixed(1)} ${ny.toFixed(1)}" stroke="#d6453a" stroke-width="2.6" stroke-linecap="round"/><circle cx="${cx}" cy="${cy}" r="5" fill="#2a3348"/>`;
+  return h;
+}
+function thermo(x, yTop, yBot, frac, col, ticks) {
+  // ticks: [[frac, label]]
+  let h = `<rect x="${x - 6}" y="${yTop}" width="12" height="${yBot - yTop}" rx="6" fill="#1a2438" stroke="#5d6a86" stroke-width="1.5"/><circle cx="${x}" cy="${yBot + 8}" r="11" fill="${col}" stroke="#5d6a86" stroke-width="1.5"/>`;
+  const fy = yBot - (yBot - yTop - 6) * clamp(frac, 0, 1);
+  h += `<rect x="${x - 3}" y="${fy.toFixed(1)}" width="6" height="${(yBot + 4 - fy).toFixed(1)}" fill="${col}"/>`;
+  for (const [f, lab] of ticks) { const y = yBot - (yBot - yTop - 6) * f; h += `<path d="M${x - 10} ${y.toFixed(1)}h4" stroke="${MUT}"/>` + T(x - 13, y + 3, 8.5, MUT, lab, 'end'); }
+  return h;
+}
+
+// ---------- lesson 1 scene ----------
+function idealScene() {
+  const m = model();
+  let h = `<rect x="${BX.x - 6}" y="${BX.y - 6}" width="${BX.w + 12}" height="${BX.h + 12}" rx="8" fill="#2a3348" stroke="${INK}" stroke-width="2"/><rect x="${BX.x}" y="${BX.y}" width="${BX.w}" height="${BX.h}" fill="#0b111c"/>`;
+  const vscale = SIG0 * Math.SQRT2 * 2.2;
+  for (const p of S.parts) {
+    const sp = Math.hypot(p.vx, p.vy);
+    h += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${PR}" fill="${heat(sp / vscale)}"/>`;
+  }
+  h += T(BX.x + BX.w / 2, BX.y + BX.h + 22, 10, '#a9b4c9', `сосуд 1 л · N = ${S.N} точек`);
+  h += T(BX.x + BX.w / 2, BX.y + BX.h + 36, 9, MUT, '1 точка = 2,5·10²⁰ молекул азота');
+  // thermometer 0…1000 K
+  h += thermo(345, 150, 352, S.T / 1000, heat((S.T - 100) / 800), [[0, '0'], [0.3, '300'], [0.6, '600'], [0.9, '900']]);
+  h += T(345, 140, 10, '#e8ecf4', `${S.T} K`, 'middle', halo);
+  // manometer 0…400 kPa
+  const p0 = pth(L().N0, L().T0) / 1000;
+  h += dial(440, 200, 52, 400, reduce ? m.pk : m.pm, { major: 100, minor: 25, unit: 'кПа', marks: [[p0, MUT], [2 * p0, OK]] });
+  h += T(440, 140, 9.5, '#a9b4c9', 'манометр');
+  const lines = [['манометр', `${fmt(reduce ? m.pk : m.pm, 1)} кПа`, '#e8ecf4'], ['p = nkT', `${fmt(m.pk, 1)} кПа`, Math.abs(m.ratio - 2) < 1e-9 ? OK : CP], ['Ē', `${sci(m.E)} Дж`, '#a9b4c9'], ['v кв', `${Math.round(m.v)} м/с`, '#a9b4c9']];
+  lines.forEach((ln, i) => { h += T(380, 290 + i * 18, 9.5, MUT, ln[0], 'start') + T(508, 290 + i * 18, 10, ln[2], ln[1], 'end'); });
+  h += T(380, 368, 9, OK, `цель: ${fmt(2 * p0, 1)} кПа`, 'start');
+  return h;
+}
+
+// ---------- lesson 2 scene ----------
+function cylGeom() { const w = 58 + S.V * 0.5, hh = 70 + S.V * 3.2; return { cx: 110, yb: 340, w, h: hh, top: 340 - hh }; }
+function mendScene() {
+  const m = model(), g = m.g, G = cylGeom(), { cx, yb, w } = G, top = G.top, r = w / 2;
+  let h = '';
+  // scale
+  h += `<rect x="${cx - 62}" y="${yb + 2}" width="124" height="8" rx="2" fill="#5d6a86" stroke="${INK}" stroke-width="1.5"/><rect x="${cx - 52}" y="${yb + 10}" width="104" height="32" rx="5" fill="#1a2438" stroke="${INK}" stroke-width="1.5"/>`;
+  h += `<rect x="${cx - 42}" y="${yb + 15}" width="84" height="20" rx="3" fill="#0b111c"/>` + T(cx, yb + 29, 11, OK, `${fmt(m.mass, 2)} кг`, 'middle', 'font-weight="500"');
+  // hose to the compressor
+  h += `<path d="M${cx} ${top - 14}C${cx} ${top - 48} 222 ${top - 48} 222 330" fill="none" stroke="#3a4762" stroke-width="5"/><path d="M${cx} ${top - 14}C${cx} ${top - 48} 222 ${top - 48} 222 330" fill="none" stroke="#5d6a86" stroke-width="2.4"/>`;
+  if (S.pumpT > 0 && !reduce) h += `<path d="M${cx} ${top - 14}C${cx} ${top - 48} 222 ${top - 48} 222 330" fill="none" stroke="${g.col}" stroke-width="2.4" stroke-dasharray="4 10" stroke-dashoffset="${(S.ph * 60).toFixed(1)}"/>`;
+  // compressor
+  h += `<rect x="192" y="328" width="62" height="38" rx="6" fill="#2a3348" stroke="${INK}" stroke-width="1.8"/><circle cx="210" cy="347" r="9" fill="#1a2438" stroke="${MUT}"/><path d="M226 340h20M226 347h20M226 354h20" stroke="${MUT}" stroke-width="1.6"/>` + T(223, 380, 9, MUT, 'компрессор');
+  // cylinder in section
+  const body = `M${cx - r} ${yb}V${top + r}A${r} ${r} 0 0 1 ${cx + r} ${top + r}V${yb}Z`;
+  h += `<path d="${body}" fill="#0b111c" stroke="${g.col}" stroke-width="7"/><path d="${body}" fill="none" stroke="${INK}" stroke-width="1.4"/>`;
+  h += `<rect x="${cx - 7}" y="${top - 16}" width="14" height="14" rx="2" fill="#a9b4c9" stroke="${INK}" stroke-width="1.4"/><path d="M${cx - 13} ${top - 19}h26" stroke="#a9b4c9" stroke-width="3" stroke-linecap="round"/>`;
+  // molecules: one dot ≈ 3 mol
+  const nd = Math.min(90, Math.round(S.nu / 3)), amp = reduce ? 0 : 1.8 * Math.sqrt((S.tc + 273) / 300);
+  const ix0 = cx - r + 7, iw = w - 14, iy0 = top + r * 0.6, ih = yb - 6 - iy0;
+  for (let i = 0; i < nd; i++) {
+    const x = ix0 + hash(i) * iw + amp * Math.sin(S.ph * (7 + 5 * hash(i + 50)) + i), y = iy0 + hash(i + 200) * ih + amp * Math.cos(S.ph * (6 + 5 * hash(i + 90)) + i * 1.7);
+    h += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.3" fill="${g.col === '#2b303b' ? '#a9b4c9' : g.col}" opacity=".85"/>`;
+  }
+  h += `<rect x="${cx - 20}" y="${(top + yb) / 2 - 11}" width="40" height="20" rx="4" fill="${g.col}" stroke="${INK}" stroke-width="1.2"/>` + T(cx, (top + yb) / 2 + 4, 12, g.txt, g.f, 'middle', 'font-weight="500"');
+  h += T(cx, top - 26, 10, '#e8ecf4', `${S.V} л`, 'middle', halo);
+  // thermometer −40…+60 °C
+  h += thermo(285, 160, 330, (S.tc + 40) / 100, heat((S.tc + 30) / 90), [[0, '−40'], [0.4, '0'], [0.8, '40']]);
+  h += T(285, 150, 10, '#e8ecf4', `${S.tc} °C`, 'middle', halo);
+  // manometer 0…25 MPa
+  h += dial(410, 205, 60, 25, m.p, { major: 5, minor: 1, unit: 'МПа', zones: [[L().pNeed - L().tol, L().pNeed + L().tol, OK], [PMAX, 25, WARN]] });
+  h += T(410, 132, 9.5, '#a9b4c9', `цель ${L().pNeed} ± ${fmt(L().tol, 1)} МПа`);
+  const ok = m.cond && Math.abs(m.p - L().pNeed) <= L().tol + 1e-9;
+  const lines = [['p', `${fmt(m.p, 2)} МПа`, ok ? OK : (m.p > PMAX ? WARN : '#e8ecf4')], ['ν', `${S.nu} моль`, '#a9b4c9'], ['T', `${m.T} K`, '#a9b4c9'], ['газ', `${g.name}, M = ${fmt(g.M, 3)}`, '#a9b4c9']];
+  lines.forEach((ln, i) => { h += T(332, 296 + i * 17, 9.5, MUT, ln[0], 'start') + T(508, 296 + i * 17, 9.5, ln[2], ln[1], 'end'); });
+  return h;
+}
+
+// ---------- lesson 3 scene ----------
+const gx = V => GX0 + V * GKV, gy = p => GY0 - p * GKP;
+function isoScene() {
+  const m = model(), py = CB - S.V3 * CK, md = MODES[S.mode];
+  let h = '';
+  // thermostat bath for the isotherm
+  if (S.mode === 'T') h += `<rect x="34" y="190" width="132" height="${CB + 14 - 190}" rx="6" fill="rgba(95,180,217,.16)" stroke="#5fb4d9" stroke-width="1.4"/>` + T(100, CB + 28, 9, '#5fb4d9', 'термостат 300 K');
+  // burner or cooling under the cylinder
+  if (S.mode !== 'T') {
+    h += `<rect x="72" y="${CB + 24}" width="56" height="10" rx="2" fill="#5d6a86" stroke="${INK}" stroke-width="1.4"/>`;
+    const f = (S.T3 - 300) / 400;
+    if (f > 0.001) { const fh = 6 + 22 * f, fl = reduce ? 0 : Math.sin(S.ph * 14) * 2; for (const dx of [-16, 0, 16]) h += `<path d="M${100 + dx - 6} ${CB + 24}Q${100 + dx} ${CB + 24 - fh - fl} ${100 + dx + 6} ${CB + 24}Z" fill="${CP}" stroke="${WARN}" stroke-width="1"/>`; }
+    if (f < -0.001) h += T(100, CB + 46, 9, C1, 'охлаждение ❄');
+    else h += T(100, CB + 46, 9, MUT, f > 0.001 ? 'горелка' : 'горелка выкл.');
+  }
+  // cylinder walls
+  h += `<path d="M${CXL - 4} 138V${CB + 4}H${CXR + 4}V138" fill="none" stroke="#a9b4c9" stroke-width="5" stroke-linejoin="round"/>`;
+  h += `<rect x="${CXL}" y="${py.toFixed(1)}" width="${CXR - CXL}" height="${(CB - py).toFixed(1)}" fill="${heat((S.T3 - 100) / 600)}" opacity=".16"/>`;
+  for (const c of S.cyl) {
+    const x = CXL + 4 + c.x * (CXR - CXL - 8), y = CB - clamp(c.y, 3, CB - py - 3);
+    h += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.6" fill="${heat((S.T3 - 100) / 600)}"/>`;
+  }
+  // piston and its rod
+  h += `<rect x="${CXL + 1}" y="${(py - 12).toFixed(1)}" width="${CXR - CXL - 2}" height="12" rx="2" fill="#5d6a86" stroke="${INK}" stroke-width="1.6"/>`;
+  h += `<path d="M100 ${(py - 12).toFixed(1)}V${(py - 40).toFixed(1)}" stroke="#a9b4c9" stroke-width="5"/>`;
+  if (S.mode === 'T') h += `<rect x="82" y="${(py - 48).toFixed(1)}" width="36" height="9" rx="4" fill="#a9b4c9" stroke="${INK}" stroke-width="1.4"/>` + knob('piston', 100, py - 44, C1);
+  if (S.mode === 'P') h += `<rect x="76" y="${(py - 64).toFixed(1)}" width="48" height="24" rx="3" fill="#2a3348" stroke="${INK}" stroke-width="1.6"/>` + T(100, py - 48, 9, '#e8ecf4', 'груз');
+  if (S.mode === 'V') for (const x of [CXL - 10, CXR + 2]) h += `<rect x="${x}" y="${(py - 18).toFixed(1)}" width="8" height="6" rx="1" fill="${VIO}" stroke="${INK}"/>`;
+  h += T(100, 126, 10.5, md.col, `${md.name}: ${md.law}`, 'middle', halo + ' font-weight="500"');
+  // graph
+  h += `<rect x="${GX0 - 8}" y="${gy(400) - 14}" width="${8 * GKV + 26}" height="${400 * GKP + 22}" rx="8" fill="#0e1520" stroke="#26324a"/>`;
+  for (let v = 1; v <= 8; v++) h += `<path d="M${gx(v)} ${GY0}V${gy(400)}" stroke="#1d2840"/>` + (v % 2 === 0 && v < 8 ? T(gx(v), GY0 + 14, 9, MUT, v) : '');
+  for (let p = 100; p <= 400; p += 100) h += `<path d="M${GX0} ${gy(p)}H${gx(8)}" stroke="#1d2840"/>` + T(GX0 - 4, gy(p) + 3, 8.5, MUT, p, 'end');
+  h += `<path d="M${GX0} ${gy(400) - 6}V${GY0}H${gx(8) + 8}" fill="none" stroke="${MUT}" stroke-width="1.4"/>` + T(gx(8) + 8, GY0 + 14, 9, MUT, 'V, л', 'end') + T(GX0 + 6, gy(400) - 2, 9, MUT, 'p, кПа', 'start');
+  // dashed guide for the current process
+  let guide = '';
+  if (S.mode === 'T') { const pts = []; for (let v = 0.75; v <= 8.001; v += 0.125) pts.push(`${gx(v).toFixed(1)} ${gy(300 / v).toFixed(1)}`); guide = 'M' + pts.join('L'); }
+  if (S.mode === 'P') guide = `M${gx(1)} ${gy(100)}H${gx(7)}`;
+  if (S.mode === 'V') guide = `M${gx(3)} ${gy(100 / 3)}V${gy(700 / 3)}`;
+  h += `<path d="${guide}" fill="none" stroke="${md.col}" stroke-width="1.2" stroke-dasharray="4 5" opacity=".6"/>`;
+  // walked segments of all three processes
+  for (const k of ['T', 'P', 'V']) {
+    const [a, b] = S.rng[k]; if (Math.abs(b - a) < 1e-9) continue;
+    let d = '';
+    if (k === 'T') { const pts = []; for (let i = 0; i <= 40; i++) { const v = a + (b - a) * i / 40; pts.push(`${gx(v).toFixed(1)} ${gy(300 / v).toFixed(1)}`); } d = 'M' + pts.join('L'); }
+    if (k === 'P') d = `M${gx(a)} ${gy(100)}H${gx(b)}`;
+    if (k === 'V') d = `M${gx(3)} ${gy(a)}V${gy(b)}`;
+    h += `<path d="${d}" fill="none" stroke="${MODES[k].col}" stroke-width="3.2" stroke-linecap="round"/>`;
+  }
+  // targets
+  for (const k of ['T', 'P', 'V']) {
+    const [tv, tp] = TARGET[k], dn = S['iso' + k];
+    if (k !== S.mode && !dn) continue;
+    h += `<circle cx="${gx(tv)}" cy="${gy(tp)}" r="6" fill="${dn ? MODES[k].col : 'none'}" stroke="${dn ? INK : MODES[k].col}" stroke-width="1.8" stroke-dasharray="${dn ? '' : '3 2'}"/>`;
+    if (!dn) h += T(gx(tv) + 9, gy(tp) - 8, 9, MODES[k].col, 'цель', 'start', halo);
+  }
+  // start point and the state point
+  h += `<circle cx="${gx(3)}" cy="${gy(100)}" r="3" fill="${MUT}"/>`;
+  const sx = gx(S.V3), sy = gy(m.p);
+  h += `<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="6.5" fill="#e8ecf4" stroke="${INK}" stroke-width="2"/>` + knob('pt', sx, sy, md.col);
+  h += T(sx + (S.V3 > 6 ? -12 : 12), sy - 12, 9.5, '#e8ecf4', `${nf(S.V3)} л; ${fmt(m.p, m.p % 1 ? 1 : 0)} кПа`, S.V3 > 6 ? 'end' : 'start', halo);
+  h += T(GX0, GY0 + 34, 10, '#e8ecf4', `p = ${fmt(m.p, 1)} кПа · V = ${nf(S.V3)} л · T = ${S.T3} K`, 'start');
+  h += T(GX0, GY0 + 50, 9.5, OK, `pV / T = ${fmt(m.p * S.V3 / S.T3, 2)} кПа·л/К`, 'start');
+  return h;
+}
+
+function hlBox(id) {
+  const lid = LID();
+  if (lid === 'ideal') return ({ box: [BX.x - 10, BX.y - 10, BX.w + 20, BX.h + 20], mol: [BX.x + 20, BX.y + 20, 80, 60], wall: [BX.x + BX.w - 10, BX.y - 10, 22, BX.h + 20], therm: [328, 128, 34, 250], gauge: [382, 132, 116, 128] })[id];
+  if (lid === 'mendeleev') { const G = cylGeom(); return ({ cyl: [G.cx - G.w / 2 - 8, G.top - 8, G.w + 16, G.h + 14], valve: [G.cx - 18, G.top - 50, 250 - G.cx, 46], gauge: [342, 136, 136, 136], therm: [262, 140, 40, 210], scale: [G.cx - 66, G.yb, 132, 46] })[id]; }
+  const py = CB - S.V3 * CK;
+  return ({ cyl: [CXL - 10, 134, CXR - CXL + 20, CB - 128], piston: [CXL - 4, py - 50, CXR - CXL + 8, 54], heat: [60, CB + 8, 80, 44], graph: [GX0 - 10, gy(400) - 16, 8 * GKV + 30, 400 * GKP + 26], pt: [gx(S.V3) - 16, gy(p3()) - 16, 32, 32] })[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = bg();
+  if (id === 'ideal') h += idealScene();
+  else if (id === 'mendeleev') h += mendScene();
+  else h += isoScene();
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// fit the scene: 520 × 405 units, centred, content at the bottom
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 520, hh / 430, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 425 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  const p = toSvg(e);
+  drag = { id: el.dataset.drag, dy: p.y - (CB - S.V3 * CK) };
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const p = toSvg(e);
+  if (drag.id === 'piston') setV3((CB - (p.y - drag.dy)) / CK);
+  if (drag.id === 'pt') {
+    const V = (p.x - GX0) / GKV, pp = (GY0 - p.y) / GKP;
+    if (S.mode === 'T') setV3(V);
+    else if (S.mode === 'P') setT3(V * 100);
+    else setT3(pp * 3);
+  }
+});
+const endDrag = () => { if (!drag) return; drag = null; scene.classList.remove('grabbing'); dirty = true; };
+scene.addEventListener('pointerup', endDrag);
+scene.addEventListener('pointercancel', endDrag);
+
+// lesson 1
+function checkIdeal() {
+  const Ls = L();
+  if (S.N === 2 * Ls.N0 && S.T === Ls.T0 && !S.byN) { S.byN = true; toast(`Молекул вдвое больше — ударов о стенки вдвое больше. p = nkT удвоилось. Теперь верните N = ${Ls.N0} и нагрейте газ.`); }
+  if (S.N === Ls.N0 && S.T === 2 * Ls.T0 && !S.byT) { S.byT = true; toast('600 K: каждая молекула бьёт чаще и сильнее, давление тоже выросло вдвое.'); }
+}
+function setN(n) {
+  n = clamp(Math.round(n / 10) * 10, 10, 120); if (n === S.N) return;
+  if (n > S.N) addParts(n - S.N); else S.parts.length = n;
+  S.N = n; normParts(); if (reduce) S.meas = expRate(S.N, S.T);
+  checkIdeal(); update();
+}
+function setT(t) {
+  t = clamp(Math.round(t / 50) * 50, 100, 900); if (t === S.T) return;
+  S.T = t; normParts(); if (reduce) S.meas = expRate(S.N, S.T);
+  checkIdeal(); update();
+}
+function stepGas(dt) {
+  const x0 = BX.x + PR, x1 = x0 + GW, y0 = BX.y + PR, y1 = y0 + GH;
+  let J = 0;
+  for (const p of S.parts) {
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    if (p.x < x0) { p.x = 2 * x0 - p.x; p.vx = -p.vx; J += 2 * Math.abs(p.vx); }
+    else if (p.x > x1) { p.x = 2 * x1 - p.x; p.vx = -p.vx; J += 2 * Math.abs(p.vx); }
+    if (p.y < y0) { p.y = 2 * y0 - p.y; p.vy = -p.vy; J += 2 * Math.abs(p.vy); }
+    else if (p.y > y1) { p.y = 2 * y1 - p.y; p.vy = -p.vy; J += 2 * Math.abs(p.vy); }
+    p.x = clamp(p.x, x0, x1); p.y = clamp(p.y, y0, y1);
+  }
+  if (dt > 0) S.meas += (J / dt - S.meas) * Math.min(1, dt / 1.5);
+}
+// lesson 2
+function checkMend() {
+  const Ls = L(), p = pMPa(S.nu, S.tc, S.V);
+  if (S.V === Ls.V0 && S.tc === Ls.t0 && Math.abs(p - Ls.pNeed) <= Ls.tol + 1e-9 && !S.hits[S.gas]) {
+    S.hits[S.gas] = true;
+    const g = GASES[S.gas];
+    if (S.gas === 'O2') toast(`${fmt(p, 2)} МПа: в баллоне ${S.nu} моль кислорода, это ${fmt(S.nu * g.M, 2)} кг. Теперь гелий.`);
+    else if (S.gas === 'He') toast(`Гелия столько же молей — ${S.nu}, но масса всего ${fmt(S.nu * g.M, 2)} кг: молярная масса в 8 раз меньше.`);
+    else toast(`${g.name}: ${S.nu} моль, ${fmt(S.nu * g.M, 2)} кг при том же давлении.`);
+  }
+}
+function pump(d) {
+  const nu = clamp(S.nu + d, 0, 2000);
+  if (d > 0 && pMPa(nu, S.tc, S.V) > PMAX + 1e-9) { toast(`Стоп: компрессор не качает выше ${PMAX} МПа — это предел для баллона.`); return; }
+  if (nu === S.nu) return;
+  S.nu = nu; if (d > 0) S.pumpT = 0.8;
+  checkMend(); update();
+}
+function setGas(k) { if (k === S.gas) return; S.gas = k; S.nu = 0; renderTools(); buildScheme(); update(); }
+function setVol(v) { if (v === S.V) return; S.V = v; S.nu = 0; renderTools(); buildScheme(); update(); }
+function setTc(t) {
+  t = clamp(Math.round(t), -30, 60); if (t === S.tc) return;
+  S.tc = t; checkMend(); update();
+  if (pMPa(S.nu, S.tc, S.V) > PMAX) toast('Давление выше 20 МПа — опасно! Так баллон и взрывается на солнце.');
+}
+// lesson 3
+function track() {
+  const r = S.rng[S.mode], v = S.mode === 'V' ? p3() : S.V3;
+  r[0] = Math.min(r[0], v); r[1] = Math.max(r[1], v);
+  const p = p3();
+  if (S.mode === 'T' && Math.abs(p - 300) < 1e-9 && !S.isoT) { S.isoT = true; toast('Объём уменьшился втрое — давление выросло втрое: pV = 100 · 3 = 300 · 1.'); }
+  if (S.mode === 'P' && Math.abs(S.V3 - 4.5) < 1e-9 && !S.isoP) { S.isoP = true; toast('T выросла в 1,5 раза (300 → 450 K), и объём тоже в 1,5 раза: V / T = const.'); }
+  if (S.mode === 'V' && Math.abs(p - 200) < 1e-9 && !S.isoV) { S.isoV = true; toast('T выросла вдвое (300 → 600 K), и давление вдвое: p / T = const.'); }
+}
+function setV3(v) {
+  if (S.mode !== 'T') return;
+  v = clamp(Math.round(v * 4) / 4, 0.75, 8); if (v === S.V3) return;
+  S.V3 = v; track(); update();
+}
+function setT3(t) {
+  if (S.mode === 'T') return;
+  t = clamp(Math.round(t / 10) * 10, 100, 700); if (t === S.T3) return;
+  S.T3 = t; if (S.mode === 'P') S.V3 = t / 100;
+  track(); update();
+}
+function setMode(md) {
+  S.mode = md; S.V3 = 3; S.T3 = 300; S.rng[md] = md === 'V' ? [100, 100] : [3, 3];
+  renderTools(); buildScheme(); update();
+}
+function stepCyl(dt) {
+  const s = Math.sqrt(S.T3 / 300), hgt = S.V3 * CK;
+  for (const c of S.cyl) {
+    c.x += c.vx * s * dt; c.y += c.vy * s * dt;
+    if (c.x < 0) { c.x = -c.x; c.vx = Math.abs(c.vx); } else if (c.x > 1) { c.x = 2 - c.x; c.vx = -Math.abs(c.vx); }
+    if (c.y < 3) { c.y = 6 - c.y; c.vy = Math.abs(c.vy); } else if (c.y > hgt - 3) { c.y = hgt - 3; c.vy = -Math.abs(c.vy); }
+  }
+}
+
+let last = performance.now(), meterT = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  const id = LID();
+  if (!reduce) {
+    if (id === 'ideal') { stepGas(dt); dirty = true; meterT += dt; if (meterT > 0.3) { meterT = 0; renderMeter(model()); } }
+    if (id === 'mendeleev') { S.ph += dt; if (S.pumpT > 0) S.pumpT -= dt; dirty = true; }
+    if (id === 'iso') { S.ph += dt; stepCyl(dt); dirty = true; }
+  }
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3800); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, cls) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}${cls ? ` class="${cls}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  let h = '';
+  if (id === 'ideal') h = B('N-', 'N −') + B('N+', 'N +') + sep + B('T-', 'T −') + B('T+', 'T +') + sep + B('reset', 'Сброс');
+  if (id === 'mendeleev') h = B('gas', `Газ ${GASES[S.gas].f}`) + B('vol', `${S.V} л`) + sep + B('t-', 't −') + B('t+', 't +') + sep + B('p10', '+10 моль', undefined, 'rec') + B('p50', '+50', undefined, 'rec') + B('m10', '−10') + B('empty', 'Выпустить');
+  if (id === 'iso') h = B('mT', 'T = const', S.mode === 'T') + B('mP', 'p = const', S.mode === 'P') + B('mV', 'V = const', S.mode === 'V') + sep + B('dn', S.mode === 'T' ? 'V −' : 'T −') + B('up', S.mode === 'T' ? 'V +' : 'T +') + sep + B('reset', 'Сброс');
+  tb.innerHTML = h;
+}
+function act(a) {
+  const id = LID();
+  if (id === 'ideal') {
+    if (a === 'N-' || a === 'N+') return setN(S.N + (a === 'N-' ? -10 : 10));
+    if (a === 'T-' || a === 'T+') return setT(S.T + (a === 'T-' ? -50 : 50));
+    if (a === 'reset') { setN(L().N0); setT(L().T0); return; }
+  }
+  if (id === 'mendeleev') {
+    if (a === 'gas') return setGas(GKEYS[(GKEYS.indexOf(S.gas) + 1) % GKEYS.length]);
+    if (a.startsWith('g-')) return setGas(a.slice(2));
+    if (a === 'vol') return setVol(VOLS[(VOLS.indexOf(S.V) + 1) % VOLS.length]);
+    if (a.startsWith('v-')) return setVol(+a.slice(2));
+    if (a === 't-' || a === 't+') return setTc(S.tc + (a === 't-' ? -1 : 1));
+    if (a === 'p10') return pump(10);
+    if (a === 'p50') return pump(50);
+    if (a === 'm10') return pump(-10);
+    if (a === 'empty') { if (S.nu) { S.nu = 0; update(); } return; }
+  }
+  if (id === 'iso') {
+    if (a === 'mT' || a === 'mP' || a === 'mV') return setMode(a[1]);
+    if (a === 'dn' || a === 'up') { const sg = a === 'dn' ? -1 : 1; return S.mode === 'T' ? setV3(S.V3 + 0.25 * sg) : setT3(S.T3 + 10 * sg); }
+    if (a === 'reset') { S.rng = { T: [3, 3], P: [3, 3], V: [100, 100] }; return setMode(S.mode); }
+  }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  box: IC('<rect x="4" y="5" width="26" height="24" rx="2" fill="none" stroke="#a9b4c9" stroke-width="2.4"/>'),
+  mol: IC('<circle cx="11" cy="12" r="3.4" fill="#72d4e8"/><circle cx="23" cy="10" r="3.4" fill="#ffb547"/><circle cx="17" cy="23" r="3.4" fill="#ff8a73"/>'),
+  wall: IC('<path d="M26 4v26" stroke="#a9b4c9" stroke-width="3"/><circle cx="18" cy="17" r="3.4" fill="#ffb547"/><path d="M8 11l8 5M8 23l8-5" stroke="#ffb547" stroke-width="1.6"/>'),
+  therm: IC('<rect x="14" y="3" width="7" height="22" rx="3.5" fill="none" stroke="#a9b4c9" stroke-width="1.8"/><circle cx="17.5" cy="27" r="5" fill="#ff8a73"/><path d="M17.5 13v12" stroke="#ff8a73" stroke-width="3"/>'),
+  gauge: IC('<circle cx="17" cy="18" r="13" fill="#e8ecf4"/><path d="M17 18l6-7" stroke="#d6453a" stroke-width="2.4" stroke-linecap="round"/>'),
+  cyl: IC('<path d="M9 31V12a8 8 0 0 1 16 0v19z" fill="#5fb4d9"/><rect x="14" y="1" width="6" height="4" fill="#a9b4c9"/>'),
+  valve: IC('<path d="M6 28C6 8 28 8 28 28" fill="none" stroke="#5d6a86" stroke-width="3"/><rect x="2" y="26" width="8" height="6" fill="#a9b4c9"/>'),
+  scale: IC('<rect x="3" y="12" width="28" height="4" fill="#5d6a86"/><rect x="7" y="17" width="20" height="12" rx="2" fill="#1a2438" stroke="#86e0a8"/>'),
+  piston: IC('<path d="M5 6v24h24V6" fill="none" stroke="#a9b4c9" stroke-width="2.4"/><rect x="7" y="13" width="20" height="5" fill="#5d6a86"/><path d="M17 13V3" stroke="#a9b4c9" stroke-width="3"/>'),
+  heat: IC('<rect x="7" y="25" width="20" height="5" fill="#5d6a86"/><path d="M11 25q4-14 6-18q2 4 6 18z" fill="#ffb547"/>'),
+  graph: IC('<path d="M5 3v26h26" fill="none" stroke="#8b96ad" stroke-width="1.8"/><path d="M8 6q3 15 21 19" fill="none" stroke="#72d4e8" stroke-width="2.4"/><path d="M8 20h20" stroke="#ffb547" stroke-width="2"/>'),
+  pt: IC('<circle cx="17" cy="17" r="7" fill="#e8ecf4" stroke="#72d4e8" stroke-width="2.4"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  const t = (ok, s) => `${s} ${ok ? '✓' : '—'}`;
+  if (id === 'ideal') return [t(m.byN, '×2 молекулами'), t(m.byT, '×2 нагревом')].join(' · ');
+  if (id === 'mendeleev') return [t(m.o2, 'кислород'), t(m.he, 'гелий')].join(' · ');
+  return [t(m.isoT, 'изотерма'), t(m.isoP, 'изобара'), t(m.isoV, 'изохора')].join(' · ');
+}
+
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'ideal') h = `<h2>Газ в сосуде</h2>` + slider('inN', 'Число молекул N (точек)', 10, 120, 10, S.N) + slider('inT', 'Температура T', 100, 900, 50, S.T) +
+      `<dl class="reads"><div><dt>p = nkT</dt><dd id="r1"></dd></div><div><dt>Ē</dt><dd id="r2"></dd></div><div><dt>v кв</dt><dd id="r3"></dd></div></dl>
+      <div class="row"><button class="ghostbtn" data-a="reset">Сброс: 40 точек, 300 K</button></div>
+      <p class="note" style="margin-top:12px">Газ — азот N₂ в сосуде объёмом 1 л. Модель плоская, а настоящие молекулы летают в трёх измерениях. Столкновения молекул друг с другом не показаны — в идеальном газе они почти не влияют на давление.</p>`;
+  if (id === 'mendeleev') h = `<h2>Баллон с газом</h2>` +
+      `<div class="ctl"><div class="lbl">Газ (новый пустой баллон)</div><div class="chips">${GKEYS.map(k => `<button data-a="g-${k}" aria-pressed="${S.gas === k}">${GASES[k].name} ${GASES[k].f}</button>`).join('')}</div></div>` +
+      `<div class="ctl"><div class="lbl">Объём баллона</div><div class="chips">${VOLS.map(v => `<button data-a="v-${v}" aria-pressed="${S.V === v}">${v} л</button>`).join('')}</div></div>` +
+      slider('inTc', 'Температура t', -30, 60, 1, S.tc) +
+      `<div class="row"><button class="ghostbtn" data-a="p10">+10 моль</button><button class="ghostbtn" data-a="p50">+50 моль</button><button class="ghostbtn" data-a="m10">−10 моль</button><button class="ghostbtn" data-a="empty">Выпустить</button></div>
+      <dl class="reads"><div><dt>давление</dt><dd id="r1"></dd></div><div><dt>ν</dt><dd id="r2"></dd></div><div><dt>масса</dt><dd id="r3"></dd></div></dl>
+      <p class="note" style="margin-top:12px">Цвета баллонов как на настоящих: кислород — голубой, азот — чёрный, аргон — серый, гелий — коричневый. При 15 МПа реальный газ немного отличается от идеального, но для оценки уравнение работает хорошо.</p>`;
+  if (id === 'iso') h = `<h2>Газ под поршнем</h2>` +
+      `<div class="ctl"><div class="lbl">Процесс</div><div class="chips">${['T', 'P', 'V'].map(k => `<button data-a="m${k}" aria-pressed="${S.mode === k}">${MODES[k].name}</button>`).join('')}</div></div>` +
+      (S.mode === 'T' ? slider('inV3', 'Объём V', 0.75, 8, 0.25, S.V3) : slider('inT3', 'Температура T', 100, 700, 10, S.T3)) +
+      `<dl class="reads"><div><dt>p</dt><dd id="r1"></dd></div><div><dt>V</dt><dd id="r2"></dd></div><div><dt>T</dt><dd id="r3"></dd></div></dl>
+      <div class="row"><button class="ghostbtn" data-a="reset">Стереть графики</button></div>
+      <p class="note" style="margin-top:12px">Масса газа не меняется: ν ≈ 0,12 моль. Изотерму ведут медленно, чтобы термостат успевал держать 300 K.</p>`;
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn); };
+  on('#inN', e => setN(+e.target.value));
+  on('#inT', e => setT(+e.target.value));
+  on('#inTc', e => setTc(+e.target.value));
+  on('#inV3', e => setV3(+e.target.value));
+  on('#inT3', e => setT3(+e.target.value));
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => { act(b.dataset.a); buildScheme(); updateScheme(model()); });
+  updateScheme(model());
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (id === 'ideal') { set('#inNO', S.N); val('#inN', S.N); set('#inTO', S.T + ' K'); val('#inT', S.T); set('#r1', fmt(m.pk, 1) + ' кПа'); set('#r2', sci(m.E) + ' Дж'); set('#r3', Math.round(m.v) + ' м/с'); }
+  if (id === 'mendeleev') { set('#inTcO', `${S.tc} °C = ${m.T} K`); val('#inTc', S.tc); set('#r1', fmt(m.p, 2) + ' МПа'); set('#r2', S.nu + ' моль'); set('#r3', fmt(m.mass, 2) + ' кг'); }
+  if (id === 'iso') { set('#inV3O', nf(S.V3) + ' л'); val('#inV3', S.V3); set('#inT3O', S.T3 + ' K'); val('#inT3', S.T3); set('#r1', fmt(m.p, 1) + ' кПа'); set('#r2', nf(S.V3) + ' л'); set('#r3', S.T3 + ' K'); }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'ideal') return [
+    { id: 'box', icon: ICON.box, name: 'Сосуд 1 л', spec: 'Закрытый, объём не меняется. Внутри азот.' },
+    { id: 'mol', icon: ICON.mol, name: 'Молекулы', spec: 'Точки без размеров. Цвет — скорость: голубые медленные, оранжевые и красные быстрые.' },
+    { id: 'wall', icon: ICON.wall, name: 'Стенки', spec: 'Молекулы отскакивают от них упруго. Сумма толчков и есть давление.' },
+    { id: 'therm', icon: ICON.therm, name: 'Термометр', spec: 'Показывает T в кельвинах — меру средней энергии молекул.' },
+    { id: 'gauge', icon: ICON.gauge, name: 'Манометр', spec: 'Считает удары о стенки. Стрелка немного дрожит: удары случайны.' }];
+  if (id === 'mendeleev') return [
+    { id: 'cyl', icon: ICON.cyl, name: 'Баллон в разрезе', spec: 'Объём от 5 до 50 л. Точки внутри — порции газа, одна точка ≈ 3 моль.' },
+    { id: 'valve', icon: ICON.valve, name: 'Вентиль и шланг', spec: 'Через них компрессор подаёт газ порциями по 10 или 50 моль.' },
+    { id: 'gauge', icon: ICON.gauge, name: 'Манометр', spec: 'Шкала в МПа. Зелёная зона — цель, красная — опасно.' },
+    { id: 'therm', icon: ICON.therm, name: 'Термометр', spec: 'В °C. В уравнение подставляют T = t + 273.' },
+    { id: 'scale', icon: ICON.scale, name: 'Весы', spec: 'Показывают массу газа: вес пустого баллона уже вычтен.' }];
+  return [
+    { id: 'cyl', icon: ICON.piston, name: 'Цилиндр', spec: 'Газа внутри всегда одинаково — около 0,12 моль.' },
+    { id: 'piston', icon: ICON.piston, name: 'Поршень', spec: 'В изотерме его двигают рукой, в изобаре держит груз, в изохоре он закреплён.' },
+    { id: 'heat', icon: ICON.heat, name: 'Горелка или термостат', spec: 'Горелка меняет T. Термостат — водяная баня — держит T = 300 K.' },
+    { id: 'graph', icon: ICON.graph, name: 'График p(V)', spec: 'Изотерма — гипербола, изобара — горизонталь, изохора — вертикаль.' },
+    { id: 'pt', icon: ICON.pt, name: 'Точка состояния', spec: 'Где газ сейчас. Её можно тянуть вдоль линии процесса.' }];
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      (Ls.safe ? `<div class="safe"><b>Безопасность</b>${Ls.safe}</div>` : '') +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Что на площадке</h2><p class="note">Нажмите на деталь, чтобы найти её на площадке.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID(), Ls = L();
+  if (id === 'ideal') {
+    const p0 = pth(Ls.N0, Ls.T0);
+    return `<h2>Давление идеального газа</h2><div class="formula">p = ⅓ m₀ n v² = nkT</div><p class="note">Азот N₂, сосуд V = 1 л = 10⁻³ м³. Число молекул N = ${S.N} · 2,5·10²⁰.</p>
+      <h3>Молекула</h3><div class="steps">` +
+      step('масса молекулы', `m₀ = M / Nₐ = 0,028 / 6,02·10²³ = ${sci(m0N2)} кг`) +
+      step('средняя энергия', `Ē = 3/2 · kT = 1,5 · 1,38·10⁻²³ · ${S.T} = ${sci(m.E)} Дж`) +
+      step('ср. квадр. скорость', `v = √(3kT / m₀) = ${Math.round(m.v)} м/с`) + `</div>
+      <h3>Газ</h3><div class="steps">` +
+      step('концентрация', `n = N / V = ${sci(S.N * ND)} / 10⁻³ = ${sci(m.n)} м⁻³`) +
+      step('давление', `p = nkT = ${sci(m.n)} · 1,38·10⁻²³ · ${S.T} = ${fmt(m.pk, 1)} кПа`, 'sum') +
+      step('проверка', `⅓ m₀ n v² = ${fmt(m0N2 * m.n * m.v * m.v / 3 / 1000, 1)} кПа`) + `</div>
+      <h3>Сравнение с началом</h3><div class="steps">` +
+      step('начало', `40 точек, 300 K → ${fmt(p0 / 1000, 1)} кПа`) +
+      step('отношение', `p / p₀ = (${S.N} / 40) · (${S.T} / 300) = ${nf(m.ratio)}`, 'sum') + `</div>`;
+  }
+  if (id === 'mendeleev') {
+    const g = m.g;
+    return `<h2>Уравнение состояния</h2><div class="formula">pV = νRT,  ν = m / M</div><p class="note">R = 8,31 Дж/(моль·К). Всё в СИ: V в м³, T в кельвинах, p в паскалях.</p>
+      <h3>Перевод единиц</h3><div class="steps">` + step('температура', `T = ${S.tc} + 273 = ${m.T} K`) + step('объём', `V = ${S.V} л = ${fmt(S.V / 1000, 3)} м³`) + step('газ', `${g.name}, M = ${fmt(g.M, 3)} кг/моль`) + `</div>
+      <h3>Сейчас в баллоне</h3><div class="steps">` +
+      step('давление', `p = νRT / V = ${S.nu} · 8,31 · ${m.T} / ${fmt(S.V / 1000, 3)} = ${fmt(m.p, 2)} МПа`, 'sum') +
+      step('масса', `m = νM = ${S.nu} · ${fmt(g.M, 3)} = ${fmt(m.mass, 2)} кг`) +
+      step('молекул', `N = νNₐ = ${S.nu ? sci(S.nu * NA) : '0'}`) + `</div>
+      <h3>Цель</h3><div class="steps">` + step('давление', `${Ls.pNeed} МПа при 40 л и 27 °C`) + step('сколько молей', 'ν = pV / (RT) = ?', 'sum') + `</div>`;
+  }
+  const p = m.p, md = S.mode;
+  let h = `<h2>Изопроцессы</h2><div class="formula">pV / T = const</div><p class="note">Начало: p₁ = 100 кПа, V₁ = 3 л, T₁ = 300 K. Здесь pV / T = 1 кПа·л/К.</p>`;
+  if (md === 'T') h += `<h3>Изотерма, T = 300 K</h3><div class="formula">p₁V₁ = p₂V₂</div><div class="steps">` + step('p₁V₁', '100 · 3 = 300 кПа·л') + step('p₂', `300 / ${nf(S.V3)} = ${fmt(p, 1)} кПа`, 'sum') + step('во сколько раз', `V₁ / V₂ = ${fmt(3 / S.V3, 2)}, p₂ / p₁ = ${fmt(p / 100, 2)}`) + `</div>`;
+  if (md === 'P') h += `<h3>Изобара, p = 100 кПа</h3><div class="formula">V₁ / T₁ = V₂ / T₂</div><div class="steps">` + step('V₁ / T₁', '3 / 300 = 0,01 л/К') + step('V₂', `0,01 · ${S.T3} = ${nf(S.V3)} л`, 'sum') + step('во сколько раз', `T₂ / T₁ = ${fmt(S.T3 / 300, 2)}, V₂ / V₁ = ${fmt(S.V3 / 3, 2)}`) + `</div>`;
+  if (md === 'V') h += `<h3>Изохора, V = 3 л</h3><div class="formula">p₁ / T₁ = p₂ / T₂</div><div class="steps">` + step('p₁ / T₁', '100 / 300 ≈ 0,333 кПа/К') + step('p₂', `100 · ${S.T3} / 300 = ${fmt(p, 1)} кПа`, 'sum') + step('во сколько раз', `T₂ / T₁ = ${fmt(S.T3 / 300, 2)}, p₂ / p₁ = ${fmt(p / 100, 2)}`) + `</div>`;
+  h += `<h3>Количество газа</h3><div class="steps">` + step('ν = pV / (RT)', '100·10³ · 3·10⁻³ / (8,31 · 300) ≈ 0,12 моль') + `</div>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter');
+  if (id === 'ideal') el.innerHTML = `<div class="k">Манометр</div><div class="v ${Math.abs(m.ratio - 2) < 1e-9 ? 'ok' : ''}">${fmt(reduce ? m.pk : m.pm, 1)} кПа</div><div class="lr"><span>N</span><span>${S.N}</span></div><div class="lr"><span>T</span><span>${S.T} K</span></div>`;
+  else if (id === 'mendeleev') { const ok = m.cond && Math.abs(m.p - L().pNeed) <= L().tol + 1e-9; el.innerHTML = `<div class="k">Манометр</div><div class="v ${ok ? 'ok' : ''}">${fmt(m.p, 2)} МПа</div><div class="lr"><span>m</span><span>${fmt(m.mass, 2)} кг</span></div><div class="lr"><span>ν</span><span>${S.nu} моль</span></div>`; }
+  else el.innerHTML = `<div class="k">${MODES[S.mode].name}</div><div class="v">${fmt(m.p, 1)} кПа</div><div class="lr"><span>V</span><span>${nf(S.V3)} л</span></div><div class="lr"><span>T</span><span>${S.T3} K</span></div>`;
+}
+
+function update() {
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Теперь вы знаете, как ведёт себя газ!'), 1900);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  ideal: '<rect x="14" y="3" width="38" height="24" rx="2" fill="none" stroke="#a9b4c9" stroke-width="1.6"/><circle cx="22" cy="10" r="2" fill="#72d4e8"/><circle cx="34" cy="20" r="2" fill="#ffb547"/><circle cx="44" cy="9" r="2" fill="#ff8a73"/><circle cx="27" cy="21" r="2" fill="#72d4e8"/><circle cx="40" cy="15" r="2" fill="#ffb547"/>',
+  mendeleev: '<path d="M14 28V12a6 6 0 0 1 12 0v16z" fill="#5fb4d9"/><circle cx="44" cy="16" r="10" fill="#e8ecf4"/><path d="M44 16l5-5" stroke="#d6453a" stroke-width="2"/>',
+  iso: '<path d="M8 3v24h52" fill="none" stroke="#8b96ad" stroke-width="1.4"/><path d="M12 5q5 17 44 19" fill="none" stroke="#72d4e8" stroke-width="2"/><path d="M14 18h36" stroke="#ffb547" stroke-width="2"/><path d="M30 6v20" stroke="#c3a8ff" stroke-width="2"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Lx, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Lx.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Lx.title}</span></span>
+      ${S.done[Lx.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  S.lesson = i; drag = null;
+  resetState(); save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L().task;
+  $('#hint').textContent = L().stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  // centre the active card by scrolling only the strip, never the page
+  const strip = $('#lessons'), cur = strip.querySelector('.lesson[aria-current="true"]');
+  if (cur) { const br = strip.getBoundingClientRect(), cr = cur.getBoundingClientRect(); strip.scrollLeft = Math.max(0, strip.scrollLeft + (cr.left - br.left) - (br.width - cr.width) / 2); }
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '';
+  if (id === 'ideal') now = `Сосуд 1 л с азотом, плоская модель: ${S.N} точек (одна точка = 2,5·10²⁰ молекул), температура ${S.T} K. По формуле p = nkT давление ${fmt(m.pk, 1)} кПа, манометр показывает около ${fmt(reduce ? m.pk : m.pm, 1)} кПа (он дрожит, потому что удары случайны). Начальное давление при 40 точках и 300 K — ${fmt(pth(40, 300) / 1000, 1)} кПа, сейчас в ${nf(m.ratio)} раза больше. Средняя кинетическая энергия молекулы ${sci(m.E)} Дж, средняя квадратичная скорость ${Math.round(m.v)} м/с. Удвоение числом молекул ${S.byN ? 'сделано' : 'не сделано'}, удвоение нагревом ${S.byT ? 'сделано' : 'не сделано'}. Готовые значения N и T не называй — наводи вопросами про p = nkT.`;
+  if (id === 'mendeleev') now = `Баллон ${S.V} л, газ — ${m.g.name} (M = ${fmt(m.g.M, 3)} кг/моль), температура ${S.tc} °C = ${m.T} K, в баллоне ${S.nu} моль, масса газа ${fmt(m.mass, 2)} кг, манометр ${fmt(m.p, 2)} МПа. Цель: 15 ± 0,3 МПа при 40 л и 27 °C сначала для кислорода (${S.hits.O2 ? 'сделано' : 'не сделано'}), затем для гелия (${S.hits.He ? 'сделано' : 'не сделано'}). Нужное число молей не называй — наводи вопросами про pV = νRT и перевод единиц.`;
+  if (id === 'iso') now = `Цилиндр с поршнем, ν ≈ 0,12 моль, начальное состояние 100 кПа, 3 л, 300 K. Сейчас процесс «${MODES[S.mode].name}» (${MODES[S.mode].law}): p = ${fmt(m.p, 1)} кПа, V = ${nf(S.V3)} л, T = ${S.T3} K. На графике p(V) пройдены участки: изотерма ${S.rng.T[0] !== S.rng.T[1] ? `от ${nf(S.rng.T[0])} до ${nf(S.rng.T[1])} л` : 'нет'}, изобара ${S.rng.P[0] !== S.rng.P[1] ? `от ${nf(S.rng.P[0])} до ${nf(S.rng.P[1])} л` : 'нет'}, изохора ${S.rng.V[0] !== S.rng.V[1] ? `от ${fmt(S.rng.V[0], 1)} до ${fmt(S.rng.V[1], 1)} кПа` : 'нет'}. Цели: изотермическое сжатие до 300 кПа (${S.isoT ? 'есть' : 'нет'}), изобарное нагревание до 4,5 л (${S.isoP ? 'есть' : 'нет'}), изохорное нагревание до 200 кПа (${S.isoV ? 'есть' : 'нет'}). Нужные объёмы и температуры не называй — наводи вопросами про законы Бойля — Мариотта, Гей-Люссака и Шарля.`;
+  return [
+    `Раздел: физика, 10 класс, тепловые явления, тема «Молекулярная физика». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'} (${taskState(m)}).`,
+    `Сейчас на площадке: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Помогай наводящими вопросами, готовые ответы не выдавай.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { ideal: 'Почему газ давит на стенки сосуда?', mendeleev: 'Почему при том же давлении гелия в баллоне по массе меньше?', iso: 'Чем изотерма отличается от изобары на графике?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
