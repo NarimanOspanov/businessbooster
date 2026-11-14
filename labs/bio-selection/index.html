@@ -1,0 +1,866 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по биологии, 11 класс: селекция — сорта и породы, искусственный отбор, гибридизация и гетерозис, селекция микроорганизмов.">
+<title>Селекция</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --leaf:#5fbf6a;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-hit]{cursor:pointer}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+.scene .lbl{font-family:var(--font-body)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .v.bad{color:var(--warn)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--arm);transition:width .2s}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:19%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 15px/1.4 var(--font-mono);text-align:center;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+.feat{display:grid;gap:6px}
+.feat div{background:var(--surface-2);border-radius:10px;padding:9px 11px;font-size:13px;line-height:1.45;border-left:4px solid var(--line)}
+.feat b{display:block;font-weight:600;font-size:13.5px;margin-bottom:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 250px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><path d="M20 34V9M20 30q-6-2-8-8" fill="none" stroke="var(--ok)" stroke-width="1.6" stroke-linecap="round"/><g fill="var(--force)"><ellipse cx="17" cy="12" rx="2.4" ry="3.6" transform="rotate(-24 17 12)"/><ellipse cx="23" cy="12" rx="2.4" ry="3.6" transform="rotate(24 23 12)"/><ellipse cx="17" cy="18" rx="2.4" ry="3.6" transform="rotate(-24 17 18)"/><ellipse cx="23" cy="18" rx="2.4" ry="3.6" transform="rotate(24 23 18)"/><ellipse cx="17" cy="24" rx="2.4" ry="3.6" transform="rotate(-24 17 24)"/><ellipse cx="23" cy="24" rx="2.4" ry="3.6" transform="rotate(24 23 24)"/></g></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Биология · Селекция</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#bio">Карта</a><a href="/physics/#bio">Биология</a><a href="/labs/bio-selection/" aria-current="page">Селекция</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Селекция</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Лабораторный стол">
+    <svg class="scene" id="scene" role="img" aria-label="Лабораторный стол с опытом. Предметы можно нажимать и перетаскивать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const f = x => (Math.round(x * 10) / 10).toString();
+const ru = (x, d = 1) => x.toFixed(d).replace('.', ',');
+const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const KEY = 'luch-bio-selection';
+const OK = '#86e0a8', WARN = '#ff8a73', ORA = '#ffb547', CY = '#72d4e8', VIO = '#b48cff', WHEAT = '#e2c46a', CORN = '#f2c94c', LEAF = '#5fbf6a';
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+// ---------- lesson 1: artificial selection (grains per wheat ear) ----------
+const SIG = 6, H2 = 0.5, MU0 = 30, NPL = 24, GOAL1 = 40;
+function makeField(mu, seed) {
+  const r = rng(seed), z = [];
+  while (z.length < NPL) { const u = r() || 1e-9, v = r(); z.push(Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v)); }
+  const m = avg(z), sd = Math.sqrt(avg(z.map(x => (x - m) * (x - m)))) || 1;
+  return z.map(x => clamp(Math.round(mu + SIG * (x - m) / sd), 8, 95));
+}
+const PCOLS = 8, PX0 = 10, PCW = 62.5, PY0 = 114, PCH = 62;
+const plantXY = i => [PX0 + (i % PCOLS + 0.5) * PCW, PY0 + (Math.floor(i / PCOLS) + 1) * PCH - 14];
+const CH = { x0: 44, x1: 504, y0: 318, y1: 394 };
+
+// ---------- lesson 2: inbreeding and heterosis (6 genes, dominant allele = vigour) ----------
+const LOCI = ['A', 'B', 'C', 'D', 'E', 'F'];
+const yieldOf = g => 30 + 10 * g.filter(v => v > 0).length;
+const homOf = g => g.filter(v => v !== 1).length / g.length;
+const pure = g => g.every(v => v !== 1);
+const f2Yield = g => 30 + 10 * g.reduce((a, v) => a + (v === 2 ? 1 : v === 1 ? 0.75 : 0), 0);
+const COLX = [92, 260, 428];
+
+// ---------- lesson 3: mutagenesis and screening of Penicillium ----------
+const D0 = 40, DM = 30, NCOL = 36, BASE_U = 20;
+const surv = t => Math.exp(-t / D0), mutp = t => 1 - Math.exp(-t / DM);
+const DISH = { x: 176, y: 250, r: 120 };
+const POS = Array.from({ length: NCOL }, (_, i) => { const rr = 102 * Math.sqrt((i + 0.5) / NCOL), a = i * 2.39996; return [DISH.x + rr * Math.cos(a), DISH.y + rr * Math.sin(a)]; });
+const ORDER = Array.from({ length: NCOL }, (_, i) => (i * 17) % NCOL);
+const haloR = p => Math.min(26, 5 + 3.2 * Math.sqrt(p));
+const zoneMM = p => 2 * haloR(p) * 90 / (2 * DISH.r);
+const DOSES = [0, 10, 30, 60, 120];
+
+const LESSONS = [
+  { id: 'breeds', title: 'Сорта и породы: искусственный отбор',
+    text: ['Селекция — наука о создании новых и улучшении существующих сортов растений, пород животных и штаммов микроорганизмов. Сорт и порода — группы организмов, созданные человеком. У них наследственно закреплены нужные признаки: урожайность, удой, качество зерна или шерсти. Основы научной селекции заложил Н. И. Вавилов: он открыл центры происхождения культурных растений и закон гомологических рядов наследственной изменчивости.',
+           'Главный метод селекции — искусственный отбор. При массовом отборе на семена оставляют много лучших растений по фенотипу. При индивидуальном отборе потомство каждого растения выращивают отдельно и оценивают — так получают чистые линии. Отбор повторяют много поколений, и признак сдвигается всё дальше.',
+           'Отбор работает только с наследственными различиями. Колос может быть крупным просто потому, что растению досталось больше влаги, — это модификация, потомкам она не передастся. Долю различий, которая зависит от генов, называют наследуемостью h². Поэтому сдвиг за поколение R = h² · S: потомки получают только часть превосходства родителей.'],
+    why: 'Селекционер выводит сорта, а продажа элитных семян и племенных животных — серьёзный бизнес. Сорта пшеницы казахстанской селекции (например, из Шортанды в Акмолинской области) выдерживают засуху и короткое северное лето. Казахская белоголовая порода коров выведена в Казахстане и хорошо переносит степные зимы. Агроном выбирает сорт под своё поле, зоотехник ведёт племенной учёт стада, генетик проверяет происхождение животных. Племенной бык или жеребец стоит в разы дороже обычного.',
+    task: 'Выведите новый сорт пшеницы: отбирая лучшие растения, поднимите среднее число зёрен в колосе с 30 до 40 и больше.',
+    hint: 'Отметьте 4 или больше растений с самыми крупными колосьями и нажмите «Посеять». Потомки наследуют только половину превосходства родителей, поэтому понадобится несколько поколений.',
+    stage: 'Нажимайте на колосья, чтобы отобрать родителей, затем «Посеять отобранные».',
+    mu0: 30,
+    check: m => m.mean >= GOAL1 },
+  { id: 'hybrid', title: 'Гибридизация и гетерозис',
+    text: ['Гибридизация — скрещивание организмов с разными генотипами. Близкородственное скрещивание (инбридинг) у растений — это самоопыление. С каждым поколением доля гетерозигот уменьшается вдвое, и получаются чистые линии, гомозиготные почти по всем генам. Но вредные рецессивные аллели тоже становятся гомозиготными и проявляются: растения слабеют. Это инбредная депрессия.',
+           'Если скрестить две разные чистые линии, гибриды первого поколения F1 часто сильнее и урожайнее обоих родителей. Это гетерозис. Одно из объяснений: рецессивные «слабые» аллели одной линии закрываются доминантными аллелями другой. Все гибриды F1 одинаковы, как и предсказывает первый закон Менделя.',
+           'Уже в F2 гибриды расщепляются, часть генов снова становится гомозиготной, и гетерозис затухает. Поэтому гибридные семена покупают каждый год. Скрещивают и разные виды — это отдалённая гибридизация: мул (осёл × лошадь), тритикале (пшеница × рожь). Такие гибриды обычно бесплодны. Плодовитость возвращают удвоением числа хромосом, как сделал Г. Д. Карпеченко с гибридом капусты и редьки.'],
+    why: 'Кукуруза и подсолнечник на полях Казахстана — в основном гибриды F1. Семеноводческие хозяйства годами поддерживают чистые линии и каждый сезон скрещивают их заново. Фермер покупает гибридные семена ежегодно, и на этом держится семенной бизнес. Бройлеры в магазине — тоже гибриды нескольких линий. Здесь работают селекционер, семеновод, агроном-консультант, зоотехник. А мул — пример гетерозиса у животных: он выносливее и лошади, и осла.',
+    task: 'Выведите две чистые линии кукурузы (гомозиготность 100 %), скрестите их и получите гибрид F1 урожайнее обоих родителей. Потом посейте F2.',
+    hint: 'Каждое самоопыление вдвое уменьшает долю гетерозигот. Гибрид сильнее родителей, если у линий разные доминантные гены: недостаток одной закрывает другая. Если не вышло — выведите одну линию заново.',
+    stage: 'Нажмите на линию — самоопыление. Нажмите в центр — скрестить линии.',
+    check: m => m.f1ok && m.f2 },
+  { id: 'microbes', title: 'Селекция микроорганизмов',
+    text: ['Микроорганизмы — бактерии, микроскопические грибы, дрожжи — дают людям антибиотики, витамины, аминокислоты, ферменты, кормовой белок. Селекция микробов идёт быстро: они делятся каждые десятки минут, а в одной пробирке их миллиарды. Их наследственный материал обычно в одинарном (гаплоидном) наборе, поэтому мутация сразу проявляется в фенотипе.',
+           'Главный метод — искусственный мутагенез и отбор. Споры или клетки обрабатывают мутагеном: ультрафиолетом, рентгеном, химическими веществами. Большинство мутантов хуже исходного штамма, но среди множества колоний находят редкие удачные. Их размножают и снова обрабатывают. Штамм — чистая культура микроорганизма с определёнными свойствами.',
+           'Так из плесени пенициллиум, в которой А. Флеминг открыл пенициллин, вывели штаммы, дающие антибиотика в тысячи раз больше. Сейчас к мутагенезу добавилась генная инженерия: в бактерию встраивают чужой ген, и она производит, например, человеческий инсулин.'],
+    why: 'Биотехнолог и микробиолог выводят и выращивают штаммы для лекарств, кормов и пищи. Дрожжи для хлеба, закваски для кефира, айрана и кумыса — тоже отобранные штаммы. В Астане работает Национальный центр биотехнологии: там создают вакцины и биопрепараты для сельского хозяйства. Специалист, который поднял выход продукта хотя бы на 10 %, экономит заводу большие деньги: ферментёры работают круглые сутки.',
+    note: 'УФ-лампы опасны для глаз и кожи: облучают только в закрытом боксе. С микроорганизмами работают в лаборатории, в перчатках, стерильными инструментами. Чашки после опыта обеззараживают.',
+    task: 'Выведите штамм-сверхпродуцент: поднимите выработку пенициллина хотя бы в 10 раз по сравнению с исходным штаммом.',
+    hint: 'Без мутагена новых свойств почти не появится, а при большой дозе почти все споры погибнут. Чем больше пенициллина даёт колония, тем шире вокруг неё зона, где не растут бактерии.',
+    stage: 'Выберите дозу УФ, нажмите на лампу, затем на колонию с самой широкой зоной и «Взять штамм».',
+    dose: 10,
+    check: m => m.prod >= 10 },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null, reseed: 0 };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+function resetField() { S.reseed++; S.gen = 0; S.pl = makeField(LESSONS[0].mu0 || MU0, 1000 + S.reseed * 31); S.ps = new Array(NPL).fill(false); S.hist = [avg(S.pl)]; }
+function resetLines() { S.ln = [new Array(6).fill(1), new Array(6).fill(1)]; S.lg = [0, 0]; S.f1 = null; S.f2 = false; }
+function resetMicro() { S.dose = LESSONS[2].dose; S.prod = 1; S.round = 0; S.phist = [1]; S.cols = null; S.pick = -1; }
+function resetLesson() { resetField(); resetLines(); resetMicro(); }
+
+// ---------- models ----------
+function model() {
+  const id = LID();
+  if (id === 'breeds') {
+    const sel = S.pl.filter((_, i) => S.ps[i]), Mp = avg(S.pl), Ms = avg(sel), Sd = sel.length ? Ms - Mp : 0;
+    return { kind: 'sel', gen: S.gen, mean: Mp, n: sel.length, Ms, Sd, R: H2 * Sd, next: Mp + H2 * Sd, min: Math.min(...S.pl), max: Math.max(...S.pl) };
+  }
+  if (id === 'hybrid') {
+    const y = S.ln.map(yieldOf), f1y = S.f1 ? yieldOf(S.f1) : null;
+    return { kind: 'hyb', y, pr: S.ln.map(pure), hom: S.ln.map(homOf), lg: S.lg, f1: S.f1, f1y, f1ok: !!S.f1 && f1y > Math.max(...y), f2: S.f2, f2y: S.f1 ? f2Yield(S.f1) : null };
+  }
+  const s = surv(S.dose), pm = mutp(S.dose);
+  return { kind: 'mic', dose: S.dose, s, pm, ncol: Math.round(NCOL * s), prod: S.prod, round: S.round, cols: S.cols, pick: S.pick };
+}
+
+// ---------- lesson 1 actions ----------
+function togglePlant(i) { S.ps[i] = !S.ps[i]; update(); }
+function sow() {
+  const n = S.ps.filter(Boolean).length;
+  if (n < 4) { toast(n ? 'Нужно хотя бы 4 родителя: с меньшим числом начнётся близкородственное скрещивание.' : 'Сначала отметьте растения-родители: нажимайте на колосья.'); return; }
+  const m = model();
+  S.gen++; S.pl = makeField(m.next, 1000 + S.reseed * 31 + S.gen * 977); S.ps.fill(false);
+  const M = avg(S.pl); S.hist.push(M);
+  toast(m.Sd < -0.05 ? `Поколение ${S.gen}: средняя упала до ${ru(M)} — родители были хуже среднего.` : m.Sd <= 0.05 ? `Поколение ${S.gen}: ничего не изменилось — родители были не лучше среднего.` : `Поколение ${S.gen}: средняя ${ru(M)} зерна. Сдвиг R = ${ru(m.R)} — половина от S = ${ru(m.Sd)}.`);
+  update();
+}
+function clearSel() { S.ps.fill(false); update(); }
+
+// ---------- lesson 2 actions ----------
+function selfLine(i) {
+  if (pure(S.ln[i])) { toast(`Линия ${i + 1} уже чистая: самоопыление больше ничего не меняет.`); return; }
+  S.ln[i] = S.ln[i].map(v => { if (v !== 1) return v; const r = Math.random(); return r < 0.25 ? 2 : r < 0.5 ? 0 : 1; });
+  S.lg[i]++; S.f1 = null; S.f2 = false;
+  const g = S.ln[i], y = yieldOf(g);
+  toast(pure(g) ? `Линия ${i + 1} стала чистой за ${S.lg[i]} поколений. Урожай ${y} ц/га${y < 90 ? ' — инбредная депрессия' : ''}.` : `Самоопыление ${S.lg[i]}: гомозиготность ${Math.round(homOf(g) * 100)} %, урожай ${y} ц/га.`);
+  update();
+}
+function newLine(i) { S.ln[i] = new Array(6).fill(1); S.lg[i] = 0; S.f1 = null; S.f2 = false; toast(`Линия ${i + 1} начата заново от гибридного растения.`); update(); }
+function cross() {
+  if (!pure(S.ln[0]) || !pure(S.ln[1])) { toast('Сначала доведите обе линии до 100 % гомозиготности — нужны чистые линии.'); return; }
+  S.f1 = S.ln[0].map((v, k) => (v === 2 ? 1 : 0) + (S.ln[1][k] === 2 ? 1 : 0)); S.f2 = false;
+  const y = yieldOf(S.f1), best = Math.max(...S.ln.map(yieldOf));
+  toast(y > best ? `Гетерозис! F1 даёт ${y} ц/га — больше лучшей линии (${best}).` : `F1 даёт ${y} ц/га — не больше лучшей линии. Линии слабы в одних и тех же генах: выведите одну из них заново.`);
+  update();
+}
+function sowF2() {
+  if (!S.f1) { toast('Сначала получите гибрид F1.'); return; }
+  S.f2 = true; toast(`F2: в среднем ≈ ${ru(f2Yield(S.f1))} ц/га вместо ${yieldOf(S.f1)}. Гибриды расщепились, гетерозис затухает.`); update();
+}
+
+// ---------- lesson 3 actions ----------
+function setDose(t) { S.dose = clamp(t, 0, 120); renderTools(); update(); }
+function plate() {
+  const s = surv(S.dose), pm = mutp(S.dose), n = Math.round(NCOL * s);
+  S.cols = []; S.pick = -1;
+  for (let i = 0; i < n; i++) {
+    let k;
+    if (Math.random() < pm) { const r = Math.random(); k = r < 0.15 ? 1.6 + Math.random() : r < 0.6 ? 0.2 + 0.6 * Math.random() : 0.9 + 0.2 * Math.random(); }
+    else k = 0.95 + 0.1 * Math.random();
+    S.cols.push({ p: S.prod * k, pos: POS[ORDER[i]] });
+  }
+  toast(n === 0 ? 'Все споры погибли: доза слишком большая.' : S.dose === 0 ? `Выросло ${n} колоний. Без мутагена они почти не отличаются от исходного штамма.` : `Выросло ${n} колоний из ${NCOL} посеянных. Ищите самую широкую зону вокруг колонии.`);
+  update();
+}
+function pickCol(i) { S.pick = i; const c = S.cols[i]; toast(`Зона подавления ${ru(zoneMM(c.p))} мм → выработка ×${ru(c.p)} к исходному штамму.`); update(); }
+function take() {
+  if (!S.cols || S.pick < 0) { toast(S.cols ? 'Сначала нажмите на колонию.' : 'Сначала облучите споры и посейте их на чашку.'); return; }
+  const p = S.cols[S.pick].p, old = S.prod; S.prod = p; S.round++; S.phist.push(p); S.cols = null; S.pick = -1;
+  toast(p > old * 1.2 ? `Новый штамм: ×${ru(p)} к исходному. Облучите его снова.` : p < old * 0.9 ? `Штамм стал хуже: ×${ru(p)}. Так бывает с большинством мутантов.` : `Штамм почти не изменился: ×${ru(p)}.`);
+  update();
+}
+
+// ---------- drawing helpers ----------
+function bench() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4000" fill="url(#tile)"/>`;
+}
+const lbl = (x, y, s, size = 10.5, fill = '#8b96ad', anchor = 'middle', extra = '') => `<text class="lbl" x="${f(x)}" y="${f(y)}" font-size="${size}" fill="${fill}" text-anchor="${anchor}" ${extra}>${s}</text>`;
+
+// ---------- lesson 1 scene ----------
+function ear(x, b, g, col) {
+  const L = Math.min(40, 8 + g * 0.42), top = b - 14 - L, rows = clamp(Math.round(L / 4.2), 2, 10);
+  let h = `<path d="M${f(x)} ${f(b)}V${f(b - 14)}" stroke="#a88f4a" stroke-width="1.6"/><path d="M${f(x)} ${f(b - 5)}q-9 -3 -12 -12" fill="none" stroke="#7f9c4a" stroke-width="1.3"/>`;
+  for (let r = 0; r < rows; r++) {
+    const y = b - 16 - r * (L - 4) / rows;
+    h += `<ellipse cx="${f(x - 2.6)}" cy="${f(y)}" rx="2.4" ry="3.4" transform="rotate(-24 ${f(x - 2.6)} ${f(y)})" fill="${col}"/><ellipse cx="${f(x + 2.6)}" cy="${f(y)}" rx="2.4" ry="3.4" transform="rotate(24 ${f(x + 2.6)} ${f(y)})" fill="${col}"/>`;
+  }
+  h += `<path d="M${f(x - 2)} ${f(top + 3)}l-4 -9M${f(x)} ${f(top + 2)}v-10M${f(x + 2)} ${f(top + 3)}l4 -9" stroke="${col}" stroke-opacity=".7" stroke-width=".8"/>`;
+  return h;
+}
+function fieldScene() {
+  let h = bench();
+  h += `<g data-hit="field"><rect x="${PX0}" y="${PY0}" width="${PCOLS * PCW}" height="${3 * PCH}" rx="10" fill="rgba(107,79,54,.12)" stroke="#26324a"/></g>`;
+  S.pl.forEach((g, i) => {
+    const [x, b] = plantXY(i), on = S.ps[i];
+    h += `<g data-hit="p${i}"><rect x="${f(x - PCW / 2 + 3)}" y="${f(b - PCH + 16)}" width="${PCW - 6}" height="${PCH - 4}" rx="7" fill="${on ? 'rgba(255,181,71,.13)' : 'rgba(0,0,0,0)'}" stroke="${on ? ORA : 'none'}" stroke-width="1.6"/>`;
+    h += ear(x, b, g, on ? ORA : WHEAT);
+    h += `<text x="${f(x)}" y="${f(b + 10)}" font-size="9.5" fill="${on ? ORA : '#8b96ad'}" text-anchor="middle">${g}</text></g>`;
+  });
+  // chart of generation means
+  const hs = S.hist, n = Math.max(6, hs.length), m = model(), nxt = m.n >= 4 ? m.next : null;
+  const lo = Math.min(25, ...hs.map(v => v - 3)), hi = Math.max(50, ...hs.map(v => v + 3), nxt === null ? 0 : nxt + 3);
+  const X = i => CH.x0 + i * (CH.x1 - CH.x0) / n, Y = v => CH.y1 - (v - lo) / (hi - lo) * (CH.y1 - CH.y0);
+  h += `<g data-hit="chart"><rect x="${CH.x0}" y="${CH.y0}" width="${CH.x1 - CH.x0}" height="${CH.y1 - CH.y0}" fill="rgba(18,26,40,.6)" stroke="#26324a"/>`;
+  for (let v = Math.ceil(lo / 10) * 10; v <= hi; v += 10) h += `<path d="M${CH.x0} ${f(Y(v))}h${CH.x1 - CH.x0}" stroke="rgba(139,150,173,.12)"/><text x="${CH.x0 - 4}" y="${f(Y(v) + 3)}" font-size="8.5" fill="#8b96ad" text-anchor="end">${v}</text>`;
+  h += lbl(CH.x0 + 4, CH.y0 + 11, 'средняя по полю, зёрен в колосе', 9, '#8b96ad', 'start');
+  for (let i = 0; i <= n; i++) h += `<text x="${f(X(i))}" y="${CH.y1 + 10}" font-size="8.5" fill="#8b96ad" text-anchor="middle">${i}</text>`;
+  h += `</g><g data-hit="goal"><path d="M${CH.x0} ${f(Y(GOAL1))}h${CH.x1 - CH.x0}" stroke="${OK}" stroke-dasharray="5 4" stroke-width="1.3"/>` + lbl(CH.x1 - 4, Y(GOAL1) - 4, 'цель 40', 9, OK, 'end') + `</g>`;
+  if (hs.length > 1) h += `<path d="M${hs.map((v, i) => `${f(X(i))} ${f(Y(v))}`).join('L')}" fill="none" stroke="${WHEAT}" stroke-width="1.8"/>`;
+  if (nxt !== null) h += `<path d="M${f(X(hs.length - 1))} ${f(Y(hs[hs.length - 1]))}L${f(X(hs.length))} ${f(Y(nxt))}" stroke="${ORA}" stroke-dasharray="3 3" stroke-width="1.4"/><circle cx="${f(X(hs.length))}" cy="${f(Y(nxt))}" r="3.5" fill="none" stroke="${ORA}" stroke-width="1.4"/>`;
+  hs.forEach((v, i) => { h += `<circle cx="${f(X(i))}" cy="${f(Y(v))}" r="3.5" fill="${v >= GOAL1 ? OK : WHEAT}"/>`; });
+  return h;
+}
+
+// ---------- lesson 2 scene ----------
+function corn(x, base, Y) {
+  const H = 50 + Y * 0.6, top = base - H, cy = base - H * 0.55, ry = 8 + Y * 0.2, rx = 5 + Y * 0.045;
+  let h = `<path d="M${f(x - 30)} ${f(base)}H${f(x + 30)}" stroke="#3a4866" stroke-width="2"/>`;
+  h += `<path d="M${f(x)} ${f(base)}V${f(top)}" stroke="${LEAF}" stroke-width="3.2" stroke-linecap="round"/>`;
+  h += `<path d="M${f(x)} ${f(base - H * 0.25)}q-24 -10 -36 4M${f(x)} ${f(base - H * 0.72)}q-22 -12 -32 0M${f(x)} ${f(base - H * 0.45)}q22 -14 32 -4" fill="none" stroke="${LEAF}" stroke-width="2.2" stroke-linecap="round"/>`;
+  h += `<path d="M${f(x)} ${f(top)}l-6 -10M${f(x)} ${f(top)}v-12M${f(x)} ${f(top)}l6 -10" stroke="#d9c27a" stroke-width="1.4" stroke-linecap="round"/>`;
+  h += `<g transform="translate(${f(x + 7 + rx)} ${f(cy)}) rotate(16)"><ellipse rx="${f(rx)}" ry="${f(ry)}" fill="${CORN}"/><ellipse rx="${f(rx * 0.45)}" ry="${f(ry)}" fill="none" stroke="rgba(4,7,13,.22)"/><path d="M0 ${f(-ry)}V${f(ry)}" stroke="rgba(4,7,13,.22)"/>`;
+  for (let k = -ry + 4; k < ry; k += 4) h += `<path d="M${f(-rx * Math.sqrt(Math.max(0, 1 - k * k / ry / ry)))} ${f(k)}h${f(2 * rx * Math.sqrt(Math.max(0, 1 - k * k / ry / ry)))}" stroke="rgba(4,7,13,.16)" stroke-width=".7"/>`;
+  h += `<path d="M${f(-rx - 2)} ${f(ry * 0.9)}Q${f(-rx - 3)} 0 0 ${f(-ry * 0.5)}M${f(rx + 2)} ${f(ry * 0.9)}Q${f(rx + 3)} 0 0 ${f(-ry * 0.3)}" fill="none" stroke="${LEAF}" stroke-width="2"/></g>`;
+  return h;
+}
+function loci(x, g) {
+  let h = '';
+  g.forEach((v, k) => {
+    const y = 290 + k * 16, a = LOCI[k], al = [v === 2 ? a : v === 1 ? a : a.toLowerCase(), v === 0 ? a.toLowerCase() : v === 1 ? a.toLowerCase() : a];
+    al.forEach((s, j) => {
+      const up = s === a, bx = x - 19 + j * 21;
+      h += `<rect x="${bx}" y="${y - 10}" width="17" height="13" rx="3" fill="${up ? 'rgba(134,224,168,.16)' : 'rgba(255,138,115,.10)'}" stroke="${up ? OK : '#56627d'}" stroke-width="1"/><text x="${bx + 8.5}" y="${y}" font-size="10" font-weight="600" fill="${up ? OK : '#8b96ad'}" text-anchor="middle">${s}</text>`;
+    });
+    if (v === 1) h += `<circle cx="${x + 26}" cy="${y - 3.5}" r="2.4" fill="${ORA}"/>`;
+  });
+  return h;
+}
+function hybScene() {
+  let h = bench();
+  const m = model();
+  [0, 1].forEach(i => {
+    const x = COLX[i * 2], g = S.ln[i], y = yieldOf(g), pr = pure(g);
+    h += `<g data-hit="l${i}"><rect x="${x - 70}" y="112" width="140" height="292" rx="12" fill="rgba(26,36,56,.45)" stroke="${pr ? OK : '#26324a'}"/>`;
+    h += corn(x, 246, y) + lbl(x, 262, `Линия ${i + 1}${pr ? ' · чистая' : ''}`, 11, pr ? OK : '#c9d3e6', 'middle', 'font-weight="600"') + lbl(x, 276, `урожай ${y} ц/га`, 10, '#e8ecf4');
+    h += loci(x, g) + lbl(x, 397, `поколений: ${S.lg[i]} · гомозиг. ${Math.round(homOf(g) * 100)} %`, 9, '#8b96ad') + `</g>`;
+  });
+  const x = COLX[1];
+  h += `<g data-hit="f1"><rect x="${x - 62}" y="112" width="124" height="292" rx="12" fill="${S.f1 ? 'rgba(255,181,71,.07)' : 'rgba(0,0,0,0)'}" stroke="${S.f1 ? (m.f1ok ? ORA : '#56627d') : '#3a4866'}" stroke-dasharray="${S.f1 ? '0' : '6 5'}"/>`;
+  if (S.f1) {
+    h += corn(x, 246, m.f1y) + lbl(x, 262, 'Гибрид F1', 11, m.f1ok ? ORA : '#c9d3e6', 'middle', 'font-weight="600"') + lbl(x, 276, `урожай ${m.f1y} ц/га`, 10, '#e8ecf4');
+    h += loci(x, S.f1) + lbl(x, 397, S.f2 ? `F2 в среднем ≈ ${ru(m.f2y)} ц/га` : 'нажмите — посеять F2', 9, S.f2 ? WARN : '#8b96ad');
+  } else {
+    h += lbl(x, 200, '×', 30, '#56627d') + lbl(x, 232, 'F1', 12, '#8b96ad', 'middle', 'font-weight="600"') + lbl(x, 252, 'нажмите —', 9.5, '#56627d') + lbl(x, 266, 'скрестить линии', 9.5, '#56627d');
+  }
+  h += `</g>`;
+  h += `<path d="M163 190h22M357 190h-22" stroke="${S.f1 ? ORA : '#3a4866'}" stroke-width="1.6"/><path d="M181 185l5 5-5 5M339 185l-5 5 5 5" fill="none" stroke="${S.f1 ? ORA : '#3a4866'}" stroke-width="1.6"/>`;
+  return h;
+}
+
+// ---------- lesson 3 scene ----------
+function dishScene() {
+  let h = bench();
+  const m = model(), D = DISH;
+  h += `<g data-hit="dish"><circle cx="${D.x}" cy="${D.y}" r="${D.r + 6}" fill="rgba(160,190,230,.05)" stroke="rgba(200,215,240,.35)" stroke-width="2"/><circle cx="${D.x}" cy="${D.y}" r="${D.r}" fill="rgba(230,214,160,.17)" stroke="rgba(200,215,240,.18)"/>`;
+  for (let k = 0; k < 40; k++) { const a = k * 2.4, rr = D.r * Math.sqrt((k * 37 % 40 + 0.5) / 40); h += `<circle cx="${f(D.x + rr * Math.cos(a))}" cy="${f(D.y + rr * Math.sin(a))}" r="1.1" fill="rgba(230,214,160,.25)"/>`; }
+  h += `</g>`;
+  if (S.cols) {
+    S.cols.forEach(c => { h += `<circle cx="${f(c.pos[0])}" cy="${f(c.pos[1])}" r="${f(haloR(c.p))}" fill="#101826" fill-opacity=".9" stroke="rgba(114,212,232,.22)"/>`; });
+    S.cols.forEach((c, i) => {
+      const sel = S.pick === i;
+      h += `<g data-hit="c${i}"><circle cx="${f(c.pos[0])}" cy="${f(c.pos[1])}" r="15" fill="rgba(0,0,0,0)"/>`;
+      if (sel) h += `<circle cx="${f(c.pos[0])}" cy="${f(c.pos[1])}" r="${f(haloR(c.p) + 2.5)}" fill="none" stroke="${ORA}" stroke-width="2"/>`;
+      h += `<circle cx="${f(c.pos[0])}" cy="${f(c.pos[1])}" r="5" fill="#7fc8a9" stroke="#e8ecf4" stroke-width=".8"/><circle cx="${f(c.pos[0] - 1.2)}" cy="${f(c.pos[1] - 1.2)}" r="1.6" fill="#c9f0dc"/></g>`;
+    });
+    if (!S.cols.length) h += lbl(D.x, D.y, 'ни одной колонии', 11, WARN, 'middle', 'font-weight="600"');
+  } else {
+    h += lbl(D.x, D.y - 6, 'чашка пуста', 11, '#c9d3e6', 'middle', 'font-weight="600"') + lbl(D.x, D.y + 10, 'нажмите на лампу:', 9.5, '#8b96ad') + lbl(D.x, D.y + 23, 'облучить споры и посеять', 9.5, '#8b96ad');
+  }
+  h += lbl(D.x, D.y + D.r + 19, `газон бактерий · штамм ×${ru(S.prod)} · раунд ${S.round}`, 9.5, '#8b96ad');
+  // UV lamp
+  const lx = 428, on = S.dose > 0;
+  h += `<g data-hit="lamp"><rect x="${lx - 74}" y="118" width="148" height="104" rx="10" fill="rgba(26,36,56,.5)" stroke="#26324a"/>`;
+  h += `<rect x="${lx - 46}" y="128" width="92" height="16" rx="5" fill="#1a2438" stroke="#56627d"/><rect x="${lx - 38}" y="141" width="76" height="6" rx="3" fill="${on ? VIO : '#3a4866'}"/>`;
+  if (on) for (let k = -3; k <= 3; k++) h += `<path d="M${lx + k * 11} 151l${k * 3} ${10 + S.dose / 10}" stroke="${VIO}" stroke-opacity="${f(0.25 + S.dose / 200)}" stroke-width="1.6" stroke-linecap="round"/>`;
+  h += lbl(lx, 190, `УФ ${S.dose} с`, 12, on ? VIO : '#c9d3e6', 'middle', 'font-weight="600"') + lbl(lx, 206, `выживает ≈ ${Math.round(m.s * 100)} %`, 9.5, '#8b96ad') + lbl(lx, 218, 'нажмите — посеять', 9, '#56627d') + `</g>`;
+  // history chart (log scale)
+  const x0 = 362, x1 = 508, y0 = 252, y1 = 372, lo = Math.log10(0.3), hi = Math.log10(Math.max(30, ...S.phist) * 1.2), n = Math.max(5, S.phist.length - 1);
+  const X = i => x0 + i * (x1 - x0) / n, Y = p => y1 - (Math.log10(Math.max(0.3, p)) - lo) / (hi - lo) * (y1 - y0);
+  h += `<g data-hit="hist"><rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" fill="rgba(18,26,40,.6)" stroke="#26324a"/>`;
+  [1, 3, 10, 30, 100].filter(v => Math.log10(v) <= hi).forEach(v => { h += `<path d="M${x0} ${f(Y(v))}h${x1 - x0}" stroke="rgba(139,150,173,.12)"/><text x="${x0 - 3}" y="${f(Y(v) + 3)}" font-size="8.5" fill="#8b96ad" text-anchor="end">×${v}</text>`; });
+  h += `<path d="M${x0} ${f(Y(10))}h${x1 - x0}" stroke="${OK}" stroke-dasharray="5 4" stroke-width="1.3"/>` + lbl(x1 - 3, Y(10) - 4, 'цель', 8.5, OK, 'end');
+  if (S.phist.length > 1) h += `<path d="M${S.phist.map((p, i) => `${f(X(i))} ${f(Y(p))}`).join('L')}" fill="none" stroke="#7fc8a9" stroke-width="1.8"/>`;
+  S.phist.forEach((p, i) => { h += `<circle cx="${f(X(i))}" cy="${f(Y(p))}" r="3.3" fill="${p >= 10 ? OK : '#7fc8a9'}"/>`; });
+  h += lbl((x0 + x1) / 2, y1 + 14, 'выработка штамма по раундам', 9, '#8b96ad') + `</g>`;
+  return h;
+}
+
+function hlBox(id) {
+  const L = LID();
+  if (L === 'breeds') {
+    if (id === 'plant') { const i = Math.max(0, S.ps.indexOf(true)), [x, b] = plantXY(i); return [x - PCW / 2, b - PCH + 14, PCW, PCH]; }
+    return { field: [PX0 - 4, PY0 - 4, PCOLS * PCW + 8, 3 * PCH + 8], chart: [CH.x0 - 30, CH.y0 - 6, CH.x1 - CH.x0 + 36, CH.y1 - CH.y0 + 22] }[id] || null;
+  }
+  if (L === 'hybrid') return { l0: [20, 108, 144, 300], l1: [356, 108, 144, 300], f1: [194, 108, 132, 300], loci: [20, 276, 480, 104] }[id] || null;
+  if (id === 'colony') { const i = S.cols && S.cols.length ? Math.max(0, S.pick) : -1; if (i < 0) return [DISH.x - 30, DISH.y - 30, 60, 60]; const [x, y] = S.cols[i].pos; return [x - 14, y - 14, 28, 28]; }
+  return { dish: [DISH.x - DISH.r - 10, DISH.y - DISH.r - 10, 2 * DISH.r + 20, 2 * DISH.r + 20], lamp: [350, 114, 156, 112], hist: [334, 246, 180, 144] }[id] || null;
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = id === 'breeds' ? fieldScene() : id === 'hybrid' ? hybScene() : dishScene();
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${f(b[0])}" y="${f(b[1])}" width="${f(b[2])}" height="${f(b[3])}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+let VB = { x: 0, y: 0, w: 520, h: 405 }, dirty = true;
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 524, hh / 420, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 412 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer (taps) ----------
+let press = null;
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-hit]'); if (!el) return;
+  e.preventDefault();
+  press = { hit: el.dataset.hit, x: e.clientX, y: e.clientY, moved: false };
+});
+scene.addEventListener('pointermove', e => { if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 8) press.moved = true; });
+scene.addEventListener('pointerup', () => { const p = press; press = null; if (p && !p.moved) tap(p.hit); });
+scene.addEventListener('pointercancel', () => { press = null; });
+
+function tap(id) {
+  const L = LID();
+  if (L === 'breeds') {
+    if (/^p\d+$/.test(id)) togglePlant(+id.slice(1));
+    else if (id === 'goal') toast('Цель — средняя 40 зёрен в колосе по всему полю, а не у одного растения.');
+  }
+  if (L === 'hybrid') {
+    if (id === 'l0') selfLine(0);
+    if (id === 'l1') selfLine(1);
+    if (id === 'f1') S.f1 ? sowF2() : cross();
+  }
+  if (L === 'microbes') {
+    if (id === 'lamp') plate();
+    if (/^c\d+$/.test(id)) pickCol(+id.slice(1));
+    if (id === 'dish' && !S.cols) toast('Сначала облучите споры: нажмите на лампу.');
+  }
+}
+
+function loop(t) {
+  requestAnimationFrame(loop);
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3600); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, c) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${c ? `<i style="background:${c}"></i>` : ''}${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    breeds: B('sow', 'Посеять отобранные') + B('clear', 'Снять выбор') + sep + B('reset', 'Сбросить'),
+    hybrid: B('s0', 'Самоопылить 1') + B('s1', 'Самоопылить 2') + sep + B('cross', 'Скрестить 1 × 2') + B('f2', 'Посеять F2') + sep + B('reset', 'Сбросить'),
+    microbes: DOSES.map(t => B('d' + t, t + ' с', S.dose === t, t ? VIO : '#56627d')).join('') + sep + B('plate', 'Облучить и посеять') + B('take', 'Взять штамм'),
+  }[id];
+  placeHint();
+}
+function placeHint() {
+  const hn = $('#hint'), st = $('#stage').getBoundingClientRect(), tb = $('#tools').getBoundingClientRect();
+  hn.style.visibility = tb.left - st.left < st.width * 0.19 + 30 ? 'hidden' : '';
+}
+addEventListener('resize', placeHint);
+function act(a) {
+  if (a === 'sow') return sow();
+  if (a === 'clear') return clearSel();
+  if (a === 's0') return selfLine(0);
+  if (a === 's1') return selfLine(1);
+  if (a === 'n0') return newLine(0);
+  if (a === 'n1') return newLine(1);
+  if (a === 'cross') return cross();
+  if (a === 'f2') return sowF2();
+  if (/^d\d+$/.test(a)) return setDose(+a.slice(1));
+  if (a === 'plate') return plate();
+  if (a === 'take') return take();
+  if (a === 'reset') {
+    if (LID() === 'breeds') resetField();
+    else if (LID() === 'hybrid') resetLines();
+    else resetMicro();
+    renderTools(); buildScheme(); update();
+  }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const dot = c => IC(`<circle cx="17" cy="17" r="11" fill="${c}" opacity=".85"/><circle cx="17" cy="17" r="4" fill="#0b1019"/>`);
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (m.kind === 'sel') return `Поколение ${m.gen} · средняя ${ru(m.mean)} из 40 · отобрано ${m.n}`;
+  if (m.kind === 'hyb') return `Линии: ${Math.round(m.hom[0] * 100)} % и ${Math.round(m.hom[1] * 100)} % · F1: ${m.f1 ? (m.f1ok ? '✓ гетерозис' : 'нет гетерозиса') : '—'} · F2: ${m.f2 ? '✓' : '—'}`;
+  return `Штамм ×${ru(m.prod)} из ×10 · раунд ${m.round}`;
+}
+
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'breeds') h = `<h2>Поле и отбор</h2><p class="note">Отмечайте растения на столе. Наследуемость числа зёрен в этом опыте h² = 0,5.</p>
+    <dl class="reads"><div><dt>Отобрано</dt><dd id="r1"></dd></div><div><dt>Средняя поля</dt><dd id="r2"></dd></div><div><dt>Средняя отобр.</dt><dd id="r3"></dd></div>
+    <div><dt>S</dt><dd id="r4"></dd></div><div><dt>R = h²·S</dt><dd id="r5"></dd></div><div><dt>Поколение</dt><dd id="r6"></dd></div></dl>
+    <div class="row"><button class="ghostbtn" data-a="sow">Посеять отобранные</button><button class="ghostbtn" data-a="clear">Снять выбор</button><button class="ghostbtn" data-a="reset">Начать сначала</button></div>`;
+  if (id === 'hybrid') h = `<h2>Линии и гибрид</h2>
+    <dl class="reads"><div><dt>Линия 1</dt><dd id="r1"></dd></div><div><dt>Линия 2</dt><dd id="r2"></dd></div><div><dt>F1</dt><dd id="r3"></dd></div>
+    <div><dt>Гомозиг. 1</dt><dd id="r4"></dd></div><div><dt>Гомозиг. 2</dt><dd id="r5"></dd></div><div><dt>F2</dt><dd id="r6"></dd></div></dl>
+    <div class="row"><button class="ghostbtn" data-a="s0">Самоопылить 1</button><button class="ghostbtn" data-a="s1">Самоопылить 2</button></div>
+    <div class="row"><button class="ghostbtn" data-a="cross">Скрестить 1 × 2</button><button class="ghostbtn" data-a="f2">Посеять F2</button></div>
+    <div class="row"><button class="ghostbtn" data-a="n0">Новая линия 1</button><button class="ghostbtn" data-a="n1">Новая линия 2</button></div>`;
+  if (id === 'microbes') h = `<h2>Мутагенез и отбор</h2>` + slider('inDose', 'Время облучения УФ, с', 0, 120, 5, S.dose) +
+    `<dl class="reads"><div><dt>Выживает</dt><dd id="r1"></dd></div><div><dt>Колоний</dt><dd id="r2"></dd></div><div><dt>Мутантов</dt><dd id="r3"></dd></div>
+    <div><dt>Штамм</dt><dd id="r4"></dd></div><div><dt>Раунд</dt><dd id="r5"></dd></div><div><dt>Выбрана</dt><dd id="r6"></dd></div></dl>
+    <div class="row"><button class="ghostbtn" data-a="plate">Облучить и посеять</button><button class="ghostbtn" data-a="take">Взять штамм</button><button class="ghostbtn" data-a="reset">Исходный штамм</button></div>`;
+  el.innerHTML = h;
+  const inp = el.querySelector('#inDose'); if (inp) inp.addEventListener('input', e => { S.dose = +e.target.value; renderTools(); update(); });
+  el.querySelectorAll('.row [data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.innerHTML = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (m.kind === 'sel') {
+    set('#r1', `${m.n} из ${NPL}`); set('#r2', ru(m.mean)); set('#r3', m.n ? ru(m.Ms) : '—'); set('#r4', m.n ? ru(m.Sd) : '—'); set('#r5', m.n ? ru(m.R) : '—'); set('#r6', m.gen);
+  } else if (m.kind === 'hyb') {
+    set('#r1', m.y[0] + ' ц/га'); set('#r2', m.y[1] + ' ц/га'); set('#r3', m.f1 ? m.f1y + ' ц/га' : '—');
+    set('#r4', Math.round(m.hom[0] * 100) + ' %'); set('#r5', Math.round(m.hom[1] * 100) + ' %'); set('#r6', m.f2 ? '≈ ' + ru(m.f2y) : '—');
+  } else {
+    set('#inDoseO', m.dose + ' с'); val('#inDose', m.dose);
+    set('#r1', Math.round(m.s * 100) + ' %'); set('#r2', `≈ ${m.ncol}`); set('#r3', Math.round(m.pm * 100) + ' %');
+    set('#r4', '×' + ru(m.prod)); set('#r5', m.round); set('#r6', m.cols && m.pick >= 0 ? '×' + ru(m.cols[m.pick].p) : '—');
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'breeds') return [
+    { id: 'field', icon: dot(WHEAT), name: 'Опытное поле', spec: '24 растения пшеницы одного поколения. Число под колосом — сколько в нём зёрен. Растения различаются и по генам, и по условиям.' },
+    { id: 'plant', icon: dot(ORA), name: 'Отобранные родители', spec: 'Оранжевые растения пойдут на семена. Только они дадут следующее поколение — это и есть искусственный отбор.' },
+    { id: 'chart', icon: dot(CY), name: 'График по поколениям', spec: 'Средняя по полю в каждом поколении. Пунктир с кружком — сколько ожидать в следующем при нынешнем выборе.' },
+    { id: 'goal', icon: dot(OK), name: 'Цель селекционера', spec: 'Средняя 40 зёрен в колосе. Сорт — это вся популяция с новым признаком, а не одно удачное растение.' }];
+  if (id === 'hybrid') return [
+    { id: 'l0', icon: dot(LEAF), name: 'Линия 1', spec: 'Потомство одного растения при самоопылении. Нажмите — ещё одно поколение самоопыления.' },
+    { id: 'l1', icon: dot(LEAF), name: 'Линия 2', spec: 'Вторая линия от того же исходного растения. Случай решает, какие гены в ней станут AA, а какие aa.' },
+    { id: 'loci', icon: dot(OK), name: 'Шесть генов', spec: 'Зелёная заглавная буква — доминантный аллель, он даёт растению силу. Строчная — рецессивный «слабый» аллель. Точка — ген в гетерозиготе.' },
+    { id: 'f1', icon: dot(ORA), name: 'Гибрид F1', spec: 'Получает от каждой линии по одному аллелю каждого гена. Если там, где одна линия слаба, другая сильна, гибрид урожайнее обеих.' }];
+  return [
+    { id: 'dish', icon: dot('#e6d6a0'), name: 'Чашка Петри', spec: 'Питательная среда, засеянная сплошным «газоном» бактерий. На неё же высевают облучённые споры пенициллиума.' },
+    { id: 'colony', icon: dot('#7fc8a9'), name: 'Колония', spec: 'Потомство одной споры — будущий штамм. Нажмите, чтобы измерить её зону.' },
+    { id: 'colony', icon: dot('#101826'), name: 'Зона подавления', spec: 'Тёмный круг вокруг колонии: пенициллин не даёт бактериям расти. Чем шире зона, тем больше антибиотика даёт колония.' },
+    { id: 'lamp', icon: dot(VIO), name: 'УФ-лампа', spec: 'Мутаген. Больше доза — больше мутаций, но и больше погибших спор.' },
+    { id: 'hist', icon: dot(OK), name: 'История штамма', spec: 'Выработка выбранных штаммов по раундам, шкала логарифмическая: ×1, ×3, ×10.' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      (L.note ? `<div class="safe"><b>Безопасность</b>${L.note}</div>` : '') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    let h = `<h2>${{ breeds: 'Что на столе', hybrid: 'Линии и гены', microbes: 'Что на столе' }[L.id]}</h2><p class="note">Нажмите на строку, чтобы найти это на столе.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    if (L.id === 'breeds') h += `<h3>Методы селекции</h3><div class="feat"><div style="border-left-color:${WHEAT}"><b>Искусственный отбор</b>Массовый — по фенотипу многих растений сразу; индивидуальный — с проверкой потомства каждого.</div><div style="border-left-color:${ORA}"><b>Гибридизация</b>Соединяет полезные признаки разных сортов и пород в одном организме.</div><div style="border-left-color:${VIO}"><b>Полиплоидия и мутагенез</b>Кратное увеличение числа хромосом (крупные плоды, сахарная свёкла) и мутации, вызванные облучением или химией.</div><div style="border-left-color:${CY}"><b>Генная и клеточная инженерия</b>Перенос нужных генов, выращивание растений из отдельных клеток.</div></div>
+      <h3>Центры происхождения культурных растений (по Н. И. Вавилову)</h3><div class="feat"><div><b>Южноазиатский тропический</b>Рис, сахарный тростник, огурец, цитрусовые.</div><div><b>Восточноазиатский</b>Соя, просо, гречиха.</div><div><b>Юго-Западноазиатский</b>Мягкая пшеница, рожь, бобовые, многие плодовые.</div><div><b>Средиземноморский</b>Капуста, сахарная свёкла, маслина.</div><div><b>Абиссинский</b>Твёрдая пшеница, ячмень, сорго.</div><div><b>Центральноамериканский</b>Кукуруза, фасоль, тыква, перец.</div><div><b>Южноамериканский</b>Картофель, томат, табак.</div><div style="border-left-color:${OK}"><b>Казахстан</b>В горах Заилийского Алатау растёт дикая яблоня Сиверса — один из предков культурной яблони.</div></div>`;
+    if (L.id === 'hybrid') h += `<h3>Виды скрещивания</h3><div class="feat"><div style="border-left-color:${LEAF}"><b>Инбридинг</b>Близкородственное скрещивание и самоопыление. Даёт чистые линии, но снижает жизнеспособность.</div><div style="border-left-color:${ORA}"><b>Аутбридинг</b>Скрещивание неродственных линий и пород. Даёт гетерозис в F1.</div><div style="border-left-color:${VIO}"><b>Отдалённая гибридизация</b>Скрещивание разных видов: мул, тритикале, капустно-редечный гибрид Карпеченко. Бесплодие преодолевают полиплоидией.</div></div>`;
+    if (L.id === 'microbes') h += `<h3>Что дают микробы</h3><div class="feat"><div style="border-left-color:#7fc8a9"><b>Антибиотики</b>Пенициллин — из гриба пенициллиума, стрептомицин — из почвенных бактерий-актиномицетов.</div><div style="border-left-color:${CY}"><b>Белки и гормоны</b>Инсулин и гормон роста из генно-инженерных бактерий и дрожжей.</div><div style="border-left-color:${WHEAT}"><b>Аминокислоты и ферменты</b>Лизин для кормов, ферменты для стиральных порошков, сыров, соков.</div><div style="border-left-color:${OK}"><b>Пища</b>Дрожжи для хлеба, молочнокислые бактерии для кефира, айрана, кумыса.</div></div>`;
+    $('#pane-parts').innerHTML = h;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  if (m.kind === 'sel') {
+    let h = `<h2>Ответ на отбор</h2><div class="formula">R = h² · S</div><div class="steps">` +
+      step('Сумма зёрен на поле', S.pl.reduce((a, b) => a + b, 0)) + step('Средняя поля Mп', `${S.pl.reduce((a, b) => a + b, 0)} ÷ ${NPL} = ${ru(m.mean)}`);
+    if (m.n) {
+      const sel = S.pl.filter((_, i) => S.ps[i]);
+      h += step(`Отобрано ${m.n}: средняя Mо`, `${sel.reduce((a, b) => a + b, 0)} ÷ ${m.n} = ${ru(m.Ms)}`) + step('Дифференциал отбора S = Mо − Mп', `${ru(m.Ms)} − ${ru(m.mean)} = ${ru(m.Sd)}`) +
+        step('Наследуемость h²', '0,5') + step('Сдвиг R = h² · S', `0,5 × ${ru(m.Sd)} = ${ru(m.R)}`) + step('Ожидаемая средняя потомков', `${ru(m.mean)} + ${ru(m.R)} = ${ru(m.next)}`, 'sum');
+      if (m.n < 4) h += step('Внимание', 'нужно ≥ 4 родителей');
+    } else h += step('Отобрано', 'пока никого — нажмите на колосья', 'sum');
+    h += `</div><h3>История</h3><div class="steps">` + S.hist.map((v, i) => step(`Поколение ${i}`, ru(v) + ' зерна')).join('') + `</div>` +
+      `<p class="note" style="margin-top:8px">Почему только половина? Половина различий между колосьями — от генов, половина — от условий: влаги, почвы, солнца. Модификации не наследуются, поэтому потомки «откатываются» к средней на половину пути.</p>`;
+    return h;
+  }
+  if (m.kind === 'hyb') {
+    let h = `<h2>Инбридинг и гетерозис</h2><div class="formula">доля гетерозигот = (½)ⁿ</div><div class="steps">`;
+    [0, 1].forEach(i => { const n = S.lg[i], het = S.ln[i].filter(v => v === 1).length; h += step(`Линия ${i + 1}: поколений n`, n) + step('По формуле', `(½)^${n} = ${ru(Math.pow(0.5, n) * 100, 1)} %`) + step('На самом деле', `${het} из 6 генов = ${ru(het / 6 * 100, 0)} %`); });
+    h += `</div><h3>Урожай</h3><div class="formula">У = 30 + 10 × k</div><p class="note">k — число генов, где есть хотя бы один доминантный аллель (A_).</p><div class="steps">` +
+      [0, 1].map(i => step(`Линия ${i + 1}`, `30 + 10 × ${S.ln[i].filter(v => v > 0).length} = ${m.y[i]} ц/га`)).join('');
+    if (m.f1) {
+      const best = Math.max(...m.y);
+      h += step('F1', `30 + 10 × ${m.f1.filter(v => v > 0).length} = ${m.f1y} ц/га`) + step('Гетерозис', `(${m.f1y} − ${best}) ÷ ${best} × 100 = ${ru((m.f1y - best) / best * 100, 0)} %`, 'sum');
+      const het = m.f1.filter(v => v === 1).length, hom = m.f1.filter(v => v === 2).length;
+      h += step('F2: ген Aa → A_ с вероятностью', '¾') + step('F2 в среднем', `30 + 10 × (${hom} + ${het} × ¾) = ${ru(m.f2y)} ц/га`);
+    } else h += step('F1', 'ещё не получен', 'sum');
+    return h + `</div>`;
+  }
+  let h = `<h2>Доза и выживание</h2><div class="formula">доля выживших = e<sup>−t/40</sup></div><div class="steps">` +
+    step('Время облучения t', m.dose + ' с') + step('Выживает', `e^(−${m.dose}/40) = ${ru(m.s * 100, 0)} %`) + step('Колоний из 36 спор', `36 × ${ru(m.s, 2)} ≈ ${m.ncol}`) +
+    step('Доля мутантов среди выживших', `1 − e^(−${m.dose}/30) = ${ru(m.pm * 100, 0)} %`) + step('Удачных мутантов (≈ 15 % мутантов)', `≈ ${ru(m.ncol * m.pm * 0.15, 1)} на чашку`, 'sum') + `</div>`;
+  h += `<h3>Зона подавления</h3><div class="steps">` + step('Чашка Петри', '90 мм') + (m.cols && m.pick >= 0 ? step('Зона выбранной колонии', `${ru(zoneMM(m.cols[m.pick].p))} мм`) + step('Выработка', `×${ru(m.cols[m.pick].p)} = ${Math.round(m.cols[m.pick].p * BASE_U)} ед/мл`, 'sum') : step('Колония', 'не выбрана')) + `</div>`;
+  h += `<h3>История штамма</h3><div class="steps">` + S.phist.map((p, i) => step(i ? `Раунд ${i}` : 'Исходный штамм', `×${ru(p)} · ${Math.round(p * BASE_U)} ед/мл`)).join('') +
+    step('Итог', `×${ru(m.prod)} из нужных ×10`, 'sum') + `</div><p class="note" style="margin-top:8px">Модель упрощена: выработка в единицах на миллилитр среды условная. Реальные промышленные штаммы прошли десятки таких раундов.</p>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const el = $('#meter'), dn = S.done[LID()];
+  if (m.kind === 'sel') {
+    el.innerHTML = `<div class="k">Средняя по полю</div><div class="v ${dn ? 'ok' : ''}">${ru(m.mean)} зерна</div>
+      <div class="lr"><span>поколение</span><span>${m.gen}</span></div><div class="lr"><span>отобрано</span><span>${m.n}</span></div>
+      <div class="gauge"><b style="width:${clamp((m.mean - 30) / 10 * 100, 0, 100)}%;${dn ? 'background:var(--ok)' : ''}"></b></div>`;
+  } else if (m.kind === 'hyb') {
+    el.innerHTML = `<div class="k">Гибрид F1</div><div class="v ${m.f1ok ? 'ok' : m.f1 ? 'bad' : ''}">${m.f1 ? m.f1y + ' ц/га' : '—'}</div>
+      <div class="lr"><span>линия 1</span><span>${m.y[0]}</span></div><div class="lr"><span>линия 2</span><span>${m.y[1]}</span></div>${m.f2 ? `<div class="lr"><span>F2</span><span>${ru(m.f2y)}</span></div>` : ''}`;
+  } else {
+    el.innerHTML = `<div class="k">Штамм</div><div class="v ${dn ? 'ok' : ''}">×${ru(m.prod)}</div>
+      <div class="lr"><span>УФ</span><span>${m.dose} с</span></div><div class="lr"><span>выбрана</span><span>${m.cols && m.pick >= 0 ? '×' + ru(m.cols[m.pick].p) : '—'}</span></div>
+      <div class="gauge"><b style="width:${clamp(Math.log10(Math.max(1, m.prod)) * 100, 0, 100)}%;${dn ? 'background:var(--ok)' : ''}"></b></div>`;
+  }
+}
+
+function update() {
+  const m = model(), L = LESSONS[S.lesson];
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Вы прошли путь селекционера!'), 1800);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  breeds: '<path d="M14 28V12M33 28V7M52 28V14" stroke="#a88f4a"/><ellipse cx="14" cy="11" rx="3" ry="6" fill="#e2c46a"/><ellipse cx="33" cy="9" rx="4" ry="8" fill="#ffb547"/><ellipse cx="52" cy="13" rx="3" ry="5" fill="#e2c46a"/>',
+  hybrid: '<ellipse cx="12" cy="17" rx="3.5" ry="7" fill="#f2c94c" opacity=".6"/><ellipse cx="54" cy="17" rx="3.5" ry="7" fill="#f2c94c" opacity=".6"/><text x="23" y="21" font-size="10" fill="#8b96ad">×</text><ellipse cx="38" cy="15" rx="5" ry="11" fill="#f2c94c"/>',
+  microbes: '<circle cx="33" cy="15" r="13" fill="rgba(230,214,160,.25)" stroke="#8b96ad"/><circle cx="27" cy="12" r="5" fill="#101826"/><circle cx="27" cy="12" r="2" fill="#7fc8a9"/><circle cx="38" cy="19" r="3" fill="#101826"/><circle cx="38" cy="19" r="1.6" fill="#7fc8a9"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i];
+  S.lesson = i; S.hl = null; press = null;
+  resetLesson();
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const ls = $('#lessons'), cur = ls.querySelector('.lesson[aria-current="true"]');
+  if (cur) { const a = ls.getBoundingClientRect(), b = cur.getBoundingClientRect(); ls.scrollLeft += b.left - a.left - (a.width - b.width) / 2; }
+}
+
+const gtTxt = g => g.map((v, k) => v === 2 ? LOCI[k] + LOCI[k] : v === 1 ? LOCI[k] + LOCI[k].toLowerCase() : LOCI[k].toLowerCase() + LOCI[k].toLowerCase()).join(' ');
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '', guide = '';
+  if (id === 'breeds') {
+    now = `Опытное поле пшеницы, поколение ${m.gen}. Число зёрен в колосе у 24 растений: ${S.pl.join(', ')}. Средняя по полю ${ru(m.mean)} (цель 40). Отобрано родителей: ${m.n}${m.n ? ` (${S.pl.filter((_, i) => S.ps[i]).join(', ')}), их средняя ${ru(m.Ms)}, S = ${ru(m.Sd)}, ожидаемый сдвиг R = h²·S = ${ru(m.R)}` : ''}. Наследуемость h² = 0,5. Средние по поколениям: ${S.hist.map(v => ru(v)).join(' → ')}.`;
+    guide = 'Не выбирай растения за ученика. Спрашивай: какие растения стоит оставить на семена, почему потомки получают только половину превосходства родителей, что будет, если отбирать случайно.';
+  }
+  if (id === 'hybrid') {
+    now = `Кукуруза, 6 генов A–F, доминантный аллель даёт силу, урожай = 30 + 10 × число генов с доминантным аллелем. Линия 1: ${gtTxt(S.ln[0])}, ${S.lg[0]} поколений самоопыления, гомозиготность ${Math.round(m.hom[0] * 100)} %, урожай ${m.y[0]} ц/га. Линия 2: ${gtTxt(S.ln[1])}, ${S.lg[1]} поколений, гомозиготность ${Math.round(m.hom[1] * 100)} %, урожай ${m.y[1]} ц/га. F1: ${m.f1 ? `${gtTxt(m.f1)}, ${m.f1y} ц/га, гетерозис ${m.f1ok ? 'есть' : 'нет'}` : 'не получен'}. F2: ${m.f2 ? `в среднем ≈ ${ru(m.f2y)} ц/га` : 'не посеян'}.`;
+    guide = 'Спрашивай: почему самоопыление уменьшает долю гетерозигот, почему чистая линия слабее исходного растения, когда F1 окажется сильнее обоих родителей и почему гетерозис затухает в F2.';
+  }
+  if (id === 'microbes') {
+    now = `Чашка Петри с газоном бактерий, исходный штамм пенициллиума ×1 (${BASE_U} ед/мл). Текущий штамм ×${ru(m.prod)}, раунд ${m.round}, история: ${S.phist.map(p => '×' + ru(p)).join(' → ')}. Доза УФ ${m.dose} с: выживает ${Math.round(m.s * 100)} % спор, мутантов среди выживших ${Math.round(m.pm * 100)} %. На чашке: ${m.cols ? `${m.cols.length} колоний${m.pick >= 0 ? `, выбрана колония ×${ru(m.cols[m.pick].p)}` : ', колония не выбрана'}` : 'пусто'}.`;
+    guide = 'Не называй готовую лучшую дозу. Спрашивай: что будет без мутагена, что будет при очень большой дозе, как по зоне подавления понять, какая колония даёт больше пенициллина.';
+  }
+  return [
+    `Раздел: биология, 11 класс, тема «Селекция» (Наследственность и эволюция). Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Для тьютора: ${guide}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = { breeds: 'Почему отбор не работает с модификациями?', hybrid: 'Почему гибридные семена покупают каждый год?', microbes: 'Почему микробы удобнее для селекции, чем коровы?' }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

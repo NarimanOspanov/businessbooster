@@ -1,0 +1,968 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по физике, 9 класс: опыт Резерфорда, модель атома, линейчатые спектры.">
+<title>Строение атома</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.meter .lr .ok{color:var(--ok)}
+.meter .lr .bad{color:var(--warn)}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button.rec{color:var(--force)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 230px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><ellipse cx="20" cy="20" rx="14" ry="6" fill="none" stroke="var(--arm)" stroke-width="1.8"/><ellipse cx="20" cy="20" rx="14" ry="6" fill="none" stroke="var(--arm)" stroke-width="1.8" transform="rotate(60 20 20)"/><ellipse cx="20" cy="20" rx="14" ry="6" fill="none" stroke="var(--arm)" stroke-width="1.8" transform="rotate(-60 20 20)"/><circle cx="20" cy="20" r="3.4" fill="var(--force)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Физика · Строение атома</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/">Карта</a><a href="/physics/">Физика</a><a href="/labs/phys-atom/" aria-current="page">Атом</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Атом</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Опытная площадка">
+    <svg class="scene" id="scene" role="img" aria-label="Площадка для опытов со строением атома. Пушку, частицы и электрон можно тянуть."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const C1 = '#72d4e8', CP = '#ffb547', OK = '#86e0a8', WARN = '#ff8a73', MUT = '#8b96ad', PRO = '#ff8a73', NEU = '#a9b4c9';
+
+const LESSONS = [
+  { id: 'rutherford', title: 'Опыт Резерфорда',
+    text: ['В 1909–1911 годах Эрнест Резерфорд и его ученики обстреливали тонкую золотую фольгу альфа-частицами. Это тяжёлые положительные частицы, они летят со скоростью около 15 000 км/с. Вокруг фольги стоял экран: там, куда попадала частица, он вспыхивал.',
+           'По модели Томсона атом — шар, по которому размазан положительный заряд, а внутри вкраплены электроны, как изюм в пудинге. Тогда все частицы пролетали бы почти прямо. Но некоторые отклонялись на большие углы, а примерно одна из 8000 отскакивала назад.',
+           'Резерфорд понял: весь положительный заряд и почти вся масса атома собраны в крошечном ядре. Оно в десятки тысяч раз меньше самого атома. Частица, летящая почти точно в ядро, отталкивается и летит обратно. Остальные проходят сквозь пустоту.'],
+    why: 'Рассеяние частиц — главный способ заглянуть внутрь вещества. Физики на ускорителях ЦЕРН и Дубны (там работают и учёные из Казахстана) так изучают ядра и элементарные частицы. В Институте ядерной физики в Алматы есть ускоритель и исследовательский реактор — там нужны физики и инженеры. Материаловеды по рассеянию ионов проверяют состав тонких плёнок в микросхемах и солнечных панелях.',
+    task: 'Обстреляйте атом пучком в модели Томсона и в ядерной модели. Найдите, какая модель объясняет отскок назад. Потом одной частицей в ядерной модели добейтесь отклонения больше 90°.',
+    hint: '«Пучок» выпускает 50 частиц. Для одной частицы тяните пушку вверх-вниз: так меняется прицельное расстояние b — насколько мимо центра атома летит частица.',
+    stage: 'Выберите модель и нажмите «Пучок».',
+    b0: 120,
+    check: m => m.thom >= 20 && m.back >= 1 && m.aim },
+  { id: 'model', title: 'Модель атома',
+    text: ['Атом состоит из ядра и электронов. Ядро собрано из протонов и нейтронов. Протон заряжен положительно (+e), нейтрон заряда не имеет, электрон заряжен отрицательно (−e). Элементарный заряд e = 1,6 · 10⁻¹⁹ Кл.',
+           'Число протонов Z — зарядовое число. Оно равно номеру элемента в таблице Менделеева и решает, какой это элемент. Массовое число A = Z + N, где N — число нейтронов. Атомы одного элемента с разным числом нейтронов называют изотопами.',
+           'В нейтральном атоме электронов столько же, сколько протонов. Электроны располагаются вокруг ядра слоями: в первом слое не больше 2 электронов, во втором — не больше 8. Если отнять или добавить электрон, получится ион.'],
+    why: 'Казахстан — первый в мире по добыче урана, и вся атомная отрасль работает с изотопами: на Ульбинском металлургическом заводе в Усть-Каменогорске делают топливо для АЭС, где важно, сколько в нём урана-235. Археологи по углероду-14 определяют возраст находок, например из сакских курганов. Врачи-радиологи вводят пациентам изотопы, чтобы увидеть опухоль на снимке.',
+    task: 'Соберите нейтральные атомы гелия-4 и углерода-12. Затем превратите углерод-12 в его изотоп — углерод-14.',
+    hint: 'Перетаскивайте частицы с лотка в атом или жмите кнопки + и −. Число после названия — массовое число A = Z + N. В нейтральном атоме электронов столько же, сколько протонов.',
+    stage: 'Тяните протоны, нейтроны и электроны с лотка в атом.',
+    targets: [{ Z: 2, A: 4, name: 'гелий-4' }, { Z: 6, A: 12, name: 'углерод-12' }, { Z: 6, A: 14, name: 'углерод-14' }],
+    check: m => m.found >= 3 },
+  { id: 'spectra', title: 'Спектры испускания и поглощения',
+    text: ['Нагретое твёрдое тело, например нить лампы, даёт сплошной спектр — радугу из всех цветов. А светящийся разреженный газ даёт линейчатый спектр: отдельные яркие линии на тёмном фоне.',
+           'Нильс Бор объяснил это так. Электрон в атоме может находиться только на определённых уровнях энергии. Переходя с верхнего уровня на нижний, атом испускает фотон с энергией hν = Eₖ − Eₙ. Энергия фотона задаёт длину волны, то есть цвет.',
+           'Набор линий у каждого элемента свой, как отпечаток пальца. Холодный газ поглощает свет тех же длин волн, которые сам испускает, — в радуге появляются тёмные линии. По ним узнают состав Солнца и далёких звёзд. Это спектральный анализ.'],
+    why: 'Спектральный анализ — рабочий инструмент химиков-аналитиков: на металлургических заводах Усть-Каменогорска, Павлодара и Темиртау спектрометр за минуту показывает состав сплава. Экологи по спектрам находят свинец и ртуть в воде и почве. Астрономы обсерватории Ассы-Тургень под Алматы по спектрам узнают, из чего состоят звёзды. Криминалисты так же определяют вещества на уликах.',
+    task: 'Переводите электрон водорода с уровня на уровень и найдите все 4 видимые линии его спектра. Потом включите спектр поглощения и сравните.',
+    hint: 'Нажмите на уровень, чтобы перевести туда электрон, или тяните сам электрон. Свет испускается, только когда электрон опускается вниз. Все видимые линии водорода дают переходы на один и тот же уровень.',
+    stage: 'Нажимайте на уровни энергии: вниз — атом светит.',
+    n0: 1,
+    check: m => m.vis >= 4 && m.abs },
+];
+
+const LS_KEY = 'luch-phys-atom';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+
+// ---------- geometry (SVG units; the scene is 520 × 405) ----------
+const A1 = { cx: 285, cy: 228, R: 150, ra: 100, d: 9, fm: 5, gx: 22, SPD: 230 }; // 1 unit = 5 фм; d — closest approach for a head-on hit (≈45 фм)
+const K1 = A1.d / 2, KT = K1 * 0.25;
+const A2 = { cx: 300, cy: 222, shells: [50, 78, 106, 134], cap: [2, 8, 8, 2], tx: 52, ty: [128, 196, 264] };
+const A3 = { x0: 70, x1: 286, ex: 178, LY: [0, 316, 256, 212, 182, 160, 142], y0: 124, sx0: 40, sx1: 490, sy: 352, sh: 24 };
+const EN = n => -13.6 / (n * n);
+const LAM = (hi, lo) => 1239.84 / (EN(hi) - EN(lo));
+const XS = lam => A3.sx0 + (lam - 380) / 370 * (A3.sx1 - A3.sx0);
+const BALMER = [3, 4, 5, 6].map(k => LAM(k, 2));
+
+const ELEM = [['', ''], ['H', 'водород'], ['He', 'гелий'], ['Li', 'литий'], ['Be', 'бериллий'], ['B', 'бор'], ['C', 'углерод'], ['N', 'азот'], ['O', 'кислород'], ['F', 'фтор'], ['Ne', 'неон'],
+  ['Na', 'натрий'], ['Mg', 'магний'], ['Al', 'алюминий'], ['Si', 'кремний'], ['P', 'фосфор'], ['S', 'сера'], ['Cl', 'хлор'], ['Ar', 'аргон'], ['K', 'калий'], ['Ca', 'кальций']];
+
+function resetState() {
+  const Ls = L();
+  Object.assign(S, {
+    mdl: 'thom', b: Ls.b0 || 120, fl: [], bt: 0, firing: false, marks: [], trails: [], aimPath: null, cnt: { thom: { n: 0, s: 0, m: 0, k: 0 }, nuc: { n: 0, s: 0, m: 0, k: 0 } }, aim: false, lastAim: null,
+    Z: 1, N: 0, E: 1, gh: null, found: {}, ph: 0,
+    n: Ls.n0 || 1, lines: {}, mode: 'emit', abs: false, last: null, photon: null, ey: null, hl: null,
+  });
+}
+resetState();
+
+function model() {
+  const id = LID();
+  if (id === 'rutherford') return { kind: id, thom: S.cnt.thom.n, back: S.cnt.nuc.k, aim: S.aim, c: S.cnt[S.mdl] };
+  if (id === 'model') return { kind: id, Z: S.Z, N: S.N, E: S.E, A: S.Z + S.N, q: S.Z - S.E, found: Object.keys(S.found).length };
+  const vis = Object.keys(S.lines).filter(k => { const l = S.lines[k]; return l.lam >= 380 && l.lam <= 750; }).length;
+  return { kind: id, n: S.n, vis, abs: S.abs, last: S.last };
+}
+
+// ---------- drawing helpers ----------
+const T = (x, y, s, fill, txt, anchor = 'middle', extra = '') => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${s}" fill="${fill}" text-anchor="${anchor}" ${extra}>${txt}</text>`;
+const halo = `paint-order="stroke" stroke="${INK}" stroke-width="3"`;
+function bg(id) {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.05)" stroke-width="1.5"/></pattern>
+    <radialGradient id="pud" cx="50%" cy="45%" r="55%"><stop offset="0" stop-color="#ff9aa8" stop-opacity=".42"/><stop offset="1" stop-color="#c76a7d" stop-opacity=".22"/></radialGradient>
+    <radialGradient id="cloud" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#72d4e8" stop-opacity=".10"/><stop offset="1" stop-color="#72d4e8" stop-opacity=".03"/></radialGradient>
+    <radialGradient id="nucg" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#ffe0a0"/><stop offset="1" stop-color="#ff8a3d"/></radialGradient>
+    ${id === 'spectra' ? rainbowDef() : ''}</defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+// wavelength (nm) → colour, after Dan Bruton
+function wl(l) {
+  let r = 0, g = 0, b = 0;
+  if (l < 440) { r = -(l - 440) / 60; b = 1; } else if (l < 490) { g = (l - 440) / 50; b = 1; } else if (l < 510) { g = 1; b = -(l - 510) / 20; }
+  else if (l < 580) { r = (l - 510) / 70; g = 1; } else if (l < 645) { r = 1; g = -(l - 645) / 65; } else r = 1;
+  let f = 1; if (l < 420) f = 0.35 + 0.65 * (l - 380) / 40; else if (l > 700) f = 0.35 + 0.65 * (750 - l) / 50;
+  const c = v => Math.round(255 * Math.pow(clamp(v * f, 0, 1), 0.8));
+  return `rgb(${c(r)},${c(g)},${c(b)})`;
+}
+const colorName = l => l < 380 ? 'ультрафиолет' : l < 450 ? 'фиолетовый' : l < 485 ? 'синий' : l < 500 ? 'голубой' : l < 565 ? 'зелёный' : l < 590 ? 'жёлтый' : l < 625 ? 'оранжевый' : l <= 750 ? 'красный' : 'инфракрасный';
+function rainbowDef() {
+  let st = '';
+  for (let l = 380; l <= 750; l += 10) st += `<stop offset="${((l - 380) / 370).toFixed(3)}" stop-color="${wl(l)}"/>`;
+  return `<linearGradient id="rb" x1="0" x2="1" y1="0" y2="0">${st}</linearGradient>`;
+}
+
+// ---------- lesson 1: Rutherford scattering ----------
+// alpha particle: m = 1, v0 = 1 unit/time; nuclear model: F = K1 / r² (head-on stop at r = d); Thomson model: weak field inside a uniform sphere
+function trace(bu, mdl) {
+  let x = -250, y = -bu, vx = 1, vy = 0, t = 0;
+  const pts = [[x, y, 0]]; let lx = x, ly = y;
+  for (let i = 0; i < 300000; i++) {
+    const r = Math.hypot(x, y);
+    let f = 0;
+    if (mdl === 'nuc') f = K1 / (r * r * r);
+    else if (r < A1.ra) f = KT / (A1.ra ** 3);
+    const dt = mdl === 'nuc' ? clamp(r * 0.01, 0.01, 1) : 1;
+    vx += f * x * dt; vy += f * y * dt; x += vx * dt; y += vy * dt; t += dt;
+    if (Math.hypot(x - lx, y - ly) >= 3) { pts.push([x, y, t]); lx = x; ly = y; }
+    if (x * vx + y * vy > 0 && Math.hypot(x, y) >= A1.R) { pts.push([x, y, t]); break; }
+  }
+  return { pts, th: Math.abs(Math.atan2(vy, vx)) * 180 / Math.PI, T: t, b: bu };
+}
+const thExact = bfm => bfm <= 0 ? 180 : 2 * Math.atan(A1.d * A1.fm / (2 * bfm)) * 180 / Math.PI;
+const cls = th => th < 10 ? 's' : th < 90 ? 'm' : 'k';
+const pathD = (pts, upto) => { let s = ''; const n = upto === undefined ? pts.length : upto; for (let i = 0; i < n; i++) s += (i ? 'L' : 'M') + (A1.cx + pts[i][0]).toFixed(1) + ' ' + (A1.cy + pts[i][1]).toFixed(1); return s; };
+function posAt(p, tau) {
+  const P = p.pts; if (tau <= 0) return { i: 0, x: P[0][0], y: P[0][1] };
+  let lo = 0, hi = P.length - 1;
+  if (tau >= P[hi][2]) return { i: hi, x: P[hi][0], y: P[hi][1] };
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (P[mid][2] <= tau) lo = mid; else hi = mid; }
+  const k = (tau - P[lo][2]) / (P[hi][2] - P[lo][2] || 1);
+  return { i: lo + 1, x: P[lo][0] + (P[hi][0] - P[lo][0]) * k, y: P[lo][1] + (P[hi][1] - P[lo][1]) * k };
+}
+const gunY = () => A1.cy - S.b / A1.fm;
+
+function rutherfordScene(t) {
+  const cx = A1.cx, cy = A1.cy;
+  let h = '';
+  // screen ring
+  h += `<circle cx="${cx}" cy="${cy}" r="${A1.R}" fill="none" stroke="#4a5876" stroke-width="5" stroke-dasharray="2 5"/>`;
+  h += T(cx + A1.R * 0.72, cy - A1.R * 0.72 - 8, 9.5, MUT, 'экран', 'start', halo);
+  // atom
+  if (S.mdl === 'thom') {
+    h += `<circle cx="${cx}" cy="${cy}" r="${A1.ra}" fill="url(#pud)" stroke="#ff9aa8" stroke-opacity=".5" stroke-width="1.5"/>`;
+    for (let i = 0; i < 14; i++) { const a = i * 2.39996, r = 16 + 78 * Math.sqrt((i + 0.5) / 14); h += `<circle cx="${(cx + r * Math.cos(a)).toFixed(1)}" cy="${(cy + r * Math.sin(a)).toFixed(1)}" r="4" fill="${C1}" stroke="${INK}" stroke-width="1"/>`; }
+    h += T(cx, cy + A1.ra + 16, 10, '#ffb3be', 'модель Томсона: «пудинг с изюмом»', 'middle', halo);
+  } else {
+    h += `<circle cx="${cx}" cy="${cy}" r="${A1.ra}" fill="url(#cloud)" stroke="#72d4e8" stroke-opacity=".25" stroke-dasharray="3 5"/>`;
+    for (let i = 0; i < 3; i++) {
+      const a = i * 60, ph = (S.ph * (0.6 + i * 0.25) + i * 2) % (2 * Math.PI);
+      h += `<ellipse cx="${cx}" cy="${cy}" rx="${A1.ra - 6}" ry="${30 + i * 6}" fill="none" stroke="#72d4e8" stroke-opacity=".18" transform="rotate(${a} ${cx} ${cy})"/>`;
+      const ex = (A1.ra - 6) * Math.cos(ph), ey = (30 + i * 6) * Math.sin(ph), ra = a * Math.PI / 180;
+      h += `<circle cx="${(cx + ex * Math.cos(ra) - ey * Math.sin(ra)).toFixed(1)}" cy="${(cy + ex * Math.sin(ra) + ey * Math.cos(ra)).toFixed(1)}" r="3.4" fill="${C1}"/>`;
+    }
+    h += `<circle cx="${cx}" cy="${cy}" r="3.2" fill="url(#nucg)" stroke="${INK}" stroke-width="1"/>`;
+    h += T(cx + 8, cy - 8, 9, CP, 'ядро', 'start', halo);
+    h += T(cx, cy + A1.ra + 16, 10, '#a9e6f2', 'ядерная модель Резерфорда', 'middle', halo);
+  }
+  // old beam trails
+  for (const p of S.trails) h += `<path d="${p}" fill="none" stroke="${CP}" stroke-opacity=".16" stroke-width="1.2"/>`;
+  // aim line
+  const gy = gunY();
+  if (!S.firing) h += `<path d="M${A1.gx + 40} ${gy.toFixed(1)}H${cx + 40}" stroke="${CP}" stroke-opacity=".45" stroke-dasharray="4 5"/>`;
+  // b marker
+  h += `<path d="M${cx - A1.ra - 40} ${cy}H${cx + A1.ra + 30}" stroke="#3a4762" stroke-dasharray="2 4"/>`;
+  if (S.b > 0) h += `<path d="M${cx - A1.ra - 30} ${cy}V${gy.toFixed(1)}" stroke="${MUT}" stroke-width="1.2"/>` + T(cx - A1.ra - 34, (cy + gy) / 2 + 4, 9.5, MUT, `b = ${S.b} фм`, 'end', halo);
+  // aim path (single particle)
+  if (S.aimPath) {
+    const p = S.aimPath, tau = S.firing ? (S.bt - p.delay) * A1.SPD : 1e9, q = posAt(p, tau);
+    h += `<path d="${pathD(p.pts, q.i)}L${(cx + q.x).toFixed(1)} ${(cy + q.y).toFixed(1)}" fill="none" stroke="${CP}" stroke-width="2"/>`;
+    if (!p.done && tau > 0) h += `<circle cx="${(cx + q.x).toFixed(1)}" cy="${(cy + q.y).toFixed(1)}" r="4.5" fill="${CP}" stroke="${INK}" stroke-width="1.4"/>`;
+    if (p.done) h += T(cx + q.x + (q.x < 0 ? -8 : 8), cy + q.y + (q.y < 0 ? -8 : 16), 10.5, cls(p.th) === 'k' ? OK : CP, `${fmt(p.th, 0)}°`, q.x < 0 ? 'end' : 'start', halo + ' font-weight="500"');
+  }
+  // particles in flight
+  for (const p of S.fl) {
+    if (p.done || p === S.aimPath) continue;
+    const tau = (S.bt - p.delay) * A1.SPD; if (tau <= 0) continue;
+    const q = posAt(p, tau), i0 = Math.max(0, q.i - 8);
+    let tr = `M${(cx + p.pts[i0][0]).toFixed(1)} ${(cy + p.pts[i0][1]).toFixed(1)}`;
+    for (let i = i0 + 1; i < q.i; i++) tr += `L${(cx + p.pts[i][0]).toFixed(1)} ${(cy + p.pts[i][1]).toFixed(1)}`;
+    tr += `L${(cx + q.x).toFixed(1)} ${(cy + q.y).toFixed(1)}`;
+    h += `<path d="${tr}" fill="none" stroke="${CP}" stroke-opacity=".6" stroke-width="1.6"/><circle cx="${(cx + q.x).toFixed(1)}" cy="${(cy + q.y).toFixed(1)}" r="3" fill="${CP}"/>`;
+  }
+  // flashes on the screen
+  for (const mk of S.marks) {
+    const age = (t - mk.t) / 900, col = mk.c === 'k' ? WARN : mk.c === 'm' ? C1 : '#e8ecf4';
+    h += `<circle cx="${mk.x.toFixed(1)}" cy="${mk.y.toFixed(1)}" r="${(age < 1 && !reduce ? 7 - 4 * age : 3).toFixed(1)}" fill="${col}" opacity="${age < 1 && !reduce ? (1 - 0.5 * age).toFixed(2) : .55}"/>`;
+  }
+  // gun
+  h += `<g data-drag="gun"><rect x="${A1.gx - 6}" y="${(gy - 26).toFixed(1)}" width="60" height="52" fill="transparent"/>
+    <rect x="${A1.gx}" y="${(gy - 13).toFixed(1)}" width="34" height="26" rx="5" fill="#5d6a86" stroke="${INK}" stroke-width="2"/>
+    <rect x="${A1.gx + 34}" y="${(gy - 5).toFixed(1)}" width="12" height="10" rx="2" fill="#8b96ad" stroke="${INK}" stroke-width="1.6"/>
+    <path d="M${A1.gx + 10} ${(gy - 4).toFixed(1)}h14M${A1.gx + 10} ${(gy + 4).toFixed(1)}h14" stroke="${INK}" stroke-width="1.4"/></g>`;
+  h += T(A1.gx + 17, gy - 19, 9, MUT, 'α', 'middle', halo);
+  h += `<path d="M${A1.gx + 17} ${(gy + 18).toFixed(1)}v10M${A1.gx + 13} ${(gy + 24).toFixed(1)}l4 5 4-5M${A1.gx + 17} ${(gy - 28).toFixed(1)}" stroke="${MUT}" stroke-width="1.2" fill="none"/>`;
+  return h;
+}
+function fire(kind) {
+  if (S.firing) return;
+  S.fl = []; S.bt = 0; S.marks = S.marks.slice(-120);
+  if (kind === 'beam') {
+    S.aimPath = null; S.trails = [];
+    const idx = Array.from({ length: 50 }, (_, i) => i);
+    for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+    idx.forEach((k, j) => { const bu = -110 + (k + Math.random()) * 4.4; const p = trace(bu, S.mdl); p.delay = j * 0.07; S.fl.push(p); });
+  } else {
+    const p = trace(S.b / A1.fm, S.mdl); p.delay = 0; p.aim = true; S.aimPath = p; S.fl.push(p);
+  }
+  S.firing = true; renderTools();
+  if (reduce) { S.bt = 1e6; stepFire(performance.now()); }
+}
+function stepFire(t) {
+  let left = 0;
+  for (const p of S.fl) {
+    if (p.done) continue;
+    if ((S.bt - p.delay) * A1.SPD >= p.T) {
+      p.done = true;
+      const c = cls(p.th), cc = S.cnt[S.mdl], e = p.pts[p.pts.length - 1], r = Math.hypot(e[0], e[1]);
+      cc.n++; cc[c]++;
+      S.marks.push({ x: A1.cx + e[0] / r * A1.R, y: A1.cy + e[1] / r * A1.R, c, t });
+      if (!p.aim) S.trails.push(pathD(p.pts));
+      if (p.aim) {
+        S.lastAim = { b: S.b, th: p.th, mdl: S.mdl };
+        if (S.mdl === 'nuc' && p.th > 90) { if (!S.aim) { S.aim = true; toast(`Отскок на ${fmt(p.th, 0)}°! Частица подлетела к ядру на ${S.b} фм и оттолкнулась назад.`); } }
+        else if (S.mdl === 'nuc') toast(`Отклонение ${fmt(p.th, 0)}°. Чтобы частица отскочила назад, целиться нужно ближе к ядру.`);
+        else toast(`Отклонение ${fmt(p.th, 1)}°. В «пудинге» заряд размазан, и сила слишком слабая, чтобы развернуть частицу.`);
+      }
+    } else left++;
+  }
+  if (!left) {
+    S.firing = false;
+    const beam = S.fl.length > 1;
+    if (beam) {
+      const k = S.fl.filter(p => cls(p.th) === 'k').length, m = S.fl.filter(p => cls(p.th) === 'm').length;
+      if (S.mdl === 'thom') toast(`Томсон: все 50 частиц прошли почти прямо. Отскоков назад нет — а в опыте они были!`);
+      else toast(`Ядерная модель: ${m} отклонились сильно, ${k} отскочили назад. Так и было в опыте.`);
+    }
+    renderTools(); update();
+  }
+}
+function setB(v) { if (S.firing) return; v = clamp(Math.round(v / 5) * 5, 0, 300); if (v === S.b) return; S.b = v; if (S.aimPath && S.aimPath.done) S.aimPath = null; update(); }
+function setMdl(md) { if (S.firing || md === S.mdl) return; S.mdl = md; S.trails = []; S.marks = []; S.aimPath = null; renderTools(); buildScheme(); update(); }
+
+// ---------- lesson 2: build an atom ----------
+const shellsOf = E => { const out = []; let left = E; for (const c of A2.cap) { if (left <= 0) break; out.push(Math.min(c, left)); left -= c; } return out; };
+function nucleons() {
+  const A = S.Z + S.N, out = [];
+  for (let i = 0; i < A; i++) {
+    const isP = Math.floor((i + 1) * S.Z / A) > Math.floor(i * S.Z / A);
+    const r = A === 1 ? 0 : 5.4 * Math.sqrt(i + 0.5), a = i * 2.39996;
+    out.push({ x: A2.cx + r * Math.cos(a), y: A2.cy + r * Math.sin(a), p: isP });
+  }
+  return out.reverse();
+}
+const ball = (x, y, r, col, lab) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="${col}" stroke="${INK}" stroke-width="1.3"/>` + (lab ? T(x, y + 3.3, r > 6 ? 9 : 8, INK, lab, 'middle', 'font-weight="500"') : '');
+function modelScene() {
+  const cx = A2.cx, cy = A2.cy, sh = shellsOf(S.E);
+  let h = '';
+  h += `<circle cx="${cx}" cy="${cy}" r="${A2.shells[3] + 14}" fill="url(#cloud)"/>`;
+  const nShow = Math.max(sh.length, 1);
+  for (let i = 0; i < 4; i++) h += `<circle cx="${cx}" cy="${cy}" r="${A2.shells[i]}" fill="none" stroke="#72d4e8" stroke-opacity="${i < nShow ? .35 : .1}" stroke-dasharray="3 5"/>`;
+  for (const q of nucleons()) h += ball(q.x, q.y, 6.2, q.p ? PRO : NEU, q.p ? '+' : '');
+  sh.forEach((cnt, i) => {
+    const r = A2.shells[i], sp = (0.5 / (i + 1)) * (i % 2 ? -1 : 1);
+    for (let j = 0; j < cnt; j++) { const a = S.ph * sp + j * 2 * Math.PI / cnt + i * 0.4; h += ball(cx + r * Math.cos(a), cy + r * Math.sin(a), 4.6, C1, ''); }
+    h += T(cx + r * Math.cos(-0.95) + 4, cy + r * Math.sin(-0.95) - 4, 9, '#a9e6f2', `${cnt}`, 'start', halo);
+  });
+  // tray
+  const lab = [['p', PRO, 'протон', '+'], ['n', NEU, 'нейтрон', ''], ['e', C1, 'электрон', '']];
+  h += `<rect x="${A2.tx - 34}" y="${A2.ty[0] - 34}" width="68" height="${A2.ty[2] - A2.ty[0] + 70}" rx="12" fill="#121a28" stroke="#26324a"/>`;
+  lab.forEach(([k, col, name, s], i) => {
+    const y = A2.ty[i];
+    h += `<g data-drag="t${k}"><circle cx="${A2.tx}" cy="${y}" r="24" fill="transparent"/>${ball(A2.tx, y, k === 'e' ? 7 : 10, col, s)}</g>` + T(A2.tx, y + 25, 9, '#a9b4c9', name);
+  });
+  if (S.gh) h += ball(S.gh.x, S.gh.y, S.gh.k === 'e' ? 7 : 10, S.gh.k === 'p' ? PRO : S.gh.k === 'n' ? NEU : C1, S.gh.k === 'p' ? '+' : '') + `<circle cx="${cx}" cy="${cy}" r="${A2.shells[3] + 14}" fill="none" stroke="${OK}" stroke-opacity=".5" stroke-dasharray="6 6"/>`;
+  // caption
+  const el = ELEM[S.Z], q = S.Z - S.E;
+  h += T(cx, cy + A2.shells[3] + 34, 12, q === 0 ? '#e8ecf4' : CP, `${el[1]}-${S.Z + S.N} · ${q === 0 ? 'нейтральный атом' : `ион, заряд ${q > 0 ? '+' : '−'}${Math.abs(q)}e`}`, 'middle', halo + ' font-weight="500"');
+  h += T(cx, cy + A2.shells[3] + 50, 9, MUT, 'размеры не в масштабе: ядро в десятки тысяч раз меньше атома', 'middle', halo);
+  return h;
+}
+function addP(k, d) {
+  const lim = { Z: [1, 20], N: [0, 26], E: [0, 20] }[k], v = S[k] + d;
+  if (v < lim[0] || v > lim[1]) { toast(k === 'Z' && v < 1 ? 'Без протонов это уже не атом. Минимум один протон.' : k === 'E' && v > 20 ? 'В этой модели не больше 20 электронов — до кальция.' : 'Дальше нельзя: в лаборатории элементы с 1-го по 20-й.'); return; }
+  S[k] = v; checkFound(); update(); if (S.tab === 'scheme') updateScheme(model());
+}
+function checkFound() {
+  for (const tg of L().targets || []) {
+    const key = tg.name;
+    if (S.Z === tg.Z && S.Z + S.N === tg.A && S.E === S.Z && !S.found[key]) {
+      S.found[key] = true;
+      toast(key === 'углерод-14' ? 'Углерод-14: те же 6 протонов, но 8 нейтронов. Это изотоп углерода.' : `Готово: ${key} — ${tg.Z} p, ${tg.A - tg.Z} n, ${tg.Z} e.`);
+    }
+  }
+}
+
+// ---------- lesson 3: hydrogen levels and spectra ----------
+const LVY = n => A3.LY[n];
+function nearestLevel(y) { let best = 1, bd = 1e9; for (let n = 1; n <= 6; n++) { const d = Math.abs(LVY(n) - y); if (d < bd) { bd = d; best = n; } } return best; }
+function goLevel(k) {
+  if (k === S.n) { dirty = true; return; }
+  const from = S.n, lam = LAM(Math.max(from, k), Math.min(from, k));
+  S.last = { from, to: k, lam, dE: Math.abs(EN(from) - EN(k)) };
+  S.photon = { t: 0, lam, out: k < from, y0: LVY(from), y1: LVY(k) };
+  S.n = k;
+  if (k < from) {
+    const key = `${from}-${k}`, fresh = !S.lines[key];
+    S.lines[key] = { from, to: k, lam };
+    const vis = lam >= 380 && lam <= 750;
+    if (vis) toast(fresh ? `Переход ${from} → ${k}: фотон ${fmt(lam, 0)} нм, ${colorName(lam)} свет.` : `Эта линия уже есть: ${fmt(lam, 0)} нм.`);
+    else toast(`Переход ${from} → ${k}: ${fmt(lam, 0)} нм — ${lam < 380 ? 'ультрафиолет' : 'инфракрасный свет'}, глаз его не видит.`);
+  } else toast(`Атом поглотил фотон ${fmt(lam, 0)} нм — электрон поднялся на уровень ${k}.`);
+  if (reduce) S.photon = null;
+  update();
+}
+function setMode(md) {
+  if (md === S.mode) return; S.mode = md;
+  if (md === 'abs' && !S.abs) { S.abs = true; toast('Тёмные линии поглощения стоят там же, где яркие линии испускания.'); }
+  renderTools(); buildScheme(); update();
+}
+function spectraScene(t) {
+  let h = '';
+  const xL = A3.x0, xR = A3.x1;
+  // ionisation
+  h += `<path d="M${xL} ${A3.y0}H${xR}" stroke="#4a5876" stroke-dasharray="4 4"/>` + T(xL - 8, A3.y0 + 3, 9, MUT, 'n = ∞', 'end') + T(xR + 8, A3.y0 + 3, 9, MUT, '0 эВ', 'start');
+  h += T((xL + xR) / 2, A3.y0 - 8, 9, MUT, 'электрон покидает атом', 'middle', halo);
+  for (let n = 1; n <= 6; n++) {
+    const y = LVY(n), on = n === S.n;
+    h += `<g data-lvl="${n}" style="cursor:pointer"><rect x="${xL - 44}" y="${y - (n >= 4 ? 9 : 12)}" width="${xR - xL + 100}" height="${n >= 4 ? 18 : 24}" fill="transparent"/>
+      <path d="M${xL} ${y}H${xR}" stroke="${on ? CP : '#8b96ad'}" stroke-width="${on ? 3 : 2}"/></g>`;
+    h += T(xL - 8, y + 3.5, 10, on ? CP : '#a9b4c9', `n = ${n}`, 'end', 'pointer-events="none"') + T(xR + 8, y + 3.5, 9.5, MUT, `${fmt(EN(n), 2)} эВ`, 'start', 'pointer-events="none"');
+  }
+  h += `<path d="M${xL - 50} ${LVY(1) + 14}V${A3.y0 - 2}" stroke="${MUT}" stroke-width="1.2"/><path d="M${xL - 50} ${A3.y0 - 6}l-3.5 7h7z" fill="${MUT}"/>` + T(xL - 54, (LVY(1) + LVY(2)) / 2, 9, MUT, 'E', 'end');
+  // past transitions as arrows
+  let ax = xL + 10;
+  for (const k of Object.keys(S.lines)) {
+    const l = S.lines[k]; if (ax > xL + 80) break;
+    const vis = l.lam >= 380 && l.lam <= 750, col = vis ? wl(l.lam) : '#5d6a86';
+    h += `<path d="M${ax} ${LVY(l.from)}V${LVY(l.to) - 5}" stroke="${col}" stroke-width="2" pointer-events="none"/><path d="M${ax - 3.5} ${LVY(l.to) - 7}l3.5 7 3.5-7z" fill="${col}" pointer-events="none"/>`;
+    ax += 7;
+  }
+  // electron
+  const ey = S.ey !== null ? S.ey : LVY(S.n);
+  h += `<g data-drag="el"><circle cx="${A3.ex}" cy="${ey.toFixed(1)}" r="18" fill="transparent"/><circle cx="${A3.ex}" cy="${ey.toFixed(1)}" r="7" fill="${C1}" stroke="${INK}" stroke-width="1.6"/>${T(A3.ex, ey + 2.8, 8, INK, '−', 'middle', 'font-weight="600"')}</g>`;
+  h += T(A3.ex, ey - 12, 9, '#a9e6f2', 'e', 'middle', halo + ' pointer-events="none"');
+  // photon
+  const ph = S.photon;
+  if (ph) {
+    const k = clamp(ph.t, 0, 1), col = ph.lam >= 380 && ph.lam <= 750 ? wl(ph.lam) : '#c3a8ff';
+    const ya = ph.out ? ph.y1 : ph.y1, x0 = ph.out ? A3.ex + 10 : 500, x1 = ph.out ? 500 : A3.ex + 10, xh = x0 + (x1 - x0) * k;
+    const wave = [];
+    const wlen = clamp(ph.lam / 40, 4, 30);
+    for (let i = 0; i <= 24; i++) { const xx = xh - (ph.out ? 1 : -1) * i * 2.4; wave.push(`${i ? 'L' : 'M'}${xx.toFixed(1)} ${(ya - 16 + 6 * Math.sin((xx - t * 0.2) / wlen * 2 * Math.PI)).toFixed(1)}`); }
+    h += `<path d="${wave.join('')}" fill="none" stroke="${col}" stroke-width="2.4" pointer-events="none"/>`;
+  }
+  // info card
+  const ix = 356, iy = 150;
+  h += `<rect x="${ix}" y="${iy}" width="160" height="${S.last ? 116 : 74}" rx="10" fill="#121a28" stroke="#26324a"/>`;
+  if (S.last) {
+    const l = S.last, vis = l.lam >= 380 && l.lam <= 750, out = l.to < l.from;
+    h += T(ix + 12, iy + 20, 10, '#a9b4c9', out ? `испускание ${l.from} → ${l.to}` : `поглощение ${l.from} → ${l.to}`, 'start');
+    h += T(ix + 12, iy + 42, 11, '#e8ecf4', `ΔE = ${fmt(l.dE, 2)} эВ`, 'start');
+    h += T(ix + 12, iy + 62, 11, vis ? wl(l.lam) : '#c3a8ff', `λ = ${fmt(l.lam, 0)} нм`, 'start', 'font-weight="500"');
+    h += T(ix + 12, iy + 82, 10, MUT, colorName(l.lam), 'start');
+    h += T(ix + 12, iy + 104, 9, MUT, `электрон на n = ${S.n}`, 'start');
+  } else {
+    h += T(ix + 12, iy + 22, 10, '#a9b4c9', 'Электрон на n = 1:', 'start') + T(ix + 12, iy + 40, 10, '#a9b4c9', 'атом не возбуждён.', 'start') + T(ix + 12, iy + 60, 9.5, MUT, 'Поднимите электрон выше.', 'start');
+  }
+  // spectrum strip
+  const sx0 = A3.sx0, sx1 = A3.sx1, sy = A3.sy, sh = A3.sh;
+  const title = { cont: 'Сплошной спектр (нить лампы)', emit: 'Спектр испускания водорода', abs: 'Спектр поглощения водорода' }[S.mode];
+  h += T(sx0, sy - 8, 10, '#e8ecf4', title, 'start', halo);
+  h += `<rect x="${sx0}" y="${sy}" width="${sx1 - sx0}" height="${sh}" fill="${S.mode === 'emit' ? '#05080d' : 'url(#rb)'}" stroke="#26324a"/>`;
+  if (S.mode === 'emit') for (const k of Object.keys(S.lines)) { const l = S.lines[k]; if (l.lam < 380 || l.lam > 750) continue; const x = XS(l.lam); h += `<rect x="${(x - 2).toFixed(1)}" y="${sy}" width="4" height="${sh}" fill="${wl(l.lam)}"/><rect x="${(x - 5).toFixed(1)}" y="${sy}" width="10" height="${sh}" fill="${wl(l.lam)}" opacity=".25"/>`; }
+  if (S.mode === 'abs') for (const lam of BALMER) { const x = XS(lam); h += `<rect x="${(x - 2).toFixed(1)}" y="${sy}" width="4" height="${sh}" fill="#05080d"/>`; }
+  for (const lam of [400, 500, 600, 700]) { const x = XS(lam); h += `<path d="M${x} ${sy + sh}v5" stroke="${MUT}"/>` + T(x, sy + sh + 16, 9, MUT, lam + (lam === 700 ? ' нм' : '')); }
+  const inv = Object.keys(S.lines).map(k => S.lines[k]).filter(l => l.lam < 380 || l.lam > 750);
+  if (inv.length) h += T(sx0, sy + sh + 32, 8.5, MUT, 'невидимые: ' + inv.slice(-4).map(l => `${l.from}→${l.to} ${fmt(l.lam, 0)} нм`).join(', '), 'start');
+  return h;
+}
+
+function hlBox(id) {
+  const lid = LID();
+  if (lid === 'rutherford') {
+    const gy = gunY();
+    return ({ gun: [A1.gx - 8, gy - 20, 62, 40], atom: [A1.cx - A1.ra - 6, A1.cy - A1.ra - 6, 2 * A1.ra + 12, 2 * A1.ra + 12], nuc: [A1.cx - 10, A1.cy - 10, 20, 20], screen: [A1.cx - A1.R - 6, A1.cy - A1.R - 6, 2 * A1.R + 12, 2 * A1.R + 12], b: [A1.cx - A1.ra - 40, Math.min(gy, A1.cy) - 6, 20, Math.abs(A1.cy - gy) + 12] })[id];
+  }
+  if (lid === 'model') {
+    const r = 6 * Math.sqrt(S.Z + S.N) + 8;
+    return ({ p: [A2.tx - 16, A2.ty[0] - 16, 32, 32], n: [A2.tx - 16, A2.ty[1] - 16, 32, 32], e: [A2.tx - 16, A2.ty[2] - 16, 32, 32], nucleus: [A2.cx - r, A2.cy - r, 2 * r, 2 * r], shells: [A2.cx - A2.shells[3] - 8, A2.cy - A2.shells[3] - 8, 2 * A2.shells[3] + 16, 2 * A2.shells[3] + 16] })[id];
+  }
+  return ({ levels: [A3.x0 - 50, A3.y0 - 10, A3.x1 - A3.x0 + 110, LVY(1) - A3.y0 + 22], el: [A3.ex - 14, LVY(S.n) - 14, 28, 28], ion: [A3.x0 - 50, A3.y0 - 18, A3.x1 - A3.x0 + 110, 26], card: [352, 146, 168, S.last ? 124 : 82], strip: [A3.sx0 - 6, A3.sy - 22, A3.sx1 - A3.sx0 + 12, A3.sh + 46] })[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = bg(id);
+  if (id === 'rutherford') h += rutherfordScene(t);
+  else if (id === 'model') h += modelScene();
+  else h += spectraScene(t);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// fit the scene: 520 × 405 units, centred, content at the bottom
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 520, hh / 430, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 420 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => {
+  const lv = e.target.closest('[data-lvl]');
+  if (lv && LID() === 'spectra') { e.preventDefault(); goLevel(+lv.dataset.lvl); return; }
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  drag = { id: el.dataset.drag };
+  const p = toSvg(e);
+  if (drag.id[0] === 't') { S.gh = { k: drag.id[1], x: p.x, y: p.y }; dirty = true; }
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const p = toSvg(e);
+  if (drag.id === 'gun') setB((A1.cy - p.y) * A1.fm);
+  else if (drag.id[0] === 't') { S.gh.x = p.x; S.gh.y = p.y; dirty = true; }
+  else if (drag.id === 'el') { S.ey = clamp(p.y, LVY(6) - 6, LVY(1) + 6); dirty = true; }
+});
+const endDrag = () => {
+  if (!drag) return;
+  const id = drag.id; drag = null; scene.classList.remove('grabbing');
+  if (id[0] === 't' && S.gh) {
+    const g = S.gh; S.gh = null;
+    if (Math.hypot(g.x - A2.cx, g.y - A2.cy) < A2.shells[3] + 16) addP(g.k === 'p' ? 'Z' : g.k === 'n' ? 'N' : 'E', 1);
+  }
+  if (id === 'el' && S.ey !== null) { const k = nearestLevel(S.ey); S.ey = null; goLevel(k); }
+  dirty = true;
+};
+scene.addEventListener('pointerup', endDrag);
+scene.addEventListener('pointercancel', endDrag);
+
+let last = performance.now();
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  const id = LID();
+  if (!reduce && (id === 'model' || (id === 'rutherford' && S.mdl === 'nuc'))) { S.ph += dt; dirty = true; }
+  if (id === 'rutherford') { if (S.firing) { S.bt += dt; stepFire(t); dirty = true; } else if (S.marks.some(m => t - m.t < 900)) dirty = true; }
+  if (id === 'spectra') { if (S.photon) { S.photon.t += dt / 1.1; if (S.photon.t >= 1) S.photon = null; dirty = true; } }
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3600); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, cls) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}${cls ? ` class="${cls}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  let h = '';
+  if (id === 'rutherford') h = B('thom', 'Томсон', S.mdl === 'thom') + B('nuc', 'Ядро', S.mdl === 'nuc') + sep + B('beam', S.firing ? 'Летят…' : 'Пучок', undefined, 'rec') + B('one', 'Одна') + sep + B('b-', 'b −') + B('b+', 'b +') + B('reset', 'Сброс');
+  if (id === 'model') h = B('Z+', 'p +') + B('Z-', 'p −') + sep + B('N+', 'n +') + B('N-', 'n −') + sep + B('E+', 'e +') + B('E-', 'e −') + sep + B('reset', 'Сброс');
+  if (id === 'spectra') h = B('cont', 'Сплошной', S.mode === 'cont') + B('emit', 'Испускание', S.mode === 'emit') + B('abs', 'Поглощение', S.mode === 'abs') + sep + B('up', 'Вверх') + B('down', 'Вниз') + B('reset', 'Сброс');
+  tb.innerHTML = h;
+}
+function act(a) {
+  const id = LID();
+  if (a === 'reset') {
+    if (id === 'rutherford') { if (S.firing) return; S.trails = []; S.marks = []; S.aimPath = null; S.cnt[S.mdl] = { n: 0, s: 0, m: 0, k: 0 }; }
+    if (id === 'model') { S.Z = 1; S.N = 0; S.E = 1; }
+    if (id === 'spectra') { S.lines = {}; S.n = 1; S.last = null; S.photon = null; }
+    renderTools(); update(); return;
+  }
+  if (a === 'thom' || a === 'nuc') return setMdl(a);
+  if (a === 'beam') return fire('beam');
+  if (a === 'one') return fire('one');
+  if (a === 'b-' || a === 'b+') return setB(S.b + (a === 'b-' ? -5 : 5));
+  if (/^[ZNE][+-]$/.test(a)) return addP(a[0], a[1] === '+' ? 1 : -1);
+  if (a === 'cont' || a === 'emit' || a === 'abs') return setMode(a);
+  if (a === 'up') return S.n < 6 ? goLevel(S.n + 1) : toast('Выше шестого уровня в этой модели не поднимаемся.');
+  if (a === 'down') return S.n > 1 ? goLevel(S.n - 1) : toast('Ниже первого уровня электрон опуститься не может — это основное состояние.');
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  gun: IC('<rect x="3" y="11" width="18" height="12" rx="3" fill="#5d6a86"/><rect x="21" y="14" width="6" height="6" fill="#8b96ad"/><circle cx="31" cy="17" r="2.5" fill="#ffb547"/>'),
+  atom: IC('<circle cx="17" cy="17" r="13" fill="#ff9aa8" opacity=".4"/><circle cx="12" cy="13" r="2" fill="#72d4e8"/><circle cx="21" cy="21" r="2" fill="#72d4e8"/><circle cx="22" cy="11" r="2" fill="#72d4e8"/>'),
+  nuc: IC('<circle cx="17" cy="17" r="13" fill="none" stroke="#72d4e8" stroke-opacity=".4" stroke-dasharray="2 3"/><circle cx="17" cy="17" r="3" fill="#ffb547"/>'),
+  screen: IC('<circle cx="17" cy="17" r="13" fill="none" stroke="#4a5876" stroke-width="3" stroke-dasharray="2 3"/><circle cx="29" cy="12" r="2.5" fill="#e8ecf4"/><circle cx="5" cy="20" r="2.5" fill="#ff8a73"/>'),
+  b: IC('<path d="M4 9h22M4 25h26" stroke="#8b96ad" stroke-dasharray="3 3"/><path d="M8 9v16" stroke="#e8ecf4" stroke-width="2"/><circle cx="28" cy="25" r="3" fill="#ffb547"/>'),
+  p: IC('<circle cx="17" cy="17" r="10" fill="#ff8a73"/><path d="M12 17h10M17 12v10" stroke="#04070d" stroke-width="2"/>'),
+  n: IC('<circle cx="17" cy="17" r="10" fill="#a9b4c9"/>'),
+  e: IC('<circle cx="17" cy="17" r="6" fill="#72d4e8"/><path d="M14 17h6" stroke="#04070d" stroke-width="1.6"/>'),
+  nucleus: IC('<circle cx="13" cy="14" r="5" fill="#ff8a73"/><circle cx="21" cy="14" r="5" fill="#a9b4c9"/><circle cx="13" cy="21" r="5" fill="#a9b4c9"/><circle cx="21" cy="21" r="5" fill="#ff8a73"/>'),
+  shells: IC('<circle cx="17" cy="17" r="7" fill="none" stroke="#72d4e8" stroke-dasharray="2 2"/><circle cx="17" cy="17" r="14" fill="none" stroke="#72d4e8" stroke-dasharray="2 2"/><circle cx="24" cy="17" r="2" fill="#72d4e8"/><circle cx="7" cy="8" r="2" fill="#72d4e8"/>'),
+  levels: IC('<path d="M4 29h26M4 18h26M4 11h26M4 7h26" stroke="#8b96ad" stroke-width="1.6"/>'),
+  el: IC('<path d="M4 18h26" stroke="#ffb547" stroke-width="2"/><circle cx="17" cy="18" r="5" fill="#72d4e8"/>'),
+  ion: IC('<path d="M4 8h26" stroke="#8b96ad" stroke-dasharray="3 3"/><path d="M17 26V12" stroke="#72d4e8" stroke-width="2"/><path d="M13 14l4-5 4 5" fill="none" stroke="#72d4e8" stroke-width="2"/>'),
+  card: IC('<rect x="3" y="7" width="28" height="20" rx="4" fill="none" stroke="#8b96ad" stroke-width="1.6"/><path d="M8 14h12M8 20h16" stroke="#e05656" stroke-width="2"/>'),
+  strip: IC('<defs><linearGradient id="icg"><stop offset="0" stop-color="#7a3cff"/><stop offset=".5" stop-color="#3cff6a"/><stop offset="1" stop-color="#ff2a2a"/></linearGradient></defs><rect x="2" y="11" width="30" height="12" fill="url(#icg)"/><path d="M10 11v12M22 11v12" stroke="#04070d" stroke-width="2"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  const t = (ok, s) => `${s} ${ok ? '✓' : '—'}`;
+  if (id === 'rutherford') return [t(m.thom >= 20, 'Пучок: Томсон'), t(m.back >= 1, 'отскок в ядерной'), t(m.aim, 'одна > 90°')].join(' · ');
+  if (id === 'model') return L().targets.map(tg => t(S.found[tg.name], tg.name)).join(' · ');
+  return `Видимых линий: ${m.vis} из 4 · ` + t(m.abs, 'поглощение');
+}
+
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'rutherford') h = `<h2>Обстрел золотой фольги</h2>` +
+    `<div class="ctl"><div class="lbl">Модель атома</div><div class="chips"><button data-a="thom" aria-pressed="${S.mdl === 'thom'}">Томсон</button><button data-a="nuc" aria-pressed="${S.mdl === 'nuc'}">ядерная</button></div></div>` +
+    slider('inB', 'Прицельное расстояние b', 0, 300, 5, S.b) +
+    `<dl class="reads"><div><dt>выпущено</dt><dd id="r1"></dd></div><div><dt>&lt;10°</dt><dd id="r2"></dd></div><div><dt>10–90°</dt><dd id="r3"></dd></div><div><dt>назад &gt;90°</dt><dd id="r4"></dd></div><div><dt>угол для b</dt><dd id="r5"></dd></div><div><dt>энергия α</dt><dd>5 МэВ</dd></div></dl>
+    <div class="row"><button class="ghostbtn" data-a="beam">Пучок</button><button class="ghostbtn" data-a="one">Одна частица</button><button class="ghostbtn" data-a="reset">Сброс</button></div>
+    <p class="note" style="margin-top:12px">Атом и ядро нарисованы крупно, а ядро сильно увеличено: на самом деле оно в десятки тысяч раз меньше атома. Поэтому в настоящем опыте назад отскакивала лишь одна частица из тысяч.</p>`;
+  if (id === 'model') {
+    const row = (k, name) => `<div class="ctl"><div class="lbl">${name} <output id="o${k}"></output></div><div class="chips"><button data-a="${k}-">−1</button><button data-a="${k}+">+1</button></div></div>`;
+    h = `<h2>Конструктор атома</h2>` + row('Z', 'Протоны Z') + row('N', 'Нейтроны N') + row('E', 'Электроны') +
+      `<dl class="reads"><div><dt>элемент</dt><dd id="r1"></dd></div><div><dt>A = Z + N</dt><dd id="r2"></dd></div><div><dt>заряд</dt><dd id="r3"></dd></div></dl>
+      <div class="row"><button class="ghostbtn" data-a="reset">Сброс</button></div>
+      <p class="note" style="margin-top:12px">Заряд показан в элементарных зарядах e. Слои электронов заполняются по 2, 8, 8, 2 — так у первых 20 элементов.</p>`;
+  }
+  if (id === 'spectra') h = `<h2>Атом водорода</h2>` +
+    `<div class="ctl"><div class="lbl">Что смотрим</div><div class="chips"><button data-a="cont" aria-pressed="${S.mode === 'cont'}">сплошной</button><button data-a="emit" aria-pressed="${S.mode === 'emit'}">испускание</button><button data-a="abs" aria-pressed="${S.mode === 'abs'}">поглощение</button></div></div>` +
+    `<div class="ctl"><div class="lbl">Перевести электрон на уровень</div><div class="chips">${[1, 2, 3, 4, 5, 6].map(k => `<button data-a="lv-${k}" aria-pressed="${S.n === k}">n = ${k}</button>`).join('')}</div></div>` +
+    `<dl class="reads"><div><dt>уровень</dt><dd id="r1"></dd></div><div><dt>энергия</dt><dd id="r2"></dd></div><div><dt>последний λ</dt><dd id="r3"></dd></div></dl>
+    <div class="row"><button class="ghostbtn" data-a="reset">Стереть линии</button></div>`;
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn); };
+  on('#inB', e => setB(+e.target.value));
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => {
+    const a = b.dataset.a;
+    if (a.startsWith('lv-')) { goLevel(+a.slice(3)); buildScheme(); updateScheme(model()); return; }
+    act(a); if (/^(thom|nuc|cont|emit|abs)$/.test(a)) buildScheme();
+    updateScheme(model());
+  });
+  updateScheme(model());
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (id === 'rutherford') { const c = S.cnt[S.mdl]; set('#inBO', S.b + ' фм'); val('#inB', S.b); set('#r1', c.n); set('#r2', c.s); set('#r3', c.m); set('#r4', c.k); set('#r5', S.mdl === 'nuc' ? fmt(thExact(S.b), 0) + '°' : '< 1°'); }
+  if (id === 'model') { set('#oZ', S.Z); set('#oN', S.N); set('#oE', S.E); set('#r1', ELEM[S.Z][0]); set('#r2', m.A); set('#r3', (m.q > 0 ? '+' : '') + fmt(m.q, 0)); }
+  if (id === 'spectra') { set('#r1', 'n = ' + S.n); set('#r2', fmt(EN(S.n), 2) + ' эВ'); set('#r3', S.last ? fmt(S.last.lam, 0) + ' нм' : '—'); el.querySelectorAll('[data-a^="lv-"]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.a.slice(3) === S.n)); }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'rutherford') return [
+    { id: 'gun', icon: ICON.gun, name: 'Источник альфа-частиц', spec: 'Крупинка радиоактивного вещества в свинцовом коробе. Альфа-частица — ядро гелия: 2 протона и 2 нейтрона, заряд +2e.' },
+    { id: 'atom', icon: ICON.atom, name: 'Атом золота', spec: 'Фольга толщиной около тысячи атомов. Здесь крупно показан один атом.' },
+    { id: 'nuc', icon: ICON.nuc, name: 'Ядро', spec: 'Заряд +79e, почти вся масса атома. Нарисовано увеличенным.' },
+    { id: 'screen', icon: ICON.screen, name: 'Экран', spec: 'Покрыт сульфидом цинка: в месте удара вспыхивает искорка. Белые — пролёт прямо, голубые — сильное отклонение, красные — отскок назад.' },
+    { id: 'b', icon: ICON.b, name: 'Прицельное расстояние b', spec: 'Насколько мимо центра ядра летит частица. Чем меньше b, тем сильнее отклонение.' }];
+  if (id === 'model') return [
+    { id: 'p', icon: ICON.p, name: 'Протон', spec: 'Заряд +e, масса около 1 а. е. м. Их число Z задаёт элемент.' },
+    { id: 'n', icon: ICON.n, name: 'Нейтрон', spec: 'Без заряда, масса почти как у протона. Меняет изотоп, но не элемент.' },
+    { id: 'e', icon: ICON.e, name: 'Электрон', spec: 'Заряд −e, масса в 1836 раз меньше, чем у протона.' },
+    { id: 'nucleus', icon: ICON.nucleus, name: 'Ядро', spec: 'Протоны и нейтроны вместе. Почти вся масса атома.' },
+    { id: 'shells', icon: ICON.shells, name: 'Электронные слои', spec: 'Вмещают 2, 8, 8… электронов. Цифра у слоя — сколько в нём электронов.' }];
+  return [
+    { id: 'levels', icon: ICON.levels, name: 'Уровни энергии', spec: 'Eₙ = −13,6 / n² эВ. Других значений энергии у электрона в атоме нет. Расстояния между уровнями нарисованы условно.' },
+    { id: 'el', icon: ICON.el, name: 'Электрон', spec: 'Нажмите на уровень или тяните электрон. n = 1 — основное состояние.' },
+    { id: 'ion', icon: ICON.ion, name: 'Граница E = 0', spec: 'Выше неё электрон уже не связан с ядром — атом ионизован.' },
+    { id: 'card', icon: ICON.card, name: 'Табло фотона', spec: 'Энергия, длина волны и цвет последнего фотона.' },
+    { id: 'strip', icon: ICON.strip, name: 'Спектр', spec: 'Полоса от 380 до 750 нм — то, что видит глаз.' }];
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Что на площадке</h2><p class="note">Нажмите на деталь, чтобы найти её на площадке.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'rutherford') {
+    const th = thExact(S.b);
+    return `<h2>Как близко к ядру</h2><div class="formula">r<sub>min</sub> = k · q<sub>α</sub> · Q / E</div><p class="note">Если частица летит точно в ядро, она тормозит, пока вся её кинетическая энергия не перейдёт в энергию отталкивания. Это и есть самое близкое расстояние.</p>
+      <h3>Числа</h3><div class="steps">` + step('k', '9 · 10⁹ Н·м²/Кл²') + step('заряд частицы q<sub>α</sub>', '2e = 3,2 · 10⁻¹⁹ Кл') + step('заряд ядра золота Q', '79e = 1,26 · 10⁻¹⁷ Кл') + step('энергия E', '5 МэВ = 8,0 · 10⁻¹³ Дж') +
+      step('r<sub>min</sub>', '9·10⁹ · 3,2·10⁻¹⁹ · 1,26·10⁻¹⁷ / 8,0·10⁻¹³ ≈ 4,5 · 10⁻¹⁴ м = 45 фм', 'sum') + `</div>
+      <p class="note" style="margin-top:8px">1 фм (фемтометр) = 10⁻¹⁵ м. Радиус атома золота — около 1,4 · 10⁻¹⁰ м, то есть в 3000 раз больше r<sub>min</sub>. Значит, ядро действительно крошечное.</p>
+      <h3>Угол для b = ${S.b} фм (ядерная модель)</h3><div class="formula">tg(θ/2) = r<sub>min</sub> / (2b)</div><div class="steps">` +
+      (S.b > 0 ? step('r<sub>min</sub> / (2b)', `45 / (2 · ${S.b}) = ${fmt(45 / (2 * S.b), 3)}`) + step('θ/2', `${fmt(th / 2, 1)}°`) : step('b = 0', 'удар в лоб')) +
+      step('угол отклонения θ', `${fmt(th, 1)}°`, 'sum') + step('назад, если θ > 90°', 'b < r<sub>min</sub> / 2 ≈ 22 фм') + `</div>
+      <p class="note" style="margin-top:8px">Эту формулу Резерфорд вывел сам. В 9 классе её не учат наизусть — важен вывод: чем ближе к ядру, тем сильнее отклонение.</p>`;
+  }
+  if (id === 'model') {
+    const el = ELEM[S.Z], sh = shellsOf(S.E);
+    return `<h2>Состав атома</h2><div class="formula">A = Z + N</div>
+      <h3>Сейчас: ${el[1]}-${m.A}</h3><div class="steps">` + step('протонов Z', `${S.Z} → элемент №${S.Z}, ${el[0]}`) + step('нейтронов N', `${S.N}`) + step('массовое число', `A = ${S.Z} + ${S.N} = ${m.A}`, 'sum') +
+      step('заряд ядра', `+${S.Z}e = ${fmt(S.Z * 1.6, 1)} · 10⁻¹⁹ Кл`) + step('электронов', `${S.E}`) + step('заряд атома', `${S.Z} − ${S.E} = ${m.q > 0 ? '+' : ''}${fmt(m.q, 0)}e`, 'sum') +
+      step('масса ядра', `≈ ${m.A} а. е. м. ≈ ${fmt(m.A * 1.66, 2)} · 10⁻²⁷ кг`) + step('электронные слои', sh.length ? sh.join(', ') : 'нет электронов') + `</div>
+      <h3>Цели</h3><div class="steps">` + L().targets.map(tg => step(tg.name, `${tg.Z} p, ${tg.A - tg.Z} n, ${tg.Z} e ${S.found[tg.name] ? '✓' : ''}`)).join('') + `</div>`;
+  }
+  const l = S.last;
+  let h = `<h2>Энергия фотона</h2><div class="formula">Eₙ = −13,6 / n² эВ</div><div class="formula">hν = Eₖ − Eₙ,&nbsp; λ = hc / ΔE</div><p class="note">h = 6,63 · 10⁻³⁴ Дж·с, c = 3 · 10⁸ м/с, 1 эВ = 1,6 · 10⁻¹⁹ Дж. Удобно помнить: λ (нм) ≈ 1240 / ΔE (эВ).</p>`;
+  if (l) {
+    const hi = Math.max(l.from, l.to), lo = Math.min(l.from, l.to);
+    h += `<h3>Переход ${l.from} → ${l.to}</h3><div class="steps">` + step(`E${hi}`, `−13,6 / ${hi * hi} = ${fmt(EN(hi), 2)} эВ`) + step(`E${lo}`, `−13,6 / ${lo * lo} = ${fmt(EN(lo), 2)} эВ`) +
+      step('ΔE', `${fmt(EN(hi), 2)} − (${fmt(EN(lo), 2)}) = ${fmt(l.dE, 2)} эВ`) + step('в джоулях', `${fmt(l.dE * 1.6, 2)} · 10⁻¹⁹ Дж`) + step('λ', `1240 / ${fmt(l.dE, 2)} ≈ ${fmt(l.lam, 0)} нм`, 'sum') + step('частота ν = c / λ', `${fmt(3e8 / (l.lam * 1e-9) / 1e14, 2)} · 10¹⁴ Гц`) +
+      step(l.to < l.from ? 'атом испустил' : 'атом поглотил', colorName(l.lam)) + `</div>`;
+  } else h += `<p class="note">Переведите электрон на другой уровень — здесь появится расчёт.</p>`;
+  const vis = Object.keys(S.lines).map(k => S.lines[k]).filter(x => x.lam >= 380 && x.lam <= 750);
+  h += `<h3>Найденные видимые линии</h3><div class="steps">` + (vis.length ? vis.sort((a, b) => b.lam - a.lam).map(x => step(`${x.from} → ${x.to}`, `${fmt(x.lam, 0)} нм`)).join('') : step('пока нет', '—')) + `</div>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter');
+  if (id === 'rutherford') { const c = S.cnt[S.mdl]; el.innerHTML = `<div class="k">${S.mdl === 'thom' ? 'Томсон' : 'Ядерная'}</div><div class="v">${c.n} частиц</div><div class="lr"><span>&lt;10°</span><span>${c.s}</span></div><div class="lr"><span>10–90°</span><span>${c.m}</span></div><div class="lr"><span>назад</span><span class="${c.k ? 'bad' : ''}">${c.k}</span></div>`; }
+  else if (id === 'model') { const el2 = ELEM[S.Z]; el.innerHTML = `<div class="k">Элемент №${S.Z}</div><div class="v ${m.q === 0 ? 'ok' : ''}">${el2[0]}-${m.A}</div><div class="lr"><span>p · n · e</span><span>${S.Z} · ${S.N} · ${S.E}</span></div><div class="lr"><span>заряд</span><span class="${m.q ? 'bad' : 'ok'}">${m.q > 0 ? '+' : ''}${fmt(m.q, 0)}e</span></div>`; }
+  else el.innerHTML = `<div class="k">Водород</div><div class="v">n = ${S.n}</div><div class="lr"><span>E</span><span>${fmt(EN(S.n), 2)} эВ</span></div><div class="lr"><span>линий</span><span class="${m.vis >= 4 ? 'ok' : ''}">${m.vis} из 4</span></div>`;
+}
+
+function update() {
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Теперь вы знаете, как устроен атом!'), 2000);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  rutherford: '<rect x="2" y="11" width="12" height="9" rx="2" fill="#5d6a86"/><path d="M14 15h20" stroke="#ffb547" stroke-width="1.4"/><path d="M14 9q22 0 38-6M14 21q30 0 22 6" stroke="#ffb547" stroke-width="1.2" fill="none" opacity=".6"/><circle cx="40" cy="15" r="2.5" fill="#ffb547"/><circle cx="40" cy="15" r="11" fill="none" stroke="#72d4e8" stroke-opacity=".4" stroke-dasharray="2 2"/>',
+  model: '<circle cx="33" cy="15" r="12" fill="none" stroke="#72d4e8" stroke-opacity=".5" stroke-dasharray="2 2"/><circle cx="30" cy="14" r="3" fill="#ff8a73"/><circle cx="35" cy="16" r="3" fill="#a9b4c9"/><circle cx="45" cy="15" r="2" fill="#72d4e8"/><circle cx="21" cy="15" r="2" fill="#72d4e8"/>',
+  spectra: '<defs><linearGradient id="mg"><stop offset="0" stop-color="#7a3cff"/><stop offset=".5" stop-color="#3cff6a"/><stop offset="1" stop-color="#ff2a2a"/></linearGradient></defs><rect x="4" y="19" width="58" height="8" fill="#05080d"/><path d="M10 19v8" stroke="#7a3cff" stroke-width="2"/><path d="M14 19v8" stroke="#5a4cff" stroke-width="2"/><path d="M24 19v8" stroke="#3cc8ff" stroke-width="2"/><path d="M53 19v8" stroke="#ff2a2a" stroke-width="2"/><path d="M6 4h30M6 9h30M6 14h30" stroke="#8b96ad" stroke-width="1.2"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Lx, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Lx.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Lx.title}</span></span>
+      ${S.done[Lx.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  S.lesson = i; drag = null;
+  resetState(); save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L().task;
+  $('#hint').textContent = L().stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  // centre the active card by scrolling only the strip, never the page
+  const strip = $('#lessons'), cur = strip.querySelector('.lesson[aria-current="true"]');
+  if (cur) { const br = strip.getBoundingClientRect(), cr = cur.getBoundingClientRect(); strip.scrollLeft = Math.max(0, strip.scrollLeft + (cr.left - br.left) - (br.width - cr.width) / 2); }
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '';
+  if (id === 'rutherford') {
+    const c = S.cnt;
+    now = `Модель атома на экране: ${S.mdl === 'thom' ? 'Томсона («пудинг с изюмом»)' : 'ядерная (Резерфорда)'}. Альфа-частицы 5 МэВ летят на атом золота. Прицельное расстояние пушки b = ${S.b} фм. Счётчики — Томсон: выпущено ${c.thom.n}, прямо ${c.thom.s}, 10–90° ${c.thom.m}, назад ${c.thom.k}; ядерная: выпущено ${c.nuc.n}, прямо ${c.nuc.s}, 10–90° ${c.nuc.m}, назад ${c.nuc.k}. ${S.lastAim ? `Последняя одиночная частица: модель ${S.lastAim.mdl === 'nuc' ? 'ядерная' : 'Томсона'}, b = ${S.lastAim.b} фм, отклонение ${fmt(S.lastAim.th, 0)}°.` : 'Одиночных выстрелов ещё не было.'} Отклонение больше 90° одиночной частицей в ядерной модели ${S.aim ? 'получено' : 'не получено'}. Не называй нужное b — наводи вопросами о том, как сила отталкивания зависит от расстояния до ядра.`;
+  }
+  if (id === 'model') now = `Собран атом: ${S.Z} протонов, ${S.N} нейтронов, ${S.E} электронов. Это ${ELEM[S.Z][1]} (${ELEM[S.Z][0]}), A = ${m.A}, заряд ${m.q > 0 ? '+' : ''}${m.q}e (${m.q === 0 ? 'нейтральный атом' : 'ион'}). Слои электронов: ${shellsOf(S.E).join(', ') || 'нет'}. Цели: ${L().targets.map(tg => tg.name + (S.found[tg.name] ? ' — собран' : ' — не собран')).join('; ')}. Не диктуй готовый состав — спрашивай, сколько протонов у элемента и как найти число нейтронов по A.`;
+  if (id === 'spectra') {
+    const vis = Object.keys(S.lines).map(k => S.lines[k]).filter(l => l.lam >= 380 && l.lam <= 750).map(l => `${l.from}→${l.to} (${fmt(l.lam, 0)} нм)`);
+    now = `Атом водорода, электрон на уровне n = ${S.n} (E = ${fmt(EN(S.n), 2)} эВ). Режим спектра: ${({ cont: 'сплошной', emit: 'испускание', abs: 'поглощение' })[S.mode]}. ${S.last ? `Последний переход ${S.last.from} → ${S.last.to}: ΔE = ${fmt(S.last.dE, 2)} эВ, λ = ${fmt(S.last.lam, 0)} нм.` : 'Переходов ещё не было.'} Найдено видимых линий: ${vis.length} из 4${vis.length ? ': ' + vis.join(', ') : ''}. Спектр поглощения ${S.abs ? 'уже открывали' : 'ещё не открывали'}. Не называй, на какой уровень нужны переходы, — наводи вопросами.`;
+  }
+  return [
+    `Раздел: физика, 9 класс, «Атом и Вселенная», тема «Строение атома». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'} (${taskState(m)}).`,
+    `Сейчас на площадке: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Помогай наводящими вопросами, готовые ответы не выдавай.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { rutherford: 'Почему большинство частиц пролетает сквозь золото?', model: 'Чем изотопы одного элемента отличаются друг от друга?', spectra: 'Почему водород светит только определёнными цветами?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

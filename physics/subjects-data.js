@@ -90,7 +90,7 @@ window.LUCH_SUBJECTS = {
       { id: 'hydro', b: 'org', g: 10, t: 'Углеводороды', items: ['Алканы', 'Алкены и алкины', 'Арены', 'Нефть и газ'], req: ['orgbase'], status: 'done', href: '/labs/chem-hydro/', lessons: 4, doneItems: 4 },
       { id: 'oxyorg', b: 'org', g: 10, t: 'Спирты, альдегиды, кислоты', items: ['Спирты', 'Альдегиды', 'Карбоновые кислоты', 'Сложные эфиры и жиры'], req: ['hydro'], status: 'done', href: '/labs/chem-oxyorg/', lessons: 4, doneItems: 4 },
       { id: 'biomol', b: 'org', g: 11, t: 'Молекулы жизни', items: ['Углеводы', 'Аминокислоты и белки', 'Нуклеиновые кислоты'], req: ['oxyorg'], status: 'done', href: '/labs/chem-biomol/', lessons: 3, doneItems: 3 },
-      { id: 'polymers', b: 'org', g: 11, t: 'Полимеры', items: ['Пластмассы', 'Волокна', 'Каучук и резина', 'Переработка пластика'], req: ['hydro'] },
+      { id: 'polymers', b: 'org', g: 11, t: 'Полимеры', items: ['Пластмассы', 'Волокна', 'Каучук и резина', 'Переработка пластика'], req: ['hydro'], status: 'done', href: '/labs/chem-polymers/', lessons: 4, doneItems: 4 },
 
       { id: 'home', b: 'life', g: 8, t: 'Химия дома', items: ['Моющие средства', 'Кислоты и щёлочи на кухне', 'Бытовая безопасность'], req: ['classes'], status: 'done', href: '/labs/chem-home/', lessons: 3, doneItems: 3 },
       { id: 'food', b: 'life', g: 9, t: 'Еда и здоровье', items: ['Белки, жиры, углеводы', 'Витамины', 'Как работают лекарства'], req: ['classes'], status: 'done', href: '/labs/chem-food/', lessons: 3, doneItems: 3 },
@@ -135,7 +135,7 @@ window.LUCH_SUBJECTS = {
 
       { id: 'mendel', b: 'gen', g: 10, t: 'Законы наследственности', items: ['Гены и признаки', 'Законы Менделя', 'Решётка Пеннета', 'Наследование пола'], req: ['division'], status: 'part', href: '/biology/', lessons: 5, doneItems: 3 },
       { id: 'variation', b: 'gen', g: 10, t: 'Изменчивость', items: ['Мутации', 'Модификации', 'Наследственные болезни'], req: ['mendel'], status: 'done', href: '/labs/bio-variation/', lessons: 3, doneItems: 3 },
-      { id: 'selection', b: 'gen', g: 11, t: 'Селекция', items: ['Сорта и породы', 'Гибридизация', 'Селекция микроорганизмов'], req: ['variation'] },
+      { id: 'selection', b: 'gen', g: 11, t: 'Селекция', items: ['Сорта и породы', 'Гибридизация', 'Селекция микроорганизмов'], req: ['variation'], status: 'done', href: '/labs/bio-selection/', lessons: 3, doneItems: 3 },
       { id: 'evolution', b: 'gen', g: 11, t: 'Эволюция', items: ['Дарвин и естественный отбор', 'Вид и видообразование', 'Доказательства эволюции'], req: ['variation', 'verts'] },
       { id: 'origin', b: 'gen', g: 11, t: 'Происхождение жизни и человека', items: ['Как появилась жизнь', 'Этапы развития жизни', 'Эволюция человека'], req: ['evolution'] },
 

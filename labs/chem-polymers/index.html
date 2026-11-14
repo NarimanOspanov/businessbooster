@@ -1,0 +1,1208 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по химии, 11 класс: собираем цепь полимера из мономеров, сортируем волокна, вулканизируем каучук и разделяем пластик для переработки.">
+<title>Полимеры</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /mechanics and /chemistry. Lab bench (SVG) on the left, lesson notebook on the right, lesson strip under the bench. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--liq);transition:width .2s}
+.gauge i{position:absolute;top:-4px;width:2px;height:14px;background:var(--force);transform:translateX(-50%)}
+.swatch{height:12px;border-radius:4px;margin-top:9px;border:1px solid rgba(255,255,255,.15)}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.cnt{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;margin-top:10px}
+.cnt div{display:flex;align-items:center;justify-content:space-between;gap:6px;background:var(--surface-2);border-radius:9px;padding:6px 8px;font-size:13px}
+.cnt b{font:500 14px var(--font-mono);min-width:44px;display:inline-block;text-align:center}
+.cnt button{width:30px;height:30px;border-radius:7px;background:var(--bg);border:1px solid var(--line);cursor:pointer;font:500 15px/1 var(--font-mono)}
+.pairs{display:grid;gap:6px;margin-top:10px}
+.pairs label{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface-2);border-radius:9px;padding:7px 10px;font-size:13.5px}
+.pairs select{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:7px;padding:5px 8px;font:500 13px var(--font-body);max-width:58%}
+.pairs select:disabled{color:var(--ok);opacity:1}
+.chk2{display:flex;align-items:center;gap:8px;font-size:13.5px;margin-top:12px}
+.chk2 input{accent-color:var(--force);width:18px;height:18px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/><ellipse cx="20" cy="20" rx="14" ry="5.5" fill="none" stroke="var(--arm)" stroke-width="1.6"/><ellipse cx="20" cy="20" rx="14" ry="5.5" fill="none" stroke="var(--arm)" stroke-width="1.6" transform="rotate(60 20 20)"/><ellipse cx="20" cy="20" rx="14" ry="5.5" fill="none" stroke="var(--arm)" stroke-width="1.6" transform="rotate(-60 20 20)"/><circle cx="20" cy="20" r="3.2" fill="var(--force)"/></svg>
+      <div><h1>ЛУЧ</h1><small>Опыты · Химия · Полимеры</small></div>
+    </div>
+    <div class="headr">
+      <nav class="sections" aria-label="Разделы"><a href="/physics/#chem">Карта</a><a href="/physics/#chem">Химия</a><a href="/labs/chem-polymers/" aria-current="page">Полимеры</a></nav>
+      <div class="prog" aria-label="Прогресс"><b>Полимеры</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Лабораторный стол">
+    <svg class="scene" id="scene" role="img" aria-label="Модель полимеров. Мономеры, карточки волокон, образец резины и шкалу плотности можно перетаскивать и нажимать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const KEY = 'luch-chem-polymers';
+const fx = (v, d = 1) => (+v).toFixed(d).replace('.', ',');
+const big = v => Math.round(v).toLocaleString('ru-RU');
+
+// ---------- lesson 1: polymerization ----------
+const MONO = {
+  eth: { name: 'этилен', f: 'CH₂=CH₂', X: '', M: 28, mcalc: 'C₂H₄: 2·12 + 4·1 = 28', poly: 'полиэтилен', ab: 'ПЭ', unit: '–CH₂–CH₂–', use: 'пакеты, плёнка, канистры, изоляция кабеля', c: '#9fc3f0' },
+  pro: { name: 'пропилен', f: 'CH₂=CH–CH₃', X: 'CH₃', M: 42, mcalc: 'C₃H₆: 3·12 + 6·1 = 42', poly: 'полипропилен', ab: 'ПП', unit: '–CH₂–CH(CH₃)–', use: 'крышки, контейнеры, трубы для горячей воды, мешки', c: '#ffb547' },
+  vc: { name: 'винилхлорид', f: 'CH₂=CH–Cl', X: 'Cl', M: 62.5, mcalc: 'C₂H₃Cl: 2·12 + 3·1 + 35,5 = 62,5', poly: 'поливинилхлорид', ab: 'ПВХ', unit: '–CH₂–CHCl–', use: 'трубы канализации, окна, линолеум, изоляция', c: '#86e0a8' },
+  sty: { name: 'стирол', f: 'CH₂=CH–C₆H₅', X: 'C₆H₅', M: 104, mcalc: 'C₈H₈: 8·12 + 8·1 = 104', poly: 'полистирол', ab: 'ПС', unit: '–CH₂–CH(C₆H₅)–', use: 'одноразовая посуда, пенопласт, корпуса техники', c: '#b88cf0' },
+};
+const MONO_IDS = ['eth', 'pro', 'vc', 'sty'];
+const GOAL_M = 62500, CHAIN_MAX = 7, NMIN = 100, NMAX = 5000, NSTEP = 100;
+
+// ---------- lesson 2: fibers ----------
+const BINS2 = [
+  { id: 'nat', name: 'Природные', sub: 'растения и животные', x: 12, w: 158 },
+  { id: 'art', name: 'Искусственные', sub: 'переработанная целлюлоза', x: 176, w: 164 },
+  { id: 'syn', name: 'Синтетические', sub: 'из нефти и газа', x: 346, w: 158 },
+];
+const BURN_CELL = 'горит быстро ровным пламенем, пахнет жжёной бумагой, остаётся немного серого пепла';
+const BURN_PROT = 'горит медленно и гаснет, пахнет палёными волосами, остаётся чёрный хрупкий комочек — растирается пальцами в порошок';
+const FIBERS = [
+  { id: 'cotton', name: 'хлопок', bin: 'nat', poly: 'целлюлоза (C₆H₁₀O₅)ₙ', src: 'волоски на семенах хлопчатника — его выращивают в Туркестанской области', how: 'волокно очищают, чешут и прядут в нить', burn: BURN_CELL, kind: 'cell' },
+  { id: 'wool', name: 'шерсть', bin: 'nat', poly: 'белок кератин', src: 'шерсть овец и верблюдов', how: 'шерсть моют, чешут и прядут', burn: BURN_PROT, kind: 'prot' },
+  { id: 'kapron', name: 'капрон', bin: 'syn', poly: 'полиамид (капрон, нейлон-6) из капролактама', src: 'сырьё — бензол из нефти', how: 'расплав полимера продавливают через фильеры — пластинки с тонкими отверстиями — и вытягивают', burn: 'плавится и капает, пахнет сургучом, остаётся твёрдый светлый шарик — его не раздавить', kind: 'syn' },
+  { id: 'viscose', name: 'вискоза', bin: 'art', poly: 'целлюлоза, химически переработанная', src: 'древесная целлюлоза', how: 'целлюлозу растворяют в щёлочи с сероуглеродом и продавливают через фильеры в кислотную ванну: целлюлоза снова выпадает уже в виде длинных нитей', burn: BURN_CELL, kind: 'cell' },
+  { id: 'flax', name: 'лён', bin: 'nat', poly: 'целлюлоза (C₆H₁₀O₅)ₙ', src: 'стебли льна — его сеют на севере Казахстана', how: 'стебли мнут, отделяют волокно и прядут', burn: BURN_CELL, kind: 'cell' },
+  { id: 'lavsan', name: 'лавсан (полиэстер)', short: 'лавсан', bin: 'syn', poly: 'полиэтилентерефталат — тот же полимер, что у ПЭТ-бутылок', src: 'терефталевая кислота и этиленгликоль из нефти', how: 'поликонденсация (выделяется вода), затем расплав продавливают через фильеры', burn: 'плавится, горит коптящим пламенем, остаётся твёрдый чёрный шарик', kind: 'syn' },
+  { id: 'silk', name: 'шёлк', bin: 'nat', poly: 'белок фиброин', src: 'нить кокона тутового шелкопряда', how: 'коконы распаривают и сматывают нить', burn: BURN_PROT, kind: 'prot' },
+  { id: 'acetate', name: 'ацетатное волокно', short: 'ацетат', bin: 'art', poly: 'ацетат целлюлозы — сложный эфир целлюлозы и уксусной кислоты', src: 'хлопковая или древесная целлюлоза', how: 'целлюлозу обрабатывают уксусным ангидридом, раствор продавливают через фильеры в тёплый воздух, растворитель испаряется', burn: 'плавится и горит, пахнет уксусом, остаётся твёрдый тёмный шарик', kind: 'ac' },
+  { id: 'nitron', name: 'нитрон (акрил)', short: 'нитрон', bin: 'syn', poly: 'полиакрилонитрил (–CH₂–CH(CN)–)ₙ', src: 'акрилонитрил из пропилена и аммиака', how: 'полимеризация, затем раствор полимера продавливают через фильеры', burn: 'горит вспышками и коптит, остаётся тёмный твёрдый наплыв', kind: 'syn' },
+];
+const fibOf = id => FIBERS.find(f => f.id === id);
+
+// ---------- lesson 3: rubber ----------
+const RX0 = 60, RL0 = 64, RY = 236;
+function rubState(s, vulc) {
+  if (!vulc || s === 0) return { k: 'raw', name: 'сырой каучук', max: 6, back: 0.25 };
+  if (s <= 5) return { k: 'soft', name: 'мягкая резина', max: 5, back: 1 };
+  if (s < 25) return { k: 'hard', name: 'жёсткая резина', max: +(5 - (s - 5) / 20 * 3.8).toFixed(2), back: 1 };
+  return { k: 'ebon', name: 'эбонит', max: 1.03, back: 1 };
+}
+const crossN = (s, vulc) => vulc ? Math.min(60, Math.round(s * 2.2)) : 0;
+
+// ---------- lesson 4: recycling ----------
+const ITEMS = [
+  { id: 'bottle', name: 'бутылка от воды', code: 1, ab: 'PET', ru: 'ПЭТ', poly: 'полиэтилентерефталат', bin: 'pet', into: 'хлопья → новые бутылки, волокно для синтепона и ковров' },
+  { id: 'shampoo', name: 'флакон шампуня', code: 2, ab: 'HDPE', ru: 'ПНД', poly: 'полиэтилен низкого давления (высокой плотности)', bin: 'po', into: 'гранулы → канистры, трубы, вёдра' },
+  { id: 'pipe', name: 'обрезок трубы', code: 3, ab: 'PVC', ru: 'ПВХ', poly: 'поливинилхлорид', bin: 'hard', into: 'принимают редко: при нагреве выделяет HCl, мешает другим пластикам' },
+  { id: 'bag', name: 'пакет-майка', code: 4, ab: 'LDPE', ru: 'ПВД', poly: 'полиэтилен высокого давления (низкой плотности)', bin: 'po', into: 'гранулы → мусорные мешки, плёнка' },
+  { id: 'box', name: 'контейнер для еды', code: 5, ab: 'PP', ru: 'ПП', poly: 'полипропилен', bin: 'po', into: 'гранулы → ящики, детали машин' },
+  { id: 'cup', name: 'одноразовый стаканчик', code: 6, ab: 'PS', ru: 'ПС', poly: 'полистирол', bin: 'hard', into: 'принимают редко: лёгкий, грязный, мало стоит' },
+  { id: 'chips', name: 'пачка от чипсов', code: 7, ab: 'O', ru: 'другое', poly: 'многослойная плёнка: несколько пластиков и алюминий', bin: 'hard', into: 'слои не разделить — почти не перерабатывают' },
+];
+const BINS4 = [
+  { id: 'pet', name: 'ПЭТ', sub: '→ хлопья, волокно', x: 172, w: 106 },
+  { id: 'po', name: 'ПЭ и ПП', sub: '→ гранулы', x: 284, w: 106 },
+  { id: 'hard', name: 'Редко берут', sub: '→ отдельно', x: 396, w: 108 },
+];
+const itemOf = id => ITEMS.find(f => f.id === id);
+const FLK_KIND = {
+  pp: { name: 'ПП', what: 'этикетки', rho: 0.905, rs: '0,905', c: '#ffb547' },
+  hdpe: { name: 'ПНД', what: 'крышки', rho: 0.955, rs: '0,955', c: '#e8ecf4' },
+  pet: { name: 'ПЭТ', what: 'хлопья бутылок', rho: 1.38, rs: '1,38', c: '#72d4e8' },
+};
+const RHO_MIN = 0.80, RHO_MAX = 1.42;
+const TANK = { x0: 140, x1: 362, top: 150, surf: 162, bot: 372 };
+const SCALE = { x: 432, y0: 372, y1: 150 };
+const rhoY = r => SCALE.y0 - (r - RHO_MIN) / (RHO_MAX - RHO_MIN) * (SCALE.y0 - SCALE.y1);
+const yRho = y => clamp(Math.round((RHO_MIN + (SCALE.y0 - y) / (SCALE.y0 - SCALE.y1) * (RHO_MAX - RHO_MIN)) * 100) / 100, RHO_MIN, RHO_MAX);
+const FLAKES = [];
+['pet', 'pet', 'hdpe', 'pp', 'pet', 'pet', 'hdpe', 'pet', 'pp', 'pet', 'pet', 'hdpe', 'pp', 'pet', 'pet', 'hdpe', 'pp', 'pet', 'pet', 'pp', 'hdpe'].forEach((k, i) => FLAKES.push({ k, i, x: TANK.x0 + 16 + (i * 53) % (TANK.x1 - TANK.x0 - 32), y: TANK.bot - 8 - (i % 4) * 4, rot: (i * 47) % 180 }));
+function liquidName(r) {
+  if (r < 0.995) return 'вода + спирт';
+  if (r <= 1.005) return 'вода';
+  if (r <= 1.2) return 'раствор NaCl';
+  return 'раствор CaCl₂';
+}
+function flakeSide(k, rho) {
+  const d = FLK_KIND[k].rho - rho;
+  return d < -0.004 ? 'up' : d > 0.004 ? 'down' : 'mid';
+}
+
+const LESSONS = [
+  { id: 'plastics', title: 'Пластмассы: цепь из мономеров',
+    text: ['Полимер — огромная молекула из тысяч одинаковых звеньев. Маленькая молекула-«кирпичик» называется мономером, а число звеньев в цепи — степенью полимеризации n. Молярная масса полимера M = n · M(мономера).',
+           'Этилен, пропилен, винилхлорид и стирол имеют двойную связь C=C. При полимеризации π-связь разрывается, и молекулы сцепляются друг с другом: n CH₂=CH₂ → (–CH₂–CH₂–)ₙ. Побочных продуктов нет, поэтому масса полимера равна массе мономера.',
+           'Пластмасса — материал на основе полимера. Термопласты (ПЭ, ПП, ПВХ, ПС) при нагреве размягчаются, им можно снова придать форму, поэтому их перерабатывают. Реактопласты (фенолформальдегидные смолы) при нагреве сшиваются навсегда и больше не плавятся.'],
+    why: 'В Атырау работает завод KPI: он делает полипропилен из пропана казахстанского газа. Технолог полимерного производства, оператор экструдера, литейщик пластмасс работают на заводах труб, окон, тары и упаковки — таких цехов много в Алматы, Астане, Шымкенте. Знание марки пластика помогает выбрать трубу для горячей воды (ПП, а не ПВХ) и не греть еду в посуде из полистирола.',
+    task: 'Соберите фрагмент цепи поливинилхлорида из 5 звеньев, а затем задайте степень полимеризации, при которой M(ПВХ) = 62 500 г/моль.',
+    hint: 'Выберите нужный мономер кнопками снизу: в ПВХ есть хлор. Тяните молекулы к растущей цепи. Степень полимеризации n меняйте кнопками −n / +n или на вкладке «Схема».',
+    stage: 'Тяните молекулу мономера к цепи или нажмите на неё. Мономер выбирается кнопками снизу.',
+    init: {},
+    check: m => m.ok },
+  { id: 'fibers', title: 'Волокна: природные и химические',
+    text: ['Волокно — это полимер, у которого длинные молекулы уложены вдоль нити. Природные волокна дают растения (хлопок и лён — целлюлоза) и животные (шерсть и шёлк — белки).',
+           'Химические волокна бывают двух видов. Искусственные получают переработкой природного полимера: из древесной целлюлозы делают вискозу и ацетатное волокно. Синтетические получают из полимеров, которых нет в природе: капрон, лавсан, нитрон. Их сырьё — нефть и газ.',
+           'Нить формуют через фильеру — пластинку с тонкими отверстиями: раствор или расплав полимера продавливают через неё и вытягивают. Различить волокна помогает проба на огонь: целлюлоза пахнет жжёной бумагой, белок — палёными волосами, синтетика плавится в твёрдый шарик.'],
+    why: 'Технолог лёгкой промышленности, дизайнер одежды, товаровед и продавец тканей выбирают ткань по составу на ярлыке. Шерсть и верблюжья шерсть — традиционное сырьё Казахстана, хлопок растят на юге. Синтетика прочная и быстро сохнет, хлопок дышит и впитывает пот: от этого зависят и спецодежда, и цена изделия.',
+    safe: 'Пробу на огонь делают только с учителем: маленький кусочек нити держат пинцетом над негорючей подставкой, рядом вода. Синтетика плавится и капает горячими каплями.',
+    task: 'Разложите все 9 волокон по трём группам: природные, искусственные, синтетические.',
+    hint: 'Спросите себя: есть ли этот полимер в природе? Если есть, переработали ли его химически? Выберите карточку и нажмите «Проба на огонь» — запах подскажет, какой полимер внутри.',
+    stage: 'Тяните карточку волокна в ящик. Или нажмите карточку, потом ящик.',
+    init: {},
+    check: m => m.placed === FIBERS.length },
+  { id: 'rubber', title: 'Каучук и резина: вулканизация',
+    text: ['Натуральный каучук — полимер изопрена: n CH₂=C(CH₃)–CH=CH₂ → (–CH₂–C(CH₃)=CH–CH₂–)ₙ. Его цепи свёрнуты клубками, поэтому каучук тянется. Но цепи не связаны между собой: под нагрузкой они скользят, и образец остаётся вытянутым. В жару каучук липкий, на морозе твердеет.',
+           'В 1839 году Чарльз Гудьир нагрел каучук с серой. Атомы серы образовали мостики между цепями по местам двойных связей. Сетка не даёт цепям скользить: резина растягивается и возвращается. Этот процесс — вулканизация. В резину добавляют несколько процентов серы, в эбонит — около трети: сетка становится такой густой, что материал твёрдый.',
+           'Синтетический каучук первым в мире получил промышленно Сергей Лебедев в 1932 году — бутадиеновый, из спирта. Сейчас из бутадиена и изопрена делают каучуки для шин, шлангов, уплотнителей.'],
+    why: 'Шины, приводные ремни, конвейерные ленты рудников и шахт Казахстана, уплотнители, перчатки — всё это резина. Шиномонтажник и автомеханик подбирают зимние шины: их резина остаётся эластичной в −30 °C. Инженер-технолог резиновых изделий подбирает долю серы и сажи под задачу: от мягкой соски до твёрдой эбонитовой детали.',
+    task: 'Сделайте резину: смешайте каучук с серой (1–5 %), вулканизируйте и растяните образец хотя бы в 3 раза. После отпускания он должен вернуться.',
+    hint: 'Сначала попробуйте растянуть сырой каучук и отпустить — он не вернётся. Потом «Новая смесь», добавьте серу и нажмите «Вулканизация».',
+    stage: 'Тяните ручку образца вправо и отпускайте. Сера и нагрев — кнопками снизу.',
+    init: {},
+    check: m => m.passed },
+  { id: 'recycling', title: 'Переработка пластика',
+    text: ['На изделии из пластика стоит треугольник из стрелок с цифрой — код материала: 1 — ПЭТ, 2 — ПНД, 3 — ПВХ, 4 — ПВД, 5 — ПП, 6 — ПС, 7 — другое. Перерабатывают термопласты, и только если они не смешаны: смесь разных полимеров даёт хрупкий материал.',
+           'На заводе бутылки дробят в хлопья и промывают. Потом хлопья кладут в воду: полиэтилен и полипропилен легче воды и всплывают, а ПЭТ тяжелее и тонет. Это флотация — разделение по плотности. Подбирая плотность жидкости, можно разделить даже ПП и ПЭ.',
+           'Сжигать пластик во дворе нельзя: ПВХ выделяет хлороводород и ядовитые диоксины, остальные пластики — сажу и угарный газ. Лучшее, что можно сделать дома, — сдать чистую тару раздельно.'],
+    why: 'В Казахстане запрещено вывозить на полигоны пластик, макулатуру и стекло без сортировки, поэтому растёт спрос на сортировщиков, технологов перерабатывающих заводов, экологов предприятий. Из ПЭТ-хлопьев делают новую тару и волокно для синтепона, из ПЭ и ПП — трубы, ящики, плёнку. Чистое сырьё стоит дороже: правильная сортировка — это деньги.',
+    safe: 'Не жгите пластик: дым ПВХ и пенопласта ядовит. На сортировке работают в перчатках — в мусоре бывают осколки и иглы.',
+    task: 'Разложите 7 предметов по потокам переработки. Затем на флотации отделите ПЭТ от крышек и этикеток, а потом ПП от ПНД: снимайте всплывшее при верной плотности жидкости.',
+    hint: 'Код 1 — свой поток, коды 2, 4, 5 — полиолефины (ПЭ и ПП). Во флотации всплывает то, что легче жидкости: ρ(пластика) < ρ(жидкости).',
+    stage: 'Сортировка: тяните предмет в контейнер. Флотация: тяните метку на шкале плотности и снимайте всплывшее.',
+    init: {},
+    check: m => m.ok },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const fresh = () => ({ mono: 'eth', chain: 0, n: 500,
+  fb: {}, fsel: null, wrongF: 0, burn: null, burned: {},
+  sp: 0, vulc: false, lam: 1, rest: 1, lamT: 1, pend: false, passed: false, rawTried: false,
+  rmode: 'sort', it: {}, isel: null, wrongI: 0, rho: 0.85, okA: false, okB: false, skim: null });
+const S = Object.assign({ lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null }, fresh());
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+function model() {
+  const id = LID();
+  if (id === 'plastics') {
+    const M = MONO[S.mono], Mp = S.n * M.M;
+    return { kind: 'poly', M, Mp, chain: S.chain, n: S.n, ok: S.mono === 'vc' && S.chain >= 5 && Math.abs(Mp - GOAL_M) < 1e-6 };
+  }
+  if (id === 'fibers') return { kind: 'fib', placed: Object.keys(S.fb).length, sel: S.fsel };
+  if (id === 'rubber') {
+    const st = rubState(S.sp, S.vulc);
+    return { kind: 'rub', st, s: S.sp, vulc: S.vulc, lam: S.lam, cross: crossN(S.sp, S.vulc), passed: S.passed };
+  }
+  const sorted = Object.keys(S.it).length;
+  return { kind: 'rec', sorted, okA: S.okA, okB: S.okB, rho: S.rho, mode: S.rmode, ok: sorted === ITEMS.length && S.okA && S.okB };
+}
+
+// ---------- scene ----------
+function bench() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="2380" fill="url(#tile)"/>
+    <rect x="-2000" y="380" width="4520" height="1200" fill="#1a2232"/>
+    <rect x="-2000" y="378" width="4520" height="4" fill="#2c3954"/>`;
+}
+
+// ----- lesson 1 -----
+const TOK = { x: 76, w: 118, h: 40, y0: 140, gap: 54 };
+const tokY = i => TOK.y0 + i * TOK.gap;
+const CH = { x0: 214, dx: 21, yUp: 246, yDn: 266 };
+const inChain = p => p.x > 168 && p.y > 160 && p.y < 360;
+function monoSVG(M, x, y, hot) {
+  const L = x - TOK.w / 2;
+  let h = `<rect x="${(L - 1.3).toFixed(1)}" y="${(y - 1.3).toFixed(1)}" width="${TOK.w + 2.6}" height="${TOK.h + 2.6}" rx="10" fill="${INK}"/>` +
+    `<rect x="${L.toFixed(1)}" y="${y.toFixed(1)}" width="${TOK.w}" height="${TOK.h}" rx="9" fill="${hot ? '#fff4dc' : '#e8ecf4'}"/>`;
+  const c1 = L + 16, c2 = L + 42, cy = y + 22;
+  h += `<path d="M${c1} ${cy - 2.5}H${c2}M${c1} ${cy + 2.5}H${c2}" stroke="#0b1019" stroke-width="1.6"/>`;
+  h += `<circle cx="${c1}" cy="${cy}" r="7" fill="#3a4762"/><circle cx="${c2}" cy="${cy}" r="7" fill="#3a4762"/>`;
+  h += `<text x="${c1}" y="${cy + 3}" font-size="8" fill="#e8ecf4" text-anchor="middle">C</text><text x="${c2}" y="${cy + 3}" font-size="8" fill="#e8ecf4" text-anchor="middle">C</text>`;
+  if (M.X) h += `<path d="M${c2 + 7} ${cy}H${c2 + 14}" stroke="#0b1019" stroke-width="1.6"/><circle cx="${c2 + 23}" cy="${cy}" r="9" fill="${M.c}"/><text x="${c2 + 23}" y="${cy + 3}" font-size="${M.X.length > 2 ? 6 : 8}" fill="#0b1019" text-anchor="middle" font-weight="500">${M.X === 'C₆H₅' ? 'Ph' : M.X}</text>`;
+  h += `<text x="${(L + TOK.w - 6).toFixed(1)}" y="${(y + 11).toFixed(1)}" font-size="7" fill="#4a556c" text-anchor="end">${M.name}</text>`;
+  return h;
+}
+function polySVG(m, t) {
+  const M = m.M;
+  let h = '';
+  const hot = drag && drag.moved && drag.id.startsWith('mo-') && inChain(drag.p);
+  h += `<rect x="172" y="168" width="334" height="186" rx="12" fill="${hot ? 'rgba(114,212,232,.07)' : 'rgba(18,26,40,.45)'}" stroke="${hot ? '#72d4e8' : '#26324a'}" stroke-dasharray="6 6"/>`;
+  h += `<text x="339" y="186" font-size="9" fill="#8b96ad" text-anchor="middle">реактор: растущая цепь ${M.poly}а</text>`;
+  // initiator
+  h += `<circle cx="${CH.x0 - 22}" cy="${CH.yDn}" r="9" fill="#5a6680"/><text x="${CH.x0 - 22}" y="${CH.yDn + 3}" font-size="8" fill="#e8ecf4" text-anchor="middle">R</text>`;
+  const pts = [[CH.x0 - 22, CH.yDn]];
+  const nC = m.chain * 2;
+  for (let k = 0; k < nC; k++) pts.push([CH.x0 + k * CH.dx, k % 2 ? CH.yDn : CH.yUp]);
+  for (let k = 1; k < pts.length; k++) h += `<path d="M${pts[k - 1][0]} ${pts[k - 1][1]}L${pts[k][0]} ${pts[k][1]}" stroke="#c8d1e2" stroke-width="2.2"/>`;
+  for (let k = 0; k < nC; k++) {
+    const [x, y] = pts[k + 1];
+    if (k % 2 === 1 && M.X) {
+      h += `<path d="M${x} ${y}V${y + 16}" stroke="#c8d1e2" stroke-width="1.8"/><circle cx="${x}" cy="${y + 25}" r="9" fill="${M.c}"/><text x="${x}" y="${y + 28}" font-size="${M.X.length > 2 ? 6 : 8}" fill="#0b1019" text-anchor="middle" font-weight="500">${M.X === 'C₆H₅' ? 'Ph' : M.X}</text>`;
+    }
+    h += `<circle cx="${x}" cy="${y}" r="6.5" fill="#3a4762" stroke="${INK}"/>`;
+  }
+  // repeating unit bracket on the first unit
+  if (m.chain) {
+    const xa = CH.x0 - 10, xb = CH.x0 + CH.dx + 13, yb = M.X ? 304 : 282;
+    h += `<path d="M${xa + 4} 230H${xa}V${yb}H${xa + 4}M${xb - 4} 230H${xb}V${yb}H${xb - 4}" stroke="#ffb547" stroke-width="1.4" fill="none"/><text x="${(xa + xb) / 2}" y="${yb + 12}" font-size="8.5" fill="#ffb547" text-anchor="middle">звено</text>`;
+  }
+  // active end (radical)
+  const end = pts[pts.length - 1], pulse = reduce ? 1 : 0.6 + 0.4 * Math.sin(t / 250);
+  h += `<circle cx="${end[0] + 11}" cy="${end[1]}" r="${(4 + 2 * pulse).toFixed(1)}" fill="#ffb547" opacity="${(0.35 + 0.5 * pulse).toFixed(2)}"/><circle cx="${end[0] + 11}" cy="${end[1]}" r="2.6" fill="#ffb547"/>`;
+  if (m.chain < CHAIN_MAX) h += `<path d="M${end[0] + 18} ${end[1]}h16" stroke="#72d4e8" stroke-width="1.4" stroke-dasharray="3 3"/><text x="${end[0] + 20}" y="${end[1] - 8}" font-size="7.5" fill="#72d4e8">сюда</text>`;
+  const sub = m.chain ? `R–(${M.unit.replace(/^–|–$/g, '')})${m.chain === 1 ? '' : String(m.chain).replace(/\d/g, d => '₀₁₂₃₄₅₆₇₈₉'[d])}–•` : 'R• — частица-инициатор';
+  h += `<text x="339" y="332" font-size="10" fill="#e8ecf4" text-anchor="middle">${sub}</text>`;
+  h += `<text x="339" y="346" font-size="8.5" fill="#8b96ad" text-anchor="middle">в настоящей цепи n = ${big(m.n)} звеньев · M = ${big(m.Mp)} г/моль</text>`;
+  MONO_IDS.forEach((k, i) => {
+    if (drag && drag.moved && drag.id === 'mo-' + i) return;
+    h += `<g data-drag="mo-${i}">${monoSVG(M, TOK.x, tokY(i), false)}</g>`;
+  });
+  h += `<text x="${TOK.x}" y="${TOK.y0 - 8}" font-size="8.5" fill="#8b96ad" text-anchor="middle">мономер: ${M.f}</text>`;
+  return h;
+}
+
+// ----- lesson 2 -----
+const FC = { w: 150, h: 28, xs: [90, 258, 426], y0: 132, gap: 34 };
+const fcPos = i => ({ x: FC.xs[i % 3], y: FC.y0 + Math.floor(i / 3) * FC.gap });
+const BIN2Y = 246, BIN2H = 130;
+const binAt = (bins, p, y0, hgt) => bins.find(b => p.x >= b.x - 6 && p.x <= b.x + b.w + 6 && p.y >= y0 - 14 && p.y <= y0 + hgt + 10);
+function fibCard(F, x, y, sel) {
+  const L = x - FC.w / 2;
+  const col = '#e8ecf4';
+  return `<rect x="${(L - 1.3).toFixed(1)}" y="${(y - 1.3).toFixed(1)}" width="${FC.w + 2.6}" height="${FC.h + 2.6}" rx="8" fill="${INK}"/>` +
+    `<rect x="${L.toFixed(1)}" y="${y.toFixed(1)}" width="${FC.w}" height="${FC.h}" rx="7" fill="${sel ? '#fff4dc' : col}" stroke="${sel ? '#ffb547' : 'none'}" stroke-width="1.6"/>` +
+    `<path d="M${(L + 10).toFixed(1)} ${(y + 9).toFixed(1)}q6 5 12 0t12 0M${(L + 10).toFixed(1)} ${(y + 15).toFixed(1)}q6 5 12 0t12 0M${(L + 10).toFixed(1)} ${(y + 21).toFixed(1)}q6 5 12 0t12 0" stroke="#8b96ad" stroke-width="1.2" fill="none"/>` +
+    `<text x="${(L + 42).toFixed(1)}" y="${(y + 18).toFixed(1)}" font-size="9.5" fill="#0b1019" font-weight="500">${F.name}</text>`;
+}
+function binSVG(B, y0, hgt, hot, chips) {
+  let h = `<rect x="${B.x}" y="${y0}" width="${B.w}" height="${hgt}" rx="11" fill="${hot ? 'rgba(114,212,232,.08)' : 'rgba(18,26,40,.6)'}" stroke="${hot ? '#72d4e8' : '#3a4762'}" stroke-width="1.6"/>`;
+  h += `<text x="${B.x + B.w / 2}" y="${y0 + 16}" font-size="9.5" fill="#e8ecf4" text-anchor="middle" font-weight="500">${B.name}</text><text x="${B.x + B.w / 2}" y="${y0 + 28}" font-size="7.5" fill="#8b96ad" text-anchor="middle">${B.sub}</text>`;
+  return h + chips;
+}
+function fibSVG(m, t) {
+  let h = '';
+  const dragF = drag && drag.moved && drag.id.startsWith('fb-');
+  const hotB = dragF ? binAt(BINS2, drag.p, BIN2Y, BIN2H) : null;
+  BINS2.forEach(B => {
+    const ins = FIBERS.filter(F => S.fb[F.id] === B.id);
+    let chips = '';
+    ins.forEach((F, j) => {
+      const cw = (B.w - 18) / 2, cx = B.x + 6 + (j % 2) * (cw + 6), cy = BIN2Y + 38 + Math.floor(j / 2) * 26;
+      chips += `<rect x="${cx.toFixed(1)}" y="${cy}" width="${cw.toFixed(1)}" height="21" rx="6" fill="#16261f" stroke="#86e0a8"/><text x="${(cx + cw / 2).toFixed(1)}" y="${cy + 14}" font-size="8.5" fill="#86e0a8" text-anchor="middle">${F.short || F.name}</text>`;
+    });
+    h += `<g data-drag="bin-${B.id}">${binSVG(B, BIN2Y, BIN2H, hotB && hotB.id === B.id, chips)}</g>`;
+  });
+  FIBERS.forEach((F, i) => {
+    if (S.fb[F.id]) return;
+    if (drag && drag.moved && drag.id === 'fb-' + F.id) return;
+    const p = fcPos(i);
+    h += `<g data-drag="fb-${F.id}">${fibCard(F, p.x, p.y, S.fsel === F.id)}</g>`;
+  });
+  if (!FIBERS.some(F => !S.fb[F.id])) h += `<text x="258" y="180" font-size="11" fill="#86e0a8" text-anchor="middle" font-weight="500">Все волокна разложены</text>`;
+  // flame of the burn test
+  if (S.burn) {
+    const k = (t - S.burn.t) / 1800;
+    if (k >= 1 && !reduce) S.burn = null;
+    else {
+      const F = fibOf(S.burn.id), i = FIBERS.indexOf(F), p = S.fb[F.id] ? { x: 258, y: 210 } : fcPos(i);
+      const fl = reduce ? 1 : 0.85 + 0.15 * Math.sin(t / 60);
+      const x = p.x + FC.w / 2 - 14, y = p.y - 2;
+      h += `<g pointer-events="none"><path d="M${x} ${y}c-8 -6 -6 -16 0 -24c1 7 6 8 6 14c0 6 -3 9 -6 10z" fill="#ffb547" opacity="${(0.85 * fl).toFixed(2)}"/><path d="M${x} ${y}c-3 -3 -3 -8 0 -12c1 4 3 5 3 8c0 2 -1 3 -3 4z" fill="#fff4dc"/></g>`;
+    }
+  }
+  return h;
+}
+
+// ----- lesson 3 -----
+function rubSVG(m, t) {
+  let h = '';
+  const st = m.st, lam = S.lam, Lx = RX0 + RL0 * lam, H = 52 / Math.sqrt(lam);
+  // ruler
+  h += `<path d="M${RX0} 312H${RX0 + RL0 * 6}" stroke="#3a4762" stroke-width="1.4"/>`;
+  for (let k = 1; k <= 6; k++) { const x = RX0 + RL0 * k; h += `<path d="M${x} 306V318" stroke="#5a6680"/><text x="${x}" y="330" font-size="8" fill="#8b96ad" text-anchor="middle">×${k}</text>`; }
+  h += `<path d="M${RX0 + RL0 * st.max} 300V322" stroke="#ff8a73" stroke-width="1.4" stroke-dasharray="3 2"/><text x="${RX0 + RL0 * st.max + 4}" y="302" font-size="7.5" fill="#ff8a73">${st.k === 'raw' ? 'предел' : 'разрыв'}</text>`;
+  if (S.rest > 1.001) h += `<path d="M${RX0 + RL0 * S.rest} 306V318" stroke="#ffb547" stroke-width="2"/><text x="${RX0 + RL0 * S.rest}" y="342" font-size="7.5" fill="#ffb547" text-anchor="middle">осталось ×${fx(S.rest, 2)}</text>`;
+  // clamp
+  h += `<rect x="${RX0 - 26}" y="${RY - 44}" width="26" height="88" rx="5" fill="#3a4762" stroke="${INK}" stroke-width="1.5"/><rect x="${RX0 - 34}" y="${RY - 52}" width="10" height="104" rx="3" fill="#2c3954"/>`;
+  // band
+  const fill = { raw: '#b89566', soft: '#4a4f5c', hard: '#3a3d46', ebon: '#1d1f24' }[st.k];
+  h += `<rect x="${RX0}" y="${(RY - H / 2).toFixed(1)}" width="${(Lx - RX0).toFixed(1)}" height="${H.toFixed(1)}" rx="5" fill="${fill}" stroke="${INK}" stroke-width="1.5"/>`;
+  // chains
+  const nCh = 5, amp = (H / 15) / lam * 1.5;
+  const cy = j => RY - H / 2 + H * (j + 0.5) / nCh;
+  for (let j = 0; j < nCh; j++) {
+    let d = '';
+    for (let u = 0; u <= 60; u++) {
+      const x = RX0 + 3 + (Lx - RX0 - 6) * u / 60;
+      const y = cy(j) + amp * Math.sin(u * 0.9 + j * 1.7) + amp * 0.5 * Math.sin(u * 2.3 + j);
+      d += `${u ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`;
+    }
+    h += `<path d="${d}" stroke="${st.k === 'raw' ? '#6a4f2c' : '#9aa3b5'}" stroke-width="1.3" fill="none" opacity=".9"/>`;
+  }
+  for (let q = 0; q < m.cross; q++) {
+    const j = q % (nCh - 1), u = ((q * 0.618034 + j * 0.27) % 1) * 0.92 + 0.04;
+    const x = RX0 + 3 + (Lx - RX0 - 6) * u;
+    h += `<path d="M${x.toFixed(1)} ${cy(j).toFixed(1)}V${cy(j + 1).toFixed(1)}" stroke="#e6c63a" stroke-width="1.6"/><circle cx="${x.toFixed(1)}" cy="${((cy(j) + cy(j + 1)) / 2).toFixed(1)}" r="1.8" fill="#e6c63a"/>`;
+  }
+  // grip
+  const hotG = drag && drag.id === 'grip';
+  h += `<g data-drag="grip"><rect x="${(Lx - 4).toFixed(1)}" y="${RY - 40}" width="34" height="80" fill="transparent"/><rect x="${(Lx - 2).toFixed(1)}" y="${RY - 34}" width="16" height="68" rx="5" fill="${hotG ? '#72d4e8' : '#e8ecf4'}" stroke="${INK}" stroke-width="1.5"/><path d="M${(Lx + 3).toFixed(1)} ${RY - 10}V${RY + 10}M${(Lx + 9).toFixed(1)} ${RY - 10}V${RY + 10}" stroke="#5a6680" stroke-width="1.5"/></g>`;
+  h += `<text x="${RX0}" y="${RY - 58}" font-size="10" fill="#e8ecf4" font-weight="500">${st.name}${m.vulc ? ` · S ${m.s} %` : m.s ? ` + сера ${m.s} % (смешано)` : ''}</text>`;
+  h += `<text x="${RX0}" y="${RY - 46}" font-size="8" fill="#8b96ad">удлинение ${Math.round((lam - 1) * 100)} %</text>`;
+  // legend
+  h += `<path d="M${RX0} 362h18" stroke="#9aa3b5" stroke-width="1.3"/><text x="${RX0 + 24}" y="365" font-size="8" fill="#8b96ad">цепь полиизопрена</text>`;
+  h += `<path d="M${RX0 + 140} 356v12" stroke="#e6c63a" stroke-width="1.6"/><text x="${RX0 + 148}" y="365" font-size="8" fill="#8b96ad">мостик –S–S– (${m.cross})</text>`;
+  // oven
+  if (S.vulc) h += `<text x="${RX0 + 300}" y="365" font-size="8" fill="#ffb547">вулканизация 140 °C ✓</text>`;
+  return h;
+}
+
+// ----- lesson 4 -----
+const IC4 = { x: 80, w: 132, h: 30, y0: 126, gap: 36 };
+const BIN4Y = 222, BIN4H = 152;
+function tri(x, y, code, s = 1) {
+  return `<g transform="translate(${x} ${y}) scale(${s})"><path d="M0 -9L8 5H-8Z" fill="none" stroke="#0b1019" stroke-width="1.5" stroke-linejoin="round"/><text x="0" y="3.5" font-size="7.5" fill="#0b1019" text-anchor="middle" font-weight="500">${code}</text></g>`;
+}
+function itemCard(I, x, y, sel) {
+  const L = x - IC4.w / 2;
+  return `<rect x="${(L - 1.3).toFixed(1)}" y="${(y - 1.3).toFixed(1)}" width="${IC4.w + 2.6}" height="${IC4.h + 2.6}" rx="8" fill="${INK}"/>` +
+    `<rect x="${L.toFixed(1)}" y="${y.toFixed(1)}" width="${IC4.w}" height="${IC4.h}" rx="7" fill="${sel ? '#fff4dc' : '#e8ecf4'}" stroke="${sel ? '#ffb547' : 'none'}" stroke-width="1.6"/>` +
+    tri(L + 15, y + 16, I.code) + `<text x="${(L + 15).toFixed(1)}" y="${(y + 28).toFixed(1)}" font-size="5.5" fill="#4a556c" text-anchor="middle">${I.ab}</text>` +
+    `<text x="${(L + 30).toFixed(1)}" y="${(y + 19).toFixed(1)}" font-size="${I.name.length > 17 ? 7.6 : 8.5}" fill="#0b1019" font-weight="500">${I.name}</text>`;
+}
+function sortSVG() {
+  let h = '';
+  const dragI = drag && drag.moved && drag.id.startsWith('it-');
+  const hotB = dragI ? binAt(BINS4, drag.p, BIN4Y, BIN4H) : null;
+  BINS4.forEach(B => {
+    let chips = '';
+    ITEMS.filter(I => S.it[I.id] === B.id).forEach((I, j) => {
+      const cy = BIN4Y + 38 + j * 26;
+      chips += `<rect x="${B.x + 6}" y="${cy}" width="${B.w - 12}" height="21" rx="6" fill="#16261f" stroke="#86e0a8"/>` + `<text x="${B.x + 12}" y="${cy + 14}" font-size="8" fill="#86e0a8">${I.code} · ${I.ru}</text>`;
+    });
+    h += `<g data-drag="bin-${B.id}">${binSVG(B, BIN4Y, BIN4H, hotB && hotB.id === B.id, chips)}`;
+    h += `<path d="M${B.x + B.w / 2 - 14} ${BIN4Y + BIN4H - 10}h28" stroke="#3a4762" stroke-width="3" stroke-linecap="round"/></g>`;
+  });
+  ITEMS.forEach((I, i) => {
+    if (S.it[I.id]) return;
+    if (drag && drag.moved && drag.id === 'it-' + I.id) return;
+    h += `<g data-drag="it-${I.id}">${itemCard(I, IC4.x, IC4.y0 + i * IC4.gap, S.isel === I.id)}</g>`;
+  });
+  if (!ITEMS.some(I => !S.it[I.id])) h += `<text x="${IC4.x}" y="240" font-size="10" fill="#86e0a8" text-anchor="middle" font-weight="500">всё разложено ✓</text><text x="${IC4.x}" y="256" font-size="8.5" fill="#8b96ad" text-anchor="middle">дальше — «Флотация»</text>`;
+  return h;
+}
+function liqColor(r) { const k = clamp((r - RHO_MIN) / (RHO_MAX - RHO_MIN), 0, 1); return `rgba(${Math.round(70 + 60 * k)},${Math.round(150 + 20 * k)},${Math.round(210 - 40 * k)},.28)`; }
+function floatSVG(t) {
+  let h = '';
+  // legend
+  Object.keys(FLK_KIND).forEach((k, i) => {
+    const K = FLK_KIND[k], y = 168 + i * 40;
+    h += flakeShape(k, 20, y, 0) + `<text x="32" y="${y + 3}" font-size="8.5" fill="#e8ecf4">${K.name}</text><text x="32" y="${y + 14}" font-size="7.5" fill="#8b96ad">${K.what}</text><text x="32" y="${y + 24}" font-size="7.5" fill="#8b96ad">ρ ${K.rs}</text>`;
+  });
+  // tank
+  h += `<rect x="${TANK.x0}" y="${TANK.surf}" width="${TANK.x1 - TANK.x0}" height="${TANK.bot - TANK.surf}" fill="${liqColor(S.rho)}"/>`;
+  h += `<path d="M${TANK.x0} ${TANK.top}V${TANK.bot}H${TANK.x1}V${TANK.top}" stroke="#5a6680" stroke-width="3" fill="none"/>`;
+  h += `<path d="M${TANK.x0} ${TANK.surf}H${TANK.x1}" stroke="#9fc3f0" stroke-width="1" opacity=".6"/>`;
+  h += `<text x="${(TANK.x0 + TANK.x1) / 2}" y="${TANK.top - 6}" font-size="9" fill="#8b96ad" text-anchor="middle">${liquidName(S.rho)} · ρ = ${fx(S.rho, 2)} г/см³</text>`;
+  FLAKES.forEach(F => { h += flakeShape(F.k, F.x, F.y, F.rot); });
+  if (S.skim) {
+    const ok = S.skim.ok;
+    h += `<rect x="${TANK.x0 + 10}" y="${TANK.surf + 30}" width="${TANK.x1 - TANK.x0 - 20}" height="34" rx="8" fill="rgba(11,16,25,.84)" stroke="${ok ? '#86e0a8' : '#3a4762'}"/>` +
+      `<text x="${(TANK.x0 + TANK.x1) / 2}" y="${TANK.surf + 44}" font-size="8.5" fill="${ok ? '#86e0a8' : '#e8ecf4'}" text-anchor="middle">сняли: ${S.skim.up.map(k => FLK_KIND[k].name).join(', ') || 'ничего'}</text>` +
+      `<text x="${(TANK.x0 + TANK.x1) / 2}" y="${TANK.surf + 57}" font-size="8" fill="#8b96ad" text-anchor="middle">на дне: ${S.skim.down.map(k => FLK_KIND[k].name).join(', ') || 'ничего'}${S.skim.mid.length ? ' · в толще: ' + S.skim.mid.map(k => FLK_KIND[k].name).join(', ') : ''}</text>`;
+  }
+  // density scale
+  const hot = drag && drag.id === 'rho';
+  h += `<g data-drag="rho"><rect x="${SCALE.x - 26}" y="${SCALE.y1 - 10}" width="96" height="${SCALE.y0 - SCALE.y1 + 20}" rx="10" fill="${hot ? 'rgba(114,212,232,.06)' : 'rgba(18,26,40,.6)'}" stroke="${hot ? '#72d4e8' : '#26324a'}"/>`;
+  h += `<path d="M${SCALE.x} ${SCALE.y0}V${SCALE.y1}" stroke="#5a6680" stroke-width="3"/>`;
+  for (let r = 0.8; r <= 1.401; r += 0.1) h += `<path d="M${SCALE.x - 5} ${rhoY(r).toFixed(1)}h10" stroke="#5a6680"/><text x="${SCALE.x - 8}" y="${(rhoY(r) + 3).toFixed(1)}" font-size="7" fill="#8b96ad" text-anchor="end">${fx(r, 1)}</text>`;
+  Object.keys(FLK_KIND).forEach(k => { const K = FLK_KIND[k], y = rhoY(K.rho); h += `<path d="M${SCALE.x + 2} ${y.toFixed(1)}h12" stroke="${K.c}" stroke-width="1.6"/><text x="${SCALE.x + 17}" y="${(y + (k === 'pp' ? 6 : k === 'hdpe' ? -1 : 3)).toFixed(1)}" font-size="7.5" fill="${K.c}">${K.name}</text>`; });
+  h += `<path d="M${SCALE.x + 2} ${rhoY(1).toFixed(1)}h8" stroke="#9fc3f0"/><text x="${SCALE.x + 17}" y="${(rhoY(1) + 3).toFixed(1)}" font-size="7" fill="#9fc3f0">вода</text>`;
+  const my = rhoY(S.rho);
+  h += `<path d="M${TANK.x1} ${my.toFixed(1)}H${SCALE.x - 8}" stroke="#ffb547" stroke-opacity=".35" stroke-dasharray="2 3"/><circle cx="${SCALE.x}" cy="${my.toFixed(1)}" r="16" fill="transparent"/><circle cx="${SCALE.x}" cy="${my.toFixed(1)}" r="7" fill="#ffb547" stroke="${INK}" stroke-width="2"/>`;
+  h += `<text x="${SCALE.x + 22}" y="${SCALE.y1 - 14}" font-size="7.5" fill="#8b96ad" text-anchor="middle">ρ, г/см³</text></g>`;
+  return h;
+}
+function flakeShape(k, x, y, rot) {
+  const c = FLK_KIND[k].c;
+  if (k === 'pet') return `<path d="M${(x - 6).toFixed(1)} ${y.toFixed(1)}l5 -4l7 2l-3 5z" fill="${c}" opacity=".85" transform="rotate(${rot} ${x.toFixed(1)} ${y.toFixed(1)})"/>`;
+  if (k === 'pp') return `<rect x="${(x - 7).toFixed(1)}" y="${(y - 1.5).toFixed(1)}" width="14" height="3" rx="1" fill="${c}" transform="rotate(${rot / 6} ${x.toFixed(1)} ${y.toFixed(1)})"/>`;
+  return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4.2" fill="none" stroke="${c}" stroke-width="2"/>`;
+}
+function flakeTarget(F) {
+  const side = flakeSide(F.k, S.rho);
+  if (side === 'up') return TANK.surf + 3 + (F.i % 3) * 3;
+  if (side === 'down') return TANK.bot - 6 - (F.i % 4) * 4;
+  return (TANK.surf + TANK.bot) / 2 + ((F.i * 13) % 40) - 20;
+}
+function stepFlakes(snap) {
+  let moving = false;
+  FLAKES.forEach(F => {
+    const T = flakeTarget(F);
+    if (snap) { F.y = T; return; }
+    const d = T - F.y;
+    if (Math.abs(d) > 0.3) { F.y += Math.sign(d) * Math.min(Math.abs(d), 0.8 + Math.abs(d) * 0.04); moving = true; } else F.y = T;
+  });
+  return moving;
+}
+
+function hlBox(id) {
+  return {
+    mono: [TOK.x - TOK.w / 2 - 6, TOK.y0 - 6, TOK.w + 12, TOK.gap * 3 + TOK.h + 12],
+    chain: [172, 168, 334, 186], init: [CH.x0 - 34, CH.yDn - 12, 24, 24], end: [CH.x0 + Math.max(0, S.chain * 2 - 1) * CH.dx - 2, 230, 30, 50],
+    unit: [CH.x0 - 12, 222, CH.dx + 24, 84],
+    cards: [10, 124, 498, 106], bnat: [8, BIN2Y - 4, 166, BIN2H + 8], bart: [172, BIN2Y - 4, 172, BIN2H + 8], bsyn: [342, BIN2Y - 4, 166, BIN2H + 8],
+    clamp: [RX0 - 38, RY - 56, 42, 112], band: [RX0 - 4, RY - 32, RL0 * S.lam + 8, 64], grip: [RX0 + RL0 * S.lam - 6, RY - 38, 26, 76], links: [RX0 - 4, RY - 30, RL0 * S.lam + 8, 60], ruler: [RX0 - 6, 298, RL0 * 6 + 14, 48],
+    items: [IC4.x - IC4.w / 2 - 6, IC4.y0 - 6, IC4.w + 12, IC4.gap * 6 + IC4.h + 12], bins4: [168, BIN4Y - 4, 340, BIN4H + 8],
+    tank: [TANK.x0 - 6, TANK.top - 6, TANK.x1 - TANK.x0 + 12, TANK.bot - TANK.top + 12], scale: [SCALE.x - 30, SCALE.y1 - 14, 104, SCALE.y0 - SCALE.y1 + 28], legend: [8, 152, 126, 112],
+  }[id];
+}
+
+function ghostSVG(d) {
+  const p = d.p, id = d.id;
+  if (id.startsWith('mo-')) return monoSVG(MONO[S.mono], p.x, p.y - TOK.h / 2, true);
+  if (id.startsWith('fb-')) { const F = fibOf(id.slice(3)); return F ? fibCard(F, p.x, p.y - FC.h / 2, true) : ''; }
+  if (id.startsWith('it-')) { const I = itemOf(id.slice(3)); return I ? itemCard(I, p.x, p.y - IC4.h / 2, true) : ''; }
+  return '';
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID(), m = model();
+  let h = bench();
+  if (id === 'plastics') h += polySVG(m, t);
+  else if (id === 'fibers') h += fibSVG(m, t);
+  else if (id === 'rubber') h += rubSVG(m, t);
+  else h += S.rmode === 'sort' ? sortSVG() : floatSVG(t);
+  if (drag && drag.moved) { const g = ghostSVG(drag); if (g) h += `<g opacity=".92" pointer-events="none">${g}</g>`; }
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="10" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 510, hh / 410, 1.7);
+  const vw = w / s, vh = hh / s;
+  scene.setAttribute('viewBox', `${(258 - vw / 2).toFixed(1)} ${(395 - vh).toFixed(1)} ${vw.toFixed(1)} ${vh.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- dragging and tapping ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+const live = id => id === 'grip' || id === 'rho';
+function liveMove(id, p) {
+  if (id === 'grip') setLam((p.x - RX0) / RL0);
+  if (id === 'rho') setRho(yRho(p.y));
+}
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  drag = { id: el.dataset.drag, x: e.clientX, y: e.clientY, p: toSvg(e), moved: false };
+  if (drag.id === 'rho') liveMove('rho', drag.p);
+  dirty = true;
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 6 && !drag.id.startsWith('bin-')) drag.moved = true;
+  drag.p = toSvg(e);
+  if (live(drag.id)) { if (drag.moved || drag.id === 'rho') liveMove(drag.id, drag.p); }
+  else if (drag.moved) dirty = true;
+});
+const endDrag = cancel => {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing'); dirty = true;
+  if (d.id === 'grip') { releaseGrip(); return; }
+  if (cancel || live(d.id)) { update(); return; }
+  if (d.moved) drop(d.id, d.p); else tap(d.id);
+};
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+function tap(id) {
+  if (id.startsWith('mo-')) return addUnit();
+  if (id.startsWith('fb-')) { const f = id.slice(3); S.fsel = S.fsel === f ? null : f; renderTools(); update(); return; }
+  if (id.startsWith('it-')) { const f = id.slice(3); S.isel = S.isel === f ? null : f; update(); return; }
+  if (id.startsWith('bin-')) {
+    const b = id.slice(4);
+    if (LID() === 'fibers') { if (S.fsel && !S.fb[S.fsel]) placeFiber(S.fsel, b); else toast('Сначала выберите карточку волокна.'); }
+    else { if (S.isel && !S.it[S.isel]) placeItem(S.isel, b); else toast('Сначала выберите предмет слева.'); }
+  }
+}
+function drop(id, p) {
+  if (id.startsWith('mo-')) { if (inChain(p)) addUnit(); else update(); return; }
+  if (id.startsWith('fb-')) { const f = id.slice(3), b = binAt(BINS2, p, BIN2Y, BIN2H); S.fsel = f; renderTools(); if (b) placeFiber(f, b.id); else update(); return; }
+  if (id.startsWith('it-')) { const f = id.slice(3), b = binAt(BINS4, p, BIN4Y, BIN4H); S.isel = f; if (b) placeItem(f, b.id); else update(); }
+}
+
+// lesson 1 actions
+function addUnit() {
+  if (S.chain >= CHAIN_MAX) { toast('Фрагмента хватит: дальше цепь растёт так же, всего n звеньев.'); return false; }
+  S.chain++;
+  if (S.chain === 1) toast(`π-связь в ${MONO[S.mono].name}е разорвалась: молекула стала первым звеном.`);
+  update(); return true;
+}
+function setMono(k) {
+  if (S.mono === k) return;
+  S.mono = k; S.chain = 0;
+  toast(`Мономер: ${MONO[k].name} ${MONO[k].f}. Получится ${MONO[k].poly} (${MONO[k].ab}).`);
+  renderTools(); buildScheme(); update();
+}
+function setN(n) { n = clamp(Math.round(n / NSTEP) * NSTEP, NMIN, NMAX); if (n === S.n) return; S.n = n; update(); }
+
+// lesson 2 actions
+function placeFiber(f, b) {
+  const F = fibOf(f), B = BINS2.find(x => x.id === b); if (!F || !B || S.fb[f]) return false;
+  if (F.bin !== b) {
+    S.wrongF++;
+    const tip = { nat: 'Этот полимер получил человек: подумайте, был ли он в природе.', art: 'Здесь только волокна из переработанной целлюлозы.', syn: 'Синтетика — полимер, которого нет в природе.' }[b];
+    toast(`Не сюда. ${tip} Попробуйте пробу на огонь.`); update(); return false;
+  }
+  S.fb[f] = b; S.fsel = null; toast(`Верно: ${F.name} — ${F.poly}.`); renderTools(); update(); return true;
+}
+function burnTest() {
+  const F = fibOf(S.fsel); if (!F) { toast('Выберите карточку волокна.'); return; }
+  S.burn = { id: F.id, t: performance.now() }; S.burned[F.id] = true;
+  toast(`${F.name[0].toUpperCase() + F.name.slice(1)}: ${F.burn}.`);
+  update();
+}
+
+// lesson 3 actions
+function setLam(l) {
+  const st = rubState(S.sp, S.vulc);
+  const v = clamp(l, S.rest, st.max);
+  if (st.k === 'ebon' && l > st.max + 0.05 && !S._ebT) { S._ebT = 1; toast('Эбонит твёрдый: сетка из серы такая густая, что он почти не тянется.'); }
+  if (Math.abs(v - S.lam) < 1e-4) return;
+  S.lam = v; S.lamT = v; S.pend = false; update();
+}
+function releaseGrip() {
+  const st = rubState(S.sp, S.vulc), lam = S.lam;
+  if (lam < 1.05) { update(); return; }
+  if (st.k === 'raw') {
+    S.rest = clamp(1 + (lam - 1) * (1 - st.back), 1, st.max);
+    S.lamT = S.rest;
+    if (lam >= 2) { S.rawTried = true; toast(`Каучук вернулся только до ×${fx(S.rest, 2)}: цепи проскользнули друг по другу.`); }
+  } else {
+    S.lamT = 1;
+    S.pend = S.sp >= 1 && S.sp <= 5 && lam >= 3;
+    if (st.k === 'hard' && lam >= 1.5) toast('Жёсткая резина вернулась, но тянется плохо: мостиков слишком много.');
+  }
+  if (reduce) { S.lam = S.lamT; finishRelax(); }
+  update();
+}
+function finishRelax() {
+  if (S.pend) { S.pend = false; S.passed = true; toast('Резина вернулась к исходной длине: сетка из серных мостиков держит цепи.'); }
+}
+function setSulfur(s) {
+  if (S.vulc) { toast('Сера уже связана с цепями. Для другого состава нажмите «Новая смесь».'); buildScheme(); return; }
+  S.sp = clamp(Math.round(s), 0, 40); update();
+}
+function vulcanize() {
+  if (S.vulc) { toast('Образец уже вулканизирован.'); return; }
+  if (S.sp === 0) { toast('Без серы нагрев ничего не дал: мостикам не из чего взяться. Добавьте серу.'); return; }
+  S.vulc = true; S.rest = 1; S.lam = S.lamT = 1; S.pend = false;
+  toast(`Нагрев до 140 °C: сера сшила цепи — ${rubState(S.sp, true).name}.`);
+  renderTools(); buildScheme(); update();
+}
+function newMix() { S.sp = 0; S.vulc = false; S.lam = S.lamT = 1; S.rest = 1; S.pend = false; S._ebT = 0; renderTools(); buildScheme(); update(); }
+
+// lesson 4 actions
+function placeItem(f, b) {
+  const I = itemOf(f), B = BINS4.find(x => x.id === b); if (!I || !B || S.it[f]) return false;
+  if (I.bin !== b) {
+    S.wrongI++;
+    toast(`Не сюда. Код ${I.code} — ${I.ab}. ${b === 'pet' ? 'В поток ПЭТ идёт только код 1.' : b === 'po' ? 'Полиолефины — это ПЭ и ПП.' : 'Этот пластик охотно принимают.'}`);
+    update(); return false;
+  }
+  S.it[f] = b; S.isel = null; toast(`Верно: ${I.name} — ${I.ru}. ${I.into[0].toUpperCase() + I.into.slice(1)}.`); update(); return true;
+}
+function setMode(md) { if (S.rmode === md) return; S.rmode = md; S.skim = null; if (md === 'float') stepFlakes(true); renderTools(); buildScheme(); update(); }
+function setRho(r) { r = clamp(Math.round(r * 100) / 100, RHO_MIN, RHO_MAX); if (r === S.rho) return; S.rho = r; S.skim = null; if (reduce) stepFlakes(true); update(); }
+function skim() {
+  const up = [], down = [], mid = [];
+  Object.keys(FLK_KIND).forEach(k => { const s = flakeSide(k, S.rho); (s === 'up' ? up : s === 'down' ? down : mid).push(k); });
+  const A = up.length === 2 && up.includes('pp') && up.includes('hdpe') && down.length === 1;
+  const B = up.length === 1 && up[0] === 'pp' && down.length === 2;
+  S.skim = { up, down, mid, ok: A || B };
+  if (A && !S.okA) { S.okA = true; toast('Чисто: всплыли крышки и этикетки, ПЭТ на дне. Теперь отделите ПП от ПНД.'); }
+  else if (B && !S.okB) { S.okB = true; toast('Отлично: всплыл только ПП, а ПНД ушёл вниз вместе с ПЭТ.'); }
+  else if (A || B) toast('Эта фракция уже получена.');
+  else if (mid.length) toast(`${mid.map(k => FLK_KIND[k].name).join(', ')} зависает в толще: плотности почти равны.`);
+  else if (!up.length) toast('Ничего не всплыло: жидкость легче всех пластиков.');
+  else if (!down.length) toast('Всплыло всё: жидкость тяжелее всех пластиков.');
+  else toast('Фракция не та, что нужна. Сравните плотности на шкале.');
+  update();
+}
+
+let last = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  let anim = !!S.hl || !!S.burn;
+  if (LID() === 'rubber' && (!drag || drag.id !== 'grip') && Math.abs(S.lam - S.lamT) > 1e-4) {
+    S.lam += (S.lamT - S.lam) * 0.16;
+    if (Math.abs(S.lam - S.lamT) < 0.004) { S.lam = S.lamT; finishRelax(); update(); }
+    anim = true;
+  }
+  if (LID() === 'recycling' && S.rmode === 'float' && stepFlakes(reduce)) anim = true;
+  const moving = !reduce && LID() === 'plastics' && t - last > 60;
+  if (dirty || anim || moving) { drawScene(t); dirty = false; last = t; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3000); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  if (id === 'plastics') tb.innerHTML = MONO_IDS.map(k => B('mo-' + k, MONO[k].ab, S.mono === k)).join('') + sep + B('add', '+ звено') + B('clr', 'Сброс') + sep + B('n-', '−n') + B('n+', '+n');
+  else if (id === 'fibers') tb.innerHTML = B('burn', 'Проба на огонь') + sep + B('reset2', 'Начать заново');
+  else if (id === 'rubber') tb.innerHTML = B('s-', '−1 % S') + B('s+', '+1 % S') + sep + B('vulc', 'Вулканизация', S.vulc) + B('mix', 'Новая смесь');
+  else tb.innerHTML = B('m-sort', 'Сортировка', S.rmode === 'sort') + B('m-float', 'Флотация', S.rmode === 'float') + sep +
+    (S.rmode === 'float' ? B('r-', '−0,01') + B('r+', '+0,01') + B('skim', 'Снять всплывшее') : B('reset4', 'Начать заново'));
+}
+function act(a) {
+  if (a.startsWith('mo-')) return setMono(a.slice(3));
+  if (a === 'add') return addUnit();
+  if (a === 'clr') { S.chain = 0; update(); return; }
+  if (a === 'n-' || a === 'n+') return setN(S.n + (a === 'n+' ? NSTEP : -NSTEP));
+  if (a === 'burn') return burnTest();
+  if (a === 'reset2') { S.fb = {}; S.fsel = null; S.wrongF = 0; buildScheme(); update(); return; }
+  if (a === 's-' || a === 's+') return setSulfur(S.sp + (a === 's+' ? 1 : -1));
+  if (a === 'vulc') return vulcanize();
+  if (a === 'mix') return newMix();
+  if (a.startsWith('m-')) return setMode(a.slice(2));
+  if (a === 'r-' || a === 'r+') return setRho(S.rho + (a === 'r+' ? 0.01 : -0.01));
+  if (a === 'skim') return skim();
+  if (a === 'reset4') { S.it = {}; S.isel = null; S.wrongI = 0; buildScheme(); update(); }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  mono: IC('<path d="M9 15H21M9 19H21" stroke="var(--muted)" stroke-width="1.6"/><circle cx="9" cy="17" r="5" fill="#3a4762"/><circle cx="21" cy="17" r="5" fill="#3a4762"/><circle cx="29" cy="17" r="4" fill="#86e0a8"/>'),
+  chain: IC('<path d="M3 21L9 13L15 21L21 13L27 21L32 13" stroke="#c8d1e2" stroke-width="2" fill="none"/>'),
+  unit: IC('<path d="M8 6H5V28H8M26 6H29V28H26" stroke="#ffb547" stroke-width="1.6" fill="none"/><path d="M9 20L17 12L25 20" stroke="#c8d1e2" stroke-width="2" fill="none"/>'),
+  init: IC('<circle cx="17" cy="17" r="8" fill="#5a6680"/><text x="17" y="21" font-size="10" fill="#e8ecf4" text-anchor="middle">R</text>'),
+  end: IC('<circle cx="17" cy="17" r="8" fill="#ffb547" opacity=".4"/><circle cx="17" cy="17" r="3.5" fill="#ffb547"/>'),
+  cards: IC('<rect x="4" y="10" width="26" height="14" rx="3" fill="#e8ecf4"/><path d="M7 14q3 3 6 0t6 0" stroke="#8b96ad" fill="none"/>'),
+  bin: IC('<rect x="5" y="8" width="24" height="20" rx="4" fill="none" stroke="var(--muted)" stroke-width="1.6"/><rect x="8" y="16" width="8" height="5" rx="2" fill="#86e0a8"/><rect x="18" y="16" width="8" height="5" rx="2" fill="#86e0a8"/>'),
+  clamp: IC('<rect x="6" y="5" width="9" height="24" rx="2" fill="#3a4762"/><rect x="15" y="13" width="15" height="8" fill="#4a4f5c"/>'),
+  band: IC('<rect x="3" y="12" width="28" height="10" rx="3" fill="#4a4f5c"/><path d="M5 15q4 2 8 0t8 0t8 0" stroke="#9aa3b5" fill="none"/>'),
+  grip: IC('<rect x="12" y="5" width="10" height="24" rx="3" fill="#e8ecf4"/><path d="M15 13V21M19 13V21" stroke="#5a6680"/>'),
+  links: IC('<path d="M4 11H30M4 23H30" stroke="#9aa3b5"/><path d="M11 11V23M22 11V23" stroke="#e6c63a" stroke-width="2"/>'),
+  ruler: IC('<path d="M3 20H31" stroke="#5a6680" stroke-width="1.5"/><path d="M7 16V24M17 16V24M27 16V24" stroke="#5a6680"/>'),
+  items: IC('<rect x="4" y="9" width="26" height="16" rx="3" fill="#e8ecf4"/><path d="M11 11L16 20H6Z" fill="none" stroke="#0b1019" stroke-width="1.3"/>'),
+  tank: IC('<path d="M5 6V29H29V6" stroke="#5a6680" stroke-width="2" fill="none"/><rect x="6" y="11" width="22" height="17" fill="rgba(95,180,217,.3)"/><rect x="9" y="11" width="7" height="2" fill="#ffb547"/><path d="M19 25l3 -2l3 1l-1 2z" fill="#72d4e8"/>'),
+  scale: IC('<path d="M17 4V30" stroke="#5a6680" stroke-width="2"/><circle cx="17" cy="14" r="4" fill="#ffb547"/><path d="M19 22h8" stroke="#72d4e8"/>'),
+  legend: IC('<rect x="5" y="9" width="12" height="3" fill="#ffb547"/><circle cx="11" cy="19" r="3" fill="none" stroke="#e8ecf4" stroke-width="1.5"/><path d="M7 27l4 -3l5 1l-2 3z" fill="#72d4e8"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (m.kind === 'poly') return `${m.M.ab} · звеньев ${m.chain} · M = ${big(m.Mp)}`;
+  if (m.kind === 'fib') return `Разложено ${m.placed} из ${FIBERS.length} · ошибок ${S.wrongF}`;
+  if (m.kind === 'rub') return `${m.st.name} · S ${m.s} % · растяжение ×${fx(S.lam, 2)}`;
+  return `Сортировка ${m.sorted}/${ITEMS.length} · ПЭТ отдельно ${S.okA ? '✓' : '—'} · ПП отдельно ${S.okB ? '✓' : '—'}`;
+}
+
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'plastics') {
+    h = `<h2>Полимеризация</h2>
+      <dl class="reads"><div><dt>M мономера</dt><dd id="r1"></dd></div><div><dt>n</dt><dd id="r2"></dd></div><div><dt>M полимера</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Мономер</div><div class="chips" id="moChips">${MONO_IDS.map(k => `<button data-k="${k}" aria-pressed="${S.mono === k}">${MONO[k].name}</button>`).join('')}</div></div>
+      <div class="ctl"><label for="sN">Степень полимеризации n <output id="oN"></output></label><input type="range" id="sN" min="${NMIN}" max="${NMAX}" step="${NSTEP}" value="${S.n}"></div>
+      <div class="row"><button class="ghostbtn" id="bAdd">+ звено к цепи</button><button class="ghostbtn" id="bClr">Сбросить цепь</button></div>
+      <p class="note" style="margin-top:12px">На столе собирается фрагмент цепи до 7 звеньев. Настоящая цепь содержит n звеньев — от сотен до сотен тысяч.</p>`;
+  }
+  if (id === 'fibers') {
+    h = `<h2>Волокна по группам</h2><p class="note">Выберите группу для каждого волокна. Верный ответ закрепится.</p>
+      <div class="pairs">${FIBERS.map(F => `<label>${F.name}<select data-f="${F.id}" ${S.fb[F.id] ? 'disabled' : ''}><option value="">—</option>${BINS2.map(B => `<option value="${B.id}" ${S.fb[F.id] === B.id ? 'selected' : ''}>${B.name.toLowerCase()}</option>`).join('')}</select></label>`).join('')}</div>
+      <dl class="reads"><div><dt>Верно</dt><dd id="r1"></dd></div><div><dt>Ошибок</dt><dd id="r2"></dd></div><div><dt>Проб</dt><dd id="r3"></dd></div></dl>`;
+  }
+  if (id === 'rubber') {
+    h = `<h2>Резиновая смесь</h2>
+      <dl class="reads"><div><dt>Сера</dt><dd id="r1"></dd></div><div><dt>Мостиков</dt><dd id="r2"></dd></div><div><dt>Длина</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><label for="sS">Сера в смеси <output id="oS"></output></label><input type="range" id="sS" min="0" max="40" step="1" value="${S.sp}" ${S.vulc ? 'disabled' : ''}></div>
+      <div class="ctl"><label for="sL">Растяжение (отпустите ползунок — образец отпущен) <output id="oL"></output></label><input type="range" id="sL" min="1" max="6" step="0.05" value="${S.lam}"></div>
+      <div class="row"><button class="ghostbtn" id="bV">Вулканизация 140 °C</button><button class="ghostbtn" id="bM">Новая смесь</button></div>
+      <p class="note" style="margin-top:12px">Мягкая резина — до 5 % серы, жёсткая — больше, эбонит — от 25 % и выше.</p>`;
+  }
+  if (id === 'recycling') {
+    h = `<h2>Линия переработки</h2>
+      <div class="ctl"><div class="lbl">Участок</div><div class="chips" id="mdChips"><button data-m="sort" aria-pressed="${S.rmode === 'sort'}">Сортировка</button><button data-m="float" aria-pressed="${S.rmode === 'float'}">Флотация</button></div></div>`;
+    if (S.rmode === 'sort') h += `<div class="pairs">${ITEMS.map(I => `<label>${I.code} · ${I.name}<select data-i="${I.id}" ${S.it[I.id] ? 'disabled' : ''}><option value="">—</option>${BINS4.map(B => `<option value="${B.id}" ${S.it[I.id] === B.id ? 'selected' : ''}>${B.name}</option>`).join('')}</select></label>`).join('')}</div>
+      <dl class="reads"><div><dt>Верно</dt><dd id="r1"></dd></div><div><dt>Ошибок</dt><dd id="r2"></dd></div><div><dt>Осталось</dt><dd id="r3"></dd></div></dl>`;
+    else h += `<dl class="reads"><div><dt>ρ жидкости</dt><dd id="r1"></dd></div><div><dt>Всплывает</dt><dd id="r2"></dd></div><div><dt>Тонет</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><label for="sR">Плотность жидкости <output id="oR"></output></label><input type="range" id="sR" min="${RHO_MIN}" max="${RHO_MAX}" step="0.01" value="${S.rho}"></div>
+      <div class="row"><button class="ghostbtn" id="bSk">Снять всплывшее</button></div>
+      <p class="note" style="margin-top:12px">Меньше 1 — вода со спиртом, больше 1 — раствор соли.</p>`;
+  }
+  el.innerHTML = h;
+  el.querySelectorAll('#moChips button').forEach(b => b.onclick = () => setMono(b.dataset.k));
+  const sN = el.querySelector('#sN'); if (sN) sN.oninput = () => setN(+sN.value);
+  const bA = el.querySelector('#bAdd'); if (bA) bA.onclick = addUnit;
+  const bC = el.querySelector('#bClr'); if (bC) bC.onclick = () => { S.chain = 0; update(); };
+  el.querySelectorAll('.pairs select[data-f]').forEach(s => s.onchange = () => { if (!s.value) return; const ok = placeFiber(s.dataset.f, s.value); if (ok) s.disabled = true; else s.value = ''; });
+  const sS = el.querySelector('#sS'); if (sS) sS.oninput = () => setSulfur(+sS.value);
+  const sL = el.querySelector('#sL'); if (sL) { sL.oninput = () => setLam(+sL.value); sL.onchange = () => releaseGrip(); }
+  const bV = el.querySelector('#bV'); if (bV) bV.onclick = vulcanize;
+  const bM = el.querySelector('#bM'); if (bM) bM.onclick = newMix;
+  el.querySelectorAll('#mdChips button').forEach(b => b.onclick = () => setMode(b.dataset.m));
+  el.querySelectorAll('.pairs select[data-i]').forEach(s => s.onchange = () => { if (!s.value) return; const ok = placeItem(s.dataset.i, s.value); if (ok) s.disabled = true; else s.value = ''; });
+  const sR = el.querySelector('#sR'); if (sR) sR.oninput = () => setRho(+sR.value);
+  const bS = el.querySelector('#bSk'); if (bS) bS.onclick = skim;
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; };
+  if (m.kind === 'poly') {
+    set('#r1', String(m.M.M).replace('.', ',')); set('#r2', big(m.n)); set('#r3', big(m.Mp)); set('#oN', big(m.n));
+    const sN = el.querySelector('#sN'); if (sN && +sN.value !== m.n) sN.value = m.n;
+    el.querySelectorAll('#moChips button').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === S.mono));
+  } else if (m.kind === 'fib') {
+    set('#r1', `${m.placed} / ${FIBERS.length}`); set('#r2', String(S.wrongF)); set('#r3', String(Object.keys(S.burned).length));
+  } else if (m.kind === 'rub') {
+    set('#r1', m.s + ' %'); set('#r2', String(m.cross)); set('#r3', '×' + fx(S.lam, 2)); set('#oS', m.s + ' %'); set('#oL', '×' + fx(S.lam, 2));
+    const sS = el.querySelector('#sS'); if (sS) { sS.disabled = S.vulc; if (+sS.value !== m.s) sS.value = m.s; }
+    const sL = el.querySelector('#sL'); if (sL && document.activeElement !== sL) sL.value = S.lam;
+  } else if (S.rmode === 'sort') {
+    set('#r1', `${m.sorted} / ${ITEMS.length}`); set('#r2', String(S.wrongI)); set('#r3', String(ITEMS.length - m.sorted));
+  } else {
+    const ks = Object.keys(FLK_KIND);
+    set('#r1', fx(S.rho, 2)); set('#oR', `${fx(S.rho, 2)} г/см³ · ${liquidName(S.rho)}`);
+    set('#r2', ks.filter(k => flakeSide(k, S.rho) === 'up').map(k => FLK_KIND[k].name).join(', ') || '—');
+    set('#r3', ks.filter(k => flakeSide(k, S.rho) === 'down').map(k => FLK_KIND[k].name).join(', ') || '—');
+    const sR = el.querySelector('#sR'); if (sR && Math.abs(+sR.value - S.rho) > 1e-6) sR.value = S.rho;
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'plastics') return [
+    { id: 'mono', icon: ICON.mono, name: 'Молекулы мономера', spec: 'Два атома углерода с двойной связью C=C и заместитель: H, CH₃, Cl или фенил C₆H₅ (Ph). Тяните их к цепи.' },
+    { id: 'init', icon: ICON.init, name: 'Инициатор R•', spec: 'Частица с неспаренным электроном (радикал). Она разрывает π-связь первой молекулы и запускает цепную реакцию.' },
+    { id: 'chain', icon: ICON.chain, name: 'Растущая цепь', spec: 'Зигзаг — углеродный скелет: все атомы C связаны одинарными связями. Заместители торчат вбок.' },
+    { id: 'unit', icon: ICON.unit, name: 'Структурное звено', spec: 'Повторяющийся кусок цепи. Его формула совпадает с формулой мономера, только без двойной связи.' },
+    { id: 'end', icon: ICON.end, name: 'Активный конец', spec: 'На конце цепи остаётся радикал •. Он присоединяет следующую молекулу мономера, пока цепь не оборвётся.' }];
+  if (id === 'fibers') return [
+    { id: 'cards', icon: ICON.cards, name: 'Карточки волокон', spec: 'Девять нитей. Нажмите карточку и «Проба на огонь»: запах и остаток выдают полимер.' },
+    { id: 'bnat', icon: ICON.bin, name: 'Природные', spec: 'Растительные (целлюлоза: хлопок, лён) и животные (белки: шерсть, шёлк).' },
+    { id: 'bart', icon: ICON.bin, name: 'Искусственные', spec: 'Природный полимер, переработанный химически: вискоза, ацетатное волокно.' },
+    { id: 'bsyn', icon: ICON.bin, name: 'Синтетические', spec: 'Полимер получен синтезом из мономеров: капрон, лавсан, нитрон.' }];
+  if (id === 'rubber') return [
+    { id: 'clamp', icon: ICON.clamp, name: 'Зажим', spec: 'Держит левый конец образца.' },
+    { id: 'band', icon: ICON.band, name: 'Образец', spec: 'Полоска каучука или резины. Серые линии — цепи полиизопрена. При растяжении клубки распрямляются, а полоска становится тоньше.' },
+    { id: 'links', icon: ICON.links, name: 'Мостики серы', spec: 'Жёлтые перемычки появляются после вулканизации. Чем больше серы, тем гуще сетка и твёрже материал.' },
+    { id: 'grip', icon: ICON.grip, name: 'Ручка', spec: 'Тяните вправо и отпускайте. Отпущенная резина возвращается, каучук — нет.' },
+    { id: 'ruler', icon: ICON.ruler, name: 'Линейка', spec: 'Во сколько раз длиннее исходного. Красная метка — предел растяжения.' }];
+  if (S.rmode === 'sort') return [
+    { id: 'items', icon: ICON.items, name: 'Предметы с кодами', spec: 'Треугольник с цифрой — код материала. Под ним — латинское сокращение: PET, HDPE, PVC, LDPE, PP, PS, O.' },
+    { id: 'bins4', icon: ICON.bin, name: 'Контейнеры потоков', spec: 'ПЭТ перерабатывают отдельно. ПЭ и ПП (полиолефины) — вместе. ПВХ, ПС и многослойную упаковку принимают редко.' }];
+  return [
+    { id: 'tank', icon: ICON.tank, name: 'Флотационная ванна', spec: 'Хлопья в жидкости: что легче — всплывает, что тяжелее — тонет.' },
+    { id: 'scale', icon: ICON.scale, name: 'Шкала плотности', spec: 'Тяните оранжевую метку: меняется плотность жидкости. Цветные риски — плотности пластиков.' },
+    { id: 'legend', icon: ICON.legend, name: 'Виды хлопьев', spec: 'ПЭТ — хлопья бутылок, ПНД — крышки, ПП — этикетки.' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      (L.safe ? `<div class="safe"><b>Безопасность</b>${L.safe}</div>` : '') +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Детали модели</h2><p class="note">Нажмите на деталь, чтобы найти её на столе.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  if (m.kind === 'poly') {
+    const M = m.M;
+    let h = `<h2>${M.poly[0].toUpperCase() + M.poly.slice(1)} (${M.ab})</h2><div class="formula">n ${M.f} → (${M.unit})ₙ</div><div class="steps">` +
+      step('тип реакции', 'полимеризация: рвётся π-связь C=C') +
+      step('M(мономера)', M.mcalc + ' г/моль') +
+      step('степень полимеризации', 'n = ' + big(m.n)) +
+      step('M(полимера) = n · M(мономера)', `${big(m.n)} · ${String(M.M).replace('.', ',')} = ${big(m.Mp)} г/моль`, 'sum') + `</div>`;
+    h += `<h3>Масса</h3><div class="steps">${step('побочные продукты', 'нет')}${step('из 1 т мономера', '1 т полимера', 'sum')}</div>`;
+    h += `<h3>Задание</h3><div class="steps">` + step('мономер', S.mono === 'vc' ? 'винилхлорид ✓' : `${M.name} — нужен другой`) +
+      step('фрагмент цепи', `${m.chain} из 5 звеньев${m.chain >= 5 ? ' ✓' : ''}`) +
+      step('M(ПВХ) нужна', `62 500 г/моль${S.mono === 'vc' && Math.abs(m.Mp - GOAL_M) < 1e-6 ? ' ✓' : ''}`) + `</div>`;
+    h += `<p class="note" style="margin-top:10px">Где применяют ${M.ab}: ${M.use}. В реальном образце цепи разной длины, поэтому говорят о средней молярной массе.</p>`;
+    return h;
+  }
+  if (m.kind === 'fib') {
+    const F = fibOf(m.sel);
+    if (!F) return `<h2>Как рассуждать</h2><div class="steps">${step('1. Есть ли такой полимер в природе?', 'нет → синтетическое')}${step('2. Если есть — переработан химически?', 'да → искусственное')}${step('3. Взят как есть', 'природное', 'sum')}</div><h3>Проба на огонь</h3><div class="steps">${step('целлюлоза', 'жжёная бумага, пепел')}${step('белок', 'палёные волосы, хрупкий комочек')}${step('синтетика', 'плавится в твёрдый шарик')}</div><p class="note" style="margin-top:10px">Нажмите карточку волокна — здесь появится его разбор.</p>`;
+    const placed = !!S.fb[F.id];
+    return `<h2>${F.name[0].toUpperCase() + F.name.slice(1)}</h2><div class="steps">` +
+      step('полимер', F.poly) + step('сырьё', F.src) + step('как получают', F.how) +
+      (S.burned[F.id] ? step('проба на огонь', F.burn) : step('проба на огонь', 'ещё не делали')) +
+      step('группа', placed ? BINS2.find(b => b.id === F.bin).name.toLowerCase() + ' ✓' : 'определите сами', 'sum') + `</div>`;
+  }
+  if (m.kind === 'rub') {
+    const s = m.s, mS = 10 * s, nS = mS / 32, nU = (1000 - mS) / 68;
+    let h = `<h2>Каучук → резина</h2><div class="formula">n CH₂=C(CH₃)–CH=CH₂ → (–CH₂–C(CH₃)=CH–CH₂–)ₙ</div><div class="steps">` +
+      step('M(изопрена C₅H₈)', '5·12 + 8·1 = 68 г/моль') +
+      step('в каждом звене', 'одна двойная связь C=C — место для мостика') + `</div>`;
+    h += `<h3>Смесь 1 кг, сера ${s} %</h3><div class="steps">` +
+      step('m(S) = 1000 · w', `1000 · ${fx(s / 100, 2)} = ${mS} г`) +
+      step('n(S) = m / 32', `${mS} / 32 = ${fx(nS, 2)} моль`) +
+      step('n(звеньев) = m(каучука) / 68', `${1000 - mS} / 68 = ${fx(nU, 1)} моль`) +
+      step('звеньев на 1 атом S', s ? fx(nU / nS, 1) : 'серы нет', 'sum') + `</div>`;
+    h += `<h3>Образец</h3><div class="steps">` +
+      step('состояние', m.st.name) + step('удлинение = (L − L₀) / L₀', `${Math.round((S.lam - 1) * 100)} %`) +
+      step('предел растяжения', '×' + fx(m.st.max, 2)) +
+      step('после отпускания', m.st.k === 'raw' ? 'остаётся вытянутым' : 'возвращается') +
+      step('задание', m.passed ? 'выполнено ✓' : 'S 1–5 %, вулканизация, растянуть ≥ ×3 и отпустить', 'sum') + `</div>`;
+    h += `<p class="note" style="margin-top:10px">Модель упрощена: в реальной резине мостики бывают из одного или нескольких атомов серы, а прочность дают ещё и наполнители — сажа.</p>`;
+    return h;
+  }
+  if (S.rmode === 'sort') {
+    const I = itemOf(S.isel);
+    let h = `<h2>Коды пластика</h2><div class="steps">` + ITEMS.map(x => step(`${x.code} · ${x.ab}`, x.ru)).join('') + `</div>`;
+    if (I) h += `<h3>${I.name}</h3><div class="steps">${step('код', `${I.code} — ${I.ab} (${I.ru})`)}${step('полимер', I.poly)}${step('что из него сделают', S.it[I.id] ? I.into + ' ✓' : 'решите, в какой поток')}</div>`;
+    else h += `<p class="note" style="margin-top:10px">Нажмите предмет — здесь появится его разбор.</p>`;
+    return h;
+  }
+  const ks = Object.keys(FLK_KIND);
+  let h = `<h2>Флотация</h2><div class="formula">ρ(пластика) &lt; ρ(жидкости) → всплывает</div><div class="steps">` +
+    ks.map(k => { const K = FLK_KIND[k], sd = flakeSide(k, S.rho); return step(`${K.name}: ${K.rs} ${sd === 'up' ? '<' : sd === 'down' ? '>' : '≈'} ${fx(S.rho, 2)}`, sd === 'up' ? 'всплывает' : sd === 'down' ? 'тонет' : 'зависает'); }).join('') + `</div>`;
+  h += `<h3>Цели</h3><div class="steps">${step('ПЭТ отдельно от ПП и ПНД', S.okA ? 'готово ✓' : 'ещё нет')}${step('ПП отдельно от ПНД', S.okB ? 'готово ✓' : 'ещё нет')}</div>`;
+  h += `<h3>Масса сырья</h3><div class="steps">${step('бутылка 0,5 л', '20 г ПЭТ + 2 г крышка + 0,5 г этикетка')}${step('доля ПЭТ', '20 / 22,5 = 89 %')}${step('из 1 т бутылок', '≈ 0,89 т ПЭТ-хлопьев (без потерь на мойке)', 'sum')}</div>`;
+  h += `<p class="note" style="margin-top:10px">Массы бутылки примерные. ПЭТ и ПВХ почти одинаковой плотности (~1,38), поэтому их флотацией не разделить — ПВХ убирают ещё на сортировке.</p>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const el = $('#meter');
+  if (m.kind === 'poly') {
+    el.innerHTML = `<div class="k">${m.M.ab} · M полимера</div><div class="v ${m.ok ? 'ok' : ''}">${big(m.Mp)}</div><div class="lr"><span>n</span><span>${big(m.n)}</span></div><div class="lr"><span>M звена</span><span>${String(m.M.M).replace('.', ',')}</span></div><div class="lr"><span>на столе</span><span>${m.chain} зв.</span></div>`;
+  } else if (m.kind === 'fib') {
+    el.innerHTML = `<div class="k">Волокна</div><div class="v ${m.placed === FIBERS.length ? 'ok' : ''}">${m.placed} из ${FIBERS.length}</div><div class="gauge"><b style="width:${(m.placed / FIBERS.length * 100).toFixed(1)}%"></b></div><div class="lr"><span>ошибок</span><span>${S.wrongF}</span></div>`;
+  } else if (m.kind === 'rub') {
+    el.innerHTML = `<div class="k">Образец</div><div class="v ${m.passed ? 'ok' : ''}">×${fx(S.lam, 2)}</div><div class="lr"><span>${m.st.name}</span></div><div class="lr"><span>сера</span><span>${m.s} %</span></div><div class="lr"><span>мостиков</span><span>${m.cross}</span></div>`;
+  } else if (S.rmode === 'sort') {
+    el.innerHTML = `<div class="k">Сортировка</div><div class="v ${m.sorted === ITEMS.length ? 'ok' : ''}">${m.sorted} из ${ITEMS.length}</div><div class="gauge"><b style="width:${(m.sorted / ITEMS.length * 100).toFixed(1)}%"></b></div><div class="lr"><span>ошибок</span><span>${S.wrongI}</span></div>`;
+  } else {
+    el.innerHTML = `<div class="k">Жидкость</div><div class="v">${fx(S.rho, 2)} г/см³</div><div class="lr"><span>${liquidName(S.rho)}</span></div><div class="lr"><span>ПЭТ отдельно</span><span>${S.okA ? '✓' : '—'}</span></div><div class="lr"><span>ПП отдельно</span><span>${S.okB ? '✓' : '—'}</span></div>`;
+  }
+}
+
+function update() {
+  const m = model(), L = LESSONS[S.lesson];
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Тема «Полимеры» освоена!');
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  plastics: '<path d="M6 19L14 11L22 19L30 11L38 19L46 11L54 19" stroke="#c8d1e2" stroke-width="1.6" fill="none"/><circle cx="14" cy="11" r="2.4" fill="#3a4762"/><circle cx="30" cy="11" r="2.4" fill="#3a4762"/><circle cx="46" cy="11" r="2.4" fill="#3a4762"/><circle cx="22" cy="25" r="3" fill="#86e0a8"/><circle cx="38" cy="25" r="3" fill="#86e0a8"/><circle cx="58" cy="19" r="2.4" fill="#ffb547"/>',
+  fibers: '<path d="M4 8q6 4 12 0t12 0t12 0t12 0t12 0M4 15q6 4 12 0t12 0t12 0t12 0t12 0M4 22q6 4 12 0t12 0t12 0t12 0t12 0" stroke="#8b96ad" stroke-width="1.3" fill="none"/>',
+  rubber: '<rect x="4" y="9" width="10" height="12" fill="#3a4762"/><rect x="14" y="11" width="40" height="8" rx="2" fill="#4a4f5c"/><path d="M24 11V19M38 11V19" stroke="#e6c63a" stroke-width="1.5"/><rect x="54" y="7" width="6" height="16" rx="2" fill="#e8ecf4"/>',
+  recycling: '<path d="M8 4V27H36V4" stroke="#5a6680" stroke-width="1.6" fill="none"/><rect x="9" y="8" width="26" height="18" fill="rgba(95,180,217,.3)"/><rect x="12" y="9" width="7" height="2" fill="#ffb547"/><circle cx="26" cy="10" r="2" fill="none" stroke="#e8ecf4"/><path d="M14 24l3 -2l3 1l-1 2zM24 24l3 -2l3 1l-1 2z" fill="#72d4e8"/><path d="M50 8L58 22H42Z" fill="none" stroke="#86e0a8" stroke-width="1.5"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i], init = JSON.parse(JSON.stringify(L.init || {}));
+  S.lesson = i; S.hl = null; drag = null;
+  Object.assign(S, fresh(), init);
+  stepFlakes(true);
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const strip = $('#lessons'), cur = strip.querySelector('.lesson[aria-current="true"]');
+  if (cur) strip.scrollLeft = cur.offsetLeft - strip.offsetLeft - (strip.clientWidth - cur.offsetWidth) / 2;
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '';
+  if (id === 'plastics') {
+    now = `Модель полимеризации. Выбран мономер ${m.M.name} ${m.M.f} (M = ${String(m.M.M).replace('.', ',')} г/моль), получается ${m.M.poly} (${m.M.ab}), звено ${m.M.unit}. На столе собран фрагмент цепи из ${m.chain} звеньев. Степень полимеризации n = ${m.n}, M полимера = ${m.Mp} г/моль. Цель: ПВХ, фрагмент из 5 звеньев и M = 62 500 г/моль. Не называй готовое n — попроси ученика посчитать M(C₂H₃Cl) и разделить.`;
+  }
+  if (id === 'fibers') {
+    const F = fibOf(S.fsel);
+    now = `Игра-сортировка: 9 волокон (${FIBERS.map(f => f.name).join(', ')}) нужно разложить по группам: природные, искусственные, синтетические. Уже верно разложены: ${FIBERS.filter(f => S.fb[f.id]).map(f => `${f.name} — ${BINS2.find(b => b.id === S.fb[f.id]).name.toLowerCase()}`).join(', ') || 'ничего'}. Ошибок: ${S.wrongF}. ${F ? `Выбрана карточка «${F.name}».` : ''} Проба на огонь сделана для: ${Object.keys(S.burned).map(k => fibOf(k).name).join(', ') || 'ничего'}. Не называй группу для неразложенных волокон — спрашивай, есть ли полимер в природе и переработан ли он.`;
+  }
+  if (id === 'rubber') {
+    now = `Образец на растяжение. Состояние: ${m.st.name}, сера в смеси ${m.s} %, вулканизация ${m.vulc ? 'проведена' : 'не проведена'}, серных мостиков в модели ${m.cross}. Текущее растяжение ×${fx(S.lam, 2)}, после прошлого отпускания осталось ×${fx(S.rest, 2)}, предел ×${fx(m.st.max, 2)}. Сырой каучук ${S.rawTried ? 'уже пробовали растянуть' : 'ещё не пробовали растягивать'}. Задание: сера 1–5 %, вулканизация, растянуть ≥ ×3 и отпустить, чтобы образец вернулся. Статус проверки: ${m.passed ? 'пройдено' : 'не пройдено'}.`;
+  }
+  if (id === 'recycling') {
+    now = S.rmode === 'sort'
+      ? `Участок сортировки: 7 предметов с кодами (${ITEMS.map(x => `${x.name} — код ${x.code} ${x.ab}`).join('; ')}) раскладываются в три контейнера: ПЭТ, ПЭ и ПП, редко принимают. Уже верно: ${ITEMS.filter(x => S.it[x.id]).map(x => x.name).join(', ') || 'ничего'}. Ошибок ${S.wrongI}. Не называй готовый контейнер — спрашивай, что значит код.`
+      : `Участок флотации: ванна с хлопьями ПЭТ (ρ 1,38), крышками ПНД (0,955) и этикетками ПП (0,905). Плотность жидкости ${fx(S.rho, 2)} г/см³ (${liquidName(S.rho)}). Сейчас всплывают: ${Object.keys(FLK_KIND).filter(k => flakeSide(k, S.rho) === 'up').map(k => FLK_KIND[k].name).join(', ') || 'ничего'}. Цели: отделить ПЭТ от ПП и ПНД (${S.okA ? 'сделано' : 'не сделано'}), отделить ПП от ПНД (${S.okB ? 'сделано' : 'не сделано'}). Сортировка ${m.sorted}/7. Не называй готовую плотность — спрашивай про сравнение плотностей.`;
+  }
+  return [
+    `Предмет: химия, 11 класс. Тема «Полимеры». Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Веди ученика наводящими вопросами, а не готовыми ответами.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = { plastics: 'Почему из этилена получается полимер, а из этана — нет?', fibers: 'Чем искусственное волокно отличается от синтетического?', rubber: 'Зачем резине сера и почему эбонит твёрдый?', recycling: 'Почему ПЭТ тонет в воде, а крышка от бутылки всплывает?' }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
