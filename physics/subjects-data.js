@@ -115,7 +115,7 @@ window.LUCH_SUBJECTS = {
 
       { id: 'cellst', b: 'cell', g: 7, t: 'Строение клетки', items: ['Мембрана и оболочка', 'Ядро', 'Органоиды', 'Клетки растений и животных'], req: ['alive', 'methods'], status: 'done', href: '/labs/bio-cellst/', lessons: 4, doneItems: 4 },
       { id: 'tissues', b: 'cell', g: 7, t: 'Ткани и органы', items: ['Ткани растений', 'Ткани животных', 'Органы и системы органов'], req: ['cellst'], status: 'done', href: '/labs/bio-tissues/', lessons: 3, doneItems: 3 },
-      { id: 'chemcell', b: 'cell', g: 10, t: 'Химия клетки', items: ['Вода и минеральные вещества', 'Белки', 'Углеводы и липиды', 'ДНК и РНК'], req: ['cellst'] },
+      { id: 'chemcell', b: 'cell', g: 10, t: 'Химия клетки', items: ['Вода и минеральные вещества', 'Белки', 'Углеводы и липиды', 'ДНК и РНК'], req: ['cellst'], status: 'done', href: '/labs/bio-chemcell/', lessons: 4, doneItems: 4 },
       { id: 'metab', b: 'cell', g: 10, t: 'Обмен веществ', items: ['Ферменты', 'Фотосинтез', 'Клеточное дыхание', 'АТФ — батарейка клетки'], req: ['chemcell'] },
       { id: 'division', b: 'cell', g: 10, t: 'Деление клетки', items: ['Митоз', 'Мейоз', 'Жизненный цикл клетки'], req: ['chemcell'] },
       { id: 'biotech', b: 'cell', g: 11, t: 'Биотехнологии', items: ['Генная инженерия', 'Клонирование', 'ПЦР-тесты', 'Биобезопасность'], req: ['division', 'mendel'] },
