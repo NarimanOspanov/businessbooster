@@ -11826,7 +11826,13 @@ http
       }
     }
 
-    let filePath = path.normalize(path.join(ROOT, urlPath));
+    // Главная saudager.ai — карта предметов «Луча»; лендинг Reception365 живёт на /reception/
+    // и остаётся главной на своём домене reception365.
+    const isReceptionHost = /reception365/i.test(String(req.headers.host || ""));
+    let staticPath = urlPath;
+    if (urlPath === "/" && !isReceptionHost) staticPath = "/physics/";
+    if (urlPath === "/reception" || urlPath === "/reception/") staticPath = "/";
+    let filePath = path.normalize(path.join(ROOT, staticPath));
 
     // Не выходить за пределы корня проекта
     if (!filePath.startsWith(ROOT)) {
@@ -11850,7 +11856,7 @@ http
           return;
         }
         // SPA-стиль: на неизвестные пути отдаём главную
-        fs.readFile(path.join(ROOT, "index.html"), (err2, home) => {
+        fs.readFile(path.join(ROOT, isReceptionHost ? "index.html" : "physics/index.html"), (err2, home) => {
           if (err2) {
             res.writeHead(404).end("Not found");
           } else {

@@ -116,7 +116,6 @@
     <div class="lt-head">${AV}<div class="lt-sp"><b>Репетитор</b><span>видит экран</span></div>
       <button class="lt-ib" id="lt-vm" type="button" aria-pressed="false" title="Разговор голосом">${WAVE}<span class="lt-tx">Голосом</span></button>
       <button class="lt-ib" id="lt-bd" type="button" title="Доска: рисовать и показывать репетитору">✎<span class="lt-tx">Доска</span></button>
-      <button class="lt-ib" id="lt-new" type="button" title="Начать заново">Заново</button>
       <button class="lt-ib" id="lt-close" type="button" aria-label="Свернуть">✕</button></div>
     <div class="lt-log" id="lt-log" aria-live="polite"></div>
     <div class="lt-sug" id="lt-sug"></div>
@@ -567,7 +566,7 @@
   const close = () => { setMode(false); if (dict) dict.abort(); panel.hidden = true; btn.hidden = false; btn.focus(); };
   btn.addEventListener('click', open);
   $('#lt-close').addEventListener('click', close);
-  $('#lt-new').addEventListener('click', () => { if (ctrl) ctrl.abort(); speaker.stop(); chat = []; saveChat(); busy = false; send.disabled = false; render(); if (voiceMode) setVoice('idle', ''); });
+
   panel.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
   sug.addEventListener('click', e => { const b = e.target.closest('button'); if (b) ask(b.textContent); });
   form.addEventListener('submit', e => {
