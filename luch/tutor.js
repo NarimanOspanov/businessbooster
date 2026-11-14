@@ -444,7 +444,11 @@
   let hlBox = null, hlTimer = 0;
   function highlight(n) {
     const it = pageEls[n - 1]; if (!it || !document.contains(it.el)) return;
-    const el = it.el, r0 = el.getBoundingClientRect();
+    highlightEl(it.el);
+  }
+  function highlightEl(el) {
+    if (!el || !document.contains(el)) return;
+    const r0 = el.getBoundingClientRect();
     if (r0.top < 60 || r0.bottom > innerHeight - 40) el.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion:reduce)').matches ? 'auto' : 'smooth' });
     if (!hlBox) { hlBox = document.createElement('div'); hlBox.className = 'lt-hl'; document.body.appendChild(hlBox); }
     const place = () => { const r = el.getBoundingClientRect(), p = 6; Object.assign(hlBox.style, { left: r.left - p + 'px', top: r.top - p + 'px', width: r.width + p * 2 + 'px', height: r.height + p * 2 + 'px' }); };
@@ -671,7 +675,7 @@
     if (on) { if (!canListen) { setVoice('idle', 'В этом браузере нет доступа к микрофону. Откройте сайт в Chrome или Safari.'); return; } unlockAudio(); turn(); }
     else { if (vListen) { vListen.abort(); vListen = null; } speaker.stop(); setVoice('idle', ''); }
   }
-  vmBtn.addEventListener('click', () => setMode(!voiceMode));
+  vmBtn.addEventListener('click', () => { setMode(!voiceMode); ls.set('luch-tutor-mode', voiceMode ? 'voice' : 'text'); });
   $('#lt-vend').addEventListener('click', () => setMode(false));
 
   const open = () => { panel.hidden = false; btn.hidden = true; render(); setTimeout(() => (voiceMode ? orb : inp).focus(), 30); };
@@ -679,7 +683,8 @@
   $('#lt-bd').addEventListener('click', () => (board.open ? board.hide() : board.show()));
   window.LuchTutor = { ask: q => { openPanel(); ask(q); }, open: openPanel, board };
   const close = () => { setMode(false); if (dict) dict.abort(); panel.hidden = true; btn.hidden = false; btn.focus(); };
-  btn.addEventListener('click', open);
+  // голос в первую очередь: кнопка сразу открывает разговор голосом (если ученик сам не выбрал текст)
+  btn.addEventListener('click', () => { open(); if (canListen && ls.get('luch-tutor-mode') !== 'text') setMode(true); });
   $('#lt-close').addEventListener('click', close);
 
   panel.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
@@ -693,5 +698,148 @@
   inp.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); } });
   inp.addEventListener('input', () => { inp.style.height = 'auto'; inp.style.height = Math.min(inp.scrollHeight, 120) + 'px'; });
   if (window.speechSynthesis) speechSynthesis.getVoices();
+
+  // ---------- гид: репетитор сам ведёт ученика — коротко, по одному шагу, голосом ----------
+  // Облачко над кнопкой: одна фраза и максимум две кнопки, главная — «Ответить голосом».
+  // Фразы проговариваются вслух, как только браузер разрешил звук (после первого касания страницы).
+  const guide = (() => {
+    const st2 = document.createElement('style');
+    st2.textContent = `.lt-tip{position:fixed;z-index:50;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(86px + env(safe-area-inset-bottom,0px));width:min(340px,calc(100vw - 36px));background:#e8ecf4;color:#0b1019;border-radius:16px;padding:13px 14px 13px 15px;box-shadow:0 14px 40px -10px rgba(0,0,0,.6);font:15px/1.45 "Golos Text",system-ui,sans-serif;animation:lt-tip-in .35s ease-out}
+      .lt-tip p{margin:0 24px 11px 0}
+      .lt-tip .x{position:absolute;top:6px;right:6px;background:none;border:0;font-size:15px;color:#4a5570;cursor:pointer;width:30px;height:30px;border-radius:50%}
+      .lt-tip .row{display:flex;gap:6px;flex-wrap:wrap}
+      .lt-tip .row button{border:0;border-radius:999px;padding:9px 14px;font:600 13.5px "Golos Text",sans-serif;cursor:pointer;background:#d3d9e7;color:#0b1019}
+      .lt-tip .row button.mic{background:#0b1019;color:#e8ecf4}
+      .lt-tip:after{content:"";position:absolute;right:28px;bottom:-6px;width:13px;height:13px;background:#e8ecf4;transform:rotate(45deg)}
+      @keyframes lt-tip-in{from{opacity:0;transform:translateY(8px)}}
+      @media (max-width:600px){.lt-tip{bottom:calc(150px + env(safe-area-inset-bottom,0px))}}
+      @media (prefers-reduced-motion:reduce){.lt-tip{animation:none}}`;
+    document.head.appendChild(st2);
+    const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
+    let tip = null, lastAt = 0, closes = 0, lastAct = Date.now();
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    async function sayAloud(el) {
+      if (!unlocked) return;
+      for (let i = 0; i < 30 && window.LuchI18n && window.LuchI18n.pending && window.LuchI18n.pending(); i++) await wait(100); // ждём перевод
+      const p = el.querySelector('p'); if (!p || !el.isConnected) return;
+      speaker.stop(); speaker.add(p.textContent); speaker.end();
+    }
+    function hide() { if (tip) { tip.remove(); tip = null; } }
+    // голосом: фраза гида попадает в разговор, и репетитор сразу слушает ответ
+    function talk(text) { hide(); chat.push({ role: 'assistant', content: text }); saveChat(); openPanel(); if (canListen) setMode(true); else render(); }
+    async function askVoice(q) {
+      hide(); openPanel();
+      if (!canListen) { ask(q); return; }
+      voiceMode = true; vmBtn.classList.add('on'); vmBtn.setAttribute('aria-pressed', true); voiceBox.hidden = false; form.hidden = true; suggestions();
+      setVoice('thinking', ''); unlockAudio();
+      await ask(q, { voice: true }); await speaker.idle();
+      if (voiceMode && vState !== 'idle') turn();
+    }
+    function show(text, chips = [], o = {}) {
+      if (!o.force && Date.now() - lastAt < 40000) return;
+      if (!panel.hidden) { if (o.inChat) { const d = bubble('assistant', text); scroll(); if (voiceMode && unlocked) { speaker.stop(); speaker.add(text); speaker.end(); } } return; }
+      hide(); lastAt = Date.now();
+      tip = document.createElement('div'); tip.className = 'lt-tip'; tip.setAttribute('role', 'status');
+      const mic = canListen && o.mic !== false ? `<button type="button" class="mic" data-k="mic">🎤 Ответить голосом</button>` : '';
+      tip.innerHTML = `<button type="button" class="x" aria-label="Закрыть">✕</button><p>${esc(text)}</p><div class="row">${mic}${chips.map((c, i) => `<button type="button" data-k="${i}">${esc(c[0])}</button>`).join('')}</div>`;
+      tip.addEventListener('click', e => {
+        const b = e.target.closest('button'); if (!b) return;
+        unlockAudio();
+        if (b.classList.contains('x')) { hide(); speaker.stop(); closes++; return; }
+        if (b.dataset.k === 'mic') return talk(text);
+        const c = chips[+b.dataset.k]; hide(); if (c && c[1]) c[1]();
+      });
+      document.body.appendChild(tip);
+      if (o.el) highlightEl(o.el);
+      if (o.speak !== false) sayAloud(tip);
+    }
+    btn.addEventListener('click', hide);
+    // звук разрешается только после касания страницы
+    addEventListener('pointerdown', e => { if (!e.target.closest('.lt-tip')) unlockAudio(); }, { once: true, capture: true });
+    ['pointerdown', 'keydown', 'input'].forEach(ev => addEventListener(ev, e => { if (!e.target.closest || !e.target.closest('.lt-panel,.lt-tip,.lt-btn')) lastAct = Date.now(); }, { capture: true, passive: true }));
+
+    // ----- лаборатория -----
+    function lab() {
+      const sh = window.LuchShell; if (!sh) return false;
+      const L = (() => { try { return (0, eval)('typeof LESSONS !== "undefined" ? LESSONS : null'); } catch (e) { return null; } })();
+      const info = () => {
+        const i = sh.lessonIdx(), h = document.querySelector('#pane-overview h2'), l = L && L[i];
+        let task = l ? (typeof l.task === 'function' ? l.task() : l.task) : '';
+        if (!task) { const tb = [...document.querySelectorAll('[class*="task"]')].find(e => e.offsetParent && e.textContent.trim().length > 15); task = tb ? tb.textContent.trim() : ''; }
+        // из рамки задания берём только саму задачу: без «Задание · урок 1» и счётчиков после неё
+        task = String(task || '').replace(/\s+/g, ' ').replace(/^Задание\s*·\s*урок\s*\d+\s*/i, '').trim();
+        const sent = task.match(/^.{12,200}?[.!?](?=\s|$)/); if (sent) task = sent[0];
+        return { i, n: L ? L.length : document.querySelectorAll('.lessons .lesson, .lessons button').length, title: h ? h.textContent.trim() : '', task: task.slice(0, 200) };
+      };
+      const taskEl = () => [...document.querySelectorAll('[class*="task"]')].find(e => e.offsetParent && !e.closest('.lt-panel,.lt-tip,#pane-hw') && e.getBoundingClientRect().width > 120);
+      const remember = () => { const x = info(); store.set('luch-last', JSON.stringify({ url: sh.lessonUrl(), title: x.title, at: Date.now() })); };
+      let idleShown = false;
+      function lessonTip(force) {
+        const x = info(); idleShown = false; remember();
+        show(`Урок ${x.i + 1}: «${x.title}». ${x.task ? 'Задача: ' + x.task : 'Попробуй опыт слева.'}`, [['Покажи, с чего начать', () => askVoice('Покажи на странице, с чего начать это задание. Коротко, по одному шагу.')]], { force, el: taskEl() });
+      }
+      // первая лаборатория в жизни — короткая экскурсия в два шага
+      setTimeout(() => {
+        if (!store.get('luch-guide-tour')) {
+          store.set('luch-guide-tour', '1');
+          show('Это лаборатория. Слева — опыт: всё можно двигать руками. В рамке — задание урока.', [['Понятно →', () => {
+            show('Справа: «Теория» — объяснение, «Практика» — управление и расчёты, «ДЗ» — задачи на дом. А я помогаю, если что-то непонятно.', [['Начать урок', () => lessonTip(true)]], { force: true, el: document.querySelector('.ls-tabs') });
+          }]], { force: true, el: taskEl() });
+        } else lessonTip(true);
+      }, 1300);
+      // смена урока
+      const strip = document.querySelector('.lessons'); let lt = 0;
+      if (strip) new MutationObserver(() => { clearTimeout(lt); lt = setTimeout(() => lessonTip(true), 700); }).observe(strip, { attributes: true, subtree: true, attributeFilter: ['aria-current'] });
+      // урок пройден: счётчик «2/5» в шапке вырос
+      const counter = [...document.querySelectorAll('header *')].find(e => !e.children.length && /^\s*\d+\s*\/\s*\d+\s*$/.test(e.textContent));
+      if (counter) {
+        let prev = parseInt(counter.textContent, 10) || 0;
+        new MutationObserver(() => {
+          const m = counter.textContent.match(/(\d+)\s*\/\s*(\d+)/); if (!m) return;
+          const a = +m[1], b = +m[2]; if (a <= prev) { prev = a; return; } prev = a; clearTimeout(lt);
+          if (a >= b) show('Ты прошёл всю тему! 🎉 Выберем следующую?', [['Выбрать тему', () => document.querySelector('.brand').click()], ['Сделать ДЗ', () => sh.openHw()]], { force: true, inChat: true });
+          else show('Отлично, задание выполнено! 🎉 Идём дальше?', [['Следующий урок →', () => { const nx = document.getElementById('nextL') || [...document.querySelectorAll('.lessons .lesson, .lessons button')][info().i + 1]; if (nx) nx.click(); }], ['Сделать ДЗ', () => sh.openHw()]], { force: true, inChat: true });
+        }).observe(counter, { childList: true, characterData: true, subtree: true });
+      }
+      // ученик долго ничего не делает — предлагаем помощь (один раз на урок)
+      setInterval(() => {
+        if (idleShown || closes >= 3 || !panel.hidden || document.hidden || Date.now() - lastAct < 30000) return;
+        idleShown = true;
+        show('Что-то не получается? Подскажу следующий шаг.', [['Подскажи шаг', () => askVoice('Я застрял. Подскажи следующий шаг в задании, коротко.')]], { force: true });
+      }, 5000);
+      return true;
+    }
+
+    // ----- карта предметов (главная) -----
+    function home() {
+      if (!document.getElementById('subjects')) return false;
+      let last = null; try { last = JSON.parse(store.get('luch-last') || 'null'); } catch (e) {}
+      setTimeout(() => {
+        if (last && last.url) return show(`С возвращением! Продолжим урок «${last.title}»?`, [['Продолжить', () => { location.href = last.url; }], ['Выбрать другое', () => gradeAsk()]], { force: true });
+        gradeAsk();
+      }, 1200);
+      function gradeAsk() {
+        show('Привет! Я твой репетитор. В каком ты классе? Подберу, с чего начать.', [['5–6', () => pick(5)], ['7', () => pick(7)], ['8', () => pick(8)], ['9', () => pick(9)], ['10–11', () => pick(10)]], { force: true });
+      }
+      function pick(g) {
+        store.set('luch-grade', g);
+        const nodes = [...document.querySelectorAll('#tree .node')];
+        const gr = n => parseInt((n.querySelector('.nm') || n).textContent, 10) || 0;
+        let cand = nodes.filter(n => gr(n) >= g && /done|part/.test(n.className)).sort((a, b) => gr(a) - gr(b))[0] || nodes.find(n => /done|part/.test(n.className));
+        if (!cand) return;
+        cand.click();
+        const name = (cand.querySelector('.nt') || cand).textContent.trim();
+        const item = matchMedia('(max-width:760px)').matches ? document.querySelector(`#list details[data-id="${cand.dataset.id}"]`) : cand;
+        if (item && item.tagName === 'DETAILS') item.open = true;
+        const go = () => { const a = document.querySelector('#side a.cta') || (item && item.querySelector('a.cta')); if (a) location.href = a.href; };
+        show(`Начни с темы «${name}». Открыть первый урок?`, [['Открыть', go], ['Другой предмет', () => highlightEl(document.getElementById('subjects'))]], { force: true, el: item });
+      }
+      return true;
+    }
+    const startAt = Date.now();
+    (function boot() { if (lab() || home()) return; if (Date.now() - startAt < 6000) setTimeout(boot, 300); })();
+    return { show, hide };
+  })();
+
   if (document.getElementById('tab-overview') && !window.LuchShell) { const sc = document.createElement('script'); sc.src = '/luch/lab-shell.js'; document.head.appendChild(sc); }
 })();
