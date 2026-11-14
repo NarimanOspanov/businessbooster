@@ -23,8 +23,8 @@ window.LUCH_SUBJECTS = {
       { id: 'systems', b: 'alg', g: 7, t: 'Системы уравнений', items: ['Уравнение с двумя переменными', 'Способ подстановки', 'Способ сложения', 'Графический способ'], req: ['expr'], status: 'done', href: '/labs/math-systems/', lessons: 4, doneItems: 4 },
       { id: 'roots', b: 'alg', g: 8, t: 'Квадратные корни', items: ['Иррациональные числа', 'Свойства корней', 'Преобразования с корнями'], req: ['poly'], status: 'done', href: '/labs/math-roots/', lessons: 3, doneItems: 3 },
       { id: 'quad', b: 'alg', g: 8, t: 'Квадратные уравнения', items: ['Дискриминант', 'Теорема Виета', 'Дробно-рациональные уравнения', 'Задачи на движение и работу'], req: ['roots'], status: 'done', href: '/labs/math-quad/', lessons: 4, doneItems: 4 },
-      { id: 'ineq', b: 'alg', g: 9, t: 'Неравенства', items: ['Линейные неравенства', 'Квадратные неравенства', 'Метод интервалов', 'Системы неравенств'], req: ['quad'] },
-      { id: 'seq', b: 'alg', g: 9, t: 'Прогрессии', items: ['Числовые последовательности', 'Арифметическая прогрессия', 'Геометрическая прогрессия', 'Сложные проценты и вклады'], req: ['expr'] },
+      { id: 'ineq', b: 'alg', g: 9, t: 'Неравенства', items: ['Линейные неравенства', 'Квадратные неравенства', 'Метод интервалов', 'Системы неравенств'], req: ['quad'], status: 'done', href: '/labs/math-ineq/', lessons: 4, doneItems: 4 },
+      { id: 'seq', b: 'alg', g: 9, t: 'Прогрессии', items: ['Числовые последовательности', 'Арифметическая прогрессия', 'Геометрическая прогрессия', 'Сложные проценты и вклады'], req: ['expr'], status: 'done', href: '/labs/math-seq/', lessons: 4, doneItems: 4 },
       { id: 'explog', b: 'alg', g: 11, t: 'Степени и логарифмы', items: ['Корень n-й степени', 'Показательная функция', 'Логарифмы', 'Показательные и логарифмические уравнения'], req: ['ineq', 'fquad'] },
 
       { id: 'coord', b: 'fn', g: 6, t: 'Координатная плоскость', items: ['Координаты точки', 'Графики зависимостей', 'Чтение графиков'], req: ['neg'], status: 'done', href: '/labs/math-coord/', lessons: 3, doneItems: 3 },
@@ -86,7 +86,7 @@ window.LUCH_SUBJECTS = {
       { id: 'metals', b: 'inorg', g: 9, t: 'Металлы', items: ['Щелочные металлы', 'Кальций и магний', 'Алюминий', 'Железо', 'Сплавы'], req: ['classes', 'table'], status: 'done', href: '/labs/chem-metals/', lessons: 5, doneItems: 5 },
       { id: 'industry', b: 'inorg', g: 11, t: 'Химическое производство', items: ['Аммиак и серная кислота', 'Металлургия Казахстана', 'Минеральные удобрения'], req: ['nonmet', 'metals', 'kinetics'] },
 
-      { id: 'orgbase', b: 'org', g: 10, t: 'Основы органики', items: ['Почему углерод особенный', 'Строение органических молекул', 'Изомерия', 'Названия веществ'], req: ['bonds'] },
+      { id: 'orgbase', b: 'org', g: 10, t: 'Основы органики', items: ['Почему углерод особенный', 'Строение органических молекул', 'Изомерия', 'Названия веществ'], req: ['bonds'], status: 'done', href: '/labs/chem-orgbase/', lessons: 4, doneItems: 4 },
       { id: 'hydro', b: 'org', g: 10, t: 'Углеводороды', items: ['Алканы', 'Алкены и алкины', 'Арены', 'Нефть и газ'], req: ['orgbase'] },
       { id: 'oxyorg', b: 'org', g: 10, t: 'Спирты, альдегиды, кислоты', items: ['Спирты', 'Альдегиды', 'Карбоновые кислоты', 'Сложные эфиры и жиры'], req: ['hydro'] },
       { id: 'biomol', b: 'org', g: 11, t: 'Молекулы жизни', items: ['Углеводы', 'Аминокислоты и белки', 'Нуклеиновые кислоты'], req: ['oxyorg'] },
@@ -165,14 +165,14 @@ window.LUCH_SUBJECTS = {
       { id: 'python', b: 'prog', g: 7, t: 'Первые программы на Python', items: ['Ввод и вывод', 'Переменные', 'Условия', 'Циклы'], req: ['blocks'], status: 'done', href: '/labs/cs-python/', lessons: 4, doneItems: 4 },
       { id: 'func', b: 'prog', g: 8, t: 'Функции и списки', items: ['Функции', 'Списки', 'Строки', 'Поиск ошибок'], req: ['python'], status: 'done', href: '/labs/cs-func/', lessons: 4, doneItems: 4 },
       { id: 'algos', b: 'prog', g: 9, t: 'Алгоритмы обработки', items: ['Поиск', 'Сортировки', 'Сложность алгоритма', 'Рекурсия'], req: ['func'], status: 'done', href: '/labs/cs-algos/', lessons: 4, doneItems: 4 },
-      { id: 'oop', b: 'prog', g: 10, t: 'Структуры данных и ООП', items: ['Словари и множества', 'Классы и объекты', 'Работа с файлами'], req: ['algos'] },
+      { id: 'oop', b: 'prog', g: 10, t: 'Структуры данных и ООП', items: ['Словари и множества', 'Классы и объекты', 'Работа с файлами'], req: ['algos'], status: 'done', href: '/labs/cs-oop/', lessons: 3, doneItems: 3 },
       { id: 'project', b: 'prog', g: 11, t: 'Свой проект', items: ['Веб-приложение или бот', 'Git и работа в команде', 'Тестирование', 'Презентация проекта'], req: ['oop', 'web'] },
 
       { id: 'binary', b: 'data', g: 6, t: 'Системы счисления', items: ['Двоичная система', 'Перевод чисел', 'Шестнадцатеричная система'], req: ['info'], status: 'done', href: '/informatics/', lessons: 5, doneItems: 3 },
       { id: 'sheets', b: 'data', g: 7, t: 'Электронные таблицы', items: ['Формулы', 'Ссылки на ячейки', 'Диаграммы', 'Сортировка и фильтр'], req: ['pc'], status: 'done', href: '/labs/cs-sheets/', lessons: 4, doneItems: 4 },
       { id: 'logic', b: 'data', g: 8, t: 'Логика', items: ['Высказывания', 'И, ИЛИ, НЕ', 'Таблицы истинности', 'Логические схемы'], req: ['binary'], status: 'done', href: '/labs/cs-logic/', lessons: 4, doneItems: 4 },
       { id: 'db', b: 'data', g: 9, t: 'Базы данных', items: ['Таблицы и связи', 'Запросы SQL', 'Проектирование базы'], req: ['sheets', 'logic'], status: 'done', href: '/labs/cs-db/', lessons: 3, doneItems: 3 },
-      { id: 'analysis', b: 'data', g: 10, t: 'Анализ данных', items: ['Сбор и очистка данных', 'Визуализация', 'Python для данных'], req: ['db', 'func'] },
+      { id: 'analysis', b: 'data', g: 10, t: 'Анализ данных', items: ['Сбор и очистка данных', 'Визуализация', 'Python для данных'], req: ['db', 'func'], status: 'done', href: '/labs/cs-analysis/', lessons: 3, doneItems: 3 },
 
       { id: 'safe', b: 'net', g: 5, t: 'Интернет и безопасность', items: ['Поиск информации', 'Надёжные пароли', 'Цифровой след', 'Как распознать фейк'], req: ['pc'], status: 'done', href: '/labs/cs-safe/', lessons: 4, doneItems: 4 },
       { id: 'networks', b: 'net', g: 8, t: 'Компьютерные сети', items: ['Как устроен интернет', 'IP-адреса и DNS', 'Протоколы'], req: ['binary', 'safe'], status: 'done', href: '/labs/cs-networks/', lessons: 3, doneItems: 3 },
