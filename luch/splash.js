@@ -1,4 +1,4 @@
-// Заставка Open Edu при загрузке страницы: логотип, название, полоска загрузки и
+// Заставка Open Edu AI при загрузке страницы: логотип, название, полоска загрузки и
 // подписи «Загружаем предметы · физика…». Подключается первой строкой <body>,
 // поэтому показывается сразу, ещё до того, как страница нарисовалась.
 (() => {
@@ -27,7 +27,7 @@
     <svg viewBox="0 0 40 40" aria-hidden="true"><g class="ring"><circle cx="20" cy="20" r="17" fill="none" stroke="#26324a" stroke-width="2"/><path d="M20 3a17 17 0 0 1 17 17" fill="none" stroke="#72d4e8" stroke-width="2.4" stroke-linecap="round"/></g>
       <path d="M20 30V19M20 19l-7-7M20 19l7-7M20 24l-5-3M20 24l5-3" stroke="#e8ecf4" stroke-width="2" stroke-linecap="round" fill="none"/>
       <circle cx="13" cy="12" r="2.4" fill="#72d4e8"/><circle cx="27" cy="12" r="2.4" fill="#ffb547"/><circle cx="15" cy="21" r="1.8" fill="#a99cff"/><circle cx="25" cy="21" r="1.8" fill="#ff8a73"/></svg>
-    <h1>OPEN EDU</h1>
+    <h1>OPEN EDU AI</h1>
     <div class="bar"><i></i></div>
     <div class="cap"></div></div>`;
   (document.body || document.documentElement).appendChild(el);
