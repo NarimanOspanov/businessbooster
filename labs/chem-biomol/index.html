@@ -903,6 +903,45 @@ function setLesson(i) {
 }
 
 // for the AI tutor: what is on the screen right now
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-chem-table.js): long molecular models on a stand and a test tube over a burner.
+window.LUCH_REAL = () => {
+  const id = LID(), m = model(), base = { module: 'chem-table' }, hex = s => parseInt(s.slice(1), 16);
+  const run = S.test && S.ph < 1;
+  if (id === 'carbs') {
+    const I = m.I, r = S.test ? carbResult(I, S.test, 1) : null;
+    const short = !S.test ? '' : run ? 'идёт опыт…' : S.test === 'i2' ? (I.helix ? 'сине-фиолетовая: йод в спирали' : I.fiber ? 'не синеет: цепь прямая' : 'не синеет — цвет йода')
+      : I.reducing ? 'красный осадок Cu₂O' : I.suc ? 'синий раствор, Cu₂O нет' : 'чёрный CuO, Cu₂O нет';
+    return { ...base, scene: 'chtb-carbs', help: 'Банка со звеньями — добавить звено, звено на подставке — убрать его и всё после, склянки — опыт с I₂ или Cu(OH)₂',
+      chain: S.chain.slice(), name: I.name, cls: I.cls, f: I.f, M: I.M, helix: I.helix, fiber: I.fiber, test: S.test, run, heat: !!(r && r.heat), ok: !!(r && r.ok),
+      res: short, got: G1.filter(([k]) => S.got[k]).length };
+  }
+  if (id === 'proteins') {
+    const P = m.P, r = S.test ? pepResult(P, S.test, 1) : null;
+    const short = !S.test ? '' : run ? 'идёт опыт…' : S.test === 'biu' ? (P.bonds >= 2 ? 'фиолетовая: связей ' + P.bonds : 'синяя: связей ' + P.bonds + ', мало') : P.arom ? 'жёлтая: есть бензольное кольцо' : 'жёлтой нет: колец нет';
+    return { ...base, scene: 'chtb-pep', help: 'Склянка с аминокислотой — добавить в конец цепи, бусина — убрать её и всё после, реактивы справа — цветная реакция',
+      aa: AA.map(a => ({ s: a.s, k: a.k, col: hex(KCOL[a.k]) })), pep: S.pep.slice(), seq: P.seq, bonds: P.bonds, M: P.M, target: P.target,
+      test: S.test, run, heat: !!(r && r.heat), ok: !!(r && r.ok), res: short, got: m.got };
+  }
+  const N = m.N, md = S.mode;
+  return { ...base, scene: 'chtb-dna', help: md === 'hb' ? 'Посчитайте водородные связи между цепями: «−», «+», «Проверить»' : 'Ступенька спирали — выбрать место, клавиша-основание — поставить, клавиши сверху — режим',
+    mode: md, tpl: S.tpl.slice(), fill: (md === 'hb' ? S.tpl.map(b => PAIR_DNA[b]) : S.fill[md].slice()), want: S.tpl.map(b => (md === 'rna' ? PAIR_RNA : PAIR_DNA)[b]),
+    cur: S.cur, dnaOk: N.dna.ok, ok: md === 'hb' ? !!S.got.hb : N[md].ok, filled: md === 'hb' ? NB : N[md].filled, wrong: md === 'hb' ? 0 : N[md].wrong, hbG: S.hbG, hb: S.got.hb ? N.hb : null, gotDna: !!S.got.dna, bcol: Object.fromEntries(Object.entries(BCOL).map(([k, v]) => [k, hex(v)])) };
+};
+// test progress for the tube colour (read every frame by the scene)
+window.LUCH_REAL.live = () => {
+  const id = LID();
+  if (!S.test || id === 'nucleic') return { ph: 1, L: [] };
+  const r = id === 'carbs' ? carbResult(carbInfo(S.chain), S.test, S.ph) : pepResult(pepInfo(S.pep), S.test, S.ph);
+  return { ph: S.ph, L: r.L };
+};
+window.LUCH_REAL.click = k => {
+  if (/^u-\d+$/.test(k)) return cutChain(+k.slice(2));
+  if (/^r-\d+$/.test(k)) return cutPep(+k.slice(2));
+  if (/^c-\d+$/.test(k)) { if (S.mode === 'hb') return; S.cur = +k.slice(2); renderTools(); update(); return; }
+  if (/^b[ATGCU]$/.test(k)) return putBase(k[1]);
+  act(k);
+};
+
 window.LUCH_CONTEXT = () => {
   const m = model(), L = LESSONS[S.lesson], id = L.id, G = GOALS[id];
   let now = '';

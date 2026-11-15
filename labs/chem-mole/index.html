@@ -978,6 +978,37 @@ function setLesson(i) {
 }
 
 // for the AI tutor: what is on the screen right now
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-chem-table.js): scales, crates of moles, a gas cylinder and bags.
+window.LUCH_REAL = () => {
+  const id = LID(), m = model(), base = { module: 'chem-table' }, r2 = v => Math.round(v * 100) / 100;
+  if (id === 'mole') return { ...base, scene: 'chtb-mole', help: 'Ящик на складе — добавить 1 или ¼ моль, ящик в порции — убрать, клавиши — вещество',
+    f: m.f, n: m.n, F: full1(), Q: quart1(), at: Object.entries(m.at), subs: SUB1, hit: TARG1.some((x, i) => m.found[i] && x.f === m.f && near(x.n, m.n)) };
+  if (id === 'molar') {
+    const found = !!(m.found[m.f] || (m.f === 'H2O' && m.same));
+    return { ...base, scene: 'chtb-molar', help: 'Гирька в лотке — положить на чашу, гирька на чаше — снять, клавиши — вещество в банке',
+      f: m.f, M: m.M, R: r2(m.R), pan: S.pan.slice(), ar: AR, wts: WTS, subs: SUB2, bal: m.bal, same: m.same, found, showM: found };
+  }
+  if (id === 'volume') return { ...base, scene: 'chtb-volume', help: 'Клавиши — добавить или выпустить газ (поршень), мешок — выбрать газ',
+    g: m.g, n: r2(m.n), V: r2(m.V), hit: TARG3.some((x, i) => m.found[i] && x.g === m.g && near(x.n, m.n)), gases: GAS.map(g => ({ g, M: Mof(g) })) };
+  const P = m.P, mass = side => { if (!m.okG) return ''; const ms = side.map(([k, f]) => S.nG * k / m.cg * Mof(f)); return ms.map(x => fmt(x, 1) + ' г').join(' + ') + (ms.length > 1 ? ' = ' + fmt(ms.reduce((a, b) => a + b, 0), 1) + ' г' : ''); };
+  return { ...base, scene: 'chtb-calc', help: 'Клавиши у стопок — ±¼ моль «дано» и «найти», клавиши внизу — задача',
+    pi: S.pi, L: P.L, R: P.R, g: P.g, s: P.s, gm: P.gm, ask: P.ask, cg: m.cg, cs: m.cs, nG: r2(m.nG), nS: r2(m.nS), mG: r2(m.mG), okG: m.okG, okS: m.okS,
+    out: r2(m.out), probs: PROB.map((x, i) => !!S.solved[i]), before: mass(P.L), after: mass(P.R) };
+};
+window.LUCH_REAL.click = k => {
+  if (k === 'tf') return addN1(1);
+  if (k === 'tq') return addN1(0.25);
+  if (k.startsWith('cf-')) return addN1(-1);
+  if (k.startsWith('cq-')) return addN1(-0.25);
+  if (k.startsWith('w-')) return addW(k.slice(2));
+  if (k.startsWith('pw-')) return remW(+k.slice(3));
+  const dv = { 'v-1': -1, 'v-q': -0.25, 'v+q': 0.25, 'v+1': 1 }[k];
+  if (dv !== undefined) { if (S.n3 + dv > NMAX + 1e-9) { toast('Цилиндр рассчитан на 3 моль (67,2 л).'); } return setN3(S.n3 + dv); }
+  if (k === 'g+' || k === 'g-') return setNb('nG', S.nG + (k === 'g+' ? 0.25 : -0.25));
+  if (k === 's+' || k === 's-') return setNb('nS', S.nS + (k === 's+' ? 0.25 : -0.25));
+  act(k);
+};
+
 window.LUCH_CONTEXT = () => {
   const m = model(), L = LESSONS[S.lesson], id = L.id;
   let now = '';

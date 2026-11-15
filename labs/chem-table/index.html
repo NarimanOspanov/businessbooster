@@ -928,6 +928,33 @@ function setLesson(i) {
   const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-chem-table.js): element blocks on a lab tray and a wall stand.
+let r3last = null;
+window.LUCH_REAL = () => {
+  const id = LID(), m = model(), base = { module: 'chem-table' }, r1 = v => Math.round(v * 100) / 100;
+  const els = E.map(e => ({ z: e.z, s: e.s, g: e.g, p: e.p, name: e.name, out: e.out, sh: e.sh }));
+  if (id === 'law') return { ...base, scene: 'chtb-law', help: 'Карточка — разрезать ленту после неё (ещё раз — склеить), клавиши — порядок по Z или по массе',
+    order: m.order, rows: m.rows.map(r => r.map(e => e.z)), place: m.place, cols: m.cols.map(c => c.ok), ok: m.okCols, maxLen: m.maxLen, done: !!S.done.law,
+    els: E.map(e => [e.s, e.m, e.g]) };
+  if (id === 'pg') return { ...base, scene: 'chtb-pg', help: 'Клетка стенда — поставить туда атом-загадку',
+    els, placed: MYST.filter(z => S.placed[z]), last: r3last, found: m.found, total: MYST.length, mi: S.mi + 1, cur: m.cur ? { z: m.cur.z, sh: m.cur.sh } : null };
+  if (id === 'metals') return { ...base, scene: 'chtb-metals', help: 'Банка с краской — выбрать кисть, клетка — раскрасить и поставить образец в проверку тока',
+    els, paint: S.paint, sel: S.sel3, brush: S.brush, painted: m.painted, border: !!(S.done.metals || m.painted === E.length) };
+  const t = m.t;
+  return { ...base, scene: 'chtb-predict', help: 'Клетка-сосед — выбрать (ещё раз — убрать), клавиши — неизвестный элемент и формула оксида',
+    tgt: S.tgt, eka: t.eka, ekaS: t.ekaS, heads: H4, nb: m.nb, ox: m.ox, oxT: m.ox ? oxTxt(m.ox) : '', oxRight: t.ox, solved: m.solved,
+    am: m.am != null ? r1(m.am) : null, ad: m.ad != null ? r1(m.ad) : null,
+    oxes: OXES.map(([f]) => ({ f, t: oxTxt(f) })),
+    cells: X4.map(row => row.map(s => s ? { s, m: D4[s].m, d: D4[s].d, t: s === S.tgt } : null)),
+    real: { s: S.tgt, n: D4[S.tgt].n, m: D4[S.tgt].m, d: D4[S.tgt].d, year: t.year } };
+};
+window.LUCH_REAL.click = k => {
+  if (k.startsWith('cut-')) return toggleCutAfter(+k.slice(4));
+  if (k.startsWith('c-')) { const z = +k.slice(2); if (LID() === 'pg') { if (placeAtom(z)) r3last = z; return; } return paintCell(z); }
+  if (k.startsWith('p-')) return pickNb(k.slice(2));
+  act(k);
+};
+
 // for the AI tutor: what is on the screen right now
 window.LUCH_CONTEXT = () => {
   const m = model(), L = LESSONS[S.lesson], id = L.id;
