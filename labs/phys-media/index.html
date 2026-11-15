@@ -1019,6 +1019,32 @@ function setLesson(i) {
   if (cur) { const a = ls.getBoundingClientRect(), b = cur.getBoundingClientRect(); ls.scrollLeft += b.left - a.left - (a.width - b.width) / 2; }
 }
 
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-media.js): real equipment on a table
+window.LUCH_REAL = () => {
+  const m = model(), id = LID(), r1 = x => Math.round(x * 10) / 10, r2 = x => Math.round(x * 100) / 100;
+  const base = { module: 'media' };
+  if (id === 'metal') return { ...base, scene: 'media-metal', help: 'Спиртовка +10°, азот −10°, проволока — металл, источник — U',
+    mat: m.mat, matName: MET[m.mat].name, t: m.t, ttxt: neg(m.t) + ' °C', U: r1(m.U), Utxt: fmt(m.U, 1) + ' В',
+    I: r2(m.I), Itxt: fmt(m.I, 2) + ' А', Rtxt: fmt(m.R, 2) + ' Ом', ok: m.mat === 'cu' && Math.abs(m.ratio - 1.5) <= 0.02 };
+  if (id === 'semi') return { ...base, scene: 'media-semi', help: 'Банка — примесь, шарик — атом, батарейка ⇄, спиртовка',
+    grid: S.grid.map(k => k === 'Si' ? 's' : k === 'P' ? 'p' : 'b').join(''), sel: S.mode, plusLeft: S.plusLeft, hot: S.hot,
+    tL: m.tL, tR: m.tR, pn: m.pn, mode: m.mode, I: r2(m.I), Itxt: fmtI(m.I) };
+  if (id === 'elec') return { ...base, scene: 'media-elec', help: '▲▼ — ток и время, красная кнопка — пуск, катод — новый',
+    I: r1(S.I), Itxt: fmt(S.I, 1) + ' А', tm: S.tm, running: !!S.run, mass: S.run ? -1 : Math.round(S.mass * 1000) / 1000, runs: S.runs.length };
+  if (id === 'gas') return { ...base, scene: 'media-gas', help: 'Насос, ▲▼ ⇄ на источнике, УФ-лампа, рубильник накала',
+    gas: S.gas, gasTxt: GAS[S.gas].short, U: r2(S.Ug), Utxt: fmt(S.Ug, 2) + ' кВ', ion: S.ion, heat: S.heat, pol: S.pol,
+    regime: m.regime, I: Math.round(m.I * 1e4) / 1e4, Itxt: fmtI(m.I) || '0', rtxt: RG[m.regime] };
+  return null;
+};
+// live values that change every frame (electrolysis run) — read by the scene in kit.onFrame
+window.LUCH_REAL.live = () => { const m = model(); return LID() === 'elec' ? { mass: m.mass, pr: runProgress(performance.now()), running: m.running, tm: S.run ? S.tm * runProgress(performance.now()) : S.tm } : null; };
+window.LUCH_REAL.click = k => {
+  if (k === 'ucycle') { const seq = [0.5, 1.5, 3, 4.5, 6], i = seq.findIndex(v => v > S.U + 1e-9); S.U = seq[i < 0 ? 0 : i]; buildScheme(); update(); return; }
+  if (k === 'gcycle') { act('g:' + GKEYS[(GKEYS.indexOf(S.gas) + 1) % GKEYS.length]); return; }
+  if (/^a\d+$/.test(k)) { if (paint(+k.slice(1))) update(); return; }
+  act(k);
+};
+
 // for the AI tutor: what is on the screen right now
 window.LUCH_CONTEXT = () => {
   const m = model(), Ls = L(), id = Ls.id;

@@ -1021,6 +1021,56 @@ function setLesson(i) {
   const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-magnet.js): the same set-up as real lab equipment
+window.LUCH_REAL = () => {
+  const id = LID(), r2 = x => Math.round(x * 100) / 100, M = { module: 'magnet' };
+  if (id === 'perm') {
+    const ni = nearInfo();
+    return { ...M, scene: 'magnet-perm', help: 'Компас — переставить, конец магнита — «здесь N», банка — опилки',
+      n: S.hidN, cx: Math.round(S.cpx), cy: Math.round(S.cpy), a: r2(needle1()), visL: S.visL, visR: S.visR, ok: S.ansOk, fil: S.filings, lines: S.lines,
+      ntxt: ni.d > 70 ? 'N на север' : ni.toward ? 'N к магниту' : ni.away ? 'N от магнита' : 'вбок' };
+  }
+  if (id === 'wire') {
+    const [bx, by] = Bvec2(), al = alpha2();
+    return { ...M, scene: 'magnet-wire', help: 'Ключ, источник — ток, провод — направление, компас — переставить',
+      on: S.wOn, dir: S.wDir, I: S.wI, x: r2((S.wx - G2.wx) / G2.ppc), y: r2((S.wy - G2.wy) / G2.ppc), a: r2(Math.atan2(by, bx)), fil: S.wFil,
+      atxt: `${fmt(Math.abs(al), 0)}°${al > 0.5 ? ' на восток' : al < -0.5 ? ' на запад' : ''}`, ok: al >= 45 && Math.abs(beta2()) <= 30 };
+  }
+  if (id === 'coil') {
+    const on = S.cOn && S.cI > 0, bc = NI() * (S.core ? 1 : 0.05) * 0.02, dir = nSide3() === 'R' ? 1 : -1;
+    return { ...M, scene: 'magnet-coil', help: 'Нажимайте на детали; щёчка катушки — «здесь N»',
+      on: S.cOn, I: S.cI, N: S.cN, core: S.core, dir: S.cDir, clips: clips3(), a: r2(Math.atan2(-1, on ? dir * bc : 0)),
+      ns: S.cAns === nSide3() && S.cOn ? nSide3() : '' };
+  }
+  if (id === 'motor') return { ...M, scene: 'magnet-motor', help: 'Нажимайте на детали; рамка — толкнуть',
+    on: S.mOn, comm: S.comm, dir: S.mDir, pol: S.pol, I: S.mI };
+  return null;
+};
+// live rotor angle for the motor (the 3D scene turns the frame with the experiment, not on its own)
+window.LUCH_REAL.live = () => ({ phi: S.phi, om: S.om, on: S.mOn && S.mI > 0, rpm: Math.round(rpm4()) });
+window.LUCH_REAL.click = k => {
+  const id = LID(), up = () => { dirty = true; renderTools(); buildScheme(); update(); };
+  if (id === 'perm' && k === 'cmove') {
+    // compass: start → left end → right end → above the middle → start
+    const P = [[120, 320], [146, 205], [374, 205], [260, 140]];
+    let i = P.findIndex(p => Math.hypot(p[0] - S.cpx, p[1] - S.cpy) < 4);
+    const n = P[(i + 1) % P.length]; setCompass1(n[0], n[1]); up(); return;
+  }
+  if (id === 'wire' && k === 'icycle') { S.wI = S.wI >= 5 - 1e-9 ? 0.5 : Math.min(5, Math.floor(S.wI * 2 + 1e-9) / 2 + 0.5); up(); return; }
+  if (id === 'wire' && k === 'ccycle') {
+    // compass on the cardboard: north / east / south / west of the wire at 3 cm, then north at 8 cm
+    const P = [[3, 0], [3, 90], [3, 180], [3, -90], [8, 0]], r = rCm2(), b = beta2();
+    let i = P.findIndex(p => Math.abs(p[0] - r) < 0.05 && Math.abs(((b - p[1] + 540) % 360) - 180) < 1);
+    const n = P[(i + 1) % P.length], a = n[1] * Math.PI / 180;
+    setCompass2(G2.wx + n[0] * G2.ppc * Math.sin(a), G2.wy - n[0] * G2.ppc * Math.cos(a)); up(); return;
+  }
+  if (id === 'coil' && k === 'icycle') { S.cI = S.cI >= 3 - 1e-9 ? 0.5 : Math.min(3, Math.floor(S.cI * 2 + 1e-9) / 2 + 0.5); up(); return; }
+  if (id === 'coil' && k === 'ncycle') { S.cN = S.cN >= 300 ? 50 : S.cN + 50; up(); return; }
+  if (id === 'motor' && k === 'icycle') { S.mI = S.mI >= 3 - 1e-9 ? 0.5 : Math.min(3, Math.floor(S.mI * 2 + 1e-9) / 2 + 0.5); up(); return; }
+  if (id === 'motor' && k === 'nudge') { S.phi += 0.8; S.om = 0; S.omS = 0; dirty = true; update(); return; }
+  act(k);
+};
+
 // for the AI tutor: what is on the screen right now
 window.LUCH_CONTEXT = () => {
   const m = model(), Ls = L(), id = Ls.id;

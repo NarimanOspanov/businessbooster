@@ -946,6 +946,39 @@ window.LUCH_SUGGEST = () => {
   return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
 };
 
+// for the «Как в жизни» 3D view (/luch/real3d.js → scenes in /luch/real3d-ac.js); only slow-changing values here
+window.LUCH_REAL = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  if (id === 'lc') return { scene: 'ac-lc', module: 'ac', help: 'Нажмите на ключ, на C, L или R; кнопки осциллографа — пауза и шаг ⅛T',
+    sw: S.sw, run: S.run, U0: Ls.U0, Ctxt: nf(S.Cu) + ' мкФ', Ltxt: nf(S.Lm) + ' мГн', R: S.R, f: Math.round(m.f), fok: m.f >= 950 && m.f <= 1050 };
+  if (id === 'ac') {
+    const r2 = x => Math.round(x * 100) / 100;
+    return { scene: 'ac-rcl', module: 'ac', help: 'Нажмите на резистор, конденсатор или катушку — подключить; − и + на генераторе — частота',
+      el: S.el, nu: S.nu, U: Ls.U, I: r2(m.I), Itxt: fmt(m.I, 2) + ' А', Xtxt: 'X = ' + nf(Math.round(m.X * 10) / 10) + ' Ом', phi: m.phi,
+      ok: S.el !== 'R' && Math.abs(m.I - 4.4) < 0.05 };
+  }
+  if (id === 'radio') {
+    const tg = Ls.target, la = clamp(m.audio / Ls.mdepth, 0, 1.2), lvl = la < 0.15 ? 0 : la;   // faint far stations are not heard
+    const hear = !S.det ? 'тишина' : lvl < 0.05 ? (m.resp[tg] > 0.5 ? 'ровный ток, тишина' : 'тишина') : m.resp[tg] >= 0.9 ? 'звук станции 2' : m.resp[tg] >= Math.max(m.resp[0], m.resp[2]) ? 'тихо, с шумом' : 'другая станция';
+    return { scene: 'ac-radio', module: 'ac', help: 'Нажмите ◄ ► на приёмнике — настройка, на микрофон — модуляция, на детектор — вкл/выкл',
+      st: Ls.st, tg, nu0: Math.round(m.nu0), resp: Math.round(m.resp[tg] * 100) / 100, mod: S.mod, det: S.det, lvl: Math.round(lvl * 20) / 20, tuned: m.tuned, hear };
+  }
+  return null;
+};
+window.LUCH_REAL.click = k => {
+  if (k === 'sw') return setSw(S.sw === 'bat' ? 'coil' : 'bat');
+  if (k === 'tune-' || k === 'tune+') {   // the receiver knob: one click — 50 kHz, so the stations (600, 1000, 1400 kHz) are reachable
+    const n = radioNu(S.C) / 50, to = (k === 'tune+' ? Math.floor(n + 0.01) + 1 : Math.ceil(n - 0.01) - 1) * 50;
+    return setC(radioC(clamp(to, 500, 1700)));
+  }
+  act(k);
+};
+// fast state for the 3D animation (read every frame, not part of the scene description)
+window.LUCH_REAL.live = () => {
+  if (LID() === 'lc') { const m = model(); return { q: S.q / m.q0, i: S.i / m.Im, hist: S.hist, tt: S.tt, win: LC.win, sw: S.sw, run: S.run }; }
+  return { ph: S.ph };
+};
+
 setLesson(S.lesson);
 fit();
 requestAnimationFrame(loop);
