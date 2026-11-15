@@ -234,7 +234,8 @@
   @media (prefers-reduced-motion:reduce){.lt-dots i,.lt-orb,.lt-mic.rec{animation:none!important}.lt-btn:hover{transform:none}}`;
   const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
 
-  const AV = '<svg class="lt-av" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="17" fill="#0b1019"/><path d="M18 8c2.6 3 2.6 17 0 20c-2.6-3-2.6-17 0-20z" fill="#72d4e8"/><path d="M6 14h12l12 7" stroke="#ffb547" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 22h12l12-7" stroke="#ffb547" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".5"/></svg>';
+  try { let ic = document.querySelector('link[rel~="icon"]'); if (!ic) { ic = document.createElement('link'); ic.rel = 'icon'; document.head.appendChild(ic); } ic.type = 'image/svg+xml'; ic.href = '/luch/owl.svg'; } catch (e) {}
+  const AV = '<svg class="lt-av" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="19.5" fill="#0b1019"/><g transform="translate(3.6 3.4) scale(.82)"><path d="M9.6 14.6 9.2 6.2 15 10.6Q20 9.4 25 10.6L30.8 6.2 30.4 14.6Q34.6 22 31.6 29Q27.6 36 20 36Q12.4 36 8.4 29Q5.4 22 9.6 14.6Z" fill="#ffb547"/><path d="M20 14Q15.2 10.8 10.9 13.4Q7.6 17.2 9.4 21.8Q11.6 25.8 15.9 25.4Q18.5 25.1 20 27.1Q21.5 25.1 24.1 25.4Q28.4 25.8 30.6 21.8Q32.4 17.2 29.1 13.4Q24.8 10.8 20 14Z" fill="#ffd896"/><circle cx="15" cy="18.8" r="5" fill="#fffaf0"/><circle cx="25" cy="18.8" r="5" fill="#fffaf0"/><circle cx="15.6" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="24.4" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="16.6" cy="18.1" r="1" fill="#fff"/><circle cx="25.4" cy="18.1" r="1" fill="#fff"/><path d="M18.6 23.4h2.8L20 26.6z" fill="#ff8a73"/><path d="M10.5 29.6Q15.3 27.4 20 29.7Q24.7 27.4 29.5 29.6V34.6Q24.7 32.6 20 34.8Q15.3 32.6 10.5 34.6Z" fill="#72d4e8"/><path d="M20 29.7V34.8" stroke="#0b1019" stroke-width="1.1"/><path d="M8.2 23.5Q5.6 28.6 9.4 32.6Q11.6 33.2 12.4 31Q10.4 28.4 8.2 23.5Z" fill="#e8962a"/><path d="M31.8 23.5Q34.4 28.6 30.6 32.6Q28.4 33.2 27.6 31Q29.6 28.4 31.8 23.5Z" fill="#e8962a"/><path d="M35 3.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" fill="#86e0a8"/></g></svg>';
   const MIC = '<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="6" y="1.5" width="6" height="10" rx="3" fill="currentColor"/><path d="M3.5 8.5a5.5 5.5 0 0 0 11 0M9 14v2.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>';
   const WAVE = '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 5v4M5 3v8M8 1.5v11M11 4v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
   const SPK = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1 4.5h2.5L7 1.5v9L3.5 7.5H1z" fill="currentColor"/><path d="M9 3.5a3.5 3.5 0 0 1 0 5" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg>';
@@ -612,6 +613,7 @@
     const a = bubble('assistant', ''); a.innerHTML = '<span class="lt-dots"><i></i><i></i><i></i></span>'; scroll();
     let context = '';
     try { context = (window.LUCH_CONTEXT && window.LUCH_CONTEXT()) || ''; } catch (e) {}
+    try { const sh = window.LuchShell; if (sh && sh.whatNext) context += '\n' + sh.whatNext(); } catch (e) {}
     const feed = opts.voice ? sentenceFeeder() : null;
     let text = '', drawn = 0; const fired = new Set();
     const elements = collectElements();
@@ -819,7 +821,11 @@
         new MutationObserver(() => {
           const m = counter.textContent.match(/(\d+)\s*\/\s*(\d+)/); if (!m) return;
           const a = +m[1], b = +m[2]; if (a <= prev) { prev = a; return; } prev = a; clearTimeout(lt);
-          if (a >= b) show('Ты прошёл всю тему! 🎉 Выберем следующую?', [['Выбрать тему', () => document.querySelector('.brand').click()], ['Сделать ДЗ', () => sh.openHw()]], { force: true, inChat: true });
+          if (a >= b) {
+            const n = sh.nextTopic && sh.nextTopic();
+            show('Ты прошёл всю тему! 🎉 ' + (n && !n.map ? 'Дальше — «' + n.t + '». Идём?' : 'Выберем следующую на карте?'),
+              [[n && !n.map ? 'Следующая тема →' : 'К карте предметов', () => (sh.goNext ? sh.goNext() : document.querySelector('.brand').click())], ['Сделать ДЗ', () => sh.openHw()]], { force: true, inChat: true });
+          }
           else show('Отлично, задание выполнено! 🎉 Идём дальше?', [['Следующий урок →', () => { const nx = document.getElementById('nextL') || [...document.querySelectorAll('.lessons .lesson, .lessons button')][info().i + 1]; if (nx) nx.click(); }], ['Сделать ДЗ', () => sh.openHw()]], { force: true, inChat: true });
         }).observe(counter, { childList: true, characterData: true, subtree: true });
       }

@@ -415,5 +415,45 @@
   setTimeout(() => { startCard(); prep(); }, 300);
   if (lessonsBox) { let t2 = 0; new MutationObserver(() => { clearTimeout(t2); t2 = setTimeout(() => { stopStory(); storyIdle(); startCard(); prep(); }, 400); }).observe(lessonsBox, { attributes: true, subtree: true, attributeFilter: ['aria-current'] }); }
 
-  window.LuchShell = { lessonIdx, lessonUrl, openHw, openTab, startPending: () => startShown, storyPlaying: () => !!st };
+  // ---------- после последнего урока — следующая тема предмета (или карта) ----------
+  // Темы берём из тех же данных, что и карта: PHYS_TOPICS на главной и /physics/subjects-data.js.
+  let nextTopic; // undefined — ещё не знаем, null — тем дальше нет, иначе { t, href, subj }
+  const here = location.pathname.replace(/index\.html$/, '');
+  const isLast = () => cards().length > 0 && lessonIdx() >= cards().length - 1;
+  const findNext = () => Promise.all([fetch('/').then(r => r.text()), fetch('/physics/subjects-data.js').then(r => r.text())]).then(([home, data]) => {
+    const groups = [];
+    const a = home.indexOf('const PHYS_TOPICS'), b = home.indexOf('const STATUS', a);
+    if (a > 0) groups.push(['phys', home.slice(a, b > a ? b : undefined)]);
+    data.split(/\n {2}(\w+): \{/).forEach((part, i, arr) => { if (i % 2 === 1) groups.push([part, arr[i + 1] || '']); });
+    for (const [subj, txt] of groups) {
+      const list = [...txt.matchAll(/\{ id: '[\w-]+'[^\n]*?\bt: '([^']+)'[^\n]*?href: '([^']+)'/g)].map(m => ({ t: m[1], href: m[2], subj }));
+      const k = list.findIndex(x => x.href === here);
+      if (k >= 0) return list[k + 1] || { t: '', href: '/#' + subj, subj, map: true };
+    }
+    return null;
+  }).catch(() => null);
+  const goNext = () => { const n = nextTopic; location.href = n ? n.href : '/'; };
+  const nextBtn = document.getElementById('nextL');
+  function syncNext() {
+    if (!nextBtn) return;
+    if (!isLast()) { nextBtn.classList.remove('ls-next-topic'); nextBtn.removeAttribute('title'); return; }
+    if (nextBtn.disabled) nextBtn.disabled = false;
+    nextBtn.classList.add('ls-next-topic');
+    const n = nextTopic, label = n && !n.map ? 'Следующая тема: ' + n.t : 'К карте предметов';
+    nextBtn.title = label; nextBtn.setAttribute('aria-label', label);
+  }
+  if (nextBtn) {
+    new MutationObserver(syncNext).observe(nextBtn, { attributes: true, attributeFilter: ['disabled'] });
+    nextBtn.addEventListener('click', e => { if (!isLast()) return; e.preventDefault(); e.stopImmediatePropagation(); goNext(); }, true);
+    findNext().then(n => { nextTopic = n; syncNext(); });
+    syncNext();
+  }
+  // подсказка наставнику: что будет после этого урока
+  const whatNext = () => {
+    if (!isLast()) return 'Дальше в этой теме есть следующий урок (кнопка › внизу).';
+    const n = nextTopic;
+    return 'Это последний урок темы. ' + (n && !n.map ? 'Кнопка › внизу ведёт на следующую тему: «' + n.t + '».' : 'Кнопка › внизу ведёт на карту предметов — там можно выбрать новую тему.');
+  };
+
+  window.LuchShell = { lessonIdx, lessonUrl, openHw, openTab, whatNext, nextTopic: () => nextTopic, goNext, startPending: () => startShown, storyPlaying: () => !!st };
 })();
