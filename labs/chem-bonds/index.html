@@ -1125,6 +1125,55 @@ window.LUCH_CONTEXT = () => {
     `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Веди ученика наводящими вопросами, а не готовыми ответами.`,
   ].join('\n');
 };
+// «Как в жизни»: учебные модели (шаростержневой набор, решётки на подставках) и образцы веществ — luch/real3d-chem-mol.js
+window.LUCH_REAL = () => {
+  const id = LID(), m = model(), base = { module: 'chem-mol' };
+  if (id === 'covalent') {
+    const neg = m.polar ? m.at.reduce((p, a) => a.E.chi > p.E.chi ? a : p).i : -1;
+    return { ...base, scene: 'chmo-cov', help: 'Нажмите на атом — его неспаренный электрон уйдёт в общую пару. Сзади — другие вещества',
+      mol: m.M.id, f: m.M.f, name: m.M.name, st: m.M.st, complete: m.complete, polar: m.polar, neg, sel: S.sel,
+      atoms: m.at.map(a => ({ s: a.s, v: a.E.v, u: a.E.u, around: a.around, ok: a.ok })), links: m.bonds.map(b => ({ a: b.a, b: b.b, n: b.n })),
+      mols: MOLS.map((x, i) => ({ id: x.id, f: x.f, done: !!S.built[x.id], cur: i === S.mol })) };
+  }
+  if (id === 'ionic') {
+    return { ...base, scene: 'chmo-ion', help: 'Нажмите на металл — он отдаст внешний электрон. Банки сзади — другое вещество',
+      cmp: S.cmp, f: m.C.f, name: m.C.name, complete: m.complete, moved: m.moved,
+      atoms: m.at.map(a => ({ s: a.s, q: a.q, outer: a.outer, metal: a.A.metal, ok: a.ok })),
+      cmps: CMPS.map((x, i) => ({ id: x.id, f: x.f, done: !!S.built2[x.id], cur: i === S.cmp })) };
+  }
+  if (id === 'metallic') {
+    return { ...base, scene: 'chmo-met', help: 'Ключ — включить ток, молоток — сдвинуть слой, спиртовка и ±100° — нагреть медь',
+      metal: m.metal, volt: S.volt, temp: S.temp, I: Math.round(m.I), shift: Math.round(S.shift / ST3 * 10) / 10, cracked: S.cracked };
+  }
+  const tt = m.test, s = m.s;
+  return { ...base, scene: 'chmo-lat', help: 'Образец спереди — в тигель; печь, лампа и молоток — испытать; модель решётки сзади — положить туда',
+    sub: S.sub, s: { id: s.id, name: s.name, f: s.f, tm: s.tm }, melted: m.melted, heat: S.heat,
+    tm: tt.tm !== undefined ? tt.tm : null, lampTested: tt.lampAt === S.sub + ':' + (m.melted ? 'l' : 's'), lamp: !!tt.lamp && tt.lampAt === S.sub + ':' + (m.melted ? 'l' : 's'),
+    hitK: tt.hit ? (s.type === 'met' ? 'flat' : s.id === 'diamond' ? 'none' : 'crumb') : null, hitT: Math.round(S.hitT),
+    placed: m.placed, subs: SUBST.map((x, i) => ({ id: x.id, short: x.short, f: x.f, placed: S.placed[i] || null, cur: i === S.sub })) };
+};
+// values that change every frame (furnace temperature)
+window.LUCH_REAL.live = () => LID() === 'lattices' ? { T: S.T, heat: S.heat } : null;
+window.LUCH_REAL.click = k => {
+  if (/^at\d$/.test(k)) {
+    const i = +k.slice(2), m = modelCov(), nbr = m.M.links.filter(([p, q]) => p === i || q === i).map(([p, q]) => p === i ? q : p);
+    const j = nbr.find(x => m.at[x].unp > 0 && m.at[i].unp > 0) ?? nbr[0];
+    if (j !== undefined) tryBond(i, j);
+    return;
+  }
+  if (/^io\d$/.test(k)) {
+    const i = +k.slice(2), m = modelIon(), A = m.at[i];
+    if (A.A.metal) { autoTransfer(i); return; }
+    const mt = m.at.filter(b => b.A.metal && b.give > 0).sort((p, q) => Math.abs(p.x - A.x) - Math.abs(q.x - A.x))[0];
+    if (mt) transfer(mt.i, i); else toast(A.need > 0 ? 'У металла не осталось внешних электронов.' : `У ${ionName(A.s, A.q)} уже 8 электронов на внешнем слое.`);
+    return;
+  }
+  if (k === 't+' || k === 't-') {
+    if (S.sample !== 'metal') { toast('Нагревать имеет смысл медь: от температуры зависит её сопротивление.'); return; }
+    S.temp = clamp(S.temp + (k === 't+' ? 100 : -100), 20, 520); buildScheme(); update(); return;
+  }
+  act(k);
+};
 window.LUCH_SUGGEST = () => {
   const L = LESSONS[S.lesson], done = S.done[L.id];
   const q = { covalent: 'Почему у азота связь тройная, а у хлора одинарная?', ionic: 'Почему натрий отдаёт электрон, а хлор принимает?', metallic: 'Почему горячий провод хуже проводит ток?', lattices: 'Почему соль плавится при 801 °C, а лёд при 0 °C?' }[L.id];
