@@ -147,14 +147,20 @@
   const ls = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
 
   const css = `
-  .lt-btn{position:fixed;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:50;display:flex;align-items:center;gap:10px;background:#e8ecf4;color:#0b1019;border:0;border-radius:999px;padding:10px 18px 10px 10px;font:600 14px/1 "Golos Text",system-ui,sans-serif;cursor:pointer;box-shadow:0 10px 30px -8px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.08);text-align:left}
+  .lt-btn{position:fixed;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:50;display:flex;align-items:center;flex-direction:row-reverse;gap:0;background:#e8ecf4;color:#0b1019;border:0;border-radius:999px;padding:5px;font:500 13.5px/1.3 "Golos Text",system-ui,sans-serif;cursor:pointer;box-shadow:0 10px 30px -8px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.08);text-align:left;max-width:calc(100vw - 36px);transition:transform .15s}
   .lt-btn:hover{transform:translateY(-1px)}
-  .lt-btn .lt-av{width:34px;height:34px}
-  .lt-btn small{display:block;font:500 11px/1.2 "IBM Plex Mono",monospace;color:#4a5570;margin-top:3px}
-  .lt-panel{position:fixed;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:51;width:min(400px,calc(100vw - 36px));min-height:240px;max-height:min(620px,calc(100vh - 36px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)));display:flex;flex-direction:column;background:#121a28;border:1px solid #26324a;border-radius:18px;box-shadow:0 24px 60px -12px rgba(0,0,0,.75);color:#e8ecf4;font:15px/1.5 "Golos Text",system-ui,sans-serif;overflow:hidden}
-  .lt-head{display:flex;align-items:center;gap:8px;padding:12px 10px 12px 14px;border-bottom:1px solid #26324a}
-  .lt-head .lt-av{width:36px;height:36px;flex:none}
-  .lt-head b{display:block;font-size:14.5px}
+  .lt-btn .lt-av{width:44px;height:44px;flex:none}
+  .lt-btn .lt-bt{display:none;padding:0 6px 0 12px;max-width:270px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .lt-btn:not(.tip-open) .lt-bt{display:none}
+  .lt-btn .lt-dot{position:absolute;top:3px;right:3px;width:11px;height:11px;border-radius:50%;background:#ff8a3c;box-shadow:0 0 0 2px #e8ecf4;display:none}
+  .lt-btn.has-tip .lt-dot{display:block;animation:lt-dotp 1.6s ease-in-out infinite}
+  @keyframes lt-dotp{50%{transform:scale(1.25)}}
+  .lt-panel{position:fixed;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:51;width:min(360px,calc(100vw - 36px));min-height:180px;max-height:min(480px,calc(100vh - 36px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)));display:flex;flex-direction:column;background:#121a28;border:1px solid #26324a;border-radius:18px;box-shadow:0 24px 60px -12px rgba(0,0,0,.75);color:#e8ecf4;font:15px/1.5 "Golos Text",system-ui,sans-serif;overflow:hidden}
+  .lt-head{display:flex;align-items:center;gap:8px;padding:7px 7px 7px 10px;border-bottom:1px solid #26324a}
+  .lt-head .lt-av{width:28px;height:28px;flex:none}
+  .lt-head b{display:block;font-size:14px}
+  .lt-head .lt-ib{width:30px;padding:0;justify-content:center;border-color:transparent}
+  .lt-head .lt-ib:hover{border-color:#26324a}
   .lt-head span{display:block;font:500 11px/1.3 "IBM Plex Mono",monospace;color:#8b96ad}
   .lt-head .lt-sp{flex:1;min-width:0}
   .lt-ib{background:none;border:1px solid #26324a;border-radius:8px;height:30px;padding:0 9px;color:#8b96ad;cursor:pointer;font:500 12px "Golos Text",sans-serif;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
@@ -230,9 +236,9 @@
     .lt-board{left:0;right:0;top:0;border-radius:0 0 16px 16px}
     body.lt-board-on .lt-panel{max-height:min(48vh,420px)}
     .lt-bf{display:none}
-    .lt-panel{right:0;left:0;bottom:0;width:100%;max-height:min(86vh,660px);border-radius:18px 18px 0 0;padding-bottom:env(safe-area-inset-bottom,0px)}
-    .lt-btn{padding:7px;opacity:.94;bottom:calc(92px + env(safe-area-inset-bottom,0px))}
-    .lt-btn>span{display:none}
+    .lt-panel{right:0;left:0;bottom:0;width:100%;max-height:min(70vh,560px);border-radius:18px 18px 0 0;padding-bottom:env(safe-area-inset-bottom,0px)}
+    .lt-btn{opacity:.96;bottom:calc(92px + env(safe-area-inset-bottom,0px))}
+    .lt-btn .lt-bt{max-width:calc(100vw - 110px)}
     .lt-ib .lt-tx{display:none}
   }
   @media (prefers-reduced-motion:reduce){.lt-dots i,.lt-orb,.lt-mic.rec{animation:none!important}.lt-btn:hover{transform:none}}`;
@@ -253,13 +259,13 @@
 
   const btn = document.createElement('button');
   btn.className = 'lt-btn'; btn.type = 'button'; btn.setAttribute('aria-label', 'Спросить наставника');
-  btn.innerHTML = `${AV}<span>Спросить наставника<small>поможет с заданием</small></span>`;
+  btn.innerHTML = `${AV}<span class="lt-bt"></span><i class="lt-dot"></i>`; btn.title = 'Наставник: поможет с заданием';
   const panel = document.createElement('section');
   panel.className = 'lt-panel'; panel.hidden = true; panel.setAttribute('aria-label', 'ИИ-наставник');
   panel.innerHTML = `
-    <div class="lt-head">${AV}<div class="lt-sp"><b>Наставник</b><span>видит экран и твои действия</span></div>
+    <div class="lt-head">${AV}<div class="lt-sp"><b>Наставник</b></div>
       <button class="lt-ib" id="lt-vm" type="button" aria-pressed="false" title="Разговор голосом" hidden>${WAVE}<span class="lt-tx">Голосом</span></button>
-      <button class="lt-ib" id="lt-bd" type="button" title="Доска: рисовать и показывать наставнику">✎<span class="lt-tx">Доска</span></button>
+      <button class="lt-ib" id="lt-bd" type="button" title="Доска: рисовать и показывать наставнику" aria-label="Доска">✎</button>
       <button class="lt-ib" id="lt-close" type="button" aria-label="Свернуть">✕</button></div>
     <div class="lt-log" id="lt-log" aria-live="polite"></div>
     <div class="lt-sug" id="lt-sug"></div>
@@ -302,7 +308,12 @@
   function boardBtn(d, text) { const bs = split(text, true).boards; if (!bs.length) return; const b = document.createElement('button'); b.type = 'button'; b.className = 'lt-say'; b.textContent = '✎ Показать на доске'; b.onclick = () => bs.forEach((x, i) => board.draw(x, i > 0)); d.appendChild(b); }
 
   let busy = false, ctrl = null, voiceMode = false;
+  let tipChips = [];
   function suggestions() {
+    if (tipChips.length) {
+      sug.innerHTML = tipChips.map((c, i) => `<button type="button" data-tc="${i}">${esc(c[0])}</button>`).join('') + '<button type="button" data-ant="1">💡 Помоги</button>';
+      sug.hidden = busy; return;
+    }
     let list = [];
     try { list = (window.LUCH_SUGGEST && window.LUCH_SUGGEST()) || []; } catch (e) {}
     if (!list.length) list = ['Объясни, что сейчас происходит в опыте', 'С чего начать?'];
@@ -313,7 +324,7 @@
     log.innerHTML = '';
     if (!chat.length) {
       const h = document.createElement('div'); h.className = 'lt-hello';
-      h.innerHTML = '<b>Привет! Я твой наставник 🙂</b>Я вижу экран и что ты делаешь. Нажми «💡 Помоги» — подскажу, что делать дальше, или просто спроси голосом.';
+      h.innerHTML = '<b>Привет! Я твой наставник 🙂</b>Вижу экран и что ты делаешь. Спроси голосом или нажми «💡 Помоги».';
       log.appendChild(h);
     }
     chat.forEach(m => bubble(m.role, m.show || m.content, m.role === 'assistant'));
@@ -770,6 +781,7 @@
   const close = () => { setMode(false); if (dict) dict.abort(); panel.hidden = true; btn.hidden = false; btn.focus(); };
   // голос в первую очередь: кнопка сразу открывает разговор голосом (если ученик сам не выбрал текст)
   btn.addEventListener('click', () => {
+    if (guide && guide.takeTip()) return;
     open(); unlockAudio();
     if (canListen && ls.get('luch-tutor-mode') !== 'text') setMode(true, true);
     anticipate();
@@ -777,7 +789,12 @@
   $('#lt-close').addEventListener('click', close);
 
   panel.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
-  sug.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.ant) anticipate(); else ask(b.textContent); });
+  sug.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.tc) { const c = tipChips[+b.dataset.tc]; tipChips = []; suggestions(); if (c && c[1]) c[1](); return; }
+    tipChips = [];
+    if (b.dataset.ant) anticipate(); else ask(b.textContent);
+  });
   form.addEventListener('submit', e => {
     e.preventDefault(); const q = inp.value, voice = dictated; dictated = false;
     inp.value = ''; inp.style.height = '';
@@ -813,7 +830,6 @@
       const p = el.querySelector('p'); if (!p || !el.isConnected) return;
       speaker.stop(); speaker.add(p.textContent); speaker.end();
     }
-    function hide() { if (tip) { tip.remove(); tip = null; } }
     // голосом: фраза гида попадает в разговор, и репетитор сразу слушает ответ
     function talk(text) { hide(); chat.push({ role: 'assistant', content: text }); saveChat(); openPanel(); if (canListen) setMode(true); else render(); }
     async function askVoice(q) {
@@ -824,35 +840,43 @@
       await ask(q, { voice: true }); await speaker.idle();
       if (voiceMode && !micOff) turn();
     }
+    let pend = null; // подсказка, ждущая открытия панели
     function show(text, chips = [], o = {}) {
       try { if (window.LuchTutorNote) window.LuchTutorNote('наставник показал подсказку: «' + String(text).slice(0, 140) + '»'); } catch (e) {}
       if (!o.force && Date.now() - lastAt < 40000) return;
-      if (!panel.hidden) { if (o.inChat) { const d = bubble('assistant', text); scroll(); if (voiceMode && unlocked) { speaker.stop(); speaker.add(text); speaker.end(); } } return; }
-      hide(); lastAt = Date.now();
-      tip = document.createElement('div'); tip.className = 'lt-tip'; tip.setAttribute('role', 'status');
-      const mic = canListen && o.mic !== false ? `<button type="button" class="mic" data-k="mic">🎤 Ответить голосом</button>` : '';
-      // сам наставник вслух не говорит — только по кнопке «Послушать»
-      const listen = `<button type="button" data-k="say" aria-label="Послушать">🔊</button>`;
-      tip.innerHTML = `<button type="button" class="x" aria-label="Закрыть">✕</button><p>${esc(text)}</p><div class="row">${mic}${chips.map((c, i) => `<button type="button" data-k="${i}">${esc(c[0])}</button>`).join('')}${listen}</div>`;
-      tip.addEventListener('click', e => {
-        const b = e.target.closest('button'); if (!b) return;
-        unlockAudio();
-        if (b.classList.contains('x')) { hide(); closes++; return; }
-        if (b.dataset.k === 'say') { speaker.stop(); speaker.add(tip.querySelector('p').textContent); speaker.end(); return; }
-        if (b.dataset.k === 'mic') return talk(text);
-        const c = chips[+b.dataset.k]; hide(); if (c && c[1]) c[1]();
-      });
-      document.body.appendChild(tip);
+      if (!panel.hidden) {
+        if (o.inChat) { bubble('assistant', text); chat.push({ role: 'assistant', content: text }); saveChat(); tipChips = chips; suggestions(); scroll(); if (voiceMode && unlocked) { speaker.stop(); speaker.add(text); speaker.end(); } }
+        return;
+      }
+      lastAt = Date.now();
+      pend = { text, chips };
+      btn.querySelector('.lt-bt').textContent = text;
+      btn.classList.add('has-tip', 'tip-open');
+      btn.setAttribute('aria-label', 'Наставник: ' + text);
       if (o.el) highlightEl(o.el);
     }
-    btn.addEventListener('click', hide);
+    function hide() { pend = null; btn.classList.remove('has-tip', 'tip-open'); btn.setAttribute('aria-label', 'Наставник'); }
+    // нажали на совёнка с подсказкой: она — первое сообщение, её кнопки — варианты ответа, наставник её проговаривает
+    function takeTip() {
+      if (!pend) return false;
+      const { text, chips } = pend; hide();
+      chat.push({ role: 'assistant', content: text }); saveChat();
+      tipChips = chips; open(); unlockAudio();
+      if (canListen && ls.get('luch-tutor-mode') !== 'text') {
+        setMode(true, true); setVoice('speaking', '');
+        speaker.stop(); speaker.add(text); speaker.end();
+        speaker.idle().then(() => { if (voiceMode && !micOff && !busy) turn(); });
+      }
+      return true;
+    }
+
     // звук разрешается только после касания страницы
     addEventListener('pointerdown', e => { if (!e.target.closest('.lt-tip')) unlockAudio(); }, { once: true, capture: true });
     // любое действие в интерфейсе убирает облачко (и его озвучку), чтобы оно не мешало
     ['pointerdown', 'keydown', 'input'].forEach(ev => addEventListener(ev, e => {
       if (e.target.closest && e.target.closest('.lt-panel,.lt-tip,.lt-btn')) return;
       lastAct = Date.now();
-      if (tip) { hide(); if (panel.hidden) speaker.stop(); }
+      if (pend) btn.classList.remove('tip-open');
     }, { capture: true, passive: true }));
 
     // ----- лаборатория -----
@@ -934,7 +958,7 @@
     }
     const startAt = Date.now();
     (function boot() { if (lab() || home()) return; if (Date.now() - startAt < 6000) setTimeout(boot, 300); })();
-    return { show, hide, talk };
+    return { show, hide, talk, takeTip };
   })();
 
   if (document.getElementById('tab-overview') && !window.LuchShell) { const sc = document.createElement('script'); sc.src = '/luch/lab-shell.js'; document.head.appendChild(sc); }
