@@ -1011,6 +1011,38 @@ function setLesson(i) {
   if (cur) { const a = st.getBoundingClientRect(), b = cur.getBoundingClientRect(); st.scrollLeft += (b.left - a.left) - (a.width - b.width) / 2; }
 }
 
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-wave.js): the same set-up as real lab equipment
+window.LUCH_REAL = () => {
+  const id = LID(), m = model(), M = { module: 'wave' }, r2 = x => Math.round(x * 100) / 100, r4 = x => Math.round(x * 1e4) / 1e4;
+  if (id === 'disp') return { ...M, scene: 'wopt-prism', help: 'Осветитель — i +5° · призма — крон/флинт · экран — другой свет',
+    inc: S.inc, mode: S.mode, gname: GLASS[S.glass].name, pr: PR, p1: [P1.x, P1.y], scr: [SCR.x, SCR.y0, SCR.y1],
+    rays: m.rays.map(r => ({ l: r.lam, c: wlColor(r.lam), p: r.pts.map(q => [r1(q.x), r1(q.y)]), o: r.out ? [r1(r.out.p.x), r1(r.out.p.y), r4(r.out.d.x), r4(r.out.d.y)] : null, ok: r.ok })),
+    ok: m.ok, dr: m.red.ok ? r2(m.red.dev) : null, dv: m.vio.ok ? r2(m.vio.dev) : null, seen: ['white', 'red', 'violet'].filter(k => S.seen[k]).length, done: !!S.done.disp };
+  if (id === 'interf') return { ...M, scene: 'wopt-young', help: 'Лазер — λ +10 нм · щели — d +0,05 мм · экран — L +0,1 м · датчик — +1 мм',
+    lam: S.lam, col: wlColor(S.lam), d: S.d, L: S.L, px: S.px, a: SLIT_A, dx: r2(m.dx), k: r2(m.k), I: Math.round(m.I * 100), done: !!S.done.interf };
+  if (id === 'diffr') return { ...M, scene: 'wopt-grating', help: 'Лазер — другой · решётка — N +100 · труба — +1° · винт — +0,1°',
+    las: S.laser, lam: m.lam, col: wlColor(m.lam), N: S.N, tel: S.tel, B: Math.round(m.B * 100),
+    o: m.o.filter(q => Math.abs(q.phi) <= 80).map(q => [q.k, r2(q.phi)]), found: S.found, done: !!S.done.diffr };
+  return { ...M, scene: 'wopt-polar', help: 'Поляроид на столе — вставить/убрать · оправы — повернуть на 15°',
+    mid: S.mid, a2: S.a2, a3: S.a3, I1: m.I1, I2: r1(m.I2), I3: r1(m.I3), done: !!S.done.polar };
+};
+window.LUCH_REAL.click = k => {
+  if (k === 'lamp') { const v = Math.floor(S.inc / 5) * 5 + 5; S.inc = v > 85 ? 5 : v; update(); return; }
+  if (k === 'prism') { act(S.glass === 'crown' ? 'g-flint' : 'g-crown'); return; }
+  if (k === 'mode') { const L = ['white', 'red', 'green', 'violet']; act('m-' + L[(L.indexOf(S.mode) + 1) % L.length]); return; }
+  if (k === 'laser') { S.lam = S.lam >= 700 ? 400 : S.lam + 10; update(); return; }
+  if (k === 'plate') { S.d = S.d >= 0.5 ? 0.1 : Math.round((S.d + 0.05) * 100) / 100; update(); return; }
+  if (k === 'screen') { S.L = S.L >= 3 ? 1 : r1(S.L + 0.1); update(); return; }
+  if (k === 'probe') { const v = Math.floor(S.px + 1e-6) + 1; S.px = v > 14 ? 0 : v; update(); return; }
+  if (k === 'las') { const L = ['red', 'green', 'x']; act('las-' + L[(L.indexOf(S.laser) + 1) % L.length]); return; }
+  if (k === 'N') { S.N = S.N >= 600 ? 100 : S.N + 100; update(); return; }
+  if (k === 't1') { const v = Math.floor(S.tel + 1e-6) + 1; S.tel = v > 75 ? 0 : v; update(); return; }
+  if (k === 'tf') { const v = r1(S.tel + 0.1); S.tel = v > 75 ? 0 : v; update(); return; }
+  if (k === 'p1') { toast('Первый поляроид закреплён: его ось вертикальна.'); return; }
+  if (k === 'p2' || k === 'p3') { const a = k === 'p2' ? 'a2' : 'a3'; S[a] = (Math.floor(S[a] / 15) * 15 + 15) % 180; update(); return; }
+  act(k);
+};
+
 // for the AI tutor: what is on the screen right now
 window.LUCH_CONTEXT = () => {
   const m = model(), L = LESSONS[S.lesson], id = L.id;
