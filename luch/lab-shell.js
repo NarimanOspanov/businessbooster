@@ -281,8 +281,8 @@
   }
   function storyIdle() {
     const reel = reelBtn();
-    story.innerHTML = `<button type="button" class="play" data-a="story"><i>▶</i><span><b>${reel ? 'Теория: видео и рассказ с картинками' : 'Теория: рассказ с картинками'}</b><small>что это · зачем нужно · как работает · немного истории</small></span></button>` +
-      (reel ? `<div class="acts" style="display:flex;gap:6px;margin-top:10px"><button class="ls-btn" data-a="reel">▶ Смотреть видео</button><button class="ls-btn ghost" data-a="story">Послушать теорию</button></div>` : '');
+    story.innerHTML = `<button type="button" class="play" data-a="story"><i>▶</i><span><b>Объясни за минуту</b><small>картинки и голос · что это, зачем, как работает</small></span></button>` +
+      (reel ? `<div class="acts" style="display:flex;gap:6px;margin-top:10px"><button class="ls-btn" data-a="reel">▶ Смотреть видео</button><button class="ls-btn ghost" data-a="story">Объясни за минуту</button></div>` : '');
   }
   // Плеер «Теории»: картинка на раздел + голос + подпись. Пауза доступна всегда.
   const imgUrl = i => '/api/tutor/story/img?k=' + encodeURIComponent(storyKey() + '|' + LANG2) + '&i=' + i;
@@ -388,7 +388,7 @@
     if (i >= secs.length) { // конец
       journal(j => { j.theoryDone = true; });
       el.classList.add('done');
-      txt.innerHTML = '<b>Теория пройдена</b><p>Теперь самое интересное — попробуй сам в опыте.</p><div class="end"><button class="ls-btn main" data-a="practice">Теперь попробуй сам →</button><button class="ls-btn ghost" data-a="again">Послушать ещё раз</button></div>';
+      txt.innerHTML = '<b>Теория пройдена</b><p>Теперь самое интересное — попробуй сам в опыте.</p><div class="end"><button class="ls-btn main" data-a="practice">Теперь попробуй сам →</button><button class="ls-btn ghost" data-a="again">Посмотреть ещё раз</button></div>';
       return stPaint();
     }
     el.classList.remove('done');
@@ -475,7 +475,7 @@
     const w = document.createElement('div'); w.className = 'ls-start'; w.setAttribute('role', 'dialog'); w.setAttribute('aria-label', 'Начало урока');
     w.innerHTML = `<div class="card"><div class="k">Урок ${n} из ${total}</div><h3>${esc(h)}</h3>
       <p>Сначала — интересная теория: что это, зачем нужно и как работает. Потом попробуешь сам в опыте, а в конце закрепим домашним заданием.</p>
-      <div class="acts">${reel ? '<button class="ls-btn main" data-a="reel">▶ Смотреть видео</button>' : ''}<button class="ls-btn ${reel ? '' : 'main'}" data-a="story">▶ Слушать теорию · 1 мин</button><button class="ls-btn ghost" data-a="practice">Сразу к практике</button></div></div>`;
+      <div class="acts">${reel ? '<button class="ls-btn main" data-a="reel">▶ Смотреть видео</button>' : ''}<button class="ls-btn ${reel ? '' : 'main'}" data-a="story">▶ Объясни за минуту</button><button class="ls-btn ghost" data-a="practice">Сразу к практике</button></div></div>`;
     const close = () => { w.remove(); startShown = false; };
     w.addEventListener('click', e => {
       if (e.target === w) return close();
