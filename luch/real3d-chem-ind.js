@@ -400,7 +400,7 @@
     });
 
     // ---- экран оператора: график выхода от температуры ----
-    const sg = new T.Group(); at(sg, 47, 0, -22, g); sg.rotation.y = -0.35;
+    const sg = new T.Group(); at(sg, 47, 0, -22, g); sg.rotation.y = 0.3;
     at(box(3, 1, 6, C.DARK), 0, B + 0.5, 0, sg);
     at(cyl(0.6, 12, C.DARK, { edges: false }), 0, B + 6, 0, sg);
     at(box(32, 22, 1.4, 0x1f2533), 0, B + 22, 0, sg);
@@ -427,8 +427,594 @@
 
     // ---- подписи ----
     tag(v3(cx, topY + 6, cz), nh3 ? 'Колонна синтеза' : 'Контактный аппарат', `${fmt(d.out, 1)} % · равновесие ${fmt(d.xeq, 1)} %`, d.ok);
-    tag(v3(px - 26, 17, pz - 4), 'Манометр', `${d.P} атм`);
-    tag(v3(px - 12, 17, pz - 4), 'Термометр', `${d.T} °C`);
+    tag(v3(px - 20, 17.5, pz - 4), 'Манометр · термометр', `${d.P} атм · ${d.T} °C`);
     tag(v3(tx, B + 5, tz), 'Катализатор', d.cat ? (nh3 ? 'Fe — в колонне' : 'V₂O₅ — в аппарате') : 'на лотке, не загружен', !d.cat);
+  };
+
+  // =====================================================================================
+  // ===== «Металлургия Казахстана»: карта-рельеф с флажками городов, слитки металлов, макет цеха выбранного металла =====
+  SC['chin-metal'] = (kit, d) => {
+    const { T, at, box, cyl, mesh, keep, tag, clickable, toon, C } = kit, h = H(kit), v3 = h.v3, v2 = h.v2;
+    const g = new T.Group(); at(g, 0, 0, 10);
+    const mx = lon => -62 + (lon - 46.6) * 1.95, mz = lat => -42 + (55.4 - lat) * 2.7;
+    const MT = s => d.metals.find(x => x.s === s);
+    const cityName = id => (d.cities.find(c => c.id === id) || {}).name || '';
+    // ---- карта ----
+    at(box(87, 3, 49, C.WOOD2), -22.5, 1.5, -20.5, g);
+    const water = 0x4f9fd8, TOP = 4.6;
+    const sea = new T.Shape(); [[46.7, 46.5], [48.6, 46.6], [49.1, 46.4], [51.2, 47.0], [53.2, 46.2], [53.0, 45.3], [51.0, 45.0], [51.3, 44.5], [50.3, 44.4], [51.3, 43.2], [52.8, 42.9], [52.4, 41.7], [52.2, 40.6], [46.7, 40.6]]
+      .forEach(([lo, la], i) => i ? sea.lineTo(mx(lo), -mz(la)) : sea.moveTo(mx(lo), -mz(la)));
+    const seaM = mesh(new T.ExtrudeGeometry(sea, { depth: 0.3, bevelEnabled: false }), water, { edges: false }); seaM.rotation.x = -Math.PI / 2; at(seaM, 0, 3, 0, g);
+    const shape = new T.Shape(); d.kz.forEach(([lo, la], i) => i ? shape.lineTo(mx(lo), -mz(la)) : shape.moveTo(mx(lo), -mz(la)));
+    const land = mesh(new T.ExtrudeGeometry(shape, { depth: 1.6, bevelEnabled: false }), 0xd8c58a, { edges: true, edgeAngle: 60 }); land.rotation.x = -Math.PI / 2; at(land, 0, 3, 0, g);
+    // горы на юго-востоке и востоке
+    [[78.5, 43.4, 3.2], [80.2, 43.2, 2.6], [76.6, 43.5, 2.4], [84.5, 49.4, 3], [86, 49.2, 2.4], [82.8, 49.0, 2]].forEach(([lo, la, s], i) => {
+      at(cyl(s * 0.9, s * 1.3, 0x9a8a6a, { r2: 0.1, seg: 7 }), mx(lo), TOP + s * 0.65, mz(la), g);
+      at(cyl(s * 0.32, s * 0.45, 0xf4f6f8, { r2: 0.05, seg: 7, edges: false }), mx(lo), TOP + s * 1.3 - s * 0.22, mz(la), g);
+    });
+    // озеро Балхаш и Иртыш
+    const lake = mesh(new T.CylinderGeometry(1, 1, 0.3, 28), water, { edges: false }); lake.scale.set(6.5, 1, 1.2); lake.rotation.y = 0.22; at(lake, mx(76), TOP + 0.05, mz(46.3), g);
+    const irt = [[86.2, 47.6], [84, 48.6], [82.6, 49.95], [80.2, 50.4], [78.5, 51.4], [76.95, 52.29], [75.5, 53.3], [74.5, 54.1], [73.6, 54.9]].map(([lo, la]) => v3(mx(lo), TOP + 0.15, mz(la)));
+    at(new T.Mesh(keep(new T.TubeGeometry(new T.CatmullRomCurve3(irt), 60, 0.4, 6)), h.ownMat(water)), 0, 0, 0, g);
+    h.sign(g, -60, -2.5, 6.2, 8, 2, [{ t: 'Каспий', w: 500 }], { bg: '#dcecf8' });
+    // ---- города: флажок, табличка, мини-завод у верно размещённого металла ----
+    const OFF = { ast: [-4.6, -2.6], tem: [3.6, 2.6], pav: [3.4, -2.6], bal: [-3.5, 2.6], jez: [0, 3.2], ukg: [1, 3.2], akt: [0, 3.2], atr: [0, 3.2], alm: [0, 3.2] };
+    const sel = d.sel && !d.mp[d.sel] ? d.sel : null;
+    d.cities.forEach(c => {
+      const x = mx(c.lon), z = mz(c.lat), on = Object.keys(d.mp).filter(s => d.mp[s] === c.id);
+      const pg = new T.Group(); at(pg, x, TOP, z, g);
+      at(cyl(0.28, 4.4, 0x3a4256, { edges: false, hull: false }), 0, 2.2, 0, pg);
+      const fl = box(2.4, 1.5, 0.15, on.length ? 0x2fbf5a : sel ? 0xffb547 : 0xe8ecf4, { edges: true }); fl.rotation.y = AZ; at(fl, Math.sin(AZ + Math.PI / 2) * 1.2, 3.7, Math.cos(AZ + Math.PI / 2) * 1.2, pg);
+      at(h.ball(0.55, 0x1b1610, { hull: false }), 0, 0.2, 0, pg);
+      const hit = h.hitBox(5, 7, 5); at(hit, 0, 3, 0, pg); clickable(hit, 'city-' + c.id);
+      const o = OFF[c.id] || [0, 3];
+      h.sign(g, x + o[0] * 1.15, z + o[1] * 1.1, TOP + 2.4, 10.5, 2.4, [{ t: c.name, w: 600 }], { post: false, bg: on.length ? '#d9f5e2' : '#fffaf0' });
+      on.forEach((s, i) => {
+        const M = MT(s), fx = x - 2.8 - i * 3.6, fz = z + 0.6;
+        at(box(2.8, 2, 2.2, 0x6b7690), fx, TOP + 1, fz, g);
+        at(cyl(0.35, 4, 0x8a5a48, { edges: false }), fx + 0.8, TOP + 2, fz - 0.6, g);
+        at(box(1.8, 0.8, 1, M.c, { matOpt: { emissive: M.c, emissiveIntensity: 0.2 } }), fx, TOP + 2.4, fz + 0.2, g);
+        h.smoke(g, fx + 0.8, TOP + 4.2, fz - 0.6, { n: 4, size: 1.6, rise: 5, spread: 1, op: 0.45, speed: 0.3, seed: i + x });
+      });
+    });
+    // ---- слитки-карточки металлов ----
+    d.metals.forEach((M, i) => {
+      const x = -54 + i * 13.5, z = 12, placed = !!d.mp[M.s], isSel = d.sel === M.s;
+      const sg = new T.Group(); at(sg, x, 0, z, g);
+      at(box(11.5, 1.2, 9, isSel ? 0xfff4dc : 0xe8ecf4), 0, 0.6, 0, sg);
+      const ing = mesh(new T.CylinderGeometry(1.8, 2.5, 2.1, 4), M.c, { edges: true, matOpt: { emissive: M.c, emissiveIntensity: 0.12 } });
+      ing.rotation.y = Math.PI / 4; ing.scale.set(1.5, 1, 1); at(ing, 0, 2.25, -1.4, sg);
+      if (isSel && !kit.reduce) kit.onFrame((dt, t) => { ing.position.y = 3.6 + 0.6 * Math.sin(t * 3); });
+      if (isSel) h.ring(sg, 0, 1.3, -1.4, 4.4);
+      const pl = h.label(10.4, 3.6, [{ t: `${M.s} · ${M.name.split(' ')[0]}`, s: 0.7 }, { t: placed ? '✓ ' + cityName(d.mp[M.s]) : 'руда ' + M.ore, s: 0.62, w: 500, c: placed ? '#1d7a3e' : '#4a556c' }], { bg: placed ? '#d9f5e2' : '#fffaf0' });
+      pl.rotation.x = -0.75; at(pl, 0, 2.2, 2.8, sg);
+      const hit = h.hitBox(11.5, 6, 9); at(hit, 0, 3, 0, sg); clickable(hit, 'mc-' + M.s);
+    });
+    // ---- макет цеха выбранного металла ----
+    const S0 = d.sel || 'Fe', M0 = MT(S0), placed0 = d.mp[S0];
+    at(box(38, 2, 52, 0x8d97a6), 44, 1, -12, g);
+    const B = 2, gr = new T.Group(); at(gr, 0, 0, 0, g);
+    const lbl = (x, z, y, txt) => h.sign(gr, x, z, y, 12, 2.6, [{ t: txt, w: 600 }], { bg: '#fffaf0' });
+    const molten = (x, y, z, r) => { at(cyl(r, 0.35, 0xff8a2a, { edges: false, hull: false, matOpt: { emissive: 0xff6a1a, emissiveIntensity: 0.9 } }), x, y, z, gr); at(h.glow(0xff8a3a, r * 4, 0.55), x, y + 1, z, gr); };
+    const ladle = (x, z, s = 1) => {
+      const pts = [v2(0, 0), v2(3 * s, 0), v2(3.7 * s, 5 * s), v2(4.1 * s, 5.4 * s), v2(3.9 * s, 5.6 * s)];
+      at(mesh(new T.LatheGeometry(pts, 24), 0x3a4256, { edges: false, hull: true, matOpt: { side: T.DoubleSide } }), x, B + 1.2, z, gr);
+      at(box(8 * s, 1.2, 6 * s, C.DARK), x, B + 0.6, z, gr);
+      molten(x, B + 1.2 + 4.8 * s, z, 3.5 * s);
+    };
+    const bath = (x, z, w, dd, sol, plates) => {
+      at(box(w, 4, dd, 0x4a5568), x, B + 2, z, gr);
+      at(box(w - 1, 0.3, dd - 1, sol, { edges: false, matOpt: { transparent: true, opacity: 0.85, emissive: sol, emissiveIntensity: 0.15 } }), x, B + 3.7, z, gr);
+      [-1, 1].forEach(k => { const b = cyl(0.35, w, 0xd8894e, { edges: false }); b.rotation.z = Math.PI / 2; at(b, x, B + 6.2, z + k * (dd / 2 - 0.6), gr); });
+      for (let i = 0; i < plates.n; i++) { const an = i % 2 === 0; at(box(an ? 0.5 : 0.25, 4.8, dd - 1.8, an ? plates.a : plates.c, { edges: true }), x - w / 2 + 1.4 + i * (w - 2.8) / (plates.n - 1), B + 4, z, gr); }
+    };
+    const stack = (x, z, col, n = 3) => { for (let l = 0; l < n; l++) for (let k = 0; k < 3; k++) { const b = box(l % 2 ? 1.8 : 5, 1, l % 2 ? 5 : 1.8, col, { matOpt: { emissive: col, emissiveIntensity: 0.1 } }); at(b, x + (l % 2 ? (k - 1) * 1.9 : 0), B + 0.5 + l, z + (l % 2 ? 0 : (k - 1) * 1.9), gr); } };
+    const acidTower = (x, z) => { const t = h.vessel(gr, x, z, 3.2, 18, 0xc9d1dc, { y0: B + 2 }); lbl(x, z + 5, 6, 'SO₂ → H₂SO₄'); return t; };
+    let mainTop = 20, mainAt = v3(40, 0, -24), proc = '';
+    if (S0 === 'Fe') {
+      proc = 'Доменный цех и сталь';
+      const pts = [v2(0, 0), v2(6, 0), v2(6, 4), v2(7.2, 11), v2(6.2, 22), v2(3.8, 31), v2(3.8, 33), v2(0, 33)];
+      const fx = 36, fz = -26;
+      at(mesh(new T.LatheGeometry(pts, 32), 0x8a5a48, { edges: false, hull: true }), fx, B, fz, gr);
+      [[4, 6.3], [11, 7.5], [18, 6.9], [26, 5.2]].forEach(([y, r]) => { const t = mesh(new T.TorusGeometry(r, 0.35, 6, 36), 0x3a4256, { edges: false }); t.rotation.x = Math.PI / 2; at(t, fx, B + y, fz, gr); });
+      at(cyl(2.4, 3, C.DARK, { r2: 3.4 }), fx, B + 34.5, fz, gr);
+      [-1, 1].forEach(k => h.pipe(gr, [v3(fx + k * 2.4, B + 33, fz), v3(fx + k * 2.4, B + 39, fz), v3(fx + k * 5, B + 39, fz)], 0.7, 0x7d8697));
+      const bus = mesh(new T.TorusGeometry(8.6, 0.8, 8, 36), 0x7d8697, { edges: false }); bus.rotation.x = Math.PI / 2; at(bus, fx, B + 8, fz, gr);
+      // воздухонагреватели
+      [[55, -34], [60, -27]].forEach(([x, z]) => h.vessel(gr, x, z, 2.8, 18, 0xa8a090, { y0: B, bottom: false, domeK: 0.8 }));
+      h.pipe(gr, [v3(55, B + 14, -34), v3(46, B + 14, -32), v3(fx + 6, B + 8, fz - 4)], 0.8, 0x7d8697);
+      // наклонный мост и скип с шихтой
+      const a0 = v3(50, B, -14), a1 = v3(fx + 2, B + 35, fz + 1);
+      [-1, 1].forEach(k => h.rodAB(gr, v3(a0.x + k * 0.8, a0.y, a0.z + k * 1.2), v3(a1.x + k * 0.8, a1.y, a1.z + k * 1.2), 0.3, C.DARK));
+      for (let i = 1; i < 6; i++) { const p = a0.clone().lerp(a1, i / 6); at(cyl(0.25, p.y - B, C.DARK, { edges: false }), p.x, B + (p.y - B) / 2, p.z, gr); }
+      const skip = new T.Group(); gr.add(skip);
+      at(box(3, 2, 2.8, 0x3a4256), 0, 0.8, 0, skip);
+      for (let i = 0; i < 6; i++) at(h.ball(0.5, [0x2a2a2a, 0x9a5a3a, 0xe8e2d0][i % 3], { hull: false, shadow: false }), (rnd(i) - 0.5) * 2, 1.9, (rnd(i + 3) - 0.5) * 2, skip);
+      kit.onFrame((dt, t) => { const ph = kit.reduce ? 0.4 : (t * 0.12) % 1, k = ph < 0.55 ? ease(ph / 0.55) : 1 - ease((ph - 0.55) / 0.45); skip.position.lerpVectors(a0, a1, k * 0.94); skip.position.y += 0.6; });
+      lbl(44, -18.5, 6, 'шихта: руда, кокс, известняк');
+      // лётка → желоб → ковш
+      const tp = v3(fx + Math.sin(AZ) * 6.3, B + 2.4, fz + Math.cos(AZ) * 6.3);
+      h.rodAB(gr, tp, v3(41.5, B + 6.6, -12.5), 0.55, 0xff8a2a, { matOpt: { emissive: 0xff6a1a, emissiveIntensity: 0.9 }, hull: false });
+      ladle(42, -11);
+      lbl(34, -7, 5, 'ковш: чугун 1450 °C');
+      // конвертер: качается, из горловины искры
+      const cv = new T.Group(); at(cv, 55, B + 8, -8, gr);
+      [-1, 1].forEach(k => { at(box(1.4, 8, 2, 0x3a4256), 55 + k * 6, B + 4, -8, gr); });
+      const cvb = new T.Group(); cv.add(cvb);
+      at(mesh(new T.LatheGeometry([v2(0, -6), v2(3.6, -6), v2(4.8, -2), v2(4.8, 2), v2(3, 5.5), v2(2.1, 6.5), v2(1.9, 6.4)], 28), 0x5a6378, { edges: false, hull: true, matOpt: { side: T.DoubleSide } }), 0, 0, 0, cvb);
+      const tr = cyl(0.8, 12.2, C.DARK, { edges: false }); tr.rotation.z = Math.PI / 2; at(tr, 0, 0, 0, cv);
+      at(h.glow(0xffc070, 7, 0.7), 0, 6.8, 0, cvb);
+      const sparks = []; for (let i = 0; i < 12; i++) { const s = new T.Mesh(keep(new T.SphereGeometry(0.28, 6, 4)), h.basic(0xffd27a)); cvb.add(s); sparks.push({ s, a: rnd(i + 70) * 6.28, v: 3 + rnd(i + 71) * 4, ph: rnd(i + 72) }); }
+      kit.onFrame((dt, t) => {
+        cvb.rotation.x = kit.reduce ? 0.15 : 0.25 * Math.sin(t * 0.6);
+        sparks.forEach(p => { const k = kit.reduce ? p.ph : (t * 0.9 + p.ph) % 1; p.s.position.set(Math.cos(p.a) * k * 3, 6.6 + k * p.v * 1.4 - k * k * 4, Math.sin(p.a) * k * 3); });
+      });
+      at(cyl(0.25, 10, C.STEEL, { edges: false }), 55, B + 21, -8, gr);
+      lbl(55, -1, 4.5, 'конвертер: чугун → сталь');
+      // прокатный стан: раскалённая полоса бежит сквозь валки
+      [34, 44].forEach(x => {
+        [-3.2, 3.2].forEach(dz => at(box(1.4, 8, 1.4, 0x3a4256), x, B + 4, 6 + dz, gr));
+        at(box(1.6, 1.4, 8, 0x3a4256), x, B + 8.6, 6, gr);
+        [B + 2.4, B + 4.8].forEach(y => { const r = cyl(1.1, 5.2, C.STEEL, { seg: 18 }); r.rotation.x = Math.PI / 2; at(r, x, y, 6, gr); });
+      });
+      const strip = box(10, 0.6, 4, 0xff7a3a, { edges: false, matOpt: { emissive: 0xff5a1a, emissiveIntensity: 0.7 } }); at(strip, 30, B + 3.6, 6, gr);
+      kit.onFrame((dt, t) => { const k = kit.reduce ? 0.4 : (t * 0.15) % 1; strip.position.x = 26 + k * 32; strip.scale.y = strip.position.x > 44 ? 0.5 : strip.position.x > 34 ? 0.75 : 1; strip.scale.x = strip.position.x > 44 ? 1.5 : 1; });
+      const coil = cyl(3, 4, 0x9aa4b4, { seg: 24 }); coil.rotation.x = Math.PI / 2; at(coil, 58, B + 3, 6, gr);
+      lbl(39, 12.5, 4.2, 'прокат: лист и рулон');
+      mainTop = 40; mainAt = v3(fx, 0, fz);
+    } else if (S0 === 'Cu') {
+      proc = 'Медеплавильный завод';
+      at(box(18, 8, 9, 0x9a4f3a), 37, B + 4, -26, gr);
+      for (let i = 0; i < 3; i++) { at(box(2.4, 2, 0.3, 0xffa040, { edges: false, matOpt: { emissive: 0xff7a2a, emissiveIntensity: 1 } }), 31 + i * 6, B + 3, -21.4, gr); at(h.glow(0xff8a3a, 6, 0.4), 31 + i * 6, B + 3, -20.8, gr); }
+      at(cyl(1.2, 8, 0x6e3527), 30, B + 12, -28, gr);
+      h.pipe(gr, [v3(44, B + 8, -27), v3(44, B + 14, -27), v3(55, B + 14, -33), v3(55, B + 20, -33)], 0.8, 0x7d8697);
+      acidTower(55, -33);
+      lbl(37, -18.5, 5, 'плавка Cu₂S + O₂');
+      ladle(31, -12, 0.8);
+      bath(46, -6, 22, 7, 0x3f8fd9, { n: 11, a: 0xc8743e, c: 0xe8a070 });
+      bath(46, 4, 22, 7, 0x3f8fd9, { n: 11, a: 0xc8743e, c: 0xe8a070 });
+      lbl(46, 10.5, 4.2, 'электролиз: медь 99,99 %');
+      stack(58, -14, 0xe8925a, 3);
+      mainTop = 16; mainAt = v3(37, 0, -26);
+    } else if (S0 === 'Al') {
+      proc = 'Электролизный цех';
+      at(box(6, 9, 6, 0x3b4a66), 30, B + 4.5, -28, gr); lbl(30, -22, 11.5, 'выпрямитель тока');
+      // опора ЛЭП
+      const px = 57, pz = -33, legs = [[-2, -2], [2, -2], [-2, 2], [2, 2]];
+      legs.forEach(([a, b]) => h.rodAB(gr, v3(px + a, B, pz + b), v3(px + a * 0.25, B + 22, pz + b * 0.25), 0.25, 0x5a6378));
+      at(box(10, 0.5, 0.5, 0x5a6378), px, B + 20, pz, gr);
+      h.pipe(gr, [v3(px - 5, B + 19.6, pz), v3(30, B + 11, -28)], 0.15, 0x1b1610);
+      for (let i = 0; i < 4; i++) {
+        const x = 32 + i * 7.5, z = -12;
+        at(box(6.4, 4, 9, 0x5a6378), x, B + 2, z, gr);
+        at(box(5.6, 0.3, 8.2, 0x2a2420, { edges: false }), x, B + 4.05, z, gr);
+        at(h.glow(0xff8a3a, 6, 0.4), x, B + 4.4, z, gr);
+        [-2, 2].forEach(dz => { at(box(4, 2.6, 2.6, 0x2a2a2a), x, B + 5.2, z + dz, gr); at(cyl(0.25, 4, C.STEEL, { edges: false }), x, B + 8.4, z + dz, gr); });
+        at(box(6.4, 0.6, 0.6, 0xc6ccd6), x, B + 10.4, z, gr);
+      }
+      const bb = cyl(0.5, 26, 0xc6ccd6, { edges: false }); bb.rotation.z = Math.PI / 2; at(bb, 43, B + 10.6, -12, gr);
+      h.pipe(gr, [v3(30, B + 9, -28), v3(30, B + 10.6, -12), v3(30.5, B + 10.6, -12)], 0.5, 0xc6ccd6);
+      lbl(43, -4.5, 4.2, 'Al₂O₃ в криолите, 950 °C');
+      ladle(34, 4, 0.75);
+      stack(52, 5, 0xc8d0dc, 4);
+      lbl(52, 12, 4.2, 'алюминий в чушках');
+      mainTop = 14; mainAt = v3(43, 0, -12);
+    } else if (S0 === 'Zn') {
+      proc = 'Цинковый завод';
+      const rf = h.vessel(gr, 33, -28, 4, 12, 0x9a6a50, { y0: B + 2 });
+      at(h.glow(0xff8a3a, 10, 0.5), 33, B + 8, -24, gr);
+      lbl(33, -20.5, 5, 'обжиг ZnS → ZnO');
+      h.pipe(gr, [v3(33, rf.top, -28), v3(33, rf.top + 3, -28), v3(55, rf.top + 3, -33), v3(55, B + 22, -33)], 0.8, 0x7d8697);
+      acidTower(55, -33);
+      // бак выщелачивания с мешалкой
+      at(cyl(4.2, 7, 0x7d8697, { seg: 28 }), 44, B + 3.5, -18, gr);
+      at(cyl(3.8, 0.3, 0xcfe6f0, { edges: false, hull: false }), 44, B + 6.9, -18, gr);
+      const st = new T.Group(); at(st, 44, B + 6, -18, gr);
+      at(cyl(0.2, 6, C.STEEL, { edges: false }), 0, 1.5, 0, st); at(box(4, 0.3, 0.8, C.STEEL), 0, -1, 0, st);
+      at(box(2, 1.8, 2, 0x3b4a66), 44, B + 11, -18, gr);
+      if (!kit.reduce) kit.onFrame((dt, t) => { st.rotation.y = t * 3; });
+      lbl(44, -12.5, 4.5, 'ZnO + H₂SO₄ → ZnSO₄');
+      bath(44, -2, 22, 7, 0xcfe6f0, { n: 11, a: 0x4a4f5a, c: 0x9fb4d9 });
+      lbl(44, 4.2, 4.2, 'электролиз ZnSO₄');
+      stack(57, 9, 0x9fb4d9, 3);
+      mainTop = 18; mainAt = v3(44, 0, -18);
+    } else {
+      proc = 'Завод ферросплавов';
+      for (let i = 0; i < 26; i++) at(h.ball(0.9 + rnd(i) * 0.5, i % 3 ? 0x2f3a33 : 0x1b1d20, { hull: false }), 31 + (rnd(i + 5) - 0.5) * 7, B + 0.6 + rnd(i + 6) * 2 * (1 - Math.abs(rnd(i + 5) - 0.5)), -10 + (rnd(i + 7) - 0.5) * 7, gr);
+      lbl(31, -4, 4.5, 'хромит FeCr₂O₄ + кокс');
+      at(cyl(9, 7, 0x9a4f3a, { seg: 30 }), 44, B + 3.5, -24, gr);
+      at(cyl(9.4, 1.4, 0x5a6378, { seg: 30 }), 44, B + 7.7, -24, gr);
+      const arcs = [];
+      [0, 2.09, 4.19].forEach(a => {
+        const x = 44 + Math.cos(a) * 4, z = -24 + Math.sin(a) * 4;
+        at(cyl(1.3, 16, 0x2a2a2a, { seg: 16 }), x, B + 14, z, gr);
+        at(box(3.4, 1.6, 3.4, 0xd8b04a), x, B + 18, z, gr);
+        const gl = h.glow(0x9fd0ff, 7, 0.6); at(gl, x, B + 7.4, z, gr); arcs.push(gl);
+      });
+      at(new T.PointLight(0xbfe0ff, 30, 50, 1.3), 44, B + 12, -24, gr);
+      if (!kit.reduce) kit.onFrame((dt, t) => arcs.forEach((a, i) => { a.material.opacity = 0.4 + 0.35 * Math.abs(Math.sin(t * 17 + i * 2)); }));
+      lbl(44, -13.5, 5, 'руднотермическая печь');
+      ladle(55, -6, 0.8);
+      for (let i = 0; i < 14; i++) at(h.ball(1 + rnd(i + 30) * 0.4, 0xa8b0bc, { hull: false, seg: 6, seg2: 4 }), 50 + (rnd(i + 31) - 0.5) * 6, B + 0.7, 7 + (rnd(i + 32) - 0.5) * 5, gr);
+      lbl(50, 12, 4.2, 'феррохром');
+      mainTop = 22; mainAt = v3(44, 0, -24);
+    }
+    // табличка макета
+    const yt = (S0 === 'Fe' ? 0 : 0);
+    h.sign(g, 33, 17, 8 + yt, 15, 4.6, [{ t: `${M0.s} · ${proc}`, s: 0.62 }, { t: M0.eq, s: 0.6, w: 600 }, { t: placed0 ? M0.plant : 'город — найдите на карте', s: 0.5, w: 500, c: placed0 ? '#1d7a3e' : '#8a5a20' }], { pw: 384 });
+    const mOut = d.ore * M0.Mm / M0.Mo;
+    tag(v3(mainAt.x, mainTop + 3, mainAt.z + 10), proc, `${d.ore} т ${M0.ore} → ${fmt(mOut, 1)} т ${M0.s}`);
+    tag(v3(-22, 8, -30), 'Карта Казахстана', `на месте ${Object.keys(d.mp).length} из ${d.metals.length} · ошибок ${d.wrong}`, Object.keys(d.mp).length === d.metals.length);
+  };
+
+  // =====================================================================================
+  // ===== «Удобрения: считаем дозу»: грядка пшеницы, мешки N/P/K, весы с совком и кнопками, бочка Либиха =====
+  SC['chin-fert'] = (kit, d) => {
+    const { T, at, box, cyl, mesh, keep, tag, clickable, toon, C } = kit, h = H(kit), v3 = h.v3;
+    const g = new T.Group(); at(g, 0, 0, 8);
+    // память: колосья растут плавно от прежней высоты
+    const prevY = mem.fert ? mem.fert.cur() : d.y, t0 = now();
+    mem.fert = { cur: () => prevY + (d.y - prevY) * ease(clamp((now() - t0) / 1.4, 0, 1)) };
+    const yNow = () => mem.fert.cur();
+    // ---- грядка ----
+    const fx = -12, fz = -20, FW = 64, FD = 30;
+    at(box(FW + 3, 5, FD + 3, 0x7a5a3a), fx, 2.5, fz, g);
+    at(box(FW, 0.6, FD, 0x4a3727, { edges: false }), fx, 5.1, fz, g);
+    for (let r = 0; r < 5; r++) at(box(FW - 2, 0.5, 1.6, 0x5a4330, { edges: false, shadow: false }), fx, 5.5, fz - FD / 2 + 3 + r * (FD - 6) / 4, g);
+    // гранулы удобрений на почве: сколько внесено и каких
+    const tot = d.F.reduce((s, F) => s + (d.fert[F.id] || 0), 0);
+    let gi = 0;
+    d.F.forEach(F => { const n = Math.round((d.fert[F.id] || 0) / 6); for (let i = 0; i < n && gi < 160; i++, gi++) at(h.ball(0.32, F.c, { hull: false, shadow: false, seg: 6, seg2: 4 }), fx + (rnd(gi + 500) - 0.5) * (FW - 3), 5.55, fz + (rnd(gi + 600) - 0.5) * (FD - 3), g); });
+    // пшеница: 5 рядов по 12 растений
+    const over = d.over.length > 0, stemCol = d.ok ? 0x5fbf5a : over ? 0xb8a040 : d.y < 0.6 ? 0xb8b26a : 0x8ccf7a, earCol = over ? 0xc9a24a : 0xe6c63a;
+    const plants = [];
+    const stemG = keep(new T.CylinderGeometry(0.16, 0.24, 1, 6)), earG = keep(new T.SphereGeometry(0.55, 10, 8)), leafG = keep(new T.BoxGeometry(0.15, 1, 0.7));
+    const stemM = h.ownMat(stemCol), earM = h.ownMat(earCol), leafM = h.ownMat(stemCol);
+    for (let r = 0; r < 5; r++) for (let i = 0; i < 12; i++) {
+      const p = new T.Group(); at(p, fx - FW / 2 + 4 + i * (FW - 8) / 11 + (rnd(r * 12 + i) - 0.5) * 1.5, 5.6, fz - FD / 2 + 3 + r * (FD - 6) / 4, g);
+      const st = new T.Mesh(stemG, stemM); p.add(st);
+      const ear = new T.Mesh(earG, earM); ear.add(new T.Mesh(earG, kit.hullMat)); p.add(ear);
+      const lf = [0, 1].map(k => { const l = new T.Mesh(leafG, leafM); l.rotation.z = k ? 0.7 : -0.7; p.add(l); return l; });
+      plants.push({ p, st, ear, lf, k: 0.9 + rnd(r * 12 + i + 50) * 0.2, ph: rnd(r * 12 + i + 90) * 6 });
+    }
+    kit.onFrame((dt, t) => {
+      const y = yNow(), hh = 2.5 + 15 * y;
+      plants.forEach(q => {
+        const H0 = hh * q.k; q.st.scale.y = H0; q.st.position.y = H0 / 2;
+        q.ear.visible = y > 0.3; q.ear.scale.set(1, 1.6 + 1.6 * y, 1); q.ear.position.y = H0 + 0.6 + 0.6 * y;
+        q.lf.forEach((l, k) => { l.scale.y = 2 + 3 * y; l.position.set(k ? -0.6 : 0.6, H0 * 0.35, 0); });
+        q.p.rotation.z = kit.reduce ? 0 : 0.06 * Math.sin(t * 1.3 + q.ph);
+      });
+    });
+    h.sign(g, fx - FW / 2 + 6, fz + FD / 2 + 3, 4.5, 14, 3.2, ['Пшеница · 1 га', { t: 'норма N 60 · P₂O₅ 40 · K₂O 30 кг', s: 0.5, w: 500 }], { pw: 320 });
+    // ---- мешки ----
+    d.F.forEach((F, i) => {
+      const x = -52 + i * 12, z = 20, isSel = d.sel === F.id, kg = d.fert[F.id] || 0;
+      const sg = new T.Group(); at(sg, x, 0, z, g);
+      const body = mesh(new T.CylinderGeometry(3.4, 4.3, 10, 4), 0xf1ece0, { edges: true }); body.rotation.y = Math.PI / 4; at(body, 0, 5, 0, sg);
+      at(cyl(1.2, 1.6, 0xe8e2d0, { r2: 0.5, edges: false }), 0, 10.8, 0, sg);
+      const band = mesh(new T.CylinderGeometry(3.52, 3.62, 1.2, 4, 1, true), F.c, { edges: false, matOpt: { side: T.DoubleSide } }); band.rotation.y = Math.PI / 4; at(band, 0, 9, 0, sg);
+      const lb = h.label(4.6, 5.4, [{ t: F.f, s: 0.75 }, { t: F.name, s: 0.55, w: 500 }, { t: [F.N && 'N ' + F.N, F.P && 'P₂O₅ ' + F.P, F.K && 'K₂O ' + F.K].filter(Boolean).join(' · ') + ' %', s: 0.5, w: 600, c: '#4a556c' }], { bg: '#fffaf0', pw: 256 });
+      lb.rotation.x = -0.05; at(lb, 0, 5, 3.0, sg);
+      if (kg) { const b = h.label(5, 1.9, ['+' + kg + ' кг'], { bg: '#ffb547' }); b.rotation.y = AZ * 0.5; at(b, 0, 13.4, 0, sg); }
+      if (isSel) h.ring(sg, 0, 0.4, 0, 5.8);
+      const hit = h.hitBox(7, 12, 7); at(hit, 0, 6, 0, sg); clickable(hit, 'sk-' + F.id);
+    });
+    // ---- весы: совок с выбранным удобрением, табло и кнопки ----
+    const SF = d.F.find(F => F.id === d.sel) || d.F[0], skg = d.fert[SF.id] || 0;
+    const wx = 22, wz = 24;
+    at(box(18, 4, 13, 0xe8ecf4), wx, 2, wz, g);
+    at(box(14, 0.8, 9, C.STEEL), wx, 4.5, wz - 1.5, g);
+    const pan = mesh(new T.CylinderGeometry(5, 3.6, 2.6, 28, 1, true), 0xc6ccd6, { edges: false, matOpt: { side: T.DoubleSide } }); at(pan, wx, 6.2, wz - 1.5, g);
+    at(cyl(3.6, 0.3, 0xc6ccd6, { edges: false, hull: false }), wx, 5, wz - 1.5, g);
+    const pile = Math.min(1, skg / 150);
+    if (skg) at(cyl(4.2 * (0.6 + 0.4 * pile), 0.6 + 2.4 * pile, SF.c, { r2: 1.2, edges: false, seg: 20 }), wx, 5.3 + (0.6 + 2.4 * pile) / 2, wz - 1.5, g);
+    const scr = h.screen(10, 3.2, `${SF.name}: ${skg} кг/га`, '#86e0a8', 360); scr.rotation.x = -0.5; at(scr, wx - 3, 3.4, wz + 6.6, g);
+    h.key(g, wx + 4.6, 3.2, wz + 4.4, '−10', 0x4f6fa8, 'f-', 3.6, 3);
+    h.key(g, wx + 8.4, 3.2, wz + 4.4, '+10', 0x3d9a5a, 'f+', 3.6, 3);
+    h.key(g, 36, 0, 30, 'очистить\nполе', 0x8a5a48, 'freset', 7, 5);
+    // ---- бочка Либиха: вода держится до самой короткой доски ----
+    const bx = 44, bz = -16, BR = 7, BH = 14, NS = 18;
+    const rel = { N: d.rel.N, P: d.rel.P, K: d.rel.K }, special = { 0: 'N', 1: 'P', 2: 'K' };
+    const minRel = Math.min(1, rel.N, rel.P, rel.K);
+    at(cyl(BR + 0.3, 1, 0x7a5232), bx, 0.5, bz, g);
+    for (let i = 0; i < NS; i++) {
+      const a = AZ - 0.42 + i * Math.PI * 2 / NS, key0 = special[i];
+      const r0 = key0 ? clamp(rel[key0], 0.04, 1.5) : 1, hs = BH * r0;
+      const c = key0 ? (Math.abs(rel[key0] - 1) <= 0.1 + 1e-9 ? 0x5fbf5a : rel[key0] > 1.1 ? 0xe06a5a : 0xc58a5c) : 0xa8743e;
+      const s = box(2.4, hs, 0.8, c); s.rotation.y = a; at(s, bx + Math.sin(a) * BR, 1 + hs / 2, bz + Math.cos(a) * BR, g);
+      if (key0) { const l = h.label(2.2, 1.6, [{ N: 'N', P: 'P₂O₅', K: 'K₂O' }[key0]], { bg: '#fffaf0', pw: 128 }); l.rotation.y = a; at(l, bx + Math.sin(a) * (BR + 0.45), 1 + Math.min(hs - 1, 3), bz + Math.cos(a) * (BR + 0.45), g); }
+    }
+    [2.5, 9].forEach(y => { const t = mesh(new T.TorusGeometry(BR + 0.5, 0.3, 6, 40), 0x3a4256, { edges: false }); t.rotation.x = Math.PI / 2; at(t, bx, y, bz, g); });
+    at(cyl(BR - 0.3, 0.6, 0x7a5232, { edges: false }), bx, 1.3, bz, g);
+    const wl = h.liquid(g, bx, 1.6, bz, BR - 0.6, 0x4f9fe0, 0.75); wl.set(Math.max(0.1, BH * minRel - 0.6));
+    // вода переливается через короткую доску
+    if (minRel < 0.98) {
+      const kmin = ['N', 'P', 'K'].reduce((a, k) => rel[k] < rel[a] ? k : a, 'N'), ia = { N: 0, P: 1, K: 2 }[kmin], a = AZ - 0.42 + ia * Math.PI * 2 / NS;
+      const top = 1 + BH * clamp(rel[kmin], 0.04, 1.5);
+      const sx = bx + Math.sin(a) * (BR + 0.8), sz2 = bz + Math.cos(a) * (BR + 0.8);
+      const fall = new T.Mesh(keep(new T.CylinderGeometry(0.5, 0.9, top, 10)), h.ownMat(0x4f9fe0, { transparent: true, opacity: 0.7, depthWrite: false })); at(fall, sx, top / 2, sz2, g);
+      const pud = mesh(new T.CylinderGeometry(3, 3, 0.15, 24), 0x4f9fe0, { edges: false, matOpt: { transparent: true, opacity: 0.6 } }); at(pud, sx + Math.sin(a) * 2, 0.1, sz2 + Math.cos(a) * 2, g);
+    }
+    // ---- подписи ----
+    tag(v3(fx, 26, fz + 8), 'Поле пшеницы', `урожай ${Math.round(d.y * 100)} % от возможного`, d.ok);
+    tag(v3(wx, 11, wz + 8), 'Весы · ' + SF.f, `${skg} кг/га`);
+    tag(v3(bx, BH + 8, bz + 8), 'Бочка Либиха', `N ${fmt(d.n.N, 0)}/60 · P₂O₅ ${fmt(d.n.P, 0)}/40 · K₂O ${fmt(d.n.K, 0)}/30`, d.ok);
+    if (over) tag(v3(fx + 20, 20, fz + 16), 'Избыток', d.over.map(k => ({ N: 'N', P: 'P₂O₅', K: 'K₂O' })[k]).join(', ') + ': вымывание, ожог корней', true);
+  };
+
+  // =====================================================================================
+  // ===== «Загрязнение воздуха и воды»: город-макет — ТЭЦ с трубой, частный сектор, дорога с машинами,
+  // ===== медный завод со стоком в реку, датчики воздуха и воды, туча с дождём, пульт мер =====
+  SC['chin-city'] = (kit, d) => {
+    const { T, at, box, cyl, mesh, keep, tag, clickable, C } = kit, h = H(kit), v3 = h.v3;
+    const g = new T.Group(); at(g, 0, 0, 0);
+    const on = k => d.on.includes(k), B = 2;
+    const mixC = (a, b, k) => new T.Color(a).lerp(new T.Color(b), clamp(k, 0, 1)).getHex();
+    at(box(126, 2, 70, 0x9db08a), 0, 1, -5, g);
+    // ---- река ----
+    const dirt = clamp((d.cu / 3) * 0.6 + (d.ph < 6.5 ? 0.4 * (6.5 - d.ph) / 3.7 : 0), 0, 1);
+    at(box(126, 0.5, 8, mixC(0x3f8fc4, 0x5a5a28, dirt), { edges: false, matOpt: { transparent: true, opacity: 0.9 } }), 0, B + 0.1, 24, g);
+    [-1, 1].forEach(k => at(box(126, 0.8, 0.8, 0x7a8a6a, { edges: false }), 0, B + 0.2, 24 + k * 4.4, g));
+    if (dirt > 0.05) { const pl = mesh(new T.CylinderGeometry(1, 1, 0.2, 28), 0x9bbf3a, { edges: false, matOpt: { transparent: true, opacity: dirt * (on('dilute') ? 0.45 : 0.75) } }); pl.scale.set(on('dilute') ? 16 : 8, 1, 3); at(pl, 46, B + 0.45, 24, g); }
+    const rHit = h.hitBox(126, 2, 8); at(rHit, 0, B + 1, 24, g); clickable(rHit, 'o-river');
+    // ---- дорога и машины ----
+    at(box(126, 0.3, 8, 0x3a3f4c, { edges: false }), 0, B + 0.15, 8, g);
+    for (let i = 0; i < 13; i++) at(box(4, 0.06, 0.4, 0xf4f6f8, { edges: false, shadow: false }), -58 + i * 9.6, B + 0.33, 8, g);
+    const carAmt = d.src.no2car / 1.2;
+    [[0xe5533f, 6, 1, 0], [0x4d7cf0, 10, -1, 0.35], [0xf2c94c, 6, 1, 0.65]].forEach(([col, z, dir, ph], i) => {
+      const car = new T.Group(); g.add(car);
+      at(box(7, 2.2, 3.6, col), 0, B + 1.6, 0, car); at(box(4, 1.8, 3.2, 0xd8eef8, { edges: true }), -0.4, B + 3.5, 0, car);
+      [[-2.3, -1.9], [2.3, -1.9], [-2.3, 1.9], [2.3, 1.9]].forEach(([wx, wz]) => { const w = cyl(1, 0.7, 0x1b1610, { seg: 12, edges: false }); w.rotation.x = Math.PI / 2; at(w, wx, B + 1, wz, car); });
+      h.smoke(car, -4, B + 1.2, 0, { n: 5, size: 1.8, rise: 4, spread: 1.2, op: 0.5, amt: carAmt, color: 0x8a7a6a, wind: -6, seed: i * 7 });
+      kit.onFrame((dt, t) => { const k = kit.reduce ? ph : (t * 0.05 + ph) % 1; car.position.set(dir * (-60 + k * 120), 0, z); car.rotation.y = dir > 0 ? 0 : Math.PI; });
+    });
+    const roadHit = h.hitBox(126, 4, 8); at(roadHit, 0, B + 2, 8, g); clickable(roadHit, 'o-road');
+    // ---- ТЭЦ на угле ----
+    const tg = new T.Group(); at(tg, 0, 0, 0, g);
+    at(box(22, 12, 12, 0x6b7690), -44, B + 6, -24, tg);
+    at(box(14, 6, 10, 0x5a6378), -44, B + 15, -24, tg);
+    for (let i = 0; i < 4; i++) at(box(3, 3, 0.3, 0xffd27a, { edges: false, matOpt: { emissive: 0xffb547, emissiveIntensity: 0.6 } }), -52 + i * 5.4, B + 6, -17.9, tg);
+    for (let i = 0; i < 22; i++) at(h.ball(1 + rnd(i) * 0.6, 0x1b1d20, { hull: false, seg: 6, seg2: 4 }), -56 + (rnd(i + 1) - 0.5) * 8, B + 0.5 + rnd(i + 2) * 1.6, -10 + (rnd(i + 3) - 0.5) * 6, tg);
+    const sH = on('stack') ? 50 : 30, sx = -28, sz = -28;
+    at(cyl(2.6, sH, 0xd8dde4, { r2: 1.7, seg: 20 }), sx, B + sH / 2, sz, tg);
+    [0.55, 0.8].forEach(f => { const r = 2.6 - 0.9 * f + 0.15; at(cyl(r, sH * 0.07, 0xc94f43, { r2: r - 0.07, seg: 20, edges: false }), sx, B + sH * f, sz, tg); });
+    h.pipe(tg, [v3(-33, B + 10, -24), v3(sx, B + 10, -24), v3(sx, B + 10, sz + 2.2)], 1, 0x7d8697);
+    const tecAmt = d.so2 + d.src.pmtec + 0.3;
+    h.smoke(tg, sx, B + sH + 1, sz, { n: 10, size: 4.5, rise: 18, spread: 3, op: 0.7, amt: Math.min(1.6, tecAmt / 1.6), color: mixC(0x9aa3b5, 0xc9b56a, d.so2 / 2.4), wind: 10, speed: 0.18 });
+    if (on('scrub')) { h.vessel(tg, -22, -16, 3, 12, 0x5fbf7a, { y0: B + 1 }); h.sign(tg, -16, -11, 6, 10, 2.4, [{ t: 'сероочистка', w: 600 }], { bg: '#d9f5e2' }); }
+    if (on('filter')) { at(box(7, 8, 8, 0x5fbf7a), -36, B + 4, -12, tg); for (let i = 0; i < 4; i++) at(box(0.3, 7, 7.4, 0x2a3142, { edges: false }), -38.4 + i * 1.6, B + 4.2, -12, tg); h.sign(tg, -36, -6, 4, 10, 2.4, [{ t: 'электрофильтр', w: 600 }], { bg: '#d9f5e2' }); }
+    const tHit = h.hitBox(30, 20, 20); at(tHit, -42, B + 10, -22, tg); clickable(tHit, 'o-tec');
+    // ---- частный сектор ----
+    const hg = new T.Group(); at(hg, 0, 0, 0, g);
+    for (let i = 0; i < 6; i++) {
+      const x = -6 + (i % 3) * 10, z = -26 + Math.floor(i / 3) * 10;
+      at(box(7, 5, 6, [0xe8d8b0, 0xd8c0a0, 0xe0e8f0][i % 3]), x, B + 2.5, z, hg);
+      const roof = mesh(new T.CylinderGeometry(4.3, 4.3, 7.4, 3), 0x8a4b3a, { edges: true }); roof.rotation.z = Math.PI / 2; roof.scale.set(1, 1, 0.75);
+      at(roof, x, B + 6.6, z, hg);
+      at(box(1.2, 4, 1.2, 0x6e3527), x + 2, B + 8, z - 1, hg);
+      at(box(1.6, 1.6, 0.2, 0xffd27a, { edges: false, matOpt: { emissive: 0xffb547, emissiveIntensity: 0.5 } }), x - 1.5, B + 2.6, z + 3.05, hg);
+      h.smoke(hg, x + 2, B + 10.2, z - 1, { n: 5, size: 2.2, rise: 8, spread: 1.4, op: 0.65, amt: d.src.pmhome / 1.5, color: 0x59606d, wind: 4, seed: i * 3 });
+    }
+    if (on('gas')) {
+      h.pipe(hg, [v3(-12, B + 3, -4), v3(20, B + 3, -4)], 0.45, 0xf2c94c);
+      for (let i = 0; i < 5; i++) at(cyl(0.25, 3, 0x5a6378, { edges: false }), -12 + i * 8, B + 1.5, -4, hg);
+      h.sign(hg, 23, -6, 5, 9, 2.4, [{ t: 'газ в дома', w: 600 }], { bg: '#fff2c4' });
+    }
+    const hHit = h.hitBox(32, 12, 22); at(hHit, 4, B + 6, -21, hg); clickable(hHit, 'o-homes');
+    // ---- медный завод и сток ----
+    const fg = new T.Group(); at(fg, 0, 0, 0, g);
+    at(box(18, 9, 12, 0x6b7690), 38, B + 4.5, -16, fg);
+    for (let i = 0; i < 3; i++) { const r = mesh(new T.CylinderGeometry(3.4, 3.4, 12, 3), 0x5a6378, { edges: true }); r.rotation.x = Math.PI / 2; at(r, 32.5 + i * 5.6, B + 10.5, -16, fg); }
+    at(cyl(1.2, 14, 0x8a5a48), 45, B + 7, -20, fg);
+    h.smoke(fg, 45, B + 14.5, -20, { n: 5, size: 2.4, rise: 8, op: 0.4, amt: 0.6, color: 0xb0b6c0, seed: 40 });
+    const outlet = [v3(38, B + 1, -10), v3(38, B + 1, 4), v3(38, B + 0.6, 20.5)];
+    h.pipe(fg, outlet, 0.9, 0x6b7690);
+    h.flow(fg, outlet, on('treat') ? 0x9fd8ff : 0x9bbf3a, 6, { r: 1.05, speed: 6 });
+    if (on('treat')) { [[52, -18], [52, -8]].forEach(([x, z]) => { at(cyl(4, 3, 0x7d8697, { seg: 28 }), x, B + 1.5, z, fg); at(cyl(3.6, 0.3, 0xf2f4f6, { edges: false, hull: false }), x, B + 2.95, z, fg); }); h.sign(fg, 56, -1, 4.5, 11, 2.4, [{ t: 'очистка стоков', w: 600 }], { bg: '#d9f5e2' }); }
+    if (on('dilute')) { const wp = [v3(58, B + 8, 2), v3(58, B + 1, 2), v3(38.9, B + 1, 2)]; at(cyl(3, 8, 0x8fbfe0), 58, B + 4, 2, fg); h.pipe(fg, wp, 0.6, 0x4f9fe0); h.sign(fg, 50, 0, 11, 13, 2.4, [{ t: 'вода для разбавления', w: 600 }], { bg: '#fff2c4' }); }
+    const fHit = h.hitBox(20, 14, 14); at(fHit, 38, B + 7, -16, fg); clickable(fHit, 'o-factory');
+    // ---- датчики ----
+    const bad = v => v > 1.0001;
+    const airBad = bad(d.so2) || bad(d.no2) || bad(d.pm);
+    at(cyl(0.4, 14, 0x5a6378, { edges: false }), -20, B + 7, 0, g);
+    at(box(9, 7, 1.2, 0x2a3142), -20, B + 15, 0, g).rotation.y = AZ;
+    const sa = h.screen(8.2, 6.2, `SO₂ ${fmt(d.so2, 2)}\nNO₂ ${fmt(d.no2, 2)}\nпыль ${fmt(d.pm, 2)}`, airBad ? '#ff8a73' : '#86e0a8', 300); sa.rotation.y = AZ; at(sa, -20 + Math.sin(AZ) * 0.65, B + 15, Math.cos(AZ) * 0.65, g);
+    at(cyl(0.4, 9, 0x5a6378, { edges: false }), 16, B + 4.5, 17, g);
+    at(box(9, 5, 1.2, 0x2a3142), 16, B + 10, 17, g).rotation.y = AZ;
+    const wBad = bad(d.cu) || d.ph < 6.5 || d.ph > 8.5;
+    const sw = h.screen(8.2, 4.2, `Cu²⁺ ${fmt(d.cu, 2)}\npH ${fmt(d.ph, 1)}`, wBad ? '#ff8a73' : '#86e0a8', 300); sw.rotation.y = AZ; at(sw, 16 + Math.sin(AZ) * 0.65, B + 10, 17 + Math.cos(AZ) * 0.65, g);
+    at(h.ball(1.3, 0xe5533f), 16, B + 0.8, 23, g);
+    // ---- туча и дождь ----
+    const cg = new T.Group(); at(cg, 14, 46, -16, g);
+    const cloudCol = mixC(0xeef2f8, 0x8a8a7a, clamp((5.6 - d.rain) / 1.4, 0, 1));
+    for (let i = 0; i < 9; i++) at(h.ball(4 + rnd(i + 200) * 3, cloudCol, { hull: false, shadow: false }), (i - 4) * 4.4, rnd(i + 201) * 2.5, (rnd(i + 202) - 0.5) * 6, cg);
+    if (d.rain < 5.3) {
+      const dropM = h.basic(mixC(0x72d4e8, 0xff8a73, (5.6 - d.rain) / 1.2)), dg = keep(new T.CylinderGeometry(0.15, 0.15, 1.8, 4));
+      const drops = []; for (let i = 0; i < 40; i++) { const m = new T.Mesh(dg, dropM); cg.add(m); drops.push({ m, x: (rnd(i + 300) - 0.5) * 38, z: (rnd(i + 301) - 0.5) * 10, ph: rnd(i + 302) }); }
+      kit.onFrame((dt, t) => drops.forEach(p => { const k = kit.reduce ? p.ph : (t * 0.8 + p.ph) % 1; p.m.position.set(p.x, -3 - k * 46, p.z); }));
+    }
+    // ---- пульт мер ----
+    at(box(116, 3, 11, 0x3b4a66), 0, 1.5, 39, g);
+    d.M.forEach((x, i) => h.key(g, -48 + i * 16, 3, 39, `${x.name}\n${x.cost} ед.`, on(x.k) ? 0x2f9a5a : 0x5a6680, 'm-' + x.k, 14.4, 7.4, on(x.k)));
+    // ---- подписи ----
+    tag(v3(-28, B + sH + 6, -28), 'ТЭЦ на угле', `SO₂ ${fmt(d.so2, 2)} · пыль ${fmt(d.src.pmtec, 2)} × нормы`, bad(d.so2));
+    tag(v3(4, B + 14, -24), 'Частный сектор', `сажа ${fmt(d.src.pmhome, 2)} × нормы`, d.src.pmhome > 1);
+    tag(v3(38, B + 20, -16), 'Медный завод', `Cu²⁺ ${fmt(d.cu, 2)} × нормы · pH ${fmt(d.ph, 1)}`, wBad);
+    tag(v3(26, 52, -16), 'Дождь', `pH ≈ ${fmt(d.rain, 1)}${d.rain < 5 ? ' · кислотный' : ''}`, d.rain < 5);
+    tag(v3(0, 8, 42), 'Пульт мер', `бюджет ${d.spent} из ${d.budget} ед. · в норме ${d.good} из 5`, d.ok);
+  };
+
+  // =====================================================================================
+  // ===== «Парниковый эффект»: лампа-«Солнце», глобус с атмосферой и молекулами, свет и ИК-лучи,
+  // ===== градусник, гора с ледником, баллоны CO₂ и CH₄ с манометрами, пульт эпох =====
+  SC['chin-gh'] = (kit, d) => {
+    const { T, at, box, cyl, mesh, keep, tag, clickable, toon, C } = kit, h = H(kit), v3 = h.v3;
+    const g = new T.Group(); at(g, 0, 0, 0);
+    const G = v3(0, 24, -8), ER = 10, SR = 14.5;
+    // ---- лампа ----
+    const L = v3(-44, 36, -24);
+    at(box(12, 1.6, 10, C.DARK), -46, 0.8, -26, g);
+    at(cyl(0.8, 34, C.STEEL, { edges: false }), -46, 18, -26, g);
+    const lampG = new T.Group(); at(lampG, L.x, L.y, L.z, g); lampG.lookAt(G);
+    const refl = mesh(new T.CylinderGeometry(6, 2.6, 6, 28, 1, true), 0xe8ecf4, { edges: false, matOpt: { side: T.DoubleSide } }); refl.rotation.x = Math.PI / 2; at(refl, 0, 0, 1, lampG);
+    at(h.ball(2.6, 0xfff3b0, { hull: false, matOpt: { emissive: 0xffe08a, emissiveIntensity: 1 } }), 0, 0, 2.5, lampG);
+    at(h.glow(0xffe08a, 22, 0.75), 0, 0, 3, lampG);
+    at(new T.PointLight(0xffe0a0, 60, 120, 1.1), 0, 0, 4, lampG);
+    const lHit = h.hitBox(12, 12, 12); at(lHit, L.x, L.y, L.z, g); clickable(lHit, 'o-sun');
+    // ---- глобус ----
+    at(cyl(7, 1.6, C.DARK, { seg: 28 }), G.x, 0.8, G.z, g);
+    at(cyl(0.9, G.y - ER, C.BRASS, { edges: false }), G.x, (G.y - ER) / 2, G.z, g);
+    const ec = document.createElement('canvas'); ec.width = 512; ec.height = 256; const ex = ec.getContext('2d');
+    ex.fillStyle = '#2f78c8'; ex.fillRect(0, 0, 512, 256);
+    for (let i = 0; i < 26; i++) { ex.fillStyle = ['#4f9a4a', '#7aa84a', '#b89a5a'][i % 3]; ex.beginPath(); ex.ellipse(rnd(i + 900) * 512, 50 + rnd(i + 901) * 150, 16 + rnd(i + 902) * 40, 10 + rnd(i + 903) * 26, rnd(i + 904) * 3, 0, 7); ex.fill(); }
+    ex.fillStyle = '#f4f6f8'; ex.fillRect(0, 0, 512, 14); ex.fillRect(0, 242, 512, 14);
+    const etex = keep(new T.CanvasTexture(ec)); etex.colorSpace = T.SRGBColorSpace;
+    const earth = new T.Mesh(keep(new T.SphereGeometry(ER, 40, 28)), h.ownMat(0xffffff, { map: etex }));
+    earth.add(new T.Mesh(earth.geometry, kit.hullMat)); at(earth, G.x, G.y, G.z, g); earth.rotation.z = 0.41;
+    const eHit = h.hitBox(ER * 1.6, ER * 1.6, ER * 1.6); at(eHit, G.x, G.y, G.z, g); clickable(eHit, 'o-ground');
+    // атмосфера: тем гуще и голубее, чем больше воздействие
+    const shell = new T.Mesh(keep(new T.SphereGeometry(SR, 40, 28)), h.ownMat(0x72d4e8, { transparent: true, opacity: clamp(0.08 + 0.05 * d.f, 0.06, 0.35), depthWrite: false })); at(shell, G.x, G.y, G.z, g);
+    // молекулы в атмосфере
+    const molG = new T.Group(); at(molG, G.x, G.y, G.z, g);
+    const nC = Math.round(d.co2 / 28), nM = Math.round(d.ch4 / 300);
+    const place = i => { const u = rnd(i + 700) * 2 - 1, a = rnd(i + 701) * Math.PI * 2, rr = ER + 1.6 + rnd(i + 702) * (SR - ER - 2.4), s = Math.sqrt(1 - u * u); return v3(Math.cos(a) * s * rr, u * rr, Math.sin(a) * s * rr); };
+    for (let i = 0; i < nC; i++) { const m = new T.Group(); m.position.copy(place(i)); m.rotation.set(rnd(i + 710) * 3, rnd(i + 711) * 3, 0); molG.add(m); at(h.ball(0.55, 0x4f586d, { hull: false, shadow: false, seg: 8, seg2: 6 }), 0, 0, 0, m); [-1, 1].forEach(k => at(h.ball(0.5, 0xe5533f, { hull: false, shadow: false, seg: 8, seg2: 6 }), k * 0.9, 0, 0, m)); }
+    for (let i = 0; i < nM; i++) { const m = new T.Group(); m.position.copy(place(i + 100)); molG.add(m); at(h.ball(0.6, 0x4f586d, { hull: false, shadow: false, seg: 8, seg2: 6 }), 0, 0, 0, m); [[1, 1, 1], [-1, -1, 1], [-1, 1, -1], [1, -1, -1]].forEach(([a, b, c]) => at(h.ball(0.36, 0xeef2f8, { hull: false, shadow: false, seg: 6, seg2: 4 }), a * 0.55, b * 0.55, c * 0.55, m)); }
+    const sHit = h.hitBox(SR * 2, 4, SR * 2); at(sHit, G.x, G.y + SR - 2, G.z, g); clickable(sHit, 'o-gas');
+    if (!kit.reduce) kit.onFrame((dt, t) => { earth.rotation.y = t * 0.15; molG.rotation.y = t * 0.05; });
+    // ---- лучи: жёлтые — свет к Земле, красные — ИК от Земли; часть ИК молекулы возвращают вниз ----
+    const toL = L.clone().sub(G).normalize(), NP = 34, pg = keep(new T.SphereGeometry(0.85, 8, 6)), mY = h.basic(0xffd36b), mR = h.basic(0xff6a4a), mB = h.basic(0xffa080);
+    const ph = [];
+    for (let i = 0; i < NP; i++) {
+      const n = toL.clone().add(v3(rnd(i + 800) - 0.5, rnd(i + 801) - 0.5, rnd(i + 802) - 0.5).multiplyScalar(1.5)).normalize();
+      const n2 = n.clone().add(v3(rnd(i + 803) - 0.5, rnd(i + 804) - 0.5, rnd(i + 805) - 0.5).multiplyScalar(0.5)).normalize();
+      const m = new T.Mesh(pg, mY); g.add(m);
+      const tail = new T.Mesh(pg, mY); tail.scale.setScalar(0.6); g.add(tail);
+      ph.push({ m, tail, n, n2, abs: rnd(i + 806) < d.pa, o: i / NP });
+    }
+    const pos = (q, k, out) => {
+      if (k < 0.35) return [out.lerpVectors(L, G.clone().addScaledVector(q.n, ER), k / 0.35), mY];
+      const s = (k - 0.35) / 0.65, P = G.clone().addScaledVector(q.n, ER);
+      if (!q.abs) return [out.copy(P).addScaledVector(q.n, s * 34), mR];
+      if (s < 0.5) return [out.copy(P).addScaledVector(q.n, s * 2 * (SR - ER)), mR];
+      return [out.lerpVectors(G.clone().addScaledVector(q.n, SR), G.clone().addScaledVector(q.n2, ER), (s - 0.5) * 2), mB];
+    };
+    kit.onFrame((dt, t) => ph.forEach((q, i) => {
+      const k = kit.reduce ? (i % 3) * 0.3 + 0.1 : (t * 0.22 + q.o) % 1;
+      q.m.material = pos(q, k, q.m.position)[1];
+      q.tail.material = pos(q, Math.max(0, k - 0.012), q.tail.position)[1];
+    }));
+    // ---- градусник ----
+    const tx = 42, tz = -14, TH = 34;
+    at(box(8, 1.4, 6, C.DARK), tx, 0.7, tz, g);
+    const tg = new T.Group(); at(tg, tx, 0, tz, g); tg.rotation.y = AZ * 0.6;
+    at(box(8, TH + 4, 1, 0xfffaf0), 0, 1.4 + (TH + 4) / 2, 0, tg);
+    at(new T.Mesh(keep(new T.SphereGeometry(2, 16, 12)), toon(0xe0473a)), 0, 4.6, 0.9, tg);
+    at(cyl(0.9, TH - 4, 0xeef6fb, { matOpt: { transparent: true, opacity: 0.6 } }), 0, 4.6 + (TH - 4) / 2, 0.9, tg);
+    const yT = Tc => 6.8 + clamp((Tc - 10) / 10, 0, 1) * (TH - 8);
+    const y10 = yT(10) - 1, SH = yT(20) - yT(10) + 2;
+    const sc = h.canvasPlane(4, SH, 96, (x, W, Hh) => { x.fillStyle = '#1b1610'; x.font = `700 30px ${MONO}`; x.textAlign = 'left'; x.textBaseline = 'middle'; for (let v = 10; v <= 20; v++) { const y = Hh * (1 - (yT(v) - y10) / SH); x.fillRect(0, y - 2, v % 2 ? 14 : 24, 4); if (v % 2 === 0) x.fillText(String(v), 30, y); } });
+    at(sc, 2.9, y10 + SH / 2, 0.55, tg);
+    const colM = cyl(0.5, 1, 0xe0473a, { edges: false, hull: false }); at(colM, 0, 6, 1.2, tg);
+    const prevT = mem.gh ? mem.gh.cur() : d.T, tt0 = now();
+    mem.gh = { cur: () => prevT + (d.T - prevT) * ease(clamp((now() - tt0) / 1.2, 0, 1)) };
+    kit.onFrame(() => { const v = mem.gh.cur(), hh = Math.max(0.5, yT(v) - 5.6); colM.scale.y = hh; colM.position.y = 5.6 + hh / 2; });
+    const thHit = h.hitBox(8, TH + 4, 4); at(thHit, tx, 1.4 + (TH + 4) / 2, tz, g); clickable(thHit, 'o-therm');
+    // ---- гора с ледником ----
+    const mx0 = 40, mz0 = 22, snow = clamp(1 - d.dT / 4, 0.04, 1);
+    at(box(22, 2, 16, 0x7a8a6a), mx0, 1, mz0, g);
+    at(cyl(9, 16, 0x7a6a5a, { r2: 0.3, seg: 9 }), mx0, 10, mz0, g);
+    at(cyl(6, 10, 0x8a7a6a, { r2: 0.3, seg: 8 }), mx0 - 7, 7, mz0 + 3, g);
+    const hs = 15.4 * 0.55 * snow;
+    at(cyl(9 * hs / 16 + 0.25, hs, 0xf4f8fc, { r2: 0.32, seg: 9 }), mx0, 18 - hs / 2, mz0, g);
+    if (d.dT > 0.8) { const s2 = clamp((d.dT - 0.8) / 2, 0.2, 1); at(cyl(3 * s2 + 1, 0.2, 0x4f9fe0, { edges: false, hull: false }), mx0 + 7, 2.15, mz0 + 6, g); }
+    const iHit = h.hitBox(20, 18, 16); at(iHit, mx0, 9, mz0, g); clickable(iHit, 'o-ice');
+    // ---- баллоны и пульт ----
+    const fracC = (d.co2 - 250) / 750, fracM = (d.ch4 - 700) / 2300;
+    [['CO₂', -44, 0x3a3f4c, fracC, 'ppm', [[0, '250'], [0.5, '625'], [1, '1000']]], ['CH₄', -30, 0xc94f43, fracM, 'ppb', [[0, '700'], [0.5, '1850'], [1, '3000']]]].forEach(([f, x, col, fr, u, marks]) => {
+      const z = 20;
+      h.vessel(g, x, z, 3.4, 16, col, { y0: 0.3, bottom: false, domeK: 0.8 });
+      at(cyl(0.6, 3, C.BRASS, { edges: false }), x, 19.5, z, g);
+      const lb = h.label(4.6, 2.6, [f], { bg: '#fffaf0' }); lb.rotation.y = AZ; at(lb, x + Math.sin(AZ) * 3.45, 9, z + Math.cos(AZ) * 3.45, g);
+      const dl = h.dial(g, x + 2.6, 21.5, z + 2.6, 2.6, u, marks, fr); dl.g.rotation.y = AZ;
+    });
+    at(box(96, 3, 10, 0x3b4a66), 0, 1.5, 40, g);
+    [['pre-1750', '1750', 280, 722], ['pre-1960', '1960', 315, 1250], ['pre-now', 'сегодня', 420, 1900]].forEach(([k, t, c, m], i) => h.key(g, -40 + i * 10, 3, 40, t, 0x6a5a8a, k, 9, 6, d.co2 === c && d.ch4 === m));
+    [['c-', '▼ CO₂', 0x4f6fa8], ['c+', '▲ CO₂', 0xd0603a], ['m-', '▼ CH₄', 0x4f6fa8], ['m+', '▲ CH₄', 0xd0603a]].forEach(([k, t, c], i) => h.key(g, -2 + i * 10 + (i > 1 ? 4 : 0), 3, 40, t, c, k, 9, 6));
+    // ---- подписи ----
+    tag(v3(G.x - 4, G.y + SR + 5, G.z), 'Атмосфера', `CO₂ ${d.co2} ppm · CH₄ ${d.ch4} ppb`);
+    tag(v3(tx, TH + 8, tz), 'Градусник Земли', `${fmt(d.T, 1)} °C · ΔT +${fmt(d.dT, 2)} °C`, d.dT > 1.5);
+    tag(v3(mx0, 20, mz0), 'Ледник', snow > 0.8 ? 'почти целый' : snow > 0.5 ? 'отступает' : 'тает быстро', snow <= 0.5);
+    tag(v3(L.x, L.y + 8, L.z), 'Лампа-«Солнце»', 'видимый свет');
+    tag(v3(-37, 28, 20), 'Баллоны', d.seen ? 'сегодняшний состав ✓' : 'поставьте «сегодня»', d.seen);
+  };
+
+  // =====================================================================================
+  // ===== «Зелёная химия»: две установки синтеза рядом — баки реагентов, реактор с мешалкой,
+  // ===== бак продукта и бочка отходов, табло атомной экономии; таблички продуктов =====
+  SC['chin-green'] = (kit, d) => {
+    const { T, at, box, cyl, mesh, tag, clickable, C } = kit, h = H(kit), v3 = h.v3;
+    const g = new T.Group(); at(g, 0, 0, 0);
+    const B = 2;
+    d.routes.forEach((R, i) => {
+      const ox = i ? 34 : -34, act = d.route === i, picked = d.picked === i;
+      const ig = new T.Group(); at(ig, ox, 0, -8, g); ig.scale.setScalar(1.22);
+      at(box(54, 2, 46, act ? 0xa6b3c4 : 0x8d97a6), 0, 1, 0, ig);
+      if (act) [[0, -23, 54, 0.6], [0, 23, 54, 0.6], [-27, 0, 0.6, 46], [27, 0, 0.6, 46]].forEach(([x, z, w, dd]) => at(box(w, 0.4, dd, 0xffd166, { edges: false, matOpt: { emissive: 0xffd166, emissiveIntensity: 0.6 } }), x, B + 0.2, z, ig));
+      const mxR = R.re.reduce((s, r) => s + r.m, 0), mW = R.ws.reduce((s, w) => s + w.m, 0), nR = R.re.length;
+      // реагенты
+      R.re.forEach((r, k) => {
+        const x = (k - (nR - 1) / 2) * 13, z = -15;
+        h.vessel(ig, x, z, 3.4, 10, 0x9fb8d9, { y0: B + 1.5 });
+        h.sign(ig, x + 1, z + 5, 4, 9.5, 3.6, [{ t: r.f, s: 0.7 }, { t: fmt(r.m, r.m % 1 ? 1 : 0) + ' г', s: 0.55, w: 500 }], { post: false, pw: 256 });
+        const pts = [v3(x, B + 15, z), v3(x, B + 18, z), v3(x * 0.3, B + 18, -4), v3(0, B + 16.5, -2)];
+        h.pipe(ig, pts, 0.45, 0x8a94a8);
+        const fl = h.flow(ig, pts, 0x72d4e8, 5, { r: 0.6, speed: 9, on: false });
+        kit.onFrame(() => { const lv = live(); fl.set(!!(lv && lv.route === i && lv.p < 0.55)); });
+      });
+      // реактор
+      const rv = h.vessel(ig, 0, -2, 5.5, 11, 0xc9d1dc, { y0: B + 2 });
+      const wx = Math.sin(AZ) * 5.6, wz = -2 + Math.cos(AZ) * 5.6;
+      at(box(3.6, 7, 0.4, 0xd8eef8, { edges: true, matOpt: { transparent: true, opacity: 0.45 } }), wx, B + 9, wz, ig).rotation.y = AZ;
+      const liq = at(box(3.2, 3.4, 0.45, 0x5fb4d9, { edges: false, matOpt: { emissive: 0x5fb4d9, emissiveIntensity: 0.3 } }), wx + Math.sin(AZ) * 0.1, B + 7.2, wz + Math.cos(AZ) * 0.1, ig); liq.rotation.y = AZ;
+      at(box(2.4, 2, 2.4, 0x3b4a66), 0, rv.top + 1, -2, ig);
+      const stir = new T.Group(); at(stir, 0, rv.top + 2, -2, ig); at(cyl(0.3, 2.4, C.STEEL, { edges: false }), 0, 1.2, 0, stir); at(box(3, 0.4, 0.6, 0xd8b04a), 0, 2.4, 0, stir);
+      const jacket = mesh(new T.TorusGeometry(5.9, 0.6, 8, 32), 0x7d8697, { edges: false }); jacket.rotation.x = Math.PI / 2; at(jacket, 0, B + 5, -2, ig);
+      const heat = h.glow(0xff8a3a, 16, 0); at(heat, 0, B + 5, -2, ig);
+      kit.onFrame((dt, t) => { const lv = live(), run = lv && lv.route === i; stir.rotation.y = kit.reduce ? 0 : t * (run ? 9 : 1.2); heat.material.opacity = run ? 0.55 : 0; liq.material.color.setHex(run ? 0x86e0a8 : 0x5fb4d9); });
+      const rHit = h.hitBox(12, 20, 12); at(rHit, 0, B + 9, -2, ig); clickable(rHit, 'run-' + i);
+      // табло
+      const scr = h.screen(10, 4.4, R.ran ? `АЭ ${fmt(R.ae, 1)} %\nE ${fmt(mW / R.pr.m, 2)}` : 'АЭ ?\nнажми реактор', R.ran ? (R.ae > 99 ? '#86e0a8' : R.ae > 60 ? '#ffb547' : '#ff8a73') : '#8b96ad', 300);
+      at(cyl(0.3, 9, 0x5a6378, { edges: false }), 13, B + 4.5, -5, ig);
+      at(box(11, 5.2, 0.8, 0x2a3142), 13, B + 11, -5, ig).rotation.y = AZ;
+      scr.rotation.y = AZ; at(scr, 13 + Math.sin(AZ) * 0.45, B + 11, -5 + Math.cos(AZ) * 0.45, ig);
+      // продукт: бак со смотровым стеклом
+      const fP = R.pr.m / mxR, fW = mW / mxR;
+      h.vessel(ig, -12, 11, 4, 9, 0xe8f4ec, { y0: B + 1 });
+      at(mesh(new T.CylinderGeometry(4.1, 4.1, 1.4, 28, 1, true), 0x2fbf5a, { edges: false, matOpt: { side: T.DoubleSide } }), -12, B + 9, 11, ig);
+      at(box(1.6, 8, 0.3, 0xd8eef8, { edges: true, matOpt: { transparent: true, opacity: 0.5 } }), -12 + Math.sin(AZ) * 4.1, B + 5.5, 11 + Math.cos(AZ) * 4.1, ig).rotation.y = AZ;
+      const pl = at(box(1.3, 1, 0.35, 0x2fbf5a, { edges: false, matOpt: { emissive: 0x2fbf5a, emissiveIntensity: 0.3 } }), -12 + Math.sin(AZ) * 4.25, B + 1.6, 11 + Math.cos(AZ) * 4.25, ig); pl.rotation.y = AZ;
+      // бочка отходов
+      at(cyl(3.6, 8, 0x5a6378, { seg: 24 }), 12, B + 4, 11, ig);
+      [2, 6].forEach(y => { const t = mesh(new T.TorusGeometry(3.7, 0.25, 6, 28), 0x3a4256, { edges: false }); t.rotation.x = Math.PI / 2; at(t, 12, B + y, 11, ig); });
+      const piles = []; for (let k = 0; k < 10; k++) { const b = h.ball(0.9, 0x9a9a7a, { hull: false, shadow: false, seg: 6, seg2: 4 }); at(b, 12 + (rnd(k + i * 9) - 0.5) * 4, B + 8.4 + (k > 5 ? 0.8 : 0), 11 + (rnd(k + i * 9 + 3) - 0.5) * 4, ig); piles.push(b); }
+      h.pipe(ig, [v3(-4, B + 3, 1), v3(-12, B + 3, 6.5)], 0.5, 0x8a94a8);
+      h.pipe(ig, [v3(4, B + 3, 1), v3(12, B + 3, 7)], 0.5, 0x8a94a8);
+      kit.onFrame(() => {
+        const lv = live(), run = lv && lv.route === i, k = run ? ease(clamp((lv.p - 0.5) / 0.5, 0, 1)) : R.ran ? 1 : 0;
+        const ph = 0.2 + 7.4 * fP * k; pl.scale.y = Math.max(0.05, ph); pl.position.y = B + 1.6 + ph / 2;
+        piles.forEach((b, j) => { b.visible = fW > 0 && k > j / 10 && j < Math.ceil(fW * 14); });
+      });
+      h.sign(ig, -12, 17.5, 3.4, 11, 3, [{ t: 'продукт ' + R.pr.f, s: 0.55 }, { t: fmt(R.pr.m, 0) + ' г', s: 0.5, w: 500 }], { post: false, bg: '#d9f5e2', pw: 256 });
+      h.sign(ig, 12, 17.5, 3.4, 11, 3, [{ t: R.ws.length ? 'отходы ' + R.ws.map(w => w.f).join(' + ') : 'отходов нет', s: 0.55 }, { t: R.ws.length ? fmt(mW, mW % 1 ? 1 : 0) + ' г' : 'бочка пуста ✓', s: 0.5, w: 500 }], { post: false, bg: '#eceff4', pw: 256 });
+      h.sign(ig, -20, -4, 9, 12, 4.4, [{ t: 'путь ' + (i + 1), s: 0.55, c: '#8a5a20' }, { t: R.name, s: 0.55 }, { t: R.cond, s: 0.42, w: 500 }], { pw: 320 });
+      if (picked) h.sign(ig, 0, 20, 3.5, 13, 3, ['✓ зелёный путь'], { post: false, bg: '#86e0a8' });
+      else if (d.picked === null && d.routes[0].ran && d.routes[1].ran) h.key(ig, 0, B, 19, 'Этот путь\nзеленее', 0x2f9a5a, 'pick-' + i, 11, 5);
+      tag(v3(ox, B + 26, -4), 'Путь ' + (i + 1) + ': ' + R.name, R.ran ? `атомная экономия ${fmt(R.ae, 1)} %` : 'нажмите на реактор', R.ran && R.ae > 99);
+    });
+    at(box(66, 3, 9, 0x3b4a66), 0, 1.5, 39, g);
+    d.targets.forEach((nm, i) => h.key(g, -21 + i * 21, 3, 39, nm, d.tgt === i ? 0x3d7bd9 : 0x5a6680, 't-' + i, 19, 6, d.tgt === i));
+    tag(v3(0, 8, 42), 'Продукт: ' + d.name + ' ' + d.f, `зелёных путей выбрано ${d.nPicked} из 3`, d.nPicked === 3);
   };
 })();
