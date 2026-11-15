@@ -938,6 +938,42 @@ function setLesson(i) {
   if (cur) { const sr = strip.getBoundingClientRect(), cr = cur.getBoundingClientRect(); strip.scrollLeft += cr.left - sr.left - (sr.width - cr.width) / 2; }
 }
 
+// для «Как в жизни» (/luch/real3d.js → /luch/real3d-engine.js): установки из кабинета физики на столе
+let wLock = false;                                    // урок «Работа газа» в 3D: поршень на упорах (V = const) или свободен (p = const)
+window.LUCH_REAL = () => {
+  const id = LID(), m = model(), base = { module: 'engine' };
+  if (id === 'first') return { ...base, scene: 'eng-first', help: 'Горелка — +50 Дж, кнопки на табло — ±50 Дж, упоры или груз — режим поршня',
+    fix: m.fix, Q: m.Q, V: Math.round(m.V * 100) / 100, V0: Math.round(V0L * 100) / 100, T: Math.round(m.T * 10) / 10,
+    Ttxt: fmt(m.T, 1) + ' K', ptxt: fmt(m.p, 1) + ' кПа', Vtxt: fmt(m.V, 2) + ' л', dUtxt: fmt(m.dU, 0) + ' Дж', Atxt: fmt(m.A, 0) + ' Дж', fixOk: !!S.rec.fix, freeOk: !!S.rec.free };
+  if (id === 'work') {
+    const P = S.path.length > 240 ? [S.path[0], ...S.path.slice(-239)] : S.path;
+    return { ...base, scene: 'eng-work', help: 'Горелка — нагреть, лёд — охладить, упоры — закрепить поршень, график — в точку 1',
+      lock: wLock, V: m.V, p: m.p, T: Math.round(m.T), A: Math.round(m.A), Atxt: fmt(m.A / 1000, 2) + ' кДж', path: P, at2: m.at2, ok: !!S.done.work };
+  }
+  if (id === 'second') return { ...base, scene: 'eng-second', help: 'Правый брусок — свести/развести, насос — вкл/выкл',
+    contact: m.contact, pump: S.pump, mixed: S.mixed, cx: Math.round(S.cx / 10) * 10, rest: B3.rest, touch: B3.touch, Th0: B3.Th0 };
+  return { ...base, scene: 'eng-carnot', help: 'Кнопки у нагревателя и холодильника — температуры, цилиндр — провести цикл',
+    T1: S.T1, T2: S.T2, run: S.run, eta: Math.round(m.eta * 1000) / 10, A: Math.round(m.A), Q1: Math.round(m.Q1), Q2: Math.round(m.Q2), cycles: S.cycles, ok: !!S.done.carnot };
+};
+// быстрые значения (температуры брусков, фаза цикла) — сцена читает их в kit.onFrame
+window.LUCH_REAL.live = () => {
+  const id = LID();
+  if (id === 'second') return { Th: S.Th, Tc: S.Tc, cx: S.cx, pump: S.pump, W: S.W, Qp: S.Qp, Qflow: S.Qflow, contact: S.cx <= B3.touch + 1 };
+  if (id === 'carnot') { const m = model(); return { ph: S.ph, run: S.run, k: m.k, V: m.cur.V, T: m.cur.T, p: m.cur.p }; }
+  const m = model(); return { V: m.V, T: m.T, p: m.p };
+};
+window.LUCH_REAL.click = k => {
+  if (k === 'mode') return act(S.mode === 'fix' ? 'free' : 'fix');
+  if (k === 'w-lock') { wLock = !wLock; toast(wLock ? 'Поршень на упорах: объём не меняется.' : 'Упоры сняты: поршень держат грузы, давление постоянное.'); return; }
+  if (k === 'w-heat' || k === 'w-cool') {
+    const [V, p] = S.path[S.path.length - 1], up = k === 'w-heat';
+    if (wLock) { const np = clamp(Math.round((p + (up ? 50 : -50)) / 50) * 50, 50, 350); if (np === p) { toast(up ? 'Хватит греть: дальше опыт не рассчитан.' : 'Меньше 50 кПа не получится.'); return; } moveTo(V, np); }
+    else { const nV = clamp(V + (up ? 2 : -2), 6, 38); if (nV === V) { toast(up ? 'Поршень у верхнего края.' : 'Сильнее сжимать нельзя.'); return; } moveTo(nV, p); }
+    return;
+  }
+  act(k);
+};
+
 // для ИИ-репетитора: что сейчас на экране
 window.LUCH_CONTEXT = () => {
   const m = model(), L = LESSONS[S.lesson], id = L.id;

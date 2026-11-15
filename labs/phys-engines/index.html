@@ -980,6 +980,40 @@ function setLesson(i) {
   const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-engine.js): school models on a table
+window.LUCH_REAL = () => {
+  const id = LID(), Ls = L(), base = { module: 'engine' };
+  if (id === 'ice') return { ...base, scene: 'eng-ice', help: S.running ? 'Двигатель работает сам · красная кнопка — заглушить' : 'Свеча — искра, маховик — +45°, зелёная кнопка — стартер',
+    running: S.running, starter: S.starter, streak: S.streak, need: Ls.need, win: Ls.win };
+  if (id === 'turb') return { ...base, scene: 'eng-turb', help: 'Горелка — огонь +10 %, вентиль — задвижка +10 %, прожектор — вкл/выкл',
+    burner: S.burner, valve: S.valve, lamp: S.lamp.slice(), spin: S.rpm > 300, ok: S.ok, trip: Ls.trip, hold: Ls.hold };
+  const e = ENG[S.eng];
+  return { ...base, scene: 'eng-eff', help: 'Кнопки на весах — масса топлива, двигатель — сменить, машина — поехали',
+    eng: S.eng, name: e.name, fuel: e.fuel, eta: e.eta, col: parseInt(e.col.slice(1), 16), mf: S.mf, driving: S.driving, arrived: S.arrived,
+    D: Ls.D, F: Ls.F, km: G3.km, Q1: MJ(Q1()), A: MJ(Ause()), Q2: MJ(Q1() - Ause()), range: Math.round(range3()), runs: S.runs.length, petrol: S.petrol, diesel: S.diesel };
+};
+// values that change every frame (crank angle, valves, pressure, rpm, car position) — read by the scene in kit.onFrame
+window.LUCH_REAL.live = () => {
+  const id = LID();
+  if (id === 'ice') {
+    const a = loc(), k = strokeOf(a), gs = gasState(a);
+    let gcol = '#7fc4ff', gop = 0.28;
+    if (gs === 'mix' && k === 1) gop = 0.28 + 0.35 * (a - 180) / 180;
+    if (gs === 'mix' && k === 2) gop = 0.5 - 0.25 * (a - 360) / 180;
+    if (gs === 'burn') { const u = (a - S.sparkAt) / (540 - S.sparkAt); gcol = u < 0.3 ? '#ffd27a' : '#ff8a3c'; gop = 0.85 - 0.5 * u; }
+    if (gs === 'exhaust') { gcol = '#8b96ad'; gop = 0.35; }
+    return { phi: S.phi, a, k, inL: valveLift(a, 0), exL: valveLift(a, 540), gas: gs, gcol: parseInt(gcol.slice(1), 16), gop,
+      flash: performance.now() - S.flashT < 220, fired: S.fired, running: S.running, streak: S.streak };
+  }
+  if (id === 'turb') return { p: S.p, rpm: S.rpm, vent: S.vent, hold: S.hold, f: freq(), flow: flow() };
+  return { pos: S.pos, left: S.left, driving: S.driving };
+};
+window.LUCH_REAL.click = k => {
+  if (k === 'starter' && S.running) k = 'stop';
+  if (k === 'turn' && S.running) { toast('Двигатель работает сам. Нажмите красную кнопку, чтобы заглушить.'); return; }
+  act(k);
+};
+
 // for the AI tutor: what is on the screen right now
 window.LUCH_CONTEXT = () => {
   const m = model(), Ls = L(), id = Ls.id;
