@@ -766,7 +766,7 @@
   const open = () => { panel.hidden = false; btn.hidden = true; render(); setTimeout(() => (voiceMode ? orb : inp).focus(), 30); };
   function openPanel() { if (panel.hidden) open(); }
   $('#lt-bd').addEventListener('click', () => (board.open ? board.hide() : board.show()));
-  window.LuchTutor = { ask: q => { openPanel(); ask(q); }, open: openPanel, board, highlight: el => highlightEl(el), hideTip: () => guide && guide.hide() };
+  window.LuchTutor = { ask: q => { openPanel(); ask(q); }, open: openPanel, board, highlight: el => highlightEl(el), hideTip: () => guide && guide.hide(), talk: t => guide && guide.talk(t) };
   const close = () => { setMode(false); if (dict) dict.abort(); panel.hidden = true; btn.hidden = false; btn.focus(); };
   // голос в первую очередь: кнопка сразу открывает разговор голосом (если ученик сам не выбрал текст)
   btn.addEventListener('click', () => {
@@ -934,7 +934,7 @@
     }
     const startAt = Date.now();
     (function boot() { if (lab() || home()) return; if (Date.now() - startAt < 6000) setTimeout(boot, 300); })();
-    return { show, hide };
+    return { show, hide, talk };
   })();
 
   if (document.getElementById('tab-overview') && !window.LuchShell) { const sc = document.createElement('script'); sc.src = '/luch/lab-shell.js'; document.head.appendChild(sc); }

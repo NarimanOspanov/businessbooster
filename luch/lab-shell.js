@@ -287,7 +287,7 @@
   // Плеер «Теории»: картинка на раздел + голос + подпись. Пауза доступна всегда.
   const imgUrl = i => '/api/tutor/story/img?k=' + encodeURIComponent(storyKey() + '|' + LANG2) + '&i=' + i;
   const tts = text => fetch('/api/tutor/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) }).then(r => r.ok ? r.blob() : null).catch(() => null);
-  let st = null; // { el, secs, i, paused, audio, voice:[promise], timer, run }
+  let st = null, lecture = null; // { el, secs, i, paused, audio, voice:[promise], timer, run }
   function stopStory() {
     if (!st) return;
     st.run = -1; clearTimeout(st.timer); clearInterval(st.factT); cancelAnimationFrame(st.kRaf);
@@ -335,6 +335,7 @@
       else if (a === 'close') stopStory();
       else if (a === 'again') stGo(0);
       else if (a === 'practice') toPractice();
+      else if (a === 'askq') { stopStory(); if (window.LuchTutor && window.LuchTutor.talk) window.LuchTutor.talk('Какой вопрос по объяснению? Спрашивай голосом — я слушаю. Можно и написать.'); }
     });
     el.querySelector('.pv h4').textContent = lessonTitle() || document.title;
     return el;
@@ -388,7 +389,14 @@
     if (i >= secs.length) { // конец
       journal(j => { j.theoryDone = true; });
       el.classList.add('done');
-      txt.innerHTML = '<b>Теория пройдена</b><p>Теперь самое интересное — попробуй сам в опыте.</p><div class="end"><button class="ls-btn main" data-a="practice">Теперь попробуй сам →</button><button class="ls-btn ghost" data-a="again">Посмотреть ещё раз</button></div>';
+      const outro = 'Если что-то осталось непонятным — спроси меня, я отвечу. А если всё ясно — попробуй сам в опыте.';
+      txt.innerHTML = '<b>Объяснение закончено</b><p>' + esc(outro) + '</p><div class="end"><button class="ls-btn main" data-a="askq">🎤 Задать вопрос</button><button class="ls-btn" data-a="practice">Теперь попробуй сам →</button><button class="ls-btn ghost" data-a="again">Посмотреть ещё раз</button></div>';
+      // наставник говорит это вслух, как продолжение объяснения
+      tts(outro).then(blob => {
+        if (!st || st.run !== my || !blob || blob.size < 100) return;
+        st.url = st.url || []; const u = st.url[99] = st.url[99] || URL.createObjectURL(blob);
+        st.audio.onended = null; st.audio.onerror = null; st.audio.src = u; st.audio.play().catch(() => {});
+      });
       return stPaint();
     }
     el.classList.remove('done');
@@ -442,7 +450,7 @@
       return;
     }
     if (st !== me) return;
-    st.secs = s.sections; step('text');
+    st.secs = s.sections; step('text'); lecture = s.sections;
     const first = [loadImg(0).then(x => (step('img'), x)), voiceOf(0).then(x => (step('voice'), x))];
     if (st.secs[1]) { loadImg(1); voiceOf(1); }
     await Promise.all(first);
@@ -554,6 +562,7 @@
     if (j.theoryDone) out.push('Теорию-лекцию прослушал полностью.');
     else if (j.heard && j.heard.length) out.push('Теорию-лекцию слушал частично: ' + j.heard.map(i => '«' + (j.titles || [])[i] + '»').join(', ') + ' (' + j.heard.length + ' из ' + (j.parts || 4) + ').');
     else out.push('Теорию-лекцию не слушал.');
+    if (lecture && (j.theoryDone || (j.heard && j.heard.length))) out.push('Текст объяснения, которое он слушал (отвечай на вопросы по нему, своими словами): ' + lecture.map(x => x.title + ': ' + x.text).join(' ').slice(0, 1600));
     if (reelBtn()) out.push(j.video ? 'Видео к уроку смотрел.' : 'Видео к уроку не смотрел.');
     const t = j.t || {};
     out.push('Время: теория ' + mins(t.theory) + ', практика ' + mins(t.practice) + ', ДЗ ' + mins(t.hw) + '. Сейчас открыта вкладка «' + (inHw ? 'ДЗ' : group === 'practice' ? 'Практика' : 'Теория') + '».');
