@@ -652,7 +652,10 @@ function tapName(p) {
   const G = NMG[S.nm];
   const j = G.V.find(i => Math.hypot(p.x - G.pos[i][0], p.y - G.pos[i][1]) < 22);
   if (j === undefined) return;
-  const ch = S.chain, k = ch.length;
+  chainTap(j);
+}
+function chainTap(j) {
+  const G = NMG[S.nm], ch = S.chain, k = ch.length;
   if (!k) S.chain = [j];
   else if (ch.includes(j)) { const i = ch.indexOf(j); S.chain = i === k - 1 ? ch.slice(0, -1) : ch.slice(0, i + 1); }
   else if (G.adj[ch[k - 1]].includes(j)) ch.push(j);
@@ -993,6 +996,38 @@ function setLesson(i) {
   const strip = $('#lessons'), cur = strip.querySelector('.lesson[aria-current="true"]');
   if (cur) strip.scrollLeft = cur.getBoundingClientRect().left - strip.getBoundingClientRect().left + strip.scrollLeft - (strip.clientWidth - cur.offsetWidth) / 2;
 }
+
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-chem-hydro.js): molecular model kit on a classroom table
+window.LUCH_REAL = () => {
+  const id = LID(), m = model(), base = { module: 'chem-hydro' };
+  if (id === 'carbon' || id === 'isomers') {
+    const d = { ...base, at: S.at.slice(), bd: { ...S.bd }, n: m.n, H: m.H, f: fml(m.n, m.H), chain: m.chainLen, rings: m.rings, pi: m.pi, lim: limit() };
+    if (id === 'carbon') return { ...d, scene: 'chhy-carbon', help: '«+» на доске — новый атом C, связь — сделать кратной, атом — убрать, кнопки — отменить и очистить',
+      got: GOALS.map(([k, n]) => [n, !!S.got[k]]) };
+    return { ...d, scene: 'chhy-iso', help: '«+» на доске — новый атом C, атом — убрать, таблички формул — C₄H₁₀, C₅H₁₂, C₆H₁₄',
+      N: S.n, total: ISO_N[S.n], name: m.canon ? m.name : null, canon: m.canon || null, found5: m.found5,
+      iso: Object.entries(S.iso[S.n]).map(([c, nm]) => ({ c, nm, bp: BP[nm] === undefined ? null : fmt(BP[nm], 1) })) };
+  }
+  if (id === 'structure') return { ...base, scene: 'chhy-struct', help: 'Модели сзади — выбрать молекулу, карточки спереди — sp³, sp², sp · тяните схему, чтобы повернуть',
+    mol: S.mol, wrong: S.wrong, real: fmt(m.real, 1),
+    mols: MOL3.map((M, i) => ({ name: M.name, f: M.f, cond: M.cond, atoms: M.atoms, bonds: M.bonds, arc: M.arc, pair: M.pair, ans: !!S.ans[i], hyb: S.ans[i] ? HYBN[M.hyb] : null })) };
+  const G = m.G, ch = S.chain, inC = new Set(ch), bonds = [], subs = [];
+  G.V.forEach(i => G.adj[i].forEach(j => { if (j > i) bonds.push([i, j]); }));
+  ch.forEach((v, i) => G.adj[v].forEach(w => { if (!inC.has(w)) subs.push({ a: w, name: branchName(w, v, G.adj), loc: i + 1 }); }));
+  return { ...base, scene: 'chhy-names', help: 'Атомы — отмечать главную цепь от C1, кнопки спереди — ‹ ›, перевернуть, сбросить',
+    nm: S.nm, total: NM.length, atoms: NM[S.nm].map(a => [a[0], a[1]]), bonds, chain: ch.slice(), subs, status: m.status, user: m.user, k: m.k,
+    done: !!S.named[S.nm], named: m.named };
+};
+// values that change every frame (the model spins on the scheme)
+window.LUCH_REAL.live = () => LID() === 'structure' ? { yaw: S.yaw, pitch: S.pitch } : null;
+window.LUCH_REAL.click = k => {
+  let r;
+  if ((r = /^add-(\d+)$/.exec(k))) return addAtom(+r[1]);
+  if ((r = /^rm-(\d+)$/.exec(k))) return removeAtom(+r[1]);
+  if ((r = /^gap-(\d+)-(\d+)$/.exec(k))) return tapGap(+r[1], +r[2]);
+  if ((r = /^at-(\d+)$/.exec(k))) return chainTap(+r[1]);
+  act(k);
+};
 
 // for the AI tutor: what is on the screen right now
 window.LUCH_CONTEXT = () => {

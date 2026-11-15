@@ -901,6 +901,36 @@ function setLesson(i) {
   if (cur) strip.scrollLeft = cur.getBoundingClientRect().left - strip.getBoundingClientRect().left + strip.scrollLeft - (strip.clientWidth - cur.offsetWidth) / 2;
 }
 
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-chem-hydro.js): models and real experiments on a classroom table
+window.LUCH_REAL = () => {
+  const id = LID(), m = model(), base = { module: 'chem-hydro' };
+  if (id === 'alkanes') return { ...base, scene: 'chhy-alk', help: '«−» и «+» — длина цепи, банка с хлором под лампой — Cl₂ + свет',
+    n: m.n, f: m.sub ? fml(m.n, m.h - 1, 'Cl') : m.f, name: m.sub ? clName(m.n) : ROOT[m.n], alk: ROOT[m.n], bp: fmt(m.bp, 1), bpv: m.bp, gas: m.gas, sub: m.sub,
+    seen: Object.keys(S.seen).map(Number).filter(k => k !== m.n).map(k => [k, BP[k]]) };
+  if (id === 'unsat') {
+    const t = S.tube;
+    return { ...base, scene: 'chhy-br', help: 'Баллон — подключить, пробирка или кнопка — пропустить 10 мл, штатив с пробирками — новая, таблички спереди — подписать баллон',
+      sel: S.sel, vol: t ? t.vol : 0, tcyl: t ? t.cyl : null, frac: Math.round(m.frac * 100) / 100,
+      lab: CYL.map(c => S.lab[c] ? GAS[S.lab[c]].name : null), res: CYL.map(c => S.res[c] === undefined ? null : Math.round(S.res[c])),
+      cur: S.lab[S.sel] || null, gases: Object.keys(GAS).map(g => ({ k: g, name: GAS[g].name, f: GAS[g].f, o: GAS[g].k + 1 })), right: m.labeled === 3 ? m.right : null };
+  }
+  if (id === 'arenes') return { ...base, scene: 'chhy-benz', help: 'Связи кольца — измерить, таблички — Кекуле или π-облако, склянки — бромная вода или Br₂ + FeBr₃',
+    view: S.view, meas: Object.keys(S.meas).map(Number), last: S.lastBond, react: S.react };
+  return { ...base, scene: 'chhy-oil', help: 'Колбы фракций — положить образец, реактор — крекинг C₁₆H₃₄, табличка «Сначала» — заново',
+    zones: ZONES.map(z => ({ n: z.n, t: z.t, c: z.c, lo: z.lo })), samples: SAMPLES.map(s => s.f), placed: SAMPLES.map((s, k) => S.placed[k] === undefined ? null : S.placed[k]),
+    s: m.s ? { f: m.s.f, name: m.s.name, bp: fmt(m.s.bp, 0) } : null, n: m.placed, cracked: S.cracked, T: Math.round(S.T / 5) * 5 };
+};
+// values that change every frame (bromine water fading, bubbles)
+window.LUCH_REAL.live = () => {
+  if (LID() !== 'unsat' || !S.tube) return null;
+  return { shown: S.tube.shown || 0, bub: (S.tube.bub || 0) > performance.now() };
+};
+window.LUCH_REAL.click = k => {
+  if (/^z\d$/.test(k)) return place(+k[1]);
+  if (/^b\d$/.test(k)) return measure(+k[1]);
+  act(k);
+};
+
 // for the AI tutor: what is on the screen right now
 window.LUCH_CONTEXT = () => {
   const m = model(), L = LESSONS[S.lesson], id = L.id;
