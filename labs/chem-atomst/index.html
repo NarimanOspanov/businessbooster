@@ -858,6 +858,41 @@ function setLesson(i) {
   if (cur) box.scrollLeft += cur.getBoundingClientRect().left - box.getBoundingClientRect().left - 8;
 }
 
+// «Как в жизни»: 3D-сцены кабинета химии (luch/real3d-chem-atom.js)
+let r3sh = null, r3fl = null;
+window.LUCH_REAL = () => {
+  const id = LID(), m = model(), base = { module: 'chem-atom' };
+  if (id === 'particles') return { ...base, scene: 'chat-particles', help: 'Лоток — добавить частицу, «−» — убрать',
+    p: m.p, n: m.n, e: m.e, A: m.A, q: m.q, s: m.s, name: cap(m.name), ion: m.s + (m.q ? sup(Math.abs(m.q) > 1 ? Math.abs(m.q) : '') + (m.q > 0 ? '⁺' : '⁻') : ''),
+    sh: m.e ? trim(conf(m.e)) : [], targets: T1.map(t => ({ nm: t.nm, got: !!S.found[t.k] })) };
+  if (id === 'isotopes') {
+    const nf = T2.filter(k => S.found[k]).length;
+    return { ...base, scene: 'chat-isotopes', help: 'Лоток — добавить нейтрон, «−n» — убрать, H C Cl — элемент, ±1 ±5 — доля хлора-35',
+      s: m.s, z: m.z, n: m.n, A: m.A, name: isoName(m.s, m.A), st: m.d ? m.d.st : 0, hl: m.d ? m.d.hl || '' : '',
+      slots: T2.filter(k => k.match(/^[A-Z][a-z]?/)[0] === m.s).map(k => { const A = +k.slice(m.s.length), dd = ISO[m.s].a[A]; return { A, got: !!S.found[k], cur: k === m.key, st: dd ? dd.st : 0 }; }),
+      nf, mix: Math.round(m.mix * 100), avg: num(m.avg, 2), ok: mixOk(m.mix) };
+  }
+  // вспышка: на каком кольце появился электрон и откуда он пришёл
+  const sh = S.sh.slice();
+  if (r3sh && r3sh.z === S.z3) {
+    const up = sh.findIndex((v, i) => v > r3sh.sh[i]), dn = sh.findIndex((v, i) => v < r3sh.sh[i]);
+    if (up >= 0) r3fl = { k: up, dir: dn > up ? 'down' : dn >= 0 ? 'up' : 'add', col: dn > up ? [0xff5a3a, 0x8fe06a, 0x7ab8ff][Math.min(2, dn - up - 1)] : 0, t: performance.now() };
+  }
+  r3sh = { z: S.z3, sh };
+  return { ...base, scene: 'chat-shells', help: 'Кольцо — посадить электрон, электрон — убрать, лоток — следующий электрон',
+    z: m.z, s: EL[m.z], name: cap(ELN[m.z]), n: Math.round(AR[m.z]) - m.z, sh, caps: CAPS, left: m.z - m.placed, ok: m.ok,
+    opts: T3.map(z => ({ z, s: EL[z], got: !!S.found[z] })) };
+};
+window.LUCH_REAL.live = () => ({ fl: r3fl ? { k: r3fl.k, dir: r3fl.dir, col: r3fl.col, age: (performance.now() - r3fl.t) / 1000 } : null });
+window.LUCH_REAL.click = k => {
+  if (/^tray-[pn]$/.test(k) && LID() === 'particles') return tap(k === 'tray-p' ? 'tp' : 'tn');
+  if (k === 'tray-e') return tap('te');
+  if (k === 'tray-n') return tap('nt');
+  if (k === 'et' || /^(sh|e3)-\d$/.test(k)) return tap(k);
+  if (/^mix[+-]\d$/.test(k)) return setMix(S.mix + (k[3] === '+' ? 1 : -1) * +k.slice(4) / 100);
+  act(k);
+};
+
 // for the AI tutor: what is on the screen right now
 window.LUCH_CONTEXT = () => {
   const m = model(), L = LESSONS[S.lesson], id = L.id;

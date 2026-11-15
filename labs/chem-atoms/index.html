@@ -1003,6 +1003,46 @@ function setLesson(i) {
   const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
+// «Как в жизни»: 3D-сцены кабинета химии (luch/real3d-chem-atom.js)
+let r3sel = null, r3bad = null;
+window.LUCH_REAL = () => {
+  const id = LID(), m = model(), base = { module: 'chem-atom' };
+  if (id === 'element') return { ...base, scene: 'chat-element', help: 'Лоток — добавить частицу, «−» — убрать, «Заново» — сначала',
+    p: m.p, n: m.n, e: m.e, A: m.A, q: m.q, sh: m.sh, s: m.el ? m.el.s : '', name: m.el ? m.el.name : '', ion: m.el ? ionName(m.el, m.q) : '' };
+  if (id === 'symbols') {
+    if (r3sel && S.placed[r3sel]) r3sel = null;
+    return { ...base, scene: 'chat-symbols', help: 'Плитка со знаком — взять, образец в витрине — положить к нему',
+      sel: r3sel, order: TILE_ORDER, tiles: TILE_ORDER.filter(s => !S.placed[s]),
+      cards: SYM.map(x => S.placed[x.s] ? { name: x.name, ok: true, s: x.s, pr: x.pr } : { name: x.name, ok: false }) };
+  }
+  if (id === 'formula') {
+    const left = {}; BUILD.forEach(s => left[s] = MAXA[s] - m.c[s]);
+    return { ...base, scene: 'chat-formula', help: 'Отделение набора — взять атом, атом на доске — убрать, ×1 ×2 ×3 — коэффициент',
+      c: { ...m.c }, left, tot: m.tot, f: m.f, k: m.k, mol: m.mol ? { key: m.mol.key, name: m.mol.name, a: m.mol.a.map(a => a[0]), b: m.mol.b } : null,
+      built: ['H2O', 'CO2', 'CH4'].map(k => ({ f: k, got: !!m.built[k] })) };
+  }
+  const isAtom = Object.values(m.sb.atoms).reduce((a, b) => a + b, 0) === 1;
+  return { ...base, scene: 'chat-mass', help: 'Гирька в футляре — на правую чашку, гирька на чашке — снять, ‹ › — другая частица',
+    sub: m.sb.id, name: m.sb.name, atom: isAtom, w: S.w.slice(), sum: m.sum, bal: m.bal, side: Math.sign(m.diff),
+    Mr: m.found[m.sb.id] || m.bal ? m.Mr : null, wt: WT, full: S.w.length >= WMAX };
+};
+// быстрые значения для сцены: угол коромысла (весы качаются плавно), последняя ошибка в витрине
+window.LUCH_REAL.live = () => ({ ang: S.ang, bad: r3bad ? { i: r3bad.i, age: (performance.now() - r3bad.t) / 1000 } : null });
+window.LUCH_REAL.click = k => {
+  if (/^tray-[pne]$/.test(k)) return addP(k[5], 1);
+  if (/^tile-/.test(k)) { const s = k.slice(5); r3sel = r3sel === s ? null : s; if (r3sel) toast(`Взят знак ${s}. Нажмите на образец в витрине.`); return; }
+  if (/^card-\d$/.test(k)) {
+    const i = +k.slice(5);
+    if (S.placed[SYM[i].s]) { toast(`Карточка «${SYM[i].name}» уже заполнена.`); return; }
+    if (!r3sel) { toast('Сначала возьмите плитку со знаком на подносе.'); return; }
+    if (place(r3sel, i)) r3sel = null; else r3bad = { i, t: performance.now() };
+    return;
+  }
+  if (/^(atom|in|w|pw)-/.test(k)) return tap(k);
+  if (k === 'reset') r3sel = null;
+  act(k);
+};
+
 // for the AI tutor: what is on the screen right now
 window.LUCH_CONTEXT = () => {
   const m = model(), L = LESSONS[S.lesson], id = L.id;
