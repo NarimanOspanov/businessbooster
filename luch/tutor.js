@@ -253,7 +253,7 @@
 
   const btn = document.createElement('button');
   btn.className = 'lt-btn'; btn.type = 'button'; btn.setAttribute('aria-label', 'Спросить наставника');
-  btn.innerHTML = `${AV}<span>Спросить наставника<small>подскажет по ситуации</small></span>`;
+  btn.innerHTML = `${AV}<span>Спросить наставника<small>поможет с заданием</small></span>`;
   const panel = document.createElement('section');
   panel.className = 'lt-panel'; panel.hidden = true; panel.setAttribute('aria-label', 'ИИ-наставник');
   panel.innerHTML = `
@@ -306,14 +306,14 @@
     let list = [];
     try { list = (window.LUCH_SUGGEST && window.LUCH_SUGGEST()) || []; } catch (e) {}
     if (!list.length) list = ['Объясни, что сейчас происходит в опыте', 'С чего начать?'];
-    sug.innerHTML = '<button type="button" data-ant="1">💡 Подскажи по ситуации</button>' + list.slice(0, 2).map(q => `<button type="button">${esc(q)}</button>`).join('');
+    sug.innerHTML = '<button type="button" data-ant="1">💡 Помоги</button>' + list.slice(0, 2).map(q => `<button type="button">${esc(q)}</button>`).join('');
     sug.hidden = busy || voiceMode;
   }
   function render() {
     log.innerHTML = '';
     if (!chat.length) {
       const h = document.createElement('div'); h.className = 'lt-hello';
-      h.innerHTML = '<b>Привет! Я твой наставник 🙂</b>Я вижу экран и что ты делаешь. Нажми 💡 — подскажу по ситуации, или просто спроси голосом.';
+      h.innerHTML = '<b>Привет! Я твой наставник 🙂</b>Я вижу экран и что ты делаешь. Нажми «💡 Помоги» — подскажу, что делать дальше, или просто спроси голосом.';
       log.appendChild(h);
     }
     chat.forEach(m => bubble(m.role, m.show || m.content, m.role === 'assistant'));
@@ -710,7 +710,7 @@
   async function anticipate() {
     if (busy) return;
     antAt = Date.now();
-    const show = '💡 Подскажи по ситуации';
+    const show = '💡 Помоги';
     if (voiceMode) { setVoice('thinking', ''); await ask(ANT, { voice: true, show }); await speaker.idle(); if (voiceMode && vState !== 'idle') turn(); }
     else await ask(ANT, { show });
   }

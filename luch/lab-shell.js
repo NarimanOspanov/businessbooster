@@ -244,7 +244,26 @@
     .ls-stage .pp span{display:none}
     .ls-stage .ctl{padding-bottom:max(16px,env(safe-area-inset-bottom))}
   }
-  @media (prefers-reduced-motion:reduce){.ls-stage .pic img.on{animation:none}.ls-stage{animation:none}}`;
+  .ls-stage .pv{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;gap:10px;padding:22px 28px;background:radial-gradient(120% 120% at 20% 0%,rgba(255,181,71,.16),transparent 60%),linear-gradient(135deg,#16213a,#0e1626);transition:opacity .5s ease}
+  .ls-stage .pic.has .pv{opacity:0;pointer-events:none}
+  .ls-stage .pv .k{font:500 11px/1 var(--font-mono,monospace);letter-spacing:.12em;text-transform:uppercase;color:var(--muted,#8b96ad)}
+  .ls-stage .pv h4{margin:0;font:500 clamp(18px,3.2vw,28px)/1.2 var(--font-display,"Unbounded",sans-serif);color:var(--fg,#e8ecf4);text-wrap:balance}
+  .ls-stage .pv ul{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px 14px;font:500 12.5px/1.3 var(--font-body,sans-serif);color:var(--muted,#8b96ad)}
+  .ls-stage .pv li:before{content:"";display:inline-block;width:9px;height:9px;margin-right:7px;border-radius:50%;border:2px solid currentColor;vertical-align:-1px;animation:ls-pulse 1.1s ease-in-out infinite}
+  .ls-stage .pv li.ok{color:#86e0a8}
+  .ls-stage .pv li.ok:before{background:currentColor;animation:none}
+  .ls-stage .pv .go{font:600 clamp(20px,3.6vw,32px)/1.2 var(--font-display,"Unbounded",sans-serif);color:var(--accent,#ffb547);animation:ls-in .3s ease}
+  @keyframes ls-pulse{50%{opacity:.35}}
+  .ls-stage .fact{font-size:15px;line-height:1.55;color:var(--fg,#e8ecf4);transition:opacity .4s ease;min-height:3.1em}
+  .ls-stage .fact.out{opacity:0}
+  .ls-stage .fact small{display:block;font:600 11px/1 var(--font-body,sans-serif);letter-spacing:.1em;text-transform:uppercase;color:var(--muted,#8b96ad);margin-bottom:7px}
+  .ls-stage .pic .wt{position:absolute;right:12px;bottom:12px;width:26px;height:26px;border-radius:50%;border:3px solid rgba(255,255,255,.25);border-top-color:var(--accent,#ffb547);animation:ls-spin .8s linear infinite;opacity:0;transition:opacity .2s}
+  .ls-stage.wait .pic .wt{opacity:1}
+  @keyframes ls-spin{to{transform:rotate(360deg)}}
+  .ls-stage .txt p .w{color:var(--muted,#8b96ad);transition:color .12s ease;border-radius:4px}
+  .ls-stage .txt p .w.sp{color:var(--fg,#e8ecf4)}
+  .ls-stage .txt p .w.cur{color:#0b1019;background:var(--accent,#ffb547);box-shadow:0 0 0 2px var(--accent,#ffb547)}
+  @media (prefers-reduced-motion:reduce){.ls-stage .pic img.on{animation:none}.ls-stage{animation:none}.ls-stage .pv li:before,.ls-stage .pic .wt{animation:none}}`;
   document.head.appendChild(css2);
   const story = document.createElement('div'); story.className = 'ls-story';
   sub.after(story);
@@ -271,7 +290,7 @@
   let st = null; // { el, secs, i, paused, audio, voice:[promise], timer, run }
   function stopStory() {
     if (!st) return;
-    st.run = -1; clearTimeout(st.timer);
+    st.run = -1; clearTimeout(st.timer); clearInterval(st.factT); cancelAnimationFrame(st.kRaf);
     try { st.audio.pause(); st.audio.removeAttribute('src'); } catch (e) {}
     (st.url || []).forEach(u => u && URL.revokeObjectURL(u));
     st.el.remove(); removeEventListener('keydown', stKeys, true); st = null;
@@ -299,8 +318,9 @@
   }
   function stShell() {
     const el = document.createElement('div'); el.className = 'ls-stage'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Теория');
-    el.innerHTML = '<div class="frame"><div class="pic"><div class="ph"><span>Готовлю лекцию…</span></div></div>' +
-      '<div class="txt" data-noi18n><b></b><p>Готовлю лекцию… это займёт несколько секунд.</p></div>' +
+    el.innerHTML = '<div class="frame"><div class="pic"><div class="pv"><div class="k">Урок ' + (lessonIdx() + 1) + ' · теория</div><h4></h4>' +
+      '<ul><li data-s="text">Пишу лекцию</li><li data-s="img">Рисую картинки</li><li data-s="voice">Записываю голос</li></ul></div><i class="wt"></i></div>' +
+      '<div class="txt" data-noi18n><b>Готовлю лекцию</b><div class="fact"></div></div>' +
       '<div class="dots"></div>' +
       '<div class="ctl"><button class="ic" data-a="prev" aria-label="Назад">‹</button><button class="pp" data-a="pp"></button><button class="ic" data-a="next" aria-label="Дальше">›</button>' +
       '<span class="sp"></span><button class="ls-btn ghost" data-a="practice">К практике →</button><button class="ic x" data-a="close" aria-label="Закрыть">✕</button></div></div>';
@@ -316,8 +336,48 @@
       else if (a === 'again') stGo(0);
       else if (a === 'practice') toPractice();
     });
+    el.querySelector('.pv h4').textContent = lessonTitle() || document.title;
     return el;
   }
+  // пока готовится лекция — полезные факты с этой же страницы
+  function pageFacts() {
+    const txt = [...document.querySelectorAll('#pane-overview p, #pane-overview li')].map(e => e.textContent.replace(/\s+/g, ' ').trim()).join(' ');
+    return (txt.match(/[^.!?]+[.!?]/g) || []).map(x => x.trim()).filter(x => x.length >= 40 && x.length <= 180);
+  }
+  function factsLoop(me) {
+    const box = me.el.querySelector('.fact'), list = pageFacts();
+    if (!list.length) { box.innerHTML = '<small>Минутку</small>Сейчас будет короткая лекция с картинками: что это, зачем нужно, как работает и немного истории.'; return; }
+    let k = 0;
+    const show = () => { box.innerHTML = '<small>Пока готовлю — знаете ли вы?</small>' + esc(list[k % list.length]); };
+    show();
+    me.factT = setInterval(() => { box.classList.add('out'); setTimeout(() => { k++; show(); box.classList.remove('out'); }, 400); }, 4800);
+  }
+  // слова текста становятся «караоке»: подсвечиваем то, что сейчас звучит
+  function karaoke(p, text) {
+    p.innerHTML = text.split(/(\s+)/).map(t => /^\s+$/.test(t) ? t : '<span class="w">' + esc(t) + '</span>').join('');
+    const ws = [...p.querySelectorAll('.w')], cum = []; let tot = 0;
+    ws.forEach(w => { const t = w.textContent; tot += t.length + 1 + (/[.!?…]$/.test(t) ? 7 : /[,;:—–)]$/.test(t) ? 3 : 0); cum.push(tot); });
+    return { ws, cum, tot, at: -1 };
+  }
+  function karaokeTick() {
+    if (!st || !st.k) return;
+    const a = st.audio, K = st.k;
+    if (a.duration && isFinite(a.duration) && a.currentTime > 0) {
+      const lead = 0.12, f = Math.max(0, Math.min(1, (a.currentTime - lead) / Math.max(0.5, a.duration - lead - 0.25)));
+      const target = f * K.tot; let idx = K.cum.findIndex(c => c >= target); if (idx < 0) idx = K.ws.length - 1;
+      if (a.ended) idx = K.ws.length;
+      if (idx !== K.at) { K.ws.forEach((w, j) => { w.classList.toggle('sp', j < idx); w.classList.toggle('cur', j === idx); }); K.at = idx; }
+    }
+    st.kRaf = requestAnimationFrame(karaokeTick);
+  }
+  const loadImg = i => st.img[i] || (st.img[i] = new Promise(res => {
+    const im = new Image(); im.alt = ''; im.decoding = 'async';
+    const t = setTimeout(() => res(null), 30000);
+    im.onload = () => { clearTimeout(t); (im.decode ? im.decode().catch(() => {}) : Promise.resolve()).then(() => res(im)); };
+    im.onerror = () => { clearTimeout(t); res(null); };
+    im.src = imgUrl(i);
+  }));
+  const voiceOf = i => st.voice[i] || (st.voice[i] = tts(st.secs[i].text));
   function stGo(i) {
     if (!st) return;
     const my = ++st.run; clearTimeout(st.timer);
@@ -332,28 +392,35 @@
     }
     el.classList.remove('done');
     const sec = secs[i];
-    txt.innerHTML = '<b>' + esc(sec.title) + '</b><p>' + esc(sec.text) + '</p>';
-    // картинка: плавная смена, лёгкий наезд камеры
-    const old = pic.querySelector('img.on');
-    const im = new Image(); im.alt = ''; im.decoding = 'async';
-    im.onload = () => { if (!st || st.i !== i) return; pic.appendChild(im); requestAnimationFrame(() => { im.classList.add('on'); if (old) old.classList.remove('on'); setTimeout(() => old && old.remove(), 900); pic.classList.add('has'); }); };
-    im.onerror = () => { if (st && st.i === i && !pic.querySelector('img')) pic.classList.remove('has'); };
-    im.src = imgUrl(i);
-    if (!old) pic.classList.remove('has');
     stPaint();
-    // голос
-    const v = st.voice[i] || (st.voice[i] = tts(sec.text));
-    if (i + 1 < secs.length && !st.voice[i + 1]) st.voice[i + 1] = tts(secs[i + 1].text);
-    v.then(blob => {
+    // заранее готовим следующий раздел
+    if (i + 1 < secs.length) { loadImg(i + 1); voiceOf(i + 1); }
+    const waitT = setTimeout(() => { if (st && st.run === my) el.classList.add('wait'); }, 250);
+    Promise.all([loadImg(i), voiceOf(i)]).then(([im, blob]) => {
+      clearTimeout(waitT);
       if (!st || st.run !== my) return;
+      el.classList.remove('wait');
+      // картинка: плавная смена, лёгкий наезд камеры
+      const old = pic.querySelector('img.on');
+      if (im) {
+        const node = im.cloneNode(); pic.appendChild(node);
+        requestAnimationFrame(() => { node.classList.add('on'); if (old) old.classList.remove('on'); setTimeout(() => old && old.remove(), 900); pic.classList.add('has'); });
+      } else pic.classList.add('has');
+      txt.innerHTML = '<b>' + esc(sec.title) + '</b><p></p>';
+      st.k = karaoke(txt.querySelector('p'), sec.text);
+      cancelAnimationFrame(st.kRaf); st.kRaf = requestAnimationFrame(karaokeTick);
       const nextUp = () => { if (st && st.run === my && !st.paused) stGo(i + 1); };
-      if (blob && blob.size > 100) {
-        st.url = st.url || []; st.url[i] = st.url[i] || URL.createObjectURL(blob);
-        st.audio.onended = () => setTimeout(nextUp, 700);
-        st.audio.onerror = () => { st.timer = setTimeout(nextUp, 6000); };
-        st.audio.src = st.url[i];
-        if (!st.paused) st.audio.play().catch(() => { st.paused = true; stPaint(); });
-      } else st.timer = setTimeout(nextUp, 7000);
+      // голос — когда картинка уже проявилась
+      st.timer = setTimeout(() => {
+        if (!st || st.run !== my) return;
+        if (blob && blob.size > 100) {
+          st.url = st.url || []; st.url[i] = st.url[i] || URL.createObjectURL(blob);
+          st.audio.onended = () => { karaokeTick(); setTimeout(nextUp, 800); };
+          st.audio.onerror = () => { st.timer = setTimeout(nextUp, 6000); };
+          st.audio.src = st.url[i];
+          if (!st.paused) st.audio.play().catch(() => { st.paused = true; stPaint(); });
+        } else { st.k.ws.forEach(w => w.classList.add('sp')); st.timer = setTimeout(nextUp, 7000); }
+      }, im && !old ? 650 : 450);
     });
   }
   async function playStory() {
@@ -361,17 +428,29 @@
     const audio = new Audio();
     // разблокируем звук сразу по нажатию (на телефонах иначе не заиграет)
     audio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA='; audio.play().catch(() => {});
-    st = { el: stShell(), secs: [], i: 0, paused: false, audio, voice: [], run: 0 };
+    st = { el: stShell(), secs: [], i: 0, paused: false, audio, voice: [], img: [], run: 0 };
     document.body.appendChild(st.el); addEventListener('keydown', stKeys, true);
     st.el.querySelector('[data-a="pp"]').innerHTML = '❚❚ <span>Пауза</span>';
     const me = st;
+    factsLoop(me);
+    const step = k => { const li = me.el.querySelector('.pv li[data-s="' + k + '"]'); if (li) li.classList.add('ok'); };
     let s; try { s = await fetchStory(); } catch (e) {
       if (st !== me) return;
+      clearInterval(me.factT);
       st.el.querySelector('.txt').innerHTML = '<b>Теория</b><p>Не получилось подготовить лекцию. Попробуйте ещё раз чуть позже.</p>';
       return;
     }
     if (st !== me) return;
-    st.secs = s.sections; stGo(0);
+    st.secs = s.sections; step('text');
+    const first = [loadImg(0).then(x => (step('img'), x)), voiceOf(0).then(x => (step('voice'), x))];
+    if (st.secs[1]) { loadImg(1); voiceOf(1); }
+    await Promise.all(first);
+    if (st !== me) return;
+    clearInterval(me.factT);
+    const pv = me.el.querySelector('.pv'); pv.querySelector('ul').outerHTML = '<div class="go">Готово, поехали!</div>';
+    await new Promise(r => setTimeout(r, 900));
+    if (st !== me) return;
+    stGo(0);
     st.el.querySelector('[data-a="pp"]').focus();
   }
   story.addEventListener('click', e => {
