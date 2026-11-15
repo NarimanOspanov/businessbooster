@@ -1068,6 +1068,48 @@ function setLesson(i) {
   const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-forces.js): the same set-up as real lab equipment
+window.LUCH_REAL = () => {
+  const id = LID(), Ls = L(), M = { module: 'forces' };
+  if (id === 'density') {
+    const sc = onScale();
+    return { ...M, scene: 'forces-density', help: 'Брусок — выбрать, весы или мензурка — положить его туда',
+      loc: { ...S.loc }, sel: S.sel, level: level1(), w: sc ? body(sc).m : 0, water: Ls.water, ans: S.ans,
+      bodies: Ls.bodies.map(b => ({ id: b.id, V: b.V })) };
+  }
+  if (id === 'gravity') {
+    const p = planet();
+    return { ...M, scene: 'forces-gravity', help: 'Ящик — поднять и отпустить, глобус — планета, гиря — +0,5 кг',
+      planet: p.id, name: p.name, g: p.g, m: S.mass, F: Math.round(S.mass * p.g * 10) / 10 };
+  }
+  if (id === 'hooke') return { ...M, scene: 'forces-hooke', help: 'Стопка грузов — повесить, грузы на крючке — снять, пружины — сменить',
+    spr: S.spr, k: sprK(), n: S.n, nMax: Ls.nMax, kOk: S.kOk };
+  if (id === 'friction') return { ...M, scene: 'forces-friction', help: 'Рука — тянуть, брусок — груз 1 кг, пластины — поверхность',
+    surf: S.surf, sname: surf().name, bm: S.bm, rec: Object.keys(S.rec).map(k => `${S.rec[k].surf}, ${S.rec[k].m} кг → ${fmt(S.rec[k].F, 1)} Н`) };
+  if (id === 'dyno') return { ...M, scene: 'forces-dyno', help: 'Предметы — подвесить на крючок, подвешенный — снять',
+    hung: S.hung, div: S.div, read: S.read };
+  return null;
+};
+// live values for smooth motion in 3D (falling crate, swinging spring, sliding block)
+window.LUCH_REAL.live = () => {
+  const id = LID();
+  if (id === 'gravity') return { h: S.h };
+  if (id === 'hooke') return { dl: S.disp / D3.cm };
+  if (id === 'friction') return { b: S.b, F: F4(), slide: sliding4(), edge: S.edge, pull: S.pull || S.str > 0 };
+  if (id === 'dyno') return { F: S.disp / D5.pxN };
+  return null;
+};
+window.LUCH_REAL.click = k => {
+  const id = LID();
+  if (id === 'density' && k.startsWith('blk-')) { const b = k.slice(4); if (S.loc[b] !== 'shelf') place1(b, 'shelf'); else act('sel-' + b); return; }
+  if (id === 'gravity' && k === 'pcycle') { const P = L().planets, i = P.findIndex(p => p.id === S.planet); return setPlanet(P[(i + 1) % P.length].id); }
+  if (id === 'gravity' && k === 'mcycle') return setMass(S.mass >= 20 ? 0.5 : S.mass + 0.5);
+  if (id === 'hooke' && k === 'n+' && S.n >= L().nMax) return toast('Все грузы уже на крючке.');
+  if (id === 'friction' && k === 'bmt') return act('bm-' + (S.bm === 1 ? 2 : 1));
+  if (id === 'dyno' && k === 'hung') return hang5(null);
+  act(k);
+};
+
 // for the AI tutor: what is on the screen right now
 window.LUCH_CONTEXT = () => {
   const m = model(), Ls = L(), id = Ls.id;

@@ -993,6 +993,67 @@ window.LUCH_SUGGEST = () => {
   return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
 };
 
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-pressure.js): the same set-up as real lab equipment
+window.LUCH_REAL = () => {
+  const id = LID(), r1 = x => Math.round(x * 10) / 10, r2 = x => Math.round(x * 100) / 100, M = { module: 'pressure' };
+  if (id === 'solid') {
+    const p = pSolid();
+    return { ...M, scene: 'pressure-solid', help: 'Ботинок — сменить обувь, рюкзак — +5 кг, турист — на одну ногу',
+      shoe: S.shoe, one: S.one, load: S.load, F: (L().body + S.load) * g, Sa: r2(SHOES[S.shoe].s * (S.one ? 1 : 2)), p: r1(p / 1000),
+      sink: p > L().pMax, sv: r1(sinkOf(p)), shoeName: SHOES[S.shoe].n };
+  }
+  if (id === 'liquid') return { ...M, scene: 'pressure-liquid', help: 'Ручка штатива — глубже, датчик — повернуть, бак — сменить жидкость',
+    h: S.hd / 10, liq: S.liq, liqName: LIQ[S.liq].n, rho: LIQ[S.liq].r, col: LIQ[S.liq].c, or: S.orient, p: r1(pLiq() / 1000) };
+  if (id === 'atm') {
+    const mm = mmHg(S.H); let pl = -1; PLACES.forEach((P, i) => { if (P.H === S.H) pl = i; });
+    return { ...M, scene: 'pressure-atm', help: 'Гора — следующее место, альпинист — выше на 100 м',
+      H: S.H, mm: Math.round(mm), kpa: r1(mm * PA_MM / 1000), place: pl >= 0 ? PLACES[pl].n : '', ok: S.reached };
+  }
+  if (id === 'arch') {
+    const A = archF(), lq = LIQ[S.liq2];
+    return { ...M, scene: 'pressure-arch', help: 'Динамометр — опустить, цилиндр на столе — сменить, сосуд — жидкость',
+      tr: S.tr, f: r2(fSub()), body: S.body, bodyName: ABODY[S.body].n, P: r2(A.P), Fa: r2(A.Fa), F: r2(A.F), Vs: Math.round(A.Vs),
+      liq: S.liq2, liqName: lq.n, rho: lq.r, col: lq.c };
+  }
+  if (id === 'float') {
+    const o = outcomeOf(S.fb, S.fl);
+    return { ...M, scene: 'pressure-float', help: 'Кубик — бросить/вынуть, кубики в лотке — выбрать, сосуд — жидкость',
+      fb: S.fb, fl: S.fl, bodyName: FB[S.fb].n, bodyRho: FB[S.fb].r, bodyCol: FB[S.fb].c, liqName: LIQ[S.fl].n, rho: LIQ[S.fl].r, col: LIQ[S.fl].c,
+      mode: S.fmode, out: o, k: S.fmode === 'rest' ? r2(subFrac()) : null,
+      bodies: FBK.map(k => ({ k, n: FB[k].n, c: FB[k].c })) };
+  }
+  return null;
+};
+// the cube falls frame by frame in the experiment: the 3D scene reads its height here (SVG units) and the geometry
+window.LUCH_REAL.live = () => ({ fy: S.fy, ys: FT.ys, yb: FT.yb, A: FT.A, top: FT.top, k: subFrac(), mode: S.fmode });
+window.LUCH_REAL.click = k => {
+  const id = LID(), nextOf = (arr, cur) => arr[(arr.indexOf(cur) + 1) % arr.length];
+  if (id === 'solid') {
+    if (k === 'shoe') return act('shoe-' + nextOf(Object.keys(SHOES), S.shoe));
+    if (k === 'pack') return setLoad(S.load >= 30 ? 0 : S.load + 5);
+    if (k === 'one') return act('one');
+  }
+  if (id === 'liquid') {
+    if (k === 'hcycle') return setDepth(S.hd >= 30 ? 0 : Math.floor(S.hd / 5) * 5 + 5);
+    if (k === 'or') return act('or');
+    if (k === 'liq') return act('liq-' + nextOf(LIQ2, S.liq));
+  }
+  if (id === 'atm') {
+    if (k === 'plnext') { const i = PLACES.findIndex(P => P.H > S.H); return act('pl-' + (i < 0 ? 0 : i)); }
+    if (k === 'up') return act(S.H >= 7100 ? 'pl-0' : 'alt+100');
+  }
+  if (id === 'arch') {
+    if (k === 'lower') { const st = [0, 50, 62, 75, 87, 100], n = st.find(v => v > S.tr); return setTr(n === undefined ? 0 : n); }
+    if (k === 'swap') return act('body-' + (S.body === 'al' ? 'st' : 'al'));
+    if (k === 'liq') return act('liq2-' + nextOf(LIQ4, S.liq2));
+  }
+  if (id === 'float') {
+    if (k === 'cube') return act(S.fmode === 'held' ? 'drop' : 'lift');
+    if (k === 'liq') return act('flnext');
+    if (k.startsWith('fb-')) return act(k);
+  }
+};
+
 setLesson(S.lesson);
 fit();
 requestAnimationFrame(loop);
