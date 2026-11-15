@@ -629,7 +629,8 @@
     let context = '';
     try { context = (window.LUCH_CONTEXT && window.LUCH_CONTEXT()) || ''; } catch (e) {}
     try { const sh = window.LuchShell; if (sh && sh.whatNext) context += '\n' + sh.whatNext(); } catch (e) {}
-    const acts = recentActions(); if (acts) context += '\nПоследние действия ученика на странице (от старых к новым):\n' + acts;
+    try { const sh = window.LuchShell; if (sh && sh.learnState) context += '\nЧто ученик уже сделал на этом уроке: ' + sh.learnState(); } catch (e) {}
+    const acts = recentActions(); if (acts) context += '\nЖурнал действий ученика (от старых к новым):\n' + acts;
     const feed = opts.voice ? sentenceFeeder() : null;
     let text = '', drawn = 0; const fired = new Set();
     const elements = collectElements();
@@ -705,12 +706,14 @@
   vmBtn.addEventListener('click', () => { setMode(!voiceMode); ls.set('luch-tutor-mode', voiceMode ? 'voice' : 'text'); });
   $('#lt-vend').addEventListener('click', () => { setMode(false); ls.set('luch-tutor-mode', 'text'); setTimeout(() => inp.focus(), 30); });
 
-  const ANT = 'Я нажал кнопку наставника. Не жди вопроса: посмотри, что сейчас на экране и что я делал до этого, и сам догадайся, что мне сейчас нужно. Застрял на задании — подскажи один следующий шаг (не решай за меня) и подсвети, куда нажать. Только начал — скажи, с чего начать. Ошибся — мягко покажи где. Всё сделал — похвали и предложи, что дальше. 1–3 коротких предложения, в конце короткий вопрос, чтобы я мог ответить голосом.';
+  const ANT_BASE = 'Я нажал «Помоги». Не жди вопроса и не спрашивай, чем помочь. Сам пойми, что мне сейчас нужно, по всему, что знаешь: что на экране и в каком состоянии опыт, что я нажимал и выставлял (журнал действий), какие сообщения показывал опыт, прослушал ли я теорию и смотрел ли видео, сколько времени где провёл, как дела с ДЗ, и что мы уже обсуждали в этом разговоре (голосом и текстом). Найди одну самую вероятную причину, почему я застрял или что мне сейчас пригодится, и помоги точно в эту точку. Не повторяй дословно то, что уже говорил раньше. Если ошибка в понимании идеи и теорию я не слушал — объясни идею одной-двумя фразами на примере из жизни. Если всё уже сделано — коротко похвали и предложи следующий шаг (ДЗ или следующий урок). Ответ короткий: 1–3 предложения, подсвети нужное место на странице.';
+  const ANT_LEVEL = ['', ' Это первая просьба о помощи: дай наводящий вопрос или намёк, не говори ответ.', ' Я уже просил помощи: теперь скажи конкретный следующий шаг — что нажать или какое значение выставить.', ' Я прошу помощи уже не в первый раз и, видимо, застрял всерьёз: разбери решение по шагам (2–4 коротких шага) и объясни, почему так.'];
   let antAt = 0;
   async function anticipate() {
     if (busy) return;
     antAt = Date.now();
-    const show = '💡 Помоги';
+    const show = '💡 Помоги', sh = window.LuchShell;
+    const n = sh && sh.noteHelp ? sh.noteHelp() : 1, ANT = ANT_BASE + ANT_LEVEL[Math.min(3, n)] + ' В конце — короткий вопрос, чтобы я мог ответить голосом.';
     if (voiceMode) { setVoice('thinking', ''); await ask(ANT, { voice: true, show }); await speaker.idle(); if (voiceMode && vState !== 'idle') turn(); }
     else await ask(ANT, { show });
   }
@@ -727,14 +730,22 @@
     const last = actions[actions.length - 1];
     if (last && last.line === line) { last.at = Date.now(); return; }
     if (last && kind === 'изменил' && last.line.startsWith('изменил «' + l + '»')) { last.line = line; last.at = Date.now(); return; }
-    actions.push({ line, at: Date.now() }); if (actions.length > 14) actions.shift();
+    actions.push({ line, at: Date.now() }); if (actions.length > 24) actions.shift();
   };
   document.addEventListener('click', e => { const el = e.target.closest('button,a,[role="button"],[role="tab"],[data-reel],label,.lesson,svg [data-k],[onclick]'); if (el) logAct('нажал', el); }, true);
   document.addEventListener('change', e => { const el = e.target; if (el.matches && el.matches('input,select,textarea')) logAct('изменил', el, el.type === 'checkbox' ? (el.checked ? 'вкл' : 'выкл') : String(el.value).slice(0, 30)); }, true);
   document.addEventListener('pointerup', e => { const el = e.target.closest && e.target.closest('svg,canvas'); if (el && !e.target.closest('button') && !el.closest('.lt-board,.lt-panel')) logAct('двигал/нажал на схеме', el.closest('[aria-label],[id]') || el); }, true);
+  const note = line => { actions.push({ line, at: Date.now() }); if (actions.length > 24) actions.shift(); };
+  window.LuchTutorNote = note;
+  const watchToast = () => {
+    const t = document.getElementById('toast'); if (!t) return;
+    let lastT = '';
+    new MutationObserver(() => { const x = t.textContent.replace(/\s+/g, ' ').trim(); if (x && x !== lastT) { lastT = x; note('опыт показал сообщение: «' + x.slice(0, 160) + '»'); } }).observe(t, { childList: true, characterData: true, subtree: true });
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watchToast); else watchToast();
   function recentActions() {
     const now = Date.now();
-    return actions.filter(a => now - a.at < 10 * 60e3).slice(-10).map(a => '- ' + Math.round((now - a.at) / 1000) + ' с назад: ' + a.line).join('\n');
+    return actions.filter(a => now - a.at < 20 * 60e3).slice(-16).map(a => '- ' + Math.round((now - a.at) / 1000) + ' с назад: ' + a.line).join('\n');
   }
   const open = () => { panel.hidden = false; btn.hidden = true; render(); setTimeout(() => (voiceMode ? orb : inp).focus(), 30); };
   function openPanel() { if (panel.hidden) open(); }
@@ -798,6 +809,7 @@
       if (voiceMode && vState !== 'idle') turn();
     }
     function show(text, chips = [], o = {}) {
+      try { if (window.LuchTutorNote) window.LuchTutorNote('наставник показал подсказку: «' + String(text).slice(0, 140) + '»'); } catch (e) {}
       if (!o.force && Date.now() - lastAt < 40000) return;
       if (!panel.hidden) { if (o.inChat) { const d = bubble('assistant', text); scroll(); if (voiceMode && unlocked) { speaker.stop(); speaker.add(text); speaker.end(); } } return; }
       hide(); lastAt = Date.now();

@@ -386,6 +386,7 @@
     const el = st.el, secs = st.secs, pic = el.querySelector('.pic'), txt = el.querySelector('.txt');
     el.querySelector('.dots').innerHTML = secs.map((x, k) => '<button data-a="dot" data-i="' + k + '" class="' + (k < i ? 'on' : k === i ? 'on cur' : '') + '" aria-label="' + esc(x.title) + '"></button>').join('');
     if (i >= secs.length) { // конец
+      journal(j => { j.theoryDone = true; });
       el.classList.add('done');
       txt.innerHTML = '<b>Теория пройдена</b><p>Теперь самое интересное — попробуй сам в опыте.</p><div class="end"><button class="ls-btn main" data-a="practice">Теперь попробуй сам →</button><button class="ls-btn ghost" data-a="again">Послушать ещё раз</button></div>';
       return stPaint();
@@ -415,7 +416,7 @@
         if (!st || st.run !== my) return;
         if (blob && blob.size > 100) {
           st.url = st.url || []; st.url[i] = st.url[i] || URL.createObjectURL(blob);
-          st.audio.onended = () => { karaokeTick(); setTimeout(nextUp, 800); };
+          st.audio.onended = () => { karaokeTick(); journal(j => { j.heard = [...new Set([...(j.heard || []), i])]; j.parts = secs.length; j.titles = secs.map(x => x.title); }); setTimeout(nextUp, 800); };
           st.audio.onerror = () => { st.timer = setTimeout(nextUp, 6000); };
           st.audio.src = st.url[i];
           if (!st.paused) st.audio.play().catch(() => { st.paused = true; stPaint(); });
@@ -534,5 +535,37 @@
     return 'Это последний урок темы. ' + (n && !n.map ? 'Кнопка › внизу ведёт на следующую тему: «' + n.t + '».' : 'Кнопка › внизу ведёт на карту предметов — там можно выбрать новую тему.');
   };
 
-  window.LuchShell = { lessonIdx, lessonUrl, openHw, openTab, whatNext, nextTopic: () => nextTopic, goNext, startPending: () => startShown, storyPlaying: () => !!st };
+  // ---------- журнал урока: что ученик уже сделал (для наставника и кнопки «Помоги») ----------
+  const JKEY = () => 'oe-learn:' + location.pathname + ':' + lessonIdx();
+  const jLoad = () => { try { return JSON.parse(localStorage.getItem(JKEY()) || 'null') || {}; } catch (e) { return {}; } };
+  function journal(fn) { const j = jLoad(); j.first = j.first || Date.now(); fn(j); try { localStorage.setItem(JKEY(), JSON.stringify(j)); } catch (e) {} }
+  journal(() => {});
+  // время в «Теории», «Практике» и «ДЗ», только пока вкладка браузера видна
+  setInterval(() => { if (document.hidden) return; const g = inHw ? 'hw' : group; journal(j => { j.t = j.t || {}; j.t[g] = (j.t[g] || 0) + 5; }); }, 5000);
+  document.addEventListener('click', e => {
+    if (e.target.closest('[data-reel]')) journal(j => { j.video = (j.video || 0) + 1; });
+    const hb = e.target.closest('#pane-hw [data-a="hint"]'); if (hb) journal(j => { j.hwHints = (j.hwHints || 0) + 1; });
+  }, true);
+  const mins = sec => sec >= 90 ? Math.round(sec / 60) + ' мин' : (sec || 0) + ' с';
+  function learnState() {
+    const j = jLoad(), out = [];
+    const onLesson = j.first ? Math.round((Date.now() - j.first) / 60000) : 0;
+    out.push('На этом уроке ученик ' + (onLesson < 2 ? 'только начал' : 'уже около ' + onLesson + ' мин') + '.');
+    if (j.theoryDone) out.push('Теорию-лекцию прослушал полностью.');
+    else if (j.heard && j.heard.length) out.push('Теорию-лекцию слушал частично: ' + j.heard.map(i => '«' + (j.titles || [])[i] + '»').join(', ') + ' (' + j.heard.length + ' из ' + (j.parts || 4) + ').');
+    else out.push('Теорию-лекцию не слушал.');
+    if (reelBtn()) out.push(j.video ? 'Видео к уроку смотрел.' : 'Видео к уроку не смотрел.');
+    const t = j.t || {};
+    out.push('Время: теория ' + mins(t.theory) + ', практика ' + mins(t.practice) + ', ДЗ ' + mins(t.hw) + '. Сейчас открыта вкладка «' + (inHw ? 'ДЗ' : group === 'practice' ? 'Практика' : 'Теория') + '».');
+    const hw = load();
+    if (hw && hw.tasks) { const ok = hw.tasks.filter(x => x.ok).length, tried = hw.tasks.filter(x => x.mine && !x.ok); out.push('ДЗ: решено ' + ok + ' из ' + hw.tasks.length + (tried.length ? ', неверные ответы: ' + tried.map(x => '«' + x.mine + '» на «' + x.q.slice(0, 80) + '»').join('; ') : '') + (j.hwHints ? ', подсказки к задачам открывал ' + j.hwHints + ' раз' : '') + '.'); }
+    else out.push('ДЗ ещё не открывал.');
+    const recent = (j.helps || []).filter(x => Date.now() - x < 20 * 60e3).length;
+    if (recent) out.push(recent > 1 ? 'Кнопку «Помоги» на этом уроке нажимает уже ' + recent + '-й раз за 20 минут.' : 'Кнопку «Помоги» на этом уроке нажал впервые.');
+    return out.join(' ');
+  }
+  // уровень подсказки: 1 — наводящий вопрос, 2 — конкретный шаг, 3 — разбор по шагам
+  function noteHelp() { let n = 0; journal(j => { j.helps = (j.helps || []).filter(x => Date.now() - x < 20 * 60e3); j.helps.push(Date.now()); n = j.helps.length; }); return n; }
+
+  window.LuchShell = { lessonIdx, lessonUrl, openHw, openTab, learnState, noteHelp, whatNext, nextTopic: () => nextTopic, goNext, startPending: () => startShown, storyPlaying: () => !!st };
 })();
