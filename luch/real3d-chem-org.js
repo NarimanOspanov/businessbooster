@@ -385,7 +385,7 @@
       if (d.labs[i]) { const s = h.sticker(7.2, 2.4, d.labs[i], '#1b1610', '#e8f3ff', 220); at(s, 0, 17.6, 2.45, tg); }
       if (sel) h.halo(tg, 0, 6, 0, 14);
     });
-    tag(R1.userData.W(RX, ty + 30, RZ), 'Пробирка ' + 'ABC'[d.sel], d.cur ? 'бирка: ' + d.cur : 'без подписи');
+    tag(R1.userData.W(RX - 6, ty + 3, RZ + 8), 'Пробирка ' + 'ABC'[d.sel], d.cur ? 'бирка: ' + d.cur : 'без подписи');
     // --- проба: водяная баня на треноге над спиртовкой или пробирка в держателе ---
     const R2 = h.zone(g, 10, -6, 1.3), W = R2.userData.W, SX = 0, SZ = 0, heat = d.rg === 'cut' || d.rg === 'ag', TR = 2.6;
     let tubeG, tubeY0;
@@ -440,7 +440,7 @@
       if (upd) { const f = upd; kit.onFrame(() => { const L = live() || {}; f(kit.reduce ? 1 : clamp(L.ph ?? 1, 0, 1)); }); }
       const bub = heat && !d.done ? h.bubbles(tubeG, 0, 0.6, 0, 1.3, 6) : null; if (bub) bub.set(0.7, LV - 0.6, 0.3, 0.8);
       const RG = { cu: 'Cu(OH)₂', cut: 'Cu(OH)₂ + t', ag: 'Ag₂O (NH₃) + t' };
-      tag(W(SX + 2, tubeY0 + 30, SZ), 'Проба ' + 'ABC'[d.sel] + ' + ' + RG[rg], d.done ? d.txt : 'идёт опыт…', d.done && ((rg === 'ag' && sub === 2) || (rg === 'cut' && sub === 2) || (rg === 'cu' && sub === 1)));
+      tag(W(SX + 2, tubeY0 + 30, SZ), 'Проба ' + 'ABC'[d.sel] + ' + ' + RG[rg], d.done ? ({ cu: sub === 1 ? 'ярко-синий раствор' : 'осадок не изменился', cut: sub === 1 ? 'синий, осадка нет' : sub === 0 ? 'осадок почернел: CuO' : 'кирпично-красный Cu₂O', ag: sub === 2 ? 'серебряное зеркало' : 'без изменений' })[rg] : 'идёт опыт…', d.done && ((rg === 'ag' && sub === 2) || (rg === 'cut' && sub === 2) || (rg === 'cu' && sub === 1)));
     } else tag(W(SX + 2, tubeY0 + 30, SZ), 'Пробирка для пробы', 'выберите реактив');
     // --- реактивы ---
     const R3 = [{ k: 'r-cu', lab: 'Cu(OH)₂', liq: 0x4a9be0, cap: 0x3b6fd8, x: 31 }, { k: 'r-cut', lab: 'Cu(OH)₂\n+ нагрев', liq: 0x4a9be0, cap: 0xe0473a, x: 42 }, { k: 'r-ag', lab: 'Ag₂O\n+ NH₃', liq: 0xe8eef4, cap: 0x2c3240, x: 53, glass: 0x8a5a2b }];
@@ -592,9 +592,9 @@
       if (done) {
         h.tubeLiquid(pt.g, 2.4, 5, 0xd7ecf7, 0.35); h.tubeLayer(pt.g, 2.4, 5, 9, 0xf3dc95, 0.85);
         aroma(kit, g, PX, ty + 21, PZ);
-        const ic = fruitIcon(kit, h, g, d.smell); if (ic) { ic.position.set(PX + 9, ty + 14, PZ); if (!kit.reduce) kit.onFrame((dt, t) => { ic.rotation.y = t * 0.8; }); }
-        tag(v3(PX + 2, ty + 32, PZ), d.ef + ' · ' + d.en, 'запах: ' + d.smell, true);
-      } else tag(v3(PX, ty + 24, PZ), 'Продукт', 'появится здесь');
+        const ic = fruitIcon(kit, h, g, d.smell); if (ic) { ic.scale.setScalar(1.7); ic.position.set(PX + 12, ty + 16, PZ); if (!kit.reduce) kit.onFrame((dt, t) => { ic.rotation.y = t * 0.8; }); }
+        tag(v3(PX + 4, ty + 4, PZ + 10), d.ef + ' · ' + d.en, 'запах: ' + d.smell, true);
+      } else tag(v3(PX + 4, ty + 4, PZ + 10), 'Продукт', 'появится здесь');
       h.floorSticker(g, 2, ty, 18, 54, 6, d.acid + ' + ' + d.alc + ' ⇄ ' + d.ef + ' + H₂O', '#1b1610', '#fffaf0', 560);
       return;
     }
@@ -687,8 +687,8 @@
     tag(v3(-48 + d.monos.findIndex(m => m.k === d.mono) * 13, ty + 20, -22), 'Мономер ' + cur.name, d.f);
     // --- цепь на подставке ---
     const CZ = h.zone(g, -14, 12, 1.25), X0 = 0, Y0 = ty + 12, Z0 = 0, DX = 3.4;
-    at(box(58, 1.4, 10, C.WOOD2), 25, ty + 0.7, Z0, CZ);
-    for (const x of [8, 42]) at(cyl(0.4, Y0 - ty - 2, C.STEEL, { edges: false }), x, ty + 1.4 + (Y0 - ty - 2) / 2, Z0, CZ);
+    at(box(54, 1.4, 10, C.WOOD2), 24, ty + 0.7, Z0, CZ);
+    for (const x of [8, 40]) at(cyl(0.4, Y0 - ty - 2, C.STEEL, { edges: false }), x, ty + 1.4 + (Y0 - ty - 2) / 2, Z0, CZ);
     const chain = new T.Group(); at(chain, 0, 0, 0, CZ);
     at(h.ball(1.4, 0x5a6680, { seg: 14, seg2: 10 }), X0 - 3, Y0 - 1, Z0, chain);
     const rt = h.flat(2, 2, kit.textTex('R', '#ffffff', '#5a6680', 64, 64)); at(rt, X0 - 3, Y0 - 1, Z0 + 1.45, chain);
@@ -806,11 +806,11 @@
       const RES = { ash: 'серый пепел', crumb: 'чёрный хрупкий комочек', light: 'твёрдый светлый шарик', dark: 'твёрдый тёмный шарик', black: 'твёрдый чёрный шарик' };
       tag(v3(PX + 6, ty + 5, PZ + 8), 'Проба на огонь', d.burned ? 'запах: ' + d.smell + ' · ' + RES[d.res] : 'нажмите на спиртовку', d.burned);
       // лупа на подставке над образцом
-      const lg = new T.Group(); at(lg, -10, ty, 22, g); lg.rotation.y = 0.35;
+      const lg = new T.Group(); at(lg, 2, ty, 28, g); lg.rotation.y = 0.35;
       at(cyl(3, 1, C.DARK), 0, 0.5, 0, lg); at(cyl(0.4, 10, C.STEEL, { edges: false }), 0, 5.5, 0, lg);
       const ring = kit.mesh(new T.TorusGeometry(5, 0.6, 8, 32), 0x2c3240, { edges: false }); at(ring, 0, 15.5, 0, lg);
       const lens = new T.Mesh(kit.keep(new T.CircleGeometry(4.7, 32)), kit.keep(new T.MeshBasicMaterial({ map: lensTex(kit, F.kind, F.id) }))); at(lens, 0, 15.5, 0.05, lg);
-      tag(v3(-10, ty + 23, 22), 'Под лупой', F.id === 'wool' ? 'волос с чешуйками' : F.id === 'cotton' ? 'плоская извитая лента' : F.id === 'flax' ? 'нить с коленцами' : F.kind === 'cell' || F.kind === 'ac' ? 'нить с бороздками' : 'гладкая блестящая нить');
+      tag(v3(2, ty + 3, 33), 'Под лупой', F.id === 'wool' ? 'волос с чешуйками' : F.id === 'cotton' ? 'плоская извитая лента' : F.id === 'flax' ? 'нить с коленцами' : F.kind === 'cell' || F.kind === 'ac' ? 'нить с бороздками' : 'гладкая блестящая нить');
     } else tag(v3(PX, ty + 20, PZ - 2), 'Проба на огонь', 'сначала выберите моток');
   };
 
