@@ -235,6 +235,7 @@ function handle(req, res, deps) {
   if (p === "/api/tutor/hw") return handleHw(req, res, deps);
   if (p === "/api/tutor/story") return handleStory(req, res, deps);
   if (p === "/api/tutor/story/img") return handleStoryImg(req, res, deps);
+  if (p === "/api/tutor/formulas") return handleFormulas(req, res, deps);
   return handleChat(req, res, deps);
 }
 function handleTts(req, res, { readBody, clientIp }) {
@@ -413,6 +414,49 @@ function handleStory(req, res, { readBody, clientIp }) {
       send(200, await p);
     } catch (e) { console.log("[story] " + (e && e.message)); send(502, { error: "Не получилось подготовить историю. Попробуйте ещё раз." }); }
   })().catch(() => { try { send(500, { error: "error" }); } catch { /* уже ответили */ } });
+}
+
+// ---------- главные формулы урока ----------
+// POST /api/tutor/formulas { key, lang, context } → { formulas: [{ f, name, vars: [[буква, что это, единица]] }] }
+// Один раз на урок, хранится в luch.lesson_story с ключом «…|f».
+const FORMULAS = [
+  'Ты — учитель. По материалам урока ниже выпиши главные формулы этого урока: те, по которым считают в задании и в разделе «Расчёты». От 0 до 4 штук, самые важные первыми.',
+  'Пиши формулы простым текстом с юникодом: ², ³, ·, /, √, Δ, ρ, λ, η, индексы ₀₁₂, дроби через «/». Без LaTeX и без кода.',
+  'Для каждой формулы: f — сама формула; name — что по ней находят (2–4 слова); vars — расшифровка каждой буквы: [буква, что это, единица измерения в СИ или «—» если безразмерная].',
+  'Не выдумывай формул, которых нет в материале урока. Если урок описательный и формул в нём нет (например, биология или история) — верни пустой список.',
+  'Ответь только JSON: {"formulas":[{"f":"I = q / t","name":"сила тока","vars":[["I","сила тока","А"],["q","заряд","Кл"],["t","время","с"]]}]}',
+].join("\n");
+function handleFormulas(req, res, { readBody, clientIp }) {
+  const send = (code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(obj)); };
+  if (req.method !== 'POST') return send(405, { error: 'POST' });
+  (async () => {
+    let b = {};
+    try { b = JSON.parse(await readBody(req)) || {}; } catch { return send(400, { error: 'bad json' }); }
+    const base = String(b.key || '').slice(0, 280) + '|' + (LANG_NAMES[b.lang] ? b.lang : 'ru');
+    if (!/^\/[\w\-/]*\|\d+\|\w+$/.test(base)) return send(400, { error: 'key' });
+    const key = base + '|f';
+    const have = await storyGet(key);
+    if (have) return send(200, have);
+    const block = allowed(clientIp(req));
+    if (block) return send(429, { error: block });
+    try {
+      let p = storyPending.get(key);
+      if (!p) {
+        p = (async () => {
+          const j = jsonOf(await oneShot(FORMULAS + langRule(b.lang), "Урок:\n" + String(b.context || '').slice(0, MAX_CTX)));
+          const formulas = (j.formulas || []).slice(0, 4).filter(x => x && x.f && String(x.f).length < 80).map(x => ({
+            f: String(x.f), name: String(x.name || '').slice(0, 60),
+            vars: (Array.isArray(x.vars) ? x.vars : []).slice(0, 8).map(v => (Array.isArray(v) ? v : []).slice(0, 3).map(t => String(t || '').slice(0, 50))),
+          }));
+          const v = { formulas };
+          await storyPut(key, v);
+          return v;
+        })();
+        storyPending.set(key, p); p.finally(() => storyPending.delete(key)).catch(() => {});
+      }
+      send(200, await p);
+    } catch (e) { console.log('[formulas] ' + (e && e.message)); send(502, { error: 'Не получилось.' }); }
+  })().catch(() => { try { send(500, { error: 'error' }); } catch { /* уже ответили */ } });
 }
 
 // ---------- картинки к «Истории урока» ----------

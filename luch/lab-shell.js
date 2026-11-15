@@ -576,5 +576,55 @@
   // уровень подсказки: 1 — наводящий вопрос, 2 — конкретный шаг, 3 — разбор по шагам
   function noteHelp() { let n = 0; journal(j => { j.helps = (j.helps || []).filter(x => Date.now() - x < 20 * 60e3); j.helps.push(Date.now()); n = j.helps.length; }); return n; }
 
+  // ---------- главные формулы урока — всегда на виду, в рамке задания ----------
+  const css3 = document.createElement('style');
+  css3.textContent = `
+  .ls-fx{pointer-events:auto;margin-top:10px;padding-top:9px;border-top:1px solid var(--line,#26324a)}
+  .ls-fx .hd{display:flex;align-items:center;gap:6px;background:none;border:0;padding:0;cursor:pointer;font:600 10.5px/1 var(--font-body,sans-serif);letter-spacing:.12em;text-transform:uppercase;color:var(--accent,#ffb547)}
+  .ls-fx .hd i{font-style:normal;color:var(--muted,#8b96ad);display:inline-block;transition:transform .2s}
+  .ls-fx.closed .list{display:none}
+  .ls-fx.closed .hd i{transform:rotate(-90deg)}
+  .ls-fx .list{display:flex;flex-direction:column;gap:5px;margin-top:8px}
+  .ls-fx .f{display:block;width:100%;text-align:left;background:rgba(255,255,255,.04);border:1px solid var(--line,#26324a);border-radius:9px;padding:6px 9px;cursor:pointer;color:var(--fg,#e8ecf4);font:inherit}
+  .ls-fx .f:hover{border-color:var(--muted,#8b96ad)}
+  .ls-fx .f code{font:600 14.5px/1.3 var(--font-mono,monospace);color:var(--fg,#e8ecf4);white-space:normal}
+  .ls-fx .f span{display:block;font-size:11.5px;line-height:1.3;color:var(--muted,#8b96ad);margin-top:2px}
+  .ls-fx .f .v{display:none;font-size:12px;line-height:1.5;color:var(--fg,#e8ecf4);margin-top:5px}
+  .ls-fx .f .v b{font-family:var(--font-mono,monospace)}
+  .ls-fx .f.open .v{display:block}`;
+  document.head.appendChild(css3);
+  const taskEl = document.querySelector('#stage .task');
+  const fxCache = {};
+  let fxFor = '';
+  function renderFx() {
+    if (!taskEl) return;
+    const k = location.pathname + '|' + lessonIdx();
+    if (fxFor === k) return; fxFor = k;
+    let box = taskEl.querySelector('.ls-fx'); if (box) box.remove();
+    if (!fxCache[k]) fxCache[k] = fetch('/api/tutor/formulas', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: k, lang: LANG2, context: 'Тема: ' + document.title + '\nУрок ' + (lessonIdx() + 1) + ': ' + lessonTitle() + '\n' + ctx() + '\nРаздел «Расчёты»: ' + ((P('calc') && P('calc').textContent) || '').replace(/\s+/g, ' ').slice(0, 1500) }) })
+      .then(r => r.ok ? r.json() : { formulas: [] }).catch(() => { delete fxCache[k]; return { formulas: [] }; });
+    fxCache[k].then(j => {
+      if (fxFor !== k || !j.formulas || !j.formulas.length) return;
+      let closed = null; try { closed = localStorage.getItem('oe-fx-closed'); } catch (e) {}
+      box = document.createElement('div'); box.className = 'ls-fx' + ((closed === '1' || (closed === null && innerWidth < 600)) ? ' closed' : '');
+      box.setAttribute('data-noi18n', '');
+      box.innerHTML = '<button type="button" class="hd" aria-expanded="true"><i>▾</i>Формулы урока</button><div class="list">' + j.formulas.map(x =>
+        '<button type="button" class="f" title="Что означают буквы"><code>' + esc(x.f) + '</code>' + (x.name ? '<span>' + esc(x.name) + '</span>' : '') +
+        (x.vars && x.vars.length ? '<div class="v">' + x.vars.map(v => '<b>' + esc(v[0] || '') + '</b> — ' + esc(v[1] || '') + (v[2] && v[2] !== '—' ? ', ' + esc(v[2]) : '')).join('<br>') + '</div>' : '') + '</button>').join('') + '</div>';
+      box.querySelector('.hd').setAttribute('aria-expanded', !box.classList.contains('closed'));
+      box.addEventListener('click', e => {
+        const h = e.target.closest('.hd');
+        if (h) { box.classList.toggle('closed'); h.setAttribute('aria-expanded', !box.classList.contains('closed')); try { localStorage.setItem('oe-fx-closed', box.classList.contains('closed') ? '1' : '0'); } catch (er) {} return; }
+        const f = e.target.closest('.f'); if (f) f.classList.toggle('open');
+      });
+      taskEl.appendChild(box); taskEl.dataset.fx = k;
+    });
+  }
+  setTimeout(renderFx, 400);
+  if (lessonsBox) new MutationObserver(() => setTimeout(renderFx, 300)).observe(lessonsBox, { attributes: true, subtree: true, attributeFilter: ['aria-current'] });
+  // опыт иногда перерисовывает рамку задания — возвращаем блок на место
+  if (taskEl) new MutationObserver(() => { if (taskEl.dataset.fx === fxFor && fxFor && !taskEl.querySelector('.ls-fx')) { fxFor = ''; renderFx(); } }).observe(taskEl, { childList: true });
+
   window.LuchShell = { lessonIdx, lessonUrl, openHw, openTab, learnState, noteHelp, whatNext, nextTopic: () => nextTopic, goNext, startPending: () => startShown, storyPlaying: () => !!st };
 })();
