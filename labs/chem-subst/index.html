@@ -1026,6 +1026,37 @@ function setLesson(i) {
   const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-chem-lab.js): samples and glassware on a white lab tray
+window.LUCH_REAL = () => {
+  const id = LID(), m = model(), base = { module: 'chem-lab' };
+  if (id === 'pure') return { ...base, scene: 'chlb-pure', help: 'Образец — посмотреть в лупу, потом лоток — положить туда',
+    items: ITEMS.map((it, i) => ({ id: it.id, short: it.short, bin: S.sort[i] || null, slot: S.sort[i] ? S.order[S.sort[i]].indexOf(i) : -1 })),
+    sel: S.sel, selName: S.sel === null ? '' : ITEMS[S.sel].short, view: S.sel === null ? null : ITEMS[S.sel].view, sorted: m.sorted };
+  if (id === 'phen') { const q = PHEN[S.ph];
+    return { ...base, scene: 'chlb-phen', help: 'Установка — провести опыт, клавиши — ответ, плитки у края — другой опыт',
+      ph: q.id, i: S.ph, name: q.name, fin: S.p >= 1, playing: S.playing, see: q.see, chem: S.ans[S.ph] ? q.chem : null,
+      ans: PHEN.map((_, i) => !!S.ans[i]), shorts: PHEN.map(x => x.short), right: m.right }; }
+  if (id === 'sep') { const sp = JSON.parse(JSON.stringify(S.sp)); delete sp.heat; delete sp.said;
+    return { ...base, scene: 'chlb-sep', help: 'Магнит, кувшин, стакан — в фильтр, колба — в чашку, спиртовка',
+      s: sp, iron: m.iron, sand: m.sand, salt: m.salt }; }
+  const hz = S.hl && Array.isArray(S.hl.id) ? HAZ.find(z => z.box === S.hl.id) : null;
+  return { ...base, scene: 'chlb-rules', help: 'Нажимайте на предметы, которые нарушают правила', found: { ...S.found }, hint: hz ? hz.id : null };
+};
+// values that change every frame (experiment progress, evaporation) — read by the scene in kit.onFrame
+window.LUCH_REAL.live = () => {
+  const id = LID();
+  if (id === 'phen') return { p: S.p };
+  if (id === 'sep') return { heat: S.sp.heat };
+  return null;
+};
+window.LUCH_REAL.click = k => {
+  if (/^it-\d$/.test(k)) { S.sel = +k.slice(3); update(); dirty = true; return; }
+  if (/^tile-\d$/.test(k)) return pickPhen(+k.slice(5));
+  if (k === 'app') return runPhen();
+  if (k.startsWith('hz-')) return hit(k.slice(3));
+  act(k);
+};
+
 // for the AI tutor: what is on the screen right now
 window.LUCH_CONTEXT = () => {
   const m = model(), L = LESSONS[S.lesson], id = L.id;

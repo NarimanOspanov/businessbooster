@@ -782,7 +782,7 @@ function insert(it, j) {
 function moveTube(z) {
   S.tube = z;
   if (z === 'lamp') {
-    const f = S.fH;
+    const f = S.fH; S.pops = (S.pops || 0) + 1;
     if (f < 0.08) { S.last2 = 'нет хлопка'; toast('Хлопка нет: в пробирке почти один воздух. Сначала соберите водород.'); }
     else if (f < 0.93) { S.last2 = 'лающий хлопок'; toast('Резкий «лающий» хлопок! Водород с примесью воздуха — гремучая смесь. Соберите ещё раз.'); }
     else { S.last2 = 'глухой хлопок'; S.f2.pure = true; toast('Глухой тихий хлопок — водород чистый. Теперь с ним можно работать.'); }
@@ -799,7 +799,7 @@ function gasTest(k) {
   if (S.mode3 !== 'el') { S.mode3 = 'el'; renderTools(); buildScheme(); }
   const v = k === 'h' ? S.vH : S.vH / 2;
   if (v < 2) { toast('Газа слишком мало для пробы — пусть электролиз поработает.'); update(); return; }
-  S.f3[k] = true;
+  S.f3[k] = true; S.tests = (S.tests || 0) + 1; S.lastTest = k;
   toast(k === 'h' ? 'Горящая лучинка у крана: газ сгорает с хлопком — это водород.' : 'Тлеющая лучинка у крана ярко вспыхнула — это кислород.');
   update();
 }
@@ -1195,6 +1195,39 @@ function setLesson(i) {
   renderTools(); renderStrip(); buildScheme(); update();
   const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
+
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-chem-lab.js): glassware on a white lab tray
+window.LUCH_REAL = () => {
+  const id = LID(), base = { module: 'chem-lab' }, hx = c => parseInt(c.slice(1), 16);
+  if (id === 'burn') {
+    const sp = S.spoon, gas = sp ? (sp.jar === S.oxJar ? 'O2' : 'air') : null, f = sp ? FX[sp.it][gas] : null, rv = j => S.rev[j] ? (S.oxJar === j ? 'O2' : 'air') : null;
+    return { ...base, scene: 'chlb-burn', help: 'Банка — выбрать, вещество — внести, ложечка — вынуть',
+      jarSel: S.jarSel, it: sp ? sp.it : null, jar: sp ? sp.jar : null, gas, rev: { A: rv('A'), B: rv('B') }, found: { ...S.f1 },
+      fx: f ? { em: f.em || null, fl: f.fl || 0, c: f.c || null, core: f.core || null, glow: f.glow, gr: f.gr, sp: !!f.sp } : null };
+  }
+  if (id === 'hydro') return { ...base, scene: 'chlb-hydro', help: 'Воронка — кислота, отвод — к трубке, спиртовка — проба, пробирка — перевернуть',
+    acid: S.acid, wet: S.tA > 0, tube: S.tube, up: S.up, clamp: S.clamp, heat: S.heat, last2: S.last2, pops: S.pops || 0, pure: !!S.f2.pure, cuDone: !!S.f2.cu };
+  if (id === 'water') return { ...base, scene: 'chlb-water', help: 'Источник — ток, краны — лучинка, вещество — в воду, стакан — свежая',
+    mode: S.mode3, on: S.on, I: S.I, f: { ...S.f3 }, cupIt: S.cupIt, cupT: Math.round(S.cupT), cupCol: S.cupIt ? hx(RX[S.cupIt].col) : null, prod: S.cupIt ? RX[S.cupIt].prod : '',
+    tests: S.tests || 0, lastTest: S.lastTest || null };
+  const m = model();
+  return { ...base, scene: 'chlb-air', help: S.bp === 3 ? 'Клавиши — ответ, ± у газов — модель воздуха' : 'Колокол — поджечь фосфор, ± у газов — модель воздуха',
+    mode: S.mode4, bp: S.bp, pick: S.pick4, ans: !!S.f4.ans, cnt: { ...S.cnt }, sel: S.sel4, match: m.match, model: !!S.f4.model };
+};
+// values that change every frame (gas fractions, volumes, elapsed time) — read by the scene in kit.onFrame
+window.LUCH_REAL.live = () => {
+  const id = LID();
+  if (id === 'burn') return { el: S.spoon ? now() - S.spoon.t0 : 0 };
+  if (id === 'hydro') return { g: gOf(), fH: S.fH, cu: S.cu, acid: S.acid };
+  if (id === 'water') return { vH: S.vH, on: S.on, cupEl: S.cupIt ? now() - S.cupT : 0 };
+  return { bp: S.bp, bt: S.bt, rise: S.rise / PART };
+};
+window.LUCH_REAL.click = k => {
+  const id = LID();
+  if (id === 'water') { if (['cur', 'tH', 'tO'].includes(k) && S.mode3 !== 'el') act('m3-el'); if ((k.startsWith('cup-') || k === 'fresh') && S.mode3 !== 'cup') act('m3-cup'); }
+  if (id === 'air') { if ((k === 'ign' || k === 'again' || k.startsWith('ans-')) && S.mode4 !== 'bell') act('m4-bell'); if (k.startsWith('st:') && S.mode4 !== 'model') act('m4-model'); }
+  act(k);
+};
 
 // for the AI tutor: what is on the screen right now
 window.LUCH_CONTEXT = () => {
