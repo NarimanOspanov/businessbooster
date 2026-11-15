@@ -566,7 +566,7 @@
     // подписи
     tag(v3(KX, topY + 5, KZ), 'Колонна синтеза', d.cat ? 'катализатор Fe' : 'без катализатора — почти стоит', !d.cat);
     tag(v3(0, TY + 17, PZ), 'Выход NH₃', `${fmt(d.x, 1)} % · скорость ${fmt(d.v, 2)}`, d.ok);
-    tag(v3(fx, TY + 14, fz), 'Фенолфталеин', made ? 'малиновый: NH₃ — основание' : 'бесцветный');
+    tag(v3(fx, TY + 24, fz), 'Фенолфталеин', made ? 'малиновый: NH₃ — основание' : 'бесцветный');
     tag(v3(50, TY + 15, 4), 'Дым без огня', made ? 'NH₃ + HCl → NH₄Cl' : '');
   };
 
@@ -710,7 +710,8 @@
       const sl = new T.Group(); at(sl, x, TY + 4.6, TZ + 8.1, g); clickable(sl, 'slot-' + i);
       at(h.hitBox(14, 7, 2), 0, 0, 0, sl);
       h.label(sl, 0, 0, 0, 13, 4.4, d.lab[i] ? [d.lab[i]] : ['?'], '#1b1610', d.lab[i] ? '#86e0a8' : d.sel5 !== null ? '#ffd166' : '#eef1f5', { border: d.lab[i] ? null : '#8b96ad', bw: 4 });
-      h.label(g, x, y0 + 16.4, TZ + 4.05, 3, 2.4, [TL[i]], '#ffffff', '#3b4a66');
+      const RS = ['газ ↑', 'осадок', 'нет'], rv = res === null ? '' : ' · ' + RS[res];
+      h.label(g, x, y0 + 16.6, TZ + 4.05, rv ? 10 : 3.4, 2.8, [TL[i] + rv], '#ffffff', res === null || res === 2 ? '#3b4a66' : '#c0392b');
       if (d.lime === i) { at(cyl(R + 0.1, 3, 0x8a5a3a, { r2: R - 0.4 }), x, y0 + TH + 0.6, TZ, g); }
     });
     // соляная кислота: склянка с пипеткой
@@ -748,23 +749,23 @@
     // этикетки на подносе
     d.labs.forEach((l, k) => {
       if (l.used) return;
-      const x = -20 + k * 20, lb = new T.Group(); at(lb, x, TY, 32, g); clickable(lb, 'lab-' + k);
+      const x = -20 + k * 20, lb = new T.Group(); at(lb, x, TY, 26, g); clickable(lb, 'lab-' + k);
       at(box(16, 0.5, 6, 0xffffff), 0, 0.25, 0, lb);
       const pl = h.canvasPlane(15, 5.2, 300, 104, (cx, a, b) => h.textLines(cx, a, b, [l.f], '#1b1610', d.sel5 === k ? '#ffd166' : '#fff6e6')); pl.rotation.x = -Math.PI / 2; at(pl, 0, 0.52, 0, lb);
       if (d.sel5 === k) { at(cyl(9, 0.2, 0xffd166, { edges: false, hull: false, shadow: false }), 0, 0.1, 0, lb); if (!kit.reduce) kit.onFrame((dt, t) => { lb.position.y = TY + 0.6 + Math.sin(t * 5) * 0.4; }); }
     });
     // образцы: формы углерода, кварц и мрамор (сзади)
-    at(box(96, 1, 10, 0x3b4a66), 0, TY + 0.5, -30, g);
-    const MX = [-38, -19, 0, 19, 38], MZ = -30, my = TY + 1;
+    at(box(100, 1, 8, 0x3b4a66), 0, TY + 0.5, 38, g);
+    const MX = [-40, -20, 0, 20, 40], MZ = 37, my = TY + 1;
     { const cg = new T.Group(); at(cg, MX[0], my, MZ, g); for (let j = 0; j < 5; j++) { const c = box(2 + rnd(j) * 1.4, 1.6 + rnd(j + 1), 2 + rnd(j + 2), 0x1c1d22); c.rotation.set(rnd(j + 3), rnd(j + 4) * 3, rnd(j + 5)); at(c, (rnd(j + 6) - 0.5) * 4, 1, (rnd(j + 7) - 0.5) * 3, cg); } }
     { const gp = cyl(3, 1.2, 0x5a5f68, { seg: 6 }); at(gp, MX[1], my + 0.6, MZ, g); const p2 = cyl(2.6, 1, 0x6a707a, { seg: 6 }); p2.rotation.y = 0.3; at(p2, MX[1] + 0.4, my + 1.7, MZ, g); }
     { const dm = mesh(new T.OctahedronGeometry(2.6), 0xe6f8ff, { edges: true, matOpt: { transparent: true, opacity: 0.75 } }); dm.scale.y = 1.2; at(dm, MX[2], my + 3.2, MZ, g); at(h.glow(0xffffff, 6, 0.4), MX[2], my + 3.6, MZ + 1, g); }
     { for (let j = 0; j < 3; j++) { const q = cyl(1 + j * 0.2, 5 - j, 0xf2f6fa, { seg: 6, r2: 0.2, matOpt: { transparent: true, opacity: 0.8 } }); q.rotation.z = (j - 1) * 0.35; at(q, MX[3] + (j - 1) * 1.8, my + 2.4, MZ, g); } }
     { for (let j = 0; j < 6; j++) { const m = box(1.8, 1.4, 1.6, 0xf6f4ee); m.rotation.set(rnd(j), rnd(j + 1) * 3, 0); at(m, MX[4] + (rnd(j + 2) - 0.5) * 5, my + 0.8 + (j > 3 ? 1 : 0), MZ + (rnd(j + 3) - 0.5) * 4, g); } }
-    [['уголь', 'C'], ['графит', 'C'], ['алмаз', 'C'], ['кварц', 'SiO₂'], ['мрамор', 'CaCO₃']].forEach(([n, f], i) => h.label(g, MX[i], TY + 0.6, MZ + 5.2, 12, 3.2, [n + ' ' + f], '#1b1610', '#fff6e6', { tilt: 0.6 }));
+    [['уголь', 'C'], ['графит', 'C'], ['алмаз', 'C'], ['кварц', 'SiO₂'], ['мрамор', 'CaCO₃']].forEach(([n, f], i) => h.label(g, MX[i], TY + 0.6, MZ + 4.4, 13, 2.8, [n + ' ' + f], '#1b1610', '#fff6e6', { tilt: 0.6 }));
     // подписи
-    const RES = ['газ CO₂', 'студенистый осадок', 'без изменений'];
-    TXs.forEach((x, i) => tag(v3(x, y0 + TH + (d.lime === i ? 9 : 4), TZ), 'Пробирка ' + TL[i], d.res[i] === null ? 'нажмите — капнуть HCl' : RES[d.res[i]], d.res[i] !== null && d.res[i] !== 2));
+    const nA = d.res.filter(r => r !== null).length;
+    tag(v3(0, y0 + TH + 5, TZ), 'Пробирки A, B, C', d.labeled ? `подписано ${d.labeled} из 3` : nA < 3 ? 'нажмите — капнуть HCl' : 'подпишите этикетками', d.labeled === 3);
     tag(v3(LX, TY + 18, LZ), 'Ca(OH)₂', d.cloudy ? 'помутнела: CaCO₃↓' : 'прозрачная', d.cloudy);
     tag(v3(hx, TY + 22, hz), 'HCl', null);
   };

@@ -131,6 +131,8 @@
     function flame(parent, x, y, z, hgt, inner, outer, glowCol) {
       const g = new T.Group(); at(g, x, y, z, parent);
       const s = spr(flameTex(inner, outer), 0xffffff, 0.94, false); s.center.set(0.5, 0.04); s.scale.set(hgt * 0.5, hgt, 1); at(s, 0, 0, 0, g);
+      // пламя рисуем поверх стекла банки, иначе стенка его гасит
+      s.material.depthTest = false; s.renderOrder = 3;
       const gl = glow(glowCol, hgt * 2.2, 0.45); at(gl, 0, hgt * 0.35, 0, g);
       g.userData.k = 1;
       if (!kit.reduce) kit.onFrame((dt, t) => { const k = g.userData.k; s.scale.set(hgt * 0.5 * k * (1 + 0.08 * Math.sin(t * 17)), hgt * k * (1 + 0.12 * Math.sin(t * 13) + 0.05 * Math.sin(t * 29)), 1); });
@@ -470,7 +472,7 @@
       let t0 = null;
       kit.onFrame((dt, t) => {
         if (t0 === null) t0 = t;
-        const s = window.__chclT ?? (kit.reduce ? 9 : t - t0), burn = clamp((s - 0.5) / 4, 0, 1), on = s > 0.5 && s < 4.8;
+        const s = kit.reduce ? 9 : t - t0, burn = clamp((s - 0.5) / 4, 0, 1), on = s > 0.5 && s < 4.8;
         const k = on ? Math.min(1, (s - 0.5) * 3, (4.8 - s) * 2.5) : 0;
         if (fl) { fl.visible = k > 0.02; fl.userData.k = Math.max(0.05, k); }
         em.material.opacity = k * (B.fl ? 0.7 : 0.9); light.intensity = k * (B.gl === 0xffffff ? 160 : 70);
@@ -481,11 +483,11 @@
         const gone = B.prod == null ? 1 - 0.85 * burn : 1;
         blob.scale.set(gone, 0.7 * gone, gone);
       });
-      tag(v3(gx, gj.top + 15, gz), 'Горение в кислороде', B.eq, true);
+      tag(v3(gx, gj.top + 3, gz + 6), 'Горение в кислороде', B.eq, true);
     } else {
       const els = sel ? elemsOf(sel.f) : [];
       const why = !sel ? 'возьмите склянку' : els.length === 1 ? 'простое вещество' : `${els.length} элемента: ${els.join(', ')}`;
-      tag(v3(gx, gj.top + 15, gz), sel ? low(sel.f) + ' — не из горения' : 'Ложка для сжигания', why);
+      tag(v3(gx, gj.top + 3, gz + 6), sel ? low(sel.f) + ' — не из горения' : 'Ложка для сжигания', why);
     }
   };
 
@@ -598,7 +600,7 @@
       let t0 = null;
       kit.onFrame((dt, t) => {
         if (t0 === null) t0 = t;
-        const s = kit.reduce || !can ? 9 : window.__chclT ?? t - t0, f = clamp(s / 3.5, 0, 1);
+        const s = kit.reduce || !can ? 9 : t - t0, f = clamp(s / 3.5, 0, 1);
         lamp.set(can && s < 3.8 ? 1 : 0); vap.set(can && s < 3.5 ? 1 : 0);
         sol.set(can ? 1.8 * (1 - f) : 0, tp.dishY + 0.3); if (cr) cr.set(f);
       });
@@ -642,7 +644,7 @@
         t.mat.color.setHex(0xdde9f2); t.mat.opacity = 0.35;
         kit.onFrame(() => {
           const L = live() || { age: 9 }, a = L.si === i ? L.age : 9;
-          const s = window.__chclT ?? (kit.reduce ? 9 : a);
+          const s = kit.reduce ? 9 : a;
           pip.visible = s < 1.6; drop.visible = s < 0.9;
           drop.position.y = TY + TH + 0.5 - (TH - LV + 0.5) * clamp(s / 0.9, 0, 1) ** 2;
           const f = clamp((s - 0.8) / 1.2, 0, 1);
@@ -680,10 +682,10 @@
         for (let i = 0; i < 3; i++) { x.beginPath(); x.arc(175 + i * 92, y, 24, 0, Math.PI * 2); x.fillStyle = r[i + 1] || '#f4f6f8'; x.fill(); x.lineWidth = 3; x.strokeStyle = '#1b1610'; x.stroke(); }
       });
     });
-    tb.rotation.x = -0.55; at(tb, -48, TY + 7.5, -26, g);
-    at(box(16, 1.6, 2, 0x3b4a66), -48, TY + 0.8, -21.6, g); at(box(1, 6, 1, 0x3b4a66), -48, TY + 3, -22, g);
-    h.washBottle(g, -52, 14);
-    h.key(g, -44, 32, 16, 6, ['Промыть'], 0x2f86e0, 'wash');
+    tb.rotation.x = -Math.PI / 2 + 0.3; at(tb, -48, TY + 2.4, 20, g);
+    at(box(20, 1.2, 1.6, 0x3b4a66), -48, TY + 0.6, 26.6, g);
+    h.washBottle(g, -50, -24);
+    h.key(g, -18, 32, 16, 6, ['Промыть'], 0x2f86e0, 'wash');
     h.key(g, 30, 30, 18, 6, [d.verified ? '✓ Верно' : 'Проверить'], d.verified ? 0x2f9e55 : 0xe08a2a, 'verify');
     if (d.verified) tag(v3(30, TY + 6, 30), 'Проверка', 'все растворы определены', true);
   };
@@ -705,7 +707,7 @@
     const P = d.prog, N = d.nodes, SZ = -6;
     const XS = [-48, -24, 4, 34];
     const L0 = live() || { age: 1e9 }, age0 = L0.age, recent = age0 < 9 && !kit.reduce;
-    const ageNow = () => { if (window.__chclT != null) return window.__chclT; const L = live(); return kit.reduce ? 99 : L ? L.age : 99; };
+    const ageNow = () => { const L = live(); return kit.reduce ? 99 : L ? L.age : 99; };
     // 0. склянка с простым веществом
     h.jar(g, XS[0], TY, SZ, { kind: cf.kind, col: cf.el, r: 4.2, h: 9, seed: 3, label: low(N[0].f) });
     // 1. банка для сжигания с ложкой
