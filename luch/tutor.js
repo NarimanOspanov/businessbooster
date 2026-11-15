@@ -151,7 +151,7 @@
   .lt-btn:hover{transform:translateY(-1px)}
   .lt-btn .lt-av{width:34px;height:34px}
   .lt-btn small{display:block;font:500 11px/1.2 "IBM Plex Mono",monospace;color:#4a5570;margin-top:3px}
-  .lt-panel{position:fixed;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:51;width:min(400px,calc(100vw - 36px));height:min(620px,calc(100vh - 36px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)));display:flex;flex-direction:column;background:#121a28;border:1px solid #26324a;border-radius:18px;box-shadow:0 24px 60px -12px rgba(0,0,0,.75);color:#e8ecf4;font:15px/1.5 "Golos Text",system-ui,sans-serif;overflow:hidden}
+  .lt-panel{position:fixed;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:51;width:min(400px,calc(100vw - 36px));min-height:240px;max-height:min(620px,calc(100vh - 36px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)));display:flex;flex-direction:column;background:#121a28;border:1px solid #26324a;border-radius:18px;box-shadow:0 24px 60px -12px rgba(0,0,0,.75);color:#e8ecf4;font:15px/1.5 "Golos Text",system-ui,sans-serif;overflow:hidden}
   .lt-head{display:flex;align-items:center;gap:8px;padding:12px 10px 12px 14px;border-bottom:1px solid #26324a}
   .lt-head .lt-av{width:36px;height:36px;flex:none}
   .lt-head b{display:block;font-size:14.5px}
@@ -160,14 +160,15 @@
   .lt-ib{background:none;border:1px solid #26324a;border-radius:8px;height:30px;padding:0 9px;color:#8b96ad;cursor:pointer;font:500 12px "Golos Text",sans-serif;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
   .lt-ib:hover{color:#e8ecf4;border-color:#8b96ad}
   .lt-ib.on{background:#72d4e8;border-color:#72d4e8;color:#0b1019}
-  .lt-log{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;overscroll-behavior:contain}
+  .lt-log{flex:1 1 auto;min-height:0;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;overscroll-behavior:contain}
   .lt-m{max-width:88%;padding:9px 12px;border-radius:14px;font-size:14px;line-height:1.5;overflow-wrap:anywhere}
   .lt-m.u{align-self:flex-end;background:#e8ecf4;color:#0b1019;border-bottom-right-radius:5px}
   .lt-m.a{align-self:flex-start;background:#1a2438;border-bottom-left-radius:5px}
   .lt-m.a p{margin:0 0 7px}.lt-m.a p:last-child{margin:0}
   .lt-m.a ul{margin:4px 0 7px;padding-left:18px}
   .lt-m.a code{font:500 13px "IBM Plex Mono",monospace;background:#0b1019;padding:1px 5px;border-radius:5px}
-  .lt-board.peek{opacity:.12;pointer-events:none;transition:opacity .3s}
+  .lt-panel,.lt-board,.lt-btn{transition:opacity .3s}
+  .lt-peek{opacity:.1!important;pointer-events:none!important}
   .lt-m .lt-say{display:inline-flex;margin:6px 14px 0 0;background:none;border:0;padding:0;color:#8b96ad;font:500 11.5px "Golos Text",sans-serif;cursor:pointer;gap:5px;align-items:center}
   .lt-m .lt-say:hover{color:#72d4e8}
   .lt-dots{display:inline-flex;gap:4px;padding:4px 0}
@@ -188,17 +189,20 @@
   .lt-mic{background:#1a2438;color:#e8ecf4;border:1px solid #26324a}
   .lt-mic.rec{background:#ff6b5a;border-color:#ff6b5a;color:#0b1019;animation:lt-p 1.2s infinite}
   @keyframes lt-p{0%{box-shadow:0 0 0 0 rgba(255,107,90,.5)}100%{box-shadow:0 0 0 12px rgba(255,107,90,0)}}
-  .lt-voice{border-top:1px solid #26324a;padding:16px 14px 14px;display:flex;flex-direction:column;align-items:center;gap:10px}
-  .lt-orb{width:96px;height:96px;border-radius:50%;border:0;cursor:pointer;position:relative;background:radial-gradient(circle at 40% 35%,#9fe6f3,#2b9fb5 60%,#14495a);box-shadow:0 0 0 0 rgba(114,212,232,.5)}
+  .lt-voice{border-top:1px solid #26324a;padding:10px 10px 10px 12px;display:flex;align-items:center;gap:10px}
+  .lt-voice[hidden]{display:none}
+  .lt-vtx{flex:1;min-width:0}
+  .lt-orb{width:44px;height:44px;flex:none;border-radius:50%;border:0;cursor:pointer;position:relative;background:radial-gradient(circle at 40% 35%,#9fe6f3,#2b9fb5 60%,#14495a);box-shadow:0 0 0 0 rgba(114,212,232,.5)}
   .lt-orb[data-s="listening"]{animation:lt-o 1.3s infinite;background:radial-gradient(circle at 40% 35%,#ffd59a,#ffb547 55%,#8a5212)}
   .lt-orb[data-s="thinking"]{animation:lt-spin 1.2s linear infinite;background:conic-gradient(#72d4e8,#1a2438,#72d4e8)}
   .lt-orb[data-s="speaking"]{animation:lt-o 0.9s infinite}
   .lt-orb[data-s="idle"]{opacity:.75}
   .lt-orb svg{position:absolute;inset:0;margin:auto}
-  @keyframes lt-o{0%{box-shadow:0 0 0 0 rgba(255,255,255,.35)}100%{box-shadow:0 0 0 22px rgba(255,255,255,0)}}
+  @keyframes lt-o{0%{box-shadow:0 0 0 0 rgba(255,255,255,.35)}100%{box-shadow:0 0 0 10px rgba(255,255,255,0)}}
   @keyframes lt-spin{to{transform:rotate(360deg)}}
-  .lt-vs{font:600 14px/1.3 "Golos Text",sans-serif;text-align:center}
-  .lt-vh{font:500 12px/1.4 "Golos Text",sans-serif;color:#8b96ad;text-align:center;min-height:17px;max-width:320px}
+  .lt-vs{font:600 13.5px/1.3 "Golos Text",sans-serif}
+  .lt-vh{font:500 12px/1.35 "Golos Text",sans-serif;color:#8b96ad;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .lt-vh:empty{display:none}
   .lt-vrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center}
   .lt-lang{display:inline-flex;border:1px solid #26324a;border-radius:8px;overflow:hidden}
   .lt-lang button{background:none;border:0;color:#8b96ad;font:600 12px "Golos Text",sans-serif;padding:6px 10px;cursor:pointer}
@@ -224,9 +228,9 @@
   @media (max-width:1100px){.lt-board{left:12px;right:12px;width:auto;top:calc(12px + env(safe-area-inset-top,0px));bottom:auto}}
   @media (max-width:600px){
     .lt-board{left:0;right:0;top:0;border-radius:0 0 16px 16px}
-    body.lt-board-on .lt-panel{height:min(48vh,420px)}
+    body.lt-board-on .lt-panel{max-height:min(48vh,420px)}
     .lt-bf{display:none}
-    .lt-panel{right:0;left:0;bottom:0;width:100%;height:min(86vh,660px);border-radius:18px 18px 0 0;padding-bottom:env(safe-area-inset-bottom,0px)}
+    .lt-panel{right:0;left:0;bottom:0;width:100%;max-height:min(86vh,660px);border-radius:18px 18px 0 0;padding-bottom:env(safe-area-inset-bottom,0px)}
     .lt-btn{padding:7px;opacity:.94;bottom:calc(92px + env(safe-area-inset-bottom,0px))}
     .lt-btn>span{display:none}
     .lt-ib .lt-tx{display:none}
@@ -249,12 +253,12 @@
 
   const btn = document.createElement('button');
   btn.className = 'lt-btn'; btn.type = 'button'; btn.setAttribute('aria-label', 'Спросить наставника');
-  btn.innerHTML = `${AV}<span>Спросить наставника<small>голосом или текстом</small></span>`;
+  btn.innerHTML = `${AV}<span>Спросить наставника<small>подскажет по ситуации</small></span>`;
   const panel = document.createElement('section');
   panel.className = 'lt-panel'; panel.hidden = true; panel.setAttribute('aria-label', 'ИИ-наставник');
   panel.innerHTML = `
-    <div class="lt-head">${AV}<div class="lt-sp"><b>Наставник</b><span>видит экран</span></div>
-      <button class="lt-ib" id="lt-vm" type="button" aria-pressed="false" title="Разговор голосом">${WAVE}<span class="lt-tx">Голосом</span></button>
+    <div class="lt-head">${AV}<div class="lt-sp"><b>Наставник</b><span>видит экран и твои действия</span></div>
+      <button class="lt-ib" id="lt-vm" type="button" aria-pressed="false" title="Разговор голосом" hidden>${WAVE}<span class="lt-tx">Голосом</span></button>
       <button class="lt-ib" id="lt-bd" type="button" title="Доска: рисовать и показывать наставнику">✎<span class="lt-tx">Доска</span></button>
       <button class="lt-ib" id="lt-close" type="button" aria-label="Свернуть">✕</button></div>
     <div class="lt-log" id="lt-log" aria-live="polite"></div>
@@ -264,11 +268,9 @@
       <textarea id="lt-in" rows="1" placeholder="Спросите что угодно…" aria-label="Вопрос наставнику"></textarea>
       <button class="lt-send" id="lt-send" type="submit" aria-label="Отправить"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M3 9h11M9.5 4.5L14 9l-4.5 4.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button></form>
     <div class="lt-voice" id="lt-voice" hidden>
-      <button class="lt-orb" id="lt-orb" type="button" data-s="idle" aria-label="Говорить"><svg width="30" height="30" viewBox="0 0 18 18" aria-hidden="true"><rect x="6" y="1.5" width="6" height="10" rx="3" fill="#0b1019"/><path d="M3.5 8.5a5.5 5.5 0 0 0 11 0M9 14v2.5" stroke="#0b1019" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg></button>
-      <div class="lt-vs" id="lt-vs">Нажмите и говорите</div>
-      <div class="lt-vh" id="lt-vh"></div>
-      <div class="lt-vrow">
-        <button class="lt-ib" id="lt-vend" type="button">Закончить разговор</button></div>
+      <button class="lt-orb" id="lt-orb" type="button" data-s="idle" aria-label="Говорить"><svg width="20" height="20" viewBox="0 0 18 18" aria-hidden="true"><rect x="6" y="1.5" width="6" height="10" rx="3" fill="#0b1019"/><path d="M3.5 8.5a5.5 5.5 0 0 0 11 0M9 14v2.5" stroke="#0b1019" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg></button>
+      <div class="lt-vtx"><div class="lt-vs" id="lt-vs">Нажмите и говорите</div><div class="lt-vh" id="lt-vh"></div></div>
+      <button class="lt-ib" id="lt-vend" type="button" title="Написать текстом">⌨<span class="lt-tx">Написать</span></button>
     </div>`;
   document.body.append(btn, panel);
   const $ = s => panel.querySelector(s);
@@ -304,17 +306,17 @@
     let list = [];
     try { list = (window.LUCH_SUGGEST && window.LUCH_SUGGEST()) || []; } catch (e) {}
     if (!list.length) list = ['Объясни, что сейчас происходит в опыте', 'С чего начать?'];
-    sug.innerHTML = list.slice(0, 3).map(q => `<button type="button">${esc(q)}</button>`).join('');
+    sug.innerHTML = '<button type="button" data-ant="1">💡 Подскажи по ситуации</button>' + list.slice(0, 2).map(q => `<button type="button">${esc(q)}</button>`).join('');
     sug.hidden = busy || voiceMode;
   }
   function render() {
     log.innerHTML = '';
     if (!chat.length) {
       const h = document.createElement('div'); h.className = 'lt-hello';
-      h.innerHTML = '<b>Привет! Я твой наставник 🙂</b>Я вижу, какой урок открыт и что происходит в опыте, могу показать нужное место на странице и нарисовать объяснение на доске. Спрашивай что угодно — глупых вопросов не бывает. Можно написать, надиктовать или поговорить голосом (кнопка «Голосом»), можно по-казахски. А на доске можно рисовать самому и показать мне рисунок.';
+      h.innerHTML = '<b>Привет! Я твой наставник 🙂</b>Я вижу экран и что ты делаешь. Нажми 💡 — подскажу по ситуации, или просто спроси голосом.';
       log.appendChild(h);
     }
-    chat.forEach(m => bubble(m.role, m.content, m.role === 'assistant'));
+    chat.forEach(m => bubble(m.role, m.show || m.content, m.role === 'assistant'));
     suggestions(); scroll();
   }
 
@@ -468,6 +470,20 @@
     const it = pageEls[n - 1]; if (!it || !document.contains(it.el)) return;
     highlightEl(it.el);
   }
+  const overlap = (a, r) => r.left < a.right && r.right > a.left && r.top < a.bottom && r.bottom > a.top;
+  function peekOver(el) {
+    if (!el || !document.contains(el)) return;
+    const r = el.getBoundingClientRect();
+    for (const w of [panel, btn, document.querySelector('.lt-board:not([hidden])'), document.querySelector('.lt-tip')]) {
+      if (!w || w.hidden || !overlap(w.getBoundingClientRect(), r)) continue;
+      w.classList.add('lt-peek'); w._peekAt = Date.now(); clearTimeout(w._peek);
+      w._peek = setTimeout(() => w.classList.remove('lt-peek'), 5000);
+    }
+  }
+  // вернуть панель сразу: касание экрана или мышь над панелью
+  const unpeek = () => document.querySelectorAll('.lt-peek').forEach(w => { clearTimeout(w._peek); w.classList.remove('lt-peek'); });
+  document.addEventListener('pointermove', e => { const w = document.querySelector('.lt-panel.lt-peek'); if (w && e.pointerType === 'mouse') { const a = w.getBoundingClientRect(); if (e.clientX > a.left && e.clientX < a.right && e.clientY > a.top && e.clientY < a.bottom && Date.now() - (w._peekAt || 0) > 1200) unpeek(); } }, { passive: true });
+  document.addEventListener('pointerdown', () => setTimeout(unpeek, 250), { passive: true, capture: true });
   function highlightEl(el) {
     if (!el || !document.contains(el)) return;
     const r0 = el.getBoundingClientRect();
@@ -475,9 +491,8 @@
     if (!hlBox) { hlBox = document.createElement('div'); hlBox.className = 'lt-hl'; document.body.appendChild(hlBox); }
     const place = () => { const r = el.getBoundingClientRect(), p = 6; Object.assign(hlBox.style, { left: r.left - p + 'px', top: r.top - p + 'px', width: r.width + p * 2 + 'px', height: r.height + p * 2 + 'px' }); };
     place(); hlBox.classList.remove('on'); void hlBox.offsetWidth; hlBox.classList.add('on');
-    // доска закрывает подсвеченное место — делаем её прозрачной на время подсветки
-    const bw = document.querySelector('.lt-board:not([hidden])');
-    if (bw) { const a = bw.getBoundingClientRect(), r = el.getBoundingClientRect(); if (r.left < a.right && r.right > a.left && r.top < a.bottom && r.bottom > a.top) { bw.classList.add('peek'); setTimeout(() => bw.classList.remove('peek'), 3500); } }
+    // панель, доска или облачко закрывают подсвеченное место — делаем их прозрачными на время подсветки
+    peekOver(el); setTimeout(() => peekOver(el), 500);
     clearInterval(hlTimer); let k = 0; hlTimer = setInterval(() => { place(); if (++k > 60) { clearInterval(hlTimer); hlBox.classList.remove('on'); } }, 80);
   }
   const MARK = /\[\[(\d{1,3})\]\]/g;
@@ -609,11 +624,12 @@
     q = q.trim(); if (!q || busy) return '';
     busy = true; send.disabled = true; sug.hidden = true;
     if (!chat.length) log.innerHTML = '';
-    chat.push({ role: 'user', content: q + (opts.image ? '\n(рисунок с доски)' : '') }); bubble('user', q + (opts.image ? ' 🖼' : ''));
+    chat.push({ role: 'user', content: q + (opts.image ? '\n(рисунок с доски)' : ''), show: opts.show }); bubble('user', (opts.show || q) + (opts.image ? ' 🖼' : ''));
     const a = bubble('assistant', ''); a.innerHTML = '<span class="lt-dots"><i></i><i></i><i></i></span>'; scroll();
     let context = '';
     try { context = (window.LUCH_CONTEXT && window.LUCH_CONTEXT()) || ''; } catch (e) {}
     try { const sh = window.LuchShell; if (sh && sh.whatNext) context += '\n' + sh.whatNext(); } catch (e) {}
+    const acts = recentActions(); if (acts) context += '\nПоследние действия ученика на странице (от старых к новым):\n' + acts;
     const feed = opts.voice ? sentenceFeeder() : null;
     let text = '', drawn = 0; const fired = new Set();
     const elements = collectElements();
@@ -626,7 +642,7 @@
     ctrl = new AbortController();
     try {
       const res = await fetch('/api/tutor', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctrl.signal,
-        body: JSON.stringify({ page, lang, voice: !!opts.voice, context: `${document.title}\n${context}`, elements, image: opts.image || undefined, messages: chat.slice(-20) }) });
+        body: JSON.stringify({ page, lang, voice: !!opts.voice, context: `${document.title}\n${context}`, elements, image: opts.image || undefined, messages: chat.slice(-20).map(m => ({ role: m.role, content: m.content })) }) });
       if (!res.ok) { let msg = 'Не получилось ответить. Попробуйте ещё раз.'; try { msg = (await res.json()).error || msg; } catch (e) {} text = msg; }
       else {
         const rd = res.body.getReader(), dec = new TextDecoder();
@@ -649,25 +665,12 @@
   // a question asked by voice gets an answer in text and in voice at the same time
   let dict = null, dictated = false;
   mic.hidden = !canListen;
-  mic.addEventListener('click', async () => {
-    unlockAudio();
-    if (dict) { dict.stop(); return; }
-    const before = inp.value ? inp.value.trim() + ' ' : '';
-    mic.classList.add('rec'); mic.setAttribute('aria-label', 'Остановить запись');
-    inp.placeholder = SR ? 'Говорите…' : 'Говорите, я запишу и расшифрую…';
-    dict = listen(t => { inp.value = before + t; });
-    let heard = '';
-    try { heard = await dict.p; inp.value = (before + heard).trim(); }
-    catch (e) { flash(micError(e)); }
-    dict = null; mic.classList.remove('rec'); mic.setAttribute('aria-label', 'Надиктовать вопрос');
-    inp.placeholder = 'Спросите что угодно…'; inp.dispatchEvent(new Event('input'));
-    if (heard) { dictated = true; form.requestSubmit(); } else inp.focus();
-  });
+  mic.addEventListener('click', () => { unlockAudio(); ls.set('luch-tutor-mode', 'voice'); setMode(true); });
   function flash(msg) { const d = bubble('assistant', msg); d.style.opacity = '.8'; scroll(); }
 
   // ---------- voice conversation ----------
   let vListen = null, vState = 'idle';
-  const VS = { idle: 'Нажмите и говорите', listening: 'Слушаю…', thinking: 'Думаю…', speaking: 'Говорю… нажмите, чтобы перебить' };
+  const VS = { idle: 'Нажмите 🎤 и говорите', listening: 'Слушаю…', thinking: 'Смотрю на экран…', speaking: 'Говорю · нажмите, чтобы перебить' };
   function setVoice(s, hint) { vState = s; orb.dataset.s = s; vs.textContent = VS[s]; if (hint !== undefined) vh.textContent = hint; }
   async function turn() {
     if (!voiceMode || busy) return;
@@ -691,27 +694,63 @@
     if (vState === 'speaking' || vState === 'thinking') { if (ctrl) ctrl.abort(); speaker.stop(); setVoice('idle', ''); setTimeout(turn, 50); return; }
     turn();
   });
-  function setMode(on) {
+  function setMode(on, quiet) {
     voiceMode = on;
     vmBtn.classList.toggle('on', on); vmBtn.setAttribute('aria-pressed', on);
     voiceBox.hidden = !on; form.hidden = on; suggestions();
+    if (on && quiet) { if (canListen) unlockAudio(); return; }
     if (on) { if (!canListen) { setVoice('idle', 'В этом браузере нет доступа к микрофону. Откройте сайт в Chrome или Safari.'); return; } unlockAudio(); turn(); }
     else { if (vListen) { vListen.abort(); vListen = null; } speaker.stop(); setVoice('idle', ''); }
   }
   vmBtn.addEventListener('click', () => { setMode(!voiceMode); ls.set('luch-tutor-mode', voiceMode ? 'voice' : 'text'); });
-  $('#lt-vend').addEventListener('click', () => setMode(false));
+  $('#lt-vend').addEventListener('click', () => { setMode(false); ls.set('luch-tutor-mode', 'text'); setTimeout(() => inp.focus(), 30); });
 
+  const ANT = 'Я нажал кнопку наставника. Не жди вопроса: посмотри, что сейчас на экране и что я делал до этого, и сам догадайся, что мне сейчас нужно. Застрял на задании — подскажи один следующий шаг (не решай за меня) и подсвети, куда нажать. Только начал — скажи, с чего начать. Ошибся — мягко покажи где. Всё сделал — похвали и предложи, что дальше. 1–3 коротких предложения, в конце короткий вопрос, чтобы я мог ответить голосом.';
+  let antAt = 0;
+  async function anticipate() {
+    if (busy) return;
+    antAt = Date.now();
+    const show = '💡 Подскажи по ситуации';
+    if (voiceMode) { setVoice('thinking', ''); await ask(ANT, { voice: true, show }); await speaker.idle(); if (voiceMode && vState !== 'idle') turn(); }
+    else await ask(ANT, { show });
+  }
+  // журнал действий ученика: что нажимал и что выставлял (без полей наставника)
+  const actions = [];
+  const labelOf = el => {
+    const t = (el.getAttribute('aria-label') || el.title || (el.tagName === 'INPUT' || el.tagName === 'SELECT' ? (el.labels && el.labels[0] && el.labels[0].textContent) || el.name || el.id : el.textContent) || '').replace(/\s+/g, ' ').trim();
+    return t.slice(0, 60);
+  };
+  const logAct = (kind, el, extra) => {
+    if (!el || el.closest('.lt-panel,.lt-btn,.lt-tip,.lt-board')) return;
+    const l = labelOf(el); if (!l && !extra) return;
+    const line = kind + ' «' + l + '»' + (extra ? ' = ' + extra : '');
+    const last = actions[actions.length - 1];
+    if (last && last.line === line) { last.at = Date.now(); return; }
+    if (last && kind === 'изменил' && last.line.startsWith('изменил «' + l + '»')) { last.line = line; last.at = Date.now(); return; }
+    actions.push({ line, at: Date.now() }); if (actions.length > 14) actions.shift();
+  };
+  document.addEventListener('click', e => { const el = e.target.closest('button,a,[role="button"],[role="tab"],[data-reel],label,.lesson,svg [data-k],[onclick]'); if (el) logAct('нажал', el); }, true);
+  document.addEventListener('change', e => { const el = e.target; if (el.matches && el.matches('input,select,textarea')) logAct('изменил', el, el.type === 'checkbox' ? (el.checked ? 'вкл' : 'выкл') : String(el.value).slice(0, 30)); }, true);
+  document.addEventListener('pointerup', e => { const el = e.target.closest && e.target.closest('svg,canvas'); if (el && !e.target.closest('button') && !el.closest('.lt-board,.lt-panel')) logAct('двигал/нажал на схеме', el.closest('[aria-label],[id]') || el); }, true);
+  function recentActions() {
+    const now = Date.now();
+    return actions.filter(a => now - a.at < 10 * 60e3).slice(-10).map(a => '- ' + Math.round((now - a.at) / 1000) + ' с назад: ' + a.line).join('\n');
+  }
   const open = () => { panel.hidden = false; btn.hidden = true; render(); setTimeout(() => (voiceMode ? orb : inp).focus(), 30); };
   function openPanel() { if (panel.hidden) open(); }
   $('#lt-bd').addEventListener('click', () => (board.open ? board.hide() : board.show()));
   window.LuchTutor = { ask: q => { openPanel(); ask(q); }, open: openPanel, board, highlight: el => highlightEl(el), hideTip: () => guide && guide.hide() };
   const close = () => { setMode(false); if (dict) dict.abort(); panel.hidden = true; btn.hidden = false; btn.focus(); };
   // голос в первую очередь: кнопка сразу открывает разговор голосом (если ученик сам не выбрал текст)
-  btn.addEventListener('click', () => { open(); if (canListen && ls.get('luch-tutor-mode') !== 'text') setMode(true); });
+  btn.addEventListener('click', () => {
+    open(); unlockAudio();
+    if (canListen && ls.get('luch-tutor-mode') !== 'text') setMode(true, true);
+    anticipate();
+  });
   $('#lt-close').addEventListener('click', close);
 
   panel.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
-  sug.addEventListener('click', e => { const b = e.target.closest('button'); if (b) ask(b.textContent); });
+  sug.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.ant) anticipate(); else ask(b.textContent); });
   form.addEventListener('submit', e => {
     e.preventDefault(); const q = inp.value, voice = dictated; dictated = false;
     inp.value = ''; inp.style.height = '';
