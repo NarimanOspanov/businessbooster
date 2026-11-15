@@ -1037,6 +1037,33 @@ function setLesson(i) {
   const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-measure.js): real instruments on a table
+window.LUCH_REAL = () => {
+  const id = LID(), Ls = L(), base = { module: 'measure' };
+  const lenD = kind => ({ ...base, scene: 'meas-len', kind, obj: { name: Ls.obj.name, mm: Ls.obj.mm }, off: Math.round((S.rx - X0) / K * 10) / 10, aligned: aligned(), read: S.read, price: price(),
+    rec: kind === 'units' ? (S.rec.len ?? null) : null, recCm: S.rec.cm ?? null, recMm: S.rec.mm ?? null,
+    help: 'Синие кнопки — двигать линейку, оранжевые — показание, тетрадь — записать' });
+  if (id === 'units' && S.st === 'len') return lenD('units');
+  if (id === 'units' && S.st === 'time') return { ...base, scene: 'meas-time', help: 'Кнопка секундомера — старт/стоп, красная — сброс, тетрадь — записать', run: S.sw.run, tRec: S.tRec, T: T_P };
+  if (id === 'units') return { ...base, scene: 'meas-mass', help: 'Гиря в ящике — на чашу, гиря на чаше — обратно', weights: Ls.weights, pan: S.pan.slice().sort((a, b) => a - b), apple: Ls.apple, got: !!S.got.mass };
+  if (id === 'error') return lenD('error');
+  if (id === 'scale') return { ...base, scene: 'meas-scale', help: 'Прибор — выбрать, кнопки ▼ ▲ — на одну единицу', inst: S.inst,
+    insts: Ls.insts.map(I => ({ id: I.id, name: I.name, unit: I.unit, min: I.min, max: I.max, label: I.label, div: I.div, target: I.target, v: S.val[I.id], hit: !!S.hit[I.id] })) };
+  return { ...base, scene: 'meas-si', help: 'Карточка — выбрать, клавиша-множитель — перевести', card: S.card,
+    cards: Ls.cards.map((c, i) => ({ q: `${num(c.v)} ${c.u}`, to: c.to, ans: num(c.v * c.f), mul: `${num(c.v)} × ${fmtF(c.f).replace('.', ',')} = ${num(c.v * c.f)}`, ok: !!S.solved[i] })),
+    factors: Ls.factors.map(f => ({ k: f, t: '× ' + fmtF(f).replace('.', ',') })) };
+};
+// values that change every frame (pendulum phase, stopwatch, balance beam) — read by the scene in kit.onFrame
+window.LUCH_REAL.live = () => {
+  const now = performance.now();
+  return { ph: (now - S.rel) / 1000, el: elapsed(now), n: swings(now), run: S.sw.run, tilt: S.tilt };
+};
+window.LUCH_REAL.click = k => {
+  if (/^w\d+$/.test(k) || /^card\d+$/.test(k)) { tap(k); return; }
+  if (/^r[+-]\d+$/.test(k)) { setRuler(S.rx + (+k.slice(1)) * K); return; }
+  act(k);
+};
+
 // for the AI tutor: what is on the screen right now
 window.LUCH_CONTEXT = () => {
   const m = model(), Ls = L(), id = Ls.id;
