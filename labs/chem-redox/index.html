@@ -911,6 +911,38 @@ function setLesson(i) {
   const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-chem-electro.js): real substances and reactions on a lab tray
+window.LUCH_REAL = () => {
+  const id = LID(), m = model(), base = { module: 'chem-electro' };
+  if (id === 'oxstate') { const c = m.c, known = {};
+    c.parts.forEach(p => { if (!p.x) known[p.s] = p.o; });
+    return { ...base, scene: 'chel-ox', help: 'Склянка — другое вещество, деление шкалы — поставить x, кнопка — записать',
+      cmp: S.cmp, k: c.f, name: low(c.f) + ' · ' + c.name, u: c.u, x: S.x, pos: m.pos, neg: m.neg, sum: m.sum, found: m.found, known,
+      nf: CMP.filter((x, i) => S.found1[i]).length, cmps: CMP.map((x, i) => ({ f: low(x.f), k: x.f, found: !!S.found1[i] })) }; }
+  if (id === 'roles') { const r = m.r;
+    return { ...base, scene: 'chel-rx', help: 'Нажмите на участника, потом на другого — перейдёт 1 e⁻; карточка — назвать роль',
+      rx: S.rx, plain: r.plain, g: r.g.map(g => ({ s: g.s, n: g.n, from: g.from, to: g.to, sp: g.sp })), st: S.st.slice(), ai: m.A.map(a => a.gi), dd: m.d,
+      moved: m.moved, total: r.g.reduce((s, g) => s + Math.max(0, g.to - g.from) * g.n, 0), ready: m.ready, found: m.found,
+      roles: { ...S.roles }, sel: S.sel === null ? null : m.A[S.sel] ? m.A[S.sel].gi : null }; }
+  const E = m.E;
+  return { ...base, scene: 'chel-bal', help: 'Лоток — добавить порцию электронов, стопка на чаше — убрать порцию',
+    eq: S.eq, sk: E.sk, fin: E.fin, red: { ...E.red }, ox: { ...E.ox }, a: m.a, b: m.b, A: m.A, B: m.B, ok: m.ok, found: !!S.found3[S.eq] };
+};
+window.LUCH_REAL.click = k => {
+  if (/^x:-?\d+$/.test(k)) return setX(+k.slice(2));
+  if (k === 'rec') return record();
+  if (/^slot\d$/.test(k)) { const gi = +k.slice(4); return setRole(gi, S.roles[gi] === 'red' ? 'ox' : 'red'); }
+  if (/^g\d$/.test(k)) {
+    const gi = +k.slice(1), A = atomsRx(RX[S.rx]), idx = A.map((a, i) => i).filter(i => A[i].gi === gi);
+    if (!idx.length) return;
+    if (S.sel === null || !A[S.sel]) { S.sel = idx.reduce((b, i) => S.st[i] < S.st[b] ? i : b, idx[0]); toast(`Выбран ${RX[S.rx].g[gi].sp}. Теперь нажмите, кому он отдаст электрон.`); update(); return; }
+    if (A[S.sel].gi === gi) { S.sel = null; update(); return; }
+    const from = S.sel, to = idx.reduce((b, i) => S.st[i] > S.st[b] ? i : b, idx[0]);
+    S.sel = null; transfer(from, to); update(); return;
+  }
+  act(k);
+};
+
 // for the AI tutor: what is on the screen right now
 window.LUCH_CONTEXT = () => {
   const m = model(), L = LESSONS[S.lesson], id = L.id;

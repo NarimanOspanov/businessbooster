@@ -1136,6 +1136,43 @@ function setLesson(i) {
   if (cur) strip.scrollLeft = cur.offsetLeft - strip.offsetLeft - (strip.clientWidth - cur.offsetWidth) / 2;
 }
 
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-chem-electro.js): glassware and devices on a lab tray
+window.LUCH_REAL = () => {
+  const id = LID(), m = model(), base = { module: 'chem-electro' }, hex = s => parseInt(s.slice(1), 16), r2 = x => Math.round(x * 100) / 100;
+  if (id === 'series') return { ...base, scene: 'chel-series', help: 'Пластинка на подносе — взять, стакан — опустить в него, пластинка в стакане — вынуть',
+    plate: S.plate, at: S.at, pcol: hex(MET[S.plate].col), Ep: fmt(MET[S.plate].E, 2), n: m.n, found: m.found,
+    plates: PLATES.map(p => ({ p, col: hex(MET[p].col) })),
+    sols: SOLS.map((s, i) => ({ f: s.f, col: hex(s.col), a: s.a, ion: s.ion, own: S.plate === s.ion, tested: !!S.tested[S.plate + '-' + i], r: reacts(S.plate, s),
+      dep: s.ion === 'H' ? null : hex(MET[s.ion].col), mix: hex(mix(s.col, ICOL[S.plate] || '#dfe7ee', 0.45)) })) };
+  if (id === 'cell') {
+    const half = k => { const M = MET[S[k]]; return { m: S[k], col: hex(M.col), sol: hex(M.sol), sa: M.sa, salt: M.salt, E: fmt(M.E, 2), dep: hex(M.col) }; };
+    return { ...base, scene: 'chel-cell', help: 'Пластинка — сменить металл, мостик — опустить или поднять, ключ — замкнуть',
+      L: half('L'), R: half('R'), bridge: S.bridge, sw: S.sw, closed: m.closed, an: m.an, E: r2(m.E), Etxt: sgn(m.E) + ' В', glow: Math.round(m.glow * 20) / 20 };
+  }
+  if (id === 'electrolysis') { const e = m.e;
+    return { ...base, scene: 'chel-ely', help: 'Источник — пуск/пауза, ▲▼ — сила тока, 0 — заново, стакан — другой электролит',
+      ely: e.id, f: e.f, cat: e.cat, an: e.an, sol: hex(e.sol), a: e.a, I: S.I, run: S.run }; }
+  return { ...base, scene: 'chel-cor', help: 'Пробирка — среда, блюдце с цинком или медью — прикрутить к гвоздю, краска, календарь — пуск',
+    env: S.env, contact: S.contact, paint: S.paint, run: S.run, f: m.f, days: S.run ? null : S.days,
+    envs: ENVS.map(e => ({ id: e.id, name: e.name, short: e.short, rate: e.rate, water: e.water, o2: e.o2, salt: e.salt })) };
+};
+// values that change every tick (minutes of electrolysis, days of corrosion) — read by the scene in kit.onFrame
+window.LUCH_REAL.live = () => {
+  const id = LID();
+  if (id === 'electrolysis') { const m = model(); return { t: S.t, run: S.run, mass: m.mass, Vc: m.Vc, Va: m.Va }; }
+  if (id === 'corrosion') return { days: S.days, run: S.run };
+  return null;
+};
+window.LUCH_REAL.click = k => {
+  if (/^bk\d$/.test(k)) return dip(+k.slice(2));
+  if (k === 'elL' || k === 'elR') return cycleMetal(k.slice(2));
+  if (k === 'bridge') return setBridge(!S.bridge);
+  if (/^env-/.test(k)) return setEnv(k.slice(4));
+  if (k === 'zn' || k === 'cu') return setContact(S.contact === k ? 'none' : k);
+  if (k === 'i+' || k === 'i-') return act(k);
+  act(k);
+};
+
 // ---------- for the AI tutor ----------
 window.LUCH_CONTEXT = () => {
   const m = model(), L = LESSONS[S.lesson], id = L.id;
