@@ -1111,6 +1111,45 @@ function setLesson(i) {
   if (cur) strip.scrollLeft = cur.getBoundingClientRect().left - strip.getBoundingClientRect().left + strip.scrollLeft - (strip.clientWidth - cur.offsetWidth) / 2;
 }
 
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-chem-org.js): glassware on a lab tray
+window.LUCH_REAL = () => {
+  const id = LID(), m = model(), base = { module: 'chem-org' }, r2 = x => Math.round(x * 100) / 100;
+  if (id === 'alcohols') { const A = ALC[S.alc];
+    return { ...base, scene: 'chor-alc', help: 'Модель молекулы — следующий спирт, спиртовка — нагреть, промывалка — вода, склянка — Cu(OH)₂',
+      i: S.alc, name: A.name, f: A.f, cond: A.cond, oh: A.oh, poly: A.poly, layers: layered(S.alc), bp: fmt(A.bp, 1), seen: !!S.seen[S.alc], act: S.act,
+      got: { bp: !!S.got.bp, layers: !!S.got.layers, blue: !!S.got.blue } }; }
+  if (id === 'aldehydes') {
+    const r = S.rg ? sampleLayers(S.perm[S.sel], S.rg, 1) : null;
+    return { ...base, scene: 'chor-ald', help: 'Пробирка A, B, C — выбрать, склянка — реактив в пробу, бирка спереди — подписать выбранную',
+      sel: S.sel, rg: S.rg, sub: S.perm[S.sel], done: S.ph >= 1, txt: r ? r.txt : '', labs: [0, 1, 2].map(i => S.lab[i] === undefined ? null : SUB[S.lab[i]]),
+      cur: S.lab[S.sel] === undefined ? null : SUB[S.lab[S.sel]], names: SUB, labelled: m.labelled, right: m.labelled === 3 ? m.right : null }; }
+  if (id === 'acids') {
+    const st = S.mix === null ? 'none' : S.mix < 1 ? 'run' : 'done';
+    return { ...base, scene: 'chor-acid', help: 'Кнопки на весах — масса соды, у склянки — уксус, колба — смешать (или заново)',
+      mv: S.mv, ms: S.ms, mst: fmt(S.ms, 1), st, V: fmt(m.V, 2), Vmax: r2(m.V), ok: m.ok, exA: m.exA > 0.005 ? fmt(m.exA, 2) : null, exS: m.exS > 0.005 ? fmt(m.exS, 2) : null }; }
+  const E = m.E, F = m.F;
+  return { ...base, scene: 'chor-est', help: S.mode === 'ester' ? 'Склянка — сменить кислоту или спирт, колба — нагреть с H₂SO₄, таблички спереди — эфиры или жиры'
+      : 'Хвост кислоты — сменить её, стакан — собрать жир, склянка NaOH — омылить, таблички спереди — эфиры или жиры',
+    mode: S.mode, got: m.got, gk: G4.map(([k]) => !!S.got[k]),
+    ...(S.mode === 'ester' ? { ac: S.ac, al: S.al, acid: E.A.f, acidN: E.A.name, alc: E.B.f, alcN: E.B.name, ef: E.f, en: E.name, smell: E.smell,
+      syn: S.syn === null ? 'none' : S.syn < 1 ? 'run' : 'done' }
+      : { fa: S.fa.map(i => ({ name: FA[i].name, f: FA[i].f, C: FA[i].C, db: FA[i].db })), ff: F.f, M: F.M, uns: F.uns, liquid: F.liquid, built: S.built, soap: S.soap }) };
+};
+// values that change every frame (temperature, reaction progress, gas volume) — read by the scene in kit.onFrame
+window.LUCH_REAL.live = () => {
+  const id = LID();
+  if (id === 'alcohols') { const m = model(); return { T: S.T, boiling: m.boiling }; }
+  if (id === 'aldehydes') return { ph: S.ph };
+  if (id === 'acids') { const m = model(); return { p: S.mix === null ? 0 : S.mix, V: m.Vnow }; }
+  if (id === 'esters') return { syn: S.syn === null ? 0 : S.syn };
+  return null;
+};
+window.LUCH_REAL.click = k => {
+  if (k === 'flask') return act(S.mix !== null && S.mix >= 1 ? 'again' : 'mix');
+  if (/^fa\d$/.test(k)) return cycle('fa', +k[2]);
+  act(k);
+};
+
 // for the AI tutor: what is on the screen right now
 window.LUCH_CONTEXT = () => {
   const m = model(), L = LESSONS[S.lesson], id = L.id;

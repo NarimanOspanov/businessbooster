@@ -1172,6 +1172,64 @@ window.LUCH_SUGGEST = () => {
   return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, с чего начать задание', q, 'Где это пригодится в профессии?'];
 };
 
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-chem-metals.js): lab glassware on a white tray
+const ION_SHORT = { fe2: ['бледно-зелёный раствор', 'серо-зелёный осадок'], fe3: ['жёлто-бурый раствор', 'бурый осадок'], al: ['бесцветный раствор', 'белый осадок'] };
+const ORDER_SHORT = { castiron: 'казан', stainless: 'нож', bronze: 'колокол', dural: 'крыло' };
+window.LUCH_REAL = () => {
+  const id = LID(), m = model(), base = { module: 'chem-metals' };
+  if (id === 'alkali') {
+    return { ...base, scene: 'chme-alkali', help: 'Банка или кнопка Li/Na/K — бросить кусочек в воду, «свежая вода» — сменить воду',
+      tested: ALKS.filter(k => S.tested[k]), busy: S.rx ? S.rx.k : null, last: S.last, pink: r2(S.pink),
+      info: ALKS.map(k => ({ k, how: ALK[k].how, flame: ALK[k].flame, hyd: ALK[k].hyd, piece: ALK[k].piece })) };
+  }
+  if (id === 'hard') {
+    return { ...base, scene: 'chme-hard', help: 'Плитка — кипятить, склянка с мылом — проба, банка соды — +0,5 ммоль',
+      heat: S.heat, soap: S.soap, soda: S.soda, f: S.heat ? null : r2(S.f), H: S.heat ? null : m.H };
+  }
+  if (id === 'al') {
+    return { ...base, scene: 'chme-al', help: 'Пробирка — выбрать, склянка или кнопка — капнуть 0,5 ммоль NaOH или HCl',
+      sel: S.sel, t: m.t.map(x => ({ naoh: x.naoh, hcl: x.hcl, b: x.b, precip: r2(x.precip), peak: x.peak })) };
+  }
+  if (id === 'fe') {
+    const ok = m.t.every(x => x.dose > 0 && x.label === x.ion);
+    return { ...base, scene: 'chme-fe', help: 'Кнопка +NaOH — капнуть щёлочь, табличка под пробиркой — сменить подпись',
+      sel: S.sel, ok, t: m.t.map(x => {
+        const I = ION[x.ion];
+        return { ion: x.ion, dose: x.dose, label: x.label, labelName: x.label ? ION[x.label].name : null, precip: x.precip, sol: I.sol, solOp: I.solOp, pr: I.pr,
+          solShort: ION_SHORT[x.ion][0], obsShort: x.dissolved ? 'осадок растворился' : ION_SHORT[x.ion][1] };
+      }) };
+  }
+  const B = BASES[S.base], ing = S.ingot ? ALLOYS[S.ingot] : null;
+  const magnetic = !!S.ingot && (['iron', 'steel', 'lsteel', 'castiron'].includes(S.ingot) || (S.ingot === 'stainless' && S.add.Ni < 8));
+  return { ...base, scene: 'chme-alloy', help: 'Банка — добавка в тигель, Fe/Cu/Al — основа, печь или «отлить» — отлить слиток',
+    base: S.base, baseName: B.name, melt: B.melt, tC: { Fe: 1550, Cu: 1150, Al: 720 }[S.base], main: m.main, clsName: m.al.name,
+    adds: B.adds.map(k => ({ k, s: ADD[k].s, amt: S.add[k], step: ADD[k].step, col: ADD[k].col })),
+    ingot: S.ingot, ingotName: ing ? ing.name : null, ingotCol: ing ? ing.col : null, dens: ing ? ing.dens : null, magnetic,
+    orders: ORDERS.map(o => ({ id: o.id, short: ORDER_SHORT[o.id], done: !!S.cast[o.id] })), ndone: m.ndone };
+};
+// values that change every frame (reaction progress, boiling, Fe(OH)₂ turning brown)
+window.LUCH_REAL.live = () => {
+  const id = LID();
+  if (id === 'alkali') return { p: S.rx ? (S.rx.dur ? clamp((performance.now() - S.rx.t0) / S.rx.dur, 0, 1) : 1) : 0 };
+  if (id === 'hard') { const m = model(); return { f: S.f, H: m.H, Ca: m.Ca, Mg: m.Mg, removed: m.removed }; }
+  if (id === 'fe') { const now = performance.now(); return { ox: [0, 1, 2].map(i => feTube(i, now).ox) }; }
+  return null;
+};
+window.LUCH_REAL.click = k => {
+  const id = LID();
+  if (id === 'alkali') { if (ALK[k]) apply(k, 'dish'); else if (k === 'water') act('water'); return; }
+  if (id === 'hard') { if (k === 'plate') tapAction('plate'); else if (k === 'soda' || k === 'soap') apply(k, 'beaker'); else if (k === 'reset') act('reset'); return; }
+  if (id === 'al' || id === 'fe') {
+    const mm = /^(naoh|hcl)-(\d)$/.exec(k);
+    if (mm) apply(mm[1], 'tube' + mm[2]);
+    else if (/^(tube|lab)\d$/.test(k)) tapAction(k);
+    else if (k === 'naoh' || k === 'hcl' || k === 'reset') act(k);
+    return;
+  }
+  if (k.startsWith('add-')) apply(k.slice(4), 'cru');
+  else if (k.startsWith('base-') || k === 'cast' || k === 'reset') act(k);
+};
+
 setLesson(S.lesson);
 fit();
 requestAnimationFrame(loop);

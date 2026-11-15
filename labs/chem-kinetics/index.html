@@ -1080,6 +1080,36 @@ function setLesson(i) {
   const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-chem-react.js): lab glassware on a white tray
+window.LUCH_REAL = () => {
+  const id = LID(), m = model(), base = { module: 'chem-react' }, r3 = x => Math.round(x * 1000) / 1000;
+  if (id === 'rate') return { ...base, scene: 'chre-rate', help: 'Склянки A и B ± — концентрация, кнопки у плитки — температура',
+    cA: r3(m.a), cB: r3(m.b), T: m.T, ratio: r3(m.ratio), fc: !!m.f1.c, fT: !!m.f1.T };
+  if (id === 'catalyst') return { ...base, scene: 'chre-cat', help: 'Чашка с добавкой — в колбу, корзина — отсортировать то, что в колбе, колба — вылить',
+    inFlask: S.inFlask, ad: m.ad ? { id: m.ad.id, name: m.ad.name, sub: m.ad.sub, cat: m.ad.cat, col: m.ad.col } : null, Ea: m.Ea,
+    adds: ADD.map(a => ({ id: a.id, name: a.name, sub: a.sub, col: a.col, tested: !!S.tested[a.id], sorted: S.sorted[a.id] || null })) };
+  if (id === 'equilibrium') {
+    const vmax = Math.max(...m.P.map(q => Math.max(q.vf, q.vb)));
+    return { ...base, scene: 'chre-equil', help: 'Ампулы в штативе — другой старт, секундомер — пуск/пауза, кнопка — отметить равновесие',
+      start: S.start, play: S.play, eq: m.eq, f3: { A: !!S.f3.A, B: !!S.f3.B }, vmax };
+  }
+  return { ...base, scene: 'chre-lc', help: 'Ванна — перенести шприц, кнопки пульта — давление и вещества',
+    T: m.T, vq: S.vq, V: m.V, dir: m.settled ? 0 : S.dir, last: S.last ? S.last.desc : null, f4: { T: !!m.f4.T, P: !!m.f4.P, C: !!m.f4.C } };
+};
+// values that change every frame (time cursor, shifting equilibrium)
+window.LUCH_REAL.live = () => {
+  const id = LID();
+  if (id === 'equilibrium') { const m = model(); return { t: m.t, a: m.p.a, b: m.p.b, vf: m.p.vf, vb: m.p.vb, eq: m.eq }; }
+  if (id === 'lechatelier') { const m = model(); return { nA: m.nA, nB: m.nB, cA: m.cA, cB: m.cB }; }
+  return null;
+};
+window.LUCH_REAL.click = k => {
+  if (k === 'yes' || k === 'no') { if (S.inFlask === null) { toast('Сначала положите добавку в колбу — нажмите на чашку.'); return; } sortAdd(S.inFlask, k); return; }
+  if (k.startsWith('bath-')) return setTemp(TEMPS[+k.slice(5)]);
+  if (k === 'v+' || k === 'v-') { const vq = S.vq + (k === 'v+' ? 1 : -1); if (vq < 2 || vq > 8) { toast(vq < 2 ? 'Сильнее сжать шприц нельзя.' : 'Поршень уже вытянут до конца.'); return; } return setV(vq); }
+  act(k);
+};
+
 // for the AI tutor: what is on the screen right now
 window.LUCH_CONTEXT = () => {
   const m = model(), L = LESSONS[S.lesson], id = L.id;

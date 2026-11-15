@@ -1115,6 +1115,45 @@ function setLesson(i) {
   const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-chem-react.js): lab glassware on a white tray
+window.LUCH_REAL = () => {
+  const id = LID(), m = model(), base = { module: 'chem-react' };
+  if (id === 'signs') {
+    const e = m.e;
+    return { ...base, scene: 'chre-signs', help: e.kind === 'flame' ? 'Щипцы с лентой — внести в пламя, кнопки — признак, банки сзади — другой опыт' : 'Пробирка с реактивом — долить, кнопки — признак, банки сзади — другой опыт',
+      eid: e.id, kind: e.kind, sign: e.sign, name: e.name, A: e.A ? { n: e.A.n, c: e.A.c } : null, B: { s: e.B.s, c: e.B.c, solid: !!e.B.solid }, liq1: e.liq1 || null,
+      ran: m.ran, done: !!S.ans[e.id], signT: signOf(e.sign).t, signs: SIGNS.map(s => ({ k: s.k, t: s.t })),
+      exps: EXP.map((x, i) => ({ id: x.id, short: x.short, c: x.B.c, done: !!S.ans[x.id], cur: i === S.exp })), nDone: EXP.filter(x => S.ans[x.id]).length };
+  }
+  if (id === 'equations') {
+    return { ...base, scene: 'chre-equation', help: 'Кнопки + и − у плиток — коэффициенты, ‹ › у доски — другое уравнение',
+      l: m.rx.l, r: m.rx.r, k: m.k.slice(), els: m.els, L: m.L, R: m.R, bal: m.bal, min: m.min, ok: m.ok, name: m.rx.name,
+      found: TARGET2.filter(k => S.found[k]).length };
+  }
+  if (id === 'mass') {
+    const run = S.ph === 'run';
+    return { ...base, scene: 'chre-mass', help: S.ph === 'ready' ? 'Пробка — снять/надеть, банка с мелом ± — масса мела, колба — начать опыт' : S.ph === 'run' ? 'Идёт реакция — следите за весами' : 'Кнопка у записей — новый опыт',
+      m: S.m3, before: m.before, shut: S.shut, ph: S.ph, reading: run ? null : m.reading, gas: m.gas,
+      closed: S.closed3 ? S.closed3.m : null, open: S.open3 ? S.open3.m : null, gasOpen: S.open3 ? gas3(S.open3.m) : 0, ans3: S.ans3,
+      opts: S.open3 && !S.ans3 ? opts3(S.open3.m) : null, ansGas: S.ans3 && S.open3 ? gas3(S.open3.m) : null };
+  }
+  const c = m.cur === undefined ? null : TY[m.cur], cnt = {};
+  TYPES.forEach(t => { cnt[t.k] = Object.values(S.place4).filter(k => k === t.k).length; });
+  return { ...base, scene: 'chre-types', help: 'Нажмите на опыт нужного типа — карточка ляжет туда',
+    card: c ? lowF(c.e) : null, cond: c ? c.cond : null, placed: m.placed, total: TY.length, cnt, types: TYPES.map(t => ({ k: t.k, name: t.name, sch: t.sch })) };
+};
+// values that change every frame (pouring, burning, the scale during the reaction)
+window.LUCH_REAL.live = () => {
+  const id = LID();
+  if (id === 'signs') return { p: runP(EXP[S.exp]) };
+  if (id === 'mass') { const m = model(); return { p: m.p, reading: m.reading }; }
+  return null;
+};
+window.LUCH_REAL.click = k => {
+  if (/^(reag$|s-|kp-|km-|stop$|flask$|a-|box-)/.test(k)) tap(k);
+  else act(k);
+};
+
 // for the AI tutor: what is on the screen right now
 window.LUCH_CONTEXT = () => {
   const m = model(), L = LESSONS[S.lesson], id = L.id;

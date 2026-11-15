@@ -1014,6 +1014,65 @@ function setLesson(i) {
   const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-chem-classes.js): glassware on a lab tray.
+// The chains lesson shows one genetic series at a time: the row the student last advanced (or picked in 3D).
+let r3row = 0, r3prog = [0, 0];
+const r3t = [-1e9, -1e9];
+window.LUCH_REAL = () => {
+  const id = LID(), base = { module: 'chem-classes' }, hex = s => parseInt(s.slice(1), 16);
+  if (id === 'oxides') return { ...base, scene: 'chcl-oxides', help: 'Склянка — взять (в ложке её получают горением), ящик — положить в него взятую склянку',
+    sel: S.sel, items: OX.map(x => ({ f: x.f, name: x.name, at: S.place[x.f] || null })) };
+  if (id === 'acids' || id === 'salts') {
+    const m = model(), C = m.C, R = m.R;
+    return { ...base, scene: id === 'acids' ? 'chcl-acids' : 'chcl-salts',
+      help: (m.acid ? 'Чашка с H — добавить атом' : 'Чашка с металлом — добавить атом, ‹ › — другой металл') + ', лоток с остатками — добавить остаток, ‹ › — другой остаток, деталь на доске — убрать',
+      acid: m.acid, C: { s: C.s, v: C.v, col: hex(ATOM[C.s].c), name: ATOM[C.s].name }, R: { s: R.s, v: R.v, col: hex(R.c) },
+      x: m.x, y: m.y, A: m.A, B: m.B, eq: m.eq, ok: m.ok, f: m.f, name: m.ok ? nameOf(C, R) : '', bad: m.ok && !m.acid && noSalt(C, R),
+      found: m.targets.map(k => ({ f: k, name: TNAME[k], got: !!S.found[k] })) };
+  }
+  if (id === 'bases') return { ...base, scene: 'chcl-bases', help: 'Склянка с индикатором — взять, пробирка — капнуть, табличка — сменить ответ, «Промыть», «Проверить»',
+    sel: S.selInd, verified: S.verified,
+    inds: IND.map(x => ({ k: x.k, name: x.name, stock: hex(x.stock) })),
+    tubes: [0, 1, 2].map(i => { const k = S.ind[i], c = tubeColor(i); return { ind: k, iname: k ? indOf(k).name : '', col: c ? hex(c) : null, cn: k ? indOf(k).cn[S.tubes[i]] : '', lab: S.lab[i] ? SAMPLE[S.lab[i]] : null }; }) };
+  if (id === 'chains') {
+    const pr = S.prog;
+    for (const r of [0, 1]) if (pr[r] !== r3prog[r]) { if (pr[r] > r3prog[r]) r3t[r] = performance.now(); r3row = r; }
+    r3prog = pr.slice();
+    const row = ROWS[r3row];
+    return { ...base, scene: r3row ? 'chcl-rown' : 'chcl-rowm', help: 'Реактив спереди — взять, светящееся место ряда — добавить его туда, табличка справа — другой ряд',
+      row: r3row, prog: pr[r3row], other: pr[1 - r3row], selR: S.selR,
+      nodes: row.nodes.map(n => ({ f: n.f, cl: n.cl })), steps: row.steps.map(s => ({ r: s.r, eq: s.eq })),
+      reag: REAG.map(k => ({ k, name: RNAME[k] })) };
+  }
+  return null;
+};
+// time since the last action (indicator drop, chain step) — read by the scene in kit.onFrame for short animations
+window.LUCH_REAL.live = () => {
+  const id = LID(), now = performance.now();
+  if (id === 'bases') return S.splash ? { si: S.splash.i, age: (now - S.splash.t) / 1000 } : { si: -1, age: 1e9 };
+  if (id === 'chains') return { age: (now - r3t[r3row]) / 1000 };
+  return null;
+};
+window.LUCH_REAL.click = k => {
+  if (/^jar-/.test(k)) { S.sel = k.slice(4); update(); return; }
+  if (/^box-/.test(k)) {
+    if (!S.sel) { toast('Сначала возьмите склянку: нажмите на неё.'); return; }
+    if (S.place[S.sel]) { toast(`${low(S.sel)} уже разложен. Возьмите другую склянку.`); return; }
+    placeOx(S.sel, k.slice(4)); return;
+  }
+  if (k === 'binA') return addX('x', 1);
+  if (k === 'binB') return addX('y', 1);
+  if (k === 'la') return addX('x', -1);
+  if (k === 'lb') return addX('y', -1);
+  if (/^ind-/.test(k)) return act('i-' + k.slice(4));
+  if (/^tube-/.test(k)) { const i = +k.slice(5); if (S.selInd) { addInd(i, S.selInd); renderTools(); return; } toast('Сначала возьмите склянку с индикатором справа.'); return; }
+  if (/^tag-/.test(k)) return cycleLab(+k.slice(4));
+  if (/^rg-/.test(k)) { const r = k.slice(3); S.selR = S.selR === r ? null : r; if (S.selR) toast(`Взят реактив ${low(r)}. Нажмите на светящееся место ряда.`); update(); return; }
+  if (k === 'st') { if (S.prog[r3row] >= 3) { toast('Этот ряд пройден. Табличка справа — другой ряд.'); return; } if (S.selR) { doStep(r3row, S.selR); return; } toast('Сначала возьмите реактив спереди.'); return; }
+  if (k === 'row') { r3row = 1 - r3row; S.selR = null; update(); return; }
+  act(k);
+};
+
 // for the AI tutor: what is on the screen right now
 window.LUCH_CONTEXT = () => {
   const m = model(), L = LESSONS[S.lesson], id = L.id;

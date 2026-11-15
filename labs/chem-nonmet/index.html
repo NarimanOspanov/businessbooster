@@ -1112,6 +1112,31 @@ function setLesson(i) {
   const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-chem-nonmet.js): real substances and glassware on a lab tray
+window.LUCH_REAL = () => {
+  const id = LID(), m = model(), base = { module: 'chem-nonmet' };
+  if (id === 'halogens') return { ...base, scene: 'chnm-hal', help: 'Пробирка — прилить галогенную воду из её ряда, образцы спереди — собрать ряд активности',
+    tubes: HAL.flatMap((g, r) => SALT.map((s, c) => ({ r, c, on: mixed(r, c), re: mixed(r, c) && reacts(r, c), out: mixed(r, c) ? (reacts(r, c) ? s.k : g.k) : null }))),
+    hal: HAL.map(g => ({ s: g.s, k: g.k })), salt: SALT.map(s => s.s), last: S.last1, eq: S.last1 && EQH[S.last1] && S.mix.includes(S.last1) ? EQH[S.last1] : null,
+    found: m.found, n: m.n, order: S.order.slice(), orderOk: S.orderOk };
+  if (id === 'sulfur') return { ...base, scene: 'chnm-sul', help: 'Нажмите вещество спереди, потом ступеньку лестницы',
+    cards: CARDS.map((c, i) => ({ f: low(c.f), k: c.f, v: S.place[i] !== undefined ? c.v : null })), sel: S.sel, placed: m.placed, wrong: S.wrong2 };
+  if (id === 'ammonia') return { ...base, scene: 'chnm-nh3', help: 'Кнопки под шкалами — температура и давление, корзина в колонне — катализатор',
+    T: S.T, P: S.P, cat: S.cat, x: Math.round(m.x * 1000) / 10, v: Math.round(m.v * 100) / 100, ok: m.ok };
+  if (id === 'phos') return { ...base, scene: 'chnm-p', help: 'Горелка — зажечь/погасить, стрелки — двигать, колба — растворить дым',
+    xb: S.xb, pow: S.pow, Tmax: m.Tmax, centred: m.centred, lit: { w: !!S.lit.w, r: !!S.lit.r }, gone: { ...S.gone }, first: S.firstLit, fair: S.fair, oxide: S.oxide, acid: S.acid };
+  return { ...base, scene: 'chnm-c', help: 'Пробирка — капнуть HCl, ещё раз — газ в известковую воду; этикетка, потом место под пробиркой',
+    res: TL.map((l, i) => S.acid5[i] ? CONT[i] : null), lab: TL.map((l, i) => S.lab5[i] !== undefined ? SUB5[S.lab5[i]].f : null), labs: SUB5.map((s, k) => ({ f: s.f, used: Object.values(S.lab5).includes(k) })),
+    sel5: S.sel5, lime: S.lime, cloudy: S.lime !== null && CONT[S.lime] === 0, limeDone: S.limeDone, labeled: m.labeled };
+};
+// values that change every frame (plate heating) — read by the scene in kit.onFrame
+window.LUCH_REAL.live = () => LID() === 'phos' ? { Ts: { ...S.Ts }, xb: S.xb, Tmax: 20 + 5 * S.pow, lit: { w: !!S.lit.w, r: !!S.lit.r }, gone: { ...S.gone } } : null;
+window.LUCH_REAL.click = k => {
+  if (/^t-\d-\d$/.test(k)) return mix(+k[2], +k[4]);
+  if (/^(card|shelf|t5|lab|slot)-\d$/.test(k) || k === 'burner' || k === 'flask' || k === 'lime' || k === 'cat') return tap(k);
+  act(k);
+};
+
 // for the AI tutor: what is on the screen right now
 window.LUCH_CONTEXT = () => {
   const m = model(), L = LESSONS[S.lesson], id = L.id;
