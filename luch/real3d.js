@@ -463,11 +463,36 @@
       tag(v3(44, 33, 4), 'Термометр', d.Ttxt);
     }
     const SCENES = { wire: sceneWire, power: scenePower, joule: sceneJoule };
+    // ---------- набор деталей для сцен из отдельных файлов (/luch/real3d-<тема>.js) ----------
+    const loading = {};
+    function loadModule(name) {
+      if (loading[name] || !/^[a-z0-9-]+$/.test(name)) return;
+      loading[name] = true;
+      const sc = document.createElement('script'); sc.src = '/luch/real3d-' + name + '.js';
+      sc.onload = () => { sig = ''; R && R.update(desc()); };
+      document.head.appendChild(sc);
+    }
+    const frameFns = [];
+    const kit = {
+      T, at, mesh, box, cyl, toon, keep, post, baseBlock, cable, tag, clickable, v3, glowTex, textTex, dialTex, bandsOf,
+      meter, supply, cells, knife, bulb, resistor, rheostat, placeOn,
+      get root() { return root; }, grad, hullMat, edgeMat,
+      C: { WOOD, WOOD2, BRASS, STEEL, DARK, INK, WIRE: WIRE_COL },
+      // анимация: fn(dt, t) каждый кадр, пока сцена на экране (после перестройки сцены сбрасывается)
+      onFrame(fn) { frameFns.push(fn); },
+      reduce,
+    };
 
     function layout(d) {
       clear();
       table();
-      if (d.scene) { SCENES[d.scene](d); return; }
+      if (d.scene) {
+        if (SCENES[d.scene]) { SCENES[d.scene](d); return; }
+        const ext = (window.LUCH_REAL_SCENES || {})[d.scene];
+        if (ext) { try { ext(kit, d); } catch (e) { console.error('[real3d scene ' + d.scene + ']', e); } return; }
+        if (d.module) loadModule(d.module);
+        return;
+      }
       const parts = [];
       // источник на заднем крае, «+» справа
       const src = d.source.type === 'supply' ? supply(d.source.U) : cells(d.source.n || 1, d.source.U);
@@ -590,6 +615,7 @@
       labels.appendChild(el); tags.push({ el, p });
     }
     function clear() {
+      frameFns.length = 0;
       sc.remove(root); root = new T.Group(); sc.add(root);
       disposables.forEach(o => o.dispose && o.dispose()); disposables = [];
       clickables.length = 0; sleeves.length = 0; tags.length = 0; labels.innerHTML = '';
@@ -648,6 +674,7 @@
       requestAnimationFrame(frame);
       const dt = Math.min(0.05, (t - last) / 1000); last = t;
       if (!reduce) for (const s of sleeves) { s.tex.offset.x -= s.speed * dt; dirty = true; }
+      if (frameFns.length) { for (const f of frameFns) { try { f(dt, t / 1000); } catch (e) {} } dirty = true; }
       if (!dirty || document.hidden) return;
       renderer.render(sc, cam); dirty = false;
       const r = view.getBoundingClientRect();
