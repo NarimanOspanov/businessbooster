@@ -1084,6 +1084,42 @@ function setLesson(i) {
   const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
+// for the «Как в жизни» 3D view (/luch/real3d.js): the circuit as real parts, in order from «+»
+const PROBE = { bp: 'src.out', bm: 'src.in', s1: 'sw.in', s2: 'sw.out', l1: 'bulb.in', l2: 'bulb.out' };
+window.LUCH_REAL = () => {
+  const Ls = L(), id = Ls.id, r2 = x => Math.round(x * 100) / 100;
+  if (id === 'amp') {
+    const cu = cur1(), over = cu.IA > Ls.Amax;
+    const path = [{ type: 'switch', id: 'sw', closed: S.sw, click: 'sw', I: cu.I }];
+    if (S.amm === 'ser') path.push({ type: 'ammeter', id: 'am', val: r2(cu.IA), max: Ls.Amax, over, value: fmt(cu.IA, 2) + ' А', click: 'amm', I: cu.I });
+    path.push({ type: 'bulb', id: 'bulb', glow: r2(Math.pow(cu.IL / 0.6, 2)), value: nf(Ls.RL) + ' Ом', I: cu.I });
+    path.push({ type: 'rheostat', id: 'rh', f: r2(S.rh / Ls.Rmax), value: fmt(S.rh, 1) + ' Ом', I: cu.I });
+    const meters = S.amm === 'par' ? [{ kind: 'A', a: 'bulb.in', b: 'bulb.out', val: r2(cu.IA), max: Ls.Amax, over, label: 'Амперметр параллельно!', value: fmt(cu.IA, 2) + ' А', click: 'amm' }]
+      : S.amm === 'none' ? [{ kind: 'A', a: null, b: null, val: 0, max: Ls.Amax, label: 'Амперметр', value: 'не подключён', click: 'slotS' }] : [];
+    return { source: { type: 'cells', n: 3, U: Ls.U }, path, meters, I: r2(cu.I) };
+  }
+  if (id === 'volt') {
+    const U = U2(), I = I2(), v = vRead();
+    return { source: { type: 'cells', n: S.n, U, click: 'ncycle' },
+      path: [{ type: 'switch', id: 'sw', closed: S.sw, click: 'sw', I }, { type: 'bulb', id: 'bulb', glow: r2(Math.pow((S.sw ? U : 0) / Ls.Urated, 2)), value: 'на ' + fmt(Ls.Urated, 1) + ' В', I }],
+      meters: [{ kind: 'V', a: PROBE[S.pr.at] || null, b: PROBE[S.pb.at] || null, val: r2(Math.max(0, v)), max: 6, value: fmt(v, 2) + ' В', click: 'pcycle' }], I: r2(I) };
+  }
+  if (id === 'ohm') {
+    const I = I4(), Ur = S.sw ? S.U : 0, Rk = S.R;
+    return { source: { type: 'supply', U: S.U },
+      path: [{ type: 'ammeter', id: 'am', val: r2(I), max: Ls.Amax, over: I > Ls.Amax, value: fmt(I, 2) + ' А', I },
+        { type: 'resistor', id: 'res', R: Rk === 'x' ? 0 : RES[Rk].R, label: Rk === 'x' ? 'Резистор X' : 'Резистор', value: Rk === 'x' ? 'R = ?' : RES[Rk].name, click: 'rcycle', I },
+        { type: 'switch', id: 'sw', closed: S.sw, click: 'sw', I }],
+      meters: [{ kind: 'V', a: 'res.in', b: 'res.out', val: r2(Ur), max: Ls.Umax, value: fmt(Ur, 1) + ' В' }], I: r2(I) };
+  }
+  return null; // урок с проволокой — не цепь
+};
+window.LUCH_REAL.click = k => {
+  if (k === 'ncycle') { act(S.n >= L().nMax ? 'n=1' : 'n+'); return; }
+  if (k === 'pcycle') { const seq = ['pp-bat', 'pp-lamp', 'pp-key', 'pp-off'], cur = S.pr.at === 'bp' ? 0 : S.pr.at === 'l1' ? 1 : S.pr.at === 's1' ? 2 : 3; act(seq[(cur + 1) % 4]); return; }
+  act(k);
+};
+
 // for the AI tutor: what is on the screen right now
 window.LUCH_CONTEXT = () => {
   const m = model(), Ls = L(), id = Ls.id;

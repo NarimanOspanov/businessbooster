@@ -910,4 +910,5 @@
   })();
 
   if (document.getElementById('tab-overview') && !window.LuchShell) { const sc = document.createElement('script'); sc.src = '/luch/lab-shell.js'; document.head.appendChild(sc); }
+  if (typeof window.LUCH_REAL === 'function' && !window.__luchReal) { const r3 = document.createElement('script'); r3.src = '/luch/real3d.js'; document.head.appendChild(r3); }
 })();
