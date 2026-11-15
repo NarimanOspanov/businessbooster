@@ -440,7 +440,8 @@
     return new Blob([buf], { type: 'audio/wav' });
   }
   const canListen = !!(SR || (navigator.mediaDevices && navigator.mediaDevices.getUserMedia));
-  function listen(onInterim) { return SR ? listenBrowser(onInterim) : listenRecorder(); }
+  const MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  function listen(onInterim) { return SR && !MOBILE ? listenBrowser(onInterim) : listenRecorder(); }
   const micError = e => e && e.message === 'mic'
     ? 'Нет доступа к микрофону. Разрешите его в настройках браузера (значок замка у адреса сайта).'
     : 'Не получилось распознать речь. Попробуйте ещё раз.';
@@ -670,38 +671,53 @@
   function flash(msg) { const d = bubble('assistant', msg); d.style.opacity = '.8'; scroll(); }
 
   // ---------- voice conversation ----------
-  let vListen = null, vState = 'idle';
-  const VS = { idle: 'Нажмите 🎤 и говорите', listening: 'Слушаю…', thinking: 'Смотрю на экран…', speaking: 'Говорю · нажмите, чтобы перебить' };
-  function setVoice(s, hint) { vState = s; orb.dataset.s = s; vs.textContent = VS[s]; if (hint !== undefined) vh.textContent = hint; }
+  // Разговор без рук: пока панель открыта, наставник всё время слушает.
+  // Тишина не выключает микрофон; выключить — нажать на кружок (и нажать снова, чтобы включить).
+  let vListen = null, vState = 'idle', micOff = false, vErr = 0;
+  const VS = { idle: 'Микрофон выключен · нажмите 🎤', listening: 'Слушаю · говорите в любой момент', thinking: 'Смотрю на экран…', speaking: 'Говорю · нажмите, чтобы перебить' };
+  function setVoice(s, hint) { vState = s; orb.dataset.s = s; vs.textContent = VS[s]; if (hint !== undefined) vh.textContent = hint; orb.setAttribute('aria-label', s === 'listening' ? 'Выключить микрофон' : s === 'idle' ? 'Включить микрофон' : 'Перебить'); }
   async function turn() {
-    if (!voiceMode || busy) return;
+    if (!voiceMode || busy || micOff || vListen) return;
+    if (document.hidden) { setVoice('idle', 'Вернитесь на вкладку — я снова буду слушать.'); return; }
     setVoice('listening', '');
-    vListen = listen(t => { vh.textContent = t; });
+    const me = vListen = listen(t => { vh.textContent = t; });
     let q = '';
-    try { q = await vListen.p; } catch (e) { vListen = null; setVoice('idle', micError(e)); return; }
-    vListen = null;
-    if (!voiceMode) return;
-    if (!q) { setVoice('idle', 'Ничего не услышал. Нажмите на кружок и говорите.'); return; }
+    try { q = await me.p; } catch (e) {
+      if (vListen === me) vListen = null;
+      if (e && e.message === 'mic') { micOff = true; setVoice('idle', micError(e)); return; }
+      if (++vErr > 4) { micOff = true; setVoice('idle', micError(e)); return; }
+      setTimeout(turn, 600 * vErr); return;
+    }
+    if (vListen !== me) return; // выключили или перебили
+    vListen = null; vErr = 0;
+    if (!voiceMode || micOff) return;
+    if (!q) { setTimeout(turn, 120); return; } // тишина — просто слушаем дальше
     vh.textContent = q; setVoice('thinking');
     speaker.stop();
     await ask(q, { voice: true });
     if (!voiceMode) return;
     await speaker.idle();
-    if (voiceMode && vState !== 'idle') turn();
+    if (voiceMode && !micOff) turn();
   }
   orb.addEventListener('click', () => {
     unlockAudio();
-    if (vState === 'listening' && vListen) { vListen.stop(); return; }
-    if (vState === 'speaking' || vState === 'thinking') { if (ctrl) ctrl.abort(); speaker.stop(); setVoice('idle', ''); setTimeout(turn, 50); return; }
-    turn();
+    if (vState === 'listening') { micOff = true; const l = vListen; vListen = null; if (l) l.abort(); setVoice('idle', 'Нажмите, когда захотите снова говорить.'); return; }
+    if (vState === 'speaking' || vState === 'thinking') { if (ctrl) ctrl.abort(); speaker.stop(); micOff = false; setVoice('idle', ''); setTimeout(turn, 50); return; }
+    micOff = false; vErr = 0; turn();
+  });
+  // вкладку свернули — микрофон на паузе; вернулись — снова слушаем
+  document.addEventListener('visibilitychange', () => {
+    if (!voiceMode) return;
+    if (document.hidden) { if (vListen) { const l = vListen; vListen = null; l.abort(); setVoice('idle', 'Вернитесь на вкладку — я снова буду слушать.'); } }
+    else if (!micOff && vState === 'idle' && !busy) turn();
   });
   function setMode(on, quiet) {
     voiceMode = on;
     vmBtn.classList.toggle('on', on); vmBtn.setAttribute('aria-pressed', on);
     voiceBox.hidden = !on; form.hidden = on; suggestions();
-    if (on && quiet) { if (canListen) unlockAudio(); return; }
-    if (on) { if (!canListen) { setVoice('idle', 'В этом браузере нет доступа к микрофону. Откройте сайт в Chrome или Safari.'); return; } unlockAudio(); turn(); }
-    else { if (vListen) { vListen.abort(); vListen = null; } speaker.stop(); setVoice('idle', ''); }
+    if (on && quiet) { micOff = false; vErr = 0; if (canListen) unlockAudio(); return; }
+    if (on) { micOff = false; vErr = 0; if (!canListen) { setVoice('idle', 'В этом браузере нет доступа к микрофону. Откройте сайт в Chrome или Safari.'); return; } unlockAudio(); turn(); }
+    else { if (vListen) { const l = vListen; vListen = null; l.abort(); } speaker.stop(); setVoice('idle', ''); }
   }
   vmBtn.addEventListener('click', () => { setMode(!voiceMode); ls.set('luch-tutor-mode', voiceMode ? 'voice' : 'text'); });
   $('#lt-vend').addEventListener('click', () => { setMode(false); ls.set('luch-tutor-mode', 'text'); setTimeout(() => inp.focus(), 30); });
@@ -714,7 +730,7 @@
     antAt = Date.now();
     const show = '💡 Помоги', sh = window.LuchShell;
     const n = sh && sh.noteHelp ? sh.noteHelp() : 1, ANT = ANT_BASE + ANT_LEVEL[Math.min(3, n)] + ' В конце — короткий вопрос, чтобы я мог ответить голосом.';
-    if (voiceMode) { setVoice('thinking', ''); await ask(ANT, { voice: true, show }); await speaker.idle(); if (voiceMode && vState !== 'idle') turn(); }
+    if (voiceMode) { setVoice('thinking', ''); await ask(ANT, { voice: true, show }); await speaker.idle(); if (voiceMode && !micOff) turn(); }
     else await ask(ANT, { show });
   }
   // журнал действий ученика: что нажимал и что выставлял (без полей наставника)
@@ -803,10 +819,10 @@
     async function askVoice(q) {
       hide(); openPanel();
       if (!canListen) { ask(q); return; }
-      voiceMode = true; vmBtn.classList.add('on'); vmBtn.setAttribute('aria-pressed', true); voiceBox.hidden = false; form.hidden = true; suggestions();
+      voiceMode = true; micOff = false; vErr = 0; vmBtn.classList.add('on'); vmBtn.setAttribute('aria-pressed', true); voiceBox.hidden = false; form.hidden = true; suggestions();
       setVoice('thinking', ''); unlockAudio();
       await ask(q, { voice: true }); await speaker.idle();
-      if (voiceMode && vState !== 'idle') turn();
+      if (voiceMode && !micOff) turn();
     }
     function show(text, chips = [], o = {}) {
       try { if (window.LuchTutorNote) window.LuchTutorNote('наставник показал подсказку: «' + String(text).slice(0, 140) + '»'); } catch (e) {}
