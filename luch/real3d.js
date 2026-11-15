@@ -142,11 +142,11 @@
       return { g, len: len + 4, tin: tm, tout: tp, tag: [n > 1 ? `БАТАРЕЯ · ${n} эл.` : 'БАТАРЕЙКА', fmtU(U)], top: 13 };
     }
     // регулируемый источник: корпус с табло и ручкой
-    function supply(U) {
+    function supply(U, unit) {
       const g = new T.Group();
       at(box(26, 16, 14, 0x3b4a66), 0, 8, 0, g);
       at(box(24, 1.2, 12, 0x4a5b7c), 0, 16.6, 0, g);
-      const scr = new T.Mesh(keep(new T.PlaneGeometry(14, 6)), new T.MeshBasicMaterial({ map: keep(textTex(fmtU(U), '#86e0a8', '#0e1520', 256, 110)) }));
+      const scr = new T.Mesh(keep(new T.PlaneGeometry(14, 6)), new T.MeshBasicMaterial({ map: keep(textTex(unit ? String(U).replace('.', ',') + ' ' + unit : fmtU(U), '#86e0a8', '#0e1520', 256, 110)) }));
       at(scr, -3, 10.5, 7.05, g);
       const knob = cyl(2.6, 2, 0xd9dfe9, { seg: 18 }); knob.rotation.x = Math.PI / 2; at(knob, 8.5, 10.5, 7.8, g);
       at(cyl(1.3, 3, 0xe0473a), 9, 18.6, -3, g); at(cyl(1.3, 3, 0x26324a), -9, 18.6, -3, g);
@@ -245,7 +245,7 @@
     }
     function textTex(txt, fg, bg, w, h) {
       const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d');
-      x.fillStyle = bg; x.fillRect(0, 0, w, h); x.fillStyle = fg; x.font = `600 ${Math.round(h * 0.62)}px "IBM Plex Mono", monospace`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(txt, w / 2, h / 2 + 2);
+      x.fillStyle = bg; x.fillRect(0, 0, w, h); x.fillStyle = fg; let fs = Math.round(h * 0.62); x.font = `600 ${fs}px "IBM Plex Mono", monospace`; const tw = x.measureText(txt).width; if (tw > w * 0.88) { fs = Math.floor(fs * w * 0.88 / tw); x.font = `600 ${fs}px "IBM Plex Mono", monospace`; } x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(txt, w / 2, h / 2 + 2);
       const t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; return t;
     }
     function dialTex(kind, val, max, over) {
@@ -297,11 +297,177 @@
 
     // ---------- раскладка цепи по краям стола ----------
     const B = { x0: -52, x1: 52, z0: -30, z1: 28 };
-    function layout(d) {
-      clear();
-      // стол
+    function table() {
       at(box(140, 3, 100, WOOD, { edges: true }), 0, -1.5, 4);
       for (let k = -4; k <= 4; k++) at(box(0.35, 0.05, 100, 0xb07a44, { edges: false, shadow: false }), k * 15.5, 0.03, 4);
+    }
+    const clickable = (g, key) => { if (key) { g.userData.click = key; clickables.push(g); } return g; };
+    const v3 = (x, y, z) => new T.Vector3(x, y, z);
+
+    // ===== «Сопротивление»: проволока на доске с линейкой, зажим-ползунок, мультиметр =====
+    function sceneWire(d) {
+      const g = new T.Group(); root.add(g);
+      at(box(112, 3, 24, WOOD2), 0, 1.5, -6, g);
+      // линейка вдоль переднего края доски
+      at(box(100, 0.5, 5, 0xf1e3c2, { edges: true }), 0, 3.25, 3.5, g);
+      for (let k = 0; k <= 20; k++) at(box(0.35, 0.12, k % 2 ? 1.6 : 3, 0x3a2e22, { edges: false, shadow: false }), -48 + k * 4.8, 3.56, 2.6 + (k % 2 ? 0.7 : 0), g);
+      const xa = -48, xb = 48, xl = xa + (xb - xa) * Math.max(0.05, Math.min(1, d.l));
+      // концевые стойки
+      const pa = post(g, xa - 3, -8, 3), pb = post(g, xb + 3, -8, 3);
+      // проволока: толщина — сечение, цвет — металл
+      const r = 0.35 + 0.75 * Math.sqrt(d.S || 0.5), wy = 5.4;
+      const metal = toon(d.col || 0xd98a4e);
+      const wire = mesh(new T.CylinderGeometry(r, r, xb - xa, 18), 0, { mat: metal, hull: true, edges: false }); wire.rotation.z = Math.PI / 2; at(wire, 0, wy, -8, g);
+      clickable(wire, 'mcycle');
+      // подсвечиваем измеряемый участок
+      const seg = mesh(new T.CylinderGeometry(r * 1.25, r * 1.25, xl - xa, 18), 0, { mat: new T.MeshBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0.28, depthWrite: false }), edges: false, shadow: false });
+      seg.rotation.z = Math.PI / 2; at(seg, (xa + xl) / 2, wy, -8, g);
+      at(box(2.4, 3, 3, BRASS), xa, wy - 1.2, -8, g); at(box(2.4, 3, 3, BRASS), xb, wy - 1.2, -8, g);
+      // зажим-ползунок
+      const cl = new T.Group(); at(cl, xl, 0, -8, g);
+      at(box(4, 6, 5, 0xe0473a), 0, wy + 3.4, 0, cl); at(box(1, 3, 1.2, STEEL), 0, wy + 0.6, 1.6, cl); at(box(1, 3, 1.2, STEEL), 0, wy + 0.6, -1.6, cl);
+      clickable(cl, 'lcycle');
+      // мультиметр перед доской
+      const mm = new T.Group(); at(mm, -24, 0, 34);
+      at(box(22, 5, 30, 0xf2c94c), 0, 2.5, 0, mm);
+      const scr = new T.Mesh(keep(new T.PlaneGeometry(17, 8)), new T.MeshBasicMaterial({ map: keep(textTex(d.Rtxt, d.ok ? '#86e0a8' : '#e8ecf4', '#0e1520', 300, 130)) }));
+      scr.rotation.x = -Math.PI / 2; at(scr, 0, 5.05, -7, mm);
+      const knob = cyl(4, 1.4, 0x2c3240); at(knob, 0, 5.7, 5, mm);
+      at(cyl(1.3, 2, 0xe0473a), -5, 6, 12, mm); at(cyl(1.3, 2, 0x26324a), 5, 6, 12, mm);
+      mm.updateMatrixWorld(true); cl.updateMatrixWorld(true);
+      const tR = v3(-5, 7, 12).applyMatrix4(mm.matrixWorld), tB = v3(5, 7, 12).applyMatrix4(mm.matrixWorld);
+      cable(tR, v3(xl, wy + 6.4, -8), WIRE_COL.probeR, 0, { r: 0.6, lift: 6, arch: 1 });
+      cable(tB, pa.clone().add(v3(0, 0, -8)), WIRE_COL.probeB, 0, { r: 0.6, lift: 6, arch: 1 });
+      tag(v3((xa + xb) / 2, 13, -8), d.matName, 'S = ' + d.Stxt);
+      tag(v3(xl, 17, -8), 'Зажим', 'l = ' + d.ltxt);
+      tag(v3(-24, 12, 34), 'Мультиметр', d.Rtxt, false);
+    }
+
+    // ===== «Мощность»: удлинитель с автоматом и бытовые приборы =====
+    function appliance(id, on) {
+      const g = new T.Group();
+      if (id === 'kettle') {
+        at(cyl(5.2, 1.4, 0x2c3240), 0, 0.7, 0, g);
+        at(cyl(4.4, 12, 0xe8ecf4, { r2: 3.6 }), 0, 7.4, 0, g);
+        at(cyl(3.8, 0.8, 0x9aa3b2), 0, 13.8, 0, g);
+        at(box(1.4, 9, 2, 0x2c3240), -5.2, 7.6, 0, g); at(box(3, 1.4, 2, 0x2c3240), -4.2, 12, 0, g); at(box(3, 1.4, 2, 0x2c3240), -4.2, 3.4, 0, g);
+        const sp = cyl(0.9, 4, 0xe8ecf4); sp.rotation.z = -0.9; at(sp, 5.2, 11, 0, g);
+        if (on) at(box(1.2, 0.8, 0.4, 0x6fe3ff, { edges: false, matOpt: { emissive: 0x3fc8ff, emissiveIntensity: 1 } }), 0, 2, 4.2, g);
+      } else if (id === 'dryer') {
+        const b = cyl(3.4, 11, 0xc779d0); b.rotation.z = Math.PI / 2; at(b, 1, 10, 0, g);
+        const nz = cyl(2.2, 4, 0x8e44ad, { r2: 1.6 }); nz.rotation.z = -Math.PI / 2; at(nz, 8.4, 10, 0, g);
+        at(box(2.6, 8, 3, 0xc779d0), -2, 4.8, 0, g); at(box(6, 1, 5, 0x8e44ad), -2, 0.5, 0, g);
+        if (on) { const h = new T.Sprite(new T.SpriteMaterial({ map: glowTex(), color: 0xff9d5c, transparent: true, blending: T.AdditiveBlending, depthWrite: false, opacity: 0.55 })); h.scale.setScalar(7); at(h, 11, 10, 0, g); }
+      } else if (id === 'iron') {
+        at(box(12, 1.2, 6, STEEL), 0, 0.6, 0, g);
+        at(box(10, 3, 5, 0x3b6fd8), -0.6, 2.7, 0, g);
+        at(box(1.4, 3.2, 1.4, 0x2c3240), -3.5, 5.4, 0, g); at(box(1.4, 3.2, 1.4, 0x2c3240), 2.5, 5.4, 0, g); at(box(8, 1.4, 2, 0x2c3240), -0.5, 7.4, 0, g);
+        if (on) at(box(0.8, 0.5, 0.8, 0xff5a3c, { edges: false, matOpt: { emissive: 0xff3c1e, emissiveIntensity: 1 } }), 3.5, 4.4, 2.2, g);
+      } else if (id === 'tv') {
+        at(box(8, 0.8, 5, 0x2c3240), 0, 0.4, 0, g); at(box(1.4, 4, 1.4, 0x2c3240), 0, 2.6, -0.6, g);
+        at(box(20, 12, 1.2, 0x1b1f28), 0, 10.6, -0.6, g);
+        const sc = new T.Mesh(keep(new T.PlaneGeometry(18.4, 10.4)), on ? new T.MeshBasicMaterial({ map: screenTex() }) : new T.MeshBasicMaterial({ color: 0x0b0e14 }));
+        at(sc, 0, 10.6, 0.02, g);
+      } else if (id === 'laptop') {
+        at(box(14, 0.9, 10, 0x9aa3b2), 0, 0.45, 0, g);
+        at(box(11, 0.1, 4, 0x2c3240, { edges: false }), 0, 0.95, -1.5, g);
+        const lid = new T.Group(); at(lid, 0, 0.9, -5, g); lid.rotation.x = -0.32;
+        at(box(14, 9.5, 0.6, 0x9aa3b2), 0, 4.75, 0, lid);
+        const sc = new T.Mesh(keep(new T.PlaneGeometry(12.4, 8)), on ? new T.MeshBasicMaterial({ map: screenTex() }) : new T.MeshBasicMaterial({ color: 0x0b0e14 }));
+        at(sc, 0, 4.75, 0.32, lid);
+      } else {
+        at(cyl(3.6, 1.2, 0x2c3240), 0, 0.6, 0, g); at(cyl(0.5, 9, STEEL, { edges: false }), 0, 5.6, 0, g);
+        at(cyl(2.4, 1.6, 0x2c3240), 0, 10.6, 0, g);
+        const glass = new T.Mesh(keep(new T.SphereGeometry(2.6, 24, 16)), new T.MeshToonMaterial({ color: on ? 0xfff1b8 : 0xdfe8ef, gradientMap: grad, transparent: true, opacity: on ? 0.95 : 0.55, emissive: 0xffc23a, emissiveIntensity: on ? 0.9 : 0 }));
+        glass.add(new T.Mesh(glass.geometry, hullMat)); at(glass, 0, 13.4, 0, g);
+        if (on) { const h = new T.Sprite(new T.SpriteMaterial({ map: glowTex(), color: 0xffd27a, transparent: true, blending: T.AdditiveBlending, depthWrite: false, opacity: 0.8 })); h.scale.setScalar(14); at(h, 0, 13.4, 0, g); at(new T.PointLight(0xffc860, 25, 40, 1.2), 0, 14, 0, g); }
+      }
+      return g;
+    }
+    let scrT = null;
+    function screenTex() {
+      if (scrT) return scrT;
+      const c = document.createElement('canvas'); c.width = 256; c.height = 144; const x = c.getContext('2d');
+      const gr = x.createLinearGradient(0, 0, 256, 144); gr.addColorStop(0, '#2b6fd8'); gr.addColorStop(1, '#72d4e8'); x.fillStyle = gr; x.fillRect(0, 0, 256, 144);
+      x.fillStyle = 'rgba(255,255,255,.85)'; x.beginPath(); x.arc(80, 70, 26, 0, 7); x.fill(); x.fillRect(130, 50, 90, 10); x.fillRect(130, 70, 70, 10); x.fillRect(130, 90, 80, 10);
+      scrT = new T.CanvasTexture(c); scrT.colorSpace = T.SRGBColorSpace; return scrT;
+    }
+    function scenePower(d) {
+      // удлинитель с шестью розетками и автоматом
+      const strip = new T.Group(); at(strip, 0, 0, -22);
+      at(box(76, 4.4, 11, 0xf3f4f6), 0, 2.2, 0, strip);
+      const n = d.apps.length, xs = k => -30 + k * 11;
+      for (let k = 0; k < n; k++) {
+        at(cyl(3.3, 0.5, 0xdfe3ea, { seg: 24 }), xs(k), 4.6, 0, strip);
+        at(box(0.8, 0.3, 2.2, 0x2c3240, { edges: false }), xs(k) - 1.1, 4.95, 0, strip); at(box(0.8, 0.3, 2.2, 0x2c3240, { edges: false }), xs(k) + 1.1, 4.95, 0, strip);
+      }
+      const br = at(box(5, 3, 7, d.trip ? 0xe0473a : 0x3fae5a), 35.5, 5.6, 0, strip); clickable(br, 'breaker');
+      strip.updateMatrixWorld(true);
+      // шнур к розетке в стене (за столом)
+      at(box(9, 12, 2, 0xf3f4f6), -60, 6, -40);
+      cable(v3(-38, 2, -22), v3(-60, 5, -38.8), 0xf3f4f6, 0, { r: 0.9, lift: 1 });
+      // приборы в ряд перед удлинителем
+      d.apps.forEach((a, k) => {
+        const x = -52 + k * 20.8, z = 18 + (k % 2) * 8;
+        const g = appliance(a.id, a.on); at(g, x, 0, z); clickable(g, 'app' + k);
+        const base = v3(x + (a.id === 'dryer' ? -2 : 0), 1.2, z - 3);
+        if (a.plug) {
+          const sock = v3(xs(k), 6.2, -22);
+          at(box(2.6, 2.2, 3, 0x2c3240), sock.x, 6.2, sock.z);
+          cable(base, sock.clone().setY(5.2), 0x2c3240, a.on ? 1 : 0, { r: 0.6, lift: 1 });
+        } else {
+          const tip = v3(x + 4, 1.4, z - 9);
+          cable(base, tip, 0x2c3240, 0, { r: 0.6, lift: 1 }); at(box(2.6, 2.2, 3, 0x2c3240), tip.x, 1.4, tip.z - 1.2);
+        }
+        tag(v3(x, a.id === 'tv' ? 20 : a.id === 'lamp' ? 19 : 17, z), a.name, a.P + ' Вт', a.on);
+      });
+      tag(v3(0, 10, -22), d.trip ? 'Автомат отключился' : 'Удлинитель', d.Ptxt, d.over);
+    }
+
+    // ===== «Джоуль — Ленц»: источник, амперметр, калориметр со спиралью и термометром =====
+    function sceneJoule(d) {
+      const src = supply(d.I, 'А'); clickable(src.g, 'icycle');
+      const sN = placeOn(src, v3(-34, 0, -14), 0, 'src');
+      const am = meter({ kind: 'A', val: d.I, max: 4, value: d.Itxt }); const aN = placeOn(am, v3(-6, 0, 22), 0, 'am');
+      // калориметр: стеклянный стакан, вода, крышка
+      const cg = new T.Group(); at(cg, 30, 0, -2); clickable(cg, 'spiral');
+      const glass = new T.Mesh(keep(new T.CylinderGeometry(11, 10, 26, 40, 1, true)), new T.MeshToonMaterial({ color: 0xcfe6f2, gradientMap: grad, transparent: true, opacity: 0.28, side: T.DoubleSide, depthWrite: false }));
+      at(glass, 0, 13, 0, cg); glass.add(new T.Mesh(glass.geometry, hullMat));
+      at(cyl(10.4, 0.6, 0xcfe6f2, { edges: false, hull: false }), 0, 0.3, 0, cg);
+      const hot = Math.max(0, Math.min(1, (d.T - 20) / 70));
+      const water = new T.Mesh(keep(new T.CylinderGeometry(10.6, 9.8, 18, 40)), new T.MeshToonMaterial({ color: new T.Color(0x5fb4e8).lerp(new T.Color(0xe88a5f), hot * 0.6), gradientMap: grad, transparent: true, opacity: 0.55, depthWrite: false }));
+      at(water, 0, 9.6, 0, cg);
+      at(cyl(11.6, 1.4, 0x3a3f4c), 0, 26.7, 0, cg);
+      // спираль: светится тем ярче, чем больше мощность
+      const pts = []; for (let k = 0; k <= 160; k++) { const a = k / 160 * Math.PI * 2 * 9; pts.push(v3(Math.cos(a) * 3.4, 4 + k / 160 * 10, Math.sin(a) * 3.4)); }
+      const glow = Math.max(0, Math.min(1, Math.sqrt(d.P / 60)));
+      const coilCol = d.run ? new T.Color(0x9aa3b2).lerp(new T.Color(0xff6a1a), 0.35 + 0.65 * glow) : new T.Color(0x9aa3b2);
+      const coil = new T.Mesh(keep(new T.TubeGeometry(new T.CatmullRomCurve3(pts), 400, 0.35, 6)), new T.MeshBasicMaterial({ color: coilCol }));
+      at(coil, 0, 0, 0, cg);
+      at(cyl(0.45, 14, STEEL, { edges: false }), -3.4, 21, 0, cg); at(cyl(0.45, 14, STEEL, { edges: false }), 3.4, 21, 0, cg);
+      at(cyl(1.3, 2.4, 0xe0473a), -3.4, 28.6, 0, cg); at(cyl(1.3, 2.4, 0x26324a), 3.4, 28.6, 0, cg);
+      if (d.run) { const h = new T.Sprite(new T.SpriteMaterial({ map: glowTex(), color: 0xff8a3c, transparent: true, blending: T.AdditiveBlending, depthWrite: false, opacity: 0.25 + 0.5 * glow })); h.scale.setScalar(16); at(h, 0, 9, 0, cg); }
+      // термометр: красный столбик по температуре
+      at(cyl(0.9, 30, 0xeef6fb, { r2: 0.9 }), 6.5, 18, 3, cg);
+      const col = Math.max(1, Math.min(24, (d.T - 0) / 100 * 24));
+      at(cyl(0.45, col, 0xe0473a, { edges: false, hull: false }), 6.5, 4 + col / 2, 3.6, cg);
+      at(new T.Mesh(keep(new T.SphereGeometry(1.4, 16, 12)), toon(0xe0473a)), 6.5, 3.2, 3, cg);
+      cg.updateMatrixWorld(true);
+      const tIn = v3(-3.4, 29.8, 0).applyMatrix4(cg.matrixWorld), tOut = v3(3.4, 29.8, 0).applyMatrix4(cg.matrixWorld);
+      cable(sN.tout, aN.tin, WIRE_COL.plus, d.run ? d.I : 0);
+      cable(aN.tout, tIn, WIRE_COL.mid, d.run ? d.I : 0, { lift: 8 });
+      cable(tOut, sN.tin, WIRE_COL.minus, d.run ? d.I : 0, { lift: 8 });
+      tag(v3(-34, 24, -14), 'Источник тока', d.Itxt);
+      tag(v3(-6, 17, 22), 'Амперметр', d.Itxt);
+      tag(v3(20, 30, -4), 'Спираль ' + d.R + ' Ом', d.run ? 'нагрев…' : d.Qtxt, d.run);
+      tag(v3(44, 33, 4), 'Термометр', d.Ttxt);
+    }
+    const SCENES = { wire: sceneWire, power: scenePower, joule: sceneJoule };
+
+    function layout(d) {
+      clear();
+      table();
+      if (d.scene) { SCENES[d.scene](d); return; }
       const parts = [];
       // источник на заднем крае, «+» справа
       const src = d.source.type === 'supply' ? supply(d.source.U) : cells(d.source.n || 1, d.source.U);
@@ -476,7 +642,7 @@
 
     // ---------- цикл ----------
     let run = true, last = performance.now(), sig = '';
-    const v3 = new T.Vector3();
+    const vTmp = new T.Vector3();
     function frame(t) {
       if (!run) return;
       requestAnimationFrame(frame);
@@ -485,13 +651,14 @@
       if (!dirty || document.hidden) return;
       renderer.render(sc, cam); dirty = false;
       const r = view.getBoundingClientRect();
-      for (const g of tags) { v3.copy(g.p).project(cam); g.el.style.transform = `translate(${((v3.x + 1) / 2 * r.width).toFixed(1)}px,${((1 - v3.y) / 2 * r.height).toFixed(1)}px) translate(-50%,-100%)`; }
+      for (const g of tags) { vTmp.copy(g.p).project(cam); g.el.style.transform = `translate(${((vTmp.x + 1) / 2 * r.width).toFixed(1)}px,${((1 - vTmp.y) / 2 * r.height).toFixed(1)}px) translate(-50%,-100%)`; }
     }
     resize(); requestAnimationFrame(frame);
     return {
       update(d) {
         if (!d) return;
         const s = JSON.stringify(d); if (s === sig) return; sig = s;
+        help.textContent = (d.help || 'Нажимайте на ключ') + ' · тяните — повернуть · колесо — ближе';
         layout(d); dirty = true;
       },
       pause() { run = false; },
