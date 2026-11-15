@@ -956,6 +956,40 @@ function setLesson(i) {
   const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-heat.js): real lab equipment on a table
+window.LUCH_REAL = () => {
+  const id = LID(), Ls = L(), r1 = x => Math.round(x * 10) / 10, hex = s => parseInt(s.slice(1), 16), base = { module: 'heat' };
+  if (id === 'cap') return { ...base, scene: 'heat-cap', help: 'Плитка — вкл/выкл, стакан — другая жидкость, секундомер — обе плитки',
+    m: S.m, mg: nf(S.m * 1000), P: Ls.P, tStop: Ls.tStop,
+    side: [0, 1].map(i => { const sb = SUB[S.subs[i]], on = S.on1[i], t = S.T1[i];
+      return { name: sn(S.subs[i]), rho: sb.rho, col: hex(sb.col), on, T: on ? null : r1(t), Ttxt: on ? '' : deg(t, t >= Ls.tStop || t < 20.05 ? 0 : 1), Qtxt: on ? '' : kJ(S.Q1[i]) }; }) };
+  if (id === 'fuel') { const f = FUEL[S.fuel], b = S.burning;
+    return { ...base, scene: 'heat-fuel', help: 'Банка на полке — топливо, топливо на весах — поджечь, кнопки ± — масса',
+      fuel: S.fuel, kind: f.kind, col: hex(f.col), short: fn(S.fuel), qtxt: qStr(f.q), mf: S.mf, burning: b, M: Ls.M,
+      left: b ? null : r1(S.left), lefttxt: b ? '' : `${fmt(S.left, S.left < 10 && S.left > 0 ? 1 : 0)} г`,
+      T: b ? null : r1(S.Tw2), Ttxt: b ? '' : deg(S.Tw2, S.Tw2 >= 100 || S.Tw2 <= 20.05 ? 0 : 1), needQ: needQ(), needTxt: kJ(needQ()),
+      fuels: FKEYS.map(k => ({ k, n: fn(k), col: hex(FUEL[k].col), kind: FUEL[k].kind })) }; }
+  const water = S.mode === 'water', Tw = water ? theta() : S.Tw3, moving = !water && (S.dropping || (S.inW && !S.settled));
+  return { ...base, scene: 'heat-bal', help: water ? 'Кувшин — долить 10 г, мерный стакан — 50 г, бруски — второй опыт' : 'Брусок — опустить, бруски на подносе — металл, кувшин — горячая вода',
+    mode: S.mode, mw: Math.round((Ls.m1 + (water ? S.mp : 0)) * 1000), mp: Math.round(S.mp * 1000), jug: Math.round(S.jug * 1000), t2: Ls.t2, tb0: Ls.tb0, tNeed: Ls.tNeed,
+    Tw: moving ? null : r1(Tw), Twtxt: moving ? '' : deg(Tw, 1), ok: water ? Math.abs(Tw - Ls.tNeed) <= 0.5 : S.settled,
+    met: S.met, metName: MET[S.met].name, metCol: hex(MET[S.met].col), mb: S.mb, mbg: nf(S.mb * 1000), inW: S.inW,
+    Tb: moving ? null : r1(S.Tb), Tbtxt: moving ? '' : deg(S.Tb, S.Tb >= 99.95 ? 0 : 1),
+    mets: MKEYS.map(k => ({ k, name: MET[k].name, col: hex(MET[k].col) })) };
+};
+// values that change every frame (heating, burning, pouring, heat exchange) — read by the scene in kit.onFrame
+window.LUCH_REAL.live = () => {
+  const id = LID();
+  if (id === 'cap') return { T: S.T1.slice(), Q: S.Q1.slice(), on: S.on1.slice() };
+  if (id === 'fuel') return { left: S.left, T: S.Tw2, Q: S.Qrel, burning: S.burning };
+  return { tilt: S.tilt, drop: S.drop, Tw: S.mode === 'water' ? theta() : S.Tw3, Tb: S.Tb, jug: S.jug, mp: S.mp };
+};
+window.LUCH_REAL.click = k => {
+  if (k === 'jug' || k === 'cup50') { if (S.mode !== 'water') act('mode-water'); else act(k === 'jug' ? 'p10' : 'p50'); return; }
+  if (/^blk-/.test(k)) { if (S.mode !== 'metal') act('mode-metal'); if (S.met !== k.slice(4)) act('met-' + k.slice(4)); return; }
+  act(k);
+};
+
 // for the AI tutor: what is on the screen right now
 window.LUCH_CONTEXT = () => {
   const m = model(), Ls = L(), id = Ls.id;
