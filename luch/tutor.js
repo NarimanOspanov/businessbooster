@@ -161,6 +161,11 @@
   .lt-head b{display:block;font-size:14px}
   .lt-head .lt-ib{width:30px;padding:0;justify-content:center;border-color:transparent}
   .lt-head .lt-ib:hover{border-color:#26324a}
+  .lt-head .lt-stop{width:auto;padding:0 11px;background:#ffb547;color:#0b1019;border:0;font-weight:700;animation:lt-stp 1.2s ease-out infinite}
+  .lt-head .lt-stop[hidden]{display:none}
+  @keyframes lt-stp{0%{box-shadow:0 0 0 0 rgba(255,181,71,.65)}100%{box-shadow:0 0 0 10px rgba(255,181,71,0)}}
+  .lt-orb[data-s="speaking"] svg{display:none}
+  .lt-orb[data-s="speaking"]:after{content:"";position:absolute;inset:0;margin:auto;width:14px;height:14px;border-radius:3px;background:#0b1019}
   .lt-head span{display:block;font:500 11px/1.3 "IBM Plex Mono",monospace;color:#8b96ad}
   .lt-head .lt-sp{flex:1;min-width:0}
   .lt-ib{background:none;border:1px solid #26324a;border-radius:8px;height:30px;padding:0 9px;color:#8b96ad;cursor:pointer;font:500 12px "Golos Text",sans-serif;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
@@ -200,7 +205,11 @@
   .lt-vtx{flex:1;min-width:0}
   .lt-orb{width:44px;height:44px;flex:none;border-radius:50%;border:0;cursor:pointer;position:relative;background:radial-gradient(circle at 40% 35%,#9fe6f3,#2b9fb5 60%,#14495a);box-shadow:0 0 0 0 rgba(114,212,232,.5)}
   .lt-orb[data-s="listening"]{animation:lt-o 1.3s infinite;background:radial-gradient(circle at 40% 35%,#ffd59a,#ffb547 55%,#8a5212)}
-  .lt-orb[data-s="thinking"]{animation:lt-spin 1.2s linear infinite;background:conic-gradient(#72d4e8,#1a2438,#72d4e8)}
+  .lt-orb[data-s="thinking"]{background:radial-gradient(circle at 40% 35%,#c9f1fa,#5fc3d8 60%,#1f6f82)}
+  .lt-orb[data-s="thinking"] svg{display:none}
+  .lt-orb[data-s="thinking"]:before{content:"";position:absolute;inset:-4px;border-radius:50%;background:conic-gradient(from 0deg,transparent 0 50%,rgba(255,181,71,.2) 62%,#ffb547 88%,#fff6e6 100%);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 3.5px),#000 calc(100% - 3px));mask:radial-gradient(farthest-side,transparent calc(100% - 3.5px),#000 calc(100% - 3px));animation:lt-spin .95s linear infinite}
+  .lt-orb[data-s="thinking"]:after{content:"";position:absolute;inset:0;margin:auto;width:6px;height:6px;border-radius:50%;background:#0b1019;animation:lt-think .9s ease-in-out infinite}
+  @keyframes lt-think{0%,100%{transform:translateY(2px);box-shadow:-9px -3px 0 #0b1019,9px 1px 0 #0b1019}33%{transform:translateY(-3px);box-shadow:-9px 2px 0 #0b1019,9px -2px 0 #0b1019}66%{transform:translateY(0);box-shadow:-9px -1px 0 #0b1019,9px -4px 0 #0b1019}}
   .lt-orb[data-s="speaking"]{animation:lt-o 0.9s infinite}
   .lt-orb[data-s="idle"]{opacity:.75}
   .lt-orb svg{position:absolute;inset:0;margin:auto}
@@ -241,7 +250,7 @@
     .lt-btn .lt-bt{max-width:calc(100vw - 110px)}
     .lt-ib .lt-tx{display:none}
   }
-  @media (prefers-reduced-motion:reduce){.lt-dots i,.lt-orb,.lt-mic.rec{animation:none!important}.lt-btn:hover{transform:none}}`;
+  @media (prefers-reduced-motion:reduce){.lt-dots i,.lt-orb,.lt-orb:before,.lt-orb:after,.lt-mic.rec,.lt-head .lt-stop{animation:none!important}.lt-btn:hover{transform:none}}`;
   const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
 
   try { let ic = document.querySelector('link[rel~="icon"]'); if (!ic) { ic = document.createElement('link'); ic.rel = 'icon'; document.head.appendChild(ic); } ic.type = 'image/svg+xml'; ic.href = '/luch/owl.svg'; } catch (e) {}
@@ -266,6 +275,7 @@
     <div class="lt-head">${AV}<div class="lt-sp"><b>Наставник</b></div>
       <button class="lt-ib" id="lt-vm" type="button" aria-pressed="false" title="Разговор голосом" hidden>${WAVE}<span class="lt-tx">Голосом</span></button>
       <button class="lt-ib" id="lt-bd" type="button" title="Доска: рисовать и показывать наставнику" aria-label="Доска">✎</button>
+      <button class="lt-ib lt-stop" id="lt-stop" type="button" title="Остановить озвучку (или скажите «стоп»)" hidden>■ Стоп</button>
       <button class="lt-ib" id="lt-close" type="button" aria-label="Свернуть">✕</button></div>
     <div class="lt-log" id="lt-log" aria-live="polite"></div>
     <div class="lt-sug" id="lt-sug"></div>
@@ -351,6 +361,7 @@
       speechSynthesis.speak(u);
     });
   }
+  let spoken = '';
   const speaker = (() => {
     let queue = [], gen = 0, running = false, ended = true, waiters = [];
     const fetchWav = text => fetch('/api/tutor/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) })
@@ -373,7 +384,7 @@
       running = false; done();
     }
     return {
-      add(text) { const marks = marksOf(text); text = clean(text); if (!text) { marks.forEach(n => highlight(n)); return; } ended = false; queue.push({ text, marks, p: fetchWav(text) }); run(gen); },
+      add(text) { const marks = marksOf(text); text = clean(text); if (!text) { marks.forEach(n => highlight(n)); return; } ended = false; spoken = (spoken + ' ' + text).slice(-1500); queue.push({ text, marks, p: fetchWav(text) }); run(gen); },
       end() { ended = true; done(); },
       stop() { gen++; queue = []; ended = true; running = false; try { audio && audio.pause(); } catch (e) {} try { window.speechSynthesis && speechSynthesis.cancel(); } catch (e) {} done(); },
       idle() { return new Promise(res => { waiters.push(res); done(); }); },
@@ -685,7 +696,7 @@
   // Разговор без рук: пока панель открыта, наставник всё время слушает.
   // Тишина не выключает микрофон; выключить — нажать на кружок (и нажать снова, чтобы включить).
   let vListen = null, vState = 'idle', micOff = false, vErr = 0;
-  const VS = { idle: 'Микрофон выключен · нажмите 🎤', listening: 'Слушаю · говорите в любой момент', thinking: 'Смотрю на экран…', speaking: 'Говорю · нажмите, чтобы перебить' };
+  const VS = { idle: 'Микрофон выключен · нажмите 🎤', listening: 'Слушаю · говорите в любой момент', thinking: 'Смотрю на экран…', speaking: 'Говорю · скажите «стоп» или нажмите ■' };
   function setVoice(s, hint) { vState = s; orb.dataset.s = s; vs.textContent = VS[s]; if (hint !== undefined) vh.textContent = hint; orb.setAttribute('aria-label', s === 'listening' ? 'Выключить микрофон' : s === 'idle' ? 'Включить микрофон' : 'Перебить'); }
   async function turn() {
     if (!voiceMode || busy || micOff || vListen) return;
@@ -703,6 +714,7 @@
     vListen = null; vErr = 0;
     if (!voiceMode || micOff) return;
     if (!q) { setTimeout(turn, 120); return; } // тишина — просто слушаем дальше
+    if (isStop(q)) { speaker.stop(); setVoice('listening', 'Хорошо, молчу. Говорите, когда нужно.'); setTimeout(turn, 120); return; }
     vh.textContent = q; setVoice('thinking');
     speaker.stop();
     await ask(q, { voice: true });
@@ -713,7 +725,7 @@
   orb.addEventListener('click', () => {
     unlockAudio();
     if (vState === 'listening') { micOff = true; const l = vListen; vListen = null; if (l) l.abort(); setVoice('idle', 'Нажмите, когда захотите снова говорить.'); return; }
-    if (vState === 'speaking' || vState === 'thinking') { if (ctrl) ctrl.abort(); speaker.stop(); micOff = false; setVoice('idle', ''); setTimeout(turn, 50); return; }
+    if (vState === 'speaking' || vState === 'thinking') { stopTalk(); return; }
     micOff = false; vErr = 0; turn();
   });
   // вкладку свернули — микрофон на паузе; вернулись — снова слушаем
@@ -788,7 +800,41 @@
   });
   $('#lt-close').addEventListener('click', close);
 
-  panel.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  // Наставник говорит? — «■ Стоп», Esc или голосом «стоп / хватит / остановись»
+  const STOP_RE = /(^|[^а-яa-z])(стоп|хватит|остановись|остановитесь|остановиться|замолчи|помолчи|тихо|прекрати|достаточно|всё понятно|все понятно|ладно[, ]+вс[её]|stop|тоқта)([^а-яa-z]|$)/i;
+  const isStop = t => { const m = String(t || '').toLowerCase().replace(/ё/g, 'е').match(STOP_RE); return !!m && String(t).trim().split(/\s+/).length <= 6; };
+  const talking = () => speaker.busy || (audio && !audio.paused && !audio.ended) || !!(window.speechSynthesis && speechSynthesis.speaking);
+  const stopBtn = $('#lt-stop');
+  function stopTalk(said) {
+    if (ctrl) ctrl.abort();
+    speaker.stop(); spoken = '';
+    stopWatchEnd();
+    if (voiceMode) { micOff = false; setVoice('idle', said ? 'Хорошо, молчу. Говорите, когда нужно.' : ''); setTimeout(turn, 350); }
+  }
+  stopBtn.addEventListener('click', () => stopTalk());
+  // пока наставник говорит — слушаем только команду «стоп» (на компьютере; на телефоне — кнопкой)
+  let sw = null;
+  function stopWatchStart() {
+    if (sw || !SR || MOBILE || !voiceMode || panel.hidden) return;
+    let rec; try { rec = new SR(); } catch (e) { return; }
+    rec.lang = LOCALE; rec.continuous = true; rec.interimResults = true;
+    rec.onresult = e => {
+      let t = ''; for (let i = e.resultIndex; i < e.results.length; i++) t += e.results[i][0].transcript + ' ';
+      // своё же слово из динамиков — не команда
+      const w = (String(t).toLowerCase().match(STOP_RE) || [])[2];
+      if (isStop(t) && !(w && spoken.toLowerCase().includes(w))) stopTalk(true);
+    };
+    rec.onerror = () => {};
+    rec.onend = () => { if (sw === rec) { sw = null; if (talking()) setTimeout(stopWatchStart, 250); } };
+    try { rec.start(); sw = rec; } catch (e) {}
+  }
+  function stopWatchEnd() { const r = sw; sw = null; if (r) { try { r.onend = null; r.abort(); } catch (e) {} } }
+  let wasTalking = false;
+  setInterval(() => {
+    const t = talking();
+    if (t !== wasTalking) { wasTalking = t; stopBtn.hidden = !t; if (t) stopWatchStart(); else { stopWatchEnd(); spoken = ''; } }
+  }, 200);
+  panel.addEventListener('keydown', e => { if (e.key === 'Escape') { if (talking()) { e.preventDefault(); stopTalk(); } else close(); } });
   sug.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.tc) { const c = tipChips[+b.dataset.tc]; tipChips = []; suggestions(); if (c && c[1]) c[1](); return; }
@@ -912,12 +958,15 @@
         new MutationObserver(() => {
           const m = counter.textContent.match(/(\d+)\s*\/\s*(\d+)/); if (!m) return;
           const a = +m[1], b = +m[2]; if (a <= prev) { prev = a; return; } prev = a; clearTimeout(lt);
+          // после практики — закрепить: 4 коротких вопроса (готовим их заранее)
+          if (sh.prefetchQuiz) sh.prefetchQuiz();
+          const quiz = sh.openQuiz ? [['✅ Закрепить: 4 вопроса', () => sh.openQuiz()]] : [];
           if (a >= b) {
             const n = sh.nextTopic && sh.nextTopic();
-            show('Ты прошёл всю тему! 🎉 ' + (n && !n.map ? 'Дальше — «' + n.t + '». Идём?' : 'Выберем следующую на карте?'),
-              [[n && !n.map ? 'Следующая тема →' : 'К карте предметов', () => (sh.goNext ? sh.goNext() : document.querySelector('.brand').click())], ['Сделать ДЗ', () => sh.openHw()]], { force: true, inChat: true });
+            show('Ты прошёл всю тему! 🎉 Давай закрепим последний урок — ответь на 4 коротких вопроса. ' + (n && !n.map ? 'А потом — «' + n.t + '».' : ''),
+              [...quiz, [n && !n.map ? 'Следующая тема →' : 'К карте предметов', () => (sh.goNext ? sh.goNext() : document.querySelector('.brand').click())], ['Сделать ДЗ', () => sh.openHw()]], { force: true, inChat: true });
           }
-          else show('Отлично, задание выполнено! 🎉 Идём дальше?', [['Следующий урок →', () => { const nx = document.getElementById('nextL') || [...document.querySelectorAll('.lessons .lesson, .lessons button')][info().i + 1]; if (nx) nx.click(); }], ['Сделать ДЗ', () => sh.openHw()]], { force: true, inChat: true });
+          else show('Отлично, задание выполнено! 🎉 Давай закрепим знания — ответь на 4 коротких вопроса.', [...quiz, ['Следующий урок →', () => { const nx = document.getElementById('nextL') || [...document.querySelectorAll('.lessons .lesson, .lessons button')][info().i + 1]; if (nx) nx.click(); }], ['Сделать ДЗ', () => sh.openHw()]], { force: true, inChat: true });
         }).observe(counter, { childList: true, characterData: true, subtree: true });
       }
       // ученик долго ничего не делает — предлагаем помощь (один раз на урок)

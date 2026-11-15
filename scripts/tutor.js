@@ -236,6 +236,7 @@ function handle(req, res, deps) {
   if (p === "/api/tutor/story") return handleStory(req, res, deps);
   if (p === "/api/tutor/story/img") return handleStoryImg(req, res, deps);
   if (p === "/api/tutor/formulas") return handleFormulas(req, res, deps);
+  if (p === "/api/tutor/quiz") return handleQuiz(req, res, deps);
   return handleChat(req, res, deps);
 }
 function handleTts(req, res, { readBody, clientIp }) {
@@ -457,6 +458,52 @@ function handleFormulas(req, res, { readBody, clientIp }) {
       send(200, await p);
     } catch (e) { console.log('[formulas] ' + (e && e.message)); send(502, { error: 'Не получилось.' }); }
   })().catch(() => { try { send(500, { error: 'error' }); } catch { /* уже ответили */ } });
+}
+
+// ---------- «Закрепим?» — 4 вопроса с вариантами ответа по уроку ----------
+// POST /api/tutor/quiz { key, lang, context } → { questions: [{ q, options: [..], correct, why }] }
+// Один раз на урок, хранится в luch.lesson_story с ключом «…|q».
+const QUIZ = [
+  "Ты — добрый репетитор. Ученик только что прошёл урок (материалы ниже): послушал объяснение и сделал опыт. Составь короткий тест, чтобы закрепить знания: ровно 4 вопроса.",
+  "Вопросы на понимание, а не на зубрёжку: 1) главная идея урока; 2) что произойдёт, если изменить величину (как в опыте); 3) простой расчёт по формуле урока с круглыми числами (если в уроке есть формулы; иначе — ещё вопрос на понимание); 4) где это встречается в жизни.",
+  "У каждого вопроса 3–4 коротких варианта, верный ровно один, неверные — правдоподобные типичные ошибки. Верный вариант ставь на разные позиции. Вопрос не длиннее 160 символов, вариант — 60.",
+  "why — одно предложение: почему верный ответ верный (объясни, а не повторяй ответ).",
+  "Формулы — простым текстом с юникодом (², ·, /, Δ), без LaTeX. Только то, что есть в материале урока, без выдуманных фактов.",
+  "Ответь только JSON: {\"questions\":[{\"q\":\"…\",\"options\":[\"…\",\"…\",\"…\"],\"correct\":0,\"why\":\"…\"}]}",
+].join("\n");
+function handleQuiz(req, res, { readBody, clientIp }) {
+  const send = (code, obj) => { res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); };
+  if (req.method !== "POST") return send(405, { error: "POST" });
+  (async () => {
+    let b = {};
+    try { b = JSON.parse(await readBody(req)) || {}; } catch { return send(400, { error: "bad json" }); }
+    const base = String(b.key || "").slice(0, 280) + "|" + (LANG_NAMES[b.lang] ? b.lang : "ru");
+    if (!/^\/[\w\-/]*\|\d+\|\w+$/.test(base)) return send(400, { error: "key" });
+    const key = base + "|q";
+    const have = await storyGet(key);
+    if (have) return send(200, have);
+    const block = allowed(clientIp(req));
+    if (block) return send(429, { error: block });
+    try {
+      let p = storyPending.get(key);
+      if (!p) {
+        p = (async () => {
+          const j = jsonOf(await oneShot(QUIZ + langRule(b.lang), "Урок:\n" + String(b.context || "").slice(0, MAX_CTX)));
+          const questions = (j.questions || []).slice(0, 5).map((x) => {
+            const options = (Array.isArray(x.options) ? x.options : []).slice(0, 4).map((o) => String(o || "").slice(0, 90)).filter(Boolean);
+            const correct = Number.isInteger(x.correct) ? x.correct : parseInt(x.correct, 10);
+            return { q: String(x.q || "").slice(0, 220), options, correct, why: String(x.why || "").slice(0, 260) };
+          }).filter((x) => x.q && x.options.length >= 2 && x.correct >= 0 && x.correct < x.options.length);
+          if (questions.length < 2) throw new Error("quiz: few questions");
+          const v = { questions };
+          await storyPut(key, v);
+          return v;
+        })();
+        storyPending.set(key, p); p.finally(() => storyPending.delete(key)).catch(() => {});
+      }
+      send(200, await p);
+    } catch (e) { console.log("[quiz] " + (e && e.message)); send(502, { error: "Не получилось составить вопросы." }); }
+  })().catch(() => { try { send(500, { error: "error" }); } catch { /* уже ответили */ } });
 }
 
 // ---------- картинки к «Истории урока» ----------

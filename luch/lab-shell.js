@@ -569,6 +569,7 @@
     const hw = load();
     if (hw && hw.tasks) { const ok = hw.tasks.filter(x => x.ok).length, tried = hw.tasks.filter(x => x.mine && !x.ok); out.push('ДЗ: решено ' + ok + ' из ' + hw.tasks.length + (tried.length ? ', неверные ответы: ' + tried.map(x => '«' + x.mine + '» на «' + x.q.slice(0, 80) + '»').join('; ') : '') + (j.hwHints ? ', подсказки к задачам открывал ' + j.hwHints + ' раз' : '') + '.'); }
     else out.push('ДЗ ещё не открывал.');
+    if (j.quiz) out.push('Мини-тест «Закрепим»: ' + j.quiz.ok + ' из ' + j.quiz.n + ' верно.');
     const recent = (j.helps || []).filter(x => Date.now() - x < 20 * 60e3).length;
     if (recent) out.push(recent > 1 ? 'Кнопку «Помоги» на этом уроке нажимает уже ' + recent + '-й раз за 20 минут.' : 'Кнопку «Помоги» на этом уроке нажал впервые.');
     return out.join(' ');
@@ -626,5 +627,103 @@
   // опыт иногда перерисовывает рамку задания — возвращаем блок на место
   if (taskEl) new MutationObserver(() => { if (taskEl.dataset.fx === fxFor && fxFor && !taskEl.querySelector('.ls-fx')) { fxFor = ''; renderFx(); } }).observe(taskEl, { childList: true });
 
-  window.LuchShell = { lessonIdx, lessonUrl, openHw, openTab, learnState, noteHelp, whatNext, nextTopic: () => nextTopic, goNext, startPending: () => startShown, storyPlaying: () => !!st };
+  // ---------- «Закрепим?» — 4 вопроса после практики ----------
+  const css4 = document.createElement('style');
+  css4.textContent = `
+  .ls-quiz{position:fixed;inset:0;z-index:72;display:grid;place-items:center;background:rgba(5,8,14,.78);padding:16px;animation:ls-in .25s ease}
+  .ls-quiz .card{width:min(520px,100%);max-height:100%;overflow:auto;background:var(--surface,#121a28);border:1px solid var(--line,#26324a);border-radius:20px;padding:22px 22px 18px;color:var(--fg,#e8ecf4);box-shadow:0 30px 80px -20px rgba(0,0,0,.8)}
+  .ls-quiz .top{display:flex;align-items:center;gap:10px}
+  .ls-quiz .k{font:500 11px/1.4 var(--font-mono,monospace);letter-spacing:.1em;text-transform:uppercase;color:var(--muted,#8b96ad);flex:1}
+  .ls-quiz .x{width:34px;height:34px;border-radius:10px;border:1px solid var(--line,#26324a);background:none;color:var(--muted,#8b96ad);cursor:pointer;font-size:15px}
+  .ls-quiz .bar{display:flex;gap:5px;margin:12px 0 16px}
+  .ls-quiz .bar i{flex:1;height:5px;border-radius:3px;background:var(--line,#26324a)}
+  .ls-quiz .bar i.ok{background:#86e0a8}.ls-quiz .bar i.no{background:#ff8a73}.ls-quiz .bar i.cur{background:var(--accent,#ffb547)}
+  .ls-quiz h3{margin:0 0 14px;font:500 18px/1.4 var(--font-body,"Golos Text",sans-serif);text-wrap:pretty}
+  .ls-quiz .opts{display:flex;flex-direction:column;gap:8px}
+  .ls-quiz .o{display:flex;gap:10px;align-items:center;text-align:left;width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--line,#26324a);background:rgba(255,255,255,.03);color:var(--fg,#e8ecf4);font:500 15px/1.35 var(--font-body,sans-serif);cursor:pointer;transition:border-color .15s,background .15s}
+  .ls-quiz .o b{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line,#26324a);font:600 12px/1 var(--font-mono,monospace);color:var(--muted,#8b96ad)}
+  .ls-quiz .o:hover:not([disabled]){border-color:var(--accent,#ffb547)}
+  .ls-quiz .o[disabled]{cursor:default}
+  .ls-quiz .o.ok{border-color:#86e0a8;background:rgba(134,224,168,.12)}.ls-quiz .o.ok b{background:#86e0a8;color:#0b1019;border-color:#86e0a8}
+  .ls-quiz .o.no{border-color:#ff8a73;background:rgba(255,138,115,.1)}.ls-quiz .o.no b{background:#ff8a73;color:#0b1019;border-color:#ff8a73}
+  .ls-quiz .fb{margin-top:12px;font-size:14.5px;line-height:1.5;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.04)}
+  .ls-quiz .fb[hidden]{display:none}
+  .ls-quiz .fb b{color:#86e0a8}.ls-quiz .fb b.no{color:#ff8a73}
+  .ls-quiz .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .ls-quiz .acts .ls-btn{padding:12px 16px;border-radius:12px;font-size:15px}
+  .ls-quiz .acts .main{background:var(--accent,#ffb547)}
+  .ls-quiz .big{font:600 34px/1.1 var(--font-display,"Unbounded",sans-serif);margin:6px 0 8px}
+  .ls-quiz .load{color:var(--muted,#8b96ad);font-size:14.5px;padding:18px 0}`;
+  document.head.appendChild(css4);
+  const quizCache = {};
+  function fetchQuiz() {
+    const k = location.pathname + '|' + lessonIdx();
+    if (!quizCache[k]) {
+      const lect = lecture ? '\nОбъяснение урока: ' + lecture.map(x => x.title + ': ' + x.text).join(' ') : '';
+      quizCache[k] = fetch('/api/tutor/quiz', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: k, lang: LANG2, context: 'Тема: ' + document.title + '\nУрок ' + (lessonIdx() + 1) + ': ' + lessonTitle() + '\n' + ctx() + lect }) })
+        .then(r => r.json().then(j => { if (!r.ok || !j.questions) throw new Error(j.error || 'quiz'); return j; })).catch(e => { delete quizCache[k]; throw e; });
+    }
+    return quizCache[k];
+  }
+  function openQuiz() {
+    document.querySelectorAll('.ls-quiz').forEach(x => x.remove());
+    const w = document.createElement('div'); w.className = 'ls-quiz'; w.setAttribute('role', 'dialog'); w.setAttribute('aria-label', 'Закрепим знания');
+    w.innerHTML = '<div class="card" data-noi18n><div class="top"><div class="k">Закрепим · ' + esc(lessonTitle()) + '</div><button class="x" data-a="close" aria-label="Закрыть">✕</button></div><div class="body"><div class="load">Готовлю вопросы по уроку…</div></div></div>';
+    document.body.appendChild(w);
+    const body = w.querySelector('.body');
+    let qs = [], i = 0, res = [];
+    const close = () => { w.remove(); removeEventListener('keydown', onKey, true); };
+    const onKey = e => { if (e.key === 'Escape') close(); else if (/^[1-4]$/.test(e.key)) { const o = body.querySelectorAll('.o')[+e.key - 1]; if (o && !o.disabled) o.click(); } else if (e.key === 'Enter') { const n = body.querySelector('[data-a="next"]'); if (n) n.click(); } };
+    addEventListener('keydown', onKey, true);
+    const bar = () => '<div class="bar">' + qs.map((_, k) => '<i class="' + (k < res.length ? (res[k] ? 'ok' : 'no') : k === i ? 'cur' : '') + '"></i>').join('') + '</div>';
+    function showQ() {
+      const q = qs[i];
+      body.innerHTML = bar() + '<h3>' + esc(q.q) + '</h3><div class="opts">' + q.options.map((o, k) => '<button type="button" class="o" data-k="' + k + '"><b>' + (k + 1) + '</b><span>' + esc(o) + '</span></button>').join('') + '</div><div class="fb" hidden></div><div class="acts" hidden></div>';
+      w.querySelector('.k').textContent = 'Закрепим · вопрос ' + (i + 1) + ' из ' + qs.length;
+      const f = body.querySelector('.o'); if (f) f.focus();
+    }
+    function showEnd() {
+      const ok = res.filter(Boolean).length, n = qs.length;
+      journal(j => { j.quiz = { ok, n, at: Date.now() }; });
+      w.querySelector('.k').textContent = 'Закрепили · ' + lessonTitle();
+      const msg = ok === n ? 'Отлично! Всё понял 🎉' : ok >= n - 1 ? 'Хорошо! Почти без ошибок.' : 'Есть над чем подумать — спроси наставника, что осталось непонятным.';
+      body.innerHTML = bar() + '<div class="big">' + ok + ' из ' + n + '</div><p style="margin:0 0 4px;font-size:15px;line-height:1.5">' + msg + '</p>' +
+        '<div class="acts">' + (ok < n ? '<button class="ls-btn main" data-a="ask">🎤 Разобрать ошибки</button>' : '') +
+        '<button class="ls-btn ' + (ok < n ? '' : 'main') + '" data-a="nextL">Дальше →</button><button class="ls-btn ghost" data-a="hw">Сделать ДЗ</button><button class="ls-btn ghost" data-a="again">Ещё раз</button></div>';
+    }
+    w.addEventListener('click', e => {
+      if (e.target === w) return close();
+      const b = e.target.closest('[data-a],.o'); if (!b) return;
+      if (b.classList.contains('o')) {
+        const q = qs[i], k = +b.dataset.k, right = k === q.correct;
+        res.push(right);
+        body.querySelectorAll('.o').forEach(o => { o.disabled = true; const kk = +o.dataset.k; if (kk === q.correct) o.classList.add('ok'); else if (kk === k) o.classList.add('no'); });
+        const fb = body.querySelector('.fb'); fb.hidden = false;
+        fb.innerHTML = (right ? '<b>Верно!</b> ' : '<b class="no">Не совсем.</b> ') + esc(q.why || '');
+        const acts = body.querySelector('.acts'); acts.hidden = false;
+        acts.innerHTML = '<button class="ls-btn main" data-a="next">' + (i + 1 < qs.length ? 'Следующий вопрос →' : 'Итог') + '</button>';
+        body.querySelector('.bar').outerHTML = bar();
+        acts.querySelector('button').focus();
+        return;
+      }
+      const a = b.dataset.a;
+      if (a === 'close') close();
+      else if (a === 'next') { i++; if (i < qs.length) showQ(); else showEnd(); }
+      else if (a === 'again') { i = 0; res = []; showQ(); }
+      else if (a === 'hw') { close(); openHw(); }
+      else if (a === 'nextL') { close(); const nx = document.getElementById('nextL') || cards()[lessonIdx() + 1]; if (nx) nx.click(); }
+      else if (a === 'ask') {
+        close();
+        const wrong = qs.map((q, k) => res[k] === false ? '«' + q.q + '» (верно: ' + q.options[q.correct] + ')' : '').filter(Boolean).join('; ');
+        if (window.LuchTutor) window.LuchTutor.ask('Я прошёл мини-тест по уроку и ошибся в вопросах: ' + wrong + '. Объясни коротко, в чём я ошибся, на примере из жизни.');
+      }
+    });
+    fetchQuiz().then(j => { if (!w.isConnected) return; qs = j.questions; showQ(); })
+      .catch(() => { if (w.isConnected) body.innerHTML = '<div class="load">Не получилось составить вопросы. Попробуйте ещё раз чуть позже.</div>'; });
+  }
+  // заранее, как только задание выполнено — чтобы не ждать
+  const prefetchQuiz = () => fetchQuiz().catch(() => {});
+
+  window.LuchShell = { lessonIdx, lessonUrl, openHw, openTab, learnState, noteHelp, whatNext, nextTopic: () => nextTopic, goNext, startPending: () => startShown, storyPlaying: () => !!st, openQuiz, prefetchQuiz };
 })();
