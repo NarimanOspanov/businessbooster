@@ -701,8 +701,10 @@
   async function turn() {
     if (!voiceMode || busy || micOff || vListen) return;
     if (document.hidden) { setVoice('idle', 'Вернитесь на вкладку — я снова буду слушать.'); return; }
+    if (mediaBusy()) { waitMedia(); return; }
     setVoice('listening', '');
     const me = vListen = listen(t => { vh.textContent = t; });
+    me.media = false;
     let q = '';
     try { q = await me.p; } catch (e) {
       if (vListen === me) vListen = null;
@@ -712,6 +714,7 @@
     }
     if (vListen !== me) return; // выключили или перебили
     vListen = null; vErr = 0;
+    if (me.media || mediaBusy()) { waitMedia(); return; } // это звук лекции/видео, а не ученик
     if (!voiceMode || micOff) return;
     if (!q) { setTimeout(turn, 120); return; } // тишина — просто слушаем дальше
     if (isStop(q)) { speaker.stop(); setVoice('listening', 'Хорошо, молчу. Говорите, когда нужно.'); setTimeout(turn, 120); return; }
@@ -722,6 +725,20 @@
     await speaker.idle();
     if (voiceMode && !micOff) turn();
   }
+  // пока на странице звучит лекция или видео — не слушаем, иначе наставник примет их голос за ученика
+  function mediaBusy() { const sh = window.LuchShell; return !!(sh && sh.mediaBusy && sh.mediaBusy()); }
+  let mediaWait = 0;
+  function waitMedia() {
+    setVoice('idle', 'Слушаю объяснение вместе с вами — задайте вопрос, когда оно закончится или на паузе.');
+    clearTimeout(mediaWait);
+    mediaWait = setTimeout(function poll() { if (!voiceMode || micOff) return; if (mediaBusy()) { mediaWait = setTimeout(poll, 600); return; } if (vState === 'idle' && !busy && !vListen) turn(); }, 600);
+  }
+  setInterval(() => {
+    if (!mediaBusy()) return;
+    if (talking()) { stopTalk(); return; } // включили лекцию/видео — наставник уступает
+    if (!vListen) return;
+    const l = vListen; l.media = true; vListen = null; l.abort(); waitMedia();
+  }, 300);
   orb.addEventListener('click', () => {
     unlockAudio();
     if (vState === 'listening') { micOff = true; const l = vListen; vListen = null; if (l) l.abort(); setVoice('idle', 'Нажмите, когда захотите снова говорить.'); return; }

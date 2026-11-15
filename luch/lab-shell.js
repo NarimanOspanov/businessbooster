@@ -725,5 +725,5 @@
   // заранее, как только задание выполнено — чтобы не ждать
   const prefetchQuiz = () => fetchQuiz().catch(() => {});
 
-  window.LuchShell = { lessonIdx, lessonUrl, openHw, openTab, learnState, noteHelp, whatNext, nextTopic: () => nextTopic, goNext, startPending: () => startShown, storyPlaying: () => !!st, openQuiz, prefetchQuiz };
+  window.LuchShell = { lessonIdx, lessonUrl, openHw, openTab, learnState, noteHelp, whatNext, nextTopic: () => nextTopic, goNext, startPending: () => startShown, storyPlaying: () => !!st, mediaBusy: () => !!(st && st.audio && !st.audio.paused && !st.audio.ended) || [...document.querySelectorAll('video,audio')].some(m => !m.paused && !m.ended && !m.muted), openQuiz, prefetchQuiz };
 })();
