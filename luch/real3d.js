@@ -622,7 +622,7 @@
     }
 
     // ---------- камера: изометрия, тянуть — повернуть, колесо — ближе ----------
-    let az = 0.62, el = 0.6, zoom = 1, W = 1, H = 1;
+    let az = 0.62, el = 0.6, zoom = 1, W = 1, H = 1, cBox = null;
     const target = new T.Vector3(0, 4, 8);
     function aim() {
       const r = 300;
@@ -630,10 +630,16 @@
       cam.lookAt(target);
       cam.updateMatrixWorld();
       // вписываем стол; сверху оставляем место под рамку задания
-      const pts = [[-70, 0, -46], [70, 0, -46], [-70, 0, 54], [70, 0, 54], [0, 26, -34]].map(p => new T.Vector3(...p).applyMatrix4(cam.matrixWorldInverse));
+      const base = [[-70, 0, -46], [70, 0, -46], [-70, 0, 54], [70, 0, 54], [0, 26, -34]];
+      if (cBox) for (const q of cBox) base.push(q); // верх высоких приборов
+      const pts = base.map(p => new T.Vector3(...p).applyMatrix4(cam.matrixWorldInverse));
       const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
       const cw = Math.max(...xs) - Math.min(...xs), ch = Math.max(...ys) - Math.min(...ys);
-      const narrow = W < 520, topPad = narrow ? 0.36 : H > 520 ? 0.2 : 0.12, availH = H * (1 - topPad - 0.06);
+      const narrow = W < 520; let topPad = narrow ? 0.36 : H > 520 ? 0.2 : 0.12;
+      // сверху — карточка задания: меряем её настоящую высоту, чтобы приборы не прятались под ней
+      const tk = stage.querySelector('.task'), vr = view.getBoundingClientRect();
+      if (tk && tk.offsetParent && vr.height > 0) { const tb = tk.getBoundingClientRect(); const over = (tb.bottom - vr.top) / vr.height; if (over > 0 && over < 0.6 && (narrow || tb.right - vr.left > vr.width * 0.45)) topPad = Math.max(narrow ? 0.12 : 0.08, over + 0.03); }
+      const availH = H * (1 - topPad - 0.06);
       const s = Math.min(W / cw * (narrow ? 1.12 : 1), availH / ch) * 0.94 * zoom;
       const cx = (Math.max(...xs) + Math.min(...xs)) / 2, cy = (Math.max(...ys) + Math.min(...ys)) / 2;
       const hw = W / s / 2, hh = H / s / 2, shift = (H * (topPad - 0.06) / 2) / s;
@@ -686,7 +692,21 @@
         if (!d) return;
         const s = JSON.stringify(d); if (s === sig) return; sig = s;
         help.textContent = (d.help || 'Нажимайте на ключ') + ' · тяните — повернуть · колесо — ближе';
-        layout(d); dirty = true;
+        layout(d);
+        // рамка камеры по настоящим размерам сцены (высокие штативы, горы, маятники)
+        try {
+          const tall = [], bb = new T.Box3();
+          root.updateMatrixWorld(true);
+          root.traverse(o => {
+            if (!o.isMesh || !o.visible || !o.geometry) return;
+            bb.setFromObject(o); if (bb.isEmpty()) return;
+            const w = bb.max.x - bb.min.x, dz = bb.max.z - bb.min.z;
+            if (w > 150 || dz > 150 || bb.max.y < 26 || bb.max.y > 140) return; // пол/фон и случайные выбросы не считаем
+            tall.push([(bb.min.x + bb.max.x) / 2, bb.max.y + 3, (bb.min.z + bb.max.z) / 2]);
+          });
+          tall.sort((a, b) => b[1] - a[1]); cBox = tall.length ? tall.slice(0, 40) : null;
+        } catch (e) { cBox = null; }
+        aim(); dirty = true;
       },
       pause() { run = false; },
       resume() { if (!run) { run = true; last = performance.now(); dirty = true; requestAnimationFrame(frame); } },
