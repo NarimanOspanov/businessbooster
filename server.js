@@ -8756,6 +8756,10 @@ http
       require("./scripts/tutor.js").handle(req, res, { readBody, clientIp });
       return;
     }
+    if (urlPath.startsWith("/api/quizroom/")) {
+      require("./scripts/quizroom.js").handle(req, res, { readBody, clientIp });
+      return;
+    }
     // MCP-коннектор для ChatGPT / Claude: ученик занимается в своём чате, мы отдаём уроки
     if (urlPath === "/mcp" || urlPath === "/mcp/") {
       require("./scripts/mcp.js").handle(req, res, { readBody, clientIp });

@@ -325,6 +325,31 @@ CREATE TABLE luch.parent_reports (
   CONSTRAINT PK_luch_parent_reports PRIMARY KEY (child_id, week_start)
 );
 
+-- Квизрум: отдельная схема quiz — игры, участники, банк вопросов (сгенерированные вопросы переиспользуются)
+IF SCHEMA_ID('quiz') IS NULL EXEC('CREATE SCHEMA quiz');
+IF OBJECT_ID('quiz.games', 'U') IS NULL
+CREATE TABLE quiz.games (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  code CHAR(6) NOT NULL,
+  category VARCHAR(20) NOT NULL,
+  questions INT NOT NULL,
+  players INT NOT NULL,
+  winner NVARCHAR(40) NULL,
+  ref NVARCHAR(200) NULL,
+  created_at DATETIME2(0) NOT NULL CONSTRAINT DF_quiz_games_created DEFAULT SYSUTCDATETIME(),
+  finished_at DATETIME2(0) NULL
+);
+IF OBJECT_ID('quiz.bank', 'U') IS NULL
+CREATE TABLE quiz.bank (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  category VARCHAR(20) NOT NULL,
+  body NVARCHAR(MAX) NOT NULL,          -- вопрос: {q, options, correct, fact, image, lesson}
+  used INT NOT NULL CONSTRAINT DF_quiz_bank_used DEFAULT 0,
+  created_at DATETIME2(0) NOT NULL CONSTRAINT DF_quiz_bank_created DEFAULT SYSUTCDATETIME()
+);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_quiz_bank_cat')
+CREATE INDEX IX_quiz_bank_cat ON quiz.bank (category);
+
 MERGE luch.languages AS t USING (VALUES ('ru', N'Русский', 1), ('kk', N'Қазақша', 2), ('en', N'English', 3), ('es', N'Español', 4)) AS s(code, name, sort)
   ON t.code = s.code
   WHEN NOT MATCHED THEN INSERT (code, name, sort, is_active) VALUES (s.code, s.name, s.sort, CASE WHEN s.code = 'ru' THEN 1 ELSE 0 END);

@@ -387,14 +387,14 @@ const HW_CHECK = [
   "Ты — добрый наставник. Проверь ответ ученика на задачу домашнего задания. Будь тёплым: похвали за верное, мягко покажи ошибку, не давай готовый ответ, если ученик ошибся, — дай подсказку следующего шага.",
   "Ответь только JSON: {\"ok\":true|false,\"feedback\":\"1–3 предложения ученику\"}. ok=true, если ответ верный по смыслу (допусти округление и другую запись единиц).",
 ].join("\n");
-async function oneShot(system, user) {
+async function oneShot(system, user, ms) {
   const c = claudeClient();
   if (c) {
     const r = await c.messages.create({ model: CLAUDE_MODEL, max_tokens: 4000, system, messages: [{ role: "user", content: user }] });
     return (r.content || []).filter((x) => x.type === "text").map((x) => x.text).join("");
   }
   const j = await gemini(GEMINI_MODEL, { systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts: [{ text: user }] }],
-    generationConfig: { maxOutputTokens: 8000, temperature: 0.5, responseMimeType: "application/json" } });
+    generationConfig: { maxOutputTokens: 8000, temperature: 0.5, responseMimeType: "application/json" } }, ms || 30000);
   const cc = ((j.candidates || [])[0] || {}).content;
   return cc && cc.parts ? cc.parts.map((p) => (p.thought ? "" : p.text || "")).join("") : "";
 }
