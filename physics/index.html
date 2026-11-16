@@ -430,7 +430,25 @@ const audioGuide = (() => {
   const btn = $('#agPlay'); let run = 0, audio = null;
   const lang = (window.LuchI18n && window.LuchI18n.lang) || 'ru';
   const mobile = () => matchMedia('(max-width:760px)').matches;
+  // открыть тему во время рассказа: на компьютере — боковая панель, на телефоне — раскрыть в списке
+  const showTopic = id => { if (!T[id]) return; if (mobile()) openInList(id); else select(id); };
+  const topicEl = (id, inner) => mobile() ? `#list details[data-id="${id}"]` : (inner ? '#side ' + inner : '#side');
+  const physSteps = () => {
+    const ready = TOPICS.filter(t => t.status !== 'soon'), lessonsN = ready.reduce((a, t) => a + (t.lessons || 0), 0);
+    const demo = T.current && T.current.status !== 'soon' ? 'current' : (ready[0] || {}).id;
+    return [
+      { t: `Привет! Я Иван, твой наставник по физике. Здесь вся школьная физика, с седьмого по одиннадцатый класс: ${ready.length} ${plural(ready.length, 'тема', 'темы', 'тем')} и ${lessonsN} ${plural(lessonsN, 'урок', 'урока', 'уроков')}. И почти в каждом ты не читаешь учебник, а сам ставишь опыт.`, sel: '.intro h2', act: () => select(null) },
+      { t: 'Физику часто считают набором скучных формул. Но за каждой формулой стоит то, что ты видишь каждый день: почему лёд не тонет, как заряжается телефон, почему ложка в стакане кажется сломанной.', sel: '#stats' },
+      { t: 'Начинаем с основ: как измерять и из чего всё состоит. От них расходятся пять веток: механика, тепло, электричество, оптика, атом и Вселенная. Чем ниже тема на карте, тем она сложнее, а линии подскажут, что пройти сначала.', sel: mobile() ? '#list' : '.treebox' },
+      { t: 'Вот, например, «Электрический ток». Каждый урок устроен одинаково. Сначала теория: нажимаешь «Объясни за минуту», и я с картинками рассказываю, что это, зачем нужно и как работает. Без зубрёжки, на простых примерах.', sel: topicEl(demo), act: () => showTopic(demo) },
+      { t: 'Потом практика. Ты сам собираешь цепь, двигаешь реостат, смотришь, как разгорается лампочка. А в режиме «Как в жизни» та же установка стоит объёмно, как настоящие приборы на лабораторном столе.', sel: topicEl(demo, '.cta'), act: () => showTopic(demo) },
+      { t: 'Если застрял, нажми «Помоги» или просто скажи вслух. Я вижу твой экран и подскажу именно в том месте, где ты остановился. После практики короткий тест, чтобы закрепить, и домашнее задание.', sel: '.lt-btn' },
+      { t: 'В итоге ты не просто запомнишь формулы, а поймёшь, как устроен мир вокруг: почему летит мяч, как работает двигатель, откуда берётся радуга. И всё это бесплатно.', sel: mobile() ? '#list' : '#tree .node.done', act: () => select(null) },
+      { t: 'Выбирай любую зелёную тему и начинай. Я буду рядом.', sel: mobile() ? '#list details' : '#tree .node.done' },
+    ];
+  };
   const steps = () => {
+    if (SUBJ.id === 'phys' && lang === 'ru') return physSteps();
     const base = TOPICS.filter(t => t.b === 'base').map(t => `«${t.t}»`).join(' и ');
     const g0 = GRADES[0], g1 = GRADES[GRADES.length - 1], n = BRANCHES.length;
     return [
@@ -446,27 +464,81 @@ const audioGuide = (() => {
     if (lang === 'ru') return texts;
     try { const r = await fetch('/api/luch/i18n', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang, texts }) }); const j = await r.json(); return j.tr || texts; } catch (e) { return texts; }
   };
-  const tts = text => fetch('/api/tutor/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) }).then(r => r.ok ? r.blob() : null).catch(() => null);
+  const tts = text => fetch('/api/tutor/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, hq: true }) }).then(r => r.ok ? r.blob() : null).catch(() => null);
   const setBtn = on => { btn.classList.toggle('on', on); btn.textContent = on ? '❚❚ Остановить' : '▶ Аудиогид по странице'; };
+
+  // субтитры: аккуратная плашка внизу экрана, видна при любой прокрутке; голос можно выключить
+  const css = document.createElement('style');
+  css.textContent = `.ag-sub{position:fixed;left:50%;bottom:18px;transform:translate(-50%,12px);z-index:60;width:min(680px,calc(100vw - 132px));
+      display:flex;align-items:flex-start;gap:12px;padding:12px 14px 12px 16px;border-radius:16px;background:rgba(14,19,32,.9);color:#eef2fb;
+      border:1px solid rgba(255,255,255,.1);box-shadow:0 10px 34px rgba(0,0,0,.35);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+      opacity:0;pointer-events:none;transition:opacity .25s,transform .25s}
+    .ag-sub.on{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+    .ag-sub .tx{flex:1;font-size:15px;line-height:1.45;min-height:1.45em}
+    .ag-sub .tx .w{transition:color .15s;color:rgba(238,242,251,.55)}.ag-sub .tx .w.said{color:#eef2fb}
+    .ag-sub .who{font:600 11px/1 var(--mono,monospace);letter-spacing:.08em;text-transform:uppercase;color:#ffb347;margin-bottom:5px}
+    .ag-sub .bt{display:flex;gap:6px;flex:none}
+    .ag-sub button{all:unset;cursor:pointer;width:32px;height:32px;border-radius:10px;display:grid;place-items:center;font-size:15px;background:rgba(255,255,255,.08);color:#eef2fb}
+    .ag-sub button:hover{background:rgba(255,255,255,.16)}.ag-sub button:focus-visible{outline:2px solid #ffb347}
+    .ag-sub .prog{position:absolute;left:16px;right:16px;bottom:6px;height:2px;border-radius:2px;background:rgba(255,255,255,.08);overflow:hidden}
+    .ag-sub .prog i{display:block;height:100%;width:0;background:#ffb347;transition:width .3s}
+    @media (max-width:760px){.ag-sub{width:calc(100vw - 96px);left:12px;transform:translateY(12px);bottom:14px}.ag-sub.on{transform:none}.ag-sub .tx{font-size:14px}}
+    @media (prefers-reduced-motion:reduce){.ag-sub{transition:none}}`;
+  document.head.appendChild(css);
+  const sub = document.createElement('div'); sub.className = 'ag-sub'; sub.setAttribute('role', 'region'); sub.setAttribute('aria-label', 'Субтитры аудиогида');
+  sub.innerHTML = '<div style="flex:1"><div class="who">Иван · аудиогид</div><div class="tx" aria-live="polite"></div></div><div class="bt"><button type="button" class="mute" aria-label="Выключить голос" title="Выключить голос — останутся субтитры">🔊</button><button type="button" class="x" aria-label="Остановить аудиогид" title="Остановить">✕</button></div><div class="prog"><i></i></div>';
+  document.body.appendChild(sub);
+  const subTx = sub.querySelector('.tx'), muteBtn = sub.querySelector('.mute'), prog = sub.querySelector('.prog i');
+  let muted = false; try { muted = localStorage.getItem('ag-muted') === '1'; } catch (e) {}
+  const paintMute = () => { muteBtn.textContent = muted ? '🔇' : '🔊'; muteBtn.setAttribute('aria-label', muted ? 'Включить голос' : 'Выключить голос'); };
+  paintMute();
+  muteBtn.onclick = () => { muted = !muted; try { localStorage.setItem('ag-muted', muted ? '1' : '0'); } catch (e) {} paintMute(); if (audio) audio.muted = muted; };
+  sub.querySelector('.x').onclick = () => stop();
+  // слова подсвечиваются по мере речи (длинные слова и паузы на знаках весят больше)
+  function showSub(text, i, n) {
+    subTx.innerHTML = text.split(/(\s+)/).map(p => /^\s+$/.test(p) ? p : `<span class="w">${esc(p)}</span>`).join('');
+    prog.style.width = Math.round((i / n) * 100) + '%';
+    const ws = [...subTx.querySelectorAll('.w')], wt = ws.map(w => w.textContent.length + 2 + (/[.,!?:;…»]$/.test(w.textContent) ? 5 : 0));
+    const tot = wt.reduce((a, b) => a + b, 0) || 1;
+    return frac => { let acc = 0; ws.forEach((w, k) => { acc += wt[k]; w.classList.toggle('said', acc / tot <= frac + 0.02); }); };
+  }
+
   async function play() {
-    const my = ++run; setBtn(true);
+    const my = ++run; setBtn(true); sub.classList.add('on');
     if (window.LuchTutor && window.LuchTutor.hideTip) window.LuchTutor.hideTip();
     if (!audio) audio = new Audio();
+    audio.muted = false;
     audio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA='; audio.play().catch(() => {}); // разрешить звук жестом
-    const st = steps(), texts = await tr(st.map(s => s[0]));
+    const st = steps().map(s => Array.isArray(s) ? { t: s[0], sel: s[1] } : s), texts = await tr(st.map(s => s.t));
+    subTx.textContent = 'Готовлю рассказ…';
     let next = tts(texts[0]);
     for (let i = 0; i < st.length; i++) {
       if (my !== run) return;
       const blob = await next; if (i + 1 < st.length) next = tts(texts[i + 1]);
       if (my !== run) return;
-      const el = document.querySelector(st[i][1]);
+      if (st[i].act) try { st[i].act(); } catch (e) {}
+      await new Promise(r => setTimeout(r, st[i].act ? 250 : 0));
+      const el = document.querySelector(st[i].sel);
       if (el && window.LuchTutor && window.LuchTutor.highlight) window.LuchTutor.highlight(el);
-      if (blob && blob.size > 100) { const u = URL.createObjectURL(blob); await new Promise(res => { audio.onended = audio.onerror = res; audio.src = u; audio.play().catch(res); }); URL.revokeObjectURL(u); }
-      else await new Promise(r => setTimeout(r, 3000));
+      const said = showSub(texts[i], i, st.length);
+      if (blob && blob.size > 100) {
+        const u = URL.createObjectURL(blob);
+        await new Promise(res => {
+          let tick = 0;
+          const loop = () => { if (my !== run) return res(); if (audio.duration) said(audio.currentTime / audio.duration); tick = requestAnimationFrame(loop); };
+          audio.onended = audio.onerror = () => { cancelAnimationFrame(tick); said(1); res(); };
+          audio.muted = muted; audio.src = u; audio.play().then(loop).catch(() => { cancelAnimationFrame(tick); res(); });
+        });
+        URL.revokeObjectURL(u);
+      } else {
+        // нет звука — читаем субтитры в темпе речи
+        const ms = Math.max(2500, texts[i].length * 62), t0 = performance.now();
+        await new Promise(res => { const loop = () => { if (my !== run) return res(); const f = (performance.now() - t0) / ms; said(Math.min(1, f)); f >= 1 ? res() : requestAnimationFrame(loop); }; loop(); });
+      }
     }
-    if (my === run) setBtn(false);
+    if (my === run) { prog.style.width = '100%'; setTimeout(() => { if (my === run) { sub.classList.remove('on'); setBtn(false); } }, 1200); }
   }
-  function stop() { run++; try { audio && audio.pause(); } catch (e) {} setBtn(false); }
+  function stop() { run++; try { audio && audio.pause(); } catch (e) {} setBtn(false); sub.classList.remove('on'); }
   btn.addEventListener('click', () => (btn.classList.contains('on') ? stop() : play()));
   $('#subjects').addEventListener('click', stop);
   return { stop };

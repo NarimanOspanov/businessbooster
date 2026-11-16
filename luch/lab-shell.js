@@ -286,7 +286,7 @@
   }
   // Плеер «Теории»: картинка на раздел + голос + подпись. Пауза доступна всегда.
   const imgUrl = i => '/api/tutor/story/img?k=' + encodeURIComponent(storyKey() + '|' + LANG2) + '&i=' + i;
-  const tts = text => fetch('/api/tutor/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) }).then(r => r.ok ? r.blob() : null).catch(() => null);
+  const tts = text => fetch('/api/tutor/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, hq: true }) }).then(r => r.ok ? r.blob() : null).catch(() => null);
   let st = null, lecture = null; // { el, secs, i, paused, audio, voice:[promise], timer, run }
   function stopStory() {
     if (!st) return;

@@ -135,8 +135,9 @@ const TTS_MODEL = process.env.TUTOR_TTS_MODEL || process.env.GEMINI_TTS_MODEL ||
 const STT_MODEL = process.env.TUTOR_STT_MODEL || "gemini-flash-lite-latest";
 // ElevenLabs читает текст точно и быстрее (~1 с); у Gemini TTS бывают сбои, когда
 // вместо текста звучит посторонняя речь. Gemini — запасной вариант и для казахского.
-const ELEVEN_VOICE = process.env.TUTOR_ELEVEN_VOICE || "XrExE9yKIg1WjnnlVkGX"; // Matilda: тёплый, мягкий
-const ELEVEN_MODEL = process.env.TUTOR_ELEVEN_MODEL || "eleven_flash_v2_5";
+const ELEVEN_VOICE = process.env.TUTOR_ELEVEN_VOICE || "1ikyXz7KIkVIgmGOM6QM"; // Иван — учитель: спокойный, ясный, родной русский
+const ELEVEN_MODEL = process.env.TUTOR_ELEVEN_MODEL || "eleven_turbo_v2_5"; // живые ответы наставника: быстро и естественнее flash
+const ELEVEN_MODEL_HQ = process.env.TUTOR_ELEVEN_MODEL_HQ || "eleven_multilingual_v2"; // лекции и аудиогид: готовятся заранее, звучат живее
 const VOICE = process.env.TUTOR_VOICE || "Sulafat"; // Gemini: тёплый голос
 const VOICE_RULES = [
   "Сейчас разговор голосом: твой ответ сразу озвучивается, а вопрос ученика расшифрован из речи (в нём могут быть ошибки распознавания — угадывай смысл).",
@@ -164,21 +165,21 @@ async function gemini(model, body, ms = 30000) {
 }
 // одинаковые фразы (аудиогид, подсказки наставника) озвучиваем один раз
 const ttsCache = new Map();
-async function speak(text) {
-  const ck = ELEVEN_VOICE + ":" + text;
+async function speak(text, hq) {
+  const ck = ELEVEN_VOICE + ":" + (hq ? "hq:" : "") + text;
   if (ttsCache.has(ck)) { const v = ttsCache.get(ck); ttsCache.delete(ck); ttsCache.set(ck, v); return v; }
-  const a = await speakRaw(text);
+  const a = await speakRaw(text, hq);
   ttsCache.set(ck, a); if (ttsCache.size > 400) ttsCache.delete(ttsCache.keys().next().value);
   return a;
 }
-async function speakRaw(text) {
+async function speakRaw(text, hq) {
   const key = keyFrom("ELEVENLABS_API_KEY", ".elevenlabs-key");
   if (key && !/[әғқңөұүһі]/i.test(text)) {
     try {
       const r = await fetch("https://api.elevenlabs.io/v1/text-to-speech/" + ELEVEN_VOICE + "?output_format=mp3_44100_64", {
         method: "POST", headers: { "xi-api-key": key, "Content-Type": "application/json" },
-        body: JSON.stringify({ text, model_id: ELEVEN_MODEL, voice_settings: { stability: 0.62, similarity_boost: 0.75, style: 0, use_speaker_boost: true, speed: 0.94 } }),
-        signal: AbortSignal.timeout(20000),
+        body: JSON.stringify({ text, model_id: hq ? ELEVEN_MODEL_HQ : ELEVEN_MODEL, voice_settings: { stability: 0.6, similarity_boost: 0.75, style: 0, use_speaker_boost: true, speed: 0.95 } }),
+        signal: AbortSignal.timeout(hq ? 40000 : 20000),
       });
       if (r.ok) return { type: "audio/mpeg", buf: Buffer.from(await r.arrayBuffer()) };
       console.log("[tutor tts] ElevenLabs " + r.status + " " + (await r.text()).slice(0, 120));
@@ -249,7 +250,7 @@ function handleTts(req, res, { readBody, clientIp }) {
     if (!text) return fail(400, "нужен текст");
     if (!voiceAllowed(clientIp(req))) return fail(429, "слишком много запросов");
     try {
-      const a = await speak(text);
+      const a = await speak(text, !!b.hq);
       res.writeHead(200, { "Content-Type": a.type, "Cache-Control": "no-store", "Content-Length": a.buf.length });
       res.end(a.buf);
     } catch (e) { console.log("[tutor tts] " + (e && e.message)); fail(502, "озвучка не получилась"); }
