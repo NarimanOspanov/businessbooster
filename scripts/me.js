@@ -69,7 +69,9 @@ async function loadAll(pool, uid) {
       WHERE user_id = @u AND at > DATEADD(day, -372, SYSUTCDATETIME()) ORDER BY at DESC`),
   ]);
   const state = {}; for (const r of st.recordset) state[r.k] = r.v;
-  return { user: u.recordset[0] || null, state, events: ev.recordset };
+  // цели, которые поставили родители, — ребёнок видит их в кабинете, наставник учитывает
+  let goals = []; try { goals = await require("./family.js").goalsOf(pool, "child_id", uid); } catch (e) { console.log("[me] goals " + (e && e.message)); }
+  return { user: u.recordset[0] || null, state, events: ev.recordset, goals };
 }
 
 function send(res, code, obj) {

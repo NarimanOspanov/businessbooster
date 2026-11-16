@@ -91,6 +91,7 @@ async function handle(req, res, { readBody }) {
   if (p === "/api/social/me" && M === "GET") {
     const r = await pool.request().input("u", sql.Int, me).query(`SELECT handle, visibility, bio, is_admin, banned,
       CASE WHEN is_admin = 1 THEN (SELECT COUNT(*) FROM luch.reports WHERE status = 'o') ELSE 0 END reports,
+      (SELECT COUNT(*) FROM luch.goals WHERE parent_id = @u AND status = 'd') goalsDone,
       (SELECT COUNT(*) FROM luch.friends WHERE (a = @u OR b = @u) AND status = 'p' AND requested_by <> @u) requests,
       (SELECT COUNT(*) FROM luch.messages WHERE to_user = @u AND read_at IS NULL AND deleted_at IS NULL AND from_id NOT IN (SELECT blocked_id FROM luch.blocks WHERE user_id = @u)) unread
       FROM luch.users WHERE id = @u`);

@@ -56,6 +56,22 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px 20
 .goal small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
 .goal .b{height:7px;border-radius:7px;background:#0b1019;margin-top:9px;overflow:hidden}.goal .b i{display:block;height:100%;border-radius:7px;background:linear-gradient(90deg,#ffb547,#86e0a8)}
 .goal.won{outline:1px solid #2f7a4f}
+.gact{margin-top:9px;display:flex;gap:8px}.gact .btn{padding:6px 11px;font-size:13px}
+.prof .pic.ro{cursor:default}
+#family h4,.par h4{margin:0 0 10px;font:600 12px/1 var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.fam{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.kid{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}.kid:last-child{border:0}
+.kid .av,.kid img{width:40px;height:40px;border-radius:50%;object-fit:cover;flex:none;display:grid;place-items:center;background:#ff9f1c;color:#1b1206;font:700 16px var(--font-display)}
+.kid .w{flex:1;min-width:0}.kid .w b{display:block}.kid .w small{color:var(--muted);font-size:12.5px}
+.invbox{margin-top:10px;padding:12px;border-radius:12px;background:var(--surface-2);font-size:13.5px}.invbox code{font:600 13px var(--font-mono);color:var(--accent);word-break:break-all}
+.gform{display:grid;grid-template-columns:1fr 90px;gap:8px;margin-top:10px}
+.gform select,.gform input{height:40px;padding:0 10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font:inherit;font-size:14px;min-width:0}
+.gform .wide{grid-column:1/-1}.gform select:focus,.gform input:focus{outline:2px solid var(--accent);border-color:transparent}
+.rep-actions{margin-top:10px;display:flex;gap:8px;align-items:center}.rep-actions small{color:var(--muted);font-size:12px}
+.modal{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:rgba(5,8,14,.62);padding:16px}
+.modal .box{width:min(420px,100%);background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:24px;text-align:center}
+.modal h3{font:700 19px/1.3 var(--font-display);margin:10px 0 8px;text-transform:none;letter-spacing:0;color:var(--fg)}.modal p{color:var(--muted);font-size:14px;margin:0 0 18px}.modal .row2{display:flex;gap:8px;justify-content:center}
+@media (max-width:760px){.fam{grid-template-columns:1fr}}
 @media (max-width:760px){.par{grid-template-columns:1fr}}
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}
 .stat{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px}
@@ -106,6 +122,7 @@ h3{font:600 12px/1 var(--font-mono);letter-spacing:.14em;text-transform:uppercas
     <div class="prof card" id="prof"></div>
     <div class="card par" id="parent" hidden></div>
     <div class="card" id="privacy" style="margin-top:14px"></div>
+    <div class="card" id="family" hidden></div>
     <div class="stats" id="stats"></div>
     <h3>Активность за год</h3>
     <div class="card heat" id="heat"></div>
@@ -126,9 +143,27 @@ const MON = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл
 const DAYS = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
 const ICON = { open: '👀', theory: '🎧', task: '✅', topic: '🏁', quiz: '🧠', help: '💡', hw: '📝', signin: '👋' };
 let selDay = null, data = null;
+const CHILD = (location.search.match(/[?&]child=([a-z0-9-]{2,40})/) || [])[1] || null; // родитель смотрит кабинет ребёнка
+async function fam(path, body) {
+  const t = await window.LuchAuth.token();
+  const r = await fetch('/api/family' + path, { method: body ? 'POST' : 'GET', headers: Object.assign({ Authorization: 'Bearer ' + t }, body ? { 'Content-Type': 'application/json' } : {}), body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => ({ ok: false, error: 'нет связи' })); if (!j.ok) throw new Error(j.error || 'ошибка'); return j;
+}
+const KIND_TXT = { tasks: 'Выполнить заданий', days: 'Заниматься дней', streak: 'Дней подряд', quiz: 'Тестов на 3+ из 4', topic: 'Заданий в теме' };
+const topicName = p => ((window.LUCH_TOPIC_NAMES || {})[p] || p).split(' · ').pop();
+function goalHtml(g, forParent) {
+  const pc = Math.round(Math.min(1, g.progress / g.target) * 100), done = g.status === 'd' || g.status === 'r';
+  const title = g.kind === 'topic' ? `${KIND_TXT.topic} «${topicName(g.topic)}»` : KIND_TXT[g.kind] || g.what;
+  const left = g.target - g.progress;
+  const sub = g.status === 'r' ? 'Награда вручена 🎉' : g.status === 'd' ? (forParent ? 'Цель достигнута — пора вручить награду!' : 'Цель достигнута! Скажи родителям 🎉') : g.status === 'expired' ? 'Срок вышел' : (g.due ? 'до ' + new Date(g.due).getDate() + ' ' + MON[new Date(g.due).getMonth()] + ' · ' : '') + 'осталось ' + left;
+  return `<div class="goal${done ? ' won' : ''}"><div class="t">${esc(title)}${done ? ' ✓' : ''}<span>${g.progress} / ${g.target}</span></div>
+    <small>${g.reward ? 'Награда: ' + esc(g.reward) + ' · ' : ''}${sub}${!forParent && g.parent ? ' · от ' + esc(g.parent.name) : ''}</small><div class="b"><i style="width:${pc}%"></i></div>
+    ${forParent && g.status === 'd' ? `<div class="gact"><button class="btn pri" data-g="${g.id}" data-ga="rewarded">Награда вручена</button></div>` : ''}
+    ${forParent && g.status === 'a' ? `<div class="gact"><button class="btn" data-g="${g.id}" data-ga="cancel" data-ask="Отменить эту цель?">Отменить</button></div>` : ''}</div>`;
+}
 
 function render() {
-  const A = window.LuchAuth, u = A.user, ev = (data.events || []).map(e => Object.assign({}, e, { d: dkey(e.at) }));
+  const A = window.LuchAuth, u = CHILD ? { firstName: data.user.nick, imageUrl: data.user.image } : A.user, ev = (data.events || []).map(e => Object.assign({}, e, { d: dkey(e.at) }));
   $('#loading').hidden = true; $('#gate').hidden = true; $('#app').hidden = false;
   const pr = data.user || {}, GOAL = { school: 'учусь в школе', ent: 'готовлюсь к ЕНТ', self: 'учусь для себя', parent: 'родитель', teacher: 'учитель' };
   const name = pr.nick || u.fullName || u.firstName || (u.primaryEmailAddress && u.primaryEmailAddress.emailAddress) || 'Ученик';
@@ -137,6 +172,10 @@ function render() {
   $('#prof').innerHTML = `<label class="pic" title="Сменить фото">${u.imageUrl ? `<img src="${esc(u.imageUrl)}" alt="">` : `<span class="av">${esc(name[0])}</span>`}<span class="cam" aria-hidden="true">📷</span><input type="file" id="ava" accept="image/png,image/jpeg,image/webp,image/gif" aria-label="Сменить фото профиля"></label>
     <div><h2>${esc(name)}</h2><p>${[about, since ? 'учится с ' + since.getDate() + ' ' + MON[since.getMonth()] + ' ' + since.getFullYear() : ''].filter(Boolean).join(' · ')}</p></div>
     <div class="sp"></div><div class="acts"><a class="btn pri" href="/social/">Друзья и группы<span class="bdg" id="socBdg" hidden></span></a><button class="btn" id="edit" type="button">О себе</button><a class="btn" href="/">Предметы</a><button class="btn" id="out" type="button">Выйти</button></div>`;
+  if (CHILD) { // родитель смотрит кабинет ребёнка: только чтение
+    $('#prof .acts').innerHTML = '<a class="btn" href="/me/">← Мой кабинет</a>'; $('#prof .pic').classList.add('ro'); $('#prof .cam').remove(); $('#ava').remove();
+    $('#privacy').hidden = true; $('#family').hidden = true; renderParent(); renderStatsEtc(); return;
+  }
   // аватар: загружаем фото в профиль Clerk, адрес картинки уходит к нам при синхронизации
   $('#ava').onchange = async e => {
     const f = e.target.files && e.target.files[0]; if (!f) return;
@@ -156,6 +195,11 @@ function render() {
   (async () => { try { const t = await A.token(); const j = await (await fetch('/api/social/me', { headers: { Authorization: 'Bearer ' + t } })).json(); const n = (j.requests || 0) + (j.unread || 0), bd = $('#socBdg'); if (bd && n) { bd.textContent = n; bd.hidden = false; } if (j.handle && !pr.handle) { data.user.handle = j.handle; data.user.visibility = j.visibility; render(); } } catch (er) {} })();
   $('#edit').onclick = () => A.onboard();
   $('#out').onclick = () => A.signOut().then(() => location.href = '/');
+  renderFamily();
+  renderStatsEtc();
+}
+function renderStatsEtc() {
+  const A = window.LuchAuth, ev = (data.events || []).map(e => Object.assign({}, e, { d: dkey(e.at) }));
 
   // по дням
   const byDay = {}; ev.forEach(e => { (byDay[e.d] = byDay[e.d] || []).push(e); });
@@ -188,7 +232,7 @@ function render() {
   $('#heat').innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Активность по дням за год">${svg}</svg>
     <div class="lg">меньше ${[0, 1, 2, 3, 4].map(i => `<i style="background:var(--h${i})"></i>`).join('')} больше</div>`;
   $('#heat').scrollLeft = $('#heat').scrollWidth; // последние месяцы — сразу на виду
-  $('#heat').querySelectorAll('rect.on').forEach(r => r.onclick = () => { selDay = selDay === r.dataset.d ? null : r.dataset.d; render(); });
+  $('#heat').querySelectorAll('rect.on').forEach(r => r.onclick = () => { selDay = selDay === r.dataset.d ? null : r.dataset.d; renderStatsEtc(); });
 
   // лента по дням
   const days = Object.keys(byDay).sort().reverse().filter(d => !selDay || d === selDay).slice(0, 30);
@@ -214,9 +258,84 @@ function render() {
     : '<p class="empty">Здесь появятся темы, которые вы начали.</p>';
 }
 
+// ---------- «Семья»: мои дети (для родителя) и цели от родителей (для ребёнка) ----------
+async function renderFamily() {
+  const F = $('#family'); let j;
+  try { j = await fam(''); } catch (e) { F.hidden = true; return; }
+  const isParent = j.children.length || (data.user && data.user.goal === 'parent');
+  const kids = j.children.map(k => `<div class="kid">${k.image ? `<img src="${esc(k.image)}" alt="">` : `<span class="av">${esc(k.name[0])}</span>`}<span class="w"><b>${esc(k.name)}</b><small>за неделю: ${k.weekDays} ${plural(k.weekDays, 'день', 'дня', 'дней')} · ${k.weekTasks} ${plural(k.weekTasks, 'задание', 'задания', 'заданий')}${k.goals.some(g => g.status === 'd') ? ' · 🎉 цель достигнута' : ''}</small></span><a class="btn pri" href="/me/?child=${esc(k.handle)}">Открыть</a></div>`).join('');
+  const parentPart = `<div><h4>Мои дети</h4>${kids || '<p class="note" style="margin:0 0 10px">Пригласите ребёнка: вы увидите его прогресс, сможете ставить цели с наградами, а я буду присылать отчёт, как он учится.</p>'}
+      <button class="btn" id="inv" type="button">${j.children.length ? 'Пригласить ещё ребёнка' : 'Пригласить ребёнка'}</button><div id="invOut"></div></div>`;
+  const myGoals = j.myGoals.filter(g => g.status !== 'x');
+  const childPart = (j.parents.length || myGoals.length) ? `<div><h4>Цели от родителей</h4>${myGoals.length ? myGoals.map(g => goalHtml(g, false)).join('') : '<p class="note" style="margin:0">Пока целей нет.</p>'}
+      <p class="note">Родители видят твой прогресс: ${j.parents.map(p => `${esc(p.name)} <button class="btn" style="padding:2px 8px;font-size:12px" data-unlink="${esc(p.handle)}">отвязать</button>`).join(', ')}</p></div>` : '';
+  F.innerHTML = `<div class="fam">${isParent ? parentPart : ''}${childPart}${!isParent && !childPart ? `<div><h4>Для родителей</h4><p class="note" style="margin:0 0 10px">Если вы родитель — пригласите ребёнка, чтобы видеть его прогресс и ставить цели с наградами.</p><button class="btn" id="inv" type="button">Пригласить ребёнка</button><div id="invOut"></div></div>` : ''}</div>`;
+  F.hidden = false;
+  const inv = $('#inv'); if (inv) inv.onclick = async () => {
+    inv.disabled = true;
+    try { const r = await fam('/invite', {}); const link = location.origin + '/me/#join/' + r.code;
+      $('#invOut').innerHTML = `<div class="invbox">Отправьте ребёнку эту ссылку — он войдёт и подтвердит:<br><code>${esc(link)}</code><div style="margin-top:8px"><button class="btn" id="cpy">Копировать</button> <span class="note">Ссылка одноразовая, действует 14 дней.</span></div></div>`;
+      $('#cpy').onclick = () => { navigator.clipboard && navigator.clipboard.writeText(link); $('#cpy').textContent = 'Скопировано'; };
+    } catch (e) { alert(e.message); } inv.disabled = false;
+  };
+  F.querySelectorAll('[data-unlink]').forEach(b => b.onclick = async () => { if (!confirm('Отвязать? Родитель больше не будет видеть твой прогресс.')) return; await fam('/unlink', { handle: b.dataset.unlink }).catch(e => alert(e.message)); renderFamily(); });
+}
+
+// ---------- кабинет ребёнка глазами родителя: отчёт наставника и цели ----------
+async function renderParent() {
+  const P = $('#parent'); P.hidden = false;
+  const name = data.user.nick, started = Object.keys(data.state || {}).filter(k => k.startsWith('luch-')).map(k => '/labs/' + k.slice(5) + '/');
+  const all = Object.keys(window.LUCH_TOPIC_NAMES || {});
+  const topics = [...new Set([...started, ...all])].slice(0, 200);
+  P.innerHTML = `<div><h4>Отчёт наставника для вас · эта неделя</h4><div class="rep"><span class="ow" aria-hidden="true">🦉</span><ul id="rep"><li class="note" style="margin:0">Составляю отчёт…</li></ul></div>
+      <div class="rep-actions"><button class="btn" id="repNew" type="button">Обновить отчёт</button><small id="repAt"></small></div></div>
+    <div><h4>Цели и вознаграждение</h4><div id="goals">${(data.goals || []).filter(g => g.status !== 'x').map(g => goalHtml(g, true)).join('') || '<p class="note" style="margin:0 0 6px">Поставьте цель — ${esc(name)} увидит её в кабинете, а я буду напоминать и хвалить за каждый шаг.</p>'}</div>
+      <form class="gform" id="gf"><select id="gk" aria-label="Какая цель">${Object.entries(KIND_TXT).map(([k, t]) => `<option value="${k}">${t}</option>`).join('')}</select><input id="gt" type="number" min="1" max="500" value="10" aria-label="Сколько">
+        <select id="gtopic" class="wide" hidden aria-label="Тема">${topics.map(p => `<option value="${esc(p)}">${esc((window.LUCH_TOPIC_NAMES || {})[p] || p)}</option>`).join('')}</select>
+        <input id="gr" class="wide" maxlength="120" placeholder="Награда, например: поход в кино" aria-label="Награда">
+        <select id="gd" aria-label="Срок"><option value="7">Срок: неделя</option><option value="14">2 недели</option><option value="30">Месяц</option><option value="0">Без срока</option></select><button class="btn pri" type="submit">Поставить</button></form></div>`;
+  const loadRep = async fresh => {
+    $('#rep').innerHTML = '<li class="note" style="margin:0">Составляю отчёт…</li>';
+    try { const r = (await fam('/report/' + CHILD + (fresh ? '?fresh=1' : ''))).report;
+      $('#rep').innerHTML = [r.summary, r.good && 'Получается: ' + r.good, r.improve && 'Стоит подтянуть: ' + r.improve, r.advice && 'Совет: ' + r.advice].filter(Boolean).map(x => `<li>${esc(x)}</li>`).join('');
+      $('#repAt').textContent = 'составлен ' + new Date(r.at).toTimeString().slice(0, 5);
+    } catch (e) { $('#rep').innerHTML = `<li class="note">${esc(e.message)}</li>`; }
+  };
+  loadRep(false); $('#repNew').onclick = () => loadRep(true);
+  $('#gk').onchange = () => { $('#gtopic').hidden = $('#gk').value !== 'topic'; $('#gt').value = { tasks: 10, days: 5, streak: 5, quiz: 3, topic: 4 }[$('#gk').value]; };
+  $('#gf').onsubmit = async e => {
+    e.preventDefault();
+    try { const r = await fam('/goal', { child: CHILD, kind: $('#gk').value, target: +$('#gt').value, topic: $('#gtopic').value, reward: $('#gr').value, days: +$('#gd').value });
+      data.goals = r.goals; renderParent(); } catch (er) { alert(er.message); }
+  };
+  P.querySelectorAll('[data-ga]').forEach(b => b.onclick = async () => { if (b.dataset.ask && !confirm(b.dataset.ask)) return; await fam('/goal/' + b.dataset.g, { action: b.dataset.ga }).catch(er => alert(er.message)); const r = await fam('/child/' + CHILD); data.goals = r.goals; renderParent(); });
+}
+async function childMode() {
+  $('#loading').hidden = true;
+  try { const r = await fam('/child/' + CHILD); data = { user: r.user, events: r.events, state: r.state, goals: r.goals }; render(); }
+  catch (e) { $('#app').hidden = true; $('#gate').hidden = false; $('#gate').innerHTML = `<h2>Кабинет ребёнка</h2><p>${esc(e.message)}</p><a class="btn" href="/me/">← Мой кабинет</a>`; }
+}
+
+// ---------- ребёнок принимает приглашение родителя: /me/#join/КОД ----------
+let joinShown = false;
+async function joinFlow(code) {
+  if (joinShown) return; joinShown = true;
+  let inv; try { inv = await fam('/invite/' + code); } catch (e) { alert(e.message); history.replaceState(null, '', '/me/'); return; }
+  if (inv.self) { alert('Это ваше приглашение — отправьте ссылку ребёнку.'); history.replaceState(null, '', '/me/'); return; }
+  const m = document.createElement('div'); m.className = 'modal';
+  m.innerHTML = `<div class="box" role="dialog" aria-modal="true" aria-labelledby="jt"><div style="font-size:40px">👨‍👩‍👧</div><h3 id="jt">${esc(inv.parent.name)} приглашает тебя</h3>
+    <p>${esc(inv.parent.name)} будет видеть твой прогресс и сможет ставить цели с наградами за учёбу. Писать тебе и видеть переписку не сможет. Отвязать можно в любой момент.</p>
+    <div class="row2"><button class="btn" id="jNo">Не сейчас</button><button class="btn pri" id="jYes">Разрешить</button></div></div>`;
+  document.body.appendChild(m);
+  const done = () => { m.remove(); history.replaceState(null, '', '/me/'); };
+  $('#jNo').onclick = done;
+  $('#jYes').onclick = async () => { try { await fam('/accept', { code }); done(); renderFamily(); } catch (e) { alert(e.message); done(); } };
+}
+
 function gate() { $('#loading').hidden = true; $('#app').hidden = true; $('#gate').hidden = false; }
 $('#signIn').onclick = () => window.LuchAuth && window.LuchAuth.openSignIn();
-document.addEventListener('luch-me', e => { if (DEMO) return; data = e.detail; if (window.LuchAuth.user) render(); });
+document.addEventListener('luch-me', e => { if (DEMO || CHILD) return; data = e.detail; if (window.LuchAuth.user) render(); });
+document.addEventListener('luch-auth', e => { const j = (location.hash.match(/^#join\/([A-Za-z0-9]{8})$/) || [])[1]; if (e.detail.user && j && !DEMO) setTimeout(() => joinFlow(j), 800); });
 document.addEventListener('luch-auth', e => { if (!e.detail.user) gate(); });
 // ?demo=1 — пример кабинета ребёнка глазами родителя (для аудиогида и рассказа о курсе): данные вымышленные
 const DEMO = /[?&]demo=1/.test(location.search);
@@ -245,7 +364,10 @@ function demo() {
   const A = window.LuchAuth;
   if (!A || !A.ready) return setTimeout(wait, 150);
   if (DEMO) return demo();
-  if (!A.user) return gate();
+  const join = (location.hash.match(/^#join\/([A-Za-z0-9]{8})$/) || [])[1];
+  if (!A.user) { gate(); if (join) { const p = document.querySelector('#gate p'); if (p) p.textContent = 'Тебя пригласил родитель. Войди или зарегистрируйся — и подтверди приглашение.'; } return; }
+  if (CHILD) return childMode();
+  if (join) joinFlow(join);
   if (A.data) { data = A.data; render(); }
 })();
 })();

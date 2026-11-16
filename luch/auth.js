@@ -35,7 +35,7 @@
     if (A.social) setBadge(A.social);
   }
   // значок: новые заявки в друзья и непрочитанные сообщения
-  function setBadge(j) { A.social = j; const n = (j.requests || 0) + (j.unread || 0), l = acc.querySelector('a'); if (!l) return; let b = l.querySelector('.bd'); if (!n) { if (b) b.remove(); return; } if (!b) { b = document.createElement('span'); b.className = 'bd'; l.appendChild(b); } b.textContent = n; b.title = 'Новые заявки и сообщения'; }
+  function setBadge(j) { A.social = j; const n = (j.requests || 0) + (j.unread || 0) + (j.goalsDone || 0), l = acc.querySelector('a'); if (!l) return; let b = l.querySelector('.bd'); if (!n) { if (b) b.remove(); return; } if (!b) { b = document.createElement('span'); b.className = 'bd'; l.appendChild(b); } b.textContent = n; b.title = 'Новые заявки и сообщения'; }
   async function socialPoll() { if (!A.user || document.hidden || FRAMED) return; try { const t = await token(); if (!t) return; const j = await (await fetch('/api/social/me', { headers: { Authorization: 'Bearer ' + t } })).json(); if (j.ok) setBadge(j); } catch (e) {} }
   setInterval(socialPoll, 60000);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -184,13 +184,15 @@
   // ---------- для наставника: кто ученик и что он уже делал ----------
   function contextLine() {
     if (!A.user || !A.data) return '';
+    const goals = (A.data.goals || []).filter(g => g.status === 'a' || g.status === 'd');
     const p = A.data.user || {}, ev = A.data.events || [], days = new Set(ev.map(e => String(e.at).slice(0, 10)));
     const done = ev.filter(e => e.kind === 'task').length, quiz = ev.filter(e => e.kind === 'quiz');
     const last = ev.filter(e => e.kind !== 'open').slice(0, 8).map(e => `${String(e.at).slice(0, 10)}: ${e.title}${e.detail ? ' (' + e.detail + ')' : ''}`).join('; ');
     const who = [p.nick ? `зовут ${p.nick} — обращайся по имени` : '', p.age ? `${p.age} лет — объясняй под этот возраст` : '',
       p.gender ? (p.gender === 'f' ? 'девушка — используй женский род' : 'парень — используй мужской род') : '', p.goal ? GOAL_TXT[p.goal] : ''].filter(Boolean).join(', ');
     return `Ученик вошёл в аккаунт${who ? ': ' + who : ''}. Занимался ${days.size} дн., выполнил заданий: ${done}, тестов: ${quiz.length}` +
-      (quiz.length ? ` (последний: ${quiz[0].title})` : '') + `. Последние действия: ${last || 'пока нет'}. Учитывай это: не повторяй то, что он уже прошёл, опирайся на пройденные темы.`;
+      (quiz.length ? ` (последний: ${quiz[0].title})` : '') + `. Последние действия: ${last || 'пока нет'}. Учитывай это: не повторяй то, что он уже прошёл, опирайся на пройденные темы.` +
+      (goals.length ? ` Цели от родителей: ${goals.map(g => `${g.kind === 'topic' ? 'заданий в теме' : g.what} — ${g.progress} из ${g.target}${g.reward ? ', награда: ' + g.reward : ''}${g.status === 'd' ? ' (достигнута!)' : ''}`).join('; ')}. Иногда мягко напоминай о цели и сколько осталось, хвали за шаг к ней.` : '');
   }
 
   // ---------- загрузка Clerk ----------

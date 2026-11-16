@@ -684,4 +684,4 @@ function handleI18n(req, res, { readBody, clientIp }) {
   })().catch(() => { try { send(500, { error: "error" }); } catch { /* уже ответили */ } });
 }
 
-module.exports = { handle, handleI18n };
+module.exports = { handle, handleI18n, oneShot, jsonOf };

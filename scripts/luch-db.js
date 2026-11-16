@@ -289,6 +289,42 @@ IF COL_LENGTH('luch.users', 'is_admin') IS NULL ALTER TABLE luch.users ADD is_ad
 IF COL_LENGTH('luch.messages', 'deleted_at') IS NULL ALTER TABLE luch.messages ADD deleted_at DATETIME2(0) NULL;
 IF COL_LENGTH('luch.reports', 'status') IS NULL ALTER TABLE luch.reports ADD status CHAR(1) NOT NULL CONSTRAINT DF_luch_reports_status DEFAULT 'o', handled_at DATETIME2(0) NULL, action NVARCHAR(40) NULL;
 
+-- родительский режим: связь родитель–ребёнок (по приглашению), цели с наградами, недельные отчёты наставника
+IF OBJECT_ID('luch.family', 'U') IS NULL
+CREATE TABLE luch.family (
+  parent_id INT NOT NULL REFERENCES luch.users(id), child_id INT NOT NULL REFERENCES luch.users(id),
+  created_at DATETIME2(0) NOT NULL CONSTRAINT DF_luch_family_created DEFAULT SYSUTCDATETIME(),
+  CONSTRAINT PK_luch_family PRIMARY KEY (parent_id, child_id)
+);
+IF OBJECT_ID('luch.family_invites', 'U') IS NULL
+CREATE TABLE luch.family_invites (
+  code CHAR(8) NOT NULL PRIMARY KEY,
+  parent_id INT NOT NULL REFERENCES luch.users(id),
+  created_at DATETIME2(0) NOT NULL CONSTRAINT DF_luch_finv_created DEFAULT SYSUTCDATETIME(),
+  used_by INT NULL, used_at DATETIME2(0) NULL
+);
+IF OBJECT_ID('luch.goals', 'U') IS NULL
+CREATE TABLE luch.goals (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  parent_id INT NOT NULL REFERENCES luch.users(id), child_id INT NOT NULL REFERENCES luch.users(id),
+  kind VARCHAR(10) NOT NULL,            -- tasks | days | streak | quiz | topic
+  target INT NOT NULL,
+  topic NVARCHAR(80) NULL,              -- /labs/<опыт>/ для kind = topic
+  reward NVARCHAR(120) NULL,
+  due_at DATETIME2(0) NULL,
+  status CHAR(1) NOT NULL CONSTRAINT DF_luch_goals_status DEFAULT 'a',   -- a — идёт, d — достигнута, r — награда вручена, x — отменена
+  created_at DATETIME2(0) NOT NULL CONSTRAINT DF_luch_goals_created DEFAULT SYSUTCDATETIME(),
+  done_at DATETIME2(0) NULL, rewarded_at DATETIME2(0) NULL
+);
+IF OBJECT_ID('luch.parent_reports', 'U') IS NULL
+CREATE TABLE luch.parent_reports (
+  child_id INT NOT NULL REFERENCES luch.users(id),
+  week_start DATE NOT NULL,
+  body NVARCHAR(MAX) NOT NULL,
+  created_at DATETIME2(0) NOT NULL CONSTRAINT DF_luch_prep_created DEFAULT SYSUTCDATETIME(),
+  CONSTRAINT PK_luch_parent_reports PRIMARY KEY (child_id, week_start)
+);
+
 MERGE luch.languages AS t USING (VALUES ('ru', N'Русский', 1), ('kk', N'Қазақша', 2), ('en', N'English', 3), ('es', N'Español', 4)) AS s(code, name, sort)
   ON t.code = s.code
   WHEN NOT MATCHED THEN INSERT (code, name, sort, is_active) VALUES (s.code, s.name, s.sort, CASE WHEN s.code = 'ru' THEN 1 ELSE 0 END);
