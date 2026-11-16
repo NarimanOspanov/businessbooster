@@ -175,6 +175,12 @@ function limited(ip, n) { const now = Date.now(), a = (lim.get(ip) || []).filter
 async function handle(req, res, { readBody, clientIp }) {
   const url = new URL(req.url, "http://x"), p = url.pathname.replace(/\/+$/, ""), M = req.method;
   for (const [c, r] of rooms) if (Date.now() - r.touched > ROOM_TTL) rooms.delete(c);
+  // серверы для голосового чата: STUN бесплатно; TURN-ретранслятор (для мобильных и корпоративных сетей) — если задан в настройках
+  if (p === "/api/quizroom/ice") {
+    const ice = [{ urls: ["stun:stun.l.google.com:19302", "stun:global.stun.twilio.com:3478"] }];
+    if (process.env.QUIZ_TURN_URLS) ice.push({ urls: process.env.QUIZ_TURN_URLS.split(",").map((x) => x.trim()), username: process.env.QUIZ_TURN_USER || "", credential: process.env.QUIZ_TURN_PASS || "" });
+    return send(res, 200, { ok: true, iceServers: ice });
+  }
   if (p === "/api/quizroom/categories") return send(res, 200, { ok: true, categories: Object.entries(CATS).map(([id, c]) => ({ id, name: c.name, emoji: c.emoji, group: c.geo ? "geo" : "school" in c ? "school" : "fun" })) });
   if (p === "/api/quizroom/create" && M === "POST") {
     if (limited(clientIp(req), 30)) return send(res, 429, { ok: false, error: "Слишком много комнат за час — подождите немного." });

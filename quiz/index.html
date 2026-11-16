@@ -84,6 +84,11 @@ input.f:focus{outline:2px solid var(--accent);border-color:transparent}
 .vbar button{all:unset;cursor:pointer;padding:9px 14px;border-radius:999px;background:var(--surface-2);font-weight:700;font-size:14px}.vbar button.on{background:var(--ok);color:#0b1019}
 .vbar button:focus-visible{outline:2px solid var(--accent)}
 .mute{all:unset;cursor:pointer;font-size:18px;padding:6px 10px;border-radius:10px;background:var(--surface-2)}
+.volw{position:relative}
+.vol{position:absolute;right:0;top:calc(100% + 8px);z-index:60;width:250px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px;box-shadow:0 14px 40px rgba(0,0,0,.45)}
+.vol label{display:block;font-size:13px;color:var(--muted);margin:2px 0 6px}.vol label b{color:var(--fg);font-weight:600}
+.vol input[type=range]{width:100%;accent-color:var(--accent);margin:0 0 12px}
+.vol input[type=range]:last-child{margin-bottom:0}
 .feat{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:22px 0}
 .feat div{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;font-size:14px;color:#cfd6e4}.feat b{display:block;color:var(--fg);margin-bottom:2px}
 .cta{margin-top:16px;display:grid;gap:8px}.cta a{text-decoration:none}
@@ -94,7 +99,9 @@ input.f:focus{outline:2px solid var(--accent);border-color:transparent}
 </head>
 <body>
 <div class="wrap">
-  <header><a class="brand" href="/"><span style="font-size:28px">🦉</span><div><b>OPEN SCHOOL AI</b><small>Квизрум</small></div></a><button class="mute" id="mute" type="button" aria-label="Голос ведущего">🔊</button></header>
+  <header><a class="brand" href="/"><span style="font-size:28px">🦉</span><div><b>OPEN SCHOOL AI</b><small>Квизрум</small></div></a><div class="volw"><button class="mute" id="mute" type="button" aria-label="Громкость" aria-expanded="false" aria-controls="vol">🔊</button>
+    <div class="vol" id="vol" hidden><label for="vHost">Голос ведущего <b id="vHostN"></b></label><input type="range" id="vHost" min="0" max="100" step="5">
+      <label for="vPeers">Голоса игроков <b id="vPeersN"></b></label><input type="range" id="vPeers" min="0" max="100" step="5"></div></div></header>
   <main id="app"></main>
 </div>
 <div class="vbar" id="vbar" hidden><span class="who" id="vwho">Голосовой чат</span><button type="button" id="vbtn">🎤 Включить микрофон</button></div>
@@ -116,15 +123,27 @@ const setSess = (c, v) => { try { localStorage.setItem(sessKey(c), JSON.stringif
 let cats = [];
 
 // ---------- голос ведущего ----------
-let muted = false; try { muted = localStorage.getItem('qr-mute') === '1'; } catch (e) {}
+// громкость: ведущий и голоса игроков — у каждого своя, запоминается
+const vols = (() => { try { return JSON.parse(localStorage.getItem('qr-vol') || 'null') || { host: 80, peers: 100 }; } catch (e) { return { host: 80, peers: 100 }; } })();
+let muted = false;
 const audio = new Audio(); const said = new Set();
-const paintMute = () => { $('#mute').textContent = muted ? '🔇' : '🔊'; $('#mute').setAttribute('aria-label', muted ? 'Включить голос ведущего' : 'Выключить голос ведущего'); };
-$('#mute').onclick = () => { muted = !muted; try { localStorage.setItem('qr-mute', muted ? '1' : '0'); } catch (e) {} paintMute(); if (muted) audio.pause(); };
+const paintMute = () => {
+  muted = vols.host === 0; audio.volume = vols.host / 100;
+  $('#mute').textContent = vols.host === 0 && vols.peers === 0 ? '🔇' : vols.host < 40 ? '🔉' : '🔊';
+  $('#vHost').value = vols.host; $('#vPeers').value = vols.peers; $('#vHostN').textContent = vols.host + '%'; $('#vPeersN').textContent = vols.peers + '%';
+  document.querySelectorAll('audio[data-peer]').forEach(a => { a.volume = vols.peers / 100; });
+};
+const saveVols = () => { try { localStorage.setItem('qr-vol', JSON.stringify(vols)); } catch (e) {} paintMute(); };
+$('#vHost').oninput = e => { vols.host = +e.target.value; saveVols(); if (vols.host === 0) audio.pause(); };
+$('#vPeers').oninput = e => { vols.peers = +e.target.value; saveVols(); };
+$('#mute').onclick = e => { e.stopPropagation(); const v = $('#vol'); v.hidden = !v.hidden; $('#mute').setAttribute('aria-expanded', String(!v.hidden)); };
+document.addEventListener('click', e => { if (!e.target.closest('.volw')) { $('#vol').hidden = true; $('#mute').setAttribute('aria-expanded', 'false'); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('#vol').hidden = true; });
 paintMute();
 const unlock = () => { audio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA='; audio.play().catch(() => {}); };
 async function say(key, text) {
   if (said.has(key)) return; said.add(key); if (muted || !text) return;
-  try { const r = await fetch('/api/tutor/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) }); if (!r.ok) return; const b = await r.blob(); audio.pause(); audio.src = URL.createObjectURL(b); audio.play().catch(() => {}); } catch (e) {}
+  try { const r = await fetch('/api/tutor/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) }); if (!r.ok) return; const b = await r.blob(); audio.pause(); audio.src = URL.createObjectURL(b); audio.volume = vols.host / 100; audio.play().catch(() => {}); } catch (e) {}
 }
 
 // ---------- главная: создать комнату ----------
@@ -291,49 +310,67 @@ async function drawGlobe(num, fresh) {
 }
 
 // ---------- голосовой чат: WebRTC «каждый с каждым», сигналы через сервер ----------
+// Слышат все игроки комнаты сразу после входа; говорят те, кто включил микрофон.
+// У каждой пары одна аудиодорожка в обе стороны: микрофон включили — подставляем звук без пересогласования.
 const voice = (() => {
-  let stream = null, on = false; const peers = new Map(); // pid → { pc, el }
-  const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:global.stun.twilio.com:3478' }] };
+  let stream = null, on = false, ICE = null, blocked = false; const peers = new Map(); // pid → { pc, el, tr }
   const num = pid => parseInt(String(pid).slice(1), 10) || 0;
   const signal = (to, data) => api(S.code + '/signal', { ...auth(), to, data });
-  function peer(pid) {
+  const iceCfg = async () => ICE || (ICE = await api('ice').then(j => ({ iceServers: j.iceServers })).catch(() => ({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] })));
+  const micTrack = () => (stream && stream.getAudioTracks()[0]) || null;
+  async function peer(pid, initiator) {
     if (peers.has(pid)) return peers.get(pid);
-    const pc = new RTCPeerConnection(ICE), el = new Audio(); el.autoplay = true;
-    if (stream) stream.getTracks().forEach(t => pc.addTrack(t, stream));
-    pc.ontrack = e => { el.srcObject = e.streams[0]; el.play().catch(() => {}); };
+    const pc = new RTCPeerConnection(await iceCfg()), el = document.createElement('audio'); el.autoplay = true; el.setAttribute('playsinline', ''); el.dataset.peer = pid; el.volume = vols.peers / 100; el.hidden = true; document.body.appendChild(el);
+    const p = { pc, el, tr: null }; peers.set(pid, p);
+    if (initiator) { p.tr = pc.addTransceiver('audio', { direction: 'sendrecv' }); if (micTrack()) p.tr.sender.replaceTrack(micTrack()); }
+    pc.ontrack = e => { el.srcObject = e.streams[0] || new MediaStream([e.track]); el.play().then(() => { blocked = false; }).catch(() => { blocked = true; if (S) paint(S); }); };
     pc.onicecandidate = e => { if (e.candidate) signal(pid, { ice: e.candidate }); };
-    const p = { pc, el }; peers.set(pid, p); return p;
+    pc.onconnectionstatechange = () => { if (pc.connectionState === 'failed') { close(pid); } if (S) paint(S); };
+    return p;
   }
-  function close(pid) { const p = peers.get(pid); if (!p) return; try { p.pc.close(); } catch (e) {} p.el.srcObject = null; peers.delete(pid); }
+  function close(pid) { const p = peers.get(pid); if (!p) return; try { p.pc.close(); } catch (e) {} p.el.srcObject = null; p.el.remove(); peers.delete(pid); }
   async function sync(st) {
     paint(st);
     for (const s of st.signals || []) {
-      if (!on) continue;
-      const p = peer(s.from), d = s.data;
+      const d = s.data;
       try {
-        if (d.sdp) { await p.pc.setRemoteDescription(d.sdp); if (d.sdp.type === 'offer') { const a = await p.pc.createAnswer(); await p.pc.setLocalDescription(a); signal(s.from, { sdp: p.pc.localDescription }); } }
-        else if (d.ice) await p.pc.addIceCandidate(d.ice);
+        if (d.sdp && d.sdp.type === 'offer') {
+          close(s.from); const p = await peer(s.from, false);
+          await p.pc.setRemoteDescription(d.sdp);
+          p.tr = p.pc.getTransceivers()[0]; if (p.tr) { p.tr.direction = 'sendrecv'; if (micTrack()) await p.tr.sender.replaceTrack(micTrack()); }
+          const a = await p.pc.createAnswer(); await p.pc.setLocalDescription(a); signal(s.from, { sdp: p.pc.localDescription });
+        } else if (d.sdp) { const p = peers.get(s.from); if (p) await p.pc.setRemoteDescription(d.sdp); }
+        else if (d.ice) { const p = peers.get(s.from); if (p) await p.pc.addIceCandidate(d.ice); }
       } catch (e) {}
     }
-    if (!on) return;
-    const others = st.players.filter(x => x.voice && x.pid !== st.me.pid && x.online).map(x => x.pid);
+    // соединяемся со всеми, кто в комнате онлайн; начинает тот, у кого номер меньше
+    const others = st.players.filter(x => x.pid !== st.me.pid && x.online).map(x => x.pid);
     for (const pid of [...peers.keys()]) if (!others.includes(pid)) close(pid);
-    for (const pid of others) if (!peers.has(pid) && num(st.me.pid) < num(pid)) { // соединение начинает тот, у кого номер меньше
-      const p = peer(pid); try { const o = await p.pc.createOffer(); await p.pc.setLocalDescription(o); signal(pid, { sdp: p.pc.localDescription }); } catch (e) {}
+    for (const pid of others) if (!peers.has(pid) && num(st.me.pid) < num(pid)) {
+      const p = await peer(pid, true); try { const o = await p.pc.createOffer(); await p.pc.setLocalDescription(o); signal(pid, { sdp: p.pc.localDescription }); } catch (e) {}
     }
   }
   function paint(st) {
-    const n = st.players.filter(x => x.voice).length, btn = $('#vbtn');
-    $('#vwho').textContent = n ? `🎙 В голосе: ${st.players.filter(x => x.voice).map(x => x.name).join(', ')}` : 'Голосовой чат комнаты';
-    btn.textContent = on ? '🎤 Выключить' : '🎤 Включить микрофон'; btn.classList.toggle('on', on);
+    const talk = st.players.filter(x => x.voice), btn = $('#vbtn');
+    const live = [...peers.values()].filter(p => p.pc.connectionState === 'connected').length;
+    $('#vwho').textContent = blocked ? '🔈 Нажмите, чтобы слышать голоса' : talk.length ? `🎙 Говорят: ${talk.map(x => x.name).join(', ')}` : live ? '🔈 Голосовой чат: включите микрофон, чтобы вас слышали' : 'Голосовой чат комнаты';
+    btn.textContent = on ? '🎤 Микрофон включён' : '🎤 Включить микрофон'; btn.classList.toggle('on', on);
   }
+  // браузер не дал проиграть звук без нажатия — первое же нажатие включает все голоса
+  document.addEventListener('click', () => { if (!blocked) return; blocked = false; peers.forEach(p => p.el.play().catch(() => { blocked = true; })); if (S) paint(S); });
+  $('#vwho').onclick = () => {};
   $('#vbtn').onclick = async () => {
-    if (on) return off();
+    if (on) return mic(false);
     try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
-    catch (e) { alert('Нет доступа к микрофону — разреши его в настройках браузера.'); return; }
-    on = true; await api(S.code + '/voice', { ...auth(), on: true }); if (S) paint(S);
+    catch (e) { alert('Нет доступа к микрофону — разреши его в настройках браузера (значок слева от адреса сайта).'); return; }
+    mic(true);
   };
-  function off() { on = false; for (const pid of [...peers.keys()]) close(pid); if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; if (S && cur.s) api(S.code + '/voice', { ...auth(), on: false }); if (S) paint(S); }
+  function mic(v) {
+    on = v; if (!v && stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    peers.forEach(p => { if (p.tr) p.tr.sender.replaceTrack(v ? micTrack() : null).catch(() => {}); });
+    if (S && cur.s) api(S.code + '/voice', { ...auth(), on: v }); if (S) paint(S);
+  }
+  function off() { mic(false); for (const pid of [...peers.keys()]) close(pid); }
   return { sync, off };
 })();
 
