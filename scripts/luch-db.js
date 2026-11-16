@@ -183,6 +183,15 @@ CREATE TABLE luch.story_image (
   CONSTRAINT PK_luch_story_image PRIMARY KEY (story_key, idx)
 );
 
+-- озвучка лекций и аудиогида: один раз сгенерировали — дальше берём отсюда
+IF OBJECT_ID('luch.tts_cache', 'U') IS NULL
+CREATE TABLE luch.tts_cache (
+  k           CHAR(64)       NOT NULL PRIMARY KEY,   -- sha256(голос + модель + текст)
+  mime        VARCHAR(40)    NOT NULL,
+  data        VARBINARY(MAX) NOT NULL,
+  created_at  DATETIME2(0)   NOT NULL CONSTRAINT DF_luch_tts_cache_created DEFAULT SYSUTCDATETIME()
+);
+
 -- учётные записи учеников (вход через Clerk), их прогресс и действия
 IF OBJECT_ID('luch.users', 'U') IS NULL
 CREATE TABLE luch.users (

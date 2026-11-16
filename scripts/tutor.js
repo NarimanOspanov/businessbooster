@@ -166,11 +166,26 @@ async function gemini(model, body, ms = 30000) {
 // одинаковые фразы (аудиогид, подсказки наставника) озвучиваем один раз
 const ttsCache = new Map();
 async function speak(text, hq) {
-  const ck = ELEVEN_VOICE + ":" + (hq ? "hq:" : "") + text;
+  const ck = ELEVEN_VOICE + ":" + (hq ? "hq:" + ELEVEN_MODEL_HQ + ":" : "") + text;
   if (ttsCache.has(ck)) { const v = ttsCache.get(ck); ttsCache.delete(ck); ttsCache.set(ck, v); return v; }
+  // лекции и аудиогид озвучиваем один раз навсегда: звук хранится в базе и переживает перезапуски
+  const dk = hq ? require("crypto").createHash("sha256").update(ck).digest("hex") : null;
+  if (dk) { const got = await ttsDbGet(dk).catch(() => null); if (got) { ttsMem(ck, got); return got; } }
   const a = await speakRaw(text, hq);
-  ttsCache.set(ck, a); if (ttsCache.size > 400) ttsCache.delete(ttsCache.keys().next().value);
+  ttsMem(ck, a);
+  if (dk && a.type === "audio/mpeg" && a.buf.length > 500) ttsDbPut(dk, a).catch((e) => console.log("[tutor tts] cache " + (e && e.message)));
   return a;
+}
+function ttsMem(ck, a) { ttsCache.set(ck, a); if (ttsCache.size > 400) ttsCache.delete(ttsCache.keys().next().value); }
+async function ttsDbGet(k) {
+  const sql = require("mssql"), pool = await db().getPool();
+  const r = await pool.request().input("k", sql.Char(64), k).query("SELECT mime, data FROM luch.tts_cache WHERE k = @k");
+  const row = r.recordset[0]; return row ? { type: row.mime, buf: Buffer.from(row.data) } : null;
+}
+async function ttsDbPut(k, a) {
+  const sql = require("mssql"), pool = await db().getPool();
+  await pool.request().input("k", sql.Char(64), k).input("m", sql.VarChar(40), a.type).input("d", sql.VarBinary(sql.MAX), a.buf)
+    .query("IF NOT EXISTS (SELECT 1 FROM luch.tts_cache WHERE k = @k) INSERT INTO luch.tts_cache (k, mime, data) VALUES (@k, @m, @d)");
 }
 async function speakRaw(text, hq) {
   const key = keyFrom("ELEVENLABS_API_KEY", ".elevenlabs-key");
