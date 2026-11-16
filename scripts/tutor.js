@@ -90,7 +90,7 @@ function cleanMessages(list) {
 
 // ---------- свой ключ ученика (Gemini / OpenAI / Anthropic): наставник работает за его счёт ----------
 // Ключ приходит в заголовке каждого запроса из браузера ученика; мы его нигде не храним и не пишем в логи.
-const USER_GEMINI_MODEL = process.env.USER_GEMINI_MODEL || "gemini-2.5-flash";
+const USER_GEMINI_MODEL = process.env.USER_GEMINI_MODEL || "gemini-3.7-flash";
 const USER_OPENAI_MODEL = process.env.USER_OPENAI_MODEL || "gpt-4.1-mini";
 const USER_CLAUDE_MODEL = process.env.USER_CLAUDE_MODEL || "claude-sonnet-5-5";
 function userAi(req) {
