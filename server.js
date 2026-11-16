@@ -3625,12 +3625,61 @@ const parsePayload = (s) => { const m = /^(reveal|topup):(\d+)$/.exec(String(s |
 
 // Что мы можем отдать по присланной ссылке: само объявление с телефоном,
 // объявление посредника с подтверждённым оригиналом хозяина, старая база.
-async function lookupContacts(id) {
+// Поиск хозяина по присланному объявлению агента — в момент запроса (17.11.2026).
+// Агентов в базе больше не держим (импорт — только хозяева), поэтому заранее
+// посчитанной пары нет. Читаем объявление: лёгкая карточка + выдача (координаты,
+// все фото); ищем хозяев рядом с теми же параметрами (до 6); лучших сверяем по
+// фото (Gemini). Само объявление агента и пары пишем в базу — повторный запрос и
+// оплата по той же ссылке ответят из базы сразу.
+async function ownerOnDemand(id) {
+  const L = require("./scripts/krisha-list.js");
+  await L.loadRegions().catch(() => { /* город останется пустым */ });
+  const r = await L.fetchMapObject(Number(id));
+  if (r.status !== "live" || !r.row) {
+    return { why: r.status === "archived" ? "объявление снято с публикации" : r.status === "not_found" ? "объявления нет на Крыше" : "Крыша не ответила: " + (r.why || "") };
+  }
+  const a = (await L.locateFull(r.row).catch(() => null)) || r.row;
+  if (!a.city) a.city = r.row.city;
+  if (a.deal && a.deal !== "sale") return { deal: a.deal, why: "аренда" };
+  if (a.userType === "owner") { await db.saveListAdverts([a]); return { saved: true }; }
+  await db.saveListAdvertsAny([a]); // агентское — только это, по запросу
+  if (a.lat == null && !a.complexId) return { saved: true, why: "не удалось определить, где квартира агента (нет координат и ЖК)" };
+  const hits = await db.findListOwners({ deal: a.deal, prop: a.prop, area: a.area, rooms: a.rooms, floor: a.floor, floors: a.floors,
+    complexId: a.complexId, lat: a.lat, lon: a.lon, id: a.id }, 6);
+  if (!hits.length) return { saved: true, why: "похожих объявлений от хозяина рядом нет" };
+  const PM = require("./scripts/photo-match.js");
+  const agentPhotos = (a.photoUrls && a.photoUrls.length ? a.photoUrls : a.photo1 ? [a.photo1] : []);
+  let scores = {};
+  if (agentPhotos.length && PM.available()) {
+    const cands = hits.map((h) => ({ id: String(h.id), photos: db.listPhotoUrls(h.photos_c, h.photos_json) })).filter((c) => c.photos.length);
+    if (cands.length) scores = await PM.scoreCandidates(agentPhotos, cands).catch(() => ({}));
+  }
+  let confirmed = 0;
+  for (const h of hits) {
+    const sc = scores[String(h.id)];
+    if (sc && sc.match) confirmed++;
+    await db.logListMatch({ agentId: a.id, ownerId: h.id, paramScore: h.score, archivedAt: h.archived_at || null,
+      photoMatch: sc ? sc.match : null, photoConf: sc ? sc.confidence : null, photoWhy: sc ? sc.why : null }).catch(() => {});
+  }
+  return { saved: true, why: confirmed ? "" : !agentPhotos.length ? "у объявления агента нет фото — сверить не с чем"
+    : !PM.available() ? "нет ключа для сверки фото" : "похожие по параметрам есть (" + hits.length + "), но фото не совпали" };
+}
+async function lookupContacts(id, opts) {
   const bot = require("./scripts/krisha-bot.js");
   const line = (r) => bot.esc([r.title, r.price ? bot.money(Number(r.price)) : null].filter(Boolean).join(" · "));
   const out = { found: false, phones: [], header: "", short: "", deal: "sale", ownerId: null, why: "" };
   try {
-    const k = await db.botLookup(id);
+    let k = await db.botLookup(id);
+    // Нет готового хозяина — ищем сейчас (только когда человек прислал ссылку:
+    // при оплате Телеграм ждёт ответа не дольше 10 с, там берём из базы).
+    const ownerKnown = (k.item && (k.item.user_type === "owner" || k.item.phones.length)) || k.owner;
+    if (!ownerKnown && opts && opts.search) {
+      if (opts.onSlow) await opts.onSlow();
+      const s = await ownerOnDemand(id).catch((e) => ({ why: "поиск не удался: " + String(e.message).slice(0, 80) }));
+      if (s.deal) out.deal = s.deal;
+      if (s.saved) k = await db.botLookup(id);
+      if (s.why && !k.owner) out.searchWhy = s.why;
+    }
     if (k.item && k.item.deal) out.deal = k.item.deal;
     if (k.item && k.item.phones.length) {
       out.found = true; out.phones = k.item.phones; out.deal = k.item.deal || "sale"; out.ownerId = k.item.id;
@@ -3642,10 +3691,12 @@ async function lookupContacts(id) {
       out.short = [k.owner.title, k.owner.price ? bot.money(Number(k.owner.price)) : null].filter(Boolean).join(" · ");
     } else if (k.item && k.item.user_type === "owner") {
       out.why = "объявление от хозяина есть в базе, телефон ещё не собран";
+    } else if (k.owner) {
+      out.why = "нашли объявление хозяина (" + k.owner.id + "), но телефон ещё не собран";
     } else if (k.item) {
-      out.why = "объявление от посредника, оригинала от хозяина у нас нет";
+      out.why = "объявление от посредника, оригинала от хозяина у нас нет" + (out.searchWhy ? ": " + out.searchWhy : "");
     } else {
-      out.why = "объявления нет в базе";
+      out.why = out.searchWhy || "объявления нет в базе";
     }
     if (!out.found) {
       let old = [];
@@ -3891,7 +3942,8 @@ async function handleTelegramUpdate(u) {
     return;
   }
 
-  const f = await lookupContacts(id);
+  const f = await lookupContacts(id, { search: true,
+    onSlow: () => say(chat, "🔎 Ищем объявление хозяина этой квартиры — это займёт до полуминуты.").catch(() => {}) });
   if (!dealAllowed(f.deal)) {
     db.logBotRequest({ userId: uid, kind: "search", krishaId: id, found: false, matches: 0, note: "аренда — пока не ищем" }).catch(() => {});
     await say(chat, ONLY_SALE_TEXT);
