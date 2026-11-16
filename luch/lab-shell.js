@@ -210,7 +210,12 @@
   @keyframes ls-in{from{opacity:0}}
   .ls-stage .frame{width:min(920px,100%,calc((100vh - 290px) * 1.78));min-width:min(560px,100%);max-height:100%;display:flex;flex-direction:column;background:var(--surface,#121a28);border:1px solid var(--line,#26324a);border-radius:20px;overflow:hidden;box-shadow:0 30px 90px -20px rgba(0,0,0,.9);color:var(--fg,#e8ecf4)}
   .ls-stage .pic{position:relative;aspect-ratio:16/9;background:linear-gradient(120deg,#1a2438,#22304a,#1a2438);background-size:200% 100%;animation:ls-shim 2.4s linear infinite;overflow:hidden;flex:none}
-  .ls-stage .pic.has{animation:none;background:#0b1019}
+  .ls-stage .pic.has{animation:none;background:#0b1019;cursor:pointer}
+  .ls-stage .big{position:absolute;left:50%;top:50%;z-index:3;width:78px;height:78px;margin:-39px 0 0 -39px;border-radius:50%;border:0;padding:0;background:rgba(11,16,25,.58);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);color:#fff;font-size:28px;line-height:1;display:grid;place-items:center;cursor:pointer;opacity:0;transform:scale(.92);transition:opacity .25s ease,transform .25s ease;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+  .ls-stage .big span{display:block;transform:translateX(var(--nx,0))}
+  .ls-stage .pic.has:hover .big,.ls-stage.paused .pic.has .big,.ls-stage .big.flash,.ls-stage .big:focus-visible{opacity:1;transform:none}
+  .ls-stage .pic:not(.has) .big,.ls-stage.done .big{display:none}
+  @media (hover:none){.ls-stage .pic.has .big{opacity:.85;transform:none}}
   @keyframes ls-shim{to{background-position:-200% 0}}
   .ls-stage .ph{position:absolute;inset:0;display:grid;place-items:center;font:500 12px/1 var(--font-mono,monospace);letter-spacing:.12em;text-transform:uppercase;color:var(--muted,#8b96ad)}
   .ls-stage .pic.has .ph{display:none}
@@ -303,9 +308,12 @@
     else if (e.key === 'ArrowLeft') stGo(Math.max(0, st.i - 1));
   }
   function stPaint() {
-    const el = st.el, pp = el.querySelector('[data-a="pp"]');
+    const el = st.el, pp = el.querySelector('.ctl [data-a="pp"]');
     pp.innerHTML = st.paused ? '▶ <span>Продолжить</span>' : '❚❚ <span>Пауза</span>';
     pp.setAttribute('aria-label', st.paused ? 'Продолжить' : 'Пауза');
+    const big = el.querySelector('.big');
+    if (big) { big.firstChild.textContent = st.paused ? '▶' : '❚❚'; big.style.setProperty('--nx', st.paused ? '3px' : '0'); big.setAttribute('aria-label', st.paused ? 'Продолжить' : 'Пауза');
+      big.classList.add('flash'); clearTimeout(big._t); big._t = setTimeout(() => big.classList.remove('flash'), 700); }
     el.classList.toggle('paused', st.paused);
   }
   function togglePause() {
@@ -319,14 +327,16 @@
   function stShell() {
     const el = document.createElement('div'); el.className = 'ls-stage'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Теория');
     el.innerHTML = '<div class="frame"><div class="pic"><div class="pv"><div class="k">Урок ' + (lessonIdx() + 1) + ' · теория</div><h4></h4>' +
-      '<ul><li data-s="text">Пишу лекцию</li><li data-s="img">Рисую картинки</li><li data-s="voice">Записываю голос</li></ul></div><i class="wt"></i></div>' +
+      '<ul><li data-s="text">Пишу лекцию</li><li data-s="img">Рисую картинки</li><li data-s="voice">Записываю голос</li></ul></div><i class="wt"></i><button class="big" data-a="pp" aria-label="Пауза"><span>❚❚</span></button></div>' +
       '<div class="txt" data-noi18n><b>Готовлю лекцию</b><div class="fact"></div></div>' +
       '<div class="dots"></div>' +
       '<div class="ctl"><button class="ic" data-a="prev" aria-label="Назад">‹</button><button class="pp" data-a="pp"></button><button class="ic" data-a="next" aria-label="Дальше">›</button>' +
       '<span class="sp"></span><button class="ls-btn ghost" data-a="practice">К практике →</button><button class="ic x" data-a="close" aria-label="Закрыть">✕</button></div></div>';
     el.addEventListener('click', e => {
       if (e.target === el) return stopStory();
-      const b = e.target.closest('[data-a]'); if (!b || !st) return;
+      const b = e.target.closest('[data-a]');
+      if (!b && st && e.target.closest('.pic.has') && !el.classList.contains('done')) return togglePause(); // как у видео: нажал на картинку — пауза
+      if (!b || !st) return;
       const a = b.dataset.a;
       if (a === 'pp') togglePause();
       else if (a === 'prev') stGo(Math.max(0, st.i - 1));
@@ -439,7 +449,7 @@
     audio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA='; audio.play().catch(() => {});
     st = { el: stShell(), secs: [], i: 0, paused: false, audio, voice: [], img: [], run: 0 };
     document.body.appendChild(st.el); addEventListener('keydown', stKeys, true);
-    st.el.querySelector('[data-a="pp"]').innerHTML = '❚❚ <span>Пауза</span>';
+    st.el.querySelector('.ctl [data-a="pp"]').innerHTML = '❚❚ <span>Пауза</span>';
     const me = st;
     factsLoop(me);
     const step = k => { const li = me.el.querySelector('.pv li[data-s="' + k + '"]'); if (li) li.classList.add('ok'); };
@@ -460,7 +470,7 @@
     await new Promise(r => setTimeout(r, 900));
     if (st !== me) return;
     stGo(0);
-    st.el.querySelector('[data-a="pp"]').focus();
+    st.el.querySelector('.ctl [data-a="pp"]').focus();
   }
   story.addEventListener('click', e => {
     const b = e.target.closest('[data-a]'); if (!b) return;
@@ -472,12 +482,12 @@
   new MutationObserver(syncStory).observe(bar, { attributes: true, subtree: true, attributeFilter: ['aria-selected'] });
   syncStory(); storyIdle();
 
-  // карточка в начале урока: «Начнём с теории?» (один раз на урок)
+  // карточка в начале урока: «Объясни за минуту» или «Сразу к практике» — каждый раз, когда открывается урок
   const seenKey = () => 'oe-start:' + location.pathname + ':' + lessonIdx();
   let startShown = false;
   function startCard() {
-    if (localStorage.getItem(seenKey())) return false;
-    try { localStorage.setItem(seenKey(), '1'); } catch (e) {}
+    if (startShown || st || document.querySelector('.ls-start')) return false;
+    try { localStorage.setItem(seenKey(), '1'); } catch (e) {} // отметка «урок открывали» — для прогресса и наставника
     startShown = true;
     const reel = reelBtn(), h = lessonTitle(), n = lessonIdx() + 1, total = cards().length;
     const w = document.createElement('div'); w.className = 'ls-start'; w.setAttribute('role', 'dialog'); w.setAttribute('aria-label', 'Начало урока');
@@ -501,6 +511,10 @@
   // готовим историю заранее, пока человек читает карточку
   const prep = () => { if (!reelBtn()) fetchStory().then(j => j.sections.forEach((x, i) => { new Image().src = imgUrl(i); })).catch(() => {}); };
   setTimeout(() => { startCard(); prep(); }, 300);
+  // перешли на другой урок этой темы — снова предлагаем начать с теории
+  { const strip = document.querySelector('.lessons'); let was = lessonIdx(), lt = 0;
+    if (strip) new MutationObserver(() => { clearTimeout(lt); lt = setTimeout(() => { const now = lessonIdx(); if (now !== was) { was = now; if (startCard()) prep(); } }, 250); })
+      .observe(strip, { childList: true, attributes: true, subtree: true, attributeFilter: ['aria-current', 'class'] }); }
   if (lessonsBox) { let t2 = 0; new MutationObserver(() => { clearTimeout(t2); t2 = setTimeout(() => { stopStory(); storyIdle(); startCard(); prep(); }, 400); }).observe(lessonsBox, { attributes: true, subtree: true, attributeFilter: ['aria-current'] }); }
 
   // ---------- после последнего урока — следующая тема предмета (или карта) ----------
