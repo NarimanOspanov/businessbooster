@@ -165,7 +165,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px 20
     <div>
       <h2>Физика от простого к сложному</h2>
       <p>Вся школьная физика с 7 по 11 класс на одной карте. Сверху основы, ниже ветки разделов: чем ниже тема, тем она сложнее. Нажмите на тему, чтобы увидеть, что в ней и что стоит пройти до неё.</p>
-      <button class="ag-play" id="agPlay" type="button">▶ Аудиогид по странице</button>
+      <button class="ag-play" id="agPlay" type="button">▶ Аудиогид по курсу</button>
     </div>
     <div class="stats" id="stats"></div>
   </div>
@@ -433,6 +433,81 @@ const audioGuide = (() => {
   // открыть тему во время рассказа: на компьютере — боковая панель, на телефоне — раскрыть в списке
   const showTopic = id => { if (!T[id]) return; if (mobile()) openInList(id); else select(id); };
   const topicEl = (id, inner) => mobile() ? `#list details[data-id="${id}"]` : (inner ? '#side ' + inner : '#side');
+  // превью урока: настоящая страница урока в окне поверх карты, гид сам показывает теорию, опыт, 3D и тест
+  const pv = (() => {
+    let box = null, fr = null, url = '', loaded = null, realBefore, timers = [];
+    const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+    const css = document.createElement('style');
+    css.textContent = `.ag-pv{position:fixed;inset:0;z-index:55;display:grid;place-items:center;padding:16px 16px 130px;background:rgba(5,8,14,.55);backdrop-filter:blur(3px);opacity:0;transition:opacity .3s}
+      .ag-pv.on{opacity:1}
+      .ag-pv .win{width:min(1000px,100%);border-radius:16px;overflow:hidden;border:1px solid #26324a;background:#0b1019;box-shadow:0 30px 80px rgba(0,0,0,.55)}
+      .ag-pv .bar{display:flex;align-items:center;gap:10px;height:38px;padding:0 10px 0 14px;background:#121a28;border-bottom:1px solid #26324a;font:500 12px var(--font-mono,monospace);color:var(--muted,#8b96ad)}
+      .ag-pv .bar i{width:10px;height:10px;border-radius:50%;background:#26324a;display:inline-block}
+      .ag-pv .bar b{flex:1;font-weight:500;color:#e8ecf4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .ag-pv .bar a{color:#ffb547;text-decoration:none;font-weight:600}.ag-pv .bar button{all:unset;cursor:pointer;width:26px;height:26px;display:grid;place-items:center;border-radius:8px;color:#e8ecf4}
+      .ag-pv .bar button:hover{background:rgba(255,255,255,.08)}
+      .ag-pv .vp{position:relative;overflow:hidden}
+      .ag-pv iframe{position:absolute;left:0;top:0;border:0;transform-origin:0 0;pointer-events:none;background:#0b1019}
+      .ag-pv .tag{position:absolute;left:12px;top:12px;z-index:2;padding:6px 12px;border-radius:999px;background:#ffb547;color:#1b1206;font:700 12px/1 var(--font-body,sans-serif);letter-spacing:.02em;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+      @media (max-width:760px){.ag-pv{padding:10px 10px 150px}}`;
+    document.head.appendChild(css);
+    const VW = () => mobile() ? 1000 : 1440, VH = () => Math.round(VW() * 0.625);
+    function fit() { if (!box) return; const vp = box.querySelector('.vp'), w = vp.clientWidth, s = w / VW(); vp.style.height = Math.round(VH() * s) + 'px'; Object.assign(fr.style, { width: VW() + 'px', height: VH() + 'px', transform: `scale(${s})` }); }
+    function build(title) {
+      box = document.createElement('div'); box.className = 'ag-pv'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Превью урока');
+      box.innerHTML = `<div class="win"><div class="bar"><i></i><i></i><i></i><b></b><a target="_blank" rel="noopener">Открыть урок ↗</a><button type="button" aria-label="Закрыть превью">✕</button></div><div class="vp"><span class="tag"></span><iframe title="Превью урока" tabindex="-1" aria-hidden="true"></iframe></div></div>`;
+      document.body.appendChild(box); fr = box.querySelector('iframe');
+      box.querySelector('button').onclick = () => close();
+      addEventListener('resize', fit); requestAnimationFrame(() => box.classList.add('on'));
+    }
+    const win = () => fr && fr.contentWindow, doc = () => { try { return fr.contentDocument; } catch (e) { return null; } };
+    const q = s => { const d = doc(); return d && d.querySelector(s); };
+    const btnByText = re => { const d = doc(); return d && [...d.querySelectorAll('button,a')].find(b => re.test(b.textContent)); };
+    function hl(el) { const w = win(); if (!el || !w) return; if (w.LuchTutor && w.LuchTutor.highlight) w.LuchTutor.highlight(el); else { el.style.outline = '3px solid #ffb547'; el.style.outlineOffset = '4px'; } }
+    function open(u, title) {
+      if (!box) build(title);
+      box.querySelector('.bar b').textContent = 'saudager.ai' + u.split('?')[0] + ' · ' + (title || 'урок');
+      box.querySelector('.bar a').href = u;
+      if (u !== url) {
+        url = u; try { if (realBefore === undefined) realBefore = localStorage.getItem('luch-real'); localStorage.setItem('luch-real', '0'); } catch (e) {}
+        loaded = new Promise(res => { fr.onload = () => { const t0 = Date.now(); (function wait() { if (q('#scene') && (Date.now() - t0 > 1800)) return res(); if (Date.now() - t0 > 9000) return res(); setTimeout(wait, 200); })(); }; });
+        fr.src = u;
+      }
+      fit(); return loaded;
+    }
+    async function go(u, stage, title) {
+      timers.forEach(clearTimeout); timers = [];
+      await open(u, title);
+      const tag = box.querySelector('.tag'), w = win();
+      try { w.LuchTutor && w.LuchTutor.hideTip && w.LuchTutor.hideTip(); } catch (e) {}
+      if (stage === 'theory') {
+        tag.textContent = '1 · Теория';
+        hl(q('.ls-start') || btnByText(/Объясни за минуту/));
+      } else if (stage === 'practice') {
+        tag.textContent = '2 · Практика: опыт';
+        const skip = btnByText(/Сразу к практике/); if (skip) skip.click();
+        const sch = q('.rl-tog [data-v="scheme"]'); if (sch && sch.getAttribute('aria-pressed') !== 'true') sch.click();
+        later(() => hl(q('#scene')), 400); later(() => hl(q('.task, .taskbox, #stage .task')), 4200);
+      } else if (stage === 'real') {
+        tag.textContent = '3 · «Как в жизни» — 3D';
+        const skip = btnByText(/Сразу к практике/); if (skip) skip.click();
+        const r = q('.rl-tog [data-v="real"]'); if (r) r.click();
+        later(() => hl(q('.rl-view') || q('#scene')), 1600);
+      } else if (stage === 'quiz') {
+        tag.textContent = '4 · Наставник и тест «Закрепим»';
+        later(() => hl(q('.lt-btn')), 300);
+        later(() => { try { w.LuchShell && w.LuchShell.openQuiz && w.LuchShell.openQuiz(); } catch (e) {} }, 4500);
+        later(() => hl(q('.ls-quiz')), 7000);
+      }
+    }
+    function close() {
+      timers.forEach(clearTimeout); timers = [];
+      if (realBefore !== undefined) { try { realBefore == null ? localStorage.removeItem('luch-real') : localStorage.setItem('luch-real', realBefore); } catch (e) {} }
+      realBefore = undefined; url = '';
+      if (box) { const b = box; box = null; fr = null; b.classList.remove('on'); setTimeout(() => b.remove(), 300); removeEventListener('resize', fit); }
+    }
+    return { go, close };
+  })();
   const physSteps = () => {
     const ready = TOPICS.filter(t => t.status !== 'soon'), lessonsN = ready.reduce((a, t) => a + (t.lessons || 0), 0);
     const demo = T.current && T.current.status !== 'soon' ? 'current' : (ready[0] || {}).id;
@@ -440,10 +515,12 @@ const audioGuide = (() => {
       { t: `Привет! Я Марат, твой наставник по физике. Здесь вся школьная физика, с седьмого по одиннадцатый класс: ${ready.length} ${plural(ready.length, 'тема', 'темы', 'тем')} и ${lessonsN} ${plural(lessonsN, 'урок', 'урока', 'уроков')}. И почти в каждом ты не читаешь учебник, а сам ставишь опыт.`, sel: '.intro h2', act: () => select(null) },
       { t: 'Физику часто считают набором скучных формул. Но за каждой формулой стоит то, что ты видишь каждый день: почему лёд не тонет, как заряжается телефон, почему ложка в стакане кажется сломанной.', sel: '#stats' },
       { t: 'Начинаем с основ: как измерять и из чего всё состоит. От них расходятся пять веток: механика, тепло, электричество, оптика, атом и Вселенная. Чем ниже тема на карте, тем она сложнее, а линии подскажут, что пройти сначала.', sel: mobile() ? '#list' : '.treebox' },
-      { t: 'Вот, например, «Электрический ток». Каждый урок устроен одинаково. Сначала теория: нажимаешь «Объясни за минуту», и я с картинками рассказываю, что это, зачем нужно и как работает. Без зубрёжки, на простых примерах.', sel: topicEl(demo), act: () => showTopic(demo) },
-      { t: 'Потом практика. Ты сам собираешь цепь, двигаешь реостат, смотришь, как разгорается лампочка. А в режиме «Как в жизни» та же установка стоит объёмно, как настоящие приборы на лабораторном столе.', sel: topicEl(demo, '.cta'), act: () => showTopic(demo) },
-      { t: 'Если застрял, нажми «Помоги» или просто скажи вслух. Я вижу твой экран и подскажу именно в том месте, где ты остановился. После практики короткий тест, чтобы закрепить, и домашнее задание.', sel: '.lt-btn' },
-      { t: 'В итоге ты не просто запомнишь формулы, а поймёшь, как устроен мир вокруг: почему летит мяч, как работает двигатель, откуда берётся радуга. И всё это бесплатно.', sel: mobile() ? '#list' : '#tree .node.done', act: () => select(null) },
+      { t: 'Вот, например, тема «Электрический ток». Нажимаешь на неё, видишь, что в ней изучают, и переходишь к урокам. Давай я покажу, как устроен урок внутри.', sel: topicEl(demo, '.cta'), act: () => showTopic(demo) },
+      { t: 'Каждый урок начинается с теории. Нажимаешь «Объясни за минуту», и я с картинками и голосом рассказываю, что это, зачем нужно и как работает. Без зубрёжки, на простых примерах.', act: () => pv.go(T[demo].href + '?l=1', 'theory', T[demo].t) },
+      { t: 'Потом практика. Это опыт: ты сам собираешь цепь, замыкаешь ключ, двигаешь реостат и смотришь, как разгорается лампочка. Рядом задание и приборы с показаниями.', act: () => pv.go(T[demo].href + '?l=1', 'practice', T[demo].t) },
+      { t: 'А в режиме «Как в жизни» та же установка стоит объёмно, как настоящие приборы на лабораторном столе. Её можно покрутить, а на приборы можно нажимать.', act: () => pv.go(T[demo].href + '?l=1', 'real', T[demo].t) },
+      { t: 'Если застрял, нажми на сову «Помоги» или просто скажи вслух. Я вижу твой экран и подскажу именно там, где ты остановился. А после практики короткий тест из четырёх вопросов, чтобы закрепить, и домашнее задание.', act: () => pv.go(T[demo].href + '?l=1', 'quiz', T[demo].t) },
+      { t: 'В итоге ты не просто запомнишь формулы, а поймёшь, как устроен мир вокруг: почему летит мяч, как работает двигатель, откуда берётся радуга. И всё это бесплатно.', sel: mobile() ? '#list' : '#tree .node.done', act: () => { pv.close(); select(null); } },
       { t: 'Выбирай любую зелёную тему и начинай. Я буду рядом.', sel: mobile() ? '#list details' : '#tree .node.done' },
     ];
   };
@@ -465,7 +542,7 @@ const audioGuide = (() => {
     try { const r = await fetch('/api/luch/i18n', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang, texts }) }); const j = await r.json(); return j.tr || texts; } catch (e) { return texts; }
   };
   const tts = text => fetch('/api/tutor/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, hq: true }) }).then(r => r.ok ? r.blob() : null).catch(() => null);
-  const setBtn = on => { btn.classList.toggle('on', on); btn.textContent = on ? '❚❚ Остановить' : '▶ Аудиогид по странице'; };
+  const setBtn = on => { btn.classList.toggle('on', on); btn.textContent = on ? '❚❚ Остановить' : '▶ Аудиогид по курсу'; };
 
   // субтитры: аккуратная плашка внизу экрана, видна при любой прокрутке; голос можно выключить
   const css = document.createElement('style');
@@ -516,9 +593,9 @@ const audioGuide = (() => {
       if (my !== run) return;
       const blob = await next; if (i + 1 < st.length) next = tts(texts[i + 1]);
       if (my !== run) return;
-      if (st[i].act) try { st[i].act(); } catch (e) {}
-      await new Promise(r => setTimeout(r, st[i].act ? 250 : 0));
-      const el = document.querySelector(st[i].sel);
+      if (st[i].act) { try { await st[i].act(); } catch (e) {} await new Promise(r => setTimeout(r, 250)); }
+      if (my !== run) return;
+      const el = st[i].sel && document.querySelector(st[i].sel);
       if (el && window.LuchTutor && window.LuchTutor.highlight) window.LuchTutor.highlight(el);
       const said = showSub(texts[i], i, st.length);
       if (blob && blob.size > 100) {
@@ -536,9 +613,9 @@ const audioGuide = (() => {
         await new Promise(res => { const loop = () => { if (my !== run) return res(); const f = (performance.now() - t0) / ms; said(Math.min(1, f)); f >= 1 ? res() : requestAnimationFrame(loop); }; loop(); });
       }
     }
-    if (my === run) { prog.style.width = '100%'; setTimeout(() => { if (my === run) { sub.classList.remove('on'); setBtn(false); } }, 1200); }
+    if (my === run) { pv.close(); prog.style.width = '100%'; setTimeout(() => { if (my === run) { sub.classList.remove('on'); setBtn(false); } }, 1200); }
   }
-  function stop() { run++; try { audio && audio.pause(); } catch (e) {} setBtn(false); sub.classList.remove('on'); }
+  function stop() { run++; try { audio && audio.pause(); } catch (e) {} setBtn(false); sub.classList.remove('on'); pv.close(); }
   btn.addEventListener('click', () => (btn.classList.contains('on') ? stop() : play()));
   $('#subjects').addEventListener('click', stop);
   return { stop };

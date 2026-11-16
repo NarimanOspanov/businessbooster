@@ -2,6 +2,7 @@
 // на новом устройстве прогресс подтягивается. Без входа всё работает как раньше (в браузере).
 (() => {
   if (window.LuchAuth) return;
+  const FRAMED = window.top !== window; // превью урока внутри аудиогида — ничего не пишем в историю
   const PK = 'pk_test_dXNhYmxlLWJhc2lsaXNrLTY0OTcuY2xlcmsuYWNjb3VudHMuZGV2JA';
   const FAPI = 'https://usable-basilisk-6497.clerk.accounts.dev';
   const RU = 'https://cdn.jsdelivr.net/npm/@clerk/localizations@4.24.1/dist/ru-RU.mjs';
@@ -39,6 +40,7 @@
   q.events = q.events || []; q.keys = q.keys || {};
   const saveQ = () => { try { origSet.call(localStorage, QKEY, JSON.stringify({ events: q.events.slice(-200), keys: q.keys })); } catch (e) {} };
   function log(kind, title, detail, extra) {
+    if (FRAMED) return;
     q.events.push(Object.assign({ kind, title, detail, page: location.pathname, at: Date.now() }, extra || {}));
     saveQ(); push();
   }
@@ -109,7 +111,7 @@
         } catch (e) {}
       }
     }
-    if (changed && /^\/labs\//.test(location.pathname) && !sessionStorage.getItem('oe-me-merged')) {
+    if (changed && !FRAMED && /^\/labs\//.test(location.pathname) && !sessionStorage.getItem('oe-me-merged')) {
       // опыт уже прочитал прогресс при загрузке — один раз перезагружаем, чтобы показать подтянутый
       try { sessionStorage.setItem('oe-me-merged', '1'); } catch (e) {}
       location.reload();
@@ -121,7 +123,7 @@
   const GOAL_TXT = { school: 'учится в школе', ent: 'готовится к ЕНТ', self: 'учится для себя', parent: 'родитель, смотрит курс для ребёнка', teacher: 'учитель' };
   let obOpen = false;
   function onboard(edit) {
-    if (obOpen || !A.user) return;
+    if (obOpen || !A.user || FRAMED) return;
     if (!edit) { try { if (sessionStorage.getItem('oe-ob-later')) return; } catch (e) {} }
     obOpen = true;
     const cur = (A.data && A.data.user) || {};
