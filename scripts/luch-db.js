@@ -183,6 +183,39 @@ CREATE TABLE luch.story_image (
   CONSTRAINT PK_luch_story_image PRIMARY KEY (story_key, idx)
 );
 
+-- учётные записи учеников (вход через Clerk), их прогресс и действия
+IF OBJECT_ID('luch.users', 'U') IS NULL
+CREATE TABLE luch.users (
+  id          INT IDENTITY(1,1) PRIMARY KEY,
+  clerk_id    NVARCHAR(64)  NOT NULL CONSTRAINT UQ_luch_users_clerk UNIQUE,
+  email       NVARCHAR(200) NULL,
+  name        NVARCHAR(200) NULL,
+  image       NVARCHAR(500) NULL,
+  created_at  DATETIME2(0)  NOT NULL CONSTRAINT DF_luch_users_created DEFAULT SYSUTCDATETIME(),
+  last_seen   DATETIME2(0)  NOT NULL CONSTRAINT DF_luch_users_seen DEFAULT SYSUTCDATETIME()
+);
+IF OBJECT_ID('luch.user_state', 'U') IS NULL
+CREATE TABLE luch.user_state (
+  user_id     INT           NOT NULL REFERENCES luch.users(id),
+  k           NVARCHAR(200) NOT NULL,
+  v           NVARCHAR(MAX) NOT NULL,
+  updated_at  DATETIME2(0)  NOT NULL CONSTRAINT DF_luch_user_state_upd DEFAULT SYSUTCDATETIME(),
+  CONSTRAINT PK_luch_user_state PRIMARY KEY (user_id, k)
+);
+IF OBJECT_ID('luch.user_events', 'U') IS NULL
+CREATE TABLE luch.user_events (
+  id          BIGINT IDENTITY(1,1) PRIMARY KEY,
+  user_id     INT           NOT NULL REFERENCES luch.users(id),
+  at          DATETIME2(0)  NOT NULL,
+  kind        NVARCHAR(16)  NOT NULL,
+  page        NVARCHAR(200) NULL,
+  lesson      INT           NULL,
+  title       NVARCHAR(300) NULL,
+  detail      NVARCHAR(500) NULL
+);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_luch_user_events_user_at')
+CREATE INDEX IX_luch_user_events_user_at ON luch.user_events (user_id, at DESC);
+
 MERGE luch.languages AS t USING (VALUES ('ru', N'Русский', 1), ('kk', N'Қазақша', 2), ('en', N'English', 3), ('es', N'Español', 4)) AS s(code, name, sort)
   ON t.code = s.code
   WHEN NOT MATCHED THEN INSERT (code, name, sort, is_active) VALUES (s.code, s.name, s.sort, CASE WHEN s.code = 'ru' THEN 1 ELSE 0 END);

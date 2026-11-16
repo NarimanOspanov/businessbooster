@@ -653,6 +653,7 @@
     try { context = (window.LUCH_CONTEXT && window.LUCH_CONTEXT()) || ''; } catch (e) {}
     try { const sh = window.LuchShell; if (sh && sh.whatNext) context += '\n' + sh.whatNext(); } catch (e) {}
     try { const sh = window.LuchShell; if (sh && sh.learnState) context += '\nЧто ученик уже сделал на этом уроке: ' + sh.learnState(); } catch (e) {}
+    try { const me = window.LuchAuth && window.LuchAuth.contextLine(); if (me) context += '\n' + me; } catch (e) {}
     const acts = recentActions(); if (acts) context += '\nЖурнал действий ученика (от старых к новым):\n' + acts;
     const feed = opts.voice ? sentenceFeeder() : null;
     let text = '', drawn = 0; const fired = new Set();
@@ -1027,6 +1028,7 @@
     return { show, hide, talk, takeTip };
   })();
 
+  if (!window.LuchAuth && !document.querySelector('script[src="/luch/auth.js"]')) { const au = document.createElement('script'); au.src = '/luch/auth.js'; document.head.appendChild(au); }
   if (document.getElementById('tab-overview') && !window.LuchShell) { const sc = document.createElement('script'); sc.src = '/luch/lab-shell.js'; document.head.appendChild(sc); }
   if (typeof window.LUCH_REAL === 'function' && !window.__luchReal) { const r3 = document.createElement('script'); r3.src = '/luch/real3d.js'; document.head.appendChild(r3); }
 })();

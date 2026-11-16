@@ -135,7 +135,7 @@ const TTS_MODEL = process.env.TUTOR_TTS_MODEL || process.env.GEMINI_TTS_MODEL ||
 const STT_MODEL = process.env.TUTOR_STT_MODEL || "gemini-flash-lite-latest";
 // ElevenLabs читает текст точно и быстрее (~1 с); у Gemini TTS бывают сбои, когда
 // вместо текста звучит посторонняя речь. Gemini — запасной вариант и для казахского.
-const ELEVEN_VOICE = process.env.TUTOR_ELEVEN_VOICE || "1ikyXz7KIkVIgmGOM6QM"; // Иван — учитель: спокойный, ясный, родной русский
+const ELEVEN_VOICE = process.env.TUTOR_ELEVEN_VOICE || "1ikyXz7KIkVIgmGOM6QM"; // голос «Иван — учитель»: спокойный, ясный, родной русский (наставник представляется Маратом)
 const ELEVEN_MODEL = process.env.TUTOR_ELEVEN_MODEL || "eleven_turbo_v2_5"; // живые ответы наставника: быстро и естественнее flash
 const ELEVEN_MODEL_HQ = process.env.TUTOR_ELEVEN_MODEL_HQ || "eleven_multilingual_v2"; // лекции и аудиогид: готовятся заранее, звучат живее
 const VOICE = process.env.TUTOR_VOICE || "Sulafat"; // Gemini: тёплый голос

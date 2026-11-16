@@ -8756,6 +8756,10 @@ http
       require("./scripts/tutor.js").handle(req, res, { readBody, clientIp });
       return;
     }
+    if (urlPath === "/api/me" || urlPath === "/api/me/sync") {
+      require("./scripts/me.js").handle(req, res, { readBody, clientIp });
+      return;
+    }
     if (urlPath === "/api/luch/i18n") {
       require("./scripts/tutor.js").handleI18n(req, res, { readBody, clientIp });
       return;
