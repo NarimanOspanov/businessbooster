@@ -166,7 +166,7 @@ async function gemini(model, body, ms = 30000) {
 // одинаковые фразы (аудиогид, подсказки наставника) озвучиваем один раз
 const ttsCache = new Map();
 async function speak(text, hq) {
-  const ck = ELEVEN_VOICE + ":" + (hq ? "hq:" + ELEVEN_MODEL_HQ + ":" : "") + text;
+  const ck = ELEVEN_VOICE + ":" + (hq ? "hq2:" + ELEVEN_MODEL_HQ + ":" : "") + text; // hq2 — ровный голос + выровненная громкость
   if (ttsCache.has(ck)) { const v = ttsCache.get(ck); ttsCache.delete(ck); ttsCache.set(ck, v); return v; }
   // лекции и аудиогид озвучиваем один раз навсегда: звук хранится в базе и переживает перезапуски
   const dk = hq ? require("crypto").createHash("sha256").update(ck).digest("hex") : null;
@@ -193,10 +193,11 @@ async function speakRaw(text, hq) {
     try {
       const r = await fetch("https://api.elevenlabs.io/v1/text-to-speech/" + ELEVEN_VOICE + "?output_format=mp3_44100_64", {
         method: "POST", headers: { "xi-api-key": key, "Content-Type": "application/json" },
-        body: JSON.stringify({ text, model_id: hq ? ELEVEN_MODEL_HQ : ELEVEN_MODEL, voice_settings: { stability: 0.6, similarity_boost: 0.75, style: 0, use_speaker_boost: true, speed: 0.95 } }),
+        // для лекций и гида — высокая стабильность: один ровный, спокойный тон во всех кусках, без «выкриков»
+        body: JSON.stringify({ text, model_id: hq ? ELEVEN_MODEL_HQ : ELEVEN_MODEL, voice_settings: { stability: hq ? 0.85 : 0.6, similarity_boost: 0.75, style: 0, use_speaker_boost: true, speed: 0.95 } }),
         signal: AbortSignal.timeout(hq ? 40000 : 20000),
       });
-      if (r.ok) return { type: "audio/mpeg", buf: Buffer.from(await r.arrayBuffer()) };
+      if (r.ok) { const buf = Buffer.from(await r.arrayBuffer()); return { type: "audio/mpeg", buf: hq ? await evenLoudness(buf) : buf }; }
       console.log("[tutor tts] ElevenLabs " + r.status + " " + (await r.text()).slice(0, 120));
     } catch (e) { console.log("[tutor tts] ElevenLabs " + (e && e.message)); }
   }
@@ -528,6 +529,17 @@ function handleQuiz(req, res, { readBody, clientIp }) {
 const STORY_IMAGE_MODEL = process.env.LUCH_IMAGE_MODEL || process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image";
 const IMG_STYLE = "Яркая познавательная иллюстрация к уроку. Цифровая живопись в стиле современной иллюстрированной энциклопедии: мягкий свет, тёплые сочные цвета, понятные формы, широкий кадр. Никаких надписей, букв, цифр и подписей на картинке.";
 const imgMem = new Map(), imgPending = new Map();
+// одинаковая громкость у всех кусков лекции и гида (EBU R128, -16 LUFS)
+function evenLoudness(buf) {
+  let ff; try { ff = require("ffmpeg-static"); } catch { ff = "ffmpeg"; }
+  return new Promise((resolve) => {
+    const p = require("child_process").spawn(ff, ["-hide_banner", "-loglevel", "error", "-i", "pipe:0", "-af", "loudnorm=I=-16:TP=-1.5:LRA=7", "-ar", "44100", "-ac", "1", "-b:a", "64k", "-f", "mp3", "pipe:1"]);
+    const out = []; p.stdout.on("data", (d) => out.push(d));
+    p.on("error", () => resolve(buf)); p.stdin.on("error", () => {});
+    p.on("close", (code) => { const o = Buffer.concat(out); resolve(code === 0 && o.length > 500 ? o : buf); });
+    p.stdin.end(buf);
+  });
+}
 function shrinkJpeg(buf) {
   let ff; try { ff = require("ffmpeg-static"); } catch { ff = "ffmpeg"; }
   return new Promise((resolve) => {
