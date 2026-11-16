@@ -61,6 +61,15 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px 20
 .ag-play{margin-top:14px;display:inline-flex;align-items:center;gap:8px;background:var(--fg);color:var(--bg);border:0;border-radius:999px;padding:10px 16px;font:600 14px var(--font-body);cursor:pointer}
 .ag-play:hover{opacity:.9}
 .ag-play.on{background:var(--accent);color:var(--bg)}
+/* «возьми за руку»: пока ученик ни разу не слушал гид — мягкая пульсация и подсказка */
+.ag-wrap{position:relative;display:inline-block}
+.ag-play.hint{background:var(--accent);animation:ag-pulse 2s ease-out infinite}
+@keyframes ag-pulse{0%{box-shadow:0 0 0 0 rgba(255,181,71,.6)}70%{box-shadow:0 0 0 14px rgba(255,181,71,0)}100%{box-shadow:0 0 0 0 rgba(255,181,71,0)}}
+.ag-tip{position:absolute;left:calc(100% + 14px);top:50%;transform:translateY(-35%);white-space:nowrap;background:var(--surface-2);border:1px solid var(--line);color:var(--fg);font:500 13.5px var(--font-body);padding:8px 12px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.35);opacity:0;transition:opacity .4s,transform .4s;pointer-events:none}
+.ag-tip:before{content:"";position:absolute;left:-6px;top:50%;margin-top:-6px;width:10px;height:10px;background:var(--surface-2);border-left:1px solid var(--line);border-bottom:1px solid var(--line);transform:rotate(45deg)}
+.ag-tip.on{opacity:1;transform:translateY(-50%)}
+@media (max-width:760px){.ag-tip{left:0;top:calc(100% + 12px);transform:translateY(-6px)}.ag-tip.on{transform:none}.ag-tip:before{left:22px;top:-6px;margin:0;transform:rotate(135deg)}}
+@media (prefers-reduced-motion:reduce){.ag-play.hint{animation:none;box-shadow:0 0 0 3px rgba(255,181,71,.45)}}
 .intro p{margin:0;color:var(--muted);max-width:60ch}
 .stats{display:flex;gap:8px;flex-wrap:wrap}
 .stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;min-width:96px}
@@ -665,7 +674,19 @@ const audioGuide = (() => {
     if (my === run) { pv.close(); setProg(1); setTimeout(() => { if (my === run) { sub.classList.remove('on'); setBtn(false); } }, 1200); }
   }
   function stop() { run++; try { audio && audio.pause(); } catch (e) {} setBtn(false); sub.classList.remove('on'); pv.close(); st = null; blobs.clear(); }
-  btn.addEventListener('click', () => (btn.classList.contains('on') ? stop() : play(0, 0)));
+  // подсветка для тех, кто ещё ни разу не включал гид
+  let tip = null;
+  const clearHint = () => { btn.classList.remove('hint'); if (tip) { tip.classList.remove('on'); setTimeout(() => tip && tip.remove(), 400); } try { localStorage.setItem('ag-heard', '1'); } catch (e) {} };
+  (function hint() {
+    let heard = false; try { heard = localStorage.getItem('ag-heard') === '1'; } catch (e) {}
+    if (heard) return;
+    if (document.querySelector('.oe-splash')) return setTimeout(hint, 300); // ждём, пока уйдёт заставка
+    const w = document.createElement('span'); w.className = 'ag-wrap'; btn.parentNode.insertBefore(w, btn); w.appendChild(btn);
+    tip = document.createElement('span'); tip.className = 'ag-tip'; tip.setAttribute('aria-hidden', 'true'); tip.textContent = 'Начните отсюда: обзор курса за 2 минуты 🎧'; w.appendChild(tip);
+    setTimeout(() => { btn.classList.add('hint'); tip.classList.add('on'); }, 700);
+    setTimeout(() => tip && tip.classList.remove('on'), 9000); // подсказка уходит, пульсация остаётся до первого запуска
+  })();
+  btn.addEventListener('click', () => { clearHint(); return btn.classList.contains('on') ? stop() : play(0, 0); });
   $('#subjects').addEventListener('click', stop);
   return { stop };
 })();
