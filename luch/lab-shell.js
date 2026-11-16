@@ -302,7 +302,7 @@
   }
   function storyIdle() {
     const reel = reelBtn();
-    story.innerHTML = `<button type="button" class="play" data-a="story"><i>▶</i><span><b>Прослушать лекцию</b><small>картинки и голос · что это, зачем, как работает</small></span></button>` +
+    story.innerHTML = `<button type="button" class="play" data-a="story"><i>▶</i><span><b>Прослушать лекцию</b><small>картинки и голос · теория, формулы и что делать в опыте</small></span></button>` +
       (reel ? `<div class="acts" style="display:flex;gap:6px;margin-top:10px"><button class="ls-btn" data-a="reel">▶ Смотреть видео</button><button class="ls-btn ghost" data-a="story">Прослушать лекцию</button></div>` : '');
   }
   // Плеер «Теории»: картинка на раздел + голос + подпись. Пауза доступна всегда.
@@ -379,7 +379,7 @@
   }
   function factsLoop(me) {
     const box = me.el.querySelector('.fact'), list = pageFacts();
-    if (!list.length) { box.innerHTML = '<small>Минутку</small>Сейчас будет короткая лекция с картинками: что это, зачем нужно, как работает и немного истории.'; return; }
+    if (!list.length) { box.innerHTML = '<small>Минутку</small>Сейчас будет лекция с картинками: что это, зачем нужно, как работает и немного истории.'; return; }
     let k = 0;
     const show = () => { box.innerHTML = '<small>Пока готовлю — знаете ли вы?</small>' + esc(list[k % list.length]); };
     show();
@@ -549,7 +549,7 @@
     const reel = reelBtn(), h = lessonTitle(), n = lessonIdx() + 1, total = cards().length;
     const w = document.createElement('div'); w.className = 'ls-start'; w.setAttribute('role', 'dialog'); w.setAttribute('aria-label', 'Начало урока');
     w.innerHTML = `<div class="card"><div class="k">Урок ${n} из ${total}</div><h3>${esc(h)}</h3>
-      <p>Сначала — интересная теория: что это, зачем нужно и как работает. Потом попробуешь сам в опыте, а в конце закрепим домашним заданием.</p>
+      <p>Сначала — лекция: что это, зачем нужно, как работает, формулы и что предстоит в опыте. Потом попробуешь сам в опыте, а в конце закрепим домашним заданием.</p>
       <div class="acts">${reel ? '<button class="ls-btn main" data-a="reel">▶ Смотреть видео</button>' : ''}<button class="ls-btn ${reel ? '' : 'main'}" data-a="story">▶ Прослушать лекцию</button><button class="ls-btn ghost" data-a="practice">Перейти к практике</button></div></div>`;
     const close = () => { w.remove(); startShown = false; };
     w.addEventListener('click', e => {
