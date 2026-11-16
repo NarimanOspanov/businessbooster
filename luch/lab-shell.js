@@ -298,8 +298,8 @@
   }
   function storyIdle() {
     const reel = reelBtn();
-    story.innerHTML = `<button type="button" class="play" data-a="story"><i>▶</i><span><b>Объясни за минуту</b><small>картинки и голос · что это, зачем, как работает</small></span></button>` +
-      (reel ? `<div class="acts" style="display:flex;gap:6px;margin-top:10px"><button class="ls-btn" data-a="reel">▶ Смотреть видео</button><button class="ls-btn ghost" data-a="story">Объясни за минуту</button></div>` : '');
+    story.innerHTML = `<button type="button" class="play" data-a="story"><i>▶</i><span><b>Прослушать лекцию</b><small>картинки и голос · что это, зачем, как работает</small></span></button>` +
+      (reel ? `<div class="acts" style="display:flex;gap:6px;margin-top:10px"><button class="ls-btn" data-a="reel">▶ Смотреть видео</button><button class="ls-btn ghost" data-a="story">Прослушать лекцию</button></div>` : '');
   }
   // Плеер «Теории»: картинка на раздел + голос + подпись. Пауза доступна всегда.
   const imgUrl = i => '/api/tutor/story/img?k=' + encodeURIComponent(storyKey() + '|' + LANG2) + '&i=' + i;
@@ -534,7 +534,7 @@
   new MutationObserver(syncStory).observe(bar, { attributes: true, subtree: true, attributeFilter: ['aria-selected'] });
   syncStory(); storyIdle();
 
-  // карточка в начале урока: «Объясни за минуту» или «Сразу к практике» — каждый раз, когда открывается урок
+  // карточка в начале урока: «Прослушать лекцию» или «Перейти к практике» — каждый раз, когда открывается урок
   const seenKey = () => 'oe-start:' + location.pathname + ':' + lessonIdx();
   let startShown = false;
   function startCard() {
@@ -545,7 +545,7 @@
     const w = document.createElement('div'); w.className = 'ls-start'; w.setAttribute('role', 'dialog'); w.setAttribute('aria-label', 'Начало урока');
     w.innerHTML = `<div class="card"><div class="k">Урок ${n} из ${total}</div><h3>${esc(h)}</h3>
       <p>Сначала — интересная теория: что это, зачем нужно и как работает. Потом попробуешь сам в опыте, а в конце закрепим домашним заданием.</p>
-      <div class="acts">${reel ? '<button class="ls-btn main" data-a="reel">▶ Смотреть видео</button>' : ''}<button class="ls-btn ${reel ? '' : 'main'}" data-a="story">▶ Объясни за минуту</button><button class="ls-btn ghost" data-a="practice">Сразу к практике</button></div></div>`;
+      <div class="acts">${reel ? '<button class="ls-btn main" data-a="reel">▶ Смотреть видео</button>' : ''}<button class="ls-btn ${reel ? '' : 'main'}" data-a="story">▶ Прослушать лекцию</button><button class="ls-btn ghost" data-a="practice">Перейти к практике</button></div></div>`;
     const close = () => { w.remove(); startShown = false; };
     w.addEventListener('click', e => {
       if (e.target === w) return close();
