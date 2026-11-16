@@ -21,6 +21,7 @@
     .oe-acc a:focus-visible,.oe-acc button:focus-visible{outline:2px solid #ffb347;outline-offset:2px}
     .oe-acc .bd{min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#ff8a73;color:#1b0b06;font:700 11px/18px inherit;text-align:center;margin-right:-4px}
     .oe-acc img,.oe-acc .av{width:24px;height:24px;border-radius:50%;margin-left:-6px;object-fit:cover;display:grid;place-items:center;background:#ff9f1c;color:#1b1206;font-size:12px}
+    @media (max-width:480px){header .brand h1{font-size:17px!important;letter-spacing:.1em!important}header .brand small{font-size:9.5px!important;letter-spacing:.08em!important}header .brand svg{width:34px!important;height:34px!important}header{column-gap:8px!important}.oe-acc{padding-left:0!important}}
     @media (max-width:600px){.oe-acc{margin-left:8px}.oe-acc .nm{display:none}.oe-acc a,.oe-acc button{padding:0 10px}}`;
   document.head.appendChild(css);
   const acc = document.createElement('div'); acc.className = 'oe-acc'; acc.dataset.noi18n = '';
@@ -61,7 +62,7 @@
   // из изменения прогресса — понятное событие для кабинета
   const title = () => (document.querySelector('header h1, .lessons [aria-current="true"] .t, .lessons [aria-current="true"]') || {}).textContent || document.title;
   const lessonTitle = () => { const a = document.querySelector('.lessons [aria-current="true"], .lessons [aria-current="page"]'); return a ? a.textContent.replace(/^\s*\d+\s*/, '').replace(/\s+/g, ' ').trim().slice(0, 120) : ''; };
-  const topicName = () => (document.querySelector('header .tt, header .topic, .brand + * b, header b') || {}).textContent || document.title.replace(/^Open Lab AI\s*[—-]\s*/, '');
+  const topicName = () => (document.querySelector('header .tt, header .topic, .brand + * b, header b') || {}).textContent || document.title.replace(/^Open School AI\s*[—-]\s*/, '');
   function doneCount(v) { try { const d = JSON.parse(v || '{}').done; return d ? (Array.isArray(d) ? d.filter(Boolean).length : Object.values(d).filter(Boolean).length) : 0; } catch (e) { return 0; } }
   function notice(k, before, v) {
     if (k.startsWith('luch-')) {
@@ -213,7 +214,7 @@
     const wasIn = !!clerk.user;
     A.user = clerk.user || null; A.ready = true; paint();
     if (A.user) setTimeout(socialPoll, 1500);
-    if (A.user) { log('open', 'Открыл: ' + (document.title.replace(/^Open Lab AI\s*[—-]\s*/, '').slice(0, 120)), '', { lesson: lessonIdx() }); flush(true); }
+    if (A.user) { log('open', 'Открыл: ' + (document.title.replace(/^Open School AI\s*[—-]\s*/, '').slice(0, 120)), '', { lesson: lessonIdx() }); flush(true); }
     clerk.addListener(({ user }) => {
       const before = A.user && A.user.id; A.user = user || null; paint();
       if (A.user && A.user.id !== before) { if (!wasIn || before) log('signin', 'Вошёл в аккаунт', ''); flush(true); }
