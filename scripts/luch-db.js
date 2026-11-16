@@ -284,6 +284,11 @@ CREATE TABLE luch.reports (
   at DATETIME2(0) NOT NULL CONSTRAINT DF_luch_reports_at DEFAULT SYSUTCDATETIME()
 );
 
+-- модерация: администраторы, ограниченные ученики, удалённые сообщения, разбор жалоб
+IF COL_LENGTH('luch.users', 'is_admin') IS NULL ALTER TABLE luch.users ADD is_admin BIT NOT NULL CONSTRAINT DF_luch_users_admin DEFAULT 0, banned BIT NOT NULL CONSTRAINT DF_luch_users_banned DEFAULT 0;
+IF COL_LENGTH('luch.messages', 'deleted_at') IS NULL ALTER TABLE luch.messages ADD deleted_at DATETIME2(0) NULL;
+IF COL_LENGTH('luch.reports', 'status') IS NULL ALTER TABLE luch.reports ADD status CHAR(1) NOT NULL CONSTRAINT DF_luch_reports_status DEFAULT 'o', handled_at DATETIME2(0) NULL, action NVARCHAR(40) NULL;
+
 MERGE luch.languages AS t USING (VALUES ('ru', N'Русский', 1), ('kk', N'Қазақша', 2), ('en', N'English', 3), ('es', N'Español', 4)) AS s(code, name, sort)
   ON t.code = s.code
   WHEN NOT MATCHED THEN INSERT (code, name, sort, is_active) VALUES (s.code, s.name, s.sort, CASE WHEN s.code = 'ru' THEN 1 ELSE 0 END);

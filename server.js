@@ -8756,6 +8756,10 @@ http
       require("./scripts/tutor.js").handle(req, res, { readBody, clientIp });
       return;
     }
+    if (urlPath.startsWith("/api/mod/")) {
+      require("./scripts/mod.js").handle(req, res, { readBody, clientIp });
+      return;
+    }
     if (urlPath.startsWith("/api/social/")) {
       require("./scripts/social.js").handle(req, res, { readBody, clientIp });
       return;

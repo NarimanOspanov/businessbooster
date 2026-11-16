@@ -82,13 +82,17 @@ async function handle(req, res, { readBody }) {
   const pool = await getPool();
   const me = (await upsertUser(pool, claims, null)).id;
   const myHandle = await ensureHandle(pool, me);
+  // ограниченный модератором ученик: читать можно, писать и добавлять — нет
+  const banned = (await pool.request().input("u", sql.Int, me).query("SELECT banned FROM luch.users WHERE id = @u")).recordset[0].banned;
+  if (banned && M === "POST" && !/\/report$/.test(p)) return send(res, 403, { ok: false, error: "модератор ограничил твой аккаунт: писать и добавлять друзей пока нельзя" });
   let m;
 
   // мои настройки и счётчики (значок в шапке)
   if (p === "/api/social/me" && M === "GET") {
-    const r = await pool.request().input("u", sql.Int, me).query(`SELECT handle, visibility, bio,
+    const r = await pool.request().input("u", sql.Int, me).query(`SELECT handle, visibility, bio, is_admin, banned,
+      CASE WHEN is_admin = 1 THEN (SELECT COUNT(*) FROM luch.reports WHERE status = 'o') ELSE 0 END reports,
       (SELECT COUNT(*) FROM luch.friends WHERE (a = @u OR b = @u) AND status = 'p' AND requested_by <> @u) requests,
-      (SELECT COUNT(*) FROM luch.messages WHERE to_user = @u AND read_at IS NULL AND from_id NOT IN (SELECT blocked_id FROM luch.blocks WHERE user_id = @u)) unread
+      (SELECT COUNT(*) FROM luch.messages WHERE to_user = @u AND read_at IS NULL AND deleted_at IS NULL AND from_id NOT IN (SELECT blocked_id FROM luch.blocks WHERE user_id = @u)) unread
       FROM luch.users WHERE id = @u`);
     return send(res, 200, { ok: true, ...r.recordset[0] });
   }
@@ -175,7 +179,7 @@ async function handle(req, res, { readBody }) {
   if (p === "/api/social/inbox" && M === "GET") {
     const r = await pool.request().input("u", sql.Int, me).query(`WITH c AS (
         SELECT CASE WHEN from_id = @u THEN to_user ELSE from_id END other, id, body, at, from_id, read_at, to_user
-        FROM luch.messages WHERE to_group IS NULL AND (from_id = @u OR to_user = @u))
+        FROM luch.messages WHERE to_group IS NULL AND deleted_at IS NULL AND (from_id = @u OR to_user = @u))
       SELECT o.other, o.body, o.at, o.from_id, u.handle, u.nick, u.name, u.image,
         (SELECT COUNT(*) FROM c c2 WHERE c2.other = o.other AND c2.to_user = @u AND c2.read_at IS NULL) unread
       FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY other ORDER BY id DESC) rn FROM c) o JOIN luch.users u ON u.id = o.other
@@ -195,14 +199,14 @@ async function handle(req, res, { readBody }) {
     const r = await pool.request().input("me", sql.Int, me).input("o", sql.Int, u.id).input("after", sql.BigInt, after).query(`
       UPDATE luch.messages SET read_at = SYSUTCDATETIME() WHERE to_user = @me AND from_id = @o AND read_at IS NULL;
       SELECT TOP 200 id, from_id, body, at, read_at FROM luch.messages
-      WHERE to_group IS NULL AND ((from_id = @me AND to_user = @o) OR (from_id = @o AND to_user = @me)) AND id > @after ORDER BY id DESC`);
+      WHERE to_group IS NULL AND deleted_at IS NULL AND ((from_id = @me AND to_user = @o) OR (from_id = @o AND to_user = @me)) AND id > @after ORDER BY id DESC`);
     return send(res, 200, { ok: true, user: pub(u), rel, canWrite: rel === "friend", messages: r.recordset.reverse().map((x) => ({ id: x.id, mine: x.from_id === me, body: x.body, at: x.at, read: !!x.read_at })) });
   }
 
   // группы: создать, вступить по коду, выйти, мои группы, страница группы, чат группы
   if (p === "/api/social/groups" && M === "GET") {
     const r = await pool.request().input("u", sql.Int, me).query(`SELECT g.code, g.name, g.owner_id, (SELECT COUNT(*) FROM luch.group_members x WHERE x.group_id = g.id) members,
-      (SELECT TOP 1 body FROM luch.messages WHERE to_group = g.id ORDER BY id DESC) last
+      (SELECT TOP 1 body FROM luch.messages WHERE to_group = g.id AND deleted_at IS NULL ORDER BY id DESC) last
       FROM luch.groups g JOIN luch.group_members m ON m.group_id = g.id WHERE m.user_id = @u ORDER BY g.created_at DESC`);
     return send(res, 200, { ok: true, groups: r.recordset.map((x) => ({ code: x.code, name: x.name, members: x.members, mine: x.owner_id === me, last: x.last })) });
   }
@@ -248,7 +252,7 @@ async function handle(req, res, { readBody }) {
           (SELECT COUNT(*) FROM luch.user_events e WHERE e.user_id = u.id AND e.kind = 'task') total
         FROM luch.group_members m JOIN luch.users u ON u.id = m.user_id WHERE m.group_id = @g ORDER BY week DESC, total DESC`),
       pool.request().input("g", sql.Int, g.id).input("after", sql.BigInt, after).input("u", sql.Int, me).query(`SELECT TOP 200 m.id, m.from_id, m.body, m.at, u.handle, u.nick, u.name, u.image
-        FROM luch.messages m JOIN luch.users u ON u.id = m.from_id WHERE m.to_group = @g AND m.id > @after
+        FROM luch.messages m JOIN luch.users u ON u.id = m.from_id WHERE m.to_group = @g AND m.deleted_at IS NULL AND m.id > @after
           AND m.from_id NOT IN (SELECT blocked_id FROM luch.blocks WHERE user_id = @u) ORDER BY m.id DESC`),
     ]);
     return send(res, 200, { ok: true, member: true, owner: g.owner_id === me,
@@ -260,7 +264,7 @@ async function handle(req, res, { readBody }) {
   // жалоба на ученика или сообщение
   if (p === "/api/social/report" && M === "POST") {
     const b = await body(req, readBody), u = b.handle ? await byHandle(pool, b.handle) : null;
-    await pool.request().input("r", sql.Int, me).input("t", sql.Int, u ? u.id : null).input("m", sql.BigInt, Number.isInteger(b.message) ? b.message : null)
+    await pool.request().input("r", sql.Int, me).input("t", sql.Int, u ? u.id : null).input("m", sql.BigInt, /^\d{1,18}$/.test(String(b.message)) ? String(b.message) : null)
       .input("why", sql.NVarChar(300), clean(b.reason, 300) || null).query("INSERT INTO luch.reports (reporter_id, target_user, message_id, reason) VALUES (@r, @t, @m, @why)");
     console.log("[social] жалоба от user " + me + (u ? " на " + u.handle : ""));
     return send(res, 200, { ok: true });
