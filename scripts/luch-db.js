@@ -224,8 +224,65 @@ CREATE TABLE luch.user_events (
 );
 -- знакомство при первом входе: как обращаться, возраст, пол (для окончаний), цель
 IF COL_LENGTH('luch.users', 'nick') IS NULL ALTER TABLE luch.users ADD nick NVARCHAR(60) NULL, age TINYINT NULL, gender CHAR(1) NULL, goal NVARCHAR(40) NULL;
+-- социальное: ник-адрес профиля, кто видит профиль, о себе
+IF COL_LENGTH('luch.users', 'handle') IS NULL ALTER TABLE luch.users ADD handle NVARCHAR(40) NULL, visibility VARCHAR(10) NOT NULL CONSTRAINT DF_luch_users_vis DEFAULT 'friends', bio NVARCHAR(200) NULL;
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_luch_user_events_user_at')
 CREATE INDEX IX_luch_user_events_user_at ON luch.user_events (user_id, at DESC);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UX_luch_users_handle')
+EXEC('CREATE UNIQUE INDEX UX_luch_users_handle ON luch.users (handle) WHERE handle IS NOT NULL');
+
+-- дружба (a < b), блокировки, личные и групповые сообщения, группы, жалобы
+IF OBJECT_ID('luch.friends', 'U') IS NULL
+CREATE TABLE luch.friends (
+  a INT NOT NULL REFERENCES luch.users(id), b INT NOT NULL REFERENCES luch.users(id),
+  status CHAR(1) NOT NULL,              -- p — заявка, a — друзья
+  requested_by INT NOT NULL,
+  created_at DATETIME2(0) NOT NULL CONSTRAINT DF_luch_friends_created DEFAULT SYSUTCDATETIME(),
+  CONSTRAINT PK_luch_friends PRIMARY KEY (a, b)
+);
+IF OBJECT_ID('luch.blocks', 'U') IS NULL
+CREATE TABLE luch.blocks (
+  user_id INT NOT NULL REFERENCES luch.users(id), blocked_id INT NOT NULL REFERENCES luch.users(id),
+  created_at DATETIME2(0) NOT NULL CONSTRAINT DF_luch_blocks_created DEFAULT SYSUTCDATETIME(),
+  CONSTRAINT PK_luch_blocks PRIMARY KEY (user_id, blocked_id)
+);
+IF OBJECT_ID('luch.groups', 'U') IS NULL
+CREATE TABLE luch.groups (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  code CHAR(8) NOT NULL CONSTRAINT UQ_luch_groups_code UNIQUE,
+  name NVARCHAR(80) NOT NULL,
+  owner_id INT NOT NULL REFERENCES luch.users(id),
+  created_at DATETIME2(0) NOT NULL CONSTRAINT DF_luch_groups_created DEFAULT SYSUTCDATETIME()
+);
+IF OBJECT_ID('luch.group_members', 'U') IS NULL
+CREATE TABLE luch.group_members (
+  group_id INT NOT NULL REFERENCES luch.groups(id), user_id INT NOT NULL REFERENCES luch.users(id),
+  joined_at DATETIME2(0) NOT NULL CONSTRAINT DF_luch_gm_joined DEFAULT SYSUTCDATETIME(),
+  CONSTRAINT PK_luch_group_members PRIMARY KEY (group_id, user_id)
+);
+IF OBJECT_ID('luch.messages', 'U') IS NULL
+CREATE TABLE luch.messages (
+  id BIGINT IDENTITY(1,1) PRIMARY KEY,
+  from_id INT NOT NULL REFERENCES luch.users(id),
+  to_user INT NULL REFERENCES luch.users(id),
+  to_group INT NULL REFERENCES luch.groups(id),
+  body NVARCHAR(1000) NOT NULL,
+  at DATETIME2(0) NOT NULL CONSTRAINT DF_luch_messages_at DEFAULT SYSUTCDATETIME(),
+  read_at DATETIME2(0) NULL
+);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_luch_messages_dm')
+CREATE INDEX IX_luch_messages_dm ON luch.messages (to_user, from_id, id);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_luch_messages_group')
+CREATE INDEX IX_luch_messages_group ON luch.messages (to_group, id);
+IF OBJECT_ID('luch.reports', 'U') IS NULL
+CREATE TABLE luch.reports (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  reporter_id INT NOT NULL REFERENCES luch.users(id),
+  target_user INT NULL, message_id BIGINT NULL,
+  reason NVARCHAR(300) NULL,
+  at DATETIME2(0) NOT NULL CONSTRAINT DF_luch_reports_at DEFAULT SYSUTCDATETIME()
+);
 
 MERGE luch.languages AS t USING (VALUES ('ru', N'Русский', 1), ('kk', N'Қазақша', 2), ('en', N'English', 3), ('es', N'Español', 4)) AS s(code, name, sort)
   ON t.code = s.code

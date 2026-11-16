@@ -9,7 +9,7 @@
   // какие ключи localStorage — это прогресс ученика (тот же список проверяет сервер)
   const KEY_RE = /^(luch-(phys|chem|bio|math|cs)-[a-z0-9-]{2,30}|oe-learn:\/labs\/[a-z0-9-]{2,40}\/:\d{1,2}|oe-start:\/labs\/[a-z0-9-]{2,40}\/:\d{1,2})$/;
   const QKEY = 'oe-me-queue';
-  const A = window.LuchAuth = { user: null, data: null, ready: false, log, contextLine, openSignIn: () => clerk && clerk.openSignIn(), signOut: () => clerk && clerk.signOut() };
+  const A = window.LuchAuth = { user: null, data: null, ready: false, log, contextLine, token: () => token(), clerk: () => clerk, refresh: () => flush(true), openSignIn: () => clerk && clerk.openSignIn(), signOut: () => clerk && clerk.signOut() };
   let clerk = null;
 
   // ---------- кнопка в шапке ----------
@@ -19,6 +19,7 @@
       font:600 13px/1 inherit;color:var(--fg,#e8ecf4);background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);white-space:nowrap}
     .oe-acc a:hover,.oe-acc button:hover{background:rgba(255,255,255,.13)}
     .oe-acc a:focus-visible,.oe-acc button:focus-visible{outline:2px solid #ffb347;outline-offset:2px}
+    .oe-acc .bd{min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#ff8a73;color:#1b0b06;font:700 11px/18px inherit;text-align:center;margin-right:-4px}
     .oe-acc img,.oe-acc .av{width:24px;height:24px;border-radius:50%;margin-left:-6px;object-fit:cover;display:grid;place-items:center;background:#ff9f1c;color:#1b1206;font-size:12px}
     @media (max-width:600px){.oe-acc{margin-left:8px}.oe-acc .nm{display:none}.oe-acc a,.oe-acc button{padding:0 10px}}`;
   document.head.appendChild(css);
@@ -31,7 +32,12 @@
     const nick = A.data && A.data.user && A.data.user.nick;
     const first = esc((nick || u.firstName || u.fullName || u.primaryEmailAddress?.emailAddress || 'Кабинет').split(' ')[0]);
     acc.innerHTML = `<a href="/me/" title="Мой кабинет: прогресс и история занятий">${u.imageUrl ? `<img src="${esc(u.imageUrl)}" alt="">` : `<span class="av">${first[0] || '•'}</span>`}<span class="nm">${first}</span></a>`;
+    if (A.social) setBadge(A.social);
   }
+  // значок: новые заявки в друзья и непрочитанные сообщения
+  function setBadge(j) { A.social = j; const n = (j.requests || 0) + (j.unread || 0), l = acc.querySelector('a'); if (!l) return; let b = l.querySelector('.bd'); if (!n) { if (b) b.remove(); return; } if (!b) { b = document.createElement('span'); b.className = 'bd'; l.appendChild(b); } b.textContent = n; b.title = 'Новые заявки и сообщения'; }
+  async function socialPoll() { if (!A.user || document.hidden || FRAMED) return; try { const t = await token(); if (!t) return; const j = await (await fetch('/api/social/me', { headers: { Authorization: 'Bearer ' + t } })).json(); if (j.ok) setBadge(j); } catch (e) {} }
+  setInterval(socialPoll, 60000);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', paint); else paint();
 
@@ -204,6 +210,7 @@
     await clerk.load({ ui: { ClerkUI: window.__internal_ClerkUICtor }, localization: loc && loc.ruRU, appearance: { variables: { colorPrimary: '#ff9f1c' } } });
     const wasIn = !!clerk.user;
     A.user = clerk.user || null; A.ready = true; paint();
+    if (A.user) setTimeout(socialPoll, 1500);
     if (A.user) { log('open', 'Открыл: ' + (document.title.replace(/^Open Lab AI\s*[—-]\s*/, '').slice(0, 120)), '', { lesson: lessonIdx() }); flush(true); }
     clerk.addListener(({ user }) => {
       const before = A.user && A.user.id; A.user = user || null; paint();

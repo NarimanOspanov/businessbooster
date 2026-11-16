@@ -63,7 +63,7 @@ async function upsertUser(pool, claims, profile) {
 
 async function loadAll(pool, uid) {
   const [u, st, ev] = await Promise.all([
-    pool.request().input("u", sql.Int, uid).query("SELECT name, email, image, created_at, nick, age, gender, goal FROM luch.users WHERE id = @u"),
+    pool.request().input("u", sql.Int, uid).query("SELECT name, email, image, created_at, nick, age, gender, goal, handle, visibility, bio FROM luch.users WHERE id = @u"),
     pool.request().input("u", sql.Int, uid).query("SELECT k, v FROM luch.user_state WHERE user_id = @u"),
     pool.request().input("u", sql.Int, uid).query(`SELECT TOP 2000 at, kind, page, lesson, title, detail FROM luch.user_events
       WHERE user_id = @u AND at > DATEADD(day, -372, SYSUTCDATETIME()) ORDER BY at DESC`),
@@ -135,5 +135,5 @@ module.exports = {
   handle(req, res, deps) {
     handle(req, res, deps).catch((e) => { console.log("[me] " + (e && e.message)); try { send(res, 500, { ok: false, error: "ошибка сервера" }); } catch { /* уже ответили */ } });
   },
-  verify,
+  verify, auth, upsertUser,
 };
