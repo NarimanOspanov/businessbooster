@@ -438,6 +438,27 @@ const STORY = [
   "К каждому разделу — поле img: сюжет иллюстрации, которую покажут, пока звучит текст (1–2 предложения: кто/что в кадре, где, что происходит). Конкретная живая сцена по смыслу раздела; для истории — сам учёный или изобретатель за работой в своей эпохе. Без надписей, схем и формул.",
   "Ответь только JSON: {\"sections\":[{\"title\":\"Что это\",\"text\":\"…\",\"img\":\"…\"},{\"title\":\"Зачем это нужно\",\"text\":\"…\",\"img\":\"…\"},{\"title\":\"Как это работает\",\"text\":\"…\",\"img\":\"…\",\"board\":\"…\"},{\"title\":\"Немного истории\",\"text\":\"…\",\"img\":\"…\"}]}",
 ].join("\n");
+// Расширенная лекция: после общей теории — формулы (откуда берутся, что значит каждая буква) и мостик к практике.
+// Пока пробуем на нескольких уроках; хранится под своим ключом «…|f3», старые лекции не трогаем.
+const STORY_F_PILOT = new Set((process.env.STORY_F_PILOT || "/labs/phys-wave/|0,/labs/phys-wave/|2").split(",").map((x) => x.trim()).filter(Boolean));
+const storyFormulas = (key) => STORY_F_PILOT.has(key.split("|").slice(0, 2).join("|"));
+const storeKey = (key) => (storyFormulas(key) ? key + "|f3" : key);
+const STORY_F = [
+  "Ты — увлечённый популяризатор науки и добрый наставник Open School AI. Напиши лекцию к уроку (описание урока ниже): сначала понятная общая теория, потом формулы этой темы, потом что предстоит на практике. Слушают и школьники, и взрослые: интересно, понятно, без зубрёжки. Текст будет звучать голосом.",
+  "Разделы по порядку:",
+  "1) «Что это» — простое объяснение через знакомый образ из жизни, 2–3 предложения.",
+  "2) «Зачем это нужно» — где это встречается и пригождается: в жизни, технике, профессиях, 2–3 предложения.",
+  "3) «Как это работает» — суть механизма, 2–4 предложения, без формул.",
+  "4) «Немного истории» — кто и как это открыл, один яркий проверенный факт. Если точных данных нет — скажи в общем, без выдуманных имён и дат.",
+  "5) Два раздела «Формула: …» (после двоеточия — что по ней находят, 1–3 слова), если в материале урока есть две формулы, иначе один: сначала закон, который объясняет само явление, потом формула, по которой считают в опыте и задании. Только формулы из материала урока, не выдумывай. Для каждого такого раздела:",
+  "   text — 4–6 предложений: откуда берётся формула и почему она именно такая (физический смысл, простое рассуждение или наглядный образ), что означает каждая буква и в чём измеряется, что будет, если одну величину увеличить. Формулу в text читай словами, как учитель вслух: «эн равно синус и делённое на синус гамма». Никаких символов формул в text.",
+  "   formulas — формулы для доски (1–2 штуки): f — запись юникодом (², ³, ·, /, √, Δ, λ, φ, γ, δ, индексы ₀₁₂, дроби через «/»), без LaTeX; vars — расшифровка каждой буквы: [буква, что это, единица или «—»].",
+  "   У разделов с формулами поля img нет.",
+  "6) «Что будем делать на практике» — 3–4 предложения: какой опыт предстоит, что именно менять и что измерять или наблюдать, какую из формул применим и что интересного должно получиться. Обращайся к ученику на «ты», с азартом.",
+  "Кроме формульных разделов, у каждого раздела есть поле img: сюжет иллюстрации (1–2 предложения: кто/что в кадре, где, что происходит). Конкретная живая сцена по смыслу раздела; для истории — сам учёный за работой в своей эпохе; для практики — ученик за похожим опытом. Без надписей, схем и формул.",
+  "Имена, названия и места пиши по-русски, без латинских букв (кроме букв в формулах).",
+  "Ответь только JSON: {\"sections\":[{\"title\":\"Что это\",\"text\":\"…\",\"img\":\"…\"},…,{\"title\":\"Формула: угол отклонения\",\"text\":\"…\",\"formulas\":[{\"f\":\"δ = i + β − A\",\"vars\":[[\"δ\",\"угол отклонения\",\"°\"]]}]},{\"title\":\"Что будем делать на практике\",\"text\":\"…\",\"img\":\"…\"}]}",
+].join("\n");
 const storyMem = new Map();
 async function storyGet(key) {
   if (storyMem.has(key)) return storyMem.get(key);
@@ -465,22 +486,28 @@ function handleStory(req, res, { readBody, clientIp }) {
     try { b = JSON.parse(await readBody(req)) || {}; } catch { return send(400, { error: "bad json" }); }
     const key = String(b.key || "").slice(0, 280) + "|" + (LANG_NAMES[b.lang] ? b.lang : "ru");
     if (!/^\/[\w\-/]*\|\d+\|\w+$/.test(key)) return send(400, { error: "key" });
-    const have = await storyGet(key);
+    const withF = storyFormulas(key), sk = storeKey(key);
+    const have = await storyGet(sk);
     if (have) return send(200, have);
     const block = allowed(clientIp(req));
     if (block) return send(429, { error: block });
     try {
-      let p = storyPending.get(key);
+      let p = storyPending.get(sk);
       if (!p) {
         p = (async () => {
-          const j = jsonOf(await oneShot(STORY + langRule(b.lang), "Урок:\n" + String(b.context || "").slice(0, MAX_CTX)));
-          const sections = (j.sections || []).slice(0, 4).map((s) => ({ title: String(s.title || ""), text: String(s.text || ""), img: s.img ? String(s.img).slice(0, 600) : undefined, board: s.board ? String(s.board).slice(0, 6000) : undefined }));
+          const j = jsonOf(await oneShot((withF ? STORY_F : STORY) + langRule(b.lang), "Урок:\n" + String(b.context || "").slice(0, MAX_CTX), withF ? 85000 : undefined));
+          const sections = (j.sections || []).slice(0, withF ? 7 : 4).map((s) => {
+            const formulas = (Array.isArray(s.formulas) ? s.formulas : []).slice(0, 2).filter((x) => x && x.f && String(x.f).length < 80).map((x) => ({
+              f: String(x.f), vars: (Array.isArray(x.vars) ? x.vars : []).slice(0, 8).map((v) => (Array.isArray(v) ? v : []).slice(0, 3).map((t) => String(t || "").slice(0, 50))),
+            }));
+            return { title: String(s.title || ""), text: String(s.text || ""), img: s.img && !formulas.length ? String(s.img).slice(0, 600) : undefined, formulas: formulas.length ? formulas : undefined, board: s.board ? String(s.board).slice(0, 6000) : undefined };
+          });
           if (sections.length < 3) throw new Error("story: few sections");
           const v = { sections };
-          await storyPut(key, v);
+          await storyPut(sk, v);
           return v;
         })();
-        storyPending.set(key, p); p.finally(() => storyPending.delete(key)).catch(() => {});
+        storyPending.set(sk, p); p.finally(() => storyPending.delete(sk)).catch(() => {});
       }
       send(200, await p);
     } catch (e) { console.log("[story] " + (e && e.message)); send(502, { error: "Не получилось подготовить историю. Попробуйте ещё раз." }); }
@@ -635,18 +662,19 @@ async function imgMake(key, i, sec) {
 function handleStoryImg(req, res, { clientIp }) {
   const u = new URL(req.url, "http://x"), key = String(u.searchParams.get("k") || "").slice(0, 300), i = parseInt(u.searchParams.get("i"), 10);
   const fail = (code, msg) => { res.writeHead(code, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" }); res.end(msg); };
-  if (!/^\/[\w\-/]*\|\d+\|\w+$/.test(key) || !(i >= 0 && i < 4)) return fail(400, "bad");
+  if (!/^\/[\w\-/]*\|\d+\|\w+$/.test(key) || !(i >= 0 && i < 8)) return fail(400, "bad");
+  const sk = storeKey(key);
   (async () => {
-    let v = await imgGet(key, i);
+    let v = await imgGet(sk, i);
     if (!v) {
-      const story = await storyGet(key);
-      if (!story || !story.sections[i]) return fail(404, "no story");
-      const ck = key + "#" + i;
+      const story = await storyGet(sk);
+      if (!story || !story.sections[i] || story.sections[i].formulas) return fail(404, "no story");
+      const ck = sk + "#" + i;
       let p = imgPending.get(ck);
       if (!p) {
         const block = allowed(clientIp(req));
         if (block) return fail(429, block);
-        p = imgMake(key, i, story.sections[i]); imgPending.set(ck, p); p.finally(() => imgPending.delete(ck)).catch(() => {});
+        p = imgMake(sk, i, story.sections[i]); imgPending.set(ck, p); p.finally(() => imgPending.delete(ck)).catch(() => {});
       }
       v = await p;
     }

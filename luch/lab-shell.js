@@ -221,6 +221,14 @@
   .ls-stage .pic.has .ph{display:none}
   .ls-stage .pic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .8s ease;transform-origin:50% 50%}
   .ls-stage .pic img.on{opacity:1;animation:ls-kb 18s ease-out forwards}
+  .ls-stage .pic .brd{position:absolute;inset:0;container-type:size;opacity:0;transition:opacity .8s ease;display:grid;place-items:center;padding:4% 6%;background:radial-gradient(120% 90% at 30% 20%,#2c4a3c,#1a2e25 70%);box-shadow:inset 0 0 0 10px #4a3524,inset 0 0 40px rgba(0,0,0,.5);color:#f4f1e8;overflow:hidden}
+  .ls-stage .pic .brd.on{opacity:1}
+  .ls-stage .pic:has(.brd.on) .big{top:auto;left:auto;right:18px;bottom:18px;margin:0;width:52px;height:52px;font-size:18px}
+  .ls-stage .pic .brd .in{display:flex;flex-direction:column;gap:3cqh;max-width:100%}
+  .ls-stage .pic .brd .f{font:600 clamp(20px,7cqw,64px)/1.15 "Golos Text",system-ui,sans-serif;color:#ffd166;text-align:center;letter-spacing:.02em;text-shadow:0 0 1px rgba(255,209,102,.6)}
+  .ls-stage .pic .brd ul{list-style:none;margin:0 auto;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,38cqw),1fr));gap:.6cqh 3cqw;font:500 clamp(11px,2.7cqw,24px)/1.35 "Golos Text",system-ui,sans-serif;color:#e8e4d8}
+  .ls-stage .pic .brd li b{color:#7fd4ff;font-weight:700}
+  .ls-stage .pic .brd li i{color:#9be89b;font-style:normal}
   .ls-stage.paused .pic img.on{animation-play-state:paused}
   @keyframes ls-kb{from{transform:scale(1)}to{transform:scale(1.09) translate(-1%,-1%)}}
   .ls-stage.done .pic img.on{animation:none}
@@ -389,7 +397,14 @@
     }
     st.kRaf = requestAnimationFrame(karaokeTick);
   }
-  const loadImg = i => st.img[i] || (st.img[i] = new Promise(res => {
+  // доска с формулами — вместо картинки в разделах «Формула: …»
+  function boardOf(sec) {
+    const b = document.createElement('div'); b.className = 'brd';
+    b.innerHTML = '<div class="in">' + sec.formulas.map(f => '<div class="f">' + esc(f.f) + '</div>' +
+      (f.vars && f.vars.length ? '<ul>' + f.vars.map(v => '<li><b>' + esc(v[0] || '') + '</b> — ' + esc(v[1] || '') + (v[2] && v[2] !== '—' ? ' <i>(' + esc(v[2]) + ')</i>' : '') + '</li>').join('') + '</ul>' : '')).join('') + '</div>';
+    return b;
+  }
+  const loadImg = i => st.img[i] || (st.img[i] = (st.secs[i] && st.secs[i].formulas) ? Promise.resolve(null) : new Promise(res => {
     const im = new Image(); im.alt = ''; im.decoding = 'async';
     const t = setTimeout(() => res(null), 30000);
     im.onload = () => { clearTimeout(t); (im.decode ? im.decode().catch(() => {}) : Promise.resolve()).then(() => res(im)); };
@@ -428,9 +443,10 @@
       if (!st || st.run !== my) return;
       el.classList.remove('wait');
       // картинка: плавная смена, лёгкий наезд камеры
-      const old = pic.querySelector('img.on');
-      if (im) {
-        const node = im.cloneNode(); pic.appendChild(node);
+      const old = pic.querySelector('img.on, .brd.on');
+      const node = sec.formulas ? boardOf(sec) : im ? im.cloneNode() : null;
+      if (node) {
+        pic.appendChild(node);
         requestAnimationFrame(() => { node.classList.add('on'); if (old) old.classList.remove('on'); setTimeout(() => old && old.remove(), 900); pic.classList.add('has'); });
       } else pic.classList.add('has');
       txt.innerHTML = '<b>' + esc(sec.title) + '</b><p></p>';
