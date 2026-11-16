@@ -281,6 +281,10 @@
   .ls-stage .txt p .w.sp{color:var(--fg,#e8ecf4)}
   .ls-stage .txt p .w.cur{color:#0b1019;background:var(--accent,#ffb547);box-shadow:0 0 0 2px var(--accent,#ffb547)}
   @media (prefers-reduced-motion:reduce){.ls-stage .pic img.on{animation:none}.ls-stage{animation:none}.ls-stage .pv li:before,.ls-stage .pic .wt{animation:none}}`;
+  css2.textContent += `
+  .ls-tplay{pointer-events:auto;position:relative;z-index:2;display:inline-flex;align-items:center;gap:7px;margin:4px 0 6px;padding:5px 11px 5px 5px;border-radius:999px;border:1px solid var(--accent,#ffb547);background:rgba(255,181,71,.1);color:var(--fg,#e8ecf4);font:600 12.5px/1.2 var(--font-body,"Golos Text",sans-serif);cursor:pointer;white-space:nowrap;max-width:100%}
+  .ls-tplay i{width:22px;height:22px;border-radius:50%;background:var(--accent,#ffb547);color:#0b1019;display:grid;place-items:center;font-style:normal;font-size:10px;padding-left:2px}
+  .ls-tplay:hover{background:rgba(255,181,71,.2)}`;
   document.head.appendChild(css2);
   const story = document.createElement('div'); story.className = 'ls-story';
   sub.after(story);
@@ -494,7 +498,7 @@
       }, im && !old ? 650 : 450);
     });
   }
-  async function playStory() {
+  async function playStory(from = 0) {
     stopStory();
     const audio = new Audio();
     // разблокируем звук сразу по нажатию (на телефонах иначе не заиграет)
@@ -513,15 +517,16 @@
     }
     if (st !== me) return;
     st.secs = s.sections; step('text'); lecture = s.sections;
-    const first = [loadImg(0).then(x => (step('img'), x)), voiceOf(0).then(x => (step('voice'), x))];
-    if (st.secs[1]) { loadImg(1); voiceOf(1); }
+    const f0 = Math.max(0, Math.min(from, st.secs.length - 1));
+    const first = [loadImg(f0).then(x => (step('img'), x)), voiceOf(f0).then(x => (step('voice'), x))];
+    if (st.secs[f0 + 1]) { loadImg(f0 + 1); voiceOf(f0 + 1); }
     await Promise.all(first);
     if (st !== me) return;
     clearInterval(me.factT);
     const pv = me.el.querySelector('.pv'); pv.querySelector('ul').outerHTML = '<div class="go">Готово, поехали!</div>';
     await new Promise(r => setTimeout(r, 900));
     if (st !== me) return;
-    stGo(0);
+    stGo(f0);
     st.el.querySelector('.ctl [data-a="pp"]').focus();
   }
   story.addEventListener('click', e => {
@@ -561,7 +566,21 @@
     return true;
   }
   // готовим историю заранее, пока человек читает карточку
-  const prep = () => { if (!reelBtn()) fetchStory().then(j => j.sections.forEach((x, i) => { new Image().src = imgUrl(i); })).catch(() => {}); };
+  const prep = () => {
+    taskPlay(null);
+    if (!reelBtn()) fetchStory().then(j => { j.sections.forEach((x, i) => { if (!x.formulas && !x.scheme) new Image().src = imgUrl(i); }); taskPlay(j); }).catch(() => {});
+  };
+  // ▶ в блоке «Задание»: ещё раз прослушать только часть лекции про практическое задание
+  function taskPlay(j) {
+    document.querySelectorAll('.ls-tplay').forEach(x => x.remove());
+    const idx = j && j.sections ? j.sections.findIndex(x => x.scheme) : -1;
+    const box = document.querySelector('#stage .task') || taskBox();
+    if (idx < 0 || !box) return;
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'ls-tplay';
+    b.innerHTML = '<i>▶</i>Как выполнить задание'; b.title = 'Наставник объяснит задание голосом';
+    b.addEventListener('click', e => { e.stopPropagation(); playStory(idx); });
+    const k = box.querySelector('.k'); if (k) k.after(b); else box.prepend(b);
+  }
   setTimeout(() => { startCard(); prep(); }, 300);
   // перешли на другой урок этой темы — снова предлагаем начать с теории
   { const strip = document.querySelector('.lessons'); let was = lessonIdx(), lt = 0;
