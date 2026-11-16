@@ -3356,6 +3356,8 @@ const IDW_FOUND_MAX = 60; // живых за прогон: столько доч
 const IDW_LOC_MAX = 2000; // очередь «записано без координат»
 // Не чаще IDW_RATE запросов в секунду: сотня в секунду с одного IP Крыше не понравится.
 const IDW_RATE = Number(process.env.KRISHA_IDS_RATE || 10);
+// Координаты дочитываем сначала для Алматы и Астаны, потом остальные города.
+const cityPrio = (r) => (r.city === "almaty" ? 0 : r.city === "astana" ? 1 : 2);
 async function freshIdWalk(L, sweepNo, listMaxSeen, deadline, conc) {
   const st = KW.ids = KW.ids || {};
   if (!st.next) {
@@ -3375,7 +3377,7 @@ async function freshIdWalk(L, sweepNo, listMaxSeen, deadline, conc) {
     const r = await L.fetchMapObject(id);
     if (r.status === "live" || r.status === "archived") { if (id > (st.top || 0)) st.top = id; }
     // агентские не дочитываем и не пишем — нужны только хозяева (см. db.saveListAdverts)
-    if (r.status === "live") { out.live++; if (r.row && (process.env.KRISHA_SAVE_AGENTS === "1" || !r.row.userType || r.row.userType === "owner")) found.set(String(id), r.row); else out.agents = (out.agents || 0) + 1; }
+    if (r.status === "live") { out.live++; if (r.row && db.listKeepRow(r.row)) found.set(String(id), r.row); else out.skipped = (out.skipped || 0) + 1; }
     else if (r.status === "not_found") out.notFound++;
     else if (r.status === "unknown") { out.unknown++; out.why = r.why; }
     return r.status;
@@ -3385,7 +3387,7 @@ async function freshIdWalk(L, sweepNo, listMaxSeen, deadline, conc) {
   // 0. Локация важнее скорости (13.11.2026): то, что прошлые прогоны записали
   // без координат (не хватило времени или не нашлось в списке), дочитываем
   // первым делом — до трёх попыток на объявление.
-  st.loc = st.loc || [];
+  st.loc = (st.loc || []).filter((r) => db.listKeepRow(r)).sort((a, b) => cityPrio(a) - cityPrio(b));
   // Ночная догонка 13.11 записала ~7 тыс. квартир без координат: когда очередь
   // почти пуста, добираем следующую порцию сверху вниз (st.locBelow — где
   // остановились), пока такие не кончатся.
@@ -3470,7 +3472,7 @@ async function freshIdWalk(L, sweepNo, listMaxSeen, deadline, conc) {
   const rows = [...found.values()];
   if (rows.length) {
     const have = await db.knownListIds(rows.map((r) => r.id));
-    const fresh = rows.filter((r) => !have.has(String(r.id)));
+    const fresh = rows.filter((r) => !have.has(String(r.id))).sort((a, b) => cityPrio(a) - cityPrio(b));
     out.full = 0;
     for (let i = 0; i < fresh.length && Date.now() < deadline - 4000; i += conc) {
       const c0 = Date.now();
@@ -6442,7 +6444,9 @@ function listWatchBadKey(where) {
   if (listWatch.badKey.length > 200) listWatch.badKey.splice(0, 100);
 }
 async function listWatchTick() {
-  const lim = Math.max(10, Number(process.env.LIST_ALERT_MIN) || 30);
+  // Ночью (00–07 по Алматы) новых объявлений хозяев мало — порог тишины 2 часа.
+  const almHour = new Date(Date.now() + 5 * 3600e3).getUTCHours();
+  const lim = almHour < 7 ? Math.max(120, Number(process.env.LIST_ALERT_NIGHT_MIN) || 120) : Math.max(10, Number(process.env.LIST_ALERT_MIN) || 30);
   let last = listWatch.lastOkAt;
   if (!last) { const t = await db.listLastNew(); last = t ? new Date(t).getTime() : null; }
   const idle = last ? Math.round((Date.now() - last) / 60e3) : null;
@@ -9680,7 +9684,9 @@ http
           }
           parts.push(r);
         }
-        for (let i = 0; i < L.SECTIONS.length; i += 3) {
+        // Первые страницы списка (поднятия, цены) — только по ?list=1 (16.11.2026):
+        // для импорта новых объявлений хозяев хватает обхода по номерам.
+        if (q.get("list") === "1") for (let i = 0; i < L.SECTIONS.length; i += 3) {
           await Promise.all(L.SECTIONS.slice(i, i + 3).map(onePart));
         }
         // Обход по номерам (13.11.2026): то, что встало в список не наверх,

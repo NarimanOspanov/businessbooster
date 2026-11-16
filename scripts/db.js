@@ -4796,7 +4796,7 @@ async function listWithoutCoords(limit, below) {
     SELECT TOP (@n) id, deal, prop, city, price, rooms, area, bumped_on
     FROM dbo.krisha_list
     WHERE id > 1017200000 AND id < @below AND lat IS NULL AND storage = 'live' AND price IS NOT NULL
-      AND (user_type = 'owner' OR user_type IS NULL)
+      AND (user_type = 'owner' OR user_type IS NULL) AND deal = 'sale' AND prop IN ('flat', 'house', 'commercial')
     ORDER BY id DESC`);
   return r.recordset.map((x) => ({ id: Number(x.id), deal: x.deal, prop: x.prop, city: x.city, price: Number(x.price),
     rooms: x.rooms, area: x.area == null ? null : Number(x.area),
@@ -5008,10 +5008,19 @@ function listSig(fields) {
 // отметка «видели» в узкой krisha_list_seen; MERGE в krisha_list — для новых и
 // изменившихся. Обход 440 тыс. живых объявлений иначе каждый круг читал и
 // переписывал всю таблицу ради одной отметки (31.10.2026).
-// Сохраняем только объявления хозяев (16.11.2026): агенты, компании и застройщики
-// не нужны. Неизвестный тип оставляем — уточнится при дочитке. Вернуть агентов:
-// KRISHA_SAVE_AGENTS=1. Ответ — по одному элементу на каждую строку, как раньше.
-const listKeepRow = (o) => process.env.KRISHA_SAVE_AGENTS === "1" || !o.userType || o.userType === "owner";
+// Что импортируем (16.11.2026): только объявления хозяев о продаже квартир,
+// домов и коммерции. Агенты, компании, застройщики, аренда, участки — не нужны.
+// Неизвестное (пусто) оставляем — уточнится при дочитке. Настройка:
+// KRISHA_IMPORT_DEALS (по умолчанию sale), KRISHA_IMPORT_PROPS (flat,house,commercial),
+// KRISHA_SAVE_AGENTS=1 — сохранять всё, как раньше. Ответ — по элементу на строку.
+const importSet = (env, def) => new Set(String(process.env[env] || def).split(",").map((x) => x.trim()).filter(Boolean));
+const listKeepRow = (o) => {
+  if (process.env.KRISHA_SAVE_AGENTS === "1") return true;
+  if (o.userType && o.userType !== "owner") return false;
+  if (o.deal && !importSet("KRISHA_IMPORT_DEALS", "sale").has(o.deal)) return false;
+  if (o.prop && !importSet("KRISHA_IMPORT_PROPS", "flat,house,commercial").has(o.prop)) return false;
+  return true;
+};
 async function saveListAdverts(rows, sweepNo) {
   const all = (rows || []).filter((o) => o && o.id);
   const keep = all.filter(listKeepRow);
@@ -5711,7 +5720,7 @@ module.exports = { listTextGet, portalUserByToken, portalUsers, portalUserSave, 
   saveListAdvert, listStats, listCompare, listPhoneCounts, listPhoneQueueSize, renewListLease, saveObjphoneDebug, archiveMissingList, leadsList, leadSetStatus, leadSetFav, leadSetHide, listEvDenormBackfill, leadPresets, leadPresetSave, leadPresetDel, listYearSources, listYearTodo, listYearSave, leadCopies, leadUncheckedCopies, leadSetCopyPhoto, dropKnownSticky, cleanStickyPhones,
   nextListOwnerWithoutPhone, markListPhoneMiss, listPhonesGet, addListPhones, setListPhones,
   agentsToMatchList, findListOwners, recordListSearched, logListMatch, listMatchStats, listPhotoUrls,
-  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, knownListIds, listMaxId, listWithoutCoords, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, instaCandidates, instaListing, instaPostReserve, instaPostFinish, instaPostByCode, instaPhotoScoresGet, instaPhotoScoreSave, instaPlacesGet, instaPlaceSave, configGet, configSet, instaNextCode, listTextSave, listTextStats, mortgageFlagSave, mortgageFlagStats, instaAccounts, instaAccountSet, instaPostAdd, instaPosts, instaPostedSince, instaPostByMedia, instaRecentMedia, instaRecentListings, instaDmAdd, instaDmMedia, instaDmStats, instaDmPrune, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
+  listDashboard, listMatchReviewRows, setListHumanOk, dbSize, dbLoad, migrateListPhotos, saveListAdverts, listKeepRow, knownListIds, listMaxId, listWithoutCoords, listHistory, botLookup, usersCount, deleteUser, mortgageLeadAdd, mortgageLeads, portalSearch, instaCandidates, instaListing, instaPostReserve, instaPostFinish, instaPostByCode, instaPhotoScoresGet, instaPhotoScoreSave, instaPlacesGet, instaPlaceSave, configGet, configSet, instaNextCode, listTextSave, listTextStats, mortgageFlagSave, mortgageFlagStats, instaAccounts, instaAccountSet, instaPostAdd, instaPosts, instaPostedSince, instaPostByMedia, instaRecentMedia, instaRecentListings, instaDmAdd, instaDmMedia, instaDmStats, instaDmPrune, starsBalance, starsCredit, revealGet, revealBuy, starsRefundMark, botHistory, botFunnel,
   objectPhotos, fillAddedOn, logMatchCandidate, matchReviewRows, setHumanOk, ownerDashboard,
   nextObjectWithoutPhone, markObjectPhoneMiss, PHONE_MISS_REASONS, objectPhonesGet, addObjectPhones, setObjectPhones,
   upsertUser, logBotRequest, botStats,
