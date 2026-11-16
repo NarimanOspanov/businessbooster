@@ -108,7 +108,19 @@ const av = (u, lg) => u && u.image ? `<img class="av${lg ? ' lg' : ''}" src="${e
 const ICON = { task: '✅', quiz: '🧠', theory: '🎧', topic: '🏁' };
 const topicName = p => ((window.LUCH_TOPIC_NAMES || {})[p] || p).split(' · ').pop();
 
+// ?demo=1 — пример для аудиогида: вымышленные друзья и группа класса, без входа и без запросов к серверу
+const DEMO = /[?&]demo=1/.test(location.search);
+const DM = (() => { const now = Date.now(), at = m => new Date(now - m * 60e3).toISOString(), U = (h, n) => ({ handle: h, name: n, image: null });
+  return {
+    'me': { ok: true, handle: 'you', requests: 1, unread: 2 },
+    'feed': { ok: true, items: [{ at: at(5), kind: 'task', title: 'Выполнила задание: Закон отражения', detail: 'Физика · Отражение света', user: U('aliya', 'Алия') }, { at: at(40), kind: 'quiz', title: 'Тест «Закрепим»: 4 из 4', detail: 'Закон Ома · Электрический ток', user: U('bekzat', 'Бекзат') }, { at: at(90), kind: 'theory', title: 'Прослушал теорию: Сила тока', detail: 'Физика · Электрический ток', user: U('timur', 'Тимур') }] },
+    'groups': { ok: true, groups: [{ code: 'DEMO0001', name: '8 «Б» — физика', members: 24, mine: true, last: 'Кто сделал ДЗ по закону Ома?' }] },
+    'g/DEMO0001': { ok: true, member: true, owner: false, group: { code: 'DEMO0001', name: '8 «Б» — физика', members: 24 },
+      board: [{ ...U('aliya', 'Алия'), week: 9, total: 31 }, { ...U('bekzat', 'Бекзат'), week: 7, total: 20 }, { ...U('you', 'Айгерим'), week: 6, total: 12, me: true }, { ...U('timur', 'Тимур'), week: 4, total: 15 }, { ...U('dana', 'Дана'), week: 2, total: 9 }],
+      messages: [{ id: 1, mine: false, body: 'Кто сделал ДЗ по закону Ома?', at: at(30), user: U('aliya', 'Алия') }, { id: 2, mine: false, body: 'Я! Посмотри 3D-схему, там сразу понятно 👍', at: at(25), user: U('bekzat', 'Бекзат') }, { id: 3, mine: true, body: 'Спасибо, сейчас попробую', at: at(20), user: U('you', 'Айгерим') }] },
+  }; })();
 async function api(path, body) {
+  if (DEMO) { const r = DM[path.split('?')[0]]; if (body) throw new Error('Это пример — войдите, чтобы писать и добавлять друзей.'); const o = JSON.parse(JSON.stringify(r || { ok: true, friends: [], incoming: [], outgoing: [], blocked: [], chats: [], users: [] })); if (/after=[1-9]/.test(path) && o.messages) o.messages = []; return o; }
   const t = await window.LuchAuth.token();
   const r = await fetch('/api/social/' + path, { method: body ? 'POST' : 'GET', headers: Object.assign({ Authorization: 'Bearer ' + t }, body ? { 'Content-Type': 'application/json' } : {}), body: body ? JSON.stringify(body) : undefined });
   const j = await r.json().catch(() => ({ ok: false, error: 'нет связи' }));
@@ -271,8 +283,8 @@ let started = false;
 function start() { if (started) return route(); started = true; $('#loading').hidden = true; $('#gate').hidden = true; $('#app').hidden = false; counters().then(route); setInterval(() => { if (!document.hidden) counters(); }, 30000); }
 function gate() { started = false; stopPoll(); $('#loading').hidden = true; $('#app').hidden = true; $('#gate').hidden = false; }
 $('#signIn').onclick = () => window.LuchAuth && window.LuchAuth.openSignIn();
-document.addEventListener('luch-auth', e => { e.detail.user ? start() : gate(); });
-(function wait() { const A = window.LuchAuth; if (!A || !A.ready) return setTimeout(wait, 150); A.user ? start() : gate(); })();
+document.addEventListener('luch-auth', e => { if (DEMO) return; e.detail.user ? start() : gate(); });
+(function wait() { const A = window.LuchAuth; if (!A || !A.ready) return setTimeout(wait, 150); if (DEMO) return start(); A.user ? start() : gate(); })();
 })();
 </script>
 <script src="/luch/topic-names.js"></script>

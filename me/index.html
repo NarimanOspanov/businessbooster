@@ -45,6 +45,18 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px 20
 .seg button{all:unset;cursor:pointer;padding:8px 12px;font-size:13px;font-weight:600}.seg button[aria-checked="true"]{background:var(--fg);color:var(--bg)}
 .seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .note{color:var(--muted);font-size:13px;margin:10px 0 0}
+.demo-tag{display:inline-block;font:600 11px/1 var(--font-mono);letter-spacing:.1em;text-transform:uppercase;padding:5px 9px;border-radius:6px;background:#3a2c12;color:var(--accent);margin-bottom:10px}
+.par{margin-top:14px;display:grid;grid-template-columns:1.25fr 1fr;gap:18px}
+.par h4{margin:0 0 10px;font:600 12px/1 var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.par .rep{display:flex;gap:12px}.par .rep .ow{width:40px;height:40px;flex:none;border-radius:50%;background:#ffb547;display:grid;place-items:center;font-size:20px}
+.par .rep ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:7px;font-size:14px}
+.par .rep li b{color:var(--fg)}.par .rep li{color:#cfd6e4}
+.goal{background:var(--surface-2);border-radius:14px;padding:12px 14px;margin-bottom:10px}
+.goal .t{display:flex;justify-content:space-between;gap:10px;font-size:14px;font-weight:600}.goal .t span{color:var(--muted);font-weight:500;font-family:var(--font-mono);font-size:13px}
+.goal small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
+.goal .b{height:7px;border-radius:7px;background:#0b1019;margin-top:9px;overflow:hidden}.goal .b i{display:block;height:100%;border-radius:7px;background:linear-gradient(90deg,#ffb547,#86e0a8)}
+.goal.won{outline:1px solid #2f7a4f}
+@media (max-width:760px){.par{grid-template-columns:1fr}}
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}
 .stat{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px}
 .stat b{display:block;font:700 26px/1.1 var(--font-display)}.stat span{color:var(--muted);font-size:13px}
@@ -92,6 +104,7 @@ h3{font:600 12px/1 var(--font-mono);letter-spacing:.14em;text-transform:uppercas
 
   <main id="app" hidden>
     <div class="prof card" id="prof"></div>
+    <div class="card par" id="parent" hidden></div>
     <div class="card" id="privacy" style="margin-top:14px"></div>
     <div class="stats" id="stats"></div>
     <h3>Активность за год</h3>
@@ -203,11 +216,35 @@ function render() {
 
 function gate() { $('#loading').hidden = true; $('#app').hidden = true; $('#gate').hidden = false; }
 $('#signIn').onclick = () => window.LuchAuth && window.LuchAuth.openSignIn();
-document.addEventListener('luch-me', e => { data = e.detail; if (window.LuchAuth.user) render(); });
+document.addEventListener('luch-me', e => { if (DEMO) return; data = e.detail; if (window.LuchAuth.user) render(); });
 document.addEventListener('luch-auth', e => { if (!e.detail.user) gate(); });
+// ?demo=1 — пример кабинета ребёнка глазами родителя (для аудиогида и рассказа о курсе): данные вымышленные
+const DEMO = /[?&]demo=1/.test(location.search);
+function demo() {
+  const A = window.LuchAuth, now = Date.now(), day = 864e5, ev = [];
+  A.user = { firstName: 'Алия', imageUrl: '' }; A.token = async () => ''; A.onboard = () => {}; A.refresh = async () => {}; A.signOut = async () => {};
+  const T = [['task', 'Выполнила задание: Закон отражения', 'Физика · Отражение света'], ['quiz', 'Тест «Закрепим»: 4 из 4', 'Изображение в зеркале · Отражение света'], ['theory', 'Прослушала теорию: Закон Ома', 'Физика · Электрический ток'], ['task', 'Выполнила задание: Преломление', 'Физика · Преломление света'], ['quiz', 'Тест «Закрепим»: 2 из 4', 'Закон Ома · Электрический ток']];
+  for (let d = 0; d < 60; d++) { if (d > 5 && (d * 7) % 5 < 2) continue; const n = d < 5 ? 3 : 1 + (d % 3); for (let k = 0; k < n; k++) { const x = T[(d + k) % T.length]; ev.push({ at: new Date(now - d * day - k * 3600e3).toISOString(), kind: x[0], title: x[1], detail: x[2], page: '/labs/phys-reflect/' }); } }
+  data = { ok: true, user: { nick: 'Алия', age: 13, goal: 'school', created_at: new Date(now - 62 * day).toISOString(), handle: 'aliya', visibility: 'friends' },
+    state: { 'luch-phys-reflect': '{"done":{"a":1,"b":1,"c":1}}', 'luch-phys-refract': '{"done":{"a":1,"b":1}}', 'luch-phys-current': '{"done":{"a":1}}' }, events: ev };
+  render();
+  $('#privacy').hidden = true;
+  document.querySelector('#prof .acts').innerHTML = '<span class="demo-tag" style="margin:0">Пример · так родитель видит кабинет ребёнка</span>';
+  const P = $('#parent'); P.hidden = false;
+  P.innerHTML = `<div><h4>Отчёт наставника для родителя · неделя</h4><div class="rep"><span class="ow" aria-hidden="true">🦉</span><ul>
+      <li><b>5 дней подряд</b> занималась, выполнила 9 заданий, тесты в среднем на 85%.</li>
+      <li>Получается: <b>оптика</b> — закон отражения и преломления разобрала уверенно.</li>
+      <li>Стоит подтянуть: <b>закон Ома</b> — в тесте 2 из 4. Я предложу ещё раз послушать «Объясни за минуту» и решить два задания.</li>
+      <li>Совет: похвалите за серию — до цели осталось всего одно задание.</li></ul></div></div>
+    <div><h4>Цели и вознаграждение</h4>
+      <div class="goal"><div class="t">10 заданий за неделю<span>9 / 10</span></div><small>Награда: поход в кино</small><div class="b"><i style="width:90%"></i></div></div>
+      <div class="goal"><div class="t">Тема «Электрический ток» целиком<span>1 / 4</span></div><small>Награда: обещанный подарок</small><div class="b"><i style="width:25%"></i></div></div>
+      <div class="goal won"><div class="t">5 дней подряд ✓<span>5 / 5</span></div><small>Выполнено — порадуйте ребёнка!</small><div class="b"><i style="width:100%"></i></div></div></div>`;
+}
 (function wait() {
   const A = window.LuchAuth;
   if (!A || !A.ready) return setTimeout(wait, 150);
+  if (DEMO) return demo();
   if (!A.user) return gate();
   if (A.data) { data = A.data; render(); }
 })();
