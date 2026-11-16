@@ -237,6 +237,8 @@
   .ls-stage .ctl{display:flex;align-items:center;gap:8px;padding:12px 16px 16px}
   .ls-stage .ctl .sp{flex:1}
   .ls-stage .ic{width:44px;height:44px;border-radius:12px;border:1px solid var(--line,#26324a);background:var(--surface-2,#1a2438);color:var(--fg,#e8ecf4);font-size:20px;cursor:pointer;flex:none}
+  .ls-stage .ic.rate{width:auto;min-width:52px;padding:0 10px;font:600 14px/1 var(--font-mono,monospace)}
+  .ls-stage.done .ic.rate{visibility:hidden}
   .ls-stage .pp{height:44px;padding:0 18px;border-radius:12px;border:0;background:var(--accent,#ffb547);color:#0b1019;font:600 15px/1 var(--font-body,sans-serif);cursor:pointer;display:inline-flex;align-items:center;gap:8px;flex:none}
   .ls-stage.done .pp,.ls-stage.done [data-a="next"]{visibility:hidden}
   .ls-stage .ctl .ls-btn{height:44px;padding:0 14px;border-radius:12px}
@@ -307,7 +309,12 @@
     else if (e.key === 'ArrowRight') stGo(st.i + 1);
     else if (e.key === 'ArrowLeft') stGo(Math.max(0, st.i - 1));
   }
+  // скорость лекции — как в плеерах; общая с аудиогидом, запоминается
+  const RATES = [1, 1.2, 1.5, 2];
+  let rate = 1; try { rate = RATES.includes(+localStorage.getItem('ag-rate')) ? +localStorage.getItem('ag-rate') : 1; } catch (e) {}
+  function paintRate() { const b = st && st.el.querySelector('[data-a="rate"]'); if (!b) return; const t = String(rate).replace('.', ',') + '×'; b.textContent = t; b.setAttribute('aria-label', 'Скорость ' + t); }
   function stPaint() {
+    paintRate();
     const el = st.el, pp = el.querySelector('.ctl [data-a="pp"]');
     pp.innerHTML = st.paused ? '▶ <span>Продолжить</span>' : '❚❚ <span>Пауза</span>';
     pp.setAttribute('aria-label', st.paused ? 'Продолжить' : 'Пауза');
@@ -331,7 +338,7 @@
       '<div class="txt" data-noi18n><b>Готовлю лекцию</b><div class="fact"></div></div>' +
       '<div class="dots"></div>' +
       '<div class="ctl"><button class="ic" data-a="prev" aria-label="Назад">‹</button><button class="pp" data-a="pp"></button><button class="ic" data-a="next" aria-label="Дальше">›</button>' +
-      '<span class="sp"></span><button class="ls-btn ghost" data-a="practice">К практике →</button><button class="ic x" data-a="close" aria-label="Закрыть">✕</button></div></div>';
+      '<button class="ic rate" data-a="rate" aria-label="Скорость 1×" title="Скорость: 1×, 1,2×, 1,5×, 2×">1×</button><span class="sp"></span><button class="ls-btn ghost" data-a="practice">К практике →</button><button class="ic x" data-a="close" aria-label="Закрыть">✕</button></div></div>';
     el.addEventListener('click', e => {
       if (e.target === el) return stopStory();
       const b = e.target.closest('[data-a]');
@@ -344,6 +351,7 @@
       else if (a === 'dot') stGo(+b.dataset.i);
       else if (a === 'close') stopStory();
       else if (a === 'again') stGo(0);
+      else if (a === 'rate') { rate = RATES[(RATES.indexOf(rate) + 1) % RATES.length]; try { localStorage.setItem('ag-rate', rate); } catch (e) {} st.audio.playbackRate = rate; paintRate(); }
       else if (a === 'practice') toPractice();
       else if (a === 'askq') { stopStory(); if (window.LuchTutor && window.LuchTutor.talk) window.LuchTutor.talk('Какой вопрос по объяснению? Спрашивай голосом — я слушаю. Можно и написать.'); }
     });
@@ -436,9 +444,9 @@
           st.url = st.url || []; st.url[i] = st.url[i] || URL.createObjectURL(blob);
           st.audio.onended = () => { karaokeTick(); journal(j => { j.heard = [...new Set([...(j.heard || []), i])]; j.parts = secs.length; j.titles = secs.map(x => x.title); }); setTimeout(nextUp, 800); };
           st.audio.onerror = () => { st.timer = setTimeout(nextUp, 6000); };
-          st.audio.src = st.url[i];
+          st.audio.src = st.url[i]; st.audio.playbackRate = rate; st.audio.defaultPlaybackRate = rate;
           if (!st.paused) st.audio.play().catch(() => { st.paused = true; stPaint(); });
-        } else { st.k.ws.forEach(w => w.classList.add('sp')); st.timer = setTimeout(nextUp, 7000); }
+        } else { st.k.ws.forEach(w => w.classList.add('sp')); st.timer = setTimeout(nextUp, 7000 / rate); }
       }, im && !old ? 650 : 450);
     });
   }
