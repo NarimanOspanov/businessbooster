@@ -557,7 +557,9 @@ const audioGuide = (() => {
     .ag-sub .who{font:600 11px/1 var(--mono,monospace);letter-spacing:.08em;text-transform:uppercase;color:#ffb347;margin-bottom:5px}
     .ag-sub .bt{display:flex;gap:6px;flex:none}
     .ag-sub button{all:unset;cursor:pointer;width:32px;height:32px;border-radius:10px;display:grid;place-items:center;font-size:15px;background:rgba(255,255,255,.08);color:#eef2fb}
-    .ag-sub button:hover{background:rgba(255,255,255,.16)}.ag-sub button:focus-visible{outline:2px solid #ffb347}
+    .ag-sub button:hover{background:rgba(255,255,255,.16)}
+    .ag-sub button.rate{width:auto;min-width:32px;padding:0 8px;font:600 12px/1 var(--font-mono,monospace)}
+    .ag-sub button.pause{font-size:13px}.ag-sub button:focus-visible{outline:2px solid #ffb347}
     .ag-sub{padding-bottom:22px}
     .ag-sub .prog{position:absolute;left:16px;right:16px;bottom:4px;height:16px;cursor:pointer;touch-action:none}
     .ag-sub .prog:before{content:"";position:absolute;left:0;right:0;top:7px;height:3px;border-radius:3px;background:rgba(255,255,255,.12)}
@@ -570,7 +572,7 @@ const audioGuide = (() => {
     @media (prefers-reduced-motion:reduce){.ag-sub{transition:none}}`;
   document.head.appendChild(css);
   const sub = document.createElement('div'); sub.className = 'ag-sub'; sub.setAttribute('role', 'region'); sub.setAttribute('aria-label', 'Субтитры аудиогида');
-  sub.innerHTML = '<div style="flex:1"><div class="who">Марат · аудиогид</div><div class="tx" aria-live="polite"></div></div><div class="bt"><button type="button" class="mute" aria-label="Выключить голос" title="Выключить голос — останутся субтитры">🔊</button><button type="button" class="x" aria-label="Остановить аудиогид" title="Остановить">✕</button></div><div class="prog" role="slider" tabindex="0" aria-label="Перемотка аудиогида" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i><b></b></div>';
+  sub.innerHTML = '<div style="flex:1"><div class="who">Марат · аудиогид</div><div class="tx" aria-live="polite"></div></div><div class="bt"><button type="button" class="pause" aria-label="Пауза" title="Пауза (пробел)">❚❚</button><button type="button" class="rate" aria-label="Скорость 1×" title="Скорость: 1×, 1,2×, 1,5×, 2×">1×</button><button type="button" class="mute" aria-label="Выключить голос" title="Выключить голос — останутся субтитры">🔊</button><button type="button" class="x" aria-label="Остановить аудиогид" title="Остановить">✕</button></div><div class="prog" role="slider" tabindex="0" aria-label="Перемотка аудиогида" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i><b></b></div>';
   document.body.appendChild(sub);
   const subTx = sub.querySelector('.tx'), muteBtn = sub.querySelector('.mute'), bar = sub.querySelector('.prog'), prog = bar.querySelector('i'), knob = bar.querySelector('b');
   const setProg = f => { const pc = Math.max(0, Math.min(100, f * 100)); prog.style.width = pc + '%'; knob.style.left = pc + '%'; bar.setAttribute('aria-valuenow', Math.round(pc)); };
@@ -587,6 +589,16 @@ const audioGuide = (() => {
     if (e.key === 'ArrowLeft') { e.preventDefault(); play(curFrac > 0.15 ? curStep : Math.max(0, curStep - 1), 0); }
   });
   let muted = false; try { muted = localStorage.getItem('ag-muted') === '1'; } catch (e) {}
+  // скорость (как в плеерах) и пауза
+  const RATES = [1, 1.2, 1.5, 2], rateBtn = sub.querySelector('.rate'), pauseBtn = sub.querySelector('.pause');
+  let rate = 1, paused = false; try { rate = RATES.includes(+localStorage.getItem('ag-rate')) ? +localStorage.getItem('ag-rate') : 1; } catch (e) {}
+  const paintRate = () => { const t = String(rate).replace('.', ',') + '×'; rateBtn.textContent = t; rateBtn.setAttribute('aria-label', 'Скорость ' + t); };
+  paintRate();
+  rateBtn.onclick = () => { rate = RATES[(RATES.indexOf(rate) + 1) % RATES.length]; try { localStorage.setItem('ag-rate', rate); } catch (e) {} paintRate(); if (audio) audio.playbackRate = rate; };
+  const paintPause = () => { pauseBtn.textContent = paused ? '▶' : '❚❚'; pauseBtn.setAttribute('aria-label', paused ? 'Продолжить' : 'Пауза'); };
+  function setPaused(v) { paused = v; paintPause(); if (!audio) return; if (paused) { try { audio.pause(); } catch (e) {} } else if (audio.src && !audio.ended && audio.currentTime > 0) audio.play().catch(() => {}); }
+  pauseBtn.onclick = () => setPaused(!paused);
+  addEventListener('keydown', e => { if (e.key === ' ' && sub.classList.contains('on') && !/INPUT|TEXTAREA|BUTTON/.test(e.target.tagName) && !e.target.isContentEditable) { e.preventDefault(); setPaused(!paused); } });
   const paintMute = () => { muteBtn.textContent = muted ? '🔇' : '🔊'; muteBtn.setAttribute('aria-label', muted ? 'Включить голос' : 'Выключить голос'); };
   paintMute();
   muteBtn.onclick = () => { muted = !muted; try { localStorage.setItem('ag-muted', muted ? '1' : '0'); } catch (e) {} paintMute(); if (audio) audio.muted = muted; };
@@ -602,7 +614,7 @@ const audioGuide = (() => {
   let st = null, texts = null; const blobs = new Map();
   const blobFor = k => { if (!blobs.has(k)) blobs.set(k, tts(texts[k])); return blobs.get(k); };
   async function play(from = 0, off = 0) {
-    const my = ++run; setBtn(true); sub.classList.add('on');
+    const my = ++run; setBtn(true); sub.classList.add('on'); paused = false; paintPause();
     if (window.LuchTutor && window.LuchTutor.hideTip) window.LuchTutor.hideTip();
     if (!audio) { audio = new Audio(); audio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA='; audio.play().catch(() => {}); } // разрешить звук жестом
     else { try { audio.pause(); } catch (e) {} }
@@ -618,6 +630,7 @@ const audioGuide = (() => {
       curStep = i; curFrac = 0; if (!dragging) setProg(i / nSteps);
       const blob = await blobFor(i); if (i + 1 < st.length) blobFor(i + 1);
       if (my !== run) return;
+      while (paused && my === run) await new Promise(r => setTimeout(r, 150)); // на паузе следующий шаг ждёт
       if (st[i].act) { try { await st[i].act(); } catch (e) {} await new Promise(r => setTimeout(r, 250)); }
       if (my !== run) return;
       const el = st[i].sel && document.querySelector(st[i].sel);
@@ -632,13 +645,13 @@ const audioGuide = (() => {
           const loop = () => { if (my !== run) { cancelAnimationFrame(raf); return res(); } if (audio.duration) tick(audio.currentTime / audio.duration); raf = requestAnimationFrame(loop); };
           audio.onended = audio.onerror = () => { cancelAnimationFrame(raf); if (my === run) tick(1); res(); };
           audio.onloadedmetadata = () => { if (start > 0.02 && audio.duration) audio.currentTime = start * audio.duration; };
-          audio.muted = muted; audio.src = u; audio.play().then(loop).catch(() => { cancelAnimationFrame(raf); res(); });
+          audio.muted = muted; audio.src = u; audio.playbackRate = rate; audio.defaultPlaybackRate = rate; audio.play().then(loop).catch(() => { cancelAnimationFrame(raf); res(); });
         });
         URL.revokeObjectURL(u);
       } else {
         // нет звука — читаем субтитры в темпе речи
-        const ms = Math.max(2500, texts[i].length * 62), t0 = performance.now() - start * ms;
-        await new Promise(res => { const loop = () => { if (my !== run) return res(); const f = (performance.now() - t0) / ms; tick(Math.min(1, f)); f >= 1 ? res() : requestAnimationFrame(loop); }; loop(); });
+        const ms = Math.max(2500, texts[i].length * 62); let f = start, last = performance.now();
+        await new Promise(res => { const loop = () => { if (my !== run) return res(); const now = performance.now(); if (!paused) f += (now - last) * rate / ms; last = now; tick(Math.min(1, f)); f >= 1 ? res() : requestAnimationFrame(loop); }; loop(); });
       }
     }
     if (my === run) { pv.close(); setProg(1); setTimeout(() => { if (my === run) { sub.classList.remove('on'); setBtn(false); } }, 1200); }
