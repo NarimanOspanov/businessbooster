@@ -88,6 +88,50 @@ function cleanMessages(list) {
   return out.length && out[out.length - 1].role === "user" ? out : null;
 }
 
+// ---------- свой ключ ученика (Gemini / OpenAI / Anthropic): наставник работает за его счёт ----------
+// Ключ приходит в заголовке каждого запроса из браузера ученика; мы его нигде не храним и не пишем в логи.
+const USER_GEMINI_MODEL = process.env.USER_GEMINI_MODEL || "gemini-2.5-flash";
+const USER_OPENAI_MODEL = process.env.USER_OPENAI_MODEL || "gpt-4.1-mini";
+const USER_CLAUDE_MODEL = process.env.USER_CLAUDE_MODEL || "claude-sonnet-5-5";
+function userAi(req) {
+  const p = String(req.headers["x-user-ai"] || "").toLowerCase(), k = String(req.headers["x-user-key"] || "").trim();
+  if (!k || k.length < 20 || k.length > 300 || !/^[A-Za-z0-9_.-]+$/.test(k)) return null;
+  return ["gemini", "openai", "anthropic"].includes(p) ? { p, k } : null;
+}
+async function streamOpenAI(key, system, messages, write, signal) {
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST", signal, headers: { "Content-Type": "application/json", Authorization: "Bearer " + key },
+    body: JSON.stringify({ model: USER_OPENAI_MODEL, stream: true, max_tokens: 3000, messages: [{ role: "system", content: system }, ...messages.map((m) => m.image
+      ? { role: m.role, content: [{ type: "text", text: m.content }, { type: "image_url", image_url: { url: "data:" + m.image.mime + ";base64," + m.image.data } }] }
+      : { role: m.role, content: m.content })] }),
+  });
+  if (!res.ok) throw new Error("openai_" + res.status);
+  const dec = new TextDecoder(); let buf = "";
+  for await (const chunk of res.body) {
+    buf += dec.decode(chunk, { stream: true }); let i;
+    while ((i = buf.indexOf("\n")) >= 0) {
+      const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+      if (!line.startsWith("data:") || line === "data: [DONE]") continue;
+      try { const d = JSON.parse(line.slice(5)).choices[0].delta; if (d && d.content) write(d.content); } catch { /* неполная строка */ }
+    }
+  }
+}
+async function streamUserClaude(key, system, messages, write, signal) {
+  const mod = require("@anthropic-ai/sdk"); const Anthropic = mod.Anthropic || mod.default || mod;
+  const c = new Anthropic({ apiKey: key });
+  const msgs = messages.map((m) => m.image ? { role: m.role, content: [{ type: "image", source: { type: "base64", media_type: m.image.mime, data: m.image.data } }, { type: "text", text: m.content }] } : { role: m.role, content: m.content });
+  const stream = c.messages.stream({ model: USER_CLAUDE_MODEL, max_tokens: 3000, system, messages: msgs }, { signal });
+  for await (const ev of stream) if (ev.type === "content_block_delta" && ev.delta.type === "text_delta") write(ev.delta.text);
+}
+function keyError(e) {
+  const m = String((e && e.message) || ""), st = +((m.match(/(\d{3})/) || [])[1] || (e && e.status) || 0);
+  if (st === 400 || st === 401 || st === 403) return "Ваш ключ ИИ не подошёл — проверьте его в кабинете, раздел «Свой ключ ИИ».";
+  if (st === 429) return "У вашего ключа ИИ закончился лимит — подождите немного или смените ключ.";
+  return "Не получилось ответить через ваш ключ ИИ. Попробуйте ещё раз.";
+}
+const ownHits = new Map();
+function ownAllowed(ip) { const now = Date.now(), a = (ownHits.get(ip) || []).filter((t) => now - t < 60e3); if (a.length >= 30) return false; a.push(now); ownHits.set(ip, a); if (ownHits.size > 5000) ownHits.clear(); return true; }
+
 async function streamClaude(client, system, messages, write, signal) {
   // рисунок ученика (m.image = { mime, data }) уходит картинкой перед текстом вопроса
   const msgs = messages.map((m) => m.image
@@ -99,10 +143,11 @@ async function streamClaude(client, system, messages, write, signal) {
   }
 }
 
-async function streamGemini(system, messages, write, signal) {
-  const key = keyFrom("GEMINI_API_KEY", ".gemini-key");
+async function streamGemini(system, messages, write, signal, userKey) {
+  const key = userKey || keyFrom("GEMINI_API_KEY", ".gemini-key");
   if (!key) throw new Error("no_model_key");
-  const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(GEMINI_MODEL) + ":streamGenerateContent?alt=sse", {
+  const model = userKey ? USER_GEMINI_MODEL : GEMINI_MODEL;
+  const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":streamGenerateContent?alt=sse", {
     method: "POST", signal,
     headers: { "Content-Type": "application/json", "x-goog-api-key": key },
     body: JSON.stringify({
@@ -294,7 +339,9 @@ function handleChat(req, res, { readBody, clientIp }) {
     try { b = JSON.parse(await readBody(req)) || {}; } catch { return fail(400, "bad json"); }
     const messages = cleanMessages(b.messages);
     if (!messages) return fail(400, "нужен вопрос");
-    const block = allowed(clientIp(req));
+    const own = userAi(req);
+    // со своим ключом общий дневной лимит не тратим — только защита от слишком частых запросов
+    const block = own ? (ownAllowed(clientIp(req)) ? null : "Слишком часто — подождите минуту.") : allowed(clientIp(req));
     if (block) return fail(429, block);
     const page = String(b.page || "").slice(0, 80);
     const ctx = String(b.context || "").slice(0, MAX_CTX);
@@ -309,13 +356,19 @@ function handleChat(req, res, { readBody, clientIp }) {
     res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "X-Accel-Buffering": "no" });
     const write = (t) => { if (!res.writableEnded) res.write(t); };
     try {
-      const c = claudeClient();
-      if (c) await streamClaude(c, system, messages, write, ac.signal);
-      else await streamGemini(system, messages, write, ac.signal);
+      if (own) {
+        if (own.p === "gemini") await streamGemini(system, messages, write, ac.signal, own.k);
+        else if (own.p === "openai") await streamOpenAI(own.k, system, messages, write, ac.signal);
+        else await streamUserClaude(own.k, system, messages, write, ac.signal);
+      } else {
+        const c = claudeClient();
+        if (c) await streamClaude(c, system, messages, write, ac.signal);
+        else await streamGemini(system, messages, write, ac.signal);
+      }
     } catch (e) {
       if (!ac.signal.aborted) {
-        console.log("[tutor] " + (e && e.message ? e.message : e));
-        write("\n\nНе получилось ответить. Попробуйте спросить ещё раз.");
+        console.log("[tutor] " + (own ? "own " + own.p + ": " + String((e && e.message) || e).split(own.k).join("***").slice(0, 160) : (e && e.message ? e.message : e)));
+        write("\n\n" + (own ? keyError(e) : "Не получилось ответить. Попробуйте спросить ещё раз."));
       }
     }
     if (!res.writableEnded) res.end();

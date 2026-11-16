@@ -666,9 +666,12 @@
     };
     ctrl = new AbortController();
     try {
-      const res = await fetch('/api/tutor', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctrl.signal,
+      // свой ключ ИИ ученика (хранится только в его браузере) — наставник отвечает за его счёт
+      let own = null; try { own = JSON.parse(localStorage.getItem('oe-ai') || 'null'); } catch (e) {}
+      const hdr = { 'Content-Type': 'application/json' }; if (own && own.p && own.k) { hdr['X-User-AI'] = own.p; hdr['X-User-Key'] = own.k; }
+      const res = await fetch('/api/tutor', { method: 'POST', headers: hdr, signal: ctrl.signal,
         body: JSON.stringify({ page, lang, voice: !!opts.voice, context: `${document.title}\n${context}`, elements, image: opts.image || undefined, messages: chat.slice(-20).map(m => ({ role: m.role, content: m.content })) }) });
-      if (!res.ok) { let msg = 'Не получилось ответить. Попробуйте ещё раз.'; try { msg = (await res.json()).error || msg; } catch (e) {} text = msg; }
+      if (!res.ok) { let msg = 'Не получилось ответить. Попробуйте ещё раз.'; try { msg = (await res.json()).error || msg; } catch (e) {} text = msg + (res.status === 429 && !own ? '\n\nЧтобы заниматься без ограничений, подключите свой бесплатный ключ Gemini: [saudager.ai/me#ai](/me/#ai).' : ''); }
       else {
         const rd = res.body.getReader(), dec = new TextDecoder();
         for (;;) {
