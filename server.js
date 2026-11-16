@@ -3374,7 +3374,8 @@ async function freshIdWalk(L, sweepNo, listMaxSeen, deadline, conc) {
     out.checked++;
     const r = await L.fetchMapObject(id);
     if (r.status === "live" || r.status === "archived") { if (id > (st.top || 0)) st.top = id; }
-    if (r.status === "live") { out.live++; if (r.row) found.set(String(id), r.row); }
+    // агентские не дочитываем и не пишем — нужны только хозяева (см. db.saveListAdverts)
+    if (r.status === "live") { out.live++; if (r.row && (process.env.KRISHA_SAVE_AGENTS === "1" || !r.row.userType || r.row.userType === "owner")) found.set(String(id), r.row); else out.agents = (out.agents || 0) + 1; }
     else if (r.status === "not_found") out.notFound++;
     else if (r.status === "unknown") { out.unknown++; out.why = r.why; }
     return r.status;

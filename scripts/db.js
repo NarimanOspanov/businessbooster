@@ -4796,6 +4796,7 @@ async function listWithoutCoords(limit, below) {
     SELECT TOP (@n) id, deal, prop, city, price, rooms, area, bumped_on
     FROM dbo.krisha_list
     WHERE id > 1017200000 AND id < @below AND lat IS NULL AND storage = 'live' AND price IS NOT NULL
+      AND (user_type = 'owner' OR user_type IS NULL)
     ORDER BY id DESC`);
   return r.recordset.map((x) => ({ id: Number(x.id), deal: x.deal, prop: x.prop, city: x.city, price: Number(x.price),
     rooms: x.rooms, area: x.area == null ? null : Number(x.area),
@@ -5007,7 +5008,19 @@ function listSig(fields) {
 // отметка «видели» в узкой krisha_list_seen; MERGE в krisha_list — для новых и
 // изменившихся. Обход 440 тыс. живых объявлений иначе каждый круг читал и
 // переписывал всю таблицу ради одной отметки (31.10.2026).
+// Сохраняем только объявления хозяев (16.11.2026): агенты, компании и застройщики
+// не нужны. Неизвестный тип оставляем — уточнится при дочитке. Вернуть агентов:
+// KRISHA_SAVE_AGENTS=1. Ответ — по одному элементу на каждую строку, как раньше.
+const listKeepRow = (o) => process.env.KRISHA_SAVE_AGENTS === "1" || !o.userType || o.userType === "owner";
 async function saveListAdverts(rows, sweepNo) {
+  const all = (rows || []).filter((o) => o && o.id);
+  const keep = all.filter(listKeepRow);
+  if (keep.length === all.length) return saveListAdvertsAll(all, sweepNo);
+  const outs = keep.length ? await saveListAdvertsAll(keep, sweepNo) : [];
+  let k = 0;
+  return all.map((o) => (listKeepRow(o) ? outs[k++] : { id: o.id, added: false, price: false, archived: false, back: false, bump: false, skipped: true }));
+}
+async function saveListAdvertsAll(rows, sweepNo) {
   const all = (rows || []).filter((o) => o && o.id);
   if (!all.length) return [];
   const uniq = [...new Map(all.map((o) => [String(o.id), o])).values()];
