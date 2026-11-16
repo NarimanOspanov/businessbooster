@@ -213,6 +213,8 @@ CREATE TABLE luch.user_events (
   title       NVARCHAR(300) NULL,
   detail      NVARCHAR(500) NULL
 );
+-- знакомство при первом входе: как обращаться, возраст, пол (для окончаний), цель
+IF COL_LENGTH('luch.users', 'nick') IS NULL ALTER TABLE luch.users ADD nick NVARCHAR(60) NULL, age TINYINT NULL, gender CHAR(1) NULL, goal NVARCHAR(40) NULL;
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_luch_user_events_user_at')
 CREATE INDEX IX_luch_user_events_user_at ON luch.user_events (user_id, at DESC);
 

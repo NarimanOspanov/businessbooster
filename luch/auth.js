@@ -13,7 +13,7 @@
 
   // ---------- кнопка в шапке ----------
   const css = document.createElement('style');
-  css.textContent = `.oe-acc{flex:none;margin-left:12px;display:flex;align-items:center}
+  css.textContent = `.oe-acc{flex:none;margin-left:auto;padding-left:12px;display:flex;align-items:center}
     .oe-acc a,.oe-acc button{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 12px;border-radius:999px;
       font:600 13px/1 inherit;color:var(--fg,#e8ecf4);background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);white-space:nowrap}
     .oe-acc a:hover,.oe-acc button:hover{background:rgba(255,255,255,.13)}
@@ -27,7 +27,8 @@
     mount();
     const u = A.user;
     if (!u) { acc.innerHTML = '<button type="button">Войти</button>'; acc.firstChild.onclick = () => clerk ? clerk.openSignIn({}) : null; acc.firstChild.title = 'Войти: прогресс сохранится и будет на любом устройстве'; return; }
-    const first = esc((u.firstName || u.fullName || u.primaryEmailAddress?.emailAddress || 'Кабинет').split(' ')[0]);
+    const nick = A.data && A.data.user && A.data.user.nick;
+    const first = esc((nick || u.firstName || u.fullName || u.primaryEmailAddress?.emailAddress || 'Кабинет').split(' ')[0]);
     acc.innerHTML = `<a href="/me/" title="Мой кабинет: прогресс и история занятий">${u.imageUrl ? `<img src="${esc(u.imageUrl)}" alt="">` : `<span class="av">${first[0] || '•'}</span>`}<span class="nm">${first}</span></a>`;
   }
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -83,7 +84,8 @@
       const j = await r.json();
       if (j.ok) {
         keys.forEach(k => delete q.keys[k]); q.events.splice(0, events.length); saveQ();
-        A.data = j; merge(j.state || {}); document.dispatchEvent(new CustomEvent('luch-me', { detail: j }));
+        A.data = j; merge(j.state || {}); paint(); document.dispatchEvent(new CustomEvent('luch-me', { detail: j }));
+        if (j.user && !j.user.nick) onboard();
       }
     } catch (e) { /* попробуем позже */ }
     pushing = false;
@@ -114,13 +116,72 @@
     }
   }
 
+  // ---------- знакомство после первого входа: имя, возраст, пол, цель ----------
+  const GOALS = [['school', 'Учусь в школе'], ['ent', 'Готовлюсь к ЕНТ'], ['self', 'Учусь для себя'], ['parent', 'Я родитель'], ['teacher', 'Я учитель']];
+  const GOAL_TXT = { school: 'учится в школе', ent: 'готовится к ЕНТ', self: 'учится для себя', parent: 'родитель, смотрит курс для ребёнка', teacher: 'учитель' };
+  let obOpen = false;
+  function onboard(edit) {
+    if (obOpen || !A.user) return;
+    if (!edit) { try { if (sessionStorage.getItem('oe-ob-later')) return; } catch (e) {} }
+    obOpen = true;
+    const cur = (A.data && A.data.user) || {};
+    const st = document.createElement('style');
+    st.textContent = `.oe-ob{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:rgba(5,8,14,.62);backdrop-filter:blur(4px);padding:16px}
+      .oe-ob form{width:min(440px,100%);background:#121a28;color:#e8ecf4;border:1px solid #26324a;border-radius:20px;padding:24px;box-shadow:0 24px 60px rgba(0,0,0,.45);font:15px/1.5 "Golos Text",system-ui,sans-serif}
+      .oe-ob h2{margin:0 0 4px;font:700 20px/1.25 "Unbounded","Golos Text",sans-serif}
+      .oe-ob p{margin:0 0 16px;color:#8b96ad;font-size:14px}
+      .oe-ob label{display:block;font-size:13px;color:#8b96ad;margin:12px 0 6px}
+      .oe-ob input{width:100%;box-sizing:border-box;height:42px;padding:0 12px;border-radius:12px;border:1px solid #26324a;background:#0b1019;color:#e8ecf4;font:inherit}
+      .oe-ob input:focus{outline:2px solid #ffb547;border-color:transparent}
+      .oe-ob .ch{display:flex;flex-wrap:wrap;gap:6px}
+      .oe-ob .ch button{all:unset;cursor:pointer;padding:7px 12px;border-radius:999px;border:1px solid #26324a;background:#1a2438;font-size:13px}
+      .oe-ob .ch button[aria-pressed="true"]{background:#ffb547;color:#1b1206;border-color:#ffb547;font-weight:600}
+      .oe-ob .ch button:focus-visible,.oe-ob .ft button:focus-visible{outline:2px solid #ffb547;outline-offset:2px}
+      .oe-ob .ft{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+      .oe-ob .ft button{all:unset;cursor:pointer;padding:10px 16px;border-radius:12px;font-weight:600;font-size:14px}
+      .oe-ob .ft .ok{background:#ffb547;color:#1b1206}.oe-ob .ft .no{color:#8b96ad}
+      .oe-ob .er{color:#ff8a73;font-size:13px;min-height:18px;margin-top:8px}`;
+    const box = document.createElement('div'); box.className = 'oe-ob'; box.dataset.noi18n = '';
+    const chips = (name, opts, val) => `<div class="ch" data-name="${name}">${opts.map(([v, t]) => `<button type="button" data-v="${v}" aria-pressed="${val === v}">${t}</button>`).join('')}</div>`;
+    box.innerHTML = `<form role="dialog" aria-modal="true" aria-labelledby="oeObT"><h2 id="oeObT">${edit ? 'О себе' : 'Давай познакомимся'}</h2>
+      <p>Наставник будет обращаться по имени и объяснять под твой возраст.</p>
+      <label for="oeObN">Как тебя зовут?</label><input id="oeObN" autocomplete="given-name" maxlength="60" value="${esc(cur.nick || A.user.firstName || '')}" placeholder="Имя">
+      <label for="oeObA">Сколько тебе лет?</label><input id="oeObA" type="number" inputmode="numeric" min="5" max="99" value="${cur.age || ''}" placeholder="Например, 14">
+      <label>Пол <span style="opacity:.7">— чтобы правильно обращаться</span></label>${chips('gender', [['m', 'Мужской'], ['f', 'Женский'], ['', 'Не указывать']], cur.gender || '')}
+      <label>Зачем учишься?</label>${chips('goal', GOALS, cur.goal || '')}
+      <div class="er" aria-live="polite"></div>
+      <div class="ft"><button type="button" class="no">${edit ? 'Отмена' : 'Позже'}</button><button type="submit" class="ok">Готово</button></div></form>`;
+    document.head.appendChild(st); document.body.appendChild(box);
+    const val = { gender: cur.gender || '', goal: cur.goal || '' };
+    box.querySelectorAll('.ch').forEach(g => g.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; val[g.dataset.name] = b.dataset.v; g.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); }));
+    const close = () => { box.remove(); st.remove(); obOpen = false; };
+    box.querySelector('.no').onclick = () => { if (!edit) try { sessionStorage.setItem('oe-ob-later', '1'); } catch (e) {} close(); };
+    box.querySelector('form').onsubmit = async e => {
+      e.preventDefault();
+      const nick = box.querySelector('#oeObN').value.trim(), age = parseInt(box.querySelector('#oeObA').value, 10);
+      const er = box.querySelector('.er');
+      if (!nick) { er.textContent = 'Напиши, как к тебе обращаться.'; box.querySelector('#oeObN').focus(); return; }
+      const t = await token(); if (!t) { er.textContent = 'Не получилось — попробуй ещё раз.'; return; }
+      try {
+        const r = await fetch('/api/me/profile', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + t }, body: JSON.stringify({ nick, age: age || null, gender: val.gender, goal: val.goal }) });
+        const j = await r.json(); if (!j.ok) { er.textContent = j.error || 'Не получилось сохранить.'; return; }
+        A.data = j; paint(); close(); document.dispatchEvent(new CustomEvent('luch-me', { detail: j }));
+        try { if (!A.user.firstName) await A.user.update({ firstName: nick }); } catch (e2) {}
+      } catch (e2) { er.textContent = 'Нет связи — попробуй ещё раз.'; }
+    };
+    setTimeout(() => box.querySelector('#oeObN').focus(), 50);
+  }
+  A.onboard = () => onboard(true);
+
   // ---------- для наставника: кто ученик и что он уже делал ----------
   function contextLine() {
     if (!A.user || !A.data) return '';
-    const ev = A.data.events || [], days = new Set(ev.map(e => String(e.at).slice(0, 10)));
+    const p = A.data.user || {}, ev = A.data.events || [], days = new Set(ev.map(e => String(e.at).slice(0, 10)));
     const done = ev.filter(e => e.kind === 'task').length, quiz = ev.filter(e => e.kind === 'quiz');
-    const last = ev.slice(0, 8).map(e => `${String(e.at).slice(0, 10)}: ${e.title}${e.detail ? ' (' + e.detail + ')' : ''}`).join('; ');
-    return `Ученик вошёл в аккаунт: ${A.user.firstName || A.user.fullName || 'без имени'}. Занимался ${days.size} ${days.size === 1 ? 'день' : 'дней'}, выполнил заданий: ${done}, тестов: ${quiz.length}` +
+    const last = ev.filter(e => e.kind !== 'open').slice(0, 8).map(e => `${String(e.at).slice(0, 10)}: ${e.title}${e.detail ? ' (' + e.detail + ')' : ''}`).join('; ');
+    const who = [p.nick ? `зовут ${p.nick} — обращайся по имени` : '', p.age ? `${p.age} лет — объясняй под этот возраст` : '',
+      p.gender ? (p.gender === 'f' ? 'девушка — используй женский род' : 'парень — используй мужской род') : '', p.goal ? GOAL_TXT[p.goal] : ''].filter(Boolean).join(', ');
+    return `Ученик вошёл в аккаунт${who ? ': ' + who : ''}. Занимался ${days.size} дн., выполнил заданий: ${done}, тестов: ${quiz.length}` +
       (quiz.length ? ` (последний: ${quiz[0].title})` : '') + `. Последние действия: ${last || 'пока нет'}. Учитывай это: не повторяй то, что он уже прошёл, опирайся на пройденные темы.`;
   }
 

@@ -33,6 +33,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px 20
 .prof .sp{flex:1}
 .btn{all:unset;cursor:pointer;padding:9px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface-2);font-size:14px;font-weight:600}
 .btn:hover{border-color:#3a4866}.btn.pri{background:var(--accent);color:#1b1206;border-color:var(--accent)}
+.prof .acts{display:flex;gap:8px;flex-wrap:wrap}
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}
 .stat{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px}
 .stat b{display:block;font:700 26px/1.1 var(--font-display)}.stat span{color:var(--muted);font-size:13px}
@@ -60,7 +61,7 @@ h3{font:600 12px/1 var(--font-mono);letter-spacing:.14em;text-transform:uppercas
 .gate{text-align:center;padding:60px 20px}
 .gate h2{font:700 26px/1.25 var(--font-display);margin:0 0 10px}
 .gate p{color:var(--muted);max-width:520px;margin:0 auto 22px}
-@media (max-width:760px){.stats{grid-template-columns:repeat(2,1fr)}.cols{grid-template-columns:1fr}.prof{flex-wrap:wrap}}
+@media (max-width:760px){.stats{grid-template-columns:repeat(2,1fr)}.cols{grid-template-columns:1fr}.prof{flex-wrap:wrap}.prof .sp{display:none}.prof .acts{width:100%}.prof .acts .btn{flex:1;text-align:center}}
 </style>
 </head>
 <body>
@@ -104,11 +105,14 @@ let selDay = null, data = null;
 function render() {
   const A = window.LuchAuth, u = A.user, ev = (data.events || []).map(e => Object.assign({}, e, { d: dkey(e.at) }));
   $('#loading').hidden = true; $('#gate').hidden = true; $('#app').hidden = false;
-  const name = u.fullName || u.firstName || (u.primaryEmailAddress && u.primaryEmailAddress.emailAddress) || 'Ученик';
+  const pr = data.user || {}, GOAL = { school: 'учусь в школе', ent: 'готовлюсь к ЕНТ', self: 'учусь для себя', parent: 'родитель', teacher: 'учитель' };
+  const name = pr.nick || u.fullName || u.firstName || (u.primaryEmailAddress && u.primaryEmailAddress.emailAddress) || 'Ученик';
+  const about = [pr.age ? pr.age + ' ' + plural(pr.age, 'год', 'года', 'лет') : '', GOAL[pr.goal] || ''].filter(Boolean).join(' · ');
   const since = data.user && data.user.created_at ? new Date(data.user.created_at) : null;
   $('#prof').innerHTML = `${u.imageUrl ? `<img src="${esc(u.imageUrl)}" alt="">` : `<span class="av">${esc(name[0])}</span>`}
-    <div><h2>${esc(name)}</h2><p>${since ? 'Учится с ' + since.getDate() + ' ' + MON[since.getMonth()] + ' ' + since.getFullYear() : ''}</p></div>
-    <div class="sp"></div><a class="btn" href="/">К предметам</a><button class="btn" id="out" type="button">Выйти</button>`;
+    <div><h2>${esc(name)}</h2><p>${[about, since ? 'учится с ' + since.getDate() + ' ' + MON[since.getMonth()] + ' ' + since.getFullYear() : ''].filter(Boolean).join(' · ')}</p></div>
+    <div class="sp"></div><div class="acts"><button class="btn" id="edit" type="button">О себе</button><a class="btn" href="/">Предметы</a><button class="btn" id="out" type="button">Выйти</button></div>`;
+  $('#edit').onclick = () => A.onboard();
   $('#out').onclick = () => A.signOut().then(() => location.href = '/');
 
   // по дням
@@ -141,6 +145,7 @@ function render() {
   const W = L + weeks * (C + G), H = T + 7 * (C + G);
   $('#heat').innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Активность по дням за год">${svg}</svg>
     <div class="lg">меньше ${[0, 1, 2, 3, 4].map(i => `<i style="background:var(--h${i})"></i>`).join('')} больше</div>`;
+  $('#heat').scrollLeft = $('#heat').scrollWidth; // последние месяцы — сразу на виду
   $('#heat').querySelectorAll('rect.on').forEach(r => r.onclick = () => { selDay = selDay === r.dataset.d ? null : r.dataset.d; render(); });
 
   // лента по дням
@@ -159,12 +164,11 @@ function render() {
     if (!k.startsWith('luch-')) continue;
     let done = 0; try { const o = JSON.parse(v); const d = o.done || {}; done = Array.isArray(d) ? d.filter(Boolean).length : Object.values(d).filter(Boolean).length; } catch (e) {}
     const lab = k.slice(5), path = '/labs/' + lab + '/';
-    const lastEv = ev.find(e => e.page === path && e.detail);
-    const name = (lastEv && lastEv.detail) || (ev.find(e => e.page === path) || {}).title || lab;
-    rows.push({ path, name: String(name).replace(/^Открыл:\s*/, ''), done, at: (ev.find(e => e.page === path) || {}).at || '' });
+    const nm = (window.LUCH_TOPIC_NAMES || {})[path] || lab, sp = nm.split(' · ');
+    rows.push({ path, name: sp.pop(), subj: sp.join(''), done, at: (ev.find(e => e.page === path) || {}).at || '' });
   }
-  rows.sort((a, b) => String(b.at).localeCompare(String(a.at)));
-  $('#topics').innerHTML = rows.length ? rows.slice(0, 20).map(r => `<a class="topic" href="${r.path}"><span class="nm">${esc(r.name)}<small>${r.done} ${plural(r.done, 'задание', 'задания', 'заданий')} выполнено</small></span><span class="bar"><i style="width:${Math.min(100, r.done * 20)}%"></i></span></a>`).join('')
+  rows.sort((a, b) => (b.done - a.done) || String(b.at).localeCompare(String(a.at)));
+  $('#topics').innerHTML = rows.length ? rows.slice(0, 20).map(r => `<a class="topic" href="${r.path}"><span class="nm">${esc(r.name)}<small>${r.subj ? esc(r.subj) + ' · ' : ''}${r.done ? r.done + ' ' + plural(r.done, 'задание выполнено', 'задания выполнено', 'заданий выполнено') : 'начата'}</small></span><span class="bar"><i style="width:${Math.min(100, r.done * 20)}%"></i></span></a>`).join('')
     : '<p class="empty">Здесь появятся темы, которые вы начали.</p>';
 }
 
@@ -180,6 +184,7 @@ document.addEventListener('luch-auth', e => { if (!e.detail.user) gate(); });
 })();
 })();
 </script>
+<script src="/luch/topic-names.js"></script>
 <script src="/luch/auth.js"></script>
 <script src="/luch/tutor.js" defer></script>
 </body>

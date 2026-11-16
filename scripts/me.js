@@ -63,7 +63,7 @@ async function upsertUser(pool, claims, profile) {
 
 async function loadAll(pool, uid) {
   const [u, st, ev] = await Promise.all([
-    pool.request().input("u", sql.Int, uid).query("SELECT name, email, image, created_at FROM luch.users WHERE id = @u"),
+    pool.request().input("u", sql.Int, uid).query("SELECT name, email, image, created_at, nick, age, gender, goal FROM luch.users WHERE id = @u"),
     pool.request().input("u", sql.Int, uid).query("SELECT k, v FROM luch.user_state WHERE user_id = @u"),
     pool.request().input("u", sql.Int, uid).query(`SELECT TOP 2000 at, kind, page, lesson, title, detail FROM luch.user_events
       WHERE user_id = @u AND at > DATEADD(day, -372, SYSUTCDATETIME()) ORDER BY at DESC`),
@@ -112,6 +112,20 @@ async function handle(req, res, { readBody }) {
         .input("detail", sql.NVarChar(500), String(e.detail || "").slice(0, 500) || null)
         .query("INSERT INTO luch.user_events (user_id, at, kind, page, lesson, title, detail) VALUES (@u, @at, @kind, @page, @lesson, @title, @detail)");
     }
+    return send(res, 200, { ok: true, ...(await loadAll(pool, u.id)) });
+  }
+  if (p === "/api/me/profile" && req.method === "POST") {
+    let b = {};
+    try { b = JSON.parse(await readBody(req)) || {}; } catch { return send(res, 400, { ok: false, error: "bad json" }); }
+    const nick = String(b.nick || "").replace(/[<>\r\n]/g, "").trim().slice(0, 60);
+    if (!nick) return send(res, 400, { ok: false, error: "как тебя зовут?" });
+    const age = Number.isInteger(+b.age) && +b.age >= 5 && +b.age <= 99 ? +b.age : null;
+    const gender = b.gender === "m" || b.gender === "f" ? b.gender : null;
+    const goal = ["school", "ent", "self", "parent", "teacher"].includes(b.goal) ? b.goal : null;
+    const u = await upsertUser(pool, claims, null);
+    await pool.request().input("u", sql.Int, u.id).input("nick", sql.NVarChar(60), nick).input("age", sql.TinyInt, age)
+      .input("g", sql.Char(1), gender).input("goal", sql.NVarChar(40), goal)
+      .query("UPDATE luch.users SET nick = @nick, age = @age, gender = @g, goal = @goal WHERE id = @u");
     return send(res, 200, { ok: true, ...(await loadAll(pool, u.id)) });
   }
   return send(res, 404, { ok: false, error: "нет такого адреса" });
