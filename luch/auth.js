@@ -29,7 +29,7 @@
   function paint() {
     mount();
     const u = A.user;
-    if (!u) { acc.innerHTML = '<button type="button">Войти</button>'; acc.firstChild.onclick = () => clerk ? clerk.openSignIn({}) : null; acc.firstChild.title = 'Войти: прогресс сохранится и будет на любом устройстве'; return; }
+    if (!u) { acc.innerHTML = '<button type="button">Войти</button>'; acc.firstChild.onclick = () => clerk ? A.openSignIn() : null; acc.firstChild.title = 'Войти: прогресс сохранится и будет на любом устройстве'; return; }
     const nick = A.data && A.data.user && A.data.user.nick;
     const first = esc((nick || u.firstName || u.fullName || u.primaryEmailAddress?.emailAddress || 'Кабинет').split(' ')[0]);
     acc.innerHTML = `<a href="/me/" title="Мой кабинет: прогресс и история занятий">${u.imageUrl ? `<img src="${esc(u.imageUrl)}" alt="">` : `<span class="av">${first[0] || '•'}</span>`}<span class="nm">${first}</span></a>`;
@@ -215,12 +215,22 @@
     A.user = clerk.user || null; A.ready = true; paint();
     if (A.user) setTimeout(socialPoll, 1500);
     if (A.user) { log('open', 'Открыл: ' + (document.title.replace(/^Open School AI\s*[—-]\s*/, '').slice(0, 120)), '', { lesson: lessonIdx() }); flush(true); }
-    clerk.addListener(({ user }) => {
-      const before = A.user && A.user.id; A.user = user || null; paint();
-      if (A.user && A.user.id !== before) { if (!wasIn || before) log('signin', 'Вошёл в аккаунт', ''); flush(true); }
-      if (!A.user) A.data = null;
+    // вход/выход: слушаем Clerk и дополнительно сверяемся сами — после входа по почте и паролю
+    // событие иногда приходит раньше, чем сессия становится активной, и шапка оставалась с «Войти»
+    const sync = () => {
+      const user = (clerk.session && clerk.session.status && clerk.session.status !== 'active') ? null : (clerk.user || null);
+      const before = A.user && A.user.id, now = user && user.id;
+      if (before === now) { if (user && user !== A.user) { A.user = user; paint(); } return; }
+      A.user = user; paint();
+      if (A.user) { if (!wasIn || before) log('signin', 'Вошёл в аккаунт', ''); flush(true); setTimeout(socialPoll, 800); }
+      else A.data = null;
       document.dispatchEvent(new CustomEvent('luch-auth', { detail: { user: A.user } }));
-    });
+    };
+    clerk.addListener(() => setTimeout(sync, 0));
+    // пока открыто окно входа — проверяем раз в секунду (до 10 минут), плюс при возврате на вкладку
+    let watch = 0;
+    A.openSignIn = () => { clerk.openSignIn({}); clearInterval(watch); const t0 = Date.now(); watch = setInterval(() => { sync(); if (A.user || Date.now() - t0 > 600e3) clearInterval(watch); }, 1000); };
+    addEventListener('focus', sync); document.addEventListener('visibilitychange', () => { if (!document.hidden) sync(); });
   }
   boot().catch(e => { A.ready = true; console.warn('[auth]', e && e.message); });
 })();
