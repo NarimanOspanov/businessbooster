@@ -152,9 +152,10 @@
   .lt-btn .lt-av{width:44px;height:44px;flex:none}
   .lt-btn .lt-bt{display:none;padding:0 6px 0 12px;max-width:270px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
   .lt-btn:not(.tip-open) .lt-bt{display:none}
-  .lt-btn .lt-dot{position:absolute;top:3px;right:3px;width:11px;height:11px;border-radius:50%;background:#ff8a3c;box-shadow:0 0 0 2px #e8ecf4;display:none}
-  .lt-btn.has-tip .lt-dot{display:block;animation:lt-dotp 1.6s ease-in-out infinite}
-  @keyframes lt-dotp{50%{transform:scale(1.25)}}
+  .lt-btn .lt-dot{position:absolute;top:3px;right:3px;width:12px;height:12px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 2px #e8ecf4;display:block}
+  .lt-btn .lt-dot:after{content:"";position:absolute;inset:0;border-radius:50%;background:#22c55e;animation:lt-online 1.8s ease-out infinite}
+  @keyframes lt-online{0%{transform:scale(1);opacity:.7}80%,100%{transform:scale(2.6);opacity:0}}
+  @media (prefers-reduced-motion:reduce){.lt-btn .lt-dot:after{animation:none;opacity:0}}
   .lt-panel{position:fixed;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:51;width:min(360px,calc(100vw - 36px));min-height:180px;max-height:min(480px,calc(100vh - 36px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)));display:flex;flex-direction:column;background:#121a28;border:1px solid #26324a;border-radius:18px;box-shadow:0 24px 60px -12px rgba(0,0,0,.75);color:#e8ecf4;font:15px/1.5 "Golos Text",system-ui,sans-serif;overflow:hidden}
   .lt-head{display:flex;align-items:center;gap:8px;padding:7px 7px 7px 10px;border-bottom:1px solid #26324a}
   .lt-head .lt-av{width:28px;height:28px;flex:none}
