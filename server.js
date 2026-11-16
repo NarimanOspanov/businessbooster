@@ -8756,8 +8756,11 @@ http
       require("./scripts/tutor.js").handle(req, res, { readBody, clientIp });
       return;
     }
-    if (urlPath.startsWith("/api/quizroom/")) {
-      require("./scripts/quizroom.js").handle(req, res, { readBody, clientIp });
+    // Квизрум переехал в отдельный продукт — старые ссылки ведут туда
+    if (urlPath === "/quiz" || urlPath.startsWith("/quiz/")) {
+      // старые ссылки вида /quiz/#КОД: браузер сохраняет #КОД при переходе, новый сайт откроет по нему комнату
+      res.writeHead(301, { Location: "https://quiznow-bshxdnbwcphradhk.northeurope-01.azurewebsites.net/" });
+      res.end();
       return;
     }
     // MCP-коннектор для ChatGPT / Claude: ученик занимается в своём чате, мы отдаём уроки
