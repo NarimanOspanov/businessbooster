@@ -223,6 +223,8 @@
   .ls-stage .pic img.on{opacity:1;animation:ls-kb 18s ease-out forwards}
   .ls-stage .pic .brd{position:absolute;inset:0;container-type:size;opacity:0;transition:opacity .8s ease;display:grid;place-items:center;padding:4% 6%;background:radial-gradient(120% 90% at 30% 20%,#2c4a3c,#1a2e25 70%);box-shadow:inset 0 0 0 10px #4a3524,inset 0 0 40px rgba(0,0,0,.5);color:#f4f1e8;overflow:hidden}
   .ls-stage .pic .brd.on{opacity:1}
+  .ls-stage .pic .brd.sch{display:block;padding:0;box-shadow:none;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi,#1c2740) 0%,var(--stage-lo,#111a2b) 62%,var(--bg,#0b1019) 100%)}
+  .ls-stage .pic .brd.sch .tag{position:absolute;left:12px;top:12px;font:700 12px/1 var(--font-mono,monospace);letter-spacing:.08em;text-transform:uppercase;color:#0b1019;background:var(--accent,#ffb547);padding:6px 9px;border-radius:999px}
   .ls-stage .pic:has(.brd.on) .big{top:auto;left:auto;right:18px;bottom:18px;margin:0;width:52px;height:52px;font-size:18px}
   .ls-stage .pic .brd .in{display:flex;flex-direction:column;gap:3cqh;max-width:100%}
   .ls-stage .pic .brd .f{font:600 clamp(20px,7cqw,64px)/1.15 "Golos Text",system-ui,sans-serif;color:#ffd166;text-align:center;letter-spacing:.02em;text-shadow:0 0 1px rgba(255,209,102,.6)}
@@ -404,7 +406,33 @@
       (f.vars && f.vars.length ? '<ul>' + f.vars.map(v => '<li><b>' + esc(v[0] || '') + '</b> — ' + esc(v[1] || '') + (v[2] && v[2] !== '—' ? ' <i>(' + esc(v[2]) + ')</i>' : '') + '</li>').join('') + '</ul>' : '')).join('') + '</div>';
     return b;
   }
-  const loadImg = i => st.img[i] || (st.img[i] = (st.secs[i] && st.secs[i].formulas) ? Promise.resolve(null) : new Promise(res => {
+  // схема опыта из урока — копия живой сцены лаборатории (в разделе «Что будем делать на практике»)
+  const sceneSvg = () => { const s = document.getElementById('scene'); return s && s.tagName.toLowerCase() === 'svg' && s.childElementCount ? s : null; };
+  function schemeOf() {
+    const s = sceneSvg(); if (!s) return null;
+    const b = document.createElement('div'); b.className = 'brd sch';
+    const c = s.cloneNode(true); c.removeAttribute('id'); c.setAttribute('aria-hidden', 'true'); c.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    // кадрируем по приборам: фон и сетку (почти во весь холст) не считаем
+    try {
+      const vb = s.viewBox.baseVal; let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      if (vb && vb.width) for (const el of s.children) {
+        if (!el.getBBox || /^(defs|style|title)$/i.test(el.tagName)) continue;
+        const r = el.getBBox(); if (!r.width && !r.height) continue;
+        if (r.width > vb.width * 1.5 || r.height > vb.height * 1.5 || (r.width > vb.width * .85 && r.height > vb.height * .5)) continue;
+        x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y); x1 = Math.max(x1, r.x + r.width); y1 = Math.max(y1, r.y + r.height);
+      }
+      if (isFinite(x0) && x1 > x0 && y1 > y0) {
+        let w = x1 - x0, h = y1 - y0; const pad = Math.max(w, h) * .08; x0 -= pad; y0 -= pad; w += pad * 2; h += pad * 2;
+        if (w / h < 16 / 9) { const nw = h * 16 / 9; x0 -= (nw - w) / 2; w = nw; } else { const nh = w * 9 / 16; y0 -= (nh - h) / 2; h = nh; }
+        if (w < vb.width * .95 || h < vb.height * .95) c.setAttribute('viewBox', [x0, y0, w, h].map(v => v.toFixed(1)).join(' '));
+      }
+    } catch (e) {}
+    c.style.cssText = 'position:absolute;inset:4%;width:92%;height:92%;pointer-events:none;overflow:visible';
+    b.appendChild(c); b.insertAdjacentHTML('beforeend', '<span class="tag">Схема опыта</span>');
+    return b;
+  }
+  const visualOf = sec => sec.formulas ? 'board' : sec.scheme && sceneSvg() ? 'scheme' : 'img';
+  const loadImg = i => st.img[i] || (st.img[i] = (st.secs[i] && visualOf(st.secs[i]) !== 'img') ? Promise.resolve(null) : new Promise(res => {
     const im = new Image(); im.alt = ''; im.decoding = 'async';
     const t = setTimeout(() => res(null), 30000);
     im.onload = () => { clearTimeout(t); (im.decode ? im.decode().catch(() => {}) : Promise.resolve()).then(() => res(im)); };
@@ -422,10 +450,10 @@
     if (i >= secs.length) { // конец
       journal(j => { j.theoryDone = true; });
       el.classList.add('done');
-      const outro = 'Если что-то осталось непонятным — спроси меня, я отвечу. А если всё ясно — попробуй сам в опыте.';
+      const outro = 'Ну что, давай попробуем на практике! Если что-то осталось непонятным — ничего страшного: задай мне любой вопрос, я отвечу. Не переживай.';
       txt.innerHTML = '<b>Объяснение закончено</b><p>' + esc(outro) + '</p><div class="end"><button class="ls-btn main" data-a="askq">🎤 Задать вопрос</button><button class="ls-btn" data-a="practice">Теперь попробуй сам →</button><button class="ls-btn ghost" data-a="again">Посмотреть ещё раз</button></div>';
-      // наставник говорит это вслух, как продолжение объяснения
-      tts(outro).then(blob => {
+      // наставник говорит это вслух, как продолжение объяснения (если раздел «на практике» уже сказал это сам — не повторяем)
+      if (!(secs[secs.length - 1] || {}).scheme) tts(outro).then(blob => {
         if (!st || st.run !== my || !blob || blob.size < 100) return;
         st.url = st.url || []; const u = st.url[99] = st.url[99] || URL.createObjectURL(blob);
         st.audio.onended = null; st.audio.onerror = null; st.audio.src = u; st.audio.play().catch(() => {});
@@ -444,7 +472,7 @@
       el.classList.remove('wait');
       // картинка: плавная смена, лёгкий наезд камеры
       const old = pic.querySelector('img.on, .brd.on');
-      const node = sec.formulas ? boardOf(sec) : im ? im.cloneNode() : null;
+      const vis = visualOf(sec), node = vis === 'board' ? boardOf(sec) : vis === 'scheme' ? schemeOf() : im ? im.cloneNode() : null;
       if (node) {
         pic.appendChild(node);
         requestAnimationFrame(() => { node.classList.add('on'); if (old) old.classList.remove('on'); setTimeout(() => old && old.remove(), 900); pic.classList.add('has'); });
