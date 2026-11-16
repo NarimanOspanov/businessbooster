@@ -462,9 +462,15 @@ const STORY_F = [
 ].join("\n");
 // раздел «на практике» всегда начинается одной фразой — чтобы было слышно, что это уже практическое задание
 const PRACTICE_START = "А теперь давай попробуем выполнить практическое задание.";
-function practiceFix(v) {
+// …а лекция — с объявления темы (17.11.2026): «Тема лекции — «Тень и полутень». Давай
+// разберёмся.» Название урока берём из контекста, который присылает страница.
+const lessonTopic = (ctx) => String((String(ctx || "").match(/Урок \d+:\s*([^\n]+)/) || [])[1] || "").replace(/[«»"]/g, "").trim().slice(0, 90);
+function practiceFix(v, topic) {
   if (!v || !Array.isArray(v.sections)) return v;
-  return { ...v, sections: v.sections.map((x) => {
+  return { ...v, sections: v.sections.map((x, i) => {
+    if (i === 0 && topic && x && !/^\s*Тема/i.test(String(x.text || ""))) {
+      return { ...x, text: "Тема лекции — «" + topic + "». Давай разберёмся. " + String(x.text || "").trim() };
+    }
     if (!x || !x.scheme) return x;
     let t = String(x.text || "").replace(/\s*Ну что,?\s*давай(?:те)? попробуем!?\s*/i, " ").replace(/\s+/g, " ").trim();
     if (!/^А теперь давай(?:те)? попробуем выполнить практическое задание/i.test(t)) t = PRACTICE_START + " " + t;
@@ -500,7 +506,8 @@ function handleStory(req, res, { readBody, clientIp }) {
     if (!/^\/[\w\-/]*\|\d+\|\w+$/.test(key)) return send(400, { error: "key" });
     const withF = storyFormulas(key), sk = storeKey(key);
     const have = await storyGet(sk);
-    if (have) return send(200, practiceFix(have));
+    const topic = (!b.lang || b.lang === "ru") ? lessonTopic(b.context) : "";
+    if (have) return send(200, practiceFix(have, topic));
     const block = allowed(clientIp(req));
     if (block) return send(429, { error: block });
     try {
@@ -521,7 +528,7 @@ function handleStory(req, res, { readBody, clientIp }) {
         })();
         storyPending.set(sk, p); p.finally(() => storyPending.delete(sk)).catch(() => {});
       }
-      send(200, practiceFix(await p));
+      send(200, practiceFix(await p, topic));
     } catch (e) { console.log("[story] " + (e && e.message)); send(502, { error: "Не получилось подготовить историю. Попробуйте ещё раз." }); }
   })().catch(() => { try { send(500, { error: "error" }); } catch { /* уже ответили */ } });
 }
