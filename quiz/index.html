@@ -327,7 +327,9 @@ const voice = (() => {
     if (initiator) { p.tr = pc.addTransceiver('audio', { direction: 'sendrecv' }); if (micTrack()) p.tr.sender.replaceTrack(micTrack()); }
     pc.ontrack = e => { el.srcObject = e.streams[0] || new MediaStream([e.track]); el.play().then(() => { blocked = false; }).catch(() => { blocked = true; if (S) paint(S); }); };
     pc.onicecandidate = e => { if (e.candidate) signal(pid, { ice: e.candidate }); };
-    pc.onconnectionstatechange = () => { if (pc.connectionState === 'failed') { close(pid); } if (S) paint(S); };
+    pc.onconnectionstatechange = () => { if (pc.connectionState === 'failed') p.failed = true; if (pc.connectionState === 'connected') p.failed = false; if (S) paint(S); };
+    // за 15 секунд не соединились — считаем, что сети не пускают
+    setTimeout(() => { if (peers.get(pid) === p && pc.connectionState !== 'connected') { p.failed = true; if (S) paint(S); } }, 15000);
     return p;
   }
   function close(pid) { const p = peers.get(pid); if (!p) return; try { p.pc.close(); } catch (e) {} p.el.srcObject = null; p.el.remove(); peers.delete(pid); }
@@ -355,7 +357,10 @@ const voice = (() => {
   function paint(st) {
     const talk = st.players.filter(x => x.voice), btn = $('#vbtn');
     const live = [...peers.values()].filter(p => p.pc.connectionState === 'connected').length;
-    $('#vwho').textContent = blocked ? '🔈 Нажмите, чтобы слышать голоса' : talk.length ? `🎙 Говорят: ${talk.map(x => x.name).join(', ')}` : live ? '🔈 Голосовой чат: включите микрофон, чтобы вас слышали' : 'Голосовой чат комнаты';
+    // с кем голос не соединился — честно показываем, чтобы было понятно, в чём дело
+    const failed = [...peers.entries()].filter(([, p]) => p.failed).map(([pid]) => (st.players.find(x => x.pid === pid) || {}).name).filter(Boolean);
+    $('#vwho').textContent = blocked ? '🔈 Нажмите, чтобы слышать голоса' : failed.length ? `⚠️ Нет связи с ${failed.join(', ')} — ваши сети не пускают звук напрямую (поможет другой интернет, например мобильный)`
+      : talk.length ? `🎙 Говорят: ${talk.map(x => x.name).join(', ')}` : live ? `🔈 Голос на связи с ${live} — включите микрофон, чтобы вас слышали` : 'Голосовой чат комнаты';
     btn.textContent = on ? '🎤 Микрофон включён' : '🎤 Включить микрофон'; btn.classList.toggle('on', on);
   }
   // браузер не дал проиграть звук без нажатия — первое же нажатие включает все голоса
