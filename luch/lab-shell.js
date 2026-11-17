@@ -246,6 +246,13 @@
   .ls-stage .dots button.cur{box-shadow:0 0 0 2px rgba(255,181,71,.25)}
   .ls-stage .ctl{display:flex;align-items:center;gap:8px;padding:12px 16px 16px}
   .ls-stage .ctl .sp{flex:1}
+  .ls-stage .fsb{display:grid;place-items:center}
+  .ls-stage.fs{padding:0;place-items:stretch;background:#05080e}
+  .ls-stage.fs .frame{width:100%;max-width:none;min-width:0;height:100%;max-height:none;border-radius:0;border:0;box-shadow:none}
+  .ls-stage.fs .pic{flex:1 1 auto;aspect-ratio:auto;min-height:0}
+  .ls-stage.fs .pic img{object-fit:contain;background:#05080e}
+  .ls-stage.fs .txt{flex:none;max-height:26vh}
+  .ls-stage.fs .pic .brd .f{font-size:clamp(24px,6cqw,84px)}
   .ls-stage .ic{width:44px;height:44px;border-radius:12px;border:1px solid var(--line,#26324a);background:var(--surface-2,#1a2438);color:var(--fg,#e8ecf4);font-size:20px;cursor:pointer;flex:none}
   .ls-stage .ic.rate{width:auto;min-width:52px;padding:0 10px;font:600 14px/1 var(--font-mono,monospace)}
   .ls-stage.done .ic.rate{visibility:hidden}
@@ -314,11 +321,13 @@
     st.run = -1; clearTimeout(st.timer); clearInterval(st.factT); cancelAnimationFrame(st.kRaf);
     try { st.audio.pause(); st.audio.removeAttribute('src'); } catch (e) {}
     (st.url || []).forEach(u => u && URL.revokeObjectURL(u));
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     st.el.remove(); removeEventListener('keydown', stKeys, true); st = null;
   }
   function stKeys(e) {
     if (!st) return;
-    if (e.key === 'Escape') { e.preventDefault(); stopStory(); }
+    if (e.key === 'Escape') { e.preventDefault(); if (st.el.classList.contains('fs')) setFs(false); else stopStory(); }
+    else if ((e.key === 'f' || e.key === 'F' || e.key === 'а' || e.key === 'А') && !/INPUT|TEXTAREA/.test(e.target.tagName)) { e.preventDefault(); toggleFs(); }
     else if (e.key === ' ' && !/INPUT|TEXTAREA/.test(e.target.tagName)) { e.preventDefault(); togglePause(); }
     else if (e.key === 'ArrowRight') stGo(st.i + 1);
     else if (e.key === 'ArrowLeft') stGo(Math.max(0, st.i - 1));
@@ -345,6 +354,24 @@
     else stGo(st.i);
     stPaint();
   }
+  // На весь экран — как у видео: настоящий полноэкранный режим браузера, а где его
+  // нет (iPhone) — плеер растягивается на всё окно. Кнопка ⤢, клавиша F, двойной клик.
+  const FS_ICON = {
+    on: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>',
+    off: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>' };
+  function paintFs() {
+    if (!st) return; const on = st.el.classList.contains('fs'), b = st.el.querySelector('[data-a="fs"]');
+    if (b) { b.innerHTML = on ? FS_ICON.off : FS_ICON.on; b.setAttribute('aria-label', on ? 'Свернуть' : 'На весь экран'); b.title = on ? 'Свернуть (F)' : 'На весь экран (F)'; }
+  }
+  function setFs(on) {
+    if (!st) return; const el = st.el;
+    el.classList.toggle('fs', on); paintFs();
+    if (on && el.requestFullscreen && !document.fullscreenElement) el.requestFullscreen().catch(() => {});
+    if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  }
+  const toggleFs = () => st && setFs(!st.el.classList.contains('fs'));
+  // вышли кнопкой браузера (Esc в полноэкранном) — убираем и растяжку
+  document.addEventListener('fullscreenchange', () => { if (st && !document.fullscreenElement && st.el.classList.contains('fs')) { st.el.classList.remove('fs'); paintFs(); } });
   function stShell() {
     const el = document.createElement('div'); el.className = 'ls-stage'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Теория');
     el.innerHTML = '<div class="frame"><div class="pic"><div class="pv"><div class="k">Урок ' + (lessonIdx() + 1) + ' · теория</div><h4></h4>' +
@@ -352,7 +379,8 @@
       '<div class="txt" data-noi18n><b>Готовлю лекцию</b><div class="fact"></div></div>' +
       '<div class="dots"></div>' +
       '<div class="ctl"><button class="ic" data-a="prev" aria-label="Назад">‹</button><button class="pp" data-a="pp"></button><button class="ic" data-a="next" aria-label="Дальше">›</button>' +
-      '<button class="ic rate" data-a="rate" aria-label="Скорость 1×" title="Скорость: 1×, 1,2×, 1,5×, 2×">1×</button><span class="sp"></span><button class="ls-btn ghost" data-a="practice">К практике →</button><button class="ic x" data-a="close" aria-label="Закрыть">✕</button></div></div>';
+      '<button class="ic rate" data-a="rate" aria-label="Скорость 1×" title="Скорость: 1×, 1,2×, 1,5×, 2×">1×</button>' +
+      '<button class="ic fsb" data-a="fs" aria-label="На весь экран" title="На весь экран (F)">' + FS_ICON.on + '</button><span class="sp"></span><button class="ls-btn ghost" data-a="practice">К практике →</button><button class="ic x" data-a="close" aria-label="Закрыть">✕</button></div></div>';
     el.addEventListener('click', e => {
       if (e.target === el) return stopStory();
       const b = e.target.closest('[data-a]');
@@ -367,9 +395,11 @@
       else if (a === 'again') stGo(0);
       else if (a === 'rate') { rate = RATES[(RATES.indexOf(rate) + 1) % RATES.length]; try { localStorage.setItem('ag-rate', rate); } catch (e) {} st.audio.playbackRate = rate; paintRate(); }
       else if (a === 'practice') toPractice();
+      else if (a === 'fs') toggleFs();
       else if (a === 'askq') { stopStory(); if (window.LuchTutor && window.LuchTutor.talk) window.LuchTutor.talk('Какой вопрос по объяснению? Спрашивай голосом — я слушаю. Можно и написать.'); }
     });
     el.querySelector('.pv h4').textContent = lessonTitle() || document.title;
+    el.querySelector('.pic').addEventListener('dblclick', e => { e.preventDefault(); toggleFs(); });
     return el;
   }
   // пока готовится лекция — полезные факты с этой же страницы
