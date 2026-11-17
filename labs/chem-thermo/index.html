@@ -1,0 +1,1274 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по химии, 8–10 класс: экзо- и эндотермические реакции, термохимические уравнения, энергия связей, теплота сгорания топлива.">
+<title>Тепловой эффект реакции</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /mechanics and /chemistry. Lab bench (SVG) on the left, lesson notebook on the right, lesson strip under the bench. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--liq);transition:width .2s}
+.gauge i{position:absolute;top:-4px;width:2px;height:14px;background:var(--force);transform:translateX(-50%)}
+.swatch{height:12px;border-radius:4px;margin-top:9px;border:1px solid rgba(255,255,255,.15)}
+.meter svg{display:block;width:100%;height:auto;margin-top:8px}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.diag{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.diag text{font-family:var(--font-mono)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.meter .big{font:700 30px/1 var(--font-display);margin-top:8px;letter-spacing:.02em}
+.meter .big small{font:500 12px/1 var(--font-body);color:var(--muted);letter-spacing:0;margin-left:6px}
+.pairs{display:grid;gap:6px;margin-top:10px}
+.pairs label{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface-2);border-radius:9px;padding:7px 10px;font-size:13.5px}
+.pairs select{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:7px;padding:5px 8px;font:500 13px var(--font-mono)}
+.pairs select:disabled{color:var(--ok);opacity:1}
+.cnt{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;margin-top:10px}
+.cnt div{display:flex;align-items:center;justify-content:space-between;gap:6px;background:var(--surface-2);border-radius:9px;padding:6px 8px;font-size:13px}
+.cnt b{font:500 14px var(--font-mono)}
+.cnt button{width:30px;height:30px;border-radius:7px;background:var(--bg);border:1px solid var(--line);cursor:pointer;font:500 15px/1 var(--font-mono)}
+.vtab{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}
+.vtab span{background:var(--surface-2);border-radius:8px;padding:7px 4px;text-align:center;font:500 12px/1.3 var(--font-mono);color:var(--muted)}
+.vtab span b{display:block;color:var(--fg);font-size:15px}
+.vtab span.on{outline:2px solid var(--ok);color:var(--fg)}
+</style>
+</head>
+<body>
+<script src="/luch/splash.js"></script>
+<div class="app">
+  <header>
+    <div class="brand" role="link" tabindex="0" title="Карта предметов" style="cursor:pointer" onclick="location.href='/#chem'" onkeydown="if(event.key==='Enter')location.href='/#chem'">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M9.6 14.6 9.2 6.2 15 10.6Q20 9.4 25 10.6L30.8 6.2 30.4 14.6Q34.6 22 31.6 29Q27.6 36 20 36Q12.4 36 8.4 29Q5.4 22 9.6 14.6Z" fill="#ffb547"/><path d="M20 14Q15.2 10.8 10.9 13.4Q7.6 17.2 9.4 21.8Q11.6 25.8 15.9 25.4Q18.5 25.1 20 27.1Q21.5 25.1 24.1 25.4Q28.4 25.8 30.6 21.8Q32.4 17.2 29.1 13.4Q24.8 10.8 20 14Z" fill="#ffd896"/><circle cx="15" cy="18.8" r="5" fill="#fffaf0"/><circle cx="25" cy="18.8" r="5" fill="#fffaf0"/><circle cx="15.6" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="24.4" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="16.6" cy="18.1" r="1" fill="#fff"/><circle cx="25.4" cy="18.1" r="1" fill="#fff"/><path d="M18.6 23.4h2.8L20 26.6z" fill="#ff8a73"/><path d="M10.5 29.6Q15.3 27.4 20 29.7Q24.7 27.4 29.5 29.6V34.6Q24.7 32.6 20 34.8Q15.3 32.6 10.5 34.6Z" fill="#72d4e8"/><path d="M20 29.7V34.8" stroke="#0b1019" stroke-width="1.1"/><path d="M8.2 23.5Q5.6 28.6 9.4 32.6Q11.6 33.2 12.4 31Q10.4 28.4 8.2 23.5Z" fill="#e8962a"/><path d="M31.8 23.5Q34.4 28.6 30.6 32.6Q28.4 33.2 27.6 31Q29.6 28.4 31.8 23.5Z" fill="#e8962a"/><path d="M35 3.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" fill="#86e0a8"/></svg>
+      <div><h1>OPEN SCHOOL AI</h1><small>Доступное образование для всех</small></div>
+    </div>
+    <div class="headr">
+      
+      <div class="prog" aria-label="Прогресс"><b>Термохимия</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Лабораторный стол">
+    <svg class="scene" id="scene" role="img" aria-label="Калориметр с термометром, весы с порциями вещества, молекулы и энергетическая диаграмма, полка с видами топлива. Карточки можно перетаскивать, молекулы и таблички — нажимать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const KEY = 'luch-chem-thermo';
+const fx = (v, d) => v.toFixed(d).replace('.', ',').replace(/^-/, '−');
+const NB = ' ';
+// число без лишних нулей: 1780, 0,5, 71,2, 44 500
+function nf(v, d = 2) {
+  const a = Math.abs(v);
+  let s = Math.abs(a - Math.round(a)) < 1e-9 ? String(Math.round(a)) : a.toFixed(a < 10 ? d : 1).replace(/0+$/, '').replace(/\.$/, '');
+  const [i, f] = s.split('.');
+  s = i.replace(/\B(?=(\d{3})+(?!\d))/g, NB) + (f ? ',' + f : '');
+  return (v < 0 && a > 1e-12 ? '−' : '') + s;
+}
+const sg = (v, d = 1) => (v > 0.0499 ? '+' : '') + fx(v, d);
+const rnd = i => { const s = Math.sin(i * 12.9898 + 78.233) * 43758.5453; return s - Math.floor(s); };
+
+// ---------- lesson 1: calorimeter, 100 g of water at 20 °C ----------
+const T0 = 20, CW = 4.18, TAU = 1.1, TB = 5;
+const SAMP = [
+  { id: 'naoh', name: 'NaOH', sub: 'гранулы, 4 г', exo: true, col: '#f2f2ee', q: 4.45, mass: 104, n: 0.1, kind: 'dis', solid: '#f2f2ee',
+    what: '4 г NaOH (0,1 моль) растворяют в 100 мл воды', eq: 'NaOH(тв) → Na⁺ + OH⁻, выделяется 44,5 кДж/моль', perMol: -44.5 },
+  { id: 'nh4', name: 'NH₄NO₃', sub: 'селитра, 8 г', exo: false, col: '#e9eef8', q: -2.57, mass: 108, n: 0.1, kind: 'dis', solid: '#e9eef8',
+    what: '8 г нитрата аммония (0,1 моль) растворяют в 100 мл воды', eq: 'NH₄NO₃(тв) → NH₄⁺ + NO₃⁻, поглощается 25,7 кДж/моль — так работает холодный пакет', perMol: 25.7 },
+  { id: 'neut', name: 'HCl + NaOH', sub: 'по 50 мл 1 М', exo: true, col: '#cfe2f0', q: 2.87, mass: 100, n: 0.05, kind: 'mix',
+    what: 'смешивают по 50 мл растворов HCl и NaOH (по 0,05 моль)', eq: 'нейтрализация H⁺ + OH⁻ → H₂O, выделяется 57 кДж на моль воды', perMol: -57.3 },
+  { id: 'soda', name: 'Сода', sub: '+ лимонная к-та', exo: false, col: '#f6f1dc', q: -1.85, mass: 105, n: 0.05, kind: 'gas', solid: '#f6f1dc',
+    what: '4,2 г питьевой соды и 3,2 г лимонной кислоты всыпают в 100 мл воды', eq: 'NaHCO₃ + H⁺ → Na⁺ + H₂O + CO₂↑ — реакция поглощает теплоту', perMol: 37 },
+  { id: 'cao', name: 'CaO', sub: 'известь, 5,6 г', exo: true, col: '#ece6d8', q: 6.5, mass: 105.6, n: 0.1, kind: 'dis', solid: '#ece6d8',
+    what: '5,6 г негашёной извести (0,1 моль) всыпают в 100 мл воды', eq: 'CaO + H₂O → Ca(OH)₂ + 65 кДж — так греются самонагревающиеся консервы', perMol: -65 },
+  { id: 'burn', name: 'Горение', sub: 'спиртовка', exo: true, col: '#ffb547', q: 3.56, mass: 100, n: 0.0065, kind: 'burn',
+    what: 'под банкой со 100 мл воды сгорает 0,30 г спирта', eq: 'C₂H₅OH + 3O₂ → 2CO₂ + 3H₂O + 1367 кДж', perMol: -1367 },
+];
+const dTof = s => s.q * 1000 / (s.mass * CW);
+function tempAt(s, t) {
+  if (!s) return T0;
+  const d = dTof(s);
+  if (s.kind === 'burn') return T0 + d * clamp(t / TB, 0, 1);
+  return T0 + d * (1 - Math.exp(-t / TAU));
+}
+const settleT = s => s && s.kind === 'burn' ? TB : 5.5;
+
+// ---------- lesson 2: calculations by thermochemical equations ----------
+const RX2 = [
+  { id: 'ch4', f: 'CH₄', name: 'метан', M: 16, nu: 1, Q: 890, col: '#9fd4f0', eq: 'CH₄ + 2O₂ → CO₂ + 2H₂O + 890 кДж', max: 64, step: 2 },
+  { id: 'h2', f: 'H₂', name: 'водород', M: 2, nu: 2, Q: 572, col: '#e8ecf4', eq: '2H₂ + O₂ → 2H₂O + 572 кДж', max: 8, step: 0.5 },
+  { id: 'caco3', f: 'CaCO₃', name: 'известняк', M: 100, nu: 1, Q: -178, col: '#ece6d8', eq: 'CaCO₃ → CaO + CO₂ − 178 кДж', max: 500, step: 10 },
+];
+const QS = [
+  { rx: 0, m: 32, ask: ['Сколько теплоты выделится', 'при сгорании 32 г метана?'], opts: [445, 890, 1780, 28480], ans: 1780 },
+  { rx: 1, m: 1, ask: ['Сколько теплоты выделится', 'при сгорании 1 г водорода?'], opts: [143, 286, 572, 1144], ans: 143 },
+  { rx: 2, m: 250, ask: ['Сколько теплоты нужно затратить,', 'чтобы разложить 250 г известняка?'], opts: [71.2, 178, 445, 44500], ans: 445 },
+];
+
+// ---------- lesson 3: bond energies, kJ/mol ----------
+const BE = { 'C–H': 413, 'O=O': 498, 'C=O': 799, 'O–H': 463, 'H–H': 436, 'Cl–Cl': 243, 'H–Cl': 432, 'N≡N': 945, 'N=O': 631 };
+const MOLS = {
+  CH4: { f: 'CH₄', atoms: [['C', 0, 0], ['H', -17, -12], ['H', 17, -12], ['H', -17, 12], ['H', 17, 12]], bonds: [[0, 1, 1], [0, 2, 1], [0, 3, 1], [0, 4, 1]], b: [['C–H', 4]] },
+  O2: { f: 'O₂', atoms: [['O', -9, 0], ['O', 9, 0]], bonds: [[0, 1, 2]], b: [['O=O', 1]] },
+  CO2: { f: 'CO₂', atoms: [['O', -21, 0], ['C', 0, 0], ['O', 21, 0]], bonds: [[0, 1, 2], [1, 2, 2]], b: [['C=O', 2]] },
+  H2O: { f: 'H₂O', atoms: [['O', 0, -4], ['H', -14, 8], ['H', 14, 8]], bonds: [[0, 1, 1], [0, 2, 1]], b: [['O–H', 2]] },
+  H2: { f: 'H₂', atoms: [['H', -7, 0], ['H', 7, 0]], bonds: [[0, 1, 1]], b: [['H–H', 1]] },
+  Cl2: { f: 'Cl₂', atoms: [['Cl', -12, 0], ['Cl', 12, 0]], bonds: [[0, 1, 1]], b: [['Cl–Cl', 1]] },
+  HCl: { f: 'HCl', atoms: [['H', -10, 0], ['Cl', 9, 0]], bonds: [[0, 1, 1]], b: [['H–Cl', 1]] },
+  N2: { f: 'N₂', atoms: [['N', -9, 0], ['N', 9, 0]], bonds: [[0, 1, 3]], b: [['N≡N', 1]] },
+  NO: { f: 'NO', atoms: [['N', -9, 0], ['O', 9, 0]], bonds: [[0, 1, 2]], b: [['N=O', 1]] },
+};
+const molE = k => MOLS[k].b.reduce((s, [b, n]) => s + BE[b] * n, 0);
+const bTxt = k => MOLS[k].b.map(([b, n]) => (n > 1 ? n + '×' : '') + b).join(' ');
+const RX3 = [
+  { id: 'ch4', name: 'CH₄ + 2O₂', eq: 'CH₄ + 2O₂ → CO₂ + 2H₂O(г)', R: ['CH4', 'O2', 'O2'], P: ['CO2', 'H2O', 'H2O'], exo: true, real: 'по таблицам 802 кДж для водяного пара, 890 кДж для жидкой воды' },
+  { id: 'hcl', name: 'H₂ + Cl₂', eq: 'H₂ + Cl₂ → 2HCl', R: ['H2', 'Cl2'], P: ['HCl', 'HCl'], exo: true, real: 'по таблицам 184 кДж' },
+  { id: 'no', name: 'N₂ + O₂', eq: 'N₂ + O₂ → 2NO', R: ['N2', 'O2'], P: ['NO', 'NO'], exo: false, real: 'по таблицам −180 кДж (теплота поглощается)' },
+];
+const sumE = list => list.reduce((s, k) => s + molE(k), 0);
+const ACOL = { H: '#e8ecf4', C: '#4f586d', O: '#e5533f', N: '#4d7cf0', Cl: '#5fc46a' };
+const ARAD = { H: 6.5, C: 9, O: 8.5, N: 8.5, Cl: 10 };
+
+// ---------- lesson 4: fuels ----------
+const FUELS = [
+  { id: 'h2', name: 'Водород', f: 'H₂', q: 120, co2: 0, fossil: false, col: '#cfe2f0' },
+  { id: 'ch4', name: 'Метан', f: 'газ', q: 50, co2: 55, fossil: true, col: '#9fd4f0' },
+  { id: 'pet', name: 'Бензин', f: 'жидкость', q: 44, co2: 70, fossil: true, col: '#ffd27a' },
+  { id: 'coal', name: 'Уголь', f: 'каменный', q: 27, co2: 95, fossil: true, col: '#55607a' },
+  { id: 'wood', name: 'Дрова', f: 'сухие', q: 15, co2: 115, fossil: false, col: '#c9a86a' },
+  { id: 'bat', name: 'Аккумул.', f: 'Li-ion', q: 0.9, co2: 0, fossil: false, col: '#86e0a8', bat: true },
+];
+const SC4 = [
+  { id: 'rocket', name: 'Ракета', E: 1000, ok: 'h2', text: ['Верхняя ступень ракеты: нужно 1000 МДж', 'при наименьшей массе топлива'],
+    right: 'Верно: у водорода около 120 МДж/кг — больше всех. Поэтому верхние ступени ракет летают на жидком водороде и кислороде.' },
+  { id: 'boiler', name: 'Котельная', E: 50000, ok: 'ch4', only: ['ch4', 'pet', 'coal'], text: ['Котельная на ископаемом топливе: 50 000 МДж', 'за зиму, как можно меньше CO₂'],
+    right: 'Верно: природный газ даёт около 55 г CO₂ на МДж — меньше угля (≈95) и бензина (≈70). В метане на один атом C приходится 4 атома H.' },
+  { id: 'indoor', name: 'Склад', E: 80, ok: 'bat', text: ['Погрузчик на закрытом складе: 80 МДж', 'за смену, без горения и выхлопа'],
+    right: 'Верно: аккумулятор не горит и не даёт выхлопа. Зато он тяжёлый: около 0,9 МДж/кг, почти в 50 раз меньше, чем у бензина.' },
+];
+const INSTR = { h2: 'водородом', ch4: 'метаном', pet: 'бензином', coal: 'углём', wood: 'дровами', bat: 'аккумулятором' };
+const massFor = (sc, f) => sc.E / f.q;
+const co2For = (sc, f) => sc.E * f.co2 / 1000; // кг
+function kgTxt(v) { return v >= 1000 ? nf(v / 1000, 1) + ' т' : v >= 10 ? nf(Math.round(v)) + ' кг' : nf(Math.round(v * 10) / 10) + ' кг'; }
+
+const LESSONS = [
+  { id: 'exo', title: 'Экзо- и эндотермические реакции',
+    text: ['Почти любая реакция идёт с выделением или поглощением теплоты. Реакции, при которых теплота выделяется, называют экзотермическими (от греч. «экзо» — наружу): смесь нагревается. Реакции, при которых теплота поглощается, — эндотермическими («эндо» — внутрь): смесь остывает, забирая тепло у окружающей среды.',
+           'Теплоту измеряют калориметром — сосудом с теплоизоляцией и термометром. Зная массу раствора m, его удельную теплоёмкость c (у воды 4,18 Дж/(г·°C)) и изменение температуры ΔT, находят теплоту: Q = c·m·ΔT.',
+           'Экзотермические: горение, нейтрализация кислоты щёлочью, гашение извести. Эндотермические: разложение известняка при нагревании, реакция соды с кислотой. Тепловой эффект есть и у растворения: NaOH нагревает воду, а нитрат аммония охлаждает её.'],
+    why: 'В спортивной медицине холодный пакет — это вода и нитрат аммония (или мочевина) в разных отсеках: сжал пакет — и он за секунды остывает почти до 0 °C, его прикладывают к ушибу. Грелки для рук работают на окислении железного порошка, самонагревающиеся консервы — на гашении извести. Инженер-технолог химического завода следит, чтобы теплота экзотермической реакции успевала отводиться, иначе реактор перегреется. В ближайшие 10 лет ИИ будет предсказывать тепловые эффекты новых процессов, но измерять их, проектировать охлаждение и отвечать за безопасность установки будут люди.',
+    safe: 'NaOH и негашёная известь CaO — едкие вещества: только в очках и перчатках, гранулы руками не берут. При растворении NaOH раствор сильно нагревается: щёлочь насыпают в воду понемногу, а не наоборот. Нитрат аммония нельзя нагревать. Спиртовку гасят колпачком, а не задувают.',
+    task: 'Проведите в калориметре все шесть опытов и разложите их по корзинам: «экзо» (теплота выделяется) или «эндо» (поглощается).',
+    hint: 'Нажмите на карточку или перетащите её в стакан и следите за термометром и графиком. Потом перетащите карточку в нужную корзину.',
+    stage: 'Карточку → в стакан: опыт. Карточку → в корзину: отсортировать.',
+    init: {},
+    check: () => SAMP.every(a => S.sorted[a.id]) },
+  { id: 'equation', title: 'Термохимические уравнения',
+    text: ['Термохимическое уравнение — уравнение реакции, в котором указан тепловой эффект Q: CH₄ + 2O₂ → CO₂ + 2H₂O + 890 кДж. «+Q» значит, что теплота выделяется, «−Q» — поглощается. Часто пишут и изменение энтальпии ΔH: у экзотермической реакции ΔH = −Q, оно отрицательное.',
+           'Тепловой эффект относится к количествам веществ, записанным в уравнении: 890 кДж выделяется при сгорании именно 1 моль метана. Сожгли 2 моль — теплоты вдвое больше. Поэтому в термохимических уравнениях бывают дробные коэффициенты и указывают состояние веществ: жидкая вода или пар — теплота разная.',
+           'Как решать задачу: найдите количество вещества n = m / M, затем составьте пропорцию по уравнению. Например, 8 г метана — это 8 / 16 = 0,5 моль; 1 моль — 890 кДж, 0,5 моль — x; x = 445 кДж.'],
+    why: 'На упаковке еды энергетическая ценность пишется в кДж и ккал — это тот же тепловой эффект: организм окисляет жиры и углеводы до CO₂ и воды (1 г жира даёт около 37 кДж, 1 г углеводов — около 17 кДж). Инженер-энергетик по термохимическим уравнениям считает, сколько газа сожжёт котельная за зиму, а инженер ракетных двигателей — сколько водорода и кислорода нужно на ступень. ИИ мгновенно посчитает пропорцию, но заметить, что перепутаны граммы и моли, и проверить, правдоподобен ли ответ, должен человек.',
+    safe: 'Метан и водород образуют с воздухом взрывоопасные смеси. Утечку газа нельзя искать огнём; если в помещении пахнет газом — не включайте свет и электроприборы, откройте окна, выйдите и вызовите газовую службу.',
+    task: 'Решите три задачи по термохимическим уравнениям: выберите верный ответ на табличках.',
+    hint: 'Весы показывают массу и порции по 1 моль: n = m / M. Посмотрите, сколько раз «помещается» уравнение, и найдите теплоту. Ползунок под весами меняет массу.',
+    stage: 'Таблички — ответы. Ползунок под весами — масса.',
+    init: {},
+    check: () => QS.every((q, i) => S.ans[i]) },
+  { id: 'bonds', title: 'Энергия связей',
+    text: ['Откуда берётся тепловой эффект? Чтобы разорвать химическую связь, нужно затратить энергию — энергию связи. Когда такая же связь образуется, столько же энергии выделяется. Например, на разрыв 1 моль связей H–H нужно 436 кДж.',
+           'Реакция — это разрыв старых связей и образование новых. Если связи в продуктах в сумме прочнее, чем в реагентах, при их образовании выделяется больше энергии, чем ушло на разрыв, — реакция экзотермическая: Q = ΣE(образованных) − ΣE(разорванных). Горение выделяет тепло потому, что связи C=O в CO₂ и O–H в воде очень прочные.',
+           'На самом деле молекулы не разбираются целиком на атомы: старые связи рвутся одновременно с образованием новых, через неустойчивое состояние — активированный комплекс. Поэтому барьер реакции (энергия активации Eₐ) гораздо ниже, чем энергия разрыва всех связей. А итоговый тепловой эффект от пути не зависит (закон Гесса). Энергии связей — средние, поэтому расчёт даёт оценку.'],
+    why: 'По энергиям связей химики оценивают, сколько тепла даст новое топливо или ракетное горючее ещё до опыта. Инженер по аккумуляторам подбирает электролиты и электроды так, чтобы при перегреве не начинались экзотермические реакции: именно они запускают «тепловой разгон» батареи. Уже сейчас ИИ-модели за минуты рассчитывают энергии связей тысяч молекул; через 10 лет такая проверка станет рутиной, а понимать, откуда берётся тепло, и принимать решения будет инженер.',
+    task: 'Проведите мысленный опыт для горения метана и для реакции N₂ + O₂ → 2NO: разорвите связи, соберите продукты и решите, экзо- или эндотермическая реакция.',
+    hint: 'Нажимайте на молекулы реагентов — связи рвутся, энергия растёт. Затем на пунктирные продукты — связи образуются. Потом выберите вывод внизу.',
+    stage: 'Реагент — разорвать. Пунктир — собрать продукт. Внизу — вывод.',
+    init: {},
+    check: () => !!(S.f3.ch4 && S.f3.no) },
+  { id: 'fuel', title: 'Топливо и энергия',
+    text: ['Удельная теплота сгорания показывает, сколько теплоты выделяется при полном сгорании 1 кг топлива. У водорода около 120 МДж/кг, у метана (природного газа) около 50, у бензина около 44, у каменного угля около 25–30, у сухих дров около 15 МДж/кг.',
+           'В большинстве видов топлива есть углерод, и при горении образуется CO₂ — главный парниковый газ. Чем больше в топливе водорода и меньше углерода, тем меньше CO₂ на каждый мегаджоуль: у природного газа около 55 г/МДж, у бензина около 70, у угля около 95. У дров ещё больше, но выросший лес снова поглощает CO₂. Водород сгорает в воду, но сегодня его чаще получают из природного газа, и CO₂ выделяется на заводе.',
+           'Аккумулятор запасает энергию в электрохимической реакции, а не в горении. У литий-ионного аккумулятора около 0,9 МДж/кг (0,25 кВт·ч/кг) — примерно в 50 раз меньше, чем у бензина. Зато электромотор превращает в движение около 90% энергии, а двигатель внутреннего сгорания — около 25–30%, и аккумулятор не даёт выхлопа там, где работает.'],
+    why: 'Энергия для домов и машин — это всегда выбор между теплотой сгорания, выбросами, ценой и безопасностью. Верхние ступени ракет летают на жидком водороде и кислороде, потому что это самое «лёгкое» топливо на единицу энергии; водородом заправляют и автобусы на топливных элементах. Дата-центры для ИИ потребляют столько энергии, сколько целые города, и почти вся она превращается в тепло — его отводят жидкостным охлаждением, а батареи электромобилей охлаждают, чтобы не перегрелись. Инженер-энергетик, инженер по аккумуляторам, инженер-технолог водородных установок — профессии, которые в ближайшие 10 лет будут нужны всё больше.',
+    safe: 'Бензин и газ огнеопасны: храните их вдали от огня, газ — только в исправных баллонах. Вздувшийся или повреждённый аккумулятор может загореться — его нельзя заряжать и выбрасывать в обычный мусор. Печь на угле или дровах с закрытой заслонкой выделяет угарный газ.',
+    task: 'Выберите топливо для трёх задач: ракета, котельная на ископаемом топливе, погрузчик на закрытом складе. Сравнивайте теплоту сгорания и выбросы CO₂.',
+    hint: 'Задачи переключаются табличками над полкой или кнопками внизу. Нажмите на топливо — под полкой появятся масса и CO₂ для этой задачи.',
+    stage: 'Нажмите на топливо, чтобы выбрать его для задачи.',
+    init: {},
+    check: () => SC4.every((s, i) => S.pick[i]) },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const S = { lesson: clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null,
+            cur: null, t1: 0, tested: {}, sorted: {}, wrong1: 0,
+            q: 0, m2: 32, ans: {}, wrong2: 0, bad2: null,
+            rx3: 0, brk: [], frm: [], f3: {}, wrong3: 0,
+            sc: 0, sel: null, pick: {}, wrong4: 0 };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: S.lesson, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+
+function model() {
+  const id = LID();
+  if (id === 'exo') {
+    const s = S.cur === null ? null : SAMP[S.cur], T = tempAt(s, S.t1), dT = T - T0, mass = s ? s.mass : 100;
+    return { kind: 'exo', s, T, dT, mass, Q: CW * mass * dT / 1000, settled: !!s && S.t1 >= settleT(s), p: s ? clamp(S.t1 / settleT(s), 0, 1) : 0 };
+  }
+  if (id === 'equation') {
+    const qq = QS[S.q], r = RX2[qq.rx], n = S.m2 / r.M, k = n / r.nu;
+    return { kind: 'eq', qq, r, m: S.m2, n, k, Q: k * Math.abs(r.Q), known: !!S.ans[S.q] };
+  }
+  if (id === 'bonds') {
+    const r = RX3[S.rx3], brk = sumE(r.R.filter((k, i) => S.brk[i])), frm = sumE(r.P.filter((k, i) => S.frm[i]));
+    const allB = r.R.every((k, i) => S.brk[i]), allF = r.P.every((k, i) => S.frm[i]);
+    return { kind: 'bd', r, brk, frm, E: brk - frm, Ebrk: sumE(r.R), Efrm: sumE(r.P), Q: sumE(r.P) - sumE(r.R), allB, allF };
+  }
+  const sc = SC4[S.sc], f = S.sel === null ? null : FUELS[S.sel];
+  return { kind: 'fu', sc, f, mass: f ? massFor(sc, f) : 0, co2: f ? co2For(sc, f) : 0 };
+}
+
+// ---------- geometry (SVG units; bench top is y = 360) ----------
+const CARD = { w: 92, h: 44, xs: [12, 110], ys: [130, 182, 234] };
+const cardXY = i => ({ x: CARD.xs[i % 2], y: CARD.ys[i >> 1] });
+const BASK = { exo: { x: 12, y: 290, w: 92, h: 64 }, endo: { x: 110, y: 290, w: 92, h: 64 } };
+const CUP = { cx: 286, x0: 242, x1: 330, y0: 214, y1: 354 };
+const PG = { x0: 384, x1: 506, y0: 150, y1: 300, tmax: 10, lo: 10, hi: 40 };
+const SCL = { cx: 105, x0: 46, x1: 164, top: 318 };
+const SLD = { x0: 40, x1: 170, y: 378 };
+const CHN = { y: 170, h: 60, xs: [200, 307, 414], w: 96 };
+const TIL = { y: 304, h: 46, w: 72, xs: [200, 279, 359, 438] };
+const MA = { x0: 22, x1: 330, yR: 170, yP: 300, pool: { x: 24, y: 204, w: 304, h: 62 } };
+const ED = { x0: 350, x1: 508, y0: 132, y1: 330 };
+const VB = { y: 332, h: 24, xs: [24, 180], w: 148 };
+const SH = { y: 170, h: 78, w: 76, x0: 18, gap: 7 };
+const fuelX = i => SH.x0 + i * (SH.w + SH.gap);
+const CH = [{ x0: 18, x1: 250 }, { x0: 274, x1: 508 }];
+const CHY = 274;
+
+const f1 = v => v.toFixed(1);
+function bench() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern>
+    <marker id="ahr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#ff8a73"/></marker>
+    <marker id="ahg" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#86e0a8"/></marker>
+    <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#8b96ad"/></marker></defs>
+    <rect x="-2000" y="-2000" width="4520" height="2360" fill="url(#tile)"/>
+    <rect x="-2000" y="360" width="4520" height="1200" fill="#1a2232"/>
+    <rect x="-2000" y="358" width="4520" height="4" fill="#2c3954"/>
+    <rect x="-2000" y="362" width="4520" height="2" fill="${INK}" opacity=".6"/>`;
+}
+
+// ----- lesson 1: calorimeter, sample cards, T(t) graph, baskets -----
+let BUB = [], acc1 = 0;
+function cardSVG(i, x, y, ghost) {
+  const a = SAMP[i], s = S.sorted[a.id], t = S.tested[a.id], inC = S.cur === i;
+  const st = s ? '#86e0a8' : inC ? '#72d4e8' : '#3a4762';
+  return `<rect x="${f1(x)}" y="${f1(y)}" width="${CARD.w}" height="${CARD.h}" rx="10" fill="${ghost ? '#1a2438' : '#121a28'}" stroke="${st}" stroke-width="1.5"/>` +
+    (a.kind === 'burn' ? `<path d="M${f1(x + 14)} ${f1(y + 13)}q6 7 0 17q-6 -10 0 -17z" fill="#ffb547"/>` : a.kind === 'mix' ? `<rect x="${f1(x + 8)}" y="${f1(y + 15)}" width="5" height="14" rx="1.5" fill="#cfe2f0"/><rect x="${f1(x + 15)}" y="${f1(y + 15)}" width="5" height="14" rx="1.5" fill="#9fd4f0"/>` :
+      `<circle cx="${f1(x + 14)}" cy="${f1(y + 22)}" r="7" fill="${a.col}" stroke="${INK}"/>`) +
+    `<text x="${f1(x + 26)}" y="${f1(y + 19)}" font-size="10" fill="#e8ecf4" font-weight="500">${a.name}</text>` +
+    `<text x="${f1(x + 26)}" y="${f1(y + 31)}" font-size="7" fill="#8b96ad">${a.sub}</text>` +
+    (s ? `<text x="${f1(x + CARD.w - 7)}" y="${f1(y + 41)}" font-size="9" fill="#86e0a8" text-anchor="end">✓</text>` : t ? `<text x="${f1(x + CARD.w - 7)}" y="${f1(y + 41)}" font-size="7" fill="#72d4e8" text-anchor="end">опыт</text>` : '');
+}
+function liqCol(dT) {
+  const k = clamp(Math.abs(dT) / 12, 0, 1), a = [95, 180, 217], b = dT >= 0 ? [255, 120, 95] : [205, 238, 255];
+  return `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * k)).join(',')})`;
+}
+function thermoSVG(x, top, bulb, T) {
+  const yT = t => bulb - 12 - clamp(t, 0, 50) / 50 * (bulb - 12 - top - 8);
+  let h = `<rect x="${x - 5}" y="${top}" width="10" height="${bulb - top}" rx="5" fill="#121a28" stroke="#c8d1e2" stroke-width="1.2"/>`;
+  for (let t = 0; t <= 50; t += 10) h += `<path d="M${x + 5} ${f1(yT(t))}h4" stroke="#8b96ad"/><text x="${x + 11}" y="${f1(yT(t) + 2.5)}" font-size="6.5" fill="#8b96ad">${t}</text>`;
+  h += `<rect x="${x - 2.2}" y="${f1(yT(T))}" width="4.4" height="${f1(bulb - yT(T))}" fill="#ff5a4a"/><circle cx="${x}" cy="${bulb}" r="7.5" fill="#ff5a4a" stroke="#c8d1e2" stroke-width="1.2"/>`;
+  h += `<rect x="${x - 25}" y="${top - 18}" width="50" height="15" rx="7.5" fill="#e8ecf4"/><text x="${x}" y="${top - 7}" font-size="9.5" fill="#0b1019" text-anchor="middle" font-weight="500">${fx(T, 1)} °C</text>`;
+  return h;
+}
+function cupSVG(m, tt) {
+  const c = CUP, s = m.s, k = clamp(Math.abs(m.dT) / 10, 0, 1);
+  let h = '';
+  const outer = `M${c.x0 - 10} ${c.y0}L${c.x0 - 4} ${c.y1}H${c.x1 + 4}L${c.x1 + 10} ${c.y0}Z`;
+  if (m.dT > 0.5) h += `<path d="${outer}" fill="none" stroke="#ff8a73" stroke-width="9" opacity="${(0.12 + 0.3 * k).toFixed(2)}" stroke-linejoin="round"/>`;
+  if (m.dT < -0.5) h += `<path d="${outer}" fill="none" stroke="#bfe8ff" stroke-width="9" opacity="${(0.12 + 0.35 * k).toFixed(2)}" stroke-linejoin="round"/>`;
+  h += `<path d="${outer}" fill="rgba(233,237,243,.1)" stroke="#8ea0c0" stroke-width="1.5"/>`;
+  const ly = 250, liq = `M${c.x0 + 1} ${ly}L${c.x0 + 4.5} ${c.y1 - 6}H${c.x1 - 4.5}L${c.x1 - 1} ${ly}Z`;
+  h += `<path d="${liq}" fill="${liqCol(m.dT)}" opacity=".34"/>`;
+  if (s && s.id === 'cao') h += `<path d="${liq}" fill="#f2f5f0" opacity="${(0.32 * m.p).toFixed(2)}"/>`;
+  if (s && s.solid) for (let i = 0; i < 9; i++) {
+    const x = c.cx - 30 + rnd(i + 3) * 52, y = c.y1 - 10 - rnd(i + 7) * 5;
+    h += `<ellipse cx="${f1(x)}" cy="${f1(y)}" rx="${s.id === 'naoh' ? 3.2 : 2.4}" ry="${s.id === 'naoh' ? 2.2 : 1.6}" fill="${s.solid}" opacity="${(0.9 * (1 - m.p)).toFixed(2)}"/>`;
+  }
+  for (const b of BUB) h += `<circle cx="${f1(b.x)}" cy="${f1(b.y)}" r="${f1(b.r)}" fill="none" stroke="#e8ecf4" stroke-width="1" opacity=".75"/>`;
+  if (reduce && s && s.id === 'soda' && m.p < 1) for (let i = 0; i < 10; i++) h += `<circle cx="${f1(c.cx - 30 + rnd(i) * 60)}" cy="${f1(262 + rnd(i + 5) * 80)}" r="2" fill="none" stroke="#e8ecf4" opacity=".75"/>`;
+  h += `<path d="M${c.x0} ${c.y0 + 6}L${c.x0 + 4} ${c.y1 - 5}H${c.x1 - 4}L${c.x1} ${c.y0 + 6}" fill="none" stroke="#8ea0c0" stroke-width="1.2" opacity=".7"/>`;
+  // frost for cold, heat shimmer for hot
+  if (m.dT < -1.5) for (let i = 0; i < 7; i++) { const x = c.x0 - 8 + (i % 2 ? c.x1 - c.x0 + 14 : 0) + (rnd(i) - 0.5) * 4, y = 240 + i * 15; h += `<path d="M${f1(x - 3)} ${y}h6M${f1(x)} ${y - 3}v6M${f1(x - 2)} ${y - 2}l4 4M${f1(x + 2)} ${y - 2}l-4 4" stroke="#e8f6ff" stroke-width="1" opacity="${(0.25 + 0.6 * k).toFixed(2)}"/>`; }
+  if (m.dT > 1.5) for (let i = 0; i < 3; i++) { const x = c.x0 + 10 + i * 24, w = reduce ? 0 : Math.sin(tt / 300 + i) * 2; h += `<path d="M${f1(x + w)} 202q5 -6 0 -12q-5 -6 0 -12" fill="none" stroke="#ff8a73" stroke-width="1.4" opacity="${(0.2 + 0.5 * k).toFixed(2)}"/>`; }
+  // lid with the thermometer
+  h += `<rect x="${c.x0 - 14}" y="${c.y0 - 8}" width="${c.x1 - c.x0 + 28}" height="9" rx="3" fill="#5c6b88" stroke="${INK}"/>`;
+  h += thermoSVG(318, 146, 336, m.T);
+  h += `<text x="${c.cx - 16}" y="${c.y0 + 22}" font-size="8" fill="#c8d1e2" text-anchor="middle">${s && s.kind === 'mix' ? '50 + 50 мл' : '100 мл воды'}</text>`;
+  return h;
+}
+function canSVG(m, tt) {
+  const cx = CUP.cx, burning = m.p < 1;
+  let h = '';
+  // tripod
+  h += `<path d="M${cx - 44} 272L${cx - 52} 356M${cx + 44} 272L${cx + 52} 356M${cx - 48} 272H${cx + 48}" stroke="#5c6b88" stroke-width="3" fill="none"/>`;
+  // metal can with water
+  h += `<rect x="${cx - 40}" y="196" width="80" height="74" rx="4" fill="#3a4762" stroke="#8ea0c0" stroke-width="1.5"/>`;
+  h += `<rect x="${cx - 37}" y="214" width="74" height="53" rx="2" fill="${liqCol(m.dT)}" opacity=".45"/>`;
+  h += `<text x="${cx - 12}" y="232" font-size="8" fill="#e8ecf4" text-anchor="middle">100 мл воды</text>`;
+  // spirit lamp
+  h += `<path d="M${cx - 20} 356V332Q${cx - 20} 320 ${cx} 320Q${cx + 20} 320 ${cx + 20} 332V356Z" fill="rgba(207,226,240,.18)" stroke="#8ea0c0" stroke-width="1.4"/>`;
+  h += `<rect x="${cx - 17}" y="${f1(340 + 12 * m.p)}" width="34" height="${f1(15 - 12 * m.p)}" fill="#cfe2f0" opacity=".35"/>`;
+  h += `<rect x="${cx - 4}" y="310" width="8" height="10" fill="#8ea0c0"/><path d="M${cx} 310v-4" stroke="#e8ecf4" stroke-width="2"/>`;
+  if (burning) {
+    const fl = reduce ? 1 : 1 + 0.12 * Math.sin(tt / 70) + 0.06 * Math.sin(tt / 37);
+    h += `<path d="M${cx} ${f1(306 - 30 * fl)}Q${cx + 11} ${f1(298 - 8 * fl)} ${cx + 7} 304Q${cx} 310 ${cx - 7} 304Q${cx - 11} ${f1(298 - 8 * fl)} ${cx} ${f1(306 - 30 * fl)}Z" fill="#ffb547" opacity=".9"/>`;
+    h += `<path d="M${cx} ${f1(304 - 14 * fl)}Q${cx + 5} 300 ${cx + 3} 304Q${cx} 307 ${cx - 3} 304Q${cx - 5} 300 ${cx} ${f1(304 - 14 * fl)}Z" fill="#72d4e8" opacity=".8"/>`;
+  } else h += `<rect x="${cx - 7}" y="300" width="14" height="12" rx="3" fill="#5c6b88" stroke="${INK}"/>`;
+  h += thermoSVG(318, 146, 252, m.T);
+  return h;
+}
+function graphSVG(m) {
+  const P = PG, X = t => P.x0 + t / P.tmax * (P.x1 - P.x0), Y = T => P.y1 - (clamp(T, P.lo - 2, P.hi + 2) - P.lo) / (P.hi - P.lo) * (P.y1 - P.y0);
+  let h = `<path d="M${P.x0} ${P.y0 - 6}V${P.y1}H${P.x1}" fill="none" stroke="#3a4762" stroke-width="1.5"/>`;
+  for (let T = P.lo; T <= P.hi; T += 10) h += `<path d="M${P.x0 - 3} ${f1(Y(T))}H${P.x1}" stroke="#26324a" stroke-width="1" ${T === T0 ? 'stroke-dasharray="4 3"' : ''}/><text x="${P.x0 - 5}" y="${f1(Y(T) + 3)}" font-size="8" fill="#8b96ad" text-anchor="end">${T}</text>`;
+  for (const t of [0, 5, 10]) h += `<text x="${f1(X(t))}" y="${P.y1 + 12}" font-size="8" fill="#8b96ad" text-anchor="middle">${t}</text>`;
+  h += `<text x="${P.x0 - 22}" y="${P.y0 - 10}" font-size="9" fill="#8b96ad">T, °C</text><text x="${P.x1}" y="${P.y1 + 24}" font-size="8" fill="#8b96ad" text-anchor="end">t, с (время ускорено)</text>`;
+  const path = (s, upto) => { let d = ''; for (let t = 0; t <= upto + 1e-9; t += 0.2) d += (d ? 'L' : 'M') + f1(X(t)) + ' ' + f1(Y(tempAt(s, t))); if (upto % 0.2) d += 'L' + f1(X(upto)) + ' ' + f1(Y(tempAt(s, upto))); return d; };
+  SAMP.forEach((a, i) => { if (S.tested[a.id] && i !== S.cur) h += `<path d="${path(a, P.tmax)}" fill="none" stroke="#8b96ad" stroke-width="1.2" opacity=".35"/>`; });
+  if (m.s) {
+    const up = Math.min(S.t1, P.tmax), col = m.dT >= 0 ? '#ff8a73' : '#9fd4f0';
+    h += `<path d="${path(m.s, up)}" fill="none" stroke="${col}" stroke-width="2.4"/><circle cx="${f1(X(up))}" cy="${f1(Y(m.T))}" r="3.5" fill="${col}"/>`;
+  }
+  return h;
+}
+function exoSVG(m, tt) {
+  let h = m.s && m.s.kind === 'burn' ? canSVG(m, tt) : cupSVG(m, tt);
+  const hotC = drag && drag.moved && drag.id.startsWith('card-') && inCupZone(drag.p);
+  if (hotC) h += `<rect x="226" y="140" width="120" height="218" rx="12" fill="rgba(114,212,232,.06)" stroke="#72d4e8" stroke-width="1.5" stroke-dasharray="6 5"/>`;
+  SAMP.forEach((a, i) => { if (!(drag && drag.moved && drag.id === 'card-' + i)) { const p = cardXY(i); h += `<g data-drag="card-${i}">${cardSVG(i, p.x, p.y)}</g>`; } });
+  const hb = drag && drag.moved && drag.id.startsWith('card-') ? basketAt(drag.p) : null;
+  for (const [k, b] of Object.entries(BASK)) {
+    const names = SAMP.filter(a => S.sorted[a.id] === k), col = k === 'exo' ? '#ff8a73' : '#9fd4f0';
+    h += `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="10" fill="${hb === k ? 'rgba(114,212,232,.1)' : '#121a28'}" stroke="${hb === k ? '#72d4e8' : col}" stroke-width="1.4" stroke-dasharray="5 4"/>` +
+      `<text x="${b.x + b.w / 2}" y="${b.y + 14}" font-size="8.5" fill="${col}" text-anchor="middle" font-weight="500" letter-spacing=".5">${k === 'exo' ? 'ЭКЗО · +Q' : 'ЭНДО · −Q'}</text>` +
+      names.map((a, j) => `<text x="${b.x + b.w / 2}" y="${b.y + 26 + j * 10}" font-size="8" fill="#e8ecf4" text-anchor="middle">${a.name}</text>`).join('');
+  }
+  h += graphSVG(m);
+  const s = m.s;
+  h += `<text x="${CUP.cx}" y="384" font-size="10" fill="#8b96ad" text-anchor="middle">${s ? `${s.name} (${s.sub}) · ΔT = ${sg(m.dT)} °C${m.settled ? '' : ' …'}` : 'стакан: 100 мл воды, 20 °C'}</text>`;
+  return h;
+}
+const inCupZone = p => p.x > 226 && p.x < 346 && p.y > 130 && p.y < 360;
+const basketAt = p => { for (const [k, b] of Object.entries(BASK)) if (p.x > b.x - 6 && p.x < b.x + b.w + 6 && p.y > b.y - 10 && p.y < b.y + b.h + 8) return k; return null; };
+function stepBubbles(dt) {
+  const m = model(), on = m.s && m.s.id === 'soda' && m.p < 1;
+  if (on) { acc1 += 30 * (1 - m.p) * dt; while (acc1 >= 1) { acc1 -= 1; BUB.push({ x: CUP.cx - 34 + Math.random() * 64, y: 346, r: 1.4 + Math.random() * 2.2, v: 40 + Math.random() * 40 }); } }
+  for (const b of BUB) { b.y -= b.v * dt; b.x += Math.sin(b.y / 7) * 0.3; }
+  BUB = BUB.filter(b => b.y > 254);
+}
+
+// ----- lesson 2: equation board, scales with mole cubes, chain, answers -----
+function eqnSVG(m) {
+  const r = m.r, qq = m.qq;
+  let h = `<rect x="200" y="122" width="308" height="36" rx="10" fill="#121a28" stroke="#3a4762"/>`;
+  h += `<text x="354" y="140" font-size="12" fill="#e8ecf4" text-anchor="middle" font-weight="500">${r.eq.replace(/([+−] \d+ кДж)$/, `<tspan fill="${r.Q > 0 ? '#ff8a73' : '#9fd4f0'}">$1</tspan>`)}</text>`;
+  h += `<text x="354" y="152" font-size="8" fill="#8b96ad" text-anchor="middle">Q относится к ${r.nu} моль ${r.f} — как записано в уравнении</text>`;
+  // scales and mole cubes
+  const n = m.n, cs = 22, full = Math.floor(n + 1e-9), frac = n - full, tot = Math.ceil(n - 1e-9), x0 = SCL.cx - tot * cs / 2;
+  h += `<text x="${SCL.cx}" y="246" font-size="9.5" fill="#c8d1e2" text-anchor="middle">${r.f}: M = ${r.M} г/моль</text>`;
+  h += `<text x="${SCL.cx}" y="262" font-size="9" fill="#8b96ad" text-anchor="middle">кубик = 1 моль = ${r.M} г</text>`;
+  for (let i = 0; i < tot; i++) {
+    const hh = i < full ? cs - 2 : (cs - 2) * frac, x = x0 + i * cs + 1, y = SCL.top - hh;
+    h += `<rect x="${f1(x)}" y="${f1(y)}" width="${cs - 2}" height="${f1(hh)}" rx="3" fill="${r.col}" stroke="${INK}" opacity=".9"/>`;
+    if (i < full) h += `<text x="${f1(x + (cs - 2) / 2)}" y="${f1(y + 14)}" font-size="9" fill="#0b1019" text-anchor="middle" font-weight="500">1</text>`;
+  }
+  h += `<ellipse cx="${SCL.cx}" cy="${SCL.top + 2}" rx="62" ry="5" fill="#8ea0c0"/><rect x="${SCL.cx - 5}" y="${SCL.top + 4}" width="10" height="6" fill="#5c6b88"/>`;
+  h += `<rect x="${SCL.x0 - 12}" y="${SCL.top + 10}" width="${SCL.x1 - SCL.x0 + 24}" height="${356 - SCL.top - 10}" rx="6" fill="#3a4762" stroke="${INK}"/>`;
+  h += `<rect x="${SCL.cx - 38}" y="${SCL.top + 15}" width="76" height="18" rx="3" fill="#0e1520"/><text x="${SCL.cx}" y="${SCL.top + 28}" font-size="11" fill="#86e0a8" text-anchor="middle">${nf(m.m)} г</text>`;
+  // mass slider
+  const kx = SLD.x0 + m.m / r.max * (SLD.x1 - SLD.x0);
+  h += `<g data-drag="m2"><rect x="${SLD.x0 - 12}" y="${SLD.y - 12}" width="${SLD.x1 - SLD.x0 + 24}" height="24" fill="#000" fill-opacity="0"/>` +
+    `<rect x="${SLD.x0}" y="${SLD.y - 2}" width="${SLD.x1 - SLD.x0}" height="4" rx="2" fill="#3a4762"/><rect x="${SLD.x0}" y="${SLD.y - 2}" width="${f1(kx - SLD.x0)}" height="4" rx="2" fill="#ffb547"/>` +
+    `<circle cx="${f1(kx)}" cy="${SLD.y}" r="8" fill="#ffb547" stroke="${INK}" stroke-width="1.5"/></g>`;
+  h += `<text x="${SLD.x0}" y="${SLD.y + 20}" font-size="8" fill="#8b96ad">0</text><text x="${SLD.x1}" y="${SLD.y + 20}" font-size="8" fill="#8b96ad" text-anchor="end">${r.max} г</text>`;
+  // chain
+  const box = (i, k, v, sub, col, hot) => { const x = CHN.xs[i]; return `<rect x="${x}" y="${CHN.y}" width="${CHN.w}" height="${CHN.h}" rx="10" fill="#121a28" stroke="${hot ? col : '#3a4762'}" stroke-width="1.4"/>` +
+    `<text x="${x + CHN.w / 2}" y="${CHN.y + 15}" font-size="8.5" fill="#8b96ad" text-anchor="middle">${k}</text>` +
+    `<text x="${x + CHN.w / 2}" y="${CHN.y + 34}" font-size="13" fill="${col}" text-anchor="middle" font-weight="500">${v}</text>` +
+    `<text x="${x + CHN.w / 2}" y="${CHN.y + 50}" font-size="7.5" fill="#8b96ad" text-anchor="middle">${sub}</text>`; };
+  h += box(0, 'n = m / M', nf(n, 3) + ' моль', `${nf(m.m)} / ${r.M}`, '#72d4e8', true);
+  h += box(1, 'уравнений', '×' + nf(m.k, 3), `${nf(n, 3)} / ${r.nu} моль`, '#c8d1e2', true);
+  h += box(2, r.Q > 0 ? 'выделится' : 'поглотится', m.known ? nf(m.Q, 1) + ' кДж' : '? кДж', m.known ? `×${nf(m.k, 3)} · ${Math.abs(r.Q)}` : 'посчитайте сами', r.Q > 0 ? '#ff8a73' : '#9fd4f0', m.known);
+  for (const i of [0, 1]) h += `<path d="M${CHN.xs[i] + CHN.w + 1} ${CHN.y + CHN.h / 2}h8" stroke="#8b96ad" stroke-width="1.4" marker-end="url(#ah)"/>`;
+  // heat bar
+  const Qmax = r.max / r.M / r.nu * Math.abs(r.Q), fw = m.known ? clamp(m.Q / Qmax, 0, 1) : 0, col = r.Q > 0 ? '#ff8a73' : '#9fd4f0';
+  h += `<rect x="200" y="244" width="308" height="12" rx="6" fill="#26324a"/><rect x="200" y="244" width="${f1(308 * fw)}" height="12" rx="6" fill="${col}" opacity=".8"/>`;
+  h += `<text x="200" y="270" font-size="8" fill="#8b96ad">теплота: ${m.known ? nf(m.Q, 1) + ' кДж' : 'откроется после верного ответа'}</text><text x="508" y="270" font-size="8" fill="#8b96ad" text-anchor="end">${nf(Qmax)} кДж</text>`;
+  // question and tiles
+  h += `<text x="200" y="284" font-size="10" fill="#e8ecf4" font-weight="500">${S.q + 1}. ${qq.ask[0]}</text><text x="214" y="297" font-size="10" fill="#e8ecf4" font-weight="500">${qq.ask[1]}</text>`;
+  qq.opts.forEach((v, i) => {
+    const x = TIL.xs[i], ok = S.ans[S.q] && v === qq.ans, bad = !S.ans[S.q] && S.bad2 === v;
+    h += `<g data-drag="tile-${i}"><rect x="${x}" y="${TIL.y}" width="${TIL.w}" height="${TIL.h}" rx="10" fill="${ok ? 'rgba(134,224,168,.16)' : '#121a28'}" stroke="${ok ? '#86e0a8' : bad ? '#ff8a73' : '#5c6b88'}" stroke-width="1.5"/>` +
+      `<text x="${x + TIL.w / 2}" y="${TIL.y + 22}" font-size="12" fill="${ok ? '#86e0a8' : '#e8ecf4'}" text-anchor="middle" font-weight="500">${nf(v, 1)}</text>` +
+      `<text x="${x + TIL.w / 2}" y="${TIL.y + 36}" font-size="8" fill="#8b96ad" text-anchor="middle">кДж${ok ? ' ✓' : ''}</text></g>`;
+  });
+  return h;
+}
+
+// ----- lesson 3: molecules, free atoms, energy levels -----
+function molSVG(k, cx, cy, mode) {
+  const M = MOLS[k];
+  let h = '';
+  const ghost = mode === 'ghost';
+  for (const [a, b, o] of M.bonds) {
+    const A = M.atoms[a], B = M.atoms[b], dx = B[1] - A[1], dy = B[2] - A[2], L = Math.hypot(dx, dy), nx = -dy / L, ny = dx / L;
+    for (let j = 0; j < o; j++) { const off = (j - (o - 1) / 2) * 3.4; h += `<path d="M${f1(cx + A[1] + nx * off)} ${f1(cy + A[2] + ny * off)}L${f1(cx + B[1] + nx * off)} ${f1(cy + B[2] + ny * off)}" stroke="${ghost ? '#5c6b88' : '#c8d1e2'}" stroke-width="1.6" ${ghost ? 'stroke-dasharray="3 3"' : ''}/>`; }
+  }
+  for (const [el, x, y] of M.atoms) {
+    const r = ARAD[el];
+    h += ghost ? `<circle cx="${f1(cx + x)}" cy="${f1(cy + y)}" r="${r}" fill="#0e1520" stroke="#5c6b88" stroke-dasharray="3 2"/>` :
+      `<circle cx="${f1(cx + x)}" cy="${f1(cy + y)}" r="${r + 1}" fill="${INK}"/><circle cx="${f1(cx + x)}" cy="${f1(cy + y)}" r="${r}" fill="${ACOL[el]}"/>`;
+    h += `<text x="${f1(cx + x)}" y="${f1(cy + y + 3)}" font-size="${el === 'Cl' ? 7.5 : 8}" fill="${ghost ? '#5c6b88' : el === 'H' || el === 'Cl' ? '#0b1019' : '#fff'}" text-anchor="middle" font-weight="500">${el}</text>`;
+  }
+  return h;
+}
+const rowX = (n, i) => MA.x0 + 8 + (i + 0.5) * (MA.x1 - MA.x0 - 16) / n;
+function freeAtoms(r) {
+  const cnt = {};
+  r.R.forEach((k, i) => { if (S.brk[i]) MOLS[k].atoms.forEach(([el]) => cnt[el] = (cnt[el] || 0) + 1); });
+  r.P.forEach((k, i) => { if (S.frm[i]) MOLS[k].atoms.forEach(([el]) => cnt[el] = (cnt[el] || 0) - 1); });
+  const out = []; for (const el of ['C', 'N', 'O', 'Cl', 'H']) for (let j = 0; j < (cnt[el] || 0); j++) out.push(el);
+  return out;
+}
+function bondSVG(m) {
+  const r = m.r;
+  let h = `<text x="${MA.x0 + 2}" y="${MA.yR - 30}" font-size="9" fill="#8b96ad">РЕАГЕНТЫ · ${r.eq}</text>`;
+  r.R.forEach((k, i) => {
+    const x = rowX(r.R.length, i), b = S.brk[i];
+    h += `<g data-drag="r-${i}"><rect x="${f1(x - 40)}" y="${MA.yR - 22}" width="80" height="44" fill="#000" fill-opacity="0"/>${molSVG(k, x, MA.yR - 2, b ? 'ghost' : 'solid')}</g>`;
+    h += `<text x="${f1(x)}" y="${MA.yR + 22}" font-size="7.5" fill="${b ? '#ff8a73' : '#8b96ad'}" text-anchor="middle">${b ? 'разорвано +' + molE(k) : bTxt(k)}</text>`;
+  });
+  const P = MA.pool, fa = freeAtoms(r);
+  h += `<rect x="${P.x}" y="${P.y}" width="${P.w}" height="${P.h}" rx="10" fill="#0e1520" stroke="#3a4762" stroke-dasharray="5 4"/><text x="${P.x + 8}" y="${P.y + 12}" font-size="8" fill="#8b96ad">свободные атомы${fa.length ? '' : ' — пока нет'}</text>`;
+  fa.forEach((el, j) => { const x = P.x + 22 + (j % 12) * 24 + (j >= 12 ? 12 : 0), y = P.y + 30 + Math.floor(j / 12) * 20 + (j % 2 ? 6 : -2); h += `<circle cx="${x}" cy="${y}" r="${ARAD[el] + 1}" fill="${INK}"/><circle cx="${x}" cy="${y}" r="${ARAD[el]}" fill="${ACOL[el]}"/><text x="${x}" y="${y + 3}" font-size="7.5" fill="${el === 'H' || el === 'Cl' ? '#0b1019' : '#fff'}" text-anchor="middle" font-weight="500">${el}</text>`; });
+  h += `<text x="${MA.x0 + 2}" y="${MA.yP - 26}" font-size="9" fill="#8b96ad">ПРОДУКТЫ</text>`;
+  r.P.forEach((k, i) => {
+    const x = rowX(r.P.length, i), f = S.frm[i];
+    h += `<g data-drag="p-${i}"><rect x="${f1(x - 40)}" y="${MA.yP - 20}" width="80" height="40" fill="#000" fill-opacity="0"/>${molSVG(k, x, MA.yP - 2, f ? 'solid' : 'ghost')}</g>`;
+    h += `<text x="${f1(x)}" y="${MA.yP + 20}" font-size="7.5" fill="${f ? '#86e0a8' : '#8b96ad'}" text-anchor="middle">${f ? 'образовано −' + molE(k) : bTxt(k)}</text>`;
+  });
+  // verdict tiles
+  const ready = m.allF, done = S.f3[r.id];
+  [['exo', 'экзо: теплота выделяется', '#ff8a73'], ['endo', 'эндо: теплота поглощается', '#9fd4f0']].forEach(([k, t, c], i) => {
+    const x = VB.xs[i], on = done && (k === 'exo') === r.exo;
+    h += `<g data-drag="v-${k}" opacity="${ready ? 1 : 0.4}"><rect x="${x}" y="${VB.y}" width="${VB.w}" height="${VB.h}" rx="8" fill="${on ? 'rgba(134,224,168,.16)' : '#121a28'}" stroke="${on ? '#86e0a8' : c}" stroke-width="1.4"/><text x="${x + VB.w / 2}" y="${VB.y + 15.5}" font-size="8.5" fill="${on ? '#86e0a8' : c}" text-anchor="middle" font-weight="500">${t}${on ? ' ✓' : ''}</text></g>`;
+  });
+  // energy level diagram
+  const top = m.Ebrk, bot = Math.min(0, -m.Q), span = top - bot, Y = E => ED.y1 - 18 - (E - bot) / span * (ED.y1 - ED.y0 - 62);
+  h += `<rect x="${ED.x0 - 6}" y="${ED.y0 - 10}" width="${ED.x1 - ED.x0 + 10}" height="${ED.y1 - ED.y0 + 26}" rx="10" fill="#0e1520" stroke="#26324a"/>`;
+  h += `<text x="${ED.x0 + 2}" y="${ED.y0 + 4}" font-size="8.5" fill="#8b96ad">E, кДж</text>`;
+  const lvl = (x0, x1, E, c, lab, dash) => `<path d="M${x0} ${f1(Y(E))}H${x1}" stroke="${c}" stroke-width="2.4" ${dash ? 'stroke-dasharray="5 3"' : ''}/><text x="${(x0 + x1) / 2}" y="${f1(Y(E) - 4)}" font-size="8" fill="${c}" text-anchor="middle">${lab}</text>`;
+  const cR = [ED.x0 + 4, ED.x0 + 44], cA = [ED.x0 + 58, ED.x0 + 100], cP = [ED.x0 + 114, ED.x1 - 4];
+  h += lvl(cR[0], cR[1], 0, '#c8d1e2', '0');
+  // activated complex: schematic hump (real barrier is far below the "all atoms" level)
+  const yA = Y(0 + 0.28 * top);
+  if (m.allF) h += `<path d="M${cR[1]} ${f1(Y(0))}C${cR[1] + 26} ${f1(Y(0))} ${cA[0] + 4} ${f1(yA)} ${(cA[0] + cA[1]) / 2} ${f1(yA)}C${cA[1] - 4} ${f1(yA)} ${cP[0] - 26} ${f1(Y(-m.Q))} ${cP[0]} ${f1(Y(-m.Q))}" fill="none" stroke="#ffb547" stroke-width="1.6" stroke-dasharray="4 3"/><text x="${(cA[0] + cA[1]) / 2}" y="${f1(yA - 5)}" font-size="7" fill="#ffb547" text-anchor="middle">акт. комплекс</text>`;
+  if (m.brk > 0) {
+    h += lvl(cA[0], cA[1], m.allB ? top : m.brk, '#ff8a73', m.allB ? 'атомы +' + top : '+' + m.brk, !m.allB);
+    h += `<path d="M${cR[1] - 6} ${f1(Y(0) - 3)}V${f1(Y(m.brk) + 6)}" stroke="#ff8a73" stroke-width="1.6" marker-end="url(#ahr)"/>`;
+  }
+  if (m.frm > 0) {
+    h += `<path d="M${cP[0] + 6} ${f1(Y(top) + 3)}V${f1(Y(m.E) - 6)}" stroke="#86e0a8" stroke-width="1.6" marker-end="url(#ahg)"/>`;
+    h += lvl(cP[0], cP[1], m.E, '#86e0a8', m.allF ? (m.E > 0 ? '+' : '−') + Math.abs(m.E) : nf(m.E), !m.allF);
+  }
+  h += `<text x="${(cR[0] + cR[1]) / 2}" y="${ED.y1 + 8}" font-size="7.5" fill="#8b96ad" text-anchor="middle">реагенты</text><text x="${(cA[0] + cA[1]) / 2}" y="${ED.y1 + 8}" font-size="7.5" fill="#8b96ad" text-anchor="middle">атомы</text><text x="${(cP[0] + cP[1]) / 2}" y="${ED.y1 + 8}" font-size="7.5" fill="#8b96ad" text-anchor="middle">продукты</text>`;
+  if (m.allF) h += `<text x="${(ED.x0 + ED.x1) / 2}" y="${ED.y0 + 16}" font-size="9" fill="${m.Q > 0 ? '#ff8a73' : '#9fd4f0'}" text-anchor="middle" font-weight="500">Q = ${m.Q > 0 ? '+' : '−'}${Math.abs(m.Q)} кДж</text>`;
+  else h += `<text x="${(ED.x0 + ED.x1) / 2}" y="${ED.y0 + 16}" font-size="8" fill="#8b96ad" text-anchor="middle">сейчас: ${m.E > 0 ? '+' : ''}${nf(m.E)} кДж</text>`;
+  return h;
+}
+
+// ----- lesson 4: fuels shelf and charts -----
+function fuelIcon(f, x, y) {
+  if (f.bat) return `<rect x="${x - 12}" y="${y - 16}" width="24" height="32" rx="3" fill="#2c3240" stroke="#86e0a8" stroke-width="1.4"/><rect x="${x - 5}" y="${y - 20}" width="10" height="4" fill="#86e0a8"/><path d="M${x + 2} ${y - 10}l-6 10h5l-3 9 7-11h-5z" fill="#86e0a8"/>`;
+  if (f.id === 'coal') return [0, 1, 2, 3].map(i => `<path d="M${x - 14 + i * 7} ${y + 14}l5 -10l7 2l2 8z" fill="#2a2f3a" stroke="#55607a"/>`).join('') + `<path d="M${x - 6} ${y + 6}l6 -12l8 4l0 8z" fill="#2a2f3a" stroke="#55607a"/>`;
+  if (f.id === 'wood') return [0, 1, 2].map(i => `<rect x="${x - 15}" y="${y - 2 + (i - 1) * 9}" width="30" height="8" rx="4" fill="#a37b4a" stroke="#5a4127"/><circle cx="${x + 13}" cy="${y + 2 + (i - 1) * 9}" r="3.2" fill="#d9b886"/>`).join('');
+  if (f.id === 'pet') return `<path d="M${x - 11} ${y + 16}V${y - 8}l6 -8h10v6h-4l3 2v24z" fill="#c8452c" stroke="${INK}"/><rect x="${x - 8}" y="${y - 2}" width="13" height="12" rx="2" fill="#ffd27a" opacity=".85"/>`;
+  return `<rect x="${x - 9}" y="${y - 12}" width="18" height="28" rx="8" fill="${f.id === 'h2' ? '#cfe2f0' : '#4d7cf0'}" stroke="${INK}"/><rect x="${x - 3}" y="${y - 18}" width="6" height="6" fill="#8ea0c0"/><text x="${x}" y="${y + 6}" font-size="7.5" fill="#0b1019" text-anchor="middle" font-weight="500">${f.id === 'h2' ? 'H₂' : 'CH₄'}</text>`;
+}
+function fuelSVG(m) {
+  const sc = m.sc;
+  let h = '';
+  // scenario tabs + text
+  SC4.forEach((s, i) => { const x = 200 + i * 104, on = i === S.sc, ok = S.pick[i]; h += `<g data-drag="sc-${i}"><rect x="${x}" y="118" width="100" height="18" rx="9" fill="${on ? '#e8ecf4' : '#121a28'}" stroke="${ok ? '#86e0a8' : '#3a4762'}"/><text x="${x + 50}" y="130.5" font-size="8.5" fill="${on ? '#0b1019' : ok ? '#86e0a8' : '#c8d1e2'}" text-anchor="middle" font-weight="500">${i + 1}. ${s.name}${ok ? ' ✓' : ''}</text></g>`; });
+  h += `<text x="200" y="150" font-size="9.5" fill="#e8ecf4" font-weight="500">${sc.text[0]}</text><text x="200" y="162" font-size="9.5" fill="#e8ecf4" font-weight="500">${sc.text[1]}</text>`;
+  // shelf
+  FUELS.forEach((f, i) => {
+    const x = fuelX(i), on = S.sel === i, ok = S.pick[S.sc] === f.id, off = sc.only && !sc.only.includes(f.id);
+    h += `<g data-drag="fuel-${i}" opacity="${off ? 0.45 : 1}"><rect x="${x}" y="${SH.y}" width="${SH.w}" height="${SH.h}" rx="10" fill="${ok ? 'rgba(134,224,168,.14)' : '#121a28'}" stroke="${ok ? '#86e0a8' : on ? '#ffb547' : '#3a4762'}" stroke-width="${on || ok ? 2 : 1.4}"/>` +
+      fuelIcon(f, x + SH.w / 2, SH.y + 28) +
+      `<text x="${x + SH.w / 2}" y="${SH.y + 58}" font-size="8.5" fill="#e8ecf4" text-anchor="middle" font-weight="500">${f.name}</text>` +
+      `<text x="${x + SH.w / 2}" y="${SH.y + 70}" font-size="7" fill="#8b96ad" text-anchor="middle">${f.f}</text></g>`;
+  });
+  h += `<rect x="${SH.x0 - 6}" y="${SH.y + SH.h + 2}" width="${6 * SH.w + 5 * SH.gap + 12}" height="5" rx="2" fill="#5c6b88"/>`;
+  // charts
+  const charts = [{ t: 'теплота сгорания, МДж/кг', v: f => f.q, max: 120, col: '#ffb547', lab: f => '≈' + nf(f.q, 1) },
+                  { t: 'CO₂ при сжигании, г/МДж', v: f => f.co2, max: 120, col: '#8b96ad', lab: f => f.bat ? '0*' : f.id === 'h2' ? '0*' : '≈' + f.co2 }];
+  charts.forEach((c, j) => {
+    const C = CH[j], bx = C.x0 + 52, bw = C.x1 - bx - 30;
+    h += `<text x="${C.x0}" y="${CHY - 8}" font-size="8.5" fill="#8b96ad">${c.t}</text>`;
+    FUELS.forEach((f, i) => {
+      const y = CHY + i * 14, on = S.sel === i, w = Math.max(1.5, c.v(f) / c.max * bw);
+      h += `<text x="${C.x0}" y="${y + 8}" font-size="8" fill="${on ? '#e8ecf4' : '#8b96ad'}">${f.name}</text><rect x="${bx}" y="${y}" width="${f1(w)}" height="10" rx="3" fill="${on ? (j ? '#c8d1e2' : '#ffb547') : c.col}" opacity="${on ? 1 : 0.5}"/><text x="${f1(bx + w + 4)}" y="${y + 8}" font-size="7.5" fill="${on ? '#e8ecf4' : '#8b96ad'}">${c.lab(f)}</text>`;
+    });
+  });
+  h += `<text x="${CH[1].x1}" y="399" font-size="6.8" fill="#8b96ad" text-anchor="end">* при работе; на заводе и электростанции CO₂ может выделяться</text>`;
+  const f = m.f;
+  h += `<text x="260" y="384" font-size="10" fill="${f ? '#e8ecf4' : '#8b96ad'}" text-anchor="middle">${f ? `${f.name}: на ${nf(sc.E)} МДж нужно ${kgTxt(m.mass)}, CO₂ при сжигании ${f.co2 ? kgTxt(m.co2) : '0'}` : 'Выберите топливо для этой задачи'}</text>`;
+  return h;
+}
+
+function hlBox(id) {
+  return {
+    cup: [CUP.x0 - 18, CUP.y0 - 14, CUP.x1 - CUP.x0 + 36, CUP.y1 - CUP.y0 + 18], thermo: [300, 124, 36, 222], cards: [CARD.xs[0] - 6, CARD.ys[0] - 6, CARD.xs[1] + CARD.w - CARD.xs[0] + 12, CARD.ys[2] + CARD.h - CARD.ys[0] + 12],
+    graph: [PG.x0 - 28, PG.y0 - 22, PG.x1 - PG.x0 + 34, PG.y1 - PG.y0 + 50], bask: [BASK.exo.x - 6, BASK.exo.y - 6, BASK.endo.x + BASK.endo.w - BASK.exo.x + 12, BASK.exo.h + 12],
+    eqb: [194, 116, 320, 48], scale: [SCL.x0 - 18, 234, SCL.x1 - SCL.x0 + 36, 360 - 234], slider: [SLD.x0 - 16, SLD.y - 16, SLD.x1 - SLD.x0 + 32, 40], chain: [CHN.xs[0] - 6, CHN.y - 6, 320, CHN.h + 12],
+    heat: [194, 238, 320, 38], tiles: [TIL.xs[0] - 6, 274, 320, TIL.h + 36],
+    react: [MA.x0 - 4, MA.yR - 42, MA.x1 - MA.x0 + 8, 72], pool: [MA.pool.x - 6, MA.pool.y - 6, MA.pool.w + 12, MA.pool.h + 12], prod: [MA.x0 - 4, MA.yP - 38, MA.x1 - MA.x0 + 8, 66],
+    ediag: [ED.x0 - 10, ED.y0 - 14, ED.x1 - ED.x0 + 18, ED.y1 - ED.y0 + 34], verd: [VB.xs[0] - 6, VB.y - 6, VB.xs[1] + VB.w - VB.xs[0] + 12, VB.h + 12],
+    board: [194, 112, 320, 58], shelf: [SH.x0 - 6, SH.y - 6, 6 * SH.w + 5 * SH.gap + 12, SH.h + 20], qchart: [CH[0].x0 - 6, CHY - 20, CH[0].x1 - CH[0].x0 + 12, 104], cchart: [CH[1].x0 - 6, CHY - 20, CH[1].x1 - CH[1].x0 + 12, 104], res: [60, 370, 400, 22],
+  }[id];
+}
+function ghostSVG(d) {
+  if (d.id.startsWith('card-')) return cardSVG(+d.id.slice(5), d.p.x - CARD.w / 2, d.p.y - CARD.h / 2, true);
+  return '';
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID(), m = model();
+  let h = bench();
+  if (id === 'exo') h += exoSVG(m, t);
+  else if (id === 'equation') h += eqnSVG(m);
+  else if (id === 'bonds') h += bondSVG(m);
+  else h += fuelSVG(m);
+  if (drag && drag.moved) h += `<g opacity=".92" pointer-events="none">${ghostSVG(drag)}</g>`;
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${f1(b[0])}" y="${f1(b[1])}" width="${f1(b[2])}" height="${f1(b[3])}" rx="10" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  let s = Math.min(w / 500, hh / 410, 1.7), vx = null;
+  // the task card (it grows with the shared «Формулы урока» block and the «Как выполнить» button) must not cover the bench:
+  // content spans x 10…510 and y 118…405 — place it to the right of the card or below it, whichever is larger
+  const tk = document.querySelector('#stage .task');
+  if (tk && tk.offsetParent) {
+    const tb = tk.getBoundingClientRect(), right = tb.right - rc.left + 8, bot = tb.bottom - rc.top + 8;
+    if (right > w / 2 - 250 * s && bot > hh - 287 * s) {
+      const sSide = Math.min(s, (w - right - 8) / 500), sDown = Math.min(s, (hh - bot) / 287);
+      if (sSide >= sDown) { s = Math.max(0.3, sSide); vx = 10 - (right + (w - 8 - right - 500 * s) / 2) / s; }
+      else s = Math.max(0.3, sDown);
+    }
+  }
+  const vw = w / s, vh = hh / s;
+  if (vx === null) vx = 260 - vw / 2;
+  scene.setAttribute('viewBox', `${vx.toFixed(1)} ${(405 - vh).toFixed(1)} ${vw.toFixed(1)} ${vh.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+new ResizeObserver(fit).observe(document.querySelector('#stage .task'));
+
+// ---------- dragging and tapping ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+const live = id => id === 'm2';
+const movable = id => id.startsWith('card-') || id === 'm2';
+function liveMove(id, p) {
+  if (id === 'm2') { const r = RX2[QS[S.q].rx]; setM2(Math.round(clamp((p.x - SLD.x0) / (SLD.x1 - SLD.x0), 0, 1) * r.max / r.step) * r.step); }
+}
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  drag = { id: el.dataset.drag, x: e.clientX, y: e.clientY, p: toSvg(e), moved: false };
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 6 && movable(drag.id)) drag.moved = true;
+  drag.p = toSvg(e);
+  if (drag.moved && live(drag.id)) { liveMove(drag.id, drag.p); return; }
+  if (drag.moved) dirty = true;
+});
+const endDrag = cancel => {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing'); dirty = true;
+  if (cancel) return;
+  if (d.moved) drop(d.id, d.p); else tap(d.id, d.p);
+};
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+function tap(id, p) {
+  if (id === 'm2') return liveMove(id, p);
+  if (id.startsWith('card-')) return testSamp(+id.slice(5));
+  if (id.startsWith('tile-')) return answer(+id.slice(5));
+  if (id.startsWith('r-')) return breakR(+id.slice(2));
+  if (id.startsWith('p-')) return formP(+id.slice(2));
+  if (id.startsWith('v-')) return verdict(id.slice(2));
+  if (id.startsWith('fuel-')) return pickFuel(+id.slice(5));
+  if (id.startsWith('sc-')) return setSc(+id.slice(3));
+}
+function drop(id, p) {
+  if (id.startsWith('card-')) {
+    const i = +id.slice(5);
+    if (inCupZone(p)) return testSamp(i);
+    const b = basketAt(p); if (b) return sortSamp(i, b);
+  }
+}
+
+// lesson 1 actions
+function testSamp(i) {
+  const a = SAMP[i];
+  if (S.cur === i) { toast(`${a.name} уже в калориметре. Чтобы повторить опыт, сначала вымойте стакан.`); return true; }
+  S.cur = i; S.t1 = reduce ? 12 : 0; S.tested[a.id] = true; BUB = []; acc1 = 0;
+  toast(`Опыт: ${a.what}. Следите за термометром.`);
+  renderTools(); update(); return true;
+}
+function sortSamp(i, k) {
+  const a = SAMP[i], d = dTof(a);
+  if (!S.tested[a.id]) { toast('Сначала проведите этот опыт в калориметре.'); return false; }
+  if ((k === 'exo') !== a.exo) {
+    S.wrong1++;
+    toast(a.exo ? `Нет: вода нагрелась на ${fx(d, 1)} °C — теплота выделилась.` : `Нет: вода остыла на ${fx(-d, 1)} °C — теплота поглотилась.`);
+    update(); return false;
+  }
+  if (S.sorted[a.id] === k) return true;
+  S.sorted[a.id] = k;
+  toast(`Верно: ${a.eq}.`);
+  update(); return true;
+}
+function clearCup() { S.cur = null; S.t1 = 0; BUB = []; renderTools(); update(); }
+
+// lesson 2 actions
+function setQ(i) { S.q = clamp(i, 0, QS.length - 1); S.m2 = QS[S.q].m; S.bad2 = null; renderTools(); buildScheme(); update(); }
+function setM2(v) { const r = RX2[QS[S.q].rx]; v = clamp(Math.round(v / r.step) * r.step, 0, r.max); if (Math.abs(v - S.m2) < 1e-9) return; S.m2 = v; update(); }
+function answer(k) {
+  const qq = QS[S.q], v = qq.opts[k], r = RX2[qq.rx], n = qq.m / r.M;
+  if (S.ans[S.q]) { toast('Эта задача уже решена. Переходите к следующей.'); return true; }
+  if (v === qq.ans) {
+    S.ans[S.q] = true; S.bad2 = null; S.m2 = qq.m;
+    const next = QS.findIndex((x, i) => !S.ans[i]);
+    toast(`Верно: n = ${nf(qq.m)} / ${r.M} = ${nf(n, 3)} моль, Q = ${nf(n, 3)} / ${r.nu} · ${Math.abs(r.Q)} = ${nf(v, 1)} кДж.${next >= 0 ? ` Дальше — задача ${next + 1}.` : ''}`);
+    update(); return true;
+  }
+  S.wrong2++; S.bad2 = v;
+  let msg = 'Нет. Сначала найдите n = m / M, потом сравните с числом моль в уравнении.';
+  if (v === Math.abs(r.Q)) msg = `Нет: ${Math.abs(r.Q)} кДж — это теплота на ${r.nu} моль ${r.f}, как в уравнении. А сколько моль в ${nf(qq.m)} г?`;
+  else if (r.nu > 1 && Math.abs(v - n * Math.abs(r.Q)) < 1e-6) msg = `Нет: в уравнении ${r.nu} моль ${r.f}, а теплота ${Math.abs(r.Q)} кДж — на все ${r.nu} моль. Разделите на ${r.nu}.`;
+  else if (Math.abs(v - qq.m * Math.abs(r.Q)) < 1e-6) msg = 'Нет: умножили на массу в граммах, а теплота пропорциональна количеству вещества в молях.';
+  toast(msg); update(); return false;
+}
+
+// lesson 3 actions
+function setRx(i) { S.rx3 = clamp(i, 0, RX3.length - 1); S.brk = []; S.frm = []; renderTools(); buildScheme(); update(); }
+function breakR(i) {
+  const r = RX3[S.rx3], k = r.R[i]; if (!k) return;
+  if (S.brk[i]) { toast(`${MOLS[k].f} уже разорвана на атомы.`); return; }
+  S.brk[i] = true;
+  toast(`Разорвали ${bTxt(k)} в ${MOLS[k].f}: затрачено ${molE(k)} кДж.`);
+  update();
+}
+function formP(i) {
+  const r = RX3[S.rx3], k = r.P[i]; if (!k) return;
+  if (S.frm[i]) { toast(`${MOLS[k].f} уже собрана.`); return; }
+  if (!r.R.every((x, j) => S.brk[j])) { toast('Сначала разорвите связи во всех молекулах реагентов: атомы для продуктов берутся из них.'); return; }
+  S.frm[i] = true;
+  toast(`Образовались ${bTxt(k)} в ${MOLS[k].f}: выделилось ${molE(k)} кДж.`);
+  update();
+}
+const breakNext = () => { const r = RX3[S.rx3], i = r.R.findIndex((k, j) => !S.brk[j]); if (i < 0) toast('Все связи в реагентах уже разорваны.'); else breakR(i); };
+const formNext = () => { const r = RX3[S.rx3], i = r.P.findIndex((k, j) => !S.frm[j]); if (i < 0) toast('Все продукты уже собраны.'); else formP(i); };
+function verdict(v) {
+  const r = RX3[S.rx3], m = model();
+  if (!m.allF) { toast('Сначала разорвите все связи и соберите все продукты — тогда станет ясен итог.'); return; }
+  if ((v === 'exo') !== r.exo) { S.wrong3++; toast(`Нет: на разрыв ушло ${m.Ebrk} кДж, а при образовании выделилось ${m.Efrm} кДж. Чего больше?`); update(); return; }
+  const first = !S.f3[r.id]; S.f3[r.id] = true;
+  toast(`Верно: Q = ${m.Efrm} − ${m.Ebrk} = ${m.Q > 0 ? '+' : '−'}${Math.abs(m.Q)} кДж, ${r.exo ? 'экзотермическая' : 'эндотермическая'} (${r.real}).${first && !(S.f3.ch4 && S.f3.no) ? ' Теперь другая реакция.' : ''}`);
+  update();
+}
+
+// lesson 4 actions
+let scT = 0;
+function setSc(i) { S.sc = clamp(i, 0, SC4.length - 1); S.sel = null; clearTimeout(scT); renderTools(); buildScheme(); update(); }
+function pickFuel(i) {
+  const sc = SC4[S.sc], f = FUELS[i];
+  S.sel = i;
+  if (S.pick[S.sc]) { update(); return; }
+  if (f.id === sc.ok) {
+    S.pick[S.sc] = f.id; toast(sc.right);
+    const next = SC4.findIndex((x, j) => !S.pick[j]), lesson = S.lesson;
+    clearTimeout(scT); if (next >= 0) scT = setTimeout(() => { if (S.lesson === lesson) setSc(next); }, 2600);
+    update(); return;
+  }
+  S.wrong4++;
+  let msg;
+  if (sc.id === 'rocket') { const h2 = FUELS[0]; msg = `Можно лучше: с ${INSTR[f.id]} понадобится ${kgTxt(massFor(sc, f))} — в ${nf(massFor(sc, f) / massFor(sc, h2), 1)} раза больше по массе, чем у самого «лёгкого» топлива.`; if (f.bat) msg = `Аккумуляторы на 1000 МДж весили бы больше тонны: около 0,9 МДж/кг. Для ракеты нужна наибольшая теплота сгорания.`; }
+  else if (sc.id === 'boiler') msg = sc.only.includes(f.id) ? `Есть вариант чище: ${f.name.toLowerCase()} даёт около ${f.co2} г CO₂ на МДж, за зиму ${kgTxt(co2For(sc, f))}.` : 'В этой задаче котельная работает на ископаемом топливе: выбирайте из метана (природного газа), бензина и угля.';
+  else msg = f.id === 'h2' ? 'Сжигать водород на закрытом складе опасно: смесь H₂ с воздухом взрывоопасна. (Бывают погрузчики на водородных топливных элементах — там водород не горит, а даёт ток.)' : `${f.name} ${f.id === 'wood' ? 'горят' : 'горит'}: пламя, выхлоп с CO₂, а при нехватке воздуха — ядовитый угарный газ CO. В закрытом складе так нельзя.`;
+  toast(msg); update();
+}
+
+// ---------- animation loop ----------
+let lastT = 0, lastUi = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - (lastT || t)) / 1000); lastT = t;
+  const id = LID();
+  let anim = false;
+  if (id === 'exo') {
+    if (S.cur !== null && S.t1 < 12) { S.t1 = Math.min(12, S.t1 + dt); if (t - lastUi > 150 || S.t1 >= 12) { lastUi = t; update(); } }
+    if (!reduce) { stepBubbles(dt); anim = true; }
+  }
+  if (dirty || anim || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3800); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  tb.innerHTML = {
+    exo: SAMP.map((a, i) => B('s-' + i, a.name, S.cur === i)).join('') + sep + B('clr', 'Вымыть'),
+    equation: QS.map((q, i) => B('q-' + i, 'Задача ' + (i + 1), S.q === i)).join('') + sep + B('m-', '−m') + B('m+', '+m'),
+    bonds: RX3.map((r, i) => B('rx-' + i, r.name, S.rx3 === i)).join('') + sep + B('brk', 'Разорвать') + B('frm', 'Собрать') + sep + B('rs3', 'Заново'),
+    fuel: SC4.map((s, i) => B('sc-' + i, s.name, S.sc === i)).join(''),
+  }[id];
+}
+function act(a) {
+  if (a.startsWith('s-')) return testSamp(+a.slice(2));
+  if (a === 'clr') return clearCup();
+  if (a.startsWith('q-')) return setQ(+a.slice(2));
+  if (a === 'm-' || a === 'm+') { const r = RX2[QS[S.q].rx]; return setM2(S.m2 + (a === 'm+' ? r.step : -r.step)); }
+  if (a.startsWith('rx-')) return setRx(+a.slice(3));
+  if (a === 'brk') return breakNext();
+  if (a === 'frm') return formNext();
+  if (a === 'rs3') return setRx(S.rx3);
+  if (a.startsWith('sc-')) return setSc(+a.slice(3));
+  if (a.startsWith('fuel-')) return pickFuel(+a.slice(5));
+  if (a === 'exo' || a === 'endo') return verdict(a);
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  cup: IC('<path d="M6 8L9 30H25L28 8Z" fill="rgba(233,237,243,.1)" stroke="#8ea0c0" stroke-width="1.5"/><rect x="9" y="17" width="16" height="12" fill="#ff8a73" opacity=".4"/><rect x="4" y="5" width="26" height="4" rx="1.5" fill="#5c6b88"/>'),
+  thermo: IC('<rect x="14" y="3" width="6" height="22" rx="3" fill="none" stroke="#c8d1e2"/><rect x="15.6" y="11" width="2.8" height="14" fill="#ff5a4a"/><circle cx="17" cy="27" r="4.5" fill="#ff5a4a"/>'),
+  cards: IC('<rect x="3" y="6" width="28" height="10" rx="3" fill="none" stroke="#3a4762"/><rect x="3" y="19" width="28" height="10" rx="3" fill="none" stroke="#72d4e8"/><circle cx="8" cy="24" r="2.6" fill="#f2f2ee"/>'),
+  graph: IC('<path d="M4 4V30H30" fill="none" stroke="#3a4762" stroke-width="1.5"/><path d="M5 20Q12 8 30 8" fill="none" stroke="#ff8a73" stroke-width="1.8"/><path d="M5 20Q12 27 30 27" fill="none" stroke="#9fd4f0" stroke-width="1.8"/>'),
+  bask: IC('<rect x="3" y="9" width="13" height="18" rx="3" fill="none" stroke="#ff8a73" stroke-dasharray="3 2"/><rect x="18" y="9" width="13" height="18" rx="3" fill="none" stroke="#9fd4f0" stroke-dasharray="3 2"/>'),
+  eqb: IC('<text x="17" y="21" font-size="8" text-anchor="middle" fill="#ff8a73" font-family="IBM Plex Mono">+Q</text><rect x="3" y="9" width="28" height="16" rx="4" fill="none" stroke="#3a4762"/>'),
+  scale: IC('<rect x="6" y="14" width="8" height="8" rx="1.5" fill="#9fd4f0"/><rect x="15" y="14" width="8" height="8" rx="1.5" fill="#9fd4f0"/><rect x="24" y="18" width="8" height="4" rx="1.5" fill="#9fd4f0"/><rect x="4" y="24" width="28" height="7" rx="2" fill="#3a4762"/>'),
+  slider: IC('<rect x="4" y="16" width="26" height="3" rx="1.5" fill="#3a4762"/><circle cx="15" cy="17.5" r="5" fill="#ffb547"/>'),
+  chain: IC('<rect x="2" y="11" width="8" height="12" rx="2" fill="none" stroke="#72d4e8"/><rect x="13" y="11" width="8" height="12" rx="2" fill="none" stroke="#c8d1e2"/><rect x="24" y="11" width="8" height="12" rx="2" fill="none" stroke="#ff8a73"/>'),
+  heat: IC('<rect x="3" y="13" width="28" height="8" rx="4" fill="#26324a"/><rect x="3" y="13" width="17" height="8" rx="4" fill="#ff8a73"/>'),
+  tiles: IC('<rect x="3" y="8" width="13" height="8" rx="2" fill="none" stroke="#5c6b88"/><rect x="18" y="8" width="13" height="8" rx="2" fill="none" stroke="#86e0a8"/><rect x="3" y="19" width="13" height="8" rx="2" fill="none" stroke="#5c6b88"/><rect x="18" y="19" width="13" height="8" rx="2" fill="none" stroke="#5c6b88"/>'),
+  react: IC('<circle cx="17" cy="17" r="5" fill="#4f586d"/><circle cx="9" cy="10" r="3.5" fill="#e8ecf4"/><circle cx="25" cy="10" r="3.5" fill="#e8ecf4"/><circle cx="9" cy="24" r="3.5" fill="#e8ecf4"/><circle cx="25" cy="24" r="3.5" fill="#e8ecf4"/>'),
+  pool: IC('<rect x="3" y="7" width="28" height="20" rx="5" fill="none" stroke="#3a4762" stroke-dasharray="3 2"/><circle cx="10" cy="17" r="3.5" fill="#e5533f"/><circle cx="18" cy="15" r="3" fill="#e8ecf4"/><circle cx="25" cy="19" r="3.5" fill="#4f586d"/>'),
+  prod: IC('<circle cx="9" cy="17" r="4.5" fill="#e5533f"/><circle cx="17" cy="17" r="4.5" fill="#4f586d"/><circle cx="25" cy="17" r="4.5" fill="#e5533f"/>'),
+  ediag: IC('<path d="M3 22H11M13 6H21M23 28H31" stroke="#c8d1e2" stroke-width="1.8"/><path d="M9 21V9" stroke="#ff8a73" stroke-width="1.5"/><path d="M25 8V26" stroke="#86e0a8" stroke-width="1.5"/>'),
+  verd: IC('<rect x="2" y="12" width="14" height="10" rx="3" fill="none" stroke="#ff8a73"/><rect x="18" y="12" width="14" height="10" rx="3" fill="none" stroke="#9fd4f0"/>'),
+  board: IC('<rect x="3" y="8" width="28" height="18" rx="4" fill="none" stroke="#3a4762"/><path d="M7 14H27M7 20H21" stroke="#c8d1e2" stroke-width="1.5"/>'),
+  shelf: IC('<rect x="5" y="9" width="8" height="15" rx="3" fill="#cfe2f0"/><rect x="15" y="9" width="8" height="15" rx="3" fill="#4d7cf0"/><rect x="25" y="11" width="6" height="13" rx="1" fill="#86e0a8"/><rect x="3" y="25" width="28" height="3" fill="#5c6b88"/>'),
+  qchart: IC('<rect x="4" y="7" width="26" height="4" rx="2" fill="#ffb547"/><rect x="4" y="14" width="12" height="4" rx="2" fill="#ffb547" opacity=".6"/><rect x="4" y="21" width="7" height="4" rx="2" fill="#ffb547" opacity=".6"/>'),
+  cchart: IC('<rect x="4" y="7" width="8" height="4" rx="2" fill="#8b96ad"/><rect x="4" y="14" width="18" height="4" rx="2" fill="#8b96ad"/><rect x="4" y="21" width="26" height="4" rx="2" fill="#8b96ad"/>'),
+  res: IC('<text x="17" y="21" font-size="8" text-anchor="middle" fill="var(--fg)" font-family="IBM Plex Mono">кг·CO₂</text>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (m.kind === 'exo') return `Опытов ${SAMP.filter(a => S.tested[a.id]).length} из 6 · разложено ${SAMP.filter(a => S.sorted[a.id]).length} из 6 · T = ${fx(m.T, 1)} °C`;
+  if (m.kind === 'eq') return `Решено ${QS.filter((q, i) => S.ans[i]).length} из 3 · сейчас задача ${S.q + 1}`;
+  if (m.kind === 'bd') return `Горение метана: ${S.f3.ch4 ? '✓' : '—'} · N₂ + O₂: ${S.f3.no ? '✓' : '—'}${S.f3.hcl ? ' · H₂ + Cl₂: ✓' : ''}`;
+  return SC4.map((s, i) => `${s.name}: ${S.pick[i] ? '✓' : '—'}`).join(' · ');
+}
+
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'exo') h = `<h2>Калориметр</h2>
+      <dl class="reads"><div><dt>T</dt><dd id="r1"></dd></div><div><dt>ΔT</dt><dd id="r2"></dd></div><div><dt>Q воды</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Опыт в калориметре</div><div class="chips" id="sChips">${SAMP.map((a, i) => `<button data-i="${i}" aria-pressed="false">${a.name}${a.id === 'soda' ? ' + кислота' : ''}</button>`).join('')}</div></div>
+      <div class="row"><button class="ghostbtn" id="clrB">Вылить и вымыть стакан</button></div>
+      <h3>Сортировка</h3><div class="pairs">${SAMP.map((a, i) => `<label>${a.name}, ${a.sub}<select data-i="${i}"><option value="">—</option><option value="exo">экзо</option><option value="endo">эндо</option></select></label>`).join('')}</div>`;
+  if (id === 'equation') { const r = RX2[QS[S.q].rx]; h = `<h2>Задачи по уравнению</h2>
+      <dl class="reads"><div><dt>n</dt><dd id="r1"></dd></div><div><dt>уравнений</dt><dd id="r2"></dd></div><div><dt>Q</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Задача</div><div class="chips" id="qChips">${QS.map((q, i) => `<button data-i="${i}">Задача ${i + 1}</button>`).join('')}</div></div>
+      <p class="note" style="margin-top:12px">${QS[S.q].ask.join(' ')}<br>${r.eq}</p>
+      <div class="ctl"><label for="mR">Масса ${r.f}, г <output id="mO"></output></label><input type="range" id="mR" min="0" max="${r.max}" step="${r.step}"></div>
+      <div class="ctl"><div class="lbl">Ответ, кДж</div><div class="chips" id="aChips">${QS[S.q].opts.map((v, i) => `<button data-i="${i}">${nf(v, 1)}</button>`).join('')}</div></div>`; }
+  if (id === 'bonds') h = `<h2>Мысленный опыт: связи</h2>
+      <dl class="reads"><div><dt>разорвано</dt><dd id="r1"></dd></div><div><dt>образовано</dt><dd id="r2"></dd></div><div><dt>энергия</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Реакция</div><div class="chips" id="rChips">${RX3.map((r, i) => `<button data-i="${i}">${r.eq}</button>`).join('')}</div></div>
+      <div class="row"><button class="ghostbtn" id="brkB">Разорвать следующую молекулу</button><button class="ghostbtn" id="frmB">Собрать следующий продукт</button></div>
+      <div class="row"><button class="ghostbtn" id="exoB">Экзо: теплота выделяется</button><button class="ghostbtn" id="endoB">Эндо: поглощается</button><button class="ghostbtn" id="rsB">Заново</button></div>`;
+  if (id === 'fuel') h = `<h2>Выбор топлива</h2>
+      <dl class="reads"><div><dt>q, МДж/кг</dt><dd id="r1"></dd></div><div><dt>масса</dt><dd id="r2"></dd></div><div><dt>CO₂</dt><dd id="r3"></dd></div></dl>
+      <div class="ctl"><div class="lbl">Задача</div><div class="chips" id="cChips">${SC4.map((s, i) => `<button data-i="${i}">${i + 1}. ${s.name}</button>`).join('')}</div></div>
+      <p class="note" id="scTxt" style="margin-top:12px"></p>
+      <div class="ctl"><div class="lbl">Топливо</div><div class="chips" id="fChips">${FUELS.map((f, i) => `<button data-i="${i}">${f.bat ? 'Аккумулятор' : f.name}</button>`).join('')}</div></div>`;
+  el.innerHTML = h;
+  const rg = (s, f) => { const x = el.querySelector(s); if (x) x.oninput = () => f(+x.value); };
+  rg('#mR', v => setM2(v));
+  const on = (s, f) => { const x = el.querySelector(s); if (x) x.onclick = f; };
+  on('#clrB', clearCup); on('#brkB', breakNext); on('#frmB', formNext); on('#exoB', () => verdict('exo')); on('#endoB', () => verdict('endo')); on('#rsB', () => setRx(S.rx3));
+  el.querySelectorAll('#sChips button').forEach(b => b.onclick = () => testSamp(+b.dataset.i));
+  el.querySelectorAll('select[data-i]').forEach(s => s.onchange = () => { if (!s.value) return; if (!sortSamp(+s.dataset.i, s.value)) s.value = S.sorted[SAMP[+s.dataset.i].id] || ''; });
+  el.querySelectorAll('#qChips button').forEach(b => b.onclick = () => setQ(+b.dataset.i));
+  el.querySelectorAll('#aChips button').forEach(b => b.onclick = () => answer(+b.dataset.i));
+  el.querySelectorAll('#rChips button').forEach(b => b.onclick = () => setRx(+b.dataset.i));
+  el.querySelectorAll('#cChips button').forEach(b => b.onclick = () => setSc(+b.dataset.i));
+  el.querySelectorAll('#fChips button').forEach(b => b.onclick = () => pickFuel(+b.dataset.i));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; };
+  const val = (s, v) => { const x = el.querySelector(s); if (x && +x.value !== v) x.value = v; };
+  const press = (s, f) => el.querySelectorAll(s + ' button').forEach(b => b.setAttribute('aria-pressed', f(+b.dataset.i)));
+  if (m.kind === 'exo') {
+    set('#r1', fx(m.T, 1) + ' °C'); set('#r2', sg(m.dT) + ' °C'); set('#r3', sg(m.Q, 2) + ' кДж');
+    press('#sChips', i => i === S.cur);
+    el.querySelectorAll('select[data-i]').forEach(s => { s.value = S.sorted[SAMP[+s.dataset.i].id] || ''; });
+  } else if (m.kind === 'eq') {
+    set('#r1', nf(m.n, 3) + ' моль'); set('#r2', '×' + nf(m.k, 3)); set('#r3', m.known ? nf(m.Q, 1) + ' кДж' : '?'); set('#mO', nf(m.m)); val('#mR', m.m);
+    press('#qChips', i => i === S.q);
+    el.querySelectorAll('#aChips button').forEach(b => b.setAttribute('aria-pressed', !!S.ans[S.q] && QS[S.q].opts[+b.dataset.i] === QS[S.q].ans));
+  } else if (m.kind === 'bd') {
+    set('#r1', '+' + m.brk + ' кДж'); set('#r2', '−' + m.frm + ' кДж'); set('#r3', (m.E > 0 ? '+' : '') + nf(m.E) + ' кДж');
+    press('#rChips', i => i === S.rx3);
+  } else {
+    set('#r1', m.f ? '≈' + nf(m.f.q, 1) : '—'); set('#r2', m.f ? kgTxt(m.mass) : '—'); set('#r3', m.f ? (m.f.co2 ? kgTxt(m.co2) : '0') : '—');
+    set('#scTxt', m.sc.text.join(' '));
+    press('#cChips', i => i === S.sc); press('#fChips', i => i === S.sel);
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'exo') return [
+    { id: 'cup', icon: ICON.cup, name: 'Калориметр', spec: 'Стакан в теплоизоляции с крышкой: 100 мл воды при 20 °C. Тепло почти не уходит наружу, поэтому вся теплота реакции идёт на нагрев раствора.' },
+    { id: 'thermo', icon: ICON.thermo, name: 'Термометр', spec: 'Шкала от 0 до 50 °C. Розовое свечение стакана — нагрев, иней — охлаждение.' },
+    { id: 'cards', icon: ICON.cards, name: 'Опыты', spec: 'Шесть опытов. Голубая рамка — опыт идёт в калориметре, «опыт» — уже проведён, ✓ — отсортирован.' },
+    { id: 'graph', icon: ICON.graph, name: 'График T(t)', spec: 'Как меняется температура во времени. Серые линии — прошлые опыты, пунктир — 20 °C.' },
+    { id: 'bask', icon: ICON.bask, name: 'Корзины', spec: 'Экзо (+Q, теплота выделяется) и эндо (−Q, теплота поглощается).' }];
+  if (id === 'equation') return [
+    { id: 'eqb', icon: ICON.eqb, name: 'Термохимическое уравнение', spec: 'Тепловой эффект указан для количеств веществ из уравнения.' },
+    { id: 'scale', icon: ICON.scale, name: 'Весы и моли', spec: 'Каждый кубик — 1 моль вещества, его масса равна M граммов. Неполный кубик — часть моля.' },
+    { id: 'slider', icon: ICON.slider, name: 'Ползунок массы', spec: 'Меняет массу на весах — можно проверить расчёт на других массах.' },
+    { id: 'chain', icon: ICON.chain, name: 'Цепочка расчёта', spec: 'Масса → количество вещества → сколько раз «помещается» уравнение → теплота.' },
+    { id: 'heat', icon: ICON.heat, name: 'Шкала теплоты', spec: 'Открывается после верного ответа на задачу с этим уравнением.' },
+    { id: 'tiles', icon: ICON.tiles, name: 'Таблички с ответами', spec: 'Нажмите на верный ответ. Красная рамка — неверный выбор.' }];
+  if (id === 'bonds') return [
+    { id: 'react', icon: ICON.react, name: 'Реагенты', spec: 'Под молекулой — какие в ней связи. Нажмите — связи рвутся, энергия затрачивается.' },
+    { id: 'pool', icon: ICON.pool, name: 'Свободные атомы', spec: 'Атомы после разрыва связей. Из них собираются продукты.' },
+    { id: 'prod', icon: ICON.prod, name: 'Продукты', spec: 'Пунктир — ещё не собраны. При образовании связей энергия выделяется.' },
+    { id: 'ediag', icon: ICON.ediag, name: 'Энергетическая диаграмма', spec: 'Уровни: реагенты (0), все атомы порознь, продукты. Пунктирная кривая — настоящий путь через активированный комплекс.' },
+    { id: 'verd', icon: ICON.verd, name: 'Вывод', spec: 'Становится активным, когда собраны все продукты.' }];
+  return [
+    { id: 'board', icon: ICON.board, name: 'Задача', spec: 'Три задачи: сколько энергии нужно и какое условие главное.' },
+    { id: 'shelf', icon: ICON.shelf, name: 'Полка с топливом', spec: 'Пять видов топлива и литий-ионный аккумулятор. Оранжевая рамка — выбрано, зелёная — верно для задачи.' },
+    { id: 'qchart', icon: ICON.qchart, name: 'Теплота сгорания', spec: 'Сколько МДж даёт 1 кг. Для аккумулятора — сколько энергии он запасает на 1 кг.' },
+    { id: 'cchart', icon: ICON.cchart, name: 'CO₂ на МДж', spec: 'Сколько граммов CO₂ выделяется при сжигании на каждый мегаджоуль.' },
+    { id: 'res', icon: ICON.res, name: 'Итог', spec: 'Масса топлива и CO₂ для выбранной задачи.' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      (L.safe ? `<div class="safe"><b>Безопасность</b>${L.safe}</div>` : '') +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Детали модели</h2><p class="note">Нажмите на деталь, чтобы найти её на столе.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  if (m.kind === 'exo') {
+    const s = m.s;
+    let h = `<h2>Теплота по нагреву воды</h2><div class="formula">Q = c · m · ΔT</div>`;
+    if (s) {
+      h += `<h3>${s.name} (${s.sub})</h3><div class="steps">` + step('c (вода и разбавленный раствор)', '4,18 Дж/(г·°C)') + step('m раствора', nf(s.mass, 1) + ' г') +
+        step('ΔT', `${fx(m.T, 1)} − 20 = ${sg(m.dT)} °C`) + step('Q = c · m · ΔT', `${sg(CW * s.mass * m.dT, 0)} Дж = ${sg(m.Q, 2)} кДж`, 'sum') + `</div>`;
+      h += m.Q >= 0 ? `<p class="note" style="margin-top:10px">Раствор получил теплоту — процесс её выделил: экзо.</p>` : `<p class="note" style="margin-top:10px">Раствор потерял теплоту — процесс её поглотил: эндо.</p>`;
+      if (s.kind === 'burn') h += `<h3>Сколько выделил спирт</h3><div class="steps">${step('n(C₂H₅OH) = 0,30 / 46', '0,0065 моль')}${step('0,0065 · 1367 кДж', '≈ 8,9 кДж')}${step('попало в воду', '≈ 3,6 кДж, около 40%')}</div><p class="note" style="margin-top:10px">Остальное тепло ушло в воздух и на нагрев банки: открытое пламя — плохой калориметр.</p>`;
+      else if (m.settled) h += `<h3>На 1 моль</h3><div class="steps">${step('n', nf(s.n, 2) + ' моль')}${step('Q / n', `${sg(m.Q / s.n, 0)} кДж/моль`)}${step('по справочнику', `${s.perMol < 0 ? '+' : '−'}${nf(Math.abs(s.perMol), 1)} кДж/моль`, 'sum')}</div>`;
+    } else h += `<p class="note">Проведите опыт — здесь появится расчёт.</p>`;
+    h += `<h3>Проведённые опыты</h3><div class="steps">${SAMP.map(a => step(`${a.name}, ${a.sub}`, S.tested[a.id] ? `ΔT ≈ ${sg(dTof(a))} °C${S.sorted[a.id] ? ' ✓' : ''}` : '?')).join('')}</div>`;
+    return h;
+  }
+  if (m.kind === 'eq') {
+    const r = m.r, qq = m.qq;
+    let h = `<h2>${r.eq}</h2><div class="formula">n = m / M · Q = n / ν · Q(ур.)</div><h3>Задача ${S.q + 1}: ${nf(qq.m)} г ${r.f}</h3><div class="steps">` +
+      step('M(' + r.f + ')', r.M + ' г/моль') + step('n = m / M', `${nf(qq.m)} / ${r.M} = ${nf(qq.m / r.M, 3)} моль`) +
+      step(`по уравнению: ${r.nu} моль`, `${Math.abs(r.Q)} кДж`) + step(`${nf(qq.m / r.M, 3)} моль`, 'x') +
+      step('x', S.ans[S.q] ? `${nf(qq.m / r.M, 3)} · ${Math.abs(r.Q)} / ${r.nu} = ${nf(qq.ans, 1)} кДж` : '? — посчитайте и выберите табличку', 'sum') + `</div>`;
+    h += `<h3>На весах сейчас</h3><div class="steps">${step('m', nf(m.m) + ' г')}${step('n', nf(m.n, 3) + ' моль')}${step('Q', m.known ? nf(m.Q, 1) + ' кДж' : 'после верного ответа')}</div>`;
+    h += `<h3>Обратная задача</h3><p class="note">Сколько метана нужно сжечь, чтобы получить 445 кДж? 445 / 890 = 0,5 моль, m = 0,5 · 16 = 8 г.</p>`;
+    h += `<h3>Задачи</h3><div class="steps">${QS.map((q, i) => step('задача ' + (i + 1), S.ans[i] ? nf(q.ans, 1) + ' кДж ✓' : 'ещё нет')).join('')}</div>`;
+    return h;
+  }
+  if (m.kind === 'bd') {
+    const r = m.r;
+    let h = `<h2>${r.eq}</h2><div class="formula">Q = ΣE(образ.) − ΣE(разорв.)</div><h3>Разрыв связей (затрата)</h3><div class="steps">` +
+      r.R.map((k, i) => step(`${MOLS[k].f}: ${MOLS[k].b.map(([b, n]) => `${n} × ${b} (${BE[b]})`).join(', ')}`, S.brk[i] ? '+' + molE(k) : '?')).join('') + step('всего', m.allB ? '+' + m.Ebrk + ' кДж' : '+' + m.brk + ' …', 'sum') + `</div>`;
+    h += `<h3>Образование связей (выделение)</h3><div class="steps">` +
+      r.P.map((k, i) => step(`${MOLS[k].f}: ${MOLS[k].b.map(([b, n]) => `${n} × ${b} (${BE[b]})`).join(', ')}`, S.frm[i] ? '−' + molE(k) : '?')).join('') + step('всего', m.allF ? '−' + m.Efrm + ' кДж' : '−' + m.frm + ' …', 'sum') + `</div>`;
+    if (m.allF) h += `<h3>Итог</h3><div class="steps">${step('Q', `${m.Efrm} − ${m.Ebrk} = ${m.Q > 0 ? '+' : '−'}${Math.abs(m.Q)} кДж`, 'sum')}${step('по таблицам', r.real)}</div>`;
+    h += `<p class="note" style="margin-top:10px">Энергии связей — средние значения в кДж/моль, поэтому расчёт даёт оценку.</p>`;
+    return h;
+  }
+  const sc = m.sc;
+  let h = `<h2>${sc.name}: ${nf(sc.E)} МДж</h2><div class="formula">m = E / q · CO₂ = E · k</div><h3>Для этой задачи</h3><div class="steps">` +
+    FUELS.map(f => step(`${f.name} (≈${nf(f.q, 1)} МДж/кг)`, `${kgTxt(massFor(sc, f))} · CO₂ ${f.co2 ? kgTxt(co2For(sc, f)) : '0'}`)).join('') + `</div>`;
+  h += `<h3>Энергия на колёсах</h3><div class="steps">${step('бензин: 44 МДж/кг · КПД ≈ 25%', '≈ 11 МДж/кг')}${step('аккумулятор: 0,9 МДж/кг · КПД ≈ 90%', '≈ 0,8 МДж/кг')}${step('разница', 'примерно в 13 раз', 'sum')}</div>`;
+  h += `<p class="note" style="margin-top:10px">Числа округлены («около»): теплота сгорания угля и дров зависит от сорта и влажности, а CO₂ водорода и аккумулятора — от того, как получены водород и электричество.</p>`;
+  h += `<h3>Задачи</h3><div class="steps">${SC4.map((s, i) => step(s.name, S.pick[i] ? FUELS.find(f => f.id === S.pick[i]).name + ' ✓' : 'ещё нет')).join('')}</div>`;
+  return h;
+}
+
+function renderMeter(m) {
+  const el = $('#meter');
+  if (m.kind === 'exo') {
+    el.innerHTML = `<div class="k">Термометр</div><div class="big" style="color:${m.dT > 0.5 ? '#ff8a73' : m.dT < -0.5 ? '#9fd4f0' : 'inherit'}">${fx(m.T, 1)}<small>°C</small></div><div class="lr"><span>ΔT</span><span>${sg(m.dT)} °C</span></div><div class="lr"><span>Q воды</span><span>${sg(m.Q, 2)} кДж</span></div>`;
+  } else if (m.kind === 'eq') {
+    el.innerHTML = `<div class="k">Задача ${S.q + 1} из 3</div><div class="v ${m.known ? 'ok' : ''}">${m.known ? nf(m.Q, 1) + ' кДж' : 'Q = ?'}</div><div class="lr"><span>m</span><span>${nf(m.m)} г</span></div><div class="lr"><span>n</span><span>${nf(m.n, 3)} моль</span></div>`;
+  } else if (m.kind === 'bd') {
+    el.innerHTML = `<div class="k">Энергия</div><div class="v ${m.allF ? 'ok' : ''}">${m.allF ? `Q = ${m.Q > 0 ? '+' : '−'}${Math.abs(m.Q)}` : (m.E > 0 ? '+' : '') + nf(m.E)} кДж</div><div class="lr"><span>разрыв</span><span>+${m.brk}</span></div><div class="lr"><span>образ.</span><span>−${m.frm}</span></div>`;
+  } else {
+    el.innerHTML = `<div class="k">${m.sc.name}</div><div class="v ${m.f && S.pick[S.sc] === m.f.id ? 'ok' : ''}">${m.f ? (m.f.bat ? 'Аккумулятор' : m.f.name) : '—'}</div><div class="lr"><span>нужно</span><span>${nf(m.sc.E)} МДж</span></div><div class="lr"><span>масса</span><span>${m.f ? kgTxt(m.mass) : '—'}</span></div><div class="lr"><span>CO₂</span><span>${m.f ? (m.f.co2 ? kgTxt(m.co2) : '0') : '—'}</span></div>`;
+  }
+}
+
+function update() {
+  const L = LESSONS[S.lesson];
+  if (!S.done[L.id] && L.check(model())) {
+    S.done[L.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Тепловой эффект реакций освоен!'), 1900);
+  }
+  const mm = model();
+  renderMeter(mm);
+  $('#taskState').textContent = taskState(mm);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(mm);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  exo: '<path d="M6 7L9 27H27L30 7" fill="none" stroke="#8ea0c0" stroke-width="1.4"/><rect x="10" y="15" width="17" height="11" fill="#ff8a73" opacity=".45"/><rect x="40" y="3" width="6" height="21" rx="3" fill="none" stroke="#c8d1e2"/><rect x="41.6" y="9" width="2.8" height="15" fill="#ff5a4a"/><circle cx="43" cy="25" r="3.4" fill="#ff5a4a"/><path d="M52 22Q55 8 62 7" fill="none" stroke="#ff8a73" stroke-width="1.5"/><path d="M52 15Q55 24 62 25" fill="none" stroke="#9fd4f0" stroke-width="1.5"/>',
+  equation: '<rect x="4" y="16" width="9" height="9" rx="2" fill="#9fd4f0"/><rect x="14" y="16" width="9" height="9" rx="2" fill="#9fd4f0"/><rect x="2" y="25" width="24" height="3" fill="#5c6b88"/><text x="45" y="20" font-size="10" text-anchor="middle" fill="#ff8a73" font-family="IBM Plex Mono">+Q</text>',
+  bonds: '<circle cx="10" cy="12" r="5" fill="#4f586d"/><circle cx="22" cy="12" r="4" fill="#e8ecf4"/><path d="M15 12h2" stroke="#c8d1e2" stroke-width="1.6"/><path d="M40 26H48M48 6H56M56 22H64" stroke="#c8d1e2" stroke-width="1.6"/><path d="M44 25V9" stroke="#ff8a73" stroke-width="1.3"/><path d="M60 8V20" stroke="#86e0a8" stroke-width="1.3"/>',
+  fuel: '<rect x="4" y="5" width="56" height="4" rx="2" fill="#ffb547"/><rect x="4" y="11" width="24" height="4" rx="2" fill="#ffb547" opacity=".7"/><rect x="4" y="17" width="21" height="4" rx="2" fill="#ffb547" opacity=".7"/><rect x="4" y="23" width="3" height="4" rx="1" fill="#86e0a8"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i], init = JSON.parse(JSON.stringify(L.init || {}));
+  S.lesson = i; S.hl = null; drag = null; clearTimeout(scT);
+  S.cur = null; S.t1 = 0; S.tested = {}; S.sorted = {}; S.wrong1 = 0; BUB = [];
+  S.q = 0; S.m2 = QS[0].m; S.ans = {}; S.wrong2 = 0; S.bad2 = null;
+  S.rx3 = 0; S.brk = []; S.frm = []; S.f3 = {}; S.wrong3 = 0;
+  S.sc = 0; S.sel = null; S.pick = {}; S.wrong4 = 0;
+  Object.assign(S, init);
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-chem-thermo.js): calorimeter on a lab tray, fuel shelf
+window.LUCH_REAL = () => {
+  const id = LID(), m = model(), base = { module: 'chem-thermo' };
+  if (id === 'exo') return { ...base, scene: 'chth-calor', help: 'Баночка — опыт в калориметре, клавиши «экзо/эндо» — отсортировать опыт из стакана, стакан — вымыть',
+    cur: S.cur, kind: m.s ? m.s.kind : null, sid: m.s ? m.s.id : null, name: m.s ? m.s.name + ' · ' + m.s.sub : null,
+    samples: SAMP.map(a => ({ id: a.id, name: a.name, col: a.col, kind: a.kind, tested: !!S.tested[a.id], sorted: S.sorted[a.id] || null })) };
+  if (id === 'fuel') return { ...base, scene: 'chth-fuel', help: 'Топливо на полке — выбрать для задачи, клавиши — сменить задачу',
+    sc: S.sc, scName: m.sc.name, E: m.sc.E, text: m.sc.text, sel: S.sel, only: m.sc.only || null, picks: SC4.map((s, i) => S.pick[i] || null),
+    res: m.f ? `${kgTxt(m.mass)} · CO₂ ${m.f.co2 ? kgTxt(m.co2) : '0'}` : null,
+    fuels: FUELS.map(f => ({ id: f.id, name: f.name, q: f.q, co2: f.co2, col: f.col, bat: !!f.bat })) };
+  return null;
+};
+// values that change every frame (temperature in the calorimeter)
+window.LUCH_REAL.live = () => {
+  if (LID() !== 'exo') return null;
+  const m = model(); return { T: m.T, dT: m.dT, p: m.p };
+};
+window.LUCH_REAL.click = k => {
+  if (k === 'exo' || k === 'endo') { if (S.cur === null) { toast('Сначала проведите опыт — нажмите на баночку.'); return; } sortSamp(S.cur, k); return; }
+  if (k === 'cup') return clearCup();
+  if (k.startsWith('smp-')) return testSamp(+k.slice(4));
+  act(k);
+};
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '';
+  if (id === 'exo') now = `Калориметр: 100 мл воды при 20 °C, термометр и график T(t). Опыты: ${SAMP.map(a => a.name + ' (' + a.sub + ')').join(', ')}. Сейчас в стакане: ${m.s ? `${m.s.what}; T = ${fx(m.T, 1)} °C, ΔT = ${sg(m.dT)} °C, теплота воды Q = c·m·ΔT = ${sg(m.Q, 2)} кДж${m.settled ? '' : ', температура ещё меняется'}` : 'чистая вода'}. Проведены: ${SAMP.filter(a => S.tested[a.id]).map(a => a.name).join(', ') || 'ничего'}. Разложены: ${SAMP.filter(a => S.sorted[a.id]).map(a => `${a.name} — ${S.sorted[a.id] === 'exo' ? 'экзо' : 'эндо'}`).join(', ') || 'ничего'}. Ошибок сортировки: ${S.wrong1}. Не говори, куда класть непроверенный опыт, — спроси, что показал термометр; объясни, что растворение NaOH и NH₄NO₃ — процесс с тепловым эффектом, хотя и не классическая реакция.`;
+  if (id === 'equation') now = `Задача ${S.q + 1} из 3: «${m.qq.ask.join(' ')}» Уравнение: ${m.r.eq}. Варианты ответа: ${m.qq.opts.map(v => nf(v, 1)).join(', ')} кДж. На весах ${nf(m.m)} г ${m.r.f} = ${nf(m.n, 3)} моль (M = ${m.r.M} г/моль), это ×${nf(m.k, 3)} от уравнения. Решены: ${QS.map((q, i) => S.ans[i] ? 'задача ' + (i + 1) : '').filter(Boolean).join(', ') || 'ничего'}. Неверных ответов: ${S.wrong2}${S.bad2 !== null ? `, последний неверный — ${nf(S.bad2, 1)}` : ''}. Не называй ответ — веди через n = m/M и пропорцию, обрати внимание на коэффициент перед веществом в уравнении.`;
+  if (id === 'bonds') now = `Мысленный опыт с энергиями связей для реакции ${m.r.eq}. Энергии связей (кДж/моль): ${Object.entries(BE).map(([b, e]) => b + ' ' + e).join(', ')}. Разорваны: ${m.r.R.map((k, i) => S.brk[i] ? MOLS[k].f : '').filter(Boolean).join(', ') || 'ничего'} (+${m.brk} кДж); образованы: ${m.r.P.map((k, i) => S.frm[i] ? MOLS[k].f : '').filter(Boolean).join(', ') || 'ничего'} (−${m.frm} кДж). ${m.allF ? `Итог Q = ${m.Q} кДж.` : ''} Вывод сделан: горение метана — ${S.f3.ch4 ? 'да' : 'нет'}, N₂ + O₂ — ${S.f3.no ? 'да' : 'нет'}, H₂ + Cl₂ — ${S.f3.hcl ? 'да' : 'нет'}. Ошибок: ${S.wrong3}. Не говори вывод прямо — спроси, на что ушло больше энергии. Подчеркни, что на диаграмме настоящий путь идёт через активированный комплекс, а не через полный распад на атомы.`;
+  if (id === 'fuel') now = `Полка с топливом: ${FUELS.map(f => `${f.name} ≈${nf(f.q, 1)} МДж/кг, ${f.co2} г CO₂/МДж`).join('; ')} (CO₂ — при сжигании; для водорода и аккумулятора выбросы зависят от производства). Задача ${S.sc + 1}: ${m.sc.text.join(' ')} (${nf(m.sc.E)} МДж). Выбрано: ${m.f ? `${m.f.name}: ${kgTxt(m.mass)}, CO₂ ${kgTxt(m.co2)}` : 'ничего'}. Решены задачи: ${SC4.map((s, i) => S.pick[i] ? s.name : '').filter(Boolean).join(', ') || 'нет'}. Неверных выборов: ${S.wrong4}. Не называй топливо — спроси, какой показатель важнее в этой задаче.`;
+  return [
+    `Предмет: химия, 8–10 класс. Тема «Тепловой эффект химических реакций». Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Веди ученика наводящими вопросами, а не готовыми ответами.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = { exo: 'Как работает холодный пакет из аптечки?', equation: 'Почему теплоту делят на коэффициент в уравнении?', bonds: 'Почему горение выделяет тепло, если связи надо рвать?', fuel: 'Почему водород не везде заменил бензин?' }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

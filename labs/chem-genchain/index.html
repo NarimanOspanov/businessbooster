@@ -1,0 +1,969 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по химии, 9–11 класс: генетическая связь веществ — цепочки неорганических превращений, от алкана до сложного эфира, планирование синтеза нужного вещества.">
+<title>Генетическая связь веществ</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /mechanics and /chemistry. Lab bench (SVG) on the left, lesson notebook on the right, lesson strip under the bench. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none;cursor:pointer}
+.scene.rot{cursor:grab}
+.scene.grabbing{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.gauge{position:relative;height:6px;border-radius:3px;background:var(--line);margin-top:10px}
+.gauge b{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--liq);transition:width .2s}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.goals{display:grid;gap:6px;margin-top:10px}
+.goals div{display:flex;justify-content:space-between;gap:10px;background:var(--surface-2);border-radius:9px;padding:8px 11px;font-size:13.5px}
+.goals span{font:500 13px var(--font-mono);color:var(--muted)}
+.goals .on span{color:var(--ok)}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1500px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.scene [data-drag]{cursor:grab}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.pairs{display:grid;gap:6px;margin-top:10px}
+.pairs label{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface-2);border-radius:9px;padding:7px 10px;font-size:13px}
+.pairs select{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:7px;padding:5px 8px;font:500 12.5px var(--font-mono);max-width:150px}
+.pairs select:disabled{color:var(--ok);opacity:1}
+.eqs{display:grid;gap:6px}
+.eqs div{background:var(--surface-2);border-radius:9px;padding:8px 11px;font:500 13px/1.4 var(--font-mono)}
+.eqs div small{display:block;font:400 11.5px/1.3 var(--font-body);color:var(--muted);margin-top:3px}
+.eqs div.ok{border-left:3px solid var(--ok)}
+.route{font:500 14px/1.6 var(--font-mono);background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;word-break:break-word}
+</style>
+</head>
+<body>
+<script src="/luch/splash.js"></script>
+<div class="app">
+  <header>
+    <div class="brand" role="link" tabindex="0" title="Карта предметов" style="cursor:pointer" onclick="location.href='/#chem'" onkeydown="if(event.key==='Enter')location.href='/#chem'">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M9.6 14.6 9.2 6.2 15 10.6Q20 9.4 25 10.6L30.8 6.2 30.4 14.6Q34.6 22 31.6 29Q27.6 36 20 36Q12.4 36 8.4 29Q5.4 22 9.6 14.6Z" fill="#ffb547"/><path d="M20 14Q15.2 10.8 10.9 13.4Q7.6 17.2 9.4 21.8Q11.6 25.8 15.9 25.4Q18.5 25.1 20 27.1Q21.5 25.1 24.1 25.4Q28.4 25.8 30.6 21.8Q32.4 17.2 29.1 13.4Q24.8 10.8 20 14Z" fill="#ffd896"/><circle cx="15" cy="18.8" r="5" fill="#fffaf0"/><circle cx="25" cy="18.8" r="5" fill="#fffaf0"/><circle cx="15.6" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="24.4" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="16.6" cy="18.1" r="1" fill="#fff"/><circle cx="25.4" cy="18.1" r="1" fill="#fff"/><path d="M18.6 23.4h2.8L20 26.6z" fill="#ff8a73"/><path d="M10.5 29.6Q15.3 27.4 20 29.7Q24.7 27.4 29.5 29.6V34.6Q24.7 32.6 20 34.8Q15.3 32.6 10.5 34.6Z" fill="#72d4e8"/><path d="M20 29.7V34.8" stroke="#0b1019" stroke-width="1.1"/><path d="M8.2 23.5Q5.6 28.6 9.4 32.6Q11.6 33.2 12.4 31Q10.4 28.4 8.2 23.5Z" fill="#e8962a"/><path d="M31.8 23.5Q34.4 28.6 30.6 32.6Q28.4 33.2 27.6 31Q29.6 28.4 31.8 23.5Z" fill="#e8962a"/><path d="M35 3.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" fill="#86e0a8"/></svg>
+      <div><h1>OPEN SCHOOL AI</h1><small>Доступное образование для всех</small></div>
+    </div>
+    <div class="headr">
+
+      <div class="prog" aria-label="Прогресс"><b>Цепочки</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/3</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Доска превращений: цепочки веществ, реактивы и карта синтеза">
+    <svg class="scene" id="scene" role="img" aria-label="Цепочки превращений веществ. Реактивы и условия перетаскиваются на стрелки; на карте синтеза путь строится нажатием на вещества."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const KEY = 'luch-chem-genchain';
+const SUBD = { '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉' };
+const low = s => String(s).replace(/\d/g, d => SUBD[d]);
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+
+// ---------- lessons 1 and 2: chains. Chips are reagents/conditions; each step lists the chips that fit ----------
+const CHIPS = {
+  inorg: [
+    { k: 'O2', l: 'O₂', s: 'кислород' }, { k: 'H2O', l: 'H₂O', s: 'вода' }, { k: 'CO2', l: 'CO₂', s: 'углекислый газ' }, { k: 'BaCl2', l: 'BaCl₂', s: 'хлорид бария' },
+    { k: 'HCl', l: 'HCl', s: 'соляная кислота' }, { k: 'NaOH', l: 'NaOH', s: 'щёлочь' }, { k: 'H2', l: 'H₂', s: 'водород' },
+  ],
+  organic: [
+    { k: 'cl2', l: 'Cl₂, hν', s: 'хлор на свету' }, { k: 'naoh', l: 'NaOH (водн.)', s: 'водный раствор' }, { k: 'cuo', l: 'CuO, t', s: 'оксид меди, нагрев' }, { k: 'ox', l: '[O]', s: 'окислитель' },
+    { k: 'hyd', l: 'H₂O, H⁺', s: 'вода, кислота-катализатор' }, { k: 'est', l: 'R–OH, H₂SO₄', s: 'спирт, конц. кислота, t' }, { k: 'h2', l: 'H₂, Ni', s: 'водород, никель' }, { k: 'alc', l: 'NaOH (спирт.)', s: 'спиртовой раствор' },
+  ],
+};
+const CHAINS = {
+  inorg: [
+    { title: 'Ряд металла', nodes: [['Ca', 'металл'], ['CaO', 'основный оксид'], ['Ca(OH)2', 'щёлочь'], ['CaCO3', 'соль']],
+      steps: [{ ok: ['O2'], eq: '2Ca + O₂ → 2CaO', cond: 'горение', type: 'соединение' },
+              { ok: ['H2O'], eq: 'CaO + H₂O → Ca(OH)₂', cond: 'гашение извести', type: 'соединение' },
+              { ok: ['CO2'], eq: 'Ca(OH)₂ + CO₂ → CaCO₃↓ + H₂O', cond: 'известковая вода мутнеет', type: 'обмен с кислотным оксидом' }] },
+    { title: 'Ряд неметалла', nodes: [['S', 'неметалл'], ['SO2', 'кисл. оксид'], ['SO3', 'кисл. оксид'], ['H2SO4', 'кислота'], ['BaSO4', 'соль']],
+      steps: [{ ok: ['O2'], eq: 'S + O₂ → SO₂', cond: 'горение, t', type: 'соединение' },
+              { ok: ['O2'], eq: '2SO₂ + O₂ ⇄ 2SO₃', cond: 'катализатор V₂O₅, t ≈ 450 °C', type: 'соединение, обратимая' },
+              { ok: ['H2O'], eq: 'SO₃ + H₂O → H₂SO₄', cond: 'на заводе SO₃ поглощают концентрированной H₂SO₄', type: 'соединение' },
+              { ok: ['BaCl2'], eq: 'H₂SO₄ + BaCl₂ → BaSO₄↓ + 2HCl', cond: 'белый осадок — качественная реакция на SO₄²⁻', type: 'обмен' }] },
+  ],
+  organic: [
+    { title: 'От метана', nodes: [['CH4', 'метан'], ['CH3Cl', 'хлорметан'], ['CH3OH', 'метанол'], ['HCHO', 'формальдегид'], ['HCOOH', 'муравьиная к-та'], ['HCOOCH3', 'метилформиат']],
+      steps: [{ ok: ['cl2'], eq: 'CH₄ + Cl₂ → CH₃Cl + HCl', cond: 'свет hν, радикальное замещение', type: 'алкан → галогеналкан' },
+              { ok: ['naoh'], eq: 'CH₃Cl + NaOH → CH₃OH + NaCl', cond: 'водный раствор щёлочи', type: 'галогеналкан → спирт' },
+              { ok: ['cuo'], eq: 'CH₃OH + CuO → HCHO + Cu + H₂O', cond: 't, медь краснеет', type: 'спирт → альдегид' },
+              { ok: ['ox'], eq: '2HCHO + O₂ → 2HCOOH', cond: '[O]: O₂ с катализатором, Ag₂O (NH₃) или Cu(OH)₂, t', type: 'альдегид → кислота' },
+              { ok: ['est'], eq: 'HCOOH + CH₃OH ⇄ HCOOCH₃ + H₂O', cond: 'R–OH = метанол, H₂SO₄ конц., t', type: 'кислота → сложный эфир' }] },
+    { title: 'От этилена', nodes: [['C2H4', 'этилен'], ['C2H5OH', 'этанол'], ['CH3CHO', 'ацетальдегид'], ['CH3COOH', 'уксусная к-та'], ['CH3COOC2H5', 'этилацетат']],
+      steps: [{ ok: ['hyd'], eq: 'C₂H₄ + H₂O → C₂H₅OH', cond: 'H₃PO₄ или H₂SO₄, t ≈ 300 °C, p', type: 'алкен → спирт (гидратация)' },
+              { ok: ['cuo'], eq: 'C₂H₅OH + CuO → CH₃CHO + Cu + H₂O', cond: 't', type: 'спирт → альдегид' },
+              { ok: ['ox'], eq: '2CH₃CHO + O₂ → 2CH₃COOH', cond: '[O]: O₂ с катализатором', type: 'альдегид → кислота' },
+              { ok: ['est'], eq: 'CH₃COOH + C₂H₅OH ⇄ CH₃COOC₂H₅ + H₂O', cond: 'R–OH = этанол, H₂SO₄ конц., t', type: 'кислота → сложный эфир' }] },
+  ],
+};
+const WRONG = {
+  'Ca|H2O': 'Кальций и правда реагирует с водой: Ca + 2H₂O → Ca(OH)₂ + H₂↑. Но на этой стрелке нужен оксид CaO.',
+  'CaO|CO2': 'CaO + CO₂ → CaCO₃ — сразу соль. А по цепочке сначала нужно основание Ca(OH)₂.',
+  'CaO|HCl': 'CaO + 2HCl → CaCl₂ + H₂O — соль, да ещё не та. Здесь нужно основание.',
+  'Ca(OH)2|HCl': 'Ca(OH)₂ + 2HCl → CaCl₂ + 2H₂O — получится хлорид, а нужен карбонат. В карбонате есть углерод — где его взять?',
+  'Ca(OH)2|BaCl2': 'Ca(OH)₂ с BaCl₂ не реагирует: ни осадка, ни газа, ни воды.',
+  'Ca(OH)2|NaOH': 'Основание с основанием не реагирует.',
+  'S|H2': 'S + H₂ → H₂S — это сероводород, а нужен оксид SO₂.',
+  'SO2|H2O': 'SO₂ + H₂O ⇄ H₂SO₃ — сернистая кислота. А по цепочке дальше оксид SO₃, в нём у серы валентность VI.',
+  'SO3|NaOH': 'SO₃ + 2NaOH → Na₂SO₄ + H₂O — сразу соль, а нужна кислота.',
+  'H2SO4|NaOH': 'H₂SO₄ + 2NaOH → Na₂SO₄ + 2H₂O — сульфат натрия, а нужен сульфат бария. Нужна растворимая соль бария.',
+  'H2SO4|HCl': 'Кислота с кислотой не реагирует.',
+  'H2SO4|H2O': 'Вода только разбавит кислоту — соли не получится. И помните: кислоту льют в воду, а не воду в кислоту.',
+  'CH4|naoh': 'Алканы со щелочами не реагируют. Сначала в молекулу надо ввести атом галогена.',
+  'CH4|hyd': 'Метан — предельный углеводород, у него нет кратной связи, к которой могла бы присоединиться вода.',
+  'CH3Cl|alc': 'Спиртовой раствор щёлочи отщепляет HCl и даёт алкен. Но у CH₃Cl один атом углерода — двойную связь не образовать. Чтобы заменить Cl на OH, берут водный раствор.',
+  'CH3OH|ox': 'Сильный окислитель проскочит альдегид и окислит спирт сразу до кислоты. Чтобы остановиться на HCHO, берут мягкий окислитель — раскалённый CuO.',
+  'C2H5OH|ox': 'Сильный окислитель проскочит альдегид и окислит спирт сразу до кислоты. Чтобы остановиться на CH₃CHO, берут мягкий окислитель — раскалённый CuO.',
+  'HCHO|cuo': 'CuO при нагревании окисляет спирты. Альдегид до кислоты окисляют [O]: кислородом с катализатором, Ag₂O в аммиаке или Cu(OH)₂ при нагревании.',
+  'CH3CHO|cuo': 'CuO при нагревании окисляет спирты. Альдегид до кислоты окисляют [O]: кислородом с катализатором, Ag₂O в аммиаке или Cu(OH)₂ при нагревании.',
+  'HCHO|h2': 'H₂ на никеле восстановит альдегид обратно в спирт — это стрелка в другую сторону.',
+  'CH3CHO|h2': 'H₂ на никеле восстановит альдегид обратно в спирт — это стрелка в другую сторону.',
+  'C2H4|h2': 'C₂H₄ + H₂ → C₂H₆ — получится этан, а нужен спирт.',
+  'C2H4|naoh': 'Алкены с водной щёлочью не реагируют. Спирт из алкена получают присоединением воды.',
+  'HCOOH|naoh': 'HCOOH + NaOH → HCOONa + H₂O — соль (формиат натрия), а нужен сложный эфир.',
+  'CH3COOH|naoh': 'CH₃COOH + NaOH → CH₃COONa + H₂O — соль (ацетат натрия), а нужен сложный эфир.',
+};
+const GENERIC = {
+  O2: 'Кислород превращает простое вещество в оксид. Здесь другой переход.', H2O: 'Вода превращает оксид в основание или кислоту. Здесь другой переход.',
+  CO2: 'Углекислый газ реагирует со щелочами и основными оксидами — на этой стрелке он не нужен.', BaCl2: 'Хлорид бария осаждает сульфат-ион: Ba²⁺ + SO₄²⁻ → BaSO₄↓. Здесь сульфат-иона нет.',
+  HCl: 'Соляная кислота даст хлорид, а в этой цепочке хлоридов нет.', NaOH: 'Со щёлочью получится соль натрия — в цепочке её нет.', H2: 'Водород — восстановитель: ни оксида, ни основания, ни соли с ним здесь не получить.',
+  cl2: 'Хлорирование на свету — реакция алканов. Исходное вещество здесь не алкан.', naoh: 'Водная щёлочь заменяет атом галогена на –OH. В исходном веществе галогена нет.',
+  cuo: 'Раскалённый CuO окисляет спирты до альдегидов. Исходное вещество здесь не спирт.', ox: 'Окислитель [O] переводит альдегид в кислоту. Исходное вещество здесь не альдегид.',
+  hyd: 'Воду присоединяют по кратной связи (алкены, алкины). У исходного вещества её нет.', est: 'Этерификация — реакция кислоты со спиртом. Исходное вещество здесь не кислота.',
+  h2: 'Водород на никеле присоединяется к кратной связи или к C=O — это восстановление, а здесь нужен другой переход.', alc: 'Спиртовой раствор щёлочи отщепляет галогеноводород и даёт алкен. Здесь это не нужно.',
+};
+
+// ---------- lesson 3: reaction map ----------
+const NODES = {
+  CH4: { d: 'CH₄', n: 'метан', x: 40, y: 165 }, C2H2: { d: 'C₂H₂', n: 'ацетилен', x: 180, y: 165 }, CH3CHO: { d: 'CH₃CHO', n: 'ацетальдегид', x: 320, y: 165 },
+  CH3COOH: { d: 'CH₃COOH', n: 'уксусная к-та', x: 460, y: 165 }, PE: { d: '(C₂H₄)ₙ', n: 'полиэтилен', x: 40, y: 280 }, C2H4: { d: 'C₂H₄', n: 'этилен', x: 180, y: 280 },
+  C2H5OH: { d: 'C₂H₅OH', n: 'этанол', x: 320, y: 280 }, EST: { d: 'CH₃COOC₂H₅', n: 'этилацетат', x: 460, y: 280 }, C2H5Cl: { d: 'C₂H₅Cl', n: 'хлорэтан', x: 250, y: 372 },
+};
+const NW3 = 80, NH3 = 40;
+// where each condition label sits (x, y, anchor): beside its arrow, never over a box or a step badge
+const ELABEL = {'CH4>C2H2':[110,159, 'middle'], 'C2H2>C2H4':[186,226, 'start'], 'C2H2>CH3CHO':[250,159, 'middle'], 'CH3CHO>CH3COOH':[390,159, 'middle'], 'CH3CHO>C2H5OH':[310,226, 'end'], 'C2H5OH>CH3CHO':[330,226, 'start'], 'C2H4>C2H5OH':[250,299, 'middle'], 'C2H5OH>C2H4':[250,270, 'middle'], 'C2H4>C2H5Cl':[205,322, 'end'], 'C2H5Cl>C2H4':[205,338, 'end'], 'C2H5Cl>C2H5OH':[295,338, 'start'], 'C2H5OH>C2H5Cl':[295,322, 'start'], 'C2H4>PE':[110,299, 'middle'], 'CH3COOH>EST':[454,226, 'end']};
+const EDGES = [
+  ['CH4', 'C2H2', '1500 °C', '2CH₄ → C₂H₂ + 3H₂', 'пиролиз метана (быстрый нагрев)'],
+  ['C2H2', 'C2H4', 'H₂, Pd', 'C₂H₂ + H₂ → C₂H₄', 'частичное гидрирование'],
+  ['C2H2', 'CH3CHO', 'H₂O, Hg²⁺', 'C₂H₂ + H₂O → CH₃CHO', 'гидратация ацетилена (реакция Кучерова)'],
+  ['CH3CHO', 'CH3COOH', 'O₂, кат.', '2CH₃CHO + O₂ → 2CH₃COOH', 'окисление альдегида'],
+  ['CH3CHO', 'C2H5OH', 'H₂, Ni', 'CH₃CHO + H₂ → C₂H₅OH', 'восстановление альдегида'],
+  ['C2H5OH', 'CH3CHO', 'CuO, t', 'C₂H₅OH + CuO → CH₃CHO + Cu + H₂O', 'мягкое окисление спирта'],
+  ['C2H4', 'C2H5OH', 'H₂O, H⁺', 'C₂H₄ + H₂O → C₂H₅OH', 'гидратация этилена'],
+  ['C2H5OH', 'C2H4', 'H₂SO₄, t', 'C₂H₅OH → C₂H₄ + H₂O', 'внутримолекулярная дегидратация, H₂SO₄ конц., t > 140 °C'],
+  ['C2H4', 'C2H5Cl', 'HCl', 'C₂H₄ + HCl → C₂H₅Cl', 'гидрохлорирование'],
+  ['C2H5Cl', 'C2H4', 'NaOH спирт.', 'C₂H₅Cl + NaOH → C₂H₄ + NaCl + H₂O', 'отщепление HCl (спиртовой раствор щёлочи, t)'],
+  ['C2H5Cl', 'C2H5OH', 'NaOH водн.', 'C₂H₅Cl + NaOH → C₂H₅OH + NaCl', 'замещение галогена (водный раствор)'],
+  ['C2H5OH', 'C2H5Cl', 'HCl', 'C₂H₅OH + HCl ⇄ C₂H₅Cl + H₂O', 'замещение –OH на Cl'],
+  ['C2H4', 'PE', 't, p, кат.', 'nCH₂=CH₂ → (–CH₂–CH₂–)ₙ', 'полимеризация'],
+  ['CH3COOH', 'EST', 'C₂H₅OH, H₂SO₄', 'CH₃COOH + C₂H₅OH ⇄ CH₃COOC₂H₅ + H₂O', 'этерификация (H₂SO₄ конц., t)'],
+].map(([a, b, c, eq, nm]) => ({ a, b, c, eq, nm, L: ELABEL[a + '>' + b] }));
+const GOALS = [
+  { from: 'CH4', to: 'C2H5OH', name: 'Этанол из метана', short: 'Этанол' },
+  { from: 'C2H5OH', to: 'PE', name: 'Полиэтилен из этанола', short: 'Полиэтилен' },
+  { from: 'CH4', to: 'EST', name: 'Этилацетат из метана', short: 'Этилацетат' },
+];
+const edge = (a, b) => EDGES.find(e => e.a === a && e.b === b);
+const outs = a => EDGES.filter(e => e.a === a);
+function shortest(from, to) {
+  const prev = { [from]: null }, q = [from];
+  while (q.length) { const u = q.shift(); if (u === to) break; for (const e of outs(u)) if (!(e.b in prev)) { prev[e.b] = u; q.push(e.b); } }
+  if (!(to in prev)) return null;
+  const p = []; for (let v = to; v !== null; v = prev[v]) p.unshift(v); return p;
+}
+function countShortest(from, to) {
+  const dist = { [from]: 0 }, cnt = { [from]: 1 }, q = [from];
+  while (q.length) { const u = q.shift(); for (const e of outs(u)) { if (!(e.b in dist)) { dist[e.b] = dist[u] + 1; cnt[e.b] = 0; q.push(e.b); } if (dist[e.b] === dist[u] + 1) cnt[e.b] += cnt[u]; } }
+  return cnt[to] || 0;
+}
+const YIELD = 0.8;
+const pathTxt = r => r.map(k => NODES[k].d).join(' → ');
+
+const LESSONS = [
+  { id: 'inorg', title: 'Цепочки неорганических превращений',
+    text: ['Генетическая связь — это превращение веществ одного класса в вещества другого. Генетический ряд металла: металл → основный оксид → основание → соль. Для кальция: Ca → CaO → Ca(OH)₂ → CaCO₃.',
+           'Ряд неметалла: неметалл → кислотный оксид → кислота → соль. У серы есть лишняя ступень: при горении получается SO₂, а серной кислоте соответствует SO₃, поэтому SO₂ ещё доокисляют на катализаторе. S → SO₂ → SO₃ → H₂SO₄ → BaSO₄.',
+           'Реактив подбирают, спрашивая: из какого класса в какой идём? Оксид из простого вещества — кислород. Основание или кислота из оксида — вода. Соль из щёлочи — кислотный оксид или кислота; соль из кислоты — основание или другая соль, если выпадает осадок.'],
+    why: 'Серной кислоты в мире производят больше, чем любого другого химического продукта, — свыше 200 млн тонн в год, и почти вся она идёт ровно по этой цепочке: S → SO₂ → SO₃ → H₂SO₄ (контактный способ). Ряд кальция — это производство извести и цемента, а на угольных электростанциях SO₂ из дыма улавливают известью и получают гипс. Инженер-технолог химического завода следит за каждой стадией цепочки; в ближайшие десять лет режимы печей и реакторов всё чаще будут подбирать системы с ИИ, но решать, безопасна ли стадия и почему упал выход, по-прежнему будет инженер, который понимает химию.',
+    safe: 'SO₂ и SO₃ ядовиты и раздражают дыхательные пути, концентрированная серная кислота обугливает кожу. Серу в школе сжигают только под тягой, кислоту при разбавлении льют в воду.',
+    task: 'Подберите реактив к каждой из 7 стрелок двух цепочек: Ca → CaO → Ca(OH)₂ → CaCO₃ и S → SO₂ → SO₃ → H₂SO₄ → BaSO₄.',
+    hint: 'Над каждой стрелкой — окошко «?». Спросите себя, из какого класса в какой идёт превращение. Один реактив может понадобиться несколько раз.',
+    stage: 'Перетащите реактив на окошко над стрелкой или нажмите реактив, потом окошко.',
+    init: {},
+    check: m => m.filled === m.total },
+  { id: 'organic', title: 'От алкана до сложного эфира',
+    text: ['В органической химии классы тоже связаны: алкан → галогеналкан → спирт → альдегид → карбоновая кислота → сложный эфир. На каждом шаге углеродный скелет остаётся прежним, меняется функциональная группа.',
+           'Над стрелкой пишут реагент и условия. Cl₂, hν — хлорирование алкана на свету. NaOH (водн.) — замена галогена на –OH. CuO, t — мягкое окисление спирта до альдегида. [O] — окисление альдегида до кислоты. R–OH, H₂SO₄ — этерификация: кислота со спиртом даёт сложный эфир.',
+           'Из этилена спирт получают сразу, присоединением воды: C₂H₄ + H₂O → C₂H₅OH. Условия решают всё: водный раствор щёлочи даёт из галогеналкана спирт, спиртовой — алкен; водород на никеле идёт в обратную сторону и восстанавливает альдегид в спирт.'],
+    why: 'Это настоящие промышленные цепочки. Метанол (около 100 млн тонн в год) окисляют в формальдегид, а из него делают смолы для фанеры, ДСП и клеёв. Этилен — самый крупнотоннажный органический продукт в мире: из него получают этанол, уксусную кислоту и этилацетат — растворитель лаков, красок и клеёв. Химик-синтетик и технолог подбирают реагенты и условия для каждой стрелки. Сегодня нейросети, обученные на миллионах реакций, предлагают реагенты и условия за секунды, но они ошибаются в селективности и безопасности — проверяет предложения химик, а химик по данным (chemical data scientist) учит такие модели и отбирает для них надёжные данные.',
+    safe: 'Метанол смертельно ядовит, формальдегид раздражает глаза и дыхательные пути, хлор — ядовитый газ. Опыты с ними проводят только под тягой и только с учителем.',
+    task: 'Расставьте реагенты и условия над 9 стрелками: метан → метилформиат и этилен → этилацетат.',
+    hint: 'Смотрите на функциональную группу до и после стрелки: появился Cl — хлорирование; Cl сменился на OH — водная щёлочь; OH стал C=O — мягкое окисление; –CHO стал –COOH — [O]; кислота стала эфиром — спирт с серной кислотой.',
+    stage: 'Перетащите реагент на окошко над стрелкой или нажмите реагент, потом окошко.',
+    init: {},
+    check: m => m.filled === m.total },
+  { id: 'synthesis', title: 'Синтез нужного вещества',
+    text: ['Синтез планируют с конца. Химик смотрит на нужное вещество и спрашивает: из чего его получить за одну стадию? Потом то же для предшественника — и так до доступного сырья. Такой разбор называют ретросинтетическим анализом.',
+           'Путей обычно несколько. Чем меньше стадий, тем выше общий выход: если каждая стадия даёт 80 %, после трёх стадий остаётся 0,8³ ≈ 51 % вещества, а после пяти — около 33 %. Поэтому ищут короткий путь, но учитывают ещё цену сырья, безопасность и отходы.',
+           'На карте — ключевые реакции: пиролиз метана даёт ацетилен, реакция Кучерова превращает ацетилен в ацетальдегид, дегидратация спирта даёт этилен, полимеризация этилена — полиэтилен, этерификация собирает сложный эфир. По той же идее устроен синтез аспирина: у салициловой кислоты группу –OH ацилируют уксусным ангидридом и получают сложный эфир — ацетилсалициловую кислоту.'],
+    why: 'Так проектируют производство пластмасс, топлива, растворителей и лекарств. Полиэтилен делают не только из нефти: в Бразилии этилен получают дегидратацией этанола из сахарного тростника — это «зелёный» полиэтилен. Маршруты синтеза лекарств всё чаще предлагают программы ретросинтеза с ИИ (например, открытые ASKCOS и AiZynthFinder): они перебирают тысячи путей за минуты. Но программа может предложить невыполнимую стадию, опасный реагент или путь с плохим выходом — поэтому ценятся химик-синтетик, который проверяет маршрут в колбе, инженер-технолог, который переносит его на завод, и химик по данным, который учит модели на надёжных реакциях.',
+    safe: 'Ацетилен и этилен с воздухом образуют взрывчатые смеси, соли ртути (катализатор реакции Кучерова) очень ядовиты — сегодня их стараются заменять. Промышленный синтез ведут только в герметичной аппаратуре.',
+    task: 'Спланируйте три синтеза: этанол из метана, полиэтилен из этанола, этилацетат из метана. Годится любой верный путь, кратчайший подсветится.',
+    hint: 'Начало пути отмечено оранжевым, цель — зелёным пунктиром. Нажимайте на вещество, в которое можно перейти за одну стадию: такие обведены голубым, над стрелками видны условия. Нажатие на последнее вещество пути — шаг назад.',
+    stage: 'Нажмите на соседнее вещество (или перетащите конец пути на него). Цель меняется кнопками внизу.',
+    init: {},
+    check: m => m.reached === GOALS.length },
+];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+const savedIdx = LESSONS.findIndex(l => l.id === saved.lesson);
+const S = { lesson: savedIdx >= 0 ? savedIdx : 0, done: saved.done || {}, tab: 'overview', hl: null,
+            fill: {}, selR: null, wrong: 0, last: null,
+            goal: 0, route: ['CH4'], reached: {}, flash: null };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ lesson: LESSONS[S.lesson].id, done: S.done })); } catch (e) {} };
+const LID = () => LESSONS[S.lesson].id;
+const isChain = () => LID() === 'inorg' || LID() === 'organic';
+
+// ---------- model ----------
+function model() {
+  const id = LID();
+  if (isChain()) {
+    const rows = CHAINS[id], total = rows.reduce((s, r) => s + r.steps.length, 0);
+    const filled = Object.keys(S.fill).length;
+    const rowDone = rows.map((r, ri) => r.steps.every((_, i) => S.fill[ri + '-' + i]));
+    return { kind: 'chain', rows, total, filled, rowDone, chips: CHIPS[id] };
+  }
+  const G = GOALS[S.goal], end = S.route[S.route.length - 1], best = shortest(G.from, G.to);
+  return { kind: 'syn', G, end, best, steps: S.route.length - 1, atGoal: end === G.to, reached: GOALS.filter((_, i) => S.reached[i]).length,
+           next: end === G.to ? [] : outs(end).filter(e => !S.route.includes(e.b)) };
+}
+
+// ---------- drawing helpers ----------
+const scene = $('#scene');
+const txt = (x, y, s, size, col, anchor = 'middle', w = 400) => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${size}" fill="${col}" text-anchor="${anchor}" font-weight="${w}">${s}</text>`;
+const fitFs = (s, w, max) => Math.min(max, (w - 8) / (Math.max(1, [...s].length) * 0.6));
+function boardBg() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.05)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/><path d="M-2000 402H2520" stroke="#26324a" stroke-width="2"/>`;
+}
+function nodeBox(x, y, w, h, label, sub, st) {
+  // st: plain | got | done | start | goal | route | cand
+  const fill = { done: '#16261f', got: '#1a2438', start: '#2a2213', route: '#1a2438', goal: 'rgba(22,38,31,.6)', cand: 'rgba(114,212,232,.07)' }[st] || '#141c2b';
+  const stroke = { done: '#86e0a8', got: '#56627d', start: '#ffb547', route: '#ffb547', goal: '#86e0a8', cand: '#72d4e8' }[st] || '#3a4762';
+  const fs = fitFs(label, w, 14);
+  return `<rect x="${(x - w / 2 - 1.3).toFixed(1)}" y="${(y - h / 2 - 1.3).toFixed(1)}" width="${(w + 2.6).toFixed(1)}" height="${(h + 2.6).toFixed(1)}" rx="11" fill="${INK}"/>` +
+    `<rect x="${(x - w / 2).toFixed(1)}" y="${(y - h / 2).toFixed(1)}" width="${w}" height="${h}" rx="10" fill="${fill}" stroke="${stroke}" stroke-width="${st === 'cand' || st === 'start' || st === 'goal' ? 2 : 1.5}"${st === 'goal' ? ' stroke-dasharray="5 4"' : ''}/>` +
+    txt(x, y + (sub ? 1 : fs * 0.36), label, fs.toFixed(1), st === 'done' || st === 'goal' ? '#86e0a8' : '#e8ecf4', 'middle', 500) +
+    (sub ? txt(x, y + h / 2 - 5, sub, 7.5, '#8b96ad') : '');
+}
+const chipSVG = (c, x, y, w, h, on) => `<rect x="${(x - w / 2 - 1.3).toFixed(1)}" y="${(y - h / 2 - 1.3).toFixed(1)}" width="${(w + 2.6).toFixed(1)}" height="${(h + 2.6).toFixed(1)}" rx="10" fill="${INK}"/>` +
+  `<rect x="${(x - w / 2).toFixed(1)}" y="${(y - h / 2).toFixed(1)}" width="${w}" height="${h}" rx="9" fill="${on ? '#fff4dc' : '#e8ecf4'}"/>` +
+  txt(x, y + 1, c.l, fitFs(c.l, w, 12.5).toFixed(1), '#0b1019', 'middle', 500) + txt(x, y + 11, c.s, 7, '#4a556c');
+
+// ----- lessons 1 and 2: chain geometry -----
+const ROWY = [184, 290], SLOTDY = 46;
+function rowGeo(n) {
+  const sp = n >= 6 ? 86 : n === 5 ? 100 : 112, nw = n >= 6 ? 70 : 80;
+  const xs = []; for (let i = 0; i < n; i++) xs.push(260 + (i - (n - 1) / 2) * sp);
+  return { sp, nw, xs, ax: i => (xs[i] + xs[i + 1]) / 2 };
+}
+const CHIP = { w: 112, h: 30, gap: 8, y0: 344, dy: 37 };
+function chipPos(i, n) {
+  const r = Math.floor(i / 4), cnt = Math.min(4, n - r * 4), k = i - r * 4;
+  const W = cnt * CHIP.w + (cnt - 1) * CHIP.gap;
+  return { x: 260 - W / 2 + CHIP.w / 2 + k * (CHIP.w + CHIP.gap), y: CHIP.y0 + r * CHIP.dy };
+}
+function slotAt(p) {
+  const rows = CHAINS[LID()];
+  for (let ri = 0; ri < rows.length; ri++) {
+    const g = rowGeo(rows[ri].nodes.length), y = ROWY[ri];
+    for (let i = 0; i < rows[ri].steps.length; i++) if (Math.abs(p.x - g.ax(i)) < g.sp / 2 - 2 && p.y > y - SLOTDY - 20 && p.y < y + 8) return [ri, i];
+  }
+  return null;
+}
+function chainSVG(m) {
+  let h = '';
+  const hot = drag && drag.moved && drag.id.startsWith('ch-') ? slotAt(drag.p) : null;
+  const chip = k => m.chips.find(c => c.k === k);
+  m.rows.forEach((row, ri) => {
+    const g = rowGeo(row.nodes.length), y = ROWY[ri], sy = y - SLOTDY, sw = g.sp - 8;
+    row.steps.forEach((st, i) => {
+      const x = g.ax(i), f = S.fill[ri + '-' + i], isHot = hot && hot[0] === ri && hot[1] === i;
+      const col = f ? '#86e0a8' : '#c8d1e2';
+      h += `<path d="M${(g.xs[i] + g.nw / 2 + 3).toFixed(1)} ${y}H${(g.xs[i + 1] - g.nw / 2 - 4).toFixed(1)}" stroke="${col}" stroke-width="2"/><path d="M${(g.xs[i + 1] - g.nw / 2 - 9).toFixed(1)} ${y - 4.5}L${(g.xs[i + 1] - g.nw / 2 - 3).toFixed(1)} ${y}L${(g.xs[i + 1] - g.nw / 2 - 9).toFixed(1)} ${y + 4.5}" fill="none" stroke="${col}" stroke-width="2"/>`;
+      h += `<path d="M${x.toFixed(1)} ${sy + 12}V${y - 5}" stroke="${f ? '#86e0a8' : '#3a4762'}" stroke-width="1.2" stroke-dasharray="2 3"/>`;
+      h += `<g data-drag="sl-${ri}-${i}"><rect x="${(x - sw / 2 - 2).toFixed(1)}" y="${sy - 16}" width="${sw + 4}" height="32" fill="transparent"/>`;
+      h += `<rect x="${(x - sw / 2).toFixed(1)}" y="${sy - 12}" width="${sw}" height="24" rx="7" fill="${f ? '#16261f' : isHot ? 'rgba(114,212,232,.18)' : '#121a28'}" stroke="${f ? '#86e0a8' : isHot || S.selR ? '#72d4e8' : '#ffb547'}" stroke-width="1.5"${f ? '' : ' stroke-dasharray="4 3"'}/>`;
+      const lab = f ? chip(f).l : '?';
+      h += txt(x, sy + 4, lab, f ? fitFs(lab, sw, 11).toFixed(1) : 12, f ? '#86e0a8' : isHot || S.selR ? '#72d4e8' : '#ffb547', 'middle', 500) + '</g>';
+    });
+    row.nodes.forEach((nd, i) => {
+      const left = i === 0 || S.fill[ri + '-' + (i - 1)], right = i === row.nodes.length - 1 || S.fill[ri + '-' + i];
+      h += nodeBox(g.xs[i], y, g.nw, 38, low(nd[0]), '', m.rowDone[ri] ? 'done' : left && right ? 'got' : 'plain');
+      h += txt(g.xs[i], y + 31, nd[1], 8.5, '#8b96ad');
+    });
+  });
+  if (S.done[LID()]) {
+    // all arrows are filled: the reagent tray gives way to the balanced equations
+    m.rows.forEach((row, ri) => {
+      const x0 = ri ? 266 : 8;
+      h += txt(x0, CHIP.y0 - 12, row.title.toUpperCase() + ' · УРАВНЕНИЯ', 8, '#86e0a8', 'start', 500);
+      row.steps.forEach((st, i) => { h += txt(x0, CHIP.y0 + 1 + i * 11.5, st.eq, 9.3, '#e8ecf4', 'start', 500); });
+    });
+  } else {
+    m.chips.forEach((c, i) => {
+      const p = chipPos(i, m.chips.length);
+      if (drag && drag.moved && drag.id === 'ch-' + c.k) { h += `<rect x="${p.x - CHIP.w / 2}" y="${p.y - CHIP.h / 2}" width="${CHIP.w}" height="${CHIP.h}" rx="9" fill="none" stroke="#3a4762" stroke-dasharray="4 4"/>`; return; }
+      h += `<g data-drag="ch-${c.k}">${chipSVG(c, p.x, p.y, CHIP.w, CHIP.h, S.selR === c.k)}</g>`;
+    });
+  }
+  return h;
+}
+
+// ----- lesson 3: reaction map -----
+function clipPt(c, dx, dy) { const t = Math.min(dx ? (NW3 / 2 + 4) / Math.abs(dx) : 1e9, dy ? (NH3 / 2 + 4) / Math.abs(dy) : 1e9); return [c.x + dx * t, c.y + dy * t]; }
+function edgeGeo(e) {
+  const A = NODES[e.a], B = NODES[e.b], L = Math.hypot(B.x - A.x, B.y - A.y), ux = (B.x - A.x) / L, uy = (B.y - A.y) / L;
+  const nx = -uy, ny = ux, pair = !!edge(e.b, e.a), o = pair ? 5 : 0;
+  const a = clipPt(A, ux, uy), b = clipPt(B, -ux, -uy);
+  return { p: [a[0] + nx * o, a[1] + ny * o], q: [b[0] + nx * o, b[1] + ny * o], ux, uy, nx, ny, pair };
+}
+function edgeSVG(e, col, w, dash, label, lcol) {
+  const g = edgeGeo(e), [p, q] = [g.p, g.q];
+  let h = `<path d="M${p[0].toFixed(1)} ${p[1].toFixed(1)}L${q[0].toFixed(1)} ${q[1].toFixed(1)}" stroke="${col}" stroke-width="${w}"${dash ? ` stroke-dasharray="${dash}"` : ''}/>`;
+  const bx = q[0] - g.ux * 8, by = q[1] - g.uy * 8;
+  h += `<path d="M${(bx + g.nx * 4.5).toFixed(1)} ${(by + g.ny * 4.5).toFixed(1)}L${q[0].toFixed(1)} ${q[1].toFixed(1)}L${(bx - g.nx * 4.5).toFixed(1)} ${(by - g.ny * 4.5).toFixed(1)}" fill="none" stroke="${col}" stroke-width="${w}"/>`;
+  if (label && e.L) {
+    const [mx, yy, anchor] = e.L, tw = [...label].length * 5 + 6, tx = anchor === 'start' ? mx - 3 : anchor === 'end' ? mx - tw + 3 : mx - tw / 2;
+    h += `<rect x="${tx.toFixed(1)}" y="${(yy - 9).toFixed(1)}" width="${tw.toFixed(1)}" height="12" rx="3" fill="rgba(11,16,25,.88)"/>` + txt(mx, yy, label, 8.3, lcol, anchor, 500);
+  }
+  return h;
+}
+function nodeAt(p) { for (const k in NODES) { const n = NODES[k]; if (Math.abs(p.x - n.x) < NW3 / 2 + 4 && Math.abs(p.y - n.y) < NH3 / 2 + 4) return k; } return null; }
+function synSVG(m) {
+  let h = '';
+  const inRoute = new Set(), best = S.reached[S.goal] ? new Set() : null;
+  for (let i = 1; i < S.route.length; i++) inRoute.add(S.route[i - 1] + '>' + S.route[i]);
+  if (best && m.best) for (let i = 1; i < m.best.length; i++) best.add(m.best[i - 1] + '>' + m.best[i]);
+  const cand = new Set(m.next.map(e => e.b)), nextE = new Set(m.next.map(e => e.a + '>' + e.b));
+  const hotN = drag && drag.moved && drag.id.startsWith('nd-') ? nodeAt(drag.p) : null;
+  // the second reagent of esterification comes from the alcohol shelf: a dotted hint line
+  { const A = NODES.C2H5OH, B = NODES.EST; h += `<path d="M${A.x + NW3 / 2 + 4} ${A.y + 12}L${B.x - NW3 / 2 - 4} ${B.y + 12}" stroke="#4a556c" stroke-width="1.2" stroke-dasharray="2 4"/>`; }
+  const layer = [[], [], []];
+  EDGES.forEach(e => {
+    const k = e.a + '>' + e.b;
+    if (inRoute.has(k)) layer[2].push(edgeSVG(e, '#ffb547', 2.6, '', e.c, '#ffb547'));
+    else if (best && best.has(k)) layer[1].push(edgeSVG(e, '#86e0a8', 2.2, '6 4', e.c, '#86e0a8'));
+    else if (nextE.has(k)) layer[1].push(edgeSVG(e, '#72d4e8', 1.8, '', e.c, '#72d4e8'));
+    else layer[0].push(edgeSVG(e, '#3a4762', 1.4, '', '', ''));
+  });
+  h += layer[0].join('') + layer[1].join('') + layer[2].join('');
+  for (const k in NODES) {
+    const n = NODES[k], ri = S.route.indexOf(k);
+    let st = 'plain';
+    if (k === m.G.to) st = 'goal';
+    if (ri > 0) st = k === m.G.to ? 'done' : 'route';
+    if (ri === 0) st = 'start';
+    if (cand.has(k) && k !== m.G.to) st = 'cand';
+    if (hotN === k && cand.has(k)) st = 'cand';
+    const isEnd = k === m.end && !m.atGoal;
+    if (drag && drag.moved && drag.id === 'nd-' + k) { h += `<rect x="${n.x - NW3 / 2}" y="${n.y - NH3 / 2}" width="${NW3}" height="${NH3}" rx="10" fill="none" stroke="#3a4762" stroke-dasharray="4 4"/>`; continue; }
+    h += `<g data-drag="nd-${k}">` + nodeBox(n.x, n.y, NW3, NH3, n.d, n.n, st);
+    if (cand.has(k)) h += `<rect x="${n.x - NW3 / 2 - 4}" y="${n.y - NH3 / 2 - 4}" width="${NW3 + 8}" height="${NH3 + 8}" rx="13" fill="none" stroke="#72d4e8" stroke-opacity="${hotN === k ? 0.9 : 0.35}" stroke-width="1.4"/>`;
+    if (ri >= 0) h += `<circle cx="${n.x - NW3 / 2 + 2}" cy="${n.y - NH3 / 2 + 2}" r="7" fill="${ri === 0 ? '#ffb547' : k === m.G.to ? '#86e0a8' : '#ffb547'}" stroke="${INK}" stroke-width="1.4"/>` + txt(n.x - NW3 / 2 + 2, n.y - NH3 / 2 + 5, String(ri), 8.5, '#0b1019', 'middle', 600);
+    if (k === m.G.to && ri < 0) h += txt(n.x + NW3 / 2 - 2, n.y - NH3 / 2 - 4, 'цель', 8, '#86e0a8', 'end', 500);
+    if (isEnd && S.route.length > 1) h += txt(n.x, n.y - NH3 / 2 - 5, 'конец пути', 7.5, '#ffb547');
+    h += '</g>';
+  }
+  // status: two short lines in the free bottom-right corner of the map
+  const st = m.atGoal ? (m.steps === m.best.length - 1 ? [`Готово за ${m.steps} ст.`, 'это кратчайший путь'] : [`Готово за ${m.steps} ст.`, `кратчайший — ${m.best.length - 1} ст. (зелёный пунктир)`])
+    : m.next.length ? [`Стадий: ${m.steps}`, 'куда можно перейти — обведено голубым'] : ['Тупик: дальше пути нет', '«Шаг назад» или «Заново»'];
+  const sc = m.atGoal ? '#86e0a8' : m.next.length ? '#8b96ad' : '#ff8a73';
+  h += txt(512, 360, st[0], 11, sc, 'end', 500) + txt(512, 375, st[1], 9.5, sc, 'end');
+  return h;
+}
+
+function hlBox(id) {
+  if (isChain()) {
+    const rows = CHAINS[LID()];
+    const row = ri => { const g = rowGeo(rows[ri].nodes.length); return [g.xs[0] - g.nw / 2 - 6, ROWY[ri] - SLOTDY - 18, g.xs[g.xs.length - 1] - g.xs[0] + g.nw + 12, SLOTDY + 56]; };
+    const g0 = rowGeo(rows[0].nodes.length), g1 = rowGeo(rows[1].nodes.length);
+    return { rowA: row(0), rowB: row(1),
+      slots: [Math.min(g0.ax(0), g1.ax(0)) - 46, ROWY[0] - SLOTDY - 16, Math.max(g0.ax(rows[0].steps.length - 1), g1.ax(rows[1].steps.length - 1)) - Math.min(g0.ax(0), g1.ax(0)) + 92, ROWY[1] - ROWY[0] + 32],
+      chips: [2, CHIP.y0 - 22, 516, CHIP.dy + CHIP.h + 10] }[id];
+  }
+  const n = k => [NODES[k].x - NW3 / 2 - 8, NODES[k].y - NH3 / 2 - 8, NW3 + 16, NH3 + 16], G = GOALS[S.goal];
+  return { map: [-12, 132, 534, 266], start: n(G.from), goal: n(G.to), status: [296, 346, 222, 36] }[id];
+}
+
+function ghostSVG(d) {
+  const p = d.p, id = d.id;
+  if (id.startsWith('ch-')) { const c = CHIPS[LID()] && CHIPS[LID()].find(x => x.k === id.slice(3)); return c ? chipSVG(c, p.x, p.y, CHIP.w, CHIP.h, true) : ''; }
+  if (id.startsWith('nd-')) { const n = NODES[id.slice(3)]; return n ? nodeBox(p.x, p.y, NW3, NH3, n.d, n.n, 'route') : ''; }
+  return '';
+}
+
+function drawScene(t) {
+  const m = model();
+  let h = boardBg();
+  h += m.kind === 'chain' ? chainSVG(m) : synSVG(m);
+  if (drag && drag.moved) h += `<g opacity=".92" pointer-events="none">${ghostSVG(drag)}</g>`;
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="10" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// The board content lives in y = 118…402 (virtual units). The shared task card covers the top-left of the stage,
+// so the content is bottom-aligned and scaled to fit under the card's real bottom edge (its height varies).
+const V0 = 118, V1 = 402;
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const tk = $('.task').getBoundingClientRect(), top = clamp(tk.bottom - rc.top + 6, 0, hh * 0.45);
+  const s = Math.min(w / 520, (hh - top) / (V1 - V0), 1.7);
+  const vw = w / s, vh = hh / s;
+  scene.setAttribute('viewBox', `${(260 - vw / 2).toFixed(1)} ${(V1 + 2 - vh).toFixed(1)} ${vw.toFixed(1)} ${vh.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+new ResizeObserver(fit).observe($('.task'));
+
+// ---------- dragging and tapping ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+const NODRAG = id => id.startsWith('sl-') || (id.startsWith('nd-') && id.slice(3) !== model().end);
+scene.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  drag = { id: el.dataset.drag, x: e.clientX, y: e.clientY, p: toSvg(e), moved: false };
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 6 && !NODRAG(drag.id)) drag.moved = true;
+  drag.p = toSvg(e); if (drag.moved) dirty = true;
+});
+const endDrag = cancel => {
+  if (!drag) return;
+  const d = drag; drag = null; scene.classList.remove('grabbing'); dirty = true;
+  if (cancel) return;
+  if (d.moved) drop(d.id, d.p); else tap(d.id);
+};
+scene.addEventListener('pointerup', () => endDrag(false));
+scene.addEventListener('pointercancel', () => endDrag(true));
+
+function tap(id) {
+  if (id.startsWith('ch-')) { const k = id.slice(3); S.selR = S.selR === k ? null : k; if (S.selR) toast(`Взят ${chipOf(k).l}. Нажмите на окошко над стрелкой.`); update(); return; }
+  if (id.startsWith('sl-')) {
+    const [, ri, i] = id.split('-').map(Number), f = S.fill[ri + '-' + i];
+    if (f) { const st = CHAINS[LID()][ri].steps[i]; toast(`${st.eq} (${st.cond})`); return; }
+    if (S.selR) return fillStep(ri, i, S.selR);
+    toast('Сначала выберите реактив внизу, потом нажмите на окошко.'); return;
+  }
+  if (id.startsWith('nd-')) return tapNode(id.slice(3));
+}
+function drop(id, p) {
+  if (id.startsWith('ch-')) { const a = slotAt(p); if (a) { if (S.fill[a[0] + '-' + a[1]]) toast('На этой стрелке реактив уже стоит.'); else fillStep(a[0], a[1], id.slice(3)); } return; }
+  if (id.startsWith('nd-')) { const k = nodeAt(p); if (k && k !== id.slice(3)) tapNode(k); }
+}
+
+// ----- actions -----
+const chipOf = k => CHIPS[LID()].find(c => c.k === k);
+function fillStep(ri, i, k) {
+  const rows = CHAINS[LID()], row = rows[ri], st = row.steps[i];
+  if (!st) return false;
+  S.selR = null;
+  if (S.fill[ri + '-' + i]) { toast('На этой стрелке реактив уже стоит.'); update(); return false; }
+  const from = row.nodes[i][0], to = row.nodes[i + 1][0];
+  if (!st.ok.includes(k)) {
+    S.wrong++;
+    toast((WRONG[from + '|' + k] || GENERIC[k] || `${chipOf(k).l} не превратит ${low(from)} в ${low(to)}.`));
+    update(); return false;
+  }
+  S.fill[ri + '-' + i] = k; S.last = [ri, i];
+  toast(`Верно: ${st.eq}`);
+  update(); return true;
+}
+function tapNode(k) {
+  const m = model();
+  if (m.atGoal) { toast('Путь до цели готов. «Заново» — попробовать другой путь, или выберите следующую цель кнопками внизу.'); return false; }
+  if (k === m.end) { if (S.route.length > 1) return back(); toast(`Путь начинается с ${NODES[k].d}. Нажмите на вещество, обведённое голубым.`); return false; }
+  if (S.route.includes(k)) { toast(`${NODES[k].d} уже есть в пути — ходить по кругу незачем.`); return false; }
+  const e = edge(m.end, k);
+  if (!e) {
+    S.wrong++;
+    const opts = outs(m.end).map(x => NODES[x.b].d).join(', ');
+    toast(`Из ${NODES[m.end].d} за одну стадию ${NODES[k].d} не получить. Отсюда можно получить: ${opts || 'ничего'}.`); update(); return false;
+  }
+  S.route.push(k); S.flash = performance.now();
+  const n = model();
+  if (n.atGoal) {
+    const len = n.steps, bl = n.best.length - 1, first = !S.reached[S.goal];
+    S.reached[S.goal] = { len: Math.min(len, S.reached[S.goal] ? S.reached[S.goal].len : 99), best: bl };
+    const cnt = countShortest(n.G.from, n.G.to);
+    toast(len === bl ? `Синтез спланирован за ${len} ст. — это кратчайший путь${cnt > 1 ? ` (таких путей ${cnt})` : ''}!` : `Синтез спланирован за ${len} ст. Это верный путь, но есть короче — ${bl} ст. Он подсвечен зелёным.`);
+    if (first) renderTools();
+  } else toast(`${e.eq} (${e.c}) — ${e.nm}.`);
+  update(); return true;
+}
+function back() { if (S.route.length > 1) { S.route.pop(); update(); return true; } return false; }
+function setGoal(g) { S.goal = clamp(g, 0, GOALS.length - 1); S.route = [GOALS[S.goal].from]; renderTools(); buildScheme(); update(); }
+
+let last = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const anim = !!S.hl;
+  if (dirty || anim) { drawScene(t); dirty = false; last = t; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3600); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  if (isChain()) tb.innerHTML = B('reset', 'Начать заново');
+  else tb.innerHTML = GOALS.map((G, i) => B('g' + i, (S.reached[i] ? '✓ ' : '') + G.short, i === S.goal)).join('') + sep + B('back', 'Шаг назад') + B('again', 'Заново');
+}
+function act(a) {
+  if (/^g\d$/.test(a)) return setGoal(+a[1]);
+  if (a === 'back') { if (!back()) toast('Путь ещё пуст: отступать некуда.'); return; }
+  if (a === 'again') { S.route = [GOALS[S.goal].from]; update(); return; }
+  if (a === 'reset') { S.fill = {}; S.selR = null; S.wrong = 0; S.last = null; buildScheme(); update(); }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  rowA: IC('<rect x="2" y="13" width="9" height="9" rx="2" fill="#9fd27a"/><path d="M12 17.5h4" stroke="#c8d1e2"/><rect x="17" y="13" width="7" height="9" rx="2" fill="none" stroke="#c8d1e2"/><path d="M25 17.5h2" stroke="#c8d1e2"/><rect x="27" y="13" width="5" height="9" rx="2" fill="#86e0a8"/>'),
+  rowB: IC('<rect x="2" y="13" width="9" height="9" rx="2" fill="#e6c63a"/><path d="M12 17.5h4" stroke="#c8d1e2"/><rect x="17" y="13" width="7" height="9" rx="2" fill="none" stroke="#c8d1e2"/><path d="M25 17.5h2" stroke="#c8d1e2"/><rect x="27" y="13" width="5" height="9" rx="2" fill="#86e0a8"/>'),
+  slots: IC('<rect x="6" y="5" width="22" height="10" rx="3" fill="none" stroke="#ffb547" stroke-dasharray="3 2"/><text x="17" y="13" font-size="7" text-anchor="middle" fill="#ffb547" font-family="IBM Plex Mono">?</text><path d="M17 15v6M5 25h22M23 21l4 4-4 4" fill="none" stroke="#c8d1e2" stroke-width="1.6"/>'),
+  chips: IC('<rect x="2" y="10" width="14" height="14" rx="3" fill="#e8ecf4"/><rect x="18" y="10" width="14" height="14" rx="3" fill="#e8ecf4"/><text x="9" y="20" font-size="6" text-anchor="middle" fill="#0b1019" font-family="IBM Plex Mono">O₂</text><text x="25" y="20" font-size="5.5" text-anchor="middle" fill="#0b1019" font-family="IBM Plex Mono">[O]</text>'),
+  map: IC('<circle cx="7" cy="9" r="4" fill="#ffb547"/><circle cx="27" cy="9" r="4" fill="none" stroke="#c8d1e2"/><circle cx="17" cy="25" r="4" fill="none" stroke="#86e0a8" stroke-dasharray="2 2"/><path d="M11 9h12M9 13l6 9M25 13l-6 9" stroke="#8b96ad" stroke-width="1.4"/>'),
+  start: IC('<rect x="4" y="10" width="26" height="14" rx="4" fill="#2a2213" stroke="#ffb547" stroke-width="1.6"/><circle cx="6" cy="11" r="4" fill="#ffb547"/>'),
+  goal: IC('<rect x="4" y="10" width="26" height="14" rx="4" fill="none" stroke="#86e0a8" stroke-width="1.6" stroke-dasharray="3 2"/><text x="17" y="20" font-size="7" text-anchor="middle" fill="#86e0a8" font-family="Golos Text">цель</text>'),
+  status: IC('<path d="M4 17h26" stroke="#ffb547" stroke-width="2.4"/><path d="M4 23h26" stroke="#86e0a8" stroke-width="2" stroke-dasharray="4 3"/><path d="M4 11h26" stroke="#72d4e8" stroke-width="1.6"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const L = LESSONS[S.lesson];
+  if (S.done[L.id]) return '✓ Выполнено';
+  if (m.kind === 'chain') return `Стрелок: ${m.filled} из ${m.total} · ошибок ${S.wrong}`;
+  return `Синтезов: ${m.reached} из ${GOALS.length} · цель: ${m.G.short.toLowerCase()}`;
+}
+
+function buildScheme() {
+  const el = $('#pane-scheme');
+  let h = '';
+  if (isChain()) {
+    const rows = CHAINS[LID()], chips = CHIPS[LID()];
+    h = `<h2>Реактив для каждой стрелки</h2><p class="note">То же, что на доске: выберите реактив для стрелки. Верный ответ закрепится.</p>` +
+      rows.map((row, ri) => `<h3>${row.title}</h3><div class="pairs">` + row.steps.map((st, i) => {
+        const f = S.fill[ri + '-' + i];
+        return `<label>${low(row.nodes[i][0])} → ${low(row.nodes[i + 1][0])}<select data-ri="${ri}" data-i="${i}" ${f ? 'disabled' : ''}><option value="">—</option>${chips.map(c => `<option value="${c.k}" ${f === c.k ? 'selected' : ''}>${c.l}</option>`).join('')}</select></label>`;
+      }).join('') + `</div>`).join('') +
+      `<dl class="reads"><div><dt>Стрелок</dt><dd id="r1"></dd></div><div><dt>Ошибок</dt><dd id="r2"></dd></div><div><dt>Осталось</dt><dd id="r3"></dd></div></dl>`;
+  } else {
+    h = `<h2>План синтеза</h2><div class="ctl"><div class="lbl">Цель</div><div class="chips" id="gChips">${GOALS.map((G, i) => `<button data-g="${i}" aria-pressed="${i === S.goal}">${S.reached[i] ? '✓ ' : ''}${G.name}</button>`).join('')}</div></div>
+      <h3>Путь</h3><div class="route" id="sRoute"></div>
+      <h3>Следующая стадия</h3><div class="parts" id="sNext"></div>
+      <div class="row"><button class="ghostbtn" id="sBack">Шаг назад</button><button class="ghostbtn" id="sAgain">Заново</button></div>
+      <dl class="reads"><div><dt>Стадий</dt><dd id="r1"></dd></div><div><dt>Выход</dt><dd id="r2"></dd></div><div><dt>Готово</dt><dd id="r3"></dd></div></dl>`;
+  }
+  el.innerHTML = h;
+  el.querySelectorAll('select[data-ri]').forEach(s => s.onchange = () => { if (!s.value) return; const ok = fillStep(+s.dataset.ri, +s.dataset.i, s.value); if (ok) s.disabled = true; else s.value = ''; });
+  el.querySelectorAll('#gChips button').forEach(b => b.onclick = () => setGoal(+b.dataset.g));
+  const bk = el.querySelector('#sBack'); if (bk) bk.onclick = () => act('back');
+  const ag = el.querySelector('#sAgain'); if (ag) ag.onclick = () => act('again');
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; };
+  if (m.kind === 'chain') {
+    set('#r1', `${m.filled} из ${m.total}`); set('#r2', String(S.wrong)); set('#r3', String(m.total - m.filled));
+    el.querySelectorAll('select[data-ri]').forEach(s => { const f = S.fill[s.dataset.ri + '-' + s.dataset.i]; if (f) { s.value = f; s.disabled = true; } else { s.disabled = false; if (!s.value) s.value = ''; } });
+    return;
+  }
+  set('#sRoute', pathTxt(S.route) + (m.atGoal ? ' ✓' : ' → …'));
+  set('#r1', String(m.steps)); set('#r2', m.steps ? fmt(Math.pow(YIELD, m.steps) * 100, 0) + ' %' : '—'); set('#r3', `${m.reached} из ${GOALS.length}`);
+  el.querySelectorAll('#gChips button').forEach(b => { b.setAttribute('aria-pressed', +b.dataset.g === S.goal); b.textContent = (S.reached[+b.dataset.g] ? '✓ ' : '') + GOALS[+b.dataset.g].name; });
+  const nx = el.querySelector('#sNext');
+  if (nx) {
+    nx.innerHTML = m.atGoal ? '<p class="note">Цель достигнута. «Заново» — попробовать другой путь.</p>'
+      : m.next.length ? m.next.map(e => `<button class="part" data-to="${e.b}"><div><b>→ ${NODES[e.b].d} · ${NODES[e.b].n}</b><span>${e.c} — ${e.nm}</span></div></button>`).join('')
+      : '<p class="note">Отсюда новых веществ не получить. Сделайте шаг назад.</p>';
+    nx.querySelectorAll('button[data-to]').forEach(b => b.onclick = () => tapNode(b.dataset.to));
+  }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'inorg') return [
+    { id: 'rowA', icon: ICON.rowA, name: 'Ряд металла', spec: 'Ca → CaO → Ca(OH)₂ → CaCO₃: металл → основный оксид → щёлочь → соль.' },
+    { id: 'rowB', icon: ICON.rowB, name: 'Ряд неметалла', spec: 'S → SO₂ → SO₃ → H₂SO₄ → BaSO₄: неметалл → оксиды → кислота → нерастворимая соль.' },
+    { id: 'slots', icon: ICON.slots, name: 'Окошки над стрелками', spec: 'Над стрелкой пишут второй реагент. Пунктирное окошко ждёт реактив, зелёное — заполнено верно (нажмите, чтобы увидеть уравнение).' },
+    { id: 'chips', icon: ICON.chips, name: 'Реактивы', spec: 'Семь веществ, среди них есть лишние. Кислород и вода нужны по два раза.' }];
+  if (id === 'organic') return [
+    { id: 'rowA', icon: ICON.rowA, name: 'Цепочка от метана', spec: 'CH₄ → CH₃Cl → CH₃OH → HCHO → HCOOH → HCOOCH₃: один атом углерода, пять разных функциональных групп.' },
+    { id: 'rowB', icon: ICON.rowB, name: 'Цепочка от этилена', spec: 'C₂H₄ → C₂H₅OH → CH₃CHO → CH₃COOH → CH₃COOC₂H₅: промышленный путь к растворителю этилацетату.' },
+    { id: 'slots', icon: ICON.slots, name: 'Реагент и условия', spec: 'В органике над стрелкой пишут и реагент, и условия: свет, нагрев, катализатор, растворитель.' },
+    { id: 'chips', icon: ICON.chips, name: 'Карточки условий', spec: 'Восемь карточек, две лишние: H₂, Ni (восстановление) и NaOH в спирте (отщепление).' }];
+  return [
+    { id: 'map', icon: ICON.map, name: 'Карта превращений', spec: 'Девять веществ и 14 реакций между ними. Стрелка — одна стадия синтеза.' },
+    { id: 'start', icon: ICON.start, name: 'Исходное вещество', spec: 'Доступное сырьё: природный газ (метан) или этанол. Цифра в кружке — номер стадии.' },
+    { id: 'goal', icon: ICON.goal, name: 'Цель синтеза', spec: 'Нужное вещество. Когда путь до него готов, кратчайший маршрут подсветится зелёным пунктиром.' },
+    { id: 'status', icon: ICON.status, name: 'Цвета стрелок', spec: 'Оранжевые — ваш путь, голубые — возможные следующие стадии, зелёный пунктир — кратчайший путь.' }];
+}
+
+function renderPanes(m) {
+  const L = LESSONS[S.lesson], done = !!S.done[L.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${L.title}</h2>` +
+      L.text.map(p => `<p>${p}</p>`).join('') +
+      `<div class="life"><b>Зачем это в жизни</b>${L.why}</div>` +
+      (L.safe ? `<div class="safe"><b>Безопасность</b>${L.safe}</div>` : '') +
+      `<div class="taskbox"><div class="k">Задание</div><p>${L.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${L.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Детали модели</h2><p class="note">Нажмите на деталь, чтобы найти её на доске.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  if (m.kind === 'chain') {
+    let h = `<h2>Уравнения реакций</h2><p class="note">Уравнение появляется, когда реактив на стрелке подобран верно.</p>`;
+    m.rows.forEach((row, ri) => {
+      h += `<h3>${row.title}${m.rowDone[ri] ? ' ✓' : ''}</h3><div class="eqs">` + row.steps.map((st, i) => {
+        const f = S.fill[ri + '-' + i];
+        return f ? `<div class="ok">${st.eq}<small>${i + 1}. ${st.type} · ${st.cond}</small></div>` : `<div>${low(row.nodes[i][0])} → ${low(row.nodes[i + 1][0])}<small>${i + 1}. реактив ещё не подобран</small></div>`;
+      }).join('') + `</div>`;
+    });
+    if (LID() === 'inorg') h += `<h3>Проверка баланса</h3><div class="steps">${step('2Ca + O₂ → 2CaO', 'Ca 2 = 2, O 2 = 2')}${step('2SO₂ + O₂ ⇄ 2SO₃', 'S 2 = 2, O 6 = 6')}${step('H₂SO₄ + BaCl₂ → BaSO₄ + 2HCl', 'H 2 = 2, Cl 2 = 2', 'sum')}</div>`;
+    else h += `<h3>Что меняется на каждом шаге</h3><div class="steps">${step('алкан → галогеналкан', 'H заменён на Cl')}${step('галогеналкан → спирт', 'Cl заменён на OH')}${step('спирт → альдегид', '–CH₂OH → –CHO')}${step('альдегид → кислота', '–CHO → –COOH')}${step('кислота + спирт → эфир', '–COOH → –COOR', 'sum')}</div>`;
+    return h;
+  }
+  const G = m.G, bl = m.best.length - 1, rec = S.reached[S.goal];
+  let h = `<h2>${G.name}</h2><div class="formula">${NODES[G.from].d} ⟹ ${NODES[G.to].d}</div><h3>Ваш путь</h3>`;
+  h += S.route.length > 1 ? `<div class="eqs">` + S.route.slice(1).map((k, i) => { const e = edge(S.route[i], k); return `<div class="ok">${e.eq}<small>${i + 1}. ${e.c} — ${e.nm}</small></div>`; }).join('') + `</div>` : `<p class="note">Пока ни одной стадии. Нажмите на вещество, обведённое голубым.</p>`;
+  h += `<h3>Общий выход</h3><div class="steps">${step('выход каждой стадии', '80 %')}${step('стадий', String(m.steps))}${step(`0,8^${m.steps}`, m.steps ? fmt(Math.pow(YIELD, m.steps) * 100, 0) + ' %' : '—', 'sum')}</div>`;
+  if (rec) {
+    h += `<h3>Кратчайший путь · ${bl} ст.</h3><div class="route">${pathTxt(m.best)}</div>`;
+    const cnt = countShortest(G.from, G.to);
+    if (cnt > 1) h += `<p class="note">Кратчайших путей ${cnt}: на карте подсвечен один из них. Химик выбирает между ними по цене сырья, безопасности и отходам.</p>`;
+    h += `<p class="note">Из 100 г исходного вещества по кратчайшему пути при выходе 80 % на стадию получится около ${fmt(Math.pow(YIELD, bl) * 100, 0)} % от теоретического количества продукта.</p>`;
+  }
+  return h;
+}
+
+function renderMeter(m) {
+  const el = $('#meter');
+  if (m.kind === 'chain') {
+    el.innerHTML = `<div class="k">Стрелки</div><div class="v ${m.filled === m.total ? 'ok' : ''}">${m.filled} из ${m.total}</div><div class="gauge"><b style="width:${(m.filled / m.total * 100).toFixed(1)}%"></b></div><div class="lr"><span>взято</span><span>${S.selR ? chipOf(S.selR).l : '—'}</span></div><div class="lr"><span>ошибок</span><span>${S.wrong}</span></div>`;
+  } else {
+    const bl = m.best.length - 1, rec = S.reached[S.goal];
+    el.innerHTML = `<div class="k">Цель</div><div class="v ${m.atGoal ? 'ok' : ''}">${NODES[m.G.to].d}</div><div class="lr"><span>стадий</span><span>${m.steps}</span></div><div class="lr"><span>кратчайший</span><span>${rec ? bl : '?'}</span></div><div class="lr"><span>выход</span><span>${m.steps ? fmt(Math.pow(YIELD, m.steps) * 100, 0) + ' %' : '—'}</span></div>`;
+  }
+}
+
+function update() {
+  const m = model(), L = LESSONS[S.lesson];
+  if (!S.done[L.id] && L.check(m)) {
+    S.done[L.id] = true; save(); renderStrip();
+    toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено! Уравнения всех реакций — на доске и во вкладке «Расчёты».' : 'Все задания выполнены. Генетическая связь веществ освоена!');
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[L.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  inorg: '<rect x="3" y="4" width="12" height="8" rx="2" fill="#9fd27a"/><rect x="27" y="4" width="12" height="8" rx="2" fill="none" stroke="#c8d1e2"/><rect x="51" y="4" width="12" height="8" rx="2" fill="#86e0a8"/><path d="M16 8h9M40 8h9" stroke="#c8d1e2" stroke-width="1.2"/><rect x="3" y="18" width="12" height="8" rx="2" fill="#e6c63a"/><rect x="27" y="18" width="12" height="8" rx="2" fill="none" stroke="#c8d1e2"/><rect x="51" y="18" width="12" height="8" rx="2" fill="#86e0a8"/><path d="M16 22h9M40 22h9" stroke="#c8d1e2" stroke-width="1.2"/>',
+  organic: '<text x="4" y="12" font-size="7" fill="#e8ecf4" font-family="IBM Plex Mono">CH₄</text><path d="M19 9h8" stroke="#c8d1e2" stroke-width="1.2"/><rect x="28" y="3" width="14" height="6" rx="2" fill="none" stroke="#ffb547" stroke-dasharray="2 1"/><text x="44" y="12" font-size="7" fill="#e8ecf4" font-family="IBM Plex Mono">ROH</text><text x="4" y="26" font-size="7" fill="#86e0a8" font-family="IBM Plex Mono">R–COOR′</text>',
+  synthesis: '<circle cx="8" cy="8" r="4" fill="#ffb547"/><circle cx="33" cy="8" r="4" fill="none" stroke="#c8d1e2"/><circle cx="33" cy="23" r="4" fill="none" stroke="#c8d1e2"/><circle cx="58" cy="15" r="4" fill="none" stroke="#86e0a8" stroke-dasharray="2 1.5"/><path d="M12 8h17M37 8l17 6M12 10l17 11M37 23l17-6" stroke="#ffb547" stroke-width="1.2"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((L, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[L.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${L.title}</span></span>
+      ${S.done[L.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  const L = LESSONS[i], init = JSON.parse(JSON.stringify(L.init || {}));
+  S.lesson = i; S.hl = null; drag = null;
+  S.fill = {}; S.selR = null; S.wrong = 0; S.last = null;
+  S.goal = 0; S.route = [GOALS[0].from]; S.reached = {}; S.flash = null;
+  Object.assign(S, init);
+  save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L.task;
+  $('#hint').textContent = L.stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const strip = $('#lessons'), cur = strip.querySelector('.lesson[aria-current="true"]');
+  if (cur) strip.scrollLeft = cur.getBoundingClientRect().left - strip.getBoundingClientRect().left + strip.scrollLeft - (strip.clientWidth - cur.offsetWidth) / 2;
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), L = LESSONS[S.lesson], id = L.id;
+  let now = '';
+  if (m.kind === 'chain') {
+    const chips = CHIPS[id];
+    now = `Цепочки: ${m.rows.map(r => r.nodes.map(n => n[0]).join(' → ')).join('; ')}. Карточки реагентов: ${chips.map(c => c.l).join(', ')}. ` +
+      `Заполнены стрелки: ${m.rows.map((r, ri) => r.steps.map((st, i) => S.fill[ri + '-' + i] ? `${r.nodes[i][0]} → ${r.nodes[i + 1][0]}: ${chipOf(S.fill[ri + '-' + i]).l}` : null).filter(Boolean).join('; ')).filter(Boolean).join('; ') || 'пока ни одной'}. ` +
+      `${S.selR ? `Взята карточка ${chipOf(S.selR).l}.` : ''} Ошибок: ${S.wrong}. Не называй реагент для незаполненной стрелки прямо — спрашивай, какая функциональная группа или какой класс веществ до и после стрелки.`;
+  } else {
+    now = `Карта синтеза: вещества ${Object.values(NODES).map(n => `${n.d} (${n.n})`).join(', ')}. Реакции на карте: ${EDGES.map(e => `${NODES[e.a].d} → ${NODES[e.b].d} (${e.c})`).join('; ')}. ` +
+      `Текущая цель: ${m.G.name}. Путь ученика: ${pathTxt(S.route)}${m.atGoal ? ' — цель достигнута' : ''}, стадий ${m.steps}. ` +
+      `Выполнены цели: ${GOALS.filter((_, i) => S.reached[i]).map(g => g.name).join(', ') || 'пока ни одной'}. Не выдавай готовый путь — спрашивай, из чего можно получить целевое вещество за одну стадию (ретросинтез).`;
+  }
+  return [
+    `Предмет: химия, 9–11 класс. Тема «Генетическая связь веществ». Урок ${S.lesson + 1} из ${LESSONS.length}: «${L.title}».`,
+    `Объяснение урока: ${L.text.join(' ')}`,
+    `Задание: ${L.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'}.`,
+    `Сейчас на экране: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Веди ученика наводящими вопросами, а не готовыми ответами.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const L = LESSONS[S.lesson], done = S.done[L.id];
+  const q = {
+    inorg: 'Почему серу нельзя сразу сжечь до SO₃?', organic: 'Чем отличается NaOH в воде от NaOH в спирте?',
+    synthesis: 'Почему химики ищут самый короткий путь синтеза?',
+  }[L.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

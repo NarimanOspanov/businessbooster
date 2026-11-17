@@ -986,4 +986,73 @@
       tag(v3(KX, ty + 9, KZ), 'Сняли: ' + (d.skim.up.join(', ') || 'ничего'), 'на дне: ' + (d.skim.down.join(', ') || 'ничего'), d.skim.ok);
     } else tag(v3(TX + 20, TB + TH + 2, TZ + TD / 2 - 5), 'Сачок', 'снять всплывшее');
   };
+
+  // ===== 5. Фенол: этанол и фенол рядом (NaOH, бромная вода, FeCl₃) или три пробирки без подписей =====
+  SC['chor-phen'] = (kit, d) => {
+    const { T, at, box, tag, clickable, C } = kit, h = H(kit), v3 = h.v3;
+    const g = new T.Group(); at(g, 0, 0, 0);
+    const ty = h.tray(g, 0, 2, 124, 80), cmp = d.mode === 'cmp', LV = 11;
+    const ph = () => { const L = live() || {}; return kit.reduce ? 1 : clamp(L.ph ?? 1, 0, 1); };
+    // содержимое пробирки: sub 0 этанол, 1 фенол, 2 глицерин; emul — фенол мутной эмульсией
+    function fill(tg, TR, sub, emul) {
+      const rg = d.rg;
+      if (!rg) { h.tubeLiquid(tg, TR, LV, sub === 1 && emul ? 0xeceee6 : 0xd7ecf7, sub === 1 && emul ? 0.75 : 0.3); return; }
+      if (sub !== 1) { h.tubeLiquid(tg, TR, LV, { naoh: 0xd7ecf7, br: 0xf0a53a, fe: 0xe3c75a }[rg], { naoh: 0.3, br: 0.6, fe: 0.5 }[rg]); return; }
+      let f = null;
+      if (rg === 'naoh') {
+        const lq = h.tubeLiquid(tg, TR, LV, emul ? 0xeceee6 : 0xd7ecf7, emul ? 0.75 : 0.3);
+        if (emul) f = k => { lq.mat.color.copy(mixC(T, 0xeceee6, 0xd7ecf7, k)); lq.mat.opacity = 0.75 - 0.45 * k; };
+      } else if (rg === 'br') {
+        const ppt = h.tubeLiquid(tg, TR, TR + 0.8, 0xf6f7f4, 0); const top = h.tubeLayer(tg, TR, TR + 0.8, LV, 0xf0a53a, 0.6);
+        f = k => { ppt.mat.opacity = 0.95 * k; top.mat.color.copy(mixC(T, 0xf0a53a, 0xefe7d6, k)); top.mat.opacity = 0.6 - 0.3 * k; };
+      } else {
+        const lq = h.tubeLiquid(tg, TR, LV, 0xe3c75a, 0.5);
+        f = k => { lq.mat.color.copy(k < 0.5 ? mixC(T, 0xe3c75a, 0xa35a9a, k / 0.5) : mixC(T, 0xa35a9a, 0x6d2fa8, (k - 0.5) / 0.5)); lq.mat.opacity = 0.5 + 0.35 * k; };
+      }
+      if (f) kit.onFrame(() => f(ph()));
+    }
+    // деревянный штатив
+    const R1 = h.zone(g, cmp ? -22 : -34, -6, 1.3), XS = cmp ? [-9, 9] : [-11, 0, 11], W1 = R1.userData.W, RW = cmp ? 30 : 36;
+    at(box(RW, 1.4, 10, C.WOOD2), 0, ty + 0.7, 0, R1);
+    at(box(RW, 1.2, 10, C.WOOD), 0, ty + 9, 0, R1);
+    for (const sx of [-RW / 2 + 1, RW / 2 - 1]) at(box(1.4, 9, 9, C.WOOD2), sx, ty + 4.9, 0, R1);
+    if (cmp) {
+      ['этанол', 'фенол'].forEach((nm, i) => {
+        const tg = new T.Group(); at(tg, XS[i], ty + 1.6, 0, R1);
+        h.testTube(tg, 0, 0, 0, 2.5, 22); fill(tg, 2.5, i, true);
+        const s = h.sticker(6.4, 2.4, nm, '#1b1610', '#e8f3ff', 200); at(s, 0, 15, 2.65, tg);
+      });
+      const done = d.rg && d.done;
+      tag(W1(XS[0], ty + 26, 0), 'Этанол', d.rg ? (done ? d.resE : 'идёт опыт…') : 'смешан с водой');
+      tag(W1(XS[1], ty + 26, 0), 'Фенол', d.rg ? (done ? d.resP : 'идёт опыт…') : 'мутная эмульсия', !!done);
+    } else {
+      XS.forEach((dx, i) => {
+        const sel = d.sel === i, tg = new T.Group(); at(tg, dx, ty + 1.6 + (sel ? 5 : 0), 0, R1); clickable(tg, 'pt' + i);
+        const tb = h.testTube(tg, 0, 0, 0, 2.3, 20); h.tubeLiquid(tb.g, 2.3, 8, 0xd7ecf7, 0.35);
+        const lt = h.sticker(2.8, 2.6, 'ABC'[i], '#1b1610', sel ? '#ffd166' : '#fffaf0', 96); at(lt, 0, 14, 2.4, tg);
+        if (d.pick === i) { const s = h.sticker(7.2, 2.4, 'фенол', '#1b1610', '#bff0cf', 220); at(s, 0, 17.6, 2.45, tg); }
+        else if (d.not[i]) { const s = h.sticker(7.2, 2.4, 'не фенол', '#1b1610', '#dfe5ec', 220); at(s, 0, 17.6, 2.45, tg); }
+        if (sel) h.halo(tg, 0, 6, 0, 14);
+      });
+      tag(W1(-6, ty + 3, 8), 'Пробирка ' + 'ABC'[d.sel], d.pick === d.sel ? 'фенол ✓' : d.not[d.sel] ? 'не фенол' : d.tested[d.sel] ? 'есть опыты' : 'опытов нет', d.pick === d.sel);
+      // проба в подставке
+      const R2 = h.zone(g, 10, -6, 1.3), W2 = R2.userData.W, TR = 2.6;
+      at(box(9, 1.6, 9, C.WOOD2), 0, ty + 0.8, 0, R2);
+      const tg = new T.Group(); at(tg, 0, ty + 1.6, 0, R2);
+      h.testTube(tg, 0, 0, 0, TR, 26);
+      if (d.rg) { fill(tg, TR, d.sub, false); tag(W2(2, ty + 30, 0), 'Проба ' + 'ABC'[d.sel] + ' + ' + d.rgName, d.done ? d.res : 'идёт опыт…', d.done && d.sub === 1 && d.rg !== 'naoh'); }
+      else tag(W2(2, ty + 30, 0), 'Пробирка для пробы', 'выберите реактив');
+    }
+    // склянки с реактивами
+    const R3 = [{ k: 'naoh', lab: 'NaOH', liq: 0xe8eef4, cap: 0x3b6fd8 }, { k: 'br', lab: 'Br₂\n+ H₂O', liq: 0xf0a53a, cap: 0x2c3240, glass: 0x8a5a2b }, { k: 'fe', lab: 'FeCl₃', liq: 0xe3c75a, cap: 0xe0473a }];
+    R3.forEach((r, j) => {
+      const b = h.bottle(g, 31 + j * 11, ty, -12, { r: 3.8, h: 10, liq: r.liq, lop: 0.8, fill: 0.55, cap: r.cap, glass: r.glass, op: r.glass ? 0.6 : 0.32, label: r.lab, lh: 4.6 });
+      b.g.scale.setScalar(1.15); clickable(b.g, 'p-' + r.k); if (d.rg === r.k) h.halo(b.g, 0, 1, 0, 16);
+    });
+    // таблички режима и отметка «фенол»
+    h.modeSign(g, -30, ty, 28, 'Сравнить', cmp, 'pm-cmp', 16);
+    h.modeSign(g, -10, ty, 28, 'Найти фенол', !cmp, 'pm-find', 18);
+    if (!cmp) h.modeSign(g, 14, ty, 28, 'Это фенол', d.pick === d.sel, 'pick', 16);
+    tag(v3(30, ty + 6, 28), 'Цели', d.got + ' из 4', d.got === 4);
+  };
 })();
