@@ -1,6 +1,7 @@
 // «Как в жизни» для темы «Электромагнитная индукция» (/labs/phys-induction/).
 // Сцены: опыт Фарадея (катушка, магнит, гальванометр), генератор (рамка между полюсами, ручка, кольца и щётки, лампа),
-// трансформатор (сердечник из пластин, две обмотки, источник, вольтметры, лампа), электромагнитные волны
+// трансформатор (сердечник из пластин, две обмотки, источник, вольтметры, лампа), самоиндукция (две лампы:
+// с резистором и с катушкой, сердечник, ключ с искрой), электромагнитные волны
 // (генератор с передающим диполем и приёмный диполь с лампочкой). Описание — window.LUCH_REAL(),
 // то, что меняется каждый кадр (положение магнита, угол рамки, фаза), берём из window.LUCH_REAL.live().
 (() => {
@@ -280,6 +281,87 @@
       });
       const sn = Math.sin(ph);
       fP.forEach(w => w.set(1.4 * sn, dt)); fS.forEach(w => w.set(1.4 * sn, dt));
+    });
+  };
+
+  // =============================== Самоиндукция ===============================
+  // лампа из набора, построенная «горящей»; яркость меняем каждый кадр, не перестраивая сцену
+  function lampCtl(T, node) {
+    const L0 = []; let glass = null, fil = null;
+    node.g.traverse(o => {
+      if (o.isPointLight) L0.push([o, 'intensity', o.intensity]);
+      else if (o.isSprite) L0.push([o.material, 'opacity', o.material.opacity]);
+      else if (o.isMesh && o.material && o.material.transparent && o.material.emissive) glass = o;
+      else if (o.isMesh && o.material && o.material.isMeshBasicMaterial && o.geometry && o.geometry.type === 'TubeGeometry') fil = o;
+    });
+    const gOff = new T.Color(0xdfe8ef), gOn = new T.Color(0xfff1b8), fOff = new T.Color(0x5d6a86), fOn = new T.Color(0xffd27a);
+    return {
+      set(b) {
+        const k = clamp(b, 0, 1.2), k1 = Math.min(1, k);
+        for (const [o, p, v] of L0) o[p] = v * k;
+        if (glass) { glass.material.emissiveIntensity = 0.9 * k1; glass.material.color.lerpColors(gOff, gOn, k1); glass.material.opacity = 0.5 + 0.42 * k1; }
+        if (fil) fil.material.color.lerpColors(fOff, fOn, k1);
+      },
+    };
+  }
+  SC['ind-selfind'] = (kit, d) => {
+    const { T, at, box, cyl, mesh, v3, clickable, C, cable, post, keep, bulb, resistor, supply, knife, placeOn, glowTex } = kit;
+    const ZA = -8, ZB = 24, XL = -30, XR = 50, CXc = 24;
+    // источник (нажать — другое напряжение) и ключ
+    const src = supply(d.U); src.g.userData.click = 'ucyc';
+    const sN = placeOn(src, v3(-50, 0, -26), 0, 'src');
+    const kN = placeOn(knife({ closed: d.sw, click: 'sw' }), v3(-50, 0, 40), 0, 'sw');
+    // узлы, где ветки соединяются
+    const nLA = post(kit.root, XL, ZA, 0), nLB = post(kit.root, XL, ZB, 0), nRA = post(kit.root, XR, ZA, 0), nRB = post(kit.root, XR, ZB, 0);
+    // ветка 1: лампа и резистор; ветка 2: лампа и катушка
+    const b1 = placeOn(bulb({ glow: 1, value: '' }), v3(-10, 0, ZA), 0, 'l1'), b2 = placeOn(bulb({ glow: 1, value: '' }), v3(-10, 0, ZB), 0, 'l2');
+    const rN = placeOn(resistor({ R: 8 }), v3(CXc, 0, ZA), 0, 'res');
+    // катушка на подставке: каркас, медная обмотка, щёчки; сердечник — железный стержень
+    const cg = new T.Group(); at(cg, CXc, 0, ZB); clickable(cg, 'core');
+    at(box(32, 2.4, 14, C.WOOD2), 0, 1.2, 0, cg);
+    const AY = 10.5;
+    for (const fx of [-10.5, 10.5]) { at(box(2, AY - 2.4, 5, 0x3a3f4c), fx, 2.4 + (AY - 2.4) / 2, 0, cg); const fl = cyl(6.6, 1, 0x3a3f4c); fl.rotation.z = Math.PI / 2; at(fl, fx, AY, 0, cg); }
+    const spool = cyl(4, 20, 0xe3c99a, { edges: false }); spool.rotation.z = Math.PI / 2; at(spool, 0, AY, 0, cg);
+    const pts = [], nt = 16, M = nt * 20;
+    for (let k = 0; k <= M; k++) { const a = k / M * nt * Math.PI * 2; pts.push(v3(-9 + 18 * k / M, AY + Math.sin(a) * 4.9, Math.cos(a) * 4.9)); }
+    const wind = mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts), M * 2, 0.55, 8), CU, { edges: false, hull: true }); at(wind, 0, 0, 0, cg);
+    const rodC = 0x6b7385;
+    if (d.core) { const rod = cyl(2.6, 32, rodC); rod.rotation.z = Math.PI / 2; at(rod, 0, AY, 0, cg); }
+    else { const rod = cyl(2.6, 32, rodC); rod.rotation.z = Math.PI / 2; at(rod, CXc, 2.6, ZB + 14); clickable(rod, 'core'); }
+    const cA = post(cg, -13, 5, 2.4), cB = post(cg, 13, 5, 2.4);
+    cable(v3(-9, AY, 4.9), cA, CU, 0, { r: 0.4, lift: 0.5 }); cable(v3(9, AY, 4.9), cB, CU, 0, { r: 0.4, lift: 0.5 });
+    const wcA = world(cg, cA), wcB = world(cg, cB);
+    // провода; бегущие огоньки — ток со своим знаком (направление «по стрелке» от «+» источника)
+    const fM = [flow(kit, cable(sN.tout, kN.tin, C.WIRE.plus, 0, { lift: 3 })), flow(kit, cable(kN.tout, nLB, C.WIRE.plus, 0, { lift: 2 })), flow(kit, cable(nRA, sN.tin, C.WIRE.minus, 0, { lift: 3 }))];
+    const fA = [flow(kit, cable(nLB, nLA, C.WIRE.mid, 0, { lift: 1 })), flow(kit, cable(b1.tout, rN.tin, C.WIRE.mid, 0, { lift: 2 })), flow(kit, cable(rN.tout, nRA, C.WIRE.mid, 0, { lift: 2 }))];
+    if (d.br) fA.push(flow(kit, cable(nLA, b1.tin, C.WIRE.mid, 0, { lift: 2 })));
+    const fB = [flow(kit, cable(nLB, b2.tin, C.WIRE.mid, 0, { lift: 2 })), flow(kit, cable(b2.tout, wcA, C.WIRE.mid, 0, { lift: 2 })), flow(kit, cable(wcB, nRB, C.WIRE.mid, 0, { lift: 2 })), flow(kit, cable(nRB, nRA, C.WIRE.mid, 0, { lift: 1 }))];
+    // левая шина (от узла ветки 2 к узлу ветки 1) несёт I1, правая — I2
+    const l1 = lampCtl(T, b1), l2 = lampCtl(T, b2);
+    // искра между контактами ключа
+    kN.g.updateMatrixWorld(true);
+    const sp = new T.Sprite(new T.SpriteMaterial({ map: glowTex(), color: 0xbfe6ff, transparent: true, blending: T.AdditiveBlending, depthWrite: false, depthTest: false, opacity: 0 }));
+    sp.scale.setScalar(16); sp.visible = false; sp.renderOrder = 6; at(sp, 0, 0, 0); sp.position.copy(kN.g.localToWorld(v3(7, 7, 0)));
+    const spL = new T.PointLight(0x9fd8ff, 0, 50, 1.2); spL.position.copy(sp.position); kit.root.add(spL);
+    kit.tag(sN.tagAt, 'Источник', d.U + ' В');
+    const swTag = liveTag(kit, kN.tagAt, 'Ключ', d.sw ? 'замкнут' : 'разомкнут', false);
+    const t1 = liveTag(kit, b1.tagAt, d.br ? 'Лампа 1 · с резистором' : 'Лампа 1 · отключена', '0 А');
+    const t2 = liveTag(kit, b2.tagAt, 'Лампа 2 · с катушкой', '0 А');
+    const tC = liveTag(kit, v3(CXc, 20, ZB), 'Катушка · L = ' + num(d.L, 0) + ' Гн' + (d.core ? ' · сердечник' : ''), 'W = 0 Дж');
+    kit.tag(rN.tagAt, 'Резистор', '8 Ом');
+    kit.onFrame(dt => {
+      const s = live(); if (!s || s.i1 === undefined) return;
+      l1.set(s.b1); l2.set(s.b2);
+      const sw = d.sw, im = sw ? s.i1 + s.i2 : 0;
+      fM.forEach(f => f.set(im * 3, dt));
+      // ветка 1: при замкнутом ключе ток I1 от левого узла к правому, после размыкания — обратный (I1 < 0)
+      fA.forEach(f => f.set(s.i1 * 3, dt));
+      fB.forEach(f => f.set(s.i2 * 3, dt));
+      const on = s.spark > 0, a = clamp(s.spark / 0.45, 0, 1);
+      sp.visible = on; sp.material.opacity = a; sp.scale.setScalar(10 + 14 * a); spL.intensity = on ? 80 * a : 0;
+      swTag.set(on ? 'искра! ≈ ' + Math.round(s.sparkV / 100) * 100 + ' В' : (d.sw ? 'замкнут' : 'разомкнут'));
+      t1.set(num(Math.abs(s.i1), 2) + ' А'); t2.set(num(Math.abs(s.i2), 2) + ' А');
+      tC.set('W = ' + num(s.W, 2) + ' Дж');
     });
   };
 

@@ -1,7 +1,8 @@
 // «Как в жизни» для тем «Тепловые двигатели» (labs/phys-engines) и «Термодинамика» (labs/phys-thermo):
 // модель ДВС в разрезе на стенде, котёл с паровой турбинкой и генератором с прожекторами, машинка на дороге до аула
 // с мерной колбой топлива и табло энергии, цилиндр с поршнем на горелке (упоры или груз), цилиндр с грузами и графиком p(V),
-// медные бруски с тепловым насосом, машина Карно между нагревателем и холодильником с табло цикла.
+// медные бруски с тепловым насосом, машина Карно между нагревателем и холодильником с табло цикла,
+// электростанция, ветряк, машины и дом с тепловым насосом (урок «Тепловые машины и экология»).
 // Сцены строятся из window.LUCH_REAL() опыта; быстрые значения (угол вала, обороты, температуры) — из LUCH_REAL.live() в onFrame.
 (() => {
   const SC = window.LUCH_REAL_SCENES = window.LUCH_REAL_SCENES || {};
@@ -925,6 +926,120 @@
       qUp.material.opacity = onSt && k === 0 ? 0.7 : 0; qDn.material.opacity = onSt && k === 2 ? 0.7 : 0;
       const key = (run ? Lv.ph.toFixed(3) : 'idle') + k;
       if (key !== lastKey) { lastKey = key; board.userData.upd(run ? { V: Lv.V, p: Lv.p } : stagePt(g, d.T1, d.T2, 0, 0), k); }
+    });
+  };
+
+  // =====================================================================================
+  // Тепловые машины и экология: электростанция с трубой и градирней, ветряк, машина, грузовик, дом с тепловым насосом,
+  // табло «куда уходит энергия». Нажатие на модель выбирает вариант (в опыте — LUCH_REAL.click).
+  // =====================================================================================
+  function drawEco(x, W, H, d) {
+    x.fillStyle = '#0e1520'; x.fillRect(0, 0, W, H);
+    x.textBaseline = 'middle'; x.textAlign = 'left';
+    x.fillStyle = '#e8ecf4'; x.font = `700 24px ${BODY}`; x.fillText(d.name, 20, 30);
+    if (d.gridName && (d.mode === 'ev' || d.mode === 'pump')) { x.fillStyle = '#8b96ad'; x.font = `500 17px ${BODY}`; x.fillText('сеть: ' + d.gridName, 20, 58); }
+    const bw = W - 40;
+    const bar = (y, lab, val, f, col) => {
+      x.fillStyle = '#26324a'; x.fillRect(20, y + 12, bw, 18);
+      x.fillStyle = col; x.fillRect(20, y + 12, bw * clamp(f, 0, 1), 18);
+      x.font = `600 18px ${BODY}`; x.fillStyle = '#a9b4c9'; x.textAlign = 'left'; x.fillText(lab, 20, y - 3);
+      x.font = `600 19px ${MONO}`; x.fillStyle = col; x.textAlign = 'right'; x.fillText(val, W - 20, y - 3); x.textAlign = 'left';
+    };
+    if (d.mode === 'pump') {
+      x.fillStyle = '#86e0a8'; x.font = `700 22px ${MONO}`; x.textAlign = 'right'; x.fillText(`×${d.cop} · предел ×${fmt(d.copMax, 1)}`, W - 20, 58); x.textAlign = 'left';
+      bar(94, 'электричество', '100', 1 / 3, '#ffd36b');
+      bar(146, 'тепло с улицы', '200', 2 / 3, '#4f8fe0');
+      bar(198, 'в дом', '300 кВт·ч', 1, '#ff8a73');
+      x.fillStyle = '#8b96ad'; x.font = `500 16px ${BODY}`; x.fillText(d.plantLoss > 10 ? `на станции впустую ≈ ${d.plantLoss} кВт·ч` : 'на станции почти без потерь', 20, 248);
+    } else {
+      x.fillStyle = '#86e0a8'; x.font = `700 24px ${MONO}`; x.textAlign = 'right'; x.fillText(`η = ${d.eta} %`, W - 20, 58);
+      x.font = `600 16px ${BODY}`; x.fillStyle = '#ff8a73'; x.textAlign = 'left'; x.fillText(d.carnot != null ? `предел Карно ${d.carnot} %` : d.hidden ? 'предел Карно: ?' : 'предела Карно нет', 20, d.gridName && d.mode === 'ev' ? 80 : 58);
+      bar(102, 'на входе', '100 кВт·ч', 1, '#ffb547');
+      bar(152, d.out, String(d.use), d.use / 100, '#86e0a8');
+      bar(202, 'тепло впустую', String(d.waste), d.waste / 100, '#ff6a4a');
+      if (d.carnot != null) { const cx = 20 + bw * d.carnot / 100; x.strokeStyle = '#ff8a73'; x.setLineDash([6, 5]); x.lineWidth = 3; x.beginPath(); x.moveTo(cx, 158); x.lineTo(cx, 190); x.stroke(); x.setLineDash([]); }
+    }
+    x.fillStyle = '#c8d1e2'; x.font = `600 18px ${BODY}`; x.textAlign = 'left'; x.fillText(d.co2txt + ' пользы', 20, H - 20);
+  }
+  SC['eng-eco'] = (kit, d) => {
+    const { T, at, box, cyl, clickable, C } = kit, h = H(kit), v3 = h.v3, tag = h.tag;
+    const sel = id => d.pick === id;
+    const glowSel = (parent, on, y = 0.3, size = 22) => { if (on) at(h.glow(0xffb547, size, 0.45), 0, y, 0, parent); };
+    const plantSel = d.group === 'power', fuelGrid = d.mode === 'ev' || d.mode === 'pump', gridFuel = fuelGrid && d.grid !== 'wind';
+    // ---- электростанция: корпус, труба, градирня (у простой газовой турбины градирни нет)
+    const P = new T.Group(); at(P, -36, 0, -16); clickable(P, 'plant');
+    at(box(26, 1, 20, 0x56627d), 0, 0.5, 0, P);
+    at(box(14, 10, 10, 0x8a96b0), -4, 6, 2, P);
+    at(box(14.4, 1.2, 10.4, 0x3b4a66), -4, 11.4, 2, P);
+    const pk = plantSel ? d.pick : gridFuel && d.grid === 'gas' ? 'ccgt' : 'coal';
+    const chimH = pk === 'coal' ? 26 : 18;
+    at(cyl(1.6, chimH, 0xd9dfe9, { r2: 1.2 }), 4, chimH / 2 + 1, -5, P);
+    for (let k = 1; k <= 2; k++) at(cyl(1.62 - k * 0.12, 1, 0xe0473a, { edges: false }), 4, chimH * (0.55 + k * 0.18), -5, P);
+    if (pk !== 'gt') at(cyl(6.2, 14, 0xc8d1e2, { r2: 4.4, seg: 32 }), -7, 8, -5, P);
+    if (pk !== 'coal') { const tb = cyl(2.6, 9, 0x3fae5a); tb.rotation.z = Math.PI / 2; at(tb, 6, 3.6, 5, P); }
+    else for (let i = 0; i < 4; i++) at(box(2.2, 1.6, 2.2, 0x23262e), 8 + (i % 2) * 2.4, 1.8 + Math.floor(i / 2) * 1.6, 6, P);
+    at(h.hitBox(28, 30, 22), 0, 14, 0, P);
+    glowSel(P, plantSel || gridFuel, 0.6, 34);
+    h.steam(P, 4, chimH + 1, -5, { n: 7, spread: 2.5, size: 3.2, rise: 14, speed: 0.3, op: 0.5, color: 0x8b96ad, amt: plantSel || gridFuel ? clamp(d.co2, 0.25, 1) : 0.15 });
+    if (pk !== 'gt') h.steam(P, -7, 15, -5, { n: 8, spread: 5, size: 5, rise: 12, speed: 0.25, op: 0.55, color: 0xffffff, amt: plantSel ? clamp(d.wastePer / 1.8, 0.3, 1) : 0.35 });
+    else h.steam(P, 4, chimH + 1, -5, { n: 5, spread: 2, size: 4, rise: 8, speed: 0.5, op: 0.3, color: 0xff8a73, amt: 0.8 }); // горячий выхлоп
+    // ---- ветряк: нажатие меняет источник электричества
+    const Wt = new T.Group(); at(Wt, -8, 0, -30); clickable(Wt, 'gcycle');
+    at(cyl(0.9, 30, 0xeef6fb, { r2: 0.55 }), 0, 15, 0, Wt);
+    at(box(2.4, 2, 4, 0xeef6fb), 0, 30.5, 0.6, Wt);
+    const rot = new T.Group(); at(rot, 0, 30.5, 2.8, Wt);
+    for (let k = 0; k < 3; k++) { const bl = box(1.3, 13, 0.4, 0xffffff); bl.position.set(Math.sin(k * 2.094) * 6.5, Math.cos(k * 2.094) * 6.5, 0); bl.rotation.z = -k * 2.094; rot.add(bl); }
+    at(h.hitBox(16, 40, 8), 0, 22, 0, Wt);
+    glowSel(Wt, fuelGrid && d.grid === 'wind', 0.4, 18);
+    // ---- машина: бензиновая или электромобиль
+    const ev = sel('ev'), Cg = new T.Group(); at(Cg, -12, 0, 24); clickable(Cg, 'cars');
+    at(box(12, 3, 6, ev ? 0x3fae5a : 0xffb547), 0, 3, 0, Cg);
+    at(box(6.4, 2.6, 5.4, ev ? 0x3fae5a : 0xffb547), -0.6, 5.8, 0, Cg);
+    at(box(6.5, 1.8, 5.5, 0x2c3a52, { edges: false }), -0.6, 5.9, 0, Cg);
+    for (const wx of [-3.6, 3.6]) for (const wz of [-3.1, 3.1]) { const ty = cyl(1.6, 1.2, 0x23262e); ty.rotation.x = Math.PI / 2; at(ty, wx, 1.6, wz, Cg); }
+    at(h.hitBox(14, 9, 8), 0, 4, 0, Cg);
+    glowSel(Cg, sel('car') || ev, 0.3, 20);
+    h.steam(Cg, -6.6, 2, 0, { n: 5, spread: 1.4, size: 2.4, rise: 6, dir: [-1, 0.2, 0], lift: 3, speed: 0.8, op: 0.5, color: 0x9aa3b2, amt: ev ? 0 : sel('car') ? 1 : 0.3 });
+    if (ev) { const ch = at(box(2, 7, 2, 0xe8ecf4), 9, 3.5, 0, Cg); at(box(2.2, 1.4, 0.4, 0x3fae5a, { edges: false }), 0, 2, 1.1, ch); }
+    // ---- грузовик
+    const Tr = new T.Group(); at(Tr, 14, 0, 26); clickable(Tr, 'o-truck');
+    at(box(13, 8, 7, 0xe8ecf4), -3, 5.4, 0, Tr);
+    at(box(5, 6, 7, 0x3b6fd8), 6.4, 4.4, 0, Tr);
+    at(box(5.1, 2, 6.4, 0x2c3a52, { edges: false }), 6.6, 6, 0, Tr);
+    for (const wx of [-6, -1, 6.4]) for (const wz of [-3.4, 3.4]) { const ty = cyl(1.7, 1.2, 0x23262e); ty.rotation.x = Math.PI / 2; at(ty, wx, 1.7, wz, Tr); }
+    at(cyl(0.4, 5, C.STEEL, { edges: false }), 4, 10, -3, Tr);
+    at(h.hitBox(18, 12, 9), 0, 5, 0, Tr);
+    glowSel(Tr, sel('truck'), 0.3, 24);
+    h.steam(Tr, 4, 12.5, -3, { n: 5, spread: 1.4, size: 2.6, rise: 7, speed: 0.6, op: 0.5, color: 0x8b96ad, amt: sel('truck') ? 1 : 0.3 });
+    // ---- дом с тепловым насосом (наружный блок с вентилятором)
+    const Ho = new T.Group(); at(Ho, 14, 0, -22); clickable(Ho, 'o-pump');
+    at(box(14, 10, 12, 0xf4efe2), 0, 5, 0, Ho);
+    const roof = cyl(10.4, 6, 0xb54a3a, { r2: 0.01, seg: 4 }); roof.rotation.y = Math.PI / 4; roof.scale.set(1, 1, 0.86); at(roof, 0, 13, 0, Ho);
+    at(box(3, 5, 0.3, 0x8a5a3a), -3, 2.5, 6.1, Ho); at(box(3.4, 3, 0.3, 0x9fd8ff, { edges: false }), 3, 6, 6.1, Ho);
+    const hp = new T.Group(); at(hp, 10, 0, 2, Ho);
+    at(box(5, 5, 3, 0xe8ecf4), 0, 2.5, 0, hp);
+    const fan = cyl(1.8, 0.3, 0x2c3240, { seg: 24 }); fan.rotation.x = Math.PI / 2; at(fan, 0, 2.6, 1.55, hp);
+    const blades = new T.Group(); at(blades, 0, 2.6, 1.75, hp);
+    for (let k = 0; k < 3; k++) { const b = box(0.5, 3, 0.15, 0x8a96b0, { edges: false }); b.rotation.z = k * 2.094; blades.add(b); }
+    at(h.hitBox(24, 18, 16), 3, 8, 0, Ho);
+    glowSel(Ho, sel('pump'), 0.3, 26);
+    if (sel('pump')) at(h.glow(0xff8a5a, 14, 0.5), 3, 6, 6.4, Ho);
+    // ---- табло «куда уходит энергия»
+    const ea = h.easel(kit.root, 42, 8, 30, 21, 5, 0.4);
+    ea.face(h.canvasPlane(28, 19.6, 420, 294, (x, Wd, Hd) => drawEco(x, Wd, Hd, d)));
+    // ---- подписи
+    const pName = { coal: 'Угольная ТЭС', gt: 'Газовая турбина', ccgt: 'Парогазовая' }[pk];
+    tag(v3(-36, chimH + 6, -16), pName, plantSel ? `η ${d.eta} %` : 'нажать — станции', plantSel);
+    tag(v3(-8, 40, -30), 'Ветряк', fuelGrid ? 'сеть: ' + d.gridName : 'откуда ток', fuelGrid && d.grid === 'wind');
+    tag(v3(-12, 10, 24), ev ? 'Электромобиль' : 'Бензиновый', sel('car') || ev ? `η ${d.eta} %` : 'нажать', sel('car') || ev);
+    tag(v3(14, 14, 26), 'Дизельный грузовик', sel('truck') ? `η ${d.eta} %` : 'нажать', sel('truck'));
+    tag(v3(16, 18, -22), 'Тепловой насос', sel('pump') ? `тепла ×${d.cop}` : 'нажать', sel('pump'));
+    tag(v3(42, 31, 8), 'Табло', d.co2txt, d.ok);
+    h.fin(1, 0, 0);
+    kit.onFrame((dt, t) => {
+      if (kit.reduce) return;
+      rot.rotation.z = -t * (fuelGrid && d.grid === 'wind' ? 1.6 : 0.6);
+      blades.rotation.z = -t * (sel('pump') ? 9 : 1.5);
     });
   };
 })();

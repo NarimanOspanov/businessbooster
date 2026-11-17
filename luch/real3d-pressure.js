@@ -1,7 +1,7 @@
 // «Как в жизни» для темы «Давление» (labs/phys-pressure): фигурка туриста в лотке со снегом, бак с датчиком
-// давления и U-образным манометром, гора-макет с трубкой Торричелли и барометром-анероидом, штатив с
+// давления и U-образным манометром, сообщающиеся сосуды и U-трубка с двумя жидкостями, гидравлический пресс с машинкой, гора-макет с трубкой Торричелли и барометром-анероидом, штатив с
 // динамометром над отливным сосудом, аквариум с кубиками из разных материалов.
-// Сцены строятся из window.LUCH_REAL() опыта; падение кубика (меняется каждый кадр) — из window.LUCH_REAL.live().
+// Сцены строятся из window.LUCH_REAL() опыта; падение кубика и ход поршней пресса (меняются каждый кадр) — из window.LUCH_REAL.live().
 (() => {
   const SC = window.LUCH_REAL_SCENES = window.LUCH_REAL_SCENES || {};
   const live = () => { try { return window.LUCH_REAL.live ? window.LUCH_REAL.live() : null; } catch (e) { return null; } };
@@ -231,7 +231,7 @@
     tag(v3(tx - 19, base + 8, tz + D / 2), d.liqName, `ρ = ${big(d.rho)} кг/м³`);
   };
 
-  // ===== 3. Атмосферное давление: гора-макет с альпинистом, трубка Торричелли, барометр-анероид =====
+  // ===== 5. Атмосферное давление: гора-макет с альпинистом, трубка Торричелли, барометр-анероид =====
   SC['pressure-atm'] = (kit, d) => {
     const { T, at, box, cyl, mesh, toon, v3, tag, clickable, keep, C } = kit, h = H(kit);
     // макет горы: 1 единица высоты = 250 м
@@ -333,7 +333,187 @@
     tag(v3(BX, BY + 9.5, BZ), 'Барометр', `${fmt(d.kpa, 1)} кПа`);
   };
 
-  // ===== 4. Закон Архимеда: штатив, динамометр с цилиндром, отливной сосуд, стаканчик =====
+  // ===== 3. Сообщающиеся сосуды: три стеклянных сосуда на общей трубке; U-трубка с двумя жидкостями =====
+  // профили сосудов: [высота, радиус] (1 единица = 1 см); наклонная трубка строится отдельно
+  const VPROF = {
+    narrow: [[0, 1.5], [30, 1.5]], funnel: [[0, 1.5], [10, 1.5], [30, 9]],
+    flask: [[0, 1.5], [3, 1.5], [8, 6.5], [16, 6.5], [21, 1.5], [30, 1.5]], wide: [[0, 7], [30, 7]], tube: [[0, 1.5], [30, 1.5]] };
+  const rAt = (p, y) => { for (let i = 1; i < p.length; i++) if (y <= p[i][0]) { const a = p[i - 1], b = p[i]; return a[1] + (b[1] - a[1]) * (y - a[0]) / (b[0] - a[0]); } return p[p.length - 1][1]; };
+  function lathe(T, prof, upTo, solid, dr = 0) {
+    const pts = [];
+    if (solid) pts.push(new T.Vector2(0, 0));
+    for (const [y, r] of prof) { if (y >= upTo) break; pts.push(new T.Vector2(r + dr, y)); }
+    pts.push(new T.Vector2(rAt(prof, upTo) + dr, upTo));
+    if (solid) pts.push(new T.Vector2(0, upTo));
+    return new T.LatheGeometry(pts, 40);
+  }
+  // всё, что сцена построила после n0, переносим в группу со сдвигом (ближе к зрителю, подальше от карточки задания)
+  function shiftBuilt(kit, n0, off) {
+    const G = new kit.T.Group(); G.position.copy(off);
+    kit.root.children.slice(n0).forEach(o => G.add(o)); kit.root.add(G);
+  }
+  SC['pressure-vessels'] = (kit, d) => {
+    const { T, at, box, cyl, mesh, v3, clickable, C } = kit, h = H(kit);
+    if (d.mode === 'two') return uTube(kit, h, d);
+    const n0 = kit.root.children.length, OFF = v3(16, 0, 8), tag = (p, ...a) => kit.tag(p.add(OFF), ...a);
+    const Yb = 3.4, wc = 0x4f9fd6, lev = d.lev, gm = h.glassMat(0xe6f4fb, 0.26), lm = h.liqMat(wc, 0.5);
+    at(box(80, 1.4, 22, C.WOOD2), -6, 0.7, 0, null);
+    // общая трубка внизу: стекло и вода
+    const pL = -31, pR = 12;
+    const pg = mesh(new T.CylinderGeometry(1.9, 1.9, pR - pL, 20, 1, true), 0, { mat: gm, edges: false, hull: true, shadow: false }); pg.rotation.z = Math.PI / 2; pg.renderOrder = 3; at(pg, (pL + pR) / 2, Yb, 0, null);
+    const pw = mesh(new T.CylinderGeometry(1.55, 1.55, pR - pL, 16), 0, { mat: lm, edges: false, shadow: false }); pw.rotation.z = Math.PI / 2; pw.renderOrder = 1; at(pw, (pL + pR) / 2, Yb, 0, null);
+    for (const x of [pL, pR]) { const c = cyl(1.9, 0.4, 0xdfe8ef, { edges: false }); c.rotation.z = Math.PI / 2; at(c, x, Yb, 0, null); }
+    for (const x of [-26, -10, 10]) at(box(4, Yb - 1.4, 4, C.DARK), x, 1.4 + (Yb - 1.4) / 2, 0, null);
+    // сосуд: стекло по профилю + вода до общего уровня
+    const vessel = (x, prof, key) => {
+      const g = new T.Group(); at(g, x, Yb, 0, null); if (key) clickable(g, key);
+      const gl = mesh(lathe(T, prof, 30, false, 0.25), 0, { mat: gm, edges: false, hull: false, shadow: false }); gl.renderOrder = 3; g.add(gl);
+      const rim = mesh(new T.TorusGeometry(rAt(prof, 30) + 0.25, 0.22, 6, 40), 0xdfe8ef, { edges: false, shadow: false }); rim.rotation.x = Math.PI / 2; at(rim, 0, 30, 0, g);
+      const lq = mesh(lathe(T, prof, lev, true), 0, { mat: lm, edges: false, shadow: false }); lq.renderOrder = 1; g.add(lq);
+      const top = new T.Mesh(kit.keep(new T.CircleGeometry(rAt(prof, lev), 40)), h.liqMat(0x8cc3ea, 0.75)); top.rotation.x = -Math.PI / 2; top.renderOrder = 2; at(top, 0, lev + 0.02, 0, g);
+      return g;
+    };
+    vessel(-26, VPROF.wide, 'pour'); vessel(-10, VPROF.tube);
+    if (d.shape === 'slant') {
+      // наклонная трубка: ось наклонена к +x, вода — до того же горизонтального уровня (по оси)
+      const t = 0.42, g = new T.Group(); at(g, 10, Yb, 0, null); g.rotation.z = -t; clickable(g, 'shape');
+      const Ls = 30 / Math.cos(t), Ll = lev / Math.cos(t);
+      const gl = mesh(new T.CylinderGeometry(1.75, 1.75, Ls, 24, 1, true), 0, { mat: gm, edges: false, hull: false, shadow: false }); gl.renderOrder = 3; at(gl, 0, Ls / 2, 0, g);
+      const rim = mesh(new T.TorusGeometry(1.75, 0.22, 6, 30), 0xdfe8ef, { edges: false, shadow: false }); rim.rotation.x = Math.PI / 2; at(rim, 0, Ls, 0, g);
+      const lq = mesh(new T.CylinderGeometry(1.5, 1.5, Ll, 20), 0, { mat: lm, edges: false, shadow: false }); lq.renderOrder = 1; at(lq, 0, Ll / 2, 0, g);
+    } else vessel(10, VPROF[d.shape] || VPROF.narrow, 'shape');
+    // линия общего уровня спереди
+    at(box(52, 0.2, 0.2, 0x2f9e57, { edges: false, shadow: false }), -8, Yb + lev, 9.5, null);
+    for (const x of [-34, 18]) at(box(0.25, Yb + lev - 1.4, 0.25, 0x2f9e57, { edges: false, shadow: false }), x, 1.4 + (Yb + lev - 1.4) / 2, 9.5, null);
+    // кувшин — долить воды
+    const jug = new T.Group(); at(jug, -44, 1.4, 8, null); clickable(jug, 'pour');
+    const jb = mesh(new T.CylinderGeometry(2.4, 3, 7, 24, 1, true), 0, { mat: gm, edges: false, hull: true, shadow: false }); jb.renderOrder = 3; at(jb, 0, 3.5, 0, jug);
+    const jl = mesh(new T.CylinderGeometry(2.3, 2.85, 4.6, 24), 0, { mat: lm, edges: false, shadow: false }); at(jl, 0, 2.4, 0, jug);
+    at(mesh(new T.TorusGeometry(1.8, 0.35, 8, 20, Math.PI), 0xdfe8ef, { edges: false }), -2.9, 4, 0, jug).rotation.z = Math.PI / 2;
+    // табличка — перейти к U-трубке
+    const pl = h.plate(null, 4, 1.6, 12.5, 14, 2.2, 'Опыт 2: U-трубка ›'); pl.scale.y = 0.75; clickable(pl, 'mode');
+    tag(v3(10, Yb + 32, 0), 'Сосуд', d.shapeName, d.ok);
+    tag(v3(-26, Yb + 32, 0), 'Уровень', `${lev} см · везде`);
+    tag(v3(-44, 10, 8), 'Кувшин', '+4 см');
+    shiftBuilt(kit, n0, OFF);
+  };
+  function uTube(kit, h, d) {
+    const { T, at, box, cyl, mesh, v3, tag, clickable, C } = kit;
+    const K = 0.95, X = 10, R = 2.3, Y0 = 15, Ht = 44 * K, gm = h.glassMat(0xe6f4fb, 0.28);
+    const merc = d.pair === 'hg', mA = h.liqMat(hex(d.aCol), 0.75), mB = h.liqMat(hex(d.bCol), merc ? 0.9 : 0.55);
+    // подставка, доска со шкалой
+    at(box(44, 1.4, 18, C.WOOD2), 0, 0.7, 0, null);
+    at(box(36, Y0 + Ht + 2, 1, 0xf1e3c2), 0, 1.4 + (Y0 + Ht + 2) / 2, -3.6, null);
+    const sc = h.flat(3.2, Ht, h.canvasTex(64, Math.round(Ht * 20), (x, w, hh) => {
+      x.fillStyle = '#1b1610'; x.font = '600 18px "IBM Plex Mono", monospace'; x.textBaseline = 'middle';
+      for (let c = 0; c <= 44; c += 2) { const y = hh - c * K * 20; x.fillRect(0, y - 1, c % 10 ? 12 : 22, 2); if (c % 10 === 0 && c) x.fillText(String(c), 26, y); }
+    }));
+    at(sc, 0, Y0 + Ht / 2, -3.05, null);
+    for (const yy of [Y0 + 4, Y0 + Ht - 3]) at(box(26, 1, 0.8, C.DARK), 0, yy, -2.9, null);
+    // стекло: два колена и изгиб
+    for (const s of [-1, 1]) { const tb = mesh(new T.CylinderGeometry(R, R, Ht, 20, 1, true), 0, { mat: gm, edges: false, hull: true, shadow: false }); tb.renderOrder = 3; at(tb, s * X, Y0 + Ht / 2, 0, null); }
+    const bend = mesh(new T.TorusGeometry(X, R, 12, 36, Math.PI), 0, { mat: gm, edges: false, shadow: false }); bend.rotation.z = Math.PI; bend.renderOrder = 3; at(bend, 0, Y0, 0, null);
+    const bl = mesh(new T.TorusGeometry(X, R - 0.35, 10, 36, Math.PI), 0, { mat: mB, edges: false, shadow: false }); bl.rotation.z = Math.PI; bl.renderOrder = 1; at(bl, 0, Y0, 0, null);
+    const col = (m) => { const c = mesh(new T.CylinderGeometry(R - 0.35, R - 0.35, 1, 18), 0, { mat: m, edges: false, shadow: false }); c.renderOrder = 1; at(c, 0, Y0, 0, null); return c; };
+    const cL = col(mB), cR = col(mB), cA = col(mA); cL.position.x = -X; cA.position.x = -X; cR.position.x = X;
+    const setC = (c, y0, y1) => { const L = y1 - y0; c.visible = L > 0.02; c.scale.y = Math.max(0.01, L); c.position.y = Y0 + (y0 + y1) / 2 * K; };
+    // граница жидкостей — зелёная планка спереди
+    const brd = at(box(2 * X + 9, 0.18, 0.18, 0x2f9e57, { edges: false, shadow: false }), 1, Y0, R + 0.8, null);
+    // левое колено — долить 5 см; таблички
+    const hit = new T.Group(); at(hit, -X, Y0 + Ht / 2, 0, null); clickable(hit, 'ha');
+    hit.add(new T.Mesh(kit.keep(new T.CylinderGeometry(R + 1, R + 1, Ht, 10)), kit.keep(new T.MeshBasicMaterial({ visible: false }))));
+    const pp = h.plate(null, -9, 1.6, 10.5, 13, 2.2, `${d.pairName} ›`); pp.scale.y = 0.75; clickable(pp, 'pair');
+    const pm = h.plate(null, 26, 1.6, 6, 12, 2.2, '‹ Опыт 1: сосуды'); pm.scale.y = 0.75; clickable(pm, 'mode');
+    if (shown.scene !== 'utube') { shown.li = d.li; shown.rr = d.rr; shown.ta = d.li + d.hA; } shown.scene = 'utube';
+    const tA = v3(-X, 0, 0), tB = v3(X, 0, 0), tI = v3(X + 7, 0, R);
+    const put = () => {
+      setC(cL, 0, shown.li); setC(cR, 0, shown.rr); setC(cA, shown.li, shown.ta);
+      brd.position.y = Y0 + shown.li * K; tA.y = Y0 + shown.ta * K + 3; tB.y = Y0 + shown.rr * K + 3; tI.y = Y0 + shown.li * K;
+    };
+    put();
+    kit.onFrame(dt => { const e = (k, v) => { shown[k] = kit.reduce ? v : ease(shown[k], v, dt, 5); }; e('li', d.li); e('rr', d.rr); e('ta', d.li + d.hA); put(); });
+    if (d.hA > 0) tag(tA, d.aName, `${d.hA} см`, d.ok);
+    tag(tB, d.bName, d.hA > 0 ? `${fmt(d.hB, 1)} см над границей` : 'уровни равны');
+    if (d.hA > 0) tag(tI, 'Граница');
+  }
+
+  // ===== 4. Гидравлический пресс: два цилиндра с маслом, ручка малого поршня, площадка с машинкой, манометр =====
+  SC['pressure-press'] = (kit, d) => {
+    const { T, at, box, cyl, mesh, v3, clickable, keep, C } = kit, h = H(kit);
+    const n0 = kit.root.children.length, OFF = v3(14, 0, 6), tag = (p, ...a) => kit.tag(p.add(OFF), ...a);
+    const rs = 0.6 * Math.sqrt(d.s1), rl = 0.55 * Math.sqrt(d.s2), XS = -32, XL = 14, Yb = 2.4, HS = 18, HL = 14, oil = 0xd6a94a;
+    const gm = h.glassMat(0xe6f4fb, 0.26), om = h.liqMat(oil, 0.6);
+    at(box(86, 1.6, 30, 0x3a4152), -4, 0.8, 0, null);
+    // трубка с маслом между цилиндрами
+    const tp = mesh(new T.CylinderGeometry(1.1, 1.1, XL - XS, 16, 1, true), 0, { mat: gm, edges: false, hull: true, shadow: false }); tp.rotation.z = Math.PI / 2; tp.renderOrder = 3; at(tp, (XS + XL) / 2, Yb + 1.2, 0, null);
+    const to = mesh(new T.CylinderGeometry(0.85, 0.85, XL - XS, 12), 0, { mat: om, edges: false, shadow: false }); to.rotation.z = Math.PI / 2; at(to, (XS + XL) / 2, Yb + 1.2, 0, null);
+    // цилиндры: стекло, дно, масло (уровень = низ поршня)
+    const cylG = (x, r, H0) => {
+      const g = mesh(new T.CylinderGeometry(r + 0.3, r + 0.3, H0, 36, 1, true), 0, { mat: gm, edges: false, hull: true, shadow: false }); g.renderOrder = 3; at(g, x, Yb + H0 / 2, 0, null);
+      at(cyl(r + 0.6, 0.8, C.STEEL, { seg: 36 }), x, Yb - 0.4 + 0.4, 0, null);
+      const rim = mesh(new T.TorusGeometry(r + 0.3, 0.25, 6, 40), C.STEEL, { edges: false }); rim.rotation.x = Math.PI / 2; at(rim, x, Yb + H0, 0, null);
+      const o = mesh(new T.CylinderGeometry(r, r, 1, 36), 0, { mat: om, edges: false, shadow: false }); o.renderOrder = 1; at(o, x, Yb, 0, null); return o;
+    };
+    const oS = cylG(XS, rs, HS), oL = cylG(XL, rl, HL);
+    // малый поршень: диск, шток, ручка (нажать)
+    const sp = new T.Group(); at(sp, XS, 0, 0, null); clickable(sp, 'push');
+    at(cyl(rs, 1, C.STEEL, { seg: 24 }), 0, 0.5, 0, sp);
+    at(cyl(Math.min(0.45, rs * 0.6), 9, C.STEEL, { edges: false }), 0, 5.5, 0, sp);
+    const hb = cyl(0.7, 9, 0xe0473a, { seg: 14 }); hb.rotation.x = Math.PI / 2; at(hb, 0, 10.2, 0, sp);
+    const a1 = h.arrow(sp, 0x72d4e8, 3 + 6 * Math.sqrt(d.f1 / 1000), 0.4); a1.rotation.z = Math.PI; at(a1, 0, 11.6 + 3 + 6 * Math.sqrt(d.f1 / 1000), 0, sp);
+    // большой поршень, шток, площадка и машинка (нажать — опустить)
+    const lp = new T.Group(); at(lp, XL, 0, 0, null); clickable(lp, 'release');
+    at(cyl(rl, 1.2, C.STEEL, { seg: 40 }), 0, 0.6, 0, lp);
+    at(cyl(clamp(rl * 0.35, 1.2, 4), 8, C.STEEL), 0, 1.2 + 4, 0, lp);
+    const PW = Math.max(28, 2 * rl + 2);
+    at(box(PW, 1, 16, 0x5c6f96), 0, 9.7, 0, lp);
+    const car = new T.Group(); at(car, 0, 10.2, 0, lp);
+    at(box(20, 3.6, 9, 0xff8a73), 0, 3.4, 0, car);
+    at(box(10, 3, 8, 0xff8a73), -0.5, 6.7, 0, car);
+    for (const s of [-1, 1]) at(box(9.4, 2.2, 0.1, 0x72d4e8, { edges: false, shadow: false }), -0.5, 6.8, s * 4.05, car);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const w = cyl(2, 1.4, 0x26324a, { seg: 20 }); w.rotation.x = Math.PI / 2; at(w, sx * 6.5, 2, sz * 4.6, car); }
+    const aW = h.arrow(lp, 0xffb547, 7, 0.4); aW.rotation.z = Math.PI; at(aW, PW / 2 + 2, 18, 0, lp);
+    // сила F2 от масла — вверх, сбоку от большого цилиндра (та же шкала, что у веса)
+    const lenF = F => 2.5 + 9 * Math.min(2, F / d.W) / 2;
+    at(h.arrow(null, 0x72d4e8, lenF(d.F2), 0.4), XL - rl - 3, Yb + 1, 4, null);
+    // манометр на трубке
+    const GX = -10, GY = 13, gg = new T.Group(); at(gg, GX, 0, 0, null);
+    at(cyl(0.45, GY - Yb - 1.2, C.BRASS, { edges: false }), 0, Yb + 1.2 + (GY - Yb - 1.2) / 2, 0, gg);
+    const cs = cyl(4.6, 1.6, C.BRASS, { seg: 36 }); cs.rotation.x = Math.PI / 2; at(cs, 0, GY + 4.4, 0, gg);
+    const a0 = Math.PI * 0.75, a1g = Math.PI * 2.25, fr = v => clamp(v / 1200, 0, 1.03);
+    const face = new T.Mesh(keep(new T.CircleGeometry(4.1, 40)), keep(new T.MeshBasicMaterial({ map: keep(h.canvasTex(256, 256, x => {
+      x.fillStyle = '#f7f3ea'; x.beginPath(); x.arc(128, 128, 126, 0, 7); x.fill();
+      x.strokeStyle = '#1b1610'; x.fillStyle = '#1b1610'; x.textAlign = 'center'; x.textBaseline = 'middle';
+      for (let v = 0; v <= 1200; v += 100) { const a = a0 + (a1g - a0) * fr(v), b2 = v % 200 === 0; x.lineWidth = b2 ? 4 : 2; x.beginPath(); x.moveTo(128 + Math.cos(a) * 112, 128 + Math.sin(a) * 112); x.lineTo(128 + Math.cos(a) * (b2 ? 92 : 100), 128 + Math.sin(a) * (b2 ? 92 : 100)); x.stroke(); if (b2) { x.font = '600 20px "IBM Plex Mono", monospace'; x.fillText(String(v), 128 + Math.cos(a) * 70, 128 + Math.sin(a) * 70); } }
+      x.font = '700 20px "Golos Text", sans-serif'; x.fillText('кПа', 128, 186);
+    })) })));
+    at(face, 0, GY + 4.4, 0.82, gg);
+    const nd = new T.Group(); at(nd, 0, GY + 4.4, 1, gg);
+    at(box(3.6, 0.3, 0.12, 0xc0392b, { edges: false, shadow: false }), 1.5, 0, 0, nd);
+    nd.rotation.z = -(a0 + (a1g - a0) * fr(d.p));
+    // таблички: площади поршней и сила
+    const p1 = h.plate(null, XS, 1.7, 13, 10, 2.2, `S₁ = ${d.s1} см² ›`); p1.scale.y = 0.75; clickable(p1, 's1');
+    const p2 = h.plate(null, XL, 1.7, Math.max(13, rl + 3), 11, 2.2, `S₂ = ${d.s2} см² ›`); p2.scale.y = 0.75; clickable(p2, 's2');
+    const p3 = h.plate(null, XS - 2, 1.7, -12, 10, 2.2, `F₁ = ${d.f1} Н ›`); p3.scale.y = 0.75; clickable(p3, 'f1');
+    // анимация: ход малого поршня и подъём площадки — из опыта каждый кадр (подъём на модели ×2)
+    const tS = v3(XS, 0, 0), tC = v3(XL, 0, 0);
+    const put = () => {
+      const L = live() || { ph: 0, lift: d.lift };
+      const yS = Yb + HS - 5 - (L.ph || 0) * 4, yL = Yb + HL - 3 + Math.min(60, L.lift || 0) * 0.12;
+      sp.position.y = yS; oS.scale.y = Math.max(0.01, yS - Yb); oS.position.y = Yb + (yS - Yb) / 2;
+      lp.position.y = yL; oL.scale.y = Math.max(0.01, yL - Yb); oL.position.y = Yb + (yL - Yb) / 2;
+      tS.y = yS + 20; tC.y = yL + 22;
+    };
+    put();
+    kit.onFrame(() => put());
+    tag(tS, 'Малый поршень', `F₁ = ${big(d.f1)} Н`);
+    tag(v3(XL - rl - 3, Yb + lenF(d.F2) + 3, 4), 'Сила F₂', `${big(d.F2)} Н`, d.ok);
+    tag(tC, 'Автомобиль 1000 кг', `поднят на ${fmt(d.lift, 1)} мм`);
+    tag(v3(GX, GY + 10, 0), 'Манометр', `${big(d.p)} кПа`);
+    shiftBuilt(kit, n0, OFF);
+  };
+
+  // ===== 6. Закон Архимеда: штатив, динамометр с цилиндром, отливной сосуд, стаканчик =====
   SC['pressure-arch'] = (kit, d) => {
     const { T, at, box, cyl, mesh, v3, clickable, C } = kit, h = H(kit);
     // приборы небольшие — вся установка собирается как обычно и затем увеличивается в SCL раз
@@ -420,7 +600,7 @@
     tag(v3(-26, 5, 16), 'Запасной', d.body === 'al' ? 'сталь' : 'алюминий');
   };
 
-  // ===== 5. Плавание тел: аквариум, кубик 10 см, лоток с кубиками из разных материалов =====
+  // ===== 7. Плавание тел: аквариум, кубик 10 см, лоток с кубиками из разных материалов =====
   function cube(kit, h, key, color, s) {
     const { T, at, box, mesh, C } = kit, g = new T.Group();
     const tr = key === 'ice' || key === 'plex';

@@ -1,5 +1,5 @@
 // «Как в жизни» для тем «Импульс» (labs/phys-momentum) и «Работа и энергия» (labs/phys-energy):
-// тележка на треке с датчиком скорости и табло импульса, две тележки с пластилином или пружиной,
+// тележка на треке с датчиком скорости и табло импульса, две тележки с пластилином или пружиной (и вариант с табло энергии и теплом),
 // модель ракеты на натянутой струне, ящик с динамометром и лебёдкой, два подъёмника (рабочий и мотор),
 // гиря на полке штатива и тележка с полосами энергии, падение мяча в трубе с насосом и полосами энергии.
 // Описание сцены — из window.LUCH_REAL() опыта; быстрые величины (положения, скорость, энергия) — из window.LUCH_REAL.live() каждый кадр.
@@ -290,6 +290,94 @@
       const u1 = Lv.u1, u2 = Lv.u2;
       for (const [c, u] of [[c1, u1], [c2, u2]]) { c.a.g.rotation.y = u < 0 ? Math.PI : 0; c.a.set(Math.abs(u) > 0.01 ? 3 + Math.abs(u) * 2.2 : 0); }
       if (spr) { const gap = clamp(b - a - CL - 0.6, 0.5, 2.6); spr.set(gap); pad.position.x = gap; }
+      t1.set('v = ' + nf(Math.round(u1 * 100) / 100) + ' м/с'); t2.set('v = ' + nf(Math.round(u2 * 100) / 100) + ' м/с');
+      if ((tick++ & 3) && tick > 4) return;
+      show(c1, u1); show(c2, u2);
+    });
+  };
+
+  // =====================================================================================
+  // Импульс (10 класс): упругий и неупругий удар — две тележки, пластилин или пружина, табло импульса и энергии, вспышка тепла
+  SC['en-impact'] = (kit, d) => {
+    const { T, at, box, mesh, v3, tag, clickable, keep } = kit;
+    const K = tools(kit);
+    const Z = -4, PPM = 10, X = x => -50 + x * PPM, CL = 9.6, LIM = 56;
+    K.track(-64, 64, Z, { stopL: true, stopR: true });
+    K.ticks(X, 10, Z + 5.27, 3.3, 1, [0, 5, 10]);
+    const mk = (m, col, acol, key) => {
+      const c = K.cart(CL, col, m - 1); clickable(c.g, key); at(c.g, 0, 0, Z);
+      at(box(8.8, 3, 0.8, 0x1b1f28), 0, c.yB, 3.9, c.g);
+      const s = K.screen(8.2, 2.5, 196, 60); at(s.m, 0, c.yB, 4.32, c.g);
+      const a = K.arrow(acol, 0.45); at(a.g, 0, c.top + 2.6, 0, c.g); a.set(0);
+      return { ...c, s, a, m };
+    };
+    const c1 = mk(d.m1, 0x3fa6c4, 0x72d4e8, 'm1'), c2 = mk(d.m2, 0x9a7fd8, 0xc3a8ff, 'm2');
+    const stick = d.mode === 'stick';
+    let spr = null, pad = null, blob = null;
+    if (stick) { blob = mesh(new T.SphereGeometry(1.5, 16, 12), 0xd9a35f, { hull: true, edges: false }); blob.scale.set(0.55, 1, 1.2); at(blob, -CL / 2 - 0.2, c2.yB, 0, c2.g); }
+    else { const sg = new T.Group(); at(sg, CL / 2, c1.yB, 0, c1.g); spr = K.spring(4, 1.3, 0.22, 0xc8d2e3); sg.add(spr.g); pad = box(0.5, 3, 3.6, 0xa9b4c9); sg.add(pad); }
+    // вспышка тепла в точке неупругого удара
+    const glow = new T.Sprite(keep(new T.SpriteMaterial({ map: kit.glowTex(), color: 0xff8a3c, transparent: true, blending: T.AdditiveBlending, depthWrite: false, opacity: 0 })));
+    glow.visible = false; at(glow, 0, c2.yB + 1, Z + 1);
+
+    // табло: импульс пары и кинетическая энергия до и после
+    const bd = K.board(30, -33, 42, 22, 504, 264), r = d.res;
+    { const x = clear(bd.s), Wd = bd.s.W, z0 = 250;
+      const P1 = r ? d.m1 * r.u1 + d.m2 * r.u2 : null, kp = 150 / Math.max(1, Math.abs(d.P));
+      text(x, 'ИМПУЛЬС, кг·м/с', 14, 18, '#8b96ad', 18, 'left', 600);
+      x.strokeStyle = '#8b96ad'; x.lineWidth = 2; x.beginPath(); x.moveTo(z0, 30); x.lineTo(z0, 104); x.stroke();
+      const prow = (y, lab, P, col) => { text(x, lab, 14, y, '#a9b4c9', 26, 'left', 700); if (Math.abs(P) > 1e-6) harrow(x, z0, z0 + P * kp, y, col, 11); else { x.fillStyle = col; x.beginPath(); x.arc(z0, y, 7, 0, TAU); x.fill(); } text(x, 'Σ ' + nf(P), Wd - 14, y, col, 28, 'right', 700); };
+      prow(48, 'до', d.P, '#ffb547');
+      if (r) prow(90, 'после', P1, '#86e0a8'); else { text(x, 'после', 14, 90, '#a9b4c9', 26, 'left', 700); text(x, 'удара ещё не было', z0 - 60, 90, '#8b96ad', 22); }
+      x.fillStyle = '#26324a'; x.fillRect(10, 114, Wd - 20, 2);
+      text(x, 'КИНЕТИЧЕСКАЯ ЭНЕРГИЯ, Дж', 14, 134, '#8b96ad', 18, 'left', 600);
+      const bx = 150, kE = 230 / Math.max(1, d.E0);
+      text(x, 'до', 14, 166, '#a9b4c9', 26, 'left', 700);
+      x.fillStyle = '#ffb547'; x.fillRect(bx, 154, Math.max(2, d.E0 * kE), 24); text(x, nf(d.E0), Wd - 14, 166, '#ffb547', 26, 'right', 700);
+      text(x, 'после', 14, 214, '#a9b4c9', 26, 'left', 700);
+      if (r) {
+        const w1 = r.E1 * kE, wq = r.Q * kE;
+        x.fillStyle = '#86e0a8'; x.fillRect(bx, 202, w1, 24);
+        if (wq > 0.5) { x.fillStyle = '#ff8a73'; x.fillRect(bx + w1, 202, wq, 24); x.fillStyle = '#5a2f2a'; for (let k = 0; k < wq; k += 9) x.fillRect(bx + w1 + k, 202, 3, 24); }
+        text(x, nf(r.E1) + (r.Q > 0.005 ? ' + ' + nf(r.Q) : ''), Wd - 14, 214, '#86e0a8', 24, 'right', 700);
+      } else text(x, 'удара ещё не было', bx, 214, '#8b96ad', 22);
+      x.fillStyle = '#86e0a8'; x.fillRect(bx, 242, 14, 14); text(x, 'Eк', bx + 20, 250, '#8b96ad', 18);
+      x.fillStyle = '#ff8a73'; x.fillRect(bx + 64, 242, 14, 14); text(x, 'тепло и деформация', bx + 84, 250, '#8b96ad', 18);
+      bd.s.tex.needsUpdate = true; }
+    // вид удара
+    K.tile(-50, 25, 'неупругий', 'stick', stick, 14);
+    K.tile(-34, 25, 'упругий', 'elastic', !stick, 14);
+    // пульт: скорости и пуск
+    const pu = K.pult(26, 27, 48, 13), bo = { w: 6.2, h: 4.2 };
+    K.lcd(pu, -15.5, 9.4, 'v₁ = ' + nf(d.v1), 13, '#72d4e8');
+    K.button(pu, -5.6, 9.4, 4.7, 'v₁ −', 'v1-', bo); K.button(pu, 1, 9.4, 4.7, 'v₁ +', 'v1+', bo);
+    K.button(pu, 9.4, 9.4, 4.7, 'v₂ −', 'v2-', bo); K.button(pu, 16, 9.4, 4.7, 'v₂ +', 'v2+', bo);
+    K.lcd(pu, -15.5, 3.8, 'v₂ = ' + nf(d.v2), 13, '#c3a8ff');
+    K.button(pu, -2.3, 3.8, 4.7, d.run ? 'Едут…' : 'Пуск', 'go', { w: 9, h: 4.2, ...(d.run ? K.GREEN : K.RED) });
+    K.button(pu, 9, 3.8, 4.7, 'Сброс', 'reset', { w: 9, h: 4.2 });
+
+    const t1 = liveTag(kit, v3(0, c1.top + 19, Z), 'Тележка ' + d.m1 + ' кг', 'v = ' + nf(d.v1) + ' м/с');
+    const t2 = liveTag(kit, v3(0, c2.top + 7, Z), 'Тележка ' + d.m2 + ' кг', 'v = ' + nf(d.v2) + ' м/с');
+    const okNow = !!r && ((r.mode === 'stick' && (d.half || d.zero)) || (r.mode === 'elastic' && d.cmp));
+    tag(v3(30, bd.top + 1, -33), 'Энергия', r ? 'Eк ' + nf(d.E0) + ' → ' + nf(r.E1) + ' Дж' + (r.Q > 0.005 ? ' · тепло ' + nf(r.Q) : '') : 'Eк до удара ' + nf(d.E0) + ' Дж', okNow);
+    tag(v3(-42, 5, 25), 'Удар', stick ? 'неупругий: слипаются' : 'упругий: разлетаются');
+    const hTag = stick ? liveTag(kit, v3(0, c2.top + 2, Z + 6), 'Тепло', r ? nf(r.Q) + ' Дж' : 'после удара') : null;
+    if (hTag) { const l = document.querySelectorAll('.rl-lbl'); hTag.el = l[l.length - 1]; if (hTag.el) hTag.el.style.visibility = 'hidden'; }
+
+    let tick = 0;
+    const show = (c, u) => K.digits(c.s, c.m + ' кг · ' + nf(Math.round(u * 100) / 100) + ' м/с', '#86e0a8', 0.6);
+    kit.onFrame(() => {
+      const Lv = live(); if (!Lv) return;
+      const a = clamp(X(Lv.x1) + CL / 2 + 0.2, -LIM, LIM), b = clamp(X(Lv.x2) + CL / 2 + 0.2, -LIM, LIM);
+      c1.g.position.x = a; c2.g.position.x = b; t1.p.x = a; t2.p.x = b;
+      c1.spin(Lv.x1 * PPM); c2.spin(Lv.x2 * PPM);
+      const u1 = Lv.u1, u2 = Lv.u2;
+      for (const [c, u] of [[c1, u1], [c2, u2]]) { c.a.g.rotation.y = u < 0 ? Math.PI : 0; c.a.set(Math.abs(u) > 0.01 ? 3 + Math.abs(u) * 2.2 : 0); }
+      if (spr) { const gap = clamp(b - a - CL - 0.6, 0.5, 2.6); spr.set(gap); pad.position.x = gap; }
+      const hot = stick && Lv.heat >= 0, k = hot && !kit.reduce ? clamp(1 - Lv.heat / 1.4, 0, 1) : 0;
+      glow.visible = hot; if (hot) { glow.position.x = b - CL / 2; glow.material.opacity = 0.3 + 0.65 * k; glow.scale.setScalar(7 + 12 * k); }
+      if (blob) blob.scale.x = hot ? 0.22 : 0.55;
+      if (hTag) { hTag.p.x = b - CL / 2; if (hTag.el) hTag.el.style.visibility = hot ? '' : 'hidden'; }
       t1.set('v = ' + nf(Math.round(u1 * 100) / 100) + ' м/с'); t2.set('v = ' + nf(Math.round(u2 * 100) / 100) + ' м/с');
       if ((tick++ & 3) && tick > 4) return;
       show(c1, u1); show(c2, u2);
