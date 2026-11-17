@@ -1,0 +1,1051 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по физике, 10 класс: ЭДС источника, закон Ома для полной цепи, короткое замыкание, соединение элементов в батарею.">
+<title>Закон Ома для полной цепи</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene [data-click]{cursor:pointer}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.meter .lr .ok{color:var(--ok)}
+.meter .lr .bad{color:var(--warn)}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button.rec{color:var(--force)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.rec{display:grid;gap:4px;margin-top:8px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<script src="/luch/splash.js"></script>
+<div class="app">
+  <header>
+    <div class="brand" role="link" tabindex="0" title="Карта предметов" style="cursor:pointer" onclick="location.href='/'" onkeydown="if(event.key==='Enter')location.href='/'">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M9.6 14.6 9.2 6.2 15 10.6Q20 9.4 25 10.6L30.8 6.2 30.4 14.6Q34.6 22 31.6 29Q27.6 36 20 36Q12.4 36 8.4 29Q5.4 22 9.6 14.6Z" fill="#ffb547"/><path d="M20 14Q15.2 10.8 10.9 13.4Q7.6 17.2 9.4 21.8Q11.6 25.8 15.9 25.4Q18.5 25.1 20 27.1Q21.5 25.1 24.1 25.4Q28.4 25.8 30.6 21.8Q32.4 17.2 29.1 13.4Q24.8 10.8 20 14Z" fill="#ffd896"/><circle cx="15" cy="18.8" r="5" fill="#fffaf0"/><circle cx="25" cy="18.8" r="5" fill="#fffaf0"/><circle cx="15.6" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="24.4" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="16.6" cy="18.1" r="1" fill="#fff"/><circle cx="25.4" cy="18.1" r="1" fill="#fff"/><path d="M18.6 23.4h2.8L20 26.6z" fill="#ff8a73"/><path d="M10.5 29.6Q15.3 27.4 20 29.7Q24.7 27.4 29.5 29.6V34.6Q24.7 32.6 20 34.8Q15.3 32.6 10.5 34.6Z" fill="#72d4e8"/><path d="M20 29.7V34.8" stroke="#0b1019" stroke-width="1.1"/><path d="M8.2 23.5Q5.6 28.6 9.4 32.6Q11.6 33.2 12.4 31Q10.4 28.4 8.2 23.5Z" fill="#e8962a"/><path d="M31.8 23.5Q34.4 28.6 30.6 32.6Q28.4 33.2 27.6 31Q29.6 28.4 31.8 23.5Z" fill="#e8962a"/><path d="M35 3.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" fill="#86e0a8"/></svg>
+      <div><h1>OPEN SCHOOL AI</h1><small>Доступное образование для всех</small></div>
+    </div>
+    <div class="headr">
+
+      <div class="prog" aria-label="Прогресс"><b>ЭДС</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Опытная площадка">
+    <svg class="scene" id="scene" role="img" aria-label="Площадка для опытов с источниками тока: ключ, реостат, перемычку и элементы можно нажимать и тянуть."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const nf = x => fmt(x, Math.abs(x - Math.round(x)) < 1e-9 ? 0 : 1);
+const fI = I => I >= 100 ? fmt(I, 0) : I >= 10 ? fmt(I, 1) : fmt(I, 2);
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+
+const LESSONS = [
+  { id: 'emf', title: 'ЭДС источника',
+    text: ['Внутри батарейки или аккумулятора действуют сторонние силы — силы не электрической природы. В батарейке это химические реакции, в генераторе — магнитное поле, в солнечной панели — свет. Они разделяют заряды: переносят положительные заряды к «+», а отрицательные — к «−», против электрических сил.',
+           'Электродвижущая сила (ЭДС) ℰ — работа сторонних сил по переносу единичного положительного заряда внутри источника от «−» к «+»: ℰ = Aст / q. ЭДС измеряют в вольтах: ℰ = 1,5 В значит, что на каждый кулон заряда сторонние силы совершают работу 1,5 Дж.',
+           'Когда цепь разомкнута, тока нет, и вольтметр на выводах источника показывает практически ℰ: его сопротивление очень большое, и ток через него ничтожен. Когда цепь замкнута, часть ЭДС «тратится» внутри самого источника, и напряжение на выводах становится меньше ℰ.'],
+    why: 'Каждый телефон и ноутбук постоянно следит за напряжением своей батареи: по нему контроллер оценивает заряд и решает, когда отключиться. Батарейка AA даёт ℰ ≈ 1,5 В, ячейка литий-ионного аккумулятора — около 3,7 В, а батарея электромобиля из сотен ячеек — 400–800 В. Солнечные и ветровые станции отдают энергию в сеть через огромные аккумуляторные накопители. Инженеры по аккумуляторам (battery engineers) и разработчики электроники (hardware engineers) проектируют источники и системы их контроля. ИИ в ближайшие годы ускорит поиск новых материалов для батарей, но ставить опыты, понимать измерения и отвечать за безопасность будут люди, которые понимают, что такое ЭДС.',
+    task: 'Измерьте ЭДС трёх источников — батарейки AA, батареи 3 × AA и ячейки Li-ion — при разомкнутом ключе и запишите показания вольтметра. Потом замкните ключ и запишите напряжение под нагрузкой.',
+    hint: 'Источник меняется кнопками внизу или нажатием на него. «Записать» — занести показание вольтметра в записи. Лампа — 6 Ом. Попробуйте и старую батарейку.',
+    stage: 'Источник и ключ — нажимайте.',
+    check: m => m.oAA && m.oAA3 && m.oLi && m.closed },
+  { id: 'ohm', title: 'Закон Ома для полной цепи',
+    text: ['Полная цепь — это внешняя часть (провода и нагрузка с сопротивлением R) и сам источник. У источника тоже есть сопротивление — внутреннее, r: ток проходит через электролит и электроды батарейки.',
+           'Закон Ома для полной цепи: сила тока равна ЭДС, делённой на полное сопротивление цепи: I = ℰ / (R + r). ЭДС «расходуется» на два участка: ℰ = I·R + I·r.',
+           'Напряжение на выводах источника равно напряжению на внешней цепи: U = I·R = ℰ − I·r. Чем меньше R, тем больше ток и тем сильнее «проседает» напряжение. График U(I) — прямая: она пересекает ось U в точке ℰ (тока нет), а её наклон равен r.'],
+    why: 'Когда телефон включает вспышку или ноутбук нагружает процессор, ток растёт, и напряжение батареи на мгновение проседает на I·r. У стареющего аккумулятора r растёт, проседание становится таким сильным, что устройство выключается при 20–30% заряда. Поэтому производители электромобилей, ноутбуков и серверов измеряют r ячеек при каждом тесте — так же, как вы сейчас: по прямой U(I). Это ежедневная работа инженеров по батареям и инженеров-электриков (electrical engineers). Данные о миллионах ячеек всё чаще анализируют алгоритмы ИИ, но в основе этих моделей та же схема «ℰ и r» — и специалист, который её понимает, увидит, где алгоритм ошибся.',
+    task: 'Замкните ключ и запишите не меньше 4 точек U и I при разных положениях реостата. По графику U(I) найдите ЭДС ℰ и внутреннее сопротивление r батареи.',
+    hint: 'Тяните ползунок реостата или жмите «R −» / «R +». «Записать точку» — нанести показания на график. ℰ — там, где прямая пересекает ось U; r = ΔU / ΔI.',
+    stage: 'Тяните ползунок реостата.',
+    check: m => m.n >= 4 && m.eOk && m.rOk },
+  { id: 'short', title: 'Короткое замыкание',
+    text: ['Короткое замыкание — это когда выводы источника соединяются проводником почти без сопротивления: внешнее R → 0. Тогда ток ограничен только внутренним сопротивлением источника: Iкз = ℰ / r.',
+           'У батарейки AA ток короткого замыкания — единицы ампер, у литий-ионной ячейки — десятки ампер, у автомобильного аккумулятора — сотни и даже тысячи. Энергия выделяется теплом в проводах и внутри самого источника (Q = I²·r·t): провода раскаляются, изоляция плавится, литий-ионная ячейка может загореться.',
+           'Поэтому в цепи ставят защиту: плавкий предохранитель — тонкую проволочку, которая перегорает при токе больше номинального, — или автоматический выключатель. Они разрывают цепь за доли секунды, раньше, чем провода успеют нагреться.'],
+    safe: 'Никогда не замыкайте выводы батареек и аккумуляторов — особенно литий-ионных и автомобильных: ожоги, пожар, взрыв. Не носите батарейки в кармане вместе с ключами и монетами. Короткое замыкание здесь — только симуляция.',
+    why: 'В каждом зарядном устройстве, пауэрбанке и ноутбуке стоит защита от короткого замыкания: микросхема отключает ячейку за миллисекунды. В батарее электромобиля сотни ячеек и специальный предохранитель, который разрывает цепь при аварии. Дата-центры, где обучают и запускают модели ИИ, питаются через ИБП — источники бесперебойного питания с огромными батареями; короткое замыкание там грозит пожаром целого зала, поэтому автоматы и предохранители рассчитывают по току Iкз = ℰ / r. Инженеры-электрики, инженеры по безопасности батарей и электромобилей отвечают за такие расчёты: ошибку здесь нельзя «откатить», и эти специалисты нужны при любом развитии ИИ.',
+    task: 'Замкните цепь с лампой. Потом замкните лампу перемычкой без предохранителя — для AA и для Li-ion — и сравните токи КЗ. Затем поставьте предохранитель 3 А и повторите.',
+    hint: 'Перемычка — пунктир справа от лампы или кнопка «Перемычка». Предохранитель ставят кнопкой внизу или нажатием на него. Сопротивление проводов не учитываем.',
+    stage: 'Пунктир — перемычка.',
+    check: m => m.scAA && m.scLi && m.blew },
+  { id: 'pack', title: 'Батарейки и аккумуляторы',
+    text: ['Батарею собирают из одинаковых элементов. При последовательном соединении («+» одного к «−» следующего) ЭДС и внутренние сопротивления складываются: ℰ = n·ℰ₀, r = n·r₀. Ёмкость остаётся как у одного элемента — через все идёт один и тот же ток.',
+           'При параллельном соединении (все «+» вместе, все «−» вместе) ЭДС остаётся ℰ₀, внутреннее сопротивление уменьшается: r = r₀ / m, а ёмкость складывается — ток делится между элементами.',
+           'Ёмкость — заряд q, который источник может отдать; её пишут в мА·ч (1 мА·ч = 3,6 Кл). Энергия батареи W = ℰ·q (в Вт·ч, если q в А·ч), время работы t = q / I. Сборка «2S2P» — две ячейки последовательно и две такие цепочки параллельно.'],
+    why: 'Батарея ноутбука — обычно 3–4 литий-ионные ячейки последовательно, батарея электромобиля — тысячи ячеек: около сотни последовательно, чтобы получить 400 В и больше, и по нескольку параллельно, чтобы хватило ёмкости. Пауэрбанк на 10 000 мА·ч хранит около 37 Вт·ч, а в самолёт разрешают брать пауэрбанки до 100 Вт·ч. Накопители для солнечных и ветровых станций и ИБП дата-центров собирают из тех же ячеек по тем же правилам. Инженеры по батареям, инженеры электромобилей (EV engineers) и разработчики электроники выбирают схему сборки, балансировку и защиту. ИИ уже помогает подбирать химический состав и предсказывать износ, но решить, что батарея безопасна и подходит устройству, может только человек, который понимает ℰ, r и ёмкость.',
+    task: 'Соберите 3 батарейки AA последовательно, потом 3 — параллельно, и сравните ℰ, r и ёмкость. Затем соберите батарею для колонки (6,5–8,5 В, ток 1,5 А, играть не меньше 4 часов) и включите колонку.',
+    hint: 'Кнопки «+ посл.» и «+ парал.» добавляют элементы в цепочку и цепочки. Нажмите на элемент — сменить AA на Li-ion. Колонка включается ключом.',
+    stage: 'Элемент — сменить тип.',
+    check: m => m.ser3 && m.par3 && m.pack },
+];
+
+const LS_KEY = 'luch-phys-emf';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) {}
+// урок храним и номером, и id: если уроки потом переставят, откроется тот же урок
+let idx0 = saved.lid ? LESSONS.findIndex(l => l.id === saved.lid) : -1;
+if (idx0 < 0) idx0 = saved.lesson | 0;
+const S = { lesson: clamp(idx0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify({ v: 1, lesson: S.lesson, lid: LESSONS[S.lesson].id, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+
+// ---------- physics data ----------
+// lamp: R — сопротивление, I0 — номинальный ток (для яркости)
+const SRC = {
+  aa:  { n: 'Батарейка AA', sh: 'AA', E: 1.5, r: 0.3, nom: '1,5 В', col: '#6ccf4f', lamp: { R: 5, I0: 0.3, n: 'лампа 1,5 В · 0,3 А' } },
+  aa3: { n: 'Батарея 3 × AA', sh: '3 × AA', E: 4.5, r: 0.9, nom: '4,5 В', col: '#6ccf4f' },
+  li:  { n: 'Ячейка Li-ion 18650', sh: 'Li-ion', E: 3.7, r: 0.05, nom: '3,7 В', col: '#3b6fd8', lamp: { R: 12, I0: 0.3, n: 'лампа 3,6 В · 0,3 А' } },
+  old: { n: 'Старая батарейка AA', sh: 'старая AA', E: 1.3, r: 3, nom: '1,5 В', col: '#8a9a5a' },
+  car: { n: 'Автомобильный аккумулятор', sh: 'авто 12 В', E: 12.6, r: 0.01, nom: '12 В', col: '#2c3240', lamp: { R: 7, I0: 1.75, n: 'лампа 12 В · 21 Вт' } },
+};
+const L1SRC = ['aa', 'aa3', 'li', 'old'], L3SRC = ['aa', 'li', 'car'];
+const RL1 = 6, FUSE = 3;
+const B2 = { E: 4.5, r: 1.5, Rmin: 1, Rmax: 15 };
+const E_OPT = [4, 4.5, 5], R_OPT = [0.5, 1, 1.5, 3];
+const CELL = { aa: { n: 'AA', E: 1.5, r: 0.3, C: 2500, col: '#6ccf4f' }, li: { n: 'Li-ion 18650', E: 3.7, r: 0.05, C: 3000, col: '#3b6fd8' } };
+const DEV = { Umin: 6.5, Umax: 8.5, I: 1.5, t: 4 };
+
+function resetState() {
+  Object.assign(S, { src1: 'aa', sw: false, rec1: [], R: 10, pts: [], ansE: false, ansR: false,
+    src3: 'aa', jump: false, fuse: false, blown: false, sc: {}, blew: false, flash: -1e9, lamp3: false,
+    cell: 'aa', ns: 1, np: 1, on: false, ser3: false, par3: false, pack: null, off: 0, hl: null });
+}
+resetState();
+
+function cur1() { const s = SRC[S.src1], I = S.sw ? s.E / (RL1 + s.r) : 0; return { s, I, U: s.E - I * s.r }; }
+function cur2() { const I = S.sw ? B2.E / (S.R + B2.r) : 0; return { I, U: B2.E - I * B2.r }; }
+function raw3() { const s = SRC[S.src3]; if (!S.sw) return 0; return s.E / ((S.jump ? 0 : s.lamp.R) + s.r); }
+function cur3() {
+  const s = SRC[S.src3];
+  if (!S.sw || (S.fuse && S.blown)) return { s, I: 0, IL: 0, U: s.E };
+  const I = raw3();
+  return { s, I, IL: S.jump ? 0 : I, U: s.E - I * s.r };
+}
+function pack() {
+  const c = CELL[S.cell], s = S.ns, p = S.np;
+  const E = s * c.E, r = s * c.r / p, C = p * c.C, W = E * C / 1000, Uload = E - DEV.I * r, t = C / 1000 / DEV.I;
+  const ok = E <= DEV.Umax + 1e-9 && Uload >= DEV.Umin - 1e-9;
+  return { c, s, p, E, r, C, W, Uload, ok, t, n: s * p, U: S.on ? Uload : E, I: S.on ? DEV.I : 0 };
+}
+// U = a + b·I по записанным точкам (метод наименьших квадратов)
+function fit2() {
+  const P = S.pts; if (P.length < 2) return null;
+  const n = P.length, sx = P.reduce((a, p) => a + p.I, 0), sy = P.reduce((a, p) => a + p.U, 0), sxx = P.reduce((a, p) => a + p.I * p.I, 0), sxy = P.reduce((a, p) => a + p.I * p.U, 0);
+  const d = n * sxx - sx * sx; if (Math.abs(d) < 1e-9) return null;
+  const b = (n * sxy - sx * sy) / d, a = (sy - b * sx) / n;
+  return { E: a, r: -b };
+}
+
+function model() {
+  const id = LID();
+  if (id === 'emf') { const c = cur1(), has = (k, sw) => S.rec1.some(x => x.src === k && x.sw === sw); return { kind: id, ...c, oAA: has('aa', false), oAA3: has('aa3', false), oLi: has('li', false), closed: S.rec1.some(x => x.sw) }; }
+  if (id === 'ohm') { const c = cur2(); return { kind: id, ...c, n: S.pts.length, eOk: S.ansE, rOk: S.ansR, fit: fit2() }; }
+  if (id === 'short') { const c = cur3(); return { kind: id, ...c, lamp: S.lamp3, scAA: S.sc.aa != null, scLi: S.sc.li != null, blew: S.blew }; }
+  const P = pack(); return { kind: id, ...P, ser3: S.ser3, par3: S.par3, pack: !!S.pack };
+}
+
+// ---------- drawing helpers ----------
+const T = (x, y, s, fill, txt, anchor = 'middle', extra = '') => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${s}" fill="${fill}" text-anchor="${anchor}" ${extra}>${txt}</text>`;
+const halo = `paint-order="stroke" stroke="${INK}" stroke-width="3"`;
+const WIRE = '#9fb0cc';
+function bg() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern>
+    <radialGradient id="glow"><stop offset="0" stop-color="#ffe9a8" stop-opacity=".9"/><stop offset=".45" stop-color="#ffd27a" stop-opacity=".35"/><stop offset="1" stop-color="#ffb547" stop-opacity="0"/></radialGradient>
+    <radialGradient id="spark"><stop offset="0" stop-color="#fffbe8" stop-opacity="1"/><stop offset=".4" stop-color="#ffb547" stop-opacity=".6"/><stop offset="1" stop-color="#ff5a2a" stop-opacity="0"/></radialGradient></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+const pathD = pts => 'M' + pts.map(p => `${(+p[0]).toFixed(1)} ${(+p[1]).toFixed(1)}`).join('L');
+const wire = (pts, w = 3, col = WIRE) => `<path d="${pathD(pts)}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round"/>`;
+function polyLen(pts) { let s = 0; for (let i = 1; i < pts.length; i++) s += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); return s; }
+function pointAt(pts, s) {
+  for (let i = 1; i < pts.length; i++) {
+    const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    if (s <= d || i === pts.length - 1) { const f = d ? clamp(s / d, 0, 1) : 0; return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * f, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * f]; }
+    s -= d;
+  }
+  return pts[pts.length - 1];
+}
+// заряды бегут по проводам от «+» к «−» (направление тока); offset S.off растёт со временем
+function charges(pts, col = '#ffb547', gap = 24) {
+  const len = polyLen(pts); let h = '';
+  for (let k = 0, s0 = ((S.off % gap) + gap) % gap; s0 + k * gap < len; k++) { const p = pointAt(pts, s0 + k * gap); h += `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.5" fill="${col}" opacity=".9" pointer-events="none"/>`; }
+  return h;
+}
+function arrow(x1, y1, x2, y2, col, w = 2.4) {
+  const a = Math.atan2(y2 - y1, x2 - x1), L2 = Math.hypot(x2 - x1, y2 - y1); if (L2 < 1) return '';
+  const hl = Math.min(9, L2 * 0.6), hx = x2 - hl * Math.cos(a), hy = y2 - hl * Math.sin(a), hw = hl * 0.5;
+  return `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${hx.toFixed(1)} ${hy.toFixed(1)}" stroke="${col}" stroke-width="${w}" stroke-linecap="round"/><path d="M${x2.toFixed(1)} ${y2.toFixed(1)}L${(hx + hw * Math.sin(a)).toFixed(1)} ${(hy - hw * Math.cos(a)).toFixed(1)}L${(hx - hw * Math.sin(a)).toFixed(1)} ${(hy + hw * Math.cos(a)).toFixed(1)}Z" fill="${col}"/>`;
+}
+function keySwitch(x1, x2, y, closed, labelUp = true, key = 'sw') {
+  const len = x2 - x1, a = closed ? 0 : -32 * Math.PI / 180;
+  const ex = x1 + Math.cos(a) * len, ey = y + Math.sin(a) * len;
+  return `<g data-click="${key}"><rect x="${x1 - 14}" y="${y - 44}" width="${len + 28}" height="62" fill="transparent"/>
+    <circle cx="${x1}" cy="${y}" r="5.5" fill="#c8d0dd" stroke="${INK}" stroke-width="1.4"/><circle cx="${x2}" cy="${y}" r="5.5" fill="#c8d0dd" stroke="${INK}" stroke-width="1.4"/>
+    <path d="M${x1} ${y}L${ex.toFixed(1)} ${ey.toFixed(1)}" stroke="${closed ? '#86e0a8' : '#ff8a73'}" stroke-width="4.5" stroke-linecap="round"/>
+    <circle cx="${ex.toFixed(1)}" cy="${ey.toFixed(1)}" r="4" fill="#0e1520" stroke="${closed ? '#86e0a8' : '#ff8a73'}" stroke-width="2"/>
+    ${T((x1 + x2) / 2, labelUp ? y - 30 : y + 26, 10.5, closed ? '#86e0a8' : '#8b96ad', closed ? 'ключ замкнут' : 'ключ: нажми', 'middle', halo)}</g>`;
+}
+function lamp(x, yc, b) {
+  const g = clamp(b, 0, 1.6), fil = g > 0.02 ? (g > 1.25 ? '#ffffff' : '#ffd27a') : '#5d6a86';
+  let h = '';
+  if (g > 0.02) h += `<circle cx="${x}" cy="${yc}" r="${(24 + 40 * Math.min(1.3, g)).toFixed(1)}" fill="url(#glow)" opacity="${Math.min(1, 0.25 + g).toFixed(2)}" pointer-events="none"/>`;
+  h += `<rect x="${x - 9}" y="${yc + 14}" width="18" height="16" rx="2" fill="#8b96ad" stroke="${INK}" stroke-width="1.2"/><path d="M${x - 9} ${yc + 19}h18M${x - 9} ${yc + 24}h18" stroke="#5d6a86"/>
+    <circle cx="${x}" cy="${yc - 4}" r="20" fill="${g > 0.02 ? '#fff3c4' : '#1c2638'}" fill-opacity="${g > 0.02 ? (0.2 + 0.5 * Math.min(1, g)).toFixed(2) : 1}" stroke="#a9d6e4" stroke-width="2"/>
+    <path d="M${x - 5} ${yc + 14}V${yc - 2}l3 -6l2 5l2 -5l2 5l2 -5l2 6V${yc + 14}" fill="none" stroke="${fil}" stroke-width="1.8" stroke-linejoin="round" transform="translate(-2 0)"/>`;
+  return h;
+}
+function dial(x, y, r, letter, val, max, over) {
+  const a = (-60 + 120 * clamp(val / max, 0, 1.08)) * Math.PI / 180, px = x, py = y + r * 0.42, len = r * 0.8;
+  let h = `<circle cx="${x}" cy="${y}" r="${r}" fill="#d9dfe9" stroke="${INK}" stroke-width="2"/><circle cx="${x}" cy="${y}" r="${r - 3}" fill="none" stroke="#8b96ad" stroke-width="1"/>`;
+  for (let k = 0; k <= 4; k++) { const b = (-60 + 30 * k) * Math.PI / 180; h += `<path d="M${(px + Math.sin(b) * r * 0.7).toFixed(1)} ${(py - Math.cos(b) * r * 0.7).toFixed(1)}L${(px + Math.sin(b) * r * 0.84).toFixed(1)} ${(py - Math.cos(b) * r * 0.84).toFixed(1)}" stroke="#26324a" stroke-width="1.3"/>`; }
+  h += `<path d="M${px} ${py}L${(px + Math.sin(a) * len).toFixed(1)} ${(py - Math.cos(a) * len).toFixed(1)}" stroke="${over ? '#ff3c2e' : '#c0392b'}" stroke-width="1.8" stroke-linecap="round"/><circle cx="${px}" cy="${py}" r="2.4" fill="#26324a"/>`;
+  h += T(x, y + r * 0.86, r * 0.4, '#0b1019', letter, 'middle', 'font-weight="500"');
+  return h;
+}
+// цифровой прибор: жёлтый корпус с табло; гнёзда снизу
+function dmeter(x, y, w, txt, letter, col = '#86e0a8') {
+  return `<rect x="${x - w / 2}" y="${y - 28}" width="${w}" height="56" rx="8" fill="#e6c14a" stroke="${INK}" stroke-width="1.8"/>
+    <rect x="${x - w / 2 + 9}" y="${y - 20}" width="${w - 18}" height="26" rx="3" fill="#0e1520"/>
+    ${T(x, y - 1.5, 15, col, txt, 'middle', 'font-weight="500"')}${T(x - w / 2 + 18, y + 20, 9, '#0b1019', letter, 'middle', 'font-weight="600"')}
+    <circle cx="${x - 14}" cy="${y + 17}" r="4.5" fill="#d9483b" stroke="${INK}"/><circle cx="${x + 14}" cy="${y + 17}" r="4.5" fill="#26324a" stroke="${INK}"/>`;
+}
+// батарейка, стоящая вертикально: «+» сверху
+function cellV(x, y1, y2, col, label, w = 26) {
+  return `<rect x="${x - 5}" y="${y1 - 5}" width="10" height="6" rx="1.5" fill="#c8d0dd" stroke="${INK}" stroke-width="1"/>
+    <rect x="${x - w / 2}" y="${y1}" width="${w}" height="${y2 - y1}" rx="5" fill="${col}" stroke="${INK}" stroke-width="1.5"/>
+    <rect x="${x - w / 2}" y="${y1}" width="${w}" height="${((y2 - y1) * 0.18).toFixed(1)}" rx="4" fill="#f2c94c" stroke="${INK}" stroke-width="1"/>
+    <rect x="${x - w / 2 + 1}" y="${y2 - 4}" width="${w - 2}" height="4" fill="#c8d0dd"/>` + (label ? T(x, (y1 + y2) / 2 + 8, 8.5, '#e8ecf4', label, 'middle', `font-weight="600" transform="rotate(-90 ${x} ${((y1 + y2) / 2 + 5).toFixed(1)})" ` + halo) : '');
+}
+const heatCol = h => { h = clamp(h, 0, 1); if (h < 0.02) return WIRE; const a = [159, 176, 204], b = [255, 90, 42], c = [255, 236, 170]; const m = h < 0.7 ? a.map((v, i) => v + (b[i] - v) * h / 0.7) : b.map((v, i) => v + (c[i] - v) * (h - 0.7) / 0.3); return `rgb(${m.map(Math.round).join(',')})`; };
+
+// ---------- lesson 1: source «inside», key, lamp, voltmeter ----------
+const G1 = { bx0: 40, bx1: 150, by0: 196, by1: 344, P: [158, 212], N: [158, 328], cx: 190, y0: 180, y1: 370, sw: [220, 280], x1: 440, ly: 272, vx: 315, vy: 292 };
+function emfScene() {
+  const c = G1, m = cur1(), s = m.s;
+  let h = '';
+  // wires
+  h += wire([c.P, [c.cx, c.P[1]], [c.cx, c.y0], [c.sw[0], c.y0]]) + wire([[c.sw[1], c.y0], [c.x1, c.y0], [c.x1, c.y1], [c.cx, c.y1], [c.cx, c.N[1]], c.N]);
+  if (m.I > 0) h += charges([c.P, [c.cx, c.P[1]], [c.cx, c.y0], [c.x1, c.y0], [c.x1, c.y1], [c.cx, c.y1], [c.cx, c.N[1]], c.N]);
+  // source: a window into it
+  h += `<g data-click="src"><rect x="${c.bx0}" y="${c.by0}" width="${c.bx1 - c.bx0}" height="${c.by1 - c.by0}" rx="10" fill="#121a28" stroke="${s.col}" stroke-width="2.2"/>
+    <rect x="${c.bx0 + 10}" y="${c.by0 + 8}" width="${c.bx1 - c.bx0 - 20}" height="8" rx="2" fill="#ff8a73"/><rect x="${c.bx0 + 10}" y="${c.by1 - 16}" width="${c.bx1 - c.bx0 - 20}" height="8" rx="2" fill="#72d4e8"/>`;
+  for (let i = 0; i < 4; i++) h += T(c.bx0 + 22 + i * 22, c.by0 + 29, 11, '#ff8a73', '+', 'middle', 'font-weight="600"') + T(c.bx0 + 22 + i * 22, c.by1 - 20, 12, '#72d4e8', '−', 'middle', 'font-weight="600"');
+  // charges carried up by the external forces
+  const top = c.by0 + 36, bot = c.by1 - 34, gap = 18, ph = m.I > 0 ? ((S.off * 0.6) % gap + gap) % gap : 6;
+  for (let y = bot - ph; y > top; y -= gap) h += `<circle cx="${(c.bx0 + c.bx1) / 2}" cy="${y.toFixed(1)}" r="5" fill="#ff8a73" stroke="${INK}" stroke-width="1"/>` + T((c.bx0 + c.bx1) / 2, y + 3, 8, INK, '+', 'middle', 'font-weight="700"');
+  h += arrow(c.bx1 - 16, bot - 4, c.bx1 - 16, top + 10, '#ffb547', 2.6) + T(c.bx1 - 22, (top + bot) / 2 + 3, 10, '#ffb547', 'Fст', 'end', halo);
+  h += arrow(c.bx0 + 16, top + 14, c.bx0 + 16, top + 50, '#72d4e8', 2) + T(c.bx0 + 22, top + 38, 9.5, '#72d4e8', 'Fэл', 'start', halo);
+  h += `</g>`;
+  h += T((c.bx0 + c.bx1) / 2, c.by1 + 18, 10.5, '#e8ecf4', s.n, 'middle', halo) + T((c.bx0 + c.bx1) / 2, c.by1 + 31, 9.5, '#8b96ad', `на корпусе: ${s.nom}`, 'middle', halo);
+  h += `<circle cx="${c.P[0]}" cy="${c.P[1]}" r="5" fill="#e0473a" stroke="${INK}"/><circle cx="${c.N[0]}" cy="${c.N[1]}" r="5" fill="#2f6fd8" stroke="${INK}"/>`;
+  h += keySwitch(c.sw[0], c.sw[1], c.y0, S.sw);
+  const P = m.I * m.I * RL1;
+  h += lamp(c.x1, c.ly, Math.sqrt(P / 2.4));
+  h += T(c.x1 - 28, c.ly + 4, 10, '#8b96ad', `${RL1} Ом`, 'end', halo);
+  // voltmeter right on the terminals of the source
+  h += `<path d="M${c.vx - 14} ${c.vy + 17}C${c.vx - 14} ${c.vy + 60} ${c.P[0] + 60} ${c.P[1] + 40} ${c.P[0] + 6} ${c.P[1] + 3}" fill="none" stroke="#e0473a" stroke-width="2.4"/>
+    <path d="M${c.vx + 14} ${c.vy + 17}C${c.vx + 14} ${c.vy + 66} ${c.N[0] + 70} ${c.N[1] + 10} ${c.N[0] + 6} ${c.N[1] + 1}" fill="none" stroke="#4a5876" stroke-width="2.4"/>`;
+  h += dmeter(c.vx, c.vy, 104, `${fmt(m.U, 2)} В`, 'V');
+  h += T(c.vx, c.vy - 36, 10, '#8b96ad', S.sw ? 'под нагрузкой' : 'цепь разомкнута: I = 0', 'middle', halo);
+  if (m.I > 0) h += arrow(300, c.y0 - 14, 340, c.y0 - 14, '#ffb547', 2) + T(320, c.y0 - 21, 10.5, '#ffb547', `I = ${fmt(m.I, 2)} А`, 'middle', halo);
+  return h;
+}
+
+// ---------- lesson 2: battery (ℰ, r), key, ammeter, rheostat, voltmeter, U(I) graph ----------
+const G2 = { x0: 70, sy0: 222, sy1: 318, y0: 170, y1: 370, sw: [112, 162], am: 232, x1: 316, rh: [130, 262], rod: 340, rodX: 284, vx: 214, vy: 262, gx0: 374, gy0: 352, gw: 126, gh: 170, Imax: 3, Umax: 5 };
+const rhX = () => G2.rh[0] + (G2.rh[1] - G2.rh[0]) * S.R / B2.Rmax;
+function ohmScene() {
+  const c = G2, m = cur2(), xs = rhX();
+  let h = '';
+  h += wire([[c.x0, c.sy0], [c.x0, c.y0], [c.sw[0], c.y0]]) + wire([[c.sw[1], c.y0], [c.am - 22, c.y0]]) + wire([[c.am + 22, c.y0], [c.x1, c.y0], [c.x1, c.y1], [c.rodX, c.y1], [c.rodX, c.rod], [c.rh[0] - 6, c.rod]]) + wire([[c.rh[0], c.y1], [c.x0, c.y1], [c.x0, c.sy1]]);
+  if (m.I > 0) h += charges([[c.x0, c.sy0], [c.x0, c.y0], [c.x1, c.y0], [c.x1, c.y1], [c.rodX, c.y1], [c.rodX, c.rod], [xs, c.rod], [xs, c.y1], [c.x0, c.y1], [c.x0, c.sy1]]);
+  // source with ℰ and r inside a dashed outline
+  h += `<g data-click="src"><rect x="${c.x0 - 34}" y="${c.sy0}" width="68" height="${c.sy1 - c.sy0}" rx="8" fill="#121a28" stroke="#8b96ad" stroke-width="1.6" stroke-dasharray="5 4"/>
+    <path d="M${c.x0} ${c.sy0}V${c.sy0 + 18}M${c.x0 - 16} ${c.sy0 + 18}h32M${c.x0 - 8} ${c.sy0 + 26}h16M${c.x0} ${c.sy0 + 26}V${c.sy0 + 44}" stroke="#e8ecf4" stroke-width="2.4"/>
+    <rect x="${c.x0 - 7}" y="${c.sy0 + 44}" width="14" height="30" rx="2" fill="#2a2f3a" stroke="#ffb547" stroke-width="2"/><path d="M${c.x0} ${c.sy0 + 74}V${c.sy1}" stroke="#e8ecf4" stroke-width="2.4"/>
+    ${T(c.x0 - 20, c.sy0 + 25, 13, '#ff8a73', '+', 'middle', 'font-weight="600"')}${T(c.x0 + 25, c.sy0 + 26, 11, '#e8ecf4', 'ℰ', 'middle')}${T(c.x0 + 22, c.sy0 + 63, 12, '#ffb547', 'r', 'middle', 'font-style="italic" font-family="Golos Text, sans-serif"')}</g>`;
+  h += T(c.x0 - 8, c.sy1 + 15, 10, '#8b96ad', S.ansE ? `ℰ = ${fmt(B2.E, 1)} В` : 'ℰ = ?', 'end', halo) + T(c.x0 - 8, c.sy1 + 28, 10, '#8b96ad', S.ansR ? `r = ${fmt(B2.r, 1)} Ом` : 'r = ?', 'end', halo);
+  h += keySwitch(c.sw[0], c.sw[1], c.y0, S.sw);
+  // rheostat: coil, rod, slider
+  h += `<rect x="${c.rh[0]}" y="${c.y1 - 9}" width="${c.rh[1] - c.rh[0]}" height="18" rx="4" fill="#3a2e22" stroke="${INK}" stroke-width="1.4"/>`;
+  for (let x = c.rh[0] + 4; x < c.rh[1]; x += 5) h += `<path d="M${x} ${c.y1 - 9}l3 18" stroke="#c9b98a" stroke-width="1.6"/>`;
+  h += `<rect x="${c.rh[0] - 6}" y="${c.rod - 2}" width="${c.rodX - c.rh[0] + 6}" height="4" fill="#5d6a86"/>`;
+  h += `<g data-drag="rh"><rect x="${(xs - 18).toFixed(1)}" y="${c.rod - 22}" width="36" height="${c.y1 - c.rod + 32}" fill="transparent"/>
+    <rect x="${(xs - 9).toFixed(1)}" y="${c.rod - 10}" width="18" height="16" rx="3" fill="#ffb547" stroke="${INK}" stroke-width="1.4"/>
+    <path d="M${xs.toFixed(1)} ${c.rod + 6}V${c.y1 - 9}" stroke="#ffb547" stroke-width="3"/>${T(xs, c.rod - 15, 9.5, '#ffb547', '↔', 'middle', halo)}</g>`;
+  h += T((c.rh[0] + c.rh[1]) / 2, c.y1 + 24, 10.5, '#e8ecf4', `реостат R = ${fmt(S.R, 1)} Ом`, 'middle', halo);
+  // ammeter
+  h += dial(c.am, c.y0, 22, 'A', m.I, c.Imax, false) + T(c.am, c.y0 - 30, 11, '#e8ecf4', `${fmt(m.I, 2)} А`, 'middle', 'font-weight="500" ' + halo);
+  // voltmeter on the terminals of the source
+  h += `<path d="M${c.vx - 22} ${c.vy - 8}H${c.x0 + 48}V${c.y0 + 26}H${c.x0}" fill="none" stroke="#e0473a" stroke-width="2"/><path d="M${c.vx - 22} ${c.vy + 8}H${c.x0 + 48}V${c.y1 - 22}H${c.x0}" fill="none" stroke="#4a5876" stroke-width="2"/>`;
+  h += `<circle cx="${c.x0}" cy="${c.y0 + 26}" r="3.5" fill="#e0473a"/><circle cx="${c.x0}" cy="${c.y1 - 22}" r="3.5" fill="#4a5876"/>`;
+  h += dial(c.vx, c.vy, 22, 'V', m.U, c.Umax, false) + T(c.vx, c.vy + 38, 11, '#e8ecf4', `${fmt(m.U, 2)} В`, 'middle', 'font-weight="500" ' + halo);
+  if (m.I > 0) h += arrow(258, c.y0 - 14, 292, c.y0 - 14, '#ffb547', 2) + T(275, c.y0 - 21, 10.5, '#ffb547', 'I', 'middle', halo);
+  h += graph2(m);
+  return h;
+}
+function graph2(m) {
+  const c = G2, gx = c.gx0, gy = c.gy0, gw = c.gw, gh = c.gh, X = i => gx + gw * i / c.Imax, Y = u => gy - gh * u / c.Umax;
+  let h = `<g data-click="rec"><rect x="${gx - 24}" y="${gy - gh - 18}" width="${gw + 34}" height="${gh + 44}" rx="10" fill="rgba(11,16,25,.6)" stroke="#26324a"/>`;
+  for (let i = 0; i <= c.Imax; i++) h += `<path d="M${X(i).toFixed(1)} ${gy}V${gy - gh}" stroke="#26324a"/>` + T(X(i), gy + 13, 9, '#8b96ad', i);
+  for (let u = 0; u <= c.Umax; u++) h += `<path d="M${gx} ${Y(u).toFixed(1)}H${gx + gw}" stroke="#26324a"/>` + (u ? T(gx - 5, Y(u) + 3, 9, '#8b96ad', u, 'end') : '');
+  h += `<path d="M${gx} ${gy - gh - 4}V${gy}H${gx + gw + 4}" fill="none" stroke="#8b96ad" stroke-width="1.4"/>` + T(gx + gw, gy - 6, 9.5, '#8b96ad', 'I, А', 'end') + T(gx + 4, gy - gh - 6, 9.5, '#8b96ad', 'U, В', 'start');
+  const F = m.fit || fit2();
+  if (F && S.pts.length >= 2 && F.r > 0) {
+    const i1 = Math.min(c.Imax, F.E / F.r), u0 = Math.min(c.Umax, F.E);
+    h += `<path d="M${X(0)} ${Y(u0).toFixed(1)}L${X(i1).toFixed(1)} ${Y(F.E - F.r * i1).toFixed(1)}" stroke="#ffb547" stroke-width="1.6" stroke-dasharray="${S.pts.length >= 4 ? '0' : '5 4'}" opacity=".8"/>`;
+    if (S.pts.length >= 4) h += `<circle cx="${X(0)}" cy="${Y(u0).toFixed(1)}" r="4.5" fill="none" stroke="#86e0a8" stroke-width="2"/>` + T(gx + 8, Y(u0) - 7, 9.5, '#86e0a8', S.ansE ? `ℰ = ${fmt(B2.E, 1)} В` : 'ℰ = ?', 'start', halo);
+  }
+  S.pts.forEach(p => { h += `<circle cx="${X(p.I).toFixed(1)}" cy="${Y(p.U).toFixed(1)}" r="3.8" fill="#72d4e8" stroke="${INK}"/>`; });
+  if (S.sw) h += `<circle cx="${X(m.I).toFixed(1)}" cy="${Y(m.U).toFixed(1)}" r="6.5" fill="none" stroke="#ffb547" stroke-width="1.8"/>`;
+  h += T(gx + gw / 2 - 6, gy + 25, 9, '#5a6680', S.pts.length ? `точек: ${S.pts.length}` : 'нажмите — записать точку', 'middle') + `</g>`;
+  return h;
+}
+
+// ---------- lesson 3: source, key, fuse, ammeter, lamp, jumper ----------
+const G3 = { x0: 80, sy0: 222, sy1: 318, y0: 180, y1: 370, sw: [118, 168], fz: [196, 254], am: 322, x1: 430, ly: 278, jx: 486, j0: 222, j1: 334 };
+function shortScene(t) {
+  const c = G3, m = cur3(), s = m.s, heat = S.jump && m.I > 0 ? clamp(Math.log10(m.I) / 3.1, 0, 1) : 0, wc = heatCol(heat), ww = 3 + heat * 1.5;
+  let h = '';
+  // wires (glow with heat)
+  h += wire([[c.x0, c.sy0], [c.x0, c.y0], [c.sw[0], c.y0]], ww, wc) + wire([[c.sw[1], c.y0], [c.fz[0], c.y0]], ww, wc) + wire([[c.fz[1], c.y0], [c.am - 32, c.y0]], ww, wc) +
+    wire([[c.am + 32, c.y0], [c.x1, c.y0], [c.x1, c.ly - 30]], ww, wc) + wire([[c.x1, c.ly + 30], [c.x1, c.y1], [c.x0, c.y1], [c.x0, c.sy1]], ww, wc);
+  if (heat > 0.25) h += `<path d="${pathD([[c.x0, c.sy0], [c.x0, c.y0], [c.x1, c.y0], [c.x1, c.j0], [c.jx, c.j0], [c.jx, c.j1], [c.x1, c.j1], [c.x1, c.y1], [c.x0, c.y1], [c.x0, c.sy1]])}" fill="none" stroke="#ff5a2a" stroke-width="${(8 + 8 * heat).toFixed(1)}" opacity="${(0.12 + 0.18 * heat).toFixed(2)}" stroke-linejoin="round" pointer-events="none"/>`;
+  if (m.I > 0) {
+    const path = S.jump ? [[c.x0, c.sy0], [c.x0, c.y0], [c.x1, c.y0], [c.x1, c.j0], [c.jx, c.j0], [c.jx, c.j1], [c.x1, c.j1], [c.x1, c.y1], [c.x0, c.y1], [c.x0, c.sy1]]
+      : [[c.x0, c.sy0], [c.x0, c.y0], [c.x1, c.y0], [c.x1, c.y1], [c.x0, c.y1], [c.x0, c.sy1]];
+    h += charges(path, heat > 0.5 ? '#fff3c4' : '#ffb547', 20);
+  }
+  // source
+  h += `<g data-click="src">`;
+  if (S.src3 === 'car') {
+    h += `<rect x="${c.x0 - 36}" y="${c.sy0 + 8}" width="72" height="${c.sy1 - c.sy0 - 8}" rx="6" fill="#2c3240" stroke="${INK}" stroke-width="1.8"/><rect x="${c.x0 - 36}" y="${c.sy0 + 8}" width="72" height="12" rx="4" fill="#3a4762"/>`;
+    for (let k = 0; k < 6; k++) h += `<circle cx="${c.x0 - 26 + k * 10.4}" cy="${c.sy0 + 14}" r="2.6" fill="#5d6a86"/>`;
+    h += `<rect x="${c.x0 - 6}" y="${c.sy0 - 2}" width="12" height="10" rx="2" fill="#e0473a" stroke="${INK}"/>` + T(c.x0, c.sy0 + 52, 10, '#e8ecf4', '12 В', 'middle', 'font-weight="600"') + T(c.x0, c.sy0 + 66, 8.5, '#8b96ad', 'свинцовый', 'middle');
+  } else h += cellV(c.x0, c.sy0 + 6, c.sy1 - 4, s.col, s.sh, S.src3 === 'li' ? 30 : 26);
+  h += `</g>` + T(c.x0 + 12, c.sy1 + 16, 10, '#8b96ad', `ℰ = ${fmt(s.E, 1)} В · r = ${fmt(s.r, 2)} Ом`, 'start', halo);
+  h += keySwitch(c.sw[0], c.sw[1], c.y0, S.sw, false);
+  // fuse or a copper link instead of it
+  const fx = (c.fz[0] + c.fz[1]) / 2;
+  h += `<g data-click="fuse"><rect x="${c.fz[0] - 6}" y="${c.y0 - 26}" width="${c.fz[1] - c.fz[0] + 12}" height="52" fill="transparent"/>`;
+  if (S.fuse) {
+    h += `<rect x="${c.fz[0]}" y="${c.y0 - 9}" width="10" height="18" rx="2" fill="#c8d0dd" stroke="${INK}"/><rect x="${c.fz[1] - 10}" y="${c.y0 - 9}" width="10" height="18" rx="2" fill="#c8d0dd" stroke="${INK}"/>
+      <rect x="${c.fz[0] + 10}" y="${c.y0 - 7}" width="${c.fz[1] - c.fz[0] - 20}" height="14" rx="3" fill="rgba(200,230,245,.16)" stroke="#a9d6e4" stroke-width="1.4"/>`;
+    if (!S.blown) h += `<path d="M${c.fz[0] + 10} ${c.y0}H${c.fz[1] - 10}" stroke="#e8ecf4" stroke-width="1.2"/>`;
+    else h += `<path d="M${c.fz[0] + 10} ${c.y0}H${fx - 8}l3 -3M${c.fz[1] - 10} ${c.y0}H${fx + 7}l-2 3" stroke="#e8ecf4" stroke-width="1.2" fill="none"/><ellipse cx="${fx}" cy="${c.y0}" rx="12" ry="5" fill="#3a3a3a" opacity=".75"/>`;
+    h += T(fx, c.y0 + 22, 10, S.blown ? '#ff8a73' : '#86e0a8', S.blown ? 'перегорел' : `предохранитель ${FUSE} А`, 'middle', halo) + (S.blown ? T(fx, c.y0 + 34, 9, '#8b96ad', 'нажми — заменить', 'middle', halo) : '');
+  } else {
+    h += `<path d="M${c.fz[0]} ${c.y0}H${c.fz[1]}" stroke="#d98a4e" stroke-width="5" stroke-linecap="round"/>` + T(fx, c.y0 + 22, 9.5, '#ff8a73', 'без предохранителя', 'middle', halo) + T(fx, c.y0 + 34, 9, '#8b96ad', 'нажми — поставить', 'middle', halo);
+  }
+  h += `</g>`;
+  // digital ammeter (shunt): shows tens and hundreds of amperes
+  h += `<rect x="${c.am - 32}" y="${c.y0 - 18}" width="64" height="36" rx="6" fill="#e6c14a" stroke="${INK}" stroke-width="1.6"/><rect x="${c.am - 26}" y="${c.y0 - 13}" width="52" height="20" rx="2" fill="#0e1520"/>` +
+    T(c.am, c.y0 + 1.5, 11.5, m.I > FUSE ? '#ff8a73' : '#86e0a8', `${fI(m.I)} А`, 'middle', 'font-weight="500"') + T(c.am, c.y0 + 15, 7.5, '#0b1019', 'A', 'middle', 'font-weight="600"');
+  // lamp and jumper
+  const L3 = s.lamp;
+  h += lamp(c.x1, c.ly, Math.pow(m.IL / L3.I0, 2));
+  h += T(c.x1 - 28, c.ly + 4, 9.5, '#8b96ad', L3.n, 'end', halo);
+  h += `<g data-click="jump"><rect x="${c.x1 + 8}" y="${c.j0 - 10}" width="${c.jx - c.x1 + 8}" height="${c.j1 - c.j0 + 20}" fill="transparent"/>`;
+  if (S.jump) h += wire([[c.x1, c.j0], [c.jx, c.j0], [c.jx, c.j1], [c.x1, c.j1]], ww + 1, heat > 0.05 ? wc : '#d98a4e') + `<circle cx="${c.x1}" cy="${c.j0}" r="4" fill="#e0473a" stroke="${INK}"/><circle cx="${c.x1}" cy="${c.j1}" r="4" fill="#e0473a" stroke="${INK}"/>` + T(c.jx + 4, (c.j0 + c.j1) / 2 + 3, 9.5, '#ff8a73', 'КЗ', 'start', halo);
+  else h += `<path d="M${c.x1} ${c.j0}H${c.jx}V${c.j1}H${c.x1}" fill="none" stroke="#8b96ad" stroke-width="1.6" stroke-dasharray="5 4"/>` + T(c.jx + 4, (c.j0 + c.j1) / 2 + 3, 9, '#8b96ad', 'перемычка', 'start', `transform="rotate(90 ${c.jx + 4} ${(c.j0 + c.j1) / 2})" ` + halo);
+  h += `</g>`;
+  // sparks and smoke at a heavy short
+  if (heat > 0.55 && !reduce) {
+    for (let k = 0; k < 6; k++) { const a = t / 70 + k * 2.1, rr = 6 + 10 * Math.abs(Math.sin(t / 90 + k)); h += `<circle cx="${(c.jx + Math.cos(a) * rr).toFixed(1)}" cy="${(c.j0 + Math.sin(a) * rr).toFixed(1)}" r="${(2 + 2 * Math.abs(Math.sin(t / 60 + k))).toFixed(1)}" fill="url(#spark)"/>`; }
+    h += T(c.jx - 30, c.j0 - 12, 10, '#ff8a73', 'искры!', 'middle', halo);
+  }
+  const fl = (performance.now() - S.flash) / 600;
+  if (fl >= 0 && fl < 1) h += `<circle cx="${fx}" cy="${c.y0}" r="${(10 + 40 * fl).toFixed(1)}" fill="url(#spark)" opacity="${(1 - fl).toFixed(2)}" pointer-events="none"/>`;
+  if (S.jump && m.I > 0) h += T((c.x0 + c.x1) / 2 + 30, c.y1 - 14, 11, '#ff8a73', `Iкз = ℰ / r = ${fI(m.I)} А`, 'middle', 'font-weight="600" ' + halo);
+  return h;
+}
+
+// ---------- lesson 4: holder with s × p cells, bus bars, key, speaker ----------
+const G4 = { x0: 64, pitch: 66, cw: 54, ch: 22, yc: 268, rp: 40, bl: 48, top: 176, y1: 370, sw: [352, 400], dx: 452, dy0: 200, dy1: 306 };
+function packScene(t) {
+  const c = G4, P = pack(), s = P.s, p = P.p, col = P.c.col;
+  const rowY = j => c.yc + (j - (p - 1) / 2) * c.rp, cx = i => c.x0 + 6 + i * c.pitch;
+  const xR = cx(s - 1) + c.cw + 12, yT = rowY(0) - c.ch / 2 - 10, yB = rowY(p - 1) + c.ch / 2 + 10;
+  let h = '';
+  // output wires
+  h += wire([[xR, yT], [xR, c.top], [c.sw[0], c.top]]) + wire([[c.sw[1], c.top], [c.dx, c.top], [c.dx, c.dy0]]) + wire([[c.dx, c.dy1], [c.dx, c.y1], [c.bl, c.y1], [c.bl, yB]]);
+  if (S.on) h += charges([[xR, yT], [xR, c.top], [c.dx, c.top], [c.dx, c.dy0]]) + charges([[c.dx, c.dy1], [c.dx, c.y1], [c.bl, c.y1], [c.bl, yB]]);
+  // holder
+  h += `<rect x="${c.bl - 12}" y="${yT - 8}" width="${xR - c.bl + 24}" height="${yB - yT + 16}" rx="8" fill="#151e2e" stroke="#3a4762" stroke-width="1.4"/>`;
+  // bus bars: «−» on the left, «+» on the right
+  h += `<rect x="${c.bl - 3}" y="${yT}" width="6" height="${yB - yT}" rx="2" fill="#72d4e8"/><rect x="${xR - 3}" y="${yT}" width="6" height="${yB - yT}" rx="2" fill="#ff8a73"/>`;
+  h += T(c.bl - 18, yT + 10, 14, '#72d4e8', '−', 'middle', halo) + T(xR + 18, yT + 10, 14, '#ff8a73', '+', 'middle', halo);
+  for (let j = 0; j < p; j++) {
+    const y = rowY(j);
+    h += wire([[c.bl, y], [cx(0), y]], 3, '#c8d0dd') + wire([[cx(s - 1) + c.cw, y], [xR, y]], 3, '#c8d0dd');
+    for (let i = 0; i + 1 < s; i++) h += wire([[cx(i) + c.cw, y], [cx(i + 1), y]], 3.4, '#c8d0dd');
+    for (let i = 0; i < s; i++) {
+      const x = cx(i);
+      h += `<g data-click="type"><rect x="${x}" y="${y - c.ch / 2}" width="${c.cw - 4}" height="${c.ch}" rx="5" fill="${col}" stroke="${INK}" stroke-width="1.4"/>
+        <rect x="${x + c.cw - 14}" y="${y - c.ch / 2}" width="10" height="${c.ch}" rx="3" fill="${S.cell === 'aa' ? '#f2c94c' : '#9aa3b2'}" stroke="${INK}" stroke-width="1"/>
+        <rect x="${x + c.cw - 4}" y="${y - 4}" width="4" height="8" fill="#c8d0dd" stroke="${INK}" stroke-width=".8"/>${T(x + (c.cw - 14) / 2, y + 3.5, 8.5, '#0b1019', S.cell === 'aa' ? '1,5 В' : '3,7 В', 'middle', 'font-weight="600"')}</g>`;
+    }
+  }
+  h += T(c.bl + 10, yB + 24, 10.5, '#e8ecf4', `${s}S${p}P · ${P.n} ${P.n === 1 ? 'элемент' : P.n < 5 ? 'элемента' : 'элементов'} ${P.c.n}`, 'start', halo);
+  h += T(c.bl + 10, yB + 38, 9.5, '#8b96ad', `${s} последовательно × ${p} параллельно`, 'start', halo);
+  h += keySwitch(c.sw[0], c.sw[1], c.top, S.on, true, 'on');
+  // speaker
+  const dx = c.dx, mid = (c.dy0 + c.dy1) / 2, pulse = S.on && !reduce ? 1 + 0.06 * Math.sin(t / 70) : 1;
+  h += `<g data-click="on"><rect x="${dx - 34}" y="${c.dy0}" width="68" height="${c.dy1 - c.dy0}" rx="10" fill="#2c3240" stroke="${INK}" stroke-width="1.8"/>
+    <circle cx="${dx}" cy="${mid - 22}" r="${(13 * pulse).toFixed(1)}" fill="#1b1f28" stroke="#5d6a86" stroke-width="2"/><circle cx="${dx}" cy="${mid - 22}" r="4" fill="#5d6a86"/>
+    <circle cx="${dx}" cy="${mid + 22}" r="${(19 * pulse).toFixed(1)}" fill="#1b1f28" stroke="#5d6a86" stroke-width="2"/><circle cx="${dx}" cy="${mid + 22}" r="6" fill="#5d6a86"/>
+    <circle cx="${dx + 24}" cy="${c.dy0 + 9}" r="3" fill="${S.on ? '#86e0a8' : '#3a4762'}"/></g>`;
+  if (S.on && !reduce) for (let k = 0; k < 3; k++) { const ph = ((t / 900 + k / 3) % 1); h += `<path d="M${dx + 40 + ph * 26} ${mid - 14 - ph * 8}q${6 + ph * 4} 14 0 ${28 + ph * 16}" fill="none" stroke="#72d4e8" stroke-width="1.6" opacity="${(1 - ph).toFixed(2)}"/>`; }
+  h += T(dx, c.dy1 + 16, 10, '#e8ecf4', 'колонка', 'middle', halo) + T(dx, c.dy1 + 29, 9, '#8b96ad', '6,5–8,5 В · 1,5 А', 'middle', halo) + T(dx, c.dy1 + 41, 9, '#8b96ad', 'играть ≥ 4 ч', 'middle', halo);
+  return h;
+}
+
+function hlBox(id) {
+  const lid = LID();
+  if (lid === 'emf') { const c = G1; return ({ src: [c.bx0 - 6, c.by0 - 6, c.bx1 - c.bx0 + 12, c.by1 - c.by0 + 44], key: [c.sw[0] - 14, c.y0 - 44, 88, 62], lamp: [c.x1 - 30, c.ly - 30, 60, 66], vm: [c.vx - 56, c.vy - 44, 112, 76], term: [c.P[0] - 12, c.P[1] - 12, 24, c.N[1] - c.P[1] + 24] })[id]; }
+  if (lid === 'ohm') { const c = G2; return ({ src: [c.x0 - 38, c.sy0 - 4, 76, c.sy1 - c.sy0 + 26], key: [c.sw[0] - 14, c.y0 - 44, 78, 62], amm: [c.am - 28, c.y0 - 44, 56, 72], rh: [c.rh[0] - 10, c.rod - 24, c.rodX - c.rh[0] + 20, c.y1 - c.rod + 54], vm: [c.vx - 28, c.vy - 28, 56, 76], graph: [c.gx0 - 26, c.gy0 - c.gh - 20, c.gw + 38, c.gh + 48] })[id]; }
+  if (lid === 'short') { const c = G3; return ({ src: [c.x0 - 40, c.sy0 - 6, 80, c.sy1 - c.sy0 + 26], key: [c.sw[0] - 14, c.y0 - 44, 78, 62], fuse: [c.fz[0] - 8, c.y0 - 28, c.fz[1] - c.fz[0] + 16, 56], amm: [c.am - 36, c.y0 - 22, 72, 44], lamp: [c.x1 - 30, c.ly - 30, 60, 66], jump: [c.x1 + 4, c.j0 - 12, c.jx - c.x1 + 16, c.j1 - c.j0 + 24] })[id]; }
+  const c = G4, P = pack(), yT = c.yc - (P.p - 1) / 2 * c.rp - c.ch / 2 - 18, yB = c.yc + (P.p - 1) / 2 * c.rp + c.ch / 2 + 18, xR = c.x0 + 6 + (P.s - 1) * c.pitch + c.cw + 12;
+  return ({ cells: [c.bl - 14, yT, xR - c.bl + 28, yB - yT], bus: [xR - 10, yT, 20, yB - yT], key: [c.sw[0] - 14, c.top - 44, 78, 62], dev: [c.dx - 40, c.dy0 - 6, 80, c.dy1 - c.dy0 + 52] })[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = bg();
+  if (id === 'emf') h += emfScene(t);
+  else if (id === 'ohm') h += ohmScene(t);
+  else if (id === 'short') h += shortScene(t);
+  else h += packScene(t);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// fit the scene: 520 × 405 units, centred, content at the bottom
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 530, hh / 440, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 414 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => {
+  const ck = e.target.closest('[data-click]'); if (ck && ck.dataset.click) { act(ck.dataset.click); return; }
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  drag = { id: el.dataset.drag };
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const p = toSvg(e);
+  if (drag.id === 'rh') setR((clamp(p.x, G2.rh[0], G2.rh[1]) - G2.rh[0]) / (G2.rh[1] - G2.rh[0]) * B2.Rmax);
+});
+const endDrag = () => { if (!drag) return; drag = null; scene.classList.remove('grabbing'); dirty = true; };
+scene.addEventListener('pointerup', endDrag);
+scene.addEventListener('pointercancel', endDrag);
+
+// ---------- state changes ----------
+function setR(v) { v = clamp(Math.round(v * 2) / 2, B2.Rmin, B2.Rmax); if (Math.abs(v - S.R) < 1e-9) return; S.R = v; update(); }
+function rec1() {
+  const m = cur1(), U = Math.round(m.U * 100) / 100, k = S.rec1.findIndex(x => x.src === S.src1 && x.sw === S.sw);
+  const r = { src: S.src1, sw: S.sw, U, I: m.I };
+  if (k >= 0) S.rec1[k] = r; else S.rec1.push(r);
+  const s = SRC[S.src1], open = S.rec1.find(x => x.src === S.src1 && !x.sw);
+  if (!S.sw) toast(`${s.n}, ключ разомкнут: ${fmt(U, 2)} В — это и есть ЭДС.` + (S.src1 === 'old' ? ' На корпусе написано 1,5 В, но батарейка уже разрядилась.' : ''));
+  else toast(`${s.n} под нагрузкой: ${fmt(U, 2)} В` + (open ? ` — меньше ЭДС ${fmt(open.U, 2)} В на ${fmt(open.U - U, 2)} В. Эта часть ЭДС «тратится» внутри источника.` : '. Запишите и ЭДС при разомкнутом ключе — сравните.'));
+  buildScheme(); update();
+}
+function rec2() {
+  const m = cur2(), I = Math.round(m.I * 100) / 100, U = Math.round(m.U * 100) / 100;
+  if (S.pts.some(p => Math.abs(p.I - I) < 0.015)) { toast('Такая точка уже есть — сдвиньте ползунок реостата.'); return; }
+  if (S.pts.length >= 8) { toast('Хватит точек — достаточно 4–6. «Очистить» — начать заново.'); return; }
+  S.pts.push({ I, U, R: S.sw ? S.R : null }); S.pts.sort((a, b) => a.I - b.I);
+  if (S.pts.length === 4) toast('Точки легли на прямую. Где она пересекает ось U? Какой у неё наклон?');
+  else toast(`Точка: I = ${fmt(I, 2)} А, U = ${fmt(U, 2)} В.` + (!S.sw ? ' Ключ разомкнут — тока нет.' : ''));
+  renderTools(); buildScheme(); update();
+}
+function answer(kind, v) {
+  if (S.pts.length < 4) { toast('Сначала запишите хотя бы 4 точки — по ним проведём прямую.'); return; }
+  if (kind === 'E') {
+    if (Math.abs(v - B2.E) < 1e-9) { S.ansE = true; toast('Верно: ℰ = 4,5 В — при I = 0 напряжение на выводах равно ЭДС.'); }
+    else toast('Посмотрите, где прямая пересекает ось U — там ток равен нулю.');
+  } else {
+    if (Math.abs(v - B2.r) < 1e-9) { S.ansR = true; toast('Верно: r = ΔU / ΔI = 1,5 Ом. Ток короткого замыкания был бы ℰ / r = 3 А.'); }
+    else toast('Возьмите две точки на прямой: r = (U₁ − U₂) / (I₂ − I₁).');
+  }
+  renderTools(); buildScheme(); update();
+}
+// lesson 3: латчи — ток КЗ, срабатывание предохранителя
+function latch() {
+  const id = LID();
+  if (id === 'short') {
+    const s = SRC[S.src3], I = raw3();
+    if (S.fuse && !S.blown && I > FUSE) {
+      S.blown = true; S.blew = true; S.flash = performance.now();
+      toast(`Ток ${fI(I)} А больше ${FUSE} А — проволочка предохранителя перегорела за доли секунды и разорвала цепь. Провода целы.`);
+      renderTools(); buildScheme();
+    }
+    if (!S.fuse && S.sw && S.jump && S.sc[S.src3] == null) {
+      S.sc[S.src3] = I;
+      toast(S.src3 === 'aa' ? `Батарейка AA: Iкз = 1,5 / 0,3 = ${fI(I)} А. Лампа погасла — весь ток идёт по перемычке, батарейка греется.`
+        : S.src3 === 'li' ? `Li-ion: Iкз = 3,7 / 0,05 = ${fI(I)} А! Провода раскаляются, ячейка может загореться.`
+          : `Аккумулятор: Iкз = 12,6 / 0,01 = ${fI(I)} А — провода плавятся, летят искры. Такой ток прожигает металл.`);
+      buildScheme();
+    }
+  }
+  if (id === 'pack') {
+    const P = pack();
+    if (S.cell === 'aa' && P.s === 3 && P.p === 1 && !S.ser3) { S.ser3 = true; toast(`3 AA последовательно: ℰ = 3 × 1,5 = 4,5 В, r = 3 × 0,3 = 0,9 Ом, ёмкость та же — 2500 мА·ч.`); }
+    if (S.cell === 'aa' && P.s === 1 && P.p === 3 && !S.par3) { S.par3 = true; toast(`3 AA параллельно: ℰ = 1,5 В, r = 0,3 / 3 = 0,1 Ом, ёмкость 3 × 2500 = 7500 мА·ч.`); }
+  }
+}
+function toggleOn() {
+  if (S.on) { S.on = false; renderTools(); update(); return; }
+  const P = pack();
+  if (P.E > DEV.Umax + 1e-9) { toast(`ℰ = ${fmt(P.E, 1)} В — больше 8,5 В. Защита колонки не даёт включиться: так можно сжечь её электронику.`); return; }
+  if (P.Uload < DEV.Umin - 1e-9) { toast(`Под нагрузкой 1,5 А напряжение ${fmt(P.Uload, 2)} В — меньше 6,5 В. Колонке не хватает напряжения.`); return; }
+  S.on = true;
+  if (P.t < DEV.t - 1e-9) toast(`Колонка играет, но ёмкости ${P.C} мА·ч хватит на ${fmt(P.t, 1)} ч — нужно 4 ч. Добавьте параллельную цепочку.`);
+  else if (!S.pack) { S.pack = { s: P.s, p: P.p, cell: S.cell, t: P.t }; toast(`Отлично: ${P.s}S${P.p}P из Li-ion — ${fmt(P.E, 1)} В, ${P.C} мА·ч, ${fmt(P.W, 1)} Вт·ч. Колонка будет играть ${fmt(P.t, 1)} ч.`); }
+  renderTools(); buildScheme(); update();
+}
+function setPack(cell, s, p) { S.cell = cell; S.ns = clamp(s, 1, 4); S.np = clamp(p, 1, 3); S.on = false; renderTools(); buildScheme(); update(); }
+
+let last = performance.now();
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  const m = model(), I = m.I || 0;
+  if (I > 0 && !reduce) { S.off += dt * Math.min(140, 26 + 40 * Math.sqrt(I)); dirty = true; }
+  if (LID() === 'short' && (performance.now() - S.flash) < 700) dirty = true;
+  if (LID() === 'pack' && S.on) dirty = true;
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 4200); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, cls, dis) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}${cls ? ` class="${cls}"` : ''}${dis ? ' disabled' : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>', key = B('sw', S.sw ? 'Разомкнуть' : 'Замкнуть', S.sw);
+  let h = '';
+  if (id === 'emf') h = L1SRC.map(k => B('s-' + k, SRC[k].sh, S.src1 === k)).join('') + sep + key + sep + B('rec', 'Записать', undefined, 'rec');
+  if (id === 'ohm') {
+    h = key + sep + B('r-', 'R −') + B('r+', 'R +') + sep + B('rec', 'Записать точку', undefined, 'rec') + B('clear', 'Очистить');
+    if (S.pts.length >= 4 && !S.ansE) h += sep + E_OPT.map(v => B('e-' + v, `ℰ = ${nf(v)} В`)).join('');
+    else if (S.pts.length >= 4 && !S.ansR) h += sep + R_OPT.map(v => B('ri-' + v, `r = ${nf(v)} Ом`)).join('');
+  }
+  if (id === 'short') h = L3SRC.map(k => B('s-' + k, SRC[k].sh, S.src3 === k)).join('') + sep + key + B('jump', 'Перемычка', S.jump, 'rec') + sep + B('fz-on', `Предохр. ${FUSE} А`, S.fuse) + B('fz-off', 'Без', !S.fuse) + (S.fuse && S.blown ? B('fuse', 'Заменить', undefined, 'rec') : '');
+  if (id === 'pack') h = B('c-aa', 'AA', S.cell === 'aa') + B('c-li', 'Li-ion', S.cell === 'li') + sep + B('s-', '− посл.', undefined, '', S.ns <= 1) + B('s+', '+ посл.', undefined, '', S.ns >= 4) + sep + B('p-', '− парал.', undefined, '', S.np <= 1) + B('p+', '+ парал.', undefined, '', S.np >= 3) + sep + B('on', S.on ? 'Выключить колонку' : 'Включить колонку', S.on, 'rec');
+  tb.innerHTML = h;
+}
+function act(a) {
+  const id = LID(), re = () => { renderTools(); buildScheme(); update(); };
+  if (!a) return;
+  if (a === 'sw') { if (id === 'pack') return toggleOn(); S.sw = !S.sw; return re(); }
+  if (a === 'on') return toggleOn();
+  if (a === 'src') { const list = id === 'emf' ? L1SRC : id === 'short' ? L3SRC : null; if (!list) return; const k = id === 'emf' ? 'src1' : 'src3'; S[k] = list[(list.indexOf(S[k]) + 1) % list.length]; return re(); }
+  if (a.startsWith('s-') && (id === 'emf' || id === 'short') && SRC[a.slice(2)]) { if (id === 'emf') S.src1 = a.slice(2); else S.src3 = a.slice(2); return re(); }
+  if (a === 'rec') return id === 'emf' ? rec1() : id === 'ohm' ? rec2() : undefined;
+  if (a === 'r-' || a === 'r+') return setR(S.R + (a === 'r+' ? 1 : -1));
+  if (a === 'rh') return setR(S.R <= B2.Rmin + 1e-9 ? B2.Rmax : S.R - 2);
+  if (a === 'clear') { S.pts = []; S.ansE = false; S.ansR = false; return re(); }
+  if (a.startsWith('e-')) return answer('E', +a.slice(2));
+  if (a.startsWith('ri-')) return answer('r', +a.slice(3));
+  if (a === 'jump') { S.jump = !S.jump; return re(); }
+  if (a === 'fz-on') { S.fuse = true; S.blown = false; return re(); }
+  if (a === 'fz-off') { S.fuse = false; S.blown = false; return re(); }
+  if (a === 'fuse') { if (!S.fuse) S.fuse = true; else if (S.blown) { S.blown = false; toast(S.jump ? 'Новый предохранитель. Но перемычка всё ещё на месте — он сразу перегорит. Уберите её.' : 'Предохранитель заменён.'); } else S.fuse = false; return re(); }
+  if (a === 'c-aa' || a === 'c-li') return setPack(a.slice(2), S.ns, S.np);
+  if (a === 'type') return setPack(S.cell === 'aa' ? 'li' : 'aa', S.ns, S.np);
+  if (a === 's-' || a === 's+') return setPack(S.cell, S.ns + (a === 's+' ? 1 : -1), S.np);
+  if (a === 'p-' || a === 'p+') return setPack(S.cell, S.ns, S.np + (a === 'p+' ? 1 : -1));
+  if (/^n-\d-\d$/.test(a)) return setPack(S.cell, +a[2], +a[4]);
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.disabled) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  src: IC('<rect x="5" y="4" width="24" height="27" rx="4" fill="#121a28" stroke="#6ccf4f" stroke-width="1.6"/><rect x="8" y="7" width="18" height="3" fill="#ff8a73"/><rect x="8" y="25" width="18" height="3" fill="#72d4e8"/><circle cx="17" cy="20" r="3" fill="#ff8a73"/><circle cx="17" cy="14" r="3" fill="#ff8a73"/><path d="M24 22V12" stroke="#ffb547" stroke-width="2"/>'),
+  cell: IC('<rect x="14" y="2" width="6" height="4" fill="#c8d0dd"/><rect x="10" y="5" width="14" height="27" rx="4" fill="#6ccf4f"/><rect x="10" y="5" width="14" height="6" rx="3" fill="#f2c94c"/>'),
+  li: IC('<rect x="14" y="2" width="6" height="4" fill="#c8d0dd"/><rect x="9" y="5" width="16" height="27" rx="4" fill="#3b6fd8"/><rect x="9" y="5" width="16" height="5" rx="3" fill="#9aa3b2"/>'),
+  car: IC('<rect x="3" y="9" width="28" height="21" rx="3" fill="#2c3240"/><rect x="7" y="5" width="5" height="5" fill="#26324a"/><rect x="22" y="5" width="5" height="5" fill="#e0473a"/><text x="17" y="24" font-size="8" text-anchor="middle" fill="#e8ecf4">12 В</text>'),
+  er: IC('<path d="M17 2v8M7 10h20M11 15h12M17 15v4" stroke="#e8ecf4" stroke-width="2"/><rect x="13" y="19" width="8" height="12" rx="1" fill="#2a2f3a" stroke="#ffb547" stroke-width="1.6"/>'),
+  key: IC('<circle cx="6" cy="22" r="3.5" fill="#c8d0dd"/><circle cx="28" cy="22" r="3.5" fill="#c8d0dd"/><path d="M6 22L24 11" stroke="#ff8a73" stroke-width="3" stroke-linecap="round"/>'),
+  amm: IC('<circle cx="17" cy="17" r="14" fill="#d9dfe9"/><path d="M17 21L23 10" stroke="#c0392b" stroke-width="2"/><text x="17" y="29" font-size="8" text-anchor="middle" fill="#0b1019">A</text>'),
+  vdial: IC('<circle cx="17" cy="17" r="14" fill="#d9dfe9"/><path d="M17 21L12 10" stroke="#c0392b" stroke-width="2"/><text x="17" y="29" font-size="8" text-anchor="middle" fill="#0b1019">V</text>'),
+  volt: IC('<rect x="3" y="7" width="28" height="20" rx="4" fill="#e6c14a"/><rect x="6" y="10" width="22" height="8" fill="#0e1520"/><circle cx="12" cy="23" r="2" fill="#d9483b"/><circle cx="22" cy="23" r="2" fill="#26324a"/>'),
+  damm: IC('<rect x="3" y="9" width="28" height="17" rx="4" fill="#e6c14a"/><rect x="6" y="12" width="22" height="9" fill="#0e1520"/><text x="17" y="19.5" font-size="7" text-anchor="middle" fill="#86e0a8">74 A</text>'),
+  lamp: IC('<circle cx="17" cy="14" r="10" fill="#fff3c4" fill-opacity=".5" stroke="#a9d6e4" stroke-width="1.6"/><rect x="12" y="24" width="10" height="7" fill="#8b96ad"/><path d="M14 22v-7l2-3 2 3 2-3v10" fill="none" stroke="#ffd27a" stroke-width="1.4"/>'),
+  rh: IC('<rect x="3" y="20" width="28" height="9" rx="2" fill="#3a2e22"/><path d="M6 20l2 9M10 20l2 9M14 20l2 9M18 20l2 9M22 20l2 9M26 20l2 9" stroke="#c9b98a"/><path d="M3 10h28" stroke="#5d6a86" stroke-width="3"/><rect x="15" y="6" width="8" height="8" fill="#ffb547"/><path d="M19 14v6" stroke="#ffb547" stroke-width="2"/>'),
+  graph: IC('<path d="M5 3v26h26" fill="none" stroke="#8b96ad" stroke-width="2"/><path d="M5 8L29 24" stroke="#ffb547" stroke-width="2"/><circle cx="11" cy="12" r="2.2" fill="#72d4e8"/><circle cx="19" cy="17" r="2.2" fill="#72d4e8"/><circle cx="25" cy="21" r="2.2" fill="#72d4e8"/>'),
+  fuse: IC('<rect x="3" y="12" width="6" height="10" fill="#c8d0dd"/><rect x="25" y="12" width="6" height="10" fill="#c8d0dd"/><rect x="9" y="13" width="16" height="8" rx="2" fill="rgba(200,230,245,.2)" stroke="#a9d6e4"/><path d="M9 17h16" stroke="#e8ecf4"/>'),
+  jump: IC('<path d="M5 8h20v18H5" fill="none" stroke="#d98a4e" stroke-width="3"/><circle cx="5" cy="8" r="3" fill="#e0473a"/><circle cx="5" cy="26" r="3" fill="#e0473a"/>'),
+  term: IC('<circle cx="17" cy="9" r="6" fill="#e0473a"/><circle cx="17" cy="25" r="6" fill="#2f6fd8"/><text x="17" y="12" font-size="9" text-anchor="middle" fill="#fff">+</text>'),
+  bus: IC('<rect x="4" y="4" width="5" height="26" fill="#72d4e8"/><rect x="25" y="4" width="5" height="26" fill="#ff8a73"/><path d="M9 11h16M9 23h16" stroke="#c8d0dd" stroke-width="2"/>'),
+  pack: IC('<rect x="3" y="6" width="13" height="9" rx="2" fill="#3b6fd8"/><rect x="18" y="6" width="13" height="9" rx="2" fill="#3b6fd8"/><rect x="3" y="19" width="13" height="9" rx="2" fill="#3b6fd8"/><rect x="18" y="19" width="13" height="9" rx="2" fill="#3b6fd8"/>'),
+  dev: IC('<rect x="7" y="3" width="20" height="28" rx="4" fill="#2c3240"/><circle cx="17" cy="11" r="4" fill="#1b1f28" stroke="#5d6a86"/><circle cx="17" cy="22" r="6" fill="#1b1f28" stroke="#5d6a86"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  const t = (ok, s) => `${s} ${ok ? '✓' : '—'}`;
+  if (id === 'emf') return [t(m.oAA, 'AA'), t(m.oAA3, '3×AA'), t(m.oLi, 'Li-ion'), t(m.closed, 'Под нагрузкой')].join(' · ');
+  if (id === 'ohm') return [`Точки ${Math.min(m.n, 4)}/4`, t(m.eOk, 'ℰ'), t(m.rOk, 'r')].join(' · ');
+  if (id === 'short') return [t(m.scAA, 'КЗ AA'), t(m.scLi, 'КЗ Li-ion'), t(m.blew, 'Предохранитель')].join(' · ');
+  return [t(m.ser3, '3 посл.'), t(m.par3, '3 парал.'), t(m.pack, 'Колонка')].join(' · ');
+}
+
+// Scheme tab: built once per change, then values refreshed (sliders keep focus while dragging)
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+const chips = (lbl, items) => `<div class="ctl"><div class="lbl">${lbl}</div><div class="chips">${items.map(([a, n, on]) => `<button data-a="${a}" aria-pressed="${!!on}">${n}</button>`).join('')}</div></div>`;
+const reads = (a, b, c) => `<dl class="reads"><div><dt>${a}</dt><dd id="r1"></dd></div><div><dt>${b}</dt><dd id="r2"></dd></div><div><dt>${c}</dt><dd id="r3"></dd></div></dl>`;
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'emf') {
+    h = `<h2>Источник, ключ, лампа, вольтметр</h2>` + chips('Источник', L1SRC.map(k => ['s-' + k, SRC[k].sh, S.src1 === k])) + chips('Ключ', [['sw', S.sw ? 'Замкнут — разомкнуть' : 'Разомкнут — замкнуть', S.sw]]) +
+      reads('вольтметр', 'ток I', 'нагрузка') + `<div class="row"><button class="ghostbtn" data-a="rec">Записать показание</button></div>` +
+      `<h3>Записи</h3><div class="rec">` + (S.rec1.length ? S.rec1.map(x => step(`${SRC[x.src].sh}, ${x.sw ? 'замкнут' : 'разомкнут'}`, `U = ${fmt(x.U, 2)} В${x.sw ? `, I = ${fmt(x.I, 2)} А` : ''}`)).join('') : '<p class="note">Пока пусто. Выберите источник и нажмите «Записать».</p>') + `</div>`;
+  }
+  if (id === 'ohm') {
+    h = `<h2>Полная цепь с реостатом</h2>` + chips('Ключ', [['sw', S.sw ? 'Замкнут — разомкнуть' : 'Разомкнут — замкнуть', S.sw]]) + slider('inR', 'Реостат R', B2.Rmin, B2.Rmax, 0.5, S.R) +
+      reads('амперметр', 'вольтметр', 'точек') + `<div class="row"><button class="ghostbtn" data-a="rec">Записать точку</button><button class="ghostbtn" data-a="clear">Очистить</button></div>` +
+      `<h3>Таблица</h3><div class="rec">` + (S.pts.length ? S.pts.map((p, i) => step(`${i + 1}. ${p.R != null ? 'R = ' + fmt(p.R, 1) + ' Ом' : 'ключ разомкнут'}`, `I = ${fmt(p.I, 2)} А · U = ${fmt(p.U, 2)} В`)).join('') : '<p class="note">Пока пусто. Замкните ключ и записывайте точки при разных R.</p>') + `</div>`;
+    if (S.pts.length >= 4) h += chips('ЭДС батареи (где прямая пересекает ось U)', E_OPT.map(v => ['e-' + v, `${nf(v)} В`, S.ansE && v === B2.E])) + chips('Внутреннее сопротивление r = ΔU / ΔI', R_OPT.map(v => ['ri-' + v, `${nf(v)} Ом`, S.ansR && v === B2.r]));
+  }
+  if (id === 'short') {
+    h = `<h2>Короткое замыкание и защита</h2>` + chips('Источник', L3SRC.map(k => ['s-' + k, SRC[k].sh, S.src3 === k])) + chips('Ключ', [['sw', S.sw ? 'Замкнут — разомкнуть' : 'Разомкнут — замкнуть', S.sw]]) +
+      chips('Перемычка на лампе', [['jump', S.jump ? 'Стоит — убрать' : 'Поставить (короткое замыкание)', S.jump]]) + chips('Защита', [['fz-on', `Предохранитель ${FUSE} А`, S.fuse], ['fz-off', 'Без предохранителя', !S.fuse]]) +
+      (S.fuse && S.blown ? `<div class="row"><button class="ghostbtn" data-a="fuse">Заменить предохранитель</button></div>` : '') +
+      reads('ток I', 'на выводах', 'лампа') + `<h3>Токи короткого замыкания</h3><div class="rec">` + L3SRC.map(k => step(SRC[k].sh, S.sc[k] != null ? `Iкз = ${fI(S.sc[k])} А` : '—')).join('') + step('предохранитель', S.blew ? 'сработал ✓' : '—') + `</div>`;
+  }
+  if (id === 'pack') {
+    h = `<h2>Батарея из элементов</h2>` + chips('Элемент', [['c-aa', 'AA · 1,5 В · 2500 мА·ч', S.cell === 'aa'], ['c-li', 'Li-ion · 3,7 В · 3000 мА·ч', S.cell === 'li']]) +
+      chips('Последовательно (S)', [1, 2, 3, 4].map(n => [`n-${n}-${S.np}`, n + 'S', S.ns === n])) + chips('Параллельно (P)', [1, 2, 3].map(n => [`n-${S.ns}-${n}`, n + 'P', S.np === n])) +
+      reads('ЭДС ℰ', 'r батареи', 'ёмкость') + `<div class="row"><button class="ghostbtn" data-a="on">${S.on ? 'Выключить колонку' : 'Включить колонку'}</button></div>` +
+      `<h3>Опыты</h3><div class="rec">` + step('3 AA последовательно', S.ser3 ? '4,5 В · 0,9 Ом · 2500 мА·ч' : '—') + step('3 AA параллельно', S.par3 ? '1,5 В · 0,1 Ом · 7500 мА·ч' : '—') + step('батарея для колонки', S.pack ? `${S.pack.s}S${S.pack.p}P · ${fmt(S.pack.t, 1)} ч` : '—') + `</div>`;
+  }
+  el.innerHTML = h;
+  const inR = el.querySelector('#inR'); if (inR) inR.addEventListener('input', e => setR(+e.target.value));
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (id === 'emf') { set('#r1', fmt(m.U, 2) + ' В'); set('#r2', fmt(m.I, 2) + ' А'); set('#r3', S.sw ? RL1 + ' Ом' : 'нет'); }
+  if (id === 'ohm') { set('#inRO', fmt(S.R, 1) + ' Ом'); val('#inR', S.R); set('#r1', fmt(m.I, 2) + ' А'); set('#r2', fmt(m.U, 2) + ' В'); set('#r3', S.pts.length); }
+  if (id === 'short') { set('#r1', fI(m.I) + ' А'); set('#r2', fmt(m.U, 2) + ' В'); set('#r3', m.IL > 0 ? 'горит' : 'не горит'); }
+  if (id === 'pack') { set('#r1', fmt(m.E, 1) + ' В'); set('#r2', fmt(m.r, 2) + ' Ом'); set('#r3', m.C + ' мА·ч'); }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'emf') return [
+    { id: 'src', icon: S.src1 === 'li' ? ICON.li : ICON.src, name: SRC[S.src1].n, spec: 'Окно внутрь источника: сторонние силы Fст несут «+» заряды от «−» к «+» против электрической силы Fэл. Нажмите — сменить источник.' },
+    { id: 'term', icon: ICON.term, name: 'Выводы «+» и «−»', spec: 'К ним подключены и цепь, и вольтметр.' },
+    { id: 'key', icon: ICON.key, name: 'Ключ', spec: 'Разомкнут — тока нет, вольтметр показывает ЭДС.' },
+    { id: 'lamp', icon: ICON.lamp, name: 'Лампа 6 Ом', spec: 'Нагрузка: при замкнутом ключе через неё идёт ток.' },
+    { id: 'vm', icon: ICON.volt, name: 'Вольтметр', spec: 'Цифровой, сопротивление около 10 МОм — ток через него ничтожен.' }];
+  if (id === 'ohm') return [
+    { id: 'src', icon: ICON.er, name: 'Батарея: ℰ и r', spec: 'Пунктир — сам источник: ЭДС и внутреннее сопротивление. Числа надо найти из опыта.' },
+    { id: 'key', icon: ICON.key, name: 'Ключ', spec: 'Замыкает цепь.' },
+    { id: 'amm', icon: ICON.amm, name: 'Амперметр 0–3 А', spec: 'Включён в разрыв цепи последовательно.' },
+    { id: 'rh', icon: ICON.rh, name: 'Реостат 1–15 Ом', spec: 'Внешнее сопротивление R. Тяните ползунок.' },
+    { id: 'vm', icon: ICON.vdial, name: 'Вольтметр 0–5 В', spec: 'На выводах батареи: показывает U = ℰ − I·r.' },
+    { id: 'graph', icon: ICON.graph, name: 'График U(I)', spec: 'Нажмите на него — записать точку.' }];
+  if (id === 'short') return [
+    { id: 'src', icon: S.src3 === 'car' ? ICON.car : S.src3 === 'li' ? ICON.li : ICON.cell, name: SRC[S.src3].n, spec: `ℰ = ${fmt(SRC[S.src3].E, 1)} В, r = ${fmt(SRC[S.src3].r, 2)} Ом. Нажмите — сменить.` },
+    { id: 'key', icon: ICON.key, name: 'Ключ', spec: 'Замыкает цепь.' },
+    { id: 'fuse', icon: ICON.fuse, name: `Предохранитель ${FUSE} А`, spec: 'Тонкая проволочка в стеклянной трубке: при токе больше 3 А плавится и разрывает цепь.' },
+    { id: 'amm', icon: ICON.damm, name: 'Амперметр с шунтом', spec: 'Измеряет и сотни ампер.' },
+    { id: 'lamp', icon: ICON.lamp, name: SRC[S.src3].lamp.n, spec: 'Подобрана под источник: в обычной цепи горит нормально.' },
+    { id: 'jump', icon: ICON.jump, name: 'Перемычка', spec: 'Толстый медный провод на выводах лампы: внешнее R ≈ 0 — короткое замыкание.' }];
+  return [
+    { id: 'cells', icon: S.cell === 'li' ? ICON.li : ICON.cell, name: S.cell === 'li' ? 'Ячейки Li-ion 18650' : 'Батарейки AA', spec: S.cell === 'li' ? '3,7 В, r ≈ 0,05 Ом, 3000 мА·ч. Нажмите — сменить на AA.' : '1,5 В, r ≈ 0,3 Ом, 2500 мА·ч. Нажмите — сменить на Li-ion.' },
+    { id: 'bus', icon: ICON.bus, name: 'Шины «−» и «+»', spec: 'Соединяют параллельные цепочки.' },
+    { id: 'key', icon: ICON.key, name: 'Ключ', spec: 'Включает колонку.' },
+    { id: 'dev', icon: ICON.dev, name: 'Колонка', spec: 'Работает при 6,5–8,5 В, берёт 1,5 А. Нужно 4 часа музыки.' }];
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      (Ls.safe ? `<div class="safe"><b>Безопасность</b>${Ls.safe}</div>` : '') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Что на площадке</h2><p class="note">Нажмите на деталь, чтобы найти её на площадке.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'emf') {
+    const s = m.s, I = s.E / (RL1 + s.r);
+    return `<h2>ЭДС источника</h2><div class="formula">ℰ = Aст / q</div><p class="note">Aст — работа сторонних сил по переносу заряда q внутри источника от «−» к «+». 1 В = 1 Дж / 1 Кл.</p>
+      <h3>${s.n}</h3><div class="steps">` + step('ЭДС ℰ', `${fmt(s.E, 2)} В`) + step('перенести 1 Кл', `Aст = ${fmt(s.E, 2)} × 1 = ${fmt(s.E, 2)} Дж`) + step('перенести 60 Кл', `Aст = ${fmt(s.E, 2)} × 60 = ${fmt(s.E * 60, 0)} Дж`, 'sum') + `</div>
+      <h3>Под нагрузкой (лампа ${RL1} Ом)</h3><div class="steps">` + step('ток', `I = ${fmt(I, 3)} А`) + step('напряжение на лампе', `U = I · R = ${fmt(I * RL1, 2)} В`) + step('«потеряно» внутри', `ℰ − U = ${fmt(s.E - I * RL1, 2)} В`, 'sum') + `</div>
+      <p class="note" style="margin-top:10px">Работа сторонних сил ℰ·q делится: часть уходит во внешнюю цепь (U·q), часть греет сам источник. Почему так — в следующем уроке.</p>`;
+  }
+  if (id === 'ohm') {
+    const F = fit2(), P = S.pts, a = P[0], b = P[P.length - 1], solved = S.ansE && S.ansR;
+    let h = `<h2>Закон Ома для полной цепи</h2><div class="formula">I = ℰ / (R + r)<br>U = ℰ − I·r</div><p class="note">R — сопротивление внешней цепи (реостат), r — внутреннее сопротивление батареи, U — напряжение на её выводах.</p>
+      <h3>Сейчас</h3><div class="steps">` + step('реостат R', `${fmt(S.R, 1)} Ом`) + step('амперметр I', `${fmt(m.I, 2)} А`) + step('вольтметр U', `${fmt(m.U, 2)} В`) + step('проверка U = I·R', S.sw ? `${fmt(m.I, 2)} × ${fmt(S.R, 1)} = ${fmt(m.I * S.R, 2)} В` : 'ключ разомкнут', 'sum') + `</div>`;
+    h += `<h3>Из двух точек</h3>`;
+    if (P.length >= 2 && Math.abs(b.I - a.I) > 0.02) {
+      const r = (a.U - b.U) / (b.I - a.I), E = a.U + a.I * r;
+      h += `<div class="steps">` + step('точка 1', `${fmt(a.I, 2)} А, ${fmt(a.U, 2)} В`) + step('точка 2', `${fmt(b.I, 2)} А, ${fmt(b.U, 2)} В`) +
+        step('r = (U₁ − U₂) / (I₂ − I₁)', `(${fmt(a.U, 2)} − ${fmt(b.U, 2)}) / (${fmt(b.I, 2)} − ${fmt(a.I, 2)}) = ${S.ansR ? fmt(r, 2) + ' Ом' : '?'}`) +
+        step('ℰ = U₁ + I₁·r', S.ansR ? `${fmt(a.U, 2)} + ${fmt(a.I, 2)} × ${fmt(r, 2)} = ${fmt(E, 2)} В` : '?', 'sum') + `</div>`;
+    } else h += `<p class="note">Запишите хотя бы две точки с разным током.</p>`;
+    if (solved) h += `<h3>Что дальше</h3><div class="steps">` + step('ток короткого замыкания', `ℰ / r = 4,5 / 1,5 = 3 А`) + step('по прямой по всем точкам', F ? `ℰ ≈ ${fmt(F.E, 2)} В, r ≈ ${fmt(F.r, 2)} Ом` : '—', 'sum') + `</div>`;
+    return h + `<p class="note" style="margin-top:10px">Чем меньше R, тем больше ток и тем больше падение I·r внутри батареи — напряжение на выводах «проседает».</p>`;
+  }
+  if (id === 'short') {
+    const s = m.s;
+    let h = `<h2>Короткое замыкание</h2><div class="formula">Iкз = ℰ / r</div><p class="note">При R → 0 ток ограничивает только внутреннее сопротивление. Мощность, которая выделяется внутри источника: P = I²·r.</p><h3>Для трёх источников</h3><div class="steps">`;
+    L3SRC.forEach(k => { const x = SRC[k], I = x.E / x.r; h += step(x.sh, `${fmt(x.E, 1)} / ${fmt(x.r, 2)} = ${fI(I)} А · ${fmt(I * I * x.r, 0)} Вт`); });
+    h += `</div><h3>Обычная цепь: ${s.lamp.n}</h3><div class="steps">` + step('I = ℰ / (R + r)', `${fmt(s.E, 1)} / (${s.lamp.R} + ${fmt(s.r, 2)}) = ${fmt(s.E / (s.lamp.R + s.r), 2)} А`) + step('меньше 3 А?', s.E / (s.lamp.R + s.r) < FUSE ? 'да — предохранитель цел' : 'нет', 'sum') + `</div>
+      <h3>Сейчас</h3><div class="steps">` + step('ток', `${fI(m.I)} А`) + step('напряжение на выводах', `${fmt(m.U, 2)} В`) + step('тепло внутри источника', `${fmt(m.I * m.I * s.r, m.I * m.I * s.r < 10 ? 2 : 0)} Вт`, 'sum') + `</div>
+      <p class="note" style="margin-top:10px">Предохранитель выбирают так, чтобы он был больше рабочего тока, но намного меньше тока короткого замыкания.</p>`;
+    return h;
+  }
+  const P = m;
+  return `<h2>Соединение элементов</h2><div class="formula">посл.: ℰ = n·ℰ₀  r = n·r₀<br>парал.: ℰ = ℰ₀  r = r₀ / m</div><p class="note">Ёмкость складывается только у параллельных цепочек. Энергия W = ℰ·q, время работы t = q / I.</p>
+    <h3>Ваша батарея ${P.s}S${P.p}P</h3><div class="steps">` + step('ЭДС', `${P.s} × ${fmt(P.c.E, 1)} = ${fmt(P.E, 1)} В`) + step('внутреннее r', `${P.s} × ${fmt(P.c.r, 2)} / ${P.p} = ${fmt(P.r, 3)} Ом`) +
+    step('ёмкость', `${P.p} × ${P.c.C} = ${P.C} мА·ч = ${fmt(P.C / 1000, 1)} А·ч`) + step('энергия W = ℰ·q', `${fmt(P.E, 1)} × ${fmt(P.C / 1000, 1)} = ${fmt(P.W, 1)} Вт·ч`, 'sum') + `</div>
+    <h3>Колонка: 1,5 А</h3><div class="steps">` + step('U = ℰ − I·r', `${fmt(P.E, 1)} − 1,5 × ${fmt(P.r, 3)} = ${fmt(P.Uload, 2)} В`) + step('в окне 6,5–8,5 В?', P.ok ? 'да' : 'нет') + step('t = q / I', `${fmt(P.C / 1000, 1)} / 1,5 = ${fmt(P.t, 1)} ч`, 'sum') + `</div>
+    <p class="note" style="margin-top:10px">1 мА·ч = 0,001 А × 3600 с = 3,6 Кл.</p>`;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter');
+  const row = (a, b, cls) => `<div class="lr"><span>${a}</span><span class="${cls || ''}">${b}</span></div>`;
+  if (id === 'emf') el.innerHTML = `<div class="k">Вольтметр</div><div class="v ${S.sw ? '' : 'ok'}">${fmt(m.U, 2)} В</div>` + row('ключ', S.sw ? 'замкнут' : 'разомкнут') + row('I', fmt(m.I, 2) + ' А') + row('записей', S.rec1.length);
+  else if (id === 'ohm') el.innerHTML = `<div class="k">Приборы</div><div class="v">${fmt(m.U, 2)} В</div>` + row('I', fmt(m.I, 2) + ' А') + row('R', fmt(S.R, 1) + ' Ом') + row('точек', S.pts.length, S.pts.length >= 4 ? 'ok' : '');
+  else if (id === 'short') el.innerHTML = `<div class="k">Амперметр</div><div class="v ${m.I > FUSE ? '' : 'ok'}" style="${m.I > FUSE ? 'color:var(--warn)' : ''}">${fI(m.I)} А</div>` + row('источник', SRC[S.src3].sh) + row('защита', S.fuse ? (S.blown ? 'перегорела' : FUSE + ' А') : 'нет', S.fuse && !S.blown ? 'ok' : 'bad') + row('лампа', m.IL > 0 ? 'горит' : 'нет');
+  else el.innerHTML = `<div class="k">Батарея ${m.s}S${m.p}P</div><div class="v ${m.ok ? 'ok' : ''}">${fmt(m.E, 1)} В</div>` + row('r', fmt(m.r, 2) + ' Ом') + row('ёмкость', m.C + ' мА·ч') + row('энергия', fmt(m.W, 1) + ' Вт·ч');
+}
+
+function update() {
+  latch();
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Теперь вы знаете закон Ома для полной цепи!'), 2400);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  emf: '<rect x="4" y="3" width="20" height="24" rx="3" fill="#121a28" stroke="#6ccf4f" stroke-width="1.2"/><rect x="6" y="5" width="16" height="2.5" fill="#ff8a73"/><rect x="6" y="22.5" width="16" height="2.5" fill="#72d4e8"/><circle cx="14" cy="12" r="2.2" fill="#ff8a73"/><circle cx="14" cy="18" r="2.2" fill="#ff8a73"/><rect x="34" y="9" width="26" height="13" rx="2" fill="#e6c14a"/><rect x="37" y="11" width="20" height="6" fill="#0e1520"/><path d="M24 7H30M24 23H30" stroke="#9fb0cc" stroke-width="1.4"/>',
+  ohm: '<path d="M6 27V3M6 27H62" stroke="#8b96ad" stroke-width="1.4"/><path d="M6 7L58 25" stroke="#ffb547" stroke-width="1.8"/><circle cx="16" cy="10.5" r="2.4" fill="#72d4e8"/><circle cx="28" cy="14.7" r="2.4" fill="#72d4e8"/><circle cx="40" cy="18.8" r="2.4" fill="#72d4e8"/><circle cx="6" cy="7" r="3" fill="none" stroke="#86e0a8" stroke-width="1.4"/>',
+  short: '<rect x="6" y="8" width="10" height="18" rx="3" fill="#3b6fd8"/><path d="M11 8V4H56V26H16" fill="none" stroke="#ff5a2a" stroke-width="2"/><rect x="24" y="1" width="14" height="6" rx="1.5" fill="rgba(200,230,245,.3)" stroke="#a9d6e4"/><circle cx="56" cy="15" r="6" fill="none" stroke="#ffb547" stroke-width="1.4"/><path d="M50 10l12 10M62 10L50 20" stroke="#fff3c4" stroke-width="1.2"/>',
+  pack: '<rect x="4" y="5" width="14" height="8" rx="2" fill="#3b6fd8"/><rect x="20" y="5" width="14" height="8" rx="2" fill="#3b6fd8"/><rect x="4" y="17" width="14" height="8" rx="2" fill="#3b6fd8"/><rect x="20" y="17" width="14" height="8" rx="2" fill="#3b6fd8"/><rect x="44" y="3" width="16" height="24" rx="3" fill="#2c3240"/><circle cx="52" cy="10" r="3" fill="#1b1f28" stroke="#5d6a86"/><circle cx="52" cy="19.5" r="4.5" fill="#1b1f28" stroke="#5d6a86"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Lx, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Lx.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Lx.title}</span></span>
+      ${S.done[Lx.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  S.lesson = i; drag = null;
+  resetState(); save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L().task;
+  $('#hint').textContent = L().stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '';
+  if (id === 'emf') now = `Источник: ${m.s.n} (на корпусе ${m.s.nom}; в модели ℰ = ${fmt(m.s.E, 2)} В, r = ${fmt(m.s.r, 2)} Ом). Ключ ${S.sw ? 'замкнут, через лампу 6 Ом идёт ток ' + fmt(m.I, 2) + ' А' : 'разомкнут, тока нет'}; цифровой вольтметр на выводах источника показывает ${fmt(m.U, 2)} В. Записи: ${S.rec1.map(x => `${SRC[x.src].sh} ${x.sw ? 'под нагрузкой' : 'без нагрузки'} — ${fmt(x.U, 2)} В`).join('; ') || 'нет'}. Наводи: почему при разомкнутом ключе вольтметр показывает ЭДС, а под нагрузкой меньше.`;
+  if (id === 'ohm') now = `Батарея с неизвестными ℰ и r (ученик должен найти их сам: в модели ℰ = 4,5 В, r = 1,5 Ом — НЕ называй эти числа). Реостат R = ${fmt(S.R, 1)} Ом, ключ ${S.sw ? 'замкнут' : 'разомкнут'}, амперметр ${fmt(m.I, 2)} А, вольтметр на выводах батареи ${fmt(m.U, 2)} В. Записанные точки (I; U): ${S.pts.map(p => `(${fmt(p.I, 2)}; ${fmt(p.U, 2)})`).join(', ') || 'нет'}. Ответ ℰ ${S.ansE ? 'найден' : 'не найден'}, r ${S.ansR ? 'найдено' : 'не найдено'}. Наводи: продолжить прямую U(I) до оси U; r = ΔU/ΔI.`;
+  if (id === 'short') now = `Источник: ${m.s.n} (ℰ = ${fmt(m.s.E, 1)} В, r = ${fmt(m.s.r, 2)} Ом), ${m.s.lamp.n}. Ключ ${S.sw ? 'замкнут' : 'разомкнут'}, перемычка на лампе ${S.jump ? 'стоит (короткое замыкание)' : 'не стоит'}, ${S.fuse ? `предохранитель ${FUSE} А ${S.blown ? 'перегорел' : 'цел'}` : 'предохранителя нет'}. Амперметр ${fI(m.I)} А. Токи КЗ: ${L3SRC.filter(k => S.sc[k] != null).map(k => `${SRC[k].sh} — ${fI(S.sc[k])} А`).join('; ') || 'не измерены'}. Предохранитель срабатывал: ${S.blew ? 'да' : 'нет'}. Это симуляция; напоминай, что в жизни выводы не замыкают.`;
+  if (id === 'pack') now = `Батарея ${m.s}S${m.p}P из элементов ${m.c.n} (ℰ₀ = ${fmt(m.c.E, 1)} В, r₀ = ${fmt(m.c.r, 2)} Ом, ${m.c.C} мА·ч): ℰ = ${fmt(m.E, 1)} В, r = ${fmt(m.r, 3)} Ом, ёмкость ${m.C} мА·ч, энергия ${fmt(m.W, 1)} Вт·ч. Колонка (6,5–8,5 В, 1,5 А, нужно 4 ч) ${S.on ? 'включена' : 'выключена'}. Подзадачи: 3 AA последовательно — ${S.ser3 ? 'да' : 'нет'}; 3 AA параллельно — ${S.par3 ? 'да' : 'нет'}; батарея для колонки — ${S.pack ? 'собрана' : 'нет'}. Схему для колонки не называй — наводи к расчёту ℰ = n·ℰ₀ и t = q/I.`;
+  return [
+    `Раздел: физика, 10 класс, тема «Законы постоянного тока: закон Ома для полной цепи». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'} (${taskState(m)}).`,
+    `Сейчас на площадке: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Помогай наводящими вопросами, готовые ответы не выдавай.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { emf: 'Почему ЭДС измеряют при разомкнутой цепи?', ohm: 'Почему телефон на холоде выключается при 30% заряда?', short: 'Почему короткое замыкание литиевого аккумулятора опаснее, чем батарейки?', pack: 'Зачем в электромобиле тысячи маленьких ячеек, а не одна большая?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-emf.js): the same set-up as real lab equipment
+const r2 = x => Math.round(x * 100) / 100;
+window.LUCH_REAL = () => {
+  const id = LID(), M = { module: 'emf' }, m = model();
+  if (id === 'emf') return { ...M, scene: 'emf-src', help: 'Источник — сменить, ключ, вольтметр — записать', src: S.src1, name: m.s.n, nom: m.s.nom, E: m.s.E, sw: S.sw, I: r2(m.I), U: r2(m.U), glow: r2(Math.sqrt(m.I * m.I * RL1 / 2.4)) };
+  if (id === 'ohm') return { ...M, scene: 'emf-ohm', help: 'Ключ, реостат — меньше R, график — записать', sw: S.sw, R: S.R, f: r2(S.R / B2.Rmax), I: r2(m.I), U: r2(m.U), pts: S.pts.map(p => [p.I, p.U]), solved: S.ansE && S.ansR };
+  if (id === 'short') return { ...M, scene: 'emf-short', help: 'Перемычка — КЗ, предохранитель, источник', src: S.src3, name: m.s.n, E: m.s.E, r: m.s.r, lampN: m.s.lamp.n, sw: S.sw, jump: S.jump, fuse: S.fuse, blown: S.blown, I: r2(m.I), glow: r2(Math.pow(m.IL / m.s.lamp.I0, 2)), heat: r2(S.jump && m.I > 0 ? clamp(Math.log10(m.I) / 3.1, 0, 1) : 0) };
+  return { ...M, scene: 'emf-pack', help: 'Элемент — AA или Li-ion, ключ — колонка', cell: S.cell, s: S.ns, p: S.np, on: S.on, E: r2(m.E), r: Math.round(m.r * 1000) / 1000, C: m.C, W: r2(m.W), t: r2(m.t), ok: m.ok };
+};
+window.LUCH_REAL.click = k => act(k);
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

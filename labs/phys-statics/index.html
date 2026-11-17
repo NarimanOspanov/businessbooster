@@ -1,0 +1,1281 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по физике: центр тяжести, условия равновесия (сумма сил и моментов), виды равновесия, устойчивость и опрокидывание.">
+<title>Статика: равновесие тел</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /mechanics and /labs/phys-machines. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene [data-click]{cursor:pointer}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .v.bad{color:var(--warn)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.meter .lr .ok{color:var(--ok)}
+.meter .lr .bad{color:var(--warn)}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button.rec{color:var(--force)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.tools .lbl{font-size:12px;color:var(--force);padding:0 4px 0 6px;white-space:nowrap}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.rec{display:grid;gap:4px;margin-top:8px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<script src="/luch/splash.js"></script>
+<div class="app">
+  <header>
+    <div class="brand" role="link" tabindex="0" title="Карта предметов" style="cursor:pointer" onclick="location.href='/'" onkeydown="if(event.key==='Enter')location.href='/'">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M9.6 14.6 9.2 6.2 15 10.6Q20 9.4 25 10.6L30.8 6.2 30.4 14.6Q34.6 22 31.6 29Q27.6 36 20 36Q12.4 36 8.4 29Q5.4 22 9.6 14.6Z" fill="#ffb547"/><path d="M20 14Q15.2 10.8 10.9 13.4Q7.6 17.2 9.4 21.8Q11.6 25.8 15.9 25.4Q18.5 25.1 20 27.1Q21.5 25.1 24.1 25.4Q28.4 25.8 30.6 21.8Q32.4 17.2 29.1 13.4Q24.8 10.8 20 14Z" fill="#ffd896"/><circle cx="15" cy="18.8" r="5" fill="#fffaf0"/><circle cx="25" cy="18.8" r="5" fill="#fffaf0"/><circle cx="15.6" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="24.4" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="16.6" cy="18.1" r="1" fill="#fff"/><circle cx="25.4" cy="18.1" r="1" fill="#fff"/><path d="M18.6 23.4h2.8L20 26.6z" fill="#ff8a73"/><path d="M10.5 29.6Q15.3 27.4 20 29.7Q24.7 27.4 29.5 29.6V34.6Q24.7 32.6 20 34.8Q15.3 32.6 10.5 34.6Z" fill="#72d4e8"/><path d="M20 29.7V34.8" stroke="#0b1019" stroke-width="1.1"/><path d="M8.2 23.5Q5.6 28.6 9.4 32.6Q11.6 33.2 12.4 31Q10.4 28.4 8.2 23.5Z" fill="#e8962a"/><path d="M31.8 23.5Q34.4 28.6 30.6 32.6Q28.4 33.2 27.6 31Q29.6 28.4 31.8 23.5Z" fill="#e8962a"/><path d="M35 3.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" fill="#86e0a8"/></svg>
+      <div><h1>OPEN SCHOOL AI</h1><small>Доступное образование для всех</small></div>
+    </div>
+    <div class="headr">
+      <div class="prog" aria-label="Прогресс"><b>Статика</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Опытная площадка">
+    <svg class="scene" id="scene" role="img" aria-label="Площадка для опытов по статике: пластины на гвоздике с отвесом, балка на весах, кронштейн, шарик в чаше, наклонная доска и башенный кран. Детали можно тянуть и нажимать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const nf = x => fmt(x, Math.abs(x - Math.round(x)) < 1e-9 ? 0 : 1);
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const PI = Math.PI, DEG = 180 / PI;
+
+const LESSONS = [
+  { id: 'cg', title: 'Центр тяжести',
+    text: ['На каждую частичку тела действует сила тяжести. Все эти маленькие силы можно заменить одной — силой тяжести всего тела, приложенной в одной точке. Эта точка — центр тяжести: как бы тело ни повернули, сила тяжести действует так, будто вся масса собрана в ней.',
+           'Тело, подвешенное на гвоздик, качается и успокаивается так, что центр тяжести оказывается точно под точкой подвеса — на вертикали, которую показывает отвес. Подвесим пластину за одну точку и проведём линию по отвесу, потом подвесим за другую — центр тяжести лежит на пересечении линий.',
+           'У однородных симметричных тел центр тяжести совпадает с центром симметрии: у прямоугольника — пересечение диагоналей, у круга — его центр, у треугольника — точка пересечения медиан. У тела сложной формы его находят опытом, и он может оказаться даже вне тела — как у уголка или бублика.'],
+    why: 'Конструкторы самолётов и дронов следят, чтобы центр тяжести был в строго заданном месте: сместится он слишком назад — машина станет неуправляемой, поэтому груз и пассажиров размещают по схеме загрузки. Инженеры-робототехники рассчитывают центр тяжести человекоподобных роботов — Boston Dynamics Atlas, Tesla Optimus — и всё время держат его над стопами, чтобы робот не упал на ходу. Смартфоны, кроссовки, гоночные машины, ракеты — всё проектируют с учётом центра тяжести. В ближайшие 10 лет рутинные расчёты всё больше будет делать ИИ, но поставить задачу и заметить, что модель ошиблась, сможет только инженер, который понимает физику, — поэтому инженеры-механики, конструкторы и робототехники останутся востребованными.',
+    task: 'Найдите центр тяжести прямоугольной пластины и пластины неправильной формы: подвесьте каждую за два разных отверстия и проведите линии по отвесу.',
+    hint: 'Нажмите на отверстие — пластина повиснет на нём. Когда она успокоится, нажмите «Провести линию». Пластину можно качнуть мышкой.',
+    stage: 'Нажмите на отверстие — подвесить за него. Пластину можно качнуть.',
+    check: m => m.rect && m.blob },
+  { id: 'cond', title: 'Условия равновесия',
+    text: ['Тело покоится, если действующие на него силы уравновешены. Первое условие равновесия: сумма всех сил равна нулю. Для балки на двух опорах: опоры давят на балку вверх с силами N_A и N_B и вместе держат вес балки и грузов: N_A + N_B = Pб + P₁ + P₂.',
+           'Второе условие: сумма моментов сил относительно любой оси равна нулю — иначе балка начала бы поворачиваться. Момент силы M = F · l, где l — плечо, кратчайшее расстояние от оси до линии действия силы. Ось удобно взять в опоре: у её силы плечо равно нулю, и она выпадает из уравнения.',
+           'Так находят реакции опор: из уравнения моментов относительно опоры A получаем N_B, а потом из суммы сил — N_A. Тот же приём работает для кронштейна: момент силы натяжения троса относительно шарнира уравновешивает момент веса груза.'],
+    why: 'Инженер-конструктор рассчитывает каждую балку моста, перекрытие здания и колонну небоскрёба именно так: сумма сил и сумма моментов равны нулю — и всё с запасом прочности. Архитекторы решают, где поставить колонны, чтобы балки не перегружались. Кронштейны держат кондиционеры, полки, вывески и солнечные панели; трос и подкос рассчитывают на натяжение. Программы расчёта и ИИ-помощники считают тысячи балок за секунды, но решить, верно ли поставлена задача и выдержит ли конструкция, по-прежнему должен человек, — поэтому инженеры-конструкторы и архитекторы, понимающие статику, нужны и будут нужны.',
+    task: 'Найдите, с какой силой балка давит на опору A, — весы откроются после ответа. Потом расставьте грузы так, чтобы обе опоры нагружались одинаково. Наконец, повесьте фонарь 20 Н на конец кронштейна так, чтобы трос был натянут не больше чем на 30 Н.',
+    hint: 'Грузы на балке перетаскивайте мышкой (шаг 5 см). Балка 1 м весит 10 Н, опоры — под её концами. Кронштейн: нажмите на крепление троса на стене, фонарь двигайте мышкой.',
+    stage: 'Перетаскивайте грузы вдоль балки.',
+    check: m => m.ans && m.eq && m.br },
+  { id: 'kinds', title: 'Виды равновесия',
+    text: ['Равновесие бывает трёх видов. Устойчивое: тело чуть отклонили — и оно само возвращается назад, как шарик на дне чаши. Неустойчивое: от малейшего толчка тело уходит всё дальше, как шарик на вершине купола. Безразличное: тело в равновесии и в любом соседнем положении, как шарик на ровном столе.',
+           'Всё решает высота центра тяжести. В устойчивом равновесии он в самой низкой точке из возможных: при отклонении поднимается, и сила тяжести возвращает тело. В неустойчивом — в самой высокой: при отклонении опускается, и тело падает. В безразличном его высота не меняется.',
+           'Ванька-встанька не падает, потому что в её донышке тяжёлый груз: центр тяжести ниже центра круглого донышка. Наклоните игрушку — центр тяжести поднимется, и она встанет. Перенесите груз в голову — и игрушка упадёт. Чем ниже центр тяжести, тем устойчивее тело.'],
+    why: 'Человекоподобные роботы — Boston Dynamics Atlas, Tesla Optimus — на каждом шаге находятся в неустойчивом равновесии, и программа сотни раз в секунду переставляет опору под центр тяжести: на этом построена вся наука о ходьбе роботов. Гироскутеры и моноколёса держатся так же: мотор всё время подкатывает колесо под центр тяжести. Корабли строят с тяжёлым балластом внизу, чтобы после крена судно выпрямлялось, как ванька-встанька. Дроны и ракеты удерживает в равновесии автоматика. Инженеры-робототехники и специалисты по системам управления — одни из самых востребованных профессий ближайших 10 лет: ИИ пишет код, но понять, почему робот падает, должен человек, знающий физику.',
+    task: 'Качните шарик в чаше, на куполе и на столе и определите вид равновесия в каждом случае. Потом наклоните ваньку-встаньку с грузом внизу и с грузом в голове.',
+    hint: 'Перетащите шарик в сторону и отпустите или нажмите «Толкнуть». После опыта выберите вид равновесия кнопками внизу. Игрушку наклоняйте мышкой.',
+    stage: 'Перетащите шарик в сторону и отпустите.',
+    check: m => m.c3 && m.toyLow && m.toyHigh },
+  { id: 'tip', title: 'Устойчивость',
+    text: ['Тело на опоре не опрокидывается, пока вертикаль, проведённая через центр тяжести, проходит через площадь опоры. Как только она выходит за край — сила тяжести поворачивает тело вокруг этого края, и оно падает.',
+           'Шкаф на наклонной доске с упором опрокинется при угле α, когда tg α = (b/2) / h, где b — ширина основания, h — высота центра тяжести. Чем шире основание и ниже центр тяжести, тем больше этот угол — тем устойчивее тело.',
+           'Отсюда два способа повысить устойчивость: увеличить площадь опоры и опустить центр тяжести. Башенный кран не опрокидывается благодаря противовесу: он сдвигает общий центр тяжести назад, к середине основания. Но слишком тяжёлый противовес опрокинет пустой кран назад.'],
+    why: 'Пизанская башня наклонена почти на 4°, но стоит уже больше 800 лет: вертикаль через её центр тяжести попадает в основание, а инженеры в 1990-х осторожно вынули грунт из-под приподнятой стороны и уменьшили наклон. Крановщики и инженеры по подъёмным машинам по таблицам подбирают противовес и вылет стрелы, а автокраны выдвигают широкие опоры. Высоко загруженный грузовик может опрокинуться на косогоре, поэтому тяжёлое кладут вниз; у электромобилей батарея лежит в полу — центр тяжести низкий. Инженеры-конструкторы проверяют небоскрёбы на опрокидывание ветром, архитекторы придумывают устойчивые формы, робототехники учат роботов не падать. Расчёты всё чаще делает ИИ, но отвечает за то, что кран и дом устоят, инженер — и такие специалисты будут нужны и через 10 лет.',
+    task: 'Наклоняйте доску, пока не опрокинется высокий шкаф, и запомните угол. Потом опустите его центр тяжести (груз внизу) и повторите. В конце подберите крану противовес, чтобы он не опрокинулся ни без груза, ни с грузом 20 кН на вылете 20 м.',
+    hint: 'Тяните оранжевое кольцо на конце доски вверх или жмите «+1°». Шкаф стоит у упора и не скользит. Кран: тележку тяните по стреле, противовес и груз — кнопками внизу.',
+    stage: 'Тяните кольцо на конце доски вверх.',
+    safe: 'Высокую мебель — шкафы, стеллажи, телевизоры — крепят к стене: если ребёнок полезет на открытую дверцу или полку, вертикаль через центр тяжести быстро выйдет за край опоры.',
+    check: m => m.tall && m.tallw && m.crane },
+];
+
+const LS_KEY = 'luch-phys-statics';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) {}
+const idxOf = id => LESSONS.findIndex(l => l.id === id);
+const S = { lesson: idxOf(saved.lessonId) >= 0 ? idxOf(saved.lessonId) : clamp(saved.lesson | 0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify({ lesson: S.lesson, lessonId: LESSONS[S.lesson].id, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+
+// ---------- data (g ≈ 10 Н/кг); the scene is 520 × 405 SVG units, table top at y = 380 ----------
+const Y = 380;
+// lesson 1: plates on a pin, plumb line
+const PV = { x: 280, y: 96 }, RX = 420, KCG = 10, CCG = 2.4, BOBY = 318;
+const SHAPES = {
+  rect: { n: 'Прямоугольник', pts: [[-80, -48], [80, -48], [80, 48], [-80, 48]], holes: [[-68, -36], [68, -36], [68, 36], [-68, 36], [0, -36]] },
+  tri: { n: 'Треугольник', pts: [[-90, 55], [90, 55], [-30, -75]], holes: [[-30, -55], [74, 45], [-74, 45]] },
+  corner: { n: 'Уголок', pts: [[-70, -75], [-30, -75], [-30, 35], [75, 35], [75, 75], [-70, 75]], holes: [[-50, -62], [62, 55], [-58, 62]] },
+  blob: { n: 'Неправильная', pts: [[-95, -20], [-70, -55], [-25, -62], [5, -40], [45, -58], [88, -30], [92, 10], [60, 40], [20, 30], [-10, 62], [-55, 58], [-85, 30]], holes: [[-78, -18], [40, -44], [78, 8], [-40, 46]] },
+};
+const SHK = ['rect', 'tri', 'corner', 'blob'];
+function centroid(P) {
+  let A = 0, cx = 0, cy = 0;
+  for (let i = 0; i < P.length; i++) { const [x0, y0] = P[i], [x1, y1] = P[(i + 1) % P.length], f = x0 * y1 - x1 * y0; A += f; cx += (x0 + x1) * f; cy += (y0 + y1) * f; }
+  A /= 2; return [cx / (6 * A), cy / (6 * A)];
+}
+for (const k in SHAPES) SHAPES[k].c = centroid(SHAPES[k].pts);
+function inPoly(P, x, y) {
+  let c = false;
+  for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, yi] = P[i], [xj, yj] = P[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; }
+  return c;
+}
+// line through hole p and the centre of gravity, from edge to edge (plate coordinates)
+function lineSeg(sh, p) {
+  const c = sh.c, dx = c[0] - p[0], dy = c[1] - p[1], Ln = Math.hypot(dx, dy), ux = dx / Ln, uy = dy / Ln, P = sh.pts;
+  let tmax = Ln;
+  for (let i = 0; i < P.length; i++) {
+    const a = P[i], b = P[(i + 1) % P.length], ex = b[0] - a[0], ey = b[1] - a[1], den = ux * ey - uy * ex;
+    if (Math.abs(den) < 1e-9) continue;
+    const wx = a[0] - p[0], wy = a[1] - p[1], t = (wx * ey - wy * ex) / den, s = (wx * uy - wy * ux) / den;
+    if (s >= -1e-9 && s <= 1 + 1e-9 && t > 0) tmax = Math.max(tmax, t);
+  }
+  return [p[0] - ux * 12, p[1] - uy * 12, p[0] + ux * (tmax + 12), p[1] + uy * (tmax + 12)];
+}
+// the parts of that line that lie on the plate (for the 3D view)
+function runs(sh, seg) {
+  const out = [], n = 120; let st = null;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, x = seg[0] + (seg[2] - seg[0]) * t, y = seg[1] + (seg[3] - seg[1]) * t, inside = inPoly(sh.pts, x, y);
+    if (inside && !st) st = [x, y];
+    if ((!inside || i === n) && st) { out.push([st[0], st[1], x, y].map(v => Math.round(v * 10) / 10)); st = null; }
+  }
+  return out;
+}
+const th0 = () => { const sh = SHAPES[S.shape], p = sh.holes[S.hole], c = sh.c; return PI / 2 - Math.atan2(c[1] - p[1], c[0] - p[0]); };
+const toWorld = (q, sh = SHAPES[S.shape]) => { const p = sh.holes[S.hole], x = q[0] - p[0], y = q[1] - p[1], c = Math.cos(S.th), s = Math.sin(S.th); return [PV.x + x * c - y * s, PV.y + x * s + y * c]; };
+const settled = () => Math.abs(S.om) < 0.05 && Math.abs(Math.sin(S.th - th0())) < 0.03 && !(drag && drag.k === 'plate');
+
+// lesson 2: beam on two scales, bracket with a cable
+const BM = { x0: 80, px: 3.6, y: 262, th: 14, Pb: 10, sy: 318 }, LA = 20, LB = 10;
+const reac = () => { const NB = (BM.Pb * 50 + LA * S.xa + LB * S.xb) / 100; return { NA: BM.Pb + LA + LB - NB, NB }; };
+const BR = { hx: 440, hy: 320, px: 3.6, l: 60, P: 20, angs: [20, 30, 45], lim: 30 };
+const tens = () => BR.P * S.xl / (BR.l * Math.sin(S.ang / DEG));
+
+// lesson 3: ball on a bowl / dome / table; roly-poly toy
+const CX = 260, RB = 16, KB = 0.0035, GB = 1000;
+const ULIM = { bowl: 140, dome: 145, flat: 160 };
+const ySurf = u => S.sh3 === 'bowl' ? 300 - KB * u * u : S.sh3 === 'dome' ? 232 + KB * Math.min(150, Math.abs(u)) ** 2 : 300;
+const ySl = u => S.sh3 === 'bowl' ? -2 * KB * u : S.sh3 === 'dome' ? 2 * KB * clamp(u, -150, 150) : 0;
+const yRest = () => (S.sh3 === 'dome' ? 232 : 300) - RB;
+function ballPos() {
+  if (S.off) return [CX + S.u, Y - RB - S.drop];
+  const sl = ySl(S.u), N = Math.sqrt(1 + sl * sl);
+  return [CX + S.u + RB * sl / N, ySurf(S.u) - RB / N];
+}
+const TOY = { R: 46, low: 20, high: -30, lie: 1.3 };
+const toyAy = () => S.toy === 'low' ? TOY.low : TOY.high;
+const KIND = { bowl: 'stable', dome: 'unstable', flat: 'neutral' };
+const KN = { stable: 'устойчивое', unstable: 'неустойчивое', neutral: 'безразличное' };
+const SH3 = { bowl: 'Чаша', dome: 'Купол', flat: 'Стол', toy: 'Ванька-встанька' };
+
+// lesson 4: cabinet on a tilting board with a stop; tower crane
+const SL = { hx: 92, hy: Y - 22, L: 330, px: 2.4, xc: 200, amax: 50 };
+const OBJ = { cube: { n: 'Куб', b: 40, h: 40, hc: 20 }, tall: { n: 'Высокий шкаф', b: 24, h: 72, hc: 36 }, tallw: { n: 'Шкаф с грузом внизу', b: 24, h: 72, hc: 16 } };
+const acrit = o => Math.atan((OBJ[o].b / 2) / OBJ[o].hc) * DEG;
+const CR = { cx: 222, k: 9, Wt: 100, xt0: 1, xw: -7, edge: 2.5, ws: [0, 30, 60, 90], H: 26 };
+const craneXc = () => (CR.Wt * CR.xt0 + S.wc * CR.xw + S.P * S.xt) / (CR.Wt + S.wc + S.P);
+const craneOk = () => Math.abs(craneXc()) <= CR.edge + 1e-9;
+
+function resetState() {
+  const id = LID();
+  Object.assign(S, {
+    shape: 'rect', hole: 0, th: 0, om: 0, lines: {}, found: {},
+    setup: id === 'tip' ? 'slope' : 'beam', xa: 30, xb: 70, ans: false, eq: null, ang: 30, xl: 40, br: null, miss: 0,
+    sh3: 'bowl', u: 0, v: 0, off: false, drop: 0, dropV: 0, pushed: false, cls: {}, toy: 'low', phi: 0, phiV: 0, lying: false, toyMax: 0, toyLow: false, toyHigh: false,
+    obj: 'tall', al: 0, beta: 0, betaV: 0, tipping: false, tipAl: 0, fallen: false, tipRec: {}, wc: 0, P: 20, xt: 6, ct: 0, ctV: 0, cfall: 0, crOk: {}, crane: false,
+    hl: null,
+  });
+  S.th = th0() + 0.45;
+}
+
+function model() {
+  const id = LID();
+  if (id === 'cg') return { kind: id, shape: S.shape, n: (S.lines[S.shape] || []).length, e: (S.th - th0()), rect: !!S.found.rect, blob: !!S.found.blob };
+  if (id === 'cond') { const R = reac(); return { kind: id, setup: S.setup, NA: R.NA, NB: R.NB, T: tens(), ans: S.ans, eq: !!S.eq, br: !!S.br }; }
+  if (id === 'kinds') return { kind: id, sh3: S.sh3, c3: ['bowl', 'dome', 'flat'].every(k => S.cls[k]), toyLow: S.toyLow, toyHigh: S.toyHigh };
+  return { kind: id, setup: S.setup, xc: craneXc(), tall: S.tipRec.tall != null, tallw: S.tipRec.tallw != null, crane: S.crane };
+}
+
+// ---------- drawing helpers ----------
+const T = (x, y, s, fill, txt, anchor = 'middle', extra = '') => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${s}" fill="${fill}" text-anchor="${anchor}" ${extra}>${txt}</text>`;
+const HALO = `paint-order="stroke" stroke="${INK}" stroke-width="3"`;
+function arrow(x1, y1, x2, y2, col, w = 3) {
+  const a = Math.atan2(y2 - y1, x2 - x1), L2 = Math.hypot(x2 - x1, y2 - y1); if (L2 < 1) return '';
+  const hl = Math.min(11, L2 * 0.6), hx = x2 - hl * Math.cos(a), hy = y2 - hl * Math.sin(a), hw = hl * 0.5;
+  const p1 = `${(hx + hw * Math.sin(a)).toFixed(1)} ${(hy - hw * Math.cos(a)).toFixed(1)}`, p2 = `${(hx - hw * Math.sin(a)).toFixed(1)} ${(hy + hw * Math.cos(a)).toFixed(1)}`;
+  return `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${hx.toFixed(1)} ${hy.toFixed(1)}" stroke="${INK}" stroke-width="${w + 2.6}" stroke-linecap="round"/><path d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${hx.toFixed(1)} ${hy.toFixed(1)}" stroke="${col}" stroke-width="${w}" stroke-linecap="round"/><path d="M${x2.toFixed(1)} ${y2.toFixed(1)}L${p1}L${p2}Z" fill="${col}" stroke="${INK}" stroke-width="1.2" stroke-linejoin="round"/>`;
+}
+function bg() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+const table = () => `<rect x="-2000" y="${Y}" width="4520" height="1200" fill="#151e2e"/><path d="M-2000 ${Y}H2520" stroke="#3a4762" stroke-width="2"/>`;
+const ROPE = '#d9c08a';
+const line2 = (d, col, w = 2.4) => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${w + 2}" stroke-linecap="round" stroke-linejoin="round"/><path d="${d}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`;
+// centre-of-gravity mark: circle with a cross
+const cgMark = (x, y, r = 7, col = '#ff8a73') => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="${col}" stroke="${INK}" stroke-width="1.4"/><path d="M${(x - r).toFixed(1)} ${y.toFixed(1)}h${2 * r}M${x.toFixed(1)} ${(y - r).toFixed(1)}v${2 * r}" stroke="${INK}" stroke-width="1.3"/>`;
+
+// ---------- lesson 1: plate on a pin ----------
+function cgScene() {
+  const sh = SHAPES[S.shape], p = sh.holes[S.hole], deg = S.th * DEG, pts = sh.pts.map(q => q.join(',')).join(' '), lines = S.lines[S.shape] || [], found = lines.length >= 2;
+  let h = table();
+  // stand: base, rod, arm with a pin
+  h += `<rect x="${RX - 55}" y="${Y - 8}" width="110" height="8" rx="2" fill="#4a5875" stroke="${INK}"/><rect x="${RX - 4}" y="${PV.y - 14}" width="8" height="${Y - 8 - PV.y + 14}" fill="#6c7a96" stroke="${INK}"/>`;
+  h += `<rect x="${PV.x - 6}" y="${PV.y - 14}" width="${RX - PV.x + 10}" height="8" rx="2" fill="#6c7a96" stroke="${INK}"/><rect x="${RX - 7}" y="${PV.y - 17}" width="14" height="14" rx="2" fill="#3a4762" stroke="${INK}"/>`;
+  h += `<path d="M${PV.x} ${PV.y - 6}V${PV.y}" stroke="#c8d2e3" stroke-width="3"/>`;
+  // plate (cardboard) in its own frame: the chosen hole sits on the pin
+  h += `<defs><clipPath id="clipP"><polygon points="${pts}"/></clipPath></defs>`;
+  h += `<g transform="translate(${PV.x} ${PV.y}) rotate(${deg.toFixed(2)}) translate(${-p[0]} ${-p[1]})">`;
+  h += `<polygon data-drag="plate" points="${pts}" fill="#e3cfa6" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>`;
+  h += `<polygon points="${pts}" fill="none" stroke="#c9ad7a" stroke-width="5" clip-path="url(#clipP)" pointer-events="none"/>`;
+  if (found && S.shape === 'rect') { const P = sh.pts; h += `<path d="M${P[0]}L${P[2]}M${P[1]}L${P[3]}" stroke="#8a6d3b" stroke-width="1" stroke-dasharray="3 4" pointer-events="none"/>`; }
+  if (found && S.shape === 'tri') { const P = sh.pts, m = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; h += `<path d="M${P[0]}L${m(P[1], P[2])}M${P[1]}L${m(P[0], P[2])}M${P[2]}L${m(P[0], P[1])}" stroke="#8a6d3b" stroke-width="1" stroke-dasharray="3 4" pointer-events="none"/>`; }
+  lines.forEach(i => {
+    const s = lineSeg(sh, sh.holes[i]), d = `M${s[0].toFixed(1)} ${s[1].toFixed(1)}L${s[2].toFixed(1)} ${s[3].toFixed(1)}`;
+    h += `<path d="${d}" stroke="#2f6fd8" stroke-width="1.2" stroke-dasharray="4 4" opacity=".55" pointer-events="none"/><path d="${d}" stroke="#2f6fd8" stroke-width="2.4" clip-path="url(#clipP)" pointer-events="none"/>`;
+  });
+  sh.holes.forEach((q, i) => {
+    const on = i === S.hole;
+    h += `<g data-click="hole-${i}"><circle cx="${q[0]}" cy="${q[1]}" r="12" fill="transparent"/><circle cx="${q[0]}" cy="${q[1]}" r="5" fill="#0e1520" stroke="${on ? '#ffb547' : '#8f6f2a'}" stroke-width="${on ? 2.2 : 1.6}"/></g>`;
+  });
+  h += `</g>`;
+  // the pin in front of the plate
+  h += `<circle cx="${PV.x}" cy="${PV.y}" r="3.6" fill="#e8ecf4" stroke="${INK}" stroke-width="1.2" pointer-events="none"/>`;
+  // plumb line from the same pin
+  h += `<path d="M${PV.x} ${PV.y}V${BOBY}" stroke="${INK}" stroke-width="2.8" pointer-events="none"/><path d="M${PV.x} ${PV.y}V${BOBY}" stroke="#e8ecf4" stroke-width="1.1" pointer-events="none"/>`;
+  h += `<path d="M${PV.x - 8} ${BOBY}h16l-8 20z" fill="#7d8799" stroke="${INK}" stroke-width="1.3" stroke-linejoin="round"/>` + T(PV.x + 14, BOBY + 12, 9.5, '#8b96ad', 'отвес', 'start', HALO);
+  if (found) { const [x, y] = toWorld(sh.c); h += cgMark(x, y) + T(x + 11, y - 9, 10, '#ff8a73', 'ЦТ', 'start', 'font-weight="600" ' + HALO); }
+  h += T(PV.x - 22, PV.y - 22, 9.5, '#8b96ad', 'гвоздик', 'end', HALO);
+  return h;
+}
+
+// ---------- lesson 2: beam on two scales ----------
+const BX = cm => BM.x0 + cm * BM.px;
+const LDIM = { la: [38, 32, LA], lb: [30, 22, LB] };
+function beamScene() {
+  const top = BM.y, bot = BM.y + BM.th, SY = BM.sy, R = reac(), stack = Math.abs(S.xa - S.xb) < 10;
+  let h = table();
+  [[0, 'A', R.NA], [100, 'B', R.NB]].forEach(([cm, n, N]) => {
+    const x = BX(cm);
+    h += `<rect x="${x - 36}" y="${SY + 6}" width="72" height="${Y - SY - 6}" rx="5" fill="#3b4a66" stroke="${INK}" stroke-width="1.6"/><rect x="${x - 40}" y="${SY}" width="80" height="7" rx="2" fill="#a9b4c9" stroke="${INK}" stroke-width="1.4"/>`;
+    h += `<rect x="${x - 27}" y="${SY + 16}" width="54" height="22" rx="3" fill="#0e1520" stroke="${INK}"/>` + T(x, SY + 31.5, 11, S.ans ? '#86e0a8' : '#8b96ad', S.ans ? fmt(N, 1) + ' Н' : '? Н', 'middle', 'font-weight="600"');
+    h += T(x, SY + 53, 8.5, '#c8d2e3', 'весы ' + n);
+    h += `<path d="M${x} ${bot}L${x - 20} ${SY}H${x + 20}Z" fill="#6c7a96" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/>`;
+    const ax = cm ? x + 30 : x - 30;
+    h += arrow(ax, SY - 2, ax, bot + 4, '#86e0a8', 2.6) + T(cm ? ax + 7 : ax - 7, SY - 12, 10, '#86e0a8', `N${n === 'A' ? '_A' : '_B'} = ${S.ans ? nf(Math.round(N * 10) / 10) + ' Н' : '?'}`, cm ? 'start' : 'end', HALO);
+  });
+  // the beam with a centimetre scale
+  h += `<rect x="${BX(0) - 8}" y="${top}" width="${100 * BM.px + 16}" height="${BM.th}" rx="2" fill="#c98f55" stroke="${INK}" stroke-width="1.6"/>`;
+  for (let c = 0; c <= 100; c += 10) { h += `<path d="M${BX(c)} ${bot - 4}V${bot}" stroke="#5a3a1e" stroke-width="1"/>`; if (c % 20 === 0) h += T(BX(c), top + 9.5, 7, '#3b2a18', c); }
+  h += T(BX(100) + 12, top + 9.5, 7.5, '#8b96ad', 'см', 'start');
+  // the beam's own weight at its middle
+  h += arrow(BX(50), bot + 2, BX(50), bot + 34, '#ff8a73', 2.4) + T(BX(50) + 7, bot + 30, 9.5, '#ff8a73', 'Pб = 10 Н', 'start', HALO);
+  // loads (iron blocks), draggable along the beam; the lighter one is put on top if they meet
+  const drawLoad = (k, cm, yb) => {
+    const [w, hh, P] = LDIM[k], x = BX(cm);
+    return `<g data-drag="${k}"><rect x="${x - w / 2 - 8}" y="${yb - hh - 8}" width="${w + 16}" height="${hh + 10}" fill="transparent"/><rect x="${x - w / 2}" y="${yb - hh}" width="${w}" height="${hh}" rx="4" fill="#7d8799" stroke="${INK}" stroke-width="1.6"/><path d="M${x - w / 2 + 4} ${yb - hh + 5}h${w - 8}" stroke="#a9b4c9" stroke-width="1.2"/>` + T(x, yb - hh / 2 + 4, 10, '#e8ecf4', P + ' Н', 'middle', 'font-weight="600" ' + HALO) + `</g>`;
+  };
+  const aTop = top - LDIM.la[1], bBase = stack ? aTop : top, bTop = bBase - LDIM.lb[1];
+  h += drawLoad('la', S.xa, top) + drawLoad('lb', S.xb, bBase);
+  h += arrow(BX(S.xa) - (stack ? 26 : 0), (stack ? top - 4 : aTop) - 30, BX(S.xa) - (stack ? 26 : 0), (stack ? top - 4 : aTop) - 3, '#ff8a73', 2.4);
+  h += arrow(BX(S.xb), bTop - 30, BX(S.xb), bTop - 3, '#ff8a73', 2.4);
+  h += T(BX(S.xa), bot + 12, 8.5, '#72d4e8', S.xa + ' см', 'middle', HALO);
+  if (S.xb !== S.xa) h += T(BX(S.xb), bot + 12, 8.5, '#72d4e8', S.xb + ' см', 'middle', HALO);
+  return h;
+}
+
+// ---------- lesson 2: bracket (rod on a hinge + cable to the wall) ----------
+function bracketScene() {
+  const B = BR, ex = B.hx - B.l * B.px, ay = B.hy - B.l * B.px * Math.tan(S.ang / DEG), Tn = tens(), over = Tn > B.lim + 1e-9, lx = B.hx - S.xl * B.px;
+  let h = table();
+  // brick wall
+  h += `<rect x="${B.hx}" y="36" width="44" height="${Y - 36}" fill="#6b5a4c" stroke="${INK}" stroke-width="1.6"/>`;
+  for (let y = 36, r = 0; y < Y; y += 16, r++) { h += `<path d="M${B.hx} ${y}h44" stroke="#4e4136" stroke-width="1"/>`; h += `<path d="M${B.hx + (r % 2 ? 14 : 30)} ${y}v16" stroke="#4e4136" stroke-width="1"/>`; }
+  // cable anchors (one bolt per angle)
+  B.angs.forEach(a => {
+    const yy = B.hy - B.l * B.px * Math.tan(a / DEG), on = a === S.ang;
+    h += `<g data-click="ang-${a}"><rect x="${B.hx - 8}" y="${yy - 14}" width="22" height="28" fill="transparent"/><rect x="${B.hx - 4}" y="${yy - 9}" width="10" height="18" rx="2" fill="${on ? '#a9b4c9' : '#4a5468'}" stroke="${INK}" stroke-width="1.2"/><circle cx="${B.hx + 1}" cy="${yy}" r="2.4" fill="${on ? '#e8ecf4' : '#8b96ad'}"/></g>` + T(B.hx + 50, yy + 3, 9, on ? '#e8ecf4' : '#8b96ad', a + '°', 'start', HALO);
+  });
+  // lever arm of the cable force: perpendicular from the hinge to the cable
+  { const dx = B.hx - ex, dy = ay - B.hy, t = ((B.hx - ex) * dx + 0) / (dx * dx + dy * dy), fx = ex + t * dx, fy = B.hy + t * dy;
+    h += `<path d="M${B.hx - 3} ${B.hy}L${fx.toFixed(1)} ${fy.toFixed(1)}" stroke="#72d4e8" stroke-width="1.4" stroke-dasharray="4 3"/>` + T((B.hx + fx) / 2 - 8, (B.hy + fy) / 2 + 12, 9.5, '#72d4e8', 'плечо d', 'end', HALO); }
+  // rod with a scale and the hinge
+  h += `<rect x="${ex}" y="${B.hy - 4}" width="${B.hx - ex}" height="8" rx="3" fill="#a9b4c9" stroke="${INK}" stroke-width="1.4"/>`;
+  for (let c = 10; c <= 50; c += 10) { const x = B.hx - c * B.px; h += `<path d="M${x} ${B.hy - 4}v4" stroke="#3a4762" stroke-width="1"/>` + T(x, B.hy - 9, 7.5, '#8b96ad', c); }
+  h += `<rect x="${B.hx - 8}" y="${B.hy - 12}" width="10" height="24" rx="2" fill="#4a5468" stroke="${INK}"/><circle cx="${B.hx - 3}" cy="${B.hy}" r="4" fill="#e8ecf4" stroke="${INK}"/>` + T(B.hx - 12, B.hy + 24, 9, '#8b96ad', 'шарнир', 'end', HALO);
+  // cable and its force sensor
+  h += line2(`M${ex} ${B.hy}L${B.hx} ${ay.toFixed(1)}`, over ? '#ff4d3a' : ROPE);
+  const sx = B.hx + (ex - B.hx) * 0.3, sy = ay + (B.hy - ay) * 0.3, ang = Math.atan2(B.hy - ay, ex - B.hx) * DEG;
+  h += `<g transform="translate(${sx.toFixed(1)} ${sy.toFixed(1)}) rotate(${ang.toFixed(1)})"><rect x="-20" y="-7" width="40" height="14" rx="4" fill="#2b6d7c" stroke="${INK}" stroke-width="1.4"/><rect x="-12" y="-3" width="24" height="6" rx="1" fill="#0e1520"/></g>`;
+  h += T(sx - 16, sy - 12, 11, over ? '#ff8a73' : '#ffb547', `T = ${fmt(Tn, 1)} Н`, 'end', 'font-weight="600" ' + HALO);
+  if (over) h += T(sx - 16, sy + 3, 9, '#ff8a73', 'больше 30 Н!', 'end', HALO);
+  // angle between rod and cable
+  { const r = 30, a = S.ang / DEG; h += `<path d="M${ex + r} ${B.hy}A${r} ${r} 0 0 0 ${(ex + r * Math.cos(a)).toFixed(1)} ${(B.hy - r * Math.sin(a)).toFixed(1)}" fill="none" stroke="#c8d2e3" stroke-width="1.2"/>` + T(ex - 8, B.hy - 8, 9.5, '#c8d2e3', `α = ${S.ang}°`, 'end', HALO); }
+  // cable pull on the rod end, towards the anchor
+  { const dx = B.hx - ex, dy = ay - B.hy, Ln = Math.hypot(dx, dy), k = clamp(16 + Tn * 1.1, 20, 70); h += arrow(ex, B.hy, ex + dx / Ln * k, B.hy + dy / Ln * k, '#ffb547', 2.6); }
+  // lantern 20 Н, draggable along the rod
+  h += `<g data-drag="lamp"><rect x="${lx - 22}" y="${B.hy - 6}" width="44" height="58" fill="transparent"/>`;
+  h += `<path d="M${lx} ${B.hy + 4}V${B.hy + 11}" stroke="#c8d2e3" stroke-width="2"/><path d="M${lx - 9} ${B.hy + 17}L${lx - 5} ${B.hy + 11}H${lx + 5}L${lx + 9} ${B.hy + 17}Z" fill="#2c3240" stroke="${INK}" stroke-width="1.2"/>`;
+  h += `<rect x="${lx - 10}" y="${B.hy + 17}" width="20" height="22" rx="2" fill="#ffd166" stroke="${INK}" stroke-width="1.4"/><path d="M${lx} ${B.hy + 17}v22M${lx - 10} ${B.hy + 28}h20" stroke="#2c3240" stroke-width="1.4"/><rect x="${lx - 11}" y="${B.hy + 39}" width="22" height="4" rx="1" fill="#2c3240" stroke="${INK}"/></g>`;
+  h += T(lx - 14, B.hy + 40, 9.5, '#ffd166', '20 Н', 'end', HALO);
+  h += arrow(lx, B.hy + 45, lx, Y - 4, '#ff8a73', 2.4) + T(lx + 7, Y - 8, 9.5, '#ff8a73', 'P', 'start', HALO);
+  h += T(lx - 14, B.hy + 26, 9, '#72d4e8', `x = ${S.xl} см`, 'end', HALO);
+  h += T(60, 210, 9.5, '#8b96ad', 'трос выдерживает', 'start') + T(60, 224, 11, '#e8ecf4', 'не больше 30 Н', 'start', 'font-weight="600"');
+  return h;
+}
+
+// ---------- lesson 3: ball on a bowl / dome / table, roly-poly ----------
+function kindsScene() {
+  if (S.sh3 === 'toy') return toyScene();
+  let h = table();
+  const ext = S.sh3 === 'bowl' ? 160 : S.sh3 === 'dome' ? 150 : 172;
+  if (S.sh3 === 'flat') {
+    h += `<g data-click="k-next"><rect x="${CX - ext}" y="300" width="${2 * ext}" height="${Y - 300}" fill="#b47944" stroke="${INK}" stroke-width="1.6"/>`;
+    h += `<rect x="${CX - ext - 4}" y="288" width="8" height="12" rx="2" fill="#6c7a96" stroke="${INK}"/><rect x="${CX + ext - 4}" y="288" width="8" height="12" rx="2" fill="#6c7a96" stroke="${INK}"/></g>`;
+  } else {
+    let d = `M${CX - ext} ${Y}L${CX - ext} ${ySurf(-ext).toFixed(1)}`;
+    for (let u = -ext; u <= ext; u += 6) d += `L${(CX + u).toFixed(1)} ${ySurf(u).toFixed(1)}`;
+    d += `L${CX + ext} ${Y}Z`;
+    h += `<path data-click="k-next" d="${d}" fill="#b47944" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/>`;
+  }
+  for (let i = 1; i < 4; i++) h += `<path d="M${CX - ext + 6} ${Y - i * 18}h${2 * ext - 12}" stroke="#8a5a30" stroke-width="1" opacity=".55" pointer-events="none"/>`;
+  // rest level of the ball's centre and the change of height
+  const [bx, by] = ballPos(), yr = yRest(), dh = (yr - by) / 10;
+  h += `<path d="M${CX - ext - 30} ${yr}H${CX + ext + 30}" stroke="#72d4e8" stroke-width="1" stroke-dasharray="5 4" opacity=".7"/>` + T(CX - ext - 34, yr + 3, 8.5, '#72d4e8', 'уровень покоя', 'end', HALO);
+  if (Math.abs(dh) > 0.05) h += `<path d="M${(bx + 24).toFixed(1)} ${yr}V${by.toFixed(1)}" stroke="#72d4e8" stroke-width="1.6"/>` + T(bx + 30, (yr + by) / 2 + 3, 9.5, '#72d4e8', `ЦТ ${dh > 0 ? 'выше' : 'ниже'} на ${fmt(Math.abs(dh), 1)} см`, 'start', HALO);
+  // the ball: steel, rolls (its highlight turns)
+  const rot = (S.u / RB) * DEG;
+  h += `<g data-drag="ball" transform="translate(${bx.toFixed(1)} ${by.toFixed(1)})"><circle r="${RB + 8}" fill="transparent"/><circle r="${RB}" fill="#c6ccd6" stroke="${INK}" stroke-width="1.8"/><g transform="rotate(${rot.toFixed(1)})"><path d="M${-RB + 3} 0H${RB - 3}" stroke="#7d8799" stroke-width="2"/></g><circle cx="-5" cy="-6" r="4" fill="#f4f6fa" opacity=".8"/><circle r="2.6" fill="#ff8a73" stroke="${INK}" stroke-width=".8"/></g>`;
+  h += T(CX, (S.sh3 === 'dome' ? 232 : S.sh3 === 'bowl' ? 300 : 300) + 36, 10, '#e8ecf4', SH3[S.sh3], 'middle', HALO);
+  if (S.cls[S.sh3]) h += T(CX, (S.sh3 === 'dome' ? 232 : 300) + 52, 9.5, '#86e0a8', KN[KIND[S.sh3]] + ' равновесие ✓', 'middle', HALO);
+  return h;
+}
+function toyScene() {
+  const R = TOY.R, ay = toyAy(), O = [CX + R * S.phi, Y - R], deg = S.phi * DEG, c = Math.cos(S.phi), s = Math.sin(S.phi);
+  const G = [O[0] - ay * s, O[1] + ay * c];
+  let h = table();
+  h += `<g data-drag="toy" transform="translate(${O[0].toFixed(1)} ${O[1]}) rotate(${deg.toFixed(2)})"><rect x="${-R - 10}" y="-112" width="${2 * R + 20}" height="${R + 122}" fill="transparent"/>`;
+  h += `<path d="M${-R} 0A${R} ${R} 0 0 0 ${R} 0Z" fill="#e0473a" stroke="${INK}" stroke-width="1.8"/>`;
+  h += `<path d="M${-R} 0C${-R} -30 -32 -44 -24 -50H24C32 -44 ${R} -30 ${R} 0Z" fill="#ff8a73" stroke="${INK}" stroke-width="1.8"/>`;
+  h += `<path d="M-30 -18Q0 -6 30 -18" fill="none" stroke="#ffd166" stroke-width="3"/>`;
+  h += `<circle cx="0" cy="-74" r="26" fill="#ffd9b0" stroke="${INK}" stroke-width="1.8"/><path d="M-26 -78A26 26 0 0 1 26 -78Q0 -94 -26 -78Z" fill="#e0473a" stroke="${INK}" stroke-width="1.4"/>`;
+  h += `<circle cx="-9" cy="-72" r="3" fill="${INK}"/><circle cx="9" cy="-72" r="3" fill="${INK}"/><path d="M-8 -62Q0 -56 8 -62" fill="none" stroke="${INK}" stroke-width="1.6"/><circle cx="-16" cy="-64" r="4" fill="#ff8a73" opacity=".6"/><circle cx="16" cy="-64" r="4" fill="#ff8a73" opacity=".6"/>`;
+  // lead weight: in the bottom or in the head
+  if (S.toy === 'low') h += `<ellipse cx="0" cy="26" rx="24" ry="9" fill="#4a5468" stroke="${INK}" stroke-width="1.2"/>` + T(0, 29, 7.5, '#e8ecf4', 'груз');
+  else h += `<ellipse cx="0" cy="-82" rx="16" ry="8" fill="#4a5468" stroke="${INK}" stroke-width="1.2"/>` + T(0, -79, 7.5, '#e8ecf4', 'груз');
+  h += `<circle cx="0" cy="0" r="2.2" fill="#e8ecf4"/>`;
+  h += `</g><g pointer-events="none">`;
+  h += cgMark(G[0], G[1], 6) + T(G[0] + (S.phi >= 0 ? -10 : 10), G[1] - 8, 9.5, '#ff8a73', 'ЦТ', S.phi >= 0 ? 'end' : 'start', 'font-weight="600" ' + HALO);
+  // vertical through the centre of gravity and the point of support
+  const ok = (G[0] - O[0]) * S.phi <= 1e-6;
+  h += `<path d="M${G[0].toFixed(1)} ${G[1].toFixed(1)}V${Y}" stroke="${ok ? '#86e0a8' : '#ff8a73'}" stroke-width="1.4" stroke-dasharray="4 3"/>`;
+  h += `<path d="M${O[0].toFixed(1)} ${Y + 1}l-6 9h12z" fill="#72d4e8" stroke="${INK}" stroke-width="1"/>` + T(O[0], Y + 21, 8.5, '#72d4e8', 'опора', 'middle', HALO);
+  if (Math.abs(S.phi) > 0.06 && !S.lying) {
+    const back = (G[0] - O[0]) * S.phi < 0;
+    h += arrow(G[0], G[1] + 10, G[0], G[1] + 40, '#ff8a73', 2.2);
+    h += T(CX, 104, 10, back ? '#86e0a8' : '#ff8a73', back ? 'ЦТ поднялся — сила тяжести возвращает игрушку' : 'ЦТ опускается — игрушка падает', 'middle', HALO);
+  }
+  if (S.lying) h += T(CX, 104, 10.5, '#ff8a73', 'Упала: центр тяжести был слишком высоко', 'middle', 'font-weight="600" ' + HALO);
+  h += T(CX + 160, Y - 40, 9.5, '#8b96ad', S.toy === 'low' ? 'груз внизу' : 'груз в голове', 'middle', HALO) + `</g>`;
+  return h;
+}
+
+// ---------- lesson 4: cabinet on a tilting board ----------
+const bw = (lx, ly) => { const a = S.al / DEG, ca = Math.cos(a), sa = Math.sin(a); return [SL.hx + lx * ca + ly * sa, SL.hy - lx * sa + ly * ca]; };
+function objCg() {    // centre of gravity of the object in board coordinates (with the tip angle β)
+  const o = OBJ[S.obj], px = SL.px, cx0 = SL.xc - o.b * px / 2, vx = o.b * px / 2, vy = -o.hc * px, cb = Math.cos(S.beta), sb = Math.sin(S.beta);
+  return [cx0 + vx * cb + vy * sb, -vx * sb + vy * cb];
+}
+function slopeScene() {
+  const o = OBJ[S.obj], px = SL.px, bwd = o.b * px, hh = o.h * px, [ex, ey] = bw(SL.L, 10), [rx, ry] = bw(SL.L - 4, -16);
+  let h = table();
+  // lifting post at the far end, hinge at the near end
+  h += `<rect x="${ex - 30}" y="${Y - 8}" width="60" height="8" rx="2" fill="#4a5875" stroke="${INK}"/><rect x="${(ex - 4).toFixed(1)}" y="${ey.toFixed(1)}" width="8" height="${(Y - 8 - ey).toFixed(1)}" fill="#6c7a96" stroke="${INK}"/>`;
+  h += `<rect x="${SL.hx - 14}" y="${SL.hy}" width="22" height="${Y - SL.hy}" rx="2" fill="#4a5875" stroke="${INK}"/>`;
+  // angle arc
+  { const r = 54, a = S.al / DEG; if (S.al > 0) h += `<path d="M${SL.hx + r} ${SL.hy}A${r} ${r} 0 0 0 ${(SL.hx + r * Math.cos(a)).toFixed(1)} ${(SL.hy - r * Math.sin(a)).toFixed(1)}" fill="none" stroke="#c8d2e3" stroke-width="1.2"/>`;
+    h += `<path d="M${SL.hx} ${SL.hy}H${SL.hx + 90}" stroke="#3a4762" stroke-width="1" stroke-dasharray="3 3"/>`; }
+  h += `<g transform="translate(${SL.hx} ${SL.hy}) rotate(${-S.al})">`;
+  h += `<rect x="0" y="0" width="${SL.L}" height="10" rx="2" fill="#c98f55" stroke="${INK}" stroke-width="1.6"/>`;
+  for (let k = 1; k < 11; k++) h += `<path d="M${k * 30} 2v6" stroke="#8a5a30" stroke-width="1"/>`;
+  // stop
+  h += `<rect x="${SL.xc - bwd / 2 - 8}" y="-8" width="8" height="8" rx="1" fill="#6c7a96" stroke="${INK}" stroke-width="1.2"/>`;
+  // object, turned by β about its lower downhill corner
+  h += `<g transform="translate(${SL.xc - bwd / 2} 0) rotate(${(-S.beta * DEG).toFixed(2)})" data-click="reset4">`;
+  if (S.obj === 'cube') h += `<rect x="0" y="${-hh}" width="${bwd}" height="${hh}" rx="2" fill="#3b6fd8" stroke="${INK}" stroke-width="1.6"/><path d="M6 ${-hh + 6}h${bwd - 12}v${hh - 12}h${-(bwd - 12)}z" fill="none" stroke="#6f97ea" stroke-width="1.2"/>`;
+  else {
+    h += `<rect x="0" y="${-hh}" width="${bwd}" height="${hh}" rx="2" fill="#b47944" stroke="${INK}" stroke-width="1.6"/><path d="M${bwd / 2} ${-hh + 4}v${hh - 8}M4 ${-hh * 0.55}h${bwd - 8}" stroke="#8a5a30" stroke-width="1.2"/><circle cx="${bwd / 2 - 4}" cy="${-hh * 0.75}" r="1.6" fill="#e9d9a8"/><circle cx="${bwd / 2 + 4}" cy="${-hh * 0.75}" r="1.6" fill="#e9d9a8"/>`;
+    if (S.obj === 'tallw') h += `<rect x="3" y="-30" width="${bwd - 6}" height="26" rx="2" fill="#4a5468" stroke="${INK}" stroke-width="1.2"/>` + T(bwd / 2, -14, 7, '#e8ecf4', 'груз');
+  }
+  h += cgMark(bwd / 2, -o.hc * px, 5);
+  h += `</g></g>`;
+  // ring to lift the board
+  h += `<path d="M${bw(SL.L - 4, 0).map(v => v.toFixed(1)).join(' ')}L${rx.toFixed(1)} ${ry.toFixed(1)}" stroke="#c8d2e3" stroke-width="2"/>`;
+  h += `<g data-drag="lift"><circle cx="${rx.toFixed(1)}" cy="${ry.toFixed(1)}" r="20" fill="transparent"/><circle cx="${rx.toFixed(1)}" cy="${ry.toFixed(1)}" r="7" fill="none" stroke="${INK}" stroke-width="6"/><circle cx="${rx.toFixed(1)}" cy="${ry.toFixed(1)}" r="7" fill="none" stroke="#ffb547" stroke-width="3.6"/></g>`;
+  h += T(rx, ry - 16, 11, '#ffb547', `α = ${S.al}°`, 'middle', 'font-weight="600" ' + HALO);
+  // vertical through the centre of gravity: does it hit the base?
+  h += `<g pointer-events="none">`;
+  if (!S.fallen) {
+    const [gx, gy] = objCg(), [wx, wy] = bw(gx, gy), a = S.al / DEG, t = (wx - SL.hx) / Math.cos(a), fy = SL.hy - t * Math.sin(a), b0 = SL.xc - bwd / 2, inside = t >= b0 - 1e-6 && t <= b0 + bwd + 1e-6 && S.beta < 1e-3;
+    const col = inside ? '#86e0a8' : '#ff8a73', [b1x, b1y] = bw(b0, 0), [b2x, b2y] = bw(b0 + bwd, 0);
+    h += `<path d="M${b1x.toFixed(1)} ${b1y.toFixed(1)}L${b2x.toFixed(1)} ${b2y.toFixed(1)}" stroke="${col}" stroke-width="4" stroke-linecap="round" opacity=".85"/>`;
+    h += `<path d="M${wx.toFixed(1)} ${wy.toFixed(1)}V${fy.toFixed(1)}" stroke="${col}" stroke-width="1.6" stroke-dasharray="4 3"/><circle cx="${wx.toFixed(1)}" cy="${fy.toFixed(1)}" r="3" fill="${col}"/>`;
+    h += arrow(wx, wy + 8, wx, wy + 34, '#ff8a73', 2.2);
+    h += T(wx + 10, wy - 6, 9.5, '#ff8a73', 'ЦТ', 'start', 'font-weight="600" ' + HALO);
+  } else h += T(300, 150, 11, '#ff8a73', `Опрокинулся при α = ${S.tipAl}°`, 'middle', 'font-weight="600" ' + HALO);
+  h += T(330, Y + 16, 9.5, '#8b96ad', OBJ[S.obj].n, 'middle', HALO) + `</g>`;
+  return h;
+}
+
+// ---------- lesson 4: tower crane ----------
+const CXm = m => CR.cx + m * CR.k;
+function craneScene() {
+  const k = CR.k, top = Y - 8 - CR.H * k, xc = craneXc(), ok = craneOk(), piv = S.cfall > 0 ? CXm(CR.edge) : CXm(-CR.edge);
+  let h = table();
+  h += `<rect x="${CXm(-CR.edge)}" y="${Y}" width="${2 * CR.edge * k}" height="4" fill="${ok ? '#86e0a8' : '#ff8a73'}" opacity=".8"/>`;
+  h += `<g transform="rotate(${(S.cfall * S.ct * DEG).toFixed(2)} ${piv} ${Y})">`;
+  // base with outriggers
+  h += `<rect x="${CXm(-3)}" y="${Y - 8}" width="${6 * k}" height="6" rx="2" fill="#4a5875" stroke="${INK}" stroke-width="1.4"/>`;
+  [-CR.edge, CR.edge].forEach(m => { h += `<rect x="${CXm(m) - 6}" y="${Y - 4}" width="12" height="4" fill="#2c3240" stroke="${INK}"/>`; });
+  // lattice tower
+  const tx0 = CR.cx - 7, tx1 = CR.cx + 7;
+  h += `<rect x="${tx0}" y="${top}" width="14" height="${Y - 8 - top}" fill="none" stroke="${INK}" stroke-width="4"/><rect x="${tx0}" y="${top}" width="14" height="${Y - 8 - top}" fill="none" stroke="#f2c94c" stroke-width="2.2"/>`;
+  let zz = ''; for (let y = Y - 8, i = 0; y > top + 2; y -= 14, i++) zz += `M${i % 2 ? tx1 : tx0} ${y}L${i % 2 ? tx0 : tx1} ${Math.max(top, y - 14)}`;
+  h += `<path d="${zz}" stroke="#f2c94c" stroke-width="1.2"/>`;
+  // cat head and ties
+  h += `<path d="M${CR.cx - 6} ${top}L${CR.cx} ${top - 34}L${CR.cx + 6} ${top}" fill="#f2c94c" stroke="${INK}" stroke-width="1.4"/>`;
+  h += `<path d="M${CR.cx} ${top - 34}L${CXm(-9)} ${top - 4}M${CR.cx} ${top - 34}L${CXm(15)} ${top - 4}" stroke="#c8d2e3" stroke-width="1.2"/>`;
+  // jib and counter-jib
+  h += `<rect x="${CXm(-9)}" y="${top - 6}" width="${31 * k}" height="8" fill="#f2c94c" stroke="${INK}" stroke-width="1.6"/>`;
+  let jz = ''; for (let x = CXm(-9), i = 0; x < CXm(22) - 1; x += 9, i++) jz += `M${x} ${i % 2 ? top - 6 : top + 2}L${Math.min(CXm(22), x + 9)} ${i % 2 ? top + 2 : top - 6}`;
+  h += `<path d="${jz}" stroke="#a37f1c" stroke-width="1"/>`;
+  h += `<rect x="${CR.cx + 8}" y="${top + 2}" width="14" height="12" rx="2" fill="#e8ecf4" stroke="${INK}" stroke-width="1.2"/><rect x="${CR.cx + 15}" y="${top + 4}" width="5" height="5" fill="#72d4e8"/>`;
+  // counterweight blocks (30 кН each) hanging under the counter-jib
+  h += `<g data-click="wc-next">`;
+  const nb = S.wc / 30;
+  for (let i = 0; i < nb; i++) h += `<rect x="${CXm(CR.xw) - 16}" y="${top + 3 + i * 15}" width="32" height="14" rx="2" fill="#9aa3b2" stroke="${INK}" stroke-width="1.3"/>` + T(CXm(CR.xw), top + 13.5 + i * 15, 7.5, INK, '30 кН', 'middle', 'font-weight="600"');
+  if (!nb) h += `<rect x="${CXm(CR.xw) - 16}" y="${top + 3}" width="32" height="14" rx="2" fill="none" stroke="#5a6680" stroke-dasharray="3 3"/>`;
+  h += `</g>`;
+  // trolley, hook and load
+  const tx = CXm(S.xt), hookY = S.P ? Y - 74 : top + 70;
+  h += line2(`M${tx} ${top + 6}V${hookY}`, '#c8d2e3', 1.4);
+  h += `<g data-drag="trolley"><rect x="${tx - 16}" y="${top - 12}" width="32" height="30" fill="transparent"/><rect x="${tx - 9}" y="${top + 2}" width="18" height="7" rx="2" fill="#4a5468" stroke="${INK}" stroke-width="1.2"/><circle cx="${tx - 5}" cy="${top + 2}" r="2.4" fill="#2c3240"/><circle cx="${tx + 5}" cy="${top + 2}" r="2.4" fill="#2c3240"/></g>`;
+  h += `<path d="M${tx} ${hookY}v6a4 4 0 1 1 -4 4" fill="none" stroke="#c8d2e3" stroke-width="2"/>`;
+  if (S.P) h += `<g data-click="p-toggle"><path d="M${tx} ${hookY + 6}L${tx - 20} ${hookY + 22}M${tx} ${hookY + 6}L${tx + 20} ${hookY + 22}" stroke="#c8d2e3" stroke-width="1.2"/><rect x="${tx - 24}" y="${hookY + 22}" width="48" height="32" rx="2" fill="#3b6fd8" stroke="${INK}" stroke-width="1.6"/><path d="M${tx - 16} ${hookY + 26}v24M${tx - 8} ${hookY + 26}v24M${tx} ${hookY + 26}v24M${tx + 8} ${hookY + 26}v24M${tx + 16} ${hookY + 26}v24" stroke="#2c56b0" stroke-width="1.2"/>` + T(tx, hookY + 42, 9, '#e8ecf4', '20 кН', 'middle', 'font-weight="600" ' + HALO) + `</g>`;
+  h += `</g>`;
+  // reach and the common centre of gravity
+  if (!S.cfall) {
+    h += `<path d="M${CR.cx} ${top + 28}H${tx}" stroke="#72d4e8" stroke-width="1.2"/><path d="M${CR.cx} ${top + 24}v8M${tx} ${top + 24}v8" stroke="#72d4e8" stroke-width="1.2"/>` + T((CR.cx + tx) / 2 + 12, top + 42, 9.5, '#72d4e8', `вылет ${S.xt} м`, 'middle', HALO);
+    const gx = CXm(xc), gy = Y - 130;
+    h += cgMark(gx, gy, 6, ok ? '#86e0a8' : '#ff8a73') + `<path d="M${gx.toFixed(1)} ${gy + 6}V${Y}" stroke="${ok ? '#86e0a8' : '#ff8a73'}" stroke-width="1.4" stroke-dasharray="4 3"/>` + T(gx - 10, gy - 4, 9, ok ? '#86e0a8' : '#ff8a73', 'общий ЦТ', 'end', HALO);
+  } else h += T(300, 110, 11, '#ff8a73', S.cfall > 0 ? 'Кран опрокинулся вперёд!' : 'Кран опрокинулся назад!', 'middle', 'font-weight="600" ' + HALO);
+  h += T(CXm(CR.xw), top + 3 + Math.max(1, nb) * 15 + 12, 9, '#8b96ad', `противовес ${S.wc} кН`, 'middle', HALO);
+  h += T(CXm(-CR.edge) - 4, Y + 16, 8.5, '#8b96ad', '−2,5 м', 'end') + T(CXm(CR.edge) + 4, Y + 16, 8.5, '#8b96ad', '+2,5 м', 'start');
+  return h;
+}
+
+function hlBox(id) {
+  const lid = LID();
+  if (lid === 'cg') {
+    const sh = SHAPES[S.shape], W = sh.pts.map(q => toWorld(q)), xs = W.map(q => q[0]), ys = W.map(q => q[1]), bb = [Math.min(...xs) - 6, Math.min(...ys) - 6, Math.max(...xs) - Math.min(...xs) + 12, Math.max(...ys) - Math.min(...ys) + 12];
+    const [cx, cy] = toWorld(sh.c);
+    return ({ stand: [PV.x - 10, PV.y - 22, RX + 60 - PV.x, Y - PV.y + 22], plate: bb, holes: bb, lines: bb, plumb: [PV.x - 14, PV.y - 4, 28, BOBY + 26 - PV.y], cgm: [cx - 16, cy - 16, 32, 32] })[id];
+  }
+  if (lid === 'cond' && S.setup === 'beam') return ({ beam: [BX(0) - 12, BM.y - 4, 100 * BM.px + 24, BM.th + 8], loads: [BX(Math.min(S.xa, S.xb)) - 26, BM.y - 66, BX(Math.max(S.xa, S.xb)) - BX(Math.min(S.xa, S.xb)) + 52, 70], sup: [BX(0) - 26, BM.y + BM.th, BX(100) - BX(0) + 52, BM.sy - BM.y - BM.th + 4], scales: [BX(0) - 44, BM.sy - 4, BX(100) - BX(0) + 88, Y - BM.sy + 6], forces: [BX(0) - 60, BM.y - 70, BX(100) - BX(0) + 120, BM.sy - BM.y + 74] })[id];
+  if (lid === 'cond') { const ex = BR.hx - BR.l * BR.px, ay = BR.hy - BR.l * BR.px * Math.tan(S.ang / DEG), lx = BR.hx - S.xl * BR.px; return ({ wall: [BR.hx - 4, 32, 52, Y - 32], rod: [ex - 6, BR.hy - 14, BR.hx - ex + 12, 28], cable: [ex - 6, ay - 10, BR.hx - ex + 12, BR.hy - ay + 16], sensor: [BR.hx + (ex - BR.hx) * 0.3 - 26, ay + (BR.hy - ay) * 0.3 - 20, 52, 40], lamp: [lx - 18, BR.hy - 2, 36, 50] })[id]; }
+  if (lid === 'kinds') {
+    if (S.sh3 === 'toy') { const x = CX + TOY.R * S.phi; return ({ toy: [x - 60, Y - 160, 120, 162], cgm: [x - 40, Y - 70, 80, 60], surface: [CX - 200, Y - 6, 400, 14] })[id] || [x - 60, Y - 160, 120, 162]; }
+    const [bx, by] = ballPos(); return ({ surface: [CX - 176, 200, 352, Y - 200], ball: [bx - 24, by - 24, 48, 48], cgm: [bx - 10, by - 10, 20, 20], level: [CX - 210, yRest() - 8, 420, 16] })[id];
+  }
+  if (S.setup === 'slope') {
+    const [ax, ay] = bw(0, 0), [bx2, by2] = bw(SL.L, 0), o = OBJ[S.obj], [ox, oy] = bw(SL.xc, -o.h * SL.px / 2);
+    return ({ board: [Math.min(ax, bx2) - 8, Math.min(ay, by2) - 8, Math.abs(bx2 - ax) + 16, Math.abs(by2 - ay) + 24], lift: [bx2 - 26, by2 - 40, 52, Y - by2 + 40], obj: [ox - o.h * SL.px / 2 - 8, oy - o.h * SL.px / 2 - 8, o.h * SL.px + 16, o.h * SL.px + 16], stop: [bw(SL.xc - o.b * SL.px / 2 - 8, 0)[0] - 12, bw(SL.xc, 0)[1] - 22, 30, 30], plumb: [ox - 40, oy - 20, 80, 120] })[id];
+  }
+  const top = Y - 8 - CR.H * CR.k;
+  return ({ tower: [CR.cx - 14, top - 40, 28, Y - top + 40], jib: [CXm(-9) - 4, top - 12, 31 * CR.k + 8, 22], cw: [CXm(CR.xw) - 22, top - 2, 44, 70], trolley: [CXm(S.xt) - 28, top - 8, 56, Y - top], base: [CXm(-3) - 6, Y - 14, 6 * CR.k + 12, 22] })[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = bg();
+  if (id === 'cg') h += cgScene();
+  else if (id === 'cond') h += S.setup === 'beam' ? beamScene() : bracketScene();
+  else if (id === 'kinds') h += kindsScene();
+  else h += S.setup === 'slope' ? slopeScene() : craneScene();
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b && b[2] > 0) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// fit the scene: 520 × 405 units, centred, content at the bottom
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 520, hh / 415, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 410 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => {
+  const ck = e.target.closest('[data-click]'); if (ck && ck.dataset.click) { act(ck.dataset.click); return; }
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  const p = toSvg(e), k = el.dataset.drag;
+  drag = { k, p0: p };
+  if (k === 'plate') { drag.a0 = Math.atan2(p.y - PV.y, p.x - PV.x); S.om = 0; }
+  if (k === 'ball') { drag.u0 = S.u; S.v = 0; }
+  if (k === 'toy') { drag.ph0 = S.phi; S.phiV = 0; S.lying = false; S.toyMax = 0; }
+  if (k === 'lift' && (S.tipping)) { drag = null; scene.classList.remove('grabbing'); }
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const p = toSvg(e), k = drag.k;
+  if (k === 'plate') { const a = Math.atan2(p.y - PV.y, p.x - PV.x); let d = a - drag.a0; if (d > PI) d -= 2 * PI; if (d < -PI) d += 2 * PI; drag.a0 = a; S.th += d; dirty = true; return; }
+  if (k === 'la' || k === 'lb') { const cm = clamp(Math.round((p.x - BM.x0) / BM.px / 5) * 5, 5, 95); if (cm !== S[k === 'la' ? 'xa' : 'xb']) { S[k === 'la' ? 'xa' : 'xb'] = cm; update(); } return; }
+  if (k === 'lamp') { const cm = clamp(Math.round((BR.hx - p.x) / BR.px / 5) * 5, 10, 60); if (cm !== S.xl) { S.xl = cm; update(); } return; }
+  if (k === 'ball') { const lim = S.off ? 235 : ULIM[S.sh3]; S.u = clamp(p.x - CX, -lim, lim); S.v = 0; dirty = true; return; }
+  if (k === 'toy') { const lim = S.toy === 'low' ? 0.9 : TOY.lie - 0.05; S.phi = clamp(drag.ph0 + (p.x - drag.p0.x) / TOY.R, -lim, lim); S.phiV = 0; S.toyMax = Math.max(S.toyMax, Math.abs(S.phi)); dirty = true; return; }
+  if (k === 'lift') { const a = clamp(Math.round(Math.atan2(SL.hy - p.y, p.x - SL.hx) * DEG), 0, SL.amax); if (a !== S.al) setAl(a); return; }
+  if (k === 'trolley') { const x = clamp(Math.round((p.x - CR.cx) / CR.k), 4, 20); if (x !== S.xt) setXt(x); return; }
+});
+const endDrag = () => {
+  if (!drag) return;
+  const k = drag.k;
+  if (k === 'ball' && Math.abs(S.u - drag.u0) > 12) { S.pushed = true; update(); }
+  drag = null; scene.classList.remove('grabbing'); dirty = true;
+};
+scene.addEventListener('pointerup', endDrag);
+scene.addEventListener('pointercancel', endDrag);
+
+function setAl(a) {
+  a = clamp(a, 0, SL.amax);
+  if (S.tipping) return;
+  S.al = a;
+  if (!S.fallen && S.al > acrit(S.obj) + 1e-9) { S.tipping = true; S.tipAl = S.al; S.beta = 0.002; S.betaV = 0; }
+  update();
+}
+function setXt(x) {
+  if (S.cfall) return;
+  S.xt = clamp(x, 4, 20); checkCrane(); update();
+}
+function checkCrane() { if (!S.cfall && !craneOk()) { S.cfall = craneXc() > 0 ? 1 : -1; S.ct = 0; S.ctV = 0; } }
+
+// ---------- motion: swinging plate, rolling ball, roly-poly, tipping cabinet, falling crane ----------
+function step(dt) {
+  const id = LID(), n = 6, h = dt / n;
+  let moved = false;
+  if (id === 'cg' && !(drag && drag.k === 'plate')) {
+    const t0 = th0();
+    if (Math.abs(S.om) > 1e-4 || Math.abs(Math.sin(S.th - t0)) > 1e-4) {
+      for (let i = 0; i < n; i++) { S.om += (-KCG * Math.sin(S.th - t0) - CCG * S.om) * h; S.th += S.om * h; }
+      if (Math.abs(S.om) < 0.01 && Math.abs(Math.sin(S.th - t0)) < 0.004) { S.th = t0 + 2 * PI * Math.round((S.th - t0) / (2 * PI)); S.om = 0; update(); }
+      moved = true;
+    }
+  }
+  if (id === 'kinds' && S.sh3 !== 'toy' && !(drag && drag.k === 'ball')) {
+    if (S.drop > 0) { for (let i = 0; i < n; i++) { S.dropV += 1500 * h; S.drop -= S.dropV * h; } if (S.drop <= 0) { S.drop = 0; S.dropV = 0; } moved = true; }
+    const sl = S.off ? 0 : ySl(S.u), a = S.off ? 0 : GB * sl / (1 + sl * sl);
+    if (Math.abs(S.v) > 0.3 || Math.abs(a) > 0.5) {
+      for (let i = 0; i < n; i++) {
+        const s2 = S.off ? 0 : ySl(S.u), a2 = S.off ? 0 : GB * s2 / (1 + s2 * s2);
+        S.v += a2 * h;
+        if (S.sh3 === 'bowl') S.v -= 0.45 * S.v * h;
+        if (S.sh3 === 'flat' || S.off) S.v -= Math.sign(S.v) * Math.min(Math.abs(S.v), 90 * h);
+        S.u += S.v * h;
+      }
+      if (S.sh3 === 'dome' && !S.off && Math.abs(S.u) > 158) { S.off = true; S.drop = Y - ySurf(150); S.dropV = 0; }
+      if (S.sh3 === 'flat' && Math.abs(S.u) > ULIM.flat) { S.u = Math.sign(S.u) * ULIM.flat; S.v = 0; }
+      if (S.sh3 === 'bowl' && Math.abs(S.u) > ULIM.bowl + 10) { S.u = Math.sign(S.u) * (ULIM.bowl + 10); S.v = -S.v * 0.3; }
+      if (S.off && Math.abs(S.u) > 235) { S.u = Math.sign(S.u) * 235; S.v = 0; }
+      if (S.sh3 === 'bowl' && Math.abs(S.v) < 2 && Math.abs(S.u) < 0.4) { S.u = 0; S.v = 0; }
+      moved = true;
+    }
+  }
+  if (id === 'kinds' && S.sh3 === 'toy' && !(drag && drag.k === 'toy') && !S.lying) {
+    const k = S.toy === 'low' ? -14 * TOY.low / 30 : 14;
+    if (Math.abs(S.phiV) > 1e-3 || Math.abs(Math.sin(S.phi)) > 1e-3) {
+      for (let i = 0; i < n; i++) { S.phiV += (k * Math.sin(S.phi) - 1.6 * S.phiV) * h; S.phi += S.phiV * h; }
+      S.toyMax = Math.max(S.toyMax, Math.abs(S.phi));
+      if (Math.abs(S.phi) >= TOY.lie) { S.phi = Math.sign(S.phi) * TOY.lie; S.phiV = 0; S.lying = true; if (S.toy === 'high' && !S.toyHigh) { S.toyHigh = true; toast('Груз в голове: при наклоне центр тяжести опускается — игрушка падает. Равновесие было неустойчивым.'); } update(); }
+      else if (Math.abs(S.phi) < 0.012 && Math.abs(S.phiV) < 0.04) {
+        S.phi = 0; S.phiV = 0;
+        if (S.toy === 'low' && S.toyMax >= 0.25 && !S.toyLow) { S.toyLow = true; toast('Груз внизу: при наклоне центр тяжести поднимается, и игрушка встаёт. Устойчивое равновесие.'); }
+        S.toyMax = 0; update();
+      }
+      moved = true;
+    }
+  }
+  if (id === 'tip' && S.setup === 'slope' && S.tipping) {
+    const ac = acrit(S.obj) / DEG;
+    for (let i = 0; i < n; i++) { S.betaV += 16 * Math.sin(S.al / DEG + S.beta - ac) * h; S.beta += S.betaV * h; }
+    if (S.beta >= PI / 2) {
+      S.beta = PI / 2; S.betaV = 0; S.tipping = false; S.fallen = true;
+      const first = S.tipRec[S.obj] == null; S.tipRec[S.obj] = S.tipAl;
+      if (first) {
+        const o = S.obj, msg = `${OBJ[o].n} опрокинулся при α = ${S.tipAl}°: вертикаль через центр тяжести вышла за край опоры.`;
+        toast(o === 'tallw' && S.tipRec.tall != null ? `Груз внизу опустил центр тяжести: теперь шкаф опрокинулся только при ${S.tipAl}°, а без груза — при ${S.tipRec.tall}°.` : o === 'tall' ? msg + ' Теперь опустите центр тяжести — выберите шкаф с грузом внизу.' : msg);
+      }
+      renderTools(); buildScheme(); update();
+    }
+    moved = true;
+  }
+  if (id === 'tip' && S.setup === 'crane' && S.cfall && S.ct < 0.3) {
+    for (let i = 0; i < n; i++) { S.ctV += 2.6 * h; S.ct += S.ctV * h; }
+    if (S.ct >= 0.3) { S.ct = 0.3; toast(S.cfall > 0 ? 'Кран опрокинулся вперёд: общий центр тяжести вышел за передние опоры. Нужен противовес тяжелее — или меньший вылет.' : 'Кран опрокинулся назад: без груза противовес слишком тяжёлый — центр тяжести вышел за задние опоры.'); renderTools(); update(); }
+    moved = true;
+  }
+  return moved;
+}
+
+// task progress reached by a state (latched, with a toast)
+function latch() {
+  const id = LID();
+  if (id === 'cond') {
+    if (S.setup === 'beam' && S.ans && !S.eq) { const R = reac(); if (Math.abs(R.NA - R.NB) < 1e-9 && !(S.xa === 50 && S.xb === 50)) { S.eq = { xa: S.xa, xb: S.xb }; toast(`Опоры нагружены одинаково: по ${nf(R.NA)} Н. Моменты грузов относительно середины балки уравновесились: 20 · ${Math.abs(S.xa - 50)} = 10 · ${Math.abs(S.xb - 50)}.` + (S.br ? '' : ' Теперь кронштейн.')); } }
+    if (S.setup === 'bracket' && !S.br && S.xl === 60 && tens() <= BR.lim + 1e-9) { S.br = { ang: S.ang, T: tens() }; toast(`Трос натянут на ${fmt(tens(), 1)} Н — меньше 30 Н. Чем выше крепление, тем больше плечо силы натяжения и тем меньше сама сила.`); }
+  }
+  if (id === 'tip' && S.setup === 'crane' && !S.cfall && craneOk()) {
+    const r = S.crOk[S.wc] || (S.crOk[S.wc] = {});
+    if (S.P === 0) r.e = true;
+    if (S.P === 20 && S.xt >= 20) r.l = true;
+    if (r.e && r.l && !S.crane) { S.crane = true; toast(`Противовес ${S.wc} кН подходит: кран устоял и пустым, и с грузом 20 кН на вылете 20 м.`); }
+  }
+}
+
+let last = performance.now(), metT = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.033, Math.max(0, (t - last) / 1000)); last = t;
+  if (step(dt)) { dirty = true; metT += dt; if (metT > 0.12) { metT = 0; renderMeter(model()); } }
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 4200); }
+
+function ansOptions() {
+  const R = reac(), tot = BM.Pb + LA + LB, set = new Set([R.NA, R.NB, tot / 2, tot].map(v => Math.round(v * 10) / 10));
+  if (set.size < 4) set.add(Math.round((R.NA + 4) * 10) / 10);
+  return [...set].slice(0, 4).sort((a, b) => a - b);
+}
+let toolsHTML = '';
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, cls) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}${cls ? ` class="${cls}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>', lbl = s => `<span class="lbl">${s}</span>`;
+  let h = '';
+  if (id === 'cg') h = SHK.map(k => B('sh-' + k, SHAPES[k].n, S.shape === k)).join('') + sep + B('line', 'Провести линию', undefined, 'rec') + B('swing', 'Качнуть') + B('clear', 'Стереть');
+  if (id === 'cond') {
+    h = B('st-beam', 'Балка', S.setup === 'beam') + B('st-bracket', 'Кронштейн', S.setup === 'bracket') + sep;
+    if (S.setup === 'beam') h += S.ans ? B('la-next', 'Груз 20 Н ›') + B('lb-next', 'Груз 10 Н ›') : lbl('Весы A покажут:') + ansOptions().map(v => B('na-' + v, nf(v) + ' Н')).join('');
+    else h += BR.angs.map(a => B('ang-' + a, 'Крепление ' + a + '°', S.ang === a)).join('') + sep + B('lamp-', '‹ Фонарь') + B('lamp+', 'Фонарь ›');
+  }
+  if (id === 'kinds') {
+    h = ['bowl', 'dome', 'flat', 'toy'].map(k => B('k-' + k, SH3[k], S.sh3 === k)).join('') + sep;
+    if (S.sh3 !== 'toy') { h += B('push', 'Толкнуть', undefined, 'rec') + B('reset3', 'Вернуть'); if (S.pushed && !S.cls[S.sh3]) h += sep + lbl('Равновесие:') + B('cl-stable', 'Устойчивое') + B('cl-unstable', 'Неустойчивое') + B('cl-neutral', 'Безразличное'); }
+    else h += B('toy-low', 'Груз внизу', S.toy === 'low') + B('toy-high', 'Груз в голове', S.toy === 'high') + sep + B('toy-tilt', S.lying ? 'Поставить' : 'Наклонить', undefined, 'rec');
+  }
+  if (id === 'tip') {
+    h = B('st-slope', 'Доска', S.setup === 'slope') + B('st-crane', 'Кран', S.setup === 'crane') + sep;
+    if (S.setup === 'slope') h += Object.keys(OBJ).map(k => B('o-' + k, OBJ[k].n, S.obj === k)).join('') + sep + B('dn5', '−5°') + B('up', '+1°', undefined, 'rec') + B('up5', '+5°') + B('reset4', 'Поставить');
+    else h += S.cfall ? B('cup', 'Поднять кран', undefined, 'rec') : CR.ws.map(w => B('wc-' + w, w ? w + ' кН' : 'Без противовеса', S.wc === w)).join('') + sep + B('p-0', 'Без груза', S.P === 0) + B('p-20', 'Груз 20 кН', S.P === 20) + sep + B('tr-', '‹') + B('tr+', 'Тележка ›');
+  }
+  if (h !== toolsHTML) { toolsHTML = h; tb.innerHTML = h; }
+}
+function act(a) {
+  if (!a) return;
+  const id = LID(), re = () => { renderTools(); buildScheme(); update(); };
+  // lesson 1
+  if (a.startsWith('hole-')) { const i = a === 'hole-next' ? (S.hole + 1) % SHAPES[S.shape].holes.length : +a.slice(5); if (i === S.hole && Math.abs(S.th - th0()) < 0.05) return; S.hole = i; S.th = th0() + (Math.random() < 0.5 ? -0.45 : 0.45); S.om = 0; return re(); }
+  if (a.startsWith('sh-')) { S.shape = a.slice(3); S.hole = 0; S.th = th0() + 0.45; S.om = 0; return re(); }
+  if (a === 'shape-next') return act('sh-' + SHK[(SHK.indexOf(S.shape) + 1) % SHK.length]);
+  if (a === 'swing') { S.om += 2.4; dirty = true; return; }
+  if (a === 'clear') { S.lines[S.shape] = []; return re(); }
+  if (a === 'line') {
+    if (!settled()) { toast('Подождите, пока пластина успокоится: отвес должен висеть неподвижно.'); return; }
+    const Ls = S.lines[S.shape] || (S.lines[S.shape] = []);
+    if (Ls.includes(S.hole)) { toast('Эта линия уже есть. Подвесьте пластину за другое отверстие.'); return; }
+    Ls.push(S.hole);
+    if (Ls.length === 1) toast('Линия проведена по отвесу: центр тяжести где-то на ней. Подвесьте пластину за другое отверстие.');
+    else if (Ls.length === 2) {
+      const first = !S.found[S.shape]; S.found[S.shape] = true;
+      const msg = { rect: 'Линии пересеклись в центре прямоугольника — там же, где его диагонали. У симметричной пластины центр тяжести в центре симметрии.', tri: 'Линии пересеклись в точке пересечения медиан треугольника.', corner: 'Центр тяжести уголка оказался вне пластины — в пустом углу!', blob: 'Линии пересеклись — это центр тяжести пластины неправильной формы. Его можно найти только опытом или расчётом.' }[S.shape];
+      toast(first ? msg : 'Линии снова пересеклись в той же точке.');
+    } else toast('Третья линия прошла через ту же точку: центр тяжести один.');
+    return re();
+  }
+  // lesson 2
+  if (a.startsWith('st-')) { S.setup = a.slice(3); if (id === 'tip') { S.al = 0; S.beta = 0; S.betaV = 0; S.tipping = false; S.fallen = false; } return re(); }
+  if (a.startsWith('na-')) {
+    const v = +a.slice(3), R = reac();
+    if (Math.abs(v - Math.round(R.NA * 10) / 10) < 1e-6) { S.ans = true; toast(`Верно: N_A = ${nf(R.NA)} Н, N_B = ${nf(R.NB)} Н. Вместе ${nf(R.NA + R.NB)} Н — ровно вес балки и грузов. Теперь сделайте нагрузку на опоры одинаковой.`); }
+    else { S.miss++; toast(S.miss > 1 ? 'Запишите моменты относительно опоры B: N_A · 100 = 10 · 50 + 20 · (100 − x₁) + 10 · (100 − x₂). Вкладка «Расчёты» поможет.' : 'Не то. Ближе к какой опоре стоит тяжёлый груз? Та опора и нагружена сильнее.'); }
+    return re();
+  }
+  if (a === 'la-next') { S.xa = S.xa >= 95 ? 5 : S.xa + 5; return re(); }
+  if (a === 'lb-next') { S.xb = S.xb >= 95 ? 5 : S.xb + 5; return re(); }
+  if (a.startsWith('ang-')) { if (id === 'cond') S.setup = 'bracket'; S.ang = +a.slice(4); return re(); }
+  if (a === 'acycle') { S.ang = BR.angs[(BR.angs.indexOf(S.ang) + 1) % BR.angs.length]; return re(); }
+  if (a === 'lamp+' || a === 'lamp-') { S.xl = clamp(S.xl + (a === 'lamp+' ? 5 : -5), 10, 60); return re(); }
+  // lesson 3
+  if (a.startsWith('k-')) { const k = a === 'k-next' ? ['bowl', 'dome', 'flat', 'toy'][(['bowl', 'dome', 'flat', 'toy'].indexOf(S.sh3) + 1) % 4] : a.slice(2); S.sh3 = k; Object.assign(S, { u: 0, v: 0, off: false, drop: 0, dropV: 0, pushed: false, phi: 0, phiV: 0, lying: false, toyMax: 0 }); return re(); }
+  if (a === 'push') { if (S.sh3 === 'toy') return act('toy-tilt'); S.v += S.off ? 120 : 150; S.pushed = true; return re(); }
+  if (a === 'reset3') { Object.assign(S, { u: 0, v: 0, off: false, drop: 0, dropV: 0 }); return re(); }
+  if (a.startsWith('cl-')) {
+    const k = a.slice(3), right = KIND[S.sh3];
+    if (k === right) { S.cls[S.sh3] = true; toast({ bowl: 'Верно, устойчивое: шарик в самой низкой точке, при отклонении его центр тяжести поднимается, и он скатывается обратно.', dome: 'Верно, неустойчивое: на вершине центр тяжести выше всего, при отклонении он опускается, и шарик скатывается.', flat: 'Верно, безразличное: на ровном столе высота центра тяжести не меняется, шарик остаётся там, куда его сдвинули.' }[S.sh3]); }
+    else toast('Посмотрите, вернулся ли шарик, и куда сдвинулся его центр тяжести — выше или ниже уровня покоя.');
+    return re();
+  }
+  if (a === 'toy-low' || a === 'toy-high') { S.sh3 = 'toy'; S.toy = a.slice(4); Object.assign(S, { phi: 0, phiV: 0, lying: false, toyMax: 0 }); return re(); }
+  if (a === 'toy-tilt') { if (S.sh3 !== 'toy') return; if (S.lying) { Object.assign(S, { phi: 0, phiV: 0, lying: false, toyMax: 0 }); return re(); } S.phiV += 2.6; return re(); }
+  // lesson 4
+  if (a.startsWith('o-')) { S.obj = a.slice(2); Object.assign(S, { al: 0, beta: 0, betaV: 0, tipping: false, fallen: false }); return re(); }
+  if (a === 'up' || a === 'up5' || a === 'dn5') { if (S.setup !== 'slope') return; setAl(S.al + (a === 'up' ? 1 : a === 'up5' ? 5 : -5)); return re(); }
+  if (a === 'reset4') { Object.assign(S, { al: 0, beta: 0, betaV: 0, tipping: false, fallen: false }); return re(); }
+  if (a.startsWith('wc-')) { if (S.cfall) { toast('Сначала поднимите кран.'); return; } S.wc = a === 'wc-next' ? CR.ws[(CR.ws.indexOf(S.wc) + 1) % CR.ws.length] : +a.slice(3); checkCrane(); return re(); }
+  if (a.startsWith('p-')) { if (S.cfall) { toast('Сначала поднимите кран.'); return; } S.P = a === 'p-toggle' ? (S.P ? 0 : 20) : +a.slice(2); checkCrane(); return re(); }
+  if (a === 'tr+' || a === 'tr-') { setXt(S.xt + (a === 'tr+' ? 2 : -2)); return re(); }
+  if (a === 'cup') { Object.assign(S, { cfall: 0, ct: 0, ctV: 0, P: 20, xt: 4 }); checkCrane(); return re(); }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  stand: IC('<rect x="3" y="28" width="22" height="4" rx="1" fill="#4a5875"/><rect x="21" y="4" width="4" height="25" fill="#6c7a96"/><rect x="6" y="4" width="19" height="4" fill="#6c7a96"/><path d="M8 8v4" stroke="#c8d2e3" stroke-width="2"/>'),
+  plate: IC('<path d="M5 9l12-5 13 6-2 15-13 5L4 23z" fill="#e3cfa6" stroke="#04070d"/><circle cx="17" cy="8" r="1.8" fill="#0e1520"/>'),
+  holes: IC('<rect x="4" y="7" width="26" height="20" rx="2" fill="#e3cfa6"/><circle cx="9" cy="12" r="2.2" fill="#0e1520"/><circle cx="25" cy="12" r="2.2" fill="#0e1520"/><circle cx="17" cy="22" r="2.2" fill="#0e1520"/>'),
+  plumb: IC('<path d="M17 2v22" stroke="#e8ecf4" stroke-width="1.6"/><path d="M12 24h10l-5 9z" fill="#7d8799"/>'),
+  lines: IC('<rect x="4" y="7" width="26" height="20" rx="2" fill="#e3cfa6"/><path d="M6 9l22 16M28 9L6 25" stroke="#2f6fd8" stroke-width="2"/>'),
+  cgm: IC('<circle cx="17" cy="17" r="8" fill="#ff8a73" stroke="#04070d"/><path d="M9 17h16M17 9v16" stroke="#04070d" stroke-width="1.6"/>'),
+  beam: IC('<rect x="2" y="13" width="30" height="7" rx="1" fill="#c98f55"/><path d="M8 13v3M14 13v3M20 13v3M26 13v3" stroke="#5a3a1e"/>'),
+  loads: IC('<rect x="4" y="12" width="14" height="14" rx="2" fill="#7d8799"/><rect x="20" y="16" width="11" height="10" rx="2" fill="#7d8799"/>'),
+  sup: IC('<path d="M9 8L3 22h12zM25 8l-6 14h12z" fill="#6c7a96"/><rect x="2" y="22" width="30" height="3" fill="#a9b4c9"/>'),
+  scales: IC('<rect x="4" y="12" width="26" height="18" rx="3" fill="#3b4a66"/><rect x="2" y="9" width="30" height="4" rx="1" fill="#a9b4c9"/><rect x="9" y="17" width="16" height="7" rx="1" fill="#0e1520"/><path d="M12 21h10" stroke="#86e0a8" stroke-width="1.6"/>'),
+  forces: IC('<path d="M10 4v18" stroke="#ff8a73" stroke-width="2.4"/><path d="M6 20l4 6 4-6" fill="#ff8a73"/><path d="M24 30V12" stroke="#86e0a8" stroke-width="2.4"/><path d="M20 14l4-6 4 6" fill="#86e0a8"/>'),
+  wall: IC('<rect x="18" y="2" width="14" height="30" fill="#6b5a4c"/><path d="M18 8h14M18 14h14M18 20h14M18 26h14M25 2v6M22 8v6M28 14v6M22 20v6" stroke="#4e4136"/>'),
+  rod: IC('<rect x="3" y="20" width="27" height="5" rx="2" fill="#a9b4c9"/><circle cx="29" cy="22.5" r="3" fill="#e8ecf4" stroke="#04070d"/>'),
+  cable: IC('<path d="M4 26L30 6" stroke="#d9c08a" stroke-width="2.6"/>'),
+  sensor: IC('<g transform="rotate(-30 17 17)"><rect x="5" y="12" width="24" height="10" rx="3" fill="#2b6d7c"/><rect x="10" y="15" width="14" height="4" fill="#0e1520"/></g>'),
+  lamp: IC('<path d="M17 2v6" stroke="#c8d2e3" stroke-width="2"/><path d="M11 12l3-4h6l3 4z" fill="#2c3240"/><rect x="11" y="12" width="12" height="14" rx="1" fill="#ffd166"/><rect x="10" y="26" width="14" height="3" fill="#2c3240"/>'),
+  bowl: IC('<path d="M2 12Q17 34 32 12V32H2z" fill="#b47944"/><circle cx="17" cy="20" r="4" fill="#c6ccd6"/>'),
+  dome: IC('<path d="M2 32V24Q17 0 32 24V32z" fill="#b47944"/><circle cx="17" cy="8" r="4" fill="#c6ccd6"/>'),
+  flat: IC('<rect x="2" y="22" width="30" height="10" fill="#b47944"/><circle cx="17" cy="18" r="4" fill="#c6ccd6"/>'),
+  ball: IC('<circle cx="17" cy="17" r="11" fill="#c6ccd6" stroke="#04070d"/><circle cx="13" cy="13" r="3" fill="#f4f6fa"/>'),
+  level: IC('<path d="M2 17h30" stroke="#72d4e8" stroke-width="2" stroke-dasharray="4 3"/>'),
+  toy: IC('<path d="M6 20a11 11 0 0 0 22 0z" fill="#e0473a"/><path d="M6 20C6 14 10 12 12 11h10c2 1 6 3 6 9z" fill="#ff8a73"/><circle cx="17" cy="7" r="5.5" fill="#ffd9b0"/>'),
+  board: IC('<path d="M2 30L30 12l1 3L4 32z" fill="#c98f55" stroke="#04070d" stroke-width="1"/>'),
+  lift: IC('<rect x="22" y="12" width="4" height="20" fill="#6c7a96"/><circle cx="24" cy="7" r="4" fill="none" stroke="#ffb547" stroke-width="2.4"/>'),
+  stop: IC('<path d="M2 28h30" stroke="#c98f55" stroke-width="4"/><rect x="8" y="20" width="6" height="7" fill="#6c7a96"/><rect x="15" y="6" width="10" height="21" fill="#b47944"/>'),
+  obj: IC('<rect x="11" y="3" width="12" height="28" rx="1" fill="#b47944"/><path d="M17 5v24" stroke="#8a5a30"/>'),
+  objw: IC('<rect x="11" y="3" width="12" height="28" rx="1" fill="#b47944"/><rect x="12" y="22" width="10" height="8" fill="#4a5468"/>'),
+  cube: IC('<rect x="7" y="9" width="20" height="20" rx="1" fill="#3b6fd8"/>'),
+  tower: IC('<rect x="14" y="4" width="6" height="28" fill="none" stroke="#f2c94c" stroke-width="2"/><path d="M14 8l6 5-6 5 6 5-6 5" stroke="#f2c94c" stroke-width="1.2" fill="none"/>'),
+  jib: IC('<rect x="2" y="10" width="30" height="4" fill="#f2c94c"/><path d="M17 2L4 10M17 2l12 8" stroke="#c8d2e3"/>'),
+  cw: IC('<rect x="7" y="8" width="20" height="8" rx="1" fill="#9aa3b2"/><rect x="7" y="17" width="20" height="8" rx="1" fill="#9aa3b2"/>'),
+  trolley: IC('<rect x="9" y="5" width="16" height="6" rx="1" fill="#4a5468"/><path d="M17 11v10" stroke="#c8d2e3" stroke-width="1.6"/><rect x="8" y="21" width="18" height="10" rx="1" fill="#3b6fd8"/>'),
+  base: IC('<rect x="2" y="24" width="30" height="5" rx="1" fill="#4a5875"/><rect x="4" y="29" width="6" height="3" fill="#2c3240"/><rect x="24" y="29" width="6" height="3" fill="#2c3240"/><rect x="14" y="4" width="6" height="20" fill="#f2c94c"/>'),
+};
+
+const step1 = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  const t = (ok, s) => `${s} ${ok ? '✓' : '—'}`;
+  if (id === 'cg') return [t(m.rect, 'Прямоугольник'), t(m.blob, 'Неправильная')].join(' · ');
+  if (id === 'cond') return [t(m.ans, 'Реакция'), t(m.eq, 'Поровну'), t(m.br, 'Кронштейн')].join(' · ');
+  if (id === 'kinds') return [t(m.c3, `Шарик ${['bowl', 'dome', 'flat'].filter(k => S.cls[k]).length}/3`), t(m.toyLow, 'Груз внизу'), t(m.toyHigh, 'Груз в голове')].join(' · ');
+  return [t(m.tall, 'Шкаф'), t(m.tallw, 'С грузом'), t(m.crane, 'Кран')].join(' · ');
+}
+
+// Scheme tab: built once per change of set-up, then values refreshed (sliders keep focus while dragging)
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+const chips = (lbl, items) => `<div class="ctl"><div class="lbl">${lbl}</div><div class="chips">${items.map(([a, n, on]) => `<button data-a="${a}" aria-pressed="${!!on}">${n}</button>`).join('')}</div></div>`;
+const reads = (a, b, c) => `<dl class="reads"><div><dt>${a}</dt><dd id="r1"></dd></div><div><dt>${b}</dt><dd id="r2"></dd></div><div><dt>${c}</dt><dd id="r3"></dd></div></dl>`;
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'cg') {
+    const sh = SHAPES[S.shape];
+    h = `<h2>Пластина на гвоздике</h2>` + chips('Пластина', SHK.map(k => ['sh-' + k, SHAPES[k].n, S.shape === k])) + chips('Подвесить за отверстие', sh.holes.map((q, i) => ['hole-' + i, String(i + 1), S.hole === i])) +
+      chips('Действия', [['line', 'Провести линию по отвесу', false], ['swing', 'Качнуть', false], ['clear', 'Стереть линии', false]]) + reads('отклонение', 'линий', 'ЦТ') +
+      `<h3>Найдено</h3><div class="rec">` + SHK.map(k => step1(SHAPES[k].n, S.found[k] ? 'центр тяжести найден ✓' : `линий: ${(S.lines[k] || []).length}`)).join('') + `</div>`;
+  }
+  if (id === 'cond') {
+    h = `<h2>${S.setup === 'beam' ? 'Балка на двух опорах' : 'Кронштейн с тросом'}</h2>` + chips('Опыт', [['st-beam', 'Балка', S.setup === 'beam'], ['st-bracket', 'Кронштейн', S.setup === 'bracket']]);
+    if (S.setup === 'beam') {
+      h += slider('inA', 'Груз 20 Н на делении', 5, 95, 5, S.xa) + slider('inB', 'Груз 10 Н на делении', 5, 95, 5, S.xb) + reads('N_A', 'N_B', 'сумма');
+      if (!S.ans) h += chips('Сколько покажут весы под опорой A?', ansOptions().map(v => ['na-' + v, nf(v) + ' Н', false]));
+      h += `<h3>Записи</h3><div class="rec">` + step1('реакция A', S.ans ? 'найдена ✓' : '—') + step1('опоры поровну', S.eq ? `грузы на ${S.eq.xa} и ${S.eq.xb} см ✓` : '—') + `</div>`;
+    } else {
+      h += chips('Крепление троса (угол α)', BR.angs.map(a => ['ang-' + a, a + '°', S.ang === a])) + slider('inL', 'Фонарь 20 Н от стены', 10, 60, 5, S.xl) + reads('T троса', 'плечо d', 'P · x');
+      h += `<h3>Записи</h3><div class="rec">` + step1('фонарь на конце, T ≤ 30 Н', S.br ? `α = ${S.br.ang}°, T = ${fmt(S.br.T, 1)} Н ✓` : '—') + `</div>`;
+    }
+  }
+  if (id === 'kinds') {
+    h = `<h2>Виды равновесия</h2>` + chips('Опыт', ['bowl', 'dome', 'flat', 'toy'].map(k => ['k-' + k, SH3[k], S.sh3 === k]));
+    if (S.sh3 !== 'toy') { h += chips('Действия', [['push', 'Толкнуть', false], ['reset3', 'Вернуть шарик', false]]) + reads('сдвиг', 'высота ЦТ', 'скорость'); if (S.pushed && !S.cls[S.sh3]) h += chips('Какое здесь равновесие?', [['cl-stable', 'Устойчивое'], ['cl-unstable', 'Неустойчивое'], ['cl-neutral', 'Безразличное']]); }
+    else h += chips('Где груз', [['toy-low', 'Внизу, в донышке', S.toy === 'low'], ['toy-high', 'В голове', S.toy === 'high']]) + chips('Действия', [['toy-tilt', S.lying ? 'Поставить' : 'Наклонить', false]]) + reads('наклон', 'высота ЦТ', 'состояние');
+    h += `<h3>Записи</h3><div class="rec">` + ['bowl', 'dome', 'flat'].map(k => step1(SH3[k], S.cls[k] ? KN[KIND[k]] + ' ✓' : '—')).join('') + step1('ванька-встанька, груз внизу', S.toyLow ? 'встаёт ✓' : '—') + step1('груз в голове', S.toyHigh ? 'падает ✓' : '—') + `</div>`;
+  }
+  if (id === 'tip') {
+    h = `<h2>${S.setup === 'slope' ? 'Шкаф на наклонной доске' : 'Башенный кран'}</h2>` + chips('Опыт', [['st-slope', 'Доска', S.setup === 'slope'], ['st-crane', 'Кран', S.setup === 'crane']]);
+    if (S.setup === 'slope') h += chips('Что стоит на доске', Object.keys(OBJ).map(k => ['o-' + k, OBJ[k].n, S.obj === k])) + slider('inAl', 'Наклон доски', 0, SL.amax, 1, S.al) + reads('угол α', 'tg α', 'состояние') + chips('', [['reset4', 'Поставить заново', false]]) +
+      `<h3>Записи</h3><div class="rec">` + Object.keys(OBJ).map(k => step1(OBJ[k].n, S.tipRec[k] != null ? `опрокинулся при ${S.tipRec[k]}°` : '—')).join('') + `</div>`;
+    else h += chips('Противовес', CR.ws.map(w => ['wc-' + w, w + ' кН', S.wc === w])) + chips('Груз на крюке', [['p-0', 'Нет', S.P === 0], ['p-20', '20 кН', S.P === 20]]) + slider('inX', 'Вылет тележки', 4, 20, 1, S.xt) + reads('общий ЦТ', 'опоры', 'кран') + (S.cfall ? chips('', [['cup', 'Поднять кран', false]]) : '') +
+      `<h3>Записи</h3><div class="rec">` + CR.ws.map(w => { const r = S.crOk[w] || {}; return step1('противовес ' + w + ' кН', `${r.e ? 'пустой стоит ✓' : 'пустой —'} · ${r.l ? '20 кН на 20 м ✓' : '20 кН на 20 м —'}`); }).join('') + `</div>`;
+  }
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn); };
+  on('#inA', e => { S.xa = +e.target.value; update(); });
+  on('#inB', e => { S.xb = +e.target.value; update(); });
+  on('#inL', e => { S.xl = +e.target.value; update(); });
+  on('#inAl', e => setAl(+e.target.value));
+  on('#inX', e => setXt(+e.target.value));
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (id === 'cg') { set('#r1', Math.round(Math.abs(Math.atan2(Math.sin(S.th - th0()), Math.cos(S.th - th0()))) * DEG) + '°'); set('#r2', (S.lines[S.shape] || []).length); set('#r3', (S.lines[S.shape] || []).length >= 2 ? 'найден' : '—'); }
+  if (id === 'cond' && S.setup === 'beam') { set('#inAO', S.xa + ' см'); set('#inBO', S.xb + ' см'); val('#inA', S.xa); val('#inB', S.xb); set('#r1', S.ans ? fmt(m.NA, 1) + ' Н' : '?'); set('#r2', S.ans ? fmt(m.NB, 1) + ' Н' : '?'); set('#r3', '40 Н'); }
+  if (id === 'cond' && S.setup === 'bracket') { set('#inLO', S.xl + ' см'); val('#inL', S.xl); set('#r1', fmt(m.T, 1) + ' Н'); set('#r2', fmt(BR.l * Math.sin(S.ang / DEG), 1) + ' см'); set('#r3', BR.P * S.xl + ' Н·см'); }
+  if (id === 'kinds') {
+    if (S.sh3 !== 'toy') { const [, by] = ballPos(); set('#r1', fmt(S.u / 10, 1) + ' см'); set('#r2', fmt((yRest() - by) / 10, 1) + ' см'); set('#r3', fmt(Math.abs(S.v) / 10, 1) + ' см/с'); }
+    else { set('#r1', Math.round(Math.abs(S.phi) * DEG) + '°'); set('#r2', fmt(toyAy() * (1 - Math.cos(S.phi)) / 10, 1) + ' см'); set('#r3', S.lying ? 'упала' : Math.abs(S.phi) < 0.01 ? 'стоит' : 'качается'); }
+  }
+  if (id === 'tip' && S.setup === 'slope') { set('#inAlO', S.al + '°'); val('#inAl', S.al); set('#r1', S.al + '°'); set('#r2', fmt(Math.tan(S.al / DEG), 2)); set('#r3', S.fallen ? 'упал' : S.tipping ? 'падает' : 'стоит'); }
+  if (id === 'tip' && S.setup === 'crane') { set('#inXO', S.xt + ' м'); val('#inX', S.xt); set('#r1', fmt(m.xc, 2) + ' м'); set('#r2', '±2,5 м'); set('#r3', S.cfall ? 'упал' : 'стоит'); }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'cg') return [
+    { id: 'stand', icon: ICON.stand, name: 'Штатив с гвоздиком', spec: 'На гвоздик вешают пластину и отвес. Пластина свободно поворачивается вокруг него.' },
+    { id: 'plate', icon: ICON.plate, name: 'Пластина: ' + SHAPES[S.shape].n.toLowerCase(), spec: 'Плотный картон одинаковой толщины. Форму меняют кнопками внизу. Пластину можно качнуть мышкой.' },
+    { id: 'holes', icon: ICON.holes, name: 'Отверстия', spec: 'Нажмите на отверстие — пластина повиснет на нём. Оранжевым обведено текущее.' },
+    { id: 'plumb', icon: ICON.plumb, name: 'Отвес', spec: 'Нить с грузиком висит строго вертикально — по ней проводят линию на пластине.' },
+    { id: 'lines', icon: ICON.lines, name: 'Линии по отвесу', spec: 'Каждая проходит через центр тяжести. Две линии пересекаются в нём.' },
+    { id: 'cgm', icon: ICON.cgm, name: 'Центр тяжести (ЦТ)', spec: 'Появляется, когда проведены две линии. После успокоения он всегда точно под гвоздиком.' }];
+  if (id === 'cond' && S.setup === 'beam') return [
+    { id: 'beam', icon: ICON.beam, name: 'Балка 1 м, 10 Н', spec: 'Деревянная, однородная: её вес приложен посередине, на 50 см. Деления — через 10 см.' },
+    { id: 'loads', icon: ICON.loads, name: 'Грузы 20 Н и 10 Н', spec: 'Чугунные. Перетаскивайте вдоль балки мышкой, шаг 5 см.' },
+    { id: 'sup', icon: ICON.sup, name: 'Опоры A и B', spec: 'Треугольные призмы под концами балки (0 и 100 см). Давят на балку вверх с силами N_A и N_B.' },
+    { id: 'scales', icon: ICON.scales, name: 'Весы под опорами', spec: 'Показывают, с какой силой балка давит на каждую опору. Откроются после ответа.' },
+    { id: 'forces', icon: ICON.forces, name: 'Силы', spec: 'Красные — силы тяжести (вниз), зелёные — реакции опор (вверх).' }];
+  if (id === 'cond') return [
+    { id: 'wall', icon: ICON.wall, name: 'Стена', spec: 'Держит шарнир стержня и крепления троса на трёх высотах. Нажмите на крепление, чтобы перевесить трос.' },
+    { id: 'rod', icon: ICON.rod, name: 'Стержень 60 см на шарнире', spec: 'Лёгкий: его весом пренебрегаем. Шарнир не мешает стержню поворачиваться — держит только трос.' },
+    { id: 'cable', icon: ICON.cable, name: 'Трос', spec: 'Выдерживает не больше 30 Н. Перегруженный трос краснеет.' },
+    { id: 'sensor', icon: ICON.sensor, name: 'Датчик силы', spec: 'Встроен в трос и показывает силу натяжения T.' },
+    { id: 'lamp', icon: ICON.lamp, name: 'Фонарь 20 Н', spec: 'Перетаскивайте вдоль стержня мышкой, шаг 5 см.' }];
+  if (id === 'kinds' && S.sh3 === 'toy') return [
+    { id: 'toy', icon: ICON.toy, name: 'Ванька-встанька', spec: 'Донышко — половина шара. Наклоняйте мышкой: игрушка катится по столу, точка опоры всегда под центром донышка.' },
+    { id: 'cgm', icon: ICON.cgm, name: 'Центр тяжести', spec: 'С грузом внизу он ниже центра донышка, с грузом в голове — выше.' },
+    { id: 'surface', icon: ICON.flat, name: 'Опора', spec: 'Голубой треугольник: точка, которой игрушка касается стола.' }];
+  if (id === 'kinds') return [
+    { id: 'surface', icon: ICON[S.sh3], name: SH3[S.sh3], spec: { bowl: 'Деревянная чаша: дно — самая низкая точка.', dome: 'Деревянный купол: вершина — самая высокая точка.', flat: 'Ровная горизонтальная доска с бортиками на концах.' }[S.sh3] },
+    { id: 'ball', icon: ICON.ball, name: 'Стальной шарик', spec: 'Перетащите в сторону и отпустите или нажмите «Толкнуть».' },
+    { id: 'cgm', icon: ICON.cgm, name: 'Центр тяжести шарика', spec: 'Красная точка в центре шарика.' },
+    { id: 'level', icon: ICON.level, name: 'Уровень покоя', spec: 'Где был центр шарика в равновесии. Голубая метка показывает, на сколько он поднялся или опустился.' }];
+  if (S.setup === 'slope') return [
+    { id: 'board', icon: ICON.board, name: 'Доска на шарнире', spec: 'Шершавая: шкаф по ней не скользит. Угол наклона α меняется от 0 до 50°.' },
+    { id: 'lift', icon: ICON.lift, name: 'Подъёмная стойка', spec: 'Тяните оранжевое кольцо вверх или жмите «+1°».' },
+    { id: 'stop', icon: ICON.stop, name: 'Упор', spec: 'Не даёт шкафу съехать: шкаф может только опрокинуться через нижний край.' },
+    { id: 'obj', icon: S.obj === 'cube' ? ICON.cube : S.obj === 'tallw' ? ICON.objw : ICON.obj, name: OBJ[S.obj].n, spec: `Основание ${OBJ[S.obj].b} см, высота ${OBJ[S.obj].h} см, центр тяжести на высоте ${OBJ[S.obj].hc} см. Нажмите — поставить заново.` },
+    { id: 'plumb', icon: ICON.plumb, name: 'Вертикаль через ЦТ', spec: 'Зелёная — попадает в основание (зелёная полоска), красная — вышла за край.' }];
+  return [
+    { id: 'tower', icon: ICON.tower, name: 'Башня с кабиной', spec: 'Башня и стрела весят 100 кН; их общий центр тяжести на 1 м впереди оси башни.' },
+    { id: 'jib', icon: ICON.jib, name: 'Стрела и противострела', spec: 'Стрела — 22 м вперёд, противострела — 9 м назад.' },
+    { id: 'cw', icon: ICON.cw, name: 'Противовес', spec: 'Бетонные блоки по 30 кН на 7 м позади башни.' },
+    { id: 'trolley', icon: ICON.trolley, name: 'Тележка и груз 20 кН', spec: 'Тележку тяните по стреле мышкой: вылет от 4 до 20 м.' },
+    { id: 'base', icon: ICON.base, name: 'Опоры крана', spec: 'Расставлены на ±2,5 м от оси. Общий центр тяжести должен оставаться между ними.' }];
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      (Ls.safe ? `<div class="safe"><b>Безопасность</b>${Ls.safe}</div>` : '') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Что на площадке</h2><p class="note">Нажмите на деталь, чтобы найти её на площадке.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'cg') {
+    const n = (S.lines[S.shape] || []).length, where = { rect: 'на пересечении диагоналей, в центре симметрии', tri: 'на пересечении медиан, на 1/3 высоты от каждой стороны', corner: 'вне пластины — в пустом углу уголка', blob: 'там, где пересеклись линии: его находят опытом' }[S.shape];
+    return `<h2>Центр тяжести</h2><div class="formula">x = (m₁x₁ + m₂x₂) / (m₁ + m₂)</div><p class="note">Тело можно мысленно разбить на простые части. Центр тяжести — это «среднее» положение частей, где каждая часть входит со своей массой (у однородной пластины масса пропорциональна площади).</p>
+      <h3>${SHAPES[S.shape].n}</h3><div class="steps">` + step1('линий проведено', n) + step1('центр тяжести', n >= 2 ? 'найден' : 'нужны 2 линии', 'sum') + `</div><p class="note" style="margin-top:10px">Где он: ${where}.</p>
+      <h3>Расчёт для уголка</h3><div class="steps">` + step1('полоса 4 × 15 см', 'S₁ = 60 см², центр x₁ = −5 см') + step1('полоса 10,5 × 4 см', 'S₂ = 42 см², центр x₂ = 2,25 см') +
+      step1('x центра тяжести', '(60·(−5) + 42·2,25) / 102 ≈ −2,0 см', 'sum') + `</div><p class="note" style="margin-top:10px">Координаты отсчитаны от середины пластины. Точка x ≈ −2 см, y ≈ 2,3 см лежит в вырезе — вне материала.</p>`;
+  }
+  if (id === 'cond' && S.setup === 'beam') {
+    const R = reac(), mom = BM.Pb * 50 + LA * S.xa + LB * S.xb, q = v => S.ans ? fmt(v, 1) + ' Н' : '?';
+    return `<h2>Балка на двух опорах</h2><div class="formula">ΣF = 0    ΣM = 0</div><p class="note">Опоры — под концами балки, на 0 и 100 см. Ось моментов — в опоре A: у силы N_A плечо 0, и она выпадает из уравнения.</p>
+      <h3>Моменты относительно опоры A</h3><div class="steps">` + step1('балка 10 Н × 50 см', '500 Н·см') + step1(`груз 20 Н × ${S.xa} см`, `${LA * S.xa} Н·см`) + step1(`груз 10 Н × ${S.xb} см`, `${LB * S.xb} Н·см`) +
+      step1('N_B × 100 см =', `${mom} Н·см`, 'sum') + step1('N_B', q(R.NB)) + `</div>
+      <h3>Сумма сил</h3><div class="steps">` + step1('N_A + N_B', '10 + 20 + 10 = 40 Н') + step1('N_A = 40 − N_B', q(R.NA), 'sum') + `</div>
+      <p class="note" style="margin-top:10px">Опоры нагружены поровну, когда моменты грузов относительно середины балки равны: 20 · (50 − x₁) = 10 · (x₂ − 50).</p>`;
+  }
+  if (id === 'cond') {
+    const sa = Math.sin(S.ang / DEG), d = BR.l * sa;
+    return `<h2>Кронштейн</h2><div class="formula">T · d = P · x</div><p class="note">Ось моментов — в шарнире: сила шарнира плеча не имеет. d = l · sin α — плечо силы натяжения (перпендикуляр из шарнира на трос), x — плечо веса фонаря.</p>
+      <h3>Сейчас</h3><div class="steps">` + step1('плечо d = 60 · sin ' + S.ang + '°', `${fmt(d, 1)} см`) + step1('момент веса P · x', `20 × ${S.xl} = ${20 * S.xl} Н·см`) + step1('T = P · x / d', `${20 * S.xl} / ${fmt(d, 1)} = ${fmt(tens(), 1)} Н`, 'sum') + `</div>
+      <h3>Фонарь на конце (x = 60 см)</h3><div class="steps">` + BR.angs.map(a => step1('α = ' + a + '°', `T = 20 / sin ${a}° = ${fmt(20 / Math.sin(a / DEG), 1)} Н`)).join('') + `</div>
+      <p class="note" style="margin-top:10px">Чем выше крепление троса, тем больше угол α и плечо d — и тем меньше натяжение.</p>`;
+  }
+  if (id === 'kinds') {
+    if (S.sh3 === 'toy') { const a = toyAy(); return `<h2>Ванька-встанька</h2><div class="formula">h = R − a · cos φ</div><p class="note">h — высота центра тяжести над столом, R — радиус донышка, a — расстояние от центра донышка до центра тяжести (вниз — плюс), φ — угол наклона.</p>
+      <h3>Сейчас</h3><div class="steps">` + step1('R', '4,6 см') + step1('a', S.toy === 'low' ? '+2 см (ЦТ ниже центра)' : '−3 см (ЦТ выше центра)') + step1('наклон φ', Math.round(Math.abs(S.phi) * DEG) + '°') + step1('ЦТ поднялся на', fmt(a * (1 - Math.cos(S.phi)) / 10, 2) + ' см', 'sum') + `</div>
+      <p class="note" style="margin-top:10px">Если a > 0, при наклоне h растёт — игрушка возвращается: равновесие устойчивое. Если a < 0, h уменьшается — игрушка падает.</p>`; }
+    const [, by] = ballPos(), dh = (yRest() - by) / 10;
+    return `<h2>Высота центра тяжести</h2><div class="formula">Eп = m · g · h</div><p class="note">Тело само движется туда, где его потенциальная энергия меньше, то есть где центр тяжести ниже.</p>
+      <div class="steps">` + step1('чаша', 'при сдвиге ЦТ выше → назад') + step1('купол', 'при сдвиге ЦТ ниже → прочь') + step1('стол', 'ЦТ на той же высоте') + `</div>
+      <h3>Сейчас: ${SH3[S.sh3].toLowerCase()}</h3><div class="steps">` + step1('сдвиг шарика', fmt(S.u / 10, 1) + ' см') + step1('ЦТ относительно покоя', (dh >= 0 ? '+' : '') + fmt(dh, 2) + ' см', 'sum') + `</div>`;
+  }
+  if (S.setup === 'slope') {
+    const o = OBJ[S.obj];
+    return `<h2>Когда тело опрокинется</h2><div class="formula">tg α = (b / 2) / h</div><p class="note">b — ширина основания, h — высота центра тяжести. При таком угле вертикаль через центр тяжести проходит точно через нижний край основания.</p>
+      <h3>${o.n}</h3><div class="steps">` + step1('b / 2', o.b / 2 + ' см') + step1('h', o.hc + ' см') + step1('tg α = (b/2) / h', fmt(o.b / 2 / o.hc, 2)) + step1('сейчас tg ' + S.al + '°', fmt(Math.tan(S.al / DEG), 2), 'sum') + `</div>
+      <h3>Записи</h3><div class="steps">` + Object.keys(OBJ).map(k => step1(OBJ[k].n, S.tipRec[k] != null ? `${S.tipRec[k]}°` : '—')).join('') + `</div>
+      <p class="note" style="margin-top:10px">Шире основание или ниже центр тяжести — больше tg α, тело устойчивее.</p>`;
+  }
+  const xc = craneXc();
+  return `<h2>Устойчивость крана</h2><div class="formula">x = Σ Pᵢ xᵢ / Σ Pᵢ</div><p class="note">Координаты — от оси башни, вперёд — плюс. Кран стоит, пока общий центр тяжести между опорами: −2,5 м ≤ x ≤ 2,5 м.</p>
+    <h3>Сейчас</h3><div class="steps">` + step1('башня и стрела', '100 кН × 1 м') + step1('противовес', `${S.wc} кН × (−7 м)`) + step1('груз', `${S.P} кН × ${S.xt} м`) +
+    step1('x', `(100 − ${7 * S.wc} + ${S.P * S.xt}) / ${100 + S.wc + S.P} = ${fmt(xc, 2)} м`, 'sum') + `</div>
+    <p class="note" style="margin-top:10px">${Math.abs(xc) <= CR.edge ? 'Центр тяжести между опорами — кран стоит.' : xc > 0 ? 'Центр тяжести впереди передних опор — кран опрокидывается вперёд.' : 'Центр тяжести позади задних опор — кран опрокидывается назад.'}</p>`;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter');
+  const row = (a, b, cls) => `<div class="lr"><span>${a}</span><span class="${cls || ''}">${b}</span></div>`;
+  if (id === 'cg') { const n = (S.lines[S.shape] || []).length, e = Math.round(Math.abs(Math.atan2(Math.sin(S.th - th0()), Math.cos(S.th - th0()))) * DEG); el.innerHTML = `<div class="k">Пластина</div><div class="v">${SHAPES[S.shape].n}</div>` + row('отверстие', S.hole + 1) + row('отклонение', e + '°', e === 0 ? 'ok' : '') + row('линий', n) + row('ЦТ', n >= 2 ? 'найден' : '—', n >= 2 ? 'ok' : ''); }
+  else if (id === 'cond' && S.setup === 'beam') el.innerHTML = `<div class="k">Весы</div><div class="v ${S.ans ? 'ok' : ''}">A: ${S.ans ? nf(Math.round(m.NA * 10) / 10) : '?'} · B: ${S.ans ? nf(Math.round(m.NB * 10) / 10) : '?'}</div>` + row('ΣP', '40 Н') + row('N_A + N_B', S.ans ? '40 Н' : '?') + row('ΣF, ΣM', '0', 'ok');
+  else if (id === 'cond') { const over = m.T > BR.lim + 1e-9; el.innerHTML = `<div class="k">Натяжение троса</div><div class="v ${over ? 'bad' : 'ok'}">T = ${fmt(m.T, 1)} Н</div>` + row('угол α', S.ang + '°') + row('фонарь x', S.xl + ' см') + row('предел', '30 Н', over ? 'bad' : ''); }
+  else if (id === 'kinds' && S.sh3 !== 'toy') { const [, by] = ballPos(), dh = (yRest() - by) / 10, mv = Math.abs(S.v) > 0.5 || S.drop > 0; el.innerHTML = `<div class="k">${SH3[S.sh3]}</div><div class="v">${mv ? 'катится' : 'покой'}</div>` + row('сдвиг', fmt(S.u / 10, 1) + ' см') + row('ЦТ', (dh >= 0 ? '+' : '') + fmt(dh, 1) + ' см', dh > 0.05 ? 'ok' : dh < -0.05 ? 'bad' : ''); }
+  else if (id === 'kinds') el.innerHTML = `<div class="k">Ванька-встанька</div><div class="v ${S.lying ? 'bad' : ''}">${S.lying ? 'упала' : Math.abs(S.phi) < 0.01 ? 'стоит' : 'качается'}</div>` + row('наклон', Math.round(Math.abs(S.phi) * DEG) + '°') + row('груз', S.toy === 'low' ? 'внизу' : 'в голове') + row('ЦТ', (toyAy() >= 0 ? '+' : '−') + fmt(Math.abs(toyAy() * (1 - Math.cos(S.phi))) / 10, 1) + ' см');
+  else if (S.setup === 'slope') el.innerHTML = `<div class="k">Наклон доски</div><div class="v ${S.fallen || S.tipping ? 'bad' : ''}">α = ${S.al}°</div>` + row('tg α', fmt(Math.tan(S.al / DEG), 2)) + row('шкаф', S.fallen ? 'упал' : S.tipping ? 'падает' : 'стоит', S.fallen || S.tipping ? 'bad' : 'ok');
+  else { const ok = craneOk() && !S.cfall; el.innerHTML = `<div class="k">Общий ЦТ крана</div><div class="v ${ok ? 'ok' : 'bad'}">x = ${fmt(m.xc, 2)} м</div>` + row('опоры', '±2,5 м') + row('противовес', S.wc + ' кН') + row('груз · вылет', `${S.P} кН · ${S.xt} м`) + row('кран', S.cfall ? 'упал' : 'стоит', ok ? 'ok' : 'bad'); }
+}
+
+function update() {
+  latch();
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Теперь вы знаете, почему тела стоят, качаются и падают!'), 2200);
+  }
+  renderTools();
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  cg: '<path d="M44 3H58V28" stroke="#6c7a96" stroke-width="2" fill="none"/><path d="M24 7l15-3 6 12-9 11-14-4z" fill="#e3cfa6"/><path d="M39 4v24" stroke="#e8ecf4" stroke-width="1"/><path d="M24 7l15 14M39 4L28 22" stroke="#2f6fd8" stroke-width="1.2"/><circle cx="33" cy="14" r="2.2" fill="#ff8a73"/>',
+  cond: '<rect x="6" y="11" width="54" height="4" fill="#c98f55"/><path d="M8 15l-4 7h8zM58 15l-4 7h8z" fill="#6c7a96"/><rect x="18" y="5" width="9" height="6" rx="1" fill="#7d8799"/><rect x="40" y="7" width="7" height="4" rx="1" fill="#7d8799"/><path d="M8 28v-5M58 28v-5" stroke="#86e0a8" stroke-width="1.6"/>',
+  kinds: '<path d="M2 14Q11 30 20 14V28H2z" fill="#b47944"/><circle cx="11" cy="18" r="3" fill="#c6ccd6"/><path d="M24 28V22Q33 6 42 22V28z" fill="#b47944"/><circle cx="33" cy="11" r="3" fill="#c6ccd6"/><rect x="46" y="20" width="18" height="8" fill="#b47944"/><circle cx="55" cy="17" r="3" fill="#c6ccd6"/>',
+  tip: '<path d="M4 27L40 13l1 2L5 29z" fill="#c98f55"/><g transform="translate(22 20) rotate(-21)"><rect x="-3" y="-15" width="7" height="15" fill="#b47944"/></g><path d="M50 27V8M44 8h20" stroke="#f2c94c" stroke-width="2"/><rect x="42" y="9" width="5" height="4" fill="#9aa3b2"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Lx, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Lx.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Lx.title}</span></span>
+      ${S.done[Lx.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  S.lesson = i; drag = null;
+  resetState(); save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L().task;
+  $('#hint').textContent = L().stage;
+  toolsHTML = ''; renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '';
+  if (id === 'cg') now = `Картонная пластина «${SHAPES[S.shape].n}» висит на гвоздике за отверстие №${S.hole + 1}, рядом с гвоздика свисает отвес. Отклонение от равновесия ${Math.round(Math.abs(Math.atan2(Math.sin(S.th - th0()), Math.cos(S.th - th0()))) * DEG)}°. Проведено линий по отвесу на этой пластине: ${(S.lines[S.shape] || []).length}. Центр тяжести найден: ${SHK.filter(k => S.found[k]).map(k => SHAPES[k].n).join(', ') || 'пока ни у одной'}. Не говори, где центр тяжести, — наводи: где оказывается центр тяжести подвешенного тела, сколько линий нужно, чтобы найти точку.`;
+  if (id === 'cond' && S.setup === 'beam') { const R = reac(); now = `Однородная балка 1 м весом 10 Н лежит концами на двух опорах (0 и 100 см), под опорами весы. Груз 20 Н стоит на ${S.xa} см, груз 10 Н — на ${S.xb} см. Реакции: N_A = ${fmt(R.NA, 1)} Н, N_B = ${fmt(R.NB, 1)} Н (ученик видит их, только если ответил: ${S.ans ? 'ответил верно' : 'ещё нет — не называй числа, наводи к уравнению моментов относительно опоры'}). Опоры поровну: ${S.eq ? 'сделано' : 'нет'}.`; }
+  if (id === 'cond' && S.setup === 'bracket') now = `Кронштейн: лёгкий стержень 60 см на шарнире в стене, трос от конца стержня к стене под углом ${S.ang}° к стержню. Фонарь 20 Н висит в ${S.xl} см от стены. Натяжение троса ${fmt(tens(), 1)} Н, трос выдерживает 30 Н. Подзадача (фонарь на конце, T ≤ 30 Н): ${S.br ? 'сделано' : 'нет'}. Нужный угол не называй — наводи к T · l · sin α = P · x.`;
+  if (id === 'kinds') now = S.sh3 === 'toy' ? `Ванька-встанька с грузом ${S.toy === 'low' ? 'в донышке (центр тяжести ниже центра донышка)' : 'в голове (центр тяжести выше центра донышка)'}; наклон ${Math.round(Math.abs(S.phi) * DEG)}°, ${S.lying ? 'игрушка упала' : 'стоит или качается'}.` : `Стальной шарик ${S.sh3 === 'bowl' ? 'в чаше' : S.sh3 === 'dome' ? 'на куполе' : 'на ровном столе'}, сдвиг ${fmt(S.u / 10, 1)} см${S.off ? ', скатился с купола на стол' : ''}.`;
+  if (id === 'kinds') now += ` Определено: ${['bowl', 'dome', 'flat'].filter(k => S.cls[k]).map(k => SH3[k]).join(', ') || 'ничего'}; игрушка с грузом внизу — ${S.toyLow ? 'проверена' : 'нет'}, с грузом в голове — ${S.toyHigh ? 'проверена' : 'нет'}. Вид равновесия не называй — спроси, вернулся ли шарик и поднялся ли центр тяжести.`;
+  if (id === 'tip' && S.setup === 'slope') now = `${OBJ[S.obj].n} (основание ${OBJ[S.obj].b} см, центр тяжести на высоте ${OBJ[S.obj].hc} см) стоит у упора на доске, наклонённой на ${S.al}°; ${S.fallen ? `опрокинулся при ${S.tipAl}°` : S.tipping ? 'опрокидывается' : 'стоит'}. Записи: ${Object.keys(OBJ).filter(k => S.tipRec[k] != null).map(k => `${OBJ[k].n} — ${S.tipRec[k]}°`).join('; ') || 'нет'}. Наводи к tg α = (b/2)/h.`;
+  if (id === 'tip' && S.setup === 'crane') now = `Башенный кран: башня со стрелой 100 кН (ЦТ на +1 м), противовес ${S.wc} кН на −7 м, груз ${S.P} кН на вылете ${S.xt} м, опоры на ±2,5 м. Общий ЦТ x = ${fmt(craneXc(), 2)} м; кран ${S.cfall ? 'опрокинулся' : 'стоит'}. Подходящий противовес не называй — наводи к расчёту x для пустого крана и с грузом.`;
+  if (id === 'tip') now += ` Подзадачи: высокий шкаф — ${S.tipRec.tall != null ? 'сделано' : 'нет'}, с грузом внизу — ${S.tipRec.tallw != null ? 'сделано' : 'нет'}, кран — ${S.crane ? 'сделано' : 'нет'}.`;
+  return [
+    `Раздел: физика, 7–10 класс, тема «Статика: равновесие тел». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}». g ≈ 10 Н/кг.`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'} (${taskState(m)}).`,
+    `Сейчас на площадке: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Помогай наводящими вопросами, готовые ответы не выдавай.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { cg: 'Почему центр тяжести может оказаться вне тела?', cond: 'Почему ось моментов удобно брать в опоре?', kinds: 'Как роботы держат равновесие при ходьбе?', tip: 'Почему Пизанская башня не падает?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-statics.js): the same set-up as real lab equipment
+window.LUCH_REAL = () => {
+  const id = LID(), M = { module: 'statics' };
+  if (id === 'cg') {
+    const sh = SHAPES[S.shape], ls = S.lines[S.shape] || [];
+    return { ...M, scene: 'statics-cg', help: 'Пластина — следующее отверстие, гвоздик — провести линию', shape: S.shape, name: sh.n, pts: sh.pts, holes: sh.holes, hole: S.hole,
+      lines: ls.map(i => runs(sh, lineSeg(sh, sh.holes[i]))).flat(), cg: ls.length >= 2 ? sh.c.map(v => Math.round(v * 10) / 10) : null };
+  }
+  if (id === 'cond' && S.setup === 'beam') { const R = reac(); return { ...M, scene: 'statics-beam', help: 'Груз — передвинуть на 5 см', xa: S.xa, xb: S.xb, show: S.ans, NA: Math.round(R.NA * 10) / 10, NB: Math.round(R.NB * 10) / 10 }; }
+  if (id === 'cond') return { ...M, scene: 'statics-bracket', help: 'Крепление троса — сменить угол, фонарь — сдвинуть', ang: S.ang, angs: BR.angs, xl: S.xl, T: Math.round(tens() * 10) / 10, over: tens() > BR.lim + 1e-9 };
+  if (id === 'kinds') return { ...M, scene: 'statics-kinds', help: S.sh3 === 'toy' ? 'Игрушка — наклонить' : 'Шарик — толкнуть, основание — сменить опыт', sh3: S.sh3, toy: S.toy };
+  if (S.setup === 'slope') return { ...M, scene: 'statics-slope', help: 'Стойка — наклон +5°, шкаф — поставить заново', obj: S.obj, o: OBJ[S.obj], xc: SL.xc, L: SL.L, px: SL.px };
+  return { ...M, scene: 'statics-crane', help: 'Тележка — дальше, противовес — сменить, груз — снять/повесить', wc: S.wc, P: S.P, fall: S.cfall };
+};
+window.LUCH_REAL.live = () => ({ th: S.th, u: S.u, off: S.off, drop: S.drop, phi: S.phi, al: S.al, beta: S.beta, fallen: S.fallen, xt: S.xt, ct: S.ct, xc: craneXc(), ok: craneOk() });
+window.LUCH_REAL.click = k => {
+  if (k === 'plate') return act('hole-next');
+  if (k === 'pin') return act('line');
+  if (k === 'lift') { if (S.fallen) return act('reset4'); return act(S.al >= SL.amax ? 'reset4' : 'up5'); }
+  if (k === 'tr+') { if (S.xt >= 20) return setXt(4); }
+  act(k);
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

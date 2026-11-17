@@ -1,0 +1,1160 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по физике, 10 класс: неразрывность струи, закон Бернулли, подъёмная сила крыла, сопротивление и обтекаемость.">
+<title>Жидкости и газы в движении</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene [data-click]{cursor:pointer}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.meter .lr .ok{color:var(--ok)}
+.meter .lr .bad{color:var(--warn)}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button.rec{color:var(--force)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.rec{display:grid;gap:4px;margin-top:8px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<script src="/luch/splash.js"></script>
+<div class="app">
+  <header>
+    <div class="brand" role="link" tabindex="0" title="Карта предметов" style="cursor:pointer" onclick="location.href='/'" onkeydown="if(event.key==='Enter')location.href='/'">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M9.6 14.6 9.2 6.2 15 10.6Q20 9.4 25 10.6L30.8 6.2 30.4 14.6Q34.6 22 31.6 29Q27.6 36 20 36Q12.4 36 8.4 29Q5.4 22 9.6 14.6Z" fill="#ffb547"/><path d="M20 14Q15.2 10.8 10.9 13.4Q7.6 17.2 9.4 21.8Q11.6 25.8 15.9 25.4Q18.5 25.1 20 27.1Q21.5 25.1 24.1 25.4Q28.4 25.8 30.6 21.8Q32.4 17.2 29.1 13.4Q24.8 10.8 20 14Z" fill="#ffd896"/><circle cx="15" cy="18.8" r="5" fill="#fffaf0"/><circle cx="25" cy="18.8" r="5" fill="#fffaf0"/><circle cx="15.6" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="24.4" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="16.6" cy="18.1" r="1" fill="#fff"/><circle cx="25.4" cy="18.1" r="1" fill="#fff"/><path d="M18.6 23.4h2.8L20 26.6z" fill="#ff8a73"/><path d="M10.5 29.6Q15.3 27.4 20 29.7Q24.7 27.4 29.5 29.6V34.6Q24.7 32.6 20 34.8Q15.3 32.6 10.5 34.6Z" fill="#72d4e8"/><path d="M20 29.7V34.8" stroke="#0b1019" stroke-width="1.1"/><path d="M8.2 23.5Q5.6 28.6 9.4 32.6Q11.6 33.2 12.4 31Q10.4 28.4 8.2 23.5Z" fill="#e8962a"/><path d="M31.8 23.5Q34.4 28.6 30.6 32.6Q28.4 33.2 27.6 31Q29.6 28.4 31.8 23.5Z" fill="#e8962a"/><path d="M35 3.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" fill="#86e0a8"/></svg>
+      <div><h1>OPEN SCHOOL AI</h1><small>Доступное образование для всех</small></div>
+    </div>
+    <div class="headr">
+
+      <div class="prog" aria-label="Прогресс"><b>Гидродинамика</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Опытная площадка">
+    <svg class="scene" id="scene" role="img" aria-label="Площадка для опытов с потоками жидкости и воздуха. Ручки можно тянуть, детали — нажимать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const nf = x => fmt(x, Math.abs(x - Math.round(x)) < 1e-9 ? 0 : 1);
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+
+const LESSONS = [
+  { id: 'cont', title: 'Неразрывность струи',
+    text: ['Вода почти не сжимается и не скапливается в трубе: сколько её вошло в трубу за секунду, столько же проходит за секунду через любое сечение. Этот объём в секунду называют расходом: Q = S·v — площадь сечения, умноженная на скорость.',
+           'Раз расход везде одинаковый, S₁v₁ = S₂v₂ — это уравнение неразрывности струи. Где труба уже, там вода течёт быстрее: сечение меньше в 3 раза — скорость больше в 3 раза.',
+           'Поэтому, если прикрыть пальцем конец садового шланга, струя бьёт дальше: кран даёт тот же расход, а выход стал уже, и вода вылетает быстрее. Струя из шланга, который держат горизонтально на высоте h, летит как брошенный камень: дальность L = v·√(2h/g).'],
+    why: 'Инженеры систем охлаждения рассчитывают, с какой скоростью жидкость побежит по тонким каналам холодных пластин на процессорах: так охлаждают серверы дата-центров для ИИ, где воздух уже не справляется. Врачи по скорости крови в сосуде (её измеряет допплеровское УЗИ) находят сужения артерий: в узком месте кровь течёт быстрее. Форсунки двигателей, пожарные стволы, струйные принтеры и капельный полив работают на том же S·v = const. ИИ всё больше считает за инженеров, но заметить, что расчёт нарушил простой закон сохранения, может только тот, кто этот закон понимает.',
+    task: 'Подберите сечение наконечника, чтобы вода в нём текла в 3 раза быстрее, чем в шланге. Затем сожмите наконечник так, чтобы струя долетела до клумбы (2,0–2,4 м).',
+    hint: 'Сечение наконечника — кнопки «Сжать / Отпустить», ползунок на вкладке «Схема» или оранжевая ручка зажима. Кран меняет расход. Шланг держат горизонтально на высоте 1 м, g ≈ 9,8 Н/кг.',
+    stage: 'Тяните оранжевую ручку зажима вверх или вниз. Нажмите на кран — сменить расход.',
+    check: m => m.k3 && m.bed },
+  { id: 'bern', title: 'Закон Бернулли',
+    text: ['В трубке Вентури вода из широкой части попадает в узкую и разгоняется. Раз вода ускоряется, на неё действует сила — её создаёт разность давлений: позади, в широкой части, давление больше, впереди, в узкой, — меньше.',
+           'Закон Бернулли: где скорость потока больше, там давление меньше. Для горизонтальной трубы p + ρv²/2 = const, поэтому p₁ − p₂ = ρ(v₂² − v₁²)/2. Давление в каждом сечении видно по высоте воды в манометрической трубке: h = p / (ρg).',
+           'То же с воздухом. Если подуть между двумя листами бумаги, они не разлетаются, а сходятся: между ними воздух быстрый и давление ниже, чем снаружи. Занавеску в душе затягивает внутрь, а лёгкую крышу ураган срывает вверх по той же причине.'],
+    why: 'На законе Бернулли работают расходомеры в трубопроводах, пульверизаторы, кислородные маски Вентури в больницах. Трубка Пито на носу каждого самолёта и многих дронов измеряет скорость по разности давлений. Инженеры-гидравлики считают перепады давления в насосах и в контурах жидкостного охлаждения дата-центров, кардиологи по скорости крови оценивают перепад давления на суженном клапане сердца. Нейросети быстро моделируют течения, но поставить задачу, выбрать допущения и проверить ответ простым законом Бернулли может только человек, который его понимает.',
+    task: 'Включите поток при сужении в 2 раза и ответьте, где давление меньше. Подберите сужение и поток, чтобы уровни воды в трубках 1 и 2 отличались больше чем на 30 см. Затем подуйте между листами бумаги.',
+    hint: 'Поток — кнопки «Поток − / +», сужение — кнопки внизу или нажмите на узкую часть трубки, кран слева тоже меняет поток. Над осью трубы в сечении 1 вода стоит на 50 см. Лист бумаги — кнопка «Два листа».',
+    stage: 'Нажмите на кран — больше поток, на узкую часть — сменить сужение.',
+    check: m => m.ans && m.d30 && m.paper },
+  { id: 'lift', title: 'Подъёмная сила крыла',
+    text: ['Крыло самолёта изогнуто и стоит к потоку под небольшим углом — углом атаки α. Крыло отклоняет поток воздуха вниз, а над крылом воздух течёт быстрее, чем под ним. По закону Бернулли сверху давление меньше, снизу больше — разность давлений и создаёт подъёмную силу.',
+           'Подъёмная сила F = Cy·ρv²S/2, где S — площадь крыла, ρ ≈ 1,2 кг/м³ — плотность воздуха. Сила растёт как квадрат скорости: вдвое быстрее поток — вчетверо больше сила. Коэффициент Cy растёт с углом атаки.',
+           'Но слишком большой угол опасен: поток перестаёт огибать верх крыла, отрывается и закручивается вихрями. Подъёмная сила резко падает — это срыв потока. У обычного крыла критический угол атаки около 15°. Поэтому на взлёте самолёт разгоняется до нужной скорости, а не задирает нос.'],
+    why: 'Авиаинженеры рассчитывают крылья самолётов, лопасти вертолётов и винты дронов, инженеры ветроэнергетики — лопасти ветряков длиной больше 100 м: лопасть — то же крыло, и её подъёмная сила крутит генератор. Антикрыло болида «Формулы-1» перевёрнуто: его сила прижимает машину к трассе. Профили крыльев сейчас подбирают с помощью вычислительной гидродинамики (CFD) и ИИ, но CFD-инженер должен понимать срыв потока и закон v², чтобы отличить верный расчёт от красивой ошибки. Электросамолёты, дроны-доставщики и ветроэнергетика растут, и эти профессии будут нужны и через десять лет.',
+    task: 'При угле атаки 6° измерьте подъёмную силу при 10 и 20 м/с и ответьте, во сколько раз она выросла. Затем при 20 м/с увеличивайте угол атаки и найдите срыв потока.',
+    hint: 'Скорость ветра и угол атаки — кнопки внизу или ползунки на «Схеме»; угол меняет и оранжевая ручка на задней кромке крыла. Весы под трубой показывают подъёмную силу. Крыло 20 × 25 см, S = 0,05 м².',
+    stage: 'Тяните оранжевую ручку на крыле — угол атаки. Нажмите на вентилятор — сменить скорость.',
+    check: m => m.r10 && m.r20 && m.ans && m.stall },
+  { id: 'drag', title: 'Сопротивление и обтекаемость',
+    text: ['Тело, которое движется в воздухе или в воде, расталкивает частицы среды. Сила сопротивления направлена против движения. Позади плохо обтекаемого тела поток отрывается и образует вихревой след: там давление пониженное, и тело тянет назад.',
+           'Сила сопротивления F = Cx·ρv²S/2, где S — площадь поперечного сечения тела. Она растёт как квадрат скорости: на вдвое большей скорости сила вчетверо больше, а мощность на её преодоление N = F·v — ввосьмеро.',
+           'Коэффициент Cx зависит от формы. У пластинки поперёк потока Cx ≈ 1,2, у шара ≈ 0,47, у обтекаемого тела-«капли» ≈ 0,05 — в двадцать с лишним раз меньше, чем у пластинки того же сечения. Поэтому самолёты, машины и велошлемы делают обтекаемыми.'],
+    why: 'У электромобиля на трассе большая часть энергии батареи уходит на сопротивление воздуха, поэтому автомобильные аэродинамики борются за каждую сотую Cx — это десятки километров запаса хода. Велогонщик на скорости 50 км/ч тратит на воздух около 90% усилий, поэтому пригибается и надевает каплевидный шлем. Инженеры «Формулы-1» ищут баланс прижимной силы и сопротивления, конструкторы дронов и судов — форму корпусов. Аэродинамические трубы теперь дополняют расчётами на суперкомпьютерах и ИИ-моделями, а специалист, который понимает, откуда берётся вихревой след, нужен везде, где экономят энергию.',
+    task: 'При скорости 20 м/с измерьте сопротивление пластинки, шара и капли одинакового сечения. Затем для одного тела сравните силу при 10 и 20 м/с и ответьте, во сколько раз она выросла.',
+    hint: 'Тело и скорость — кнопки внизу или вкладка «Схема»; нажмите на тело в трубе, чтобы сменить его. Динамометр под трубой держит тело на подставке и показывает силу сопротивления. Сечение всех тел S = 0,01 м².',
+    stage: 'Нажмите на тело — сменить форму, на вентилятор — сменить скорость.',
+    check: m => m.p20 && m.s20 && m.d20 && m.ans },
+];
+
+// numbers stay with their units, «м/с» does not break at the slash
+LESSONS.forEach(l => ['task', 'hint', 'stage'].forEach(k => { l[k] = l[k].replace(/(\d) (м\/с|л\/с|см²|см|м²|м|Н|Па)(?![а-яё])/g, '$1\u00a0$2').replace(/м\/с/g, 'м/\u2060с'); }));
+
+const LS_KEY = 'luch-phys-fluids';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) {}
+const savedIdx = saved.lid ? LESSONS.findIndex(l => l.id === saved.lid) : saved.lesson | 0;
+const S = { lesson: clamp(savedIdx < 0 ? 0 : savedIdx, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify({ lesson: S.lesson, lid: LESSONS[S.lesson].id, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+
+// ---------- physics (water 1000 кг/м³, air 1,2 кг/м³, g ≈ 9,8 Н/кг) ----------
+const RHO_W = 1000, RHO_A = 1.2, G = 9.8;
+// 1. hose: S₁ = 3 см² (≈ ¾″ hose), held horizontally 1 m above the ground; Q in л/с, S in см² → v = 10·Q/S м/с
+const P1 = { S1: 3, H: 1, QS: [0.15, 0.3, 0.45], Smin: 0.5, Smax: 3, bed: [2.0, 2.4] };
+const tFall = Math.sqrt(2 * P1.H / G);
+const v1of = () => S.Q * 10 / P1.S1, v2of = () => S.Q * 10 / S.S2, rangeOf = () => v2of() * tFall;
+// 2. Venturi tube: S₁ = 4 см², water stands 50 см above the axis in tube 1 (pump keeps p₁ constant); no losses
+const VT = { S1: 4, h1: 50, Qmax: 0.4 };
+function vt() { const v1 = S.Qv * 10 / VT.S1, v2 = v1 * S.n, dh = (v2 * v2 - v1 * v1) / (2 * G) * 100; return { v1, v2, h1: VT.h1, h2: VT.h1 - dh, h3: VT.h1, dh, dp: RHO_W * (v2 * v2 - v1 * v1) / 2 }; }
+const dpAir = v => RHO_A * v * v / 2;
+// 3. wing 20 × 25 см (S = 0,05 м²), cambered profile: Cy = 0,25 + 0,09·α up to the critical 15°, then the flow separates
+const WG = { S: 0.05, acrit: 15, amin: -4, amax: 22 };
+const cyOf = a => a <= WG.acrit ? 0.25 + 0.09 * a : 1.15 - 0.035 * (a - WG.acrit);
+const liftOf = (v, a) => cyOf(a) * RHO_A * v * v * WG.S / 2;
+// 4. bodies of the same cross-section S = 0,01 м²
+const SH = { plate: { n: 'Пластинка', cx: 1.17 }, sphere: { n: 'Шар', cx: 0.47 }, drop: { n: 'Капля', cx: 0.05 }, car: { n: 'Модель машины', cx: 0.30 } };
+const SHAPES = ['plate', 'sphere', 'drop', 'car'], A4 = 0.01;
+const dragOf = (v, sh) => SH[sh].cx * RHO_A * v * v * A4 / 2;
+const qOf = v => RHO_A * v * v / 2;
+
+function resetState() {
+  Object.assign(S, { Q: 0.3, S2: 3, k3: null, bed: null,
+    setup: 'venturi', Qv: 0.1, n: 2, vb: 0, ans: false, d30: null, paper: null,
+    v: 5, a: 6, rec3: {}, stall: null, shape: 'plate', rec4: {}, warn: false, hl: null });
+}
+resetState();
+
+function model() {
+  const id = LID();
+  if (id === 'cont') return { kind: id, Q: S.Q, S1: P1.S1, S2: S.S2, v1: v1of(), v2: v2of(), L: rangeOf(), k3: !!S.k3, bed: !!S.bed };
+  if (id === 'bern') return Object.assign({ kind: id, setup: S.setup, Q: S.Qv, n: S.n, vb: S.vb, dpa: dpAir(S.vb), ans: S.ans, d30: !!S.d30, paper: !!S.paper }, vt());
+  if (id === 'lift') return { kind: id, v: S.v, a: S.a, cy: cyOf(S.a), F: liftOf(S.v, S.a), q: qOf(S.v), stalled: S.a > WG.acrit, r10: S.rec3[10] != null, r20: S.rec3[20] != null, ans: S.ans, stall: !!S.stall };
+  const r = S.rec4;
+  return { kind: id, v: S.v, shape: S.shape, cx: SH[S.shape].cx, F: dragOf(S.v, S.shape), q: qOf(S.v), p20: r.plate20 != null, s20: r.sphere20 != null, d20: r.drop20 != null,
+    dbl: SHAPES.some(k => r[k + 10] != null && r[k + 20] != null), ans: S.ans };
+}
+
+// ---------- drawing helpers ----------
+const T = (x, y, s, fill, txt, anchor = 'middle', extra = '') => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${s}" fill="${fill}" text-anchor="${anchor}" ${extra}>${txt}</text>`;
+const HALO = `paint-order="stroke" stroke="${INK}" stroke-width="3"`;
+function arrow(x1, y1, x2, y2, col, w = 3) {
+  const a = Math.atan2(y2 - y1, x2 - x1), L2 = Math.hypot(x2 - x1, y2 - y1); if (L2 < 1) return '';
+  const hl = Math.min(11, L2 * 0.6), hx = x2 - hl * Math.cos(a), hy = y2 - hl * Math.sin(a), hw = hl * 0.5;
+  const p1 = `${(hx + hw * Math.sin(a)).toFixed(1)} ${(hy - hw * Math.cos(a)).toFixed(1)}`, p2 = `${(hx - hw * Math.sin(a)).toFixed(1)} ${(hy + hw * Math.cos(a)).toFixed(1)}`;
+  return `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${hx.toFixed(1)} ${hy.toFixed(1)}" stroke="${INK}" stroke-width="${w + 2.6}" stroke-linecap="round"/><path d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${hx.toFixed(1)} ${hy.toFixed(1)}" stroke="${col}" stroke-width="${w}" stroke-linecap="round"/><path d="M${x2.toFixed(1)} ${y2.toFixed(1)}L${p1}L${p2}Z" fill="${col}" stroke="${INK}" stroke-width="1.2" stroke-linejoin="round"/>`;
+}
+function bg() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern>
+    <linearGradient id="glassG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfe6f2" stop-opacity=".22"/><stop offset=".5" stop-color="#cfe6f2" stop-opacity=".06"/><stop offset="1" stop-color="#cfe6f2" stop-opacity=".16"/></linearGradient>
+    <linearGradient id="waterG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7fcbec"/><stop offset="1" stop-color="#2f7fae"/></linearGradient></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+const Y = 380;
+const ground = (col = '#151e2e') => `<rect x="-2000" y="${Y}" width="4520" height="1200" fill="${col}"/><path d="M-2000 ${Y}H2520" stroke="#3a4762" stroke-width="2"/>`;
+const WATER = '#5fb4d9', AIR = '#cfe6f2', GLASS = '#c8e4f2';
+// a horizontal tube of varying radius r(x): glass wall and water inside
+function tubePath(x0, x1, yc, r, pad = 0) {
+  let top = '', bot = '';
+  for (let x = x0; x <= x1 + 0.01; x += 2) { const rr = r(Math.min(x, x1)) + pad; top += `${top ? 'L' : 'M'}${x.toFixed(1)} ${(yc - rr).toFixed(1)}`; bot = `L${x.toFixed(1)} ${(yc + rr).toFixed(1)}` + bot; }
+  return top + bot + 'Z';
+}
+// volume coordinate along a tube: ξ(x) = ∫ S dx; particles are placed by ξ, so they spread out where the tube is narrow
+function volTable(x0, x1, area, cmPerPx) {
+  const xs = [], vs = []; let acc = 0;
+  for (let x = x0; x <= x1 + 0.01; x += 1) { xs.push(x); vs.push(acc); acc += area(x + 0.5) * cmPerPx; }
+  return { xs, vs, tot: vs[vs.length - 1] };
+}
+function xOfVol(tb, v) {
+  let lo = 0, hi = tb.vs.length - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (tb.vs[m] <= v) lo = m; else hi = m; }
+  const d = tb.vs[hi] - tb.vs[lo] || 1; return tb.xs[lo] + (v - tb.vs[lo]) / d * (tb.xs[hi] - tb.xs[lo]);
+}
+const smooth = u => { u = clamp(u, 0, 1); return u * u * (3 - 2 * u); };
+const dot = (x, y, r, col, op = 1) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="${col}" opacity="${op}"/>`;
+
+// ---------- clock for the flows ----------
+let FT = 0, VOL1 = 0, VOL2 = 0, FAN = 0;
+
+// =====================================================================================
+// 1. Hose with a nozzle; the jet flies to the flower bed
+const C1 = { y: 296, x0: 26, xw: 140, xc: 158, xn: 198, r1: 15, k: 84, TS: 0.35 };   // k: px per metre, the same scale for height and range
+const r2px = () => C1.r1 * Math.sqrt(S.S2 / P1.S1);
+const r1x = x => x <= C1.xw ? C1.r1 : x >= C1.xc ? r2px() : C1.r1 + (r2px() - C1.r1) * smooth((x - C1.xw) / (C1.xc - C1.xw));
+let tb1 = null, tb1k = '';
+function contScene() {
+  const C = C1, r2 = r2px(), v1 = v1of(), v2 = v2of(), Lr = rangeOf(), Qc = S.Q * 1000;
+  let h = ground();
+  // wall and tap
+  h += `<rect x="-40" y="196" width="${C.x0 - 6 + 40}" height="${Y - 196}" fill="#3a3346" stroke="${INK}" stroke-width="1.4"/>`;
+  for (let i = 0; i < 9; i++) h += `<path d="M-40 ${216 + i * 20}H${C.x0 - 6}" stroke="#4a4258" stroke-width="1"/>`;
+  h += `<g data-click="qcycle"><rect x="${C.x0 - 12}" y="${C.y - 12}" width="16" height="24" rx="3" fill="#a9b4c9" stroke="${INK}" stroke-width="1.4"/><rect x="${C.x0 - 7}" y="${C.y - 30}" width="6" height="18" fill="#a9b4c9" stroke="${INK}" stroke-width="1.2"/>` +
+    `<rect x="${C.x0 - 20}" y="${C.y - 36}" width="${22}" height="7" rx="3" fill="#e0473a" stroke="${INK}" stroke-width="1.4" transform="rotate(${-40 + S.Q / 0.45 * 40} ${C.x0 - 4} ${C.y - 33})"/></g>`;
+  // hose and nozzle: glass and water
+  h += `<path d="${tubePath(C.x0, C.xn, C.y, r1x, 2.5)}" fill="url(#glassG)" stroke="${GLASS}" stroke-width="1.6"/>`;
+  h += `<path d="${tubePath(C.x0, C.xn, C.y, r1x)}" fill="url(#waterG)" opacity=".75"/>`;
+  // jet: a parabola x = v·t, y = g·t²/2
+  let jd = '';
+  for (let i = 0; i <= 40; i++) { const t = tFall * i / 40, x = C.xn + v2 * t * C.k, y = C.y + G * t * t / 2 * C.k; jd += `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`; }
+  h += `<path d="${jd}" fill="none" stroke="${WATER}" stroke-width="${Math.max(2, r2 * 1.2).toFixed(1)}" stroke-linecap="round" opacity=".35"/>`;
+  // flower bed and range ruler on the ground
+  const bx0 = C.xn + P1.bed[0] * C.k, bx1 = C.xn + P1.bed[1] * C.k, hit = Lr >= P1.bed[0] && Lr <= P1.bed[1];
+  h += `<g data-hl="bed"><rect x="${bx0}" y="${Y - 8}" width="${bx1 - bx0}" height="10" rx="3" fill="#5a3b24" stroke="${INK}" stroke-width="1.2"/>`;
+  for (let i = 0; i < 5; i++) { const fx = bx0 + 4 + i * 8; h += `<path d="M${fx} ${Y - 8}v-10" stroke="#3fae5a" stroke-width="1.6"/><circle cx="${fx}" cy="${Y - 20}" r="3.2" fill="${['#ff8a73', '#ffd166', '#f2a2d6', '#ffb547', '#ff8a73'][i]}" stroke="${INK}" stroke-width=".8"/>`; }
+  h += `</g>` + T((bx0 + bx1) / 2, Y - 30, 9.5, hit ? '#86e0a8' : '#8b96ad', 'клумба', 'middle', HALO);
+  for (let m = 0; m <= 3.001; m += 0.5) { const x = C.xn + m * C.k; h += `<path d="M${x} ${Y}v${m % 1 ? 5 : 8}" stroke="#8b96ad" stroke-width="1.2"/>` + T(x, Y + 18, 9, '#8b96ad', nf(m) + (m === 3 ? ' м' : '')); }
+  // landing point
+  const lx = C.xn + Lr * C.k;
+  if (lx < 640) h += `<ellipse cx="${lx.toFixed(1)}" cy="${Y - 1}" rx="${(6 + r2 * 0.6).toFixed(1)}" ry="2.6" fill="${WATER}" opacity=".7"/>` + T(lx, Y - 44, 10.5, hit ? '#86e0a8' : '#72d4e8', `L = ${fmt(Lr, 2)} м`, 'middle', 'font-weight="600" ' + HALO);
+  // height of the hose
+  h += `<path d="M36 ${C.y + C.r1 + 4}V${Y}M31 ${C.y + C.r1 + 4}h10M31 ${Y}h10" stroke="#72d4e8" stroke-width="1.3"/>` + T(44, 362, 9.5, '#72d4e8', `h = ${nf(P1.H)} м`, 'start', HALO);
+  // particles: lanes in the tube, then droplets of the jet
+  const key = fmt(S.S2, 2);
+  if (key !== tb1k) { tb1 = volTable(C.x0, C.xn, x => P1.S1 * (r1x(x) / C.r1) ** 2, 100 / C.k); tb1k = key; }
+  const dXi = 14 * 100 / C.k * P1.S1, Wv = tb1.tot + Qc * tFall * 1.04, N = Math.ceil(Wv / dXi), Wm = N * dXi;
+  for (let k = 0; k < 3; k++) {
+    const f = [-0.55, 0, 0.55][k];
+    for (let i = 0; i < N; i++) {
+      const xi = ((VOL1 + i * dXi + k * dXi / 3) % Wm + Wm) % Wm;
+      if (xi > Wv) continue;
+      if (xi <= tb1.tot) { const x = xOfVol(tb1, xi); h += dot(x, C.y + f * r1x(x) * 0.8, 2, '#e8f6ff', 0.85); }
+      else { const t = (xi - tb1.tot) / Qc, x = C.xn + v2 * t * C.k, y = C.y + f * r2 * 0.6 + G * t * t / 2 * C.k; if (y < Y - 1) h += dot(x, y, 2.2, '#bfe6fa', 0.9); }
+    }
+  }
+  // nozzle clamp with the drag handle
+  const cx = (C.xc + C.xn) / 2 + 2, hy = C.y + r2 + 18;
+  h += `<rect x="${cx - 9}" y="${(C.y - r2 - 5).toFixed(1)}" width="18" height="${(2 * r2 + 10).toFixed(1)}" rx="4" fill="none" stroke="#a9b4c9" stroke-width="3.2"/>`;
+  h += `<path d="M${cx} ${(C.y + r2 + 5).toFixed(1)}V${(hy - 7).toFixed(1)}" stroke="#a9b4c9" stroke-width="2.4"/>`;
+  h += `<g data-drag="clamp"><circle cx="${cx}" cy="${hy.toFixed(1)}" r="16" fill="transparent"/><circle cx="${cx}" cy="${hy.toFixed(1)}" r="7" fill="none" stroke="${INK}" stroke-width="6"/><circle cx="${cx}" cy="${hy.toFixed(1)}" r="7" fill="none" stroke="#ffb547" stroke-width="3.6"/></g>`;
+  h += T(cx + 14, hy + 16, 10, '#e8ecf4', `S₂ = ${fmt(S.S2, 2)} см²`, 'start', HALO);
+  h += T((C.x0 + C.xw) / 2 + 10, C.y + C.r1 + 18, 10, '#e8ecf4', `S₁ = ${nf(P1.S1)} см²`, 'middle', HALO);
+  // velocities
+  const ay1 = C.y - C.r1 - 14;
+  h += arrow(76, ay1, 76 + clamp(v1 * 26, 8, 60), ay1, '#ffb547', 2.6) + T(76, ay1 - 9, 10.5, '#ffb547', `v₁ = ${fmt(v1, 1)} м/с`, 'start', 'font-weight="600" ' + HALO);
+  const ay2 = C.y - r2 - 14;
+  h += arrow(C.xc + 4, ay2, C.xc + 4 + clamp(v2 * 9, 8, 80), ay2, '#ffb547', 2.6) + T(C.xc + 4, ay2 - 9, 10.5, '#ffb547', `v₂ = ${fmt(v2, 1)} м/с`, 'start', 'font-weight="600" ' + HALO);
+  return h;
+}
+
+// =====================================================================================
+// 2. Venturi tube with three manometer tubes; or two sheets of paper and a blower
+const C2 = { y: 330, x0: 30, x1: 168, x2: 212, x3: 298, x4: 352, x5: 490, r1: 16, cmPx: 0.2, kh: 3.2, tubes: [100, 255, 420], TS: 0.12 };
+const r2v = () => C2.r1 / Math.sqrt(S.n);
+const rvx = x => x <= C2.x1 ? C2.r1 : x < C2.x2 ? C2.r1 + (r2v() - C2.r1) * smooth((x - C2.x1) / (C2.x2 - C2.x1)) : x <= C2.x3 ? r2v() : x < C2.x4 ? r2v() + (C2.r1 - r2v()) * smooth((x - C2.x3) / (C2.x4 - C2.x3)) : C2.r1;
+let tb2 = null, tb2k = '';
+function venturiScene() {
+  const C = C2, R = vt(), hs = [R.h1, R.h2, R.h3], vs = [R.v1, R.v2, R.v1];
+  let h = ground();
+  // stand legs
+  [178, 345].forEach(x => { h += `<rect x="${x - 4}" y="${C.y + rvx(x)}" width="8" height="${Y - C.y - rvx(x)}" fill="#6c7a96" stroke="${INK}"/>`; });
+  // ruler at tube 1: cm above the axis
+  const rx = C.tubes[0] - 26, top = C.y - 62 * C.kh;
+  h += `<g data-hl="ruler"><rect x="${rx - 4}" y="${top - 4}" width="18" height="${C.y - top + 4}" rx="2" fill="#e9d9a8" stroke="${INK}" stroke-width="1.2"/>`;
+  for (let c = 0; c <= 60; c += 5) { const y = C.y - c * C.kh; h += `<path d="M${rx - 4} ${y}h${c % 10 ? 4 : 8}" stroke="#3b3320" stroke-width="1"/>`; if (c % 10 === 0 && c) h += T(rx + 9, y + 3, 7, '#3b3320', c); }
+  h += `</g>` + T(rx + 5, top - 9, 8, '#8b96ad', 'см');
+  // manometer tubes
+  C.tubes.forEach((x, i) => {
+    const hh = hs[i], ly = C.y - Math.max(0, hh) * C.kh, yb = C.y - rvx(x);
+    h += `<rect x="${x - 5}" y="${top}" width="10" height="${yb - top}" fill="url(#glassG)" stroke="${GLASS}" stroke-width="1.4"/>`;
+    if (hh > 0.3) h += `<rect x="${x - 3.6}" y="${ly.toFixed(1)}" width="7.2" height="${(yb - ly + 1).toFixed(1)}" fill="url(#waterG)" opacity=".85"/><path d="M${x - 9} ${ly.toFixed(1)}h18" stroke="#72d4e8" stroke-width="1.4"/>`;
+    h += T(x + 12, ly + 4, 10, '#72d4e8', `${Math.round(hh)} см`, 'start', HALO);
+    h += `<circle cx="${x}" cy="${top - 12}" r="8" fill="#72d4e8" stroke="${INK}" stroke-width="1.2"/>` + T(x, top - 8.5, 10, INK, i + 1, 'middle', 'font-weight="600"');
+  });
+  // level of tube 1 and the difference with tube 2
+  const y1 = C.y - R.h1 * C.kh, y2 = C.y - Math.max(0, R.h2) * C.kh;
+  h += `<path d="M${C.tubes[0] + 6} ${y1}H${C.tubes[2] - 6}" stroke="#86e0a8" stroke-width="1.2" stroke-dasharray="4 4" opacity=".7"/>`;
+  if (R.dh > 0.5) { const ax = C.tubes[1] - 16; h += `<path d="M${ax} ${y1}V${y2.toFixed(1)}M${ax - 4} ${y1}h8M${ax - 4} ${y2.toFixed(1)}h8" stroke="#ffb547" stroke-width="1.6"/>` + T(ax - 6, (y1 + y2) / 2 + 4, 10.5, '#ffb547', `Δh = ${Math.round(R.dh)} см`, 'end', 'font-weight="600" ' + HALO); }
+  if (R.h2 < 0) h += T(C.tubes[1], C.y - 28, 9.5, '#ff8a73', 'разрежение: засасывает воздух', 'middle', HALO);
+  // tube body
+  h += `<g data-click="ncycle"><path d="${tubePath(C.x0, C.x5, C.y, rvx, 2.5)}" fill="url(#glassG)" stroke="${GLASS}" stroke-width="1.6"/>`;
+  h += `<path d="${tubePath(C.x0, C.x5, C.y, rvx)}" fill="url(#waterG)" opacity="${S.Qv > 0 ? 0.75 : 0.55}"/></g>`;
+  // valve at the inlet, outflow at the end
+  h += `<g data-click="qinc"><rect x="${C.x0 - 26}" y="${C.y - 10}" width="26" height="20" rx="3" fill="#a9b4c9" stroke="${INK}" stroke-width="1.3"/><path d="M${C.x0 - 13} ${C.y - 10}v-14" stroke="#a9b4c9" stroke-width="3"/><circle cx="${C.x0 - 13}" cy="${C.y - 26}" r="8" fill="none" stroke="#e0473a" stroke-width="3"/><path d="M${C.x0 - 21} ${C.y - 26}h16M${C.x0 - 13} ${C.y - 34}v16" stroke="#e0473a" stroke-width="1.6"/></g>`;
+  h += T(C.x0 - 13, C.y - 42, 10, '#e8ecf4', `Q = ${fmt(S.Qv, 2)} л/с`, 'middle', HALO);
+  if (S.Qv > 0) h += arrow(C.x5 + 4, C.y, C.x5 + 26, C.y, WATER, 2.6);
+  // particles
+  const key = S.n;
+  if (key !== tb2k) { tb2 = volTable(C.x0, C.x5, x => VT.S1 * (rvx(x) / C.r1) ** 2, C.cmPx); tb2k = key; }
+  if (S.Qv > 0) {
+    const dXi = 16 * C.cmPx * VT.S1, N = Math.ceil(tb2.tot / dXi), Wm = N * dXi;
+    for (let k = 0; k < 3; k++) { const f = [-0.55, 0, 0.55][k]; for (let i = 0; i < N; i++) { const xi = ((VOL2 + i * dXi + k * dXi / 3) % Wm + Wm) % Wm; if (xi > tb2.tot) continue; const x = xOfVol(tb2, xi); h += dot(x, C.y + f * rvx(x) * 0.8, 2, '#e8f6ff', 0.85); } }
+  }
+  // velocities under the tube
+  C.tubes.forEach((x, i) => { h += T(x, C.y + C.r1 + 22, 10, '#ffb547', `v${'₁₂₃'[i]} = ${fmt(vs[i], 1)} м/с`, 'middle', HALO); });
+  if (S.n > 1) h += T((C.x2 + C.tubes[1]) / 2 - 2, C.y + 3.5, 9, '#e8ecf4', `S₂ = S₁/${S.n}`, 'middle', HALO);
+  return h;
+}
+const PP = { rod: 128, x1: 218, x2: 302, len: 190, top: 134 };
+const sheetDef = () => 34 * clamp(dpAir(S.vb) / 60, 0, 1);
+function paperScene() {
+  const D = sheetDef(), mid = (PP.x1 + PP.x2) / 2;
+  let h = ground();
+  h += `<rect x="150" y="${Y - 8}" width="60" height="8" rx="2" fill="#4a5875" stroke="${INK}"/><rect x="176" y="${PP.rod - 6}" width="8" height="${Y - PP.rod - 2}" fill="#6c7a96" stroke="${INK}"/>`;
+  h += `<rect x="176" y="${PP.rod - 4}" width="${PP.x2 + 26 - 176}" height="8" rx="2" fill="#6c7a96" stroke="${INK}"/>`;
+  // sheets: hang from clips, the free ends bend inwards
+  [[PP.x1, 1], [PP.x2, -1]].forEach(([x0, s]) => {
+    let d = '';
+    for (let i = 0; i <= 20; i++) { const u = i / 20, y = PP.top + u * PP.len, x = x0 + s * D * u * u; d += `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`; }
+    h += `<g data-hl="sheets"><path d="${d}" fill="none" stroke="${INK}" stroke-width="6" stroke-linecap="round"/><path d="${d}" fill="none" stroke="#f4f1e8" stroke-width="3.4" stroke-linecap="round"/></g>`;
+    h += `<rect x="${x0 - 5}" y="${PP.rod - 3}" width="10" height="12" rx="2" fill="#3b6fd8" stroke="${INK}" stroke-width="1.2"/>`;
+  });
+  // blower on the right, a pipe bends down between the sheets
+  const by = 150;
+  h += `<g data-click="blow"><rect x="410" y="${by - 22}" width="62" height="44" rx="8" fill="#3b4a66" stroke="${INK}" stroke-width="1.5"/><circle cx="441" cy="${by}" r="14" fill="#26324a" stroke="#a9b4c9" stroke-width="2"/>`;
+  for (let k = 0; k < 4; k++) { const a = FAN * (0.2 + S.vb * 0.25) + k * Math.PI / 2; h += `<path d="M441 ${by}L${(441 + Math.cos(a) * 12).toFixed(1)} ${(by + Math.sin(a) * 12).toFixed(1)}" stroke="#a9b4c9" stroke-width="3" stroke-linecap="round"/>`; }
+  h += `</g><path d="M410 ${by}H${mid + 8}Q${mid} ${by} ${mid} ${by + 8}V${PP.top + 6}" fill="none" stroke="${INK}" stroke-width="9"/><path d="M410 ${by}H${mid + 8}Q${mid} ${by} ${mid} ${by + 8}V${PP.top + 6}" fill="none" stroke="#a9b4c9" stroke-width="6"/>`;
+  h += T(441, by - 30, 10, '#e8ecf4', `воздух: v = ${nf(S.vb)} м/с`, 'middle', HALO);
+  // air between the sheets
+  if (S.vb > 0) for (let k = 0; k < 3; k++) for (let i = 0; i < 7; i++) {
+    const u = (((FT * (0.12 + S.vb * 0.05) + i / 7 + k * 0.05) % 1) + 1) % 1, y = PP.top + 8 + u * (PP.len - 8), w = (PP.x2 - PP.x1) / 2 - D * (u * u) - 6;
+    h += `<path d="M${(mid + (k - 1) * w * 0.6).toFixed(1)} ${y.toFixed(1)}v8" stroke="${AIR}" stroke-width="1.6" stroke-linecap="round" opacity=".7"/>`;
+  }
+  // pressure arrows: atmosphere pushes the sheets inwards
+  const yA = PP.top + PP.len * 0.62, dA = D * 0.38;
+  h += arrow(PP.x1 - 52, yA, PP.x1 - 8 + dA, yA, '#72d4e8', 2.4) + arrow(PP.x2 + 52, yA, PP.x2 + 8 - dA, yA, '#72d4e8', 2.4);
+  h += T(PP.x1 - 30, yA - 10, 9.5, '#72d4e8', 'p атм', 'middle', HALO) + T(PP.x2 + 30, yA - 10, 9.5, '#72d4e8', 'p атм', 'middle', HALO);
+  h += T(mid, PP.top + PP.len + 26, 10, '#ffb547', S.vb > 0 ? `между листами p меньше на ${fmt(dpAir(S.vb), 0)} Па` : 'подуйте между листами', 'middle', 'font-weight="600" ' + HALO);
+  return h;
+}
+
+// =====================================================================================
+// 3, 4. Wind tunnel: fan on the left, glass walls, streamlines of smoke
+const TN = { x0: 26, xf: 60, x1: 500, yt: 150, yb: 330, yc: 240 };
+function tunnelBase(v) {
+  let h = ground();
+  [90, 440].forEach(x => { h += `<rect x="${x - 4}" y="${TN.yb}" width="8" height="${Y - TN.yb}" fill="#6c7a96" stroke="${INK}"/>`; });
+  h += `<rect x="${TN.xf}" y="${TN.yt}" width="${TN.x1 - TN.xf}" height="${TN.yb - TN.yt}" fill="url(#glassG)" stroke="${GLASS}" stroke-width="1.6"/>`;
+  h += `<path d="M${TN.xf} ${TN.yt}H${TN.x1}M${TN.xf} ${TN.yb}H${TN.x1}" stroke="#a9b4c9" stroke-width="3"/>`;
+  // fan (drawn face-on as an icon of the blower)
+  const fx = TN.x0 + 17, fy = TN.yc;
+  h += `<g data-click="vcycle"><rect x="${TN.x0}" y="${TN.yt - 6}" width="${TN.xf - TN.x0}" height="${TN.yb - TN.yt + 12}" rx="6" fill="#3b4a66" stroke="${INK}" stroke-width="1.5"/>`;
+  h += `<circle cx="${fx}" cy="${fy}" r="15" fill="#26324a" stroke="#a9b4c9" stroke-width="1.6"/>`;
+  for (let k = 0; k < 3; k++) { const a = FAN + k * 2.094; h += `<path d="M${fx} ${fy}L${(fx + Math.cos(a) * 13).toFixed(1)} ${(fy + Math.sin(a) * 13).toFixed(1)}" stroke="#a9b4c9" stroke-width="4" stroke-linecap="round"/>`; }
+  h += `<circle cx="${fx}" cy="${fy}" r="3" fill="#e8ecf4"/></g>`;
+  h += arrow(TN.xf + 214, TN.yt - 14, TN.xf + 244, TN.yt - 14, '#ffb547', 2.4) + T(TN.xf + 208, TN.yt - 10, 10.5, '#ffb547', `ветер v = ${nf(v)} м/с`, 'end', 'font-weight="600" ' + HALO);
+  return h;
+}
+function streamDraw(lines, v, t) {
+  // lines: [{ys, y0, spd}] sampled at xs every 6 px
+  let h = '';
+  for (const ln of lines) {
+    let d = ''; ln.ys.forEach((y, i) => { d += `${i ? 'L' : 'M'}${(TN.xf + 4 + i * 6).toFixed(1)} ${y.toFixed(1)}`; });
+    h += `<path d="${d}" fill="none" stroke="${AIR}" stroke-width="1" opacity="${v > 0 ? 0.26 : 0.12}"/>`;
+  }
+  if (v <= 0) return h;
+  const Lx = TN.x1 - TN.xf - 8, n = 9;
+  for (const ln of lines) for (let i = 0; i < n; i++) {
+    const s = reduce ? i / n : (((t * ln.spd / Lx + i / n + ln.ph) % 1) + 1) % 1, xr = s * Lx, j = Math.floor(xr / 6), fr = xr / 6 - j;
+    if (j + 1 >= ln.ys.length) continue;
+    const y = ln.ys[j] + (ln.ys[j + 1] - ln.ys[j]) * fr, x = TN.xf + 4 + xr, dy = ln.ys[j + 1] - ln.ys[j], a = Math.atan2(dy, 6);
+    h += `<path d="M${(x - 5 * Math.cos(a)).toFixed(1)} ${(y - 5 * Math.sin(a)).toFixed(1)}L${(x + 5 * Math.cos(a)).toFixed(1)} ${(y + 5 * Math.sin(a)).toFixed(1)}" stroke="#e8f6ff" stroke-width="2" stroke-linecap="round" opacity=".85"/>`;
+  }
+  return h;
+}
+const nSamples = Math.floor((TN.x1 - TN.xf - 8) / 6) + 1;
+
+// --- wing: NACA-like cambered profile, chord 120 px (20 см), pivot at 35% of the chord
+const WC = { xc: 262, yc: 240, c: 120, piv: 0.35 };
+const FOIL = (() => {
+  const up = [], lo = [], m = 0.04, p = 0.4, t = 0.13;
+  for (let i = 0; i <= 30; i++) {
+    const x = (1 - Math.cos(i / 30 * Math.PI)) / 2, yt = 5 * t * (0.2969 * Math.sqrt(x) - 0.126 * x - 0.3516 * x * x + 0.2843 * x ** 3 - 0.1015 * x ** 4);
+    const yc = x < p ? m / (p * p) * (2 * p * x - x * x) : m / ((1 - p) ** 2) * (1 - 2 * p + 2 * p * x - x * x);
+    up.push([(x - WC.piv) * WC.c, -(yc + yt) * WC.c]); lo.push([(x - WC.piv) * WC.c, -(yc - yt) * WC.c]);
+  }
+  return up.concat(lo.reverse());
+})();
+const rot = (p, a) => [p[0] * Math.cos(a) - p[1] * Math.sin(a), p[0] * Math.sin(a) + p[1] * Math.cos(a)];
+// streamline shape around the wing (an illustration of the flow, not a CFD solution)
+function wingLines(a) {
+  const ta = Math.tan(a * Math.PI / 180), cy = cyOf(a), stalled = a > WG.acrit, Y0 = [-80, -60, -42, -27, -14, 12, 25, 40, 58, 80];
+  return Y0.map((y0, li) => {
+    const dec = Math.exp(-Math.abs(y0) / 45), ys = [];
+    const yAt = x => {
+      const xl = x - WC.xc, u = xl / WC.c, win = Math.exp(-((u - 0.15) ** 2) * 1.2);
+      const cam = dec * xl * ta * win, dl = 10 * cy * dec * Math.tanh(1.8 * (u - 0.15));
+      const th = 8 * Math.exp(-(((u - 0.05) / 0.35) ** 2)) * Math.exp(-Math.abs(y0) / 30);
+      return WC.yc + y0 + cam + dl + (y0 < 0 ? -th : th * 0.5);
+    };
+    const xSep = WC.xc - 0.3 * WC.c, ySep = yAt(xSep);
+    for (let i = 0; i < nSamples; i++) {
+      const x = TN.xf + 4 + i * 6;
+      let y = yAt(x);
+      if (stalled && y0 < 0 && y0 > -50 && x > xSep) { const k = Math.exp(-Math.max(0, x - xSep - 1.3 * WC.c) / 90); y = ySep + (y - ySep) * (1 - k) - 6 * k * Math.exp(-Math.abs(y0) / 25); }
+      ys.push(clamp(y, TN.yt + 4, TN.yb - 4));
+    }
+    const boost = stalled ? (y0 < 0 ? 0.1 : -0.1) : (y0 < 0 ? 0.42 : -0.22) * Math.max(0, cy) * dec;
+    return { y0, ys, spd: S.v * 7 * (1 + boost), ph: li * 0.137 };
+  });
+}
+let wl = null, wlk = '';
+function wingScene() {
+  const a = S.a * Math.PI / 180, F = liftOf(S.v, S.a), st = S.a > WG.acrit;
+  let h = tunnelBase(S.v);
+  const k = S.a + '|' + S.v; if (k !== wlk) { wl = wingLines(S.a); wlk = k; }
+  h += streamDraw(wl, S.v, FT);
+  // rod and balance under the tunnel
+  const bx = WC.xc, by = 344;
+  h += `<rect x="${bx - 2.5}" y="${WC.yc}" width="5" height="${by - WC.yc}" fill="#a9b4c9" stroke="${INK}" stroke-width="1"/>`;
+  h += `<g data-hl="balance"><rect x="${bx - 46}" y="${by}" width="92" height="28" rx="5" fill="#3b4a66" stroke="${INK}" stroke-width="1.5"/><rect x="${bx - 36}" y="${by + 6}" width="72" height="16" rx="3" fill="#0e1520"/>` + T(bx, by + 18, 11, '#86e0a8', `${fmt(F, 1)} Н`, 'middle', 'font-weight="600"') + `</g>`;
+  // wing
+  const pts = FOIL.map(p => rot(p, a)).map(([x, y]) => `${(WC.xc + x).toFixed(1)},${(WC.yc + y).toFixed(1)}`).join(' ');
+  h += `<g data-click="ainc"><polygon points="${pts}" fill="#d9dfe9" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/></g>`;
+  h += `<circle cx="${WC.xc}" cy="${WC.yc}" r="3" fill="#6c7a96" stroke="${INK}"/>`;
+  // separated flow: vortices above the rear of the wing
+  if (st && S.v > 0) for (let i = 0; i < 4; i++) {
+    const cx = WC.xc + 10 + i * 34, cy2 = WC.yc - 18 + (S.a - 15) * 0.9 + i * 6, r = 9 + i * 2, ph = FT * (2 + S.v * 0.1) + i;
+    h += `<path d="M${(cx + r * Math.cos(ph)).toFixed(1)} ${(cy2 + r * Math.sin(ph)).toFixed(1)}A${r} ${r} 0 1 1 ${(cx + r * Math.cos(ph + 4.4)).toFixed(1)} ${(cy2 + r * Math.sin(ph + 4.4)).toFixed(1)}" fill="none" stroke="#ff8a73" stroke-width="1.6" opacity=".75"/>`;
+  }
+  // chord line, angle of attack and the trailing-edge handle
+  const te = rot([(1 - WC.piv) * WC.c, 0], a), le = rot([-WC.piv * WC.c, 0], a);
+  h += `<path d="M${(WC.xc + le[0] - 40).toFixed(1)} ${(WC.yc + le[1]).toFixed(1)}H${(WC.xc + le[0] - 4).toFixed(1)}" stroke="#8b96ad" stroke-width="1" stroke-dasharray="3 3"/>`;
+  h += T(WC.xc + le[0] - 44, WC.yc + le[1] - 8, 10.5, st ? '#ff8a73' : '#e8ecf4', `α = ${nf(S.a)}°`, 'start', 'font-weight="600" ' + HALO);
+  const hx = WC.xc + te[0] + 8 * Math.cos(a), hy = WC.yc + te[1] + 8 * Math.sin(a);
+  h += `<g data-drag="alpha"><circle cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="16" fill="transparent"/><circle cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="6.5" fill="none" stroke="${INK}" stroke-width="6"/><circle cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="6.5" fill="none" stroke="#ffb547" stroke-width="3.6"/></g>`;
+  // lift arrow
+  if (Math.abs(F) > 0.05) { const len = clamp(Math.abs(F) * 2.4, 12, 80) * Math.sign(F); h += arrow(WC.xc, WC.yc - 6 * Math.sign(F), WC.xc, WC.yc - 6 * Math.sign(F) - len, '#86e0a8', 3) + T(WC.xc + 10, WC.yc - 6 - len + 4, 10.5, '#86e0a8', `F = ${fmt(F, 1)} Н`, 'start', 'font-weight="600" ' + HALO); }
+  if (st && S.v > 0) h += T(WC.xc + 70, TN.yb - 12, 10, '#ff8a73', 'срыв потока!', 'middle', 'font-weight="600" ' + HALO);
+  return h;
+}
+
+// --- drag: bodies of the same cross-section (80 px high) on a stand with a horizontal dynamometer
+const DB = { xc: 250, yc: 240, R: 40 };
+const SHG = { plate: { a: 4, wake: 0.3, sh: 0 }, sphere: { a: 40, wake: 0.55, sh: 0 }, drop: { a: 82, wake: 1, sh: 34 }, car: { a: 76, wake: 0.8, sh: 6, b: 30 } };
+function dragLines(shape) {
+  const g = SHG[shape], R = g.b || DB.R, Y0 = [-84, -64, -46, -30, -16, -5, 5, 16, 30, 46, 64, 84];
+  return Y0.map((y0, li) => {
+    const ys = [];
+    for (let i = 0; i < nSamples; i++) {
+      const x = TN.xf + 4 + i * 6, xr = x - DB.xc - g.sh;
+      let xp = xr * R / g.a; if (xp > 0) xp *= g.wake;
+      const A = Math.abs(y0); let lo = Math.sqrt(Math.max(0, R * R - xp * xp)) + 1e-3, hi = A + R + 2;
+      if (A < 1e-6) { ys.push(DB.yc); continue; }
+      for (let it = 0; it < 26; it++) { const m = (lo + hi) / 2, f = m * (1 - R * R / (xp * xp + m * m)); if (f > A) hi = m; else lo = m; }
+      ys.push(clamp(DB.yc + Math.sign(y0) * (lo + hi) / 2, TN.yt + 4, TN.yb - 4));
+    }
+    return { y0, ys, spd: S.v * 7, ph: li * 0.173 };
+  });
+}
+let dl = null, dlk = '';
+function bodySvg(shape) {
+  const x = DB.xc, y = DB.yc, R = DB.R;
+  if (shape === 'plate') return `<rect x="${x - 4}" y="${y - R}" width="8" height="${2 * R}" rx="2" fill="#d9dfe9" stroke="${INK}" stroke-width="1.6"/>`;
+  if (shape === 'sphere') return `<circle cx="${x}" cy="${y}" r="${R}" fill="#d9dfe9" stroke="${INK}" stroke-width="1.6"/><ellipse cx="${x - 12}" cy="${y - 14}" rx="10" ry="7" fill="#fff" opacity=".4"/>`;
+  if (shape === 'drop') return `<path d="M${x} ${y - R}C${x + 60} ${y - R} ${x + 110} ${y - 10} ${x + 132} ${y}C${x + 110} ${y + 10} ${x + 60} ${y + R} ${x} ${y + R}A${R} ${R} 0 0 1 ${x} ${y - R}Z" transform="translate(${-R + 8} 0)" fill="#d9dfe9" stroke="${INK}" stroke-width="1.6"/>`;
+  // car: side view, nose to the wind
+  const b = y + 22;
+  return `<path d="M${x - 74} ${b}L${x - 74} ${b - 16}Q${x - 72} ${b - 24} ${x - 54} ${b - 26}L${x - 26} ${b - 30}Q${x - 8} ${b - 48} ${x + 18} ${b - 48}Q${x + 44} ${b - 46} ${x + 64} ${b - 28}L${x + 76} ${b - 24}L${x + 78} ${b}Z" fill="#3b6fd8" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/>` +
+    `<path d="M${x - 18} ${b - 31}Q${x - 4} ${b - 43} ${x + 14} ${b - 43}L${x + 14} ${b - 31}ZM${x + 20} ${b - 43}Q${x + 38} ${b - 42} ${x + 52} ${b - 31}L${x + 20} ${b - 31}Z" fill="#cfe6f2" stroke="${INK}" stroke-width="1"/>` +
+    `<circle cx="${x - 44}" cy="${b}" r="10" fill="#2c3240" stroke="${INK}" stroke-width="1.4"/><circle cx="${x + 48}" cy="${b}" r="10" fill="#2c3240" stroke="${INK}" stroke-width="1.4"/>`;
+}
+function dragScene() {
+  const F = dragOf(S.v, S.shape), g = SHG[S.shape];
+  let h = tunnelBase(S.v);
+  if (S.shape !== dlk) { dl = dragLines(S.shape); dlk = S.shape; }
+  dl.forEach(l => { l.spd = S.v * 7; });
+  h += streamDraw(dl, S.v, FT);
+  // stand: rod down to a cart on a rail; the dynamometer holds the cart from the left
+  const cy = 350, cw = 36;
+  h += `<rect x="${DB.xc - 2.5}" y="${DB.yc}" width="5" height="${cy - DB.yc}" fill="#a9b4c9" stroke="${INK}" stroke-width="1"/>`;
+  h += `<path d="M120 ${cy + 24}H380" stroke="#6c7a96" stroke-width="3"/>`;
+  h += `<rect x="${DB.xc - cw / 2}" y="${cy}" width="${cw}" height="18" rx="3" fill="#4a5875" stroke="${INK}" stroke-width="1.3"/><circle cx="${DB.xc - 10}" cy="${cy + 21}" r="3.4" fill="#2c3240" stroke="${INK}"/><circle cx="${DB.xc + 10}" cy="${cy + 21}" r="3.4" fill="#2c3240" stroke="${INK}"/>`;
+  const ax = 126, dx0 = 140, dx1 = DB.xc - cw / 2 - 8, max = 10, z0 = dx0 + 10, z1 = dx1 - 14, px = z0 + clamp(F / max, 0, 1.05) * (z1 - z0);
+  h += `<rect x="${ax - 6}" y="${cy - 10}" width="10" height="${Y - cy + 10}" fill="#6c7a96" stroke="${INK}"/>`;
+  h += `<g data-hl="dyn"><rect x="${dx0}" y="${cy - 2}" width="${z1 - dx0 + 8}" height="22" rx="5" fill="#2b6d7c" stroke="${INK}" stroke-width="1.5"/><rect x="${z0 - 4}" y="${cy + 3}" width="${z1 - z0 + 8}" height="9" rx="2" fill="#e8ecf4"/>`;
+  for (let i = 0; i <= 10; i++) { const x = z0 + i / 10 * (z1 - z0); h += `<path d="M${x.toFixed(1)} ${cy + 3}v${i % 2 ? 4 : 6}" stroke="#1b2537" stroke-width="${i % 2 ? 0.8 : 1.2}"/>`; if (i % 2 === 0) h += T(x, cy + 19, 6, '#e8ecf4', nf(max * i / 10)); }
+  h += `<path d="M${px.toFixed(1)} ${cy + 2}v12" stroke="#ff4d3a" stroke-width="2.4"/></g>`;
+  h += `<path d="M${ax + 4} ${cy + 9}H${dx0}M${z1 + 8} ${cy + 9}H${DB.xc - cw / 2}" stroke="#c8d2e3" stroke-width="2"/>`;
+  h += T((dx0 + z1) / 2, cy - 8, 10.5, '#ffb547', `F = ${fmt(F, F < 1 ? 2 : 1)} Н`, 'middle', 'font-weight="600" ' + HALO);
+  // body
+  h += `<g data-click="shape">${bodySvg(S.shape)}</g>`;
+  // wake vortices behind bluff bodies
+  if (S.v > 0 && g.wake < 1) {
+    const n = S.shape === 'plate' ? 5 : S.shape === 'sphere' ? 4 : 3, back = S.shape === 'car' ? DB.xc + 80 : DB.xc + (S.shape === 'plate' ? 8 : DB.R);
+    for (let i = 0; i < n; i++) {
+      const cx = back + 16 + i * 26, cy2 = DB.yc + (i % 2 ? 1 : -1) * (S.shape === 'car' ? 4 : 16) * (1 - g.wake + 0.4), r = (S.shape === 'plate' ? 13 : 10) - i, ph = FT * (2.5 + S.v * 0.12) * (i % 2 ? -1 : 1) + i;
+      h += `<path d="M${(cx + r * Math.cos(ph)).toFixed(1)} ${(cy2 + r * Math.sin(ph)).toFixed(1)}A${r} ${r} 0 1 ${i % 2 ? 0 : 1} ${(cx + r * Math.cos(ph + (i % 2 ? -4.4 : 4.4))).toFixed(1)} ${(cy2 + r * Math.sin(ph + (i % 2 ? -4.4 : 4.4))).toFixed(1)}" fill="none" stroke="#ff8a73" stroke-width="1.6" opacity=".7"/>`;
+    }
+  }
+  // drag arrow along the flow
+  if (F > 0.01) { const x0 = DB.xc + (S.shape === 'drop' ? 100 : S.shape === 'car' ? 82 : S.shape === 'plate' ? 10 : DB.R + 4), len = clamp(F * 16, 10, 100); h += arrow(x0, DB.yc - DB.R - 16, x0 + len, DB.yc - DB.R - 16, '#ff8a73', 3); }
+  h += T(DB.xc - 12, DB.yc + DB.R + 30, 10, '#e8ecf4', `${SH[S.shape].n} · Cx ≈ ${fmt(SH[S.shape].cx, 2)}`, 'end', HALO);
+  return h;
+}
+
+function hlBox(id) {
+  const lid = LID();
+  if (lid === 'cont') {
+    const C = C1, r2 = r2px(), cx = (C.xc + C.xn) / 2 + 2;
+    return ({ tap: [C.x0 - 24, C.y - 42, 32, 58], hose: [C.x0, C.y - C.r1 - 6, C.xw - C.x0, 2 * C.r1 + 12], nozzle: [C.xw, C.y - C.r1 - 6, C.xn - C.xw + 4, 2 * C.r1 + 12], clamp: [cx - 14, C.y - r2 - 8, 28, 2 * r2 + 38],
+      jet: [C.xn, C.y - 10, rangeOf() * C.k + 10, Y - C.y + 12], bed: [C.xn + P1.bed[0] * C.k - 4, Y - 34, (P1.bed[1] - P1.bed[0]) * C.k + 8, 40], ruler: [C.xn - 6, Y - 4, 3 * C.k + 12, 28] })[id];
+  }
+  if (lid === 'bern') {
+    const C = C2, top = C.y - 62 * C.kh;
+    if (S.setup === 'paper') return ({ sheets: [PP.x1 - 8, PP.top - 8, PP.x2 - PP.x1 + 16, PP.len + 14], blower: [404, 122, 74, 56], stand: [146, PP.rod - 10, PP.x2 + 30 - 146, Y - PP.rod + 10] })[id];
+    return ({ tube: [C.x0 - 4, C.y - C.r1 - 6, C.x5 - C.x0 + 8, 2 * C.r1 + 12], neck: [C.x2 - 4, C.y - C.r1 - 6, C.x3 - C.x2 + 8, 2 * C.r1 + 12], mano: [C.tubes[0] - 12, top - 24, C.tubes[2] - C.tubes[0] + 24, C.y - top + 20],
+      valve: [C.x0 - 30, C.y - 38, 34, 52], ruler: [C.tubes[0] - 42, top - 8, 26, C.y - top + 10] })[id];
+  }
+  const tun = { fan: [TN.x0 - 4, TN.yt - 10, TN.xf - TN.x0 + 8, TN.yb - TN.yt + 20], tunnel: [TN.xf - 4, TN.yt - 6, TN.x1 - TN.xf + 8, TN.yb - TN.yt + 12] };
+  if (lid === 'lift') return Object.assign(tun, { wing: [WC.xc - 0.4 * WC.c - 6, WC.yc - 34, WC.c + 18, 64], balance: [WC.xc - 50, 340, 100, 36], handle: [WC.xc + 0.65 * WC.c - 14, WC.yc - 20, 36, 54] })[id];
+  return Object.assign(tun, { body: [DB.xc - 80, DB.yc - DB.R - 8, 214, 2 * DB.R + 16], dyn: [120, 336, DB.xc - 100, 40] })[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = bg();
+  if (id === 'cont') h += contScene();
+  else if (id === 'bern') h += S.setup === 'paper' ? paperScene() : venturiScene();
+  else if (id === 'lift') h += wingScene();
+  else h += dragScene();
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b && b[2] > 0) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// fit the scene: 520 × 405 units, centred, content at the bottom
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 520, hh / 415, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 410 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => {
+  const ck = e.target.closest('[data-click]'); if (ck && ck.dataset.click) { act(ck.dataset.click); return; }
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  drag = { id: el.dataset.drag, p0: toSvg(e), S20: S.S2 };
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const p = toSvg(e);
+  if (drag.id === 'clamp') setS2(drag.S20 + (p.y - drag.p0.y) * 0.03);   // up — squeeze
+  if (drag.id === 'alpha') setA(Math.atan2(p.y - WC.yc, p.x - WC.xc) * 180 / Math.PI);
+});
+const endDrag = () => { if (!drag) return; drag = null; scene.classList.remove('grabbing'); dirty = true; };
+scene.addEventListener('pointerup', endDrag);
+scene.addEventListener('pointercancel', endDrag);
+
+function setS2(v) { v = clamp(Math.round(v * 20) / 20, P1.Smin, P1.Smax); if (v === S.S2) return; S.S2 = v; update(); }
+function setQv(v) { v = clamp(Math.round(v * 20) / 20, 0, VT.Qmax); if (v === S.Qv) return; S.Qv = v; update(); }
+function setVb(v) { v = clamp(Math.round(v), 0, 15); if (v === S.vb) return; S.vb = v; update(); }
+function setV(v) { v = clamp(Math.round(v), 0, 30); if (v === S.v) return; S.v = v; update(); }
+function setA(v) { v = clamp(Math.round(v), WG.amin, WG.amax); if (v === S.a) return; S.a = v; update(); }
+
+// task progress that is reached by a state (latched, with a toast)
+function latch() {
+  const id = LID();
+  if (id === 'cont') {
+    if (!S.k3 && Math.abs(S.S2 - 1) < 1e-6) { S.k3 = { v1: v1of(), v2: v2of() }; toast(`S₂ = 1 см² — втрое меньше S₁ = 3 см², и вода в наконечнике течёт втрое быстрее: ${fmt(v2of(), 1)} м/с против ${fmt(v1of(), 1)} м/с.`); buildScheme(); }
+    const Lr = rangeOf();
+    if (!S.bed && Lr >= P1.bed[0] && Lr <= P1.bed[1]) { S.bed = { S2: S.S2, v2: v2of(), L: Lr }; toast(`Струя на клумбе: L = ${fmt(Lr, 2)} м. Наконечник ${fmt(S.S2, 2)} см² разогнал воду до ${fmt(v2of(), 1)} м/с.`); buildScheme(); }
+  }
+  if (id === 'bern') {
+    const R = vt();
+    if (S.setup === 'venturi' && !S.d30 && R.dh > 30) { S.d30 = { n: S.n, Q: S.Qv, dh: R.dh }; toast(`Δh = ${Math.round(R.dh)} см: в узкой части давление меньше на ${fmt(R.dp / 1000, 1)} кПа. Чем больше разница скоростей, тем больше разница давлений.`); buildScheme(); }
+    if (S.setup === 'paper' && !S.paper && S.vb >= 8) { S.paper = { v: S.vb, dp: dpAir(S.vb) }; toast(`Листы сошлись! Между ними воздух движется со скоростью ${S.vb} м/с, давление там меньше атмосферного на ${fmt(dpAir(S.vb), 0)} Па.`); buildScheme(); }
+  }
+  if (id === 'lift') {
+    if ((S.v === 10 || S.v === 20) && S.rec3[S.v] == null) {
+      if (S.a !== 6) { if (!S.warn) { S.warn = true; toast('По заданию угол атаки 6° — поставьте его кнопками «α» или ручкой на крыле.'); } }
+      else { S.rec3[S.v] = liftOf(S.v, 6); toast(`${S.v} м/с, α = 6°: весы показывают ${fmt(S.rec3[S.v], 1)} Н.` + (S.rec3[10] != null && S.rec3[20] != null ? ' Сравните две силы и ответьте, во сколько раз выросла сила.' : '')); buildScheme(); }
+    }
+    if (!S.stall && S.a > WG.acrit && S.v >= 15) { S.stall = { a: S.a, F: liftOf(S.v, S.a), F15: liftOf(S.v, 15) }; toast(`Срыв потока при α = ${S.a}°: поток оторвался от верха крыла, подъёмная сила упала с ${fmt(liftOf(S.v, 15), 1)} до ${fmt(liftOf(S.v, S.a), 1)} Н.`); buildScheme(); }
+  }
+  if (id === 'drag' && (S.v === 10 || S.v === 20 || S.v === 30)) {
+    const k = S.shape + S.v;
+    if (S.rec4[k] == null) { S.rec4[k] = dragOf(S.v, S.shape); toast(`${SH[S.shape].n}, ${S.v} м/с: F = ${fmt(S.rec4[k], 2)} Н.`); buildScheme(); }
+  }
+}
+
+let last = performance.now(), acc = 0;
+function flowing() { const id = LID(); return !reduce && (id === 'cont' || (id === 'bern' && (S.setup === 'paper' ? S.vb > 0 : S.Qv > 0)) || ((id === 'lift' || id === 'drag') && S.v > 0)); }
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  const id = LID();
+  if (flowing()) {
+    FT += dt;
+    if (id === 'cont') VOL1 += S.Q * 1000 * dt * C1.TS;
+    if (id === 'bern') VOL2 += S.Qv * 1000 * dt * C2.TS;
+    if (id === 'lift' || id === 'drag') FAN += dt * S.v * 0.5;
+    if (id === 'bern' && S.setup === 'paper') FAN += dt * 6;
+    acc += dt;
+    if (acc >= 1 / 32 || dirty) { acc = 0; drawScene(t); dirty = false; }
+    return;
+  }
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 4200); }
+
+const ansLift = () => (S.rec3[10] != null && S.rec3[20] != null) && !S.ans;
+const ansDrag = () => model().dbl && !S.ans;
+const ansBern = () => S.setup === 'venturi' && S.Qv >= 0.2 && S.n >= 2 && !S.ans;
+let toolsH = '';
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, cls) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}${cls ? ` class="${cls}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  let h = '';
+  if (id === 'cont') h = P1.QS.map(q => B('q-' + q, fmt(q, 2) + ' л/с', S.Q === q)).join('') + sep + B('sq', 'Сжать', undefined, 'rec') + B('unsq', 'Отпустить') + B('s-3', 'Без зажима');
+  if (id === 'bern') {
+    h = B('st-venturi', 'Трубка Вентури', S.setup === 'venturi') + B('st-paper', 'Два листа', S.setup === 'paper') + sep;
+    if (S.setup === 'venturi') {
+      h += [1, 2, 3].map(n => B('n-' + n, n === 1 ? 'Без сужения' : 'Сужение ×' + n, S.n === n)).join('') + sep + B('qv-', 'Поток −') + B('qv+', 'Поток +', undefined, 'rec');
+      if (ansBern()) h += sep + B('ans-narrow', 'Давление меньше в узкой') + B('ans-wide', 'в широкой') + B('ans-eq', 'одинаковое');
+    } else h += B('vb-', 'Дуть слабее') + B('vb+', 'Дуть сильнее', undefined, 'rec');
+  }
+  if (id === 'lift') {
+    h = B('v-', 'Ветер −') + B('v+', 'Ветер +', undefined, 'rec') + [10, 20].map(v => B('v-' + v, v + ' м/с', S.v === v)).join('') + sep + B('a-', 'α −') + B('a+', 'α +') + B('a-6', 'α = 6°', S.a === 6);
+    if (ansLift()) h += sep + B('ans-2', 'Сила выросла в 2 раза') + B('ans-4', 'в 4 раза') + B('ans-8', 'в 8 раз');
+  }
+  if (id === 'drag') {
+    h = SHAPES.map(k => B('sh-' + k, SH[k].n.replace('Модель машины', 'Машина'), S.shape === k)).join('') + sep + B('v-', 'Ветер −') + B('v+', 'Ветер +', undefined, 'rec') + [10, 20, 30].map(v => B('v-' + v, v + ' м/с', S.v === v)).join('');
+    if (ansDrag()) h += sep + B('ans-2', 'Сила выросла в 2 раза') + B('ans-4', 'в 4 раза') + B('ans-8', 'в 8 раз');
+  }
+  if (h !== toolsH) { toolsH = h; tb.innerHTML = h; }
+}
+function act(a) {
+  if (!a) return;
+  const id = LID(), re = () => { renderTools(); buildScheme(); update(); };
+  if (a.startsWith('q-')) { S.Q = +a.slice(2); return re(); }
+  if (a === 'qcycle') { S.Q = P1.QS[(P1.QS.indexOf(S.Q) + 1) % P1.QS.length]; return re(); }
+  if (a === 'sq') return setS2(S.S2 - 0.1);
+  if (a === 'unsq') return setS2(S.S2 + 0.1);
+  if (a === 's-3') return setS2(3);
+  if (a === 'squeeze') return setS2(S.S2 <= P1.Smin + 1e-6 ? P1.Smax : S.S2 - 0.25);
+  if (a.startsWith('st-')) { S.setup = a.slice(3); return re(); }
+  if (a.startsWith('n-')) { S.n = +a.slice(2); return re(); }
+  if (a === 'ncycle') { S.n = S.n % 3 + 1; return re(); }
+  if (a === 'qv+') return setQv(S.Qv + 0.05);
+  if (a === 'qv-') return setQv(S.Qv - 0.05);
+  if (a === 'qinc') return setQv(S.Qv >= VT.Qmax - 1e-6 ? 0 : S.Qv + 0.05);
+  if (a === 'vb+') return setVb(S.vb + 2);
+  if (a === 'vb-') return setVb(S.vb - 2);
+  if (a === 'blow') return setVb(S.vb >= 14 ? 0 : S.vb + 2);
+  if (a === 'v+') return setV(S.v + 5);
+  if (a === 'v-') return setV(S.v - 5);
+  if (/^v-\d+$/.test(a)) return setV(+a.slice(2));
+  if (a === 'vcycle') return setV(S.v >= 30 ? 0 : S.v + 5);
+  if (a === 'a+') return setA(S.a + 1);
+  if (a === 'a-') return setA(S.a - 1);
+  if (a === 'a-6') return setA(6);
+  if (a === 'ainc') return setA(S.a >= WG.amax ? WG.amin : S.a + 2);
+  if (a.startsWith('sh-')) { S.shape = a.slice(3); return re(); }
+  if (a === 'shape') { S.shape = SHAPES[(SHAPES.indexOf(S.shape) + 1) % SHAPES.length]; return re(); }
+  if (a.startsWith('ans-')) {
+    if (id === 'bern') {
+      if (!ansBern()) { toast('Сначала включите поток и сузьте трубку.'); return; }
+      if (a === 'ans-narrow') { S.ans = true; toast('Верно: в узкой части вода быстрее, и давление там меньше — уровень в трубке 2 ниже.'); re(); }
+      else toast('Посмотрите на уровни воды в трубках: где столбик ниже, там давление меньше.');
+      return;
+    }
+    if (id === 'lift' && !ansLift() || id === 'drag' && !ansDrag()) return;
+    if (a === 'ans-4') { S.ans = true; toast('Верно: скорость выросла в 2 раза, а сила — в 2² = 4 раза. Сила пропорциональна v².'); re(); }
+    else toast('Разделите большую силу на меньшую. Скорость выросла в 2 раза — а сила?');
+  }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  tap: IC('<rect x="4" y="12" width="12" height="10" rx="2" fill="#a9b4c9"/><rect x="8" y="5" width="4" height="8" fill="#a9b4c9"/><rect x="3" y="3" width="14" height="4" rx="2" fill="#e0473a"/><path d="M16 17h14" stroke="#5fb4d9" stroke-width="5"/>'),
+  hose: IC('<rect x="2" y="11" width="30" height="12" rx="2" fill="#5fb4d9" stroke="#c8e4f2" stroke-width="1.5"/><circle cx="9" cy="17" r="1.6" fill="#e8f6ff"/><circle cx="17" cy="15" r="1.6" fill="#e8f6ff"/><circle cx="25" cy="19" r="1.6" fill="#e8f6ff"/>'),
+  nozzle: IC('<path d="M2 9h14l8 5h8v6h-8l-8 5H2z" fill="#5fb4d9" stroke="#c8e4f2" stroke-width="1.5"/>'),
+  clamp: IC('<rect x="10" y="6" width="14" height="16" rx="3" fill="none" stroke="#a9b4c9" stroke-width="3"/><path d="M17 22v4" stroke="#a9b4c9" stroke-width="2"/><circle cx="17" cy="29" r="3.4" fill="none" stroke="#ffb547" stroke-width="2.4"/>'),
+  jet: IC('<path d="M3 8Q20 8 30 30" fill="none" stroke="#5fb4d9" stroke-width="3"/><circle cx="12" cy="9" r="1.8" fill="#bfe6fa"/><circle cx="22" cy="15" r="1.8" fill="#bfe6fa"/>'),
+  bed: IC('<rect x="3" y="24" width="28" height="7" rx="2" fill="#5a3b24"/><path d="M9 24v-8M17 24v-10M25 24v-8" stroke="#3fae5a" stroke-width="2"/><circle cx="9" cy="15" r="3" fill="#ff8a73"/><circle cx="17" cy="13" r="3" fill="#ffd166"/><circle cx="25" cy="15" r="3" fill="#f2a2d6"/>'),
+  ruler: IC('<rect x="2" y="11" width="30" height="12" rx="2" fill="#e9d9a8"/><path d="M6 11v5M11 11v3M16 11v5M21 11v3M26 11v5" stroke="#3b3320" stroke-width="1.4"/>'),
+  venturi: IC('<path d="M2 9h9l5 5h2l5-5h9v16h-9l-5-5h-2l-5 5H2z" fill="#5fb4d9" stroke="#c8e4f2" stroke-width="1.5"/>'),
+  neck: IC('<path d="M2 6h8l6 8h2l6-8h8v22h-8l-6-8h-2l-6 8H2z" fill="none" stroke="#c8e4f2" stroke-width="1.5"/><path d="M12 17h10" stroke="#ffb547" stroke-width="2.4"/>'),
+  mano: IC('<rect x="5" y="3" width="6" height="28" fill="none" stroke="#c8e4f2" stroke-width="1.4"/><rect x="6.5" y="9" width="3" height="21" fill="#5fb4d9"/><rect x="14" y="3" width="6" height="28" fill="none" stroke="#c8e4f2" stroke-width="1.4"/><rect x="15.5" y="18" width="3" height="12" fill="#5fb4d9"/><rect x="23" y="3" width="6" height="28" fill="none" stroke="#c8e4f2" stroke-width="1.4"/><rect x="24.5" y="9" width="3" height="21" fill="#5fb4d9"/>'),
+  valve: IC('<rect x="6" y="18" width="22" height="12" rx="2" fill="#a9b4c9"/><path d="M17 18V10" stroke="#a9b4c9" stroke-width="3"/><circle cx="17" cy="8" r="6" fill="none" stroke="#e0473a" stroke-width="2.6"/>'),
+  sheets: IC('<path d="M11 3Q11 22 15 31M23 3Q23 22 19 31" fill="none" stroke="#f4f1e8" stroke-width="2.6"/><path d="M17 6v18" stroke="#cfe6f2" stroke-width="1.6" stroke-dasharray="3 2"/>'),
+  blower: IC('<rect x="3" y="8" width="28" height="20" rx="5" fill="#3b4a66"/><circle cx="17" cy="18" r="7" fill="#26324a" stroke="#a9b4c9" stroke-width="1.6"/><path d="M12 18h10M17 13v10" stroke="#a9b4c9" stroke-width="2"/>'),
+  stand: IC('<rect x="3" y="28" width="16" height="4" rx="1" fill="#4a5875"/><rect x="9" y="4" width="4" height="25" fill="#6c7a96"/><rect x="9" y="4" width="22" height="4" fill="#6c7a96"/>'),
+  fan: IC('<rect x="3" y="3" width="28" height="28" rx="6" fill="#3b4a66"/><circle cx="17" cy="17" r="10" fill="#26324a" stroke="#a9b4c9" stroke-width="1.5"/><path d="M17 17l8-3M17 17l-6 7M17 17l-2-9" stroke="#a9b4c9" stroke-width="3" stroke-linecap="round"/>'),
+  tunnel: IC('<rect x="2" y="8" width="30" height="18" fill="rgba(207,230,242,.15)" stroke="#c8e4f2" stroke-width="1.5"/><path d="M5 14h24M5 20h24" stroke="#cfe6f2" stroke-width="1.2" stroke-dasharray="4 3"/>'),
+  wing: IC('<path d="M3 19Q8 9 18 10Q27 11 32 18Q20 17 3 19z" fill="#d9dfe9" stroke="#04070d" stroke-width="1"/>'),
+  balance: IC('<rect x="3" y="20" width="28" height="11" rx="3" fill="#3b4a66"/><rect x="7" y="23" width="20" height="5" rx="1" fill="#0e1520"/><path d="M17 4v16" stroke="#a9b4c9" stroke-width="2.4"/><path d="M11 25h12" stroke="#86e0a8" stroke-width="2"/>'),
+  handle: IC('<path d="M3 15Q12 9 22 13" fill="none" stroke="#d9dfe9" stroke-width="4"/><circle cx="26" cy="19" r="5" fill="none" stroke="#ffb547" stroke-width="2.6"/>'),
+  body: IC('<path d="M6 17A9 9 0 0 1 15 8Q26 9 32 17Q26 25 15 26A9 9 0 0 1 6 17z" fill="#d9dfe9"/>'),
+  dyn: IC('<rect x="3" y="12" width="24" height="10" rx="3" fill="#2b6d7c"/><rect x="6" y="15" width="18" height="4" fill="#e8ecf4"/><path d="M15 14v6" stroke="#ff4d3a" stroke-width="2"/><path d="M27 17h5" stroke="#c8d2e3" stroke-width="2"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  const t = (ok, s) => `${s} ${ok ? '✓' : '—'}`;
+  if (id === 'cont') return [t(m.k3, 'v₂ = 3v₁'), t(m.bed, 'Клумба')].join(' · ');
+  if (id === 'bern') return [t(m.ans, 'Ответ'), t(m.d30, 'Δh > 30 см'), t(m.paper, 'Листы')].join(' · ');
+  if (id === 'lift') return [t(m.r10, '10 м/с'), t(m.r20, '20 м/с'), t(m.ans, 'Ответ'), t(m.stall, 'Срыв')].join(' · ');
+  return [t(m.p20, 'Пластинка'), t(m.s20, 'Шар'), t(m.d20, 'Капля'), t(m.ans, 'v²')].join(' · ');
+}
+
+// Scheme tab: built once per lesson, then values refreshed (sliders keep focus while dragging)
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+const chips = (lbl, items) => `<div class="ctl"><div class="lbl">${lbl}</div><div class="chips">${items.map(([a, n, on]) => `<button data-a="${a}" aria-pressed="${!!on}">${n}</button>`).join('')}</div></div>`;
+const reads = (a, b, c) => `<dl class="reads"><div><dt>${a}</dt><dd id="r1"></dd></div><div><dt>${b}</dt><dd id="r2"></dd></div><div><dt>${c}</dt><dd id="r3"></dd></div></dl>`;
+const ansChips = (lbl, list) => chips(lbl, list.map(([a, n]) => [a, n, false]));
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'cont') h = `<h2>Шланг с наконечником</h2>` + chips('Кран (расход Q)', P1.QS.map(q => ['q-' + q, fmt(q, 2) + ' л/с', S.Q === q])) +
+      slider('inS', 'Сечение наконечника S₂', P1.Smin, P1.Smax, 0.05, S.S2) + reads('v₁ в шланге', 'v₂ в наконечнике', 'дальность L') +
+      `<h3>Записи</h3><div class="rec">` + step('v₂ = 3·v₁', S.k3 ? `S₂ = 1 см², v₂ = ${fmt(S.k3.v2, 1)} м/с` : '—') + step('на клумбе', S.bed ? `S₂ = ${fmt(S.bed.S2, 2)} см², L = ${fmt(S.bed.L, 2)} м` : '—') + `</div>`;
+  if (id === 'bern') {
+    h = `<h2>${S.setup === 'paper' ? 'Два листа бумаги' : 'Трубка Вентури'}</h2>` + chips('Опыт', [['st-venturi', 'Трубка Вентури', S.setup === 'venturi'], ['st-paper', 'Два листа', S.setup === 'paper']]);
+    if (S.setup === 'venturi') {
+      h += chips('Сужение (S₁ / S₂)', [1, 2, 3].map(n => ['n-' + n, n === 1 ? 'нет' : '× ' + n, S.n === n])) + slider('inQ', 'Поток Q', 0, VT.Qmax, 0.05, S.Qv) + reads('v₁', 'v₂', 'h₁ − h₂');
+      if (ansBern()) h += ansChips('Где давление меньше?', [['ans-narrow', 'В узкой части'], ['ans-wide', 'В широкой части'], ['ans-eq', 'Везде одинаковое']]);
+    } else h += slider('inB', 'Скорость воздуха между листами', 0, 15, 1, S.vb) + reads('v воздуха', 'Δp', 'листы');
+    h += `<h3>Записи</h3><div class="rec">` + step('где давление меньше', S.ans ? 'в узкой части' : '—') + step('Δh > 30 см', S.d30 ? `сужение ×${S.d30.n}, Q = ${fmt(S.d30.Q, 2)} л/с, Δh = ${Math.round(S.d30.dh)} см` : '—') + step('листы сошлись', S.paper ? `v = ${S.paper.v} м/с, Δp = ${fmt(S.paper.dp, 0)} Па` : '—') + `</div>`;
+  }
+  if (id === 'lift') {
+    h = `<h2>Крыло в аэродинамической трубе</h2>` + slider('inV', 'Скорость ветра v', 0, 30, 1, S.v) + slider('inA', 'Угол атаки α', WG.amin, WG.amax, 1, S.a) + reads('подъёмная сила', 'Cy', 'ρv²/2') +
+      `<h3>Записи (α = 6°)</h3><div class="rec">` + step('10 м/с', S.rec3[10] != null ? `F = ${fmt(S.rec3[10], 1)} Н` : '—') + step('20 м/с', S.rec3[20] != null ? `F = ${fmt(S.rec3[20], 1)} Н` : '—') + step('срыв потока', S.stall ? `α = ${S.stall.a}°: ${fmt(S.stall.F15, 1)} → ${fmt(S.stall.F, 1)} Н` : '—') + `</div>`;
+    if (ansLift()) h += ansChips('Во сколько раз выросла сила?', [['ans-2', 'в 2 раза'], ['ans-4', 'в 4 раза'], ['ans-8', 'в 8 раз']]);
+  }
+  if (id === 'drag') {
+    h = `<h2>Тела в аэродинамической трубе</h2>` + chips('Тело (сечение 0,01 м²)', SHAPES.map(k => ['sh-' + k, SH[k].n, S.shape === k])) + slider('inV', 'Скорость ветра v', 0, 30, 1, S.v) + reads('сопротивление', 'Cx', 'ρv²/2') +
+      `<h3>Записи</h3><div class="rec">` + SHAPES.map(k => step(SH[k].n, [10, 20, 30].filter(v => S.rec4[k + v] != null).map(v => `${v} м/с: ${fmt(S.rec4[k + v], 2)} Н`).join(' · ') || '—')).join('') + `</div>`;
+    if (ansDrag()) h += ansChips('Скорость выросла вдвое. Во сколько раз выросла сила?', [['ans-2', 'в 2 раза'], ['ans-4', 'в 4 раза'], ['ans-8', 'в 8 раз']]);
+  }
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn); };
+  on('#inS', e => setS2(+e.target.value));
+  on('#inQ', e => setQv(+e.target.value));
+  on('#inB', e => setVb(+e.target.value));
+  on('#inV', e => setV(+e.target.value));
+  on('#inA', e => setA(+e.target.value));
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (id === 'cont') { set('#inSO', fmt(S.S2, 2) + ' см²'); val('#inS', S.S2); set('#r1', fmt(m.v1, 1) + ' м/с'); set('#r2', fmt(m.v2, 1) + ' м/с'); set('#r3', fmt(m.L, 2) + ' м'); }
+  if (id === 'bern') {
+    if (S.setup === 'venturi') { set('#inQO', fmt(S.Qv, 2) + ' л/с'); val('#inQ', S.Qv); set('#r1', fmt(m.v1, 2) + ' м/с'); set('#r2', fmt(m.v2, 2) + ' м/с'); set('#r3', Math.round(m.dh) + ' см'); }
+    else { set('#inBO', S.vb + ' м/с'); val('#inB', S.vb); set('#r1', S.vb + ' м/с'); set('#r2', fmt(m.dpa, 0) + ' Па'); set('#r3', S.vb >= 8 ? 'сошлись' : S.vb > 0 ? 'сближаются' : 'висят'); }
+  }
+  if (id === 'lift') { set('#inVO', S.v + ' м/с'); val('#inV', S.v); set('#inAO', S.a + '°'); val('#inA', S.a); set('#r1', fmt(m.F, 1) + ' Н'); set('#r2', fmt(m.cy, 2)); set('#r3', fmt(m.q, 0) + ' Па'); }
+  if (id === 'drag') { set('#inVO', S.v + ' м/с'); val('#inV', S.v); set('#r1', fmt(m.F, 2) + ' Н'); set('#r2', fmt(m.cx, 2)); set('#r3', fmt(m.q, 0) + ' Па'); }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'cont') return [
+    { id: 'tap', icon: ICON.tap, name: 'Кран', spec: 'Задаёт расход Q — сколько литров воды в секунду идёт в шланг. Нажмите на кран, чтобы сменить расход.' },
+    { id: 'hose', icon: ICON.hose, name: 'Шланг, S₁ = 3 см²', spec: 'Прозрачный, чтобы видеть поток. Белые точки — «метки» воды: их скорость — скорость воды.' },
+    { id: 'nozzle', icon: ICON.nozzle, name: 'Наконечник', spec: 'Сужение на конце шланга. Сечение S₂ от 0,5 до 3 см².' },
+    { id: 'clamp', icon: ICON.clamp, name: 'Зажим', spec: 'Как палец на конце шланга. Тяните оранжевую ручку вверх — сжать, вниз — отпустить.' },
+    { id: 'jet', icon: ICON.jet, name: 'Струя', spec: 'Вылетает горизонтально с высоты 1 м и падает по параболе.' },
+    { id: 'bed', icon: ICON.bed, name: 'Клумба', spec: 'Цель: от 2,0 до 2,4 м от наконечника.' },
+    { id: 'ruler', icon: ICON.ruler, name: 'Разметка', spec: 'Метры по земле от конца шланга.' }];
+  if (id === 'bern') {
+    if (S.setup === 'paper') return [
+      { id: 'sheets', icon: ICON.sheets, name: 'Два листа бумаги', spec: 'Висят параллельно на расстоянии около 8 см.' },
+      { id: 'blower', icon: ICON.blower, name: 'Воздуходувка', spec: 'Дует вниз между листами. Нажмите — сильнее.' },
+      { id: 'stand', icon: ICON.stand, name: 'Штатив', spec: 'Держит листы за верхние края.' }];
+    return [
+      { id: 'tube', icon: ICON.venturi, name: 'Трубка Вентури', spec: 'Стеклянная труба с сужением, S₁ = 4 см². Белые точки показывают, как быстро течёт вода.' },
+      { id: 'neck', icon: ICON.neck, name: 'Узкая часть', spec: 'Сечение S₂ = S₁ / 2 или S₁ / 3. Нажмите на трубку, чтобы сменить сужение.' },
+      { id: 'mano', icon: ICON.mano, name: 'Манометрические трубки', spec: 'Высота воды в трубке показывает давление в этом сечении: h = p / (ρg).' },
+      { id: 'valve', icon: ICON.valve, name: 'Кран', spec: 'Поток от 0 до 0,4 л/с. Насос держит давление в сечении 1 постоянным.' },
+      { id: 'ruler', icon: ICON.ruler, name: 'Линейка', spec: 'Сантиметры от оси трубы.' }];
+  }
+  const base = [
+    { id: 'fan', icon: ICON.fan, name: 'Вентилятор', spec: 'Гонит воздух по трубе со скоростью от 0 до 30 м/с. Нажмите — сменить скорость.' },
+    { id: 'tunnel', icon: ICON.tunnel, name: 'Аэродинамическая труба', spec: 'Прозрачная. В поток добавлен дым — белые черточки, линии тока.' }];
+  if (id === 'lift') return base.concat([
+    { id: 'wing', icon: ICON.wing, name: 'Модель крыла', spec: 'Профиль с изгибом, хорда 20 см, размах 25 см, S = 0,05 м². Нажмите — угол +2°.' },
+    { id: 'handle', icon: ICON.handle, name: 'Ручка угла атаки', spec: 'Оранжевое кольцо на задней кромке: тяните вверх-вниз.' },
+    { id: 'balance', icon: ICON.balance, name: 'Аэродинамические весы', spec: 'Крыло стоит на стойке, весы показывают подъёмную силу в ньютонах.' }]);
+  return base.concat([
+    { id: 'body', icon: ICON.body, name: 'Тело на стойке', spec: 'Пластинка, шар, капля или модель машины; сечение у всех 0,01 м². Нажмите — сменить.' },
+    { id: 'dyn', icon: ICON.dyn, name: 'Динамометр 0–10 Н', spec: 'Держит тележку со стойкой и показывает силу сопротивления.' }]);
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      (Ls.safe ? `<div class="safe"><b>Безопасность</b>${Ls.safe}</div>` : '') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Что на площадке</h2><p class="note">Нажмите на деталь, чтобы найти её на площадке.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'cont') {
+    return `<h2>Неразрывность струи</h2><div class="formula">Q = S₁v₁ = S₂v₂</div><p class="note">Q в м³/с, S в м², v в м/с. 1 л = 0,001 м³, 1 см² = 0,0001 м².</p>
+      <h3>Сейчас</h3><div class="steps">` + step('расход Q', `${fmt(m.Q, 2)} л/с = ${fmt(m.Q * 1000, 0)} см³/с`) +
+      step('v₁ = Q / S₁', `${fmt(m.Q * 1000, 0)} / ${nf(m.S1)} = ${fmt(m.v1 * 100, 0)} см/с = ${fmt(m.v1, 2)} м/с`) +
+      step('v₂ = Q / S₂', `${fmt(m.Q * 1000, 0)} / ${fmt(m.S2, 2)} = ${fmt(m.v2, 2)} м/с`, 'sum') + step('v₂ / v₁ = S₁ / S₂', `${nf(m.S1)} / ${fmt(m.S2, 2)} = ${fmt(m.S1 / m.S2, 2)}`) + `</div>
+      <h3>Дальность струи</h3><div class="steps">` + step('время падения t = √(2h/g)', `√(2 × 1 / 9,8) = ${fmt(tFall, 3)} с`) + step('L = v₂ · t', `${fmt(m.v2, 2)} × ${fmt(tFall, 3)} = ${fmt(m.L, 2)} м`, 'sum') +
+      step('для клумбы 2,0–2,4 м', `v₂ = ${fmt(P1.bed[0] / tFall, 1)}–${fmt(P1.bed[1] / tFall, 1)} м/с`) + `</div>
+      <p class="note" style="margin-top:10px">Сопротивление воздуха не учитываем. Сожмите выход вдвое — скорость и дальность вырастут вдвое.</p>`;
+  }
+  if (id === 'bern') {
+    if (S.setup === 'paper') return `<h2>Два листа бумаги</h2><div class="formula">Δp = ρv² / 2</div><p class="note">ρ = 1,2 кг/м³ — плотность воздуха, v — скорость воздуха между листами. Снаружи воздух стоит, там атмосферное давление.</p>
+      <h3>Сейчас</h3><div class="steps">` + step('скорость v', `${S.vb} м/с`) + step('Δp = 1,2 × v² / 2', `1,2 × ${S.vb * S.vb} / 2 = ${fmt(m.dpa, 0)} Па`, 'sum') + step('сила на лист A4 (0,06 м²)', `${fmt(m.dpa, 0)} × 0,06 ≈ ${fmt(m.dpa * 0.06, 2)} Н`) + `</div>
+      <p class="note" style="margin-top:10px">Лист A4 весит около 0,05 Н, поэтому даже небольшой перепад давления заметно сдвигает его.</p>`;
+    return `<h2>Закон Бернулли</h2><div class="formula">p₁ + ρv₁²/2 = p₂ + ρv₂²/2</div><p class="note">ρ = 1000 кг/м³ — вода. Давление измеряем высотой столба: p = ρgh. Трубка горизонтальная, трения нет.</p>
+      <h3>Скорости</h3><div class="steps">` + step('v₁ = Q / S₁', `${fmt(S.Qv * 1000, 0)} см³/с / 4 см² = ${fmt(m.v1, 2)} м/с`) + step('v₂ = v₁ · S₁/S₂', `${fmt(m.v1, 2)} × ${S.n} = ${fmt(m.v2, 2)} м/с`) + `</div>
+      <h3>Разность давлений</h3><div class="steps">` + step('p₁ − p₂ = ρ(v₂² − v₁²)/2', `1000 × (${fmt(m.v2 * m.v2, 2)} − ${fmt(m.v1 * m.v1, 2)}) / 2 = ${fmt(m.dp, 0)} Па`) +
+      step('Δh = (p₁ − p₂) / (ρg)', `${fmt(m.dp, 0)} / 9800 = ${fmt(m.dh / 100, 3)} м ≈ ${Math.round(m.dh)} см`, 'sum') + step('h₂ = h₁ − Δh', `50 − ${Math.round(m.dh)} = ${Math.round(m.h2)} см`) + `</div>
+      <p class="note" style="margin-top:10px">В сечении 3 труба снова широкая, скорость и давление те же, что в сечении 1. Если h₂ < 0, в узкой части давление ниже атмосферного — так работает водоструйный насос.</p>`;
+  }
+  if (id === 'lift') {
+    const vto = Math.sqrt(2 * 70000 * 9.8 / (1.2 * 122.6 * 1.6));
+    return `<h2>Подъёмная сила</h2><div class="formula">F = Cy · ρv²/2 · S</div><p class="note">ρ = 1,2 кг/м³, S = 0,05 м² — площадь крыла. Cy зависит от угла атаки: здесь Cy ≈ 0,25 + 0,09·α до 15°, после срыва резко падает.</p>
+      <h3>Сейчас</h3><div class="steps">` + step('скоростной напор ρv²/2', `1,2 × ${S.v * S.v} / 2 = ${fmt(m.q, 0)} Па`) + step('Cy при α = ' + S.a + '°', fmt(m.cy, 2) + (m.stalled ? ' (срыв)' : '')) +
+      step('F = Cy · q · S', `${fmt(m.cy, 2)} × ${fmt(m.q, 0)} × 0,05 = ${fmt(m.F, 1)} Н`, 'sum') + `</div>
+      <h3>Взлёт пассажирского самолёта</h3><div class="steps">` + step('масса', '70 т, вес ≈ 686 кН') + step('крыло S, Cy с закрылками', '122,6 м², ≈ 1,6') +
+      step('v = √(2mg / (ρ·S·Cy))', `≈ ${fmt(vto, 0)} м/с ≈ ${fmt(vto * 3.6, 0)} км/ч`, 'sum') + `</div>
+      <p class="note" style="margin-top:10px">Подъёмная сила равна весу — самолёт отрывается от полосы. Вдвое меньше скорость — вчетверо меньше сила.</p>`;
+  }
+  const cN = (v, cx, A) => cx * 1.2 * v * v / 2 * A;
+  return `<h2>Сила сопротивления</h2><div class="formula">F = Cx · ρv²/2 · S</div><p class="note">ρ = 1,2 кг/м³, S = 0,01 м² — площадь сечения тела. Мощность на преодоление сопротивления N = F·v.</p>
+    <h3>Сейчас</h3><div class="steps">` + step('ρv²/2', `1,2 × ${S.v * S.v} / 2 = ${fmt(m.q, 0)} Па`) + step('Cx · ' + SH[S.shape].n.toLowerCase(), fmt(m.cx, 2)) + step('F = Cx · q · S', `${fmt(m.cx, 2)} × ${fmt(m.q, 0)} × 0,01 = ${fmt(m.F, 2)} Н`, 'sum') + `</div>
+    <h3>Электромобиль, Cx = 0,25, S = 2,2 м²</h3><div class="steps">` + step('90 км/ч (25 м/с)', `F ≈ ${fmt(cN(25, 0.25, 2.2), 0)} Н, N ≈ ${fmt(cN(25, 0.25, 2.2) * 25 / 1000, 1)} кВт`) + step('130 км/ч (36 м/с)', `F ≈ ${fmt(cN(36, 0.25, 2.2), 0)} Н, N ≈ ${fmt(cN(36, 0.25, 2.2) * 36 / 1000, 1)} кВт`, 'sum') +
+    step('то же при Cx = 0,30', `N ≈ ${fmt(cN(36, 0.3, 2.2) * 36 / 1000, 1)} кВт`) + `</div>
+    <p class="note" style="margin-top:10px">Скорость в 1,44 раза больше — мощность на воздух почти втрое больше (1,44³ ≈ 3). Поэтому запас хода электромобиля на трассе заметно меньше, чем в городе.</p>`;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter');
+  const row = (a, b, cls) => `<div class="lr"><span>${a}</span><span class="${cls || ''}">${b}</span></div>`;
+  if (id === 'cont') el.innerHTML = `<div class="k">Струя</div><div class="v ${m.L >= P1.bed[0] && m.L <= P1.bed[1] ? 'ok' : ''}">L = ${fmt(m.L, 2)} м</div>` + row('Q', fmt(m.Q, 2) + ' л/с') + row('v₁', fmt(m.v1, 1) + ' м/с') + row('v₂', fmt(m.v2, 1) + ' м/с', Math.abs(m.S2 - 1) < 1e-6 ? 'ok' : '');
+  else if (id === 'bern') {
+    if (S.setup === 'paper') el.innerHTML = `<div class="k">Между листами</div><div class="v ${S.vb >= 8 ? 'ok' : ''}">Δp = ${fmt(m.dpa, 0)} Па</div>` + row('v', S.vb + ' м/с');
+    else el.innerHTML = `<div class="k">Манометры</div><div class="v ${m.dh > 30 ? 'ok' : ''}">Δh = ${Math.round(m.dh)} см</div>` + row('h₁', Math.round(m.h1) + ' см') + row('h₂', Math.round(m.h2) + ' см', m.h2 < 0 ? 'bad' : '') + row('h₃', Math.round(m.h3) + ' см');
+  } else if (id === 'lift') el.innerHTML = `<div class="k">Весы</div><div class="v">F = ${fmt(m.F, 1)} Н</div>` + row('v', S.v + ' м/с') + row('α', S.a + '°', m.stalled ? 'bad' : '') + row('Cy', fmt(m.cy, 2));
+  else el.innerHTML = `<div class="k">Динамометр</div><div class="v">F = ${fmt(m.F, 2)} Н</div>` + row('v', S.v + ' м/с') + row('Cx', fmt(m.cx, 2)) + row('тело', SH[S.shape].n.replace('Модель машины', 'машина').toLowerCase());
+}
+
+function update() {
+  latch();
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Теперь вы знаете, как движутся жидкости и газы!'), 2000);
+  }
+  renderTools();
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  cont: '<path d="M2 12h26l6 2h6v4h-6l-6 2H2z" fill="#5fb4d9" stroke="#c8e4f2" stroke-width=".8"/><path d="M40 16Q52 16 60 28" fill="none" stroke="#5fb4d9" stroke-width="2"/><rect x="52" y="25" width="12" height="4" rx="1" fill="#5a3b24"/><circle cx="58" cy="23" r="1.8" fill="#ff8a73"/>',
+  bern: '<path d="M2 20h18l8 3h8l8-3h20v8H44l-8-3h-8l-8 3H2z" fill="#5fb4d9" stroke="#c8e4f2" stroke-width=".8"/><rect x="9" y="3" width="4" height="17" fill="none" stroke="#c8e4f2" stroke-width=".8"/><rect x="10" y="6" width="2" height="14" fill="#5fb4d9"/><rect x="30" y="3" width="4" height="20" fill="none" stroke="#c8e4f2" stroke-width=".8"/><rect x="31" y="14" width="2" height="9" fill="#5fb4d9"/><rect x="51" y="3" width="4" height="17" fill="none" stroke="#c8e4f2" stroke-width=".8"/><rect x="52" y="6" width="2" height="14" fill="#5fb4d9"/>',
+  lift: '<path d="M4 9h58M4 23h58" stroke="#cfe6f2" stroke-width=".8" opacity=".6"/><path d="M14 17Q20 10 32 11Q44 12 52 18Q34 17 14 17z" fill="#d9dfe9"/><path d="M33 12V3" stroke="#86e0a8" stroke-width="2"/><path d="M30 5l3-4 3 4" fill="#86e0a8"/>',
+  drag: '<path d="M4 7h58M4 25h58" stroke="#cfe6f2" stroke-width=".8" opacity=".6"/><path d="M14 16A8 8 0 0 1 22 8Q36 9 46 16Q36 23 22 24A8 8 0 0 1 14 16z" fill="#d9dfe9"/><path d="M48 16h12" stroke="#ff8a73" stroke-width="2"/><path d="M58 13l4 3-4 3" fill="#ff8a73"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Lx, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Lx.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Lx.title}</span></span>
+      ${S.done[Lx.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  S.lesson = i; drag = null;
+  resetState(); save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L().task;
+  $('#hint').textContent = L().stage;
+  toolsH = ''; renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '';
+  if (id === 'cont') now = `Кран даёт расход ${fmt(S.Q, 2)} л/с. Шланг сечением 3 см² держат горизонтально на высоте 1 м, сечение наконечника ${fmt(S.S2, 2)} см². Скорость воды в шланге ${fmt(m.v1, 2)} м/с, в наконечнике ${fmt(m.v2, 2)} м/с, струя падает в ${fmt(m.L, 2)} м (клумба 2,0–2,4 м). Подзадачи: v₂ = 3v₁ — ${S.k3 ? 'сделано' : 'нет'}; струя на клумбе — ${S.bed ? 'сделано' : 'нет'}. Нужное сечение не называй — наводи к S₁v₁ = S₂v₂ и L = v·√(2h/g).`;
+  if (id === 'bern') now = S.setup === 'paper' ? `Опыт с двумя листами бумаги: воздуходувка дует между ними со скоростью ${S.vb} м/с, перепад давления ${fmt(m.dpa, 0)} Па; листы ${S.vb >= 8 ? 'сошлись' : 'пока почти висят'}.`
+    : `Трубка Вентури (вода): S₁ = 4 см², сужение в ${S.n} раз${S.n === 1 ? ' (нет сужения)' : 'а'}, поток ${fmt(S.Qv, 2)} л/с. Скорости: v₁ = ${fmt(m.v1, 2)} м/с, v₂ = ${fmt(m.v2, 2)} м/с. Уровни в трубках: ${Math.round(m.h1)}, ${Math.round(m.h2)}, ${Math.round(m.h3)} см (Δh = ${Math.round(m.dh)} см).`;
+  if (id === 'bern') now += ` Подзадачи: ответ, где давление меньше — ${S.ans ? 'дан верно' : 'нет'}; Δh > 30 см — ${S.d30 ? 'сделано' : 'нет'}; листы — ${S.paper ? 'сделано' : 'нет'}. Ответов не называй — наводи к закону Бернулли.`;
+  if (id === 'lift') now = `Аэродинамическая труба: скорость ветра ${S.v} м/с, крыло S = 0,05 м² под углом атаки ${S.a}° (Cy = ${fmt(m.cy, 2)}${m.stalled ? ', срыв потока' : ''}), весы показывают подъёмную силу ${fmt(m.F, 1)} Н. Записи при 6°: 10 м/с — ${S.rec3[10] != null ? fmt(S.rec3[10], 1) + ' Н' : 'нет'}, 20 м/с — ${S.rec3[20] != null ? fmt(S.rec3[20], 1) + ' Н' : 'нет'}. Ответ про рост силы ${S.ans ? 'дан' : 'не дан'}, срыв ${S.stall ? 'найден' : 'не найден'}. Во сколько раз выросла сила — не называй, наводи к F ∝ v².`;
+  if (id === 'drag') now = `Аэродинамическая труба: скорость ${S.v} м/с, в потоке ${SH[S.shape].n.toLowerCase()} (Cx ≈ ${fmt(m.cx, 2)}, сечение 0,01 м²), динамометр показывает сопротивление ${fmt(m.F, 2)} Н. Записи: ${Object.keys(S.rec4).map(k => `${SH[k.replace(/\d/g, '')].n.toLowerCase()} ${k.replace(/\D/g, '')} м/с — ${fmt(S.rec4[k], 2)} Н`).join('; ') || 'нет'}. Ответ про v² ${S.ans ? 'дан' : 'не дан'}. Ответов не называй — наводи к F = Cx·ρv²S/2.`;
+  return [
+    `Раздел: физика, 10 класс, тема «Жидкости и газы в движении: гидро- и аэродинамика». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'} (${taskState(m)}).`,
+    `Сейчас на площадке: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Помогай наводящими вопросами, готовые ответы не выдавай.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { cont: 'Почему из сжатого шланга вода бьёт дальше?', bern: 'Почему листы бумаги сходятся, а не разлетаются?', lift: 'Почему самолёт не может просто задрать нос, чтобы взлететь раньше?', drag: 'Почему электромобиль на трассе разряжается быстрее, чем в городе?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-fluids.js)
+window.LUCH_REAL = () => {
+  const id = LID(), M = { module: 'fluids' };
+  if (id === 'cont') return { ...M, scene: 'fluids-pipe', help: 'Кран — расход, наконечник — сжать', Q: S.Q, S1: P1.S1, H: P1.H, bed: P1.bed };
+  if (id === 'bern') return S.setup === 'paper' ? { ...M, scene: 'fluids-paper', help: 'Воздуходувка — дуть сильнее' } : { ...M, scene: 'fluids-venturi', help: 'Кран — поток, узкая часть — сменить сужение', n: S.n, h1: VT.h1 };
+  if (id === 'lift') return { ...M, scene: 'fluids-wing', help: 'Вентилятор — скорость, крыло — угол атаки +2°' };
+  return { ...M, scene: 'fluids-drag', help: 'Вентилятор — скорость, тело — сменить форму', shape: S.shape, name: SH[S.shape].n, cx: SH[S.shape].cx };
+};
+// live values for smooth motion in 3D
+window.LUCH_REAL.live = () => {
+  const id = LID();
+  if (id === 'cont') return { Q: S.Q, S2: S.S2, v1: v1of(), v2: v2of(), L: rangeOf() };
+  if (id === 'bern') { const R = vt(); return { Q: S.Qv, v1: R.v1, v2: R.v2, h1: R.h1, h2: R.h2, h3: R.h3, vb: S.vb, dp: dpAir(S.vb), def: sheetDef() / 34 }; }
+  if (id === 'lift') return { v: S.v, a: S.a, F: liftOf(S.v, S.a), cy: cyOf(S.a), stalled: S.a > WG.acrit };
+  return { v: S.v, F: dragOf(S.v, S.shape) };
+};
+window.LUCH_REAL.click = k => act(k);
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
