@@ -225,7 +225,11 @@
   .ls-stage .pic .brd.on{opacity:1}
   .ls-stage .pic .brd.sch{display:block;padding:0;box-shadow:none;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi,#1c2740) 0%,var(--stage-lo,#111a2b) 62%,var(--bg,#0b1019) 100%)}
   .ls-stage .pic .brd.sch .tag{position:absolute;left:12px;top:12px;font:700 12px/1 var(--font-mono,monospace);letter-spacing:.08em;text-transform:uppercase;color:#0b1019;background:var(--accent,#ffb547);padding:6px 9px;border-radius:999px}
-  .ls-stage .pic:has(.brd.on) .big{top:auto;left:auto;right:18px;bottom:18px;margin:0;width:52px;height:52px;font-size:18px}
+  .ls-stage .pic:has(.brd.on) .big{top:auto;right:auto;left:18px;bottom:18px;margin:0;width:52px;height:52px;font-size:18px}
+  .ls-stage .pbtn{position:absolute;z-index:4;width:40px;height:40px;border-radius:12px;border:0;padding:0;display:grid;place-items:center;background:rgba(11,16,25,.58);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);color:#fff;font-size:18px;cursor:pointer;transition:background .15s}
+  .ls-stage .pbtn:hover,.ls-stage .pbtn:focus-visible{background:rgba(11,16,25,.85)}
+  .ls-stage .pbtn.px{top:10px;right:10px}
+  .ls-stage .pbtn.pfs{bottom:10px;right:10px}
   .ls-stage .pic .brd .in{display:flex;flex-direction:column;gap:3cqh;max-width:100%}
   .ls-stage .pic .brd .f{font:600 clamp(20px,7cqw,64px)/1.15 "Golos Text",system-ui,sans-serif;color:#ffd166;text-align:center;letter-spacing:.02em;text-shadow:0 0 1px rgba(255,209,102,.6)}
   .ls-stage .pic .brd ul{list-style:none;margin:0 auto;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,38cqw),1fr));gap:.6cqh 3cqw;font:500 clamp(11px,2.7cqw,24px)/1.35 "Golos Text",system-ui,sans-serif;color:#e8e4d8}
@@ -375,12 +379,14 @@
   function stShell() {
     const el = document.createElement('div'); el.className = 'ls-stage'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Теория');
     el.innerHTML = '<div class="frame"><div class="pic"><div class="pv"><div class="k">Урок ' + (lessonIdx() + 1) + ' · теория</div><h4></h4>' +
-      '<ul><li data-s="text">Пишу лекцию</li><li data-s="img">Рисую картинки</li><li data-s="voice">Записываю голос</li></ul></div><i class="wt"></i><button class="big" data-a="pp" aria-label="Пауза"><span>❚❚</span></button></div>' +
+      '<ul><li data-s="text">Пишу лекцию</li><li data-s="img">Рисую картинки</li><li data-s="voice">Записываю голос</li></ul></div><i class="wt"></i><button class="big" data-a="pp" aria-label="Пауза"><span>❚❚</span></button>' +
+      '<button class="pbtn px" data-a="close" aria-label="Закрыть" title="Закрыть (Esc)">✕</button>' +
+      '<button class="pbtn pfs fsb" data-a="fs" aria-label="На весь экран" title="На весь экран (F)">' + FS_ICON.on + '</button></div>' +
       '<div class="txt" data-noi18n><b>Готовлю лекцию</b><div class="fact"></div></div>' +
       '<div class="dots"></div>' +
       '<div class="ctl"><button class="ic" data-a="prev" aria-label="Назад">‹</button><button class="pp" data-a="pp"></button><button class="ic" data-a="next" aria-label="Дальше">›</button>' +
       '<button class="ic rate" data-a="rate" aria-label="Скорость 1×" title="Скорость: 1×, 1,2×, 1,5×, 2×">1×</button>' +
-      '<button class="ic fsb" data-a="fs" aria-label="На весь экран" title="На весь экран (F)">' + FS_ICON.on + '</button><span class="sp"></span><button class="ls-btn ghost" data-a="practice">К практике →</button><button class="ic x" data-a="close" aria-label="Закрыть">✕</button></div></div>';
+      '<span class="sp"></span><button class="ls-btn ghost" data-a="practice">К практике →</button></div></div>';
     el.addEventListener('click', e => {
       if (e.target === el) return stopStory();
       const b = e.target.closest('[data-a]');
