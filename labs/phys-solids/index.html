@@ -1,0 +1,1313 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по физике, 10 класс: поверхностное натяжение, капилляры и смачивание, кристаллы и аморфные тела, деформации и прочность.">
+<title>Жидкости и твёрдые тела</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /labs/phys-machines. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene [data-click]{cursor:pointer}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.meter .lr .ok{color:var(--ok)}
+.meter .lr .bad{color:var(--warn)}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button.rec{color:var(--force)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.rec{display:grid;gap:4px;margin-top:8px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<script src="/luch/splash.js"></script>
+<div class="app">
+  <header>
+    <div class="brand" role="link" tabindex="0" title="Карта предметов" style="cursor:pointer" onclick="location.href='/'" onkeydown="if(event.key==='Enter')location.href='/'">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M9.6 14.6 9.2 6.2 15 10.6Q20 9.4 25 10.6L30.8 6.2 30.4 14.6Q34.6 22 31.6 29Q27.6 36 20 36Q12.4 36 8.4 29Q5.4 22 9.6 14.6Z" fill="#ffb547"/><path d="M20 14Q15.2 10.8 10.9 13.4Q7.6 17.2 9.4 21.8Q11.6 25.8 15.9 25.4Q18.5 25.1 20 27.1Q21.5 25.1 24.1 25.4Q28.4 25.8 30.6 21.8Q32.4 17.2 29.1 13.4Q24.8 10.8 20 14Z" fill="#ffd896"/><circle cx="15" cy="18.8" r="5" fill="#fffaf0"/><circle cx="25" cy="18.8" r="5" fill="#fffaf0"/><circle cx="15.6" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="24.4" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="16.6" cy="18.1" r="1" fill="#fff"/><circle cx="25.4" cy="18.1" r="1" fill="#fff"/><path d="M18.6 23.4h2.8L20 26.6z" fill="#ff8a73"/><path d="M10.5 29.6Q15.3 27.4 20 29.7Q24.7 27.4 29.5 29.6V34.6Q24.7 32.6 20 34.8Q15.3 32.6 10.5 34.6Z" fill="#72d4e8"/><path d="M20 29.7V34.8" stroke="#0b1019" stroke-width="1.1"/><path d="M8.2 23.5Q5.6 28.6 9.4 32.6Q11.6 33.2 12.4 31Q10.4 28.4 8.2 23.5Z" fill="#e8962a"/><path d="M31.8 23.5Q34.4 28.6 30.6 32.6Q28.4 33.2 27.6 31Q29.6 28.4 31.8 23.5Z" fill="#e8962a"/><path d="M35 3.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" fill="#86e0a8"/></svg>
+      <div><h1>OPEN SCHOOL AI</h1><small>Доступное образование для всех</small></div>
+    </div>
+    <div class="headr">
+
+      <div class="prog" aria-label="Прогресс"><b>Твёрдые тела</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Опытная площадка">
+    <svg class="scene" id="scene" role="img" aria-label="Площадка для опытов с жидкостями и твёрдыми телами. Кольцо динамометра и рукоятку разрывной машины можно тянуть, детали — нажимать."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const nf = x => fmt(x, Math.abs(x - Math.round(x)) < 1e-9 ? 0 : 1);
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d';
+const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+
+const LESSONS = [
+  { id: 'tension', title: 'Поверхностное натяжение',
+    text: ['Молекулу внутри жидкости соседи притягивают со всех сторон одинаково, а молекулу на поверхности — только снизу и с боков. Поэтому поверхность ведёт себя как растянутая плёнка и стремится сократиться: капли круглые, мыльные пузыри — шары.',
+           'Сила поверхностного натяжения направлена вдоль поверхности и перпендикулярно её границе: F = σ·l, где l — длина границы, σ — коэффициент поверхностного натяжения, Н/м. У воды при 20 °C σ ≈ 0,073 Н/м, у мыльного раствора — около 0,04 Н/м.',
+           'У мыльной плёнки две поверхности, поэтому перекладину рамки тянет сила F = 2σl. В отличие от пружины, плёнка тянет одинаково, как сильно её ни растягивай: на новую поверхность просто выходят молекулы из толщи плёнки.',
+           'Скрепку и водомерку держит поверхность воды: она прогибается под ними, как батут. Мыло уменьшает σ — и та же скрепка тонет.'],
+    why: 'Струйный принтер выстреливает капли объёмом в несколько пиколитров, и то, как капля отрывается от сопла и ложится на бумагу, задаёт поверхностное натяжение. Так же печатают 3D-принтеры жидкой смолой и биопринтеры — живыми клетками. В микрофлюидике капли в каналах тоньше волоса работают как пробирки: «лаборатория на чипе» делает анализ по одной капле крови. Краски, моющие средства, спреи с лекарствами подбирают по σ. С этим работают инженеры-технологи печати, химики-технологи и разработчики микрофлюидных чипов. Через десять лет ИИ будет подбирать составы чернил и растворов быстрее людей, но понять, почему капля в реальном приборе ведёт себя не так, как в модели, сможет специалист, который знает физику поверхности.',
+    task: 'Растяните мыльную плёнку до отметки 6 см перекладиной 3 см и перекладиной 8 см, сравните силы. Потом положите скрепку на чистую воду и капните в воду мыло.',
+    hint: 'Тяните оранжевое кольцо динамометра. Перекладина и опыт меняются кнопками внизу. Динамометр показывает миллиньютоны: 1 мН = 0,001 Н.',
+    stage: 'Тяните кольцо динамометра вправо. Нажмите на перекладину — сменить длину.',
+    check: m => m.f3 && m.f8 && m.fl && m.sk },
+  { id: 'capil', title: 'Капилляры и смачивание',
+    text: ['Если молекулы жидкости притягиваются к твёрдому телу сильнее, чем друг к другу, жидкость смачивает его: капля воды растекается по чистому стеклу, а у стенки поверхность загибается вверх — мениск вогнутый. Ртуть стекло не смачивает: собирается в шарик, мениск выпуклый.',
+           'В узкой трубке — капилляре — смачивающая жидкость поднимается: поверхностное натяжение тянет её вверх вдоль стенки, пока вес столба не уравновесит эту силу. Высота подъёма h = 2σ / (ρ g r): чем тоньше трубка, тем выше столб.',
+           'Несмачивающая жидкость в капилляре опускается ниже уровня в сосуде. В общем виде h = 2σ cos θ / (ρ g r), где θ — краевой угол: у воды на чистом стекле θ ≈ 0°, у ртути θ ≈ 140°, cos θ < 0, и h получается отрицательной.',
+           'Капилляры повсюду: бумажное полотенце и ткань впитывают воду, влага поднимается в почве к корням, керосин — по фитилю. В растениях вода идёт по тонким сосудам; в высоких деревьях её главным образом тянет испарение листьями, а капиллярность помогает.'],
+    why: 'Экспресс-тесты на вирусы и тест-полоски глюкометров работают без насосов: каплю протягивает по полоске капиллярная сила. На этом же построены микрофлюидные чипы — «лаборатория на чипе», где анализ крови идёт в каналах тоньше волоса. На заводах микросхем следят, как жидкости смачивают кремниевую пластину при промывке и нанесении фоторезиста, а ткани и стёкла делают водоотталкивающими, меняя краевой угол. Разработчики медицинских тест-систем, инженеры-технологи полупроводников и материаловеды будут нужны и через десять лет: ИИ предложит состав покрытия, но проверить, почему жидкость не идёт по каналу, должен человек, который понимает смачивание.',
+    task: 'Опустите в воду капилляры радиусом 1 мм, 0,5 мм и 0,25 мм и сравните высоты подъёма. Ответьте, во сколько раз выше поднимается вода в трубке вдвое тоньше. Потом замените воду ртутью и опустите хотя бы один капилляр.',
+    hint: 'Нажмите на капилляр — он опустится в жидкость или поднимется. Жидкость меняется кнопками внизу. Линейка справа — в миллиметрах от уровня жидкости в ванночке.',
+    stage: 'Нажмите на капилляр, чтобы опустить его в жидкость.',
+    safe: 'Ртуть и её пары ядовиты. Опыты с ртутью показывают только в запаянных приборах или на видео. Разбился ртутный термометр — не трогайте шарики руками и пылесосом, откройте окно, выйдите из комнаты и позовите взрослых.',
+    check: m => m.w3 && m.ans && m.hg },
+  { id: 'cryst', title: 'Кристаллы и аморфные тела',
+    text: ['В кристалле атомы или ионы стоят в строгом порядке — в узлах кристаллической решётки, и этот порядок повторяется на миллионы шагов. Так устроены лёд, поваренная соль, металлы, кварц, кремний.',
+           'Кристалл плавится при определённой температуре. Пока решётка разрушается, вся подводимая теплота идёт на это, и температура не растёт — на графике видна горизонтальная площадка. Лёд плавится при 0 °C, поваренная соль — при 801 °C.',
+           'В аморфных телах — стекле, канифоли, смолах, многих пластиках — порядок только ближний, как в застывшей жидкости. Определённой температуры плавления у них нет: при нагревании тело постепенно размягчается и становится всё более текучим. Похоже ведут себя воск и пластилин.',
+           'Свойства кристалла могут зависеть от направления — это анизотропия: слюда расщепляется на листки, графит — на слои. Алмаз и графит — один и тот же углерод. В алмазе каждый атом прочно связан с четырьмя соседями в объёмной сетке, а в графите атомы образуют плоские слои, слабо связанные между собой. Поэтому алмаз — самый твёрдый природный минерал, а графитом пишут.'],
+    why: 'Каждый процессор и чип памяти делают на пластине монокристаллического кремния диаметром 300 мм. Её режут из кристалла, выращенного из расплава почти без дефектов: лишний сдвиг атомов — и транзисторы работают хуже. Из слоя графита толщиной в один атом получается графен — очень прочный и проводящий материал для датчиков и аккумуляторов. Сапфировые стёкла часов, светодиоды, лазеры и солнечные панели тоже начинаются с выращенных кристаллов. Инженеры-технологи полупроводникового производства и материаловеды — одни из самых востребованных специалистов в мире: заводы чипов строят во многих странах, ИИ ускоряет поиск новых материалов, но понимать, как порядок атомов определяет свойства, и наладить выращивание кристалла должен человек.',
+    task: 'Нагрейте кристалл (лёд или соль) и аморфное тело (канифоль или стекло) до конца опыта и сравните графики. Ответьте, у кого на графике есть площадка. Затем рассмотрите решётки алмаза и графита.',
+    hint: 'Образец выбирается кнопками внизу, «Нагреть» включает печь. Справа — график температуры, в круге — как стоят частицы. Кнопки «Алмаз» и «Графит» показывают решётки углерода.',
+    stage: 'Нажмите на печь — включить или выключить нагрев.',
+    safe: 'Горячий тигель берут только щипцами и в рукавицах. Расплавленная соль и размягчённое стекло имеют температуру около 800 °C, а остывающее стекло на вид не отличить от холодного.',
+    check: m => m.crys && m.amor && m.ans && m.carbon },
+  { id: 'strength', title: 'Деформации и прочность',
+    text: ['Деформация — изменение формы или размеров тела под действием сил. Если после снятия нагрузки тело возвращает форму, деформация упругая; если остаётся изменённым — пластическая.',
+           'Механическое напряжение σ = F / S — сила на единицу площади сечения, в паскалях (1 МПа = 1 Н/мм²). Относительное удлинение ε = ΔL / L₀. При небольших напряжениях выполняется закон Гука: σ = E·ε, где E — модуль Юнга. У стали E ≈ 200 ГПа, у меди ≈ 110 ГПа, у алюминия ≈ 70 ГПа.',
+           'На диаграмме растяжения сначала идёт прямая — закон Гука. Выше предела текучести σт металл «течёт»: удлинение быстро растёт, и после разгрузки остаётся остаточное удлинение. Наибольшее напряжение, которое выдерживает образец, — предел прочности σпч; при нём образец рвётся.',
+           'Детали рассчитывают с запасом прочности n = σпч / σ: рабочее напряжение должно быть в несколько раз меньше предела прочности и ниже предела текучести, чтобы конструкция не деформировалась навсегда.'],
+    why: 'Мосты, небоскрёбы, краны и тросы лифтов рассчитывают так, чтобы напряжения оставались в упругой области с запасом прочности. Инженеры-конструкторы и специалисты по обследованию сооружений проверяют расчёты и следят, не начал ли металл где-то «течь». Кузова электромобилей и крылья самолётов делают из высокопрочной стали, алюминиевых сплавов и углепластика — карбона, который в несколько раз легче стали при сравнимой прочности. Материаловеды испытывают новые сплавы и композиты на разрывных машинах, как на этой площадке. ИИ и компьютерные модели уже придумывают лёгкие формы деталей, но отвечать за то, что мост выдержит, будет инженер-конструктор, который понимает диаграмму растяжения, — такая профессия останется нужной и через десять лет.',
+    task: 'Нагрузите проволоку и снимите нагрузку, не дойдя до предела текучести, — она вернётся к прежней длине. Перейдите предел текучести и снимите нагрузку — останется удлинение. Наконец подберите материал и диаметр, чтобы проволока держала 400 Н (груз ≈ 40 кг) упруго и с запасом прочности n ≥ 2.',
+    hint: 'Тяните оранжевую рукоятку нижнего зажима вниз или жмите кнопки нагрузки. Материал и диаметр — кнопками внизу, «Новая» ставит новый образец. Длина проволоки L₀ = 1 м.',
+    stage: 'Тяните рукоятку нижнего зажима вниз.',
+    safe: 'При обрыве проволока хлещет концами. Испытания на разрыв проводят в защитных очках, за экраном, не наклоняясь над образцом.',
+    check: m => m.el && m.pl && m.pick },
+];
+
+const LS_KEY = 'luch-phys-solids';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) {}
+const savedIdx = saved.lid ? LESSONS.findIndex(l => l.id === saved.lid) : saved.lesson | 0;
+const S = { lesson: clamp(savedIdx < 0 ? 0 : savedIdx, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify({ lesson: S.lesson, lid: LESSONS[S.lesson].id, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+
+// ---------- physics data ----------
+const g = 9.8;
+// lesson 1: soap film on a wire frame, paper clip on water
+const SIG = { water: 0.073, soap: 0.040 };
+const BARS = [3, 5, 8], XT = 6;                                  // bar lengths, target stretch (см)
+const filmF = l => 2 * SIG.soap * l / 100 * 1000;               // мН
+const CLIP = { P: 9.8, L: 22 };                                  // clip 1 г → 9,8 мН; contact line 2 × 11 см
+const clipMax = liq => SIG[liq] * CLIP.L / 100 * 1000;           // мН
+// lesson 2: capillaries
+const RS = [1, 0.5, 0.25];                                       // радиус, мм
+const rs = r => String(r).replace('.', ',');
+const LIQ = { water: { n: 'Вода', s: 0.073, rho: 1000, th: 0 }, hg: { n: 'Ртуть', s: 0.47, rho: 13600, th: 140 } };
+const capH = (liq, r) => { const q = LIQ[liq]; return 2 * q.s * Math.cos(q.th * Math.PI / 180) / (q.rho * g * r / 1000) * 1000; };   // мм
+// lesson 3: heating curves (heat per gram, Дж/г; P — Дж/г за минуту)
+const SAMP = {
+  ice:    { n: 'Лёд', kind: 'cr', T0: -20, Tm: 0, T1: 30, cs: 2.1, cl: 4.2, lam: 334, P: 42, gmin: -30, gmax: 40, tick: 10, hot: false },
+  salt:   { n: 'Соль', kind: 'cr', T0: 700, Tm: 801, T1: 860, cs: 1.1, cl: 1.4, lam: 482, P: 60, gmin: 680, gmax: 880, tick: 50, hot: true },
+  rosin:  { n: 'Канифоль', kind: 'am', T0: 20, Ts1: 55, Ts2: 100, T1: 140, c: 1.3, P: 21, gmin: 0, gmax: 160, tick: 40, hot: false },
+  glass:  { n: 'Стекло', kind: 'am', T0: 400, Ts1: 550, Ts2: 750, T1: 900, c: 0.9, P: 54, gmin: 380, gmax: 920, tick: 100, hot: true },
+};
+const SAMPLES = ['ice', 'salt', 'rosin', 'glass'];
+const TMAX = 14, SIM = 1.25;                                     // минут на графике, минут опыта в секунду
+// lesson 4: tensile test of a wire, L0 = 1 м
+const MAT = {
+  steel: { n: 'Сталь', gen: 'стали', adj: 'стальная', E: 200000, yt: 250, ut: 400, eu: 0.20, col: '#a9b4c9' },
+  copper: { n: 'Медь', gen: 'меди', adj: 'медная', E: 110000, yt: 70, ut: 220, eu: 0.30, col: '#d98a4e' },
+  al: { n: 'Алюминий', gen: 'алюминия', adj: 'алюминиевая', E: 70000, yt: 35, ut: 90, eu: 0.25, col: '#d4d9e2' },
+};
+const MATS = ['steel', 'copper', 'al'], DS = [1, 2, 3], FMAX = 3000, FT = 400, L0 = 1000;
+const area = d => Math.PI * d * d / 4;                           // мм²
+const epl = (M, smax) => smax <= M.yt ? 0 : M.eu * ((smax - M.yt) / (M.ut - M.yt)) ** 2;
+
+function resetState() {
+  Object.assign(S, {
+    setup: 'frame', bar: 3, x: 1, rec1: {}, liq1: 'water', clip: 'hand', clipY: 0, fl: null, sk: null,
+    liq: 'water', dip: [false, false, false], lev: [0, 0, 0], recW: {}, recHg: {}, ans: false,
+    view: 'heat', samp: 'ice', heat: false, tm: 0, Q: 0, T: -20, f: 0, pts: [], fin: false, crys: null, amor: null, seenD: false, seenG: false,
+    mat: 'steel', d: 2, F: 0, smax: 0, ep: 0, broken: false, el: null, pl: null, pick: null, warn4: '',
+    warn: false, hl: null });
+  resetSample();
+}
+function resetSample() {
+  const s = SAMP[S.samp];
+  Object.assign(S, { heat: false, tm: 0, Q: 0, Qa: 0, T: s.T0, f: 0, pts: [[0, s.T0]], fin: false });
+}
+resetState();
+
+// lesson 3: temperature from the heat taken in
+function heatTo(Q) {
+  const s = SAMP[S.samp];
+  if (s.kind === 'cr') {
+    const q1 = s.cs * (s.Tm - s.T0);
+    if (Q < q1) { S.T = s.T0 + Q / s.cs; S.f = 0; }
+    else if (Q < q1 + s.lam) { S.T = s.Tm; S.f = (Q - q1) / s.lam; }
+    else { S.T = s.Tm + (Q - q1 - s.lam) / s.cl; S.f = 1; }
+  } else {
+    // no latent heat: the heat capacity rises smoothly while the body softens
+    let T = S.T, q = S.Qa || 0;
+    if (Q < q) { T = s.T0; q = 0; }
+    while (q < Q) { const dq = Math.min(0.5, Q - q); T += dq / (s.c * (1 + 0.45 * Math.exp(-(((T - (s.Ts1 + s.Ts2) / 2) / ((s.Ts2 - s.Ts1) / 2)) ** 2)))); q += dq; }
+    S.T = T; S.Qa = q; S.f = smooth(s.Ts1, s.Ts2, T);
+  }
+  S.Q = Q;
+}
+const softState = () => {
+  const s = SAMP[S.samp];
+  if (s.kind === 'cr') return S.f <= 0 ? 'твёрдое' : S.f < 1 ? `плавится · жидкого ${Math.round(S.f * 100)}%` : 'жидкость';
+  return S.T < s.Ts1 ? 'твёрдое' : S.T < (s.Ts1 + s.Ts2) / 2 ? 'размягчается' : S.T < s.Ts2 ? 'вязкое' : 'текучее';
+};
+
+// lesson 4: stress now
+const sig4 = () => S.broken ? 0 : S.F / area(S.d);
+const eps4 = () => { const M = MAT[S.mat]; return S.ep + sig4() / M.E; };
+
+function model() {
+  const id = LID();
+  if (id === 'tension') return { kind: id, F: filmF(S.bar), l: S.bar, x: S.x, f3: S.rec1[3] != null, f8: S.rec1[8] != null, fl: !!S.fl, sk: !!S.sk, Fmax: clipMax(S.liq1) };
+  if (id === 'capil') return { kind: id, h: RS.map(r => capH(S.liq, r)), w3: RS.every(r => S.recW[r] != null), hg: Object.keys(S.recHg).length > 0, ans: S.ans };
+  if (id === 'cryst') return { kind: id, T: S.T, f: S.f, crys: !!S.crys, amor: !!S.amor, ans: S.ans, carbon: S.seenD && S.seenG };
+  const M = MAT[S.mat], s = sig4();
+  return { kind: id, F: S.F, sig: s, eps: eps4(), dl: eps4() * L0, n: s > 0 ? M.ut / s : Infinity, el: !!S.el, pl: !!S.pl, pick: !!S.pick };
+}
+
+// ---------- drawing helpers ----------
+const T = (x, y, s, fill, txt, anchor = 'middle', extra = '') => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${s}" fill="${fill}" text-anchor="${anchor}" ${extra}>${txt}</text>`;
+const HALO = `paint-order="stroke" stroke="${INK}" stroke-width="3"`;
+function arrow(x1, y1, x2, y2, col, w = 3) {
+  const a = Math.atan2(y2 - y1, x2 - x1), L2 = Math.hypot(x2 - x1, y2 - y1); if (L2 < 1) return '';
+  const hl = Math.min(11, L2 * 0.6), hx = x2 - hl * Math.cos(a), hy = y2 - hl * Math.sin(a), hw = hl * 0.5;
+  const p1 = `${(hx + hw * Math.sin(a)).toFixed(1)} ${(hy - hw * Math.cos(a)).toFixed(1)}`, p2 = `${(hx - hw * Math.sin(a)).toFixed(1)} ${(hy + hw * Math.cos(a)).toFixed(1)}`;
+  return `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${hx.toFixed(1)} ${hy.toFixed(1)}" stroke="${INK}" stroke-width="${w + 2.6}" stroke-linecap="round"/><path d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${hx.toFixed(1)} ${hy.toFixed(1)}" stroke="${col}" stroke-width="${w}" stroke-linecap="round"/><path d="M${x2.toFixed(1)} ${y2.toFixed(1)}L${p1}L${p2}Z" fill="${col}" stroke="${INK}" stroke-width="1.2" stroke-linejoin="round"/>`;
+}
+function bg() {
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern>
+    <linearGradient id="film" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7fd4ff"/><stop offset=".35" stop-color="#c79bff"/><stop offset=".65" stop-color="#ffd36b"/><stop offset="1" stop-color="#86e0a8"/></linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#cfe8f5" stop-opacity=".32"/><stop offset=".5" stop-color="#cfe8f5" stop-opacity=".08"/><stop offset="1" stop-color="#cfe8f5" stop-opacity=".28"/></linearGradient>
+    <radialGradient id="glow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ff8a3c" stop-opacity=".75"/><stop offset="1" stop-color="#ff8a3c" stop-opacity="0"/></radialGradient></defs>
+    <rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+const Y = 380;
+const table = () => `<rect x="-2000" y="${Y}" width="4520" height="1200" fill="#151e2e"/><path d="M-2000 ${Y}H2520" stroke="#3a4762" stroke-width="2"/>`;
+const WATER = '#5fb4d9', HG = '#c9d1dc', AIR = '#101826';
+const DLEN = 84, DRING = 114;
+// dynamometer: hook at (hx, hy), body along (ux, uy) towards the hand; ring at hook + u·DRING
+function dyno(hx, hy, ux, uy, F, max, side, unit) {
+  const th = Math.atan2(ux, -uy) * 180 / Math.PI, z0 = -90, z1 = -24, py = z0 + clamp(F / max, 0, 1.06) * (z1 - z0);
+  const W = (lx, ly) => { const a = th * Math.PI / 180; return [hx + lx * Math.cos(a) - ly * Math.sin(a), hy + lx * Math.sin(a) + ly * Math.cos(a)]; };
+  let s = `<g transform="translate(${hx.toFixed(1)} ${hy.toFixed(1)}) rotate(${th.toFixed(1)})">`;
+  s += `<path d="M0 -14V-6a4 4 0 1 1 -4 4" fill="none" stroke="#c8d2e3" stroke-width="2"/>`;
+  s += `<rect x="-14" y="${-14 - DLEN}" width="28" height="${DLEN}" rx="6" fill="#2b6d7c" stroke="${INK}" stroke-width="1.6"/>`;
+  s += `<rect x="-4" y="${z0 - 6}" width="12" height="${z1 - z0 + 12}" rx="2" fill="#e8ecf4"/>`;
+  for (let i = 0; i <= 10; i++) { const y = z0 + i / 10 * (z1 - z0); s += `<path d="M2 ${y.toFixed(1)}h${i % 2 ? 4 : 6}" stroke="#1b2537" stroke-width="${i % 2 ? 0.8 : 1.2}"/>`; }
+  s += `<path d="M0 ${py.toFixed(1)}V-14" stroke="#c8d2e3" stroke-width="1.6"/><path d="M-5 ${py.toFixed(1)}h14" stroke="#ff4d3a" stroke-width="2.4"/>`;
+  s += `<path d="M0 ${-14 - DLEN}V${-DRING + 7}" stroke="#c8d2e3" stroke-width="2.2"/>`;
+  s += `<g data-drag="hand"><circle cx="0" cy="${-DRING}" r="20" fill="transparent"/><circle cx="0" cy="${-DRING}" r="7" fill="none" stroke="${INK}" stroke-width="6"/><circle cx="0" cy="${-DRING}" r="7" fill="none" stroke="#ffb547" stroke-width="3.6"/></g></g>`;
+  for (let i = 0; i <= 10; i += 2) { const [x, y] = W(-9, z0 + i / 10 * (z1 - z0)); s += T(x, y + 2.4, 6.5, '#e8ecf4', nf(max * i / 10)); }
+  const [lx, ly] = W(side * 30, -14 - DLEN / 2);
+  s += T(lx, ly + 4, 11, '#ffb547', `${fmt(F, 1)} ${unit}`, 'middle', 'font-weight="600" ' + HALO);
+  return s;
+}
+function standRod(x, yTop, armTo, armY) {
+  return `<rect x="${x - 40}" y="${Y - 8}" width="90" height="8" rx="2" fill="#4a5875" stroke="${INK}"/><rect x="${x - 4}" y="${yTop}" width="8" height="${Y - 8 - yTop}" fill="#6c7a96" stroke="${INK}"/>` +
+    `<rect x="${x - 4}" y="${armY - 4}" width="${armTo - x + 4}" height="8" rx="2" fill="#6c7a96" stroke="${INK}"/><rect x="${x - 7}" y="${armY - 7}" width="14" height="14" rx="2" fill="#3a4762" stroke="${INK}"/>`;
+}
+
+// ---------- lesson 1: frame with a soap film; paper clip on water ----------
+const FR = { x0: 168, yc: 252, px: 22, rail: 10, ry: 356 };
+function geoFrame() {
+  const half = S.bar * FR.px / 2, yT = FR.yc - half, yB = FR.yc + half, xb = FR.x0 + S.x * FR.px, xr = FR.x0 + FR.rail * FR.px;
+  return { yT, yB, xb, xr, hx: xb + 4, hy: FR.yc };
+}
+function frameScene() {
+  const G = geoFrame(), F = filmF(S.bar);
+  let h = table() + standRod(FR.x0 - 56, FR.yc - 20, FR.x0, FR.yc);
+  // film between the closed side and the bar
+  h += `<rect x="${FR.x0}" y="${G.yT.toFixed(1)}" width="${(G.xb - FR.x0).toFixed(1)}" height="${(G.yB - G.yT).toFixed(1)}" fill="url(#film)" opacity=".42"/>`;
+  for (let k = 1; k < 4; k++) h += `<path d="M${FR.x0 + 3} ${(G.yT + (G.yB - G.yT) * k / 4).toFixed(1)}Q${((FR.x0 + G.xb) / 2).toFixed(1)} ${(G.yT + (G.yB - G.yT) * k / 4 - 6).toFixed(1)} ${(G.xb - 3).toFixed(1)} ${(G.yT + (G.yB - G.yT) * k / 4).toFixed(1)}" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="1"/>`;
+  // wire frame: closed side and two rails
+  h += `<path d="M${G.xr} ${G.yT.toFixed(1)}H${FR.x0}V${G.yB.toFixed(1)}H${G.xr}" fill="none" stroke="${INK}" stroke-width="5.4" stroke-linejoin="round"/><path d="M${G.xr} ${G.yT.toFixed(1)}H${FR.x0}V${G.yB.toFixed(1)}H${G.xr}" fill="none" stroke="#c8d2e3" stroke-width="3" stroke-linejoin="round"/>`;
+  // sliding bar
+  h += `<g data-click="bcycle"><rect x="${(G.xb - 9).toFixed(1)}" y="${(G.yT - 10).toFixed(1)}" width="18" height="${(G.yB - G.yT + 20).toFixed(1)}" fill="transparent"/><rect x="${(G.xb - 2.5).toFixed(1)}" y="${(G.yT - 7).toFixed(1)}" width="5" height="${(G.yB - G.yT + 14).toFixed(1)}" rx="2" fill="#c9a24a" stroke="${INK}" stroke-width="1.2"/></g>`;
+  h += T(G.xb, G.yT - 12, 9.5, '#c9a24a', `l = ${S.bar} см`, 'middle', HALO);
+  // forces: the film pulls the bar back, the hand pulls it out
+  h += arrow(G.xb - 6, FR.yc + 22, G.xb - 6 - F * 7, FR.yc + 22, '#72d4e8', 2.6) + T(G.xb - 10, FR.yc + 40, 10, '#72d4e8', `2σl`, 'end', HALO);
+  h += dyno(G.hx, G.hy, 1, 0, F, 10, 1, 'мН');
+  h += arrow(G.hx + DRING + 9, G.hy, G.hx + DRING + 14 + F * 6, G.hy, '#ffb547', 2.6);
+  // ruler under the frame, target mark at 6 см
+  h += `<rect x="${FR.x0 - 6}" y="${FR.ry}" width="${FR.rail * FR.px + 12}" height="18" rx="2" fill="#e9d9a8" stroke="${INK}" stroke-width="1.2"/>`;
+  for (let c = 0; c <= FR.rail * 2; c++) { const x = FR.x0 + c * FR.px / 2; h += `<path d="M${x} ${FR.ry}v${c % 2 ? 4 : 7}" stroke="#3b3320" stroke-width="1"/>`; if (c % 2 === 0) h += T(x, FR.ry + 15, 7, '#3b3320', c / 2); }
+  const tx = FR.x0 + XT * FR.px;
+  h += `<path d="M${tx} ${FR.ry}V${(G.yB + 4).toFixed(1)}" stroke="#86e0a8" stroke-width="1.4" stroke-dasharray="4 3"/>` + T(tx, FR.ry - 4, 8.5, '#86e0a8', '6 см', 'middle', HALO);
+  h += `<path d="M${G.xb.toFixed(1)} ${FR.ry - 1}l-4 -7h8z" fill="#72d4e8" stroke="${INK}" stroke-width="1"/>`;
+  h += T((FR.x0 + G.xb) / 2, FR.yc + 4, 9.5, '#e8ecf4', 'мыльная плёнка', 'middle', HALO);
+  return h;
+}
+const DISH = { x0: 110, x1: 430, top: 228, s: 274, bot: 372 };
+function clipShape(cx, cy, sc) {   // side view of a paper clip lying flat: two nested loops, seen at a low angle
+  const w = 38 * sc, hh = 5 * sc;
+  return `<path d="M${cx - w} ${cy}a${hh} ${hh} 0 0 1 ${hh} ${-hh}H${cx + w - hh}a${hh} ${hh} 0 0 1 0 ${2 * hh}H${cx - w + 10 * sc}" fill="none" stroke="${INK}" stroke-width="4"/>` +
+    `<path d="M${cx - w} ${cy}a${hh} ${hh} 0 0 1 ${hh} ${-hh}H${cx + w - hh}a${hh} ${hh} 0 0 1 0 ${2 * hh}H${cx - w + 10 * sc}" fill="none" stroke="#c8d2e3" stroke-width="2"/>` +
+    `<path d="M${cx - w + 6 * sc} ${cy - hh * 0.4}H${cx + w - 12 * sc}" stroke="#c8d2e3" stroke-width="1.6"/>`;
+}
+function clipScene() {
+  const D = DISH, cx = 270, soap = S.liq1 === 'soap';
+  let h = table();
+  // glass dish with water
+  h += `<rect x="${D.x0}" y="${D.top}" width="${D.x1 - D.x0}" height="${D.bot - D.top + 6}" rx="8" fill="url(#glass)" stroke="#8fb3c8" stroke-width="2"/>`;
+  let surf = `M${D.x0 + 4} ${D.s}`;
+  const dimples = [];
+  if (S.clip === 'float') dimples.push([cx, 40, 7]);
+  if (!soap) dimples.push([158, 6, 4], [176, 6, 4], [196, 6, 4], [216, 6, 4]);
+  dimples.sort((a, b) => a[0] - b[0]);
+  for (const [x, w, dep] of dimples) surf += `H${x - w - 12}Q${x - w} ${D.s} ${x - w} ${D.s + dep}H${x + w}Q${x + w} ${D.s} ${x + w + 12} ${D.s}`;
+  surf += `H${D.x1 - 4}`;
+  h += `<path d="${surf}V${D.bot}H${D.x0 + 4}Z" fill="${WATER}" opacity="${soap ? 0.5 : 0.42}"/><path d="${surf}" fill="none" stroke="#bfe6f7" stroke-width="1.6"/>`;
+  if (soap) for (let k = 0; k < 7; k++) h += `<circle cx="${300 + k * 17}" cy="${D.s + 8 + (k % 3) * 9}" r="${2 + k % 2}" fill="none" stroke="rgba(255,255,255,.45)" stroke-width="1"/>`;
+  // water strider: legs press small dimples; after the soap it rests on the rim
+  if (!soap) h += `<g><ellipse cx="187" cy="${D.s - 7}" rx="16" ry="3.6" fill="#3a2e22" stroke="${INK}" stroke-width="1"/><path d="M175 ${D.s - 7}L158 ${D.s + 3}M181 ${D.s - 6}L176 ${D.s + 3}M193 ${D.s - 6}L196 ${D.s + 3}M199 ${D.s - 7}L216 ${D.s + 3}" stroke="#3a2e22" stroke-width="1.4"/></g>` + T(187, D.s - 16, 8.5, '#c8d2e3', 'водомерка', 'middle', HALO);
+  else h += `<g><ellipse cx="132" cy="${D.top - 4}" rx="14" ry="3.4" fill="#3a2e22" stroke="${INK}" stroke-width="1"/><path d="M122 ${D.top - 4}L112 ${D.top + 2}M142 ${D.top - 4}L150 ${D.top + 2}" stroke="#3a2e22" stroke-width="1.4"/></g>`;
+  // the clip
+  if (S.clip === 'hand') {
+    h += `<g data-click="clip"><rect x="${cx - 50}" y="132" width="100" height="40" fill="transparent"/>` + clipShape(cx, 160, 1) + `<path d="M${cx - 6} 96L${cx - 2} 155M${cx + 6} 96L${cx + 2} 155" stroke="#8b96ad" stroke-width="2.4"/></g>` + T(cx, 92, 9, '#8b96ad', 'пинцет со скрепкой · нажмите', 'middle', HALO);
+  } else {
+    const y = S.clip === 'float' ? D.s + 4 : S.clipY;
+    h += clipShape(cx, y, 1);
+    if (S.clip === 'float') {
+      const Fm = clipMax(S.liq1);
+      h += arrow(cx - 34, D.s + 10, cx - 46, D.s - 12, '#72d4e8', 2.2) + arrow(cx + 34, D.s + 10, cx + 46, D.s - 12, '#72d4e8', 2.2) + T(cx + 52, D.s - 16, 9.5, '#72d4e8', `до ${nf(Math.round(Fm))} мН`, 'start', HALO);
+      h += arrow(cx, D.s + 8, cx, D.s + 8 + CLIP.P * 3, '#ff8a73', 2.4) + T(cx + 6, D.s + 44, 9.5, '#ff8a73', `P ≈ ${nf(CLIP.P)} мН`, 'start', HALO);
+    }
+  }
+  // dropper bottle with dish soap
+  h += `<g data-click="soap"><rect x="378" y="96" width="60" height="96" fill="transparent"/><rect x="392" y="130" width="34" height="48" rx="6" fill="#86e0a8" stroke="${INK}" stroke-width="1.6"/><rect x="398" y="118" width="22" height="13" rx="2" fill="#e8ecf4" stroke="${INK}" stroke-width="1.2"/><path d="M405 118l4 -18 4 18z" fill="#e8ecf4" stroke="${INK}" stroke-width="1.2"/>` + T(409, 158, 8.5, INK, 'мыло', 'middle', 'font-weight="600"') + `</g>`;
+  if (!soap) h += T(409, 200, 9, '#8b96ad', 'нажмите — капнуть', 'middle', HALO);
+  h += T(D.x0 + 8, D.bot - 8, 9, '#8b96ad', soap ? `мыльная вода · σ ≈ 0,04 Н/м` : `вода · σ ≈ 0,073 Н/м`, 'start', HALO);
+  return h;
+}
+
+// ---------- lesson 2: capillaries in a bath, drops on glass ----------
+const CP = { xs: [236, 320, 400], w: [7, 4.2, 2.4], top: 128, bot: 370, lift: 80, s: 300, px: 2.6, bx0: 196, bx1: 432, btop: 262, rx: 462 };
+function capScene() {
+  const liq = S.liq, col = liq === 'water' ? WATER : HG, op = liq === 'water' ? 0.45 : 0.92;
+  let h = table();
+  // bath
+  h += `<rect x="${CP.bx0}" y="${CP.btop}" width="${CP.bx1 - CP.bx0}" height="${Y - CP.btop}" rx="6" fill="url(#glass)" stroke="#8fb3c8" stroke-width="2"/>`;
+  h += `<rect x="${CP.bx0 + 3}" y="${CP.s}" width="${CP.bx1 - CP.bx0 - 6}" height="${Y - 3 - CP.s}" fill="${col}" opacity="${op}"/>`;
+  // tubes
+  CP.xs.forEach((x, i) => {
+    const w = CP.w[i], dy = S.dip[i] ? 0 : -CP.lift, t = CP.top + dy, b = CP.bot + dy, lev = CP.s - S.lev[i] * CP.px;
+    let g = `<g data-click="tube-${i}"><rect x="${x - w - 12}" y="${t - 6}" width="${2 * w + 24}" height="${b - t + 12}" fill="transparent"/>`;
+    // inside: air above the level, liquid below (only when the tube stands in the liquid)
+    g += `<rect x="${x - w}" y="${t}" width="${2 * w}" height="${b - t}" fill="${AIR}"/>`;
+    if (S.dip[i] || Math.abs(S.lev[i]) > 0.2) {
+      const yl = clamp(lev, t + 2, b);
+      g += `<rect x="${x - w}" y="${yl.toFixed(1)}" width="${2 * w}" height="${(b - yl).toFixed(1)}" fill="${col}" opacity="${liq === 'water' ? 0.75 : 0.95}"/>`;
+      // meniscus: concave for water, convex for mercury
+      const m = Math.min(4, w * 0.9) * (liq === 'water' ? 1 : -1);
+      g += `<path d="M${x - w} ${(yl - (liq === 'water' ? m : 0)).toFixed(1)}Q${x} ${(yl + (liq === 'water' ? m : -m) * 1.4).toFixed(1)} ${x + w} ${(yl - (liq === 'water' ? m : 0)).toFixed(1)}" fill="none" stroke="${liq === 'water' ? '#bfe6f7' : '#ffffff'}" stroke-width="1.4"/>`;
+    }
+    g += `<rect x="${x - w - 2.5}" y="${t}" width="2.5" height="${b - t}" fill="#cfe8f5" opacity=".75"/><rect x="${x + w}" y="${t}" width="2.5" height="${b - t}" fill="#cfe8f5" opacity=".75"/>`;
+    g += `<path d="M${x - w - 2.5} ${t}h${2 * w + 5}" stroke="#cfe8f5" stroke-width="1.2"/></g>`;
+    h += g + T(x, t - 10, 9.5, '#e8ecf4', `r = ${rs(RS[i])} мм`, 'middle', HALO);
+    if (S.dip[i] && Math.abs(S.lev[i]) > 0.5) h += T(x + w + 6, (CP.s + lev) / 2 + 3, 9, liq === 'water' ? '#72d4e8' : '#e8ecf4', `${S.lev[i] > 0 ? '' : '−'}${nf(Math.round(Math.abs(S.lev[i]) * 10) / 10)} мм`, 'start', HALO);
+  });
+  // liquid surface in the bath (drawn over the tubes' bottoms)
+  h += `<path d="M${CP.bx0 + 3} ${CP.s}H${CP.bx1 - 3}" stroke="${liq === 'water' ? '#bfe6f7' : '#ffffff'}" stroke-width="1.6"/>`;
+  // ruler in mm from the bath level
+  const up = 65, dn = 25;
+  h += `<rect x="${CP.rx - 4}" y="${CP.s - up * CP.px - 6}" width="20" height="${(up + dn) * CP.px + 12}" rx="2" fill="#e9d9a8" stroke="${INK}" stroke-width="1.2"/>`;
+  for (let c = -dn; c <= up; c += 5) { const y = CP.s - c * CP.px; h += `<path d="M${CP.rx - 4} ${y}h${c % 10 ? 4 : 8}" stroke="#3b3320" stroke-width="1"/>`; if (c % 10 === 0) h += T(CP.rx + 10, y + 3, 7, '#3b3320', c); }
+  h += T(CP.rx + 6, CP.s - up * CP.px - 10, 8, '#8b96ad', 'мм');
+  h += `<path d="M${CP.bx1} ${CP.s}H${CP.rx - 4}" stroke="${liq === 'water' ? '#72d4e8' : '#e8ecf4'}" stroke-width="1.2" stroke-dasharray="3 3"/>`;
+  // drops on a glass plate: wetting vs non-wetting
+  const px = 96, py = 330;
+  h += `<rect x="${px - 64}" y="${py}" width="128" height="6" rx="1" fill="#cfe8f5" opacity=".55" stroke="#8fb3c8"/><rect x="${px - 56}" y="${py + 6}" width="8" height="${Y - py - 6}" fill="#6c7a96"/><rect x="${px + 48}" y="${py + 6}" width="8" height="${Y - py - 6}" fill="#6c7a96"/>`;
+  if (liq === 'water') {
+    h += `<path d="M${px - 46} ${py}Q${px} ${py - 14} ${px + 46} ${py}Z" fill="${WATER}" opacity=".8" stroke="#bfe6f7" stroke-width="1"/>`;
+    h += T(px, py - 22, 9, '#72d4e8', 'вода смачивает · θ ≈ 0°', 'middle', HALO);
+  } else {
+    h += `<path d="M${px - 9} ${py}A17 17 0 1 1 ${px + 9} ${py}Z" fill="${HG}" stroke="${INK}" stroke-width="1"/><circle cx="${px - 5}" cy="${py - 22}" r="3" fill="#fff" opacity=".7"/>`;
+    h += `<path d="M${px - 9} ${py}l-18 -15" stroke="#ffb547" stroke-width="1.2"/>` + T(px, py - 42, 9, '#e8ecf4', 'ртуть не смачивает · θ ≈ 140°', 'middle', HALO);
+  }
+  h += T(px, py + 24, 8.5, '#8b96ad', 'капля на стекле', 'middle', HALO);
+  return h;
+}
+
+// ---------- lesson 3: heating a crystal or an amorphous body; carbon lattices ----------
+const HT = { x0: 30, x1: 160, top: 318, gx0: 318, gx1: 505, gy0: 150, gy1: 350, bx: 222, by: 196, br: 50 };
+// fixed pseudo-random positions for the amorphous picture
+const RND = (() => { let s = 7; const r = () => (s = (s * 16807) % 2147483647) / 2147483647; const p = []; for (let i = 0; i < 36; i++) p.push([r(), r()]); return p; })();
+function latticeBubble(t) {
+  const s = SAMP[S.samp], B = HT, cr = s.kind === 'cr';
+  const amp = 0.8 + 3.2 * clamp((S.T - s.T0) / (s.T1 - s.T0), 0, 1);
+  let h = `<path d="M${B.bx - B.br * 0.7} ${B.by + B.br * 0.7}L${(HT.x0 + HT.x1) / 2 + 20} ${HT.top - 34}" stroke="#8b96ad" stroke-width="1.2" stroke-dasharray="3 3"/>`;
+  h += `<circle cx="${B.bx}" cy="${B.by}" r="${B.br}" fill="#0e1520" stroke="#8b96ad" stroke-width="1.6"/><clipPath id="bub"><circle cx="${B.bx}" cy="${B.by}" r="${B.br - 2}"/></clipPath><g clip-path="url(#bub)">`;
+  const n = 6, step = 15, x0 = B.bx - (n - 1) * step / 2, y0 = B.by - (n - 1) * step / 2;
+  const col = S.samp === 'salt' ? null : cr ? '#9fd8f0' : '#e3b25a';
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+    const k = i * n + j, ph = k * 1.7 + t / 140;
+    let x, y;
+    if (cr) {
+      x = x0 + j * step; y = y0 + i * step;
+      // melted fraction: atoms leave their places, starting from the edges of the picture
+      const free = S.f > 0 && ((k * 37) % 100) / 100 < S.f;
+      if (free) { x += (RND[k][0] - 0.5) * 14; y += (RND[k][1] - 0.5) * 14; }
+    } else { x = B.bx - 42 + RND[k][0] * 84; y = B.by - 42 + RND[k][1] * 84; x += Math.sin(ph * 0.7) * S.f * 4; }
+    if (!reduce) { x += Math.sin(ph) * amp; y += Math.cos(ph * 1.3) * amp; }
+    const c = col || ((i + j) % 2 ? '#86e0a8' : '#e8ecf4'), r = col ? 4.8 : (i + j) % 2 ? 5.6 : 4;
+    h += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="${c}" stroke="${INK}" stroke-width="1"/>`;
+  }
+  h += `</g>` + T(B.bx, B.by - B.br - 8, 9, '#8b96ad', cr ? (S.samp === 'salt' ? 'ионы Na⁺ и Cl⁻ в решётке' : 'молекулы в решётке') : 'беспорядок, как в жидкости', 'middle', HALO);
+  return h;
+}
+function heaterScene(t) {
+  const s = SAMP[S.samp], on = S.heat;
+  let h = table();
+  // electric furnace / hot plate with a crucible
+  h += `<g data-click="heat"><rect x="${HT.x0}" y="${HT.top}" width="${HT.x1 - HT.x0}" height="${Y - HT.top}" rx="6" fill="#3a4762" stroke="${INK}" stroke-width="1.6"/>`;
+  h += `<rect x="${HT.x0 + 10}" y="${HT.top + 34}" width="34" height="18" rx="3" fill="#0e1520" stroke="${INK}"/>` + T(HT.x0 + 27, HT.top + 47, 9, on ? '#ff8a73' : '#5a6680', on ? 'ВКЛ' : 'ВЫКЛ', 'middle', 'font-weight="600"');
+  h += `<circle cx="${HT.x1 - 24}" cy="${HT.top + 43}" r="9" fill="#6c7a96" stroke="${INK}"/><path d="M${HT.x1 - 24} ${HT.top + 43}l5 -6" stroke="${INK}" stroke-width="2"/>`;
+  if (on) h += `<ellipse cx="${(HT.x0 + HT.x1) / 2}" cy="${HT.top}" rx="60" ry="16" fill="url(#glow)"/>`;
+  h += `<rect x="${HT.x0 + 6}" y="${HT.top - 5}" width="${HT.x1 - HT.x0 - 12}" height="6" rx="2" fill="${on ? '#ff6a1a' : '#6c7a96'}" stroke="${INK}"/></g>`;
+  // crucible with the sample
+  const cx = (HT.x0 + HT.x1) / 2, cTop = HT.top - 48, cBot = HT.top - 5;
+  h += `<path d="M${cx - 34} ${cTop}L${cx - 26} ${cBot}H${cx + 26}L${cx + 34} ${cTop}Z" fill="#d8d2c4" stroke="${INK}" stroke-width="1.6"/>`;
+  let sc = '';
+  if (s.kind === 'cr') {
+    const solidH = 26 * (1 - S.f), liqH = 12 * S.f;
+    const solidCol = S.samp === 'ice' ? '#cfeefc' : '#f1f1ee', liqCol = S.samp === 'ice' ? WATER : '#ffb36b';
+    if (S.f > 0) sc += `<rect x="${cx - 27}" y="${(cBot - liqH - 2).toFixed(1)}" width="54" height="${(liqH + 2).toFixed(1)}" fill="${liqCol}" opacity=".85"/>`;
+    if (solidH > 1) for (let k = 0; k < 3; k++) { const w = 13 * (1 - S.f * 0.4), x = cx - 18 + k * 18, yb = cBot - liqH * 0.4 - 2; sc += `<path d="M${(x - w / 2).toFixed(1)} ${yb.toFixed(1)}l0 ${(-solidH * (0.8 + k % 2 * 0.2)).toFixed(1)}l${(w / 2).toFixed(1)} -5l${(w / 2).toFixed(1)} 5V${yb.toFixed(1)}Z" fill="${solidCol}" stroke="${INK}" stroke-width="1"/>`; }
+  } else {
+    const soft = S.f, col = S.samp === 'rosin' ? '#d9a441' : '#9fd8c8', hot = S.samp === 'glass' && soft > 0.2 ? '#ffb36b' : col;
+    // the lump sags and spreads as it softens
+    const top = cBot - 30 + 20 * soft, w = 18 + 8 * soft;
+    sc += `<path d="M${(cx - w - 6).toFixed(1)} ${cBot - 2}Q${(cx - w).toFixed(1)} ${top.toFixed(1)} ${cx} ${top.toFixed(1)}Q${(cx + w).toFixed(1)} ${top.toFixed(1)} ${(cx + w + 6).toFixed(1)} ${cBot - 2}Z" fill="${hot}" opacity=".92" stroke="${INK}" stroke-width="1"/>`;
+  }
+  h += sc;
+  // thermocouple probe and display
+  h += `<path d="M${cx + 12} ${cBot - 6}L${cx + 30} ${cTop - 14}H${HT.x1 + 40}V${Y - 40}" fill="none" stroke="#c8d2e3" stroke-width="1.8"/>`;
+  { const dx = HT.x1 + 40, dy = Y - 40; h += `<rect x="${dx - 31}" y="${dy}" width="62" height="34" rx="5" fill="#2b6d7c" stroke="${INK}" stroke-width="1.4"/><rect x="${dx - 26}" y="${dy + 5}" width="52" height="18" rx="2" fill="#0e1520"/>` + T(dx, dy + 18, 11, '#86e0a8', `${Math.round(S.T)} °C`, 'middle', 'font-weight="600"') + T(dx, dy + 31, 6.5, '#e8ecf4', 'термопара'); }
+  h += T(cx, HT.top + 18, 9.5, '#e8ecf4', s.hot ? 'электропечь' : 'нагреватель', 'middle', HALO);
+  h += latticeBubble(t);
+  h += graph();
+  return h;
+}
+function graph() {
+  const s = SAMP[S.samp], G = HT, tx = v => G.gx0 + v / TMAX * (G.gx1 - G.gx0), ty = T0 => G.gy1 - (T0 - s.gmin) / (s.gmax - s.gmin) * (G.gy1 - G.gy0);
+  let h = `<rect x="${G.gx0 - 4}" y="${G.gy0 - 8}" width="${G.gx1 - G.gx0 + 12}" height="${G.gy1 - G.gy0 + 12}" rx="8" fill="rgba(11,16,25,.6)" stroke="#26324a"/>`;
+  for (let v = Math.ceil(s.gmin / s.tick) * s.tick; v <= s.gmax; v += s.tick) { const y = ty(v); h += `<path d="M${G.gx0} ${y.toFixed(1)}H${G.gx1}" stroke="#26324a" stroke-width="1"/>` + T(G.gx0 - 7, y + 3, 7.5, '#8b96ad', v, 'end'); }
+  for (let m = 0; m <= TMAX; m += 2) { const x = tx(m); h += `<path d="M${x.toFixed(1)} ${G.gy1}v4" stroke="#8b96ad"/>` + T(x, G.gy1 + 13, 7.5, '#8b96ad', m); }
+  h += `<path d="M${G.gx0} ${G.gy0 - 4}V${G.gy1}H${G.gx1 + 4}" fill="none" stroke="#8b96ad" stroke-width="1.4"/>`;
+  h += T(G.gx0 + 2, G.gy0 - 12, 9, '#8b96ad', 'T, °C', 'start') + T(G.gx1, G.gy1 + 26, 9, '#8b96ad', 't, мин', 'end');
+  if (s.kind === 'cr') h += `<path d="M${G.gx0} ${ty(s.Tm).toFixed(1)}H${G.gx1}" stroke="#86e0a8" stroke-width="1" stroke-dasharray="4 4"/>` + T(G.gx1 - 2, ty(s.Tm) - 5, 8.5, '#86e0a8', `tпл = ${s.Tm} °C`, 'end', HALO);
+  else h += `<rect x="${G.gx0}" y="${ty(s.Ts2).toFixed(1)}" width="${G.gx1 - G.gx0}" height="${(ty(s.Ts1) - ty(s.Ts2)).toFixed(1)}" fill="rgba(255,181,71,.08)"/>` + T(G.gx0 + 4, ty(s.Ts1) + 12, 8.5, '#ffb547', `размягчение ${s.Ts1}–${s.Ts2} °C`, 'start', HALO);
+  // earlier finished runs stay as faint lines
+  if (S.pts.length > 1) h += `<path d="M${S.pts.map(p => `${tx(p[0]).toFixed(1)} ${ty(p[1]).toFixed(1)}`).join('L')}" fill="none" stroke="#ffb547" stroke-width="2.4" stroke-linejoin="round"/>`;
+  h += `<circle cx="${tx(S.tm).toFixed(1)}" cy="${ty(S.T).toFixed(1)}" r="4" fill="#ffb547" stroke="${INK}"/>`;
+  h += T(G.gx1 + 6, G.gy0 - 14, 10, '#e8ecf4', `${s.n} · ${s.kind === 'cr' ? 'кристалл' : 'аморфное тело'}`, 'end', HALO);
+  return h;
+}
+// carbon: diamond (3D tetrahedral network) and graphite (stacked hexagonal layers), oblique projection
+const CARB = (() => {
+  const pr = (x, y, z) => [x - z * 0.45, -y + z * 0.32], pg = (x, y, z) => [x + z * 0.5, -y + z * 0.22];
+  const dia = [], db = [];
+  const fcc = [[0, 0, 0], [0, .5, .5], [.5, 0, .5], [.5, .5, 0]];
+  for (const [a, b, c] of fcc) for (const o of [[0, 0, 0], [.25, .25, .25]]) for (const dx of [0, 1]) for (const dy of [0, 1]) for (const dz of [0, 1]) {
+    const p = [a + o[0] + dx, b + o[1] + dy, c + o[2] + dz];
+    if (p.every(v => v <= 1.001) && !dia.some(q => Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]) < 1e-3)) dia.push(p);
+  }
+  for (let i = 0; i < dia.length; i++) for (let j = i + 1; j < dia.length; j++) { const d = Math.hypot(dia[i][0] - dia[j][0], dia[i][1] - dia[j][1], dia[i][2] - dia[j][2]); if (Math.abs(d - Math.sqrt(3) / 4) < 0.01) db.push([i, j]); }
+  const gr = [], gb = [];
+  for (let L2 = 0; L2 < 3; L2++) {
+    const base = gr.length, sh = L2 % 2 ? 1 : 0;
+    for (let i = -3; i <= 3; i++) for (let j = -2; j <= 2; j++) {
+      const x = i * 1.5, z = (j + (Math.abs(i) % 2 ? 0.5 : 0)) * Math.sqrt(3);
+      [[x, z], [x + 1, z]].forEach(([px, pz]) => { if (Math.abs(px + sh - 0.5) <= 4.1 && Math.abs(pz) <= 2.7) gr.push([px + sh, L2 * 2.36, pz]); });
+    }
+    for (let i = base; i < gr.length; i++) for (let j = i + 1; j < gr.length; j++) if (Math.abs(Math.hypot(gr[i][0] - gr[j][0], gr[i][2] - gr[j][2]) - 1) < 0.02) gb.push([i, j]);
+  }
+  return { pr, pg, dia, db, gr, gb };
+})();
+function carbonScene() {
+  const C = CARB, selD = S.view === 'diamond';
+  let h = table();
+  const draw = (pts, bonds, ox, oy, sc, col, on, pj) => {
+    const P = pts.map(p => { const [x, y] = pj(p[0], p[1], p[2]); return [ox + x * sc, oy + y * sc, p[2]]; });
+    let s = '';
+    bonds.forEach(([i, j]) => { s += `<path d="M${P[i][0].toFixed(1)} ${P[i][1].toFixed(1)}L${P[j][0].toFixed(1)} ${P[j][1].toFixed(1)}" stroke="${on ? '#8b96ad' : '#3a4762'}" stroke-width="${on ? 2.2 : 1.6}"/>`; });
+    P.map((p, k) => [p, k]).sort((a, b) => a[0][2] - b[0][2]).forEach(([p]) => { s += `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${on ? (pj === C.pg ? 3.6 : 5.6) : (pj === C.pg ? 3 : 4.2)}" fill="${on ? col : '#3a4762'}" stroke="${INK}" stroke-width="1"/>`; });
+    return s;
+  };
+  h += `<g data-click="v-diamond"><rect x="20" y="120" width="230" height="250" rx="12" fill="${selD ? 'rgba(114,212,232,.06)' : 'transparent'}" stroke="${selD ? '#72d4e8' : '#26324a'}"/>` + draw(C.dia, C.db, 96, 300, 118, '#9fd8f0', selD, C.pr) + `</g>`;
+  h += `<g data-click="v-graphite"><rect x="270" y="120" width="236" height="250" rx="12" fill="${!selD ? 'rgba(114,212,232,.06)' : 'transparent'}" stroke="${!selD ? '#72d4e8' : '#26324a'}"/>` + draw(C.gr, C.gb, 380, 336, 17, '#a9b4c9', !selD, C.pg) + `</g>`;
+  h += T(135, 140, 12, selD ? '#e8ecf4' : '#8b96ad', 'Алмаз', 'middle', 'font-weight="600"') + T(388, 140, 12, !selD ? '#e8ecf4' : '#8b96ad', 'Графит', 'middle', 'font-weight="600"');
+  const rows = selD ? ['каждый атом — 4 прочные связи', 'объёмная сетка', 'твёрдость по Моосу 10', 'ток не проводит, прозрачный', 'ρ ≈ 3,5 г/см³'] : ['слои из шестиугольников', 'между слоями связь слабая', 'твёрдость по Моосу 1–2', 'проводит ток вдоль слоёв', 'ρ ≈ 2,2 г/см³'];
+  const x = selD ? 30 : 280;
+  rows.forEach((r, i) => { h += T(x + 4, 166 + i * 14, 9, '#e8ecf4', '· ' + r, 'start', HALO); });
+  if (!selD) h += T(388, 360, 8.5, '#72d4e8', 'слои легко сдвигаются — так пишет карандаш', 'middle', HALO);
+  else h += T(135, 360, 8.5, '#72d4e8', 'так же — кремний в чипах', 'middle', HALO);
+  return h;
+}
+
+// ---------- lesson 4: tensile testing machine and the stress–strain diagram ----------
+const TM = { cl: 176, cr: 304, top: 150, ug: 176, len: 112, gx0: 350, gx1: 508, gy0: 150, gy1: 350, smax: 420, pxF: 15 };
+function geoTensile() {
+  const e = S.broken ? S.ep : eps4(), vis = e * TM.len * 0.6, yl = TM.ug + 14 + TM.len + vis + S.F / FMAX * 6;
+  return { e, vis, yl, hx: (TM.cl + TM.cr) / 2, hy: yl + 30 };
+}
+function tensileScene() {
+  const G = geoTensile(), M = MAT[S.mat], cx = G.hx, s = sig4();
+  let h = table();
+  // frame: base, two columns, upper crosshead
+  h += `<rect x="${TM.cl - 26}" y="${Y - 14}" width="${TM.cr - TM.cl + 52}" height="14" rx="3" fill="#4a5875" stroke="${INK}" stroke-width="1.4"/>`;
+  [TM.cl, TM.cr].forEach(x => { h += `<rect x="${x - 7}" y="${TM.top}" width="14" height="${Y - 14 - TM.top}" fill="#6c7a96" stroke="${INK}" stroke-width="1.2"/>`; });
+  h += `<rect x="${TM.cl - 14}" y="${TM.top - 10}" width="${TM.cr - TM.cl + 28}" height="22" rx="3" fill="#3a4762" stroke="${INK}" stroke-width="1.4"/>`;
+  // force display on the crosshead
+  h += `<rect x="${cx - 36}" y="${TM.top - 34}" width="72" height="24" rx="4" fill="#2b6d7c" stroke="${INK}" stroke-width="1.2"/><rect x="${cx - 31}" y="${TM.top - 30}" width="62" height="16" rx="2" fill="#0e1520"/>` + T(cx, TM.top - 18, 10.5, '#86e0a8', `${Math.round(S.F)} Н`, 'middle', 'font-weight="600"');
+  // upper grip
+  h += `<rect x="${cx - 12}" y="${TM.top + 12}" width="24" height="${TM.ug + 14 - TM.top - 12}" rx="2" fill="#a9b4c9" stroke="${INK}" stroke-width="1.2"/>`;
+  // wire specimen (thickness by diameter), snapped when broken
+  const ww = 1.2 + S.d * 1.1, y0 = TM.ug + 14, y1 = G.yl;
+  if (!S.broken) h += `<rect x="${cx - ww / 2}" y="${y0}" width="${ww}" height="${(y1 - y0).toFixed(1)}" fill="${M.col}" stroke="${INK}" stroke-width=".8"/>`;
+  else { const ym = (y0 + y1) / 2; h += `<path d="M${cx - ww / 2} ${y0}V${ym - 8}l${ww / 2} 3 ${ww / 2} -2V${y0}Z" fill="${M.col}" stroke="${INK}" stroke-width=".8"/><path d="M${cx - ww / 2} ${y1}V${ym + 8}l${ww / 2} -3 ${ww / 2} 2V${y1}Z" fill="${M.col}" stroke="${INK}" stroke-width=".8"/>` + T(cx + 12, ym + 4, 10, '#ff8a73', 'разрыв', 'start', HALO); }
+  // dial gauge (ΔL)
+  const dx = cx + 34, dy = y0 + 46;
+  h += `<path d="M${cx + 6} ${(y1 - 6).toFixed(1)}H${dx}V${dy + 16}" fill="none" stroke="#c8d2e3" stroke-width="1.4"/><circle cx="${dx}" cy="${dy}" r="16" fill="#f4f6fa" stroke="${INK}" stroke-width="1.4"/>`;
+  const dl = G.e * L0, a = -Math.PI / 2 + (dl % 1) * Math.PI * 2;
+  for (let k = 0; k < 10; k++) { const b = -Math.PI / 2 + k * Math.PI / 5; h += `<path d="M${(dx + Math.cos(b) * 12).toFixed(1)} ${(dy + Math.sin(b) * 12).toFixed(1)}L${(dx + Math.cos(b) * 15).toFixed(1)} ${(dy + Math.sin(b) * 15).toFixed(1)}" stroke="#1b2537"/>`; }
+  h += `<path d="M${dx} ${dy}L${(dx + Math.cos(a) * 12).toFixed(1)} ${(dy + Math.sin(a) * 12).toFixed(1)}" stroke="#e0473a" stroke-width="1.8"/>` + T(dx, dy - 22, 9.5, '#e8ecf4', `ΔL = ${fmt(dl, dl < 10 ? 2 : 1)} мм`, 'middle', HALO);
+  // lower grip with the pull handle, screw to the base
+  h += `<path d="M${cx} ${(G.yl + 16).toFixed(1)}V${Y - 14}" stroke="#8b96ad" stroke-width="5" stroke-dasharray="2 2"/>`;
+  h += `<rect x="${cx - 12}" y="${(G.yl).toFixed(1)}" width="24" height="16" rx="2" fill="#a9b4c9" stroke="${INK}" stroke-width="1.2"/>`;
+  h += `<g data-drag="hand"><rect x="${cx - 40}" y="${(G.hy - 12).toFixed(1)}" width="80" height="24" fill="transparent"/><path d="M${cx - 28} ${G.hy.toFixed(1)}H${cx + 28}" stroke="${INK}" stroke-width="8" stroke-linecap="round"/><path d="M${cx - 28} ${G.hy.toFixed(1)}H${cx + 28}" stroke="#ffb547" stroke-width="5" stroke-linecap="round"/></g>`;
+  if (S.F > 0) h += arrow(cx + 34, G.hy, cx + 34, G.hy + 10 + S.F / FMAX * 30, '#ffb547', 2.4);
+  h += T(cx, TM.top + 4, 8.5, '#e8ecf4', 'разрывная машина', 'middle', HALO);
+  h += T(cx - 16, (y0 + y1) / 2, 9, '#c8d2e3', `${M.n}, d = ${S.d} мм`, 'middle', `transform="rotate(-90 ${cx - 16} ${((y0 + y1) / 2).toFixed(1)})" ` + HALO);
+  h += diagram();
+  void s;
+  return h;
+}
+// ε axis: 0–0,5 % takes 35 % of the width (to see the Hooke line), 0,5–32 % the rest
+const ex = e => { const G = TM, W = G.gx1 - G.gx0; return e <= 0.005 ? G.gx0 + e / 0.005 * 0.35 * W : G.gx0 + 0.35 * W + (Math.min(e, 0.32) - 0.005) / (0.32 - 0.005) * 0.65 * W; };
+const sy = s => TM.gy1 - s / TM.smax * (TM.gy1 - TM.gy0);
+function diagram() {
+  const G = TM, M = MAT[S.mat];
+  let h = `<rect x="${G.gx0 - 4}" y="${G.gy0 - 10}" width="${G.gx1 - G.gx0 + 12}" height="${G.gy1 - G.gy0 + 14}" rx="8" fill="rgba(11,16,25,.6)" stroke="#26324a"/>`;
+  for (let v = 100; v <= 400; v += 100) h += `<path d="M${G.gx0} ${sy(v).toFixed(1)}H${G.gx1}" stroke="#26324a"/>` + T(G.gx0 - 6, sy(v) + 3, 7.5, '#8b96ad', v, 'end');
+  [[0.001, '0,1'], [0.003, '0,3'], [0.005, '0,5'], [0.1, '10'], [0.2, '20'], [0.3, '30']].forEach(([e, l]) => { h += `<path d="M${ex(e).toFixed(1)} ${G.gy1}v4" stroke="#8b96ad"/>` + T(ex(e), G.gy1 + 13, 7.5, '#8b96ad', l); });
+  h += `<path d="M${ex(0.005).toFixed(1)} ${G.gy0}V${G.gy1}" stroke="#3a4762" stroke-dasharray="2 3"/>`;
+  h += `<path d="M${G.gx0} ${G.gy0 - 6}V${G.gy1}H${G.gx1 + 4}" fill="none" stroke="#8b96ad" stroke-width="1.4"/>`;
+  h += T(G.gx0 + 2, G.gy0 - 14, 9, '#8b96ad', 'σ, МПа', 'start') + T(G.gx1, G.gy1 + 26, 9, '#8b96ad', 'ε, % (до 0,5 % крупнее)', 'end');
+  // the material's loading curve
+  const pts = [[0, 0], [M.yt / M.E, M.yt]];
+  for (let k = 1; k <= 24; k++) { const s = M.yt + (M.ut - M.yt) * k / 24; pts.push([epl(M, s) + s / M.E, s]); }
+  h += `<path d="M${pts.map(p => `${ex(p[0]).toFixed(1)} ${sy(p[1]).toFixed(1)}`).join('L')}" fill="none" stroke="#5a6680" stroke-width="2"/>`;
+  h += `<path d="M${G.gx0} ${sy(M.yt).toFixed(1)}H${G.gx1}" stroke="#86e0a8" stroke-dasharray="4 4"/>` + T(G.gx1 - 2, sy(M.yt) + 11, 8.5, '#86e0a8', `σт = ${M.yt}`, 'end', HALO);
+  h += `<path d="M${G.gx0} ${sy(M.ut).toFixed(1)}H${G.gx1}" stroke="#ff8a73" stroke-dasharray="4 4"/>` + T(G.gx1 - 2, sy(M.ut) - 4, 8.5, '#ff8a73', `σпч = ${M.ut}`, 'end', HALO);
+  // stress of the task load for this wire
+  const s4 = FT / area(S.d);
+  if (s4 < TM.smax) h += `<path d="M${G.gx0} ${sy(s4).toFixed(1)}h14" stroke="#ffb547" stroke-width="2"/>` + T(G.gx0 + 17, sy(s4) + 3, 8, '#ffb547', '400 Н', 'start', HALO);
+  // the path of this specimen: loaded to smax, now at the current point (unloading parallel to the Hooke line)
+  if (S.smax > 0) {
+    const top = [S.ep + S.smax / M.E, S.smax], lp = [[0, 0], [Math.min(top[0], M.yt / M.E), Math.min(S.smax, M.yt)]];
+    if (S.smax > M.yt) for (let k = 1; k <= 20; k++) { const s = M.yt + (S.smax - M.yt) * k / 20; lp.push([epl(M, s) + s / M.E, s]); }
+    h += `<path d="M${lp.map(p => `${ex(p[0]).toFixed(1)} ${sy(p[1]).toFixed(1)}`).join('L')}" fill="none" stroke="#ffb547" stroke-width="2.6"/>`;
+    if (!S.broken) h += `<path d="M${ex(top[0]).toFixed(1)} ${sy(top[1]).toFixed(1)}L${ex(S.ep).toFixed(1)} ${sy(0).toFixed(1)}" stroke="#ffb547" stroke-width="1.4" stroke-dasharray="3 3"/>`;
+  }
+  if (!S.broken) h += `<circle cx="${ex(eps4()).toFixed(1)}" cy="${sy(sig4()).toFixed(1)}" r="4.6" fill="#ffb547" stroke="${INK}"/>`;
+  h += T(G.gx1 + 6, G.gy0 - 16, 9.5, '#e8ecf4', `${M.n}: E = ${M.E / 1000} ГПа`, 'end', HALO);
+  return h;
+}
+
+function hlBox(id) {
+  const lid = LID();
+  if (lid === 'tension') {
+    if (S.setup === 'frame') {
+      const G = geoFrame();
+      return ({ frame: [FR.x0 - 8, G.yT - 8, G.xr - FR.x0 + 16, G.yB - G.yT + 16], film: [FR.x0, G.yT, G.xb - FR.x0, G.yB - G.yT], bar: [G.xb - 10, G.yT - 24, 20, G.yB - G.yT + 34],
+        dyn: [G.hx - 6, G.hy - 22, DRING + 30, 44], ruler: [FR.x0 - 10, FR.ry - 6, FR.rail * FR.px + 20, 28], stand: [FR.x0 - 100, FR.yc - 26, 110, Y - FR.yc + 26] })[id];
+    }
+    return ({ dish: [DISH.x0 - 6, DISH.top - 6, DISH.x1 - DISH.x0 + 12, DISH.bot - DISH.top + 18], clip: S.clip === 'hand' ? [220, 130, 100, 44] : [222, (S.clip === 'float' ? DISH.s : S.clipY) - 12, 96, 24],
+      strider: S.liq1 === 'soap' ? [112, DISH.top - 14, 44, 18] : [150, DISH.s - 24, 74, 32], soap: [384, 92, 52, 104] })[id];
+  }
+  if (lid === 'capil') {
+    const i = { t1: 0, t2: 1, t3: 2 }[id];
+    if (i != null) { const x = CP.xs[i], dy = S.dip[i] ? 0 : -CP.lift; return [x - CP.w[i] - 10, CP.top + dy - 22, 2 * CP.w[i] + 20, CP.bot - CP.top + 26]; }
+    return ({ bath: [CP.bx0 - 6, CP.btop - 6, CP.bx1 - CP.bx0 + 12, Y - CP.btop + 6], ruler: [CP.rx - 10, CP.s - 65 * CP.px - 14, 34, 90 * CP.px + 24], plate: [26, 280, 140, 100] })[id];
+  }
+  if (lid === 'cryst') {
+    if (S.view !== 'heat') return ({ diamond: [16, 116, 238, 258], graphite: [266, 116, 244, 258] })[id];
+    return ({ heater: [HT.x0 - 6, HT.top - 10, HT.x1 - HT.x0 + 12, Y - HT.top + 10], crucible: [(HT.x0 + HT.x1) / 2 - 40, HT.top - 54, 80, 54], probe: [HT.x1 + 4, Y - 46, 72, 44], bubble: [HT.bx - HT.br - 6, HT.by - HT.br - 6, 2 * HT.br + 12, 2 * HT.br + 26], graph: [HT.gx0 - 30, HT.gy0 - 24, HT.gx1 - HT.gx0 + 44, HT.gy1 - HT.gy0 + 54] })[id];
+  }
+  const G = geoTensile();
+  return ({ frame: [TM.cl - 28, TM.top - 14, TM.cr - TM.cl + 56, Y - TM.top + 14], disp: [G.hx - 40, TM.top - 38, 80, 32], wire: [G.hx - 10, TM.ug + 10, 20, G.yl - TM.ug - 6], gauge: [G.hx + 10, TM.ug + 20, 50, 66],
+    handle: [G.hx - 34, G.hy - 14, 68, 28], diag: [TM.gx0 - 30, TM.gy0 - 24, TM.gx1 - TM.gx0 + 44, TM.gy1 - TM.gy0 + 54] })[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = bg();
+  if (id === 'tension') h += S.setup === 'frame' ? frameScene() : clipScene();
+  else if (id === 'capil') h += capScene();
+  else if (id === 'cryst') h += S.view === 'heat' ? heaterScene(t) : carbonScene();
+  else h += tensileScene();
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b && b[2] > 0) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// fit the scene: 520 × 405 units, centred, content at the bottom
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 520, hh / 415, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 410 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer: pull the dynamometer ring (lesson 1) or the machine handle (lesson 4) ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+const pullDir = () => LID() === 'tension' ? { ux: 1, uy: 0, per: FR.px } : { ux: 0, uy: 1, per: 1 / TM.pxF };
+scene.addEventListener('pointerdown', e => {
+  const ck = e.target.closest('[data-click]'); if (ck && ck.dataset.click) { act(ck.dataset.click); return; }
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  drag = { p0: toSvg(e), v0: LID() === 'tension' ? S.x : S.F, dir: pullDir() };
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const p = toSvg(e), D = drag.dir, along = ((p.x - drag.p0.x) * D.ux + (p.y - drag.p0.y) * D.uy) / D.per;
+  setPos(drag.v0 + along);
+});
+const endDrag = () => { if (!drag) return; drag = null; scene.classList.remove('grabbing'); dirty = true; };
+scene.addEventListener('pointerup', endDrag);
+scene.addEventListener('pointercancel', endDrag);
+
+function setPos(v) {
+  if (LID() === 'tension') { v = clamp(Math.round(v * 2) / 2, 1, 9); if (v === S.x) return; S.x = v; return update(); }
+  if (LID() === 'strength') setF(v);
+}
+function setF(v) {
+  if (S.broken) { if (v > 0) toast('Образец разорван — нажмите «Новая», чтобы поставить новую проволоку.'); return; }
+  v = clamp(Math.round(v / 10) * 10, 0, FMAX); if (v === S.F) return;
+  const M = MAT[S.mat], s = v / area(S.d);
+  if (s >= M.ut) {
+    S.smax = M.ut; S.ep = M.eu; S.broken = true; S.F = 0;
+    toast(`Разрыв! σ = ${Math.round(s)} МПа достигло предела прочности ${M.gen} (${M.ut} МПа).`);
+    return update();
+  }
+  S.F = v;
+  if (s > S.smax) { S.smax = s; S.ep = epl(M, s); }
+  update();
+}
+
+// task progress reached by a state (latched, with a toast)
+function latch() {
+  const id = LID();
+  if (id === 'tension' && S.setup === 'frame' && S.x >= XT && S.rec1[S.bar] == null) {
+    const F = filmF(S.bar); S.rec1[S.bar] = F;
+    const others = Object.keys(S.rec1).filter(k => +k !== S.bar);
+    toast(`Перекладина ${S.bar} см: F = ${fmt(F, 1)} мН — и столько же было в начале: плёнка тянет одинаково при любом растяжении.` + (others.length ? ` Сила пропорциональна длине перекладины l.` : ''));
+    buildScheme();
+  }
+  if (id === 'capil') RS.forEach((r, i) => {
+    const h = capH(S.liq, r), rec = S.liq === 'water' ? S.recW : S.recHg;
+    if (S.dip[i] && Math.abs(S.lev[i] - h) < 0.3 && rec[r] == null) {
+      rec[r] = h;
+      toast(S.liq === 'water' ? `r = ${rs(r)} мм: вода поднялась на ${fmt(h, 0)} мм.` + (Object.keys(S.recW).length === 3 ? ' Тоньше трубка — выше столб.' : '') : `Ртуть в капилляре r = ${rs(r)} мм опустилась на ${fmt(-h, 0)} мм ниже уровня в ванночке: стекло она не смачивает.`);
+      buildScheme(); renderTools();
+    }
+  });
+  if (id === 'strength' && !S.broken) {
+    const M = MAT[S.mat], s = sig4();
+    if (S.F === 0 && S.smax > 0) {
+      if (S.smax <= M.yt && S.smax >= 0.5 * M.yt && !S.el) { S.el = { mat: S.mat, s: S.smax }; toast(`Нагрузку сняли — проволока вернулась к длине 1 м: σ = ${Math.round(S.smax)} МПа не дошло до σт = ${M.yt} МПа, деформация упругая.`); buildScheme(); }
+      if (S.smax <= M.yt && S.smax < 0.5 * M.yt && !S.el && !S.warn) { S.warn = true; toast(`Проволока вернулась, но нагрузка была маленькой. Дойдите хотя бы до половины σт = ${M.yt} МПа.`); }
+      if (S.smax > M.yt && !S.pl) { S.pl = { mat: S.mat, dl: S.ep * L0 }; toast(`Нагрузку сняли, а проволока осталась длиннее на ${fmt(S.ep * L0, 1)} мм: после предела текучести деформация пластическая.`); buildScheme(); }
+    }
+    if (S.F === FT) {
+      const n = M.ut / s, key = S.mat + S.d;
+      if (s <= M.yt && S.ep === 0 && n >= 2) { if (!S.pick) { S.pick = { mat: S.mat, d: S.d, s, n }; toast(`${M.n}, d = ${S.d} мм держит 400 Н: σ = ${Math.round(s)} МПа < σт, запас прочности n = ${fmt(n, 1)}.`); buildScheme(); } }
+      else if (S.warn4 !== key) {
+        S.warn4 = key;
+        toast(S.ep > 0 ? 'Эта проволока уже растянута пластически — для проверки поставьте новую.' : s > M.yt ? `σ = ${Math.round(s)} МПа больше предела текучести ${M.yt} МПа — проволока потянется навсегда.` : `Упруго, но запас прочности n = ${fmt(n, 1)} < 2.`);
+      }
+    }
+  }
+}
+
+// ---------- animation: clip falling, capillary columns, heating ----------
+let last = performance.now(), lightT = 0;
+function lightUpdate() {
+  const m = model();
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+  if (S.tab === 'scheme') updateScheme(m);
+}
+function stepSim(dt) {
+  const id = LID();
+  let moved = false;
+  if (id === 'tension' && S.clip === 'sink' && S.clipY < DISH.bot - 8) { S.clipY = Math.min(DISH.bot - 8, S.clipY + dt * (reduce ? 1e4 : 140)); moved = true; }
+  if (id === 'capil') {
+    RS.forEach((r, i) => {
+      const tgt = S.dip[i] ? capH(S.liq, r) : 0, cur = S.lev[i];
+      if (Math.abs(tgt - cur) > 0.02) { S.lev[i] = reduce ? tgt : cur + (tgt - cur) * Math.min(1, dt * 2.6); if (Math.abs(S.lev[i] - tgt) < 0.05) S.lev[i] = tgt; moved = true; }
+    });
+    if (moved) { const before = Object.keys(S.recW).length + Object.keys(S.recHg).length; latch(); if (Object.keys(S.recW).length + Object.keys(S.recHg).length !== before) update(); }
+  }
+  if (id === 'cryst' && S.view === 'heat') {
+    moved = true;   // atoms vibrate
+    if (S.heat && !S.fin) {
+      const s = SAMP[S.samp], dm = dt * SIM;
+      S.tm = Math.min(TMAX, S.tm + dm); heatTo(S.Q + s.P * dm);
+      const lp = S.pts[S.pts.length - 1];
+      if (S.tm - lp[0] >= 0.08) S.pts.push([S.tm, S.T]);
+      if (S.T >= s.T1 || S.tm >= TMAX) {
+        S.fin = true; S.heat = false; S.pts.push([S.tm, S.T]);
+        if (s.kind === 'cr' && !S.crys) { S.crys = S.samp; toast(`${s.n}: пока шло плавление, температура стояла на ${s.Tm} °C — на графике площадка.`); }
+        else if (s.kind === 'am' && !S.amor) { S.amor = S.samp; toast(`${s.n}: температура росла всё время, тело постепенно размягчалось — площадки нет.`); }
+        else toast('Опыт закончен. Выберите другой образец или начните сначала.');
+        renderTools(); buildScheme(); update();
+      }
+      lightT += dt; if (lightT > 0.2) { lightT = 0; lightUpdate(); }
+    }
+  }
+  return moved;
+}
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.1, (t - last) / 1000); last = t;
+  if (stepSim(dt)) dirty = true;
+  if (dirty || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 4200); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, cls) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}${cls ? ` class="${cls}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  let h = '';
+  if (id === 'tension') {
+    h = B('st-frame', 'Рамка с плёнкой', S.setup === 'frame') + B('st-clip', 'Скрепка на воде', S.setup === 'clip') + sep;
+    if (S.setup === 'frame') h += BARS.map(l => B('bar-' + l, l + ' см', S.bar === l)).join('') + sep + B('pull', 'Тянуть', undefined, 'rec') + B('back', 'Назад');
+    else h += B('clip', S.clip === 'hand' ? 'Положить скрепку' : 'Достать скрепку', undefined, 'rec') + B('soap', 'Капнуть мыло') + B('fresh', 'Чистая вода');
+  }
+  if (id === 'capil') {
+    h = B('lq-water', 'Вода', S.liq === 'water') + B('lq-hg', 'Ртуть', S.liq === 'hg') + sep + RS.map((r, i) => B('tube-' + i, `r ${rs(r)} мм`, S.dip[i])).join('');
+    if (Object.keys(S.recW).length >= 2 && !S.ans) h += sep + B('ans-2', 'Вдвое тоньше → выше в 2 раза') + B('ans-4', 'в 4 раза') + B('ans-1', 'так же');
+  }
+  if (id === 'cryst') {
+    h = SAMPLES.map(k => B('s-' + k, SAMP[k].n, S.view === 'heat' && S.samp === k)).join('') + sep;
+    if (S.view === 'heat') h += B('heat', S.heat ? 'Пауза' : 'Нагреть', undefined, 'rec') + B('restart', 'Сначала') + sep;
+    h += B('v-diamond', 'Алмаз', S.view === 'diamond') + B('v-graphite', 'Графит', S.view === 'graphite');
+    if (S.crys && S.amor && !S.ans) h += sep + B('ans-cr', 'Площадка: кристалл') + B('ans-am', 'аморфное') + B('ans-both', 'оба');
+  }
+  if (id === 'strength') h = MATS.map(k => B('m-' + k, MAT[k].n, S.mat === k)).join('') + sep + DS.map(d => B('d-' + d, d + ' мм', S.d === d)).join('') + sep +
+    B('f+100', '+100 Н', undefined, 'rec') + B('f+10', '+10') + B('f-10', '−10') + B('f400', '400 Н') + B('f0', 'Снять') + B('new', 'Новая');
+  tb.innerHTML = h;
+}
+function act(a) {
+  const id = LID(), re = () => { renderTools(); buildScheme(); update(); };
+  if (a === 'pull') return setPos(S.x + 1);
+  if (a === 'back') return setPos(S.x - 1);
+  if (a.startsWith('st-')) { S.setup = a.slice(3); return re(); }
+  if (a.startsWith('bar-')) { S.bar = +a.slice(4); S.x = 1; return re(); }
+  if (a === 'bcycle') { S.bar = BARS[(BARS.indexOf(S.bar) + 1) % BARS.length]; S.x = 1; return re(); }
+  if (a === 'clip') {
+    if (S.clip !== 'hand') { S.clip = 'hand'; return re(); }
+    if (clipMax(S.liq1) > CLIP.P) { S.clip = 'float'; if (!S.fl) { S.fl = true; toast(`Скрепка из стали лежит на воде! Поверхность прогнулась и держит её: до ${fmt(clipMax(S.liq1), 0)} мН против веса ${fmt(CLIP.P, 1)} мН.`); } }
+    else { S.clip = 'sink'; S.clipY = DISH.s + 4; if (!S.sk) S.sk = true; toast(`В мыльной воде σ меньше: поверхность держит лишь ${fmt(clipMax(S.liq1), 1)} мН, а скрепка весит ${fmt(CLIP.P, 1)} мН — тонет.`); }
+    return re();
+  }
+  if (a === 'soap') {
+    if (S.liq1 === 'soap') { toast('Мыло уже в воде. «Чистая вода» — сменить воду.'); return; }
+    S.liq1 = 'soap';
+    if (S.clip === 'float') { S.clip = 'sink'; S.clipY = DISH.s + 4; S.sk = true; toast(`Мыло снизило σ с 0,073 до 0,04 Н/м — поверхность держит лишь ${fmt(clipMax('soap'), 1)} мН, скрепка утонула. Водомерка выбралась на край.`); }
+    else toast('Мыло снизило поверхностное натяжение воды с 0,073 до 0,04 Н/м. Водомерка выбралась на край. Попробуйте положить скрепку.');
+    return re();
+  }
+  if (a === 'fresh') { S.liq1 = 'water'; S.clip = 'hand'; return re(); }
+  if (a.startsWith('lq-')) { S.liq = a.slice(3); S.dip = [false, false, false]; S.lev = [0, 0, 0]; return re(); }
+  if (a.startsWith('tube-')) { const i = +a.slice(5); S.dip[i] = !S.dip[i]; return re(); }
+  if (a.startsWith('ans-')) {
+    if (id === 'capil') {
+      if (a === 'ans-2') { S.ans = true; toast('Верно: h = 2σ/(ρgr) обратно пропорциональна радиусу — в 2 раза тоньше, в 2 раза выше.'); re(); }
+      else toast('Сравните записи: r = 1 мм и r = 0,5 мм. Во сколько раз отличаются высоты?');
+      return;
+    }
+    if (a === 'ans-cr') { S.ans = true; toast('Верно: у кристалла есть температура плавления — пока решётка разрушается, температура стоит.'); re(); }
+    else toast('Посмотрите на графики: где температура какое-то время не менялась?');
+    return;
+  }
+  if (a.startsWith('s-')) { S.view = 'heat'; S.samp = a.slice(2); resetSample(); return re(); }
+  if (a === 'heat') {
+    if (S.view !== 'heat') return;
+    if (S.fin) { resetSample(); }
+    S.heat = !S.heat; return re();
+  }
+  if (a === 'restart') { resetSample(); return re(); }
+  if (a.startsWith('v-')) {
+    S.view = a.slice(2); S.heat = false;
+    if (S.view === 'diamond') S.seenD = true; else S.seenG = true;
+    toast(S.view === 'diamond' ? 'Алмаз: каждый атом углерода связан с четырьмя соседями в объёмной сетке — поэтому он такой твёрдый.' : 'Графит: те же атомы углерода, но слоями. Слои слабо связаны и легко скользят — анизотропия.');
+    return re();
+  }
+  if (a.startsWith('m-')) { S.mat = a.slice(2); newWire(); return re(); }
+  if (a.startsWith('d-')) { S.d = +a.slice(2); newWire(); return re(); }
+  if (a === 'new') { newWire(); return re(); }
+  if (a === 'f+100') return setF(S.F + 100);
+  if (a === 'f+10') return setF(S.F + 10);
+  if (a === 'f-10') return setF(S.F - 10);
+  if (a === 'f400') return setF(FT);
+  if (a === 'f0') return setF(0);
+}
+function newWire() { Object.assign(S, { F: 0, smax: 0, ep: 0, broken: false, warn4: '', warn: false }); }
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  frame: IC('<path d="M30 7H5v20h25" fill="none" stroke="#c8d2e3" stroke-width="2.4"/><rect x="18" y="5" width="3" height="24" fill="#c9a24a"/>'),
+  film: IC('<defs><linearGradient id="if" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7fd4ff"/><stop offset=".5" stop-color="#c79bff"/><stop offset="1" stop-color="#ffd36b"/></linearGradient></defs><rect x="4" y="7" width="26" height="20" rx="2" fill="url(#if)" opacity=".7"/>'),
+  bar: IC('<rect x="15" y="3" width="4" height="28" rx="1.5" fill="#c9a24a"/>'),
+  dyn: IC('<rect x="11" y="4" width="12" height="22" rx="3" fill="#2b6d7c"/><rect x="16" y="7" width="4" height="16" fill="#e8ecf4"/><path d="M15 15h7" stroke="#ff4d3a" stroke-width="2"/><circle cx="17" cy="30" r="3" fill="none" stroke="#ffb547" stroke-width="2"/>'),
+  ruler: IC('<rect x="2" y="11" width="30" height="12" rx="2" fill="#e9d9a8"/><path d="M6 11v5M11 11v3M16 11v5M21 11v3M26 11v5" stroke="#3b3320" stroke-width="1.4"/>'),
+  stand: IC('<rect x="3" y="28" width="22" height="4" rx="1" fill="#4a5875"/><rect x="7" y="8" width="4" height="21" fill="#6c7a96"/><rect x="7" y="12" width="22" height="4" fill="#6c7a96"/>'),
+  dish: IC('<path d="M3 10v18h28V10" fill="none" stroke="#8fb3c8" stroke-width="2"/><rect x="4" y="16" width="26" height="11" fill="#5fb4d9" opacity=".6"/>'),
+  clip: IC('<path d="M6 17a4 4 0 0 1 4-4h16a4 4 0 0 1 0 8H12a2 2 0 0 1 0-4h12" fill="none" stroke="#c8d2e3" stroke-width="2"/>'),
+  strider: IC('<ellipse cx="17" cy="16" rx="8" ry="2.6" fill="#3a2e22"/><path d="M10 16L3 22M13 16l-3 6M21 16l3 6M24 16l7 6" stroke="#3a2e22" stroke-width="1.6"/><path d="M1 23h32" stroke="#5fb4d9" stroke-width="1.6"/>'),
+  soap: IC('<rect x="10" y="12" width="14" height="19" rx="3" fill="#86e0a8"/><rect x="13" y="7" width="8" height="5" fill="#e8ecf4"/><path d="M15 7l2-5 2 5" fill="#e8ecf4"/>'),
+  tube: IC('<rect x="13" y="2" width="8" height="30" fill="#101826" stroke="#cfe8f5" stroke-width="1.6"/><rect x="14" y="12" width="6" height="19" fill="#5fb4d9"/>'),
+  tubeS: IC('<rect x="14.5" y="2" width="5" height="30" fill="#101826" stroke="#cfe8f5" stroke-width="1.4"/><rect x="15.5" y="6" width="3" height="25" fill="#5fb4d9"/>'),
+  bath: IC('<path d="M3 8v22h28V8" fill="none" stroke="#8fb3c8" stroke-width="2"/><rect x="4" y="17" width="26" height="12" fill="#5fb4d9" opacity=".6"/>'),
+  bathHg: IC('<path d="M3 8v22h28V8" fill="none" stroke="#8fb3c8" stroke-width="2"/><rect x="4" y="17" width="26" height="12" fill="#c9d1dc"/>'),
+  plate: IC('<rect x="2" y="22" width="30" height="4" fill="#cfe8f5" opacity=".7"/><path d="M5 22q12-8 24 0z" fill="#5fb4d9"/>'),
+  heater: IC('<rect x="4" y="18" width="26" height="14" rx="2" fill="#3a4762"/><rect x="6" y="15" width="22" height="3" fill="#ff6a1a"/><path d="M11 15l2-9h8l2 9z" fill="#d8d2c4"/>'),
+  crucible: IC('<path d="M7 9l4 20h12l4-20z" fill="#d8d2c4"/><path d="M11 20h12l-1 8H12z" fill="#cfeefc"/>'),
+  probe: IC('<rect x="8" y="16" width="20" height="13" rx="2" fill="#2b6d7c"/><rect x="10" y="18" width="16" height="6" fill="#0e1520"/><path d="M14 16V4" stroke="#c8d2e3" stroke-width="1.6"/>'),
+  lattice: IC('<circle cx="17" cy="17" r="15" fill="#0e1520" stroke="#8b96ad"/><g fill="#9fd8f0"><circle cx="11" cy="11" r="2.6"/><circle cx="17" cy="11" r="2.6"/><circle cx="23" cy="11" r="2.6"/><circle cx="11" cy="17" r="2.6"/><circle cx="17" cy="17" r="2.6"/><circle cx="23" cy="17" r="2.6"/><circle cx="11" cy="23" r="2.6"/><circle cx="17" cy="23" r="2.6"/><circle cx="23" cy="23" r="2.6"/></g>'),
+  graph: IC('<path d="M4 3v27h27" fill="none" stroke="#8b96ad" stroke-width="1.6"/><path d="M6 26l8-10h9l6-10" fill="none" stroke="#ffb547" stroke-width="2"/>'),
+  diamond: IC('<path d="M17 4L6 14l11 16 11-16z" fill="#9fd8f0" stroke="#04070d"/><path d="M6 14h22M17 4l-4 10 4 16 4-16z" fill="none" stroke="#04070d" stroke-width=".8"/>'),
+  graphite: IC('<path d="M4 8l8-4 8 4 8-4M4 17l8-4 8 4 8-4M4 26l8-4 8 4 8-4" fill="none" stroke="#a9b4c9" stroke-width="2"/>'),
+  machine: IC('<rect x="4" y="30" width="26" height="3" fill="#4a5875"/><rect x="5" y="4" width="3" height="26" fill="#6c7a96"/><rect x="26" y="4" width="3" height="26" fill="#6c7a96"/><rect x="3" y="3" width="28" height="4" fill="#3a4762"/>'),
+  wire: IC('<rect x="15.5" y="3" width="3" height="28" fill="#a9b4c9"/><rect x="12" y="2" width="10" height="4" fill="#6c7a96"/><rect x="12" y="28" width="10" height="4" fill="#6c7a96"/>'),
+  gauge: IC('<circle cx="17" cy="17" r="12" fill="#f4f6fa" stroke="#04070d"/><path d="M17 17l6-6" stroke="#e0473a" stroke-width="2"/>'),
+  disp: IC('<rect x="3" y="10" width="28" height="14" rx="3" fill="#2b6d7c"/><rect x="6" y="13" width="22" height="8" fill="#0e1520"/><path d="M9 17h12" stroke="#86e0a8" stroke-width="2"/>'),
+  handle: IC('<path d="M5 17h24" stroke="#ffb547" stroke-width="5" stroke-linecap="round"/><path d="M17 3v12" stroke="#8b96ad" stroke-width="3"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  const t = (ok, s) => `${s} ${ok ? '✓' : '—'}`;
+  if (id === 'tension') return [t(m.f3, '3 см'), t(m.f8, '8 см'), t(m.fl, 'Плавает'), t(m.sk, 'Утонула')].join(' · ');
+  if (id === 'capil') return [t(m.w3, 'Вода ×3'), t(m.ans, 'Вывод'), t(m.hg, 'Ртуть')].join(' · ');
+  if (id === 'cryst') return [t(m.crys, 'Кристалл'), t(m.amor, 'Аморфное'), t(m.ans, 'Вывод'), t(m.carbon, 'Углерод')].join(' · ');
+  return [t(m.el, 'Упруго'), t(m.pl, 'Пластично'), t(m.pick, '400 Н, n ≥ 2')].join(' · ');
+}
+
+// Scheme tab: built once per change, then values refreshed (sliders keep focus while dragging)
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+const chips = (lbl, items) => `<div class="ctl"><div class="lbl">${lbl}</div><div class="chips">${items.map(([a, n, on]) => `<button data-a="${a}" aria-pressed="${!!on}">${n}</button>`).join('')}</div></div>`;
+const reads = (a, b, c) => `<dl class="reads"><div><dt>${a}</dt><dd id="r1"></dd></div><div><dt>${b}</dt><dd id="r2"></dd></div><div><dt>${c}</dt><dd id="r3"></dd></div></dl>`;
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'tension') {
+    h = `<h2>${S.setup === 'frame' ? 'Рамка с мыльной плёнкой' : 'Скрепка на воде'}</h2>` + chips('Опыт', [['st-frame', 'Рамка с плёнкой', S.setup === 'frame'], ['st-clip', 'Скрепка на воде', S.setup === 'clip']]);
+    if (S.setup === 'frame') h += chips('Длина перекладины l', BARS.map(l => ['bar-' + l, l + ' см', S.bar === l])) + slider('inX', 'Перекладина на отметке', 1, 9, 0.5, S.x) + reads('сила F', 'l', 'σ = F/2l') +
+      `<h3>Записи (растянуть до 6 см)</h3><div class="rec">` + BARS.map(l => step(`перекладина ${l} см`, S.rec1[l] != null ? `F = ${fmt(S.rec1[l], 1)} мН` : '—')).join('') + `</div>`;
+    else h += chips('Вода', [['fresh', 'Чистая', S.liq1 === 'water'], ['soap', 'С мылом', S.liq1 === 'soap']]) + chips('Скрепка', [['clip', S.clip === 'hand' ? 'Положить на воду' : 'Достать', false]]) + reads('вес P', 'держит до', 'σ') +
+      `<h3>Записи</h3><div class="rec">` + step('на чистой воде', S.fl ? 'плавает ✓' : '—') + step('после мыла', S.sk ? 'утонула ✓' : '—') + `</div>`;
+  }
+  if (id === 'capil') {
+    h = `<h2>Капилляры в ванночке</h2>` + chips('Жидкость', [['lq-water', 'Вода', S.liq === 'water'], ['lq-hg', 'Ртуть', S.liq === 'hg']]) +
+      chips('Капилляры в жидкости (нажмите)', RS.map((r, i) => ['tube-' + i, `r = ${rs(r)} мм`, S.dip[i]])) + reads('r = 1 мм', 'r = 0,5 мм', 'r = 0,25 мм') +
+      `<h3>Записи</h3><div class="rec">` + RS.map(r => step(`вода, r = ${rs(r)} мм`, S.recW[r] != null ? `h = ${fmt(S.recW[r], 0)} мм` : '—')).join('') + RS.filter(r => S.recHg[r] != null).map(r => step(`ртуть, r = ${rs(r)} мм`, `h = ${fmt(S.recHg[r], 0)} мм`)).join('') + `</div>`;
+    if (Object.keys(S.recW).length >= 2) h += chips('Во сколько раз выше поднимается вода в трубке вдвое тоньше?', [['ans-2', 'В 2 раза', S.ans], ['ans-4', 'В 4 раза', false], ['ans-1', 'Так же', false]]);
+  }
+  if (id === 'cryst') {
+    h = `<h2>${S.view === 'heat' ? 'Нагреваем образец' : 'Решётки углерода'}</h2>` + chips('Образец', SAMPLES.map(k => ['s-' + k, `${SAMP[k].n} · ${SAMP[k].kind === 'cr' ? 'кристалл' : 'аморфное'}`, S.view === 'heat' && S.samp === k])) +
+      chips('Углерод', [['v-diamond', 'Алмаз', S.view === 'diamond'], ['v-graphite', 'Графит', S.view === 'graphite']]);
+    if (S.view === 'heat') h += `<div class="row"><button class="ghostbtn" data-a="heat">${S.heat ? 'Пауза' : 'Нагреть'}</button><button class="ghostbtn" data-a="restart">Сначала</button></div>` + reads('T', 'время', 'состояние');
+    h += `<h3>Записи</h3><div class="rec">` + step('кристалл', S.crys ? `${SAMP[S.crys].n}: площадка при ${SAMP[S.crys].Tm} °C` : '—') + step('аморфное', S.amor ? `${SAMP[S.amor].n}: площадки нет` : '—') + step('алмаз / графит', `${S.seenD ? '✓' : '—'} / ${S.seenG ? '✓' : '—'}`) + `</div>`;
+    if (S.crys && S.amor) h += chips('У какого тела на графике есть площадка?', [['ans-cr', 'У кристалла', S.ans], ['ans-am', 'У аморфного', false], ['ans-both', 'У обоих', false]]);
+  }
+  if (id === 'strength') {
+    h = `<h2>Разрывная машина</h2>` + chips('Материал', MATS.map(k => ['m-' + k, MAT[k].n, S.mat === k])) + chips('Диаметр проволоки', DS.map(d => ['d-' + d, d + ' мм', S.d === d])) +
+      slider('inF', 'Нагрузка F', 0, FMAX, 10, S.F) + `<div class="row"><button class="ghostbtn" data-a="f400">400 Н</button><button class="ghostbtn" data-a="f0">Снять нагрузку</button><button class="ghostbtn" data-a="new">Новая проволока</button></div>` + reads('σ, МПа', 'ΔL, мм', 'запас n') +
+      `<h3>Записи</h3><div class="rec">` + step('упругая', S.el ? `${MAT[S.el.mat].n}: σ = ${Math.round(S.el.s)} МПа, вернулась` : '—') + step('пластическая', S.pl ? `${MAT[S.pl.mat].n}: осталось ${fmt(S.pl.dl, 1)} мм` : '—') +
+      step('400 Н, n ≥ 2', S.pick ? `${MAT[S.pick.mat].n}, ${S.pick.d} мм: n = ${fmt(S.pick.n, 1)}` : '—') + `</div>`;
+  }
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn); };
+  on('#inX', e => setPos(+e.target.value));
+  on('#inF', e => setF(+e.target.value));
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (id === 'tension') {
+    if (S.setup === 'frame') { set('#inXO', nf(S.x) + ' см'); val('#inX', S.x); set('#r1', fmt(m.F, 1) + ' мН'); set('#r2', S.bar + ' см'); set('#r3', fmt(m.F / 1000 / (2 * S.bar / 100), 3) + ' Н/м'); }
+    else { set('#r1', fmt(CLIP.P, 1) + ' мН'); set('#r2', fmt(m.Fmax, 1) + ' мН'); set('#r3', fmt(SIG[S.liq1], 3) + ' Н/м'); }
+  }
+  if (id === 'capil') RS.forEach((r, i) => set('#r' + (i + 1), S.dip[i] ? fmt(S.lev[i], 0) + ' мм' : '—'));
+  if (id === 'cryst' && S.view === 'heat') { set('#r1', Math.round(S.T) + ' °C'); set('#r2', fmt(S.tm, 1) + ' мин'); set('#r3', softState()); }
+  if (id === 'strength') { val('#inF', S.F); set('#inFO', S.F + ' Н'); set('#r1', S.broken ? 'разрыв' : fmt(m.sig, 0)); set('#r2', fmt(m.dl, m.dl < 10 ? 2 : 1)); set('#r3', S.broken ? '—' : m.sig > 0 ? fmt(m.n, 1) : '∞'); }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'tension') {
+    if (S.setup === 'frame') return [
+      { id: 'frame', icon: ICON.frame, name: 'Проволочная рамка', spec: 'П-образная, рельсы длиной 10 см. По ним скользит перекладина.' },
+      { id: 'film', icon: ICON.film, name: 'Мыльная плёнка', spec: 'σ ≈ 0,04 Н/м. Две поверхности — спереди и сзади, поэтому F = 2σl.' },
+      { id: 'bar', icon: ICON.bar, name: 'Перекладина 3, 5 или 8 см', spec: 'Лёгкая медная проволочка, трения нет. Нажмите — сменить длину.' },
+      { id: 'dyn', icon: ICON.dyn, name: 'Динамометр 0–10 мН', spec: 'Очень чувствительный: 1 мН = 0,001 Н, как вес 0,1 г. Тяните кольцо вправо.' },
+      { id: 'ruler', icon: ICON.ruler, name: 'Линейка', spec: 'Положение перекладины; пунктир — отметка 6 см.' },
+      { id: 'stand', icon: ICON.stand, name: 'Штатив', spec: 'Держит рамку за закрытую сторону.' }];
+    return [
+      { id: 'dish', icon: ICON.dish, name: 'Стеклянная ванночка с водой', spec: S.liq1 === 'water' ? 'Чистая вода: σ ≈ 0,073 Н/м.' : 'С мылом: σ ≈ 0,04 Н/м.' },
+      { id: 'clip', icon: ICON.clip, name: 'Стальная скрепка 1 г', spec: 'Вес ≈ 9,8 мН. Проволока длиной 11 см касается воды с двух сторон — граница 22 см.' },
+      { id: 'strider', icon: ICON.strider, name: 'Водомерка', spec: 'Насекомое с длинными ногами в водоотталкивающих волосках: бегает по поверхности, не прокалывая её.' },
+      { id: 'soap', icon: ICON.soap, name: 'Жидкое мыло', spec: 'Молекулы мыла собираются на поверхности и уменьшают σ почти вдвое.' }];
+  }
+  if (id === 'capil') return [
+    { id: 't1', icon: ICON.tube, name: 'Капилляр r = 1 мм', spec: 'Стеклянная трубка. Нажмите — опустить в жидкость или поднять.' },
+    { id: 't2', icon: ICON.tube, name: 'Капилляр r = 0,5 мм', spec: 'Вдвое тоньше первого.' },
+    { id: 't3', icon: ICON.tubeS, name: 'Капилляр r = 0,25 мм', spec: 'Самый тонкий — тоньше спички в 4 раза.' },
+    { id: 'bath', icon: S.liq === 'water' ? ICON.bath : ICON.bathHg, name: S.liq === 'water' ? 'Ванночка с водой' : 'Ванночка с ртутью', spec: S.liq === 'water' ? 'σ = 0,073 Н/м, ρ = 1000 кг/м³, θ ≈ 0°.' : 'σ ≈ 0,47 Н/м, ρ = 13 600 кг/м³, θ ≈ 140°. Только в закрытом приборе!' },
+    { id: 'ruler', icon: ICON.ruler, name: 'Линейка, мм', spec: 'Ноль — уровень жидкости в ванночке.' },
+    { id: 'plate', icon: ICON.plate, name: 'Стеклянная пластинка', spec: 'Капля показывает краевой угол θ: растекается или собирается в шарик.' }];
+  if (id === 'cryst') {
+    if (S.view !== 'heat') return [
+      { id: 'diamond', icon: ICON.diamond, name: 'Алмаз', spec: 'Углерод, каждый атом связан с 4 соседями. Самый твёрдый природный минерал.' },
+      { id: 'graphite', icon: ICON.graphite, name: 'Графит', spec: 'Тот же углерод, слоями из шестиугольников. Мягкий, проводит ток вдоль слоёв.' }];
+    return [
+      { id: 'heater', icon: ICON.heater, name: SAMP[S.samp].hot ? 'Электропечь' : 'Нагреватель', spec: 'Даёт образцу тепло с постоянной мощностью. Нажмите — включить или выключить.' },
+      { id: 'crucible', icon: ICON.crucible, name: 'Тигель с образцом', spec: `${SAMP[S.samp].n}: ${SAMP[S.samp].kind === 'cr' ? 'кристалл, tпл = ' + SAMP[S.samp].Tm + ' °C' : 'аморфное тело, размягчается в интервале ' + SAMP[S.samp].Ts1 + '–' + SAMP[S.samp].Ts2 + ' °C'}.` },
+      { id: 'probe', icon: ICON.probe, name: 'Термопара', spec: 'Электронный термометр: работает и при 900 °C.' },
+      { id: 'bubble', icon: ICON.lattice, name: 'Частицы под «лупой»', spec: 'Как стоят атомы или молекулы. При нагреве они колеблются сильнее.' },
+      { id: 'graph', icon: ICON.graph, name: 'График T(t)', spec: 'Температура образца со временем. Ищите площадку.' }];
+  }
+  return [
+    { id: 'frame', icon: ICON.machine, name: 'Разрывная машина', spec: 'Верхний зажим неподвижен, нижний тянет винт. Так испытывают металлы и пластики.' },
+    { id: 'wire', icon: ICON.wire, name: `Проволока: ${MAT[S.mat].n.toLowerCase()}, ${S.d} мм`, spec: `L₀ = 1 м, S = ${fmt(area(S.d), 2)} мм². E = ${MAT[S.mat].E / 1000} ГПа, σт = ${MAT[S.mat].yt} МПа, σпч = ${MAT[S.mat].ut} МПа.` },
+    { id: 'disp', icon: ICON.disp, name: 'Датчик силы', spec: 'Показывает нагрузку F в ньютонах.' },
+    { id: 'gauge', icon: ICON.gauge, name: 'Индикатор удлинения', spec: 'Удлинение ΔL в миллиметрах: стрелка делает оборот на 1 мм.' },
+    { id: 'handle', icon: ICON.handle, name: 'Рукоятка', spec: 'Тяните вниз — нагрузка растёт, вверх — уменьшается.' },
+    { id: 'diag', icon: ICON.graph, name: 'Диаграмма растяжения', spec: 'Серая линия — материал, оранжевая — путь этого образца.' }];
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      (Ls.safe ? `<div class="safe"><b>Безопасность</b>${Ls.safe}</div>` : '') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Что на площадке</h2><p class="note">Нажмите на деталь, чтобы найти её на площадке.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'tension') {
+    if (S.setup === 'frame') {
+      const l = S.bar / 100, F = filmF(S.bar);
+      return `<h2>Сила плёнки</h2><div class="formula">F = 2 σ l</div><p class="note">σ ≈ 0,04 Н/м — мыльный раствор, l — длина перекладины. Множитель 2 — у плёнки две поверхности. Перекладина лёгкая, трения нет.</p>
+        <h3>Перекладина ${S.bar} см</h3><div class="steps">` + step('l', `${S.bar} см = ${fmt(l, 2)} м`) + step('F = 2σl', `2 × 0,04 × ${fmt(l, 2)} = ${fmt(F / 1000, 4)} Н`) + step('в миллиньютонах', `${fmt(F, 1)} мН`, 'sum') + `</div>
+        <h3>Найти σ из опыта</h3><div class="steps">` + step('σ = F / (2l)', `${fmt(F / 1000, 4)} / (2 × ${fmt(l, 2)}) = ${fmt(F / 1000 / (2 * l), 3)} Н/м`, 'sum') + `</div>
+        <p class="note" style="margin-top:10px">Сила не зависит от того, насколько растянута плёнка, — только от длины границы. У пружины не так: чем больше растяжение, тем больше сила (закон Гука).</p>`;
+    }
+    const Fw = clipMax('water'), Fs = clipMax('soap');
+    return `<h2>Почему скрепка не тонет</h2><div class="formula">Fmax = σ · L</div><p class="note">L — длина границы, по которой вода касается скрепки: проволока 11 см, с двух сторон — 22 см. Сила натяжения поднимает скрепку, пока поверхность не прогнётся до вертикали. Архимедова сила для тонкой проволоки ничтожна.</p>
+      <h3>Сравниваем с весом</h3><div class="steps">` + step('вес P = mg', `0,001 кг × 9,8 = ${fmt(CLIP.P, 1)} мН`) + step('чистая вода', `0,073 × 0,22 = ${fmt(Fw, 1)} мН > P`) + step('с мылом', `0,04 × 0,22 = ${fmt(Fs, 1)} мН < P`, 'sum') + `</div>
+      <p class="note" style="margin-top:10px">У водомерки ноги покрыты водоотталкивающими волосками, и общая длина их границы с водой велика: насекомое весит около 0,1 мН, а поверхность могла бы держать в несколько раз больше.</p>`;
+  }
+  if (id === 'capil') {
+    const q = LIQ[S.liq], c = Math.cos(q.th * Math.PI / 180);
+    return `<h2>Высота подъёма</h2><div class="formula">h = 2σ cos θ / (ρ g r)</div><p class="note">${q.n}: σ = ${fmt(q.s, 3)} Н/м, ρ = ${q.rho} кг/м³, θ ≈ ${q.th}°, cos θ = ${fmt(c, 2)}; g = 9,8 Н/кг. Для смачивающей жидкости cos θ ≈ 1 и h = 2σ / (ρ g r).</p>
+      <h3>Три капилляра</h3><div class="steps">` + RS.map(r => step(`r = ${rs(r)} мм`, `2 × ${fmt(q.s, 3)} × ${fmt(c, 2)} / (${q.rho} × 9,8 × ${fmt(r / 1000, 5)}) = ${fmt(capH(S.liq, r), 1)} мм`)).join('') + `</div>
+      <h3>Как зависит от радиуса</h3><div class="steps">` + step('h · r', `= 2σ cos θ / (ρ g) — постоянно`) + step('r в 2 раза меньше', 'h в ? раз больше', 'sum') + `</div>
+      <p class="note" style="margin-top:10px">Столб поднимается, пока его вес ρ g h · πr² не сравняется с силой натяжения вдоль края σ · 2πr · cos θ.</p>`;
+  }
+  if (id === 'cryst') {
+    if (S.view !== 'heat') return `<h2>Алмаз и графит</h2><div class="formula">C = C, а свойства — разные</div><div class="steps">` + step('твёрдость по Моосу', '10 / 1–2') + step('плотность', '3,5 / 2,2 г/см³') + step('электропроводность', 'нет / есть вдоль слоёв') + step('связи у атома', '4 в объёме / 3 в слое', 'sum') + `</div><p class="note" style="margin-top:10px">Слева — алмаз, справа — графит. Свойства определяет не только состав, но и то, как атомы расставлены в решётке. Слой графита толщиной в один атом — графен.</p>`;
+    const s = SAMP[S.samp];
+    if (s.kind === 'cr') return `<h2>${s.n}: плавление кристалла</h2><div class="formula">Q = c m Δt    Q = λ m</div><p class="note">На 1 г образца. Нагреватель даёт ${s.P} Дж каждую минуту.</p><div class="steps">` +
+      step('нагреть твёрдое', `${fmt(s.cs, 1)} × ${s.Tm - s.T0} = ${Math.round(s.cs * (s.Tm - s.T0))} Дж → ${fmt(s.cs * (s.Tm - s.T0) / s.P, 1)} мин`) +
+      step('расплавить', `λ = ${s.lam} Дж/г → ${fmt(s.lam / s.P, 1)} мин при ${s.Tm} °C`, 'sum') + step('нагреть жидкость', `${fmt(s.cl, 1)} × ${s.T1 - s.Tm} = ${Math.round(s.cl * (s.T1 - s.Tm))} Дж → ${fmt(s.cl * (s.T1 - s.Tm) / s.P, 1)} мин`) +
+      `</div><p class="note" style="margin-top:10px">Всё время плавления теплота уходит на разрушение решётки, а не на рост температуры. Сейчас: ${Math.round(S.T)} °C, ${softState()}.</p>`;
+    return `<h2>${s.n}: аморфное тело</h2><div class="formula">tпл нет — только интервал размягчения</div><div class="steps">` + step('начало размягчения', `≈ ${s.Ts1} °C`) + step('становится текучим', `≈ ${s.Ts2} °C`) + step('сейчас', `${Math.round(S.T)} °C · ${softState()}`, 'sum') +
+      `</div><p class="note" style="margin-top:10px">Скрытой теплоты плавления нет: решётки нет, разрушать нечего. Температура растёт всё время, лишь чуть медленнее в интервале размягчения. Поэтому стекло выдувают и вытягивают — оно мягкое в широком интервале температур.</p>`;
+  }
+  const M = MAT[S.mat], A = area(S.d), s = m.sig, s4 = FT / A;
+  return `<h2>Напряжение и удлинение</h2><div class="formula">σ = F / S    σ = E·ε</div><p class="note">S = πd²/4. Не путайте: σ здесь — механическое напряжение, а не поверхностное натяжение. 1 МПа = 1 Н/мм².</p>
+    <h3>Сейчас: ${M.n.toLowerCase()}, d = ${S.d} мм</h3><div class="steps">` + step('S', `3,14 × ${S.d}² / 4 = ${fmt(A, 2)} мм²`) + step('σ = F / S', `${S.F} / ${fmt(A, 2)} = ${fmt(s, 0)} МПа`) +
+    step('ε', S.smax <= M.yt ? `σ / E = ${fmt(s, 0)} / ${M.E} = ${fmt(s / M.E * 100, 3)} %` : `${fmt(m.eps * 100, 2)} % (за пределом текучести)`) + step('ΔL = ε·L₀', `${fmt(m.dl, m.dl < 10 ? 2 : 1)} мм`, 'sum') + `</div>
+    <h3>Проверка на 400 Н</h3><div class="steps">` + step('σ при 400 Н', `400 / ${fmt(A, 2)} = ${fmt(s4, 0)} МПа`) + step('ниже σт?', `${M.yt} МПа — ${s4 <= M.yt ? 'да' : 'нет'}`) + step('n = σпч / σ', `${M.ut} / ${fmt(s4, 0)} = ${fmt(M.ut / s4, 1)}`, 'sum') + `</div>
+    <p class="note" style="margin-top:10px">Нужна проволока, у которой при 400 Н σ ≤ σт и n ≥ 2.</p>`;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter');
+  const row = (a, b, cls) => `<div class="lr"><span>${a}</span><span class="${cls || ''}">${b}</span></div>`;
+  if (id === 'tension') {
+    if (S.setup === 'frame') el.innerHTML = `<div class="k">Динамометр</div><div class="v">${fmt(m.F, 1)} мН</div>` + row('l', S.bar + ' см') + row('отметка', nf(S.x) + ' см', S.x >= XT ? 'ok' : '') + row('σ', '0,04 Н/м');
+    else el.innerHTML = `<div class="k">Скрепка</div><div class="v ${S.clip === 'float' ? 'ok' : ''}">${S.clip === 'hand' ? 'в пинцете' : S.clip === 'float' ? 'плавает' : 'утонула'}</div>` + row('P', fmt(CLIP.P, 1) + ' мН') + row('держит', fmt(m.Fmax, 1) + ' мН', m.Fmax > CLIP.P ? 'ok' : 'bad') + row('σ', fmt(SIG[S.liq1], 3) + ' Н/м');
+  } else if (id === 'capil') {
+    el.innerHTML = `<div class="k">${LIQ[S.liq].n} · подъём h</div>` + RS.map((r, i) => row(`r ${rs(r)} мм`, S.dip[i] ? fmt(S.lev[i], 0) + ' мм' : '—', S.dip[i] ? (S.lev[i] >= 0 ? 'ok' : 'bad') : '')).join('');
+  } else if (id === 'cryst') {
+    if (S.view === 'heat') el.innerHTML = `<div class="k">Термопара</div><div class="v">${Math.round(S.T)} °C</div>` + row('t', fmt(S.tm, 1) + ' мин') + row('', softState(), S.f > 0 ? 'ok' : '');
+    else el.innerHTML = `<div class="k">Углерод</div><div class="v">${S.view === 'diamond' ? 'Алмаз' : 'Графит'}</div>` + row('Моос', S.view === 'diamond' ? '10' : '1–2') + row('ток', S.view === 'diamond' ? 'нет' : 'есть', S.view === 'diamond' ? 'bad' : 'ok');
+  } else {
+    const M = MAT[S.mat];
+    el.innerHTML = `<div class="k">Датчик силы</div><div class="v">${S.broken ? 'разрыв' : S.F + ' Н'}</div>` + row('σ', fmt(m.sig, 0) + ' МПа', m.sig > M.yt ? 'bad' : '') + row('ΔL', fmt(m.dl, m.dl < 10 ? 2 : 1) + ' мм') + row('n', S.broken ? '—' : m.sig > 0 ? fmt(m.n, 1) : '∞', m.sig > 0 && m.n >= 2 && m.sig <= M.yt ? 'ok' : m.sig > 0 ? 'bad' : '');
+  }
+}
+
+function update() {
+  latch();
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Теперь вы знаете, как устроены жидкости и твёрдые тела!'), 2200);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  tension: '<path d="M44 6H10v18h34" fill="none" stroke="#c8d2e3" stroke-width="1.6"/><rect x="11" y="7" width="20" height="16" fill="#c79bff" opacity=".45"/><rect x="30" y="4" width="2.4" height="22" fill="#c9a24a"/><rect x="38" y="12" width="16" height="6" rx="2" fill="#2b6d7c"/>',
+  capil: '<rect x="6" y="18" width="54" height="11" fill="#5fb4d9" opacity=".55"/><rect x="18" y="4" width="5" height="24" fill="#101826" stroke="#cfe8f5"/><rect x="19" y="13" width="3" height="15" fill="#5fb4d9"/><rect x="38" y="2" width="3" height="26" fill="#101826" stroke="#cfe8f5" stroke-width=".8"/><rect x="38.8" y="5" width="1.4" height="23" fill="#5fb4d9"/>',
+  cryst: '<g fill="#9fd8f0"><circle cx="8" cy="8" r="2.4"/><circle cx="15" cy="8" r="2.4"/><circle cx="22" cy="8" r="2.4"/><circle cx="8" cy="15" r="2.4"/><circle cx="15" cy="15" r="2.4"/><circle cx="22" cy="15" r="2.4"/><circle cx="8" cy="22" r="2.4"/><circle cx="15" cy="22" r="2.4"/><circle cx="22" cy="22" r="2.4"/></g><path d="M32 26l8-10h10l8-12" fill="none" stroke="#ffb547" stroke-width="2"/>',
+  strength: '<rect x="8" y="3" width="3" height="25" fill="#6c7a96"/><rect x="24" y="3" width="3" height="25" fill="#6c7a96"/><rect x="6" y="2" width="23" height="3" fill="#3a4762"/><rect x="16.5" y="6" width="2" height="16" fill="#a9b4c9"/><path d="M36 27l3-17q6-4 10-2l9 4" fill="none" stroke="#ffb547" stroke-width="1.8"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Lx, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Lx.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Lx.title}</span></span>
+      ${S.done[Lx.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  S.lesson = i; drag = null;
+  resetState(); save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L().task;
+  $('#hint').textContent = L().stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '';
+  if (id === 'tension') now = S.setup === 'frame'
+    ? `П-образная проволочная рамка с мыльной плёнкой (σ ≈ 0,04 Н/м, две поверхности). Перекладина длиной ${S.bar} см стоит на отметке ${nf(S.x)} см, динамометр показывает ${fmt(m.F, 1)} мН. Записи (растянуть до 6 см): ${BARS.filter(l => S.rec1[l] != null).map(l => `${l} см — ${fmt(S.rec1[l], 1)} мН`).join('; ') || 'нет'}. Значения не называй заранее — наводи к F = 2σl и к тому, что сила не зависит от растяжения.`
+    : `Стеклянная ванночка с ${S.liq1 === 'water' ? 'чистой водой (σ = 0,073 Н/м)' : 'мыльной водой (σ ≈ 0,04 Н/м)'}. Стальная скрепка 1 г (вес 9,8 мН), граница с водой 22 см: ${S.clip === 'hand' ? 'в пинцете' : S.clip === 'float' ? 'лежит на поверхности' : 'утонула'}. Плавала на чистой воде — ${S.fl ? 'да' : 'нет'}; утонула после мыла — ${S.sk ? 'да' : 'нет'}. Наводи к сравнению σ·L с весом.`;
+  if (id === 'capil') now = `Ванночка с ${S.liq === 'water' ? 'водой (σ = 0,073 Н/м, θ ≈ 0°)' : 'ртутью (σ ≈ 0,47 Н/м, ρ = 13 600 кг/м³, θ ≈ 140°)'}. Капилляры радиусом 1; 0,5; 0,25 мм: ${RS.map((r, i) => `${rs(r)} мм — ${S.dip[i] ? `в жидкости, h = ${fmt(S.lev[i], 0)} мм` : 'поднят'}`).join('; ')}. Записи воды: ${RS.filter(r => S.recW[r] != null).map(r => `${rs(r)} мм — ${fmt(S.recW[r], 0)} мм`).join('; ') || 'нет'}; ртуть: ${RS.filter(r => S.recHg[r] != null).map(r => `${rs(r)} мм — ${fmt(S.recHg[r], 0)} мм`).join('; ') || 'нет'}. Вывод про «вдвое тоньше» ${S.ans ? 'сделан' : 'не сделан'}. Ответ не называй — наводи к h = 2σ/(ρgr).`;
+  if (id === 'cryst') now = S.view === 'heat'
+    ? `В тигле ${SAMP[S.samp].n.toLowerCase()} (${SAMP[S.samp].kind === 'cr' ? 'кристалл' : 'аморфное тело'}), нагрев ${S.heat ? 'идёт' : 'выключен'}: прошло ${fmt(S.tm, 1)} мин, T = ${Math.round(S.T)} °C, состояние — ${softState()}. Записи: кристалл — ${S.crys ? SAMP[S.crys].n : 'нет'}; аморфное — ${S.amor ? SAMP[S.amor].n : 'нет'}; алмаз ${S.seenD ? 'смотрели' : 'не смотрели'}, графит ${S.seenG ? 'смотрели' : 'не смотрели'}. Вывод про площадку ${S.ans ? 'сделан' : 'не сделан'}. Наводи вопросами, где температура переставала расти.`
+    : `На экране решётки углерода, выбран ${S.view === 'diamond' ? 'алмаз' : 'графит'}. Наводи к тому, что свойства зависят от расположения атомов, а не только от состава.`;
+  if (id === 'strength') { const M = MAT[S.mat]; now = `Разрывная машина: ${M.adj} проволока d = ${S.d} мм, L₀ = 1 м (E = ${M.E / 1000} ГПа, σт = ${M.yt} МПа, σпч = ${M.ut} МПа). Нагрузка ${S.F} Н, σ = ${fmt(m.sig, 0)} МПа, ΔL = ${fmt(m.dl, 2)} мм, ${S.broken ? 'образец разорван' : S.ep > 0 ? `остаточное удлинение ${fmt(S.ep * L0, 1)} мм` : 'остаточного удлинения нет'}. Подзадачи: упругая разгрузка — ${S.el ? 'есть' : 'нет'}; пластическая — ${S.pl ? 'есть' : 'нет'}; проволока на 400 Н с n ≥ 2 — ${S.pick ? `${MAT[S.pick.mat].n}, ${S.pick.d} мм` : 'не найдена'}. Подходящую проволоку не называй — наводи к σ = F/S, сравнению с σт и n = σпч/σ.`; }
+  return [
+    `Раздел: физика, 10 класс, тема «Свойства жидкостей и твёрдых тел». Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'} (${taskState(m)}).`,
+    `Сейчас на площадке: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Помогай наводящими вопросами, готовые ответы не выдавай.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { tension: 'Почему мыльный пузырь круглый?', capil: 'Как вода поднимается в дереве?', cryst: 'Почему алмаз твёрдый, а графит мягкий?', strength: 'Зачем мостам запас прочности?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-solids.js): the same set-up as real lab equipment
+window.LUCH_REAL = () => {
+  const id = LID(), M = { module: 'solids' };
+  if (id === 'tension') return S.setup === 'frame'
+    ? { ...M, scene: 'solids-frame', help: 'Перекладина — сменить длину, кольцо динамометра — тянуть', bar: S.bar, xT: XT }
+    : { ...M, scene: 'solids-clip', help: 'Скрепка — положить или достать, флакон — капнуть мыло', clip: S.clip, soap: S.liq1 === 'soap' };
+  if (id === 'capil') return { ...M, scene: 'solids-capil', help: 'Капилляр — опустить или поднять, ванночка — сменить жидкость', liq: S.liq, dip: S.dip.slice() };
+  if (id === 'cryst') return S.view === 'heat'
+    ? { ...M, scene: 'solids-heat', help: 'Печь — нагрев, тигель — сменить образец, модель решётки — алмаз', samp: S.samp, kind: SAMP[S.samp].kind, name: SAMP[S.samp].n, hot: SAMP[S.samp].hot }
+    : { ...M, scene: 'solids-carbon', help: 'Модель — выбрать алмаз или графит, подставка — вернуться к нагреву', view: S.view };
+  return { ...M, scene: 'solids-tensile', help: 'Рукоятка — нагрузить на 100 Н, датчик — снять нагрузку, катушки — материал', mat: S.mat, d: S.d, col: MAT[S.mat].col, name: MAT[S.mat].n, broken: S.broken };
+};
+// live values for smooth motion in 3D
+window.LUCH_REAL.live = () => ({ x: S.x, F: LID() === 'tension' ? filmF(S.bar) : S.F, clipY: S.clip === 'sink' ? (S.clipY - DISH.s) / (DISH.bot - 8 - DISH.s) : 0,
+  lev: S.lev.slice(), T: S.T, f: S.f, heat: S.heat, eps: LID() === 'strength' ? (S.broken ? S.ep : eps4()) : 0, sig: LID() === 'strength' ? sig4() : 0 });
+window.LUCH_REAL.click = k => {
+  const id = LID();
+  if (k === 'pull') { if (id === 'tension') return setPos(S.x >= 9 ? 1 : S.x + 1); return setF(S.F + 100); }
+  if (k === 'liq') return act('lq-' + (S.liq === 'water' ? 'hg' : 'water'));
+  if (k === 'samp') return act('s-' + SAMPLES[(SAMPLES.indexOf(S.samp) + 1) % SAMPLES.length]);
+  if (k === 'mat') return act('m-' + MATS[(MATS.indexOf(S.mat) + 1) % MATS.length]);
+  if (k === 'back') return act('s-' + S.samp);
+  act(k);
+};
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>

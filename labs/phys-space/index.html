@@ -1,0 +1,1154 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивная лаборатория по физике, 9 класс: первая и вторая космические скорости, орбиты спутников, невесомость и перегрузки, как взлетает ракета.">
+<title>Космос: спутники и невесомость</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+<style>
+/* Layout: the same lab shell as /chemistry and /mechanics. Stage (SVG) on the left, lesson notebook on the right, lesson strip under the stage. */
+:root{
+  --bg:#0b1019;
+  --surface:#121a28;
+  --surface-2:#1a2438;
+  --line:#26324a;
+  --fg:#e8ecf4;
+  --muted:#8b96ad;
+  --force:#ffb547;
+  --arm:#72d4e8;
+  --ok:#86e0a8;
+  --warn:#ff8a73;
+  --liq:#5fb4d9;
+  --tag-bg:rgba(11,16,25,.84);
+  --stage-hi:#1a2539;
+  --stage-lo:#0e1520;
+  --font-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --font-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--arm);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 384px;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand svg{width:40px;height:40px;flex:none}
+.brand h1{font:700 22px/1 var(--font-display);letter-spacing:.16em;margin:0}
+.brand small{display:block;font:500 11px/1 var(--font-mono);color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:7px}
+.sections{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;flex-wrap:wrap}
+.sections a{color:var(--muted);text-decoration:none;font:600 11.5px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;padding:9px 12px;border-radius:7px}
+.sections a:hover{color:var(--fg)}
+.sections a[aria-current="page"]{background:var(--surface-2);color:var(--fg)}
+.prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px}
+.prog b{font:600 11.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase}
+.bar{width:110px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--arm);transition:width .4s}
+.prog .num{font:500 13px/1 var(--font-mono);font-variant-numeric:tabular-nums}
+.headr{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:radial-gradient(120% 95% at 50% 35%,var(--stage-hi) 0%,var(--stage-lo) 62%,var(--bg) 100%)}
+.scene{position:absolute;left:0;top:0;width:100%;height:calc(100% - 54px);display:block;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
+.scene [data-drag]{cursor:grab}
+.scene [data-click]{cursor:pointer}
+.scene.grabbing,.scene.grabbing [data-drag]{cursor:grabbing}
+.scene text{font-family:var(--font-mono)}
+
+.task{position:absolute;top:14px;left:14px;max-width:min(340px,calc(100% - 200px));background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:11px 14px 12px;pointer-events:none}
+.task .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force)}
+.task p{margin:7px 0 8px;font-size:14px;line-height:1.4;text-wrap:pretty}
+.state{font:500 12px/1.3 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.state.done{color:var(--ok)}
+
+.meter{position:absolute;top:14px;right:14px;width:170px;background:var(--tag-bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;pointer-events:none}
+.meter .k{font:600 10px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.meter .v{font:500 15px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums}
+.meter .v.ok{color:var(--ok)}
+.meter .lr{display:flex;justify-content:space-between;gap:6px;margin-top:7px;font:500 10.5px/1.2 var(--font-mono);color:var(--muted)}
+.meter .lr .ok{color:var(--ok)}
+.meter .lr .bad{color:var(--warn)}
+
+.tools{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;align-items:center;background:var(--tag-bg);border:1px solid var(--line);border-radius:11px;padding:4px;max-width:calc(100% - 20px)}
+.tools button{background:none;border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tools button:hover{color:var(--fg)}
+.tools button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.tools button.rec{color:var(--force)}
+.tools .sep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.hint{position:absolute;left:16px;bottom:16px;font-size:12px;color:var(--muted);max-width:24%;pointer-events:none}
+
+.panel{grid-column:2;grid-row:2/4;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:14px 4px 12px;font:600 11px/1 var(--font-body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--force)}
+.pbody{flex:1;min-height:0;overflow:auto;padding:18px 18px 22px}
+.pbody h2{font:500 17px/1.3 var(--font-display);margin:0 0 12px;text-wrap:balance}
+.pbody h3{font:600 11px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+.pbody p{margin:0 0 12px;line-height:1.55;max-width:65ch}
+.note{font-size:13px;color:var(--muted)}
+.lesson-k{font:500 11px/1 var(--font-mono);color:var(--muted);margin-bottom:8px}
+.life{background:var(--surface-2);border-radius:12px;padding:11px 13px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.life b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--ok);margin-bottom:7px}
+.taskbox{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;margin-top:16px}
+.taskbox .k{font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--force);margin-bottom:6px}
+.taskbox p{margin:0 0 8px}
+.taskbox .note{margin:8px 0 0}
+.primary{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:var(--fg);color:var(--bg);border:0;border-radius:9px;padding:10px 14px;font-weight:600;font-size:13.5px;cursor:pointer}
+.primary:disabled{opacity:.35;cursor:default}
+.ghostbtn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:500;cursor:pointer}
+.ghostbtn:hover{border-color:var(--muted)}
+
+.reads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 4px}
+.reads div{background:var(--surface-2);border-radius:9px;padding:8px 9px;min-width:0}
+.reads dt{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.reads dd{margin:6px 0 0;font:500 14px/1 var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{margin-top:16px}
+.ctl label,.ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font:500 13px var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;margin:8px 0 0;accent-color:var(--force)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 13px/1 var(--font-body);cursor:pointer;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+.formula{font:500 18px/1.3 var(--font-mono);text-align:center;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--bg);margin-bottom:10px}
+.steps{display:grid;gap:6px}
+.step{display:flex;justify-content:space-between;gap:12px;align-items:baseline;background:var(--surface-2);border-radius:9px;padding:9px 11px;font-size:13px}
+.step b{font-weight:500;color:var(--muted)}
+.step span{font:500 13px var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.step.sum{background:none;border:1px solid var(--line)}
+.step.sum b{color:var(--fg)}
+
+.parts{display:grid;gap:8px}
+.part{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer}
+.part:hover{border-color:var(--muted)}
+.part svg{width:34px;height:34px;flex:none}
+.part b{display:block;font-weight:600;font-size:14px}
+.part span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+
+.strip{grid-column:1;display:flex;gap:8px;min-width:0}
+.lessons{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin;padding-bottom:2px}
+.lesson{flex:0 0 212px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--muted);text-align:left;cursor:pointer;position:relative}
+.lesson:hover{border-color:var(--muted)}
+.lesson[aria-current="true"]{border-color:var(--force);color:var(--fg)}
+.lesson svg{width:66px;height:30px;flex:none;background:var(--bg);border-radius:6px}
+.lesson .n{display:block;font:500 10.5px/1 var(--font-mono);margin-bottom:4px}
+.lesson .t{display:block;font:600 12.5px/1.25 var(--font-body)}
+.lesson .chk{position:absolute;top:6px;right:8px;font:600 12px/1 var(--font-mono);color:var(--ok)}
+.navbtn{flex:none;width:46px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer;font:500 18px/1 var(--font-mono)}
+.navbtn.next{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.navbtn:disabled{opacity:.3;cursor:default}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px;transition:opacity .25s,transform .25s;z-index:60;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1280px){.hint{display:none}}
+@media (max-width:980px){
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:64vh;min-height:430px}
+  .panel{grid-column:auto;grid-row:auto}
+  .strip{grid-column:auto}
+  .pbody{overflow:visible}
+}
+@media (max-width:600px){
+  .meter{width:118px;padding:8px}
+  .meter .v{font-size:13px}
+  .task{max-width:calc(100% - 146px);padding:9px 11px}
+  .task p{font-size:13px}
+  .tools button{padding:6px 7px;font-size:12px}
+  .reads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand h1{font-size:19px}
+  .sections a{padding:9px 8px;letter-spacing:.05em}
+  .stage{height:calc(80vw + 210px);min-height:0}
+}
+.safe{border:1px solid rgba(255,138,115,.38);border-radius:12px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin:0 0 12px}
+.safe b{display:block;font:600 10.5px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.rec{display:grid;gap:4px;margin-top:8px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<script src="/luch/splash.js"></script>
+<div class="app">
+  <header>
+    <div class="brand" role="link" tabindex="0" title="Карта предметов" style="cursor:pointer" onclick="location.href='/'" onkeydown="if(event.key==='Enter')location.href='/'">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M9.6 14.6 9.2 6.2 15 10.6Q20 9.4 25 10.6L30.8 6.2 30.4 14.6Q34.6 22 31.6 29Q27.6 36 20 36Q12.4 36 8.4 29Q5.4 22 9.6 14.6Z" fill="#ffb547"/><path d="M20 14Q15.2 10.8 10.9 13.4Q7.6 17.2 9.4 21.8Q11.6 25.8 15.9 25.4Q18.5 25.1 20 27.1Q21.5 25.1 24.1 25.4Q28.4 25.8 30.6 21.8Q32.4 17.2 29.1 13.4Q24.8 10.8 20 14Z" fill="#ffd896"/><circle cx="15" cy="18.8" r="5" fill="#fffaf0"/><circle cx="25" cy="18.8" r="5" fill="#fffaf0"/><circle cx="15.6" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="24.4" cy="19.2" r="2.9" fill="#0b1019"/><circle cx="16.6" cy="18.1" r="1" fill="#fff"/><circle cx="25.4" cy="18.1" r="1" fill="#fff"/><path d="M18.6 23.4h2.8L20 26.6z" fill="#ff8a73"/><path d="M10.5 29.6Q15.3 27.4 20 29.7Q24.7 27.4 29.5 29.6V34.6Q24.7 32.6 20 34.8Q15.3 32.6 10.5 34.6Z" fill="#72d4e8"/><path d="M20 29.7V34.8" stroke="#0b1019" stroke-width="1.1"/><path d="M8.2 23.5Q5.6 28.6 9.4 32.6Q11.6 33.2 12.4 31Q10.4 28.4 8.2 23.5Z" fill="#e8962a"/><path d="M31.8 23.5Q34.4 28.6 30.6 32.6Q28.4 33.2 27.6 31Q29.6 28.4 31.8 23.5Z" fill="#e8962a"/><path d="M35 3.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" fill="#86e0a8"/></svg>
+      <div><h1>OPEN SCHOOL AI</h1><small>Доступное образование для всех</small></div>
+    </div>
+    <div class="headr">
+
+      <div class="prog" aria-label="Прогресс"><b>Космос</b><div class="bar"><i id="progBar"></i></div><span class="num" id="progNum">0/4</span></div>
+    </div>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Опытная площадка">
+    <svg class="scene" id="scene" role="img" aria-label="Площадка для опытов о космосе: пушка на горе, спутник на орбите, лифт с весами, ракета. Детали можно нажимать, спутник — тянуть."></svg>
+    <div class="task" aria-live="polite">
+      <div class="k" id="taskK">Задание</div>
+      <p id="taskText"></p>
+      <div class="state" id="taskState"></div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="hint" id="hint"></div>
+    <div class="tools" role="toolbar" aria-label="Действия" id="tools"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-overview" aria-selected="true">Обзор</button>
+      <button role="tab" id="tab-parts" aria-selected="false">Детали</button>
+      <button role="tab" id="tab-scheme" aria-selected="false">Схема</button>
+      <button role="tab" id="tab-calc" aria-selected="false">Расчёты</button>
+    </div>
+    <div class="pbody" id="pane-overview" role="tabpanel"></div>
+    <div class="pbody" id="pane-parts" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-scheme" role="tabpanel" hidden></div>
+    <div class="pbody" id="pane-calc" role="tabpanel" hidden></div>
+  </aside>
+
+  <nav class="strip" aria-label="Уроки">
+    <div class="lessons" id="lessons"></div>
+    <button class="navbtn" id="prevL" aria-label="Предыдущий урок">‹</button>
+    <button class="navbtn next" id="nextL" aria-label="Следующий урок">›</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (x, n = 1) => {
+  if (!isFinite(x)) return '∞';
+  let s = (Math.round(x * 10 ** n) / 10 ** n).toFixed(n);
+  if (/^-0(\.0+)?$/.test(s)) s = s.slice(1);
+  return s.replace('.', ',').replace('-', '−');
+};
+const nf = x => fmt(x, Math.abs(x - Math.round(x)) < 1e-9 ? 0 : 1);
+const big = x => String(Math.round(x)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');   // 20 200
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#04070d', TAU = Math.PI * 2;
+
+const LESSONS = [
+  { id: 'cosmic', title: 'Первая космическая скорость',
+    text: ['Ньютон придумал мысленный опыт: на вершине очень высокой горы, выше воздуха, стоит пушка и стреляет горизонтально. Чем больше скорость ядра, тем дальше оно улетает, прежде чем упасть. Но Земля круглая: пока ядро летит, поверхность под ним тоже «уходит вниз».',
+           'При некоторой скорости ядро опускается ровно настолько, насколько изгибается поверхность, и летит вокруг Земли, не приближаясь к ней. Это первая космическая скорость. Тяготение сообщает ядру центростремительное ускорение: g = v² / R, отсюда v₁ = √(gR) = √(9,8 м/с² · 6 400 000 м) ≈ 7,9 км/с. Один виток у самой Земли занимает около 85 минут.',
+           'Если скорость больше, ядро летит по вытянутому эллипсу, уходит выше горы, но всё равно возвращается. При скорости ≈ 11,2 км/с — второй космической, v₂ = √2 · v₁ — тяготение уже не может вернуть тело, и оно навсегда уходит от Земли. До такой скорости разгоняют аппараты, летящие к Луне, Марсу и другим планетам.'],
+    why: 'Каждый спутник связи, навигации и наблюдения Земли летит со скоростью около первой космической — иначе он упал бы. Межпланетные зонды и корабли к Луне и Марсу разгоняют почти до второй космической. Скорости и траектории рассчитывают специалисты по орбитальной механике и аналитики космических миссий. В ближайшие годы программы с ИИ будут перебирать тысячи вариантов траекторий за минуты, но выбрать надёжный, проверить расчёт и решить, сколько топлива оставить в запасе, по-прежнему будет человек, который понимает, откуда берутся 7,9 и 11,2 км/с.',
+    task: 'Выстрелите из пушки так, чтобы ядро упало на Землю. Затем найдите скорость, при которой ядро облетит Землю по окружности на одной высоте и вернётся к горе. Наконец, разгоните ядро так, чтобы оно навсегда улетело от Земли.',
+    hint: 'Скорость меняется кнопками внизу или ползунком на вкладке «Схема», выстрел — «Огонь» или нажатие на пушку. Воздуха нет. Гора нарисована намного выше настоящей: ядро стартует с её вершины, на которой v₁ = 7,9 км/с.',
+    stage: 'Нажмите на пушку — выстрел.',
+    check: m => m.fell && m.orbit && m.esc },
+  { id: 'orbits', title: 'Орбиты спутников',
+    text: ['Спутник на круговой орбите всё время падает к Земле, но летит вбок так быстро, что не приближается к ней. Сила тяготения сообщает ему центростремительное ускорение: GMm / r² = mv² / r, откуда v = √(GM / r). Здесь r = R + h — расстояние от центра Земли, GM ≈ 4·10¹⁴ м³/с².',
+           'Чем выше орбита, тем меньше скорость и тем длиннее путь, поэтому период T = 2πr / v быстро растёт. Низкие орбиты (от 300 до 2000 км: Международная космическая станция, спутники интернета вроде Starlink) — около 1,5 ч на виток при скорости 7–8 км/с. Навигационные спутники (GPS и подобные системы) летят на высоте около 20 000 км, виток — около 12 ч.',
+           'На высоте ≈ 36 000 км над экватором период равен суткам: спутник кружит вместе с Землёй и висит над одной точкой. Это геостационарная орбита — антенну-«тарелку» можно навести на него один раз. Зато сигналу лететь далеко: до спутника и обратно — около 0,24 с, а до низкого спутника — всего несколько тысячных секунды.'],
+    why: 'Группировки из тысяч низких спутников раздают интернет в горах, в океане и в самолётах. Навигационные системы (GPS и другие) нужны каждому смартфону, такси, кораблю и комбайну. Геостационарные спутники передают телевидение и следят за погодой над целым полушарием, спутники наблюдения снимают поля, лесные пожары и льды. Операторы спутников управляют группировками, аналитики миссий подбирают орбиты. Автоматика и ИИ всё больше берут на себя рутинные манёвры уклонения от обломков, а людям, понимающим орбитальную механику, остаются решения: какую орбиту выбрать, сколько нужно спутников и как не засорить околоземное пространство.',
+    task: 'Подберите орбиту для трёх задач: интернет с малой задержкой сигнала, телевидение для одного региона (антенна смотрит в одну точку неба) и навигация. Тяните спутник от Земли или к ней и жмите «Вывести на орбиту».',
+    hint: 'Задача выбирается кнопками внизу. Высота — перетаскиванием спутника, кнопками «h −» и «h +» или ползунком на «Схеме». Высоты на рисунке сжаты, чтобы всё поместилось, но расчёты — настоящие. 1 секунда на экране — 30 минут.',
+    stage: 'Тяните спутник — меняйте высоту орбиты.',
+    check: m => m.net && m.tv && m.nav },
+  { id: 'weight', title: 'Невесомость и перегрузки',
+    text: ['Масса — мера инертности тела, она одна и та же на Земле, в лифте и на орбите. Вес — сила, с которой тело давит на опору или растягивает подвес. Когда опора покоится или движется равномерно, вес равен силе тяжести: P = mg.',
+           'Если опора движется с ускорением a, направленным вверх (лифт разгоняется вверх или тормозит при спуске), ей приходится не только держать тело, но и разгонять его: P = m(g + a) — вес больше, это перегрузка. При ускорении вниз P = m(g − a) — вес меньше. Перегрузку измеряют в «же»: n = P / (mg).',
+           'Если опора падает вместе с телом с ускорением g, вес равен нулю — это невесомость. Космонавты на МКС не «без притяжения»: на высоте 400 км тяготение лишь примерно на 11% слабее, чем у поверхности. Станция и люди вместе падают вокруг Земли с первой космической скоростью — поэтому всё внутри плавает.'],
+    why: 'При старте ракеты космонавты испытывают перегрузку до 3–4 g, при спуске — ещё больше; кресла делают по фигуре, и космонавт лежит спиной по направлению ускорения. Невесомость тренируют в самолётах-лабораториях, летящих по параболе, и в бассейнах. Космические медики изучают, как месяцы невесомости влияют на мышцы и кости, — это нужно для долгих полётов к Луне и Марсу. Конструкторы лифтов и аттракционов ограничивают ускорения, а инженеры носимой электроники учат акселерометры в часах и телефонах замечать падение человека. Модели ИИ обрабатывают данные датчиков, но какие ускорения безопасны для человека, решают инженеры и врачи, понимающие физику веса.',
+    task: 'Покатайтесь на лифте-тренажёре с весами. Добейтесь, чтобы весы показали больше 50 кг, меньше 50 кг и ноль. Затем ответьте, почему космонавты на МКС находятся в невесомости.',
+    hint: 'Кнопки внизу: «Вверх», «Вниз», «Свободное падение» (трос отпускают сверху, а внизу кабину плавно тормозят). Масса человека 50 кг, g ≈ 9,8 м/с². Весы показывают P / g в килограммах. График показаний — справа.',
+    stage: 'Нажмите на кабину — поехать.',
+    safe: 'Настоящий лифт не падает: если трос ослабнет, ловители зажмут кабину на направляющих. Свободное падение здесь — как в аттракционе «башня падения», где кабину внизу тормозят магниты.',
+    check: m => m.more && m.less && m.zero && m.ans },
+  { id: 'rocket', title: 'Как взлетает ракета',
+    text: ['Ракета отталкивается не от воздуха, а от собственных газов: двигатель с огромной скоростью выбрасывает их назад, а ракета по закону сохранения импульса получает толчок вперёд. Поэтому ракета летает и в пустоте.',
+           'Константин Циолковский вывел, какую скорость наберёт ракета, сжигая топливо: Δv = u · ln(m₀ / mк). Здесь u — скорость истечения газов (около 3 км/с), m₀ — стартовая масса, mк — масса, когда топливо выгорело. Скорость растёт лишь как логарифм отношения масс: чтобы получить Δv втрое больше u, топливо должно составлять 95% массы ракеты.',
+           'Для выхода на орбиту нужно около 9,4 км/с: 7,9 км/с плюс потери на преодоление тяжести и сопротивления воздуха. Одна ступень, которая везёт до конца тяжёлые пустые баки, столько не наберёт. Выход — ступени: отработавшую ступень сбрасывают, и дальше разгоняется уже лёгкая ракета. Многоразовая первая ступень оставляет запас топлива, разворачивается и садится на двигателях — её не строят заново для каждого пуска.'],
+    why: 'Первые ступени, которые возвращаются и садятся на двигателях на площадку или на плавучую платформу, заметно удешевили запуски — поэтому на орбите стало гораздо больше спутников связи и научных аппаратов. Те же расчёты нужны для кораблей к Луне и Марсу, для посадочных модулей и для заправки на орбите. Инженеры ракетно-космической отрасли проектируют двигатели и ступени, инженеры космической робототехники — посадочные опоры, манипуляторы и луноходы. Компьютер с ИИ может просчитать тысячи вариантов конструкции, но понять, откуда берётся выигрыш от сброса массы, и проверить результат сможет только инженер, знающий формулу Циолковского.',
+    task: 'Запустите одноступенчатую ракету и убедитесь, что до орбиты она не долетит. Соберите двухступенчатую и выведите спутник на орбиту. Затем включите посадку первой ступени и снова выведите спутник — для этого подберите массу груза.',
+    hint: 'Ступени, груз и посадка выбираются кнопками внизу, запуск — «Пуск» или нажатие на ракету. Скорость истечения газов u = 3,3 км/с, для орбиты нужно Δv ≈ 9,4 км/с. Массы — в тоннах, стартовая масса около 100 т.',
+    stage: 'Нажмите на ракету — пуск.',
+    check: m => m.one && m.two && m.land },
+];
+
+const LS_KEY = 'luch-phys-space';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) {}
+const idx0 = typeof saved.lesson === 'string' ? LESSONS.findIndex(l => l.id === saved.lesson) : (saved.lesson | 0);
+const S = { lesson: clamp(idx0 < 0 ? 0 : idx0, 0, LESSONS.length - 1), done: saved.done || {}, tab: 'overview', hl: null };
+const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify({ lesson: LESSONS[S.lesson].id, done: S.done })); } catch (e) {} };
+const L = () => LESSONS[S.lesson];
+const LID = () => L().id;
+
+// ---------- physics data ----------
+const G0 = 9.8, RKM = 6400, GM = 4e14, CL = 3e5;          // g, радиус Земли (км), GM (м³/с²), скорость света (км/с)
+const V1 = 7.9, V2 = 11.2, T1MIN = TAU * RKM / V1 / 60;    // 7,9 км/с; виток у Земли ≈ 85 мин
+const orb = h => { const r = (RKM + h) * 1000, v = Math.sqrt(GM / r); return { r, v, T: TAU * r / v }; };   // м, м/с, с
+const MASS = 50;
+const U = 3.3, DV_ORB = 9.4;
+// ракета: массы в тоннах
+function rocketCfg(st, pay, land) {
+  if (st === 1) { const m0 = 90 + 8 + pay, mk = 8 + pay; return { st, pay, land: false, m0, b1: 90, mk1: mk, dv1: U * Math.log(m0 / mk), dv2: 0, dv: U * Math.log(m0 / mk) }; }
+  const res = land ? 6 : 0, m20 = 18 + 2 + pay, m0 = 72 + 6 + m20, b1 = 72 - res, mk1 = m0 - b1;
+  const dv1 = U * Math.log(m0 / mk1), dv2 = U * Math.log(m20 / (2 + pay));
+  return { st, pay, land, res, m0, m20, b1, mk1, dv1, dv2, dv: dv1 + dv2 };
+}
+
+function resetState() {
+  Object.assign(S, {
+    // урок 1
+    v: 6, cur: null, shots: [], fell: null, orbit: null, esc: null,
+    // урок 2
+    h: 400, mission: 'net', ok: { net: null, tv: null, nav: null }, th: 0, aS: Math.PI / 2 + 0.7,
+    // урок 3
+    y: 0, vy: 0, a: 0, prog: null, simT: 0, sampT: 0, hist: [], more: false, less: false, zero: false, ans: false,
+    // урок 4
+    st: 1, pay: 2, land: false, fl: null, last: null, one: false, two: false, landOk: false,
+    hl: null,
+  });
+}
+resetState();
+
+// ---------- lesson 1: Newton's cannon (normalized units: GM = 1, вершина горы r = 1, v₁ = 1) ----------
+const C1 = { cx: 260, cy: 262, S: 116, RE: 0.9 };
+const p1 = (x, y) => [C1.cx + x * C1.S, C1.cy - y * C1.S];
+function fire() {
+  if (S.cur) return;
+  const vn = S.v / V1;
+  S.cur = { v: S.v, x: 0, y: 1, vx: vn, vy: 0, t: 0, th: 0, aPrev: 0, acc: 0, pts: [[0, 1]] };
+  update();
+}
+function step1(dt) {
+  const c = S.cur; if (!c) return;
+  const r0 = Math.hypot(c.x, c.y);
+  let rem = dt * 1.5 * Math.max(1, r0 * r0 * 1.2);
+  const H = 0.0025;
+  while (rem > 1e-9) {
+    const hh = Math.min(H, rem); rem -= hh;
+    let r3 = Math.pow(c.x * c.x + c.y * c.y, 1.5);
+    c.vx -= c.x / r3 * hh / 2; c.vy -= c.y / r3 * hh / 2;
+    c.x += c.vx * hh; c.y += c.vy * hh;
+    r3 = Math.pow(c.x * c.x + c.y * c.y, 1.5);
+    c.vx -= c.x / r3 * hh / 2; c.vy -= c.y / r3 * hh / 2;
+    c.t += hh;
+    const a = Math.atan2(c.x, c.y); let da = a - c.aPrev; if (da < -Math.PI) da += TAU; if (da > Math.PI) da -= TAU; c.th += da; c.aPrev = a;
+    c.acc += hh; if (c.acc >= 0.02) { c.acc = 0; c.pts.push([c.x, c.y]); }
+    const r = Math.hypot(c.x, c.y);
+    if (r < C1.RE) { const k = C1.RE / r; c.x *= k; c.y *= k; c.pts.push([c.x, c.y]); return finish1('fell'); }
+    if (c.th >= TAU - 1e-3) { c.pts.push([0, Math.hypot(c.x, c.y)]); return finish1(Math.abs(c.v - V1) < 0.051 ? 'orbit' : 'ellipse'); }
+    if (r > 3.1) { const E = (c.vx * c.vx + c.vy * c.vy) / 2 - 1 / r; c.pts.push([c.x, c.y]); return finish1(E >= 0 ? 'esc' : 'far'); }
+  }
+}
+const ellA = vn => 1 / (2 - vn * vn);                     // большая полуось при старте с r = 1
+function finish1(res) {
+  const c = S.cur; S.cur = null;
+  const min = c.t * T1MIN / TAU;
+  const shot = { v: c.v, res, pts: c.pts, th: c.th, min };
+  S.shots.push(shot); if (S.shots.length > 6) S.shots.shift();
+  const vs = fmt(c.v, 1);
+  if (res === 'fell') { const km = c.th * RKM; if (!S.fell) S.fell = shot; toast(`${vs} км/с: ядро упало в ${big(Math.round(km / 10) * 10)} км от горы через ${nf(Math.round(min))} мин.` + (c.v < 7 ? ' Чем больше скорость, тем дальше оно улетает.' : '')); }
+  if (res === 'orbit') { S.orbit = shot; toast(`${vs} км/с: ядро облетело Землю на одной высоте за ${Math.round(min)} мин и вернулось к горе. Это первая космическая скорость!`); }
+  if (res === 'ellipse') toast(c.v > V1 ? `${vs} км/с: ядро ушло выше горы по эллипсу и вернулось через ${Math.round(min)} мин. По окружности оно летит только при одной скорости.` : `${vs} км/с: ядро облетело Землю, опустившись ниже вершины, — тоже эллипс. Для окружности нужна чуть большая скорость.`);
+  if (res === 'far') { const a = ellA(c.v / V1), hrs = TAU * Math.pow(a, 1.5) * T1MIN / TAU / 60; toast(`${vs} км/с: ядро ушло далеко по вытянутому эллипсу и вернётся только через ≈ ${hrs > 48 ? Math.round(hrs / 24) + ' сут' : Math.round(hrs) + ' ч'}. Ещё чуть быстрее — и не вернётся совсем.`); }
+  if (res === 'esc') { S.esc = shot; toast(`${vs} км/с: тяготение не может вернуть ядро — оно уходит от Земли навсегда. Это вторая космическая скорость (≈ 11,2 км/с).`); }
+  buildScheme(); update();
+}
+const RES_COL = { fell: '#ff8a73', orbit: '#86e0a8', ellipse: '#72d4e8', far: '#c9a2ff', esc: '#ffd166' };
+const RES_NAME = { fell: 'упало', orbit: 'окружность', ellipse: 'эллипс', far: 'далёкий эллипс', esc: 'улетело' };
+
+// ---------- lesson 2: orbits (высоты на рисунке сжаты: rd = RE + K·√(h / 36 000)) ----------
+const C2 = { cx: 260, cy: 238, RE: 40, K: 112 };
+const rdOf = h => C2.RE + C2.K * Math.sqrt(h / 36000);
+const hOfRd = d => 36000 * Math.pow(Math.max(0, d - C2.RE) / C2.K, 2);
+const snapH = h => { h = clamp(h, 200, 40000); return h < 2000 ? Math.round(h / 50) * 50 : Math.round(h / 100) * 100; };
+const RINGS = [['МКС', 400], ['GPS', 20200], ['ГСО', 35800]];
+const MISSIONS = { net: 'Интернет с малой задержкой', tv: 'Телевидение для региона', nav: 'Навигация' };
+const Th = h => orb(h).T / 3600;
+const delayMs = h => 2 * h / CL * 1000;
+function cityVisible() {
+  const aC = TAU * S.th / 24 + Math.PI / 2, r = RKM + S.h;
+  return Math.cos(S.aS - aC) > RKM / r;
+}
+function launch2() {
+  const h = S.h, T = Th(h), ms = delayMs(h), mis = S.mission;
+  let ok = false, msg = '';
+  if (mis === 'net') {
+    ok = h <= 2000;
+    msg = ok ? `h = ${big(h)} км: сигнал туда и обратно за ${fmt(ms, 1)} мс — почти без задержки. Но спутник за ${fmt(T * 60, 0)} мин облетает Землю и быстро уходит за горизонт, поэтому таких спутников нужны тысячи.`
+             : `h = ${big(h)} км: сигнал туда и обратно идёт ${fmt(ms, 0)} мс — для видеозвонков и игр это заметная задержка. Нужна низкая орбита.`;
+  } else if (mis === 'tv') {
+    ok = Math.abs(T - 24) <= 0.3;
+    msg = ok ? `h = ${big(h)} км, T ≈ ${fmt(T, 1)} ч — как сутки. Спутник висит над одной точкой, антенну наводят один раз. Это геостационарная орбита.`
+             : `T = ${fmt(T, 1)} ч: за сутки спутник сделает ${fmt(24 / T, 1)} витка вместо одного и уйдёт с неба над регионом — антенну пришлось бы всё время поворачивать. Нужен период 24 ч.`;
+  } else {
+    ok = h >= 18000 && h <= 24000;
+    msg = ok ? `h = ${big(h)} км, T ≈ ${fmt(T, 1)} ч: спутник видно почти с половины Земли, и два десятка таких спутников покрывают всю планету. Так летают спутники GPS и других навигационных систем.`
+             : h < 18000 ? `h = ${big(h)} км: каждый спутник видно лишь с небольшого участка Земли — для навигации их понадобились бы сотни. Поднимите орбиту.`
+                         : `h = ${big(h)} км: слишком высоко — сигнал слабее, а геостационарные спутники висят над экватором и плохо видны у полюсов. Навигации нужна средняя орбита.`;
+  }
+  if (ok && mis === 'tv') S.aS = TAU * S.th / 24 + Math.PI / 2;   // геостационарный — ставим над городом
+  if (ok && !S.ok[mis]) { S.ok[mis] = { h, T }; const nx = Object.keys(MISSIONS).find(k => !S.ok[k]); if (nx) { S.mission = nx; msg += ` Следующая задача: «${MISSIONS[nx]}».`; } }
+  toast(msg);
+  renderTools(); buildScheme(); update();
+}
+
+// ---------- lesson 3: elevator with a scale ----------
+const C3 = { x: 330, w: 108, ch: 98, base: 378, px: 12.4, top: 20 };
+function plan(to) {
+  const d = to - S.y, s = Math.sign(d), D = Math.abs(d), A = 2, VM = 4;
+  if (D < 0.3) return null;
+  if (D >= VM * VM / A) return [{ a: s * A, dur: VM / A }, { a: 0, dur: (D - VM * VM / A) / VM }, { a: -s * A, dur: VM / A }];
+  const t = Math.sqrt(D / A); return [{ a: s * A, dur: t }, { a: -s * A, dur: t }];
+}
+function startProg(kind) {
+  if (S.prog) return;
+  let ph = null;
+  if (kind === 'up') { ph = plan(C3.top); if (!ph) return toast('Кабина уже наверху. Попробуйте «Вниз» или «Свободное падение».'); }
+  if (kind === 'down') { ph = plan(0); if (!ph) return toast('Кабина уже внизу. Сначала поднимитесь.'); }
+  if (kind === 'drop') { if (S.y < C3.top - 0.5) return toast('Свободное падение начинают сверху — поднимите кабину кнопкой «Вверх».'); ph = [{ a: -G0, dur: 1.2 }, { a: 3 * G0, dur: 0.4 }]; }
+  S.prog = { kind, ph, i: 0, t: 0 };
+  renderTools(); update();
+}
+function step3(dt) {
+  S.simT += dt;
+  const P = S.prog;
+  if (P) {
+    let rem = dt;
+    while (rem > 0 && S.prog) {
+      const f = P.ph[P.i], left = f.dur - P.t, h = Math.min(rem, left);
+      S.a = f.a; S.y += S.vy * h + f.a * h * h / 2; S.vy += f.a * h; P.t += h; rem -= h;
+      if (P.t >= f.dur - 1e-9) { P.i++; P.t = 0; if (P.i >= P.ph.length) { S.prog = null; S.vy = 0; S.a = 0; S.y = Math.abs(S.y - C3.top) < 0.05 ? C3.top : Math.abs(S.y) < 0.05 ? 0 : S.y; renderTools(); update(); } }
+    }
+    S.y = clamp(S.y, 0, C3.top + 0.5);
+  } else S.a = 0;
+  S.sampT += dt;
+  if (S.sampT >= 0.05) { S.sampT = 0; S.hist.push({ t: S.simT, kg: kg3() }); while (S.hist.length && S.simT - S.hist[0].t > 9) S.hist.shift(); }
+  latch3();
+}
+const kg3 = () => Math.max(0, MASS * (G0 + S.a) / G0);
+function latch3() {
+  const k = kg3();
+  if (k > 52 && !S.more) { S.more = true; toast(`Весы: ${Math.round(k)} кг! Кабина ускоряется вверх — пол давит сильнее: P = m(g + a). Масса осталась 50 кг.`); buildScheme(); update(); }
+  if (k < 48 && k > 2 && !S.less) { S.less = true; toast(`Весы: ${Math.round(k)} кг. Ускорение направлено вниз — вес меньше: P = m(g − a).`); buildScheme(); update(); }
+  if (k < 0.5 && !S.zero) { S.zero = true; toast('Весы: 0 кг — невесомость! Человек и весы падают вместе с ускорением g и не давят друг на друга.'); renderTools(); buildScheme(); update(); }
+}
+
+// ---------- lesson 4: rocket ----------
+const PATH = p => { p = clamp(p, 0, 1); return [110 + 330 * Math.pow(p, 1.5), 372 - 290 * (1 - (1 - p) * (1 - p))]; };
+const pathAng = p => { const a = PATH(Math.max(0, p - 0.01)), b = PATH(Math.min(1, p + 0.01)); return Math.atan2(b[0] - a[0], a[1] - b[1]) * 180 / Math.PI; };
+const LANDX = 236, OCEAN = 330;
+function launch4() {
+  if (S.fl) return;
+  if (S.st === 1 && S.land) S.land = false;
+  const c = rocketCfg(S.st, S.pay, S.land);
+  const B1 = S.st === 1 ? 4 : 2.6, B2 = 2.6;
+  S.fl = { c, t: 0, B1, B2, tReach: null, end: 0 }; S.lastF = null;
+  S.fl.end = S.st === 1 ? B1 + 2.6 : Math.max(B1 + B2 + (c.dv >= DV_ORB ? 1.6 : 2.6), B1 + (c.land ? 3.6 : 2.6)) + 0.5;
+  S.last = null;
+  renderTools(); update();
+}
+// где что находится в момент t полёта (общая функция для схемы и 3D)
+function flight() {
+  const F = S.fl, c = F ? F.c : rocketCfg(S.st, S.pay, S.land), out = { v: 0, main: null, s1: null, splash1: false, splash2: false, landed: false, orbit: false };
+  if (!F) { out.main = { x: 110, y: 372, ang: 0, sc: 1, kind: S.st === 1 ? 'one' : 'two', flame: false }; return out; }
+  const t = F.t, sep = c.st === 2 && t >= F.B1;
+  const vAt = (m0, burn, k) => U * Math.log(m0 / (m0 - burn * clamp(k, 0, 1)));
+  const place = (v, kind, flame, sc0) => {
+    const p = v / DV_ORB;
+    if (p >= 1) { if (F.tReach == null) F.tReach = t; const [x, y] = PATH(1); return { x: x + 95 * (t - F.tReach), y, ang: 90, sc: 0.5, kind, flame, p: 1 }; }
+    const [x, y] = PATH(p); return { x, y, ang: pathAng(p), sc: sc0 ?? (1 - 0.5 * clamp(p * 2.5, 0, 1)), kind, flame, p };
+  };
+  const ballistic = (v, kind, tt) => {   // не хватило скорости: подъём по инерции и падение в океан
+    const p = v / DV_ORB, [bx, by] = PATH(p), q = clamp(tt / 2.4, 0, 1);
+    if (q >= 1) out.splash2 = true;
+    return { x: bx + 150 * q, y: by - 50 * q + (50 + 378 - by) * q * q, ang: pathAng(p) + 70 * q, sc: 1 - 0.5 * clamp(p * 2.5, 0, 1), kind, flame: false, p, hide: q >= 1 };
+  };
+  if (c.st === 1) {
+    if (t < F.B1) { out.v = vAt(c.m0, c.b1, t / F.B1); out.main = place(out.v, 'one', true); }
+    else { out.v = c.dv; out.main = ballistic(c.dv, 'one', t - F.B1); }
+    return out;
+  }
+  if (!sep) { out.v = vAt(c.m0, c.b1, t / F.B1); out.main = place(out.v, 'two', true); return out; }
+  const tt = t - F.B1;
+  if (tt < F.B2) { out.v = c.dv1 + vAt(c.m20, 18, tt / F.B2); out.main = place(out.v, 's2', true); }
+  else if (c.dv >= DV_ORB) { out.v = c.dv; out.main = place(out.v, 's2', false); out.orbit = true; }
+  else { out.v = c.dv; out.main = ballistic(c.dv, 's2', tt - F.B2); }
+  // первая ступень после разделения
+  const ps = c.dv1 / DV_ORB, [sx, sy] = PATH(ps), a0 = pathAng(ps), sc = 1 - 0.5 * clamp(ps * 2.5, 0, 1);
+  if (!c.land) {
+    const q = clamp(tt / 2.4, 0, 1);
+    out.s1 = { x: sx + 60 * q, y: sy + (378 - sy) * q * q, ang: a0 + 220 * q, sc, kind: 's1', flame: false, hide: q >= 1 };
+    out.splash1 = q >= 1;
+  } else {
+    const q = clamp(tt / 3.4, 0, 1), cx = sx + 40, cy = sy - 60, ex = LANDX, ey = 372;
+    const x = (1 - q) * (1 - q) * sx + 2 * (1 - q) * q * cx + q * q * ex, y = (1 - q) * (1 - q) * sy + 2 * (1 - q) * q * cy + q * q * ey;
+    const turn = clamp(q / 0.7, 0, 1), sm = turn * turn * (3 - 2 * turn);
+    out.s1 = { x, y, ang: a0 * (1 - sm) - 30 * Math.sin(Math.PI * sm), sc: sc + (1 - sc) * sm, kind: 's1', flame: q < 0.16 || (q > 0.8 && q < 1), legs: q > 0.72 };
+    out.landed = q >= 1;
+  }
+  return out;
+}
+function step4(dt) {
+  const F = S.fl; if (!F) return;
+  F.t += dt;
+  if (F.t >= F.end) {
+    const c = F.c, orbit = c.dv >= DV_ORB;
+    S.last = { st: c.st, pay: c.pay, land: c.land, dv: c.dv, dv1: c.dv1, dv2: c.dv2, orbit };
+    S.fl = null; S.lastF = { c, t: F.end, B1: F.B1, B2: F.B2, tReach: F.tReach, end: F.end };
+    const d = fmt(c.dv, 1);
+    if (c.st === 1) { if (!S.one) S.one = S.last; toast(`Одна ступень: Δv = ${d} км/с < 9,4. Ракета до конца везла тяжёлые пустые баки — до орбиты не хватило, она упала в океан.`); }
+    else if (!c.land) { if (orbit) { S.two = S.last; toast(`Две ступени: Δv = ${fmt(c.dv1, 1)} + ${fmt(c.dv2, 1)} = ${d} км/с — спутник на орбите! Пустую первую ступень сбросили, и вторая разгоняла уже лёгкую ракету.` + (S.landOk ? '' : ' Теперь включите посадку первой ступени.')); } else toast(`Δv = ${d} км/с — не хватило.`); }
+    else if (orbit) { S.landOk = S.last; toast(`Ступень села на площадку, спутник на орбите (Δv = ${d} км/с). Запас топлива на посадку отнял часть скорости, поэтому груз пришлось уменьшить, — зато ступень полетит снова.`); }
+    else toast(`Ступень села, но спутнику не хватило: Δv = ${d} км/с < 9,4. Топливо на посадку «съело» скорость — уменьшите груз.`);
+    renderTools(); buildScheme(); update();
+  }
+}
+
+// ---------- drawing helpers ----------
+const T = (x, y, s, fill, txt, anchor = 'middle', extra = '') => `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${s}" fill="${fill}" text-anchor="${anchor}" ${extra}>${txt}</text>`;
+const HALO = `paint-order="stroke" stroke="${INK}" stroke-width="3"`;
+function arrow(x1, y1, x2, y2, col, w = 3) {
+  const a = Math.atan2(y2 - y1, x2 - x1), L2 = Math.hypot(x2 - x1, y2 - y1); if (L2 < 1) return '';
+  const hl = Math.min(11, L2 * 0.6), hx = x2 - hl * Math.cos(a), hy = y2 - hl * Math.sin(a), hw = hl * 0.5;
+  const q1 = `${(hx + hw * Math.sin(a)).toFixed(1)} ${(hy - hw * Math.cos(a)).toFixed(1)}`, q2 = `${(hx - hw * Math.sin(a)).toFixed(1)} ${(hy + hw * Math.cos(a)).toFixed(1)}`;
+  return `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${hx.toFixed(1)} ${hy.toFixed(1)}" stroke="${INK}" stroke-width="${w + 2.6}" stroke-linecap="round"/><path d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${hx.toFixed(1)} ${hy.toFixed(1)}" stroke="${col}" stroke-width="${w}" stroke-linecap="round"/><path d="M${x2.toFixed(1)} ${y2.toFixed(1)}L${q1}L${q2}Z" fill="${col}" stroke="${INK}" stroke-width="1.2" stroke-linejoin="round"/>`;
+}
+const rnd = i => { const s = Math.sin(i * 127.1 + 31.7) * 43758.5453; return s - Math.floor(s); };
+const STARS = (() => { let s = ''; for (let i = 0; i < 230; i++) { const x = -400 + rnd(i) * 1320, y = -520 + rnd(i + 500) * 940, r = 0.5 + rnd(i + 900) * 1.1; s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(2)}" fill="#dfe8ff" opacity="${(0.25 + rnd(i + 77) * 0.6).toFixed(2)}"/>`; } return s; })();
+function bg(space) {
+  if (space) return STARS;
+  return `<defs><pattern id="tile" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(160,185,230,.06)" stroke-width="1.5"/></pattern></defs><rect x="-2000" y="-2000" width="4520" height="4520" fill="url(#tile)"/>`;
+}
+const CONT = [[-0.38, 0.28, 0.3, 0.2, 20], [0.3, 0.48, 0.24, 0.17, -15], [0.22, -0.3, 0.3, 0.22, 30], [-0.45, -0.42, 0.18, 0.26, 0], [0.62, -0.02, 0.15, 0.3, 10], [-0.1, 0.02, 0.12, 0.1, 0]];
+function earth(cx, cy, r, rot, polar) {
+  let s = `<defs><clipPath id="eclip"><circle cx="${cx}" cy="${cy}" r="${r}"/></clipPath><radialGradient id="eshade" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#fff" stop-opacity=".16"/><stop offset=".6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".38"/></radialGradient></defs>`;
+  s += `<circle cx="${cx}" cy="${cy}" r="${r + 4}" fill="none" stroke="rgba(114,212,232,.16)" stroke-width="3"/>`;
+  s += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#2f6fb0" stroke="${INK}" stroke-width="2"/>`;
+  s += `<g clip-path="url(#eclip)"><g transform="rotate(${rot.toFixed(2)} ${cx} ${cy})">` + CONT.map(([x, y, a, b, ang]) => `<ellipse cx="${(cx + x * r).toFixed(1)}" cy="${(cy + y * r).toFixed(1)}" rx="${(a * r).toFixed(1)}" ry="${(b * r).toFixed(1)}" transform="rotate(${ang} ${(cx + x * r).toFixed(1)} ${(cy + y * r).toFixed(1)})" fill="#4c9a62"/>`).join('') + `</g>`;
+  s += polar ? `<circle cx="${cx}" cy="${cy}" r="${(r * 0.2).toFixed(1)}" fill="#eef4f8"/>` : `<ellipse cx="${cx}" cy="${(cy + r * 0.97).toFixed(1)}" rx="${(r * 0.42).toFixed(1)}" ry="${(r * 0.1).toFixed(1)}" fill="#eef4f8"/>` ;
+  s += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#eshade)"/></g>`;
+  return s;
+}
+const poly = (pts, map) => pts.map((p, i) => { const [x, y] = map(p[0], p[1]); return (i ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1); }).join('');
+
+// ---------- scene 1 ----------
+function cosmicScene(t) {
+  const C = C1;
+  let h = earth(C.cx, C.cy, C.RE * C.S, 0, false);
+  // гора на вершине: от поверхности до r = 1
+  const P = (th, r) => [C.cx + r * C.S * Math.sin(th), C.cy - r * C.S * Math.cos(th)];
+  const mpts = [P(-0.3, C.RE - 0.01), P(-0.12, 0.95), P(-0.03, 0.992), P(0.03, 0.992), P(0.12, 0.95), P(0.3, C.RE - 0.01)];
+  h += `<path d="M${mpts.map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join('L')}Z" fill="#7a6a58" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/>`;
+  const sn = [P(-0.075, 0.97), P(-0.03, 0.992), P(0.03, 0.992), P(0.075, 0.97), P(0.03, 0.976), P(0, 0.968), P(-0.03, 0.976)];
+  h += `<path d="M${sn.map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join('L')}Z" fill="#eef4f8"/>`;
+  // прошлые траектории
+  S.shots.forEach((sh, i) => {
+    const col = RES_COL[sh.res], op = (0.35 + 0.65 * (i + 1) / S.shots.length).toFixed(2);
+    const vis = sh.pts.filter(q => Math.hypot(q[0], q[1]) <= 2.4);
+    h += `<path d="${poly(vis, p1)}" fill="none" stroke="${col}" stroke-width="2" stroke-dasharray="${sh.res === 'orbit' ? '0' : '5 4'}" opacity="${op}"/>`;
+    const e = vis[vis.length - 1], [ex, ey] = p1(e[0], e[1]);
+    if (sh.res === 'fell') h += `<path d="M${ex - 4} ${ey - 4}l8 8M${ex + 4} ${ey - 4}l-8 8" stroke="${col}" stroke-width="2" opacity="${op}"/>`;
+    const mid = sh.res === 'orbit' || sh.res === 'ellipse' ? sh.pts[Math.floor(sh.pts.length * 0.5)] : e;
+    let [lx, ly] = p1(mid[0], mid[1]);
+    if (sh.res === 'fell') { const k = 1 + 16 / Math.hypot(lx - C.cx, ly - C.cy); lx = C.cx + (lx - C.cx) * k; ly = C.cy + (ly - C.cy) * k; }
+    lx = clamp(lx, VB.x + 30, VB.x + VB.w - 30); ly = clamp(ly, VB.y + 14, VB.y + VB.h - 8);
+    if (Math.hypot(lx - C.cx, ly - (C.cy - C.S)) > 34) h += T(lx, ly + (sh.res === 'orbit' ? 14 : 4), 9.5, col, fmt(sh.v, 1), 'middle', HALO + ` opacity="${op}"`);
+  });
+  // пушка на вершине
+  const [gx, gy] = P(0, 0.992);
+  h += `<g data-click="fire"><rect x="${gx - 22}" y="${gy - 30}" width="44" height="34" fill="transparent"/>`;
+  h += `<rect x="${gx - 5}" y="${gy - 12.5}" width="24" height="7" rx="3" fill="#3a4152" stroke="${INK}" stroke-width="1.4"/><rect x="${gx + 17}" y="${gy - 13.5}" width="4" height="9" rx="1.5" fill="#262b38" stroke="${INK}" stroke-width="1"/>`;
+  h += `<rect x="${gx - 10}" y="${gy - 8}" width="16" height="6" rx="1.5" fill="#8a5a30" stroke="${INK}" stroke-width="1.2"/><circle cx="${gx - 3}" cy="${gy - 2.5}" r="4.4" fill="#5b3a1e" stroke="${INK}" stroke-width="1.2"/><circle cx="${gx - 3}" cy="${gy - 2.5}" r="1.2" fill="#c8d2e3"/></g>`;
+  h += T(gx, gy - 38, 10.5, '#ffb547', `v = ${fmt(S.v, 1)} км/с`, 'middle', 'font-weight="600" ' + HALO);
+  // летящее ядро
+  const c = S.cur;
+  if (c) {
+    h += `<path d="${poly(c.pts.concat([[c.x, c.y]]), p1)}" fill="none" stroke="#ffb547" stroke-width="2.4"/>`;
+    const [bx, by] = p1(c.x, c.y), r = Math.hypot(c.x, c.y), vv = Math.hypot(c.vx, c.vy);
+    h += arrow(bx, by, bx + c.vx / vv * 30, by - c.vy / vv * 30, '#72d4e8', 2.4);
+    h += arrow(bx, by, bx - c.x / r * 24 / (r * r), by + c.y / r * 24 / (r * r), '#ff8a73', 2.4);
+    h += `<circle cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="5" fill="#2b2f3a" stroke="#e8ecf4" stroke-width="1.5"/>`;
+  } else {
+    h += arrow(gx + 22, gy - 9, gx + 48, gy - 9, '#72d4e8', 2.2);
+  }
+  // подписи
+  h += T(C.cx, C.cy + 4, 11, '#e8ecf4', 'Земля', 'middle', HALO) + T(C.cx, C.cy + 18, 9, '#c8d2e3', 'R = 6400 км', 'middle', HALO);
+  return h;
+}
+
+// ---------- scene 2 ----------
+function orbitScene(t) {
+  const C = C2, rot = -(S.th / 24) * 360, rd = rdOf(S.h);
+  let h = '';
+  // кольца-ориентиры
+  RINGS.forEach(([n, hh]) => { const r = rdOf(hh); h += `<circle cx="${C.cx}" cy="${C.cy}" r="${r.toFixed(1)}" fill="none" stroke="rgba(160,185,230,.22)" stroke-width="1.2" stroke-dasharray="3 5"/>` + T(C.cx + r * 0.7071 + 4, C.cy + r * 0.7071 + 10, 8.5, '#8b96ad', `${n} · ${big(hh)} км`, 'start', HALO); });
+  h += earth(C.cx, C.cy, C.RE, rot, true);
+  // город на экваторе (вращается с Землёй)
+  const aC = TAU * S.th / 24 + Math.PI / 2, cxC = C.cx + C.RE * Math.cos(aC), cyC = C.cy - C.RE * Math.sin(aC);
+  // зона видимости спутника на поверхности (настоящий угол)
+  const r = RKM + S.h, half = Math.acos(RKM / r), aS = S.aS, sx = C.cx + rd * Math.cos(aS), sy = C.cy - rd * Math.sin(aS);
+  const z1 = [C.cx + C.RE * Math.cos(aS - half), C.cy - C.RE * Math.sin(aS - half)], z2 = [C.cx + C.RE * Math.cos(aS + half), C.cy - C.RE * Math.sin(aS + half)];
+  h += `<path d="M${sx.toFixed(1)} ${sy.toFixed(1)}L${z1[0].toFixed(1)} ${z1[1].toFixed(1)}A${C.RE} ${C.RE} 0 0 0 ${z2[0].toFixed(1)} ${z2[1].toFixed(1)}Z" fill="rgba(255,209,102,.13)" stroke="rgba(255,209,102,.45)" stroke-width="1"/>`;
+  h += `<path d="M${z1[0].toFixed(1)} ${z1[1].toFixed(1)}A${C.RE} ${C.RE} 0 0 0 ${z2[0].toFixed(1)} ${z2[1].toFixed(1)}" fill="none" stroke="#ffd166" stroke-width="3"/>`;
+  const vis = cityVisible();
+  if (vis) h += `<path d="M${sx.toFixed(1)} ${sy.toFixed(1)}L${cxC.toFixed(1)} ${cyC.toFixed(1)}" stroke="#86e0a8" stroke-width="1.6" stroke-dasharray="4 3"/>`;
+  h += `<circle cx="${cxC.toFixed(1)}" cy="${cyC.toFixed(1)}" r="4" fill="#ff8a73" stroke="${INK}" stroke-width="1.4"/>`;
+  { const k = 1 + 16 / C.RE; h += T(C.cx + (cxC - C.cx) * k, C.cy + (cyC - C.cy) * k + 3, 8.5, '#ff8a73', 'город', 'middle', HALO); }
+  // орбита и спутник
+  h += `<circle cx="${C.cx}" cy="${C.cy}" r="${rd.toFixed(1)}" fill="none" stroke="#72d4e8" stroke-width="1.8"/>`;
+  // стрелка скорости спутника (по ходу, против часовой)
+  const vlen = 10 + orb(S.h).v / 1000 * 3.2;
+  h += arrow(sx, sy, sx - Math.sin(aS) * vlen, sy - Math.cos(aS) * vlen, '#72d4e8', 2);
+  const ang = -aS * 180 / Math.PI;
+  h += `<g data-drag="sat" transform="translate(${sx.toFixed(1)} ${sy.toFixed(1)}) rotate(${ang.toFixed(1)})"><circle r="20" fill="transparent"/>`;
+  h += `<rect x="-3" y="-17" width="6" height="11" fill="#3b6fd8" stroke="${INK}" stroke-width="1"/><rect x="-3" y="6" width="6" height="11" fill="#3b6fd8" stroke="${INK}" stroke-width="1"/>`;
+  h += `<path d="M0 -6V-17M0 6V17" stroke="#a9b4c9" stroke-width="1"/><rect x="-5" y="-5" width="10" height="10" rx="1.5" fill="#d9c08a" stroke="${INK}" stroke-width="1.4"/><circle cx="-6.5" cy="0" r="2.4" fill="#e8ecf4" stroke="${INK}" stroke-width="1"/></g>`;
+  const lx = C.cx + (rd + 26) * Math.cos(aS), ly = C.cy - (rd + 26) * Math.sin(aS);
+  const cs = Math.cos(aS), anc = cs > 0.35 ? 'start' : cs < -0.35 ? 'end' : 'middle', dy = Math.sin(aS) > 0 ? -6 : 8;
+  h += T(lx, ly + dy, 10, '#e8ecf4', `h = ${big(S.h)} км`, anc, 'font-weight="600" ' + HALO);
+  h += T(lx, ly + dy + 12, 9, '#72d4e8', `T = ${fmtT(Th(S.h))}`, anc, HALO);
+  return h;
+}
+const fmtT = Tt => Tt < 2 ? Math.round(Tt * 60) + ' мин' : fmt(Tt, 1) + ' ч';
+
+// ---------- scene 3 ----------
+function liftScene(t) {
+  const C = C3, yb = C.base - S.y * C.px, yt = yb - C.ch, x0 = C.x - C.w / 2, x1 = C.x + C.w / 2;
+  const sTop = C.base - C.top * C.px - C.ch - 22;
+  let h = `<rect x="-2000" y="${C.base}" width="4520" height="1200" fill="#151e2e"/><path d="M-2000 ${C.base}H2520" stroke="#3a4762" stroke-width="2"/>`;
+  // шахта: направляющие, этажи, верхний блок
+  h += `<rect x="${x0 - 12}" y="${sTop}" width="${C.w + 24}" height="${C.base - sTop}" fill="#0e1520" stroke="#3a4762" stroke-width="1.4"/>`;
+  h += `<path d="M${x0 - 5} ${sTop + 10}V${C.base}M${x1 + 5} ${sTop + 10}V${C.base}" stroke="#4a5875" stroke-width="3"/>`;
+  for (let f = 0; f <= 5; f++) { const yy = C.base - f * (C.top / 5) * C.px; h += `<path d="M${x0 - 34} ${yy.toFixed(1)}h20" stroke="#4a5875" stroke-width="1.4"/>` + T(x0 - 38, yy - 3, 8.5, '#8b96ad', `${f * 4} м`, 'end'); }
+  h += `<rect x="${C.x - 30}" y="${sTop - 8}" width="60" height="10" rx="2" fill="#4a5875" stroke="${INK}"/><circle cx="${C.x}" cy="${sTop + 6}" r="9" fill="#c9a24a" stroke="${INK}" stroke-width="1.4"/>`;
+  // трос: в свободном падении провисает
+  const free = S.prog && S.prog.kind === 'drop';
+  if (free) { const my = (sTop + 12 + yt) / 2; h += `<path d="M${C.x} ${sTop + 12}Q${C.x + 22} ${my - 20} ${C.x - 6} ${my}T${C.x} ${yt}" fill="none" stroke="#d9c08a" stroke-width="2"/>`; }
+  else h += `<path d="M${C.x} ${sTop + 12}V${yt}" stroke="#d9c08a" stroke-width="2.2"/>`;
+  // кабина
+  h += `<g data-click="cab"><rect x="${x0}" y="${yt.toFixed(1)}" width="${C.w}" height="${C.ch}" rx="4" fill="#1d2a40" stroke="${INK}" stroke-width="2"/>`;
+  h += `<rect x="${x0 + 4}" y="${(yt + 4).toFixed(1)}" width="${C.w - 8}" height="${C.ch - 8}" rx="2" fill="#24344f"/><path d="M${x0} ${(yb - 4).toFixed(1)}h${C.w}" stroke="#4a5875" stroke-width="4"/>`;
+  // весы и человек
+  const k = kg3(), n = (G0 + S.a) / G0, wl = n < 0.05;
+  const sy = yb - 9;
+  h += `<rect x="${C.x - 20}" y="${sy.toFixed(1)}" width="40" height="6" rx="2" fill="#e8ecf4" stroke="${INK}" stroke-width="1.2"/><rect x="${C.x - 8}" y="${(sy + 1).toFixed(1)}" width="16" height="4" fill="#0c1a14"/>` + T(C.x, sy + 4.4, 4.2, '#86e0a8', Math.round(k));
+  const fy = sy, lift = wl ? 0 : 0, hip = fy - 26 - lift, sh = fy - 50 - lift, hd = fy - 60 - lift;
+  const arm = wl ? `M${C.x} ${sh + 3}L${C.x - 14} ${sh - 12}M${C.x} ${sh + 3}L${C.x + 14} ${sh - 12}` : `M${C.x} ${sh + 3}L${C.x - 10} ${hip - 2}M${C.x} ${sh + 3}L${C.x + 10} ${hip - 2}`;
+  h += `<path d="M${C.x - 6} ${fy}L${C.x - 3} ${hip}M${C.x + 6} ${fy}L${C.x + 3} ${hip}" stroke="#2c3240" stroke-width="5" stroke-linecap="round"/>`;
+  h += `<path d="M${C.x} ${hip}V${sh}" stroke="#3b6fd8" stroke-width="11" stroke-linecap="round"/>`;
+  h += `<path d="${arm}" stroke="#3b6fd8" stroke-width="4.4" stroke-linecap="round"/>`;
+  h += `<circle cx="${C.x}" cy="${hd}" r="7" fill="#f0c9a0" stroke="${INK}" stroke-width="1.2"/><path d="M${C.x - 7} ${hd - 2}a7 7 0 0 1 14 0z" fill="#5b3a1e"/>`;
+  // яблоко: лежит на полу, в невесомости висит
+  const ay = wl ? yt + 34 + Math.sin(t / 400) * 2 : yb - 9;
+  h += `<circle cx="${x1 - 16}" cy="${(ay - 4).toFixed(1)}" r="4.4" fill="#e0473a" stroke="${INK}" stroke-width="1"/><path d="M${x1 - 16} ${(ay - 8.4).toFixed(1)}l1.4 -3" stroke="#5b3a1e" stroke-width="1.2"/>`;
+  h += `</g>`;
+  // силы на человека и ускорение кабины
+  const mid = (hip + sh) / 2;
+  h += arrow(C.x - 22, mid, C.x - 22, mid + 30, '#ff8a73', 2.4) + T(C.x - 26, mid + 30, 9, '#ff8a73', 'mg', 'end', HALO);
+  if (k > 0.4) h += arrow(C.x + 22, fy - 2, C.x + 22, fy - 2 - 30 * k / MASS, '#ffb547', 2.4) + T(C.x + 26, fy - 6 - 30 * k / MASS, 9, '#ffb547', 'N', 'start', HALO);
+  if (Math.abs(S.a) > 0.05) { const ax = x1 + 24, ac = yt + C.ch / 2, L = clamp(Math.abs(S.a) * 4, 10, 46) * Math.sign(S.a); h += arrow(ax, ac + L / 2, ax, ac - L / 2, '#72d4e8', 2.6) + T(ax + 8, ac + 3, 9.5, '#72d4e8', `a = ${fmt(Math.abs(S.a), 1)}`, 'start', HALO); }
+  // весы-циферблат и график
+  h += dial(118, 200, 42, k);
+  h += graph3(22, 286, 196, 76);
+  return h;
+}
+function dial(cx, cy, r, k) {
+  let s = `<circle cx="${cx}" cy="${cy}" r="${r + 6}" fill="#e8ecf4" stroke="${INK}" stroke-width="2"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="#f7f3ea"/>`;
+  const A = v => Math.PI * (0.75 + 1.5 * v / 200);
+  for (let v = 0; v <= 200; v += 10) { const a = A(v), l = v % 50 ? 5 : 9; s += `<path d="M${(cx + Math.cos(a) * r).toFixed(1)} ${(cy + Math.sin(a) * r).toFixed(1)}L${(cx + Math.cos(a) * (r - l)).toFixed(1)} ${(cy + Math.sin(a) * (r - l)).toFixed(1)}" stroke="#1b1610" stroke-width="${v % 50 ? 1 : 1.8}"/>`; if (v % 50 === 0) s += T(cx + Math.cos(a) * (r - 17), cy + Math.sin(a) * (r - 17) + 3, 8, '#1b1610', v); }
+  { const a = A(50); s += `<path d="M${(cx + Math.cos(a) * (r - 1)).toFixed(1)} ${(cy + Math.sin(a) * (r - 1)).toFixed(1)}L${(cx + Math.cos(a) * (r - 11)).toFixed(1)} ${(cy + Math.sin(a) * (r - 11)).toFixed(1)}" stroke="#2e9e4f" stroke-width="3"/>`; }
+  const a = A(clamp(k, 0, 205));
+  s += `<path d="M${cx} ${cy}L${(cx + Math.cos(a) * (r - 6)).toFixed(1)} ${(cy + Math.sin(a) * (r - 6)).toFixed(1)}" stroke="#d62828" stroke-width="2.6" stroke-linecap="round"/><circle cx="${cx}" cy="${cy}" r="4" fill="#1b1610"/>`;
+  s += T(cx, cy + r * 0.78, 10.5, '#1b1610', Math.round(k) + ' кг', 'middle', 'font-weight="600"') + T(cx, cy + r + 20, 9.5, '#8b96ad', 'показания весов', 'middle');
+  return s;
+}
+function graph3(x, y, w, hh) {
+  const Yk = k => y + hh - hh * clamp(k, 0, 220) / 220;
+  let s = `<rect x="${x}" y="${y}" width="${w}" height="${hh}" rx="6" fill="rgba(11,16,25,.7)" stroke="#26324a"/>`;
+  for (const k of [0, 50, 100, 150, 200]) s += `<path d="M${x} ${Yk(k).toFixed(1)}h${w}" stroke="${k === 50 ? '#2e9e4f' : 'rgba(160,185,230,.12)'}" stroke-width="${k === 50 ? 1.4 : 1}" ${k === 50 ? 'stroke-dasharray="4 3"' : ''}/>` + T(x - 4, Yk(k) + 3, 7.5, '#8b96ad', k, 'end');
+  s += T(x + w, y - 5, 8.5, '#8b96ad', 'весы, кг · последние 9 с', 'end');
+  const pts = S.hist.map(p => [x + w * (1 - (S.simT - p.t) / 9), Yk(p.kg)]);
+  if (pts.length > 1) s += `<path d="M${pts.map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join('L')}" fill="none" stroke="#ffb547" stroke-width="2.2" stroke-linejoin="round"/>`;
+  return s;
+}
+
+// ---------- scene 4 ----------
+function rocketG(o, t) {
+  if (!o || o.hide) return '';
+  const fl = o.flame ? flame(t) : '';
+  let b = '';
+  const W = 16;
+  const st1 = (y0, legs) => `<rect x="${-W / 2}" y="${y0 - 62}" width="${W}" height="62" rx="2" fill="#eef1f6" stroke="${INK}" stroke-width="1.4"/><rect x="${-W / 2}" y="${y0 - 50}" width="${W}" height="5" fill="#2c3240"/><path d="M${-W / 2} ${y0 - 60}h${W}" stroke="#9aa3b2" stroke-width="1"/><rect x="-6" y="${y0}" width="12" height="4" fill="#3a4152" stroke="${INK}" stroke-width="1"/>` + (legs ? `<path d="M-7 ${y0 - 6}L-15 ${y0 + 4}M7 ${y0 - 6}L15 ${y0 + 4}" stroke="#2c3240" stroke-width="2.4" stroke-linecap="round"/>` : `<path d="M-8 ${y0 - 8}l-3 4v-10zM8 ${y0 - 8}l3 4v-10z" fill="#2c3240"/>`) + `<path d="M${-W / 2} ${y0 - 34}h${W}" stroke="#9aa3b2" stroke-width=".8"/>`;
+  const st2 = y0 => `<rect x="${-W / 2}" y="${y0 - 24}" width="${W}" height="24" rx="2" fill="#eef1f6" stroke="${INK}" stroke-width="1.4"/><rect x="-5" y="${y0}" width="10" height="3" fill="#3a4152"/><path d="M${-W / 2} ${y0 - 24}C${-W / 2} ${y0 - 36} -3 ${y0 - 42} 0 ${y0 - 44}C3 ${y0 - 42} ${W / 2} ${y0 - 36} ${W / 2} ${y0 - 24}Z" fill="#d8dde6" stroke="${INK}" stroke-width="1.4"/><path d="M-3 ${y0 - 18}h6" stroke="#2c3240" stroke-width="1.2"/>`;
+  if (o.kind === 'one') b = `<rect x="${-W / 2}" y="-92" width="${W}" height="92" rx="2" fill="#eef1f6" stroke="${INK}" stroke-width="1.4"/><rect x="${-W / 2}" y="-70" width="${W}" height="5" fill="#2c3240"/><path d="M${-W / 2} -92C${-W / 2} -104 -3 -110 0 -112C3 -110 ${W / 2} -104 ${W / 2} -92Z" fill="#d8dde6" stroke="${INK}" stroke-width="1.4"/><rect x="-6" y="0" width="12" height="4" fill="#3a4152" stroke="${INK}" stroke-width="1"/><path d="M-8 -8l-3 4v-10zM8 -8l3 4v-10z" fill="#2c3240"/>`;
+  if (o.kind === 'two') b = st1(0, false) + `<rect x="${-W / 2}" y="-66" width="${W}" height="4" fill="#3a4152"/>` + st2(-66);
+  if (o.kind === 's2') b = st2(0);
+  if (o.kind === 's1') b = st1(0, o.legs);
+  return `<g transform="translate(${o.x.toFixed(1)} ${o.y.toFixed(1)}) rotate(${o.ang.toFixed(1)}) scale(${o.sc.toFixed(3)})">${fl}${b}</g>`;
+}
+function flame(t) {
+  const k = reduce ? 1 : 0.85 + 0.15 * Math.sin(t / 37) + 0.08 * Math.sin(t / 13);
+  return `<path d="M-6 4Q0 ${(4 + 34 * k).toFixed(1)} 6 4Z" fill="#ffb547" opacity=".9"/><path d="M-3 4Q0 ${(4 + 20 * k).toFixed(1)} 3 4Z" fill="#fff1c2"/>`;
+}
+function rocketScene(t) {
+  const fs = flight(), F = S.fl;
+  let h = '';
+  // орбита
+  h += `<path d="M300 82H${VB.x + VB.w + 20}" stroke="#86e0a8" stroke-width="1.6" stroke-dasharray="6 5"/>` + T(306, 74, 9.5, '#86e0a8', 'орбита ≈ 200 км · 7,9 км/с', 'start', HALO);
+  // земля, океан, стартовый стол, посадочная площадка
+  h += `<rect x="-2000" y="380" width="${2000 + OCEAN}" height="1200" fill="#1b2a22"/><rect x="${OCEAN}" y="384" width="4000" height="1200" fill="#1c3f63"/><path d="M-2000 380H${OCEAN}" stroke="#3a5a46" stroke-width="2"/><path d="M${OCEAN} 384H2520" stroke="#3f6f9e" stroke-width="2"/>`;
+  h += T(OCEAN + 70, 400, 9, '#8fb8e0', 'океан');
+  h += `<rect x="78" y="374" width="64" height="6" fill="#4a5875" stroke="${INK}"/><path d="M84 380V232M92 380V232M84 240h8M84 270h8M84 300h8M84 330h8M84 360h8M84 240l8 30M92 270l-8 30M84 300l8 30M92 330l-8 30" stroke="#6c7a96" stroke-width="2"/><path d="M92 250h8M92 316h8" stroke="#6c7a96" stroke-width="2"/>`;
+  h += `<rect x="${LANDX - 26}" y="376" width="52" height="4" fill="#4a5875" stroke="${INK}"/><circle cx="${LANDX}" cy="378" r="0" />` + T(LANDX, 395, 9, '#8b96ad', 'посадочная площадка');
+  h += T(110, 395, 9, '#8b96ad', 'старт');
+  // ракета
+  if (!F && !S.lastF) h += `<g data-click="launch"><rect x="90" y="250" width="40" height="130" fill="transparent"/>${rocketG(fs.main, t)}</g>`;
+  else {
+    const view = F ? fs : flightAt(S.lastF);
+    h += rocketG(view.main, t) + rocketG(view.s1, t);
+    if (view.splash1 && view.s1) h += splash(view.s1.x, 382);
+    if (view.splash2 && view.main) h += splash(view.main.x, 382);
+    if (view.landed) h += T(LANDX, 300, 10, '#86e0a8', 'ступень села ✓', 'middle', HALO);
+    if (!F) h += `<g data-click="launch">${rocketG({ x: 110, y: 372, ang: 0, sc: 1, kind: S.st === 1 ? 'one' : 'two', flame: false }, t).replace('<g ', '<g opacity=".35" ')}<rect x="90" y="250" width="40" height="130" fill="transparent"/></g>`;
+  }
+  // шкала скорости Δv
+  const v = F ? fs.v : S.last ? S.last.dv : 0;
+  h += gauge(486, 150, 210, v);
+  return h;
+}
+function flightAt(st) { const keep = S.fl; S.fl = st; const out = flight(); S.fl = keep; return out; }
+const splash = (x, y) => `<path d="M${(x - 12).toFixed(1)} ${y}q6 -12 12 0q6 -12 12 0" fill="none" stroke="#bfe6ff" stroke-width="2"/>`;
+function gauge(x, y, hh, v) {
+  const Y = k => y + hh - hh * clamp(k, 0, 12) / 12;
+  let s = `<rect x="${x - 9}" y="${y}" width="18" height="${hh}" rx="4" fill="#0e1520" stroke="#3a4762"/>`;
+  s += `<rect x="${x - 7}" y="${Y(v).toFixed(1)}" width="14" height="${(y + hh - Y(v)).toFixed(1)}" rx="3" fill="${v >= DV_ORB ? '#86e0a8' : '#ffb547'}"/>`;
+  for (let k = 0; k <= 12; k += 2) s += `<path d="M${x - 13} ${Y(k).toFixed(1)}h4" stroke="#8b96ad"/>` + T(x - 16, Y(k) + 3, 8, '#8b96ad', k, 'end');
+  s += `<path d="M${x - 12} ${Y(DV_ORB).toFixed(1)}h24" stroke="#ff8a73" stroke-width="2"/>` + T(x + 14, Y(DV_ORB) + 3, 9, '#ff8a73', '9,4', 'start', HALO) + T(x, y + hh + 14, 8.5, '#ff8a73', 'красная — орбита');
+  s += T(x, y - 18, 9, '#8b96ad', 'Δv, км/с') + T(x, y - 6, 11, v >= DV_ORB ? '#86e0a8' : '#ffb547', fmt(v, 1), 'middle', 'font-weight="600"');
+  return s;
+}
+
+// ---------- highlight boxes for the parts list ----------
+function hlBox(id) {
+  const lid = LID();
+  if (lid === 'cosmic') { const C = C1, R = C.RE * C.S; return ({ earth: [C.cx - R, C.cy - R, 2 * R, 2 * R], mount: [C.cx - 34, C.cy - C.S - 6, 68, C.S * 0.12 + 10], cannon: [C.cx - 14, C.cy - C.S - 16, 40, 22], traces: [C.cx - C.S - 6, C.cy - C.S - 6, 2 * C.S + 12, 2 * C.S + 12], ball: S.cur ? (() => { const [x, y] = p1(S.cur.x, S.cur.y); return [x - 10, y - 10, 20, 20]; })() : [C.cx + 20, C.cy - C.S - 18, 30, 18] })[id]; }
+  if (lid === 'orbits') { const C = C2, rd = rdOf(S.h), sx = C.cx + rd * Math.cos(S.aS), sy = C.cy - rd * Math.sin(S.aS), aC = TAU * S.th / 24 + Math.PI / 2;
+    return ({ earth: [C.cx - C.RE, C.cy - C.RE, 2 * C.RE, 2 * C.RE], sat: [sx - 20, sy - 20, 40, 40], orbit: [C.cx - rd - 4, C.cy - rd - 4, 2 * rd + 8, 2 * rd + 8], zone: [sx - 24, sy - 24, 48, 48], city: [C.cx + C.RE * Math.cos(aC) - 10, C.cy - C.RE * Math.sin(aC) - 10, 20, 20], rings: [C.cx - rdOf(35800), C.cy - rdOf(35800), 2 * rdOf(35800), 2 * rdOf(35800)] })[id]; }
+  if (lid === 'weight') { const C = C3, yb = C.base - S.y * C.px; return ({ cab: [C.x - C.w / 2 - 4, yb - C.ch - 4, C.w + 8, C.ch + 8], scale: [C.x - 24, yb - 14, 48, 14], person: [C.x - 18, yb - 76, 36, 68], cable: [C.x - 10, C.base - C.top * C.px - C.ch - 30, 20, C.top * C.px + 30], dial: [70, 150, 96, 120], graph: [14, 270, 210, 98] })[id]; }
+  return ({ rocket: [88, 252, 44, 130], pad: [74, 228, 72, 156], landing: [LANDX - 32, 368, 64, 16], gauge: [468, 128, 36, 238], orbit: [296, 64, 230, 26] })[id];
+}
+
+const scene = $('#scene');
+function drawScene(t) {
+  const id = LID();
+  let h = bg(id !== 'weight');
+  if (id === 'cosmic') h += cosmicScene(t);
+  else if (id === 'orbits') h += orbitScene(t);
+  else if (id === 'weight') h += liftScene(t);
+  else h += rocketScene(t);
+  if (S.hl) {
+    const k = clamp(1 - (t - S.hl.t) / 1800, 0, 1), b = hlBox(S.hl.id);
+    if (k === 0) S.hl = null;
+    else if (b && b[2] > 0) h += `<rect x="${b[0].toFixed(1)}" y="${b[1].toFixed(1)}" width="${b[2].toFixed(1)}" height="${b[3].toFixed(1)}" rx="8" fill="rgba(114,212,232,.07)" stroke="#72d4e8" stroke-width="2" stroke-dasharray="6 5" pointer-events="none" opacity="${reduce ? 1 : (0.5 + 0.5 * Math.abs(Math.sin((t - S.hl.t) / 220))).toFixed(2)}"/>`;
+  }
+  scene.innerHTML = h;
+}
+
+// fit the scene: 520 × 405 units, centred, content at the bottom
+let VB = { x: 0, y: 0, w: 520, h: 405 };
+function fit() {
+  const rc = scene.getBoundingClientRect(), w = rc.width, hh = rc.height; if (!w || !hh) return;
+  const s = Math.min(w / 520, hh / 415, 1.7);
+  VB = { w: w / s, h: hh / s }; VB.x = 260 - VB.w / 2; VB.y = 410 - VB.h;
+  scene.setAttribute('viewBox', `${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  dirty = true;
+}
+new ResizeObserver(fit).observe(scene);
+
+// ---------- pointer: click parts, drag the satellite ----------
+let drag = null, dirty = true;
+const toSvg = e => { const pt = scene.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const c = scene.getScreenCTM(); return c ? pt.matrixTransform(c.inverse()) : { x: 0, y: 0 }; };
+scene.addEventListener('pointerdown', e => {
+  const ck = e.target.closest('[data-click]'); if (ck && ck.dataset.click) { act(ck.dataset.click); return; }
+  const el = e.target.closest('[data-drag]'); if (!el) return;
+  e.preventDefault();
+  try { scene.setPointerCapture(e.pointerId); } catch (er) {}
+  scene.classList.add('grabbing');
+  drag = { what: el.dataset.drag };
+});
+scene.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const p = toSvg(e);
+  if (drag.what === 'sat') { const d = Math.hypot(p.x - C2.cx, p.y - C2.cy); S.aS = Math.atan2(C2.cy - p.y, p.x - C2.cx); setH(hOfRd(d)); }
+});
+const endDrag = () => { if (!drag) return; drag = null; scene.classList.remove('grabbing'); dirty = true; };
+scene.addEventListener('pointerup', endDrag);
+scene.addEventListener('pointercancel', endDrag);
+function setH(h) { h = snapH(h); if (h === S.h) { dirty = true; return; } S.h = h; update(); }
+function setV(v) { v = clamp(Math.round(v * 10) / 10, 1, 12); if (v === S.v) return; S.v = v; update(); }
+
+let last = performance.now(), slow = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.15, (t - last) / 1000); last = t;   // медленный кадр не замедляет опыт
+  const id = LID();
+  let anim = false;
+  if (id === 'cosmic' && S.cur) { step1(dt); anim = true; }
+  if (id === 'orbits') { const Tt = Th(S.h); S.th += dt * 0.5; S.aS += dt * 0.5 * TAU / Tt; anim = true; }
+  if (id === 'weight') { step3(dt); anim = true; }
+  if (id === 'rocket' && S.fl) { step4(dt); anim = true; }
+  if (anim) { slow += dt; if (slow > 0.12) { slow = 0; const m = model(); renderMeter(m); updateScheme(m); } }
+  if (dirty || anim || S.hl) { drawScene(t); dirty = false; }
+}
+
+// ---------- UI ----------
+let toastT = 0;
+function toast(msg) { const tt = $('#toast'); tt.textContent = msg; tt.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => tt.classList.remove('show'), 4600); }
+
+function renderTools() {
+  const id = LID(), tb = $('#tools');
+  const B = (k, label, pressed, cls) => `<button data-a="${k}"${pressed !== undefined ? ` aria-pressed="${pressed}"` : ''}${cls ? ` class="${cls}"` : ''}>${label}</button>`;
+  const sep = '<span class="sep"></span>';
+  let h = '';
+  if (id === 'cosmic') h = B('v-1', '−1') + B('v-01', '−0,1') + B('v+01', '+0,1') + B('v+1', '+1') + sep + B('fire', 'Огонь', undefined, 'rec') + B('clear', 'Стереть следы');
+  if (id === 'orbits') h = Object.keys(MISSIONS).map(k => B('mis-' + k, (S.ok[k] ? '✓ ' : '') + { net: 'Интернет', tv: 'Телевидение', nav: 'Навигация' }[k], S.mission === k)).join('') + sep + B('h-', 'h −') + B('h+', 'h +') + sep + B('launch2', 'Вывести на орбиту', undefined, 'rec');
+  if (id === 'weight') {
+    h = B('up', 'Вверх', undefined, S.prog ? '' : 'rec') + B('down', 'Вниз') + B('drop', 'Свободное падение');
+    if (S.zero && !S.ans) h += sep + B('ans-nog', 'На МКС нет притяжения') + B('ans-fall', 'Станция падает вокруг Земли') + B('ans-air', 'Их держит воздух');
+  }
+  if (id === 'rocket') h = B('st-1', '1 ступень', S.st === 1) + B('st-2', '2 ступени', S.st === 2) + sep + B('pay-1', 'Груз 1 т', S.pay === 1) + B('pay-2', 'Груз 2 т', S.pay === 2) + sep + B('land', 'Посадка ступени', S.land) + sep + B('launch', 'Пуск', undefined, 'rec');
+  tb.innerHTML = h;
+}
+function act(a) {
+  const id = LID();
+  const re = () => { renderTools(); buildScheme(); update(); };
+  if (id === 'cosmic') {
+    if (a === 'fire') return fire();
+    if (a === 'clear') { if (S.cur) return; S.shots = []; return re(); }
+    const m = a.match(/^v([+-])(1|01)$/); if (m) { setV(S.v + (m[1] === '+' ? 1 : -1) * (m[2] === '1' ? 1 : 0.1)); return; }
+    if (a.startsWith('vset-')) return setV(+a.slice(5));
+  }
+  if (id === 'orbits') {
+    if (a.startsWith('mis-')) { S.mission = a.slice(4); return re(); }
+    if (a === 'h+' || a === 'h-') { const s = a === 'h+' ? 1 : -1, st = S.h < 2000 ? 100 : 1000; let h = S.h + s * st; if (s > 0 && S.h < 2000 && h > 2000) h = 2000; setH(S.h >= 2000 && s < 0 && h < 2000 ? 1900 : h); return; }
+    if (a.startsWith('hset-')) return setH(+a.slice(5));
+    if (a === 'launch2' || a === 'sat') return launch2();
+  }
+  if (id === 'weight') {
+    if (a === 'up' || a === 'down' || a === 'drop') return startProg(a);
+    if (a === 'cab') return startProg(S.y < C3.top - 0.5 ? 'up' : 'down');
+    if (a.startsWith('ans-')) {
+      if (!S.zero) { toast('Сначала добейтесь, чтобы весы показали ноль.'); return; }
+      if (a === 'ans-fall') { S.ans = true; toast('Верно: станция и космонавты вместе падают вокруг Земли с ускорением ≈ 8,7 м/с² и не давят друг на друга. Притяжение на высоте 400 км почти такое же, как у поверхности.'); re(); }
+      else if (a === 'ans-nog') toast('Притяжение на высоте 400 км всего на 11% слабее, чем у Земли: g ≈ 8,7 м/с². Без него станция улетела бы по прямой. Подумайте, что делали весы в свободном падении.');
+      else toast('Воздух в станции такой же, как дома, — он людей не держит. Вспомните, что было с весами при свободном падении.');
+      return;
+    }
+  }
+  if (id === 'rocket') {
+    if (a === 'launch') return launch4();
+    if (S.fl) { toast('Ракета в полёте — дождитесь конца.'); return; }
+    if (a.startsWith('st-')) { S.st = +a.slice(3); if (S.st === 1) S.land = false; S.lastF = null; S.last = null; return re(); }
+    if (a.startsWith('pay-')) { S.pay = +a.slice(4); S.lastF = null; S.last = null; return re(); }
+    if (a === 'land') { if (S.st === 1) { toast('Сажать можно только первую ступень двухступенчатой ракеты — одноступенчатой пришлось бы вернуть всю ракету.'); return; } S.land = !S.land; S.lastF = null; S.last = null; return re(); }
+  }
+}
+$('#tools').addEventListener('click', e => { const b = e.target.closest('button'); if (b) act(b.dataset.a); });
+
+const TABS = ['overview', 'parts', 'scheme', 'calc'];
+function setTab(t) {
+  S.tab = t;
+  for (const x of TABS) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#pane-' + x).hidden = x !== t; }
+  if (t === 'scheme') buildScheme();
+  renderPanes(model());
+}
+TABS.forEach(x => $('#tab-' + x).addEventListener('click', () => setTab(x)));
+
+// ---------- icons ----------
+const IC = inner => `<svg viewBox="0 0 34 34" aria-hidden="true">${inner}</svg>`;
+const ICON = {
+  earth: IC('<circle cx="17" cy="17" r="13" fill="#2f6fb0"/><ellipse cx="12" cy="13" rx="5" ry="3.5" fill="#4c9a62"/><ellipse cx="21" cy="22" rx="5" ry="4" fill="#4c9a62"/>'),
+  mount: IC('<path d="M2 30L15 8l5 7 3-3 9 18z" fill="#7a6a58"/><path d="M12 13l3-5 3 4z" fill="#eef4f8"/>'),
+  cannon: IC('<rect x="9" y="12" width="20" height="6" rx="3" fill="#3a4152"/><rect x="5" y="17" width="14" height="5" fill="#8a5a30"/><circle cx="11" cy="23" r="5" fill="#5b3a1e"/>'),
+  ball: IC('<circle cx="17" cy="17" r="7" fill="#2b2f3a" stroke="#e8ecf4" stroke-width="1.5"/><path d="M24 17h8" stroke="#72d4e8" stroke-width="2"/>'),
+  traces: IC('<path d="M17 4A13 13 0 1 1 4 17" fill="none" stroke="#86e0a8" stroke-width="2"/><path d="M17 4Q28 6 26 20" fill="none" stroke="#ff8a73" stroke-width="2" stroke-dasharray="3 2"/>'),
+  sat: IC('<rect x="13" y="13" width="8" height="8" fill="#d9c08a"/><rect x="2" y="14" width="10" height="6" fill="#3b6fd8"/><rect x="22" y="14" width="10" height="6" fill="#3b6fd8"/>'),
+  orbit: IC('<circle cx="17" cy="17" r="13" fill="none" stroke="#72d4e8" stroke-width="2"/><circle cx="17" cy="17" r="6" fill="#2f6fb0"/><circle cx="28" cy="10" r="2.5" fill="#d9c08a"/>'),
+  zone: IC('<path d="M17 3L5 26a14 6 0 0 0 24 0z" fill="rgba(255,209,102,.35)" stroke="#ffd166"/>'),
+  city: IC('<circle cx="17" cy="17" r="12" fill="#2f6fb0"/><circle cx="17" cy="5" r="4" fill="#ff8a73"/>'),
+  rings: IC('<circle cx="17" cy="17" r="5" fill="#2f6fb0"/><circle cx="17" cy="17" r="9" fill="none" stroke="#8b96ad" stroke-dasharray="2 2"/><circle cx="17" cy="17" r="14" fill="none" stroke="#8b96ad" stroke-dasharray="2 2"/>'),
+  cab: IC('<rect x="7" y="4" width="20" height="26" rx="2" fill="#1d2a40" stroke="#4a5875" stroke-width="2"/><path d="M17 0v4" stroke="#d9c08a" stroke-width="2"/>'),
+  scale: IC('<rect x="5" y="20" width="24" height="7" rx="2" fill="#e8ecf4"/><rect x="12" y="21.5" width="10" height="4" fill="#0c1a14"/>'),
+  person: IC('<circle cx="17" cy="7" r="4.5" fill="#f0c9a0"/><path d="M17 12v10" stroke="#3b6fd8" stroke-width="6" stroke-linecap="round"/><path d="M14 22l-1 9M20 22l1 9" stroke="#2c3240" stroke-width="3"/>'),
+  cable: IC('<circle cx="17" cy="6" r="5" fill="#c9a24a"/><path d="M17 11v21" stroke="#d9c08a" stroke-width="2.4"/>'),
+  dial: IC('<circle cx="17" cy="17" r="13" fill="#f7f3ea" stroke="#e8ecf4" stroke-width="2"/><path d="M17 17l7-6" stroke="#d62828" stroke-width="2.4"/>'),
+  graph: IC('<rect x="3" y="5" width="28" height="24" rx="3" fill="#0e1520"/><path d="M5 20h6l3-8 4 14 3-10h8" fill="none" stroke="#ffb547" stroke-width="2"/>'),
+  rocket: IC('<path d="M17 2c4 4 5 9 5 14v10h-10V16c0-5 1-10 5-14z" fill="#eef1f6"/><path d="M12 24l-4 6h4zM22 24l4 6h-4z" fill="#2c3240"/><path d="M14 28h6l-3 5z" fill="#ffb547"/>'),
+  pad: IC('<rect x="3" y="28" width="28" height="4" fill="#4a5875"/><path d="M8 28V4M12 28V4M8 8l4 6M12 14l-4 6M8 20l4 6" stroke="#6c7a96" stroke-width="1.6"/>'),
+  landing: IC('<rect x="3" y="26" width="28" height="4" fill="#4a5875"/><path d="M17 4v16" stroke="#eef1f6" stroke-width="6"/><path d="M13 18l-5 8M21 18l5 8" stroke="#2c3240" stroke-width="2"/>'),
+  gauge: IC('<rect x="12" y="3" width="10" height="28" rx="3" fill="#0e1520" stroke="#3a4762"/><rect x="14" y="13" width="6" height="16" fill="#ffb547"/><path d="M9 10h16" stroke="#ff8a73" stroke-width="2"/>'),
+  orbitline: IC('<path d="M2 12h30" stroke="#86e0a8" stroke-width="2" stroke-dasharray="4 3"/><path d="M4 30Q8 14 26 12" fill="none" stroke="#ffb547" stroke-width="2"/>'),
+};
+
+const step = (a, b, cls) => `<div class="step ${cls || ''}"><b>${a}</b><span>${b}</span></div>`;
+
+function model() {
+  const id = LID();
+  if (id === 'cosmic') return { kind: id, v: S.v, fly: !!S.cur, fell: !!S.fell, orbit: !!S.orbit, esc: !!S.esc };
+  if (id === 'orbits') { const o = orb(S.h); return { kind: id, h: S.h, v: o.v, T: o.T / 3600, ms: delayMs(S.h), net: !!S.ok.net, tv: !!S.ok.tv, nav: !!S.ok.nav }; }
+  if (id === 'weight') return { kind: id, y: S.y, a: S.a, kg: kg3(), P: MASS * (G0 + S.a), n: (G0 + S.a) / G0, more: S.more, less: S.less, zero: S.zero, ans: S.ans };
+  const c = rocketCfg(S.st, S.pay, S.land);
+  return { kind: id, c, fly: !!S.fl, one: !!S.one, two: !!S.two, land: !!S.landOk };
+}
+
+function taskState(m) {
+  const id = LID();
+  if (S.done[id]) return '✓ Выполнено';
+  const t = (ok, s) => `${s} ${ok ? '✓' : '—'}`;
+  if (id === 'cosmic') return [t(m.fell, 'Упало'), t(m.orbit, 'Окружность'), t(m.esc, 'Улетело')].join(' · ');
+  if (id === 'orbits') return [t(m.net, 'Интернет'), t(m.tv, 'ТВ'), t(m.nav, 'Навигация')].join(' · ');
+  if (id === 'weight') return [t(m.more, '> 50 кг'), t(m.less, '< 50 кг'), t(m.zero, '0'), t(m.ans, 'МКС')].join(' · ');
+  return [t(m.one, '1 ступень'), t(m.two, '2 ступени'), t(m.land, 'Посадка')].join(' · ');
+}
+
+// Scheme tab: built once per lesson, then values refreshed (sliders keep focus while dragging)
+function slider(id, label, min, max, stepv, val) {
+  return `<div class="ctl"><label for="${id}">${label} <output id="${id}O"></output></label><input type="range" id="${id}" min="${min}" max="${max}" step="${stepv}" value="${val}"></div>`;
+}
+const chips = (lbl, items) => `<div class="ctl"><div class="lbl">${lbl}</div><div class="chips">${items.map(([a, n, on]) => `<button data-a="${a}" aria-pressed="${!!on}">${n}</button>`).join('')}</div></div>`;
+const reads = (a, b, c) => `<dl class="reads"><div><dt>${a}</dt><dd id="r1"></dd></div><div><dt>${b}</dt><dd id="r2"></dd></div><div><dt>${c}</dt><dd id="r3"></dd></div></dl>`;
+function buildScheme() {
+  const id = LID(), el = $('#pane-scheme');
+  let h = '';
+  if (id === 'cosmic') h = `<h2>Пушка Ньютона</h2>` + slider('inV', 'Скорость ядра', 1, 12, 0.1, S.v) + chips('Быстрый выбор', [3, 6, 9, 12].map(v => ['vset-' + v, v + ' км/с', S.v === v])) + reads('v', 'v / v₁', 'виток у Земли') +
+      `<h3>Выстрелы</h3><div class="rec">` + (S.shots.length ? S.shots.map(s => step(`${fmt(s.v, 1)} км/с`, `${RES_NAME[s.res]}${s.res === 'fell' ? `, ${big(Math.round(s.th * RKM / 10) * 10)} км` : s.res === 'orbit' || s.res === 'ellipse' ? `, ${Math.round(s.min)} мин` : ''}`)).join('') : '<p class="note">Пока пусто. Нажмите «Огонь».</p>') + `</div>`;
+  if (id === 'orbits') h = `<h2>Орбита спутника</h2>` + chips('Задача', Object.keys(MISSIONS).map(k => ['mis-' + k, (S.ok[k] ? '✓ ' : '') + MISSIONS[k], S.mission === k])) +
+      slider('inH', 'Высота орбиты h', 200, 40000, 100, S.h) + chips('Известные орбиты', [['hset-400', 'МКС · 400 км', S.h === 400], ['hset-550', 'Starlink · 550 км', S.h === 550]]) + reads('скорость v', 'период T', 'сигнал туда-обратно') +
+      `<button class="ghostbtn" data-a="launch2" style="margin-top:12px">Вывести на орбиту</button>` +
+      `<h3>Подобранные орбиты</h3><div class="rec">` + Object.keys(MISSIONS).map(k => step(MISSIONS[k], S.ok[k] ? `${big(S.ok[k].h)} км · T ${fmtT(S.ok[k].T)}` : '—')).join('') + `</div>`;
+  if (id === 'weight') h = `<h2>Лифт-тренажёр с весами</h2>` + chips('Поездка', [['up', 'Вверх', false], ['down', 'Вниз', false], ['drop', 'Свободное падение', false]]) + reads('весы', 'ускорение a', 'перегрузка n') +
+      `<h3>Наблюдения</h3><div class="rec">` + step('больше 50 кг', S.more ? 'есть ✓' : '—') + step('меньше 50 кг', S.less ? 'есть ✓' : '—') + step('ноль', S.zero ? 'есть ✓' : '—') + `</div>` +
+      (S.zero ? chips('Почему космонавты на МКС невесомы?', [['ans-nog', 'На орбите нет притяжения', false], ['ans-fall', 'Станция с людьми падает вокруг Земли', S.ans], ['ans-air', 'Их держит воздух станции', false]]) : '');
+  if (id === 'rocket') {
+    const c = rocketCfg(S.st, S.pay, S.land);
+    h = `<h2>Ракета на старте</h2>` + chips('Ступени', [['st-1', '1 ступень', S.st === 1], ['st-2', '2 ступени', S.st === 2]]) + chips('Груз (спутник)', [['pay-1', '1 т', S.pay === 1], ['pay-2', '2 т', S.pay === 2]]) +
+      chips('Первая ступень', [['land', S.land ? 'Садится на площадку' : 'Одноразовая — падает в океан', S.land]]) + reads('m₀', 'топливо', 'груз') +
+      `<button class="ghostbtn" data-a="launch" style="margin-top:12px">Пуск</button>` +
+      `<h3>Массы, т</h3><div class="steps">` + (c.st === 1 ? step('ступень: топливо + баки', '90 + 8') : step('1-я ступень: топливо + баки', `72 + 6${c.land ? ' (6 т — запас на посадку)' : ''}`) + step('2-я ступень: топливо + баки', '18 + 2')) + step('груз', c.pay) + step('стартовая масса', nf(c.m0), 'sum') + `</div>` +
+      `<h3>Пуски</h3><div class="rec">` + step('1 ступень', S.one ? `Δv = ${fmt(S.one.dv, 1)} км/с — мало` : '—') + step('2 ступени', S.two ? `Δv = ${fmt(S.two.dv, 1)} км/с — орбита` : '—') + step('с посадкой', S.landOk ? `груз ${S.landOk.pay} т, Δv = ${fmt(S.landOk.dv, 1)} км/с` : '—') + `</div>`;
+  }
+  el.innerHTML = h;
+  const on = (sel, fn) => { const x = el.querySelector(sel); if (x) x.addEventListener('input', fn); };
+  on('#inV', e => setV(+e.target.value));
+  on('#inH', e => setH(+e.target.value));
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => act(b.dataset.a));
+  updateScheme(model());
+}
+function updateScheme(m) {
+  const el = $('#pane-scheme'); if (el.hidden) return;
+  const id = LID(), set = (s, v) => { const x = el.querySelector(s); if (x) x.textContent = v; }, val = (s, v) => { const x = el.querySelector(s); if (x && document.activeElement !== x) x.value = v; };
+  if (id === 'cosmic') { set('#inVO', fmt(S.v, 1) + ' км/с'); val('#inV', S.v); set('#r1', fmt(S.v, 1) + ' км/с'); set('#r2', fmt(S.v / V1, 2)); set('#r3', '≈ 85 мин'); }
+  if (id === 'orbits') { set('#inHO', big(S.h) + ' км'); val('#inH', S.h); set('#r1', fmt(m.v / 1000, 2) + ' км/с'); set('#r2', fmtT(m.T)); set('#r3', m.ms < 10 ? fmt(m.ms, 1) + ' мс' : Math.round(m.ms) + ' мс'); }
+  if (id === 'weight') { set('#r1', Math.round(m.kg) + ' кг'); set('#r2', fmt(m.a, 1) + ' м/с²'); set('#r3', fmt(m.n, 1) + ' g'); }
+  if (id === 'rocket') { set('#r1', nf(m.c.m0) + ' т'); set('#r2', '90 т'); set('#r3', m.c.pay + ' т'); }
+}
+
+function partsList() {
+  const id = LID();
+  if (id === 'cosmic') return [
+    { id: 'earth', icon: ICON.earth, name: 'Земля', spec: 'Радиус R ≈ 6400 км, у поверхности g ≈ 9,8 м/с². Воздуха в опыте нет.' },
+    { id: 'mount', icon: ICON.mount, name: 'Гора Ньютона', spec: 'Нарисована намного выше настоящей, чтобы было видно, откуда стреляем.' },
+    { id: 'cannon', icon: ICON.cannon, name: 'Пушка', spec: 'Стреляет горизонтально. Нажмите — выстрел.' },
+    { id: 'ball', icon: ICON.ball, name: 'Ядро', spec: 'Голубая стрелка — скорость, красная — сила тяготения к центру Земли.' },
+    { id: 'traces', icon: ICON.traces, name: 'Следы выстрелов', spec: 'Красные — упало, зелёный — окружность, голубые — эллипс, жёлтые — улетело.' }];
+  if (id === 'orbits') return [
+    { id: 'earth', icon: ICON.earth, name: 'Земля (вид с Северного полюса)', spec: 'Поворачивается за 24 ч; 1 с на экране — 30 мин.' },
+    { id: 'sat', icon: ICON.sat, name: 'Спутник', spec: 'Тяните его от Земли или к ней — меняется высота орбиты.' },
+    { id: 'orbit', icon: ICON.orbit, name: 'Орбита', spec: 'Круговая, над экватором. v = √(GM / r).' },
+    { id: 'zone', icon: ICON.zone, name: 'Зона видимости', spec: 'Жёлтая дуга — откуда виден спутник. Чем выше орбита, тем она шире.' },
+    { id: 'city', icon: ICON.city, name: 'Город', spec: 'Зелёный пунктир — спутник виден из города.' },
+    { id: 'rings', icon: ICON.rings, name: 'Известные орбиты', spec: 'МКС 400 км, GPS 20 200 км, геостационарная 35 800 км. Высоты сжаты.' }];
+  if (id === 'weight') return [
+    { id: 'cab', icon: ICON.cab, name: 'Кабина лифта', spec: 'Разгон и торможение — 2 м/с², скорость до 4 м/с. Нажмите — поехать.' },
+    { id: 'cable', icon: ICON.cable, name: 'Трос и блок', spec: 'При свободном падении трос отпускают — он провисает.' },
+    { id: 'scale', icon: ICON.scale, name: 'Напольные весы', spec: 'Показывают P / g в килограммах — то есть вес, а не массу.' },
+    { id: 'person', icon: ICON.person, name: 'Человек 50 кг', spec: 'Красная стрелка — сила тяжести mg, оранжевая — сила реакции весов N.' },
+    { id: 'dial', icon: ICON.dial, name: 'Циферблат весов', spec: 'Зелёная метка — 50 кг, вес в покое.' },
+    { id: 'graph', icon: ICON.graph, name: 'График показаний', spec: 'Как менялись показания весов за последние 9 с.' }];
+  return [
+    { id: 'rocket', icon: ICON.rocket, name: S.st === 1 ? 'Одноступенчатая ракета' : 'Двухступенчатая ракета', spec: S.st === 1 ? 'Топливо 90 т, баки и двигатели 8 т.' : '1-я ступень: 72 т топлива и 6 т конструкции; 2-я: 18 т и 2 т. Нажмите — пуск.' },
+    { id: 'pad', icon: ICON.pad, name: 'Стартовый стол', spec: 'Ракета стоит вертикально у башни обслуживания.' },
+    { id: 'landing', icon: ICON.landing, name: 'Посадочная площадка', spec: 'Сюда садится многоразовая первая ступень на двигателях и выпускает опоры.' },
+    { id: 'gauge', icon: ICON.gauge, name: 'Шкала Δv', spec: 'Какую скорость набрала ракета. Красная черта — 9,4 км/с, нужно для орбиты.' },
+    { id: 'orbit', icon: ICON.orbitline, name: 'Орбита', spec: 'Высота около 200 км, скорость 7,9 км/с.' }];
+}
+
+function renderPanes(m) {
+  const Ls = L(), done = !!S.done[Ls.id];
+  if (S.tab === 'overview') {
+    $('#pane-overview').innerHTML = `<div class="lesson-k">Урок ${S.lesson + 1} из ${LESSONS.length}</div><h2>${Ls.title}</h2>` +
+      Ls.text.map(p => `<p>${p}</p>`).join('') +
+      (Ls.safe ? `<div class="safe"><b>Безопасность</b>${Ls.safe}</div>` : '') +
+      `<div class="life"><b>Зачем это в жизни</b>${Ls.why}</div>` +
+      `<div class="taskbox"><div class="k">Задание</div><p>${Ls.task}</p><div class="state ${done ? 'done' : ''}">${taskState(m)}</div><p class="note">${Ls.hint}</p></div>` +
+      `<button class="primary" id="goNext" ${S.lesson === LESSONS.length - 1 ? 'disabled' : ''}>Следующий урок ›</button>`;
+    const n = $('#goNext'); if (n) n.onclick = () => setLesson(S.lesson + 1);
+  }
+  if (S.tab === 'parts') {
+    $('#pane-parts').innerHTML = `<h2>Что на площадке</h2><p class="note">Нажмите на деталь, чтобы найти её на площадке.</p><div class="parts">` +
+      partsList().map(p => `<button class="part" data-id="${p.id}">${p.icon}<div><b>${p.name}</b><span>${p.spec}</span></div></button>`).join('') + `</div>`;
+    $('#pane-parts').querySelectorAll('.part').forEach(b => b.onclick = () => { S.hl = { id: b.dataset.id, t: performance.now() }; dirty = true; });
+  }
+  if (S.tab === 'scheme') updateScheme(m);
+  if (S.tab === 'calc') $('#pane-calc').innerHTML = calcHTML(m);
+}
+
+function calcHTML(m) {
+  const id = LID();
+  if (id === 'cosmic') {
+    const vn = S.v / V1, kind = S.v < V1 - 0.05 ? 'меньше v₁ — ядро упадёт (с высокой горы может пролететь по эллипсу ниже вершины)' : S.v < V1 + 0.05 ? 'равна v₁ — окружность' : S.v < V2 - 0.05 ? 'между v₁ и v₂ — вытянутый эллипс, ядро вернётся' : 'не меньше v₂ — ядро улетит';
+    return `<h2>Космические скорости</h2><div class="formula">v₁ = √(gR)    v₂ = √2 · v₁</div><p class="note">Ядро летит по окружности, если тяготение сообщает ему как раз центростремительное ускорение: g = v² / R.</p>
+      <h3>Первая космическая</h3><div class="steps">` + step('g', '9,8 м/с²') + step('R', '6 400 000 м') + step('g · R', '≈ 6,27·10⁷ м²/с²') + step('v₁ = √(gR)', '≈ 7 920 м/с ≈ 7,9 км/с', 'sum') + `</div>
+      <h3>Вторая космическая и виток</h3><div class="steps">` + step('v₂ = 1,41 · 7,9', '≈ 11,2 км/с', 'sum') + step('виток T = 2πR / v₁', '2 · 3,14 · 6400 / 7,9 ≈ 5090 с') + step('', '≈ 85 мин') + `</div>
+      <h3>Сейчас</h3><div class="steps">` + step('скорость ядра', fmt(S.v, 1) + ' км/с') + step('v / v₁', fmt(vn, 2)) + `</div><p class="note" style="margin-top:10px">Скорость ${kind}.</p>`;
+  }
+  if (id === 'orbits') {
+    const o = orb(S.h), r = o.r / 1000;
+    return `<h2>Скорость и период спутника</h2><div class="formula">v = √(GM / r)    T = 2πr / v</div><p class="note">GM ≈ 4·10¹⁴ м³/с², r = R + h, R = 6400 км. Задержка сигнала: он идёт со скоростью света c = 300 000 км/с до спутника и обратно, t = 2h / c.</p>
+      <h3>Высота ${big(S.h)} км</h3><div class="steps">` + step('r = 6400 + h', `${big(r)} км`) + step('v = √(4·10¹⁴ / r)', `${big(o.v)} м/с ≈ ${fmt(o.v / 1000, 2)} км/с`) + step('T = 2πr / v', `${big(o.T)} с ≈ ${fmtT(o.T / 3600)}`, 'sum') + step('сигнал 2h / c', `${m.ms < 10 ? fmt(m.ms, 1) : Math.round(m.ms)} мс`) + step('витков за сутки', fmt(86400 / o.T, 1)) + `</div>
+      <h3>Для сравнения</h3><div class="steps">` + step('МКС, 400 км', `7,67 км/с · 93 мин`) + step('GPS, 20 200 км', `3,88 км/с · 12 ч`) + step('ГСО, 35 800 км', `3,08 км/с · 24 ч`) + `</div>`;
+  }
+  if (id === 'weight') {
+    const a = S.a, P = MASS * (G0 + a);
+    return `<h2>Вес в лифте</h2><div class="formula">P = m (g + a)    n = P / (mg)</div><p class="note">a берём со знаком: вверх — «+», вниз — «−». m = 50 кг, g = 9,8 м/с². Весы показывают P / g.</p>
+      <h3>Сейчас</h3><div class="steps">` + step('ускорение a', fmt(a, 1) + ' м/с²') + step('P = 50 · (9,8 ' + (a < 0 ? '− ' + fmt(-a, 1) : '+ ' + fmt(a, 1)) + ')', `${Math.round(Math.max(0, P))} Н`) + step('весы P / g', `${Math.round(Math.max(0, P) / G0)} кг`, 'sum') + step('перегрузка n', fmt(Math.max(0, P) / (MASS * G0), 1) + ' g') + `</div>
+      <h3>Поездки</h3><div class="steps">` + step('разгон вверх, a = +2', '50 · 11,8 / 9,8 ≈ 60 кг') + step('торможение вверху, a = −2', '50 · 7,8 / 9,8 ≈ 40 кг') + step('свободное падение, a = −g', '0 кг · невесомость') + step('торможение после падения, +3g', '200 кг · 4 g') + `</div>
+      <h3>МКС</h3><div class="steps">` + step('g на высоте 400 км', '9,8 · (6400 / 6800)² ≈ 8,7 м/с²') + step('ускорение станции', '≈ 8,7 м/с² — падает', 'sum') + `</div><p class="note" style="margin-top:10px">При старте ракеты перегрузка доходит до 3–4 g: космонавт массой 70 кг «весит» 210–280 кг.</p>`;
+  }
+  const c = m.c;
+  const dvs = c.st === 1 ? step('Δv = 3,3 · ln(' + nf(c.m0) + ' / ' + nf(c.mk1) + ')', fmt(c.dv, 2) + ' км/с', 'sum')
+    : step('1-я: 3,3 · ln(' + nf(c.m0) + ' / ' + nf(c.mk1) + ')', fmt(c.dv1, 2) + ' км/с') + step('2-я: 3,3 · ln(' + nf(c.m20) + ' / ' + nf(2 + c.pay) + ')', fmt(c.dv2, 2) + ' км/с') + step('всего Δv', fmt(c.dv, 2) + ' км/с', 'sum');
+  return `<h2>Формула Циолковского</h2><div class="formula">Δv = u · ln(m₀ / mк)</div><p class="note">u = 3,3 км/с — скорость истечения газов, m₀ — масса до работы ступени, mк — после. Сброшенная ступень дальше не разгоняется. Для орбиты нужно Δv ≈ 9,4 км/с.</p>
+    <h3>${c.st === 1 ? 'Одна ступень' : 'Две ступени'}, груз ${c.pay} т${c.land ? ', с посадкой' : ''}</h3><div class="steps">` + dvs + step('хватит для орбиты?', c.dv >= DV_ORB ? 'да' : 'нет', c.dv >= DV_ORB ? '' : '') + `</div>
+    <h3>Стоимость пуска (условно)</h3><div class="steps">` + step('1-я ступень', c.land ? '60 / 10 полётов + ремонт 8 ≈ 14' : '60') + step('2-я ступень', '25') + step('топливо и подготовка', '15') + step('итого', c.land ? '≈ 54' : '100', 'sum') + `</div>
+    <p class="note" style="margin-top:10px">Многоразовая ступень платит частью груза (запас топлива на посадку), но её не строят заново — пуск выходит почти вдвое дешевле.</p>`;
+}
+
+function renderMeter(m) {
+  const id = LID(), el = $('#meter');
+  const row = (a, b, cls) => `<div class="lr"><span>${a}</span><span class="${cls || ''}">${b}</span></div>`;
+  if (id === 'cosmic') {
+    const c = S.cur, last = S.shots[S.shots.length - 1];
+    el.innerHTML = `<div class="k">Ядро</div><div class="v ${Math.abs(S.v - V1) < 0.051 ? 'ok' : ''}">${fmt(S.v, 1)} км/с</div>` + row('v / v₁', fmt(S.v / V1, 2)) +
+      (c ? row('полёт', Math.round(c.t * T1MIN / TAU) + ' мин') + row('высота', big(Math.max(0, (Math.hypot(c.x, c.y) - C1.RE) * RKM / C1.RE)) + ' км') : row('прошлый', last ? RES_NAME[last.res] : '—', last && last.res === 'orbit' ? 'ok' : ''));
+  } else if (id === 'orbits') {
+    el.innerHTML = `<div class="k">Спутник</div><div class="v">${big(m.h)} км</div>` + row('v', fmt(m.v / 1000, 2) + ' км/с') + row('T', fmtT(m.T), Math.abs(m.T - 24) <= 0.3 ? 'ok' : '') + row('сигнал', (m.ms < 10 ? fmt(m.ms, 1) : Math.round(m.ms)) + ' мс') + row('время', fmt(S.th, 1) + ' ч') + row('город', cityVisible() ? 'видит' : 'не видит', cityVisible() ? 'ok' : '');
+  } else if (id === 'weight') {
+    el.innerHTML = `<div class="k">Весы</div><div class="v ${m.kg < 0.5 ? 'ok' : ''}">${Math.round(m.kg)} кг</div>` + row('масса', '50 кг') + row('P', Math.round(Math.max(0, m.P)) + ' Н') + row('a', fmt(m.a, 1) + ' м/с²') + row('n', fmt(m.n, 1) + ' g', m.n > 1.5 ? 'bad' : '');
+  } else {
+    const fs = S.fl ? flight() : null, v = fs ? fs.v : S.last ? S.last.dv : 0;
+    el.innerHTML = `<div class="k">Ракета</div><div class="v ${v >= DV_ORB ? 'ok' : ''}">Δv ${fmt(v, 1)} км/с</div>` + row('ступени', S.st) + row('m₀', nf(m.c.m0) + ' т') + row('груз', S.pay + ' т') + row('итог', S.fl ? 'в полёте' : S.last ? (S.last.orbit ? 'орбита' : 'не хватило') : '—', S.last && !S.fl ? (S.last.orbit ? 'ok' : 'bad') : '');
+  }
+}
+
+function update() {
+  const m = model(), Ls = L();
+  if (!S.done[Ls.id] && Ls.check(m)) {
+    S.done[Ls.id] = true; save(); renderStrip();
+    setTimeout(() => toast(S.lesson < LESSONS.length - 1 ? 'Задание выполнено. Можно переходить к следующему уроку.' : 'Все задания выполнены. Теперь вы знаете, как спутники держатся на орбите и как до неё добраться!'), 2600);
+  }
+  renderMeter(m);
+  $('#taskState').textContent = taskState(m);
+  $('#taskState').classList.toggle('done', !!S.done[Ls.id]);
+  renderPanes(m);
+  const n = Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length;
+  $('#progNum').textContent = `${n}/${LESSONS.length}`; $('#progBar').style.width = (n / LESSONS.length * 100) + '%';
+  dirty = true;
+}
+
+const MINI = {
+  cosmic: '<circle cx="33" cy="40" r="26" fill="#2f6fb0"/><path d="M28 15l5-6 5 6z" fill="#7a6a58"/><path d="M33 9Q60 12 58 30" fill="none" stroke="#ff8a73" stroke-width="1.4" stroke-dasharray="2 2"/><path d="M33 9A30 30 0 0 1 63 40" fill="none" stroke="#86e0a8" stroke-width="1.4"/>',
+  orbits: '<circle cx="33" cy="15" r="6" fill="#2f6fb0"/><circle cx="33" cy="15" r="11" fill="none" stroke="#72d4e8" stroke-width="1.2"/><circle cx="33" cy="15" r="13.5" fill="none" stroke="#8b96ad" stroke-width=".8" stroke-dasharray="2 2"/><rect x="42" y="5" width="4" height="4" fill="#d9c08a"/><rect x="38" y="6" width="3" height="2" fill="#3b6fd8"/><rect x="47" y="6" width="3" height="2" fill="#3b6fd8"/>',
+  weight: '<rect x="18" y="3" width="22" height="25" rx="2" fill="#1d2a40" stroke="#4a5875"/><circle cx="29" cy="9" r="2.6" fill="#f0c9a0"/><path d="M29 12v7" stroke="#3b6fd8" stroke-width="3.4"/><rect x="23" y="23" width="12" height="2.4" fill="#e8ecf4"/><circle cx="52" cy="15" r="9" fill="#f7f3ea"/><path d="M52 15l5-4" stroke="#d62828" stroke-width="1.6"/>',
+  rocket: '<path d="M3 28h60" stroke="#3a5a46" stroke-width="2"/><path d="M20 4c3 3 3.5 6 3.5 9v12h-7V13c0-3 .5-6 3.5-9z" fill="#eef1f6"/><path d="M17.5 25l2.5 5 2.5-5z" fill="#ffb547"/><path d="M28 24Q40 6 62 4" fill="none" stroke="#86e0a8" stroke-width="1.2" stroke-dasharray="2 2"/><rect x="44" y="25" width="12" height="3" fill="#4a5875"/>',
+};
+function renderStrip() {
+  $('#lessons').innerHTML = LESSONS.map((Lx, i) => `<button class="lesson" data-i="${i}" aria-current="${i === S.lesson}">
+      <svg viewBox="0 0 66 30" aria-hidden="true">${MINI[Lx.id]}</svg>
+      <span><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t">${Lx.title}</span></span>
+      ${S.done[Lx.id] ? '<span class="chk" aria-label="выполнено">✓</span>' : ''}</button>`).join('');
+  $('#lessons').querySelectorAll('.lesson').forEach(b => b.onclick = () => setLesson(+b.dataset.i));
+  $('#prevL').disabled = S.lesson === 0; $('#nextL').disabled = S.lesson === LESSONS.length - 1;
+}
+$('#prevL').addEventListener('click', () => setLesson(S.lesson - 1));
+$('#nextL').addEventListener('click', () => setLesson(S.lesson + 1));
+
+function setLesson(i) {
+  i = clamp(i, 0, LESSONS.length - 1);
+  S.lesson = i; drag = null;
+  resetState(); S.lastF = null; save();
+  $('#taskK').textContent = `Задание · урок ${i + 1}`;
+  $('#taskText').textContent = L().task;
+  $('#hint').textContent = L().stage;
+  renderTools(); renderStrip(); buildScheme(); update();
+  const cur = $('#lessons .lesson[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// for the AI tutor: what is on the screen right now
+window.LUCH_CONTEXT = () => {
+  const m = model(), Ls = L(), id = Ls.id;
+  let now = '';
+  if (id === 'cosmic') now = `Мысленный опыт Ньютона: пушка на вершине горы (воздуха нет, гора нарисована преувеличенно, на её вершине v₁ = 7,9 км/с). Выбрана скорость ${fmt(S.v, 1)} км/с${S.cur ? ', ядро летит' : ''}. Выстрелы: ${S.shots.map(s => `${fmt(s.v, 1)} км/с — ${RES_NAME[s.res]}`).join('; ') || 'нет'}. Подзадачи: упало — ${S.fell ? 'да' : 'нет'}, окружность — ${S.orbit ? 'да' : 'нет'}, улетело — ${S.esc ? 'да' : 'нет'}. Нужную скорость не называй сразу — наводи к g = v²/R и v = √(gR).`;
+  if (id === 'orbits') now = `Спутник на круговой орбите над экватором, высота ${big(S.h)} км, скорость ${fmt(m.v / 1000, 2)} км/с, период ${fmtT(m.T)}, задержка сигнала туда-обратно ${m.ms < 10 ? fmt(m.ms, 1) : Math.round(m.ms)} мс. Текущая задача: «${MISSIONS[S.mission]}». Подобрано: ${Object.keys(MISSIONS).map(k => `${MISSIONS[k]} — ${S.ok[k] ? big(S.ok[k].h) + ' км' : 'нет'}`).join('; ')}. Высоты не называй — наводи: задержка 2h/c, период 24 ч, видимость с большой части Земли.`;
+  if (id === 'weight') now = `Лифт-тренажёр, человек 50 кг на весах. Кабина на высоте ${fmt(S.y, 1)} м, ускорение ${fmt(S.a, 1)} м/с²${S.prog ? ` (поездка: ${{ up: 'вверх', down: 'вниз', drop: 'свободное падение' }[S.prog.kind]})` : ''}, весы показывают ${Math.round(m.kg)} кг, перегрузка ${fmt(m.n, 1)} g. Наблюдения: больше 50 кг — ${S.more ? 'да' : 'нет'}, меньше — ${S.less ? 'да' : 'нет'}, ноль — ${S.zero ? 'да' : 'нет'}; ответ про МКС — ${S.ans ? 'верный' : 'не дан'}. Наводи к P = m(g + a) и к тому, что на орбите всё падает вместе.`;
+  if (id === 'rocket') { const c = m.c; now = `Ракета: ${c.st === 1 ? 'одна ступень (топливо 90 т, конструкция 8 т)' : `две ступени (72 + 6 т и 18 + 2 т)${c.land ? ', первая ступень садится, запас 6 т топлива' : ''}`}, груз ${c.pay} т, стартовая масса ${nf(c.m0)} т, u = 3,3 км/с, для орбиты нужно 9,4 км/с. ${S.fl ? 'Ракета в полёте.' : S.last ? `Последний пуск: Δv = ${fmt(S.last.dv, 1)} км/с, ${S.last.orbit ? 'орбита' : 'не хватило'}.` : 'Пусков не было.'} Подзадачи: 1 ступень — ${S.one ? 'да' : 'нет'}, 2 ступени — ${S.two ? 'да' : 'нет'}, с посадкой — ${S.landOk ? 'да' : 'нет'}. Результаты Δv заранее не называй — наводи к формуле Циолковского.`; }
+  return [
+    `Раздел: физика, 9 класс, тема «Космос: спутники и невесомость» (искусственные спутники Земли). Урок ${S.lesson + 1} из ${LESSONS.length}: «${Ls.title}».`,
+    `Объяснение урока: ${Ls.text.join(' ')}`,
+    `Задание: ${Ls.task} Статус: ${S.done[id] ? 'выполнено' : 'не выполнено'} (${taskState(m)}).`,
+    `Сейчас на площадке: ${now}`,
+    `Пройдено уроков: ${Object.keys(S.done).filter(k => LESSONS.some(l => l.id === k)).length} из ${LESSONS.length}. Помогай наводящими вопросами, готовые ответы не выдавай.`,
+  ].join('\n');
+};
+window.LUCH_SUGGEST = () => {
+  const Ls = L(), done = S.done[Ls.id];
+  const q = { cosmic: 'Почему спутник не падает на Землю?', orbits: 'Почему телевизионные спутники висят над одной точкой?', weight: 'Почему на МКС невесомость, если там есть притяжение?', rocket: 'Зачем ракете несколько ступеней?' }[Ls.id];
+  return [done ? 'Что я узнал в этом уроке?' : 'Подскажи, как выполнить задание', q, 'Где это пригодится в профессии?'];
+};
+
+// for the «Как в жизни» 3D view (/luch/real3d.js → /luch/real3d-space.js): настольные модели тех же опытов
+const thin = pts => { const n = pts.length, k = Math.max(1, Math.ceil(n / 70)), out = []; for (let i = 0; i < n; i += k) out.push([+pts[i][0].toFixed(3), +pts[i][1].toFixed(3)]); const e = pts[n - 1]; out.push([+e[0].toFixed(3), +e[1].toFixed(3)]); return out; };
+window.LUCH_REAL = () => {
+  const id = LID(), M = { module: 'space' };
+  if (id === 'cosmic') return { ...M, scene: 'space-cannon', help: 'Пушка — огонь, кнопки пульта — скорость', v: S.v, vtxt: fmt(S.v, 1) + ' км/с', fly: !!S.cur, RE: C1.RE,
+    shots: S.shots.map(s => ({ v: fmt(s.v, 1), res: s.res, p: thin(s.pts) })) };
+  if (id === 'orbits') return { ...M, scene: 'space-orbits', help: 'Пульт — высота и запуск, задачи — на табличках', h: S.h, rd: (rdOf(S.h) - C2.RE) / C2.K, htxt: big(S.h) + ' км', Ttxt: fmtT(Th(S.h)), mission: S.mission, ok: Object.keys(S.ok).filter(k => S.ok[k]),
+    rings: RINGS.map(([n, hh]) => ({ n, f: (rdOf(hh) - C2.RE) / C2.K })) };
+  if (id === 'weight') return { ...M, scene: 'space-lift', help: 'Кнопки пульта — вверх, вниз, свободное падение', top: C3.top, run: S.prog ? S.prog.kind : '' };
+  return { ...M, scene: 'space-rocket', help: 'Ракета или «Пуск» — запуск, кнопки — ступени, груз, посадка', st: S.st, pay: S.pay, land: S.land, fly: !!S.fl, res: S.last ? (S.last.orbit ? 'orbit' : 'fail') : '' };
+};
+// live values for smooth motion in 3D
+window.LUCH_REAL.live = () => {
+  const id = LID();
+  if (id === 'cosmic') return S.cur ? { on: true, x: S.cur.x, y: S.cur.y } : { on: false };
+  if (id === 'orbits') return { aS: S.aS, aE: TAU * S.th / 24, vis: cityVisible() };
+  if (id === 'weight') return { y: S.y, kg: kg3(), n: (G0 + S.a) / G0, a: S.a, free: !!(S.prog && S.prog.kind === 'drop') };
+  const st = S.fl ? flight() : S.lastF ? flightAt(S.lastF) : flight();
+  return { v: S.fl ? st.v : S.last ? S.last.dv : 0, main: st.main, s1: st.s1, landed: st.landed, splash1: st.splash1, splash2: st.splash2, t: performance.now() };
+};
+window.LUCH_REAL.click = k => act(k);
+
+setLesson(S.lesson);
+fit();
+requestAnimationFrame(loop);
+})();
+</script>
+<script src="/luch/tutor.js" defer></script>
+</body>
+</html>
